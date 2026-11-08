@@ -7,7 +7,8 @@ inclusion: always
 ## Repository `Urinet-ch/dokumentenmanagement`
 ```
 dokumentenmanagement/
-├── CLAUDE.md                Einstieg für Claude Code (bindet die Steering-Dateien ein)
+├── CLAUDE.md                Einstieg für Agenten (bindet die Steering-Dateien ein, Parallelbetrieb)
+├── AGENTS.md                Verweis für GitHub Copilot auf CLAUDE.md (keine eigenen Regeln)
 ├── .kiro/
 │   ├── steering/            product.md, tech.md, structure.md
 │   └── specs/
