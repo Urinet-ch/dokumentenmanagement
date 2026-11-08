@@ -48,7 +48,8 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Prompt und Sicherheitsschwelle nur auf den 30 Belegen zum Abstimmen iterieren; die 20 zurückgehaltenen erst im Gate-Lauf verwenden
   - Bericht getrennt nach Abstimmungs- und Prüfteil: Trefferquote je Feld und gesamt, Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, 0.9), Liste der Fehlschläge; der Bericht liegt im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, ins Repository (`docs/spikes/golden-ergebnis.md`) kommen nur Kennzahlen und Beleg-IDs, keine Inhalte
   - im Repository nur das Schema von `erwartet.json` und `GoldenDatensatzIT` (manuell gestartet, nie in der CI)
-  - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11_
+  - Hostprüfung: `GoldenLauf` und `GoldenDatensatzIT` brechen vor dem ersten Beleg ab, wenn `archiv.ki.basis-url` nicht per `https` auf den Host `api.infomaniak.com` zeigt (exakter Vergleich, ohne Suffix-Treffer); Unit-Test mit `localhost`, `http` und Suffix-Trick (`api.infomaniak.com.example.org`) → Abbruch
+  - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11, 16.22_
   - _Abhängig von: 0.1, 0.3_
 
 - [ ] 0.6 Gate-Review und ADRs [Fabian]
@@ -134,6 +135,17 @@ Arbeitsweise je Aufgabe (Claude Code):
   - **Abbruchkriterium:** Das Archiv braucht mehr als das Budget (Summe `mem_limit` > 700 MiB oder `cpus` > 0.75), ein Container auf der VPS wird wegen Speichermangel beendet, oder die Health einer anderen App fällt während der Messung aus → Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 (4.9) und Wechsel (5.11) vorziehen (16.18)
   - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
   - _Abhängig von: 0.7, 1.9_
+
+- [ ] 1.11 Profil lokal und Prüfung der KI-Basis-URL [Backend]
+  - Quarkus-Profil `lokal` nach design.md («KI», Profil `lokal`, ADR-012): erbt von `dev`, `archiv.ki.basis-url=http://localhost:1234/v1`, Modellname `archiv-lokal`, Dev-Stub von `KiPort` für das Sprachmodell aus (`archiv.ki.stub=false`), Embeddings und Reranker als Stub ohne Vektoren, kein Infomaniak-Token
+  - echten OCR-Adapter im Profil `lokal` einschalten (`%lokal.archiv.ocr.stub=false`, OCRmyPDF als lokales Docker-Image wie in 0.5), damit das Sprachmodell den echten Volltext erhält (7.1); wirksam, sobald der OCR-Adapter aus 2.6 besteht
+  - Startprüfung `KiBasisUrlPruefung` für `archiv.ki.basis-url` und `archiv.ki.reranker-url` (Spike 0.3), für Embeddings mit Spec 02: Host nur `api.infomaniak.com` (HTTPS), in `lokal` zusätzlich `localhost` bzw. `127.0.0.1`, in `test` nur mit dem Port der WireMock-Testressource (nie 1234); bei aktivem Stub entfällt die Prüfung der zugehörigen URL (leer zulässig); `lokal` zusammen mit `prod` bricht ab; die Hostprüfung von `GoldenLauf` und `GoldenDatensatzIT` stammt aus 0.5, der Gate-0-Lauf (0.6) liegt vor dieser Aufgabe
+  - Konfigurationstest als reiner Unit-Test (JUnit, ohne Quarkus-Start und ohne aktives Profil `lokal`; Prüflogik mit Profilnamen und URI als Eingabe, Profilwerte aus `application.properties` per `SmallRyeConfigBuilder` gelesen): fremder Host (z. B. `api.openai.com`), Suffix-Trick (`api.infomaniak.com.example.org`), Benutzerangabe in der URI, `localhost` im Profil `prod`, `localhost:1234` im Profil `test`, fremder Host in `archiv.ki.reranker-url`, `lokal` zusammen mit `prod` → Prüfung bricht ab, die Meldung nennt nur Host und Profil; `api.infomaniak.com` in `prod`, `localhost` in `lokal`, `localhost` mit WireMock-Port in `test` und `dev` mit Stub und leerer Basis-URL → Prüfung gelingt; Profil `lokal`: keine Eigenschaft verweist auf `/run/secrets/infomaniak_ai_token` (fehlende Datei → Prüfung gelingt), Embedding- und Reranker-Port sind Stubs
+  - prüfen und im README festhalten, ob LM Studio das Schema von `MetadatenVorschlag` (inkl. nullable/`anyOf`) mit `strict` durchsetzt
+  - Anleitung in `backend/README.md`, Abschnitt «Lokales Modell (LM Studio)»: CLI mit `npx lmstudio install-cli`; Modell nach ADR-012 als GGUF mit `lms get <name>@<quant> --gguf`, `model_key` mit `lms ls`; Speicherbedarf mit `lms load <model_key> --estimate-only` prüfen, dann `lms load <model_key> --context-length <n> --identifier archiv-lokal` (Kontextlänge so, dass der Prompt aus design.md passt, Wert im README); Server mit `lms server start --port 1234` ohne `--bind` (Standard `127.0.0.1`) und ohne `--cors`; nie `--bind 0.0.0.0`, `LMS_SERVER_HOST` oder «Serve on Local Network», keine Cloud-Modelle und keine Websuche in LM Studio; Start des Archivs mit `mvn quarkus:dev -Dquarkus.profile=lokal`; Hinweise: Ergebnisse gelten nicht als Nachweis (ADR-012, Entscheid 8), der zurückgehaltene Teil des Golden-Datensatzes (0.8) wird nie lokal verwendet, HEIC vor dem Senden wandeln
+  - die CI aktiviert das Profil `lokal` nie (der Konfigurationstest startet Quarkus nicht); KI-Aufrufe in Tests bleiben WireMock
+  - _Anforderungen: 16.20, 16.21, 16.22_
+  - _Abhängig von: 0.5, 1.1, 1.2_
 
 ## Welle 2 — Dokumente, Ablage, Verarbeitung
 
