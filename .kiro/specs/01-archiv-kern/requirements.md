@@ -73,7 +73,7 @@ Belege zuverlässig erkennen und ob Infomaniak alle nötigen Funktionen bietet, 
 in eine Sackgasse investiere.
 
 #### Acceptance Criteria
-1. Das Archiv-Projekt SOLL einen Golden-Datensatz von 50 anonymisierten Belegen (genau 10 Quittungen, 10 Lieferantenrechnungen, 10 eigene Rechnungen/Offerten, 10 Behörden-/Versicherungsbriefe, 10 gemischte Handy-Fotos) mit einer Erwartungsdatei `erwartet.json` verwenden, der ausschliesslich ausserhalb des Repositorys unter `ARCHIV_GOLDEN_DIR` liegt; das Repository SOLL nur das Schema von `erwartet.json` und den Test enthalten. Nachweis: manuell [Fabian].
+1. Das Archiv-Projekt SOLL einen Golden-Datensatz von 50 anonymisierten oder synthetischen (0.10) Belegen (genau 10 Quittungen, 10 Lieferantenrechnungen, 10 eigene Rechnungen/Offerten, 10 Behörden-/Versicherungsbriefe, 10 gemischte Handy-Fotos) mit einer Erwartungsdatei `erwartet.json` verwenden, der ausschliesslich ausserhalb des Repositorys unter `ARCHIV_GOLDEN_DIR` liegt; das Repository SOLL nur das Schema von `erwartet.json` und den Test enthalten. Nachweis: manuell [Fabian].
 2. WENN der Prototyp den Golden-Datensatz verarbeitet, DANN SOLL er pro Beleg Art, Datum, Partner, Betrag und Belegnummer nach den Regeln aus 0.7 mit der Erwartung vergleichen und einen Bericht mit Trefferquote je Feld und gesamt ausgeben, getrennt nach Abstimmungs- und Prüfteil (0.8); der Lauf mit echten Belegen erfolgt nur manuell, nie in der CI.
 3. WENN auf den 20 zurückgehaltenen Belegen (0.8) mindestens 18 in Art, Datum, Partner und Betrag nach den Regeln aus 0.7 korrekt sind und 0.9 erfüllt ist, DANN SOLL der Bericht das Gate «Phase 0 bestanden» ausweisen. Nachweis: manuell [Fabian].
 4. Der Spike-Bericht SOLL für Infomaniak Object Storage (eigenes Public-Cloud-Projekt nur für den Object Storage) festhalten, ob Object Lock pro Objekt (`PutObjectRetention`, Modus GOVERNANCE) und Versionierung funktionieren, ob sich ein Schlüssel ohne Recht `s3:BypassGovernanceRetention` ausstellen lässt und ob der Modus COMPLIANCE verfügbar ist. Nachweis: manuell [Fabian].
@@ -82,6 +82,7 @@ in eine Sackgasse investiere.
 7. WENN ein Vorschlag mit der Erwartung verglichen wird, DANN SOLL der Prototyp je Feld diese Regeln anwenden: Art und Datum exakt gleich, Betrag auf den Rappen gleich, Partner nach Normalisierung (design.md) gleich, Belegnummer exakt gleich nach Entfernen von Leerzeichen; fehlt ein Feld in der Erwartung, gilt es nur als korrekt, wenn auch der Vorschlag leer ist.
 8. Der Golden-Datensatz SOLL fest geteilt sein in 30 Belege zum Abstimmen von Prompt und Schwellen und 20 zurückgehaltene Belege; die 20 zurückgehaltenen SOLLEN nie zum Abstimmen verwendet werden. Nachweis: manuell [Fabian].
 9. FALLS im Prüfteil unter allen Feldern mit Sicherheit ab der Schwelle aus 7.6 (≥, Startwert 0.8) mehr als 1 Fehler steckt, DANN SOLL der Bericht das Gate als nicht bestanden ausweisen, bis die Schwelle so angehoben ist, dass höchstens 1 Fehler verbleibt.
+10. Der Golden-Datensatz DARF aus synthetischen Belegen bestehen, die ein reproduzierbarer Generator ohne echte Personen- oder Firmendaten erzeugt; WENN echte Belege vorliegen, DANN SOLL der Bericht sie zusätzlich als Realitätsprüfung getrennt ausweisen. Nachweis: manuell [Fabian].
 
 ---
 

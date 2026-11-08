@@ -42,7 +42,8 @@ dokumentenmanagement/
 │       └── gemeinsam/       Auth, API-Client (aus OpenAPI generiert), Offline-Warteschlange
 ├── tools/
 │   ├── archiv_client.py     Client für rechnung_gen.py und urinet_pdf.py
-│   └── drive_import/        Java-CLI (Picocli) für den Drive-Altbestand
+│   ├── drive_import/        Java-CLI (Picocli) für den Drive-Altbestand
+│   └── golden_synth/        Python-Generator für synthetische Golden-Belege (Req 0.10); Ausgabe nur ausserhalb des Repos
 ├── wordpress/urinet-archiv-plugin/   (Spec 03)
 ├── deploy/
 │   ├── infomaniak/compose.yml   Produktion: Dienste mit Traefik-Labels, Secrets als Dateien
