@@ -1,0 +1,172 @@
+{
+  "_entwurf": "Werte von Fabian im PR zu bestätigen",
+  "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2).",
+  "_fragen": [
+    "Standard-Vertraulichkeit: NORMAL nur für OFFERTE und PROJEKTDOKUMENT, damit die Rolle mitarbeiter Offerten und Projektdokumente lesen kann – passt das?",
+    "gesetzliche_pflicht = false nur für KORRESPONDENZ und PROJEKTDOKUMENT (P12). Sollen OFFERTE, VERTRAG und VERSICHERUNG wirklich mit WORM gesperrt werden?",
+    "VERTRAG ist PERSONAL wie im Konzept (Arbeitsverträge). Kundenaufträge wären damit für die Rolle mitarbeiter unsichtbar – oder eigene Art für Kundenaufträge?"
+  ],
+  "dokumentarten": [
+    {
+      "code": "AUSGANGSRECHNUNG",
+      "name": "Ausgangsrechnung",
+      "gruppen": ["finanz"],
+      "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "richtung", "betrag", "waehrung", "faelligkeit"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "OFFERTE",
+      "name": "Offerte",
+      "gruppen": ["finanz", "frei"],
+      "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "betrag", "waehrung"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {"angebot_gueltig_bis": {"type": "string", "format": "date"}},
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "LIEFERANTENBELEG",
+      "name": "Lieferantenbeleg",
+      "gruppen": ["finanz"],
+      "pflichtfelder": ["titel", "datum", "partner", "richtung", "betrag", "waehrung"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "QUITTUNG",
+      "name": "Quittung / Spesen",
+      "gruppen": ["finanz"],
+      "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "LOHNABRECHNUNG",
+      "name": "Lohnabrechnung",
+      "gruppen": ["finanz", "frei"],
+      "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung", "zusatz.periode", "zusatz.person"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "periode": {"type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"},
+          "person": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "PERSONAL",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "VERTRAG",
+      "name": "Vertrag",
+      "gruppen": ["vertrag"],
+      "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "PERSONAL",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GUELTIG_BIS",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "VERSICHERUNG",
+      "name": "Versicherung",
+      "gruppen": ["vertrag", "finanz"],
+      "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GUELTIG_BIS",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "BEHOERDE",
+      "name": "Behörde",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "datum", "partner"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "aktenzeichen": {"type": "string"},
+          "frist": {"type": "string", "format": "date"}
+        },
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "BANK",
+      "name": "Bank",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "datum", "partner", "zusatz.periode_von", "zusatz.periode_bis"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "periode_von": {"type": "string", "format": "date"},
+          "periode_bis": {"type": "string", "format": "date"}
+        },
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    },
+    {
+      "code": "PROJEKTDOKUMENT",
+      "name": "Projektdokument",
+      "gruppen": [],
+      "pflichtfelder": ["titel", "projekt"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "aufbewahrung_ab": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true
+    },
+    {
+      "code": "KORRESPONDENZ",
+      "name": "Korrespondenz",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "datum", "partner"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {"bezug_dokument": {"type": "string", "format": "uuid"}},
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": false,
+      "aktiv": true
+    }
+  ]
+}

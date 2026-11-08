@@ -12,6 +12,8 @@ einmal erfasst und ist danach per Suche oder per Frage im Chat auffindbar, immer
 Grundlage: Konzept «UriNet Archiv — Konzept und Anforderungen» vom 08.11.2026
 (https://claude.ai/artifact/6mjnH1zM56T1AphxAQq88h). Die Anforderungs-IDs des Konzepts
 (D1–D8, I1–I6, S1–S2, C1–C3, M1–M4, B1–B4) stehen in jeder Spec in Klammern hinter der Anforderung.
+Das Konzept ist für Claude-Code-Sitzungen nicht erreichbar: Massgeblich sind die Steering-Dateien
+und die freigegebenen Specs unter `.kiro/specs/` (Kiro-Format, umgesetzt mit Claude Code, siehe `CLAUDE.md`).
 
 ## Leitsatz
 Jedes Dokument einmal erfassen, mit Metadaten versehen, unveränderbar ablegen – und es danach
@@ -20,10 +22,17 @@ in Sekunden wiederfinden.
 ## Benutzer und Rollen
 | Rolle | Wer | Darf |
 | --- | --- | --- |
-| `inhaber` | Fabian Aschwanden | alles im eigenen Mandanten |
-| `mitarbeiter` | Joel Aschwanden | erfassen, Projekt- und eigene Dokumente lesen; keine Dokumente mit Vertraulichkeit `personal` ausser den eigenen |
-| `treuhaender` | externer Treuhänder | nur lesen und Jahresexport |
+| `inhaber` | Fabian Aschwanden | alles im eigenen Mandanten; im Mandanten `urinet` als Einziger bestätigen, Vertraulichkeit ändern und verwerfen |
+| `mitarbeiter` | Joel Aschwanden | erfassen; lesen nur `NORMAL` und die eigenen `PERSONAL`-Dokumente; nicht bestätigen, ändern oder verwerfen |
+| `treuhaender` | externer Treuhänder | nur lesen (`NORMAL`, `INTERN`, `PERSONAL` – Lohnabrechnungen für den Abschluss) und Jahresexport |
 | `geschaeftsstelle` | VHF/GSK (Mandant 2) | Dokumente des eigenen Mandanten erfassen und pflegen |
+
+Vertraulichkeit (`NORMAL` | `INTERN` | `PERSONAL`):
+- `NORMAL` – alle Rollen des Mandanten.
+- `INTERN` – `inhaber` und `treuhaender` sowie `geschaeftsstelle` (Mandant 2).
+- `PERSONAL` – `inhaber`, `treuhaender` (nur lesend), `geschaeftsstelle` (Mandant 2) und der Mitarbeiter, den das Dokument betrifft (`person_benutzer`). Ein Dokument ohne bestätigte Art gilt als `PERSONAL` und ist nur für Rollen mit Recht A7 und den Erfasser sichtbar.
+
+Verbindlich ist die Matrix Rolle × Aktion in Requirement 2 von Spec 01; jede Zeile ist ein testbares Kriterium.
 
 ## Mandanten
 - Mandant 1: `urinet` (ab Phase 1).
@@ -38,7 +47,7 @@ in Sekunden wiederfinden.
 ## Phasen und Specs
 | Phase | Spec | Inhalt | Gate |
 | --- | --- | --- | --- |
-| 0 Klären | `01-archiv-kern`, Welle 0 | Spikes, Golden-Datensatz, Test-Export 21.CRM | ≥ 45 von 50 Belegen richtig erkannt |
+| 0 Klären | `01-archiv-kern`, Welle 0 | Spikes, Golden-Datensatz, Test-Export 21.CRM | ≥ 18 von 20 zurückgehaltenen Belegen richtig erkannt (30 zum Abstimmen), höchstens 1 Fehler unter den sicheren Feldern |
 | 1 Archiv-Kern | `01-archiv-kern`, Wellen 1–5 | Erfassung, OCR, KI-Vorschläge, Eingangskorb, Suche, GeBüV-Ablage, CRM-CSV-Import | Belege 2026 im Archiv, Prüflauf ohne Abweichung |
 | 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport, AbaNinja (nur mit Abo Basic) | 7 Beispielfragen richtig und mit Quelle |
 | 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, öffentliche Schnittstelle, WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |

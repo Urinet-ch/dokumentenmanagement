@@ -3,7 +3,9 @@
 ## Overview
 Kein neuer Dienst: der bestehende Archiv-Dienst erhält einen Mandanten `vhf-gsk`, eine
 öffentliche Schnittstelle `/public/v1` und ein WordPress-Plugin. Besucher sprechen nie direkt
-mit dem Archiv; das Plugin ruft es serverseitig mit dem Site-Key auf.
+mit dem Archiv; das Plugin ruft es serverseitig mit dem Site-Key auf. Neue Teile folgen der
+hexagonalen Gliederung aus `structure.md` (`integration/wordpress` mit `domain`, `application`,
+`adapter`); Schemaänderungen nur als neue Liquibase-Changesets.
 
 ```mermaid
 sequenceDiagram
@@ -12,7 +14,7 @@ sequenceDiagram
   participant A as Archiv /public/v1
   participant S3 as Object Storage
   B->>WP: Seite «Merkblätter» (angemeldet)
-  WP->>A: GET /public/v1/dokumente?reihe=MERKBLATT<br/>Bearber Site-Key · X-Archiv-Zugriff: mitglieder · X-Archiv-Client: <Hash>
+  WP->>A: GET /public/v1/dokumente?reihe=MERKBLATT<br/>Bearer Site-Key · X-Archiv-Zugriff: mitglieder · X-Archiv-Client: <Hash>
   A-->>WP: Liste (öffentlich + Mitglieder)
   WP-->>B: HTML (Transient-Cache 10 Min.)
   B->>WP: Klick «PDF öffnen»
@@ -25,9 +27,11 @@ sequenceDiagram
 ## Components and Interfaces
 
 ### Mandant und Branding
-- Seed `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` (Bulletin, Merkblatt, Protokoll, Jahresbericht; Gruppe `frei`; `zusatz_schema` mit `reihe`, `ausgabe`, `jahr`, `fachgebiet`, `zugriff`, `veroeffentlicht`; Aufbewahrung unbefristet).
+- Seed `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` (Bulletin, Merkblatt, Protokoll, Jahresbericht; Gruppe `frei`; `zusatz_schema` mit `reihe`, `ausgabe`, `jahr`, `fachgebiet`, `zugriff`, `veroeffentlicht`; Aufbewahrung unbefristet; Standard-Vertraulichkeit und `gesetzliche_pflicht` [offen: je Art VHF/GSK – Entscheid vor Welle 10]). Ohne gesetzliche Pflicht keine Object-Lock-Sperre (Spec 01, 6.12).
+- Provisionierung wie Spec 01 (Changelog `db/mandant`, Bucket im Object-Storage-Projekt des Archivs, App-Schlüssel ohne Bypass-Recht); Schema und Bucket werden in Sicherung, Zweitkopie und Restore-Probe aufgenommen (Requirement 1.5).
 - `mandant.branding` = `{name, logoUrl, primaerfarbe, domain}`; `GET /api/v1/branding?domain=` (öffentlich, nur Darstellung).
-- Keycloak: Client `archiv-vhf-gsk` mit Theme `vhf-gsk`; Benutzer der Geschäftsstelle mit Attribut `mandant=vhf-gsk`, Rolle `geschaeftsstelle`.
+- Domain: [offen: Domain VHF/GSK – Entscheid vor Welle 10]; zusätzlicher Traefik-Router per Labels in `deploy/infomaniak/compose.yml`, Deploy nur über den GitHub-Actions-Workflow.
+- Keycloak (`archiv-auth.apps.urinet.ch`): Client `archiv-vhf-gsk` mit Theme `vhf-gsk`; Benutzer der Geschäftsstelle mit Attribut `mandant=vhf-gsk`, Rolle `geschaeftsstelle` (Rechte nach Rechtematrix Spec 01, 2.6; A11 bis A14 offen, bis dahin 403).
 - KI-Prompt pro Mandant: Dokumentarten-Beschreibung und Fachgebiet-Liste aus dem Seed; Zugriffsstufe nicht Teil des Vorschlags.
 
 ### Öffentliche Schnittstelle (`integration/wordpress`)
@@ -42,7 +46,7 @@ sequenceDiagram
 | GET | `/public/v1/dokumente/{id}/datei` | `{url, gueltigBis}` (5 Min.) |
 | POST | `/public/v1/chat` | `{frage, gespraechId?}` → SSE wie Spec 02, Werkzeuge eingeschränkt |
 
-- Filter in allen Abfragen: `status='ARCHIVIERT' AND zusatz->>'veroeffentlicht'='true' AND (zusatz->>'zugriff'='oeffentlich' OR :mitglied)`.
+- Filter in allen Abfragen: `status='ARCHIVIERT' AND vertraulichkeit='NORMAL' AND zusatz->>'veroeffentlicht'='true' AND (zusatz->>'zugriff'='oeffentlich' OR :mitglied)` (Requirement 3.4, 3.6).
 - `OeffentlicherChatAgent`: eigener `@RegisterAiService` mit `OeffentlicheWerkzeuge` (`dokumente_suchen`, `dokument_zeigen`), Systemprompt mit Verbandsname, Fachgebieten und Hinweis auf Geschäftsstelle; Gesprächsspeicher 6 Nachrichten.
 - Rate-Limit: 20 Fragen/h pro Client-Hash; Token-Budget pro Mandant und Monat aus `mandant_budget(monat, tokens_max, tokens_verbraucht)`.
 
@@ -66,14 +70,14 @@ urinet-archiv-plugin/
 
 ### Mandantenverwaltung
 - `MandantBericht` monatlich (Auftrag `MANDANT_BERICHT`): Speicher (S3-Listing-Summe), Dokumente, `ki_verbrauch` nach Zweck, Chat-Fragen; E-Mail an Betreiber.
-- `MandantVollexport` (Auftrag `MANDANT_EXPORT`): wie Jahresexport, aber alle Jahre, Original + PDF/A, `metadaten.json`, `metadaten.csv`.
-- `MandantAbbau` (Kommando `archiv mandant abbauen <code> --nach-export <exportId>`): deaktivieren → nach 30 Tagen Schema droppen, Keycloak-Client löschen, Objekte ohne Sperre löschen, gesperrte auflisten.
+- `MandantVollexport` (Auftrag `MANDANT_EXPORT`): wie Jahresexport, aber alle Jahre, Original + Arbeitsfassung (falls vorhanden) + PDF/A, `metadaten.json`, `metadaten.csv`.
+- `MandantAbbau` (Kommando `archiv mandant abbauen <code> --nach-export <exportId>`): deaktivieren → nach 30 Tagen Schema droppen, Keycloak-Client löschen, Objekte ohne Sperre löschen (App-Schlüssel ohne Bypass-Recht, gesperrte Objekte bleiben), gesperrte auflisten; der Bericht nennt das Datum, an dem der letzte Sicherungsstand der Zweitkopie mit Daten des Mandanten ausläuft (Requirement 8.5).
 
 ## Data Models (neu)
 ```sql
--- public
+-- public (Liquibase-Changelog db/public)
 mandant_budget(mandant text, monat date, tokens_max int, tokens_verbraucht int, primary key (mandant, monat))
--- m_vhf_gsk (zusätzlich zu Spec 01/02)
+-- m_vhf_gsk (zusätzlich zu Spec 01/02; Liquibase-Changelog db/mandant)
 alte_url(url text pk, dokument_id uuid fk)
 oeffentliche_frage(id bigserial pk, frage text, quellen jsonb, tokens int, zeit timestamptz)  -- 90 Tage
 ```
@@ -83,9 +87,12 @@ oeffentliche_frage(id bigserial pk, frage text, quellen jsonb, tokens int, zeit 
 - Budget erschöpft → HTTP 429 mit `fehlercode=BUDGET`, Plugin zeigt «Der Chatbot ist diesen Monat ausgelastet – die Suche funktioniert weiterhin.»
 
 ## Testing Strategy
+Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x.y>` (tech.md).
+
 | Ebene | Schwerpunkt |
 | --- | --- |
-| Integration Backend | Zugriffsstufen, `veroeffentlicht`, Site-Key eines Mandanten sieht nie den anderen, 404 statt 403, Rate-Limit, Budget |
-| Isolation | `MandantenIsolationIT`: urinet-Benutzer, vhf-gsk-Benutzer, Site-Key, Chat – Matrix aller Wege |
-| Plugin | PHPUnit mit WP-Test-Suite (wp-env), Mock des Archivs; Playwright gegen wp-env: Liste, Suche, Chatbot, Download, Mitglied vs. Gast |
+| Szenarien Backend (Cucumber) | Zugriffsstufen, `veroeffentlicht`, nie `INTERN`/`PERSONAL` öffentlich, Site-Key eines Mandanten sieht nie den anderen, 404 statt 403, Rate-Limit, Budget, Rechte `geschaeftsstelle` nach Rechtematrix |
+| Isolation | `MandantenIsolationIT` (Szenarien `@req-1.4`, `@req-9.1`): urinet-Benutzer, vhf-gsk-Benutzer, Site-Key, Chat – Matrix aller Wege |
+| Sicherung | Restore-Probe stellt Schema und Bucket von `vhf-gsk` mit wieder her (Requirement 1.5) |
+| Plugin | PHPUnit mit WP-Test-Suite (wp-env), Mock des Archivs; Cucumber.js + Playwright gegen wp-env: Liste, Suche, Chatbot, Download, Mitglied vs. Gast |
 | Sicherheit | OWASP API Top 10 Prüfliste, ZAP-Baseline gegen Staging |
