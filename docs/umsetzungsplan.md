@@ -72,7 +72,7 @@ flowchart LR
 | Welle | Inhalt | Aufgaben | Parallel (Rollen) | Aufwand |
 | --- | --- | --- | --- | --- |
 | 0 | Golden-Datensatz, Spikes S3/AI, Test-Export 21.CRM, Prototyp, Stufe A vorbereiten (bestehende VPS) | 01: 0.1–0.7 | Fabian ∥ Backend ∥ Infra | 3 T |
-| 1 | Gerüst, CI, Dev-Umgebung, Mandanten, Rollen, API-Tokens, Stammdaten Dokumentarten, Leitplanken, Deploy-Workflow, Stufe A einrichten und Speicherbudget messen | 01: 1.1–1.10 | Infra ∥ Backend ∥ Fabian | 3 T |
+| 1 | Gerüst, CI, Dev-Umgebung, Mandanten, Rollen, API-Tokens, Stammdaten Dokumentarten, Leitplanken, Deploy-Workflow, Stufe A einrichten und Speicherbudget messen, Profil lokal | 01: 1.1–1.11 | Infra ∥ Backend ∥ Fabian | 3 T |
 | 2 | Dokumentarten, Datenmodell, S3, Upload, Aufträge, OCR, Frontend-Gerüst, Mindestversionen Handys | 01: 2.1–2.8 | Backend ∥ Infra ∥ Frontend ∥ Fabian | 4 T |
 | 3 | Kontakte, KI-Vorschlag, Lernen, Bestätigen, Versionen, Eingangskorb, PWA | 01: 3.1–3.7 | Backend ∥ Frontend ∥ Fabian | 4 T |
 | 4 | CSV-Import, Suche, Generator-Client, Drive-Import, Entscheide vor Welle 5 (inkl. K5) | 01: 4.1–4.9 | Backend ∥ Frontend ∥ Fabian | 3 T |
@@ -124,7 +124,8 @@ noch klassisch).
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
-P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS starten»):
+P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS starten»); P19 am 08.11.2026 von Fabian
+**ergänzt** (lokales Modell, eng begrenzt):
 
 | Nr. | Thema | Entscheid | Noch offen |
 | --- | --- | --- | --- |
@@ -146,6 +147,7 @@ P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS star
 | P16 | Tests | BDD nach Blueprint: Cucumber-Features mit Tag `@req-x.y`, JUnit für Unit-Tests | – |
 | P17 | Notfallzugang | versiegelte Notfallunterlagen ausserhalb des Systems (neues Kriterium in Req 16); Notfallablauf für den Treuhänder in der Verfahrensbeschreibung; bis Welle 5 | – |
 | P18 | AVV KI | Spike AI Services hält Speicherung und Training fest; AVV unter `docs/vertrag/` | – |
+| P19 | Lokales Modell (08.11.2026) | **neu 08.11.2026:** Profil `lokal` (ADR-012): Sprachmodell in LM Studio nur auf dem Entwicklerrechner, nur an `localhost`; erlaubt für Entwicklung, Prompt-Vorarbeit und echte Belege, die den Rechner nicht verlassen; nicht für Gate 0, Golden-Lauf, Abnahmen, CI, Stufe A/B und Produktion; Startprüfung der KI-Basis-URL (Req 16.20–16.22, Aufgaben 0.5 und 1.11); Startmodell Mistral Small 3.2 24B, weil Mistral Small 4 nicht belegt in 64 GB läuft; Embeddings und Reranker lokal als Stub; Ergebnisse kein Nachweis für Infomaniak | Durchsetzung von `strict` in LM Studio (nicht dokumentiert, in 1.11 prüfen und im README festhalten); Schema-Features (`anyOf`, #103) |
 
 Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.3, Req 0.5), K2 Zeitbudget, K3 Treuhänder
 (Aufgabe 5.7), K4 21.CRM-Export (Aufgabe 0.4), K5 Servergrösse und -kosten (vor Welle 5, siehe P1).

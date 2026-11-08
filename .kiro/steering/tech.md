@@ -29,6 +29,7 @@ inclusion: always
 5. **KI rechnet nicht.** Summen, Zählungen und Fristen kommen aus SQL. Das Sprachmodell wählt nur Werkzeuge und formuliert. Kein freies Text-zu-SQL.
 6. **Daten bleiben in der Schweiz.** Speicher, Datenbank und KI nur bei Infomaniak; die Zweitkopie der Sicherung und der Zeitstempel bei Schweizer Anbietern. Alle KI-Aufrufe (Sprachmodell, Embeddings, Reranker) gehen an das bestehende Konto bei Infomaniak AI Services (Modellliste geprüft 07.11.2026); keine Aufrufe an andere KI-Anbieter, auch nicht als Rückfall oder in Tests gegen echte Modelle. Die Regel gilt auch für echte Daten in Tests (z. B. Golden-Datensatz); CI-Logs und Benachrichtigungen enthalten nur IDs, keine Inhalte. Synthetische Testdaten dürfen in der CI verarbeitet werden.
    **Ausdrückliche Ausnahme Sicherung:** Die Sicherung läuft über GitHub Actions, also über Runner ausserhalb der Schweiz. Zulässig nur, weil der Server die Daten vorher asymmetrisch verschlüsselt (er hält nur den öffentlichen Schlüssel) und der Runner ausschliesslich verschlüsselte Daten sieht.
+   **Ausdrückliche Ausnahme lokales Modell (ADR-012):** Im Quarkus-Profil `lokal` speichert und verarbeitet das Archiv Daten auf dem Entwicklerrechner (Dev Services, Ablage, OCR, Sprachmodell über LM Studio, nur an `127.0.0.1` gebunden), für Entwicklung und Prompt-Vorarbeit, auch mit echten Belegen, die den Rechner nicht verlassen. Nie für Gate 0, Golden-Lauf, Abnahmen, CI, Stufe A, Stufe B oder Produktion; zeigt `archiv.ki.basis-url` weder per HTTPS auf `api.infomaniak.com` noch – nur in den Profilen `lokal` und `test` – auf `localhost`/`127.0.0.1`, bricht das Archiv beim Start ab (Req 16.21). In `test` ist `localhost` nur für WireMock zulässig, nie für LM Studio. Ergebnisse des lokalen Modells gelten nicht als Nachweis für Infomaniak.
 7. **Keine Geheimnisse im Code und nicht in Umgebungsvariablen.** Secrets liegen nur als Dateien unter `/run/secrets/`, Quelle sind die GitHub-Secrets des Repos. Nie als `environment` oder `env_file` in Compose, weil Umgebungsvariablen über die Docker-API (z. B. die Log-Ansicht) lesbar sind. AbaNinja-Tokens in der DB nur verschlüsselt (AES-GCM, Schlüssel aus der Secret-Datei `archiv_data_key`). Manifest- und Datenschlüssel (`archiv_data_key`) liegen zusätzlich im Passwort-Manager; der öffentliche Manifest-Schlüssel liegt unter `docs/`. Lokale Clients (Generator-Client, Drive-Import) lesen ihr API-Token aus einer Datei mit Rechten 600 (`~/.config/urinet-archiv/token` oder Pfad aus `ARCHIV_TOKEN_DATEI`), nie das Token selbst aus einer Umgebungsvariable.
 8. **Das Archiv markiert nie etwas als bezahlt.** Zahlstatus wird nur aus AbaNinja gelesen.
 9. **Beträge als `NUMERIC(12,2)` / `BigDecimal`**, nie `double`. Währung immer mitspeichern (Standard `CHF`).
@@ -41,6 +42,7 @@ inclusion: always
 - Modelle per Konfiguration: `archiv.ki.chat-modell=mistralai/Mistral-Small-4-119B-2603` (Alternative `Apertus-v1.5-70B`, solange BETA nur zum Testen), `archiv.ki.embedding-modell` = BGE Multilingual Gemma2 (Test: Qwen3-Embedding-8B), `archiv.ki.reranker-modell=BAAI/bge-reranker-v2-m3` (Reserve `Qwen3-Reranker-0.6B`). Exakte Modellnamen aus der Modellliste im Konto übernehmen.
 - Der Spike AI Services hält fest, ob Infomaniak Eingaben speichert oder zum Training nutzt; der AVV wird unter `docs/vertrag/` referenziert.
 - Kosten pro Aufruf über `ki_verbrauch` nachvollziehen; Richtwert ca. CHF 1.50 pro 1'000 Chat-Fragen mit Mistral.
+- Profil `lokal` (ADR-012, nur Entwicklerrechner): `%lokal.archiv.ki.basis-url=http://localhost:1234/v1` (LM Studio), Modellname aus `lms load … --identifier`, echter OCR-Adapter, Embeddings und Reranker als Stub; Startprüfung für `archiv.ki.basis-url` und `archiv.ki.reranker-url`: nur HTTPS auf `api.infomaniak.com`, in `lokal` zusätzlich `localhost` bzw. `127.0.0.1`, in `test` nur mit dem Port der WireMock-Testressource.
 
 ## Plattform und Betrieb (nicht verhandelbar)
 Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was hier fehlt, wird nachgefragt, nicht geraten.
@@ -64,7 +66,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 - REST unter `/api/v1`, JSON, OpenAPI über `quarkus-smallrye-openapi`; Fehler als RFC 9457 Problem Details.
 - Optimistisches Locking über `version` und `If-Match`/`ETag` bei `PATCH`.
 - Lange Arbeiten (OCR, KI, Archivierung, Import, Manifest) laufen als Auftrag in der Tabelle `public.auftrag`, abgeholt mit `SELECT … FOR UPDATE SKIP LOCKED`. Kein Message-Broker.
-- Konfiguration in `application.properties` mit Profilen `dev`, `test`, `prod`; Infomaniak-Endpunkte und Modellnamen konfigurierbar.
+- Konfiguration in `application.properties` mit Profilen `dev`, `test`, `prod`, dazu `lokal` (nur Entwicklerrechner, ADR-012); Infomaniak-Endpunkte und Modellnamen konfigurierbar.
 - Logging strukturiert (JSON in `prod`), nie Dokumentinhalte, Beträge oder Personendaten loggen – nur IDs.
 
 ## Konventionen Frontend

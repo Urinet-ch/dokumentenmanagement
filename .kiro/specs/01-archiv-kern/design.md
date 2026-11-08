@@ -10,7 +10,7 @@ Object Storage (eigenes Public-Cloud-Projekt). Die PWA dient für Erfassung, Ein
 Import und Verwaltung.
 
 Nummern: «Req x.y» verweist auf `requirements.md`, «A1–A14» auf die Rechtematrix (Req 2.6),
-«P1–P18» auf die Prüfentscheide in `docs/umsetzungsplan.md`, «Konzept-Entscheid E1–E5» auf das Konzept.
+«P1–P19» auf die Prüfentscheide in `docs/umsetzungsplan.md`, «Konzept-Entscheid E1–E5» auf das Konzept.
 
 Leitentscheide (ADRs in `docs/adr/`):
 - ADR-001 Eigenbau statt Paperless-ngx (Konzept Variante B, Konzept-Entscheid E2).
@@ -24,6 +24,7 @@ Leitentscheide (ADRs in `docs/adr/`):
 - ADR-009 Rollen eng nach Rechtematrix (P3, Req 2.6). Unsichtbare Dokumente antworten mit 404 vor 403, damit die Antwort nicht verrät, dass ein Dokument existiert.
 - ADR-010 Plattform (P1, geändert 08.11.2026): Infomaniak-VPS mit Traefik, Deploy nur über GitHub Actions (SSH-Bundle, Health-Prüfung, Rollback), in zwei Stufen: Stufe A auf der bestehenden VPS (nur Test- und anonymisierte Daten, Speicherbudget, ohne Leistungsziele), Stufe B auf einer eigenen, grösseren VPS spätestens vor echten Belegen (Req 16.15–16.19). Keycloak bleibt (P5).
 - ADR-011 Hexagonale Struktur je Fachbereich (`domain`, `application`, `adapter`) mit Driven Ports und Dev-Stubs für Ablage, KI, OCR und Integration, durch ArchUnit erzwungen (Req 16.13).
+- ADR-012 Lokales Sprachmodell über LM Studio nur im Profil `lokal` auf dem Entwicklerrechner, nur an `localhost`; nie für Gate 0, Golden-Lauf, Abnahmen, CI oder Betrieb; Startprüfung der KI-Basis-URL (P19, Req 16.20–16.22).
 
 ## Architecture
 
@@ -304,6 +305,63 @@ Feld für Feld mit dem Seed (Felder mit `_` am Anfang ausgenommen). [offen: Wert
 **Normalisierung** (`gemeinsam`, gilt für Gate-Vergleich Req 0.7, Partner-Abgleich und CSV-Import):
 - Name: Unicode NFKC, Kleinschreibung, `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`, übrige Akzente entfernt (`é→e`), `&` → `und`, Satzzeichen → Leerzeichen, Rechtsformen als ganzes Wort entfernt (`ag`, `gmbh`, `sa`, `sarl`, `sagl`, `kg`, `klg`, `verein`, `genossenschaft`, `stiftung`, `ltd`, `inc`), Mehrfachleerzeichen zusammengefasst, getrimmt.
 - PLZ nur Ziffern; E-Mail klein und getrimmt; IBAN ohne Leerzeichen, gross.
+
+#### Profil `lokal` (Req 16.20–16.22, ADR-012)
+Nur für den Entwicklerrechner: Das Sprachmodell läuft in LM Studio (OpenAI-kompatibel). Der Adapter
+hinter `KiPort` bleibt derselbe wie für Infomaniak, es wechseln nur Basis-URL und Modellname.
+Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req 16.7).
+
+```properties
+# erbt von dev: Dev Services, Stubs für Ablage und Integration
+%lokal.quarkus.config.profile.parent=dev
+# Dev-Stub von KiPort für das Sprachmodell aus (Schalter per Konfiguration, nicht per Build-Profil)
+%dev.archiv.ki.stub=true
+%lokal.archiv.ki.stub=false
+# echter OCR-Adapter (OCRmyPDF als lokales Docker-Image wie in Aufgabe 0.5), damit das
+# Sprachmodell den echten Volltext erhält (Req 7.1)
+%dev.archiv.ocr.stub=true
+%lokal.archiv.ocr.stub=false
+# LM Studio, Port beim Start ausdrücklich gesetzt (lms server start --port 1234)
+%lokal.archiv.ki.basis-url=http://localhost:1234/v1
+# Name aus lms load <model_key> --identifier archiv-lokal
+%lokal.archiv.ki.chat-modell=archiv-lokal
+```
+
+- Start: `mvn quarkus:dev -Dquarkus.profile=lokal`. Kein Infomaniak-Token, keine Produkt-ID.
+  Ist in LM Studio die Authentifizierung eingeschaltet, liegt deren Token nur als Datei vor (Regel 7).
+- Embeddings und Reranker: Stub ohne Vektoren (Spec 02). Vektoren aus einem anderen Modell kommen nie
+  in eine Datenbank, die mit Infomaniak-Vektoren arbeitet.
+- Modell: Startwert Mistral Small 3.2 24B Instruct (GGUF, Katalog `mistralai/mistral-small-3.2`),
+  Alternative Ministral 3 14B Instruct (`mistralai/ministral-3-14b`). GGUF statt MLX und kein
+  Reasoning-Modell, weil dort `json_schema` teils ignoriert wird oder das JSON in
+  `reasoning_content` landet (ADR-012).
+- Antwortformat wie bei Infomaniak (`json_schema`, `json_object` lehnt LM Studio ab). Wie streng
+  LM Studio `strict` durchsetzt (auch für nullable/`anyOf` im Schema von `MetadatenVorschlag`), ist
+  nicht dokumentiert; Aufgabe 1.11 hält es im README fest, die Validierung nach Req 7.3 gilt unverändert.
+- Bilder: Laut Doku des Python-SDK unterstützt der Server JPEG, PNG und WebP; für die OpenAI-API nicht
+  dokumentiert. PNG oder JPEG senden (WebP-Data-URI-Fehler #1752); HEIC vorher wandeln (Verarbeitung).
+
+**Startprüfung `KiBasisUrlPruefung`** (Adapter `ki`, `@Observes StartupEvent`, vor dem ersten KI-Aufruf):
+- `archiv.ki.basis-url` und `archiv.ki.reranker-url` (Spike 0.3) als URI lesen; für Embeddings gilt
+  die Prüfung, sobald Spec 02 eigene Schlüssel einführt. Zulässig sind:
+
+| Profil | Schema | Host |
+| --- | --- | --- |
+| alle | `https` | `api.infomaniak.com` (Pfad aus der Kontoübersicht, nicht geprüft) |
+| `lokal` | `http` | `localhost`, `127.0.0.1` (Port frei) |
+| `test` (WireMock) | `http` | `localhost`, `127.0.0.1`, nur mit dem Port, den die WireMock-Testressource beim Start setzt; Port 1234 (LM Studio) immer abgelehnt |
+
+- Ist der zugehörige Stub aktiv (`archiv.ki.stub=true`, z. B. in `dev`; Reranker in `lokal`), entfällt
+  die Prüfung dieser URL; eine leere URL ist dann zulässig.
+- Hosts werden klein geschrieben und exakt verglichen, ohne Suffix-Treffer
+  (`api.infomaniak.com.example.org` ist abgelehnt); URIs mit Benutzerangabe (`user@host`) sind abgelehnt.
+- Alles andere bricht den Start ab (Req 16.21); die Meldung nennt nur den abgelehnten Host und das
+  aktive Profil.
+- `lokal` zusammen mit `prod` bricht den Start ab (Req 16.22).
+- Die Prüflogik ist eine reine Funktion (Profilnamen und URI als Eingabe) und wird als Unit-Test ohne
+  aktives Quarkus-Profil `lokal` geprüft; die CI aktiviert `lokal` nie.
+- `GoldenLauf` und `GoldenDatensatzIT` laufen nur per HTTPS gegen `api.infomaniak.com`, sonst Abbruch
+  vor dem ersten Beleg (Req 16.22, umgesetzt in Aufgabe 0.5).
 
 ### Kontakt und Importe (`kontakt`, `importe`)
 CSV-Import-Ablauf:
