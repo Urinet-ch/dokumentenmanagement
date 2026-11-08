@@ -3,7 +3,8 @@
 ## Overview
 Ein Quarkus-Dienst (Java 25) in zwei Laufarten: **API** (REST für Web-App, Handy-App, Generatoren
 und Drive-Import; liefert die Angular-PWA über Quinoa im selben Artefakt aus) und **Worker**
-(Verarbeitung aus der Auftragsschlange). Er läuft auf einer eigenen Infomaniak-VPS hinter Traefik.
+(Verarbeitung aus der Auftragsschlange). Er läuft hinter Traefik, zuerst auf der bestehenden Infomaniak-VPS
+(Stufe A, nur Testdaten), ab dem Wechsel vor der Übernahme in Welle 5 auf einer eigenen Infomaniak-VPS (Stufe B).
 Daten liegen pro Mandant in einem eigenen PostgreSQL-Schema und einem eigenen Bucket im Infomaniak
 Object Storage (eigenes Public-Cloud-Projekt). Die PWA dient für Erfassung, Eingangskorb, Suche,
 Import und Verwaltung.
@@ -21,7 +22,7 @@ Leitentscheide (ADRs in `docs/adr/`):
 - ADR-007 Unveränderbarkeit (P2): GOVERNANCE statt COMPLIANCE, damit Fehlarchivierungen und Löschbegehren nach revDSG lösbar bleiben. Dafür erhält die Anwendung nur einen App-Schlüssel ohne `s3:BypassGovernanceRetention`, der einzige Bypass-Schlüssel liegt offline beim Inhaber, und jedes Manifest trägt einen RFC-3161-Zeitstempel eines Schweizer Anbieters (Pflicht). Rückfall nach dem Spike Object Storage (Aufgabe 0.2, Req 0.4): COMPLIANCE für `manifest/` (Req 6.11).
 - ADR-008 Sicherung (P4): Zweitkopie von Datenbanken und Bucket bei einem zweiten Schweizer Anbieter über den zentralen Sicherungs-Workflow (GitHub Actions, maintenance-Muster). Der Server verschlüsselt vorher asymmetrisch, der Runner sieht nur Chiffrat (Req 16.7, 16.8).
 - ADR-009 Rollen eng nach Rechtematrix (P3, Req 2.6). Unsichtbare Dokumente antworten mit 404 vor 403, damit die Antwort nicht verrät, dass ein Dokument existiert.
-- ADR-010 Plattform (P1): eigene Infomaniak-VPS mit Traefik, Deploy nur über GitHub Actions (SSH-Bundle, Health-Prüfung, Rollback). Keycloak bleibt (P5).
+- ADR-010 Plattform (P1, geändert 08.11.2026): Infomaniak-VPS mit Traefik, Deploy nur über GitHub Actions (SSH-Bundle, Health-Prüfung, Rollback), in zwei Stufen: Stufe A auf der bestehenden VPS (nur Test- und anonymisierte Daten, Speicherbudget, ohne Leistungsziele), Stufe B auf einer eigenen, grösseren VPS spätestens vor echten Belegen (Req 16.15–16.19). Keycloak bleibt (P5).
 - ADR-011 Hexagonale Struktur je Fachbereich (`domain`, `application`, `adapter`) mit Driven Ports und Dev-Stubs für Ablage, KI, OCR und Integration, durch ArchUnit erzwungen (Req 16.13).
 
 ## Architecture
@@ -37,7 +38,7 @@ flowchart TB
     DEP["Deploy-Workflow<br/>Images · Bundle · Health-Prüfung"]
     SIC["Sicherungs-Workflow<br/>maintenance-Muster · restic"]
   end
-  subgraph VPS["Eigene Infomaniak-VPS, Schweiz"]
+  subgraph VPS["Infomaniak-VPS, Schweiz<br/>Stufe A bestehend · Stufe B eigene"]
     TR["Traefik<br/>TLS · X-Real-Ip"]
     KC["Keycloak<br/>archiv-auth.apps.urinet.ch"]
     API["Quarkus API + PWA über Quinoa<br/>archiv.apps.urinet.ch"]
@@ -74,14 +75,23 @@ flowchart TB
 API und Worker sind dasselbe Artefakt; `archiv.rolle=api|worker` schaltet REST-Endpunkte bzw.
 den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mit PWA) und
 `archiv-worker` (zusätzlich `ocrmypdf`, `tesseract-ocr-deu`, `img2pdf`, `libheif-examples`,
-`ghostscript`, `poppler-utils`).
+`ghostscript`, `poppler-utils`). In Stufe A laufen beide Rollen in einem Container
+(`archiv.rolle=api,worker`, Image `archiv-worker`, weil es die OCR-Werkzeuge enthält).
 
 ### Betrieb auf der VPS (Req 16.1, 16.4, 16.10, P1)
-- `deploy/infomaniak/compose.yml` mit den Diensten `archiv-api`, `archiv-worker`, `archiv-db` (PostgreSQL 17 mit `pgvector`), `archiv-keycloak` und `archiv-sicherung` (täglicher Export, siehe «Sicherung»). Limits, `cap_drop: ALL`, `no-new-privileges` und numerische uid gemäss Compose-Policy (tech.md); die Fremd-Images werden als `archiv-db:<version>` und `archiv-keycloak:<version>` umgetaggt und im Infra-Repo der VPS eingetragen.
-- Traefik-Labels nur an `archiv-api` und `archiv-keycloak`; Datenbank, Worker und Sicherung hängen nur im internen Netz. Die API ist nur über Traefik erreichbar (kein veröffentlichter Port), deshalb ist `X-Real-Ip` vertrauenswürdig.
+- `deploy/infomaniak/compose.yml` mit den Diensten `archiv-api`, `archiv-worker`, `archiv-db` (PostgreSQL 17 mit `pgvector`), `archiv-keycloak` und `archiv-sicherung` (täglicher Export, siehe «Sicherung»); in Stufe A ohne eigenen Dienst `archiv-worker` (siehe «Stufen»). Limits, `cap_drop: ALL`, `no-new-privileges` und numerische uid gemäss Compose-Policy (tech.md); die Fremd-Images werden als `archiv-db:<version>` und `archiv-keycloak:<version>` umgetaggt und im Infra-Repo der VPS eingetragen.
+- Traefik-Labels nur an `archiv-api` und `archiv-keycloak`; nur diese beiden hängen zusätzlich am Netz «web» von Traefik. Datenbank, Worker und Sicherung hängen nur im eigenen internen Docker-Netz des Archivs. Die API ist nur über Traefik erreichbar (kein veröffentlichter Port), deshalb ist `X-Real-Ip` vertrauenswürdig.
 - Router `archiv.apps.urinet.ch`: alle Pfade ausser `/q/*`, dazu ein eigener Router nur für `/q/health/live` (schlanker Health-Pfad ohne Details). `/q/health/ready` und `/q/metrics` bleiben im internen Netz für das Monitoring der VPS (Anbindung in Welle 5).
 - Router `archiv-auth.apps.urinet.ch`: nur `/realms/` und `/resources/`; die Admin-Konsole ist nicht öffentlich.
 - Deploy nur über `.github/workflows/deploy.yml`: `mvn verify`, Images bauen, Bundle (Images, `compose.yml`, Secret-Dateien aus GitHub-Secrets) per SSH an den Deploy-Befehl der VPS, danach Health-Prüfung über `/q/health/live` und die interne Readiness; schlägt sie fehl, Rollback auf das Vorgänger-Image. Weil Migrationen rückwärtskompatibel sind (Req 16.11), läuft das Vorgänger-Image auf dem neuen Schema.
+
+### Stufen der Plattform (Req 16.1, 16.15–16.19, P1)
+- **Stufe A** (Welle 1 bis zum Wechsel, bestehende VPS, Werte in `tech.md`): dieselbe `compose.yml` und derselbe Deploy-Workflow wie Stufe B; die stufenabhängigen Werte (ein App-Dienst statt zwei, Limits, Speicher-Einstellungen) liegen versioniert unter `deploy/infomaniak/`, nie von Hand auf dem Server.
+  - `archiv-api` mit Image `archiv-worker` und `archiv.rolle=api,worker`; `archiv.worker.parallel=1`; OCRmyPDF seitenweise nacheinander (`--jobs 1`).
+  - Speicherbudget: Summe der `mem_limit` aller Archiv-Dienste ≤ 700 MiB, `cpus` zusammen ≤ 0.75; JVM-Heap, `shared_buffers`/`work_mem` von PostgreSQL und der Heap von Keycloak knapp gesetzt. Die Werte sind Richtwerte und werden in Aufgabe 1.10 gemessen.
+  - Nur Test- und anonymisierte Daten (Req 16.15); Leistungsziele gelten nicht (Req 16.16); Sicherung nur als Funktionstest (Req 16.19).
+- **Stufe B** (eigene VPS, Grösse nach K5): `archiv-api` (`archiv.rolle=api`) und `archiv-worker` (`archiv.rolle=worker`) getrennt, Parallelität und Limits nach K5; hier gelten die Leistungsziele.
+- **Wechsel** (Aufgabe 5.11, Req 16.17, 16.18): neue VPS nach dem Muster einrichten, Deploy-Ziel im Workflow umstellen (Host und Zugang nur als GitHub-Secrets), DNS beider Domains umstellen, Stufe B leer starten (Datenbanken und Realm-Benutzer der Stufe A werden nicht übernommen), Archiv-Dienste auf Stufe A entfernen, Leistungsmessung auf Stufe B.
 
 ### Secrets und Konfiguration (Req 16.9)
 - Alle Secrets liegen als Dateien unter `/run/secrets/` (Compose `secrets:` mit `file:` aus dem Bundle), Quelle sind die GitHub-Secrets des Repos; nie `environment` oder `env_file`. Quarkus liest sie über die File-System-Config-Source (`smallrye.config.source.file.locations=/run/secrets`, Dateiname = Konfigurationsschlüssel). PostgreSQL nutzt `POSTGRES_PASSWORD_FILE`, Keycloak einen Einstiegs-Wrapper, der die Dateien liest.
@@ -248,7 +258,7 @@ Feld für Feld mit dem Seed (Felder mit `_` am Anfang ausgenommen). [offen: Wert
 <!-- seed:dokumentarten:ende -->
 
 ### Verarbeitung (`verarbeitung`)
-- Tabelle `public.auftrag`; `AuftragPoller` (Quarkus Scheduler, alle 2 s) holt `LIMIT n FOR UPDATE SKIP LOCKED`, Parallelität `archiv.worker.parallel=2`.
+- Tabelle `public.auftrag`; `AuftragPoller` (Quarkus Scheduler, alle 2 s) holt `LIMIT n FOR UPDATE SKIP LOCKED`, Parallelität `archiv.worker.parallel=2` (Stufe A: 1).
 - Auftragstypen Phase 1: `VERARBEITEN`, `KI_VORSCHLAG`, `ARCHIVIEREN`, `CSV_VORSCHAU`, `CSV_UEBERNEHMEN`, `MANIFEST`, `PRUEFLAUF`.
 - `VERARBEITEN`: Typ per Tika-Detektor → HEIC→JPEG (`heif-convert`) → Bilder→PDF (`img2pdf`; bei Handy-Erfassung aus den Arbeitsfassungen, Req 5.10) → `ocrmypdf --output-type pdfa-2 --rotate-pages --deskew -l deu+eng [--skip-text]` → Text via `pdftotext` → Vorschaubilder (`pdftoppm -r 72`) → Swiss QR Code lesen (siehe «KI») → Folgeauftrag `KI_VORSCHLAG`, bei Generator-Dokumenten Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`.
 - Digital signierte PDFs (Req 5.8): OCRmyPDF bricht ohne Freigabe ab; der Worker ruft es dann mit `--invalidate-digital-signatures` auf. Nur die PDF/A-Fassung verliert die Signatur, das Original bleibt unverändert.
@@ -350,7 +360,7 @@ Zuordnungsvorschlag: Spaltenüberschriften gegen Synonymliste (`Firma|Name|Nachn
 - `websearch_to_tsquery('german', :q)`, Rang `ts_rank_cd`, Auszug `ts_headline` (max. 2 Fragmente).
 - Belegnummer (Req 14.7): Entspricht `:q` exakt einer `dokument_finanz.belegnummer`, steht dieses Dokument vor den Volltexttreffern; Filter `belegnummer=` ist exakt.
 - Filter als dynamische Kriterien (Panache/Criteria): Art, Partner, Zeitraum (Belegdatum), Betrag von–bis, Richtung, Tags, Status, Geschäftsjahr, Belegnummer (Req 14.2). Indizes: `dokument(art)`, `(partner_id)`, `(datum)`, `(geschaeftsjahr)`, `(status)`, `gin(tags)`, `dokument_finanz(betrag)`, `(richtung)`, `(belegnummer)`.
-- Jede Abfrage läuft durch `VertraulichkeitFilter` und den Mandanten-Kontext (Req 14.5). Leistungsziel 14.3: [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 1].
+- Jede Abfrage läuft durch `VertraulichkeitFilter` und den Mandanten-Kontext (Req 14.5). Leistungsziel 14.3 nur auf Stufe B (Req 16.16): [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5].
 
 ### Protokoll und Manifest (`protokoll`)
 - `ZugriffProtokollInterceptor` (`@Protokolliert(aktion=…)`) an Resource-Methoden schreibt **synchron in derselben Transaktion** wie die Aktion. Scheitert das Schreiben, wird die Transaktion zurückgerollt und die Aktion nicht ausgeführt (Req 10.8). Bei Downloads wird geschrieben, bevor die vorsignierte URL ausgegeben wird.
@@ -402,6 +412,7 @@ Zuordnungsvorschlag: Spaltenüberschriften gegen Synonymliste (`Firma|Name|Nachn
 - `archiv-sicherung` auf der VPS (täglich, vor dem Abholfenster): `pg_dump` der Archiv- und der Keycloak-Datenbank, Realm-Export, inkrementelle Kopie des Buckets (Originale, Arbeitsfassungen, PDF/A, Manifeste; neue Objekte seit dem letzten Export, mit Liste der Versions-IDs) und Manifest-Schlüssel. Den restic-Schlüssel hält der Server nicht (siehe «Secrets»). Alles wird asymmetrisch an den öffentlichen Sicherungsschlüssel verschlüsselt (z. B. `age`); der Server hält nur den öffentlichen Schlüssel.
 - Der zentrale Sicherungs-Workflow (maintenance-Muster) holt den Export per SSH und schreibt ihn mit restic zur Zweitkopie ([offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]); Aufbewahrung pro App 30 Tages-, 12 Monats- und 10 Jahresstände. `backup-gate.sh` prüft zusätzlich: beide Dumps vorhanden, Bucket-Export vollständig (Anzahl Objekte = Einträge in der Datenbank).
 - Restore-Probe, automatisiert und wiederkehrend ([offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]): Sie stellt in einer getrennten Umgebung in der Schweiz (Compose-Projekt `archiv-probe` auf der VPS, Probe-Bucket im Public-Cloud-Projekt) Datenbanken und Dateien wieder her, meldet einen Testbenutzer an, öffnet ein Dokument und endet mit grünem Prüflauf. Offen ist, wie der private Sicherungsschlüssel zur Probe kommt, ohne dass der Runner Klartext sieht: [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5].
+- Stufe A (Req 16.19): keine echten Daten, deshalb nur die Restore-Probe als Funktionstest, keine Aufbewahrungspflicht. Auch `archiv-probe` zählt zum Speicherbudget; während der Probe ruht der Archiv-Stack der Stufe A.
 - Anleitung `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Req 16.3, Nachweis manuell).
 
 ### Frontend
@@ -593,15 +604,18 @@ synthetisch (Req 16.7).
 | Integration | `@QuarkusTest`, Dev Services PostgreSQL + Keycloak, Testcontainers MinIO (Object Lock, Versionierung), WireMock (AI, TSA) | Mandantentrennung (immer zwei Mandanten), Dubletten-Index mit verworfenen Dokumenten, `belegnummer_eigen` (Generator-Dokument in `FEHLER` verwerfen, korrigiert neu senden → 202, Req 11.11), INSERT-only-Trigger, 404 vor 403, Protokoll in derselben Transaktion, Sperre setzen und verlängern, App-Schlüssel kann nicht löschen, verwaiste Aufträge |
 | Architektur | ArchUnit | Schichten `domain` → nichts, `application` → `domain`, `adapter` → `application`/`domain`; Fachbereiche nur über `application` (structure.md); kein Zugriff auf `public`-Tabellen aus Mandanten-Code ausser `auftrag`; keine `double`-Beträge; kein `System.getenv` für Secrets |
 | Worker | Testcontainer mit Worker-Image | OCR auf 5 synthetischen PDFs/Fotos, signiertes und verschlüsseltes PDF, Arbeitsfassung als Quelle, Zeitgrenze, PDF/A-Validierung mit veraPDF |
-| Leistung | Lastskript gegen eine Umgebung in K5-Grösse | Req 3.2, 5.5 (p95), 14.3 (p95); [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 1] |
+| Leistung | Lastskript gegen Stufe B (K5-Grösse), Lauf in Aufgabe 5.11; in Stufe A nur Funktion (Req 16.16) | Req 3.2, 5.5 (p95), 14.3 (p95); [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5] |
+| Speicherbudget Stufe A | Messung in Aufgabe 1.10 mit synthetischen Belegen | Spitzenverbrauch je Dienst gegen das Budget aus `tech.md`, Health und Speicher der anderen Apps (Req 16.18) |
 | KI-Qualität | `GoldenDatensatzIT`, nur manuell gestartet, Daten aus `ARCHIV_GOLDEN_DIR` ausserhalb des Repos, echter AI-Aufruf | Bericht je Feld, getrennt nach Abstimmungs- (30) und Prüfteil (20); Gate ≥ 18/20 und Req 0.9 (Nachweis manuell) |
 | Frontend | Vitest, Playwright (mobile Viewport 375 px) | Erfassen mit Testbild mit und ohne Kanten, Offline-Warteschlange (Dublette, 4xx, 5xx, offline), Eingangskorb bestätigen in ≤ 2 Tipps |
-| Betrieb | Restore-Probe, automatisiert und wiederkehrend | Datenbanken und Dateien wiederherstellen, Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3) |
+| Betrieb | Restore-Probe, automatisiert und wiederkehrend; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3) |
 
 ## Open Points
 - Object Lock pro Objekt, Schlüssel ohne Bypass-Recht, COMPLIANCE und `x-amz-checksum-sha256` bei Infomaniak (Spike Object Storage, Aufgabe 0.2, Req 0.4). Rückfall ohne Sperre pro Objekt: getrennte Buckets `…-eingang` (ohne Sperre), `…-archiv` (Standard-Aufbewahrung 10 Jahre) und `…-ablage` für Arten ohne `gesetzliche_pflicht`. Rückfall ohne Schlüssel ohne Bypass: Req 6.11.
 - Strukturierte Antworten bei Infomaniak (Spike AI Services, Aufgabe 0.3, Req 0.5) – Rückfall: JSON-Modus + Validierung.
-- [offen: VPS-Grösse K5 – Entscheid vor Welle 1]; danach Messbedingungen für Req 3.2, 5.5, 14.3 und die Zeitgrenzen der Aufträge prüfen.
+- [offen: VPS-Grösse K5 – Entscheid vor Welle 5] (Stufe B; früher, falls 1.10 abbricht oder 16.18 später eintritt); danach Messbedingungen für Req 3.2, 5.5, 14.3 und die Zeitgrenzen der Aufträge prüfen.
+- Speicherbudget der Stufe A (700 MiB, 0.75 CPU) ist ein Richtwert; Messung und Ergebnis in Aufgabe 1.10.
+- Testobjekte der Stufe A im Object Storage: Gesperrte Objekte lassen sich mit dem App-Schlüssel nicht löschen (Req 6.5), und `MandantProvisionierung` legt `urinet-archiv-<code>` an. [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1] (vor Welle 1, weil 1.9/1.10 auf Stufe A den ersten Mandanten samt Bucket anlegen). Vorschlag: In Stufe A eigene Test-Buckets, der produktive Bucket `urinet-archiv-urinet` entsteht erst in Aufgabe 5.4 auf Stufe B.
 - [offen: Werte der 11 Dokumentarten – Entscheid vor Welle 2]; Entwurf im Seed mit Fragen unter `_fragen`.
 - [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5].
 - [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5].

@@ -71,12 +71,12 @@ flowchart LR
 
 | Welle | Inhalt | Aufgaben | Parallel (Rollen) | Aufwand |
 | --- | --- | --- | --- | --- |
-| 0 | Golden-Datensatz, Spikes S3/AI, Test-Export 21.CRM, Prototyp, Entscheid K5 (Servergrösse) | 01: 0.1–0.7 | Fabian ∥ Backend ∥ Infra | 3 T |
-| 1 | Gerüst, CI, Dev-Umgebung, Mandanten, Rollen, API-Tokens, Stammdaten Dokumentarten, Leitplanken, Deploy-Workflow | 01: 1.1–1.9 | Infra ∥ Backend ∥ Fabian | 3 T |
+| 0 | Golden-Datensatz, Spikes S3/AI, Test-Export 21.CRM, Prototyp, Stufe A vorbereiten (bestehende VPS) | 01: 0.1–0.7 | Fabian ∥ Backend ∥ Infra | 3 T |
+| 1 | Gerüst, CI, Dev-Umgebung, Mandanten, Rollen, API-Tokens, Stammdaten Dokumentarten, Leitplanken, Deploy-Workflow, Stufe A einrichten und Speicherbudget messen | 01: 1.1–1.10 | Infra ∥ Backend ∥ Fabian | 3 T |
 | 2 | Dokumentarten, Datenmodell, S3, Upload, Aufträge, OCR, Frontend-Gerüst, Mindestversionen Handys | 01: 2.1–2.8 | Backend ∥ Infra ∥ Frontend ∥ Fabian | 4 T |
 | 3 | Kontakte, KI-Vorschlag, Lernen, Bestätigen, Versionen, Eingangskorb, PWA | 01: 3.1–3.7 | Backend ∥ Frontend ∥ Fabian | 4 T |
-| 4 | CSV-Import, Suche, Generator-Client, Drive-Import, Entscheide vor Welle 5 | 01: 4.1–4.9 | Backend ∥ Frontend ∥ Fabian | 3 T |
-| 5 | Protokoll, Manifest, Prüflauf, Produktion, Sicherung, Überwachung und Monitoring-Anbindung, Verfahrensbeschreibung, Übernahme, Notfallunterlagen | 01: 5.1–5.10 | Backend ∥ Infra ∥ Fabian | 2 T |
+| 4 | CSV-Import, Suche, Generator-Client, Drive-Import, Entscheide vor Welle 5 (inkl. K5) | 01: 4.1–4.9 | Backend ∥ Frontend ∥ Fabian | 3 T |
+| 5 | Wechsel auf Stufe B, Protokoll, Manifest, Prüflauf, Produktion, Sicherung, Überwachung und Monitoring-Anbindung, Verfahrensbeschreibung, Übernahme, Notfallunterlagen | 01: 5.1–5.11 | Backend ∥ Infra ∥ Fabian | 2 T |
 | 6 | E-Mail-Eingang, Embeddings, Hybridsuche, Jahresexport | 02: 6.1–6.5 | Backend ∥ Frontend ∥ Fabian | 3 T |
 | 7 | Werkzeuge, Agent, SSE, Chat-Oberfläche | 02: 7.1–7.4 | Backend ∥ Frontend | 4 T |
 | 8 | AbaNinja (nur E1 = ja) | 02: 8.1–8.6 | Backend ∥ Frontend | 2 T |
@@ -98,6 +98,11 @@ Agenten; ohne Agenten ist mit etwa dem doppelten Aufwand zu rechnen.
 | Mai–Jul 2027 | 2 Abgleich und Chat | 6–9 | 7 Beispielfragen + ≥ 18/20 richtig mit Quelle |
 | ab Etappe 2 VHF/GSK | 3 Zweiter Mandant | 10–12 | VHF/GSK-Archiv online |
 
+Plattform (P1): Wellen 1–4 laufen auf Stufe A (bestehende VPS, nur Testdaten). K5 fällt in Welle 4
+(Aufgabe 4.9, Richtwert März 2027); Bestellung, Einrichtung und Wechsel auf Stufe B (Aufgabe 5.11)
+liegen zu Beginn von Welle 5, vor der Übernahme der Belege 2026; bricht 1.10 ab oder tritt 16.18
+später ein, rücken K5 und der Wechsel nach vorne.
+
 Fixpunkte: Vorstandsentscheid VHF/GSK 19.11.2026 (bestimmt E4 und den Start von Phase 3);
 Jahresabschluss 2026 (Phase 1 sollte vorher die Belege 2026 enthalten, sonst Abschluss 2026
 noch klassisch).
@@ -109,7 +114,7 @@ noch klassisch).
 | Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | [offen] |
 | E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | [offen] |
 | E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | [offen] |
-| K5 Server | vor Welle 1 | Grösse und Kosten der eigenen Infomaniak-VPS (P1) | [offen: VPS-Grösse K5 – Entscheid vor Welle 1] |
+| K5 Server | vor Welle 5 (früher, falls 1.10 abbricht oder 16.18 später eintritt) | Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (P1) | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
 | E5 Papier | vor Welle 5 | Papieroriginale nach Scan vernichten? Verfahrensbeschreibung anpassen | [offen] |
 | Gate 1 | Ende Welle 5 | Belege 2026 im Archiv, Prüflauf ohne Abweichung | [offen] |
 | E1 AbaNinja Basic | vor Welle 8 | Abo Basic (CHF 21/Mt.)? Nein → Welle 8 entfällt | [offen] |
@@ -118,11 +123,12 @@ noch klassisch).
 | Gate 3 | Ende Welle 12 | Archiv online, Geschäftsstelle veröffentlicht selbständig | [offen] |
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
-mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**:
+mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
+P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS starten»):
 
 | Nr. | Thema | Entscheid | Noch offen |
 | --- | --- | --- | --- |
-| P1 | Zielplattform | eigene, grössere Infomaniak-VPS (Traefik, Bundle-Deploy, Compose-Policy) + Public-Cloud-Projekt nur für Object Storage; K5 vor Welle 1; Leistungsziele an die Grösse gebunden | [offen: VPS-Grösse K5 – Entscheid vor Welle 1] |
+| P1 | Zielplattform | **geändert 08.11.2026:** zwei Stufen mit gleichem Muster (Traefik, Bundle-Deploy, Compose-Policy) + Public-Cloud-Projekt nur für Object Storage (unverändert). **Stufe A** ab Welle 1 auf der bestehenden Infomaniak-VPS: nur Test- und anonymisierte Daten, Speicherbudget ≤ 700 MiB / 0.75 CPU (in Welle 1 gemessen, Aufgabe 1.10), API und Worker in einem Container, keine Leistungsziele, Sicherung nur als Funktionstest. **Stufe B** eigene, grössere Infomaniak-VPS: Wechsel (Aufgabe 5.11) spätestens vor echten Belegen (Übernahme/Produktion in Welle 5), früher bei Budgetüberschreitung oder wenn andere Apps der VPS leiden; Leistungsziele und Lasttests erst hier; K5 vor Welle 5. Bisher: eigene VPS ab Welle 1, K5 vor Welle 1 | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
 | P2 | Unveränderbarkeit | Object Lock GOVERNANCE, App-Schlüssel ohne Bypass, Bypass-Schlüssel offline beim Inhaber, RFC-3161-Zeitstempel Pflicht; Spike prüft Schlüssel ohne Bypass und COMPLIANCE, sonst COMPLIANCE mindestens für `manifest/` | [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5] |
 | P3 | Rollen | eng: `mitarbeiter` erfasst, liest `NORMAL` und eigene `PERSONAL`; nur `inhaber` bestätigt, ändert Vertraulichkeit, verwirft; `INTERN` nur `inhaber`/`treuhaender`; `treuhaender` liest `PERSONAL`; gilt für Mandant `urinet`, `geschaeftsstelle` (Mandant 2) nach Matrix; Matrix Rolle × Aktion in Req 2 | – |
 | P4 | Sicherung Belegdateien | Datenbank (inkl. Keycloak, Realm) und Bucket; Zweitkopie bei zweitem Schweizer Anbieter; über GitHub Actions (Muster `maintenance`), Server verschlüsselt vorher asymmetrisch; Ausnahme in Req 16.7; Restore-Probe automatisiert inkl. Dateien und Anmeldung | [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5] |
@@ -142,7 +148,7 @@ mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden
 | P18 | AVV KI | Spike AI Services hält Speicherung und Training fest; AVV unter `docs/vertrag/` | – |
 
 Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.3, Req 0.5), K2 Zeitbudget, K3 Treuhänder
-(Aufgabe 5.7), K4 21.CRM-Export (Aufgabe 0.4), K5 Servergrösse und -kosten (vor Welle 1, siehe P1).
+(Aufgabe 5.7), K4 21.CRM-Export (Aufgabe 0.4), K5 Servergrösse und -kosten (vor Welle 5, siehe P1).
 
 ## 7. Risiken
 
@@ -154,7 +160,9 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Zeitstempel nicht von Anfang an | Speicherzeitpunkt nicht belegbar, nicht nachholbar | TSA-Anbieter vor Welle 5 wählen, kein produktives Archivieren ohne Zeitstempel |
 | Konto- oder Anbieterverlust | Totalverlust nach Papiervernichtung | Zweitkopie bei zweitem Schweizer Anbieter, Restore-Probe inkl. Dateien (P4) |
 | Sicherung über Runner ausserhalb der Schweiz | Verstoss gegen Regel 6 | Server verschlüsselt asymmetrisch, Runner sieht nur verschlüsselte Daten |
-| VPS zu klein | Leistungsziele verfehlt, OCR blockiert API | Grösse nach K5 vor Welle 1, Limits je Dienst, Lasttests in Welle 2 und 4 (2.4, 2.6, 4.5) |
+| VPS zu klein (Stufe B) | Leistungsziele verfehlt, OCR blockiert API | Grösse nach K5 vor Welle 5, Limits je Dienst, Lastskripte aus 2.4, 2.6, 4.5 mit Nachweis auf Stufe B (5.11) |
+| Stufe A reicht nicht oder belastet andere Apps | Archiv oder andere Apps der VPS instabil (Speicher, Health) | Speicherbudget mit Messung und Abbruchkriterium in 1.10, Prüfung nach jedem Deploy (1.9, Req 16.18); bricht 1.10 ab oder tritt 16.18 später ein, Archiv auf Stufe A stoppen, K5 und Wechsel (5.11) vorziehen |
+| Echte Daten auf Stufe A | Belege, Personal- oder Lohndaten auf einer geteilten VPS ohne Reserven | nur Test- und anonymisierte Daten (Req 16.15); Übernahme 5.8 erst nach dem Wechsel 5.11 |
 | Infomaniak ohne strukturierte Antworten / Tool Calling | Extraktor bzw. Chat aufwendiger | JSON-Modus + Validierung; Chat mit Apertus oder späterem Modell, Werkzeugauswahl per Klassifikation |
 | Embedding-Dimension > 4'000 | kein HNSW-Index | anderes Modell (Qwen3-Embedding-8B) oder Dimension reduzieren |
 | Zeitbudget im Nebenerwerb | Verzögerung | Wellen sind einzeln abschliessbar; Phase 2/3 verschiebbar ohne Folgen für Phase 1 |
@@ -164,7 +172,8 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 
 | Posten | Kosten |
 | --- | --- |
-| Eigene Infomaniak-VPS | [offen: CHF __/Mt. – K5, Entscheid vor Welle 1] |
+| Bestehende Infomaniak-VPS (Stufe A, Welle 1 bis zum Wechsel) | keine Zusatzkosten (bestehende VPS) |
+| Eigene Infomaniak-VPS (Stufe B, ab Welle 5) | [offen: CHF __/Mt. – K5, Entscheid vor Welle 5] |
 | Object Storage (Public-Cloud-Projekt) | nach Verbrauch, einige GB pro Jahr |
 | Infomaniak AI Services | ca. CHF 1.50 pro 1'000 Chat-Fragen (Mistral), Erfassung ähnlich pro 1'000 Dokumente |
 | Zweitkopie Sicherung (zweiter Schweizer Anbieter) | [offen: CHF __/Mt. – Anbieter, Entscheid vor Welle 5] |

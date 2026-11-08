@@ -7,7 +7,7 @@ inclusion: always
 ## Stack
 | Bereich | Wahl | Hinweis |
 | --- | --- | --- |
-| Backend | Java 25, Quarkus (aktuelle LTS beim Projektstart), Maven | ein Modul `backend`, zwei Laufarten: `api` und `worker` (Konfig `archiv.rolle`) |
+| Backend | Java 25, Quarkus (aktuelle LTS beim Projektstart), Maven | ein Modul `backend`, zwei Laufarten: `api` und `worker` (Konfig `archiv.rolle`; in Stufe A beide in einem Container: `archiv.rolle=api,worker`) |
 | Persistenz | PostgreSQL 17 mit `pgvector` und `pg_trgm`, Hibernate ORM mit Panache, Liquibase | Mandantentrennung **Schema pro Mandant** (`quarkus.hibernate-orm.multitenant=SCHEMA`); Changelogs `db/public` und `db/mandant`; Hibernate nur `validate` |
 | Dateien | Infomaniak Object Storage (S3) über `quarkus-amazon-s3`, Endpoint-Override, Path-Style | eigenes Infomaniak-Public-Cloud-Projekt nur für den Object Storage; Object Lock GOVERNANCE, Versionierung an (Regel 2) |
 | Zeitstempel | RFC 3161, **Pflicht** für jedes Manifest | Schweizer Anbieter [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5] |
@@ -17,7 +17,7 @@ inclusion: always
 | Anmeldung | Keycloak (OIDC, PKCE, TOTP-2FA), `quarkus-oidc` | bleibt (externer Treuhänder, Mandant 2); Mandant kommt aus dem Token-Claim `mandant` |
 | Frontend | Angular (aktuelle Version), Standalone Components, Signals, Angular Material, PWA (`@angular/pwa`) | über Quinoa im API-Artefakt ausgeliefert; Offline-Warteschlange in IndexedDB |
 | CSV | Apache Commons CSV, ICU4J (Zeichensatz-Erkennung) | |
-| Betrieb | Docker Compose (`deploy/infomaniak/compose.yml`) auf einer eigenen Infomaniak-VPS, Traefik (Labels) | Domains `archiv.apps.urinet.ch`, `archiv-auth.apps.urinet.ch`; Details unter «Plattform und Betrieb» |
+| Betrieb | Docker Compose (`deploy/infomaniak/compose.yml`), Traefik (Labels), in zwei Stufen: Stufe A auf der bestehenden Infomaniak-VPS (nur Testdaten), Stufe B auf einer eigenen Infomaniak-VPS | Domains `archiv.apps.urinet.ch`, `archiv-auth.apps.urinet.ch`; Details unter «Plattform und Betrieb» |
 | Sicherung | `pg_dump` + Bucket-Kopie → restic, Zweitkopie bei einem zweiten Schweizer Anbieter | [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]; Details unter «Plattform und Betrieb» |
 | Tests | Cucumber (Features mit Tag `@req-<x.y>`), JUnit 5 für Unit-Tests, Quarkus Dev Services (PostgreSQL, Keycloak), Testcontainers (MinIO mit Object Lock), WireMock, AssertJ, ArchUnit, REST-assured, Playwright | Backend-Szenarien mit Java-Runner, Browser-Szenarien mit Cucumber.js + Playwright gegen den Prod-Build |
 
@@ -44,12 +44,18 @@ inclusion: always
 
 ## Plattform und Betrieb (nicht verhandelbar)
 Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was hier fehlt, wird nachgefragt, nicht geraten.
-- **Server:** eigene Infomaniak-VPS nur für das Archiv (nicht die bestehende kleine VPS). Grösse [offen: VPS-Grösse K5 – Entscheid vor Welle 1]; Leistungsziele der Requirements gelten für diese Grösse. Object Storage in einem eigenen Infomaniak-Public-Cloud-Projekt.
+- **Server in zwei Stufen (P1, geändert 08.11.2026):** Object Storage in beiden Stufen unverändert in einem eigenen Infomaniak-Public-Cloud-Projekt.
+  - **Stufe A** (ab Welle 1 bis zum Wechsel): bestehende Infomaniak-VPS Lite (1 vCPU, 2 GB RAM ohne Swap, davon gemessen am 08.11.2026 rund 1'140 MB verfügbar; 20 GB Disk, 15 GB frei). Gleiches Muster wie Stufe B: Traefik, Deploy nur per GitHub Actions, `deploy/infomaniak/compose.yml`, Compose-Policy, Domains `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`. Die Leistungsziele der Requirements (z. B. 3.2, 5.5, 14.3) gelten in Stufe A **nicht**, nur die Funktion; Lasttests erst auf Stufe B.
+  - **Stufe B:** eigene, grössere Infomaniak-VPS nur für das Archiv. Grösse [offen: VPS-Grösse K5 – Entscheid vor Welle 5]; die Leistungsziele der Requirements gelten für diese Grösse.
+  - **Wechsel auf Stufe B** (eigene Aufgabe 5.11): spätestens bevor echte Belege ins Archiv kommen (vor Übernahme und Produktion in Welle 5); früher, falls 1.10 abbricht oder 16.18 später eintritt (Budget überschritten, Speicherabbruch auf der VPS oder fehlgeschlagene Health-Prüfung einer anderen App). Der Wechsel umfasst: neue VPS einrichten, Deploy-Ziel umstellen, Testdaten verwerfen, Leistungsmessung.
+- **Datenregel Stufe A:** nur Test- und anonymisierte Daten; keine echten Belege, keine Personal- oder Lohndaten. Grund: Die VPS teilt sich das Netz «web» mit anderen Apps und hat keine Reserven.
+- **Speicherbudget Stufe A** (Richtwert, in Welle 1 zu messen): Summe der `mem_limit` des Archivs höchstens 700 MiB, `cpus` zusammen höchstens 0.75. API und Worker in **einem** Container (`archiv.rolle=api,worker`), Worker-Parallelität 1, OCR seitenweise; PostgreSQL und Keycloak mit knappen Heap- bzw. Speicher-Einstellungen.
+- **Netz:** Datenbank (`archiv-db`), Worker und Sicherung nur im eigenen internen Docker-Netz des Archivs; am Netz «web» von Traefik hängen nur `archiv-api` (API/PWA) und `archiv-keycloak` (öffentlich nur `/realms/` und `/resources/`, Admin-Konsole nicht öffentlich).
 - **Reverse Proxy:** Traefik der VPS mit Let's Encrypt; die Dienste melden sich per Docker-Labels an. Kein eigener Proxy. Für Logs zählt die Client-IP aus `X-Real-Ip` von Traefik.
 - **Deploy nur per GitHub-Actions-Workflow:** Image bauen, Bundle (Image, `deploy/infomaniak/compose.yml`, Secret-Dateien) per SSH an den Deploy-Befehl der VPS, danach Health-Prüfung; schlägt sie fehl, Rollback auf das Vorgänger-Image. Kein manuelles `docker compose up` auf dem Server.
 - **Compose-Policy der VPS:** Speicher- und CPU-Limits, `cap_drop: ALL`, `no-new-privileges`, numerische uid ungleich 0, Volumes nur mit Eintrag für die Sicherung. Fremd-Images (PostgreSQL, Keycloak) werden als `<app>:…` umgetaggt, mit Eintrag im Infra-Repo der VPS.
 - **Erreichbarkeit:** öffentlich nur `archiv.apps.urinet.ch` (API + PWA) und `archiv-auth.apps.urinet.ch` (Keycloak) sowie ein schlanker Health-Pfad. Kennzahlen und Detail-Health nur intern. Die Anbindung an das Monitoring der VPS ist eine Aufgabe in Welle 5.
-- **Sicherung:** täglich PostgreSQL (Archiv und Keycloak inkl. Realm) und der Bucket (Original, Arbeitsfassung, PDF/A, Manifeste). Der Server verschlüsselt asymmetrisch, die zentrale Sicherung über GitHub Actions (Muster `maintenance`, Gate-Skript `backup-gate.sh` und Restore-Probe, erweitert um PostgreSQL und Bucket) holt die Daten ab und schreibt sie mit restic zum zweiten Schweizer Anbieter. Aufbewahrung 30 Tage, 12 Monate, 10 Jahresstände pro App.
+- **Sicherung:** täglich PostgreSQL (Archiv und Keycloak inkl. Realm) und der Bucket (Original, Arbeitsfassung, PDF/A, Manifeste). Der Server verschlüsselt asymmetrisch, die zentrale Sicherung über GitHub Actions (Muster `maintenance`, Gate-Skript `backup-gate.sh` und Restore-Probe, erweitert um PostgreSQL und Bucket) holt die Daten ab und schreibt sie mit restic zum zweiten Schweizer Anbieter. Aufbewahrung 30 Tage, 12 Monate, 10 Jahresstände pro App. In Stufe A (keine echten Daten) nur die Restore-Probe als Funktionstest, keine Aufbewahrungspflicht.
 - **Restore-Probe:** wiederkehrend und automatisiert; umfasst Datenbank und Dateien inklusive Anmeldung und endet mit einem grünen Prüflauf.
 - **Notfallunterlagen:** Keycloak-Admin, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang inkl. Bypass-Schlüssel und öffentlicher Manifest-Schlüssel versiegelt an einem dokumentierten Ort ausserhalb des Systems.
 
