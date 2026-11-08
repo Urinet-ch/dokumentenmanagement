@@ -6,7 +6,8 @@ Infomaniak (Schweiz).
 
 ## Spec-driven Development im Kiro-Stil, umgesetzt mit Claude Code
 Die Specs folgen dem Kiro-Format; umgesetzt wird mit Claude Code, nicht mit dem Werkzeug Kiro.
-- `CLAUDE.md` – Einstieg und Arbeitsweise für Claude Code (bindet die Steering-Dateien ein)
+- `CLAUDE.md` – Einstieg und Arbeitsweise für Claude Code und GitHub Copilot (bindet die Steering-Dateien ein, Parallelbetrieb)
+- `AGENTS.md` – Verweis für GitHub Copilot auf `CLAUDE.md`
 - `.kiro/steering/` – Produkt, Technik, Struktur (in jeder Sitzung aktiv)
 - `.kiro/specs/01-archiv-kern/` – Phase 0 und 1
 - `.kiro/specs/02-abgleich-chat/` – Phase 2
