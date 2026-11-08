@@ -47,14 +47,14 @@ flowchart LR
 
 ### Embeddings und Hybridsuche (`ki`, `suche`)
 - Tabelle `chunk(id bigserial, dokument_id uuid, nr int, text text, embedding halfvec(<dim>))`, HNSW-Index `halfvec_cosine_ops`.
-  Die Dimension kommt aus dem Spike AI Services (Spec 01, Aufgabe 0.3, Req 0.5). BGE Multilingual Gemma2 liefert voraussichtlich 3'584 Dimensionen – über der HNSW-Grenze von 2'000 für `vector`, aber innerhalb der Grenze von 4'000 für `halfvec`; daher `halfvec`.
+  Spike AI Services (Spec 01, Aufgabe 0.3): `bge_multilingual_gemma2` liefert 3'584 Dimensionen – über der HNSW-Grenze von 2'000 für `vector`, aber innerhalb der Grenze von 4'000 für `halfvec`; daher `halfvec(3584)`. Die Vektoren sind nicht normiert, daher Kosinus (`halfvec_cosine_ops`), nicht Skalarprodukt.
 - `Chunker`: Absätze zusammenfassen bis ≈ 3'000 Zeichen, 400 Zeichen Überlappung, Titel + Art + Partner als Kopfzeile jedes Chunks.
 - `EmbeddingService` (LangChain4j `EmbeddingModel`, OpenAI-kompatibel), Batch 16 Chunks, Auftrag `EMBEDDING` nach erfolgreichem `ARCHIVIEREN` (Status `ARCHIVIERT`); Nachberechnung `EMBEDDING_ALLE`.
 - `HybridSuche.suchen(frage, filter, k)`:
   1. Volltext: Top 50 nach `ts_rank_cd`.
   2. Vektor: Frage einbetten, Top 50 Chunks nach Kosinus, auf Dokumente verdichten (bester Chunk zählt).
   3. RRF: `score = Σ 1 / (60 + rang)`.
-  4. Top 30 an Reranker (`RerankerClient`, REST gemäss Spike), Top k zurück.
+  4. Top 30 an Reranker (`RerankerClient`, REST gemäss Spike: `POST /2/ai/{product_id}/cohere/v2/rerank` mit `model`, `query`, `documents`, `top_n`; Antwort `results[].index` und `relevance_score`, Skala je Modell verschieden), Top k zurück.
   5. Ausfall von 2 oder 4 → nur Volltext, Ergebnis mit `degradiert=true`.
   Volltext und Vektor verwenden denselben Sichtbarkeitsfilter wie die Volltextsuche (Spec 01, 2.3 und 2.6), angewendet vor der Verdichtung und dem Reranker.
 - REST: `GET /api/v1/dokumente?q=…&modus=hybrid` (Standard ab Phase 2: `hybrid`).

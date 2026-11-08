@@ -61,9 +61,8 @@ Die KI soll Art, Datum, Partner und Betrag vorschlagen, damit der Inhaber nur no
 - **Negativ:** Jedes erfasste Dokument braucht eine Bestätigung; Erfassungen von `mitarbeiter` warten auf den Inhaber.
   Gemildert durch Bestätigen in höchstens zwei Tipps (Req 8.4).
 - **Negativ:** Der Generator-Pfad vertraut den Skripten; Schutz nur über Validierung (422) und Belegnummer-Reservation (409).
-- **Umsetzung:** Antwortformat offen bis Spike 0.3: JSON-Schema-Antwort, sonst JSON-Modus mit Validierung (design.md,
-  Open Points). Ob Bilder direkt gelesen werden können (K1), hält der Spike fest; design.md setzt auf den
-  OCR-Volltext.
+- **Umsetzung:** Spike 0.3 (`docs/spikes/infomaniak-ai.md`): JSON-Schema-Antwort funktioniert, den JSON-Modus lehnt
+  Infomaniak ab. Bilder kann Mistral-Small-4 direkt lesen (K1); design.md setzt weiterhin auf den OCR-Volltext.
 - **Tests:** Der Golden-Datensatz läuft nur manuell gegen das echte Modell, nie in der CI (Req 0.2, tech.md Regel 6).
 
 ## Verweise

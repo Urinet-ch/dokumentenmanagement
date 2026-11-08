@@ -29,7 +29,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Ergebnis in `docs/spikes/s3-object-lock.md`; gibt es keinen Schlüssel ohne Bypass-Recht, gilt COMPLIANCE für `manifest/` (6.11); bei negativem Befund zu Object Lock pro Objekt Rückfall aus design.md wählen
   - _Anforderungen: 0.4, 6.2, 6.3, 6.5, 6.11_
 
-- [ ] 0.3 Spike Infomaniak AI Services [Backend] [Fabian]
+- [x] 0.3 Spike Infomaniak AI Services [Backend] [Fabian]
   - Das Konto und die Modelle bestehen bereits (Modellliste geprüft 07.11.2026); kein Konto anlegen, keine anderen Anbieter
   - [Fabian] API-Token als Secret-Datei (`/run/secrets/infomaniak_ai_token`), Produkt-ID und Basis-URL aus dem Infomaniak-Konto bereitstellen (`archiv.ki.product-id`, `archiv.ki.basis-url`)
   - Quarkus-Mini-App mit `quarkus-langchain4j-openai`, Base-URL und Produkt-ID aus Konfiguration
