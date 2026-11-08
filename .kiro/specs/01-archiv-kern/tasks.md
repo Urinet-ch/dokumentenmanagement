@@ -20,7 +20,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Ablage nur ausserhalb des Repositorys im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, nie in Git, CI oder Tickets
   - _Anforderungen: 0.1, 0.7, 0.8_
 
-- [ ] 0.2 Spike Infomaniak Object Storage [Infra] [Fabian]
+- [x] 0.2 Spike Infomaniak Object Storage [Infra] [Fabian]
   - [Fabian] eigenes Infomaniak-Public-Cloud-Projekt nur für den Object Storage anlegen und Zugang für den Spike als Secret-Datei bereitstellen
   - Bucket mit Object Lock + Versionierung anlegen, `PutObjectRetention` GOVERNANCE pro Objekt testen, Löschen mit/ohne `x-amz-bypass-governance-retention` prüfen
   - prüfen, ob sich ein Schlüssel ohne Recht `s3:BypassGovernanceRetention` ausstellen lässt (App-Schlüssel): Löschen und Verkürzen einer gesperrten Version müssen mit ihm scheitern, auch mit Bypass-Header
