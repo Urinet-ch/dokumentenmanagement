@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from .modell import KATEGORIEN, Beleg
 
 REPO = Path(__file__).resolve().parents[2]
 STANDARD_SEED = 20261108
+STANDARD_GOLDEN_DIR = "~/urinet-archiv-golden"
+MARKER = ".golden-synth"
+ENDUNGEN = ("pdf", "jpg", "heic")
+
+
+def golden_wurzel() -> Path:
+    return Path(os.environ.get("ARCHIV_GOLDEN_DIR", STANDARD_GOLDEN_DIR)).expanduser().resolve()
 
 
 def heic_verfuegbar() -> bool:
@@ -25,15 +33,28 @@ def belege(seed: int) -> list[Beleg]:
     return liste
 
 
-def erzeuge(seed: int, ziel: Path) -> list[Beleg]:
-    ziel = ziel.expanduser().resolve()
+def pruefe_ziel(ziel: Path, golden: Path) -> None:
+    """Bricht ab, bevor etwas geschrieben oder gelöscht wird, wenn das Ziel nicht sicher dem Generator gehört."""
     if ziel.is_relative_to(REPO):
         raise SystemExit(f"Ausgabe im Repository ist nicht erlaubt: {ziel}")
+    if golden.is_relative_to(ziel):
+        raise SystemExit(f"Ausgabe in die Golden-Wurzel ({golden}) oder einen übergeordneten Ordner ist nicht "
+                         f"erlaubt: {ziel}. Unterordner verwenden, z. B. {golden / 'synthetisch'}.")
+    if ziel.exists() and any(ziel.iterdir()) and not (ziel / MARKER).is_file():
+        raise SystemExit(f"{ziel} ist nicht leer und enthält keinen Marker {MARKER}; der Ordner stammt nicht "
+                         "vom Generator. Leeren Ordner wählen.")
+
+
+def erzeuge(seed: int, ziel: Path, golden: Path | None = None) -> list[Beleg]:
+    ziel = ziel.expanduser().resolve()
+    pruefe_ziel(ziel, (golden or golden_wurzel()).expanduser().resolve())
     liste = belege(seed)
-    ordner = ziel / "belege"
-    ordner.mkdir(parents=True, exist_ok=True)
-    for alt in ordner.glob("[0-9][0-9]_*"):
-        alt.unlink()
+    (ziel / "belege").mkdir(parents=True, exist_ok=True)
+    (ziel / MARKER).write_text("Erzeugt von tools/golden_synth. Inhalt wird bei jedem Lauf ersetzt.\n", encoding="utf-8")
+    for b in liste:
+        stamm = Path(b.datei).with_suffix("")
+        for endung in ENDUNGEN:
+            (ziel / stamm.with_suffix(f".{endung}")).unlink(missing_ok=True)
     for b in liste:
         pdf = b.erzeuge_pdf()
         daten = foto.fotografiere(pdf, b.foto, np.random.default_rng([seed, b.nr])) if b.foto else pdf
