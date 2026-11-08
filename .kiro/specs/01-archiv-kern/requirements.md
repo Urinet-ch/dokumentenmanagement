@@ -324,7 +324,7 @@ damit Dokumente von Anfang an den richtigen Partnern zugeordnet werden.
 7. Das Archiv SOLL Kontakte, die im CSV fehlen, nie löschen; nur bei einem als Vollexport markierten Import SOLL es fehlende Kontakte mit `crm_id` als «nicht mehr im CRM-Export» kennzeichnen.
 8. Das Archiv SOLL jeden Import mit Dateiname, Prüfsumme, Benutzer, Zeit und Zählern protokollieren und die Originaldatei unter `importe/` ablegen.
 9. WO die Datei Verkaufschancen enthält (Importart `verkaufschance`), SOLL das Archiv sie mit Titel, Phase, Betrag und Datum über die Kontakt-ID aus 21.CRM dem passenden Kontakt zuordnen und bestehende Verkaufschancen über ihre `crm_id` aktualisieren.
-10. FALLS Pflichtspalten (Name) fehlen oder die Datei über 10'000 Zeilen hat, DANN SOLL das Archiv den Import mit einer verständlichen Meldung ablehnen.
+10. FALLS keine Spalte dem Feld Name zugeordnet ist (beim 21.CRM-Export `Name` oder `Organisation`, weil Organisationen dort keinen `Name` haben) oder die Datei über 10'000 Zeilen hat, DANN SOLL das Archiv den Import mit einer verständlichen Meldung ablehnen; eine Zeile ohne Namen SOLL als «fehlerhaft» gelten.
 11. FALLS eine Datei keine Datenzeilen enthält, DANN SOLL das Archiv den Import mit der Meldung «keine Datenzeilen» ablehnen und keinen Kontakt ändern oder kennzeichnen.
 
 ### Requirement 14: Volltextsuche mit Filtern (S1)

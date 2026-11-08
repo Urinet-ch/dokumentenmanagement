@@ -410,9 +410,12 @@ Regeln des Abgleichs (Req 13), Normalisierung siehe «KI»:
 - Übernehmen (Req 13.6): Gefüllte CSV-Zellen gewinnen, leere Zellen überschreiben nichts; alles in einer Transaktion.
 - Nur bei `vollexport=true` erhalten Kontakte mit `crm_id`, die im CSV fehlen, `nicht_im_export = true`; gelöscht wird nie (Req 13.7).
 - Verkaufschancen (Req 13.9): Kontakt über die Spalte Kontakt-ID aus 21.CRM (`kontakt.crm_id`), Aktualisierung über `verkaufschance.crm_id`.
-- Ablehnung: Pflichtspalte Name fehlt oder mehr als 10'000 Zeilen → 422 `CSV_UNGUELTIG` (Req 13.10); keine Datenzeilen → 422 `CSV_LEER` «keine Datenzeilen», kein Kontakt wird geändert oder gekennzeichnet (Req 13.11).
+- «Fehlerhaft» (Req 13.3, 13.10), für alle Dateien: Spaltenzahl nach dem Parsen (RFC 4180) ≠ Kopfzeile oder `name` leer; die Zeile wird nicht übernommen und in der Vorschau gezählt.
+- Ablehnung: keine Spalte für `name` (Profil «21.CRM»: `Name` oder `Organisation`) oder mehr als 10'000 Zeilen → 422 `CSV_UNGUELTIG` (Req 13.10); keine Datenzeilen → 422 `CSV_LEER` «keine Datenzeilen», kein Kontakt wird geändert oder gekennzeichnet (Req 13.11).
 
-Zuordnungsvorschlag: Spaltenüberschriften gegen Synonymliste (`Firma|Name|Nachname → name`, `PLZ|Postleitzahl → plz`, `E-Mail|Mail → email`, `ID|Nummer|Kontakt-Nr → crm_id` …) – endgültig nach Test-Export (K4).
+Profil «21.CRM» (K4, `docs/spikes/21crm-export.md`): Erkennt das Archiv die Kopfzeile des 21.CRM-Gesamtexports (`ADDRESS.csv`: Windows-1252, Semikolon, Felder nur bei Bedarf in Anführungszeichen nach RFC 4180, Datensätze mit LF, Spalte `Sekretär(in)` doppelt), schlägt der Zuordnungsdialog (Req 13.2) das Profil vor; nach einmaliger Bestätigung gilt es für den Mandanten wie jede gespeicherte Zuordnung. Regeln des Profils: `crm_id` = `GGUID`; `typ` aus `Kontakt ist eine Organisation`; `name` = `Organisation` bei Organisationen, sonst `Name`; `vorname` = `Vorname`; `name_normalisiert` bei Personen aus Vorname und Name; `strasse`/`plz`/`ort` aus den Feldern «(Geschäft)»; `email` gemäss Index `Standard-E-Mail` (1 Geschäft, 3 Privat, 5 Zentrale), sonst das erste gefüllte aus Geschäft, Zentrale, Geschäft 2, Privat; `telefon` gemäss `Standard-Telefon 1` (4 Geschäft, 10 Zentrale), sonst Geschäft, Zentrale, Mobil (Geschäft); Zeilen mit `Ist gelöscht = true` werden übersprungen; Zeitstempel `TT.MM.JJ HH:MM:SS` als Europe/Zurich. Verkaufschancen (`GWOPPORTUNITY.csv`): `crm_id` = `GGUID`, Kontakt über `ACCOUNTGUID`, `titel` = `Name`, `phase` = `Phase`, `betrag` = `Gesamt`, `datum` = `Beginn` [offen: Zuordnung der Verkaufschancen aus 21.CRM mit einem Nachexport mit Testdaten bestätigen – Entscheid vor Welle 4]. Die Zuordnung wird nach Spaltenposition gespeichert, weil Spaltennamen doppelt vorkommen können.
+
+Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonymliste (`Firma|Organisation|Name|Nachname → name`, `PLZ|Postleitzahl → plz`, `E-Mail|Mail → email`, `ID|GGUID|Nummer|Kontakt-Nr → crm_id` …).
 
 ### Suche (`suche`)
 - Spalte `volltext_tsv tsvector GENERATED ALWAYS AS (setweight(to_tsvector('german', coalesce(titel,'')),'A') || setweight(to_tsvector('german', coalesce(partner_name,'')),'B') || setweight(to_tsvector('german', archiv_tags_text(tags)),'B') || setweight(to_tsvector('german', coalesce(volltext,'')),'C')) STORED`, GIN-Index. `archiv_tags_text(text[])` ist eine als `IMMUTABLE` deklarierte Hilfsfunktion (`array_to_string` ist nur `STABLE` und in generierten Spalten nicht erlaubt), Req 14.1.
@@ -675,11 +678,11 @@ synthetisch (Req 16.7).
 - [offen: VPS-Grösse K5 – Entscheid vor Welle 5] (Stufe B; früher, falls 1.10 abbricht oder 16.18 später eintritt); danach Messbedingungen für Req 3.2, 5.5, 14.3 und die Zeitgrenzen der Aufträge prüfen.
 - Speicherbudget der Stufe A (700 MiB, 0.75 CPU) ist ein Richtwert; Messung und Ergebnis in Aufgabe 1.10.
 - Testobjekte der Stufe A im Object Storage: Gesperrte Objekte lassen sich mit dem App-Schlüssel nicht löschen (Req 6.5), und `MandantProvisionierung` legt `urinet-archiv-<code>` an. [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1] (vor Welle 1, weil 1.9/1.10 auf Stufe A den ersten Mandanten samt Bucket anlegen). Vorschlag: In Stufe A eigene Test-Buckets, der produktive Bucket `urinet-archiv-urinet` entsteht erst in Aufgabe 5.4 auf Stufe B.
+- [offen: Zuordnung der Verkaufschancen aus 21.CRM mit einem Nachexport mit Testdaten bestätigen – Entscheid vor Welle 4] (`docs/spikes/21crm-export.md`).
 - [offen: Werte der 11 Dokumentarten – Entscheid vor Welle 2]; Entwurf im Seed mit Fragen unter `_fragen`.
 - [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5].
 - [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5].
 - [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]; [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5].
 - [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
 - [offen: Rechte der Geschäftsstelle A11–A14 – Entscheid in `03-zweiter-mandant`]; bis dahin 403.
-- Spalten des 21.CRM-Exports (K4) – bestimmt die Synonymliste.
 - Startwerte zum Prüfen in Welle 1: Gesamtgrenze der Upload-Anfrage (500 MB), Ähnlichkeitsschwelle 0.6.
