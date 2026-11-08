@@ -59,6 +59,8 @@ das Kriterium ist erst nach diesem Entscheid umsetzbar.
 - **Bypass-Schlüssel** – einzige S3-Zugangsdaten mit Recht `s3:BypassGovernanceRetention`; offline beim Inhaber, nie auf dem Server.
 - **Zweitkopie** – verschlüsselte Sicherung von Datenbanken und Bucket bei einem zweiten Schweizer Anbieter.
 - **Notfallunterlagen** – versiegelte Zugangsdaten ausserhalb des Systems für den Notfall (Requirement 16.12).
+- **Stufe A** – Betrieb ab Welle 1 bis zum Wechsel auf der bestehenden Infomaniak-VPS, nur mit Test- und anonymisierten Daten und im Speicherbudget aus `tech.md` (Requirement 16.15).
+- **Stufe B** – Betrieb auf einer eigenen, grösseren Infomaniak-VPS (Grösse nach K5); Voraussetzung für echte Belege (Requirement 16.17).
 
 ---
 
@@ -154,7 +156,7 @@ damit digitale Dokumente ohne Umweg ins Archiv kommen.
 
 #### Acceptance Criteria
 1. Das Archiv SOLL Dateien der Typen PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB pro Datei annehmen, auch mehrere in einem Vorgang.
-2. WENN eine Datei hochgeladen wird, DANN SOLL das Archiv innert 2 Sekunden mit HTTP 202 und je Datei einem Ergebnis `{id, status}` antworten und die Verarbeitung als Auftrag einreihen (Messpunkt: Server, ab vollständig empfangener Anfrage; Eingabe, Last und Hardware: [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 1]).
+2. WENN eine Datei hochgeladen wird, DANN SOLL das Archiv innert 2 Sekunden mit HTTP 202 und je Datei einem Ergebnis `{id, status}` antworten und die Verarbeitung als Auftrag einreihen (Messpunkt: Server, ab vollständig empfangener Anfrage; Eingabe, Last und Hardware: [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5]; gilt erst ab Stufe B, 16.16).
 3. FALLS der Dateityp nicht unterstützt ist (geprüft am Dateiinhalt, nicht an der Endung), DANN SOLL das Archiv die Datei mit HTTP 415 `DATEITYP_UNBEKANNT` und einer verständlichen Meldung ablehnen.
 4. FALLS eine Datei mit identischer SHA-256-Prüfsumme im Mandanten bereits zu einem nicht verworfenen Dokument gehört (Prüfung je Datei), DANN SOLL das Archiv kein neues Dokument anlegen und für diese Datei das Ergebnis `{status: "DUBLETTE", vorhandenId}` liefern; darf der Benutzer das vorhandene Dokument nicht sehen (2.3), SOLL es nur «bereits vorhanden» ohne ID melden.
 5. WO der Benutzer mehrere Bilder als «ein Dokument» markiert, SOLL das Archiv sie in der gewählten Reihenfolge zu einem mehrseitigen Dokument zusammenfassen.
@@ -185,7 +187,7 @@ damit ich es auch in zehn Jahren noch öffnen und finden kann.
 2. WO ein PDF bereits eine Textebene hat, SOLL der Worker kein neues OCR ausführen, aber trotzdem eine PDF/A-Fassung erzeugen (`--skip-text`).
 3. Das Archiv SOLL den erkannten Volltext pro Dokument speichern und für die deutsche Volltextsuche indexieren.
 4. FALLS die Verarbeitung fehlschlägt, DANN SOLL das Archiv sie mit wachsender Wartezeit erneut versuchen, insgesamt höchstens 3 Versuche, und danach den Status `FEHLER` mit Fehlertext setzen, ohne das Original zu verlieren.
-5. Der Worker SOLL ein einseitiges Handy-Foto innert 30 Sekunden fertig verarbeiten, getestet als p95 vom Start des Auftrags bis zum Status `EINGANGSKORB`, ohne KI-Wartezeit ([offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 1]).
+5. Der Worker SOLL ein einseitiges Handy-Foto innert 30 Sekunden fertig verarbeiten, getestet als p95 vom Start des Auftrags bis zum Status `EINGANGSKORB`, ohne KI-Wartezeit ([offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5]; gilt erst ab Stufe B, 16.16).
 6. FALLS ein Auftrag die in design.md festgelegte Zeitgrenze seines Auftragstyps überschreitet, DANN SOLL der Worker ihn abbrechen und als fehlgeschlagenen Versuch nach 5.4 werten.
 7. FALLS ein Auftrag im Zustand `LAEUFT` kein Lebenszeichen mehr gibt, DANN SOLL das Archiv ihn nach Ablauf der Zeitgrenze wieder freigeben und als fehlgeschlagenen Versuch nach 5.4 werten.
 8. WO ein PDF digital signiert ist, SOLL der Worker die PDF/A-Fassung auch dann erzeugen, wenn die Signatur dabei verloren geht; das Original SOLL unverändert bleiben.
@@ -330,7 +332,7 @@ damit ich jede Rechnung in Sekunden habe.
 #### Acceptance Criteria
 1. Das Archiv SOLL eine Suche über Volltext, Titel, Partner und Tags (deutsche Stammformen; Tags sind Teil des Volltextindex) anbieten.
 2. Die Suche SOLL Filter für Dokumentart, Partner, Zeitraum (Belegdatum), Betrag von–bis, Richtung, Tags, Status und Geschäftsjahr kombinierbar unterstützen.
-3. WENN eine Suche ausgeführt wird, DANN SOLL das Archiv bei bis zu 50'000 Dokumenten pro Mandant innert 1 Sekunde (p95, Messpunkt Server) antworten, sortiert nach Relevanz oder Datum ([offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 1]).
+3. WENN eine Suche ausgeführt wird, DANN SOLL das Archiv bei bis zu 50'000 Dokumenten pro Mandant innert 1 Sekunde (p95, Messpunkt Server) antworten, sortiert nach Relevanz oder Datum ([offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5]; gilt erst ab Stufe B, 16.16).
 4. Suchtreffer SOLLEN eine Textstelle mit hervorgehobenem Suchbegriff zeigen.
 5. Die Suche SOLL Requirement 2.3 (Vertraulichkeit) und Requirement 1.2 (Mandant) einhalten.
 6. WENN der Benutzer ein Dokument öffnet, DANN SOLL das Archiv eine zeitlich begrenzte Download-Adresse (höchstens 5 Minuten gültig) für die gespeicherte Versions-ID der PDF/A-Fassung ausgeben und den Zugriff protokollieren.
@@ -357,7 +359,7 @@ damit Integrität und Speicherzeitpunkt belegt sind (Art. 9 GeBüV).
 damit kein Dokument verloren geht.
 
 #### Acceptance Criteria
-1. Das Archiv SOLL auf einer eigenen Infomaniak-VPS ([offen: VPS-Grösse K5 – Entscheid vor Welle 1]) aus `deploy/infomaniak/compose.yml` vollständig starten (API mit Java 25 und Quarkus, die PWA über Quinoa im selben Artefakt; Worker; PostgreSQL; Keycloak) und hinter Traefik (Labels) unter `archiv.apps.urinet.ch` (App) und `archiv-auth.apps.urinet.ch` (Keycloak) erreichbar sein; der Object Storage liegt in einem eigenen Public-Cloud-Projekt bei Infomaniak. Nachweis: manuell [Fabian] (Deploy-Protokoll).
+1. Das Archiv SOLL in Stufe A auf der bestehenden Infomaniak-VPS und ab Stufe B auf einer eigenen Infomaniak-VPS ([offen: VPS-Grösse K5 – Entscheid vor Welle 5]) aus `deploy/infomaniak/compose.yml` vollständig starten (API mit Java 25 und Quarkus, die PWA über Quinoa im selben Artefakt; Worker, in Stufe A im selben Container wie die API; PostgreSQL; Keycloak) und hinter Traefik (Labels) unter `archiv.apps.urinet.ch` (App) und `archiv-auth.apps.urinet.ch` (Keycloak) erreichbar sein; der Object Storage liegt in einem eigenen Public-Cloud-Projekt bei Infomaniak. Nachweis: manuell [Fabian] (Deploy-Protokoll).
 2. Das Archiv SOLL täglich eine verschlüsselte Sicherung von Archiv-Datenbank, Keycloak-Datenbank und Realm, Bucket (Originale, Arbeitsfassungen, PDF/A, Manifeste) und Manifest-Schlüssel als Zweitkopie bei einem zweiten Schweizer Anbieter schreiben ([offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]) und pro App 30 Tages-, 12 Monats- und 10 Jahresstände aufbewahren; der restic-Schlüssel liegt nur beim Sicherungs-Workflow und in den Notfallunterlagen (16.12). Nachweis: manuell [Fabian] (Sicherungsprotokoll).
 3. Das Repository SOLL eine Anleitung zur Wiederherstellung enthalten, die einmal in einer Testumgebung vollständig durchgespielt wurde (Nachweis: manuell [Fabian]); zusätzlich SOLL eine automatisierte Restore-Probe wiederkehrend ([offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]) Datenbanken und Dateien wiederherstellen, die Anmeldung prüfen und mit einem grünen Prüflauf (15.5) enden.
 4. Das Archiv SOLL `/q/health` (Liveness/Readiness) und Kennzahlen (Aufträge offen, Fehler, Eingangskorb-Grösse, Korrekturquote je Feld) bereitstellen; öffentlich erreichbar SOLL nur ein schlanker Health-Pfad sein, die Kennzahlen nur für das Monitoring der VPS.
@@ -371,6 +373,11 @@ damit kein Dokument verloren geht.
 12. Für das Archiv SOLLEN versiegelte Notfallunterlagen an einem in der Verfahrensbeschreibung genannten Ort ausserhalb des Systems bestehen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung, 16.8), S3-Zugang inkl. Bypass-Schlüssel (6.10) und öffentlicher Manifest-Schlüssel. Nachweis: manuell [Fabian].
 13. Das Backend SOLL je Fachbereich in `domain`, `application` und `adapter` gegliedert sein und Ablage, KI, OCR und Integration über Driven Ports mit Dev-Stubs anbinden; ArchUnit-Tests SOLLEN die Abhängigkeitsregeln des Blueprints prüfen. Nachweis: JUnit (ArchUnit-Tests).
 14. Jedes Kriterium dieser Spec ohne Nachweis-Vermerk («manuell», «Dokument» oder «JUnit») SOLL durch mindestens ein Cucumber-Szenario mit Tag `@req-<x.y>` abgedeckt sein; Unit-Tests laufen mit JUnit.
+15. SOLANGE das Archiv in Stufe A läuft, SOLL es nur Test- und anonymisierte Daten enthalten, keine echten Belege und keine Personal- oder Lohndaten, weil die bestehende VPS das Netz «web» mit anderen Apps teilt und keine Reserven hat. Anonymisiert heisst ohne Bezug zu realen Personen oder Firmen (z. B. die anonymisierten Beispielzeilen aus Aufgabe 0.4); geschwärzte echte Belege, auch der Golden-Datensatz (0.1), gelten als echte Belege. Nachweis: manuell [Fabian] (Bestätigung im Messbericht der Aufgabe 1.10 und im Wechselprotokoll der Aufgabe 5.11, welche Testdaten auf Stufe A geladen wurden).
+16. SOLANGE das Archiv in Stufe A läuft, SOLLEN die Leistungsziele 3.2, 5.5 und 14.3 nicht gelten, sondern nur die Funktion; die Leistungsziele SOLLEN mit Lasttests auf Stufe B nachgewiesen werden. Nachweis: manuell [Fabian] (Messbericht Stufe B).
+17. Das Archiv SOLL auf Stufe B laufen, bevor echte Belege ins Archiv kommen (Übernahme und Produktivbetrieb in Welle 5); der Wechsel umfasst die neue VPS, die Umstellung des Deploy-Ziels, das Verwerfen der Testdaten aus Stufe A und die Leistungsmessung nach 16.16. Nachweis: manuell [Fabian] (Wechselprotokoll).
+18. FALLS in Stufe A die Summe der `mem_limit` des Archivs 700 MiB oder `cpus` zusammen 0.75 überschreiten müsste, ein Container auf der VPS wegen Speichermangel beendet wird oder die Health-Prüfung einer anderen App der VPS fehlschlägt, DANN SOLL das Archiv auf Stufe A gestoppt werden und vorzeitig auf Stufe B wechseln (16.17). Nachweis: manuell [Fabian] (Messbericht Stufe A aus Aufgabe 1.10 und Prüfung nach jedem Deploy aus Aufgabe 1.9).
+19. SOLANGE das Archiv in Stufe A läuft, SOLL die Sicherung nur als Funktionstest mit der Restore-Probe (16.3) laufen; die Aufbewahrung nach 16.2 SOLL erst ab Stufe B gelten. Nachweis: manuell [Fabian] (Restore-Protokoll).
 
 ---
 

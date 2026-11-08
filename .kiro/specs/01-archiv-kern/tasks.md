@@ -8,10 +8,10 @@ Arbeitsweise je Aufgabe (Claude Code):
 - Eine Sitzung, ein Branch (`feature/01-<aufgabe>-<stichwort>`), ein PR. Der PR nennt die erfüllten Kriterien als `@req-<x.y>` und hakt die Checkbox hier ab.
 - Szenarien und Tests zuerst bzw. mitliefern: Cucumber-Features mit `@req-<x.y>`, Domain-Logik zusätzlich mit JUnit. Es gilt die Definition of Done aus `tech.md`.
 - Kriterien mit «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder «Nachweis: JUnit» brauchen kein Cucumber-Szenario; der Nachweis wird im PR verlinkt.
-- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 0.6, 0.7, 1.7, 2.8, 4.9).
+- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 0.6, 1.7, 1.10, 2.8, 4.9, 5.11).
 - Aufgabennummern bleiben stabil; neue Aufgaben erhalten die nächste freie Nummer ihrer Welle.
 
-## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, K5 entschieden)
+## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, Stufe A vorbereitet)
 
 - [ ] 0.1 Golden-Datensatz zusammenstellen [Fabian]
   - 50 Belege gemäss Requirement 0.1 auswählen (genau 10 je Kategorie), Personendaten schwärzen (AHV-Nr., IBAN Dritter)
@@ -59,13 +59,14 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 0.3, 0.9_
   - _Abhängig von: 0.2, 0.3, 0.4, 0.5_
 
-- [ ] 0.7 Servergrösse K5 entscheiden und VPS bereitstellen [Fabian] [Infra]
-  - [Fabian] Grösse der eigenen Infomaniak-VPS für API, Worker (OCR), PostgreSQL mit pgvector und Keycloak festlegen [offen: VPS-Grösse K5 – Entscheid vor Welle 1] und bestellen
-  - [Fabian] Messbedingungen (Eingabe, Last, Hardware) für 3.2, 5.5 und 14.3 aus der Grösse ableiten und per PR in requirements.md nachtragen
-  - [Infra] VPS nach dem Muster des Betriebs einrichten (Traefik mit Let's Encrypt, Deploy-Befehl für das SSH-Bundle, Compose-Policy, Monitoring); Einträge im Infra-Repo der VPS
-  - _Anforderungen: 3.2, 5.5, 14.3, 16.1_
+- [ ] 0.7 Stufe A auf der bestehenden VPS vorbereiten [Fabian] [Infra]
+  - K5 (Grösse der eigenen VPS) ist nicht mehr Teil von Welle 0; Entscheid vor Welle 5 in 4.9, Wechsel in 5.11 (P1, geändert 08.11.2026)
+  - [Fabian] Zugang des Deploy-Workflows zur bestehenden Infomaniak-VPS (Deploy-Befehl für das SSH-Bundle) als GitHub-Secret bereitstellen; DNS für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch` auf diese VPS
+  - [Infra] Einträge im Infra-Repo der VPS (Compose-Policy, umgetaggte Images, internes Netz des Archivs); Ausgangswerte vor dem ersten Deploy festhalten (verfügbarer Speicher, freie Disk; Stand 08.11.2026: rund 1'140 MB, 15 GB)
+  - Datenregel Stufe A festhalten: nur Test- und anonymisierte Daten, keine echten Belege, keine Personal- oder Lohndaten
+  - _Anforderungen: 16.1, 16.10, 16.15_
 
-## Welle 1 — Fundament (Voraussetzung: Gate 0, VPS aus 0.7 bereit)
+## Welle 1 — Fundament (Voraussetzung: Gate 0, Stufe A aus 0.7 bereit)
 
 - [ ] 1.1 Repository-Gerüst und CI [Infra]
   - Struktur gemäss `structure.md`, Paketstruktur hexagonal je Fachbereich (`domain`, `application`, `adapter`)
@@ -120,9 +121,19 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
   - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
   - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
-  - erster Deploy des Gerüsts auf die VPS aus 0.7, noch ohne echte Belege (15.3)
-  - _Anforderungen: 16.1, 16.9, 16.10, 16.11_
+  - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
+  - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
+  - _Anforderungen: 16.1, 16.9, 16.10, 16.11, 16.18_
   - _Abhängig von: 0.7, 1.1_
+
+- [ ] 1.10 Stufe A einrichten und Speicherbudget messen [Infra]
+  - Stufenwerte versioniert unter `deploy/infomaniak/`: `archiv-api` mit Image `archiv-worker` und `archiv.rolle=api,worker`, `archiv.worker.parallel=1`, OCR seitenweise (`--jobs 1`); knappe Heap- bzw. Speicher-Einstellungen für JVM, PostgreSQL und Keycloak; Summe der `mem_limit` ≤ 700 MiB, `cpus` zusammen ≤ 0.75
+  - Netz prüfen: Datenbank (`archiv-db`), Worker und Sicherung nur im eigenen internen Docker-Netz des Archivs; am Netz «web» von Traefik hängen nur `archiv-api` (API/PWA) und `archiv-keycloak` (öffentlich nur `/realms/` und `/resources/`, Admin-Konsole nicht öffentlich)
+  - Buckets der Stufe A nach dem Entscheid aus design.md (Open Points: Bucket-Namen der Stufe A, Entscheid vor Welle 1) konfigurieren
+  - Messung nur mit synthetischen Testbelegen: Spitzenverbrauch je Dienst im Leerlauf, beim Upload und bei OCR mehrseitiger Belege; verfügbarer Speicher der VPS gegenüber den Ausgangswerten aus 0.7; Health der anderen Apps während der Messung; Ergebnis in `docs/spikes/stufe-a-speicher.md` (nur Zahlen, keine Namen anderer Apps); darin [Fabian] bestätigen, welche Testdaten auf Stufe A geladen wurden (16.15)
+  - **Abbruchkriterium:** Das Archiv braucht mehr als das Budget (Summe `mem_limit` > 700 MiB oder `cpus` > 0.75), ein Container auf der VPS wird wegen Speichermangel beendet, oder die Health einer anderen App fällt während der Messung aus → Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 (4.9) und Wechsel (5.11) vorziehen (16.18)
+  - _Anforderungen: 16.1, 16.10, 16.15, 16.18_
+  - _Abhängig von: 0.7, 1.9_
 
 ## Welle 2 — Dokumente, Ablage, Verarbeitung
 
@@ -153,7 +164,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 2.4 Upload-Endpunkt [Backend]
   - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
-  - Antwort 202 ≤ 2 s (Messbedingungen aus 0.7), Status `NEU`, Auftrag `VERARBEITEN` einreihen
+  - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
 - [ ] 2.5 Auftragsschlange [Backend]
@@ -166,7 +177,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Dockerfile Worker (JVM + ocrmypdf, tesseract-ocr-deu/eng, img2pdf, libheif-examples, poppler-utils, ghostscript) nach Compose-Policy (uid ungleich 0)
   - Port `OcrPort` mit Adapter und Dev-Stub; `VerarbeitenHandler`: Status `VERARBEITUNG`, HEIC→JPEG, Bilder→PDF, bei Handy-Erfassung PDF/A aus der Arbeitsfassung, OCRmyPDF (`--skip-text` bei Textebene), `pdftotext`, Vorschaubilder; Folgeauftrag `KI_VORSCHLAG`; nach 3 Fehlversuchen `FEHLER` mit Fehlertext
   - signierte PDFs: PDF/A auch bei Verlust der Signatur, Original unverändert; keine PDF/A möglich (z. B. verschlüsselt) → Vermerk `pdfa_fehlt` und Eingangskorb
-  - veraPDF-Prüfung im Test; Laufzeit einseitiges Foto als p95 ≤ 30 s (Messbedingungen aus 0.7)
+  - veraPDF-Prüfung im Test; Lastskript für die Laufzeit einseitiges Foto als p95 ≤ 30 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16)
   - _Anforderungen: 5.1–5.10_
 
 - [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
@@ -256,7 +267,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 4.5 Volltextsuche [Backend]
   - `GET /api/v1/dokumente` mit `websearch_to_tsquery` (inkl. Tags), Filtern (Art, Partner, Zeitraum, Betrag, Richtung, Tags, Status, Geschäftsjahr, Belegnummer exakt), Sortierung, `ts_headline`; Vertraulichkeit nach 2.3 und Mandant
-  - Lasttest mit 50'000 synthetischen Dokumenten: p95 ≤ 1 s (Messbedingungen aus 0.7)
+  - Lasttest mit 50'000 synthetischen Dokumenten: p95 ≤ 1 s; Lastskript hier bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - `GET /api/v1/dokumente/{id}/datei` mit vorsignierter URL (5 Min.) für die gespeicherte Versions-ID, mit Protokoll
   - _Anforderungen: 14.1–14.7_
 
@@ -285,8 +296,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - zweiten Schweizer Anbieter für die Zweitkopie wählen [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]
   - Rhythmus der Restore-Probe [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5] und Aufbewahrungsfrist des Zugriffsprotokolls [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5] festlegen
   - Schlüsselweg der Restore-Probe festlegen [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5]
+  - Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (API, Worker mit OCR, PostgreSQL mit pgvector, Keycloak) festlegen [offen: VPS-Grösse K5 – Entscheid vor Welle 5]; Messbedingungen (Eingabe, Last, Hardware) für 3.2, 5.5 und 14.3 daraus ableiten; bricht 1.10 ab oder tritt 16.18 später ein, wird dieser Punkt vorgezogen
   - Ergebnisse per PR in requirements.md, design.md, tech.md und `docs/umsetzungsplan.md` nachtragen
-  - _Anforderungen: 10.9, 15.3, 16.2, 16.3_
+  - _Anforderungen: 3.2, 5.5, 10.9, 14.3, 15.3, 16.2, 16.3, 16.17_
 
 ## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1 (Voraussetzung: Entscheide aus 4.9)
 
@@ -313,12 +325,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 6.9, 15.5, 15.9, 15.10_
 
 - [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
-  - Produktion auf der VPS aus 0.7 mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
+  - Produktion auf Stufe B (VPS aus 5.11) mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
   - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv
   - [Fabian] App-Schlüssel ohne Bypass-Recht als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Bypass-Schlüssel erstellen und nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
   - produktives Archivieren erst, wenn der Zeitstempeldienst angebunden ist (15.3)
-  - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10_
-  - _Abhängig von: 1.9, 4.9_
+  - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10, 16.17_
+  - _Abhängig von: 1.9, 4.9, 5.11_
 
 - [ ] 5.5 Sicherung und Wiederherstellung [Infra] [Fabian]
   - im Repository (`deploy/backup/`): täglicher Export von Archiv-Datenbank, Keycloak-Datenbank und Realm, Bucket (Original, Arbeitsfassung, PDF/A, Manifeste) und Manifest-Schlüssel; der Server verschlüsselt asymmetrisch und hält nur den öffentlichen Schlüssel
@@ -326,7 +338,8 @@ Arbeitsweise je Aufgabe (Claude Code):
   - automatisierte Restore-Probe im Rhythmus aus 4.9: Datenbanken und Dateien wiederherstellen, Anmeldung prüfen, Prüflauf (5.3) grün
   - Restore-Probe nach dem Schlüsselweg aus 4.9
   - `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian])
-  - _Anforderungen: 16.2, 16.3, 16.7, 16.8_
+  - solange Stufe A läuft: nur Funktionstest mit Testdaten (Restore-Probe), keine Aufbewahrungspflicht; Aufbewahrung nach 16.2 erst auf Stufe B (5.11)
+  - _Anforderungen: 16.2, 16.3, 16.7, 16.8, 16.19_
   - _Abhängig von: 4.9, 5.3_
 
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
@@ -340,18 +353,30 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
-  - Voraussetzung: Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün
+  - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
   - **Gate Phase 1:** alle Belege 2026 im Archiv, Prüflauf grün
-  - _Anforderungen: 1.4, 12.7, 13.6, 15.3, 15.5, 16.3_
-  - _Abhängig von: 5.1–5.7, 5.9, 5.10_
+  - _Anforderungen: 1.4, 12.7, 13.6, 15.3, 15.5, 16.3, 16.17_
+  - _Abhängig von: 5.1–5.7, 5.9, 5.10, 5.11_
 
 - [ ] 5.9 Anbindung an das Monitoring der VPS [Infra]
-  - interne Kennzahlen und Detail-Health an das Monitoring der VPS anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
+  - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
   - _Anforderungen: 16.4, 16.5_
+  - _Abhängig von: 5.11_
 
 - [ ] 5.10 Notfallunterlagen [Fabian]
   - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang inkl. Bypass-Schlüssel, öffentlicher Manifest-Schlüssel; Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
   - Vollständigkeit einmal mit dem Notfallablauf aus 5.7 prüfen
   - _Anforderungen: 6.10, 16.12_
+
+- [ ] 5.11 Wechsel auf Stufe B [Infra] [Fabian]
+  - Zeitpunkt: zu Beginn von Welle 5, vor 5.4 und vor der Übernahme 5.8; vorgezogen (Ausnahme von «Aufgaben anderer Wellen nicht vorziehen»), wenn 1.10 abbricht oder 16.18 später eintritt
+  - [Fabian] eigene Infomaniak-VPS in der Grösse aus 4.9 (K5) bestellen; Zugang des Deploy-Workflows als GitHub-Secret; DNS für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch` auf die neue VPS umstellen
+  - [Infra] neue VPS nach dem Muster des Betriebs einrichten (Traefik mit Let's Encrypt, Deploy-Befehl für das SSH-Bundle, Compose-Policy, Monitoring); Einträge im Infra-Repo der VPS
+  - [Infra] Deploy-Ziel im Workflow aus 1.9 umstellen; Stufenwerte für B: `archiv-api` (`archiv.rolle=api`) und `archiv-worker` (`archiv.rolle=worker`) getrennt, Parallelität und Limits nach K5
+  - Testdaten verwerfen: Datenbanken und Realm-Benutzer der Stufe A nicht übernehmen, Stufe B startet leer; Test-Buckets nach dem Entscheid aus design.md (Open Points: Bucket-Namen der Stufe A); danach Archiv-Dienste auf Stufe A entfernen und die Einträge im Infra-Repo der bestehenden VPS zurückbauen; im Wechselprotokoll [Fabian] bestätigen, welche Testdaten auf Stufe A geladen wurden (16.15)
+  - Sicherung und Restore-Probe aus 5.5 auf Stufe B einrichten bzw. umstellen, Aufbewahrung nach 16.2 ab hier; ist 5.5 beim Wechsel noch offen, richtet 5.5 sie direkt auf Stufe B ein
+  - Leistungsmessung auf Stufe B mit den Lastskripten aus 2.4, 2.6 und 4.5 unter den Messbedingungen aus 4.9; Messbericht im PR verlinken; bei vorgezogenem Wechsel die Leistungsmessung nachholen, sobald 2.4, 2.6 und 4.5 fertig sind, spätestens vor 5.4
+  - _Anforderungen: 3.2, 5.5, 14.3, 16.1, 16.2, 16.10, 16.15, 16.16, 16.17, 16.18, 16.19_
+  - _Abhängig von: 1.9, 2.4, 2.6, 4.5, 4.9 (bei vorgezogenem Wechsel nur der Entscheid K5 aus 4.9)_
