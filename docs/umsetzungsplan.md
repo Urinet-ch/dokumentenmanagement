@@ -6,8 +6,9 @@ Specs unter `.kiro/specs/`.
 **Rund 35 Arbeitstage in 13 Wellen und 4 Phasen. Nach jeder Phase steht ein messbares Gate;
 die nächste Phase beginnt erst, wenn es erfüllt ist.**
 
-> **Zur Freigabe:** Die Requirements von Spec 01 liegen mit dem PR des Branches `spec-01-pruefung`
-> zur Freigabe vor. Er arbeitet die Prüfung von Spec 01 ein (Entscheide P1–P18 in Abschnitt 6).
+> **Freigegeben:** Spec 01 am 08.11.2026 (PR #1, Merge `c7b83f4`) mit der eingearbeiteten Prüfung
+> (Entscheide P1–P18 in Abschnitt 6). Die Werte der Dokumentarten im Seed bleiben Entwurf bis
+> vor Welle 2. Specs 02 und 03 sind noch nicht geprüft.
 
 ## 1. Aufbau der Spec
 
