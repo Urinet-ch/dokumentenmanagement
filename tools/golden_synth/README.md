@@ -8,6 +8,10 @@ Erkennung von Art, Datum, Partner, Betrag und Belegnummer.
   byte-gleiche Dateien und dieselbe `erwartet.json`.
 - Ausgabe **nur ausserhalb des Repositorys**; der Generator bricht ab, wenn das Ziel im Repository liegt.
   Erzeugte Belege nie committen.
+- Ausgabeschutz: Abbruch, bevor etwas geschrieben wird, wenn das Ziel die Golden-Wurzel
+  (`$ARCHIV_GOLDEN_DIR`, sonst `~/urinet-archiv-golden`) ist oder sie enthält, oder wenn ein nicht leerer Ordner
+  den Marker `.golden-synth` nicht trägt. Der Generator legt den Marker selbst an und ersetzt nur die
+  Dateinamen aus seinem Katalog; fremde Dateien im Ziel bleiben liegen.
 - Beleg und Erwartung stammen aus denselben Werten im Katalog (`katalog.py`), nicht aus nachträglichem Lesen.
 
 ## Einrichten und Aufruf
