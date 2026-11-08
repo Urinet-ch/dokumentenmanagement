@@ -38,7 +38,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Ergebnis in `docs/spikes/infomaniak-ai.md`
   - _Anforderungen: 0.5, 16.7_
 
-- [ ] 0.4 Test-Export 21.CRM [Fabian]
+- [x] 0.4 Test-Export 21.CRM [Fabian]
   - Kontakte und Verkaufschancen als CSV exportieren, 5 Beispielzeilen anonymisieren
   - als `backend/src/test/resources/csv/21crm-kontakte-beispiel.csv` und `…-verkaufschancen-beispiel.csv` ablegen; Spalten, Trennzeichen, Zeichensatz in `docs/spikes/21crm-export.md`
   - _Anforderungen: 0.6, 13.1_
@@ -258,8 +258,8 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 4.1 CSV-Erkennung und Spaltenzuordnung [Backend]
   - Upload `/api/v1/importe/crm` (Recht A12), SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Name Pflicht, ≤ 10'000 Zeilen, ohne Datenzeilen abgelehnt)
-  - Synonymliste aus `docs/spikes/21crm-export.md`; `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
-  - Tests mit den Beispieldateien aus 0.4 (UTF-8 mit BOM, Windows-1252, Komma/Semikolon) und einer Datei ohne Datenzeilen
+  - Profil «21.CRM» aus design.md (Erkennung der Kopfzeile, Name aus `Name` oder `Organisation`, E-Mail/Telefon über Index, gelöschte Zeilen übersprungen, Zuordnung nach Spaltenposition) und Synonymliste für andere Dateien (`docs/spikes/21crm-export.md`); `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
+  - Tests mit den Beispieldateien aus 0.4 (`21crm-kontakte-beispiel.csv` Windows-1252/Semikolon, `21crm-verkaufschancen-beispiel.csv` ohne Datenzeilen) plus daraus abgeleitete Varianten (UTF-8 mit BOM, Komma, Zeile mit verschobener Spaltenzahl)
   - _Anforderungen: 2.18, 13.1, 13.2, 13.10, 13.11_
   - _Abhängig von: 0.4_
 

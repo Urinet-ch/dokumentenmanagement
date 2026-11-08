@@ -410,9 +410,11 @@ Regeln des Abgleichs (Req 13), Normalisierung siehe «KI»:
 - Übernehmen (Req 13.6): Gefüllte CSV-Zellen gewinnen, leere Zellen überschreiben nichts; alles in einer Transaktion.
 - Nur bei `vollexport=true` erhalten Kontakte mit `crm_id`, die im CSV fehlen, `nicht_im_export = true`; gelöscht wird nie (Req 13.7).
 - Verkaufschancen (Req 13.9): Kontakt über die Spalte Kontakt-ID aus 21.CRM (`kontakt.crm_id`), Aktualisierung über `verkaufschance.crm_id`.
-- Ablehnung: Pflichtspalte Name fehlt oder mehr als 10'000 Zeilen → 422 `CSV_UNGUELTIG` (Req 13.10); keine Datenzeilen → 422 `CSV_LEER` «keine Datenzeilen», kein Kontakt wird geändert oder gekennzeichnet (Req 13.11).
+- Ablehnung: keine Spalte für `name` (Profil «21.CRM»: `Name` oder `Organisation`) oder mehr als 10'000 Zeilen → 422 `CSV_UNGUELTIG` (Req 13.10); keine Datenzeilen → 422 `CSV_LEER` «keine Datenzeilen», kein Kontakt wird geändert oder gekennzeichnet (Req 13.11).
 
-Zuordnungsvorschlag: Spaltenüberschriften gegen Synonymliste (`Firma|Name|Nachname → name`, `PLZ|Postleitzahl → plz`, `E-Mail|Mail → email`, `ID|Nummer|Kontakt-Nr → crm_id` …) – endgültig nach Test-Export (K4).
+Profil «21.CRM» (K4, `docs/spikes/21crm-export.md`): Erkennt das Archiv die Kopfzeile des 21.CRM-Gesamtexports (`ADDRESS.csv`, Windows-1252, Semikolon, ohne Anführungszeichen, Spalte `Sekretär(in)` doppelt), gilt eine fest eingebaute Zuordnung statt des Dialogs: `crm_id` = `GGUID`; `typ` aus `Kontakt ist eine Organisation`; `name` = `Organisation` bei Organisationen, sonst `Name`; `vorname` = `Vorname`; `strasse`/`plz`/`ort` aus den Feldern «(Geschäft)»; `email` gemäss Index `Standard-E-Mail` (1 Geschäft, 3 Privat, 5 Zentrale), `telefon` gemäss `Standard-Telefon 1` (4 Geschäft, 10 Zentrale); Zeilen mit `Ist gelöscht = true` werden übersprungen; Zeitstempel `TT.MM.JJ HH:MM:SS` als Europe/Zurich. Verkaufschancen (`GWOPPORTUNITY.csv`): `crm_id` = `GGUID`, Kontakt über `ACCOUNTGUID`, `titel` = `Name`, `phase` = `Phase`, `betrag` = `Gesamt`, `datum` = `Beginn` [offen: mit Testdaten bestätigen – Entscheid vor Welle 4]. Zeilen mit anderer Spaltenzahl als die Kopfzeile gelten als «fehlerhaft». Die Zuordnung wird nach Spaltenposition gespeichert.
+
+Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonymliste (`Firma|Organisation|Name|Nachname → name`, `PLZ|Postleitzahl → plz`, `E-Mail|Mail → email`, `ID|GGUID|Nummer|Kontakt-Nr → crm_id` …).
 
 ### Suche (`suche`)
 - Spalte `volltext_tsv tsvector GENERATED ALWAYS AS (setweight(to_tsvector('german', coalesce(titel,'')),'A') || setweight(to_tsvector('german', coalesce(partner_name,'')),'B') || setweight(to_tsvector('german', archiv_tags_text(tags)),'B') || setweight(to_tsvector('german', coalesce(volltext,'')),'C')) STORED`, GIN-Index. `archiv_tags_text(text[])` ist eine als `IMMUTABLE` deklarierte Hilfsfunktion (`array_to_string` ist nur `STABLE` und in generierten Spalten nicht erlaubt), Req 14.1.
@@ -681,5 +683,4 @@ synthetisch (Req 16.7).
 - [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]; [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5].
 - [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
 - [offen: Rechte der Geschäftsstelle A11–A14 – Entscheid in `03-zweiter-mandant`]; bis dahin 403.
-- Spalten des 21.CRM-Exports (K4) – bestimmt die Synonymliste.
 - Startwerte zum Prüfen in Welle 1: Gesamtgrenze der Upload-Anfrage (500 MB), Ähnlichkeitsschwelle 0.6.
