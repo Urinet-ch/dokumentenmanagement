@@ -1,31 +1,42 @@
 # Implementation Plan — 01 Archiv-Kern
 
 Aufgaben sind in **Wellen** gruppiert. Innerhalb einer Welle laufen Aufgaben mit verschiedener
-Rolle parallel (Crew), eine Welle beginnt erst, wenn die vorherige abgeschlossen und das Gate
+Rolle parallel, eine Welle beginnt erst, wenn die vorherige abgeschlossen und das Gate
 erfüllt ist. Rollen: **[Backend]**, **[Frontend]**, **[Infra]**, **[QA]**, **[Fabian]** (manuell, nicht vom Agenten).
-Jede Aufgabe: Tests zuerst bzw. mitliefern, `mvn verify` / `ng test` grün, Akzeptanzkriterien im PR nennen.
 
-## Welle 0 — Phase 0 Klären (Gate: ≥ 45/50, Spikes dokumentiert)
+Arbeitsweise je Aufgabe (Claude Code):
+- Eine Sitzung, ein Branch (`feature/01-<aufgabe>-<stichwort>`), ein PR. Der PR nennt die erfüllten Kriterien als `@req-<x.y>` und hakt die Checkbox hier ab.
+- Szenarien und Tests zuerst bzw. mitliefern: Cucumber-Features mit `@req-<x.y>`, Domain-Logik zusätzlich mit JUnit. Es gilt die Definition of Done aus `tech.md`.
+- Kriterien mit «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder «Nachweis: JUnit» brauchen kein Cucumber-Szenario; der Nachweis wird im PR verlinkt.
+- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 0.6, 0.7, 1.7, 2.8, 4.9).
+- Aufgabennummern bleiben stabil; neue Aufgaben erhalten die nächste freie Nummer ihrer Welle.
+
+## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, K5 entschieden)
 
 - [ ] 0.1 Golden-Datensatz zusammenstellen [Fabian]
-  - 50 Belege gemäss Requirement 0.1 auswählen, Personendaten schwärzen (AHV-Nr., IBAN Dritter)
-  - `erwartet.json` mit Art, Datum, Partner, Betrag, Belegnummer je Datei erfassen
-  - Ablage ausserhalb des Repos (`~/archiv-golden/`), Pfad per Umgebungsvariable `ARCHIV_GOLDEN_DIR`
-  - _Anforderungen: 0.1_
+  - 50 Belege gemäss Requirement 0.1 auswählen (genau 10 je Kategorie), Personendaten schwärzen (AHV-Nr., IBAN Dritter)
+  - `erwartet.json` mit Art, Datum, Partner, Betrag, Belegnummer je Datei erfassen; fehlt ein Feld auf dem Beleg, bleibt es leer (Regel 0.7)
+  - vor dem ersten Lauf je Kategorie 6 Belege zum Abstimmen und 4 zurückgehaltene festlegen (zusammen 30/20) und in `erwartet.json` vermerken; die Aufteilung bleibt danach unverändert
+  - Ablage nur ausserhalb des Repositorys im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, nie in Git, CI oder Tickets
+  - _Anforderungen: 0.1, 0.7, 0.8_
 
-- [ ] 0.2 Spike Infomaniak Object Storage [Infra]
+- [ ] 0.2 Spike Infomaniak Object Storage [Infra] [Fabian]
+  - [Fabian] eigenes Infomaniak-Public-Cloud-Projekt nur für den Object Storage anlegen und Zugang für den Spike als Secret-Datei bereitstellen
   - Bucket mit Object Lock + Versionierung anlegen, `PutObjectRetention` GOVERNANCE pro Objekt testen, Löschen mit/ohne `x-amz-bypass-governance-retention` prüfen
+  - prüfen, ob sich ein Schlüssel ohne Recht `s3:BypassGovernanceRetention` ausstellen lässt (App-Schlüssel): Löschen und Verkürzen einer gesperrten Version müssen mit ihm scheitern, auch mit Bypass-Header
+  - prüfen, ob der Modus COMPLIANCE verfügbar ist (Testobjekt mit kurzer Frist)
   - prüfen, ob Objekte ohne Retention im selben Bucket löschbar bleiben (Präfix `eingang/`)
-  - Ergebnis in `docs/spikes/s3-object-lock.md`; bei negativem Befund Rückfall aus design.md wählen
-  - _Anforderungen: 0.4, 6.2, 6.3_
+  - Ergebnis in `docs/spikes/s3-object-lock.md`; gibt es keinen Schlüssel ohne Bypass-Recht, gilt COMPLIANCE für `manifest/` (6.11); bei negativem Befund zu Object Lock pro Objekt Rückfall aus design.md wählen
+  - _Anforderungen: 0.4, 6.2, 6.3, 6.5, 6.11_
 
-- [ ] 0.3 Spike Infomaniak AI Services [Backend]
+- [ ] 0.3 Spike Infomaniak AI Services [Backend] [Fabian]
   - Das Konto und die Modelle bestehen bereits (Modellliste geprüft 07.11.2026); kein Konto anlegen, keine anderen Anbieter
-  - [Fabian] Produkt-ID, API-Token und Basis-URL aus dem Infomaniak-Konto als Secrets bereitstellen (`INFOMANIAK_AI_PRODUCT_ID`, `INFOMANIAK_AI_TOKEN`)
+  - [Fabian] API-Token als Secret-Datei (`/run/secrets/infomaniak_ai_token`), Produkt-ID und Basis-URL aus dem Infomaniak-Konto bereitstellen (`archiv.ki.product-id`, `archiv.ki.basis-url`)
   - Quarkus-Mini-App mit `quarkus-langchain4j-openai`, Base-URL und Produkt-ID aus Konfiguration
   - testen: JSON-Schema-Antwortformat, JSON-Modus, Tool Calling mit Mistral-Small-4, Embeddings-Endpunkt (Dimension notieren), Bild-Eingabe (K1), Reranker-Endpunkt (Form der API notieren)
+  - [Fabian] festhalten, ob Infomaniak AI Eingaben speichert oder zum Training nutzt; den AVV unter `docs/vertrag/` referenzieren
   - Ergebnis in `docs/spikes/infomaniak-ai.md`
-  - _Anforderungen: 0.5_
+  - _Anforderungen: 0.5, 16.7_
 
 - [ ] 0.4 Test-Export 21.CRM [Fabian]
   - Kontakte und Verkaufschancen als CSV exportieren, 5 Beispielzeilen anonymisieren
@@ -33,207 +44,314 @@ Jede Aufgabe: Tests zuerst bzw. mitliefern, `mvn verify` / `ng test` grün, Akze
   - _Anforderungen: 0.6, 13.1_
 
 - [ ] 0.5 Prototyp-Pipeline auf dem Golden-Datensatz [Backend]
-  - Kommandozeilen-Klasse `GoldenLauf`: Datei → OCRmyPDF (lokales Docker-Image) → Text → KI-Vorschlag (Prompt gemäss design.md) → Vergleich mit `erwartet.json`
-  - Bericht `golden-bericht.md` mit Trefferquote je Feld und Liste der Fehlschläge
-  - Prompt iterieren, bis Gate erreicht oder Grenze klar
-  - _Anforderungen: 0.2, 0.3_
+  - Kommandozeilen-Klasse `GoldenLauf`: Datei → OCRmyPDF (lokales Docker-Image) → Text → Swiss QR Code deterministisch auslesen → KI-Vorschlag (Prompt gemäss design.md, QR-Werte vor KI-Werten) → Vergleich mit `erwartet.json` nach den Regeln aus 0.7
+  - Prompt und Sicherheitsschwelle nur auf den 30 Belegen zum Abstimmen iterieren; die 20 zurückgehaltenen erst im Gate-Lauf verwenden
+  - Bericht getrennt nach Abstimmungs- und Prüfteil: Trefferquote je Feld und gesamt, Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, 0.9), Liste der Fehlschläge; der Bericht liegt im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, ins Repository (`docs/spikes/golden-ergebnis.md`) kommen nur Kennzahlen und Beleg-IDs, keine Inhalte
+  - im Repository nur das Schema von `erwartet.json` und `GoldenDatensatzIT` (manuell gestartet, nie in der CI)
+  - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11_
   - _Abhängig von: 0.1, 0.3_
 
 - [ ] 0.6 Gate-Review und ADRs [Fabian]
-  - Spike-Berichte und Golden-Bericht prüfen; Entscheide E2 (Eigenbau), E3 (PWA) bestätigen
-  - ADR-001 bis ADR-006 in `docs/adr/` freigeben
-  - _Anforderungen: 0.3_
+  - Spike-Berichte und Golden-Ergebnis prüfen; Gate 0 nach 0.3 und 0.9 abnehmen, die Schwelle für 7.6 festhalten und beides in `docs/umsetzungsplan.md` (Abschnitt 6) eintragen
+  - Konzept-Entscheide E2 (Eigenbau), E3 (PWA) bestätigen
+  - D8 einer anderen Spec zuordnen oder bewusst streichen [offen: D8 einer anderen Spec zuordnen oder bewusst streichen – Entscheid vor Welle 1]; Ergebnis in der Rückverfolgung von requirements.md und in P14 (`docs/umsetzungsplan.md`) nachtragen
+  - ADR-001 bis ADR-011 in `docs/adr/` per Merge freigeben; Spike-Erkenntnisse per PR in design.md zurückschreiben, bevor Welle 1 startet
+  - _Anforderungen: 0.3, 0.9_
+  - _Abhängig von: 0.2, 0.3, 0.4, 0.5_
 
-## Welle 1 — Fundament
+- [ ] 0.7 Servergrösse K5 entscheiden und VPS bereitstellen [Fabian] [Infra]
+  - [Fabian] Grösse der eigenen Infomaniak-VPS für API, Worker (OCR), PostgreSQL mit pgvector und Keycloak festlegen [offen: VPS-Grösse K5 – Entscheid vor Welle 1] und bestellen
+  - [Fabian] Messbedingungen (Eingabe, Last, Hardware) für 3.2, 5.5 und 14.3 aus der Grösse ableiten und per PR in requirements.md nachtragen
+  - [Infra] VPS nach dem Muster des Betriebs einrichten (Traefik mit Let's Encrypt, Deploy-Befehl für das SSH-Bundle, Compose-Policy, Monitoring); Einträge im Infra-Repo der VPS
+  - _Anforderungen: 3.2, 5.5, 14.3, 16.1_
+
+## Welle 1 — Fundament (Voraussetzung: Gate 0, VPS aus 0.7 bereit)
 
 - [ ] 1.1 Repository-Gerüst und CI [Infra]
-  - Struktur gemäss `structure.md`; Quarkus-Projekt `backend` (Java 21, Extensions: rest-jackson, hibernate-orm-panache, jdbc-postgresql, flyway, oidc, smallrye-openapi, smallrye-health, micrometer, scheduler, amazon-s3, langchain4j-openai)
-  - Angular-Projekt `frontend` (Standalone, Material, PWA)
-  - GitHub Actions: `mvn verify`, `ng test`, `ng build`, Docker-Images bauen
-  - _Anforderungen: 16.1_
+  - Struktur gemäss `structure.md`, Paketstruktur hexagonal je Fachbereich (`domain`, `application`, `adapter`)
+  - Quarkus-Projekt `backend` (Java 25, Extensions: rest-jackson, hibernate-orm-panache, jdbc-postgresql, liquibase, oidc, smallrye-openapi, smallrye-health, micrometer, scheduler, amazon-s3, langchain4j-openai, quinoa); Hibernate nur `validate`
+  - Angular-Projekt `frontend` (Standalone, Material, PWA), über Quinoa im API-Artefakt ausgeliefert
+  - Cucumber-Runner für Backend-Features unter `backend/src/test/resources/features/<fachbereich>/`, Cucumber.js + Playwright für Browser-Szenarien
+  - GitHub Actions: `mvn verify` (Cucumber, JUnit, ArchUnit), `ng test`, Build über Quinoa, Docker-Images; Prüfungen: bestehende Liquibase-Changesets unverändert, OpenAPI und generierter Client aktuell, jedes Kriterium mit `@req`-Szenario oder Nachweis-Vermerk; CI-Logs nur mit IDs
+  - _Anforderungen: 1.7, 16.1, 16.7, 16.13, 16.14_
 
-- [ ] 1.2 Entwicklungsumgebung mit Docker Compose [Infra]
-  - `deploy/docker-compose.dev.yml`: PostgreSQL 17 + pgvector, Keycloak, MinIO (Object Lock), Mailpit
-  - Keycloak-Realm-Export `urinet-archiv` mit Rollen, Claim-Mapper `mandant`, TOTP-Pflicht, Testbenutzer je Rolle
-  - _Anforderungen: 2.1, 2.2, 16.1_
+- [ ] 1.2 Entwicklungsumgebung [Infra]
+  - Quarkus Dev Services für PostgreSQL 17 + pgvector und Keycloak; MinIO (Object Lock) und Mailpit für Entwicklung und Tests
+  - Keycloak-Realm-Export `deploy/keycloak/realm-export.json` (Realm `urinet-archiv`) mit den Rollen `inhaber`, `mitarbeiter`, `treuhaender`, `geschaeftsstelle`, Claim-Mapper `mandant`, TOTP-Pflicht, Testbenutzer je Rolle
+  - Dev-Stubs der Driven Ports (Ablage, KI, OCR, Integration) im Profil `dev`
+  - _Anforderungen: 2.1, 2.2, 16.13_
 
 - [ ] 1.3 Mandantenregister und Provisionierung [Backend]
-  - Flyway `db/public`: `mandant`, `auftrag`, `api_client`
-  - `MandantProvisionierung` (Schema, Flyway `db/mandant`, Bucket mit Object Lock + Versionierung, Seed Dokumentarten); Admin-Kommando `archiv mandant anlegen <code>`
+  - Liquibase `db/public`: `mandant` (inkl. Geschäftsjahresende), `auftrag`, `api_client`
+  - `MandantProvisionierung` (Schema, Liquibase `db/mandant`, Bucket mit Object Lock + Versionierung, Seed der Dokumentarten aus `seed/<code>/dokumentarten.json`); Admin-Kommando `archiv mandant anlegen <code>`
+  - beim Start Migration aller aktiven Mandanten über Liquibase, Hibernate nur `validate`
   - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt
-  - _Anforderungen: 1.1, 1.5_
+  - _Anforderungen: 1.1, 1.5, 1.7, 9.6_
 
-- [ ] 1.4 Mandanten-Kontext und Rollen [Backend]
+- [ ] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
-  - Tests: ohne Claim → 403; inaktiver Mandant → 403; fremde Dokument-ID → 404; `treuhaender` schreibt → 403
-  - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4_
+  - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
+  - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; fremde Dokument-ID → 404; `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
-- [ ] 1.5 API-Tokens für Generatoren [Backend]
-  - `ApiTokenAuthMechanism`, Argon2id, Kommando `archiv token erstellen <mandant> <name> generator` (gibt Geheimnis einmal aus), Widerruf
-  - _Anforderungen: 2.5_
+- [ ] 1.5 API-Tokens für Generatoren und Import [Backend]
+  - `ApiTokenAuthMechanism`, Argon2id, an einen Mandanten gebunden, Scopes `generator` und `import`; ein Token erreicht nur die Endpunkte seines Scopes, sonst 403
+  - Kommando `archiv token erstellen <mandant> <name> <scope>` (gibt Geheimnis einmal aus); Anlegen, Anzeigen und Widerruf nur mit Recht A14
+  - _Anforderungen: 2.5, 2.20_
 
 - [ ] 1.6 Querschnitt: Problem Details, Protokoll-Grundlage, ArchUnit [Backend]
-  - `ExceptionMapper` → RFC 9457 mit `fehlercode`; Tabelle `zugriff_protokoll` mit Sperr-Trigger; `@Protokolliert`-Interceptor
-  - ArchUnit-Regeln aus design.md
-  - _Anforderungen: 10.2, 10.3_
+  - `ExceptionMapper` → RFC 9457 mit `fehlercode`
+  - Tabelle `zugriff_protokoll` mit Trigger (nur `INSERT`); `@Protokolliert`-Interceptor schreibt synchron in derselben Transaktion, IP aus `X-Real-Ip`; schlägt der Eintrag fehl, wird die Aktion nicht ausgeführt; verweigerte Zugriffe mit Aktion `VERWEIGERT`
+  - ArchUnit-Regeln aus `structure.md` (Blueprint)
+  - _Anforderungen: 10.2, 10.3, 10.7, 10.8, 16.13_
+
+- [ ] 1.7 Stammdaten der Dokumentarten festlegen [Fabian]
+  - Entwurf der Stammdaten-Tabelle in design.md prüfen und je Art Code, Gruppen, Pflichtfelder, Standard-Vertraulichkeit, Aufbewahrung (Jahre, ab wann) und `gesetzliche_pflicht` festlegen [offen: Werte der 11 Dokumentarten – Entscheid vor Welle 2]
+  - Freigabe per Merge; ersetzt den [offen]-Vermerk in Requirement 9.2
+  - _Anforderungen: 9.1, 9.2_
+
+- [ ] 1.8 Leitplanken im Repository [Infra] [Fabian]
+  - Git-Hooks `pre-commit` und `pre-push` mit Secret-Scan; Secret-Scan zusätzlich als CI-Workflow, Pflicht vor dem Merge
+  - Claude-Code-Hooks in `.claude/settings.json`: nach dem Bearbeiten einer Java-Datei die betroffenen Tests ausführen, Bearbeiten bestehender Changesets unter `db/**` blockieren, keine Secret-Dateien lesen oder schreiben
+  - [Fabian] Leitplanken-Vorlage des Betriebs übernehmen und Branch-Schutz für `main` setzen (PR und grüne CI Pflicht)
+  - _Anforderungen: 16.9, 16.14_
+
+- [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
+  - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
+  - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
+  - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
+  - erster Deploy des Gerüsts auf die VPS aus 0.7, noch ohne echte Belege (15.3)
+  - _Anforderungen: 16.1, 16.9, 16.10, 16.11_
+  - _Abhängig von: 0.7, 1.1_
 
 ## Welle 2 — Dokumente, Ablage, Verarbeitung
 
-- [ ] 2.1 Dokumentarten und Aufbewahrung [Backend]
-  - Entität `Dokumentart`, REST `/dokumentarten` (CRUD, Löschen nur ohne Dokumente → sonst inaktiv), JSON-Schema-Validierung für `zusatz`
-  - Seed `urinet` mit 11 Arten; `AufbewahrungRechner` (Geschäftsjahr / gültig bis / unbefristet) mit Unit-Tests (Beleg 2026 → 31.12.2036)
-  - _Anforderungen: 9.1–9.5_
+- [ ] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
+  - Entität `Dokumentart` mit Standard-Vertraulichkeit und `gesetzliche_pflicht`; REST `/api/v1/dokumentarten` (CRUD nur mit Recht A11; Löschen nur ohne Dokumente, sonst 409 `DOKUMENTART_IN_GEBRAUCH` → inaktiv); JSON-Schema-Validierung für `zusatz` (422 `ZUSATZ_UNGUELTIG`)
+  - Seed `backend/src/main/resources/seed/urinet/dokumentarten.json` mit den 11 Arten aus 1.7; ein Test prüft den Seed Feld für Feld gegen die Stammdaten-Tabelle in design.md
+  - `AufbewahrungRechner`: Ende des bestätigten Geschäftsjahres (Geschäftsjahresende des Mandanten) plus Jahre der Regel; ohne Belegdatum Eingangsdatum; Verträge ab `gueltig_bis`, ohne `gueltig_bis` unbefristet; Neuberechnung verlängert nur; Frist in der Vergangenheit → «Frist abgelaufen»; keine Löschung bei Fristablauf
+  - Unit-Tests: Beleg 2026 → 31.12.2036; abweichendes Geschäftsjahresende; ohne Belegdatum; Vertrag ohne `gueltig_bis`; Neuberechnung mit früherem Datum → Sperre bleibt, Konflikt protokolliert
+  - [Fabian] Abnahme: Seed gegen die freigegebene Tabelle prüfen
+  - _Anforderungen: 2.17, 9.1–9.9_
+  - _Abhängig von: 1.7_
 
-- [ ] 2.2 Datenmodell Dokument [Backend]
-  - Flyway `db/mandant`: `dokument`, `dokument_finanz`, `dokument_vertrag`, `dokument_version`, generierte `volltext_tsv` + Indizes
-  - Panache-Entitäten, `VertraulichkeitFilter`
-  - Tests: Vertraulichkeit `personal` für `mitarbeiter` unsichtbar, für Inhaber sichtbar
-  - _Anforderungen: 2.3, 10.1_
+- [ ] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
+  - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
+  - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
+  - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
+  - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten
+  - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
+  - _Anforderungen: 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
 
 - [ ] 2.3 Ablage-Service S3 [Backend]
-  - `AblageService` mit `ablegenEingang`, `archivieren` (Kopie, Prüfsummenvergleich, Retention, Löschen in `eingang/`), `loeschenEingang`, `vorsignierteUrl`
-  - Testcontainers MinIO mit Object Lock: archivierte Datei nicht löschbar, Prüfsummen-Abweichung bricht ab
-  - _Anforderungen: 6.2, 6.3, 6.4, 6.5_
+  - Port `AblagePort` mit S3-Adapter und Dev-Stub: `ablegenEingang`, `archivieren`, `sperreVerlaengern`, `loeschenEingang`, `vorsignierteUrl`
+  - `archivieren`: Original, Arbeitsfassung (falls vorhanden) und PDF/A nach `archiv/` kopieren, Prüfsummen vergleichen, Versions-ID je Datei in `dokument_datei` speichern; Sperre GOVERNANCE bis `aufbewahren_bis` nur bei `gesetzliche_pflicht`, unbefristete Dokumente dieser Arten 10 Jahre (Reihenfolge der Prüfung gemäss design.md, `retainUntil`); danach `eingang/` löschen
+  - nur der App-Schlüssel ohne Bypass-Recht; `vorsignierteUrl` nur für die gespeicherte Versions-ID; COMPLIANCE für `manifest/` per Konfiguration, falls der Spike Object Storage (Aufgabe 0.2, Req 0.4) es verlangt
+  - Testcontainers MinIO mit Object Lock: archivierte Datei nicht löschbar, Prüfsummen-Abweichung bricht ab, Art ohne gesetzliche Pflicht ohne Sperre, Sperre nur verlängerbar
+  - _Anforderungen: 6.2, 6.3, 6.4, 6.5, 6.9, 6.11, 6.12, 14.6_
 
 - [ ] 2.4 Upload-Endpunkt [Backend]
-  - `POST /dokumente` multipart, Typprüfung per Tika-Detektor, 50 MB, SHA-256 vor allem anderen, Dublettenprüfung, `zusammenfassen`, Antwort 202 ≤ 2 s
-  - Auftrag `VERARBEITEN` einreihen
-  - _Anforderungen: 3.1–3.5, 6.1_
+  - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
+  - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
+  - Antwort 202 ≤ 2 s (Messbedingungen aus 0.7), Status `NEU`, Auftrag `VERARBEITEN` einreihen
+  - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
 - [ ] 2.5 Auftragsschlange [Backend]
-  - `AuftragService.einreihen(typ, nutzlast)`, `AuftragPoller` mit `SKIP LOCKED`, Wiederholung mit Backoff, Mandantenkontext pro Auftrag
-  - Test: zwei Worker holen denselben Auftrag nie doppelt
-  - _Anforderungen: 1.6, 5.4_
+  - `AuftragService.einreihen(typ, nutzlast)`, `AuftragPoller` mit `SKIP LOCKED`, insgesamt 3 Versuche mit wachsender Wartezeit, Mandantenkontext pro Auftrag
+  - Zeitgrenze je Auftragstyp (design.md) und Lebenszeichen; verwaiste `LAEUFT`-Aufträge nach Ablauf der Zeitgrenze freigeben, zählt als Versuch
+  - Tests: zwei Worker holen denselben Auftrag nie doppelt; Zeitüberschreitung und verwaister Auftrag zählen als Fehlversuch
+  - _Anforderungen: 1.6, 5.4, 5.6, 5.7_
 
 - [ ] 2.6 Worker-Image und Verarbeitung [Backend] [Infra]
-  - Dockerfile Worker (JVM + ocrmypdf, tesseract-ocr-deu/eng, img2pdf, libheif-examples, poppler-utils, ghostscript)
-  - `VerarbeitenHandler`: HEIC→JPEG, Bilder→PDF, OCRmyPDF (`--skip-text` bei Textebene), `pdftotext`, Vorschaubilder; Folgeauftrag `KI_VORSCHLAG`
-  - veraPDF-Prüfung im Test; Laufzeitmessung einseitiges Foto ≤ 30 s
-  - _Anforderungen: 5.1–5.5_
+  - Dockerfile Worker (JVM + ocrmypdf, tesseract-ocr-deu/eng, img2pdf, libheif-examples, poppler-utils, ghostscript) nach Compose-Policy (uid ungleich 0)
+  - Port `OcrPort` mit Adapter und Dev-Stub; `VerarbeitenHandler`: Status `VERARBEITUNG`, HEIC→JPEG, Bilder→PDF, bei Handy-Erfassung PDF/A aus der Arbeitsfassung, OCRmyPDF (`--skip-text` bei Textebene), `pdftotext`, Vorschaubilder; Folgeauftrag `KI_VORSCHLAG`; nach 3 Fehlversuchen `FEHLER` mit Fehlertext
+  - signierte PDFs: PDF/A auch bei Verlust der Signatur, Original unverändert; keine PDF/A möglich (z. B. verschlüsselt) → Vermerk `pdfa_fehlt` und Eingangskorb
+  - veraPDF-Prüfung im Test; Laufzeit einseitiges Foto als p95 ≤ 30 s (Messbedingungen aus 0.7)
+  - _Anforderungen: 5.1–5.10_
 
 - [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
-  - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE), Navigation mit Eingangskorb-Zähler
-  - Seite Upload mit Drag & Drop, Mehrfachauswahl, «als ein Dokument», Fortschritt, Fehlermeldungen
+  - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE) gegen Keycloak, Navigation mit Eingangskorb-Zähler, Menüpunkte nach Rechtematrix
+  - Seite Upload mit Drag & Drop, Mehrfachauswahl, «als ein Dokument», Fortschritt, Ergebnis je Datei (angenommen, «bereits vorhanden», Fehlermeldung)
   - API-Client aus OpenAPI generieren
-  - _Anforderungen: 3.1, 3.3, 3.5, 8.6_
+  - _Anforderungen: 3.1, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
+
+- [ ] 2.8 Mindestversionen der Handys festlegen [Fabian]
+  - Mindestversionen iOS (Safari) und Android (Chrome) festlegen [offen: Mindestversionen iOS und Android – Entscheid vor Welle 3] und per PR in Requirement 4.1 nachtragen; Testgeräte für 3.7 bereitstellen
+  - _Anforderungen: 4.1_
 
 ## Welle 3 — KI-Vorschläge, Eingangskorb, Handy-Erfassung
 
 - [ ] 3.1 Kontakte und Partner-Abgleich [Backend]
-  - Flyway `kontakt`, `verkaufschance` mit `pg_trgm`; `Normalisierer`; REST `/kontakte`
+  - Liquibase `kontakt`, `verkaufschance` mit `pg_trgm`; `Normalisierer` gemäss design.md; REST `/api/v1/kontakte` (lesen; ändern nur mit Recht A12)
   - `PartnerAbgleich` (E-Mail, UID, IBAN, Ähnlichkeit ≥ 0.6, «unsicher» bei Abstand < 0.1) mit Tests
-  - _Anforderungen: 7.4_
+  - _Anforderungen: 2.18, 7.4_
 
 - [ ] 3.2 Metadaten-Extraktor [Backend]
-  - `MetadatenExtraktor` (LangChain4j), Prompt aus Welle 0 übernehmen, Schema-Validierung + eine Nachfrage, Belegnummer-Muster, Sicherheiten, `ki_verbrauch`
-  - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter
+  - Port `KiPort` mit Adapter (LangChain4j) und Dev-Stub; `MetadatenExtraktor` mit Prompt aus Welle 0, Schema-Validierung + eine Nachfrage, Sicherheiten je Feld, Schwelle aus Gate 0, `ki_verbrauch`
+  - Swiss QR Code vor dem KI-Aufruf deterministisch auslesen, seine Werte vor den KI-Werten verwenden
+  - Vorschlag inkl. Vertraulichkeit (vorbelegt mit dem Standard der Art); das Belegnummer-Muster setzt die Art nur, wenn der Mandant Aussteller ist (Testfall Lieferantenrechnung `2026-123`)
+  - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter; Logs nur mit IDs
   - WireMock-Tests für gültige, ungültige und fehlende Antworten
-  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8_
+  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
-  - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern; Auswahl der 5 Beispiele (gleicher Partner, sonst gleiche Art, neueste zuerst)
-  - _Anforderungen: 7.7_
+  - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
+  - Vorauswahl vor dem KI-Aufruf deterministisch über diese Merkmale, ohne Treffer die 5 neuesten; kein zweiter KI-Aufruf
+  - Korrekturquote je Feld als Kennzahl fortschreiben
+  - Szenario: Nach einer Korrektur bei Partner X enthält der nächste Beleg mit der IBAN von X das Beispiel
+  - _Anforderungen: 7.7, 7.9, 7.10_
+  - _Abhängig von: 3.2_
 
-- [ ] 3.4 Bestätigen, Verwerfen, Archivieren [Backend]
-  - `POST /dokumente/{id}/bestaetigen`: Pflichtfelder, `aufbewahren_bis`, Auftrag `ARCHIVIEREN` (AblageService.archivieren), Status `ARCHIVIERT`
-  - `POST /dokumente/{id}/verwerfen`: Dateien löschen, Protokoll, Status `VERWORFEN`
-  - _Anforderungen: 6.3, 6.6, 8.2, 8.3, 8.5_
+- [ ] 3.4 Bestätigen, Verwerfen, Archivieren, Wiederholen [Backend]
+  - `POST /api/v1/dokumente/{id}/bestaetigen` (Recht A7): nur aus `EINGANGSKORB`, sonst 409; Pflichtfelder (422 `PFLICHTFELD_FEHLT`); Vertraulichkeit übernehmen; `aufbewahren_bis`; Frist in der Vergangenheit → «Frist abgelaufen», der Inhaber entscheidet; Belegnummer einer eigenen Art schon vergeben → 409, bei Fremdbelegen nur Warnung; Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`
+  - `ArchivierenHandler`: `AblageService.archivieren`; Status `ARCHIVIERT` erst nach Kopie, Prüfsummenvergleich und Sperre; bei Fehler `ARCHIVIERUNG_FEHLER`, bestätigte Metadaten bleiben, E-Mail an den Inhaber (nur Dokument-ID)
+  - `POST /api/v1/dokumente/{id}/verwerfen` (Recht A9): aus `EINGANGSKORB` und `FEHLER` Dateien löschen, Protokoll mit Prüfsumme und Grund, Status `VERWORFEN`; aus `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER` oder `ARCHIVIERT` → 409
+  - `POST /api/v1/dokumente/{id}/wiederholen` (Recht A10): `FEHLER` → `NEU` (Verarbeitung neu), `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` (nur Archivierung, Metadaten unverändert), sonst 409
+  - Dokument mit `pdfa_fehlt`: der Inhaber archiviert das Original allein oder verwirft
+  - _Anforderungen: 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6, 6.7, 6.8, 6.13, 8.2, 8.3, 8.5, 8.8, 8.9, 8.10, 9.8_
 
 - [ ] 3.5 Metadaten ändern und Versionen [Backend]
-  - `PATCH /dokumente/{id}` mit `If-Match`, Grund Pflicht bei `ARCHIVIERT`, Eintrag in `dokument_version`; 412 bei Konflikt
-  - _Anforderungen: 10.1, 10.4_
+  - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`
+  - Vertraulichkeit und `person_benutzer` nur mit Recht A8
+  - Änderung von Belegdatum, Art, Geschäftsjahr oder `gueltig_bis` → `aufbewahren_bis` neu berechnen, Sperre nur verlängern (`sperreVerlaengern`), Konflikt protokollieren
+  - _Anforderungen: 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6_
 
 - [ ] 3.6 Eingangskorb-Oberfläche [Frontend]
-  - Liste mit Vorschaubild, Vorschlägen, «bitte prüfen»-Markierung, Partnerauswahl mit Suche, Bestätigen in ≤ 2 Tipps, Verwerfen mit Rückfrage
+  - Liste nach Recht A5 (`mitarbeiter` nur selbst erfasste) mit Vorschaubild, Vorschlägen, «bitte prüfen»-Markierung, Partnerauswahl mit Suche, Bestätigen in ≤ 2 Tipps, Verwerfen mit Rückfrage und Grund
+  - `FEHLER` mit Fehlertext, «erneut verarbeiten» und «verwerfen»; `ARCHIVIERUNG_FEHLER` mit «Archivierung wiederholen»; Hinweise «Frist abgelaufen», `pdfa_fehlt` und Belegnummer-Warnung bei Fremdbelegen
+  - Aktionen nur nach Rechtematrix sichtbar
   - Playwright im 375-px-Viewport
-  - _Anforderungen: 8.1–8.6_
+  - _Anforderungen: 2.11, 2.24, 8.1–8.10_
 
-- [ ] 3.7 Handy-Erfassung (PWA) [Frontend]
-  - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), Vorschau anpassen/verwerfen, JPEG 2'480 px
-  - Offline-Warteschlange (IndexedDB), automatischer Upload bei `online`, 3 Fehlversuche → manuell wiederholen
-  - Test auf echtem iPhone (Safari) und Android (Chrome) [Fabian]
-  - _Anforderungen: 4.1–4.6_
+- [ ] 3.7 Handy-Erfassung (PWA) [Frontend] [Fabian]
+  - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), ohne erkannte Kanten das ganze Bild, Vorschau anpassen/verwerfen, JPEG 2'480 px
+  - Upload je Seite: Rohaufnahme als Original, Zuschnitt als Arbeitsfassung
+  - Offline-Warteschlange (IndexedDB) mit Zähler, automatischer Upload bei `online`; `DUBLETTE` gilt als übertragen und wird gelöscht; nur Netzwerkfehler und 5xx zählen als Fehlversuch, offline nicht; 3 Fehlversuche → manuell wiederholen; 4xx sofort fehlerhaft mit Meldung des Servers (401 → neu anmelden)
+  - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
+  - _Anforderungen: 4.1–4.8_
+  - _Abhängig von: 2.8_
 
 ## Welle 4 — CSV-Import, Suche, Generatoren, Altbestand
 
 - [ ] 4.1 CSV-Erkennung und Spaltenzuordnung [Backend]
-  - Upload `/importe/crm`, SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Name Pflicht, ≤ 10'000 Zeilen)
-  - Synonymliste aus `docs/spikes/21crm-export.md`; `import_zuordnung` lesen/speichern
-  - Tests mit den Beispieldateien aus 0.4 (UTF-8 mit BOM, Windows-1252, Komma/Semikolon)
-  - _Anforderungen: 13.1, 13.2, 13.10_
+  - Upload `/api/v1/importe/crm` (Recht A12), SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Name Pflicht, ≤ 10'000 Zeilen, ohne Datenzeilen abgelehnt)
+  - Synonymliste aus `docs/spikes/21crm-export.md`; `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
+  - Tests mit den Beispieldateien aus 0.4 (UTF-8 mit BOM, Windows-1252, Komma/Semikolon) und einer Datei ohne Datenzeilen
+  - _Anforderungen: 2.18, 13.1, 13.2, 13.10, 13.11_
   - _Abhängig von: 0.4_
 
 - [ ] 4.2 Vorschau und Abgleich [Backend]
-  - Auftrag `CSV_VORSCHAU`: Abgleich Kontakt-ID → E-Mail → Name+PLZ, Ergebnis je Zeile in `import_zeile`, Zähler im Lauf
-  - Dublettenregel (mehrere Kandidaten oder nur Ähnlichkeit)
+  - Auftrag `CSV_VORSCHAU`: Abgleich Kontakt-ID → E-Mail → normalisierter Name + PLZ (ein exakter Treffer zählt), Ergebnis je Zeile in `import_zeile`, Zähler im Lauf
+  - «mögliche Dublette» bei mehreren Kandidaten, sich widersprechenden Stufen oder nur Ähnlichkeit ab der Schwelle aus design.md
   - _Anforderungen: 13.3, 13.4, 13.5_
 
 - [ ] 4.3 Übernahme und Protokoll [Backend]
-  - Auftrag `CSV_UEBERNEHMEN` in einer Transaktion; Dubletten-Entscheide; fehlende Kontakte nur `nicht_im_export=true`; Originaldatei nach `importe/`
-  - Verkaufschancen-Import (Art `verkaufschance`) mit Kontakt-Zuordnung
+  - Auftrag `CSV_UEBERNEHMEN` in einer Transaktion; leere Zellen überschreiben nichts; Dubletten-Entscheide; «nicht mehr im CRM-Export» nur bei Vollexport und nur für Kontakte mit `crm_id`, nie löschen; Originaldatei nach `importe/`
+  - Verkaufschancen-Import (Importart `verkaufschance`) über die Kontakt-ID aus 21.CRM zuordnen, bestehende über `crm_id` aktualisieren
   - _Anforderungen: 13.6, 13.7, 13.8, 13.9_
 
 - [ ] 4.4 Import-Oberfläche [Frontend]
-  - Upload, Zuordnungsdialog (Spalte → Feld mit Vorschlag), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe
-  - _Anforderungen: 13.2, 13.3, 13.5, 13.6_
+  - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
+  - _Anforderungen: 13.2, 13.3, 13.5, 13.6, 13.7_
 
 - [ ] 4.5 Volltextsuche [Backend]
-  - `GET /dokumente` mit `websearch_to_tsquery`, Filtern, Sortierung, `ts_headline`; Vertraulichkeit und Mandant
-  - Lasttest mit 50'000 synthetischen Dokumenten: p95 ≤ 1 s
-  - `GET /dokumente/{id}/datei` mit vorsignierter URL (5 Min.) und Protokoll
-  - _Anforderungen: 14.1–14.6_
+  - `GET /api/v1/dokumente` mit `websearch_to_tsquery` (inkl. Tags), Filtern (Art, Partner, Zeitraum, Betrag, Richtung, Tags, Status, Geschäftsjahr, Belegnummer exakt), Sortierung, `ts_headline`; Vertraulichkeit nach 2.3 und Mandant
+  - Lasttest mit 50'000 synthetischen Dokumenten: p95 ≤ 1 s (Messbedingungen aus 0.7)
+  - `GET /api/v1/dokumente/{id}/datei` mit vorsignierter URL (5 Min.) für die gespeicherte Versions-ID, mit Protokoll
+  - _Anforderungen: 14.1–14.7_
 
 - [ ] 4.6 Suche und Dokumentansicht [Frontend]
-  - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Tags, Geschäftsjahr), Trefferliste mit Auszug
-  - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund), Versionen, Download
-  - _Anforderungen: 14.1, 14.2, 14.4, 10.1_
+  - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Richtung, Status, Tags, Geschäftsjahr, Belegnummer), Trefferliste mit Auszug
+  - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
+  - _Anforderungen: 10.1, 14.1, 14.2, 14.4, 14.7_
 
 - [ ] 4.7 Generator-Endpunkt und Python-Client [Backend]
-  - `POST /dokumente/generator`: Validierung, direkt archivieren, 409 bei vergebener Belegnummer
-  - `tools/archiv_client.py` (requests, Token aus Umgebung `ARCHIV_TOKEN`, Ordner `archiv-ausstehend/` bei Ausfall); Einbau-Beispiel für `rechnung_gen.py` und `urinet_pdf.py` in `tools/README.md`
-  - _Anforderungen: 11.1–11.5_
+  - `POST /api/v1/dokumente/generator` (Scope `generator`): Pflichtfelder der Art (422 `PFLICHTFELD_FEHLT`), unbekannte `crmId` (422); `vertraulichkeit` und `personBenutzer` Pflicht bei Standard `PERSONAL`, sonst Standard der Art
+  - Verarbeitung ohne KI (Prüfsumme, Dublettenprüfung, PDF/A, Volltext, Vorschau), `aufbewahren_bis`, Archivierung über `ARCHIVIERUNG` nach `ARCHIVIERT`; Antwort 201 oder 202 gemäss design.md
+  - gleiche SHA-256 wie ein vorhandenes Dokument → 200 mit vorhandener ID; Belegnummer einer eigenen Art mit abweichender SHA-256 → 409
+  - Verwerfen eines Generator-Dokuments (aus `FEHLER` oder `EINGANGSKORB`) gibt die Reservation in `belegnummer_eigen` in derselben Transaktion frei; Integrationstest: verwerfen, korrigiert neu senden → 202
+  - `tools/archiv_client.py` (requests, Token aus Datei mit Rechten 600: `~/.config/urinet-archiv/token` oder Pfad aus `ARCHIV_TOKEN_DATEI`, nie im Code oder als Umgebungsvariable); bei Ausfall Ordner `archiv-ausstehend/`, bei 409 nach `archiv-konflikt/` ohne erneutes Senden; Einbau-Beispiel für `rechnung_gen.py` und `urinet_pdf.py` in `tools/README.md`
+  - _Anforderungen: 11.1–11.11_
 
 - [ ] 4.8 Drive-Import-Werkzeug [Backend]
-  - `tools/drive_import` (Java, Picocli): rekursiv, Trockenlauf, Ordnerpfad als `hinweis`, Überspringen gleicher Prüfsummen, Liste `.gdoc/.gsheet`
-  - Pfad-Muster → Hinweise an die KI (Kunde, Art)
-  - _Anforderungen: 12.1–12.5_
+  - `tools/drive_import` (Java, Picocli), Anmeldung mit API-Token vom Scope `import` (Token aus Datei wie in 4.7, nie als Umgebungsvariable): rekursiv, Trockenlauf, Ordnerpfad als `hinweis`; Pfad-Muster → Hinweise an die KI (Kunde, Art)
+  - `DUBLETTE` gilt als übertragen («schon vorhanden»); `.gdoc/.gsheet` in der Liste «bitte als PDF exportieren»; Office-, `.eml`- und ZIP-Dateien sowie vom Archiv abgelehnte Dateien unter «nicht übernommen» mit Pfad und Grund
+  - Schlussbericht: gefunden = übertragen + schon vorhanden + übersprungen + abgelehnt
+  - importierte Dokumente landen im Eingangskorb, nie direkt im Archiv
+  - _Anforderungen: 12.1–12.8_
 
-## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1
+- [ ] 4.9 Entscheide vor Welle 5 [Fabian]
+  - Zeitstempeldienst (RFC 3161) in der Schweiz wählen und Zugang bereitstellen [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5]
+  - zweiten Schweizer Anbieter für die Zweitkopie wählen [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]
+  - Rhythmus der Restore-Probe [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5] und Aufbewahrungsfrist des Zugriffsprotokolls [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5] festlegen
+  - Schlüsselweg der Restore-Probe festlegen [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5]
+  - Ergebnisse per PR in requirements.md, design.md, tech.md und `docs/umsetzungsplan.md` nachtragen
+  - _Anforderungen: 10.9, 15.3, 16.2, 16.3_
+
+## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1 (Voraussetzung: Entscheide aus 4.9)
 
 - [ ] 5.1 Zugriffsprotokoll vollständig [Backend] [Frontend]
-  - `@Protokolliert` an allen Lese-/Schreib-/Download-Endpunkten; REST `/protokoll` (nur Inhaber) mit Filtern; Seite `/verwaltung/protokoll`
-  - Test: UPDATE/DELETE auf `zugriff_protokoll` scheitert
-  - _Anforderungen: 10.2, 10.3, 10.5_
+  - `@Protokolliert` an allen Endpunkten der Liste in design.md, inkl. verweigerter Zugriffe (`VERWEIGERT`); REST `/api/v1/protokoll` (Recht A13) mit Filtern; Seite `/verwaltung/protokoll`
+  - Aufbewahrungsfrist aus 4.9 umsetzen
+  - Tests: UPDATE/DELETE auf `zugriff_protokoll` scheitert; ohne Protokolleintrag keine Aktion
+  - _Anforderungen: 2.19, 10.2, 10.3, 10.5, 10.7, 10.8, 10.9_
+  - _Abhängig von: 4.9_
 
 - [ ] 5.2 Tages-Manifest [Backend]
-  - Auftrag `MANIFEST` täglich 02:00 Europe/Zurich, Hash-Kette, Ed25519-Signatur, optional RFC 3161, Ablage mit Object Lock, Tabelle `manifest`
-  - Prüfwerkzeug `archiv manifest pruefen <datum>` (Signatur + Kette)
-  - _Anforderungen: 15.1–15.4_
+  - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
+  - Hash-Kette (erstes Manifest `vorher_sha256 = null`), Ed25519-Signatur (Schlüssel als Secret-Datei, öffentlicher Schlüssel unter `docs/`), RFC-3161-Zeitstempel als Pflicht beim Anbieter aus 4.9
+  - Ablage unter `manifest/` mit Object Lock bis zum spätesten `aufbewahren_bis` der enthaltenen Dateien (COMPLIANCE, falls 6.11 greift), Tabelle `manifest`
+  - verpasste Läufe in Datumsreihenfolge nachholen, höchstens ein Manifest pro Datum; Tests für 29.03.2026 und 25.10.2026; Alarm bei fehlendem Manifest
+  - Prüfwerkzeug `archiv manifest pruefen <datum>` (Signatur, Kette, Zeitstempel)
+  - _Anforderungen: 6.11, 15.1–15.4, 15.6, 15.7, 15.8, 16.9_
+  - _Abhängig von: 4.9_
 
 - [ ] 5.3 Monatlicher Prüflauf [Backend]
-  - Auftrag `PRUEFLAUF`: alle Dateien stromweise hashen, mit DB und Manifest vergleichen, Bericht + E-Mail bei Abweichung
-  - _Anforderungen: 15.5_
+  - Auftrag `PRUEFLAUF`: alle Dateien über die gespeicherte Versions-ID stromweise hashen, mit Datenbank und Manifest vergleichen (massgeblich SHA-256); fremde Versionen und Löschmarken unter `archiv/` als Abweichung
+  - Sperren unbefristeter Dokumente und von Manifesten, die in weniger als 12 Monaten ablaufen, um 10 Jahre verlängern
+  - Bericht und E-Mail an den Inhaber bei Abweichung (nur IDs)
+  - _Anforderungen: 6.9, 15.5, 15.9, 15.10_
 
-- [ ] 5.4 Produktivbetrieb aufsetzen [Infra]
-  - `deploy/docker-compose.yml` (Caddy, API, Worker, PostgreSQL, Keycloak), Domains `archiv.urinet.ch`/`auth.urinet.ch`, Secrets als Dateien
-  - Infomaniak-Server einrichten (Grösse gemäss K5), Bucket `urinet-archiv-urinet` produktiv
-  - _Anforderungen: 16.1, 16.7_
+- [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
+  - Produktion auf der VPS aus 0.7 mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
+  - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv
+  - [Fabian] App-Schlüssel ohne Bypass-Recht als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Bypass-Schlüssel erstellen und nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
+  - produktives Archivieren erst, wenn der Zeitstempeldienst angebunden ist (15.3)
+  - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10_
+  - _Abhängig von: 1.9, 4.9_
 
-- [ ] 5.5 Sicherung und Wiederherstellung [Infra]
-  - `pg_dump` + restic nach Swiss Backup (verschlüsselt, Aufbewahrung 30 T / 12 M / 10 J), Systemd-Timer oder Compose-Cron
-  - `docs/betrieb/wiederherstellung.md` und erfolgreiche Restore-Probe in Testumgebung
-  - _Anforderungen: 16.2, 16.3_
+- [ ] 5.5 Sicherung und Wiederherstellung [Infra] [Fabian]
+  - im Repository (`deploy/backup/`): täglicher Export von Archiv-Datenbank, Keycloak-Datenbank und Realm, Bucket (Original, Arbeitsfassung, PDF/A, Manifeste) und Manifest-Schlüssel; der Server verschlüsselt asymmetrisch und hält nur den öffentlichen Schlüssel
+  - [Fabian] [Infra] im Infra-Repo der VPS: Sicherungsworkflow nach dem Muster `maintenance` holt die verschlüsselten Daten ab und schreibt sie mit restic zum Anbieter aus 4.9 (restic-Schlüssel nur als GitHub-Secret dieses Workflows und in den Notfallunterlagen); Aufbewahrung pro App 30 Tage, 12 Monate, 10 Jahresstände; `backup-gate.sh` und Restore-Probe um PostgreSQL und den Bucket erweitern
+  - automatisierte Restore-Probe im Rhythmus aus 4.9: Datenbanken und Dateien wiederherstellen, Anmeldung prüfen, Prüflauf (5.3) grün
+  - Restore-Probe nach dem Schlüsselweg aus 4.9
+  - `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian])
+  - _Anforderungen: 16.2, 16.3, 16.7, 16.8_
+  - _Abhängig von: 4.9, 5.3_
 
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
-  - Health, Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb), E-Mail an Inhaber bei Fehleraufträgen > 1 h und fehlgeschlagener Sicherung
-  - _Anforderungen: 16.4, 16.5_
+  - Health: öffentlich nur ein schlanker Pfad über Traefik; Detail-Health und Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb, Korrekturquote je Feld) nur intern
+  - E-Mail an den Inhaber bei einem Dokument > 1 h in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER`, bei fehlgeschlagener Sicherung und fehlendem Manifest; Inhalte nur IDs
+  - _Anforderungen: 16.4, 16.5, 16.7_
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
-  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe, Umgang mit Papier (E5); vom Treuhänder gegenlesen lassen (K3)
-  - _Anforderungen: 16.6_
+  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe, Umgang mit Papier (Konzept-Entscheid E5), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
+  - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
+  - _Anforderungen: 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
-  - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren, Papierbelege 2026 fotografieren, Generatoren umstellen
-  - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
+  - Voraussetzung: Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün
+  - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
+  - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
   - **Gate Phase 1:** alle Belege 2026 im Archiv, Prüflauf grün
-  - _Anforderungen: 1.4, 13.6, 15.5_
+  - _Anforderungen: 1.4, 12.7, 13.6, 15.3, 15.5, 16.3_
+  - _Abhängig von: 5.1–5.7, 5.9, 5.10_
+
+- [ ] 5.9 Anbindung an das Monitoring der VPS [Infra]
+  - interne Kennzahlen und Detail-Health an das Monitoring der VPS anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
+  - _Anforderungen: 16.4, 16.5_
+
+- [ ] 5.10 Notfallunterlagen [Fabian]
+  - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang inkl. Bypass-Schlüssel, öffentlicher Manifest-Schlüssel; Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
+  - Vollständigkeit einmal mit dem Notfallablauf aus 5.7 prüfen
+  - _Anforderungen: 6.10, 16.12_

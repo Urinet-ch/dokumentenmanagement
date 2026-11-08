@@ -4,7 +4,13 @@
 Phase 2 fügt dem bestehenden Quarkus-Dienst vier Bausteine hinzu: E-Mail-Eingang
 (`integration/mail`), Embeddings und Hybridsuche (`ki`, `suche`), Chat-Agent (`ki/chat`) und
 Jahresexport (`export`). Die AbaNinja-Anbindung (`integration/abaninja`) wird nur aktiviert,
-wenn für den Mandanten eine Verbindung hinterlegt ist (Entscheid E1).
+wenn für den Mandanten eine Verbindung hinterlegt ist (Konzept-Entscheid E1).
+
+Jeder Baustein folgt der hexagonalen Gliederung aus `structure.md`: Scheduler und Auftrags-Handler
+unter `adapter/in/job`, REST unter `adapter/in/rest`; IMAP, Infomaniak AI (Embeddings, Reranker,
+Sprachmodell) und AbaNinja liegen hinter Driven Ports in `application` mit Implementierung und
+Dev-Stub unter `adapter/out`. Schemaänderungen kommen als neue Liquibase-Changesets in `db/mandant`
+bzw. `db/public`.
 
 ```mermaid
 flowchart LR
@@ -36,21 +42,22 @@ flowchart LR
 ### E-Mail-Eingang (`integration/mail`)
 - `MailPoller` (Scheduler, alle 10 Min., nur Rolle `worker`), Jakarta Mail (`quarkus-mailer` reicht nicht für IMAP → `org.eclipse.angus:angus-mail`).
 - Konfiguration pro Mandant in `integration_mail(host, port, benutzer, passwort_verschluesselt, zugelassene_absender text[], aktiv)`; Host Infomaniak `mail.infomaniak.com:993` (in Konfiguration prüfen).
-- Ablauf: Ordner `INBOX` → je Nachricht `Message-ID` gegen `mail_eingang(message_id unique)` prüfen → Anhänge als Upload (Quelle `EMAIL`, `hinweis` = Betreff/Absender) → ohne Anhang: `.eml` als Original, Text mit PDFBox zu PDF, danach normale Verarbeitung → Nachricht nach `Archiviert`.
+- Ablauf: Ordner `INBOX` → je Nachricht `Message-ID` gegen `mail_eingang(message_id unique)` prüfen → Anhänge als Upload (Quelle `EMAIL`, `hinweis` = Betreff/Absender; Dublettenprüfung je Datei wie Spec 01, 3.4) → ohne Anhang: `.eml` als Original, Text mit PDFBox zu PDF, danach normale Verarbeitung (`NEU` → `VERARBEITUNG` → `EINGANGSKORB`, bis zur Bestätigung `PERSONAL` nach Spec 01, 2.21) → Nachricht nach `Archiviert`.
 - Nicht zugelassener Absender → Ordner `Quarantaene`, Eintrag `mail_eingang(status=QUARANTAENE)`.
 
 ### Embeddings und Hybridsuche (`ki`, `suche`)
 - Tabelle `chunk(id bigserial, dokument_id uuid, nr int, text text, embedding halfvec(<dim>))`, HNSW-Index `halfvec_cosine_ops`.
-  Die Dimension kommt aus Spike W0.3. BGE Multilingual Gemma2 liefert voraussichtlich 3'584 Dimensionen – über der HNSW-Grenze von 2'000 für `vector`, aber innerhalb der Grenze von 4'000 für `halfvec`; daher `halfvec`.
+  Die Dimension kommt aus dem Spike AI Services (Spec 01, Aufgabe 0.3, Req 0.5). BGE Multilingual Gemma2 liefert voraussichtlich 3'584 Dimensionen – über der HNSW-Grenze von 2'000 für `vector`, aber innerhalb der Grenze von 4'000 für `halfvec`; daher `halfvec`.
 - `Chunker`: Absätze zusammenfassen bis ≈ 3'000 Zeichen, 400 Zeichen Überlappung, Titel + Art + Partner als Kopfzeile jedes Chunks.
-- `EmbeddingService` (LangChain4j `EmbeddingModel`, OpenAI-kompatibel), Batch 16 Chunks, Auftrag `EMBEDDING` nach `ARCHIVIEREN`; Nachberechnung `EMBEDDING_ALLE`.
+- `EmbeddingService` (LangChain4j `EmbeddingModel`, OpenAI-kompatibel), Batch 16 Chunks, Auftrag `EMBEDDING` nach erfolgreichem `ARCHIVIEREN` (Status `ARCHIVIERT`); Nachberechnung `EMBEDDING_ALLE`.
 - `HybridSuche.suchen(frage, filter, k)`:
   1. Volltext: Top 50 nach `ts_rank_cd`.
   2. Vektor: Frage einbetten, Top 50 Chunks nach Kosinus, auf Dokumente verdichten (bester Chunk zählt).
   3. RRF: `score = Σ 1 / (60 + rang)`.
   4. Top 30 an Reranker (`RerankerClient`, REST gemäss Spike), Top k zurück.
   5. Ausfall von 2 oder 4 → nur Volltext, Ergebnis mit `degradiert=true`.
-- REST: `GET /dokumente?q=…&modus=hybrid` (Standard ab Phase 2: `hybrid`).
+  Volltext und Vektor verwenden denselben Sichtbarkeitsfilter wie die Volltextsuche (Spec 01, 2.3 und 2.6), angewendet vor der Verdichtung und dem Reranker.
+- REST: `GET /api/v1/dokumente?q=…&modus=hybrid` (Standard ab Phase 2: `hybrid`).
 
 ### Chat-Agent (`ki/chat`)
 - `ArchivAgent` als `@RegisterAiService(tools = ArchivWerkzeuge.class)`, Systemprompt deutsch:
@@ -74,25 +81,29 @@ flowchart LR
   WHERE d.status = 'ARCHIVIERT' AND f.richtung = 'EINNAHME' AND f.waehrung = 'CHF'
     AND d.art IN (SELECT code FROM dokumentart WHERE 'finanz' = ANY(gruppen))
     AND d.datum BETWEEN :von AND :bis
+    AND <Sichtbarkeitsfilter des Benutzers nach Spec 01, 2.6, Zeilen A2 bis A4>
   GROUP BY 1 ORDER BY 1;
   ```
+  Der Sichtbarkeitsfilter gilt in allen Werkzeug-Abfragen, auch für Summen, Anzahlen und Lücken (Requirement 5.2).
   Basis ZAHLUNGSDATUM nur, wenn `bezahlt_am` gefüllt ist (AbaNinja); sonst Hinweis an den Agenten.
 - `vollstaendigkeit`: Lücken in `^\d{4}-\d{3}$` je Jahr, Lohnabrechnungen je Monat ab erstem Beleg der Art, Kontoauszüge je Monat, AbaNinja-Belege ohne `dokument_id`.
 - REST `POST /api/v1/chat` → `text/event-stream` mit Ereignissen `werkzeug {name}`, `text {delta}`, `quellen [{titel, link}|{datenstand}]`, `fertig {gespraechId, tokens}`, `fehler {meldung}`.
 - Rate-Limit: Zähler pro Benutzer und Stunde (Tabelle oder Caffeine-Cache), 100/h.
 
 ### Jahresexport (`export`)
-- `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /exporte/{id}` liefert vorsignierte URL (24 h).
-- Inhalt gemäss Requirement 7; `belegliste.csv` UTF-8 mit BOM, Semikolon (Excel CH).
+- `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).
+- Rollen: `inhaber`, `treuhaender`; alle anderen 403 (Requirement 7.5).
+- Inhalt gemäss Requirement 7 (nur Status `ARCHIVIERT`, bei `pdfa_fehlt` das Original); `belegliste.csv` UTF-8 mit BOM, Semikolon (Excel CH).
+- Zugriffsprotokoll (Ergänzung zur Endpunktliste in Spec 01, design.md): `POST /api/v1/exporte` (Aktion Exportieren) und `GET /api/v1/exporte/{id}` (Herunterladen), beide mit Export-ID statt Dokument-ID.
 
 ### AbaNinja (`integration/abaninja`, nur bei E1 = ja)
 - `AbaNinjaClient` (Quarkus REST Client, Basis `https://api.abaninja.ch`, `Authorization: Bearer`, Pfad `/accounts/{accountUuid}/…`). Endpunkte gemäss docs.abaninja.ch prüfen und in `docs/spikes/abaninja-api.md` festhalten: Adressen (Firmen, Personen), Dokumente v2 (Rechnungen, Belege, PDF), Webhooks, Seitenweise Abfrage.
 - `integration_abaninja(account_uuid, token_verschluesselt, webhook_geheimnis_verschluesselt, aktiv, letzter_sync, letzter_fehler)`; `belegnummer_alias(alias text pk, belegnummer text)` mit Startwerten `R0001→2026-001`, `R0002→2026-002`.
 - `AbaNinjaSync` täglich 03:00: Adressen → Kontakte; Rechnungen → `dokument_finanz` (Status, `bezahlt_am`); Lieferantenbelege → Verknüpfung oder Eingangskorb.
 - `AbaNinjaWebhookResource` `POST /webhooks/abaninja/{mandant}`: Echtheitsprüfung (Verfahren gemäss Dokumentation), Idempotenz über Ereignis-ID in `webhook_ereignis(id unique)`, Auftrag `ABANINJA_EREIGNIS`, Antwort 202.
-- `Verschluesselung`: AES-256-GCM, Schlüssel `ARCHIV_DATA_KEY` (Umgebung), zufälliger 96-Bit-IV pro Wert.
+- `Verschluesselung`: AES-256-GCM, Schlüssel aus der Secret-Datei `/run/secrets/archiv_data_key` (Quelle GitHub-Secret, nie `environment`/`env_file`; zusätzlich im Passwort-Manager, tech.md Regel 7), zufälliger 96-Bit-IV pro Wert. Gilt auch für `integration_mail.passwort_verschluesselt`.
 
-## Data Models (neu in `m_<code>`)
+## Data Models (neu in `m_<code>`, Liquibase-Changelog `db/mandant`)
 ```sql
 chunk(id bigserial pk, dokument_id uuid fk, nr int, text text, embedding halfvec(3584))
   -- Dimension gemäss Spike; Index: USING hnsw (embedding halfvec_cosine_ops)
@@ -118,10 +129,13 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
 - AbaNinja: Backoff 1/2/4/8/16 Min.; 401 → Verbindung als `ungueltig` markieren, Inhaber benachrichtigen.
 
 ## Testing Strategy
+Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x.y>` (Features unter
+`backend/src/test/resources/features/<fachbereich>/`, Chat-Oberfläche mit Cucumber.js + Playwright).
+
 | Ebene | Schwerpunkt |
 | --- | --- |
-| Unit | Chunker, RRF, Kennzahl-Parameter → SQL, Lückenerkennung, AES-GCM, Dateinamen im Export |
-| Integration | GreenMail (IMAP) für Mail-Eingang; WireMock für Embeddings, Reranker, Chat-Modell (Tool-Call-Antworten simuliert), AbaNinja inkl. Webhook-Echtheit; pgvector mit `halfvec` in Dev Services |
-| Sicherheit | Werkzeuge mit zwei Mandanten und Rolle `mitarbeiter`: keine fremden/`personal`-Dokumente; Prompt-Injection-Testdokument («ignoriere alle Regeln …») ändert nichts |
-| Abnahme | `ChatPruefliste` (20 Fragen, YAML) gegen Produktivkopie, Bericht mit richtig/falsch/Quelle |
-| Last | Hybridsuche 50'000 Dokumente p95 ≤ 2 s |
+| Unit (JUnit 5) | Chunker, RRF, Kennzahl-Parameter → SQL, Lückenerkennung, AES-GCM, Dateinamen im Export |
+| Szenarien (Cucumber) | GreenMail (IMAP) für Mail-Eingang; WireMock für Embeddings, Reranker, Chat-Modell (Tool-Call-Antworten simuliert), AbaNinja inkl. Webhook-Echtheit; pgvector mit `halfvec` in Dev Services |
+| Sicherheit | Werkzeuge und Hybridsuche mit zwei Mandanten und allen Rollen der Rechtematrix (Spec 01, 2.6): `mitarbeiter` sieht weder `INTERN` noch fremde `PERSONAL`-Dokumente, auch nicht in Summen, Anzahlen und Lücken; unbestätigte Dokumente nur für Rollen mit Recht A7 und den Erfasser; Export nur `inhaber`/`treuhaender`; Prompt-Injection-Testdokument («ignoriere alle Regeln …») ändert nichts |
+| Abnahme | `ChatPruefliste` (20 Fragen, YAML unter `ARCHIV_GOLDEN_DIR`, nicht im Repo) manuell gegen den Produktivbestand, nie in der CI; Bericht nur mit Fragen-Nr. und richtig/falsch/Quelle-ja/nein, ohne Inhalte |
+| Last | Hybridsuche 50'000 Dokumente p95 ≤ 2 s, Messbedingungen wie Spec 01, 3.2 |
