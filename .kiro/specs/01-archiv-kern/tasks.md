@@ -41,6 +41,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [x] 0.4 Test-Export 21.CRM [Fabian]
   - Kontakte und Verkaufschancen als CSV exportieren, 5 Beispielzeilen anonymisieren
   - als `backend/src/test/resources/csv/21crm-kontakte-beispiel.csv` und `…-verkaufschancen-beispiel.csv` ablegen; Spalten, Trennzeichen, Zeichensatz in `docs/spikes/21crm-export.md`
+  - Ergebnis 08.11.2026: Kontakte erledigt; der Export enthielt keine Verkaufschancen. [Fabian] Nachexport mit 2 Test-Verkaufschancen vor Welle 4, dann Zuordnung bestätigen und die Beispieldatei füllen (design.md, offener Punkt)
   - _Anforderungen: 0.6, 13.1_
 
 - [ ] 0.5 Prototyp-Pipeline auf dem Golden-Datensatz [Backend]
@@ -257,9 +258,9 @@ Arbeitsweise je Aufgabe (Claude Code):
 ## Welle 4 — CSV-Import, Suche, Generatoren, Altbestand
 
 - [ ] 4.1 CSV-Erkennung und Spaltenzuordnung [Backend]
-  - Upload `/api/v1/importe/crm` (Recht A12), SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Name Pflicht, ≤ 10'000 Zeilen, ohne Datenzeilen abgelehnt)
-  - Profil «21.CRM» aus design.md (Erkennung der Kopfzeile, Name aus `Name` oder `Organisation`, E-Mail/Telefon über Index, gelöschte Zeilen übersprungen, Zuordnung nach Spaltenposition) und Synonymliste für andere Dateien (`docs/spikes/21crm-export.md`); `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
-  - Tests mit den Beispieldateien aus 0.4 (`21crm-kontakte-beispiel.csv` Windows-1252/Semikolon, `21crm-verkaufschancen-beispiel.csv` ohne Datenzeilen) plus daraus abgeleitete Varianten (UTF-8 mit BOM, Komma, Zeile mit verschobener Spaltenzahl)
+  - Upload `/api/v1/importe/crm` (Recht A12), SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Spalte für `name` Pflicht, bei 21.CRM `Name` oder `Organisation`; Zeile ohne Namen oder mit falscher Spaltenzahl «fehlerhaft»; ≤ 10'000 Zeilen; ohne Datenzeilen abgelehnt); Parser nach RFC 4180 (Felder in Anführungszeichen mit `;` oder Zeilenumbruch)
+  - Profil «21.CRM» aus design.md (Erkennung der Kopfzeile, Name aus `Name` oder `Organisation`, E-Mail/Telefon über Index, gelöschte Zeilen übersprungen, Zuordnung nach Spaltenposition) als Vorschlag im Zuordnungsdialog und Synonymliste für andere Dateien (beide design.md, Befund in `docs/spikes/21crm-export.md`); `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
+  - Tests mit den Beispieldateien aus 0.4 (`21crm-kontakte-beispiel.csv` Windows-1252/Semikolon, `21crm-verkaufschancen-beispiel.csv` ohne Datenzeilen) plus daraus abgeleitete Varianten: UTF-8 mit BOM, Komma, Feld in Anführungszeichen mit `;` und Zeilenumbruch, Zeile mit falscher Spaltenzahl, Zeile ohne Namen, `Ist gelöscht = true`, eigene Datei nur mit Kopfzeile für Req 13.11 (die Verkaufschancen-Beispieldatei wird nach dem Nachexport gefüllt)
   - _Anforderungen: 2.18, 13.1, 13.2, 13.10, 13.11_
   - _Abhängig von: 0.4_
 
@@ -270,11 +271,11 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 4.3 Übernahme und Protokoll [Backend]
   - Auftrag `CSV_UEBERNEHMEN` in einer Transaktion; leere Zellen überschreiben nichts; Dubletten-Entscheide; «nicht mehr im CRM-Export» nur bei Vollexport und nur für Kontakte mit `crm_id`, nie löschen; Originaldatei nach `importe/`
-  - Verkaufschancen-Import (Importart `verkaufschance`) über die Kontakt-ID aus 21.CRM zuordnen, bestehende über `crm_id` aktualisieren
+  - Verkaufschancen-Import (Importart `verkaufschance`) über die Kontakt-ID aus 21.CRM zuordnen (Profil «21.CRM»: `ACCOUNTGUID` → `kontakt.crm_id`, `GGUID` → `verkaufschance.crm_id`, design.md), bestehende über `crm_id` aktualisieren
   - _Anforderungen: 13.6, 13.7, 13.8, 13.9_
 
 - [ ] 4.4 Import-Oberfläche [Frontend]
-  - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
+  - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag; erkanntes Profil «21.CRM» vorausgewählt), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
   - _Anforderungen: 13.2, 13.3, 13.5, 13.6, 13.7_
 
 - [ ] 4.5 Volltextsuche [Backend]

@@ -2,7 +2,7 @@
 
 Aus dem Export übernommen werden nur Spaltennamen und technische Aufzählungswerte (true/false, Status-
 texte, Länderformat). Keine Zeile, kein Name, keine Adresse, keine ID wird kopiert.
-Aufruf: python3 crm_beispiel.py <exportordner> <zielordner>
+Aufruf: python3 tools/crm/beispiel_erzeugen.py <exportordner> <zielordner>
 """
 import csv, io, random, sys
 from pathlib import Path

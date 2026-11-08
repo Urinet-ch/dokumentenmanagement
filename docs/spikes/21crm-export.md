@@ -13,8 +13,8 @@ Beispieldateien (erfundene Werte, Kopfzeile 1:1 aus dem Export, erzeugt mit `too
 |---|---|---|
 | Zeichensatz | Windows-1252: kein BOM, kein gültiges UTF-8, Umlaute und `ß` als Einzelbyte (z. B. `Straße (Geschäft)`) | Erkennung «UTF-8 gültig? sonst Windows-1252» genügt |
 | Trennzeichen | Semikolon | – |
-| Anführungszeichen | keine, auch nicht bei Feldern mit Leerzeichen | Ein `;` oder Zeilenumbruch in einem Feld verschiebt die Spalten; solche Zeilen gelten als «fehlerhaft» (Spaltenzahl ≠ Kopfzeile). Im Test-Export kommt das bei Kontakten nicht vor |
-| Zeilenende | LF; die Datei endet mit LF | CRLF trotzdem annehmen (andere Tabellen des Exports mischen CRLF und LF) |
+| Anführungszeichen | nur bei Bedarf nach RFC 4180: in `ADDRESS.csv` keine; in `ACTION.csv` 127 Felder mit Zeilenumbrüchen und in `FILTER.csv` 11 Felder mit `;` stehen in `"…"` | Parser nach RFC 4180 (kein einfaches Aufteilen am `;`); Zeilen, deren Spaltenzahl danach nicht zur Kopfzeile passt, gelten als «fehlerhaft» |
+| Zeilenende | Datensätze enden mit LF, auch die letzte Zeile | CRLF kommt im Export nur innerhalb von Feldern in Anführungszeichen vor (`ACTION.csv`); als Datensatzende trotzdem annehmen |
 | Kopfzeile | deutsche Klartextnamen, 151 Spalten in `ADDRESS.csv`; die Spalte `Sekretär(in)` kommt **zweimal** vor | Zuordnung über die Spaltenposition speichern, nicht nur über den Namen |
 | Wahrheitswerte | `true` / `false` | – |
 | Zeitstempel | `TT.MM.JJ HH:MM:SS`, zweistelliges Jahr, ohne Zeitzone (z. B. `03.02.26 09:15:00`) | als Europe/Zurich lesen |
@@ -28,7 +28,7 @@ Die übrigen Tabellen des Gesamtexports (`ACTION`, `FILTER`, `VIEWDEFINITION` u.
 - **Organisation oder Person** steht in `Kontakt ist eine Organisation` (`true`/`false`). Bei Organisationen ist `Name` **leer**; der Firmenname steht in `Organisation`. Bei Personen stehen `Vorname` und `Name`; `Organisation` enthält höchstens den Firmennamen als Text, es gibt keine ID-Verknüpfung zur Organisation.
 - **Adresse:** genutzt werden nur die Felder «(Geschäft)»; Privat-, Besuchs- und Rechnungsadresse sind im Export leer. Personen haben oft keine PLZ (4 von 8).
 - **E-Mail:** vier Felder; `Standard-E-Mail` ist ein Index: `1` = `E-Mail (Geschäft)`, `3` = `E-Mail (Privat)`, `5` = `E-Mail (Zentrale)`.
-- **Telefon:** `Standard-Telefon 1` ist ein Index: `4` = `Telefon (Geschäft)`, `10` = `Telefon (Zentrale)`; dazu `PHONEID<n>` mit der Nummer nur aus Ziffern (`0041…`). Format der Anzeige: `+41 41 000 01 10`.
+- **Telefon:** `Standard-Telefon 1` ist ein Index: `4` = `Telefon (Geschäft)`, `10` = `Telefon (Zentrale)`; dazu `PHONEID<n>` mit der Nummer nur aus Ziffern (`0041…`). Die Anzeige beginnt mit `+41`, die Gruppierung variiert (`+41 41 000 01 10` oder `+41 410 000 110`); einheitlich ist nur `PHONEID<n>`.
 - **Gelöschte und deaktivierte Kontakte** sind über `Ist gelöscht` und `Kontakt deaktiviert` markiert (im Test-Export alle `false`).
 - Dazu viele technische Spalten (`OWNERGUID`, `Zugriffsberechtigte`, `GEOTILEID`, `EBID-Status` …), die der Import ignoriert.
 
@@ -46,7 +46,7 @@ Die übrigen Tabellen des Gesamtexports (`ACTION`, `FILTER`, `VIEWDEFINITION` u.
 | `erstellt`, `geaendert` | `Erzeugt am`, `Geändert am` |
 | (übersprungen) | Zeilen mit `Ist gelöscht = true` |
 
-Eine Zuordnung «Spalte → Feld» allein reicht dafür nicht: `name` hängt vom Typ ab, `email` und `telefon` von einem Index. Vorschlag: Das Archiv erkennt die Kopfzeile des 21.CRM-Gesamtexports und nutzt dafür ein fest eingebautes Profil «21.CRM» mit diesen Regeln; andere CSV-Dateien laufen über den Zuordnungsdialog (Req 13.2).
+Eine Zuordnung «Spalte → Feld» allein reicht dafür nicht: `name` hängt vom Typ ab, `email` und `telefon` von einem Index (im Export bei 13 von 18 bzw. 15 von 18 Kontakten leer, darum die Ausweichregeln). Vorschlag (übernommen in design.md): Das Archiv erkennt die Kopfzeile des 21.CRM-Gesamtexports, der Zuordnungsdialog (Req 13.2) schlägt das Profil «21.CRM» mit diesen Regeln vor, Fabian bestätigt es einmal. Bei Personen bildet `name_normalisiert` Vorname und Name, damit der Abgleich Name + PLZ (Req 13.4) gleichnamige Personen trennt.
 
 **Anforderungsänderung (Vorschlag):** Req 13.10 nennt die Pflichtspalte «Name». Im 21.CRM-Export ist `Name` bei allen Organisationen leer. Neu: Pflicht ist eine Spalte für das Feld `name`, beim Profil «21.CRM» `Name` **oder** `Organisation`; eine Zeile ohne beides ist «fehlerhaft».
 
@@ -63,10 +63,9 @@ Der Export enthält keine Verkaufschancen, nur die Kopfzeile (32 Spalten). Für 
 | `betrag` | `Gesamt` mit `Währung` |
 | `datum` | `Beginn` (oder `Ende`; Format vermutlich wie die Zeitstempel) |
 
-Die leere Datei eignet sich als Testfall für Req 13.11 (`CSV_LEER`, «keine Datenzeilen»).
+Bis zum Nachexport hat die Beispieldatei nur die Kopfzeile; für Req 13.11 (`CSV_LEER`) bekommt Aufgabe 4.1 eine eigene Datei nur mit Kopfzeile.
 
 ## Offene Punkte
 
 - **Verkaufschancen prüfen:** Fabian legt in 21.CRM zwei Test-Verkaufschancen an (eine mit Betrag, eine ohne) und exportiert erneut. Danach Zuordnung, Datumsformat und `ACCOUNTGUID` bestätigen und die Beispieldatei mit erfundenen Zeilen füllen.
 - **Exportweg:** Neben dem Gesamtexport bietet 21.CRM vermutlich einen Listen-Export aus der Kontaktansicht. Ob dieser andere Spaltennamen oder ein anderes Format liefert, ist ungeprüft; der Import soll den Gesamtexport als Standard nehmen.
-- **Felder mit `;`:** Kommen in Notizen oder Adresszusätzen Semikolons vor, bricht die Zeile. Prüfen, ob 21.CRM solche Felder beim Export maskiert (im Test-Export kein Fall).
