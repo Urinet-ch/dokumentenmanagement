@@ -12,7 +12,7 @@ Stand 08.11.2026 · Req 0.5, 16.7 · Mini-App: [`spikes/infomaniak-ai/`](../../s
 | Embeddings | `bge_multilingual_gemma2`: **3'584 Dimensionen**, Vektoren **nicht normiert** (Länge ≈ 159), Parameter `dimensions` nicht unterstützt |
 | Reranker | Cohere-kompatibel unter `POST /2/ai/{product_id}/cohere/v2/rerank`, nicht unter der OpenAI-Basis-URL (Form unten) |
 | Bild-Eingabe (K1) | **funktioniert**: Mistral-Small-4 liest ein PNG (`image_url` als Base64-Data-URL) und gibt Belegnummer, Datum, Betrag und Aussteller richtig zurück |
-| Speicherung / Training, AVV | siehe Abschnitt «Datenschutz und AVV» |
+| Speicherung / Training, AVV | keine dauerhafte Speicherung der Inhalte, kein Training (vertraglich); AVV gilt über die ANB – Details und offene Punkte im Abschnitt «Datenschutz und AVV» |
 
 ## Zugang und Konfiguration
 
@@ -123,4 +123,9 @@ Antwort (absteigend nach Relevanz):
 
 ## Datenschutz und AVV
 
-[offen: wird aus dem Bericht `scratchpad/infomaniak-ai-avv.md` übernommen]
+Massgebend ist [infomaniak-ai-datenschutz.md](infomaniak-ai-datenschutz.md) (Prüfung der öffentlichen Infomaniak-Dokumente am 08.11.2026) mit Belegen, offenen Punkten und Rückfragen an Infomaniak. Kurz zu Req 0.5:
+
+- **Speichert Infomaniak Eingaben?** Nicht dauerhaft; nur Betriebsdaten und eine vorübergehende Speicherung während der Anfrage. Fristen sind offen (Abschnitt 1).
+- **Training?** Vertraglich ausgeschlossen, für alle Modelle der API (Abschnitt 2).
+- **AVV:** gilt über die ANB ohne separate Unterzeichnung; Verweise unter [docs/vertrag/README.md](../vertrag/README.md) (Abschnitt 4).
+- Die im Spike verwendeten Modelle tragen kein Beta-Kennzeichen (Abschnitt 5).
