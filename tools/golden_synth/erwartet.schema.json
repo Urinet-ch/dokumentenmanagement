@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Urinet-ch/dokumentenmanagement/tools/golden_synth/erwartet.schema.json",
+  "title": "Erwartungsdatei des Golden-Datensatzes (Req 0.1, 0.7, 0.8)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "seed", "belege"],
+  "properties": {
+    "version": { "const": 1 },
+    "seed": { "type": ["integer", "null"] },
+    "belege": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/beleg" } }
+  },
+  "$defs": {
+    "datum": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "betrag": { "type": ["string", "null"], "pattern": "^-?\\d+\\.\\d{2}$" },
+    "beleg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["datei", "art", "kategorie", "datum", "partner", "betrag", "waehrung", "belegnummer", "richtung",
+                   "faelligkeit", "foto", "qr", "teil", "randfaelle", "seed"],
+      "properties": {
+        "datei": { "type": "string", "pattern": "^belege/\\d{2}_[a-z0-9_]+\\.(pdf|jpg|heic)$" },
+        "art": { "enum": ["AUSGANGSRECHNUNG", "OFFERTE", "LIEFERANTENBELEG", "QUITTUNG", "LOHNABRECHNUNG", "VERTRAG",
+                          "VERSICHERUNG", "BEHOERDE", "BANK", "PROJEKTDOKUMENT", "KORRESPONDENZ"] },
+        "kategorie": { "enum": ["QUITTUNG", "LIEFERANTENRECHNUNG", "EIGENE_RECHNUNG_OFFERTE", "BEHOERDE_VERSICHERUNG",
+                                "HANDY_FOTO"] },
+        "datum": { "$ref": "#/$defs/datum" },
+        "partner": { "type": ["string", "null"], "minLength": 1 },
+        "betrag": { "$ref": "#/$defs/betrag" },
+        "waehrung": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "belegnummer": { "type": ["string", "null"], "minLength": 1 },
+        "richtung": { "enum": ["EINNAHME", "AUSGABE", null] },
+        "faelligkeit": { "$ref": "#/$defs/datum" },
+        "foto": { "type": "boolean" },
+        "qr": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/qr" }] },
+        "teil": { "enum": ["abstimmen", "zurueckgehalten"] },
+        "randfaelle": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_]+$" } },
+        "seed": { "type": ["integer", "null"] }
+      }
+    },
+    "qr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["konto", "betrag", "waehrung", "referenztyp", "referenz", "zahlungsempfaenger"],
+      "properties": {
+        "konto": { "type": "string", "pattern": "^CH\\d{19}$" },
+        "betrag": { "$ref": "#/$defs/betrag" },
+        "waehrung": { "enum": ["CHF", "EUR"] },
+        "referenztyp": { "enum": ["QRR", "SCOR", "NON"] },
+        "referenz": { "type": ["string", "null"] },
+        "zahlungsempfaenger": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
