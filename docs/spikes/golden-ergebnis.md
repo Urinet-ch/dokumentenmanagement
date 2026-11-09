@@ -10,7 +10,7 @@ Vorschlag und Sicherheit je Beleg liegen in `$ARCHIV_GOLDEN_DIR/berichte/<Zeitpu
 - **Prüfteil (Gate, Req 0.3/0.9): noch nicht gelaufen.** Den Gate-Lauf (`--gate`, 20 zurückgehaltene Belege) startet Fabian.
 - **Nachschärfen (09.11.2026, unten):** Prompt v5 mit Bild für Fotos und engerer Nachbearbeitung, 21 und 26/30 Belege
   mit Art, Datum, Partner, Betrag richtig (Mittel 23.5); in keinem Lauf eine Schwelle ≤ 1.0 mit höchstens einem Fehler.
-  Eingefroren für den Gate-Lauf: `v5-fb5c021d33fc`.
+  Vorläufig eingefroren: `v5-fb5c021d33fc` (kein Gate-Lauf vor Abschluss der Gate-Vorbereitung, siehe unten).
 - **Abstimmungsteil (30 synthetische Belege), Endstand Prompt v3:** 82 % der Felder richtig, 18/30 Belege mit Art,
   Datum, Partner und Betrag richtig (60 %). Hochgerechnet auf den Prüfteil wären das rund 12/20, das Gate verlangt 18/20.
 - **Schwelle (Req 0.9):** Mit 0.8 bleiben 8–13 falsche Felder mit hoher Sicherheit. Die kleinste Schwelle mit höchstens
@@ -18,12 +18,14 @@ Vorschlag und Sicherheit je Beleg liegen in `$ARCHIV_GOLDEN_DIR/berichte/<Zeitpu
 - **Grösste Fehlerquelle:** Handy-Fotos über OCR (5 von 6 Fotos im Abstimmungsteil weitgehend falsch). Mit Variante K1
   (Bild statt OCR-Text) sind die Fotos überwiegend richtig.
 - **Zweite Fehlerquelle:** Lieferantenrechnungen werden als `AUSGANGSRECHNUNG` eingestuft, darunter der Testfall `2026-123` (Req 7.12).
-- **Realitätsprüfung (Req 0.10):** 0 bestätigte echte Belege (20 noch nicht bestätigt oder mit Prüfmarke).
+- **Realitätsprüfung (Req 0.10):** 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35);
+  `--realitaet` noch nicht gelaufen.
 - Kosten: rund CHF 0.014 je 30 Belege (Text) bzw. CHF 0.025 (K1); KI rund 3–4 s je Beleg.
 
 ## Läufe auf dem Abstimmungsteil
 
-Alle mit `mistralai/Mistral-Small-4-119B-2603`, `json_schema` strict, `temperature=0`, ein Aufruf je Beleg, Schwelle 0.8.
+Alle mit `mistralai/Mistral-Small-4-119B-2603`, `json_schema` strict, `temperature=0`, ein Aufruf je Beleg (logisch;
+Transport-Wiederholungen siehe Befund 14), Schwelle 0.8.
 
 | Lauf | Prompt | Eingabe | Art | Datum | Partner | Betrag | Beleg-Nr. | Felder | Gate-Belege | Fehler ≥ 0.8 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -136,16 +138,18 @@ ist ein Einzellauf und ebenfalls nur Referenz.
 | **2026-11-09-1434** | **V3 `v5-fb5c021d33fc`** | Bild für Fotos | 25 | 28 | 29 | 28 | 29 | 139/150 | 21/30 | 9 |
 | **2026-11-09-1438** | **V3 `v5-fb5c021d33fc`** | Bild für Fotos | 26 | 30 | 29 | 30 | 28 | 143/150 | 26/30 | 6 |
 | 2026-11-09-1442 | V4 `v6-35426948c145` (verworfen) | Bild für Fotos | 25 | 28 | 26 | 27 | 29 | 135/150 | 19/30 | 11 |
-| 2026-11-09-1445 | V4 `v6-35426948c145` (verworfen) | Bild für Fotos | 24 | 29 | 27 | 29 | 29 | 138/150 | 22/30 | 6 |
+| 2026-11-09-1445¹ | V4 `v6-35426948c145` (verworfen) | Bild für Fotos | 24 | 29 | 27 | 29 | 29 | 138/150 | 22/30 | 6 |
+
+¹ Vollbericht durch Prüflauf (v5, 1 Beleg) überschrieben, Zahlen nur aus der Konsole.
 
 Je Variante (Belege mit Art, Datum, Partner, Betrag richtig; Mittel und Spannweite der zwei Läufe):
 
 | Variante | Gate-Belege | Art roh (Modell) → nach Nachbearbeitung | Umstufungen | Fehler ≥ 0.8 | kleinste Schwelle (≤ 1 Fehler) |
 | --- | --- | --- | --- | --- | --- |
 | V1 v3, OCR-Text | 19.0 (18–20) | 23 → 23; 26 → 26 | – | 10; 12 | keine ≤ 1.0; keine ≤ 1.0 |
-| V2 v3, Bild für Fotos | 23.0 (22–24) | 23 → 26; 27 → 28 | 0; 0 | 9; 5 | keine ≤ 1.0; keine ≤ 1.0 |
+| V2 v3, Bild für Fotos | 23.0 (22–24) | 23 → 26; 27 → 28 | – (Regel erst ab V3, Commit «Prompt v5 und engere Nachbearbeitung») | 9; 5 | keine ≤ 1.0; keine ≤ 1.0 |
 | **V3 v5, Bild für Fotos** | **23.5 (21–26)** | 20 → 25; 21 → 26 | 0; 0 | 9; 6 | keine ≤ 1.0; keine ≤ 1.0 |
-| V4 v6 (verworfen) | 20.5 (19–22) | 20 → 25; 19 → 24 | 0; 0 | 11; 6 | keine ≤ 1.0; keine ≤ 1.0 |
+| V4 v6 (verworfen) | 20.5 (19–22¹) | 20 → 25; 19 → 24¹ | 0; 0¹ | 11; 6¹ | keine ≤ 1.0; keine ≤ 1.0¹ |
 
 Tokens und Kosten je Lauf (30 Belege, Preise wie oben):
 - V1: 35'814 ein / rund 9'300 aus, CHF 0.014 (alles Text).
@@ -167,49 +171,65 @@ Verbleibende Fehlschläge V3 (Beleg-ID: Feld):
 Befunde aus dem Nachschärfen (Fortsetzung der Nummerierung oben):
 
 7. **Bildweg für Fotos ist der grösste Hebel.** V1 → V2: Gate-Belege im Mittel 19 → 23, Fehler ≥ 0.8 im Mittel 11 → 7,
-   Kosten rund +20 %. Kontrolle: in allen V2- bis V4-Läufen liefen genau die 6 `HANDY_FOTO` als Bild.
+   Kosten rund +20 %. Kontrolle: in allen V2- bis V4-Läufen liefen genau die 6 `HANDY_FOTO` als Bild (V4 Lauf 2 nur
+   aus der Konsole¹).
 8. **v5 verschiebt den Rückfallwert der Art.** Mit fremden Arten zuerst meldet das Modell bei Unsicherheit
    `LIEFERANTENBELEG` statt `AUSGANGSRECHNUNG`: Die rohe Art sinkt (20–21 statt 23–27 richtig), auch eigene Rechnungen
    kommen roh als `LIEFERANTENBELEG`; QR und Belegnummer-Muster korrigieren sie (nach Nachbearbeitung 25–26). V3 liegt
    mit 23.5 im Mittel innerhalb der Laufschwankung von V2 (23.0); die Spannweite ist grösser (21–26).
    Beleg 28 (Offerte, Total ohne Monatspauschale) war in V2 zweimal falsch, in V3 zweimal richtig.
-9. **Umstufung greift im Abstimmungsteil nicht (0 in allen Läufen):** Mit v5 meldet das Modell bei fremdem QR keine
-   eigene Art mehr. Die Regel bleibt als Sicherung.
+9. **Umstufung greift im Abstimmungsteil nicht (0 in allen V3- und V4-Läufen):** Unter v3 hätte es je Lauf 1–4
+   Kandidaten gegeben (rohe Art `AUSGANGSRECHNUNG`/`OFFERTE` bei fremdem QR). Unter v5 meldet das Modell bei fremdem QR
+   keine eigene Art mehr; der Fehler verschiebt sich zu sicherem `LIEFERANTENBELEG` bei Behördenbelegen mit QR (32, 48).
+   Die Regel bleibt als Sicherung.
 10. **Kennung im Kopf- oder Fussbereich:** Kontrolle bestanden, kein eigener Beleg verliert `mandantIstAussteller`
     (21, 24–28, 47). Grenze: Beim kurzen Rückerstattungsschreiben 40 (17 Zeilen, also ganze Seite) steht die
     Mandanten-IBAN als Gutschriftskonto zwei Zeilen über dem Seitenende; der Mandant gilt dort weiter als Aussteller.
     Ohne eigene Art oder passendes Muster wirkt sich das nicht aus; eine Zeilenregel trennt Fuss und Schlusssatz hier nicht.
 11. **Req 0.9 bleibt der Engpass:** In allen acht Läufen gibt es keine Schwelle ≤ 1.0 mit höchstens einem Fehler. In V3
     kommen falsche Felder weiterhin mit Sicherheit 0.9–1.0, vor allem die Art (Quittung 03, Behördenschreiben 32, 40, 48,
-    Foto 42).
-12. **Kann 7 (v6, Schemafeld `absender` + Partner-Wache) verworfen:** V4 erreicht 19 und 22 Gate-Belege, unter dem
-    V3-Mittel 23.5, und hat in einem Lauf mehr Fehler ≥ 0.8 (11). Code zurückgenommen (Revert im PR).
+    Foto 42). Die sicheren Art-Fehler bei 32 und 48 folgen aus dem Rückfallwert von v5 (Befund 8) und belasten Req 0.9.
+12. **Kann 7 (v6, Schemafeld `absender` + Partner-Wache) verworfen:** V4 erreicht 19 und 22¹ Gate-Belege, unter dem
+    V3-Mittel 23.5, und hat in einem Lauf mehr Fehler ≥ 0.8 (11). Der Entscheid gegen v6 stützt sich belegbar auf
+    Lauf 1442 (19 < 23.5). Code zurückgenommen (Revert im PR).
 13. **Generator-Befund (nur Code von `tools/golden_synth` gelesen):** `e28` erwartet das Total nach Rabatt ohne die
     Monatspauschale; keine andere Offerte trägt wiederkehrende Gebühren. Kein Behördenbrief nutzt die Beschriftung
-    «Antrag» oder «Geschäftsnummer»; die Antrag-Regel ist synthetisch nicht messbar. Sozialversicherungs-Schreiben
-    (31, 39, 40 inkl. Rückerstattung) sind als `BEHOERDE`, UVG und KTG (34, 35, 37) als `VERSICHERUNG` erwartet.
-14. **Wiederholungen:** `quarkus.langchain4j.openai.max-retries=1` schickt nach Timeout oder HTTP 502 einen zweiten
-    Request (je einmal in den Läufen 1424 und 1445). Für Req 7.1 («einmal») im Produkt beachten.
+    «Antrag» oder «Geschäftsnummer»; die Antrag-Regel ist synthetisch nicht messbar. Der Generator erwartet
+    Sozialversicherungs-Schreiben (auch Rückerstattungen) als `BEHOERDE`, UVG und KTG als `VERSICHERUNG`; geprüft am
+    Code von tools/golden_synth.
+14. **Transport-Wiederholungen:** `max-retries=1` bedeutet in langchain4j 1.19.3 eine Wiederholung; 0 lehnt Quarkus ab.
+    Genauigkeit nicht betroffen, kiMs und Kosten schon; in 1424 kiMs max. rund 186 s. Vorgekommen je einmal in den
+    Läufen 1424 und 1445¹; die Pipeline zählte sie nicht (`aufrufe` blieb 1). Seit PR #15 nutzt der Prototyp ein eigenes
+    `ChatModel` ohne Wiederholung (`KiModell`, `maxRetries(0)`; WireMock-Test: bei HTTP 502 genau ein Request).
 
-**Eingefroren für den Gate-Lauf: Prompt `v5-fb5c021d33fc`** (V3; Bildweg `fotos`; Nachbearbeitung wie in PR #15).
+**Vorläufig eingefroren: Prompt `v5-fb5c021d33fc`** (V3; Bildweg `fotos`; Nachbearbeitung wie in PR #15). Kein
+Gate-Lauf vor Abschluss von Aufgabe 0.5 Gate-Vorbereitung (Req 0.9 neu, Regeln R3/E1/E2, Modellvergleich). Der
+Gate-Lauf läuft auf dem Commit, mit dem Prompt-Hash, Modell und Nachbearbeitung eingefroren werden (Merge-Commit des
+PR, der sie zuletzt festlegt), ohne spätere Änderungen im Spike.
 
 ## Offen für Gate 0 (Aufgabe 0.6, Fabian)
 
 Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.md)):
-1. main mit PR #15, `cd spikes/golden-lauf && mvn package`.
+1. Vorläufig: main mit PR #15, `cd spikes/golden-lauf && mvn package`. Kein Gate-Lauf vor Abschluss von Aufgabe 0.5
+   Gate-Vorbereitung (Req 0.9 neu, Regeln R3/E1/E2, Modellvergleich). Der Gate-Lauf läuft auf dem Commit, mit dem
+   Prompt-Hash, Modell und Nachbearbeitung eingefroren werden (Merge-Commit des PR, der sie zuletzt festlegt), ohne
+   spätere Änderungen im Spike.
 2. Schwelle festlegen. Regel: `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei V3-Läufe.
    **Kein Vorschlag:** Beide V3-Läufe melden «keine ≤ 1.0». Den Wert setzt Fabian (`-Darchiv.ki.schwelle=<wert>`,
    nie unter 0.8, Req 7.6, 0.9).
 3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.schwelle=<wert> -jar target/quarkus-app/quarkus-run.jar --gate`
    (ohne Zusatzschalter, der Bildweg für Fotos ist Standard).
-4. Prompt-Hash der Konsole mit `v5-fb5c021d33fc` vergleichen; weicht er ab, gilt der Lauf nicht.
+4. Prompt-Hash der Konsole mit dem eingefrorenen Hash (vorläufig `v5-fb5c021d33fc`) vergleichen; weicht er ab, gilt
+   der Lauf nicht. Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht QR-Format, Kürzung (`MAX_ZEICHEN`),
+   Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich sind deshalb auch der Commit nach Schritt 1 und
+   das Modell in `kennzahlen.md`.
 5. Kennzahlen des Prüfteils hier eintragen. «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3). Meldet der Prüfteil «keine ≤ 1.0», ist das Gate nicht
    bestanden (Req 0.9); wie es weitergeht, entscheidet Fabian.
 
 Weiter offen:
 - Abstand zum Gate: V3 erreicht im Abstimmungsteil 21–26/30 (hochgerechnet 14–17/20), das Gate verlangt 18/20.
-- Bestätigung echter Belege für die Realitätsprüfung (`bestaetigt: true`, Prüfmarken auflösen), danach `--realitaet`
-  (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
-- Welche Bildfassung das Produkt sendet (Rohaufnahme oder Arbeitsfassung), design.md «KI», Bildweg.
+- Realitätsprüfung: 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35); `--realitaet` noch nicht
+  gelaufen (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
+- Welche Bildfassung das Produkt sendet: entschieden von Fabian am 09.11.2026, design.md «KI», Bildweg.
 - «Geschäftsnummer» als Beschriftung der Belegnummer (nur Vorschlag, nicht umgesetzt).
