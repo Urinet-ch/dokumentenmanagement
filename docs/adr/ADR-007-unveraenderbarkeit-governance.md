@@ -38,7 +38,7 @@
 
 ## Nachtrag 09.11.2026 (Spike 0.2)
 
-**Status:** Vorschlag. Entscheid Fabian bei Gate 0 (Aufgabe 0.6). Der Entscheid oben bleibt bis dahin unverändert.
+**Status:** **Entschieden von Fabian am 09.11.2026: Option B.** Wirksam mit der Freigabe der ADRs an Gate 0 (Aufgabe 0.6). Abweichend vom Entscheid oben gibt es keinen App-Schlüssel ohne Bypass-Recht; Req 6.5 wird in einem eigenen PR angepasst (alt → neu).
 
 Befund der Live-Tests vom 08.11.2026 (Infomaniak Object Storage, Ceph-Dienst `s3.gva2.infomaniak.cloud`; Einzelheiten und Testnummern in [`docs/spikes/s3-object-lock.md`](../spikes/s3-object-lock.md)):
 - **Object Lock pro Objekt, GOVERNANCE und COMPLIANCE funktionieren** wie bei AWS [T 1, 3a–3d, 4a–4f]: GOVERNANCE verhindert Löschen und Verkürzen ohne Bypass-Header; COMPLIANCE verhindert beides auch mit Bypass, verbietet den Wechsel zu GOVERNANCE und erlaubt das Verlängern.
@@ -47,10 +47,10 @@ Befund der Live-Tests vom 08.11.2026 (Infomaniak Object Storage, Ceph-Dienst `s3
 
 Optionen (Abwägung im Spike-Bericht, Abschnitt «Optionen»):
 - **A:** ein Projekt, COMPLIANCE für alle Arten mit `gesetzliche_pflicht` und für `manifest/`. Voller Schutz gegen vorzeitiges Löschen; eine falsch gesetzte Frist bleibt bis zum Ablauf, darum Frist im Code begrenzen. Weicht von P2 ab (COMPLIANCE für alle gesperrten Objekte war abgelehnt, siehe «Betrachtete Alternativen»).
-- **B (Vorschlag):** ein Projekt, GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` – der in tasks.md (0.2) und Punkt 7 vorgesehene Rückfall. Dokumente sind gegen Fehler der App und Versehen geschützt; eine Manipulation mit gestohlenem App-Schlüssel ist nicht verhindert, fällt aber über das COMPLIANCE-gesperrte, zeitgestempelte Manifest auf. Req 6.5 ist damit nur eingeschränkt erfüllt, weil der App-Schlüssel technisch das Bypass-Recht hat.
+- **B (gewählt 09.11.2026):** ein Projekt, GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` – der in tasks.md (0.2) und Punkt 7 vorgesehene Rückfall. Dokumente sind gegen Fehler der App und Versehen geschützt; eine Manipulation mit gestohlenem App-Schlüssel ist nicht verhindert, fällt aber über das COMPLIANCE-gesperrte, zeitgestempelte Manifest auf. Req 6.5 ist damit nur eingeschränkt erfüllt, weil der App-Schlüssel technisch das Bypass-Recht hat.
 - **C:** zwei Projekte, Policy mit Deny auf Bypass für das App-Projekt. Nur abgeleitet, nicht getestet; verlangt einen eigenen Spike (zweites Projekt, Java SDK v2, Zugriff über Projektgrenzen).
 
-Bei Option B oder A ist noch zu klären, wie Req 6.5 («App-Schlüssel ohne Recht `s3:BypassGovernanceRetention`») zu lesen ist; eine Änderung des Kriteriums gehört als ausgewiesene Anforderungsänderung in einen eigenen PR nach dem Optionsentscheid (Aufgabe 0.6), nicht in diesen Nachtrag.
+Mit Option B ist noch zu klären, wie Req 6.5 («App-Schlüssel ohne Recht `s3:BypassGovernanceRetention`») zu lesen ist; eine Änderung des Kriteriums gehört als ausgewiesene Anforderungsänderung in einen eigenen PR nach dem Optionsentscheid (Aufgabe 0.6), nicht in diesen Nachtrag.
 
 ## Verweise
 - Nachtrag: `docs/spikes/s3-object-lock.md` (Spike 0.2), `docs/umsetzungsplan.md` Abschnitt 6 (P2, Abnahme Gate 0)
