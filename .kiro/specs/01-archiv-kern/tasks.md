@@ -64,7 +64,8 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 0.7 Stufe A auf der bestehenden VPS vorbereiten [Fabian] [Infra]
   - K5 (Grösse der eigenen VPS) ist nicht mehr Teil von Welle 0; Entscheid vor Welle 5 in 4.9, Wechsel in 5.11 (P1, geändert 08.11.2026)
   - [Fabian] Zugang des Deploy-Workflows zur bestehenden Infomaniak-VPS (Deploy-Befehl für das SSH-Bundle) als GitHub-Secret bereitstellen; DNS für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch` auf diese VPS
-  - [Infra] Einträge im Infra-Repo der VPS (Compose-Policy, umgetaggte Images, internes Netz des Archivs); Ausgangswerte vor dem ersten Deploy festhalten (verfügbarer Speicher, freie Disk; Stand 08.11.2026: rund 1'140 MB, 15 GB)
+    - Ergebnis 09.11.2026: Deploy-Key `archiv` im Infra-Repo (`deploy-keys/archiv.pub`, `einrichten.sh` gelaufen, Forced Command `deploy-app.sh archiv`); im Repo Secret `INFOMANIAK_SSH_KEY` und Variablen `INFOMANIAK_HOST`, `INFOMANIAK_KNOWN_HOSTS` gesetzt. DNS über den bestehenden Wildcard-Eintrag `*.apps.urinet.ch`, beide Namen lösen auf die VPS auf; `archiv-auth.apps.urinet.ch` deckt die Compose-Policy als `<app>-…` ohne Eintrag in `etc/app-hosts` ab
+  - [Infra] Einträge im Infra-Repo der VPS (Compose-Policy, umgetaggte Images, internes Netz des Archivs); Ausgangswerte vor dem ersten Deploy festhalten (verfügbarer Speicher, freie Disk; Stand 08.11.2026: rund 1'140 MB, 15 GB; 09.11.2026: 1'130 MB verfügbar, 15 GB frei)
   - Datenregel Stufe A festhalten: nur Test- und anonymisierte Daten, keine echten Belege, keine Personal- oder Lohndaten
   - _Anforderungen: 16.1, 16.10, 16.15_
 
