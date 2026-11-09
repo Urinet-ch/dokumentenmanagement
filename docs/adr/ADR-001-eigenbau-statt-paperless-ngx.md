@@ -1,6 +1,6 @@
 # ADR-001: Eigenbau statt Paperless-ngx
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Dort wird auch Konzept-Entscheid E2 bestätigt.
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Dort wird auch Konzept-Entscheid E2 bestätigt.
 
 **Datum:** 08.11.2026
 

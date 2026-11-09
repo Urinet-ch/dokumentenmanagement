@@ -1,6 +1,6 @@
 # ADR-003: Auftragsschlange in PostgreSQL statt Message-Broker
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6)
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026)
 
 **Datum:** 08.11.2026
 

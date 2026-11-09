@@ -1,6 +1,6 @@
 # ADR-006: KI nur für Vorschläge, Bestätigung durch Menschen, Generatoren ohne KI
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.3 (Antwortformat bei Infomaniak AI) und Golden-Lauf 0.5 (Sicherheitsschwelle für Req 7.6).
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Vorbehalt: Spike 0.3 (Antwortformat bei Infomaniak AI) und Golden-Lauf 0.5 (Sicherheitsschwelle für Req 7.6).
 
 **Datum:** 08.11.2026
 

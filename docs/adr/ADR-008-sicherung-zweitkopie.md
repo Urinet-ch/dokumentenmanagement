@@ -1,6 +1,6 @@
 # ADR-008: Sicherung als verschlüsselte Zweitkopie bei einem zweiten Schweizer Anbieter über den zentralen Sicherungs-Workflow
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6)
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026)
 
 **Datum:** 08.11.2026
 

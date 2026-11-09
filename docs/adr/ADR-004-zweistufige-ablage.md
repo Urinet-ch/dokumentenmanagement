@@ -1,6 +1,6 @@
 # ADR-004: Zweistufige Ablage – `eingang/` ohne Sperre, `archiv/` mit Sperre nur bei gesetzlicher Pflicht
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket) – durchgeführt 08.11.2026, Sperre pro Objekt und Löschbarkeit bestätigt [T 3a, 5] (`docs/spikes/s3-object-lock.md`); Rückfall Punkt 8 nicht nötig. Der Modus der Sperre ist im Nachtrag 09.11.2026 von ADR-007 entschieden: Option B (GOVERNANCE für `archiv/`, COMPLIANCE für `manifest/`; Fabian, 09.11.2026).
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket) – durchgeführt 08.11.2026, Sperre pro Objekt und Löschbarkeit bestätigt [T 3a, 5] (`docs/spikes/s3-object-lock.md`); Rückfall Punkt 8 nicht nötig. Der Modus der Sperre ist im Nachtrag 09.11.2026 von ADR-007 entschieden: Option B (GOVERNANCE für `archiv/`, COMPLIANCE für `manifest/`; Fabian, 09.11.2026).
 
 **Datum:** 08.11.2026
 

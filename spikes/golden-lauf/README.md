@@ -52,7 +52,7 @@ Anzeigetexten, Reihenfolge, Mandantenname, Markierungen aus `golden.eigene-arten
 K1-Vorlage (`BENUTZER_K1`, Bildweg), das erzeugte JSON-Schema, die Reihenfolge von `ArtCode` und den Bildweg (`fotos`, bei `--k1`
 `alle`) ab. Der System-Prompt wird in Java gerendert und fertig an das Modell übergeben; gehashter und gesendeter Text
 sind dadurch gleich. Abstimmen und `--gate` nutzen denselben synthetischen Mandanten und haben denselben Hash; bei
-`--realitaet` weicht er wegen des Mandantennamens der echten Belege ab. Nicht abgedeckt sind QR-Format, Kürzung
+`--realitaet` ist er gleich, solange `golden.mandant-name` für beide Teile gilt (Lauf 2026-11-09-191327). Nicht abgedeckt sind QR-Format, Kürzung
 (`MAX_ZEICHEN`), Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich sind deshalb auch der Commit
 (Gate-Lauf Schritt 1) und das Modell in `kennzahlen.md`.
 

@@ -13,11 +13,12 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, Stufe A vorbereitet)
 
-- [ ] 0.1 Golden-Datensatz zusammenstellen [Fabian]
+- [x] 0.1 Golden-Datensatz zusammenstellen [Fabian]
   - 50 Belege gemäss Requirement 0.1 auswählen (genau 10 je Kategorie), Personendaten schwärzen (AHV-Nr., IBAN Dritter)
   - `erwartet.json` mit Art, Datum, Partner, Betrag, Belegnummer je Datei erfassen; fehlt ein Feld auf dem Beleg, bleibt es leer (Regel 0.7)
   - vor dem ersten Lauf je Kategorie 6 Belege zum Abstimmen und 4 zurückgehaltene festlegen (zusammen 30/20) und in `erwartet.json` vermerken; die Aufteilung bleibt danach unverändert
   - Ablage nur ausserhalb des Repositorys im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, nie in Git, CI oder Tickets
+  - Ergebnis 09.11.2026: 50 synthetische Belege (Generator `tools/golden_synth`), Aufteilung 30/20 fest; dazu 20 echte Belege für die Realitätsprüfung, bestätigt von Fabian
   - _Anforderungen: 0.1, 0.7, 0.8_
 
 - [x] 0.2 Spike Infomaniak Object Storage [Infra] [Fabian]
@@ -44,20 +45,22 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Ergebnis 08.11.2026: Kontakte erledigt; der Export enthielt keine Verkaufschancen. [Fabian] Nachexport mit 2 Test-Verkaufschancen vor Welle 4, dann Zuordnung bestätigen und die Beispieldatei füllen (design.md, offener Punkt)
   - _Anforderungen: 0.6, 13.1_
 
-- [ ] 0.5 Prototyp-Pipeline auf dem Golden-Datensatz [Backend]
+- [x] 0.5 Prototyp-Pipeline auf dem Golden-Datensatz [Backend]
   - Kommandozeilen-Klasse `GoldenLauf`: Datei → OCRmyPDF (lokales Docker-Image) → Text → Swiss QR Code deterministisch auslesen → KI-Vorschlag (Prompt gemäss design.md, QR-Werte vor KI-Werten) → Vergleich mit `erwartet.json` nach den Regeln aus 0.7
   - Prompt und Sicherheitsschwelle nur auf den 30 Belegen zum Abstimmen iterieren; die 20 zurückgehaltenen erst im Gate-Lauf verwenden
   - Bericht getrennt nach Abstimmungs- und Prüfteil: Trefferquote je Feld und gesamt, Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, 0.9), Liste der Fehlschläge; der Bericht liegt im Verzeichnis aus `ARCHIV_GOLDEN_DIR`, ins Repository (`docs/spikes/golden-ergebnis.md`) kommen nur Kennzahlen und Beleg-IDs, keine Inhalte
   - im Repository nur das Schema von `erwartet.json` und `GoldenDatensatzIT` (manuell gestartet, nie in der CI)
   - Hostprüfung: `GoldenLauf` und `GoldenDatensatzIT` brechen vor dem ersten Beleg ab, wenn `archiv.ki.basis-url` nicht per `https` auf den Host `api.infomaniak.com` zeigt (exakter Vergleich, ohne Suffix-Treffer); Unit-Test mit `localhost`, `http` und Suffix-Trick (`api.infomaniak.com.example.org`) → Abbruch
+  - Ergebnis 09.11.2026: Gate-Lauf auf dem Merge-Commit von PR #21: Prüfteil 20/20, 1 Fehler ab 0.8, Schwelle 0.8, Modell `google/gemma-4-31B-it` (`docs/spikes/golden-ergebnis.md`)
   - _Anforderungen: 0.1, 0.2, 0.3, 0.7, 0.8, 0.9, 7.11, 16.22_
   - _Abhängig von: 0.1, 0.3_
 
-- [ ] 0.6 Gate-Review und ADRs [Fabian]
+- [x] 0.6 Gate-Review und ADRs [Fabian]
   - Spike-Berichte und Golden-Ergebnis prüfen; Gate 0 nach 0.3 und 0.9 abnehmen, die Schwelle für 7.6 festhalten und beides in `docs/umsetzungsplan.md` (Abschnitt 6) eintragen
   - Konzept-Entscheide E2 (Eigenbau), E3 (PWA) bestätigen
   - D8 einer anderen Spec zuordnen oder bewusst streichen; Ergebnis in der Rückverfolgung von requirements.md und in P14 (`docs/umsetzungsplan.md`) nachtragen. Ergebnis: bewusst gestrichen (entschieden von Fabian am 09.11.2026: keine native App, nur Web-App), in der Rückverfolgung und in P14 nachgetragen
   - ADR-001 bis ADR-011 in `docs/adr/` per Merge freigeben (nach dem Gate-Lauf, in einem PR zusammen mit dem Gate-Ergebnis; Fabian, 09.11.2026); Spike-Erkenntnisse per PR in design.md zurückschreiben, bevor Welle 1 startet
+  - Ergebnis 09.11.2026: Gate 0 bestanden mit Auflagen A1 und A2 (abgenommen von Fabian, `docs/umsetzungsplan.md`, Abschnitt 6); ADR-001 bis ADR-011 per Merge von PR #23 freigegeben
   - _Anforderungen: 0.3, 0.9_
   - _Abhängig von: 0.2, 0.3, 0.4, 0.5_
 
@@ -221,6 +224,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter; Logs nur mit IDs
   - WireMock-Tests für gültige, ungültige und fehlende Antworten; ein WireMock-Test prüft den Request: `model` = Wert von `archiv.ki.erfassung-modell` (nicht `archiv.ki.chat-modell`), `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `response_format` `json_schema` mit `strict`
   - Befund Gate-Lauf (`docs/spikes/golden-ergebnis.md`): Belegnummer-Vorschläge mit hoher Sicherheit gezielt prüfen, ohne Prompt, Modell oder Aufrufparameter gegenüber Gate 0 zu ändern (sonst neuer Golden-Lauf)
+  - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser das Belegnummer-Muster bestätigt sie (design.md «KI», Nachbearbeitung); Unit-Test für beide Fälle
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
@@ -372,7 +376,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
-  - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün
+  - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün; Realitätsprüfung nach Auflage A2 aus Gate 0 erfüllt (`docs/umsetzungsplan.md`, Abschnitt 6)
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
   - **Gate Phase 1:** alle Belege 2026 im Archiv, Prüflauf grün
