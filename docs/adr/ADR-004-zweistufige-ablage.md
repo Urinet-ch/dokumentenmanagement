@@ -1,6 +1,6 @@
 # ADR-004: Zweistufige Ablage – `eingang/` ohne Sperre, `archiv/` mit Sperre nur bei gesetzlicher Pflicht
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket).
+**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket) – durchgeführt 08.11.2026, Sperre pro Objekt und Löschbarkeit bestätigt [T 3a, 5] (`docs/spikes/s3-object-lock.md`); Rückfall Punkt 8 nicht nötig. Der Modus der Sperre ist im Nachtrag 09.11.2026 von ADR-007 offen (Option A/B/C).
 
 **Datum:** 08.11.2026
 
@@ -9,7 +9,7 @@
 - Die Frist `aufbewahren_bis` steht erst nach der Bestätigung im Eingangskorb fest (Art, Belegdatum, Geschäftsjahr, Req 9.3). Eine Sperre beim Eingang hätte noch kein richtiges Ablaufdatum.
 - Nicht jede Dokumentart unterliegt einer gesetzlichen Aufbewahrungspflicht (P12: Attribut `gesetzliche_pflicht`, WORM nur bei «ja»; z. B. `PROJEKTDOKUMENT`, `KORRESPONDENZ`). Solche Dokumente sollen über die spätere Löschfunktion mit Protokoll löschbar bleiben (tech.md Regel 2).
 - Der Bucket je Mandant (`urinet-archiv-<code>`) ist versioniert. Eine Standard-Aufbewahrung des Buckets würde jedes neue Objekt sperren, also auch den Eingang.
-- Ob Infomaniak Object Lock pro Objekt unterstützt und ungesperrte Objekte im selben Bucket löschbar bleiben, klärt der Spike Object Storage (Aufgabe 0.2, Req 0.4).
+- Ob Infomaniak Object Lock pro Objekt unterstützt und ungesperrte Objekte im selben Bucket löschbar bleiben, hat der Spike Object Storage (Aufgabe 0.2, Req 0.4) geklärt: beides ja [T 3a, 5].
 
 ## Entscheid
 1. **Ein Bucket je Mandant** mit `ObjectLockEnabledForBucket=true` und Versionierung, **ohne Standard-Aufbewahrung**; gesperrt wird nur pro Objekt.
@@ -21,7 +21,7 @@
 5. **Arten ohne gesetzliche Pflicht** liegen ebenfalls unter `archiv/`, ohne Sperre; Prüfsummen, Manifest und das Verbot von Überschreiben und Löschen über die Schnittstellen gelten trotzdem (Req 6.5, 6.12).
 6. **Fehler:** abweichende Prüfsumme oder nicht gesetzte Sperre → sofort `ARCHIVIERUNG_FEHLER`, bestätigte Metadaten bleiben, Inhaber wird benachrichtigt (Req 6.4). Ein neuer Versuch übernimmt eine korrekte Kopie und löscht eine fehlerhafte, ungesperrte Kopie über ihre Versions-ID (Req 15.10).
 7. **Verwerfen** nur aus `EINGANGSKORB` und `FEHLER`: alle Versionen unter `eingang/` und `vorschau/` löschen, SHA-256 und Grund protokollieren (Req 6.6). Ab `ARCHIVIERUNG` antwortet das Archiv 409 (Req 6.7).
-8. **Rückfall**, falls der Spike keine Sperre pro Objekt bestätigt: getrennte Buckets `…-eingang` (ohne Sperre), `…-archiv` (Standard-Aufbewahrung 10 Jahre) und `…-ablage` für Arten ohne `gesetzliche_pflicht` (design.md, Open Points). Der `AblagePort` (ADR-011) bleibt gleich, nur der Adapter ändert sich.
+8. **Rückfall**, falls der Spike keine Sperre pro Objekt bestätigt: getrennte Buckets `…-eingang` (ohne Sperre), `…-archiv` (Standard-Aufbewahrung 10 Jahre) und `…-ablage` für Arten ohne `gesetzliche_pflicht`. Der `AblagePort` (ADR-011) bliebe gleich, nur der Adapter änderte sich. **Nicht nötig:** Spike 0.2 hat die Sperre pro Objekt bestätigt [T 3a, 5]; der Rückfall entfällt (design.md, Open Points).
 
 ## Betrachtete Alternativen
 - **Sofort gesperrt ablegen beim Eingang:** abgelehnt. Fehlerfassungen wären nicht mehr löschbar (Req 6.2), und das Ablaufdatum der Sperre ist vor der Bestätigung unbekannt.

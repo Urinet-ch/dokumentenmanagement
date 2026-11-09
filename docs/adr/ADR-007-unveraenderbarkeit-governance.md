@@ -50,7 +50,7 @@ Optionen (Abwägung im Spike-Bericht, Abschnitt «Optionen»):
 - **B (Vorschlag):** ein Projekt, GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` – der in tasks.md (0.2) und Punkt 7 vorgesehene Rückfall. Dokumente sind gegen Fehler der App und Versehen geschützt; eine Manipulation mit gestohlenem App-Schlüssel ist nicht verhindert, fällt aber über das COMPLIANCE-gesperrte, zeitgestempelte Manifest auf. Req 6.5 ist damit nur eingeschränkt erfüllt, weil der App-Schlüssel technisch das Bypass-Recht hat.
 - **C:** zwei Projekte, Policy mit Deny auf Bypass für das App-Projekt. Nur abgeleitet, nicht getestet; verlangt einen eigenen Spike (zweites Projekt, Java SDK v2, Zugriff über Projektgrenzen).
 
-Bei Option B oder A ist noch zu klären, wie Req 6.5 («App-Schlüssel ohne Recht `s3:BypassGovernanceRetention`») zu lesen ist; eine Änderung des Kriteriums gehört als ausgewiesene Anforderungsänderung in den Gate-0-PR, nicht in diesen Nachtrag.
+Bei Option B oder A ist noch zu klären, wie Req 6.5 («App-Schlüssel ohne Recht `s3:BypassGovernanceRetention`») zu lesen ist; eine Änderung des Kriteriums gehört als ausgewiesene Anforderungsänderung in einen eigenen PR nach dem Optionsentscheid (Aufgabe 0.6), nicht in diesen Nachtrag.
 
 ## Verweise
 - Nachtrag: `docs/spikes/s3-object-lock.md` (Spike 0.2), `docs/umsetzungsplan.md` Abschnitt 6 (P2, Abnahme Gate 0)

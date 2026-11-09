@@ -111,7 +111,7 @@ noch klassisch).
 
 | Gate / Entscheid | Wann | Kriterium / Frage | Ergebnis |
 | --- | --- | --- | --- |
-| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | **Zwischenstand 09.11.2026:** Abstimmungsteil (30 synthetische Belege), Prompt v3 `v3-24e40a6cf5ab`, OCR-Text: 123/150 Felder (82 %), 18/30 Belege mit Art, Datum, Partner, Betrag richtig (60 %), 13 Fehler ≥ 0.8, kleinste Schwelle mit höchstens 1 Fehler 0.91; Variante K1 (Bild): 134/150, 18/30, 12 Fehler ≥ 0.8 (`docs/spikes/golden-ergebnis.md`). Prüfteil: [offen: Gate-Lauf `--gate`, Fabian]. Realitätsprüfung: 0 bestätigte echte Belege. Spikes 0.2, 0.3, 0.4 dokumentiert (0.4 ohne Verkaufschancen, Nachexport vor Welle 4). Abnahme siehe Vorlage unten |
+| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | **Zwischenstand 09.11.2026:** Abstimmungsteil (30 synthetische Belege), Prompt v3 `v3-24e40a6cf5ab`, OCR-Text: 123/150 Felder (82 %), 18/30 Belege mit Art, Datum, Partner, Betrag richtig (60 %; hochgerechnet auf den Prüfteil rund 12/20, Gate verlangt 18/20), 13 Fehler ≥ 0.8, kleinste Schwelle mit höchstens 1 Fehler 0.91 (Lauf 2026-11-09-0616; je nach Lauf 0.91 bis > 1.0 und 8–13 Fehler ≥ 0.8 bei gleichem Prompt v3, Laufschwankung golden-ergebnis.md Befund 6); Variante K1 (Bild): 134/150, 18/30, 12 Fehler ≥ 0.8 (`docs/spikes/golden-ergebnis.md`). Prüfteil: [offen: Gate-Lauf `--gate`, Fabian]. Realitätsprüfung: 0 bestätigte echte Belege. Spikes 0.2, 0.3, 0.4 dokumentiert (0.4 ohne Verkaufschancen, Nachexport vor Welle 4). Abnahme siehe Vorlage unten |
 | E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | [offen] |
 | E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | [offen] |
 | K5 Server | vor Welle 5 (früher, falls 1.10 abbricht oder 16.18 später eintritt) | Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (P1) | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
@@ -132,8 +132,8 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 | Datum der Abnahme | [offen] |
 | Prompt-Fassung und Hash im Gate-Lauf | [offen] (Abstimmungsteil zuletzt: v3 `v3-24e40a6cf5ab`) |
 | Eingabe | [offen: OCR-Text oder K1 für Fotos] |
-| Schwelle (Req 0.9, gilt für Req 7.6) | [offen] (Startwert 0.8; Abstimmungsteil: kleinste Schwelle mit höchstens 1 Fehler 0.91) |
-| Prüfteil: Belege mit Art, Datum, Partner, Betrag richtig | [offen] / 20 (Gate: ≥ 18) |
+| Schwelle (Req 0.9, gilt für Req 7.6) | [offen] (Startwert 0.8; Abstimmungsteil: kleinste Schwelle mit höchstens 1 Fehler 0.91 im Lauf 2026-11-09-0616, je nach Lauf 0.91 bis > 1.0 – Laufschwankung, golden-ergebnis.md Befund 6) |
+| Prüfteil: Belege mit Art, Datum, Partner, Betrag richtig | [offen] / 20 (Gate: ≥ 18; Hochrechnung aus dem Abstimmungsteil rund 12/20) |
 | Prüfteil: Fehler mit Sicherheit ≥ Schwelle | [offen] (Gate: ≤ 1) |
 | Realitätsprüfung (Req 0.10): bestätigte echte Belege | [offen] von 20 |
 | Realitätsprüfung: Quote | [offen] |
@@ -142,9 +142,10 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 | Entscheid | Stand |
 | --- | --- |
 | Umstufung der Art bei eigener Art und fremdem QR-Zahlungsempfänger (statt nur Sicherheit 0) | vorgeschlagen (golden-ergebnis.md, Befund 3) · [offen] |
-| K1: Bild an das Modell nur für Fotos, Volltext weiter per OCR | vorgeschlagen (golden-ergebnis.md, Befund 2) · [offen] |
-| Offerten: Betrag = einmaliges Total der Umsetzung, wiederkehrende Gebühren zählen nicht | **festgelegt von Fabian am 09.11.2026** beim Bestätigen der echten Belege, für den Golden-Datensatz · Übernahme in Prompt und design.md: [offen] |
-| Behördenschreiben: Antrags-ID gilt als Belegnummer | **festgelegt von Fabian am 09.11.2026** beim Bestätigen der echten Belege, für den Golden-Datensatz · Übernahme in Prompt und design.md: [offen] |
+| K1: Bild an das Modell nur für Fotos, Volltext weiter per OCR | vorgeschlagen (golden-ergebnis.md, Befund 2; gemessen nur K1 für alle Belege; nur Fotos offline aus zwei Läufen kombiniert (Analyse), nicht als eigener Lauf gemessen) · [offen] |
+| Offerten: Betrag = einmaliges Total der Umsetzung | **festgelegt von Fabian am 09.11.2026** bei der Durchsicht der echten Belege (Bestätigung noch offen), für den Golden-Datensatz. Wortlaut zu einer Offerte: «Betrag für die Umsetzung ist 0.00 – einmalig mit 100 % Familienrabatt, die 21.15 pro Monat sind dann die monatliche Wartungsgebühr». Auslegung daraus, nicht von Fabian festgelegt: wiederkehrende Gebühren zählen generell nicht – [offen: bestätigen] · Übernahme in Prompt und design.md: [offen] |
+| Behördenschreiben: Antrags-ID als Belegnummer | **festgelegt von Fabian am 09.11.2026** bei der Durchsicht der echten Belege (Bestätigung noch offen), für den Golden-Datensatz. Wortlaut zu einer EasyGov-Vollmacht: «besser die Antrags-UUID» (als Belegnummer). Auslegung daraus: Die Antrags-ID gilt bei Behördenschreiben als Belegnummer – [offen: bestätigen] · Übernahme in Prompt und design.md: [offen] |
+| Abgrenzung BEHOERDE/VERSICHERUNG (Sozialversicherungen wie AHV-Ausgleichskassen) | Beschreibungsspalte in der Dokumentarten-Tabelle · [offen: Entscheid Fabian] |
 | Object Lock: Option A / B / C (ADR-007, Nachtrag) | Vorschlag B (GOVERNANCE für Dokumente, COMPLIANCE für `manifest/`) · [offen] |
 | E2 Eigenbau | [offen] |
 | E3 PWA | [offen] |
