@@ -68,10 +68,12 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
+  - Spec 04 ergänzt den Vollexport um den OKF-Export der Wissensbasis (Spec 04, 17.5; Aufgabe 15.5)
   - _Anforderungen: 8.2, 8.3, 8.5_
 
 - [ ] 12.3 Isolations- und Sicherheitstests [QA]
   - `MandantenIsolationIT` (Szenarien `@req-1.4`, `@req-9.1`) über alle Wege; OWASP-API-Prüfliste und ZAP-Baseline gegen Staging, Prüfbericht unter `docs/abnahme/`; Befunde beheben
+  - Spec 04 erweitert `MandantenIsolationIT` um die Wissensbasis (Spec 04, 11.5; Aufgabe 16.1)
   - _Anforderungen: 1.4, 9.1, 9.2_
 
 - [ ] 12.4 Einführung und Abnahme [Fabian]

@@ -1,7 +1,8 @@
 # Architekturentscheide (ADR)
 
 Je Entscheid eine Datei `ADR-<nnn>-<stichwort>.md` (Status, Kontext, Entscheid, Alternativen,
-Folgen, Verweise). Quelle der Liste: `.kiro/specs/01-archiv-kern/design.md`, Abschnitt Overview.
+Folgen, Verweise). Quelle der Liste: `.kiro/specs/01-archiv-kern/design.md`, Abschnitt Overview;
+ADR-013: `.kiro/specs/04-wissensbasis/design.md`.
 Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 
 | ADR | Entscheid | Status |
@@ -18,3 +19,4 @@ Freigabe: per Merge im Rahmen von Aufgabe 0.6 (Gate 0).
 | [ADR-010](ADR-010-plattform-zwei-stufen.md) | Das Archiv läuft zuerst auf der bestehenden Infomaniak-VPS (Stufe A, Speicherbudget 700 MiB), vor echten Belegen auf einer eigenen VPS (Stufe B), Deploy nur über GitHub Actions. | Vorgeschlagen |
 | [ADR-011](ADR-011-hexagonale-struktur-archunit.md) | Jeder Fachbereich ist hexagonal aufgebaut (Domain, Application, Adapter mit Dev-Stubs), ArchUnit-Tests erzwingen die Abhängigkeitsregeln. | Vorgeschlagen |
 | [ADR-012](ADR-012-lokales-modell-entwicklung.md) | Ein lokales Sprachmodell über LM Studio ist nur im Profil `lokal` auf dem Entwicklerrechner erlaubt, nur an `localhost`, nie für Gate 0, Golden-Lauf, Abnahmen, CI oder Betrieb; das Archiv prüft die KI-Basis-URL beim Start. | Vorgeschlagen (Freigabe per eigenem Merge, nicht Teil von 0.6) |
+| [ADR-013](ADR-013-wissensbasis-nach-llm-wiki-muster.md) | Die Wissensbasis folgt dem LLM-Wiki-Muster (OKF), liegt im Mandanten-Schema, und die KI schreibt nur Entwürfe, die ein Mensch mit Recht A17 freigibt. | Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04) |

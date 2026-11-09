@@ -50,7 +50,7 @@ damit ich «Unfallversicherung» finde, auch wenn auf der Police «UVG» steht.
 damit ich nicht selbst suchen und rechnen muss.
 
 #### Acceptance Criteria
-1. Das Archiv SOLL einen Chat-Agenten anbieten, der ausschliesslich diese Werkzeuge aufrufen darf: `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`.
+1. Das Archiv SOLL einen Chat-Agenten anbieten, der ausschliesslich diese Werkzeuge aufrufen darf: `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`. Spec 04, 8.1 ergänzt die Liste um die nur lesenden Werkzeuge `wissen_index` und `wissen_seite_zeigen`; sonst bleibt sie abschliessend (umgesetzt in Spec 04, Aufgabe 15.2).
 2. WENN eine Frage Summen, Anzahlen oder Zeiträume betrifft, DANN SOLL der Agent das Werkzeug `kennzahl` verwenden; das Ergebnis SOLL aus einer vordefinierten SQL-Abfrage stammen und unverändert in die Antwort übernommen werden.
 3. Das Werkzeug `kennzahl` SOLL Einnahmen oder Ausgaben für einen Zeitraum liefern, gruppiert nach Jahr, Monat, Partner oder Dokumentart, wahlweise nach Belegdatum oder Zahlungsdatum.
 4. WO der Zahlstatus unbekannt ist (keine AbaNinja-Verbindung), SOLL `offene_posten` die Rechnungen mit Fälligkeit liefern und ausdrücklich angeben, dass der Zahlstatus nicht bekannt ist.
@@ -64,7 +64,7 @@ damit ich nicht selbst suchen und rechnen muss.
 damit ich der Zahl auch vor dem Treuhänder trauen kann.
 
 #### Acceptance Criteria
-1. Jede Antwort SOLL eine Liste der verwendeten Quellen enthalten (Dokumenttitel mit Link oder «Datenstand: <Zeitpunkt>, <n> Belege»).
+1. Jede Antwort SOLL eine Liste der verwendeten Quellen enthalten (Dokumenttitel mit Link oder «Datenstand: <Zeitpunkt>, <n> Belege»). Spec 04, 8.5 ergänzt die Quellenform «Wissensseite (Titel, Link, Stand) mit Quelldokumenten» (umgesetzt in Spec 04, Aufgabe 15.2).
 2. FALLS kein Werkzeug ein passendes Ergebnis liefert, DANN SOLL der Agent sagen, dass er keinen Beleg gefunden hat, und keine Vermutung als Tatsache formulieren.
 3. WENN der Benutzer auf eine Quelle tippt, DANN SOLL die App das Dokument öffnen (mit Protokolleintrag).
 
@@ -84,7 +84,7 @@ damit Vertraulichkeit und Mandantentrennung auch im Chat gelten.
 damit ich unterwegs schnell nachschauen kann.
 
 #### Acceptance Criteria
-1. Die App SOLL eine Chat-Seite mit Eingabefeld, gestreamter Antwort, Quellen-Chips und den letzten 20 Gesprächen bieten.
+1. Die App SOLL eine Chat-Seite mit Eingabefeld, gestreamter Antwort, Quellen-Chips und den letzten 20 Gesprächen bieten. Spec 04, 12.4 und 16.6 ergänzen: Quellen-Chips zeigen Wissensseiten und Dokumente unterscheidbar, und Benutzer mit Recht A18 erhalten an einer Antwort die Aktion «Als Analyse vorschlagen», nur in Gesprächen ohne Aufruf von `kennzahl`, `offene_posten`, `fristen` oder `vollstaendigkeit` (umgesetzt in Spec 04, Aufgabe 15.3).
 2. WENN der Agent ein Werkzeug aufruft, DANN SOLL die App einen kurzen Hinweis zeigen («suche Rechnungen …»).
 3. Die Chat-Seite SOLL bei 375 px Breite ohne horizontales Scrollen bedienbar sein.
 
@@ -93,7 +93,7 @@ damit ich unterwegs schnell nachschauen kann.
 damit der Abschluss ohne Zusammensuchen möglich ist.
 
 #### Acceptance Criteria
-1. WENN ein Benutzer mit Rolle `inhaber` oder `treuhaender` einen Export für ein Geschäftsjahr anfordert, DANN SOLL das Archiv als Auftrag ein ZIP erstellen mit den PDF/A-Fassungen aller Dokumente des Geschäftsjahres im Status `ARCHIVIERT` (bei Vermerk `pdfa_fehlt` nach Spec 01, 5.9 mit dem Original), `belegliste.csv` (ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname), `pruefsummen.sha256` und den Manifesten des Jahres.
+1. WENN ein Benutzer mit Rolle `inhaber` oder `treuhaender` einen Export für ein Geschäftsjahr anfordert, DANN SOLL das Archiv als Auftrag ein ZIP erstellen mit den PDF/A-Fassungen aller Dokumente des Geschäftsjahres im Status `ARCHIVIERT` (bei Vermerk `pdfa_fehlt` nach Spec 01, 5.9 mit dem Original), `belegliste.csv` (ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname), `pruefsummen.sha256` und den Manifesten des Jahres. Spec 04, 1.6 ergänzt: Dokumente der Art `WISSENSQUELLE` SOLLEN nicht in den Jahresexport und nicht in `belegliste.csv` gelangen, weil sie keine Belege sind (umgesetzt in Spec 04, Aufgabe 13.2).
 2. WENN der Export fertig ist, DANN SOLL das Archiv einen Download-Link (24 Stunden gültig) anzeigen und per E-Mail melden.
 3. Das Archiv SOLL jeden Export mit Benutzer, Zeit und Prüfsumme des ZIP protokollieren.
 4. Dateinamen im ZIP SOLLEN dem Muster `<datum>_<art>_<belegnummer|id>_<partner>.pdf` folgen (nur ASCII, ohne Leerzeichen).

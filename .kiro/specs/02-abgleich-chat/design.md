@@ -73,6 +73,10 @@ flowchart LR
 | `offene_posten` | `stichtag?` | Rechnungen `{belegnummer, partner, betrag, faelligkeit, zahlstatus\|UNBEKANNT}` + Hinweis, ob AbaNinja verbunden |
 | `fristen` | `von`, `bis` | `{datum, art, dokument, beschreibung}` |
 | `vollstaendigkeit` | `geschaeftsjahr` | Lücken je Kategorie |
+| `wissen_index` (Spec 04) | `frage?`, `typ?`, `anzahl≤50` (nur mit `frage`) | Indexzeilen der sichtbaren Wissensseiten (Spec 04, design.md, «Chat-Werkzeuge») |
+| `wissen_seite_zeigen` (Spec 04) | `pfad` | freigegebene Fassung einer sichtbaren Wissensseite mit Quellen und Hinweisen (Spec 04, design.md, «Chat-Werkzeuge») |
+
+- Spec 04 ergänzt den Systemprompt um die Regel für Fragen nach Wissen (zuerst `wissen_index`, dann `wissen_seite_zeigen`, Hinweise nennen; Wortlaut in Spec 04, design.md, «Chat-Werkzeuge»).
 
 - Kennzahl-SQL (Beispiel EINNAHMEN, BELEGDATUM, Gruppierung JAHR):
   ```sql
@@ -87,13 +91,14 @@ flowchart LR
   Der Sichtbarkeitsfilter gilt in allen Werkzeug-Abfragen, auch für Summen, Anzahlen und Lücken (Requirement 5.2).
   Basis ZAHLUNGSDATUM nur, wenn `bezahlt_am` gefüllt ist (AbaNinja); sonst Hinweis an den Agenten.
 - `vollstaendigkeit`: Lücken in `^\d{4}-\d{3}$` je Jahr, Lohnabrechnungen je Monat ab erstem Beleg der Art, Kontoauszüge je Monat, AbaNinja-Belege ohne `dokument_id`.
-- REST `POST /api/v1/chat` → `text/event-stream` mit Ereignissen `werkzeug {name}`, `text {delta}`, `quellen [{titel, link}|{datenstand}]`, `fertig {gespraechId, tokens}`, `fehler {meldung}`.
+- REST `POST /api/v1/chat` → `text/event-stream` mit Ereignissen `werkzeug {name}`, `text {delta}`, `quellen [{titel, link}|{datenstand}]`, `fertig {gespraechId, tokens}`, `fehler {meldung}`. Spec 04 ergänzt in `quellen` die Form `{wissen:{titel, link, stand}, dokumente:[{titel, link, seiten}]}` für Wissensseiten (Spec 04, Req 8.5).
 - Rate-Limit: Zähler pro Benutzer und Stunde (Tabelle oder Caffeine-Cache), 100/h.
 
 ### Jahresexport (`export`)
 - `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).
 - Rollen: `inhaber`, `treuhaender`; alle anderen 403 (Requirement 7.5).
 - Inhalt gemäss Requirement 7 (nur Status `ARCHIVIERT`, bei `pdfa_fehlt` das Original); `belegliste.csv` UTF-8 mit BOM, Semikolon (Excel CH).
+- Ohne Dokumente der Art `WISSENSQUELLE`, auch nicht in `belegliste.csv` (Spec 04 ergänzt, Spec 04, Req 1.6).
 - Zugriffsprotokoll (Ergänzung zur Endpunktliste in Spec 01, design.md): `POST /api/v1/exporte` (Aktion Exportieren) und `GET /api/v1/exporte/{id}` (Herunterladen), beide mit Export-ID statt Dokument-ID.
 
 ### AbaNinja (`integration/abaninja`, nur bei E1 = ja)
@@ -107,6 +112,7 @@ flowchart LR
 ```sql
 chunk(id bigserial pk, dokument_id uuid fk, nr int, text text, embedding halfvec(3584))
   -- Dimension gemäss Spike; Index: USING hnsw (embedding halfvec_cosine_ops)
+  -- nur Dokumente; Embeddings der Wissensseiten liegen in wissensseite_chunk (Spec 04), nicht hier
 mail_eingang(message_id text pk, absender text, betreff text, status text, zeit timestamptz, dokument_ids uuid[])
 integration_mail(id int pk default 1, host text, port int, benutzer text, passwort_verschluesselt bytea,
                  zugelassene_absender text[], aktiv bool)

@@ -9,8 +9,8 @@ Daten liegen pro Mandant in einem eigenen PostgreSQL-Schema und einem eigenen Bu
 Object Storage (eigenes Public-Cloud-Projekt). Die PWA dient für Erfassung, Eingangskorb, Suche,
 Import und Verwaltung.
 
-Nummern: «Req x.y» verweist auf `requirements.md`, «A1–A14» auf die Rechtematrix (Req 2.6),
-«P1–P19» auf die Prüfentscheide in `docs/umsetzungsplan.md`, «Konzept-Entscheid E1–E5» auf das Konzept.
+Nummern: «Req x.y» verweist auf `requirements.md`, «A1–A14» auf die Rechtematrix (Req 2.6; A15–A19 ergänzt Spec 04, Req 12.1),
+«P1–P19» auf die Prüfentscheide in `docs/umsetzungsplan.md` (P20–P22 ergänzt Spec 04), «Konzept-Entscheid E1–E5» auf das Konzept.
 
 Leitentscheide (ADRs in `docs/adr/`):
 - ADR-001 Eigenbau statt Paperless-ngx (Konzept Variante B, Konzept-Entscheid E2).
@@ -207,6 +207,7 @@ stateDiagram-v2
 - `bestaetigen` setzt `bestaetigt`, `bestaetigt_von`, `geschaeftsjahr`, `aufbewahren_bis`, reserviert bei eigenen Arten die Belegnummer und reiht `ARCHIVIEREN` ein, alles in einer Transaktion. Die bestätigten Metadaten bleiben bei `ARCHIVIERUNG_FEHLER` unverändert (Req 6.4, 6.8).
 - Bestätigen eines Dokuments mit `pdfa_fehlt` verlangt `{ohnePdfa: true}` und archiviert nur Original und Arbeitsfassung (Req 5.9).
 - Warnungen im Eingangskorb (Req 8.10): gibt es bei einem Fremdbeleg schon ein nicht verworfenes Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art, liefert `GET /dokumente/{id}` `warnungen: [{code: "BELEGNUMMER_BEKANNT", vorhandenId}]` (ohne ID, wenn unsichtbar); die Bestätigung bleibt erlaubt.
+- Port `DokumentEreignisse` in `dokument/application` (Spec 04 ergänzt, umgesetzt in Spec 04, Aufgabe 14.1; Spec 04, Req 5.1, 15.1): `archiviert(id, art)` meldet der Handler `ARCHIVIEREN` beim Wechsel auf `ARCHIVIERT`, `geaendert(id, felder)` melden `PATCH` (auch A8) und jeder Statuswechsel, jeweils synchron in derselben Transaktion wie der Statuswechsel bzw. die Metadaten-Version. Grund: Asynchron ginge ein Folgeauftrag (z. B. `WISSEN_INGEST`) bei einem Absturz verloren, und andere Fachbereiche erreichen `dokument` nur über `application` (ADR-011).
 
 ### Ablage (`ablage`)
 - `AblageService` (application) nutzt den Driven Port `AblagePort` mit dem Adapter `S3Ablage` (`adapter/out/s3`, App-Schlüssel aus `s3_app_zugang`; setzt nie `x-amz-bypass-governance-retention` und verkürzt keine Sperre, Req 6.5) und einem Dev-Stub im Dateisystem. Operationen: `ablegenEingang(mandant, docId, rolle, nr, stream)`, `archivieren(…)`, `loeschenEingang(…)` (alle Versionen), `sperreSetzen(…)`, `sperreVerlaengern(…)`, `vorsignierteUrl(schluessel, versionId, 5 min)`.
@@ -214,7 +215,7 @@ stateDiagram-v2
   1. CopyObject `eingang/…` → `archiv/…`, Versions-ID der Kopie speichern.
   2. SHA-256 vergleichen: `x-amz-checksum-sha256`, falls Infomaniak ihn liefert (Spike Object Storage, Aufgabe 0.2, Req 0.4), sonst die Kopie über ihre Versions-ID erneut lesen und hashen.
   3. Nur bei `gesetzliche_pflicht`: `PutObjectRetention(mode=GOVERNANCE, retainUntil)` und Kontrolle per `GetObjectRetention`.
-  4. Erst wenn alle Dateien kopiert, geprüft und gesperrt sind: `dokument.archiviert = now()`, `sperre_bis`, Status `ARCHIVIERT`; danach die `eingang/`-Objekte mit allen Versionen löschen (der Bucket ist versioniert, ein einfaches Löschen liesse Altversionen liegen).
+  4. Erst wenn alle Dateien kopiert, geprüft und gesperrt sind: `dokument.archiviert = now()`, `sperre_bis`, Status `ARCHIVIERT` und in derselben Transaktion `DokumentEreignisse.archiviert(id, art)` (siehe «Dokument»); danach die `eingang/`-Objekte mit allen Versionen löschen (der Bucket ist versioniert, ein einfaches Löschen liesse Altversionen liegen).
 - Abweichende Prüfsumme oder nicht gesetzte Sperre → sofort `ARCHIVIERUNG_FEHLER` ohne weiteren Versuch, Benachrichtigung an den Inhaber (Req 6.4); Netz- oder 5xx-Fehler → Wiederholung nach der Auftragsregel, nach 3 Versuchen ebenfalls `ARCHIVIERUNG_FEHLER`. Ein neuer Versuch übernimmt eine vorhandene, korrekte Kopie (gleiche SHA-256) statt erneut zu kopieren; eine fehlerhafte, ungesperrte Kopie löscht er über ihre Versions-ID, damit unter `archiv/` keine fremden Versionen entstehen (Req 15.10).
 - `retainUntil`, Prüfung in dieser Reihenfolge: (1) Art ohne `gesetzliche_pflicht` → keine Sperre, Prüfsummen und Manifest gelten trotzdem (Req 6.12), auch wenn das Dokument unbefristet ist; (2) «Frist abgelaufen» → keine Sperre (Req 9.8); (3) unbefristet → heute + 10 Jahre, der Prüflauf verlängert (Req 6.9, 15.9); (4) sonst Ende des Tages `aufbewahren_bis` (Europe/Zurich, als UTC).
 - Sperre bei Metadatenänderung (Req 9.7): Ergibt die Neuberechnung ein späteres `aufbewahren_bis`, verlängert `sperreVerlaengern` alle Dateien; ein früheres Datum ändert die Sperre nicht, `sperre_bis` bleibt, und der Konflikt wird mit Aktion `SPERRE_KONFLIKT` protokolliert. Wechselt die Art auf eine mit `gesetzliche_pflicht`, wird die Sperre jetzt gesetzt. Verlängern geht in GOVERNANCE ohne Bypass-Header, Verkürzen und Löschen nicht [T 3b, 3c]; die Anwendung setzt den Bypass-Header nie (Req 6.5; ADR-007, Nachtrag 09.11.2026).
@@ -265,7 +266,7 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 ### Verarbeitung (`verarbeitung`)
 - Tabelle `public.auftrag`; `AuftragPoller` (Quarkus Scheduler, alle 2 s) holt `LIMIT n FOR UPDATE SKIP LOCKED`, Parallelität `archiv.worker.parallel=2` (Stufe A: 1).
 - Auftragstypen Phase 1: `VERARBEITEN`, `KI_VORSCHLAG`, `ARCHIVIEREN`, `CSV_VORSCHAU`, `CSV_UEBERNEHMEN`, `MANIFEST`, `PRUEFLAUF`.
-- `VERARBEITEN`: Typ per Tika-Detektor → HEIC→JPEG (`heif-convert`) → Bilder→PDF (`img2pdf`; bei Handy-Erfassung aus den Arbeitsfassungen, Req 5.10) → `ocrmypdf --output-type pdfa-2 --rotate-pages --deskew -l deu+eng [--skip-text]` → Text via `pdftotext` → Vorschaubilder (`pdftoppm -r 72`) → Swiss QR Code lesen (siehe «KI») → Folgeauftrag `KI_VORSCHLAG`, bei Generator-Dokumenten Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`.
+- `VERARBEITEN`: Typ per Tika-Detektor → HEIC→JPEG (`heif-convert`) → Bilder→PDF (`img2pdf`; bei Handy-Erfassung aus den Arbeitsfassungen, Req 5.10) → `ocrmypdf --output-type pdfa-2 --rotate-pages --deskew -l deu+eng [--skip-text]` → Text via `pdftotext` (`dokument.volltext` behält `\f` als Seitentrenner von `pdftotext`; Seitenangaben und Auszugsprüfung der Wissensbasis beruhen darauf, Spec 04, Req 5.6) → Vorschaubilder (`pdftoppm -r 72`) → Swiss QR Code lesen (siehe «KI») → Folgeauftrag `KI_VORSCHLAG`, bei Generator-Dokumenten Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`.
 - Digital signierte PDFs (Req 5.8): OCRmyPDF bricht ohne Freigabe ab; der Worker ruft es dann mit `--invalidate-digital-signatures` auf. Nur die PDF/A-Fassung verliert die Signatur, das Original bleibt unverändert.
 - Keine PDF/A-Fassung möglich, z. B. verschlüsseltes PDF (Req 5.9): `pdfa_fehlt = true`, Fehlertext in `fehler`, Status `EINGANGSKORB`; den Text liest Tika, soweit möglich, und die KI läuft trotzdem.
 - Zeitgrenzen je Auftragstyp (Req 5.6; Startwerte, konfigurierbar unter `archiv.auftrag.zeitgrenze.<typ>`, nach K5 zu prüfen):
@@ -279,6 +280,11 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 | `CSV_UEBERNEHMEN` | 10 min |
 | `MANIFEST` | 15 min |
 | `PRUEFLAUF` | 30 min je Teilauftrag (500 Dateien) |
+| `WISSEN_INGEST` (Spec 04) | 3 min je Teilauftrag |
+| `WISSEN_LINT` (Spec 04) | 3 min je Teilauftrag |
+| `WISSEN_EMBEDDING` (Spec 04) | 10 min |
+| `WISSEN_EMBEDDING_ALLE` (Spec 04) | 30 min je Teilauftrag (500 Seiten) |
+| `WISSEN_EXPORT` (Spec 04) | 15 min |
 
 - Externe Werkzeuge laufen per `ProcessBuilder` mit `waitFor(zeitgrenze)` und danach `destroyForcibly()`, Java-Teile mit `orTimeout`. Eine Überschreitung zählt als fehlgeschlagener Versuch.
 - Lebenszeichen (Req 5.7): Der Worker schreibt während eines Auftrags alle 30 s `auftrag.lebenszeichen`. `AuftragAufraeumer` (jede Minute) setzt `LAEUFT`-Aufträge mit `lebenszeichen < now() - zeitgrenze(typ)` auf `OFFEN`, `versuche + 1`, `fehler = 'verwaist'`.
@@ -460,6 +466,7 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 - `websearch_to_tsquery('german', :q)`, Rang `ts_rank_cd`, Auszug `ts_headline` (max. 2 Fragmente).
 - Belegnummer (Req 14.7): Entspricht `:q` exakt einer `dokument_finanz.belegnummer`, steht dieses Dokument vor den Volltexttreffern; Filter `belegnummer=` ist exakt.
 - Filter als dynamische Kriterien (Panache/Criteria): Art, Partner, Zeitraum (Belegdatum), Betrag von–bis, Richtung, Tags, Status, Geschäftsjahr, Belegnummer (Req 14.2). Indizes: `dokument(art)`, `(partner_id)`, `(datum)`, `(geschaeftsjahr)`, `(status)`, `gin(tags)`, `dokument_finanz(betrag)`, `(richtung)`, `(belegnummer)`.
+- Abschnitt «Wissen» (Spec 04 ergänzt, Spec 04, Req 9.4): Die Suchseite zeigt passende Wissensseiten mit Titel, Typ und Beschreibung in einem eigenen Abschnitt über den Dokumenttreffern; sie ruft dazu zusätzlich `GET /api/v1/wissensseiten?q=` auf, `GET /api/v1/dokumente?q=` bleibt unverändert.
 - Jede Abfrage läuft durch `VertraulichkeitFilter` und den Mandanten-Kontext (Req 14.5). Leistungsziel 14.3 nur auf Stufe B (Req 16.16): [offen: Messbedingungen nach VPS-Grösse K5 – Entscheid vor Welle 5].
 
 ### Protokoll und Manifest (`protokoll`)
@@ -476,9 +483,10 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 | `BESTAETIGEN` | `POST /dokumente/{id}/bestaetigen` |
 | `VERWERFEN` | `POST /dokumente/{id}/verwerfen` (mit SHA-256 und Grund) |
 | `WIEDERHOLEN` | `POST /dokumente/{id}/wiederholen` |
-| `EXPORTIEREN` | Jahresexport (`02-abgleich-chat`) |
-| `VERWEIGERT` | jede 403 oder 404 nach Req 1.4, 2.3 oder 2.6 an den obigen Endpunkten und an A11–A14, mit Fehlercode |
+| `EXPORTIEREN` | Jahresexport (`02-abgleich-chat`); OKF-Export der Wissensbasis (Spec 04, mit Export-ID und SHA-256) |
+| `VERWEIGERT` | jede 403 oder 404 nach Req 1.4, 2.3 oder 2.6 an den obigen Endpunkten, an A11–A14 und an den Endpunkten der Wissensbasis (Spec 04), mit Fehlercode |
 | `SPERRE_KONFLIKT` | Systemaktion bei Req 9.7 (altes und neues Datum) |
+| `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`, `WISSEN_INGEST`, `WISSEN_LINT` | Endpunkte der Wissensbasis (Spec 04, design.md, «Zugriffsprotokoll»); `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN` mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, `WISSEN_INGEST` mit Dokument-ID |
 
 - `zugriff_protokoll` und `dokument_version` sind INSERT-only: Trigger `BEFORE UPDATE OR DELETE → RAISE EXCEPTION`, und die DB-Rolle `archiv_app` hat auf beiden nur `INSERT` und `SELECT` (Req 10.3). Aufbewahrung: [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
 
@@ -487,7 +495,7 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 - Der Auftrag erzeugt für jedes fehlende Datum D bis gestern ein Manifest, in Datumsreihenfolge, beginnend nach dem letzten vorhandenen bzw. beim Anlagedatum des Mandanten (Req 15.6). `manifest.datum` ist Primärschlüssel; ein vorhandenes Manifest wird nie neu erzeugt (idempotent).
 - Fenster `[von, bis)`: `von` = `bis` des Vorgängers (erstes Manifest: `von = null`, `vorher_sha256 = null`), `bis` = Beginn von D+1 in Europe/Zurich. Die Tagesgrenzen kommen aus `ZonedDateTime`, Umstellungstage haben also 23 bzw. 25 Stunden; der Lauf um 03:30 liegt ausserhalb der Umstellungsstunde. Testfälle 29.03.2026 und 25.10.2026 (Req 15.7).
 - Auch Tage ohne archivierte Dateien erhalten ein Manifest (Protokoll-Hash, lückenlose Kette).
-- Inhalt (Req 15.1): alle Dateien (Originale, Arbeitsfassungen, PDF/A) der Dokumente mit `dokument.archiviert` im Fenster, dazu SHA-256 und Anzahl der Zeilen von `zugriff_protokoll` und `dokument_version` mit `zeit` im Fenster. Die Zeilen werden nach `id` sortiert, kanonisch serialisiert und gehasht.
+- Inhalt (Req 15.1): alle Dateien (Originale, Arbeitsfassungen, PDF/A) der Dokumente mit `dokument.archiviert` im Fenster, dazu SHA-256 und Anzahl der Zeilen von `zugriff_protokoll` und `dokument_version` mit `zeit` im Fenster (Spec 04, Req 4.6 ergänzt unter `protokolle` die Tabellen `wissensseite_version` und `wissens_log`). Die Zeilen werden nach `id` sortiert, kanonisch serialisiert und gehasht.
 
 ```json
 { "mandant": "urinet", "datum": "2026-11-07", "von": "…Z", "bis": "…Z",
@@ -518,6 +526,7 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 
 ### Frontend
 - Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`.
+- Dokumentansicht `/dokument/:id` (Spec 04 ergänzt): Abschnitt «In der Wissensbasis verwendet» (Spec 04, Req 15.4) und Routenparameter `/dokument/:id?seite=n`, der das Dokument auf PDF-Seite n öffnet (Spec 04, Req 16.2).
 - Auslieferung über Quinoa im API-Artefakt unter `archiv.apps.urinet.ch`; die API liegt unter `/api/v1`.
 - Erfassen: `getUserMedia` (Rückkamera) mit Fallback `<input type="file" accept="image/*" capture="environment">`; Kantenerkennung und Entzerrung mit **jscanify** (OpenCV.js, als Web Worker, lazy geladen).
   - Original (Req 4.7, P13): die unbearbeitete Aufnahme, beim Fallback die Datei der Kamera, sonst das volle Videobild als JPEG 95 %.
@@ -621,6 +630,8 @@ ki_beispiel(id bigserial pk, partner_id uuid null, art text, eingabe_auszug text
             zeit timestamptz)
   index(iban), index(uid), index(email), index(muster), index(zeit)
 ki_verbrauch(id bigserial pk, zweck text, modell text, tokens_ein int, tokens_aus int, zeit timestamptz)
+  -- zweck: Spec 04 ergänzt WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING (Monatsbericht nach Zweck, Spec 03, 8.1;
+  -- Monatsbudget der Wissensbasis, Spec 04, 13.6)
 
 import_zuordnung(art text pk, spalten jsonb, kopf_hash text, geaendert timestamptz)
 import_lauf(id uuid pk, art text, vollexport bool, dateiname text, sha256 text, zeichensatz text,
@@ -682,6 +693,11 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 | 422 | `PARTNER_UNBEKANNT` | unbekannte `crmId` (Req 11.7) |
 | 422 | `ZUSATZ_UNGUELTIG` | Zusatzfelder oder Schema ungültig (Req 9.5) |
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
+| 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
+| 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |
+| 422 | `VERTRAULICHKEIT_ZU_TIEF` | Vertraulichkeit einer Wissensseite unter der berechneten Stufe (Spec 04, Req 6.8) |
+| 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
+| 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
 
@@ -724,4 +740,5 @@ synthetisch (Req 16.7).
 - [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]; [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5]; [offen: ob die Restore-Probe im Probe-Bucket Sperren setzt – Entscheid vor Welle 5] (siehe «Sicherung und Wiederherstellung»).
 - [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
 - [offen: Rechte der Geschäftsstelle A11–A14 – Entscheid in `03-zweiter-mandant`]; bis dahin 403.
+- Löschfunktion (Req 9.9) und Wissensbasis: Konflikt «nur anfügende Seitenversionen vs. Löschung nach revDSG» (Spec 04, Req 15.5); die Spec zur Löschfunktion muss ihn lösen: [offen: Umgang mit Seitenversionen, die auf einem gelöschten Dokument beruhen (revDSG) – Entscheid in der Spec zur Löschfunktion].
 - Startwerte zum Prüfen in Welle 1: Gesamtgrenze der Upload-Anfrage (500 MB), Ähnlichkeitsschwelle 0.6.

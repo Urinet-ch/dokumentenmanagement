@@ -42,6 +42,11 @@
 - **Umsetzung:** Die ArchUnit-Regeln entstehen in Aufgabe 1.6 und müssen mit jedem neuen Fachbereich und jeder neuen Regel in tech.md nachgeführt werden.
 - **Tests:** Ein Dev-Stub kann vom echten Verhalten abweichen. Deshalb laufen Integrationstests gegen MinIO mit Object Lock, WireMock und das Worker-Image (design.md, Testing Strategy), und `GoldenDatensatzIT` prüft die echte KI manuell.
 
+## Nachtrag 09.11.2026 (Spec 04)
+Spec 04 fügt den Fachbereich `wissen` hinzu; die Regeln aus Punkt 5 gelten für ihn wie für alle Fachbereiche
+(Spec 04, Aufgabe 13.3). Vom Fachbereich `dokument` zu `wissen` führt nur der Port `DokumentEreignisse` in
+`dokument/application` (Spec 01, design.md, «Dokument»), siehe ADR-013.
+
 ## Verweise
 - Req 16.13 (Nachweis: JUnit, ArchUnit-Tests), 16.14
 - tech.md Regeln 6, 7, 9 und 12, Konventionen Backend, Tests und Qualität; structure.md, Paketstruktur je Fachbereich

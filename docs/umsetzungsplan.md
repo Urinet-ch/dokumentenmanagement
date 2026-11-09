@@ -3,7 +3,7 @@
 Stand 08.11.2026 · Grundlage: Konzept «UriNet Archiv — Konzept und Anforderungen» und die
 Specs unter `.kiro/specs/`.
 
-**Rund 35 Arbeitstage in 13 Wellen und 4 Phasen. Nach jeder Phase steht ein messbares Gate;
+**17 Wellen in 5 Phasen, rund 35 Arbeitstage für die Wellen 0–12 (Spec 04, Wellen 13–16, noch nicht geschätzt). Nach jeder Phase steht ein messbares Gate;
 die nächste Phase beginnt erst, wenn es erfüllt ist.**
 
 > **Freigegeben:** Spec 01 am 08.11.2026 (PR #1, Merge `c7b83f4`) mit der eingearbeiteten Prüfung
@@ -18,6 +18,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/01-archiv-kern/` | Phase 0 + 1: 17 Requirements, Design, Aufgaben | 0–5 | ca. 19 Tage |
 | `.kiro/specs/02-abgleich-chat/` | Phase 2: 13 Requirements, Design, Aufgaben | 6–9 | ca. 10 Tage |
 | `.kiro/specs/03-zweiter-mandant/` | Phase 3: 9 Requirements, Design, Aufgaben | 10–12 | ca. 6 Tage |
+| `.kiro/specs/04-wissensbasis/` | Phase 4: 18 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
 `design.md` (Architektur, Schnittstellen, Datenmodell, Fehler, Tests), `tasks.md` (Aufgaben mit
@@ -44,12 +45,12 @@ jeweils mit Review durch Fabian.
 3. **Requirements freigeben:** Jede Fassung von `requirements.md` kommt als PR. Freigabe = Fabian merged den PR auf `main`.
 4. **Design freigeben:** ebenso per PR – das ist der wichtigste Prüfpunkt (Architektur, nicht Syntax).
 5. **Tasks wellenweise:** Jede Aufgabe einer Welle bearbeitet eine eigene Claude-Code-Sitzung auf eigenem Branch; Aufgaben derselben Welle laufen parallel nach Rolle. Fabian prüft und merged die PRs; die Welle ist abgeschlossen, wenn alle ihre Checkboxen in `tasks.md` auf `main` abgehakt sind.
-6. Nach Welle 0, 5, 9 und 12 das Gate abnehmen und in Abschnitt 6 eintragen.
+6. Nach Welle 0, 5, 9, 12 und 16 das Gate abnehmen und in Abschnitt 6 eintragen.
 7. Erkenntnisse aus Spikes (Welle 0) per PR zurück in `design.md` schreiben, bevor Welle 1 startet.
 
 Konventionen pro Aufgabe:
 - Branch `feature/<spec>-<aufgabe>-<stichwort>`, z. B. `feature/01-2.6-ocr`.
-- Commit mit Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A14` bezeichnen nur die Zeilen der Rechtematrix.
+- Commit mit Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A19` bezeichnen nur die Zeilen der Rechtematrix (A15–A19 aus Spec 04, Requirement 12.1).
 - PR-Beschreibung nennt die erfüllten Akzeptanzkriterien (`@req-x.y`) und die Tests dazu; Checkbox in `tasks.md` im selben PR abhaken.
 - Änderungen an Requirements werden im PR ausdrücklich ausgewiesen, nie stillschweigend.
 - Aufgabe gilt als erledigt, wenn die Definition of Done aus `tech.md` erfüllt ist.
@@ -67,7 +68,14 @@ flowchart LR
   G1 --> W6[W6 Mail, Embeddings,<br/>Export<br/>3 T] --> W7[W7 Chat<br/>4 T] --> W9[W9 Abnahme<br/>1 T] --> G2{Gate 2<br/>7 Fragen}
   W6 --> W8[W8 AbaNinja<br/>2 T · nur E1=ja] --> W9
   G2 --> W10[W10 Mandant VHF<br/>2 T] --> W11[W11 Schnittstelle,<br/>Plugin<br/>3 T] --> W12[W12 Abnahme<br/>1 T] --> G3{Gate 3<br/>online}
+  G2 --> W13
+  G3 --> W13[W13 Grundlagen<br/>Wissensbasis] --> W14[W14 Ingest,<br/>Freigabe] --> W15[W15 Suche, Chat,<br/>Lint, Export] --> W16[W16 Abnahme] --> G4{Gate 4<br/>47/50 · 14/15}
+  W6 -.->|Embeddings, Hybridsuche| W15
+  W7 -.->|Agent| W15
 ```
+
+Spec 04 setzt Gate Phase 2 und Gate Phase 3 voraus; Welle 15 baut zusätzlich auf Embeddings, Hybridsuche
+und Chat-Agent aus Spec 02 (Wellen 6–7) auf.
 
 | Welle | Inhalt | Aufgaben | Parallel (Rollen) | Aufwand |
 | --- | --- | --- | --- | --- |
@@ -84,7 +92,11 @@ flowchart LR
 | 10 | AVV, Mandant VHF/GSK, Branding, Erfassung, Altbestand | 03: 10.1–10.6 | Backend ∥ Frontend ∥ Infra ∥ Fabian | 2 T |
 | 11 | Öffentliche Schnittstelle, Chatbot, WordPress-Plugin | 03: 11.1–11.5 | Backend ∥ Frontend | 3 T |
 | 12 | Bericht, Vollexport/Abbau, Isolation/Sicherheit, Einführung | 03: 12.1–12.4 | Backend ∥ QA ∥ Fabian | 1 T |
-| | **Total** | | | **ca. 35 T** |
+| 13 | Entscheide und Folgeänderungen, Dokumentart Wissensquelle, Fachbereich `wissen`, Seitenmodell, Sichtbarkeit, Lesen | 04: 13.1–13.6 | Fabian ∥ Backend | noch nicht geschätzt |
+| 14 | Ingest, Entwurf und Freigabe, Widerspruchsschutz, Änderungen an Quelldokumenten, Oberflächen | 04: 14.1–14.6 | Backend ∥ Frontend | noch nicht geschätzt |
+| 15 | Seiten-Embeddings und Suche, Chat-Werkzeuge, Analyse-Vorschlag, Lint, OKF-Export | 04: 15.1–15.5 | Backend ∥ Frontend | noch nicht geschätzt |
+| 16 | Sicherheits- und Isolationstests, Prüfliste und Gate | 04: 16.1–16.2 | QA ∥ Fabian | noch nicht geschätzt |
+| | **Total** | | | **ca. 35 T** (Wellen 0–12; Wellen 13–16 noch nicht geschätzt) |
 
 Die Tage sind Aufwand von Fabian (Steuern, Prüfen, manuelle Aufgaben) bei Umsetzung durch
 Agenten; ohne Agenten ist mit etwa dem doppelten Aufwand zu rechnen.
@@ -97,6 +109,9 @@ Agenten; ohne Agenten ist mit etwa dem doppelten Aufwand zu rechnen.
 | Jan–Apr 2027 | 1 Archiv-Kern | 1–5 | alle Belege 2026 im Archiv, Prüflauf grün |
 | Mai–Jul 2027 | 2 Abgleich und Chat | 6–9 | 7 Beispielfragen + ≥ 18/20 richtig mit Quelle |
 | ab Etappe 2 VHF/GSK | 3 Zweiter Mandant | 10–12 | VHF/GSK-Archiv online |
+| nach Gate 2 und Gate 3 | 4 Wissensbasis | 13–16 | 5 Wissensquellen, ≥ 47/50 Fussnoten belegt, ≥ 14/15 Fragen mit Seite und Quelldokument |
+
+Spec 04 folgt nach Spec 02 und nach Spec 03 (entschieden von Fabian am 09.11.2026); Spec 01 bleibt im Umfang stabil.
 
 Plattform (P1): Wellen 1–4 laufen auf Stufe A (bestehende VPS, nur Testdaten). K5 fällt in Welle 4
 (Aufgabe 4.9, Richtwert März 2027); Bestellung, Einrichtung und Wechsel auf Stufe B (Aufgabe 5.11)
@@ -121,6 +136,7 @@ noch klassisch).
 | Gate 2 | Ende Welle 9 | 7 Beispielfragen + ≥ 18/20 | [offen] |
 | E4 VHF/GSK | nach 19.11.2026 | Archiv in Etappe 2 der Offerte O-2026-002 oder später | [offen] |
 | Gate 3 | Ende Welle 12 | Archiv online, Geschäftsstelle veröffentlicht selbständig | [offen] |
+| Gate 4 | Ende Welle 16 | Stichprobe 5 Wissensquellen; Belegtreue ≥ 47 von 50 Fussnoten, kein stilles Überschreiben, ≥ 14 von 15 Fragen korrekt mit Seite und Quelldokument; Isolationstest grün; Lauf manuell auf Stufe B (Spec 04, Req 18) | [offen] |
 
 **Abnahme Gate 0** (Vorlage, füllt Fabian aus)
 
@@ -150,12 +166,13 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 | E2 Eigenbau | **bestätigt von Fabian am 09.11.2026** |
 | E3 PWA | **bestätigt von Fabian am 09.11.2026** |
 | D8 | **entschieden von Fabian am 09.11.2026:** bewusst gestrichen («Ich möchte keine native App, nur Web-App.»); ersetzt den früheren Stand «einer Folge-Spec zuordnen, nicht streichen»; Rückverfolgung in requirements.md nachgetragen |
+| Spec 04 Wissensbasis (zwölf Entscheide, Spec 04, design.md, Open Points) | **entschieden von Fabian am 09.11.2026** (alle Empfehlungen übernommen): (1) Spec 04 nach Spec 03, Wellen 13–16; (2) in `vhf-gsk` nur die sechs Standard-Seitentypen; (3) A19 der Geschäftsstelle 403, Einstellungen und OKF-Export nur `inhaber`; (4) Ingest nur für die Art `WISSENSQUELLE`, sonst 422 `KEINE_WISSENSQUELLE`; (5) Tokenbudget je Ingest 300'000, konfigurierbar; (6) Gate Phase 4: 5 Wissensquellen, ≥ 47/50 Fussnoten, ≥ 14/15 Fragen; (7) `WISSENSQUELLE` nur von Hand, KI-Vorschlag der Art bleibt Option; (8) `ueberblick` nur aus `NORMAL`-Wissen; (9) Kontextstufe: eine `NORMAL`-Seite bleibt nach `INTERN`-Ingest dauerhaft `INTERN` (`STUFE_STEIGT`), akzeptiert; (10) ein offener Ingest je Mandant, akzeptiert; (11) Monatsbudget der Wissensbasis 1'000'000 Tokens je Mandant, konfigurierbar; (12) neue Fehlercodes per Folge-PR in die Code-Liste von Spec 01. Einziger offener Punkt: [offen: Umgang mit Seitenversionen, die auf einem gelöschten Dokument beruhen (revDSG) – Entscheid in der Spec zur Löschfunktion] (Spec 04, Req 15.5) |
 | Freigabe ADR-001 bis ADR-012 (per Merge) | [offen] – nach dem Gate-Lauf, ein PR mit dem Gate-Ergebnis (Fabian, 09.11.2026); ADR-012 per eigenem Merge (nicht Teil von 0.6) |
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
 P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS starten»); P2 am 09.11.2026 von Fabian **geändert** (Option B); P19 am 08.11.2026 von Fabian
-**ergänzt** (lokales Modell, eng begrenzt):
+**ergänzt** (lokales Modell, eng begrenzt); P20–P22 am 09.11.2026 von Fabian zu Spec 04 **ergänzt** (Wissensbasis, ADR-013):
 
 | Nr. | Thema | Entscheid | Noch offen |
 | --- | --- | --- | --- |
@@ -178,6 +195,9 @@ P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS star
 | P17 | Notfallzugang | versiegelte Notfallunterlagen ausserhalb des Systems (neues Kriterium in Req 16); Notfallablauf für den Treuhänder in der Verfahrensbeschreibung; bis Welle 5 | – |
 | P18 | AVV KI | Spike AI Services hält Speicherung und Training fest; AVV unter `docs/vertrag/` | – |
 | P19 | Lokales Modell (08.11.2026) | **neu 08.11.2026:** Profil `lokal` (ADR-012): Sprachmodell in LM Studio nur auf dem Entwicklerrechner, nur an `localhost`; erlaubt für Entwicklung, Prompt-Vorarbeit und echte Belege, die den Rechner nicht verlassen; nicht für Gate 0, Golden-Lauf, Abnahmen, CI, Stufe A/B und Produktion; Startprüfung der KI-Basis-URL (Req 16.20–16.22, Aufgaben 0.5 und 1.11); Startmodell Mistral Small 3.2 24B, weil Mistral Small 4 nicht belegt in 64 GB läuft; Embeddings und Reranker lokal als Stub; Ergebnisse kein Nachweis für Infomaniak | Durchsetzung von `strict` in LM Studio (nicht dokumentiert, in 1.11 prüfen und im README festhalten); Schema-Features (`anyOf`, #103) |
+| P20 | Pflege der Wissensbasis (09.11.2026) | **neu 09.11.2026:** Die KI schreibt nur Entwürfe; wirksam wird eine Änderung erst, wenn der `inhaber` bzw. im Mandanten `vhf-gsk` die `geschaeftsstelle` sie einzeln nach angesehenem Diff freigibt (A17; Spec 04, Req 6; ADR-013) | Seitenversionen gelöschter Dokumente (revDSG), siehe Entscheid «Spec 04 Wissensbasis» oben |
+| P21 | Quelle der Wissensbasis (09.11.2026) | **neu 09.11.2026:** Dokumentart `WISSENSQUELLE` ohne gesetzliche Pflicht, auf demselben Erfassungsweg wie andere Dokumente (Spec 04, Req 1) | – |
+| P22 | Zeitpunkt Spec 04 (09.11.2026) | **neu 09.11.2026:** Spec 04 nach Spec 02 und Spec 03 (Wellen 13–16); Spec 01 bleibt im Umfang stabil | – |
 
 Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.3, Req 0.5), K2 Zeitbudget, K3 Treuhänder
 (Aufgabe 5.7), K4 21.CRM-Export (Aufgabe 0.4), K5 Servergrösse und -kosten (vor Welle 5, siehe P1).

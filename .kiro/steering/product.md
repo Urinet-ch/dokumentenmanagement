@@ -12,6 +12,7 @@ einmal erfasst und ist danach per Suche oder per Frage im Chat auffindbar, immer
 Grundlage: Konzept «UriNet Archiv — Konzept und Anforderungen» vom 08.11.2026
 (https://claude.ai/artifact/6mjnH1zM56T1AphxAQq88h). Die Anforderungs-IDs des Konzepts
 (D1–D8, I1–I6, S1–S2, C1–C3, M1–M4, B1–B4) stehen in jeder Spec in Klammern hinter der Anforderung.
+Spec 04 trägt keine Konzept-ID; ihre Grundlage ist der Auftrag von Fabian vom 09.11.2026.
 Das Konzept ist für Claude-Code-Sitzungen nicht erreichbar: Massgeblich sind die Steering-Dateien
 und die freigegebenen Specs unter `.kiro/specs/` (Kiro-Format, umgesetzt mit Claude Code, siehe `CLAUDE.md`).
 
@@ -33,6 +34,8 @@ Vertraulichkeit (`NORMAL` | `INTERN` | `PERSONAL`):
 - `PERSONAL` – `inhaber`, `treuhaender` (nur lesend), `geschaeftsstelle` (Mandant 2) und der Mitarbeiter, den das Dokument betrifft (`person_benutzer`). Ein Dokument ohne bestätigte Art gilt als `PERSONAL` und ist nur für Rollen mit Recht A7 und den Erfasser sichtbar.
 
 Verbindlich ist die Matrix Rolle × Aktion in Requirement 2 von Spec 01; jede Zeile ist ein testbares Kriterium.
+Die Wissensbasis (Spec 04) gibt der `inhaber` frei, im Mandanten `vhf-gsk` die `geschaeftsstelle` (Recht A17;
+Zeilen A15–A19 in Spec 04, Requirement 12.1).
 
 ## Mandanten
 - Mandant 1: `urinet` (ab Phase 1).
@@ -51,6 +54,7 @@ Verbindlich ist die Matrix Rolle × Aktion in Requirement 2 von Spec 01; jede Ze
 | 1 Archiv-Kern | `01-archiv-kern`, Wellen 1–5 | Erfassung, OCR, KI-Vorschläge, Eingangskorb, Suche, GeBüV-Ablage, CRM-CSV-Import | Belege 2026 im Archiv, Prüflauf ohne Abweichung |
 | 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport, AbaNinja (nur mit Abo Basic) | 7 Beispielfragen richtig und mit Quelle |
 | 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, öffentliche Schnittstelle, WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |
+| 4 Wissensbasis | `04-wissensbasis` | Wissensbasis nach LLM-Wiki-Muster | Gate Phase 4: 5 Wissensquellen, ≥ 47 von 50 Fussnoten belegt, ≥ 14 von 15 Fragen mit Seite und Quelldokument richtig |
 
 ## Beispielfragen (Abnahme Chat, Phase 2)
 1. «Zeig mir die letzte Rechnung an den FC Schattdorf.»
