@@ -16,13 +16,20 @@ Funktionalität: Anmeldung über Keycloak mit zweitem Faktor und Rollen
   Szenario: Mit Passwort und TOTP ist die Anfrage angemeldet
     Wenn sich «inhaber-urinet» mit Passwort und TOTP anmeldet
     Und mit diesem Token «/api/v1/dokumente» abfragt
-    Dann lässt das Archiv die Anfrage als angemeldet zu
+    # angemeldet; den Pfad gibt es noch nicht
+    Dann antwortet das Archiv angemeldet mit Status 404
 
+  @req-2.1
+  Szenario: Ein Token ohne Audience archiv-api lehnt die API ab
+    Wenn sich «mitarbeiter-urinet» über den Client «archiv-test-fremd» mit Passwort und TOTP anmeldet
+    Und mit diesem Token «/api/v1/dokumente» abfragt
+    Dann lehnt das Archiv die Anfrage mit Status 401 ab
+
+  # Der importierte Export (kein Token ohne TOTP über irgendeinen Client oder Ablauf) prüft RealmExportKeycloakTest.
   @req-2.1
   Szenario: Der Realm für Stufe A und B verlangt TOTP ohne Ausnahme
     Dann verlangt der Realm-Export im Browser Passwort und TOTP
     Und jeder neue Benutzer muss TOTP einrichten
-    Und kein Client des Realm-Exports erlaubt die Anmeldung ohne Browser
 
   @req-2.2
   Szenario: Der Realm kennt die vier Rollen

@@ -45,6 +45,11 @@ public class AnmeldungSchritte {
         token = Testanmeldung.token(benutzer);
     }
 
+    @Wenn("sich «{word}» über den Client «{word}» mit Passwort und TOTP anmeldet")
+    public void mitTotpUeberClient(String benutzer, String client) {
+        token = Testanmeldung.token(client, benutzer);
+    }
+
     @Und("mit diesem Token «{word}» abfragt")
     public void mitTokenAbfragen(String pfad) {
         antwort = given().auth().oauth2(token).when().get(pfad);
@@ -60,9 +65,9 @@ public class AnmeldungSchritte {
         assertThat(antwort.statusCode()).isEqualTo(401);
     }
 
-    @Dann("lässt das Archiv die Anfrage als angemeldet zu")
-    public void angemeldet() {
-        assertThat(antwort.statusCode()).isNotIn(401, 403);
+    @Dann("antwortet das Archiv angemeldet mit Status {int}")
+    public void angemeldet(int status) {
+        assertThat(antwort.statusCode()).isEqualTo(status);
     }
 
     @Dann("enthält das Token die Rolle «{word}» und den Mandanten «{word}»")
@@ -79,6 +84,7 @@ public class AnmeldungSchritte {
     public void rollenImExport(String a, String b, String c, String d) throws IOException {
         List<String> rollen = new ArrayList<>();
         export().path("roles").path("realm").forEach(r -> rollen.add(r.path("name").asText()));
+        rollen.removeIf(r -> r.equals("offline_access") || r.equals("uma_authorization") || r.startsWith("default-roles-"));
         assertThat(rollen).containsExactlyInAnyOrder(a, b, c, d);
     }
 
@@ -109,14 +115,6 @@ public class AnmeldungSchritte {
             }
         }
         assertThat(pflicht).isTrue();
-    }
-
-    @Und("kein Client des Realm-Exports erlaubt die Anmeldung ohne Browser")
-    public void keinDirectGrant() throws IOException {
-        for (JsonNode client : export().path("clients")) {
-            assertThat(client.path("directAccessGrantsEnabled").asBoolean()).as(client.path("clientId").asText()).isFalse();
-            assertThat(client.path("implicitFlowEnabled").asBoolean()).as(client.path("clientId").asText()).isFalse();
-        }
     }
 
     private static List<String> andereRollen(String rolle) {

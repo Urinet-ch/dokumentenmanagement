@@ -52,6 +52,23 @@ class ReqAbdeckungTest {
     }
 
     @Test
+    void labelOhneUnterstrichBrichtAb() {
+        for (String zeile : List.of("  - Anforderungen: 2.1", "*Anforderungen: 2.1*", "  - **Anforderungen**: 2.1")) {
+            assertThatThrownBy(() -> ReqAbdeckung.gefordert(List.of("- [x] 1.1 A", zeile))).as(zeile)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(ReqAbdeckung.gefordert(List.of("Jede Aufgabe liefert für ihre Anforderungen Szenarien."))).isEmpty();
+    }
+
+    @Test
+    void checkboxAusserhalbDesMustersBrichtAb() {
+        for (String zeile : List.of("- [x]  1.2 Zwei Leerzeichen", "* [x] 1.2 Stern", "  - [X]\t1.2 Tabulator")) {
+            assertThatThrownBy(() -> ReqAbdeckung.gefordert(List.of(zeile))).as(zeile)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
     void ueberschriftUndOptionaleAufgabeSetzenZaehlungZurueck() {
         List<String> tasks = List.of(
                 "- [x] 1.1 Gerüst",

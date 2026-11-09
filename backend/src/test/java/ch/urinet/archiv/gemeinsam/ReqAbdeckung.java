@@ -24,6 +24,8 @@ import java.util.stream.Stream;
 public final class ReqAbdeckung {
 
     private static final Pattern AUFGABE = Pattern.compile("^\\s*- \\[([ xX])](\\*?) (\\S+)");
+    private static final Pattern CHECKBOX = Pattern.compile("^\\s*[-*] \\[[ xX]]");
+    private static final Pattern LABEL = Pattern.compile("^\\s*-?\\s*[*_]*Anforderungen[*_]*\\s*:");
     private static final Pattern WELLE = Pattern.compile("^(\\d+)\\.\\d+$");
     private static final Pattern OPTIONAL = Pattern.compile("^O\\.\\d+$");
     private static final Pattern ANFORDERUNGEN = Pattern.compile("^\\s*(?:- )?_Anforderungen: ([^_]*)_\\s*$");
@@ -84,7 +86,10 @@ public final class ReqAbdeckung {
                         && welle.matches() && Integer.parseInt(welle.group(1)) >= 1;
                 continue;
             }
-            if (!zeile.contains("_Anforderungen")) {
+            if (CHECKBOX.matcher(zeile).find()) {
+                throw new IllegalArgumentException("Checkbox nicht im Format «- [x] x.y Titel»: " + zeile.strip());
+            }
+            if (!zeile.contains("_Anforderungen") && !LABEL.matcher(zeile).find()) {
                 continue;
             }
             Matcher anforderungen = ANFORDERUNGEN.matcher(zeile);

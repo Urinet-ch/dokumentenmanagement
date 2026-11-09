@@ -49,9 +49,12 @@ class EntwicklungsdiensteTest {
             ResultSet version = befehl.executeQuery("select current_setting('server_version_num')::int / 10000");
             version.next();
             assertThat(version.getInt(1)).isEqualTo(17);
-            ResultSet vektor = befehl.executeQuery("select count(*) from pg_available_extensions where name = 'vector'");
-            vektor.next();
-            assertThat(vektor.getInt(1)).isEqualTo(1);
+            befehl.execute("create extension if not exists vector");
+            befehl.execute("create temporary table vektor_probe (v vector(3))");
+            befehl.execute("insert into vektor_probe values ('[1,2,3]')");
+            ResultSet abstand = befehl.executeQuery("select v <-> '[1,2,4]' from vektor_probe");
+            abstand.next();
+            assertThat(abstand.getDouble(1)).isEqualTo(1.0);
         }
     }
 

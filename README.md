@@ -54,8 +54,9 @@ cd backend && mvn quarkus:dev
 ```
 - Startet über Dev Services PostgreSQL 17 mit pgvector, Keycloak mit dem Realm `urinet-archiv` aus
   `deploy/keycloak/realm-test.json` sowie MinIO (Object Lock) und Mailpit aus `backend/compose-devservices.yml`.
-  Die Adressen zeigt die Dev UI unter `http://localhost:8080/q/dev-ui`; Mailpit hat eine Weboberfläche auf dem
-  zugeordneten Port 8025.
+  Die Adressen zeigt die Dev UI unter `http://localhost:8080/q/dev-ui`. Mailpit läuft auf einem zufälligen Host-Port:
+  Weboberfläche über `archiv.entwicklung.mailpit-port` (Dev UI, Configuration) oder
+  `docker compose -p urinet-archiv-dev port mailpit 8025`.
 - Im Profil `dev` laufen Ablage, KI, OCR und Integration als Dev-Stubs (`archiv.<port>.stub=true`).
 - Testbenutzer (nur im Test-Realm, nie im Export für Stufe A und B), Passwort `Test-Passwort-1`, TOTP mit dem
   Test-Secret aus `realm-test.json` (`urinet-archiv-test-otp-nur-lokal`; für eine Authenticator-App als Base32

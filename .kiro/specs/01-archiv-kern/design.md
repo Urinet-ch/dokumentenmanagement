@@ -734,13 +734,14 @@ derselben Spec. Die Kriterien der Welle 0 (u. a. 0.2, 0.7, 0.9) sind durch den G
 Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 mit pgvector
 (`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2`, Realm aus
 `deploy/keycloak/realm-test.json`) als Dev Services der Extensions, MinIO und Mailpit als Compose Dev Services aus
-`backend/compose-devservices.yml` (Abweichung von «Testcontainers MinIO»: Compose deckt dev und Tests mit einer Datei
-ab). MinIO veröffentlicht keine Images mehr auf Docker Hub; verwendet wird `cgr.dev/chainguard/minio` mit festem
+`backend/compose-devservices.yml` (statt Testcontainers, weil Compose dev und Tests mit einer Datei abdeckt; entschieden
+von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub; verwendet wird `cgr.dev/chainguard/minio` mit festem
 Digest. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
 haben je einen Dev-Stub unter `adapter/out/stub/`; `adapter/out/<Name>Auswahl` wählt zur Laufzeit nach
 `archiv.<port>.stub` (nur in `dev` an). Ohne Stub und ohne echten Adapter bricht die Auswahl ab; die Methoden und
 Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die Datenbank nicht erreichbar ist
-(Agroal) oder keine Datasource aktiv ist (`DatenbankBereitschaft`).
+(Agroal) oder keine Datasource aktiv ist (`DatenbankBereitschaft`). Die API nimmt nur Tokens mit Audience
+`archiv-api` an (`quarkus.oidc.token.audience`).
 
 | Ebene | Werkzeug | Schwerpunkt |
 | --- | --- | --- |

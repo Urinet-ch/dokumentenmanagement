@@ -25,7 +25,7 @@ erwarte() {
   if [[ "$ist" -eq "$soll" && ( -z "${MELDUNG:-}" || "$ausgabe" == *"$MELDUNG"* ) ]]; then
     echo "ok   $fall (Exit $ist)"
   else
-    echo "FEHL $fall (Exit $ist, erwartet $soll${MELDUNG:+ mit «$MELDUNG»})"
+    echo "FEHL $fall (Exit $ist, erwartet $soll${MELDUNG:+ mit «${MELDUNG}»})"
     fehler=1
   fi
 }

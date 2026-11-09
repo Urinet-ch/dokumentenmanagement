@@ -58,6 +58,12 @@ Folgen von Option B für den Entscheid oben (Anforderungsänderungen alt → neu
 - **Bucket Policy (entschieden von Fabian am 09.11.2026):** `MandantProvisionierung` setzt auf jedem Mandanten-Bucket eine Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` (Aufgabe 1.3). Sie schützt nur gegen Versehen, ein Fehler der App mit Bypass-Header scheitert [T 6c]; gegen einen gestohlenen Schlüssel schützt sie nicht, weil jeder Schlüssel des Projekts sie löschen oder überschreiben kann [T 6b–7g]. Eine Korrektur mit dem Inhaber-Zugang muss sie vorher entfernen.
 - **Umsetzung und Tests:** App-Schlüssel ausstellen und Inhaber-Zugang offline verwahren (Aufgabe 5.4). Testcontainers MinIO: Ohne Bypass-Header lassen sich gesperrte Versionen nicht löschen und Sperren nicht verkürzen, Verlängern gelingt; Manifeste unter COMPLIANCE lassen sich auch mit Bypass-Header nicht löschen oder verkürzen (Test-Bucket ohne Bucket Policy, sonst greift deren Deny [T 6c]). Dass die Anwendung `x-amz-bypass-governance-retention` (`bypassGovernanceRetention`) bei keinem Aufruf setzt, prüft ein Request-Interceptor in den Integrationstests, ergänzend eine ArchUnit-Regel im Produktionscode (JUnit, Req 6.5; Aufgabe 2.3). Die Provisionierung prüft die Bucket Policy (Aufgabe 1.3).
 
+## Nachtrag 09.11.2026 (Testumgebung)
+MinIO läuft in Tests und in `dev` aus den Compose Dev Services (`backend/compose-devservices.yml`, Image
+`cgr.dev/chainguard/minio` mit festem Digest), nicht als Testcontainers-Container (entschieden von Fabian am
+09.11.2026, Aufgabe 1.2). «Testcontainers MinIO» oben heisst damit «MinIO aus den Compose Dev Services»; die Tests
+selbst bleiben gleich.
+
 ## Verweise
 - Nachtrag: `docs/spikes/s3-object-lock.md` (Spike 0.2), `docs/umsetzungsplan.md` Abschnitt 6 (P2, Abnahme Gate 0)
 - Req 0.4, 6.3, 6.5, 6.9, 6.10, 6.11, 9.7, 15.1–15.5, 15.8, 15.9, 16.9, 16.12, 16.15, 16.17
