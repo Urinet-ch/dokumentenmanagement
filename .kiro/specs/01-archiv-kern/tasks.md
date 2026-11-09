@@ -139,7 +139,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 0.7, 1.9_
 
 - [ ] 1.11 Profil lokal und Prüfung der KI-Basis-URL [Backend]
-  - Quarkus-Profil `lokal` nach design.md («KI», Profil `lokal`, ADR-012): erbt von `dev`, `archiv.ki.basis-url=http://localhost:1234/v1`, Modellname `archiv-lokal`, Dev-Stub von `KiPort` für das Sprachmodell aus (`archiv.ki.stub=false`), Embeddings und Reranker als Stub ohne Vektoren, kein Infomaniak-Token
+  - Quarkus-Profil `lokal` nach design.md («KI», Profil `lokal`, ADR-012): erbt von `dev`, `archiv.ki.basis-url=http://localhost:1234/v1`, Modellname `archiv-lokal` (für `archiv.ki.chat-modell` und `archiv.ki.erfassung-modell`), Dev-Stub von `KiPort` für das Sprachmodell aus (`archiv.ki.stub=false`), Embeddings und Reranker als Stub ohne Vektoren, kein Infomaniak-Token
   - echten OCR-Adapter im Profil `lokal` einschalten (`%lokal.archiv.ocr.stub=false`, OCRmyPDF als lokales Docker-Image wie in 0.5), damit das Sprachmodell den echten Volltext erhält (7.1); wirksam, sobald der OCR-Adapter aus 2.6 besteht
   - Startprüfung `KiBasisUrlPruefung` für `archiv.ki.basis-url` und `archiv.ki.reranker-url` (Spike 0.3), für Embeddings mit Spec 02: Host nur `api.infomaniak.com` (HTTPS), in `lokal` zusätzlich `localhost` bzw. `127.0.0.1`, in `test` nur mit dem Port der WireMock-Testressource (nie 1234); bei aktivem Stub entfällt die Prüfung der zugehörigen URL (leer zulässig); `lokal` zusammen mit `prod` bricht ab; die Hostprüfung von `GoldenLauf` und `GoldenDatensatzIT` stammt aus 0.5, der Gate-0-Lauf (0.6) liegt vor dieser Aufgabe
   - Konfigurationstest als reiner Unit-Test (JUnit, ohne Quarkus-Start und ohne aktives Profil `lokal`; Prüflogik mit Profilnamen und URI als Eingabe, Profilwerte aus `application.properties` per `SmallRyeConfigBuilder` gelesen): fremder Host (z. B. `api.openai.com`), Suffix-Trick (`api.infomaniak.com.example.org`), Benutzerangabe in der URI, `localhost` im Profil `prod`, `localhost:1234` im Profil `test`, fremder Host in `archiv.ki.reranker-url`, `lokal` zusammen mit `prod` → Prüfung bricht ab, die Meldung nennt nur Host und Profil; `api.infomaniak.com` in `prod`, `localhost` in `lokal`, `localhost` mit WireMock-Port in `test` und `dev` mit Stub und leerer Basis-URL → Prüfung gelingt; Profil `lokal`: keine Eigenschaft verweist auf `/run/secrets/infomaniak_ai_token` (fehlende Datei → Prüfung gelingt), Embedding- und Reranker-Port sind Stubs
@@ -215,7 +215,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.18, 7.4_
 
 - [ ] 3.2 Metadaten-Extraktor [Backend]
-  - Port `KiPort` mit Adapter (LangChain4j) und Dev-Stub; `MetadatenExtraktor` mit Prompt aus Welle 0, Schema-Validierung + eine Nachfrage, Sicherheiten je Feld, Schwelle aus Gate 0, `ki_verbrauch`
+  - Port `KiPort` mit Adapter (LangChain4j) und Dev-Stub; `MetadatenExtraktor` mit Prompt aus Welle 0, Schema-Validierung + eine Nachfrage, Sicherheiten je Feld, Modell (`archiv.ki.erfassung-modell`), Aufrufparameter und Schwelle aus Gate 0 (design.md «KI»), `ki_verbrauch`
   - Swiss QR Code vor dem KI-Aufruf deterministisch auslesen, seine Werte vor den KI-Werten verwenden
   - Vorschlag inkl. Vertraulichkeit (vorbelegt mit dem Standard der Art); das Belegnummer-Muster setzt die Art nur, wenn der Mandant Aussteller ist (Testfall Lieferantenrechnung `2026-123`)
   - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter; Logs nur mit IDs

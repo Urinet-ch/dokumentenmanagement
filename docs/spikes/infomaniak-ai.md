@@ -23,7 +23,8 @@ Stand 08.11.2026 · Req 0.5, 16.7 · Mini-App: [`spikes/infomaniak-ai/`](../../s
 
 | Zweck | Modellname in der API | Bemerkung |
 | --- | --- | --- |
-| Sprachmodell | `mistralai/Mistral-Small-4-119B-2603` | `max_token_input` 256'000 |
+| Sprachmodell | `mistralai/Mistral-Small-4-119B-2603` | `max_token_input` 256'000; ab Gate 0 für Chat und Wissensbasis |
+| Sprachmodell Erfassung (ab Gate 0, 09.11.2026) | `google/gemma-4-31B-it` | `max_token_input` 100'000 (`GET /1/ai/models`, 09.11.2026); Tool Calling nicht geprüft, für die Erfassung nicht nötig |
 | Embeddings | `bge_multilingual_gemma2` | Antwort meldet `model: BAAI/bge-multilingual-gemma2` |
 | Embeddings (Test) | `Qwen/Qwen3-Embedding-8B` | 4'096 Dimensionen, `dimensions` wird unterstützt (2'048 geprüft) |
 | Reranker | `BAAI/bge-reranker-v2-m3` | nur über die Cohere-Schnittstelle, nicht in `/models` |

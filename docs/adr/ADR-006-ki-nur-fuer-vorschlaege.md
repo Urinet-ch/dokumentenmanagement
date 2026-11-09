@@ -70,6 +70,16 @@ Punkt 1 (genau ein Aufruf je Beleg) gilt unverändert für den Metadaten-Vorschl
 eigener, nachgelagerter Zweck mit mehreren Aufrufen und ändert keine Metadaten. Wissensseiten folgen demselben
 Grundsatz «KI nur für Vorschläge», siehe ADR-013.
 
+## Nachtrag 09.11.2026 (Gate 0, Modell der Erfassung)
+Golden-Lauf 0.5 und Gate-Lauf liegen vor (`docs/spikes/golden-ergebnis.md`): Prüfteil 20/20 Belege mit Art, Datum,
+Partner und Betrag richtig, 1 falsches Feld mit Sicherheit ab 0.8, Schwelle `archiv.ki.schwelle=0.8`. Gemessen mit
+`google/gemma-4-31B-it`; Mistral-Small-4 verfehlte das Gate im Abstimmungsteil. Entschieden von Fabian am 09.11.2026:
+Den Metadaten-Vorschlag macht `archiv.ki.erfassung-modell=google/gemma-4-31B-it`, getrennt von `archiv.ki.chat-modell`
+(Chat und Wissensbasis bleiben bei Mistral-Small-4, bis Gate 2 bzw. Gate 4 messen). Ein anderes Erfassungsmodell gilt
+erst nach einem neuen Golden-Lauf (design.md «KI»). Der Satz «design.md setzt weiterhin auf den OCR-Volltext» unter
+«Folgen» ist überholt: Für Bild-Originale gilt der Bildweg (Req 7.1, design.md «KI», Bildweg). Der Entscheid oben
+bleibt unverändert; der Vorbehalt zur Sicherheitsschwelle ist damit erfüllt.
+
 ## Verweise
 - Req 0.2, 0.3, 0.5, 0.9, 2.6 (A7), 2.21, 7.1–7.12, 8.1–8.4, 11.2, 11.6, 11.7, 11.10, 12.8, 16.4
 - P3, P10, P11; tech.md Regeln 5 und 6

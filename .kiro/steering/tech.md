@@ -13,7 +13,7 @@ inclusion: always
 | Zeitstempel | RFC 3161, **Pflicht** für jedes Manifest | Schweizer Anbieter [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5] |
 | OCR | OCRmyPDF + Tesseract (`deu`, `eng`), img2pdf, libheif | im Worker-Image installiert, Aufruf per `ProcessBuilder` |
 | Textextraktion | Apache Tika (nur für digitale PDFs/Office ohne OCR) | |
-| KI | Quarkus LangChain4j (`quarkus-langchain4j-openai`) gegen Infomaniak AI Services (OpenAI-kompatibel) | Sprachmodell `mistralai/Mistral-Small-4-119B-2603`; Embeddings BGE Multilingual Gemma2; Reranker `BAAI/bge-reranker-v2-m3` |
+| KI | Quarkus LangChain4j (`quarkus-langchain4j-openai`) gegen Infomaniak AI Services (OpenAI-kompatibel) | Sprachmodelle: Erfassung `google/gemma-4-31B-it` (Gate 0), Chat und Wissensbasis `mistralai/Mistral-Small-4-119B-2603`; Embeddings BGE Multilingual Gemma2; Reranker `BAAI/bge-reranker-v2-m3` |
 | Anmeldung | Keycloak (OIDC, PKCE, TOTP-2FA), `quarkus-oidc` | bleibt (externer Treuhänder, Mandant 2); Mandant kommt aus dem Token-Claim `mandant` |
 | Frontend | Angular (aktuelle Version), Standalone Components, Signals, Angular Material, PWA (`@angular/pwa`) | über Quinoa im API-Artefakt ausgeliefert; Offline-Warteschlange in IndexedDB |
 | CSV | Apache Commons CSV, ICU4J (Zeichensatz-Erkennung) | |
@@ -39,12 +39,12 @@ inclusion: always
 
 ## Infomaniak AI Services (bestehendes Konto)
 - Zugang: Token als Secret-Datei `/run/secrets/infomaniak_ai_token`, Produkt-ID in `archiv.ki.product-id`, Basis-URL der OpenAI-kompatiblen Schnittstelle in `archiv.ki.basis-url` (aus der Infomaniak-Kontoübersicht übernehmen, nicht raten).
-- Modelle per Konfiguration: `archiv.ki.chat-modell=mistralai/Mistral-Small-4-119B-2603` (Alternative `Apertus-v1.5-70B`, solange BETA nur zum Testen), `archiv.ki.embedding-modell=bge_multilingual_gemma2` (Test: `Qwen/Qwen3-Embedding-8B`), `archiv.ki.reranker-modell=BAAI/bge-reranker-v2-m3` (Reserve `Qwen/Qwen3-Reranker-0.6B`). Exakte Modellnamen aus der Modellliste im Konto übernehmen (Stand Spike 0.3, `docs/spikes/infomaniak-ai.md`).
+- Modelle per Konfiguration: `archiv.ki.erfassung-modell=google/gemma-4-31B-it` (Metadaten-Vorschlag, Spec 01 Req 7; durch Gate 0 belegt, ein Wechsel braucht einen neuen Golden-Lauf, design.md «KI»), `archiv.ki.chat-modell=mistralai/Mistral-Small-4-119B-2603` (Chat, Spec 02; Alternative `Apertus-v1.5-70B`, solange BETA nur zum Testen), `archiv.ki.embedding-modell=bge_multilingual_gemma2` (Test: `Qwen/Qwen3-Embedding-8B`), `archiv.ki.reranker-modell=BAAI/bge-reranker-v2-m3` (Reserve `Qwen/Qwen3-Reranker-0.6B`). Exakte Modellnamen aus der Modellliste im Konto übernehmen (Stand Spike 0.3, `docs/spikes/infomaniak-ai.md`).
 - Reranker nicht unter der OpenAI-Basis-URL, sondern Cohere-kompatibel unter `archiv.ki.reranker-url` (`https://api.infomaniak.com/2/ai/{product_id}/cohere/v2/rerank`).
 - Der Spike AI Services hält fest, ob Infomaniak Eingaben speichert oder zum Training nutzt; der AVV wird unter `docs/vertrag/` referenziert.
 - Wissensbasis (Spec 04): Konfigurationsschlüssel `archiv.wissen.*` (Startwerte in Spec 04, design.md, «Konfiguration und Aufträge»). `archiv.wissen.modell` ist ein Modellname (Standard `archiv.ki.chat-modell`), keine URL, und gehört nicht zu den URL-Schlüsseln der Startprüfung; die Wissensbasis ruft das Sprachmodell nur über `archiv.ki.basis-url` auf, einen eigenen URL-Schlüssel gibt es nicht (Spec 04, Requirement 13.1).
-- Kosten pro Aufruf über `ki_verbrauch` nachvollziehen; Richtwert ca. CHF 1.50 pro 1'000 Chat-Fragen mit Mistral.
-- Profil `lokal` (ADR-012, nur Entwicklerrechner): `%lokal.archiv.ki.basis-url=http://localhost:1234/v1` (LM Studio), Modellname aus `lms load … --identifier`, echter OCR-Adapter, Embeddings und Reranker als Stub; Startprüfung für `archiv.ki.basis-url` und `archiv.ki.reranker-url`: nur HTTPS auf `api.infomaniak.com`, in `lokal` zusätzlich `localhost` bzw. `127.0.0.1`, in `test` nur mit dem Port der WireMock-Testressource.
+- Kosten pro Aufruf über `ki_verbrauch` nachvollziehen; Richtwerte ca. CHF 1.50 pro 1'000 Chat-Fragen mit Mistral, ca. CHF 0.40 pro 1'000 erfasste Belege mit gemma-4-31B-it (Golden-Lauf 09.11.2026, exkl. MWST).
+- Profil `lokal` (ADR-012, nur Entwicklerrechner): `%lokal.archiv.ki.basis-url=http://localhost:1234/v1` (LM Studio), Modellname (`archiv.ki.erfassung-modell`, `archiv.ki.chat-modell`) aus `lms load … --identifier`, echter OCR-Adapter, Embeddings und Reranker als Stub; Startprüfung für `archiv.ki.basis-url` und `archiv.ki.reranker-url`: nur HTTPS auf `api.infomaniak.com`, in `lokal` zusätzlich `localhost` bzw. `127.0.0.1`, in `test` nur mit dem Port der WireMock-Testressource.
 
 ## Plattform und Betrieb (nicht verhandelbar)
 Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was hier fehlt, wird nachgefragt, nicht geraten.

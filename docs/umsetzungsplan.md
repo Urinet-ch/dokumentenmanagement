@@ -227,7 +227,7 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Bestehende Infomaniak-VPS (Stufe A, Welle 1 bis zum Wechsel) | keine Zusatzkosten (bestehende VPS) |
 | Eigene Infomaniak-VPS (Stufe B, ab Welle 5) | [offen: CHF __/Mt. – K5, Entscheid vor Welle 5] |
 | Object Storage (Public-Cloud-Projekt) | nach Verbrauch, einige GB pro Jahr |
-| Infomaniak AI Services | ca. CHF 1.50 pro 1'000 Chat-Fragen (Mistral), Erfassung ähnlich pro 1'000 Dokumente |
+| Infomaniak AI Services | ca. CHF 1.50 pro 1'000 Chat-Fragen (Mistral), ca. CHF 0.40 pro 1'000 erfasste Dokumente (gemma-4-31B-it, Golden-Lauf 09.11.2026), exkl. MWST |
 | Zweitkopie Sicherung (zweiter Schweizer Anbieter) | [offen: CHF __/Mt. – Anbieter, Entscheid vor Welle 5] |
 | RFC-3161-Zeitstempel | [offen: CHF __/Mt. – TSA-Anbieter, Entscheid vor Welle 5] |
 | AbaNinja Basic | CHF 21/Mt., nur bei E1 = ja |
