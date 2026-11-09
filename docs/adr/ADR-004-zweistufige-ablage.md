@@ -25,10 +25,10 @@
 
 ## Betrachtete Alternativen
 - **Sofort gesperrt ablegen beim Eingang:** abgelehnt. Fehlerfassungen wären nicht mehr löschbar (Req 6.2), und das Ablaufdatum der Sperre ist vor der Bestätigung unbekannt.
-- **Bucket mit Standard-Aufbewahrung:** abgelehnt. Damit wäre auch `eingang/` gesperrt (design.md, «Ablage»). Bleibt nur im Rückfall für den eigenen Archiv-Bucket.
+- **Bucket mit Standard-Aufbewahrung:** abgelehnt. Damit wäre auch `eingang/` gesperrt (design.md, «Ablage»). Der Rückfall dafür entfällt laut Spike 0.2 [T 3a, 5].
 - **Sperre für alle Arten:** abgelehnt nach P12. Dokumente ohne gesetzliche Pflicht wären bis zum Ablauf nicht löschbar, auch nicht über die spätere Löschfunktion.
 - **Eingang ausserhalb des Object Storage** (Dateisystem der VPS): abgelehnt. API und Worker laufen in Stufe B in getrennten Containern und bräuchten einen gemeinsamen Speicher. Die VPS der Stufe A hat wenig freie Disk, und `archivieren` wäre keine Kopie innerhalb eines Speichers mit Prüfsumme mehr.
-- **Getrennte Buckets von Anfang an:** nicht gewählt. Mehr Buckets je Mandant für Provisionierung, Rechte und Sicherung, ohne Mehrwert, solange die Sperre pro Objekt funktioniert. Bleibt als Rückfall.
+- **Getrennte Buckets von Anfang an:** nicht gewählt. Mehr Buckets je Mandant für Provisionierung, Rechte und Sicherung, ohne Mehrwert, solange die Sperre pro Objekt funktioniert. Der Rückfall entfällt laut Spike 0.2 [T 3a, 5].
 
 ## Folgen
 - **Positiv:** Fehlerfassungen bleiben löschbar; die Grenze zwischen «noch korrigierbar» und «unveränderbar» ist eindeutig am Präfix und am Status `ARCHIVIERT` erkennbar. `ARCHIVIERT` heisst immer: kopiert, geprüft und, bei Pflicht, gesperrt.
@@ -37,7 +37,7 @@
 - **Negativ:** Unter `archiv/` dürfen keine fremden Versionen entstehen. Der Prüflauf meldet fremde Versionen und Löschmarken als Abweichung (Req 15.10).
 - **Umsetzung:** `AblageService` mit Port `AblagePort`, S3-Adapter und Dev-Stub (Aufgabe 2.3); Bestätigen, Archivieren, Verwerfen und Wiederholen in Aufgabe 3.4. Sperre bei Metadatenänderung nur verlängern (Req 9.7, ADR-007).
 - **Tests:** Testcontainers MinIO mit Object Lock und Versionierung: archivierte Datei nicht löschbar, Abweichung der Prüfsumme bricht ab, Art ohne Pflicht ohne Sperre, Verwerfen löscht alle Versionen. Cucumber-Szenarien zu Req 6.x.
-- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen: [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
+- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; ob der App-Schlüssel das Bypass-Recht hat, hängt vom Optionsentscheid A/B/C in ADR-007 ab, Spike 0.2 [T 6b–7g]): [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
 
 ## Verweise
 - Spike 0.2 (Vorbehalt): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007
