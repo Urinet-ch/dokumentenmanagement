@@ -74,7 +74,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 1 — Fundament (Voraussetzung: Gate 0, Stufe A aus 0.7 bereit)
 
-- [ ] 1.1 Repository-Gerüst und CI [Infra]
+- [x] 1.1 Repository-Gerüst und CI [Infra]
   - Struktur gemäss `structure.md`, Paketstruktur hexagonal je Fachbereich (`domain`, `application`, `adapter`)
   - Quarkus-Projekt `backend` (Java 25, Extensions: rest-jackson, hibernate-orm-panache, jdbc-postgresql, liquibase, oidc, smallrye-openapi, smallrye-health, micrometer, scheduler, amazon-s3, langchain4j-openai, quinoa); Hibernate nur `validate`
   - Angular-Projekt `frontend` (Standalone, Material, PWA), über Quinoa im API-Artefakt ausgeliefert

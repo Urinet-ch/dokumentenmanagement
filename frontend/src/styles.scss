@@ -1,0 +1,35 @@
+@use '@angular/material' as mat;
+
+// UriNet-Branding (tech.md, Konventionen Frontend); Inter ohne externe Schriftquelle
+:root {
+  --urinet-dunkel: #05070c;
+  --urinet-karte: #0d1017;
+  --urinet-gelb: #eeb111;
+  --urinet-hell: #f2efe7;
+}
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$yellow-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: (Inter, system-ui, sans-serif),
+        brand-family: (Inter, system-ui, sans-serif),
+      ),
+      density: 0,
+    )
+  );
+}
+
+body {
+  color-scheme: dark;
+  background-color: var(--urinet-dunkel);
+  color: var(--urinet-hell);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100%;
+}
