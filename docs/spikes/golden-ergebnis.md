@@ -7,7 +7,9 @@ Vorschlag und Sicherheit je Beleg liegen in `$ARCHIV_GOLDEN_DIR/berichte/<Zeitpu
 
 ## Kurz
 
-- **Prüfteil (Gate, Req 0.3/0.9): noch nicht gelaufen.** Den Gate-Lauf (`--gate`, 20 zurückgehaltene Belege) startet Fabian.
+- **Prüfteil (Gate, Req 0.3/0.9): Gate-Lauf 2026-11-09-185812 (Fabian), Kriterien erfüllt.** 20/20 Belege mit Art, Datum,
+  Partner, Betrag richtig (Gate: ≥ 18), 1 falsches Feld mit Sicherheit ≥ 0.8 (Gate: ≤ 1), kleinste Schwelle 0.00,
+  Schwelle 0.8. Abnahme: `docs/umsetzungsplan.md`, Abschnitt 6.
 - **Gate-Vorbereitung (09.11.2026, unten):** Req 0.9 neu, Regeln R3/E1/E2. gemma-4-31B-it erreicht 30/30 in vier
   Läufen mit kleinster Schwelle 0.00 (gate-reif), Qwen3.5-397B 30/30 und 28/30 (gate-reif, teuer, Timeouts),
   Mistral-Small-4 27/30 und 24/30 (nicht gate-reif). Fabian hat am 09.11.2026 entschieden: gemma-4-31B-it, Schwelle 0.8.
@@ -287,6 +289,28 @@ Timeouts (ein Beleg ohne Vorschlag zählt als falsch) und rund 30-fache Kosten.
 Eingangsdatum `2026-11-10`, Schwelle 0.8, Commit = Merge-Commit von PR #21; alle Werte sind Standard in
 `application.properties` (Kontroll-Lauf `--limit 1` ohne Startparameter zeigt sie in der Konsolenzeile).
 
+## Gate-Lauf (Prüfteil, 09.11.2026)
+
+Lauf `2026-11-09-185812-gate`, gestartet von Fabian auf dem Merge-Commit von PR #21 (`2c36441`) ohne Zusatzparameter.
+Konsolenzeile und `kennzahlen.md` zeigen die eingefrorenen Werte: Prompt `v5-fb5c021d33fc`, Modell
+`google/gemma-4-31B-it`, Nachbearbeitung `nb-2026-11-09`, Eingangsdatum `2026-11-10`, Schwelle 0.8 (≥).
+
+| Art | Datum | Partner | Betrag | Beleg-Nr. | Felder | Gate-Belege | Fehler ≥ 0.8 | kleinste Schwelle |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 20 | 20 | 20 | 20 | 19 | 99/100 | 20/20 | 1 | 0.00 |
+
+- Belege 20, ohne Vorschlag 0, Nachfragen 0, Swiss QR gelesen 10; Eingabe Bild 4, Text 16 (Kontrolle `HANDY_FOTO` als
+  Bild: ok).
+- Art roh (Modell) 20/20, nach Nachbearbeitung 20/20; Umstufungen keine; R3 ohne Treffer; «bitte prüfen» bei 0.8: 0
+  Felder. Der eine Fehler ist eine Belegnummer mit Sicherheit ≥ 0.8; er steht damit nicht auf «bitte prüfen».
+- Tokens 26'166 ein / 4'900 aus, Kosten ca. CHF 0.0072; KI im Mittel 3.3 s je Beleg, OCR 3.4 s (inkl. Cache).
+- Beleg-IDs des Prüfteils stehen nur im Bericht unter `$ARCHIV_GOLDEN_DIR` (CLAUDE.md Regel 9).
+
+**Ergebnis:** Req 0.3 (≥ 18/20) und Req 0.9 (höchstens 1 Fehler ab der Schwelle) sind erfüllt. Wie im Abstimmungsteil
+war das einzige falsche Feld eine Belegnummer mit hoher Sicherheit; der eine erlaubte Fehler ist damit ausgeschöpft.
+Befund für Welle 3 (KI-Vorschläge im Produkt): Die Belegnummer ist in Abstimmungs- und Prüfteil die einzige Fehlerquelle
+mit hoher Sicherheit; in Aufgabe 3.2 gezielt prüfen, ohne den eingefrorenen Stand des Prototyps zu ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
+
 ## Offen für Gate 0 (Aufgabe 0.6, Fabian)
 
 Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.md)):
@@ -305,10 +329,10 @@ Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.m
    bestanden (Req 0.9); wie es weitergeht, entscheidet Fabian.
 
 Weiter offen:
-- Abstand zum Gate: gemma-4-31B-it erreicht im Abstimmungsteil 30/30 in vier Läufen; ob das auf den Prüfteil
-  überträgt, zeigt erst der Gate-Lauf (die Regeln sind am Abstimmungsteil gefunden, Überanpassung möglich).
-- Modellwechsel: Die Folgeänderungen in tech.md, design.md «KI», ADR-006, ADR-012, Req 0.5, tasks.md und Spec 04
-  kommen nach dem Gate-Lauf in einem eigenen PR (Entscheid Fabian: ADRs erst nach dem Gate-Lauf; Liste im PR #21).
+- Abstand zum Gate: erledigt, Gate-Lauf oben (20/20 im Prüfteil).
+- Modellwechsel: umgesetzt in PR #22. gemma-4-31B-it gilt nur für die Erfassung (`archiv.ki.erfassung-modell`), Chat
+  und Wissensbasis bleiben bei Mistral-Small-4 (entschieden von Fabian am 09.11.2026). Req 0.5, Aufgabe 0.3 und Spec 04
+  bleiben unverändert, weil sie Chat-Modell und Tool Calling betreffen.
 - Realitätsprüfung: 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35); `--realitaet` noch nicht
   gelaufen (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
 - Welche Bildfassung das Produkt sendet: entschieden von Fabian am 09.11.2026, design.md «KI», Bildweg.

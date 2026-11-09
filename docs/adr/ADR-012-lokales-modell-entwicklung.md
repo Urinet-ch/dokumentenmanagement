@@ -127,6 +127,19 @@
   [#1752](https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/1752)); HEIC vorher wandeln,
   wie im Worker ohnehin (design.md, Verarbeitung).
 
+## Nachtrag 09.11.2026 (Gate 0, Modell der Erfassung)
+Seit Gate 0 hat die Erfassung ein eigenes Produktivmodell: `archiv.ki.erfassung-modell=google/gemma-4-31B-it`
+(entschieden von Fabian am 09.11.2026, ADR-006, Nachtrag 09.11.2026); `archiv.ki.chat-modell` bleibt
+`mistralai/Mistral-Small-4-119B-2603`. Der Kontext oben («Sprachmodell `mistralai/Mistral-Small-4-119B-2603`») gilt
+damit nur noch für Chat und Wissensbasis. Im Profil `lokal` zeigen beide Schlüssel auf `archiv-lokal` (design.md,
+Profil `lokal`).
+- Die Begründung für Mistral Small 3.2 («nächstes belegtes Verhalten zum Produktivmodell») trägt nur noch für den Chat.
+  Für die Erfassung wäre ein lokales Gemma-4-Modell näher am Produktivmodell. Gemma 4 steht unter Apache 2.0
+  ([Modellkarte](https://huggingface.co/google/gemma-4-31B-it)); der Lizenz-Einwand gegen Gemma 3 unter «Betrachtete
+  Alternativen» gilt dafür nicht. Grösse als GGUF und Verhalten mit `json_schema` in LM Studio sind nicht geprüft.
+  [offen: lokales Modell für die Erfassung – Entscheid vor Welle 3]
+- Punkt 8 («Kein Nachweis») gilt unverändert: Das lokale Modell ersetzt keinen Golden-Lauf gegen Infomaniak.
+
 ## Verweise
 - Req 0.2, 0.3, 0.8, 7.3, 16.7, 16.14, 16.20–16.22; P19
 - tech.md Regel 6 und «Infomaniak AI Services»; design.md «KI», Abschnitt «Profil `lokal`»

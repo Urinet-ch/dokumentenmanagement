@@ -23,13 +23,14 @@ Stand 08.11.2026 · Req 0.5, 16.7 · Mini-App: [`spikes/infomaniak-ai/`](../../s
 
 | Zweck | Modellname in der API | Bemerkung |
 | --- | --- | --- |
-| Sprachmodell | `mistralai/Mistral-Small-4-119B-2603` | `max_token_input` 256'000 |
+| Sprachmodell | `mistralai/Mistral-Small-4-119B-2603` | `max_token_input` 256'000; ab Gate 0 für Chat und Wissensbasis |
+| Sprachmodell Erfassung (ab Gate 0, 09.11.2026) | `google/gemma-4-31B-it` | `max_token_input` 100'000 (`GET /1/ai/models`, 09.11.2026); Tool Calling nicht geprüft, für die Erfassung nicht nötig |
 | Embeddings | `bge_multilingual_gemma2` | Antwort meldet `model: BAAI/bge-multilingual-gemma2` |
 | Embeddings (Test) | `Qwen/Qwen3-Embedding-8B` | 4'096 Dimensionen, `dimensions` wird unterstützt (2'048 geprüft) |
 | Reranker | `BAAI/bge-reranker-v2-m3` | nur über die Cohere-Schnittstelle, nicht in `/models` |
 | Reranker (Reserve) | `Qwen/Qwen3-Reranker-0.6B` | geprüft, gleiche Schnittstelle |
 
-Weitere Chat-Modelle im Konto: `swiss-ai/Apertus-v1.5-70B`, `mistralai/Ministral-3-14B-Instruct-2512`, `google/gemma-4-31B-it`, `moonshotai/Kimi-K2.6`, `Qwen/Qwen3.5-397B-A17B-FP8`, `Qwen/Qwen3.8-27B-FP8`.
+Weitere Chat-Modelle im Konto: `swiss-ai/Apertus-v1.5-70B`, `mistralai/Ministral-3-14B-Instruct-2512`, `google/gemma-4-31B-it` (ab Gate 0 Erfassung, siehe oben), `moonshotai/Kimi-K2.6`, `Qwen/Qwen3.5-397B-A17B-FP8`, `Qwen/Qwen3.8-27B-FP8`.
 
 Versionen der Mini-App: Quarkus 3.40.1 (LTS), `quarkus-langchain4j-openai` 1.13.3, LangChain4j 1.19.3, Java 25.
 
@@ -128,4 +129,7 @@ Massgebend ist [infomaniak-ai-datenschutz.md](infomaniak-ai-datenschutz.md) (Pr�
 - **Speichert Infomaniak Eingaben?** Nicht dauerhaft; nur Betriebsdaten und eine vorübergehende Speicherung während der Anfrage. Fristen sind offen (Abschnitt 1).
 - **Training?** Vertraglich ausgeschlossen, für alle Modelle der API (Abschnitt 2).
 - **AVV:** gilt über die ANB ohne separate Unterzeichnung; Verweise unter [docs/vertrag/README.md](../vertrag/README.md) (Abschnitt 4).
-- Die im Spike verwendeten Modelle tragen kein Beta-Kennzeichen (Abschnitt 5).
+- Die im Spike verwendeten Modelle tragen kein Beta-Kennzeichen (Abschnitt 5). Das gilt auch für das Erfassungsmodell
+  `google/gemma-4-31B-it` (`meta.is_beta: false`, `GET /1/ai/models`, 09.11.2026). Dass es auf Infomaniak-GPUs in der
+  Schweiz läuft, ist nur allgemein belegt (ANB Art. 15.1), nicht pro Modell (Abschnitt 2):
+  [offen: Bestätigung von Infomaniak, dass google/gemma-4-31B-it ausschliesslich auf eigenen GPUs in der Schweiz läuft – Entscheid vor Welle 5].

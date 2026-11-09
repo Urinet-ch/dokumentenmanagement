@@ -18,4 +18,4 @@ Abgerufen am 08.11.2026.
 
 Offen (siehe Datenschutzbericht, «Was Fabian bestätigen oder bei Infomaniak nachfragen sollte»):
 - [offen: AVV-PDF und TOMs mit Abrufdatum ablegen, da die PDF keine Versionsangabe hat – Fabian]
-- [offen: Rückfrage an dpo@infomaniak.com zu Geltung für AI Services, Unterauftragsverarbeitern und Fristen – Fabian]
+- [offen: Rückfrage an dpo@infomaniak.com zu Geltung für AI Services, Unterauftragsverarbeitern, Fristen und Standort von google/gemma-4-31B-it (Erfassungsmodell seit Gate 0) – Fabian]

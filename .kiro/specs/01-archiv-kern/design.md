@@ -50,7 +50,7 @@ flowchart TB
   subgraph PC["Infomaniak Public Cloud, eigenes Projekt"]
     S3[("Object Storage<br/>Bucket je Mandant · Object Lock · Versionierung")]
   end
-  AI["Infomaniak AI Services<br/>Mistral-Small-4"]
+  AI["Infomaniak AI Services<br/>gemma-4-31B-it (Erfassung) · Mistral-Small-4 (Chat)"]
   TSA["Zeitstempeldienst Schweiz<br/>RFC 3161 · Anbieter offen"]
   B2[("Zweitkopie<br/>zweiter Schweizer Anbieter · offen")]
   PWA -->|HTTPS| TR
@@ -295,6 +295,7 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 ### KI (`ki`)
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
 - Driven Port `KiPort` mit Adapter gegen Infomaniak AI Services und Dev-Stub (feste Antworten); in Tests WireMock.
+- Modell der Erfassung (Gate 0, entschieden von Fabian am 09.11.2026): `archiv.ki.erfassung-modell=google/gemma-4-31B-it`, getrennt von `archiv.ki.chat-modell` (Chat Spec 02, Standard für `archiv.wissen.modell` in Spec 04), weil Gate 0 nur den Metadaten-Vorschlag misst. Aufrufparameter wie im Gate-Lauf: `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `json_schema` mit `strict`. Ein anderes Erfassungsmodell oder andere Parameter gelten erst nach einem neuen Golden-Lauf (Req 0.3, 0.9). `archiv.ki.erfassung-modell` ist ein Modellname, keine URL, und gehört nicht zu den URL-Schlüsseln der Startprüfung. gemma-4-31B-it nimmt bei Infomaniak höchstens 100'000 Eingabe-Tokens an (Modellliste 09.11.2026). Im Gate-Lauf brauchte ein Beleg im Mittel rund 1'300 Eingabe-Tokens, als Text (12'000 Zeichen) wie als Bild (Prototyp: alle Seiten in einem Seitenbild, lange Kante höchstens 2000 px, `Seitenbild`); sendet das Produkt mehrere Seitenbilder einzeln, ist die Grenze mit Aufgabe 3.2 neu zu prüfen.
 - Genau ein Aufruf je Beleg (Req 7.1). Prompt (Deutsch): Rolle «Archivassistent für ein Schweizer KMU», Liste der Dokumentarten mit Beschreibung und Standard-Vertraulichkeit, Partner-Hinweis (Ordnerpfad, Absenderadresse), Werte aus dem Swiss QR Code, bis 5 Beispiele aus der Vorauswahl, Text gekürzt auf 12'000 Zeichen (Anfang + Ende).
 - Feldregeln im Prompt (Fabian, 09.11.2026):
   - `art`: Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. cassa di compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG.
@@ -345,9 +346,12 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
   eigener UID im Kopf, und werden zu `LIEFERANTENBELEG` umgestuft.
 - OCR: `-l deu+fra+ita+eng` (fremdsprachige Belege); das offizielle OCRmyPDF-Image enthält weder `ita` noch poppler,
   daher ein abgeleitetes, versioniertes Image (`spikes/golden-lauf/ocr/Dockerfile`). Rohfotos liefern über Tesseract
-  kaum brauchbaren Text; ein Seitenbild direkt an Mistral-Small-4 (K1) war bei Fotos deutlich besser.
+  kaum brauchbaren Text; ein Seitenbild direkt an Mistral-Small-4 (K1) war bei Fotos deutlich besser (der Gate-Lauf mit
+  gemma-4-31B-it nutzt denselben Bildweg für Fotos).
 - Die Sicherheit je Feld trennt richtig und falsch kaum (falsche Felder oft 0.9–1.0); das Modell antwortet trotz
-  `temperature=0` zwischen Läufen unterschiedlich.
+  `temperature=0` zwischen Läufen unterschiedlich (gemessen mit Mistral-Small-4). Mit gemma-4-31B-it waren vier Läufe
+  auf dem Abstimmungsteil fast gleich; im Abstimmungsteil wie im Prüfteil blieb je genau ein falsches Feld, eine
+  Belegnummer mit hoher Sicherheit (Abstimmungsteil 1.0, Prüfteil ≥ 0.8; `docs/spikes/golden-ergebnis.md`).
 
 **Normalisierung** (`gemeinsam`, gilt für Gate-Vergleich Req 0.7, Partner-Abgleich und CSV-Import):
 - Name: Unicode NFKC, Kleinschreibung, `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`, übrige Akzente entfernt (`é→e`), `&` → `und`, Satzzeichen → Leerzeichen, Rechtsformen als ganzes Wort entfernt (`ag`, `gmbh`, `sa`, `sarl`, `sagl`, `kg`, `klg`, `verein`, `genossenschaft`, `stiftung`, `ltd`, `inc`), Mehrfachleerzeichen zusammengefasst, getrimmt.
@@ -372,6 +376,7 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 %lokal.archiv.ki.basis-url=http://localhost:1234/v1
 # Name aus lms load <model_key> --identifier archiv-lokal
 %lokal.archiv.ki.chat-modell=archiv-lokal
+%lokal.archiv.ki.erfassung-modell=archiv-lokal
 ```
 
 - Start: `mvn quarkus:dev -Dquarkus.profile=lokal`. Kein Infomaniak-Token, keine Produkt-ID.
@@ -381,7 +386,8 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - Modell: Startwert Mistral Small 3.2 24B Instruct (GGUF, Katalog `mistralai/mistral-small-3.2`),
   Alternative Ministral 3 14B Instruct (`mistralai/ministral-3-14b`). GGUF statt MLX und kein
   Reasoning-Modell, weil dort `json_schema` teils ignoriert wird oder das JSON in
-  `reasoning_content` landet (ADR-012).
+  `reasoning_content` landet (ADR-012). Lokales Modell für die Erfassung seit dem Wechsel auf gemma-4-31B-it:
+  [offen: lokales Modell für die Erfassung – Entscheid vor Welle 3] (ADR-012, Nachtrag 09.11.2026).
 - Antwortformat wie bei Infomaniak (`json_schema`, `json_object` lehnt LM Studio ab). Wie streng
   LM Studio `strict` durchsetzt (auch für nullable/`anyOf` im Schema von `MetadatenVorschlag`), ist
   nicht dokumentiert; Aufgabe 1.11 hält es im README fest, die Validierung nach Req 7.3 gilt unverändert.
