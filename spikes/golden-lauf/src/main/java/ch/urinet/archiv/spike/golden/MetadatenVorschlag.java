@@ -26,10 +26,10 @@ public record MetadatenVorschlag(
 
     public enum Richtung { EINNAHME, AUSGABE }
 
-    /** Codes aus der Tabelle in design.md; als Enum im Schema, damit das Modell keine fremden Werte liefert. */
+    /** Codes aus der Tabelle in design.md, fremde Arten zuerst (Prompt v5); als Enum im Schema, damit das Modell keine fremden Werte liefert. */
     public enum ArtCode {
-        AUSGANGSRECHNUNG, OFFERTE, LIEFERANTENBELEG, QUITTUNG, LOHNABRECHNUNG, VERTRAG, VERSICHERUNG, BEHOERDE, BANK,
-        PROJEKTDOKUMENT, KORRESPONDENZ
+        LIEFERANTENBELEG, QUITTUNG, VERTRAG, VERSICHERUNG, BEHOERDE, BANK, PROJEKTDOKUMENT, KORRESPONDENZ,
+        AUSGANGSRECHNUNG, OFFERTE, LOHNABRECHNUNG
     }
 
     public enum Vertraulichkeit { NORMAL, INTERN, PERSONAL }

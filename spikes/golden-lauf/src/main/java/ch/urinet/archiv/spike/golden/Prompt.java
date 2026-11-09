@@ -27,16 +27,20 @@ public final class Prompt {
             Adressfeld oder ist der Zahlungsempfänger im Swiss QR Code ein anderer, ist es ein fremder Beleg, auch wenn \
             die Nummer wie eine eigene aussieht. Belege von Dritten sind nie eine solche Art: Kassenbons und Quittungen sind QUITTUNG, \
             Rechnungen und Gutschriften von Lieferanten LIEFERANTENBELEG, Schreiben, Verfügungen und Rechnungen von \
-            Ämtern und Ausgleichskassen BEHOERDE, Policen, Prämienrechnungen und Mahnungen von Versicherungen \
+            Ämtern und Steuerverwaltungen BEHOERDE, Policen, Prämienrechnungen und Mahnungen von Versicherungen \
             VERSICHERUNG.
+            - Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. cassa di \
+            compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; UVG- und Krankentaggeld-Versicherer \
+            sind VERSICHERUNG.
             - partnerName: die Gegenpartei aus Sicht des Mandanten (bei fremden Belegen der Aussteller, bei eigenen \
             Belegen der Empfänger, bei Quittungen wer das Geld erhalten hat), nie der Mandant selbst und nie eine \
             Zahlungsart; so geschrieben wie auf dem Beleg.
             - datum: Belegdatum (Ausstellungsdatum) als JJJJ-MM-TT; zweistellige Jahre wie in 8.11.26 sind 20xx. \
             Erfinde kein Datum: steht keines auf dem Beleg, null.
-            - betrag: zu zahlender bzw. bezahlter Endbetrag; Gutschriften negativ; ohne Betrag null (nicht 0).
+            - betrag: zu zahlender bzw. bezahlter Endbetrag; Gutschriften negativ; ohne Betrag null (nicht 0). Bei \
+            Offerten das einmalige Total; wiederkehrende Beträge (pro Monat oder Jahr) zählen nicht.
             - belegnummer: Nummer des Belegs ohne Beschriftung, z. B. nach «Rechnung», «Nr.», «Bon», «Beleg», \
-            «Quittung», «Ticket», «Bestellung», «Referenz», «Police» oder «Verfügung»; nicht die QR-Referenz \
+            «Quittung», «Ticket», «Bestellung», «Referenz», «Police», «Verfügung» oder «Antrag»; nicht die QR-Referenz \
             und nicht die Kundennummer; fehlt sie, null.
             - richtung: EINNAHME oder AUSGABE aus Sicht des Mandanten; ohne Betrag null.
             - faelligkeit: Zahlungsfrist als JJJJ-MM-TT; bei «zahlbar innert N Tagen» Belegdatum plus N Tage; sonst null.

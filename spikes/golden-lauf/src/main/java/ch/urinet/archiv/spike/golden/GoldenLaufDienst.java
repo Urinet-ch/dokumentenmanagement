@@ -74,7 +74,7 @@ public class GoldenLaufDienst {
         }
         List<Dokumentarten.Art> arten = Dokumentarten.aus(Dokumentarten.designMd(Path.of("")));
         Path cache = golden.resolve(".cache-golden-lauf");
-        String systemPrompt = Prompt.system(mandant.name(), Dokumentarten.alsPromptListe(arten, eigeneArten));
+        String systemPrompt = Prompt.system(mandant.name(), Dokumentarten.alsPromptListe(arten, eigeneArten, mandant.name()));
         String promptHash = Prompt.hash(systemPrompt, bildweg(k1));
 
         LOG.infof("Modus %s%s: %d Belege, Prompt %s", modus.verzeichnis(), k1 ? " (K1, Bild)" : "", auswahl.size(), promptHash);
