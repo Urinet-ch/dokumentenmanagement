@@ -14,6 +14,7 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +38,11 @@ public class GoldenLaufDienst {
     String mandantName;
     @ConfigProperty(name = "golden.eigene-arten")
     List<String> eigeneArten;
-    @ConfigProperty(name = "golden.preis.ein-chf-pro-mio", defaultValue = "0.20")
+    @ConfigProperty(name = "golden.eingangsdatum")
+    LocalDate eingangsdatum;
+    @ConfigProperty(name = "golden.preis.ein-chf-pro-mio")
     double preisEin;
-    @ConfigProperty(name = "golden.preis.aus-chf-pro-mio", defaultValue = "0.75")
+    @ConfigProperty(name = "golden.preis.aus-chf-pro-mio")
     double preisAus;
 
     public record Ausgang(Path ordner, List<BelegErgebnis> ergebnisse, Bericht.Kennzahlen kennzahlen) {
@@ -78,14 +81,16 @@ public class GoldenLaufDienst {
         String promptHash = Prompt.hash(systemPrompt, bildweg(k1));
         Path ordner = Bericht.legeLaufordnerAn(golden.resolve("berichte"), Bericht.ordnerName(start, modus, k1, limit));
 
-        LOG.infof("Modus %s%s: %d Belege, Prompt %s", modus.verzeichnis(), k1 ? " (K1, Bild)" : "", auswahl.size(), promptHash);
+        LOG.infof("Modus %s%s: %d Belege, Prompt %s, Modell %s, Nachbearbeitung %s, Eingangsdatum %s", modus.verzeichnis(),
+                k1 ? " (K1, Bild)" : "", auswahl.size(), promptHash, modell, Nachbearbeitung.FASSUNG, eingangsdatum);
         List<BelegErgebnis> ergebnisse = new ArrayList<>();
         for (Erwartung e : auswahl) {
             BelegErgebnis r = pipeline.verarbeite(e, mandant, systemPrompt, arten, cache, k1);
             ergebnisse.add(r);
             LOG.info(zeile(r));
         }
-        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, start.format(Bericht.ZEITPUNKT), promptHash, modell, schwelle,
+        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, start.format(Bericht.ZEITPUNKT), promptHash, modell,
+                Nachbearbeitung.FASSUNG, eingangsdatum.toString(), schwelle,
                 echt.belege().size(), echt.ausgeschlossen(), preisEin, preisAus);
         Bericht.Kennzahlen k = Bericht.berechne(ergebnisse, schwelle, preisEin, preisAus);
         Bericht.schreibe(ordner, lauf, ergebnisse, k);

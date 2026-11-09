@@ -312,9 +312,11 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 - `SwissQrLeser` (Req 7.11, P11): Seiten mit `pdftoppm -r 300` rendern, QR mit ZXing decodieren, nur Payloads mit Kopf `SPC`; liest IBAN, Betrag, Währung, Referenz und Zahlungsempfänger. Diese Werte gehen in den Prompt und ersetzen nach der Antwort die KI-Werte (Sicherheit 1.0).
 - Nachbearbeitung:
   - Belegnummer-Muster setzen oder bestätigen `art` nur, wenn der Mandant Aussteller ist: Die Kreditor-IBAN des QR-Codes oder eine UID oder IBAN im Briefkopf gehört zu `mandant.kennungen` (Req 7.5, 7.12; Testfall Lieferantenrechnung `2026-123` bleibt `LIEFERANTENBELEG`).
-  - Betrag auf 2 Stellen; Datum mehr als 1 Jahr in der Zukunft → Sicherheit 0.
+  - Betrag auf 2 Stellen; Belegdatum strikt nach dem Eingangsdatum → Sicherheit 0, der gleiche Tag nicht (Prototyp-Regel R3, entschieden von Fabian am 09.11.2026; ersetzt «Datum mehr als 1 Jahr in der Zukunft → Sicherheit 0»; Fälligkeiten nicht betroffen).
+  - Prototyp-Regel E1, entschieden von Fabian am 09.11.2026: Liefert das Modell den Betrag 0 und gibt es keinen Betrag aus dem Swiss QR Code, wird der Betrag leer (Sicherheit unverändert); ein QR-Betrag, auch 0.00, bleibt vorrangig (Req 7.11).
+  - Prototyp-Regel E2, entschieden von Fabian am 09.11.2026: Nach Belegnummer-Muster und QR-Umstufung wird `LIEFERANTENBELEG` zu `QUITTUNG` (Art-Sicherheit 0.5, Vertraulichkeit der End-Art), wenn die rohe Art und die Art nach diesen Regeln `LIEFERANTENBELEG` sind, kein Swiss QR Code gelesen wurde, `partnerIban` leer und die Fälligkeit leer ist. Hat das Muster die Art gesetzt, greift E2 nicht (Req 7.12 unberührt).
   - Fehlt die Vertraulichkeit, gilt der Standard der vorgeschlagenen Art (Req 7.2).
-- Felder unter `archiv.ki.schwelle` (Startwert 0.8, nach Req 0.9 angehoben) markiert der Eingangskorb mit «bitte prüfen» (Req 7.6).
+- Felder unter `archiv.ki.schwelle` (Startwert 0.8, nach Req 0.9 angehoben) markiert der Eingangskorb mit «bitte prüfen» (Req 7.6). Die Schwelle wirkt auf die Sicherheit nach der Nachbearbeitung (Req 0.9, 7.6).
 - Korrektur (Req 7.7): Jede vom Vorschlag abweichende Bestätigung speichert ein `ki_beispiel` mit den Merkmalen aus Schritt 1. Die Korrekturquote je Feld (korrigierte / bestätigte Vorschläge, gleitend 90 Tage) ist Kennzahl unter `/q/metrics` (Req 16.4).
 - `PartnerAbgleich`: exakte Treffer über E-Mail, UID, IBAN; sonst `similarity(name_normalisiert, :name) >= archiv.abgleich.aehnlichkeit` (Startwert 0.6, `pg_trgm`), bester Treffer; zwei Treffer mit Abstand < 0.1 → «unsicher».
 - `KiVerbrauch` speichert Tokens (Ein/Aus) je Aufruf, Mandant, Zweck.

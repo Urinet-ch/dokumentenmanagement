@@ -24,11 +24,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 /** Auswertung nach Req 0.2, 0.3, 0.9. Vollbericht nur in ARCHIV_GOLDEN_DIR; kennzahlen.md enthält keine Inhalte. */
 public final class Bericht {
 
-    public record Lauf(Modus modus, boolean k1, String zeitpunkt, String promptHash, String modell, double schwelle,
+    public record Lauf(Modus modus, boolean k1, String zeitpunkt, String promptHash, String modell,
+                       String nachbearbeitung, String eingangsdatum, double schwelle,
                        int echteBestaetigt, int echteAusgeschlossen, double preisEin, double preisAus) {
     }
 
@@ -37,7 +39,9 @@ public final class Bericht {
                              long tokensEin, long tokensAus, int tokensUnvollstaendig, double kostenChf,
                              long ocrMsSchnitt, long kiMsSchnitt, List<String> fehlschlaege,
                              int belegeBild, long tokensEinBild, long tokensAusBild, double kostenBild, double kostenText,
-                             List<String> fotosNichtAlsBild, int artRohRichtig, List<String> umstufungen) {
+                             List<String> fotosNichtAlsBild, int artRohRichtig, List<String> umstufungen,
+                             Map<String, Integer> umstufungenJeGrund, int r3Treffer, int r3Richtig,
+                             int bittePruefen, int bittePruefenRichtig) {
 
         public int felderRichtig() {
             return richtig.values().stream().mapToInt(Integer::intValue).sum();
@@ -84,7 +88,27 @@ public final class Bericht {
                 .filter(r -> r.vorschlag() != null && Vergleich.art(r.erwartung().art(), r.vorschlag().artRoh())).count();
         // Beleg-ID (bei echten Belegen die Kurz-ID), nie der Dateiname
         List<String> umstufungen = ergebnisse.stream().filter(r -> r.vorschlag() != null && r.vorschlag().umgestuft())
-                .map(r -> r.erwartung().id() + ": " + r.vorschlag().artRoh() + " → " + r.vorschlag().art()).toList();
+                .map(r -> r.erwartung().id() + ": " + r.vorschlag().artRoh() + " → " + r.vorschlag().art()
+                        + " (" + r.vorschlag().umstufungGrund() + ")").toList();
+        Map<String, Integer> jeGrund = new TreeMap<>();
+        ergebnisse.stream().filter(r -> r.vorschlag() != null && r.vorschlag().umgestuft())
+                .forEach(r -> jeGrund.merge(r.vorschlag().umstufungGrund(), 1, Integer::sum));
+        int r3Treffer = (int) ergebnisse.stream().filter(r -> r.vorschlag() != null && r.vorschlag().datumNachEingang()).count();
+        int r3Richtig = (int) ergebnisse.stream()
+                .filter(r -> r.vorschlag() != null && r.vorschlag().datumNachEingang() && r.richtig().get(Feld.DATUM)).count();
+        int bittePruefen = 0;
+        int bittePruefenRichtig = 0;
+        for (BelegErgebnis r : ergebnisse) {
+            if (r.vorschlag() == null) {
+                continue;
+            }
+            for (Feld f : Feld.values()) {
+                if (r.vorschlag().sicherheit().getOrDefault(f, 0.0) < schwelle) {
+                    bittePruefen++;
+                    bittePruefenRichtig += r.richtig().get(f) ? 1 : 0;
+                }
+            }
+        }
         int n = Math.max(1, ergebnisse.size());
         return new Kennzahlen(ergebnisse.size(), richtig,
                 (int) ergebnisse.stream().filter(BelegErgebnis::gateRichtig).count(),
@@ -96,7 +120,7 @@ public final class Bericht {
                 ergebnisse.stream().mapToLong(BelegErgebnis::ocrMs).sum() / n,
                 ergebnisse.stream().mapToLong(BelegErgebnis::kiMs).sum() / n, fehlschlaege,
                 bild.size(), einBild, ausBild, kostenBild, kosten - kostenBild, fotosNichtAlsBild, artRohRichtig,
-                umstufungen);
+                umstufungen, jeGrund, r3Treffer, r3Richtig, bittePruefen, bittePruefenRichtig);
     }
 
     /** Req 0.9: falsche Felder, deren Sicherheit die Schwelle erreicht (>=). */
@@ -191,7 +215,8 @@ public final class Bericht {
         sb.append("### Lauf ").append(lauf.modus().verzeichnis()).append(lauf.k1() ? ", Variante K1 (Bild statt OCR-Text)" : "")
                 .append(" (").append(lauf.zeitpunkt()).append(")\n\n");
         sb.append("- Modell `").append(lauf.modell()).append("`, Prompt `").append(lauf.promptHash())
-                .append("`, Schwelle ").append(lauf.schwelle()).append(" (≥)\n");
+                .append("`, Nachbearbeitung `").append(lauf.nachbearbeitung()).append("`, Eingangsdatum ")
+                .append(lauf.eingangsdatum()).append(", Schwelle ").append(lauf.schwelle()).append(" (≥)\n");
         sb.append("- Belege: ").append(k.belege()).append(", davon ohne Vorschlag: ").append(k.fehlgeschlagen())
                 .append(", Nachfragen (Req 7.3): ").append(k.nachfragen()).append(", Swiss QR gelesen: ")
                 .append(k.qrGefunden()).append("\n\n");
@@ -211,6 +236,11 @@ public final class Bericht {
                 .append(", nach Nachbearbeitung: ").append(k.richtig().get(Feld.ART)).append("/").append(k.belege())
                 .append("; Umstufungen: ").append(k.umstufungen().size())
                 .append(k.umstufungen().isEmpty() ? "" : " (" + String.join("; ", k.umstufungen()) + ")").append("\n");
+        sb.append("- Umstufungen je Grund: ").append(k.umstufungenJeGrund().isEmpty() ? "keine" : k.umstufungenJeGrund())
+                .append("; R3 (Datum nach Eingang): ").append(k.r3Treffer()).append(" Treffer, davon richtige Datumsfelder: ")
+                .append(k.r3Richtig()).append("\n");
+        sb.append("- Felder unter der Schwelle («bitte prüfen»): ").append(k.bittePruefen()).append(", davon richtig: ")
+                .append(k.bittePruefenRichtig()).append("\n");
         sb.append("- Eingabe: Bild ").append(k.belegeBild()).append(", Text ").append(k.belege() - k.belegeBild())
                 .append("; Kontrolle HANDY_FOTO als Bild: ")
                 .append(k.fotosNichtAlsBild().isEmpty() ? "ok" : "Abweichung bei " + String.join(", ", k.fotosNichtAlsBild()))

@@ -11,7 +11,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Zählt die Tokens jeder Modellantwort, auch wenn der AI-Service sie danach nicht parsen kann (Req 7.3, Nachfrage).
- * Die Extension registriert ChatModelListener-Beans automatisch. Belege laufen nacheinander, daher ein Zähler je Beleg.
+ * KiModell registriert den Zähler explizit als Listener (das Standardmodell der Extension wird nicht verwendet).
+ * Belege laufen nacheinander, daher ein Zähler je Beleg.
  */
 @ApplicationScoped
 public class TokenZaehler implements ChatModelListener {
