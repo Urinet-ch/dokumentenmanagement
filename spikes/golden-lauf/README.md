@@ -82,15 +82,13 @@ Nachbearbeitung (`Nachbearbeitung.FASSUNG`, bei jeder Regeländerung hochgezähl
 ## Gate-Lauf (nur Fabian)
 
 1. Commit = Merge-Commit von PR #21 (Gate-Vorbereitung), ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
-   Kein Gate-Lauf, bevor Fabian den Vorschlag (Modell, Schwelle) im Review bestätigt hat.
-2. Schwelle festlegen: Regel `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei Abstimmungsläufe
-   der gewählten Variante (Werte in [golden-ergebnis.md](../../docs/spikes/golden-ergebnis.md)). **Vorschlag: 0.8**
-   (gemma-4-31B-it). Den Wert setzt Fabian.
-3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.chat-modell=google/gemma-4-31B-it -Dgolden.preis.ein-chf-pro-mio=0.20 -Dgolden.preis.aus-chf-pro-mio=0.40 -Darchiv.ki.schwelle=0.8 -jar target/quarkus-app/quarkus-run.jar --gate`
-   (Vorschlag; `golden.eingangsdatum` und Bildweg für Fotos sind Standard).
-4. Prompt-Hash, Modell, Fassung der Nachbearbeitung und Eingangsdatum der Konsolenzeile mit den eingefrorenen Werten
-   vergleichen (Vorschlag: `v5-fb5c021d33fc`, `google/gemma-4-31B-it`, `nb-2026-11-09`, `2026-11-10`); weicht einer ab,
-   gilt der Lauf nicht.
+   Kein Gate-Lauf vor dem Merge von PR #21.
+2. Schwelle 0.8 (entschieden von Fabian am 09.11.2026; gemma-4-31B-it, kleinste Schwelle 0.00 in vier Läufen).
+3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -jar target/quarkus-app/quarkus-run.jar --gate`.
+   Modell, Preise, Schwelle, Eingangsdatum und Bildweg für Fotos sind Standard. Zusatzparameter machen den Lauf ungültig.
+4. Konsolenzeile mit den eingefrorenen Werten vergleichen: Prompt `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`,
+   Nachbearbeitung `nb-2026-11-09`, Eingangsdatum `2026-11-10`; Schwelle 0.8 in `kennzahlen.md`. Weicht einer ab, gilt
+   der Lauf nicht.
    Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht QR-Format, Kürzung, Bildaufbereitung und
    Modell/Parameter; massgeblich ist deshalb auch der Commit nach Schritt 1.
 5. Kennzahlen des Prüfteils in golden-ergebnis.md eintragen. Bestanden bei mindestens 18/20 Belegen mit Art, Datum,

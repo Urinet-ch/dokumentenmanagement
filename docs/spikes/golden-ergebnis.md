@@ -10,10 +10,10 @@ Vorschlag und Sicherheit je Beleg liegen in `$ARCHIV_GOLDEN_DIR/berichte/<Zeitpu
 - **Prüfteil (Gate, Req 0.3/0.9): noch nicht gelaufen.** Den Gate-Lauf (`--gate`, 20 zurückgehaltene Belege) startet Fabian.
 - **Gate-Vorbereitung (09.11.2026, unten):** Req 0.9 neu, Regeln R3/E1/E2. gemma-4-31B-it erreicht 30/30 in vier
   Läufen mit kleinster Schwelle 0.00 (gate-reif), Qwen3.5-397B 30/30 und 28/30 (gate-reif, teuer, Timeouts),
-  Mistral-Small-4 27/30 und 24/30 (nicht gate-reif). Vorschlag: gemma-4-31B-it, Schwelle 0.8; Fabian entscheidet.
+  Mistral-Small-4 27/30 und 24/30 (nicht gate-reif). Fabian hat am 09.11.2026 entschieden: gemma-4-31B-it, Schwelle 0.8.
 - **Nachschärfen (09.11.2026, unten):** Prompt v5 mit Bild für Fotos und engerer Nachbearbeitung, 21 und 26/30 Belege
   mit Art, Datum, Partner, Betrag richtig (Mittel 23.5); in keinem Lauf eine Schwelle ≤ 1.0 mit höchstens einem Fehler.
-  Vorläufig eingefroren: `v5-fb5c021d33fc` (kein Gate-Lauf vor Abschluss der Gate-Vorbereitung, siehe unten).
+  Vorläufig eingefroren: `v5-fb5c021d33fc` (abgelöst durch den eingefrorenen Stand der Gate-Vorbereitung, siehe oben).
 - **Abstimmungsteil (30 synthetische Belege), Endstand Prompt v3:** 82 % der Felder richtig, 18/30 Belege mit Art,
   Datum, Partner und Betrag richtig (60 %). Hochgerechnet auf den Prüfteil wären das rund 12/20, das Gate verlangt 18/20.
 - **Schwelle (Req 0.9):** Mit 0.8 bleiben 8–13 falsche Felder mit hoher Sicherheit. Die kleinste Schwelle mit höchstens
@@ -209,7 +209,8 @@ Befunde aus dem Nachschärfen (Fortsetzung der Nummerierung oben):
 **Vorläufig eingefroren: Prompt `v5-fb5c021d33fc`** (V3; Bildweg `fotos`; Nachbearbeitung wie in PR #15). Kein
 Gate-Lauf vor Abschluss von Aufgabe 0.5 Gate-Vorbereitung (Req 0.9 neu, Regeln R3/E1/E2, Modellvergleich). Der
 Gate-Lauf läuft auf dem Commit, mit dem Prompt-Hash, Modell und Nachbearbeitung eingefroren werden (Merge-Commit des
-PR, der sie zuletzt festlegt), ohne spätere Änderungen im Spike.
+PR, der sie zuletzt festlegt), ohne spätere Änderungen im Spike. Abgelöst durch «Eingefroren für den Gate-Lauf» im
+Abschnitt «Gate-Vorbereitung» (PR #21).
 
 ## Gate-Vorbereitung (09.11.2026, PR #21)
 
@@ -276,28 +277,27 @@ CHF 0.02) und die Tokens der zwei Qwen-Timeouts (unbekannt); deutlich unter dem 
 - M2 Qwen3.5-397B: gate-reif (Mittel 29.0, min. 28, Schwelle 0.00 in beiden Läufen); nicht bestätigt.
 - M3 gemma-4-31B-it: gate-reif (Mittel 30.0, Schwelle 0.00) und in zwei weiteren Läufen bestätigt (30/30, 30/30).
 
-**Vorschlag (Fabian bestätigt im Review): M3 gemma-4-31B-it**, Schwelle `max(0.8, 0.00) = 0.8`. Bei 0.8 stehen 1 von 149
+**Entscheid Fabian (09.11.2026): M3 gemma-4-31B-it, Schwelle 0.8** (`max(0.8, 0.00)`). Bei 0.8 stehen 1 von 149
 richtigen Feldern auf «bitte prüfen» (0.7 %). Gründe: vier gleich gute Läufe, keine Timeouts, Kosten und Laufzeit rund
 einen Zehntel bis Dreissigstel von Qwen. Risiko: Der wiederkehrende sichere Fehler verbraucht den einen erlaubten Fehler
 (Req 0.9); ein zweiter sicherer Fehler im Prüfteil liesse das Gate scheitern. Qwen hat dieses Risiko nicht, dafür
 Timeouts (ein Beleg ohne Vorschlag zählt als falsch) und rund 30-fache Kosten.
 
-**Vorschlag zum Einfrieren:** Prompt `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Nachbearbeitung `nb-2026-11-09`,
-Eingangsdatum `2026-11-10`, Schwelle 0.8, Commit = Merge-Commit von PR #21.
+**Eingefroren für den Gate-Lauf:** Prompt `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Nachbearbeitung `nb-2026-11-09`,
+Eingangsdatum `2026-11-10`, Schwelle 0.8, Commit = Merge-Commit von PR #21; alle Werte sind Standard in
+`application.properties` (Kontroll-Lauf `--limit 1` ohne Startparameter zeigt sie in der Konsolenzeile).
 
 ## Offen für Gate 0 (Aufgabe 0.6, Fabian)
 
 Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.md)):
 1. Commit = Merge-Commit von PR #21 (Gate-Vorbereitung), ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
-   Kein Gate-Lauf, bevor Fabian den Vorschlag unten im Review bestätigt hat.
-2. Schwelle festlegen. Regel: `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei Läufe der
-   gewählten Variante. **Vorschlag: 0.8** (gemma-4-31B-it, kleinste Schwelle 0.00 in allen vier Läufen). Den Wert setzt
-   Fabian (`-Darchiv.ki.schwelle=<wert>`, nie unter 0.8, Req 7.6, 0.9).
-3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.chat-modell=google/gemma-4-31B-it -Dgolden.preis.ein-chf-pro-mio=0.20 -Dgolden.preis.aus-chf-pro-mio=0.40 -Darchiv.ki.schwelle=0.8 -jar target/quarkus-app/quarkus-run.jar --gate`
-   (`golden.eingangsdatum` ist Standard `2026-11-10`; der Bildweg für Fotos ist Standard).
-4. Prompt-Hash, Modell, Fassung der Nachbearbeitung und Eingangsdatum der Konsolenzeile mit den eingefrorenen Werten
-   vergleichen (Vorschlag: `v5-fb5c021d33fc`, `google/gemma-4-31B-it`, `nb-2026-11-09`, `2026-11-10`); weicht einer ab,
-   gilt der Lauf nicht. Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht
+   Kein Gate-Lauf vor dem Merge von PR #21.
+2. Schwelle 0.8 (entschieden von Fabian am 09.11.2026; gemma-4-31B-it, kleinste Schwelle 0.00 in vier Läufen).
+3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -jar target/quarkus-app/quarkus-run.jar --gate`.
+   Modell, Preise, Schwelle, Eingangsdatum und Bildweg für Fotos sind Standard. Zusatzparameter machen den Lauf ungültig.
+4. Konsolenzeile mit den eingefrorenen Werten vergleichen: Prompt `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`,
+   Nachbearbeitung `nb-2026-11-09`, Eingangsdatum `2026-11-10`; Schwelle 0.8 in `kennzahlen.md`. Weicht einer ab, gilt
+   der Lauf nicht. Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht
    QR-Format, Kürzung (`MAX_ZEICHEN`), Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich ist deshalb
    auch der Commit nach Schritt 1.
 5. Kennzahlen des Prüfteils hier eintragen. «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
@@ -307,8 +307,8 @@ Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.m
 Weiter offen:
 - Abstand zum Gate: gemma-4-31B-it erreicht im Abstimmungsteil 30/30 in vier Läufen; ob das auf den Prüfteil
   überträgt, zeigt erst der Gate-Lauf (die Regeln sind am Abstimmungsteil gefunden, Überanpassung möglich).
-- Modellwechsel: Wählt Fabian gemma oder Qwen, folgen Änderungen in tech.md, design.md «KI», ADR-006 und ADR-012
-  (Liste im PR #21).
+- Modellwechsel: Die Folgeänderungen in tech.md, design.md «KI», ADR-006, ADR-012, Req 0.5, tasks.md und Spec 04
+  kommen nach dem Gate-Lauf in einem eigenen PR (Entscheid Fabian: ADRs erst nach dem Gate-Lauf; Liste im PR #21).
 - Realitätsprüfung: 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35); `--realitaet` noch nicht
   gelaufen (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
 - Welche Bildfassung das Produkt sendet: entschieden von Fabian am 09.11.2026, design.md «KI», Bildweg.

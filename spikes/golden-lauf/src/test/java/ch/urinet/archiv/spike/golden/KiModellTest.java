@@ -69,7 +69,7 @@ class KiModellTest {
 
         assertThat(antwort.content().art()).isEqualTo(MetadatenVorschlag.ArtCode.QUITTUNG);
         server.verify(1, postRequestedFor(urlEqualTo(PFAD))
-                .withRequestBody(matchingJsonPath("$.model", equalTo("mistralai/Mistral-Small-4-119B-2603")))
+                .withRequestBody(matchingJsonPath("$.model", equalTo("google/gemma-4-31B-it")))
                 .withRequestBody(matchingJsonPath("$.response_format.type", equalTo("json_schema")))
                 .withRequestBody(matchingJsonPath("$.response_format.json_schema.strict", equalTo("true")))
                 .withRequestBody(matchingJsonPath("$[?(@.temperature == 0)]"))

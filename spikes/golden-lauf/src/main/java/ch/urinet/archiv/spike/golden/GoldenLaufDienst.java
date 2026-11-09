@@ -40,9 +40,9 @@ public class GoldenLaufDienst {
     List<String> eigeneArten;
     @ConfigProperty(name = "golden.eingangsdatum")
     LocalDate eingangsdatum;
-    @ConfigProperty(name = "golden.preis.ein-chf-pro-mio", defaultValue = "0.20")
+    @ConfigProperty(name = "golden.preis.ein-chf-pro-mio")
     double preisEin;
-    @ConfigProperty(name = "golden.preis.aus-chf-pro-mio", defaultValue = "0.75")
+    @ConfigProperty(name = "golden.preis.aus-chf-pro-mio")
     double preisAus;
 
     public record Ausgang(Path ordner, List<BelegErgebnis> ergebnisse, Bericht.Kennzahlen kennzahlen) {
