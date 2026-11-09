@@ -29,8 +29,8 @@ public final class Bericht {
 
     public record Kennzahlen(int belege, Map<Feld, Integer> richtig, int gateRichtig, int fehlerUeberSchwelle,
                              BigDecimal kleinsteSchwelle, int qrGefunden, int nachfragen, int fehlgeschlagen,
-                             long tokensEin, long tokensAus, double kostenChf, long ocrMsSchnitt, long kiMsSchnitt,
-                             List<String> fehlschlaege) {
+                             long tokensEin, long tokensAus, int tokensUnvollstaendig, double kostenChf,
+                             long ocrMsSchnitt, long kiMsSchnitt, List<String> fehlschlaege) {
 
         public int felderRichtig() {
             return richtig.values().stream().mapToInt(Integer::intValue).sum();
@@ -71,7 +71,8 @@ public final class Bericht {
                 (int) ergebnisse.stream().filter(BelegErgebnis::qrGefunden).count(),
                 (int) ergebnisse.stream().filter(r -> r.aufrufe() > 1).count(),
                 (int) ergebnisse.stream().filter(r -> r.vorschlag() == null).count(),
-                ein, aus, ein / 1e6 * preisEin + aus / 1e6 * preisAus,
+                ein, aus, (int) ergebnisse.stream().filter(BelegErgebnis::tokensUnvollstaendig).count(),
+                ein / 1e6 * preisEin + aus / 1e6 * preisAus,
                 ergebnisse.stream().mapToLong(BelegErgebnis::ocrMs).sum() / n,
                 ergebnisse.stream().mapToLong(BelegErgebnis::kiMs).sum() / n, fehlschlaege);
     }
@@ -137,6 +138,7 @@ public final class Bericht {
         m.put("aufrufe", r.aufrufe());
         m.put("tokensEin", r.tokensEin());
         m.put("tokensAus", r.tokensAus());
+        m.put("tokensUnvollstaendig", r.tokensUnvollstaendig());
         m.put("ocrMs", r.ocrMs());
         m.put("kiMs", r.kiMs());
         m.put("fehler", r.fehler());
@@ -166,6 +168,10 @@ public final class Bericht {
                 .append(k.kleinsteSchwelle() == null ? "keine ≤ 1.0" : k.kleinsteSchwelle().toPlainString()).append("\n");
         sb.append(String.format(Locale.ROOT, "- Tokens: %s ein / %s aus; Kosten ca. CHF %.4f (CHF %.2f / %.2f je 1 Mio., exkl. MWST)%n",
                 tausender(k.tokensEin()), tausender(k.tokensAus()), k.kostenChf(), lauf.preisEin(), lauf.preisAus()));
+        if (k.tokensUnvollstaendig() > 0) {
+            sb.append("- Tokens unvollständig bei ").append(k.tokensUnvollstaendig())
+                    .append(" Belegen (Aufruf ohne Modellantwort, z. B. Timeout oder HTTP-Fehler; Tokens nicht bekannt)\n");
+        }
         sb.append("- Laufzeit je Beleg (Mittel): OCR ").append(k.ocrMsSchnitt()).append(" ms (inkl. Cache), KI ")
                 .append(k.kiMsSchnitt()).append(" ms\n");
         sb.append("- Realitätsprüfung (Req 0.10): ").append(lauf.echteBestaetigt()).append(" bestätigte echte Belege, ")

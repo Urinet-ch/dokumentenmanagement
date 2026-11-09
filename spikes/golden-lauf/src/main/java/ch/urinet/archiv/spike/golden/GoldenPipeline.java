@@ -30,8 +30,8 @@ import java.util.Optional;
 public class GoldenPipeline {
 
     public record BelegErgebnis(Erwartung erwartung, Nachbearbeitung.Ergebnis vorschlag, Map<Feld, Boolean> richtig,
-                                boolean qrGefunden, int aufrufe, long tokensEin, long tokensAus, long ocrMs, long kiMs,
-                                String fehler) {
+                                boolean qrGefunden, int aufrufe, long tokensEin, long tokensAus,
+                                boolean tokensUnvollstaendig, long ocrMs, long kiMs, String fehler) {
 
         public boolean gateRichtig() {
             for (Feld f : Vergleich.GATE_FELDER) {
@@ -45,6 +45,8 @@ public class GoldenPipeline {
 
     @Inject
     MetadatenExtraktor extraktor;
+    @Inject
+    TokenZaehler zaehler;
 
     @ConfigProperty(name = "golden.ocr.image")
     String image;
@@ -62,11 +64,11 @@ public class GoldenPipeline {
         try {
             ocr = ocrMitCache(e.datei(), cache);
             qr = SwissQrLeser.lies(ocr.seiten());
-        } catch (IOException | InterruptedException ex) {
+        } catch (IOException | InterruptedException | RuntimeException ex) {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            return fehlschlag(e, 0, 0, 0, (System.nanoTime() - start) / 1_000_000, 0, "OCR: " + ex.getMessage());
+            return fehlschlag(e, 0, 0, 0, false, (System.nanoTime() - start) / 1_000_000, 0, "OCR: " + Ocr.grund(ex));
         }
         long ocrMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -82,9 +84,10 @@ public class GoldenPipeline {
             try {
                 bild = Seitenbild.aus(ocr.seiten());
             } catch (IOException | RuntimeException ex) {
-                return fehlschlag(e, 0, 0, 0, ocrMs, 0, "K1-Bild: " + KiFehler.grund(ex));
+                return fehlschlag(e, 0, 0, 0, false, ocrMs, 0, "K1-Bild: " + KiFehler.grund(ex));
             }
         }
+        zaehler.zuruecksetzen();
         try {
             aufrufe++;
             antwort = k1
@@ -106,13 +109,23 @@ public class GoldenPipeline {
             }
         }
         long kiMs = (System.nanoTime() - kiStart) / 1_000_000;
-        if (antwort != null && antwort.tokenUsage() != null) {
+        // Tokens aller Aufrufe inkl. eines nicht parsebaren Erstaufrufs; fehlt eine Antwort (Timeout, HTTP), unvollständig
+        TokenZaehler.Stand stand = zaehler.stand();
+        boolean unvollstaendig;
+        if (stand.antworten() > 0) {
+            ein = stand.ein();
+            aus = stand.aus();
+            unvollstaendig = stand.antworten() < aufrufe;
+        } else if (antwort != null && antwort.tokenUsage() != null) {
             TokenUsage t = antwort.tokenUsage();
             ein = t.inputTokenCount() == null ? 0 : t.inputTokenCount();
             aus = t.outputTokenCount() == null ? 0 : t.outputTokenCount();
+            unvollstaendig = aufrufe > 1;
+        } else {
+            unvollstaendig = aufrufe > 0;
         }
         if (antwort == null || antwort.content() == null) {
-            return fehlschlag(e, aufrufe, ein, aus, ocrMs, kiMs, "KI: " + fehler);
+            return fehlschlag(e, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, "KI: " + fehler);
         }
         Nachbearbeitung.Ergebnis v = Nachbearbeitung.bearbeite(antwort.content(), qr, ocr.text(), mandant, arten,
                 eigeneArten, LocalDate.now());
@@ -122,17 +135,17 @@ public class GoldenPipeline {
         richtig.put(Feld.PARTNER, Vergleich.partner(e.partner(), v.partner()));
         richtig.put(Feld.BETRAG, Vergleich.betrag(e.betrag(), v.betrag()));
         richtig.put(Feld.BELEGNUMMER, Vergleich.belegnummer(e.belegnummer(), v.belegnummer()));
-        return new BelegErgebnis(e, v, richtig, qr.isPresent(), aufrufe, ein, aus, ocrMs, kiMs,
+        return new BelegErgebnis(e, v, richtig, qr.isPresent(), aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs,
                 aufrufe > 1 ? "Nachfrage nach " + fehler : null);
     }
 
-    private static BelegErgebnis fehlschlag(Erwartung e, int aufrufe, long ein, long aus, long ocrMs, long kiMs,
-                                            String fehler) {
+    private static BelegErgebnis fehlschlag(Erwartung e, int aufrufe, long ein, long aus, boolean unvollstaendig,
+                                            long ocrMs, long kiMs, String fehler) {
         Map<Feld, Boolean> falsch = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
             falsch.put(f, false);
         }
-        return new BelegErgebnis(e, null, falsch, false, aufrufe, ein, aus, ocrMs, kiMs, fehler);
+        return new BelegErgebnis(e, null, falsch, false, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, fehler);
     }
 
     /** OCR-Ergebnis je Dateiinhalt (SHA-256) und Image zwischenspeichern, damit Prompt-Iterationen nicht neu OCRen. */

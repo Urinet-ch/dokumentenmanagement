@@ -23,7 +23,7 @@ class BerichtTest {
         Nachbearbeitung.Ergebnis v = new Nachbearbeitung.Ergebnis("QUITTUNG", null, null, null, null, null, null, null,
                 null, null, false, sicherheit);
         Erwartung e = new Erwartung(id, null, false, "abstimmen", "QUITTUNG", null, null, null, null, null, List.of());
-        return new BelegErgebnis(e, v, richtig, false, 1, 100, 50, 10, 20, null);
+        return new BelegErgebnis(e, v, richtig, false, 1, 100, 50, false, 10, 20, null);
     }
 
     static Map<Feld, Double> s(double wert) {

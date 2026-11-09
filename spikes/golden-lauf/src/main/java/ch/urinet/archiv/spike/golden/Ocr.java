@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -59,7 +60,7 @@ public final class Ocr {
             Path eingang;
             if (endung.equals("heic")) {
                 eingang = arbeit.resolve("eingang.jpg");
-                ausfuehren(List.of("sips", "-s", "format", "jpeg", datei.toString(), "--out", eingang.toString()), arbeit);
+                ausfuehren(List.of("sips", "-s", "format", "jpeg", datei.toString(), "--out", eingang.toString()), arbeit, null);
             } else {
                 eingang = arbeit.resolve("eingang." + endung);
                 Files.copy(datei, eingang, StandardCopyOption.REPLACE_EXISTING);
@@ -69,30 +70,65 @@ public final class Ocr {
                             + (endung.equals("pdf") ? "" : " --image-dpi 300") + " " + eingang.getFileName() + " ocr.pdf",
                     "pdftotext -layout -enc UTF-8 ocr.pdf text.txt",
                     "pdftoppm -r 300 -png ocr.pdf seite");
-            ausfuehren(List.of(docker, "run", "--rm", "--network", "none", "-v", arbeit.toAbsolutePath() + ":/data",
-                    "-w", "/data", "--entrypoint", "sh", image, "-c", skript), arbeit);
+            String container = "golden-ocr-" + UUID.randomUUID();
+            ausfuehren(List.of(docker, "run", "--rm", "--name", container, "--network", "none",
+                    "-v", arbeit.toAbsolutePath() + ":/data", "-w", "/data", "--entrypoint", "sh", image, "-c", skript),
+                    arbeit, container);
             List<Path> seiten = seiten(arbeit);
             if (seiten.isEmpty() || !Files.isRegularFile(arbeit.resolve("text.txt"))) {
-                throw new IOException("OCR ohne Text oder Seitenbilder");
+                throw new OcrFehler("OCR ohne Text oder Seitenbilder");
             }
             Files.writeString(arbeit.resolve(FERTIG), "");
             return new Resultat(Files.readString(arbeit.resolve("text.txt"), StandardCharsets.UTF_8), seiten);
         } catch (IOException | InterruptedException | RuntimeException e) {
-            loesche(arbeit);
+            try {
+                loesche(arbeit);
+            } catch (IOException | RuntimeException loeschfehler) {
+                // Rest ohne «fertig» wird beim nächsten Lauf ersetzt; der Beleg zählt als Fehlschlag
+                e.addSuppressed(loeschfehler);
+            }
             throw e;
         }
     }
 
-    private void ausfuehren(List<String> befehl, Path arbeit) throws IOException, InterruptedException {
+    /** Eigene Meldungen (Exit-Code, Zeitgrenze) sind ohne Pfade; sonst nur der Klassenname (Pfade enthalten Dateinamen). */
+    static String grund(Exception e) {
+        return e instanceof OcrFehler ? e.getMessage() : KiFehler.grund(e);
+    }
+
+    /** Fehler mit selbst formulierter Meldung ohne Pfade oder Belegtext. */
+    static final class OcrFehler extends IOException {
+        OcrFehler(String meldung) {
+            super(meldung);
+        }
+    }
+
+    private void ausfuehren(List<String> befehl, Path arbeit, String container) throws IOException, InterruptedException {
         Process p = new ProcessBuilder(befehl).redirectErrorStream(true)
                 .redirectOutput(arbeit.resolve("werkzeug.log").toFile()).start();
         if (!p.waitFor(zeitgrenze.toMillis(), TimeUnit.MILLISECONDS)) {
             p.destroyForcibly();
-            throw new IOException("Zeitgrenze überschritten: " + Path.of(befehl.getFirst()).getFileName());
+            // destroyForcibly beendet nur den docker-Client, nicht den Container
+            if (container != null) {
+                stoppe(container);
+            }
+            throw new OcrFehler("Zeitgrenze überschritten: " + Path.of(befehl.getFirst()).getFileName());
         }
         if (p.exitValue() != 0) {
             // nur der Exit-Code, nicht die Werkzeugausgabe (kann Belegtext enthalten)
-            throw new IOException(Path.of(befehl.getFirst()).getFileName() + " Exit " + p.exitValue());
+            throw new OcrFehler(Path.of(befehl.getFirst()).getFileName() + " Exit " + p.exitValue());
+        }
+    }
+
+    private void stoppe(String container) throws InterruptedException {
+        try {
+            Process kill = new ProcessBuilder(docker, "kill", container).redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!kill.waitFor(30, TimeUnit.SECONDS)) {
+                kill.destroyForcibly();
+            }
+        } catch (IOException e) {
+            // Container evtl. schon beendet; der Beleg zählt ohnehin als Fehlschlag
         }
     }
 
@@ -114,6 +150,8 @@ public final class Ocr {
                     throw new UncheckedIOException(e);
                 }
             });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
         }
     }
 
