@@ -8,7 +8,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - Eine Sitzung, ein Branch (`feature/01-<aufgabe>-<stichwort>`), ein PR. Der PR nennt die erfüllten Kriterien als `@req-<x.y>` und hakt die Checkbox hier ab.
 - Szenarien und Tests zuerst bzw. mitliefern: Cucumber-Features mit `@req-<x.y>`, Domain-Logik zusätzlich mit JUnit. Es gilt die Definition of Done aus `tech.md`.
 - Kriterien mit «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder «Nachweis: JUnit» brauchen kein Cucumber-Szenario; der Nachweis wird im PR verlinkt.
-- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 0.6, 1.7, 1.10, 2.8, 4.9, 5.11).
+- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 1.7, 1.10, 2.8, 4.9, 5.5, 5.11).
 - Aufgabennummern bleiben stabil; neue Aufgaben erhalten die nächste freie Nummer ihrer Welle.
 
 ## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, Stufe A vorbereitet)
@@ -26,7 +26,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - prüfen, ob sich ein Schlüssel ohne Recht `s3:BypassGovernanceRetention` ausstellen lässt (App-Schlüssel): Löschen und Verkürzen einer gesperrten Version müssen mit ihm scheitern, auch mit Bypass-Header
   - prüfen, ob der Modus COMPLIANCE verfügbar ist (Testobjekt mit kurzer Frist)
   - prüfen, ob Objekte ohne Retention im selben Bucket löschbar bleiben (Präfix `eingang/`)
-  - Ergebnis in `docs/spikes/s3-object-lock.md`; gibt es keinen Schlüssel ohne Bypass-Recht, gilt COMPLIANCE für `manifest/` (6.11); bei negativem Befund zu Object Lock pro Objekt Rückfall aus design.md wählen
+  - Ergebnis in `docs/spikes/s3-object-lock.md`; gibt es keinen Schlüssel ohne Bypass-Recht, gilt COMPLIANCE für `manifest/` (6.11); bei negativem Befund zu Object Lock pro Objekt Rückfall aus design.md wählen. Befund: kein Schlüssel ohne Bypass-Recht im selben Projekt [T 6b–7g], Object Lock pro Objekt geht; entschieden 09.11.2026: Option B (ADR-007, Nachtrag 09.11.2026)
   - _Anforderungen: 0.4, 6.2, 6.3, 6.5, 6.11_
 
 - [x] 0.3 Spike Infomaniak AI Services [Backend] [Fabian]
@@ -56,8 +56,8 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 0.6 Gate-Review und ADRs [Fabian]
   - Spike-Berichte und Golden-Ergebnis prüfen; Gate 0 nach 0.3 und 0.9 abnehmen, die Schwelle für 7.6 festhalten und beides in `docs/umsetzungsplan.md` (Abschnitt 6) eintragen
   - Konzept-Entscheide E2 (Eigenbau), E3 (PWA) bestätigen
-  - D8 einer anderen Spec zuordnen oder bewusst streichen [offen: D8 einer anderen Spec zuordnen oder bewusst streichen – Entscheid vor Welle 1]; Ergebnis in der Rückverfolgung von requirements.md und in P14 (`docs/umsetzungsplan.md`) nachtragen
-  - ADR-001 bis ADR-011 in `docs/adr/` per Merge freigeben; Spike-Erkenntnisse per PR in design.md zurückschreiben, bevor Welle 1 startet
+  - D8 einer anderen Spec zuordnen oder bewusst streichen; Ergebnis in der Rückverfolgung von requirements.md und in P14 (`docs/umsetzungsplan.md`) nachtragen. Ergebnis: bewusst gestrichen (entschieden von Fabian am 09.11.2026: keine native App, nur Web-App), in der Rückverfolgung und in P14 nachgetragen
+  - ADR-001 bis ADR-011 in `docs/adr/` per Merge freigeben (nach dem Gate-Lauf, in einem PR zusammen mit dem Gate-Ergebnis; Fabian, 09.11.2026); Spike-Erkenntnisse per PR in design.md zurückschreiben, bevor Welle 1 startet
   - _Anforderungen: 0.3, 0.9_
   - _Abhängig von: 0.2, 0.3, 0.4, 0.5_
 
@@ -86,9 +86,9 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 1.3 Mandantenregister und Provisionierung [Backend]
   - Liquibase `db/public`: `mandant` (inkl. Geschäftsjahresende), `auftrag`, `api_client`
-  - `MandantProvisionierung` (Schema, Liquibase `db/mandant`, Bucket mit Object Lock + Versionierung, Seed der Dokumentarten aus `seed/<code>/dokumentarten.json`); Admin-Kommando `archiv mandant anlegen <code>`
+  - `MandantProvisionierung` (Schema, Liquibase `db/mandant`, Bucket mit Object Lock + Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` als Schutz gegen Versehen (design.md «Ablage»; entschieden von Fabian am 09.11.2026), Seed der Dokumentarten aus `seed/<code>/dokumentarten.json`); Admin-Kommando `archiv mandant anlegen <code>`
   - beim Start Migration aller aktiven Mandanten über Liquibase, Hibernate nur `validate`
-  - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt
+  - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt; jeder Bucket trägt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`
   - _Anforderungen: 1.1, 1.5, 1.7, 9.6_
 
 - [ ] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
@@ -129,7 +129,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 0.7, 1.1_
 
 - [ ] 1.10 Stufe A einrichten und Speicherbudget messen [Infra]
-  - Stufenwerte versioniert unter `deploy/infomaniak/`: `archiv-api` mit Image `archiv-worker` und `archiv.rolle=api,worker`, `archiv.worker.parallel=1`, OCR seitenweise (`--jobs 1`); knappe Heap- bzw. Speicher-Einstellungen für JVM, PostgreSQL und Keycloak; Summe der `mem_limit` ≤ 700 MiB, `cpus` zusammen ≤ 0.75
+  - Stufenwerte versioniert unter `deploy/infomaniak/`: `archiv-api` mit Image `archiv-worker` und `archiv.rolle=api,worker`, `archiv.stufe=A` (2.3), `archiv.worker.parallel=1`, OCR seitenweise (`--jobs 1`); knappe Heap- bzw. Speicher-Einstellungen für JVM, PostgreSQL und Keycloak; Summe der `mem_limit` ≤ 700 MiB, `cpus` zusammen ≤ 0.75
   - Netz prüfen: Datenbank (`archiv-db`), Worker und Sicherung nur im eigenen internen Docker-Netz des Archivs; am Netz «web» von Traefik hängen nur `archiv-api` (API/PWA) und `archiv-keycloak` (öffentlich nur `/realms/` und `/resources/`, Admin-Konsole nicht öffentlich)
   - Buckets der Stufe A nach dem Entscheid aus design.md (Open Points: Bucket-Namen der Stufe A, Entscheid vor Welle 1) konfigurieren
   - Messung nur mit synthetischen Testbelegen: Spitzenverbrauch je Dienst im Leerlauf, beim Upload und bei OCR mehrseitiger Belege; verfügbarer Speicher der VPS gegenüber den Ausgangswerten aus 0.7; Health der anderen Apps während der Messung; Ergebnis in `docs/spikes/stufe-a-speicher.md` (nur Zahlen, keine Namen anderer Apps); darin [Fabian] bestätigen, welche Testdaten auf Stufe A geladen wurden (16.15)
@@ -153,6 +153,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
   - Entität `Dokumentart` mit Standard-Vertraulichkeit und `gesetzliche_pflicht`; REST `/api/v1/dokumentarten` (CRUD nur mit Recht A11; Löschen nur ohne Dokumente, sonst 409 `DOKUMENTART_IN_GEBRAUCH` → inaktiv); JSON-Schema-Validierung für `zusatz` (422 `ZUSATZ_UNGUELTIG`)
   - Seed `backend/src/main/resources/seed/urinet/dokumentarten.json` mit den 11 Arten aus 1.7; ein Test prüft den Seed Feld für Feld gegen die Stammdaten-Tabelle in design.md
+  - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026)
   - `AufbewahrungRechner`: Ende des bestätigten Geschäftsjahres (Geschäftsjahresende des Mandanten) plus Jahre der Regel; ohne Belegdatum Eingangsdatum; Verträge ab `gueltig_bis`, ohne `gueltig_bis` unbefristet; Neuberechnung verlängert nur; Frist in der Vergangenheit → «Frist abgelaufen»; keine Löschung bei Fristablauf
   - Unit-Tests: Beleg 2026 → 31.12.2036; abweichendes Geschäftsjahresende; ohne Belegdatum; Vertrag ohne `gueltig_bis`; Neuberechnung mit früherem Datum → Sperre bleibt, Konflikt protokolliert
   - [Fabian] Abnahme: Seed gegen die freigegebene Tabelle prüfen
@@ -170,8 +171,10 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 2.3 Ablage-Service S3 [Backend]
   - Port `AblagePort` mit S3-Adapter und Dev-Stub: `ablegenEingang`, `archivieren`, `sperreVerlaengern`, `loeschenEingang`, `vorsignierteUrl`
   - `archivieren`: Original, Arbeitsfassung (falls vorhanden) und PDF/A nach `archiv/` kopieren, Prüfsummen vergleichen, Versions-ID je Datei in `dokument_datei` speichern; Sperre GOVERNANCE bis `aufbewahren_bis` nur bei `gesetzliche_pflicht`, unbefristete Dokumente dieser Arten 10 Jahre (Reihenfolge der Prüfung gemäss design.md, `retainUntil`); danach `eingang/` löschen
-  - nur der App-Schlüssel ohne Bypass-Recht; `vorsignierteUrl` nur für die gespeicherte Versions-ID; COMPLIANCE für `manifest/` per Konfiguration, falls der Spike Object Storage (Aufgabe 0.2, Req 0.4) es verlangt
-  - Testcontainers MinIO mit Object Lock: archivierte Datei nicht löschbar, Prüfsummen-Abweichung bricht ab, Art ohne gesetzliche Pflicht ohne Sperre, Sperre nur verlängerbar
+  - nur der App-Schlüssel aus `s3_app_zugang`; der S3-Adapter setzt nie `x-amz-bypass-governance-retention` (SDK: `bypassGovernanceRetention`) und verkürzt keine Sperre (6.5; Option B, ADR-007, Nachtrag 09.11.2026); `vorsignierteUrl` nur für die gespeicherte Versions-ID; Manifeste unter `manifest/` im Modus COMPLIANCE (6.11)
+  - Sperrmodus von `manifest/` per Konfiguration (entschieden von Fabian am 09.11.2026): Standard COMPLIANCE; ab Stufe B (16.17; dort kommen echte Belege ins Archiv) fest COMPLIANCE mit der Frist nach 15.4, API und Worker brechen den Start ab, falls dort ein anderer Modus oder eine kürzere Frist konfiguriert ist; abweichend (GOVERNANCE oder kürzere Frist) nur in Tests, in der lokalen Entwicklung und in den Stufenwerten der Stufe A unter `deploy/infomaniak/` (nur Testdaten, 16.15), damit Test-Buckets löschbar bleiben; die Regel hängt nicht am Profil `prod`, weil Stufe A mit denselben Images und demselben Deploy-Workflow läuft wie Stufe B (design.md «Protokoll und Manifest»); die Stufe erkennt die Startprüfung am Konfigurationswert `archiv.stufe` (`A` | `B`) in den Stufenwerten unter `deploy/infomaniak/`, fehlt er, gilt `B` (sicherer Standard: COMPLIANCE wird erzwungen), Stufe A setzt ausdrücklich `archiv.stufe=A`, ebenso die Konfiguration der Tests und der lokalen Entwicklung; Test: abweichender Sperrmodus oder kürzere Frist mit den Stufenwerten der Stufe B → Start von `archiv-api` und `archiv-worker` bricht ab; ohne `archiv.stufe` → wie mit `B`, Start bricht ab
+  - Testcontainers MinIO mit Object Lock: Löschen und Verkürzen einer gesperrten Version scheitern mit den Aufrufen der Anwendung (ohne Bypass-Header), Prüfsummen-Abweichung bricht ab, Art ohne gesetzliche Pflicht ohne Sperre, Sperre nur verlängerbar, Objekt unter `manifest/` in COMPLIANCE auch mit Bypass-Header weder löschbar noch verkürzbar (6.11; Test-Bucket ohne Bucket Policy, sonst greift deren Deny [T 6c])
+  - Nachweis 6.5 (JUnit): Request-Interceptor in den Integrationstests prüft, dass kein S3-Aufruf der Anwendung `x-amz-bypass-governance-retention` sendet; ergänzend ArchUnit-Regel gegen `bypassGovernanceRetention` im Produktionscode (Testklassen ausgenommen)
   - _Anforderungen: 6.2, 6.3, 6.4, 6.5, 6.9, 6.11, 6.12, 14.6_
 
 - [ ] 2.4 Upload-Endpunkt [Backend]
@@ -309,6 +312,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - zweiten Schweizer Anbieter für die Zweitkopie wählen [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]
   - Rhythmus der Restore-Probe [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5] und Aufbewahrungsfrist des Zugriffsprotokolls [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5] festlegen
   - Schlüsselweg der Restore-Probe festlegen [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5]
+  - festlegen, ob die Restore-Probe im Probe-Bucket Sperren setzt [offen: ob die Restore-Probe im Probe-Bucket Sperren setzt – Entscheid vor Welle 5] (Manifeste in COMPLIANCE wären dort bis zum Ablauf nicht löschbar, 5.5)
   - Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (API, Worker mit OCR, PostgreSQL mit pgvector, Keycloak) festlegen [offen: VPS-Grösse K5 – Entscheid vor Welle 5]; Messbedingungen (Eingabe, Last, Hardware) für 3.2, 5.5 und 14.3 daraus ableiten; bricht 1.10 ab oder tritt 16.18 später ein, wird dieser Punkt vorgezogen
   - Ergebnisse per PR in requirements.md, design.md, tech.md und `docs/umsetzungsplan.md` nachtragen
   - _Anforderungen: 3.2, 5.5, 10.9, 14.3, 15.3, 16.2, 16.3, 16.17_
@@ -325,7 +329,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
   - Hash-Kette (erstes Manifest `vorher_sha256 = null`), Ed25519-Signatur (Schlüssel als Secret-Datei, öffentlicher Schlüssel unter `docs/`), RFC-3161-Zeitstempel als Pflicht beim Anbieter aus 4.9
-  - Ablage unter `manifest/` mit Object Lock bis zum spätesten `aufbewahren_bis` der enthaltenen Dateien (COMPLIANCE, falls 6.11 greift), Tabelle `manifest`
+  - Ablage unter `manifest/` mit Object Lock im Modus COMPLIANCE (6.11, Option B) bis zum spätesten `aufbewahren_bis` der enthaltenen Dateien, Tabelle `manifest`
   - verpasste Läufe in Datumsreihenfolge nachholen, höchstens ein Manifest pro Datum; Tests für 29.03.2026 und 25.10.2026; Alarm bei fehlendem Manifest
   - Prüfwerkzeug `archiv manifest pruefen <datum>` (Signatur, Kette, Zeitstempel)
   - _Anforderungen: 6.11, 15.1–15.4, 15.6, 15.7, 15.8, 16.9_
@@ -339,8 +343,8 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
   - Produktion auf Stufe B (VPS aus 5.11) mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
-  - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv
-  - [Fabian] App-Schlüssel ohne Bypass-Recht als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Bypass-Schlüssel erstellen und nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
+  - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv, mit der Bucket Policy aus 1.3 (Deny auf `s3:BypassGovernanceRetention`)
+  - [Fabian] App-Schlüssel (`s3_app_zugang`; hat technisch das Bypass-Recht, Option B, ADR-007, Nachtrag 09.11.2026) als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Inhaber-Zugang zum Public-Cloud-Projekt des Object Storage (Zugangsdaten, mit denen Schlüssel ausgestellt und Korrekturen ausgeführt werden) nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
   - produktives Archivieren erst, wenn der Zeitstempeldienst angebunden ist (15.3)
   - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10, 16.17_
   - _Abhängig von: 1.9, 4.9, 5.11_
@@ -348,7 +352,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.5 Sicherung und Wiederherstellung [Infra] [Fabian]
   - im Repository (`deploy/backup/`): täglicher Export von Archiv-Datenbank, Keycloak-Datenbank und Realm, Bucket (Original, Arbeitsfassung, PDF/A, Manifeste) und Manifest-Schlüssel; der Server verschlüsselt asymmetrisch und hält nur den öffentlichen Schlüssel
   - [Fabian] [Infra] im Infra-Repo der VPS: Sicherungsworkflow nach dem Muster `maintenance` holt die verschlüsselten Daten ab und schreibt sie mit restic zum Anbieter aus 4.9 (restic-Schlüssel nur als GitHub-Secret dieses Workflows und in den Notfallunterlagen); Aufbewahrung pro App 30 Tage, 12 Monate, 10 Jahresstände; `backup-gate.sh` und Restore-Probe um PostgreSQL und den Bucket erweitern
-  - automatisierte Restore-Probe im Rhythmus aus 4.9: Datenbanken und Dateien wiederherstellen, Anmeldung prüfen, Prüflauf (5.3) grün
+  - automatisierte Restore-Probe im Rhythmus aus 4.9: Datenbanken und Dateien wiederherstellen, Anmeldung prüfen, Prüflauf (5.3) grün; [offen: ob die Restore-Probe im Probe-Bucket Sperren setzt – Entscheid vor Welle 5]; läuft die Probe mit den Stufenwerten der Stufe B (Sperrmodus von `manifest/` fest COMPLIANCE, 2.3), wären Manifeste dort (6.11, Option B) bis zum Ablauf ihrer Sperre nicht löschbar
   - Restore-Probe nach dem Schlüsselweg aus 4.9
   - `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian])
   - solange Stufe A läuft: nur Funktionstest mit Testdaten (Restore-Probe), keine Aufbewahrungspflicht; Aufbewahrung nach 16.2 erst auf Stufe B (5.11)
@@ -379,7 +383,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 5.11_
 
 - [ ] 5.10 Notfallunterlagen [Fabian]
-  - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang inkl. Bypass-Schlüssel, öffentlicher Manifest-Schlüssel; Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
+  - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang des Inhabers (Inhaber-Zugang, 6.10), öffentlicher Manifest-Schlüssel; Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
   - Vollständigkeit einmal mit dem Notfallablauf aus 5.7 prüfen
   - _Anforderungen: 6.10, 16.12_
 
@@ -387,7 +391,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Zeitpunkt: zu Beginn von Welle 5, vor 5.4 und vor der Übernahme 5.8; vorgezogen (Ausnahme von «Aufgaben anderer Wellen nicht vorziehen»), wenn 1.10 abbricht oder 16.18 später eintritt
   - [Fabian] eigene Infomaniak-VPS in der Grösse aus 4.9 (K5) bestellen; Zugang des Deploy-Workflows als GitHub-Secret; DNS für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch` auf die neue VPS umstellen
   - [Infra] neue VPS nach dem Muster des Betriebs einrichten (Traefik mit Let's Encrypt, Deploy-Befehl für das SSH-Bundle, Compose-Policy, Monitoring); Einträge im Infra-Repo der VPS
-  - [Infra] Deploy-Ziel im Workflow aus 1.9 umstellen; Stufenwerte für B: `archiv-api` (`archiv.rolle=api`) und `archiv-worker` (`archiv.rolle=worker`) getrennt, Parallelität und Limits nach K5
+  - [Infra] Deploy-Ziel im Workflow aus 1.9 umstellen; Stufenwerte für B: `archiv-api` (`archiv.rolle=api`) und `archiv-worker` (`archiv.rolle=worker`) getrennt, beide mit `archiv.stufe=B`, Parallelität und Limits nach K5; Sperrmodus von `manifest/` COMPLIANCE ohne Abweichung (2.3)
   - Testdaten verwerfen: Datenbanken und Realm-Benutzer der Stufe A nicht übernehmen, Stufe B startet leer; Test-Buckets nach dem Entscheid aus design.md (Open Points: Bucket-Namen der Stufe A); danach Archiv-Dienste auf Stufe A entfernen und die Einträge im Infra-Repo der bestehenden VPS zurückbauen; im Wechselprotokoll [Fabian] bestätigen, welche Testdaten auf Stufe A geladen wurden (16.15)
   - Sicherung und Restore-Probe aus 5.5 auf Stufe B einrichten bzw. umstellen, Aufbewahrung nach 16.2 ab hier; ist 5.5 beim Wechsel noch offen, richtet 5.5 sie direkt auf Stufe B ein
   - Leistungsmessung auf Stufe B mit den Lastskripten aus 2.4, 2.6 und 4.5 unter den Messbedingungen aus 4.9; Messbericht im PR verlinken; bei vorgezogenem Wechsel die Leistungsmessung nachholen, sobald 2.4, 2.6 und 4.5 fertig sind, spätestens vor 5.4

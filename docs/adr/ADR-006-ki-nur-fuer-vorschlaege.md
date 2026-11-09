@@ -43,7 +43,7 @@ Die KI soll Art, Datum, Partner und Betrag vorschlagen, damit der Inhaber nur no
 ## Betrachtete Alternativen
 1. **Automatisch archivieren ab hoher Sicherheit** – abgelehnt: Das Gate lässt Fehler unter sicheren
    Feldern zu (Req 0.9); eine Fehlarchivierung bei Arten mit `gesetzliche_pflicht` ist nach der Sperre
-   nur mit dem Bypass-Schlüssel des Inhabers lösbar (ADR-007), und P3 legt die Bestätigung in Menschenhand.
+   nur mit dem Bypass-Schlüssel des Inhabers lösbar (ADR-007; unter Option B: Inhaber-Zugang, siehe ADR-007, Nachtrag 09.11.2026), und P3 legt die Bestätigung in Menschenhand.
 2. **KI auch bei Generator-Dokumenten, zur Kontrolle** – abgelehnt: Die Metadaten sind dort Quelle, keine
    Schätzung; ein Vorschlag brächte Kosten und mögliche Widersprüche ohne Nutzen.
 3. **Mehrere KI-Aufrufe je Beleg** (z. B. erst Art, dann Felder, oder KI-gestützte Beispielauswahl) –

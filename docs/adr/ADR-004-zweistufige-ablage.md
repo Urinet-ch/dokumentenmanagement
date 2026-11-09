@@ -1,6 +1,6 @@
 # ADR-004: Zweistufige Ablage – `eingang/` ohne Sperre, `archiv/` mit Sperre nur bei gesetzlicher Pflicht
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket) – durchgeführt 08.11.2026, Sperre pro Objekt und Löschbarkeit bestätigt [T 3a, 5] (`docs/spikes/s3-object-lock.md`); Rückfall Punkt 8 nicht nötig. Der Modus der Sperre ist im Nachtrag 09.11.2026 von ADR-007 offen (Option A/B/C).
+**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Object Lock pro Objekt, Löschbarkeit ungesperrter Objekte im selben Bucket) – durchgeführt 08.11.2026, Sperre pro Objekt und Löschbarkeit bestätigt [T 3a, 5] (`docs/spikes/s3-object-lock.md`); Rückfall Punkt 8 nicht nötig. Der Modus der Sperre ist im Nachtrag 09.11.2026 von ADR-007 entschieden: Option B (GOVERNANCE für `archiv/`, COMPLIANCE für `manifest/`; Fabian, 09.11.2026).
 
 **Datum:** 08.11.2026
 
@@ -36,11 +36,11 @@
 - **Negativ:** Jede Datei wird einmal kopiert. Wegen der Versionierung muss das Löschen unter `eingang/` alle Versionen erfassen, sonst bleiben Altversionen liegen.
 - **Negativ:** Unter `archiv/` dürfen keine fremden Versionen entstehen. Der Prüflauf meldet fremde Versionen und Löschmarken als Abweichung (Req 15.10).
 - **Umsetzung:** `AblageService` mit Port `AblagePort`, S3-Adapter und Dev-Stub (Aufgabe 2.3); Bestätigen, Archivieren, Verwerfen und Wiederholen in Aufgabe 3.4. Sperre bei Metadatenänderung nur verlängern (Req 9.7, ADR-007).
-- **Tests:** Testcontainers MinIO mit Object Lock und Versionierung: archivierte Datei nicht löschbar, Abweichung der Prüfsumme bricht ab, Art ohne Pflicht ohne Sperre, Verwerfen löscht alle Versionen. Cucumber-Szenarien zu Req 6.x.
-- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; mit Option B (entschieden 09.11.2026, ADR-007) hat der App-Schlüssel technisch das Bypass-Recht, Spike 0.2 [T 6b–7g]): [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
+- **Tests:** Testcontainers MinIO mit Object Lock und Versionierung: archivierte Datei nicht löschbar (unter Option B: ohne Bypass-Header, siehe ADR-007, Nachtrag 09.11.2026), Abweichung der Prüfsumme bricht ab, Art ohne Pflicht ohne Sperre, Verwerfen löscht alle Versionen. Cucumber-Szenarien zu Req 6.x.
+- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; mit Option B (entschieden 09.11.2026, ADR-007) hat der App-Schlüssel technisch das Bypass-Recht, Spike 0.2 [T 6b–7g]) (siehe ADR-007, Nachtrag 09.11.2026: die Anwendung setzt den Header nie, Req 6.5; Manifeste in COMPLIANCE sind mit keinem Schlüssel des Projekts löschbar [T 4b/4c], darum darf der Sperrmodus von `manifest/` auf Stufe A per Konfiguration abweichen, Req 6.11, Aufgabe 2.3): [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
 
 ## Verweise
-- Spike 0.2 (Vorbehalt): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007
+- Spike 0.2 (Vorbehalt – durchgeführt 08.11.2026): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007
 - Req 0.4, 6.1–6.9, 6.12, 6.13, 9.3, 9.7, 9.8, 15.10
 - P2, P12
 - Aufgaben 0.2, 2.3, 3.4, 5.3
