@@ -48,7 +48,7 @@ while IFS=$'\t' read -r status datei _; do
         fehler=1
       fi
       if grep -E '^\+' <<<"$diff" | grep -vE '^\+\+\+' | sed 's/^+//' \
-          | grep -vE '^[[:space:]]*(<include(All)?[[:space:]][^>]*/>|<!--.*-->)?[[:space:]]*$' >/dev/null; then
+          | grep -vE '^[[:space:]]*(<include(All)?[[:space:]][^>]*/>|<!--([^-]|-[^-])*-->)?[[:space:]]*$' >/dev/null; then
         echo "Master-Changelog: nur <include>, <includeAll> oder Kommentare erlaubt: $datei"
         fehler=1
       fi

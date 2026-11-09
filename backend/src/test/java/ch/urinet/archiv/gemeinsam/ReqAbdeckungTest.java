@@ -30,6 +30,28 @@ class ReqAbdeckungTest {
     }
 
     @Test
+    void kommaAmEndeBrichtAb() {
+        assertThatThrownBy(() -> ReqAbdeckung.kriterien("1.7,")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anforderungszeileMussGanzPassen() {
+        for (String zeile : List.of("  - _Anforderungen: 1.7, 2.1", "  - _Anforderungen_: 1.7", "  - _Anforderungen: 1.7_ und 2.1")) {
+            assertThatThrownBy(() -> ReqAbdeckung.gefordert(List.of("- [x] 1.1 A", zeile))).as(zeile)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test
+    void checkboxMitUngueltigerKennungBrichtAb() {
+        for (String zeile : List.of("- [x] 1.1a Gerüst", "- [ ] Gerüst", "- [x] X.1 Gerüst")) {
+            assertThatThrownBy(() -> ReqAbdeckung.gefordert(List.of(zeile))).as(zeile)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(ReqAbdeckung.gefordert(List.of("- [ ] O.1 Optional", "- [x]* Frei 1"))).isEmpty();
+    }
+
+    @Test
     void ueberschriftUndOptionaleAufgabeSetzenZaehlungZurueck() {
         List<String> tasks = List.of(
                 "- [x] 1.1 Gerüst",

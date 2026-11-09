@@ -20,12 +20,12 @@ fehler=0
 erwarte() {
   local soll="$1" fall="$2"
   shift 2
-  local ist=0
-  "$skript" "$@" >/dev/null 2>&1 || ist=$?
-  if [[ "$ist" -eq "$soll" ]]; then
+  local ist=0 ausgabe
+  ausgabe="$("$skript" "$@" 2>&1)" || ist=$?
+  if [[ "$ist" -eq "$soll" && ( -z "${MELDUNG:-}" || "$ausgabe" == *"$MELDUNG"* ) ]]; then
     echo "ok   $fall (Exit $ist)"
   else
-    echo "FEHL $fall (Exit $ist, erwartet $soll)"
+    echo "FEHL $fall (Exit $ist, erwartet $soll${MELDUNG:+ mit «$MELDUNG»})"
     fehler=1
   fi
 }
@@ -55,5 +55,14 @@ erwarte 1 "Changeset im Master-Changelog" "$basis"
 
 aendern sh -c "sed -i.bak 's#001-a.xml#001-x.xml#' $db/changelog.xml && rm $db/changelog.xml.bak"
 erwarte 1 "Master-Changelog geändert statt ergänzt" "$basis"
+
+aendern sh -c "sed -i.bak 's#</databaseChangeLog>#    <!-- a --><property name=\"x\" value=\"y\"/><!-- b -->\n</databaseChangeLog>#' $db/changelog.xml && rm $db/changelog.xml.bak"
+erwarte 1 "Element zwischen zwei Kommentaren" "$basis"
+
+aendern sh -c "sed -i.bak 's#</databaseChangeLog>#    <changeSet id=\"002\" author=\"t\"/>\n</databaseChangeLog>#' $db/changelog.xml && rm $db/changelog.xml.bak"
+basis_mit_changeset="$(git rev-parse HEAD)"
+echo fall > ausserhalb.txt
+git add -A && git commit -q -m "fall ausserhalb db"
+MELDUNG="Changeset direkt im Master-Changelog" erwarte 1 "Changeset schon in der Basis, Fall ändert nichts unter db/" "$basis_mit_changeset"
 
 exit $fehler
