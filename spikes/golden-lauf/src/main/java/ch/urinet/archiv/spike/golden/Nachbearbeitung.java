@@ -126,8 +126,9 @@ public final class Nachbearbeitung {
     }
 
     /**
-     * Eigene UID oder IBAN im Kopf- oder Fussbereich einer Seite (Seiten durch Seitenvorschub getrennt, wie pdftotext);
-     * eine IBAN im Fliesstext, z. B. als Gutschriftskonto, zählt nicht.
+     * Eigene UID oder IBAN im Kopf- oder Fussbereich einer Seite (Seiten durch Seitenvorschub getrennt, wie pdftotext):
+     * erste und letzte 10 nicht leere Zeilen; Seiten mit bis zu 20 nicht leeren Zeilen zählen ganz, eine Mandanten-IBAN
+     * als Gutschriftskonto in kurzen Briefen schliesst den Mandanten als Aussteller daher nicht aus.
      */
     static boolean kopfOderFussEnthaeltKennung(String text, Mandant m) {
         if (text == null) {

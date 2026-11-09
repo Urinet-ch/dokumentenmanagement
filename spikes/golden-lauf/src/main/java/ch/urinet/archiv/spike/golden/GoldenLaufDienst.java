@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,6 +54,7 @@ public class GoldenLaufDienst {
         if (k1 && modus != Modus.ABSTIMMEN) {
             throw new IllegalArgumentException("--k1 nur im Abstimmungsteil");
         }
+        LocalDateTime start = LocalDateTime.now();
         // Req 16.22: vor dem ersten Beleg, mit den Werten, die der Client tatsächlich verwendet
         Config config = ConfigProvider.getConfig();
         Hostpruefung.pruefeKonfiguration(schluessel -> config.getOptionalValue(schluessel, String.class));
@@ -76,6 +76,7 @@ public class GoldenLaufDienst {
         Path cache = golden.resolve(".cache-golden-lauf");
         String systemPrompt = Prompt.system(mandant.name(), Dokumentarten.alsPromptListe(arten, eigeneArten, mandant.name()));
         String promptHash = Prompt.hash(systemPrompt, bildweg(k1));
+        Path ordner = Bericht.legeLaufordnerAn(golden.resolve("berichte"), Bericht.ordnerName(start, modus, k1, limit));
 
         LOG.infof("Modus %s%s: %d Belege, Prompt %s", modus.verzeichnis(), k1 ? " (K1, Bild)" : "", auswahl.size(), promptHash);
         List<BelegErgebnis> ergebnisse = new ArrayList<>();
@@ -84,12 +85,10 @@ public class GoldenLaufDienst {
             ergebnisse.add(r);
             LOG.info(zeile(r));
         }
-        String zeitpunkt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"));
-        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, zeitpunkt, promptHash, modell, schwelle, echt.belege().size(),
-                echt.ausgeschlossen(), preisEin, preisAus);
+        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, start.format(Bericht.ZEITPUNKT), promptHash, modell, schwelle,
+                echt.belege().size(), echt.ausgeschlossen(), preisEin, preisAus);
         Bericht.Kennzahlen k = Bericht.berechne(ergebnisse, schwelle, preisEin, preisAus);
-        Path ordner = Bericht.schreibe(golden.resolve("berichte").resolve(zeitpunkt + "-" + modus.verzeichnis()
-                + (k1 ? "-k1" : "")), lauf, ergebnisse, k);
+        Bericht.schreibe(ordner, lauf, ergebnisse, k);
         return new Ausgang(ordner, ergebnisse, k);
     }
 

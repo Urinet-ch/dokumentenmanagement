@@ -127,6 +127,16 @@ class NachbearbeitungTest {
     }
 
     @Test
+    void kurzeSeiteZaehltGanzAuchGutschriftskontoInDerDrittletztenZeile() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 17; i++) {
+            sb.append(i == 14 ? "Gutschrift auf Ihr Konto CH93 0076 2011 6238 5295 7" : "Zeile " + i).append('\n');
+        }
+        // heutiges Verhalten: bei bis zu 20 nicht leeren Zeilen gilt die ganze Seite als Kopf- oder Fussbereich
+        assertThat(Nachbearbeitung.kopfOderFussEnthaeltKennung(sb.toString(), MANDANT)).isTrue();
+    }
+
+    @Test
     void umstufungAusgangsrechnungUndOfferteBeiFremdemQr() throws IOException {
         for (String art : List.of("AUSGANGSRECHNUNG", "OFFERTE")) {
             var e = Nachbearbeitung.bearbeite(vorschlag(art, null, "2026-03-01", Vertraulichkeit.PERSONAL),

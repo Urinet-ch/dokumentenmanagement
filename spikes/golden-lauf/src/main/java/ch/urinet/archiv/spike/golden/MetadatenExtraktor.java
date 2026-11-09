@@ -12,7 +12,7 @@ import io.quarkiverse.langchain4j.RegisterAiService.NoChatMemoryProviderSupplier
  * Ein Aufruf je Beleg (Req 7.1), ohne Chat-Memory, JSON-Schema strict (design.md «KI»). Der System-Prompt kommt fertig
  * gerendert ({@link Prompt#system}), damit der Prompt-Hash genau den gesendeten Text abdeckt.
  */
-@RegisterAiService(chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)
+@RegisterAiService(chatLanguageModelSupplier = KiModell.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)
 public interface MetadatenExtraktor {
 
     String PROMPT_VERSION = "v5";

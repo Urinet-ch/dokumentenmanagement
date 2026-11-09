@@ -9,12 +9,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Req 0.9: Fehler ab Schwelle (>=) und kleinste Schwelle mit höchstens einem Fehler. */
 class BerichtTest {
@@ -82,6 +86,33 @@ class BerichtTest {
         assertThat(beleg.path("artRohSicherheit").asDouble()).isEqualTo(0.9);
         assertThat(beleg.path("vorschlag").path("art").asText()).isEqualTo("QUITTUNG");
         assertThat(beleg.path("eingabe").asText()).isEqualTo("TEXT");
+    }
+
+    @Test
+    void ordnerNameMitSekundenUndLimit() {
+        LocalDateTime t = LocalDateTime.of(2026, 11, 9, 14, 45, 7);
+        assertThat(Bericht.ordnerName(t, Modus.ABSTIMMEN, false, 0)).isEqualTo("2026-11-09-144507-abstimmen");
+        assertThat(Bericht.ordnerName(t, Modus.ABSTIMMEN, false, 1)).isEqualTo("2026-11-09-144507-abstimmen-limit1");
+        assertThat(Bericht.ordnerName(t, Modus.ABSTIMMEN, true, 3)).isEqualTo("2026-11-09-144507-abstimmen-k1-limit3");
+    }
+
+    @Test
+    void fehlenderBerichteOrdnerWirdAngelegt(@TempDir Path tmp) throws Exception {
+        Path ordner = Bericht.legeLaufordnerAn(tmp.resolve("berichte"), "lauf");
+        assertThat(ordner).isDirectory().isEqualTo(tmp.resolve("berichte/lauf"));
+    }
+
+    @Test
+    void vorhandenerLaufordnerBrichtAbUndBleibtUnveraendert(@TempDir Path tmp) throws Exception {
+        Path alt = Files.createDirectories(tmp.resolve("berichte/lauf"));
+        Files.writeString(alt.resolve("ergebnisse.json"), "alt");
+        assertThatThrownBy(() -> Bericht.legeLaufordnerAn(tmp.resolve("berichte"), "lauf"))
+                .isInstanceOf(FileAlreadyExistsException.class);
+        List<BelegErgebnis> r = List.of(ergebnis("a", s(0.9)));
+        Bericht.Lauf lauf = new Bericht.Lauf(Modus.ABSTIMMEN, false, "t", "v5-x", "m", 0.8, 0, 0, 0.2, 0.75);
+        assertThatThrownBy(() -> Bericht.schreibe(alt, lauf, r, Bericht.berechne(r, 0.8, 0.2, 0.75)))
+                .isInstanceOf(FileAlreadyExistsException.class);
+        assertThat(alt.resolve("ergebnisse.json")).hasContent("alt");
     }
 
     @Test

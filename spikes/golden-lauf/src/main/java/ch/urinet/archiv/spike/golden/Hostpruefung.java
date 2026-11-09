@@ -37,8 +37,8 @@ public final class Hostpruefung {
     }
 
     /**
-     * Prüft alle Schlüssel, aus denen eine KI-Basis-URL kommen kann, auch die tatsächlich vom Client verwendete
-     * ({@code quarkus.langchain4j.openai.base-url}); fehlt ein Wert, gilt er als abgelehnt.
+     * Prüft alle Schlüssel, aus denen eine KI-Basis-URL kommen kann, darunter {@code archiv.ki.basis-url}, die
+     * {@link KiModell} tatsächlich verwendet; fehlt ein Wert, gilt er als abgelehnt.
      */
     public static void pruefeKonfiguration(Function<String, Optional<String>> lesen) {
         for (String schluessel : SCHLUESSEL) {

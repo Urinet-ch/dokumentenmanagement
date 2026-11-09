@@ -8,11 +8,15 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -127,16 +131,31 @@ public final class Bericht {
         return werte;
     }
 
+    static final DateTimeFormatter ZEITPUNKT = DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss");
+
+    /** Ordnername aus dem Startzeitpunkt; --limit steht immer im Namen, damit Probeläufe erkennbar bleiben. */
+    public static String ordnerName(LocalDateTime start, Modus modus, boolean k1, int limit) {
+        return start.format(ZEITPUNKT) + "-" + modus.verzeichnis() + (k1 ? "-k1" : "") + (limit > 0 ? "-limit" + limit : "");
+    }
+
+    /** Legt den Laufordner neu an; existiert er schon, bricht der Lauf ab, statt einen Vollbericht zu überschreiben. */
+    public static Path legeLaufordnerAn(Path berichte, String name) throws IOException {
+        Files.createDirectories(berichte);
+        return Files.createDirectory(berichte.resolve(name));
+    }
+
     public static Path schreibe(Path ordner, Lauf lauf, List<BelegErgebnis> ergebnisse, Kennzahlen k) throws IOException {
-        Files.createDirectories(ordner);
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).enable(SerializationFeature.INDENT_OUTPUT);
         Map<String, Object> voll = new LinkedHashMap<>();
         voll.put("lauf", lauf);
         voll.put("kennzahlen", k);
         voll.put("belege", ergebnisse.stream().map(Bericht::eintrag).toList());
-        json.writeValue(ordner.resolve("ergebnisse.json").toFile(), voll);
-        Files.writeString(ordner.resolve("kennzahlen.md"), kennzahlenMarkdown(lauf, k), StandardCharsets.UTF_8);
+        try (OutputStream aus = Files.newOutputStream(ordner.resolve("ergebnisse.json"), StandardOpenOption.CREATE_NEW)) {
+            json.writeValue(aus, voll);
+        }
+        Files.writeString(ordner.resolve("kennzahlen.md"), kennzahlenMarkdown(lauf, k), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE_NEW);
         return ordner;
     }
 

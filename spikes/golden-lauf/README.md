@@ -39,10 +39,11 @@ java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -ja
 | `--k1` | wie ohne Schalter | Variante K1: jeder Beleg als Seitenbild (Bildweg `alle`, nur Abstimmungsteil) |
 | `--limit N` | erste N | Probelauf |
 
-Vor dem ersten Beleg bricht die App ab, wenn `archiv.ki.basis-url` oder die vom Client tatsächlich verwendete
+Vor dem ersten Beleg bricht die App ab, wenn `archiv.ki.basis-url` (verwendet vom Client `KiModell`) oder
 `quarkus.langchain4j.openai.base-url` nicht per `https` exakt auf `api.infomaniak.com` zeigt (Req 16.22). Kein Profil
-`lokal`, kein LM Studio (ADR-012). Eine Nachfrage (Req 7.3) gibt es nur bei Parse- oder Schemafehlern; Timeouts und
-HTTP-Fehler zählen als Fehlschlag mit Grund.
+`lokal`, kein LM Studio (ADR-012). Je Aufruf geht genau ein Request raus: `KiModell` setzt `maxRetries(0)`, weil
+`quarkus.langchain4j.openai.max-retries` den Wert 0 ablehnt und 1 eine Wiederholung bedeutet. Eine Nachfrage (Req 7.3)
+gibt es nur bei Parse- oder Schemafehlern; Timeouts und HTTP-Fehler zählen als Fehlschlag mit Grund.
 
 ## Prompt-Hash
 
@@ -51,7 +52,9 @@ Anzeigetexten, Reihenfolge, Mandantenname, Markierungen aus `golden.eigene-arten
 Nachfrage-Vorlagen, das erzeugte JSON-Schema, die Reihenfolge von `ArtCode` und den Bildweg (`fotos`, bei `--k1`
 `alle`) ab. Der System-Prompt wird in Java gerendert und fertig an das Modell übergeben; gehashter und gesendeter Text
 sind dadurch gleich. Abstimmen und `--gate` nutzen denselben synthetischen Mandanten und haben denselben Hash; bei
-`--realitaet` weicht er wegen des Mandantennamens der echten Belege ab.
+`--realitaet` weicht er wegen des Mandantennamens der echten Belege ab. Nicht abgedeckt sind QR-Format, Kürzung
+(`MAX_ZEICHEN`), Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich sind deshalb auch der Commit
+(Gate-Lauf Schritt 1) und das Modell in `kennzahlen.md`.
 
 ## Nachbearbeitung (nur Prototyp)
 
@@ -68,21 +71,27 @@ sind dadurch gleich. Abstimmen und `--gate` nutzen denselben synthetischen Manda
 
 ## Gate-Lauf (nur Fabian)
 
-1. main mit PR #15, `cd spikes/golden-lauf && mvn package`.
+1. Vorläufig: main mit PR #15, `cd spikes/golden-lauf && mvn package`. Kein Gate-Lauf vor Abschluss von Aufgabe 0.5
+   Gate-Vorbereitung (Req 0.9 neu, Regeln R3/E1/E2, Modellvergleich). Der Gate-Lauf läuft auf dem Commit, mit dem
+   Prompt-Hash, Modell und Nachbearbeitung eingefroren werden (Merge-Commit des PR, der sie zuletzt festlegt), ohne
+   spätere Änderungen im Spike.
 2. Schwelle festlegen: Vorschlag `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei Abstimmungsläufe
    der übernommenen Variante (Wert in [golden-ergebnis.md](../../docs/spikes/golden-ergebnis.md), «Offen für Gate 0»);
    meldet einer davon «keine ≤ 1.0», gibt es keinen Vorschlag. Den Wert setzt Fabian.
 3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.schwelle=<wert> -jar target/quarkus-app/quarkus-run.jar --gate`
    (ohne Zusatzschalter, der Bildweg für Fotos ist Standard).
 4. Prompt-Hash der Konsole mit dem eingefrorenen Hash in golden-ergebnis.md vergleichen; weicht er ab, gilt der Lauf nicht.
+   Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht QR-Format, Kürzung, Bildaufbereitung und
+   Modell/Parameter; massgeblich sind deshalb auch der Commit nach Schritt 1 und das Modell in `kennzahlen.md`.
 5. Kennzahlen des Prüfteils in golden-ergebnis.md eintragen. Bestanden bei mindestens 18/20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3); «keine ≤ 1.0» im Prüfteil heisst nicht bestanden.
 
 ## Ausgabe
 
 - Konsole: nur Beleg-ID (synthetisch Dateiname, echt die ersten 8 Zeichen des SHA-256 des Dateinamens), Feld, richtig/falsch.
-- `$ARCHIV_GOLDEN_DIR/berichte/<JJJJ-MM-TT-HHMM>-<modus>[-k1]/`: `ergebnisse.json` (Vollbericht je Beleg) und
-  `kennzahlen.md` (nur Zahlen und IDs, für `docs/spikes/golden-ergebnis.md`).
+- `$ARCHIV_GOLDEN_DIR/berichte/<JJJJ-MM-TT-HHMMSS>-<modus>[-k1][-limitN]/` (Startzeitpunkt): `ergebnisse.json`
+  (Vollbericht je Beleg) und `kennzahlen.md` (nur Zahlen und IDs, für `docs/spikes/golden-ergebnis.md`). Der Ordner
+  entsteht vor dem ersten KI-Aufruf; gibt es ihn schon, bricht der Lauf ab, statt einen Bericht zu überschreiben.
 - OCR-Cache: `$ARCHIV_GOLDEN_DIR/.cache-golden-lauf/` (Text, Seitenbilder je Dateiinhalt). Ein Eintrag gilt erst mit der
   Datei `fertig` als vollständig; schlägt ein OCR-Schritt fehl, wird der Arbeitsordner gelöscht. Enthält Kopien der
   Belege und bleibt deshalb im Golden-Ordner; zum Löschen den Ordner entfernen.
