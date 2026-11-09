@@ -82,7 +82,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - GitHub Actions: `mvn verify` (Cucumber, JUnit, ArchUnit), `ng test`, Build über Quinoa, Docker-Images; Prüfungen: bestehende Liquibase-Changesets unverändert, OpenAPI und generierter Client aktuell, jedes Kriterium mit `@req`-Szenario oder Nachweis-Vermerk; CI-Logs nur mit IDs
   - _Anforderungen: 1.7, 16.1, 16.7, 16.13, 16.14_
 
-- [ ] 1.2 Entwicklungsumgebung [Infra]
+- [x] 1.2 Entwicklungsumgebung [Infra]
   - Quarkus Dev Services für PostgreSQL 17 + pgvector und Keycloak; MinIO (Object Lock) und Mailpit für Entwicklung und Tests
   - Keycloak-Realm-Export `deploy/keycloak/realm-export.json` (Realm `urinet-archiv`) mit den Rollen `inhaber`, `mitarbeiter`, `treuhaender`, `geschaeftsstelle`, Claim-Mapper `mandant`, TOTP-Pflicht, Testbenutzer je Rolle
   - Dev-Stubs der Driven Ports (Ablage, KI, OCR, Integration) im Profil `dev`

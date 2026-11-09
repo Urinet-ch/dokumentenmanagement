@@ -1,5 +1,14 @@
 {
   "openapi" : "3.1.0",
+  "components" : {
+    "securitySchemes" : {
+      "SecurityScheme" : {
+        "type" : "openIdConnect",
+        "openIdConnectUrl" : "https://archiv-auth.apps.urinet.ch/realms/urinet-archiv/.well-known/openid-configuration",
+        "description" : "Authentication"
+      }
+    }
+  },
   "info" : {
     "title" : "UriNet Archiv API",
     "version" : "v1"

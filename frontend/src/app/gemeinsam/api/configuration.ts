@@ -91,6 +91,10 @@ constructor({ accessToken, apiKeys, basePath, credentials, encodeParam, encoder,
         }
         this.encodeParam = encodeParam ?? (param => this.defaultEncodeParam(param));
         this.credentials = credentials ?? {};
+
+        // init default SecurityScheme credential
+        if (!this.credentials['SecurityScheme']) {
+        }
     }
 
     /**
