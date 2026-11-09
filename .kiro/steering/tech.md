@@ -19,7 +19,7 @@ inclusion: always
 | CSV | Apache Commons CSV, ICU4J (Zeichensatz-Erkennung) | |
 | Betrieb | Docker Compose (`deploy/infomaniak/compose.yml`), Traefik (Labels), in zwei Stufen: Stufe A auf der bestehenden Infomaniak-VPS (nur Testdaten), Stufe B auf einer eigenen Infomaniak-VPS | Domains `archiv.apps.urinet.ch`, `archiv-auth.apps.urinet.ch`; Details unter «Plattform und Betrieb» |
 | Sicherung | `pg_dump` + Bucket-Kopie → restic, Zweitkopie bei einem zweiten Schweizer Anbieter | [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]; Details unter «Plattform und Betrieb» |
-| Tests | Cucumber (Features mit Tag `@req-<x.y>`), JUnit (Jupiter 6, über die Quarkus-BOM) für Unit-Tests, Quarkus Dev Services (PostgreSQL, Keycloak), MinIO (Object Lock, Versionierung) und Mailpit als Compose Dev Services (`backend/compose-devservices.yml`), WireMock, AssertJ, ArchUnit, REST-assured, Playwright | Backend-Szenarien mit Java-Runner, Browser-Szenarien mit Cucumber.js + Playwright gegen den Prod-Build |
+| Tests | Cucumber (Features mit Tag `@req-<x.y>`), JUnit (Jupiter 6, über die Quarkus-BOM) für Unit-Tests, Quarkus Dev Services (PostgreSQL, Keycloak), MinIO (Object Lock, Versionierung) und Mailpit als Compose Dev Services (`backend/compose-devservices.yml`), Testcontainers nur für `ExportKeycloak` (Keycloak mit `realm-export.json`), WireMock, AssertJ, ArchUnit, REST-assured, Playwright | Backend-Szenarien mit Java-Runner, Browser-Szenarien mit Cucumber.js + Playwright gegen den Prod-Build |
 
 ## Nicht verhandelbare Regeln
 1. **Mandant nie aus Benutzereingaben.** Der Mandant stammt ausschliesslich aus dem verifizierten Token (`mandant`-Claim) bzw. aus dem API-Token. Kein Header, kein Query-Parameter, kein Prompt setzt ihn.
