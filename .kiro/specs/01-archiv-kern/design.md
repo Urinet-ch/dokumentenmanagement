@@ -290,6 +290,12 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 - `MetadatenExtraktor` als LangChain4j-`@RegisterAiService` ohne Chat-Memory (`NoChatMemoryProviderSupplier`; sonst vermischen sich Belege im selben Request-Kontext), Antwort als Java-Record `MetadatenVorschlag` im JSON-Schema-Antwortformat (`response-format=json_schema`, `strict-json-schema=true`). Infomaniak lehnt den JSON-Modus (`json_object`) ab; einen Rückfall gibt es nicht, ohne gültige Antwort gilt Req 7.1 (ohne Vorschlag in den Eingangskorb). Spike 0.3: `docs/spikes/infomaniak-ai.md`.
 - Driven Port `KiPort` mit Adapter gegen Infomaniak AI Services und Dev-Stub (feste Antworten); in Tests WireMock.
 - Genau ein Aufruf je Beleg (Req 7.1). Prompt (Deutsch): Rolle «Archivassistent für ein Schweizer KMU», Liste der Dokumentarten mit Beschreibung und Standard-Vertraulichkeit, Partner-Hinweis (Ordnerpfad, Absenderadresse), Werte aus dem Swiss QR Code, bis 5 Beispiele aus der Vorauswahl, Text gekürzt auf 12'000 Zeichen (Anfang + Ende).
+- Feldregeln im Prompt (Fabian, 09.11.2026):
+  - `art`: Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. cassa di compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG.
+  - `betrag`: Bei Offerten das einmalige Total; wiederkehrende Beträge (pro Monat oder Jahr) zählen nicht.
+  - `belegnummer`: «Antrag» gehört zu den Beschriftungen der Belegnummer (Antrags-ID, Antragsnummer, z. B. bei Behördenschreiben).
+- Bildweg (Req 7.1): Ist das Original ein Bild (JPEG, PNG, HEIC/HEIF, TIFF; Typ am Inhalt erkannt wie Req 3.3, nie an der Endung), geht statt des OCR-Texts das Bild ans Modell, auch bei der Nachfrage (Req 7.3). OCR läuft trotzdem für Volltext und Swiss QR Code. Im Prototyp (Golden-Lauf) gehen die von OCRmyPDF gerenderten Seiten ans Modell. Das Produkt sendet die gerenderten Seiten des PDF nach Req 5.1; bei der Handy-Erfassung entsteht es aus der Arbeitsfassung (Req 4.7, 5.10), sonst aus dem Original, auch bei mehreren Bildern als ein Dokument (Req 3.5). Der Prototyp hat ebenso die von OCRmyPDF gerenderten Seiten gemessen (ohne Zuschnitt); die Gate-Kennzahlen sind damit auf das Produkt übertragbar (entschieden von Fabian am 09.11.2026).
+- Transport-Wiederholungen steuert das Produkt bewusst (eigener Client, Auftragsregel Req 5.4), nicht über `quarkus.langchain4j.openai.max-retries`: Dort bedeutet 1 in LangChain4j 1.19.3 eine Wiederholung (zwei Requests bei Timeout oder 5xx), 0 lehnt Quarkus ab. Der Prototyp nutzt deshalb ein eigenes `ChatModel` mit `maxRetries(0)` (`KiModell`).
 - `MetadatenVorschlag(String art, String titel, String datum, String partnerName, String partnerUid, String partnerIban, String partnerEmail, String belegnummer, Richtung richtung, BigDecimal betrag, String waehrung, String faelligkeit, String qrReferenz, Vertraulichkeit vertraulichkeit, List<String> tags, Sicherheit sicherheit)`; `Sicherheit` ist ein Record mit je einem `Double` pro Feld.
   Spike 0.3: LangChain4j bildet `LocalDate` als Objekt `{year, month, day}` und `Map` als leeres Objekt ab; das Modell liess das Datum dann meist leer und `sicherheit` immer. Deshalb Datumsfelder als ISO-Text (`@Description("… als ISO-Datum JJJJ-MM-TT")`), Umwandlung in `LocalDate` in der Nachbearbeitung (ungültig → leer, Sicherheit 0).
 - `BeispielVorauswahl` (Req 7.9, P10), deterministisch vor dem Aufruf, ohne zweiten KI-Aufruf:
@@ -310,13 +316,25 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 **Erkenntnisse aus dem Golden-Lauf (Aufgabe 0.5, `docs/spikes/golden-ergebnis.md`; Abstimmungsteil, vor Gate 0):**
 - `art` als Enum der Dokumentart-Codes im Schema statt `String`: Mit `String` lieferte das Modell auch Werte wie `AUSGABE`.
 - Der Prompt markiert die `eigene_arten` des Mandanten und nennt Regeln für fremde Belege; trotzdem stuft das Modell
-  Lieferantenrechnungen oft als `AUSGANGSRECHNUNG` ein. Prototyp-Regel: eigene Art, aber QR-Zahlungsempfänger nicht in
-  `mandant.kennungen` → Art unverändert (Req 7.12), Sicherheit der Art 0 («bitte prüfen»). Ob umgestuft wird, entscheidet Gate 0.
+  Lieferantenrechnungen oft als `AUSGANGSRECHNUNG` ein. Prototyp-Regeln: Nennt der Swiss QR Code eine IBAN ausserhalb
+  `mandant.kennungen`, ist der Mandant nicht Aussteller, auch wenn Kopf oder Fuss seine Kennung zeigen. Eigene Art,
+  Mandant nicht Aussteller → Sicherheit der Art 0 («bitte prüfen»), auch ohne Swiss QR Code. Bei fremdem
+  QR-Zahlungsempfänger wird `AUSGANGSRECHNUNG` oder `OFFERTE` zu `LIEFERANTENBELEG` mit Sicherheit der Art 0.5
+  («bitte prüfen») und der Standard-Vertraulichkeit von `LIEFERANTENBELEG` (der Wert des Modells gilt dann nicht);
+  `LOHNABRECHNUNG` wird nie umgestuft. Das Belegnummer-Muster ändert die Art weiterhin nicht (Req 7.12). Entscheid
+  Fabian, 0.5-Nachschärfen.
 - Der QR-Zahlungsempfänger ersetzt `partnerName` und `partnerIban` nur bei fremden Belegen; bei eigenen Belegen ist er der Mandant.
 - «Briefkopf» wurde im Prototyp vereinfacht als «UID oder IBAN des Mandanten irgendwo im Volltext» geprüft. **Nur Prototyp,
   für Welle 3 nicht übernehmen:** Lieferanten und Behörden drucken oft UID oder MWST-Nummer des Kunden; dann gälte der
   Mandant fälschlich als Aussteller und das Belegnummer-Muster würde einen fremden Beleg umstufen (verboten nach Req 7.12).
-  Massgeblich sind der Absenderblock (Briefkopf) bzw. der Zahlungsempfänger im Swiss QR Code.
+  Massgeblich sind der Absenderblock (Briefkopf) bzw. der Zahlungsempfänger im Swiss QR Code. Seit 0.5-Nachschärfen
+  prüft der Prototyp enger: Ein Swiss QR Code mit fremder IBAN hat Vorrang (Mandant nicht Aussteller); sonst zählt nur
+  der QR-Zahlungsempfänger mit Mandanten-IBAN oder eine Mandanten-IBAN/UID im Kopf- oder Fussbereich einer Seite
+  (erste und letzte 10 nicht leere Zeilen; Seiten mit bis zu 20 nicht leeren Zeilen zählen ganz, eine Mandanten-IBAN
+  als Gutschriftskonto in kurzen Briefen schliesst den Mandanten als Aussteller daher nicht aus), nicht mehr im
+  Fliesstext. `mandant.kennungen.ibans` muss auch die
+  QR-IBANs des Mandanten enthalten; sonst gelten eigene QR-Rechnungen mit QR-IBAN als «nicht Aussteller», auch bei
+  eigener UID im Kopf, und werden zu `LIEFERANTENBELEG` umgestuft.
 - OCR: `-l deu+fra+ita+eng` (fremdsprachige Belege); das offizielle OCRmyPDF-Image enthält weder `ita` noch poppler,
   daher ein abgeleitetes, versioniertes Image (`spikes/golden-lauf/ocr/Dockerfile`). Rohfotos liefern über Tesseract
   kaum brauchbaren Text; ein Seitenbild direkt an Mistral-Small-4 (K1) war bei Fotos deutlich besser.

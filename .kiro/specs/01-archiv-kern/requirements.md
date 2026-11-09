@@ -220,7 +220,7 @@ damit gescannte Belege als Buchungsbelege gelten.
 damit ich nur noch bestätigen muss.
 
 #### Acceptance Criteria
-1. WENN der Volltext vorliegt, DANN SOLL das Archiv das Sprachmodell einmal mit Text, Liste der Dokumentarten, den Werten aus dem Swiss QR Code (7.11) und bis zu 5 Korrekturbeispielen aus der Vorauswahl nach 7.9 aufrufen und eine Antwort nach festem JSON-Schema verlangen.
+1. WENN der Volltext vorliegt, DANN SOLL das Archiv das Sprachmodell einmal mit Text bzw., wenn das Original ein Bild ist (Typ nach Inhalt), mit den gerenderten Seiten des Dokuments (Fassung: design.md «KI», Bildweg), Liste der Dokumentarten, den Werten aus dem Swiss QR Code (7.11) und bis zu 5 Korrekturbeispielen aus der Vorauswahl nach 7.9 aufrufen und eine Antwort nach festem JSON-Schema verlangen.
 2. Der Vorschlag SOLL mindestens enthalten: Dokumentart, Titel, Belegdatum, Partnername, Belegnummer, Richtung (Einnahme/Ausgabe), Betrag, Währung, Fälligkeit, Vertraulichkeit (vorbelegt mit der Standard-Vertraulichkeit der vorgeschlagenen Art), Tags und pro Feld eine Sicherheit von 0 bis 1.
 3. FALLS die Antwort nicht dem Schema entspricht, DANN SOLL das Archiv einmal mit Fehlerhinweis nachfragen und sonst das Dokument ohne Vorschlag in den Eingangskorb legen.
 4. WENN ein Partnername vorgeschlagen wird, DANN SOLL das Archiv ihn mit den Kontakten abgleichen (E-Mail, UID, IBAN, sonst Namensähnlichkeit ≥ 0.6) und den besten Treffer verknüpfen oder «neuer Partner?» markieren.

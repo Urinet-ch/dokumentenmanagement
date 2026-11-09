@@ -13,14 +13,17 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /** Nachbearbeitung nach design.md «KI»: QR vor KI, Belegnummer-Muster nur bei eigenem Beleg (Req 7.5, 7.11, 7.12). */
 public final class Nachbearbeitung {
 
     public record Ergebnis(String art, LocalDate datum, String partner, String partnerIban, BigDecimal betrag,
                            String waehrung, String belegnummer, String richtung, LocalDate faelligkeit,
-                           String vertraulichkeit, boolean mandantIstAussteller, Map<Feld, Double> sicherheit) {
+                           String vertraulichkeit, boolean mandantIstAussteller, Map<Feld, Double> sicherheit,
+                           String artRoh, double artRohSicherheit, boolean umgestuft) {
     }
 
     /** structure.md «Belegnummern»; das Muster setzt die Art nur, wenn der Mandant Aussteller ist. */
@@ -29,6 +32,19 @@ public final class Nachbearbeitung {
             Pattern.compile("^R\\d{4}$"), "AUSGANGSRECHNUNG",
             Pattern.compile("^O-\\d{4}-\\d{3}$"), "OFFERTE",
             Pattern.compile("^F\\d{4}$"), "LIEFERANTENBELEG");
+
+    /** Kopf- bzw. Fussbereich: die ersten und letzten N nicht leeren Zeilen einer Seite (Begründung im README). */
+    static final int KOPF_FUSS_ZEILEN = 10;
+
+    /**
+     * Eigene Arten, die bei fremdem QR-Zahlungsempfänger zu LIEFERANTENBELEG werden (Entscheid Fabian, 0.5-Nachschärfen):
+     * Eine Rechnung oder Offerte mit fremder QR-IBAN ist fast immer eine Eingangsrechnung. LOHNABRECHNUNG fehlt bewusst,
+     * sonst sänke die Vertraulichkeit von PERSONAL auf die von LIEFERANTENBELEG (Req 2.22, 7.2).
+     */
+    static final Set<String> UMSTUFBAR = Set.of("AUSGANGSRECHNUNG", "OFFERTE");
+    static final String UMSTUFUNG_ZIEL = "LIEFERANTENBELEG";
+    /** Unter der Schwelle (≥ 0.8), also «bitte prüfen». */
+    static final double UMSTUFUNG_SICHERHEIT = 0.5;
 
     private Nachbearbeitung() {
     }
@@ -71,7 +87,9 @@ public final class Nachbearbeitung {
             }
         }
 
-        boolean aussteller = qrVomMandant || textEnthaeltKennung(text, mandant);
+        // Vorrang: Ein QR-Code mit fremder IBAN schliesst den Mandanten als Aussteller aus, auch bei eigener UID im Kopf
+        boolean qrFremd = qr.isPresent() && !qrVomMandant;
+        boolean aussteller = !qrFremd && (qrVomMandant || kopfOderFussEnthaeltKennung(text, mandant));
         if (aussteller && belegnummer != null) {
             for (Map.Entry<Pattern, String> m : MUSTER.entrySet()) {
                 if (m.getKey().matcher(belegnummer).matches()) {
@@ -80,18 +98,26 @@ public final class Nachbearbeitung {
                 }
             }
         }
-        // Eigene Art, obwohl ein QR-Code einen anderen Zahlungsempfänger nennt: Art nicht ändern (Req 7.12), aber prüfen lassen
-        if (!aussteller && qr.isPresent() && art != null && eigeneArten.contains(art)) {
-            sicherheit.put(Feld.ART, 0.0);
+        // Eigene Art ohne Kennung des Mandanten: bei fremdem QR umstufen, sonst unverändert (Req 7.12) und prüfen lassen
+        boolean umgestuft = false;
+        if (!aussteller && art != null && eigeneArten.contains(art)) {
+            if (qrFremd && UMSTUFBAR.contains(art)) {
+                art = UMSTUFUNG_ZIEL;
+                sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
+                umgestuft = true;
+            } else {
+                sicherheit.put(Feld.ART, 0.0);
+            }
         }
 
         String endArt = art;
-        String vertraulichkeit = v.vertraulichkeit() != null ? v.vertraulichkeit().name()
-                : arten.stream().filter(a -> a.code().equals(endArt)).map(Dokumentarten.Art::vertraulichkeit)
+        String standard = arten.stream().filter(a -> a.code().equals(endArt)).map(Dokumentarten.Art::vertraulichkeit)
                 .findFirst().orElse(null);
+        // Bei Umstufung gehört der Modellwert zur verworfenen Art
+        String vertraulichkeit = !umgestuft && v.vertraulichkeit() != null ? v.vertraulichkeit().name() : standard;
         return new Ergebnis(art, datum, partner, partnerIban, betrag, waehrung, belegnummer,
                 v.richtung() == null ? null : v.richtung().name(), datum(v.faelligkeit()), vertraulichkeit,
-                aussteller, sicherheit);
+                aussteller, sicherheit, v.art() == null ? null : v.art().name(), wert(s.art()), umgestuft);
     }
 
     static boolean enthaeltIban(Mandant m, String iban) {
@@ -99,11 +125,28 @@ public final class Nachbearbeitung {
         return m.ibans().stream().map(Normalisierung::iban).anyMatch(gesucht::equals);
     }
 
-    /** Eigene UID oder IBAN im Belegtext (Briefkopf/Fuss) zeigt den Mandanten als Aussteller an. */
-    static boolean textEnthaeltKennung(String text, Mandant m) {
+    /**
+     * Eigene UID oder IBAN im Kopf- oder Fussbereich einer Seite (Seiten durch Seitenvorschub getrennt, wie pdftotext):
+     * erste und letzte 10 nicht leere Zeilen; Seiten mit bis zu 20 nicht leeren Zeilen zählen ganz, eine Mandanten-IBAN
+     * als Gutschriftskonto in kurzen Briefen schliesst den Mandanten als Aussteller daher nicht aus.
+     */
+    static boolean kopfOderFussEnthaeltKennung(String text, Mandant m) {
         if (text == null) {
             return false;
         }
+        for (String seite : text.split("\f")) {
+            List<String> zeilen = seite.lines().filter(z -> !z.isBlank()).toList();
+            List<String> bereich = zeilen.size() <= 2 * KOPF_FUSS_ZEILEN ? zeilen
+                    : Stream.concat(zeilen.subList(0, KOPF_FUSS_ZEILEN).stream(),
+                    zeilen.subList(zeilen.size() - KOPF_FUSS_ZEILEN, zeilen.size()).stream()).toList();
+            if (enthaeltKennung(String.join("\n", bereich), m)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean enthaeltKennung(String text, Mandant m) {
         String kompakt = Normalisierung.iban(text);
         boolean iban = m.ibans().stream().map(Normalisierung::iban).anyMatch(i -> !i.isEmpty() && kompakt.contains(i));
         boolean uid = m.uid() != null && kompakt.contains(Normalisierung.iban(m.uid()));

@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,11 +52,26 @@ public final class Dokumentarten {
         throw new IllegalStateException("design.md nicht gefunden (GoldenLauf im Repository starten)");
     }
 
-    /** eigeneArten: design.md «Mandant», Einstellung eigene_arten (urinet: AUSGANGSRECHNUNG, OFFERTE, LOHNABRECHNUNG). */
-    public static String alsPromptListe(List<Art> arten, List<String> eigeneArten) {
+    /**
+     * Anzeigetexte nur im Prompt (v5); die Tabelle in design.md bleibt. %s ist der Mandantenname, eingesetzt in Java,
+     * weil die Liste selbst der Wert von {dokumentarten} ist und nicht nochmals ersetzt würde.
+     */
+    static final Map<String, String> ANZEIGE = Map.of(
+            "LIEFERANTENBELEG", "Lieferantenbeleg – Rechnung, Facture, Fattura oder Gutschrift eines Lieferanten an %s (Eingangsrechnung)",
+            "QUITTUNG", "Quittung / Spesen – Kassenbon, Zahlungsbestätigung, Billett, Parkticket; bereits bezahlt",
+            "AUSGANGSRECHNUNG", "Ausgangsrechnung – nur wenn %s im Briefkopf als Absender steht");
+
+    /**
+     * eigeneArten: design.md «Mandant», Einstellung eigene_arten (urinet: AUSGANGSRECHNUNG, OFFERTE, LOHNABRECHNUNG).
+     * Fremde Arten zuerst, eigene zuletzt (je in Tabellenreihenfolge): Bei Unsicherheit fällt das Modell auf frühe Werte zurück.
+     */
+    public static String alsPromptListe(List<Art> arten, List<String> eigeneArten, String mandant) {
+        List<Art> sortiert = new ArrayList<>(arten.stream().filter(a -> !eigeneArten.contains(a.code())).toList());
+        sortiert.addAll(arten.stream().filter(a -> eigeneArten.contains(a.code())).toList());
         StringBuilder sb = new StringBuilder();
-        for (Art a : arten) {
-            sb.append("- ").append(a.code()).append(": ").append(a.name()).append(", ").append(a.vertraulichkeit());
+        for (Art a : sortiert) {
+            String name = ANZEIGE.containsKey(a.code()) ? ANZEIGE.get(a.code()).replace("%s", mandant) : a.name();
+            sb.append("- ").append(a.code()).append(": ").append(name).append(", ").append(a.vertraulichkeit());
             if (eigeneArten.contains(a.code())) {
                 sb.append(" (stellt der Mandant selbst aus)");
             }

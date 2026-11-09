@@ -10,7 +10,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -56,18 +55,18 @@ public final class Ocr {
         try {
             loesche(arbeit);
             Files.createDirectories(arbeit);
-            String endung = endung(datei);
+            Dateityp typ = Dateityp.erkenne(datei);
             Path eingang;
-            if (endung.equals("heic")) {
+            if (typ == Dateityp.HEIF) {
                 eingang = arbeit.resolve("eingang.jpg");
                 ausfuehren(List.of("sips", "-s", "format", "jpeg", datei.toString(), "--out", eingang.toString()), arbeit, null);
             } else {
-                eingang = arbeit.resolve("eingang." + endung);
+                eingang = arbeit.resolve("eingang." + (typ == Dateityp.UNBEKANNT ? "pdf" : typ.endung));
                 Files.copy(datei, eingang, StandardCopyOption.REPLACE_EXISTING);
             }
             String skript = String.join(" && ",
                     "ocrmypdf -q -l " + sprachen + " --skip-text --rotate-pages --deskew --output-type pdf"
-                            + (endung.equals("pdf") ? "" : " --image-dpi 300") + " " + eingang.getFileName() + " ocr.pdf",
+                            + (typ.istBild() ? " --image-dpi 300" : "") + " " + eingang.getFileName() + " ocr.pdf",
                     "pdftotext -layout -enc UTF-8 ocr.pdf text.txt",
                     "pdftoppm -r 300 -png ocr.pdf seite");
             String container = "golden-ocr-" + UUID.randomUUID();
@@ -153,10 +152,5 @@ public final class Ocr {
         } catch (UncheckedIOException e) {
             throw e.getCause();
         }
-    }
-
-    private static String endung(Path datei) {
-        String n = datei.getFileName().toString();
-        return n.substring(n.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT).replace("jpeg", "jpg");
     }
 }
