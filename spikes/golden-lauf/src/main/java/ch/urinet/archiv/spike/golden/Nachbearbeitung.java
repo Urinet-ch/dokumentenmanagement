@@ -20,7 +20,8 @@ public final class Nachbearbeitung {
 
     public record Ergebnis(String art, LocalDate datum, String partner, String partnerIban, BigDecimal betrag,
                            String waehrung, String belegnummer, String richtung, LocalDate faelligkeit,
-                           String vertraulichkeit, boolean mandantIstAussteller, Map<Feld, Double> sicherheit) {
+                           String vertraulichkeit, boolean mandantIstAussteller, Map<Feld, Double> sicherheit,
+                           String artRoh, double artRohSicherheit) {
     }
 
     /** structure.md «Belegnummern»; das Muster setzt die Art nur, wenn der Mandant Aussteller ist. */
@@ -91,7 +92,7 @@ public final class Nachbearbeitung {
                 .findFirst().orElse(null);
         return new Ergebnis(art, datum, partner, partnerIban, betrag, waehrung, belegnummer,
                 v.richtung() == null ? null : v.richtung().name(), datum(v.faelligkeit()), vertraulichkeit,
-                aussteller, sicherheit);
+                aussteller, sicherheit, v.art() == null ? null : v.art().name(), wert(s.art()));
     }
 
     static boolean enthaeltIban(Mandant m, String iban) {

@@ -57,7 +57,8 @@ public class GoldenPipeline {
     @ConfigProperty(name = "golden.eigene-arten")
     List<String> eigeneArten;
 
-    public BelegErgebnis verarbeite(Erwartung e, Mandant mandant, List<Dokumentarten.Art> arten, Path cache, boolean k1) {
+    public BelegErgebnis verarbeite(Erwartung e, Mandant mandant, String systemPrompt, List<Dokumentarten.Art> arten,
+                                    Path cache, boolean k1) {
         long start = System.nanoTime();
         Ocr.Resultat ocr;
         Optional<QrDaten> qr;
@@ -73,7 +74,6 @@ public class GoldenPipeline {
         long ocrMs = (System.nanoTime() - start) / 1_000_000;
 
         String text = Prompt.gekuerzt(ocr.text());
-        String artenListe = Dokumentarten.alsPromptListe(arten, eigeneArten);
         long kiStart = System.nanoTime();
         int aufrufe = 0;
         long ein = 0, aus = 0;
@@ -91,16 +91,16 @@ public class GoldenPipeline {
         try {
             aufrufe++;
             antwort = k1
-                    ? extraktor.extrahiereBild(mandant.name(), artenListe, Prompt.qr(qr), bild)
-                    : extraktor.extrahiere(mandant.name(), artenListe, Prompt.qr(qr), text);
+                    ? extraktor.extrahiereBild(systemPrompt, Prompt.qr(qr), bild)
+                    : extraktor.extrahiere(systemPrompt, Prompt.qr(qr), text);
         } catch (RuntimeException ex) {
             if (KiFehler.istSchemafehler(ex)) {
                 fehler = "Schemafehler";
                 try {
                     aufrufe++;
                     antwort = k1
-                            ? extraktor.nachfrageBild(mandant.name(), artenListe, Prompt.qr(qr), bild, fehler)
-                            : extraktor.nachfrage(mandant.name(), artenListe, Prompt.qr(qr), text, fehler);
+                            ? extraktor.nachfrageBild(systemPrompt, Prompt.qr(qr), bild, fehler)
+                            : extraktor.nachfrage(systemPrompt, Prompt.qr(qr), text, fehler);
                 } catch (RuntimeException ex2) {
                     fehler = fehler + ", Nachfrage: " + KiFehler.grund(ex2);
                 }

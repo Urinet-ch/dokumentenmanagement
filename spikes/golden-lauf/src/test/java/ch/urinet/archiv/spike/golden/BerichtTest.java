@@ -3,9 +3,13 @@ package ch.urinet.archiv.spike.golden;
 import ch.urinet.archiv.spike.golden.GoldenPipeline.BelegErgebnis;
 import ch.urinet.archiv.spike.golden.MetadatenVorschlag.Sicherheit;
 import ch.urinet.archiv.spike.golden.Vergleich.Feld;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +25,7 @@ class BerichtTest {
             richtig.put(f, !List.of(falsch).contains(f));
         }
         Nachbearbeitung.Ergebnis v = new Nachbearbeitung.Ergebnis("QUITTUNG", null, null, null, null, null, null, null,
-                null, null, false, sicherheit);
+                null, null, false, sicherheit, "AUSGANGSRECHNUNG", 0.9);
         Erwartung e = new Erwartung(id, null, false, "abstimmen", "QUITTUNG", null, null, null, null, null, List.of());
         return new BelegErgebnis(e, v, richtig, false, 1, 100, 50, false, 10, 20, null);
     }
@@ -61,5 +65,16 @@ class BerichtTest {
     @Test
     void sicherheitDefaultsNichtNoetig() {
         assertThat(new Sicherheit(null, null, null, null, null, null, null, null, null, null).art()).isNull();
+    }
+
+    @Test
+    void vollberichtEnthaeltRoheArtUndSicherheit(@TempDir Path tmp) throws Exception {
+        List<BelegErgebnis> r = List.of(ergebnis("a", s(0.95), Feld.ART));
+        Bericht.Lauf lauf = new Bericht.Lauf(Modus.ABSTIMMEN, false, "t", "v3-x", "m", 0.8, 0, 0, 0.2, 0.75);
+        Bericht.schreibe(tmp, lauf, r, Bericht.berechne(r, 0.8, 0.2, 0.75));
+        JsonNode beleg = new ObjectMapper().readTree(tmp.resolve("ergebnisse.json").toFile()).path("belege").get(0);
+        assertThat(beleg.path("artRoh").asText()).isEqualTo("AUSGANGSRECHNUNG");
+        assertThat(beleg.path("artRohSicherheit").asDouble()).isEqualTo(0.9);
+        assertThat(beleg.path("vorschlag").path("art").asText()).isEqualTo("QUITTUNG");
     }
 }

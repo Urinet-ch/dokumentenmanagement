@@ -36,6 +36,8 @@ public class GoldenLaufDienst {
     double schwelle;
     @ConfigProperty(name = "golden.mandant-name")
     String mandantName;
+    @ConfigProperty(name = "golden.eigene-arten")
+    List<String> eigeneArten;
     @ConfigProperty(name = "golden.preis.ein-chf-pro-mio", defaultValue = "0.20")
     double preisEin;
     @ConfigProperty(name = "golden.preis.aus-chf-pro-mio", defaultValue = "0.75")
@@ -72,21 +74,28 @@ public class GoldenLaufDienst {
         }
         List<Dokumentarten.Art> arten = Dokumentarten.aus(Dokumentarten.designMd(Path.of("")));
         Path cache = golden.resolve(".cache-golden-lauf");
+        String systemPrompt = Prompt.system(mandant.name(), Dokumentarten.alsPromptListe(arten, eigeneArten));
+        String promptHash = Prompt.hash(systemPrompt, bildweg(k1));
 
-        LOG.infof("Modus %s%s: %d Belege, Prompt %s", modus.verzeichnis(), k1 ? " (K1, Bild)" : "", auswahl.size(), Prompt.hash());
+        LOG.infof("Modus %s%s: %d Belege, Prompt %s", modus.verzeichnis(), k1 ? " (K1, Bild)" : "", auswahl.size(), promptHash);
         List<BelegErgebnis> ergebnisse = new ArrayList<>();
         for (Erwartung e : auswahl) {
-            BelegErgebnis r = pipeline.verarbeite(e, mandant, arten, cache, k1);
+            BelegErgebnis r = pipeline.verarbeite(e, mandant, systemPrompt, arten, cache, k1);
             ergebnisse.add(r);
             LOG.info(zeile(r));
         }
         String zeitpunkt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm"));
-        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, zeitpunkt, Prompt.hash(), modell, schwelle, echt.belege().size(),
+        Bericht.Lauf lauf = new Bericht.Lauf(modus, k1, zeitpunkt, promptHash, modell, schwelle, echt.belege().size(),
                 echt.ausgeschlossen(), preisEin, preisAus);
         Bericht.Kennzahlen k = Bericht.berechne(ergebnisse, schwelle, preisEin, preisAus);
         Path ordner = Bericht.schreibe(golden.resolve("berichte").resolve(zeitpunkt + "-" + modus.verzeichnis()
                 + (k1 ? "-k1" : "")), lauf, ergebnisse, k);
         return new Ausgang(ordner, ergebnisse, k);
+    }
+
+    /** Kennung des Bildwegs für den Prompt-Hash. */
+    static String bildweg(boolean k1) {
+        return k1 ? "alle" : "ohne";
     }
 
     /** Konsole: nur Beleg-ID (synthetisch Dateiname, echt Kurz-ID), Feld, richtig/falsch. */

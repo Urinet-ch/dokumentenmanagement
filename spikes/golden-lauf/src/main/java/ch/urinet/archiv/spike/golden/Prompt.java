@@ -1,16 +1,20 @@
 package ch.urinet.archiv.spike.golden;
 
 import ch.urinet.archiv.spike.golden.SwissQrLeser.QrDaten;
+import dev.langchain4j.service.output.JsonSchemas;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 
 /** Prompt nach design.md «KI»: Rolle, Dokumentarten, QR-Werte, Text (12'000 Zeichen, Anfang + Ende); ohne Beispiele. */
 public final class Prompt {
 
+    /** Vorlage; {mandant} und {dokumentarten} setzt {@link #system} in Java ein, damit gehashter und gesendeter Text gleich sind. */
     static final String SYSTEM = """
             Du bist Archivassistent für ein Schweizer KMU. Mandant (eigene Firma): {mandant}.
             Erfasse die Metadaten des Belegs für das Archiv des Mandanten.
@@ -87,11 +91,35 @@ public final class Prompt {
                 + ", Zahlungsempfänger " + q.zahlungsempfaenger();
     }
 
-    /** Kennung der Prompt-Fassung für den Bericht (Version + Hash der Vorlagen). */
-    public static String hash() {
+    /** Fertig gerenderter System-Prompt, wie ihn das Modell erhält. */
+    public static String system(String mandant, String dokumentarten) {
+        return SYSTEM.replace("{mandant}", mandant).replace("{dokumentarten}", dokumentarten);
+    }
+
+    /** Antwortschema, wie LangChain4j es aus dem Record ableitet (Feldnamen, Reihenfolge, Beschreibungen, Enum-Werte). */
+    public static String schema() {
+        return JsonSchemas.jsonSchemaFrom(MetadatenVorschlag.class).map(Object::toString)
+                .orElseThrow(() -> new IllegalStateException("kein JSON-Schema für MetadatenVorschlag"));
+    }
+
+    public static List<String> artCodes() {
+        return Arrays.stream(MetadatenVorschlag.ArtCode.values()).map(Enum::name).toList();
+    }
+
+    /** Hash für einen Lauf: gerenderter System-Prompt, Vorlagen, Schema, ArtCode-Reihenfolge und Bildweg-Kennung. */
+    public static String hash(String system, String bildweg) {
+        return hash(system, BENUTZER, NACHFRAGE, BENUTZER_K1, schema(), artCodes(), bildweg);
+    }
+
+    /** Kennung der Prompt-Fassung: PROMPT_VERSION + "-" + 12 Hex-Zeichen; jeder Teil wird längenpräfixiert gehasht. */
+    public static String hash(String system, String benutzer, String nachfrage, String benutzerK1, String schema,
+                              List<String> artCodes, String bildweg) {
+        StringBuilder sb = new StringBuilder();
+        for (String teil : List.of(system, benutzer, nachfrage, benutzerK1, schema, String.join(",", artCodes), bildweg)) {
+            sb.append(teil.length()).append(':').append(teil).append('\n');
+        }
         try {
-            byte[] h = MessageDigest.getInstance("SHA-256")
-                    .digest((SYSTEM + BENUTZER + NACHFRAGE + BENUTZER_K1).getBytes(StandardCharsets.UTF_8));
+            byte[] h = MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(StandardCharsets.UTF_8));
             return MetadatenExtraktor.PROMPT_VERSION + "-" + HexFormat.of().formatHex(h).substring(0, 12);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);

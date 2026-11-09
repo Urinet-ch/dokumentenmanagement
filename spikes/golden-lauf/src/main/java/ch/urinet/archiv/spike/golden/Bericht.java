@@ -133,6 +133,9 @@ public final class Bericht {
                 "partner", String.valueOf(e.partner()), "betrag", String.valueOf(e.betrag()),
                 "belegnummer", String.valueOf(e.belegnummer())));
         m.put("vorschlag", r.vorschlag());
+        // Art des Modells vor der Nachbearbeitung, um Prompt- und Nachbearbeitungswirkung zu trennen
+        m.put("artRoh", r.vorschlag() == null ? null : r.vorschlag().artRoh());
+        m.put("artRohSicherheit", r.vorschlag() == null ? null : r.vorschlag().artRohSicherheit());
         m.put("richtig", r.richtig());
         m.put("qrGefunden", r.qrGefunden());
         m.put("aufrufe", r.aufrufe());
