@@ -65,6 +65,11 @@ Die KI soll Art, Datum, Partner und Betrag vorschlagen, damit der Inhaber nur no
   Infomaniak ab. Bilder kann Mistral-Small-4 direkt lesen (K1); design.md setzt weiterhin auf den OCR-Volltext.
 - **Tests:** Der Golden-Datensatz läuft nur manuell gegen das echte Modell, nie in der CI (Req 0.2, tech.md Regel 6).
 
+## Nachtrag 09.11.2026 (Spec 04)
+Punkt 1 (genau ein Aufruf je Beleg) gilt unverändert für den Metadaten-Vorschlag; der Ingest der Wissensbasis ist ein
+eigener, nachgelagerter Zweck mit mehreren Aufrufen und ändert keine Metadaten. Wissensseiten folgen demselben
+Grundsatz «KI nur für Vorschläge», siehe ADR-013.
+
 ## Verweise
 - Req 0.2, 0.3, 0.5, 0.9, 2.6 (A7), 2.21, 7.1–7.12, 8.1–8.4, 11.2, 11.6, 11.7, 11.10, 12.8, 16.4
 - P3, P10, P11; tech.md Regeln 5 und 6

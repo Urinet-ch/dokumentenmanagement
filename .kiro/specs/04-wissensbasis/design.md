@@ -464,9 +464,10 @@ getrennt. Oberfläche mit Cucumber.js + Playwright.
 | Last | Suche nach Wissensseiten bei 2'000 Seiten p95 ≤ 1 s, Messbedingungen wie Spec 01, 3.2 |
 
 ## Folgeänderungen in anderen Dokumenten
-Diese Spec ändert die folgenden Dateien nicht selbst; sie werden nach dem Merge von PR #15 (PR #16 ist gemergt) in
-einem eigenen PR nachgezogen (Aufgabe 13.1). Grund: Spec 01 (Abschnitt «KI» in design.md) ist in PR #15 in Arbeit, die
-Folgeänderungen kommen gesammelt in einem PR, und Spec 01 bleibt im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt …» beschrieben ist.
+Diese Spec ändert die folgenden Dateien nicht selbst; nachgezogen mit PR #20 (Aufgabe 13.1). Grund: Die
+Folgeänderungen kommen gesammelt in einem PR, und Spec 01 bleibt im Umfang stabil. Noch offen: Spec 01 Nr. 3 (eigener PR
+nach PR #21, der den Abschnitt «KI» in Spec 01 ändert) und Nr. 15 (eigener Titel-PR); bis dahin gilt dort das Verhalten,
+das hier als «Spec 04 ergänzt …» beschrieben ist.
 
 ### Spec 01 (`.kiro/specs/01-archiv-kern/`)
 1. **requirements.md, Req 2.6 (Rechtematrix):** Zeilen A15–A19 aus Spec 04, Req 12.1 aufnehmen oder auf Spec 04
@@ -496,7 +497,7 @@ Folgeänderungen kommen gesammelt in einem PR, und Spec 01 bleibt im Umfang stab
    `WISSEN_INGEST`, `WISSEN_LINT`; `EXPORTIEREN` und `VERWEIGERT` auf die Wissens-Endpunkte erweitern. Grund: Die
    Tabelle ist die Liste der protokollierten Endpunkte.
 10. **design.md, Fehlercodes:** `KEINE_WISSENSQUELLE`, `ENTWURF_BEFUND`, `VERTRAULICHKEIT_ZU_TIEF`,
-    `VERTRAULICHKEIT_UNGUELTIG`, `ANALYSE_NICHT_MOEGLICH` in die abschliessende Code-Liste aufnehmen, per Folge-PR
+    `VERTRAULICHKEIT_UNGUELTIG`, `ANALYSE_NICHT_MOEGLICH` in die abschliessende Code-Liste aufnehmen, mit PR #20
     (entschieden von Fabian am 09.11.2026). Grund: Die Liste der Problem-Details-Codes ist in Spec 01 abschliessend.
 11. **design.md, `ki_verbrauch.zweck`:** Werte `WISSEN_INGEST`, `WISSEN_LINT`, `WISSEN_EMBEDDING`. Grund: Monatsbericht
     nach Zweck (Spec 03, 8.1) und Monatsbudget der Wissensbasis (Spec 04, 13.6).
@@ -607,8 +608,8 @@ Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
 10. Ein offener Ingest je Mandant, akzeptiert (Requirement 5.13).
 11. Monatsbudget der Wissensbasis je Mandant: Startwert 1'000'000 Tokens, konfigurierbar, immer mit Grenze
     (Requirement 13.6).
-12. Fehlercodes `VERTRAULICHKEIT_UNGUELTIG` und `ANALYSE_NICHT_MOEGLICH` (mit den übrigen neuen Codes) kommen per
-    Folge-PR in die abschliessende Code-Liste von Spec 01 (Folgeänderung Spec 01, Nr. 10).
+12. Fehlercodes `VERTRAULICHKEIT_UNGUELTIG` und `ANALYSE_NICHT_MOEGLICH` (mit den übrigen neuen Codes) stehen seit
+    PR #20 in der abschliessenden Code-Liste von Spec 01 (Folgeänderung Spec 01, Nr. 10).
 
 Offen:
 - [offen: Umgang mit Seitenversionen, die auf einem gelöschten Dokument beruhen (revDSG) – Entscheid in der Spec zur Löschfunktion] (Requirement 15.5). Konflikt: `wissensseite_version` ist nur anfügend.

@@ -14,7 +14,8 @@ dokumentenmanagement/
 │   └── specs/
 │       ├── 01-archiv-kern/  requirements.md, design.md, tasks.md
 │       ├── 02-abgleich-chat/
-│       └── 03-zweiter-mandant/
+│       ├── 03-zweiter-mandant/
+│       └── 04-wissensbasis/
 ├── backend/                 Quarkus (API + Worker), liefert die PWA über Quinoa aus
 │   └── src/main/java/ch/urinet/archiv/
 │       ├── mandant/         Mandant, TenantResolver, Provisionierung
@@ -30,15 +31,17 @@ dokumentenmanagement/
 │       ├── protokoll/       Zugriffsprotokoll, Tages-Manifest
 │       ├── export/          Jahresexport (Spec 02)
 │       ├── integration/     abaninja/, mail/, wordpress/ (Spec 02/03)
+│       ├── wissen/          Wissensbasis: Seiten, Ingest, Freigabe, Lint, OKF-Export (Spec 04)
 │       └── gemeinsam/       Fehler (Problem Details), Zeit, Geld
 │   └── src/main/resources/
 │       ├── db/public/       Liquibase: Mandantenregister, Aufträge, API-Clients
 │       ├── db/mandant/      Liquibase: Schema je Mandant
-│       └── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten
-│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>)
+│       ├── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten
+│       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
+│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>); Spec 04 unter features/wissen/
 ├── frontend/                Angular PWA (Build über Quinoa)
 │   └── src/app/
-│       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/
+│       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/  wissen/ (Spec 04)
 │       └── gemeinsam/       Auth, API-Client (aus OpenAPI generiert), Offline-Warteschlange
 ├── tools/
 │   ├── archiv_client.py     Client für rechnung_gen.py und urinet_pdf.py
@@ -80,7 +83,7 @@ ArchUnit prüft: `domain` hängt von nichts ab, `application` nur von `domain`, 
 - Enums als Text speichern: `status IN ('NEU','VERARBEITUNG','EINGANGSKORB','ARCHIVIERUNG','ARCHIVIERUNG_FEHLER','ARCHIVIERT','FEHLER','VERWORFEN')`; `vertraulichkeit IN ('NORMAL','INTERN','PERSONAL')`.
 - REST: Plural, Kleinschreibung: `/api/v1/dokumente`, `/api/v1/dokumente/{id}/wiederholen`, `/api/v1/importe/crm`.
 - API-Token-Scopes: `generator`, `import` (Spec 01), `wordpress` (Site-Key, Spec 03).
-- Branches `feature/<spec>-<aufgabe>-<stichwort>` (z. B. `feature/01-2.6-ocr`), Commits nach Conventional Commits, Text deutsch, Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A14` bezeichnen nur die Zeilen der Rechtematrix (Spec 01, Requirement 2.6).
+- Branches `feature/<spec>-<aufgabe>-<stichwort>` (z. B. `feature/01-2.6-ocr`), Commits nach Conventional Commits, Text deutsch, Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A19` bezeichnen nur die Zeilen der Rechtematrix (Spec 01, Requirement 2.6; A15–A19 aus Spec 04, Requirement 12.1).
 
 ## Belegnummern (Erkennung und Validierung)
 | Art | Muster | Beispiel |

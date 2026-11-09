@@ -78,6 +78,10 @@
   es einen Notfallablauf in der Verfahrensbeschreibung, mit Notfallunterlagen statt zusätzlicher
   Rechte (P17, Req 16.6, 16.12).
 
+## Nachtrag 09.11.2026 (Spec 04)
+Die Sichtbarkeit von Wissensseiten ergibt sich aus Hülle und Mindeststufe und läuft über den
+`VertraulichkeitFilter`, siehe ADR-013. Spec 04, Requirement 12.1 ergänzt die Matrix um die Zeilen A15–A19.
+
 ## Verweise
 - Req 1.4, 2.1–2.24, 10.7, 11.10
 - P3, P17; `product.md` (Benutzer und Rollen)

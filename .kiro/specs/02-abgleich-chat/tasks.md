@@ -91,7 +91,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 13.1, 13.2_
 
 ## Optionen
-Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren.
+Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.
 
 - [ ]* O.1 Eigene Rechnungen nach AbaNinja importieren (I4) [Backend]
   - Generator-Dokumente der Art Ausgangsrechnung per PDF-Import an AbaNinja senden, AbaNinja-UUID speichern
