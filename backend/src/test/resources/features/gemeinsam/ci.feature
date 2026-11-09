@@ -1,9 +1,10 @@
 # language: de
+@spec-01
 Funktionalität: CI und Nachweise
 
   @req-16.7
   Szenario: Die CI verarbeitet keine echten Daten und ruft keine echte KI auf
-    Dann verwendet der CI-Workflow «.github/workflows/ci.yml» kein Secret und keinen Golden-Lauf
+    Dann verwendet kein Workflow unter «.github/workflows» ein Secret oder einen Golden-Lauf
     Und im Profil «test» zeigt «archiv.ki.basis-url» auf «localhost»
     Und Requests und Antworten des Sprachmodells werden nicht geloggt
 

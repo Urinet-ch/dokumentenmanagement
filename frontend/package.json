@@ -7,7 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "api:generieren": "openapi-generator-cli generate -i openapi/openapi.yaml -g typescript-angular -o src/app/gemeinsam/api --additional-properties=ngVersion=22.2.5,fileNaming=kebab-case",
+    "api:generieren": "node scripts/api-leeren.mjs && openapi-generator-cli generate -i openapi/openapi.yaml -g typescript-angular -o src/app/gemeinsam/api --additional-properties=ngVersion=22.2.5,fileNaming=kebab-case",
     "e2e": "cucumber-js"
   },
   "private": true,

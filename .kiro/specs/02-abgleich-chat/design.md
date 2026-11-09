@@ -140,7 +140,7 @@ Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x
 
 | Ebene | Schwerpunkt |
 | --- | --- |
-| Unit (JUnit 5) | Chunker, RRF, Kennzahl-Parameter → SQL, Lückenerkennung, AES-GCM, Dateinamen im Export |
+| Unit (JUnit Jupiter 6) | Chunker, RRF, Kennzahl-Parameter → SQL, Lückenerkennung, AES-GCM, Dateinamen im Export |
 | Szenarien (Cucumber) | GreenMail (IMAP) für Mail-Eingang; WireMock für Embeddings, Reranker, Chat-Modell (Tool-Call-Antworten simuliert), AbaNinja inkl. Webhook-Echtheit; pgvector mit `halfvec` in Dev Services |
 | Sicherheit | Werkzeuge und Hybridsuche mit zwei Mandanten und allen Rollen der Rechtematrix (Spec 01, 2.6): `mitarbeiter` sieht weder `INTERN` noch fremde `PERSONAL`-Dokumente, auch nicht in Summen, Anzahlen und Lücken; unbestätigte Dokumente nur für Rollen mit Recht A7 und den Erfasser; Export nur `inhaber`/`treuhaender`; Prompt-Injection-Testdokument («ignoriere alle Regeln …») ändert nichts |
 | Abnahme | `ChatPruefliste` (20 Fragen, YAML unter `ARCHIV_GOLDEN_DIR`, nicht im Repo) manuell gegen den Produktivbestand, nie in der CI; Bericht nur mit Fragen-Nr. und richtig/falsch/Quelle-ja/nein, ohne Inhalte |

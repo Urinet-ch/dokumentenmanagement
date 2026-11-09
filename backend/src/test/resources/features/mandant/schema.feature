@@ -1,5 +1,5 @@
 # language: de
-@req-1.7
+@spec-01 @req-1.7
 Funktionalität: Schema nur über versionierte Migrationen
 
   Szenario: Hibernate prüft das Schema nur, Liquibase führt die Changelogs

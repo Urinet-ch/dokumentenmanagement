@@ -23,3 +23,15 @@ Then(/^sehe ich den Titel «(.+)»$/, async function (titel) {
   await this.seite.getByText(titel, { exact: true }).first().waitFor();
   assert.equal(await this.seite.title(), titel);
 });
+
+Then(/^liefert das Archiv «(.+)» mit Status (\d+)$/, async function (pfad, status) {
+  const antwort = await this.seite.request.get(basisUrl + pfad);
+  assert.equal(antwort.status(), Number(status));
+});
+
+Then(/^liefert der Deep Link «(.+)» die Startseite$/, async function (pfad) {
+  const antwort = await this.seite.request.get(basisUrl + pfad);
+  assert.equal(antwort.status(), 200);
+  assert.match(antwort.headers()['content-type'] ?? '', /text\/html/);
+  assert.match(await antwort.text(), /<app-root/);
+});

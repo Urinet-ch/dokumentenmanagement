@@ -86,6 +86,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Quarkus Dev Services für PostgreSQL 17 + pgvector und Keycloak; MinIO (Object Lock) und Mailpit für Entwicklung und Tests
   - Keycloak-Realm-Export `deploy/keycloak/realm-export.json` (Realm `urinet-archiv`) mit den Rollen `inhaber`, `mitarbeiter`, `treuhaender`, `geschaeftsstelle`, Claim-Mapper `mandant`, TOTP-Pflicht, Testbenutzer je Rolle
   - Dev-Stubs der Driven Ports (Ablage, KI, OCR, Integration) im Profil `dev`
+  - Datasource aktiv, OIDC (`quarkus.oidc.tenant-enabled`), Dev Services und automatisches OpenAPI-Security-Schema wieder einschalten (in 1.1 vorübergehend aus)
   - _Anforderungen: 2.1, 2.2, 16.13_
 
 - [ ] 1.3 Mandantenregister und Provisionierung [Backend]

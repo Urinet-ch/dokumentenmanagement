@@ -11,6 +11,10 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,6 +24,11 @@ public class GemeinsamSchritte {
 
     /** Tests laufen in {@code backend/}; das Repository liegt eine Ebene höher. */
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
+
+    /** Workflows, die Secrets brauchen dürfen (Req 16.7); heute keiner, später der Deploy (1.9). */
+    static final Set<String> WORKFLOWS_MIT_SECRETS = Set.of();
+
+    private static final Pattern SECRETS = Pattern.compile("\\bsecrets\\b");
 
     private Response antwort;
 
@@ -34,10 +43,21 @@ public class GemeinsamSchritte {
         assertThat(antwort.body().asString()).contains(text);
     }
 
-    @Dann("verwendet der CI-Workflow «{word}» kein Secret und keinen Golden-Lauf")
-    public void ciOhneSecretUndGolden(String workflow) throws IOException {
-        String inhalt = Files.readString(REPO.resolve(workflow), StandardCharsets.UTF_8);
-        assertThat(inhalt).doesNotContain("secrets.", "ARCHIV_GOLDEN_DIR", "-Dgolden", "GoldenDatensatzIT");
+    @Dann("verwendet kein Workflow unter «{word}» ein Secret oder einen Golden-Lauf")
+    public void workflowsOhneSecretUndGolden(String verzeichnis) throws IOException {
+        List<Path> workflows;
+        try (Stream<Path> dateien = Files.list(REPO.resolve(verzeichnis))) {
+            workflows = dateien.filter(p -> p.toString().matches(".*\\.ya?ml")).sorted().toList();
+        }
+        assertThat(workflows).isNotEmpty();
+        for (Path workflow : workflows) {
+            String name = workflow.getFileName().toString();
+            String inhalt = Files.readString(workflow, StandardCharsets.UTF_8);
+            if (!WORKFLOWS_MIT_SECRETS.contains(name)) {
+                assertThat(SECRETS.matcher(inhalt).find()).as("Secret in %s", name).isFalse();
+            }
+            assertThat(inhalt).as(name).doesNotContain("ARCHIV_GOLDEN_DIR", "-Dgolden", "GoldenDatensatzIT");
+        }
     }
 
     @Und("im Profil «test» zeigt «{word}» auf «{word}»")

@@ -720,13 +720,19 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 ## Testing Strategy
 Nachweis: jedes Kriterium ohne Vermerk «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder
 «Nachweis: JUnit» als Cucumber-Szenario mit Tag `@req-<x.y>` (Req 16.14); Features unter
-`backend/src/test/resources/features/<fachbereich>/`. Testdaten im Repository sind ausschliesslich
-synthetisch (Req 16.7).
+`backend/src/test/resources/features/<fachbereich>/`, je Datei auf Feature-Ebene genau ein Tag `@spec-NN`.
+Testdaten im Repository sind ausschliesslich synthetisch (Req 16.7).
+
+Reichweite der CI-Prüfung (Req 16.14, entschieden mit Aufgabe 1.1): Geprüft werden die Kriterien unter
+`_Anforderungen_` abgehakter Aufgaben ab Welle 1; die Prüfung wächst mit jeder abgehakten Aufgabe. Optionale Aufgaben
+(`O.n`) zählen nicht. Abgedeckt ist ein Kriterium durch ein `@req`-Tag oder einen Nachweis-Vermerk, jeweils innerhalb
+derselben Spec. Die Kriterien der Welle 0 (u. a. 0.2, 0.7, 0.9) sind durch den Gate-Bericht nachgewiesen
+(`docs/spikes/golden-ergebnis.md`, `docs/umsetzungsplan.md` Abschnitt 6).
 
 | Ebene | Werkzeug | Schwerpunkt |
 | --- | --- | --- |
 | Akzeptanz | Cucumber; Java-Runner mit REST-assured gegen `@QuarkusTest`, Browser-Szenarien mit Cucumber.js + Playwright | alle `@req`-Kriterien; Rechtematrix als Scenario Outline Rolle × A1–A14 (Req 2.6–2.20); Statusübergänge; Fehlercodes |
-| Unit | JUnit 5, AssertJ | Normalisierung, Fristberechnung, Belegnummer-Muster, Swiss-QR-Parser, Beispielvorauswahl, CSV-Erkennung, Manifest-Fenster (Zeitumstellung), Kanonisierung und Signatur, `DokumentartSeedTest` |
+| Unit | JUnit (Jupiter 6, über die Quarkus-BOM), AssertJ | Normalisierung, Fristberechnung, Belegnummer-Muster, Swiss-QR-Parser, Beispielvorauswahl, CSV-Erkennung, Manifest-Fenster (Zeitumstellung), Kanonisierung und Signatur, `DokumentartSeedTest` |
 | Integration | `@QuarkusTest`, Dev Services PostgreSQL + Keycloak, Testcontainers MinIO (Object Lock, Versionierung), WireMock (AI, TSA) | Mandantentrennung (immer zwei Mandanten), Dubletten-Index mit verworfenen Dokumenten, `belegnummer_eigen` (Generator-Dokument in `FEHLER` verwerfen, korrigiert neu senden → 202, Req 11.11), INSERT-only-Trigger, 404 vor 403, Protokoll in derselben Transaktion, Sperre setzen und verlängern, gesperrte Version ohne Bypass-Header weder löschbar noch verkürzbar, Manifest in COMPLIANCE auch mit Bypass-Header nicht löschbar (Test-Bucket ohne Bucket Policy, sonst greift deren Deny [T 6c]), kein S3-Aufruf der Anwendung sendet `x-amz-bypass-governance-retention` (Request-Interceptor, Req 6.5), Provisionierung setzt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`, verwaiste Aufträge |
 | Architektur | ArchUnit | Schichten `domain` → nichts, `application` → `domain`, `adapter` → `application`/`domain`; Fachbereiche nur über `application` (structure.md); kein Zugriff auf `public`-Tabellen aus Mandanten-Code ausser `auftrag`; keine `double`-Beträge; kein `System.getenv` für Secrets; keine Verwendung von `bypassGovernanceRetention` im Produktionscode (Testklassen ausgenommen, `ImportOption.DoNotIncludeTests`; ergänzend zum Request-Interceptor, Req 6.5) |
 | Worker | Testcontainer mit Worker-Image | OCR auf 5 synthetischen PDFs/Fotos, signiertes und verschlüsseltes PDF, Arbeitsfassung als Quelle, Zeitgrenze, PDF/A-Validierung mit veraPDF |
