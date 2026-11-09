@@ -8,6 +8,16 @@
   "properties": {
     "version": { "const": 1 },
     "seed": { "type": ["integer", "null"] },
+    "mandant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "uid", "ibans"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "uid": { "type": ["string", "null"], "pattern": "^CHE-\\d{3}\\.\\d{3}\\.\\d{3}$" },
+        "ibans": { "type": "array", "items": { "type": "string", "pattern": "^CH\\d{19}$" } }
+      }
+    },
     "belege": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/beleg" } }
   },
   "$defs": {

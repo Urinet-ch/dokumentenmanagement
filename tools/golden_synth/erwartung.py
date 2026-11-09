@@ -79,6 +79,15 @@ def eintrag(b: Beleg, seed: int) -> dict:
     }
 
 
+def mandant(seed: int) -> dict:
+    """Kennungen des Mandanten (design.md «Mandant», Req 7.5): Absender der eigenen Belege."""
+    from .katalog import Kontext
+
+    f = Kontext(seed).firma("urinet")
+    return {"name": f.name, "uid": f.uid, "ibans": [f.iban]}
+
+
 def als_json(belege: list[Beleg], seed: int) -> str:
-    inhalt = {"version": 1, "seed": seed, "belege": [eintrag(b, seed) for b in sorted(belege, key=lambda b: b.nr)]}
+    inhalt = {"version": 1, "seed": seed, "mandant": mandant(seed),
+              "belege": [eintrag(b, seed) for b in sorted(belege, key=lambda b: b.nr)]}
     return json.dumps(inhalt, ensure_ascii=False, indent=2) + "\n"

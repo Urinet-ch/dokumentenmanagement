@@ -105,3 +105,12 @@ def test_uid_und_iban_der_firmen_gueltig(belege):
             assert pz.iban_gueltig(b.qr.empfaenger.iban)
             if b.qr.empfaenger.uid:
                 assert pz.uid_gueltig(b.qr.empfaenger.uid)
+
+
+def test_mandant_kennungen_passen_zu_eigenen_belegen(daten):
+    m = daten["mandant"]
+    assert m["name"] == "UriNet Aschwanden" and all(pz.iban_gueltig(i) for i in m["ibans"])
+    eigene = [e for e in daten["belege"] if e["art"] == "AUSGANGSRECHNUNG"]
+    assert eigene and all(e["qr"]["konto"] in m["ibans"] for e in eigene)
+    fremde = [e for e in daten["belege"] if e["qr"] and e["art"] != "AUSGANGSRECHNUNG"]
+    assert not any(e["qr"]["konto"] in m["ibans"] for e in fremde)
