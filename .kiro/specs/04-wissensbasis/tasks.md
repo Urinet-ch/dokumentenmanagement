@@ -1,30 +1,29 @@
 # Implementation Plan — 04 Wissensbasis
 
-Voraussetzungen: Gate Phase 2 (Entscheid 09.11.2026: Spec 04 nach Spec 02), Feld titel mit Herkunftsmarkierung in Spec 01
-umgesetzt (eigener PR, Entscheid 09.11.2026), Spec 04 und ADR-013 auf `main` gemergt. Die Reihenfolge zu Phase 3 ist nicht
-entschieden: [offen: Lage von Spec 04 zu Spec 03 – Entscheid in umsetzungsplan.md]. Alle Teile für den Mandanten `vhf-gsk`
-(Seed-Felder nach 13.2, Freigabe durch die Geschäftsstelle nach 13.5, Szenarien mit `geschaeftsstelle`) setzen Spec 03,
-Aufgabe 10.2 voraus. Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe)
+Voraussetzungen: Gate Phase 2 (Entscheid 09.11.2026: Spec 04 nach Spec 02), Gate Phase 3 (Spec 04 nach Spec 03,
+entschieden von Fabian am 09.11.2026), Spec 04 und ADR-013 auf `main` gemergt. Das Feld `dokument.titel` gibt es in Spec 01 bereits
+(Requirement 7.2); seine Präzisierungen im eigenen PR sind keine Voraussetzung. Weil Spec 03 vorher umgesetzt ist, sind
+auch die Teile für den Mandanten `vhf-gsk` (Seed-Felder nach 13.2, Freigabe durch die Geschäftsstelle nach 13.5,
+Szenarien mit `geschaeftsstelle`) mit Spec 03, Aufgabe 10.2 erfüllt. Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe)
 nach `CLAUDE.md`, Branch `feature/04-<aufgabe>-<stichwort>`. Die Wellen 13–16 folgen auf die Nummern von Spec 03. Steht ein
-Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgabe 13.1). Abhängigkeiten zu anderen Specs stehen als `Spec 0n: <Aufgabe>`.
+Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgabe 13.1; bei 15.5 auf die Spec zur Löschfunktion – 14.4 setzt 15.5 bis dahin nur mit der Kennzeichnung «Quelle prüfen» um). Abhängigkeiten zu anderen Specs stehen als `Spec 0n: <Aufgabe>`.
 Jede Aufgabe liefert für ihre Anforderungen Cucumber-Szenarien mit `@req-<x.y>` unter `features/wissen/` (ausser bei
 Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
-## Welle 13 — Grundlagen der Wissensbasis (Voraussetzung: Gate Phase 2)
+## Welle 13 — Grundlagen der Wissensbasis (Voraussetzung: Gate Phase 2 und Gate Phase 3)
 
 - [ ] 13.1 Entscheide und Folgeänderungen [Fabian]
-  - Entscheid vor Welle 13 einholen: Lage von Spec 04 zu Spec 03 (`umsetzungsplan.md`), weitere Seitentypen für `vhf-gsk`, Recht A19 der Geschäftsstelle
-  - Entscheide vor Welle 14 einholen: Tokenbudget je Ingest, Ingest für archivierte Dokumente anderer Arten
-  - Entscheid vor Welle 16 einholen: Stichprobengrösse und Schwellen Gate Phase 4
-  - ADR-013 per Merge freigeben; die Folgeänderungen nach design.md, Abschnitt «Folgeänderungen in anderen Dokumenten» (Spec 01/02/03, `product.md`, `structure.md`, `tech.md`, `umsetzungsplan.md`, `docs/adr/README.md`, Nachträge zu ADR-006, ADR-009 und ADR-011) nach dem Merge von PR #15 und PR #16 als eigenen PR veranlassen
-  - _Anforderungen: 2.3, 5.7, 12.1, 13.4, 18.1_
+  - Alle zwölf Entscheide vom 09.11.2026 eingetragen (entschieden von Fabian am 09.11.2026; design.md, Open Points)
+  - Offen bleibt nur der Umgang mit Seitenversionen gelöschter Dokumente (revDSG), Entscheid in der Spec zur Löschfunktion (Requirement 15.5)
+  - ADR-013 per Merge freigeben; die Folgeänderungen nach design.md, Abschnitt «Folgeänderungen in anderen Dokumenten» (Spec 01/02/03, `product.md`, `structure.md`, `tech.md`, `umsetzungsplan.md`, `docs/adr/README.md`, Nachträge zu ADR-006, ADR-009 und ADR-011) nach dem Merge von PR #15 als eigenen PR veranlassen (PR #16 ist gemergt); darin auch die neuen Fehlercodes in die abschliessende Code-Liste von Spec 01
+  - _Anforderungen: 2.3, 5.7, 12.1, 13.4, 13.6, 18.1_
 
 - [ ] 13.2 Dokumentart Wissensquelle [Backend]
-  - Seed-Teil `seed/_alle/dokumentarten-wissen.json` nach design.md, beim Anlegen jedes Mandanten eingelesen, nur anlegen, wenn der Code fehlt; für `vhf-gsk` mit `zugriff` und `veroeffentlicht` (erst nach Spec 03, Aufgabe 10.2); `WissensquelleSeedTest`; `DokumentartSeedTest` aus Spec 01 unverändert
+  - Seed-Teil `seed/_alle/dokumentarten-wissen.json` nach design.md, beim Anlegen jedes Mandanten eingelesen, nur anlegen, wenn der Code fehlt; für `vhf-gsk` mit `zugriff` und `veroeffentlicht` (Spec 03, Aufgabe 10.2); `WissensquelleSeedTest`; `DokumentartSeedTest` aus Spec 01 unverändert
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)
   - _Anforderungen: 1.1–1.6_
-  - _Abhängig von: Spec 01: Feld titel (eigener PR, Entscheid 09.11.2026)_
+  - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
 - [ ] 13.3 Fachbereich `wissen` und Datenmodell [Backend]
   - Paket `wissen` mit `domain`, `application`, `adapter`; ArchUnit-Regeln wie ADR-011 (kein Zugriff auf `public` ausser `auftrag`)
@@ -41,7 +40,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 13.5 Sichtbarkeit und Rechte [Backend]
   - Hülle (`wissensseite_dokument`, rekursiv mit Zyklen) und Hülle je Version (`wissensseite_version_dokument`), wirksame Vertraulichkeit = max(Hülle, Mindeststufe), `WissenSichtbarkeit` auf Basis des `VertraulichkeitFilter` inkl. Mindeststufe
-  - Aktionen A15–A19 in `Berechtigung`, 404 vor 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
+  - Aktionen A15–A19 in `Berechtigung`, 404 vor 403, A19 für `geschaeftsstelle` 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
   - _Anforderungen: 11.1–11.3, 11.5, 11.8, 12.1–12.3_
   - _Abhängig von: 13.3_
 
@@ -57,7 +56,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Port `DokumentEreignisse` nach design.md (Ergänzung zu Spec 01, in derselben Transaktion); Auftrag `WISSEN_INGEST` nach `ARCHIVIERT` und über `POST /dokumente/{id}/wissen-ingest` (Seitenbereich); höchstens ein Ingest je Mandant `IN_ARBEIT`/`OFFEN`, weitere `WARTEND`; Vorprüfung (Art, `PERSONAL`, Volltext, PDF/A und `\f`-Seiten, laufender oder wartender Ingest, Schätzung mit Ein- und Ausgabe, Monatsbudget der Wissensbasis)
   - Teilaufträge `KERNAUSSAGEN`, `PLANUNG`, `SEITE`, `QUELLE` mit je einem Aufruf über `KiPort` und JSON-Schema, `ABSCHLUSS` ohne Aufruf; Auszugsprüfung; Ingest-Kontext nur bis zur Stufe der Wissensquelle, `ueberblick` nur bei `NORMAL`; belegter Pfad höherer Stufe → Befund und Hinweis; Kontextstufe je Änderung; Eingrenzung grosser Indizes über die Volltextsuche (Vektor folgt in 15.1)
   - `archiv.wissen.*` (Modell über `archiv.ki.basis-url`, kein eigener URL-Schlüssel); `ki_verbrauch` mit neuen Zwecken; Zeitgrenzen der neuen Auftragstypen
-  - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
+  - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 300'000 und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
   - Prompt-Injection-PDF: Ergebnis nur als Entwurf mit Befunden
   - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
@@ -102,7 +101,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 15.2 Chat-Werkzeuge und Quellen [Backend]
   - `wissen_index` und `wissen_seite_zeigen` in `ArchivWerkzeuge` (nur lesend, Mandant/Benutzer aus Kontext, Kürzung nach `werkzeug-max-zeichen` mit `GEKUERZT`), Systemprompt-Ergänzung, SSE-Quellenform `{wissen, dokumente}`, Hinweise in der Antwort
-  - Szenarien mit simulierten Tool-Calls: nur freigegebene Fassungen, `mitarbeiter` erhält keine Seite mit unsichtbarer Hülle; `OeffentlicheWerkzeuge` (Spec 03) ohne Wissenswerkzeuge, sobald vorhanden
+  - Szenarien mit simulierten Tool-Calls: nur freigegebene Fassungen, `mitarbeiter` erhält keine Seite mit unsichtbarer Hülle; `OeffentlicheWerkzeuge` (Spec 03) ohne Wissenswerkzeuge
   - _Anforderungen: 8.1–8.7, 8.9, 11.4_
   - _Abhängig von: 15.1, Spec 02: 7.1–7.3_
 
@@ -117,15 +116,15 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 14.2, 14.3_
 
 - [ ] 15.5 OKF-Export [Backend] [Frontend]
-  - Auftrag `WISSEN_EXPORT`, ZIP mit Frontmatter (SnakeYAML), `index.md`, `log.md`, URN-Verweise, Links im Inhalt auf `.md` umgeschrieben; Download 24 h; Protokoll mit SHA-256; Einstellungen `/wissensbasis/einstellungen` (A19)
-  - `OkfKonformitaetTest` (JUnit, Nachweis für 17.3, im PR verlinkt); Vollexport nach Spec 03, 8.2 um den OKF-Export ergänzen, sobald 12.2 aus Spec 03 vorhanden ist
+  - Auftrag `WISSEN_EXPORT`, ZIP mit Frontmatter (SnakeYAML), `index.md`, `log.md`, URN-Verweise, Links im Inhalt auf `.md` umgeschrieben; Download 24 h; Protokoll mit SHA-256; Einstellungen `/wissensbasis/einstellungen` (A19, `geschaeftsstelle` erhält 403)
+  - `OkfKonformitaetTest` (JUnit, Nachweis für 17.3, im PR verlinkt); Vollexport nach Spec 03, 8.2 (Aufgabe 12.2) um den OKF-Export ergänzen
   - _Anforderungen: 17.1–17.5, 14.3_
   - _Abhängig von: 13.6_
 
 ## Welle 16 — Abnahme Phase 4
 
 - [ ] 16.1 Sicherheits- und Isolationstests [QA]
-  - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern, sobald vorhanden
+  - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern
   - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen; Befunde beheben
   - _Anforderungen: 11.5, 11.6, 18.5_
   - _Abhängig von: 15.1–15.5_
@@ -133,7 +132,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 16.2 Prüfliste und Gate [Fabian] [QA]
   - `wissen-pruefliste.yaml` (Wissensquellen, Fussnoten-Stichprobe, Fragen mit erwarteten Seiten und Quelldokumenten) nur unter `ARCHIV_GOLDEN_DIR`; im Repo nur Schema und Test `WissenPrueflisteIT`
   - Lauf manuell auf Stufe B, nie in der CI; Bericht `docs/abnahme/phase4.md` nur mit Nummern und Ergebnissen, Kennzahl «unverändert angenommen»
-  - **Gate Phase 4:** Belegtreue, kein stilles Überschreiben und Antwortquote nach den Schwellen aus 13.1, Isolationstest grün
+  - **Gate Phase 4:** Stichprobe 5 Wissensquellen; Belegtreue mindestens 47 von 50 Fussnoten, kein stilles Überschreiben, mindestens 14 von 15 Fragen korrekt mit Seite und Quelldokument beantwortet (18.1–18.4); Isolationstest grün
   - _Anforderungen: 18.1–18.4, 18.6, 18.7_
   - _Abhängig von: 16.1_
 

@@ -5,7 +5,8 @@ Phase 4 fügt dem Quarkus-Dienst den Fachbereich `wissen` hinzu. Er dockt an dre
 - **Eingang:** Eine Wissensquelle durchläuft den normalen Weg aus Spec 01 (Upload → `VERARBEITEN` →
   `KI_VORSCHLAG` → Eingangskorb → Bestätigung A7 → `ARCHIVIEREN` → `ARCHIVIERT`). Erst danach reiht der
   Fachbereich `WISSEN_INGEST` ein, ausgelöst über den Port `DokumentEreignisse` (siehe Ingest). Die Art
-  `WISSENSQUELLE` wählt ein Mensch im Eingangskorb; der KI-Vorschlag aus Spec 01 kennt sie nicht (Requirement 1.5).
+  `WISSENSQUELLE` wählt ein Mensch im Eingangskorb; der KI-Vorschlag aus Spec 01 kennt sie nicht (Requirement 1.5,
+  entschieden von Fabian am 09.11.2026). Nur diese Art löst einen Ingest aus (Requirement 5.7).
 - **Pflege:** Ingest und Lint schreiben nur Entwürfe. Freigeben kann nur ein Mensch mit Recht A17; erst dabei
   entstehen Seitenversionen, Index, Log und Embeddings.
 - **Nutzung:** Der `ArchivAgent` aus Spec 02 erhält zwei lesende Werkzeuge; die Suche zeigt Seiten neben
@@ -79,7 +80,7 @@ flowchart LR
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
 | Hinweis `ABSCHNITT_FEHLT` | Pflichtabschnitte nach Requirement 2.8 |
 | Hinweis `HOEHERE_STUFE_VORHANDEN` | geplanter Pfad von einer Seite höherer Vertraulichkeit belegt (Requirement 5.12), nur für A17 sichtbar |
-| Hinweis `STUFE_STEIGT` | Annahme erhöht die wirksame Vertraulichkeit der Seite (Requirement 6.8) |
+| Hinweis `STUFE_STEIGT` | Annahme erhöht die wirksame Vertraulichkeit der Seite dauerhaft (Requirement 6.8) |
 
 - Seitenangaben: Der Volltext aus Spec 01 (`pdftotext`) trennt Seiten mit `\f`. Spec 04 setzt voraus, dass
   `dokument.volltext` diese Trenner unverändert speichert (Folgeänderung Spec 01, design.md, `VERARBEITEN`).
@@ -166,7 +167,7 @@ flowchart LR
   - In allen Fällen bleibt das Dokument unberührt.
 - Budget: Tokens je Teilauftrag aufsummieren (`wissens_entwurf.tokens_*`); bei Erreichen → `ABSCHLUSS` mit
   `unvollstaendig = true` (Requirement 13.5). Monatsbudget: Summe `ki_verbrauch` mit Zweck `WISSEN_*` im Monat gegen
-  `wissens_einstellung.monatsbudget_tokens` (leer = keine Grenze); `public.mandant_budget` (Chatbot, Spec 03) wird
+  `wissens_einstellung.monatsbudget_tokens`, sonst den Startwert `archiv.wissen.monatsbudget-tokens` (1'000'000); `public.mandant_budget` (Chatbot, Spec 03) wird
   weder gelesen noch geschrieben. Erschöpft: manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` mit Hinweis «Budget
   erschöpft» (Requirement 13.6).
 
@@ -279,8 +280,8 @@ flowchart LR
 | POST | `/wissensentwuerfe/{id}/aenderungen/{nr}/verwerfen {grund}` | verwerfen, `If-Match` (A17) |
 | POST | `/wissensentwuerfe/{id}/aenderungen/{nr}/neu-erzeugen` | veraltete Änderung neu erzeugen (A17) |
 | POST | `/wissensbasis/lint` | Lint starten (A17) |
-| POST | `/wissensbasis/exporte`, GET `/wissensbasis/exporte/{id}` | OKF-Export (A19) |
-| GET/PUT | `/wissensbasis/einstellungen` | Budget, Lint-Zeitplan (A19) |
+| POST | `/wissensbasis/exporte`, GET `/wissensbasis/exporte/{id}` | OKF-Export (A19, nur `inhaber`) |
+| GET/PUT | `/wissensbasis/einstellungen` | Budgets (je Ingest, Lint, Monat), Lint-Zeitplan (A19, nur `inhaber`) |
 
 ### Zugriffsprotokoll (Ergänzung zur Tabelle in Spec 01, design.md)
 Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (Spec 02, design.md):
@@ -316,8 +317,9 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 | `archiv.wissen.index-max-zeichen` | 60'000 |
 | `archiv.wissen.seite-max-zeichen` | 20'000 |
 | `archiv.wissen.werkzeug-max-zeichen` | 12'000 |
-| `archiv.wissen.budget-tokens` | [offen: Tokenbudget je Ingest, Vorschlag 300'000 Tokens – Entscheid vor Welle 14] |
+| `archiv.wissen.budget-tokens` | 300'000 (entschieden von Fabian am 09.11.2026) |
 | `archiv.wissen.lint-budget-tokens` | 100'000 |
+| `archiv.wissen.monatsbudget-tokens` | 1'000'000 je Mandant und Kalendermonat (entschieden von Fabian am 09.11.2026) |
 | `archiv.wissen.lint-zeitplan` | `0 0 4 ? * SUN` (Europe/Zurich) |
 | `archiv.wissen.lint-paare` | 30 |
 
@@ -421,8 +423,8 @@ wissens_lint(id uuid pk, gestartet timestamptz, beendet timestamptz null, ausgel
              befunde jsonb, entwurf_id uuid null)
 
 wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens int, lint_zeitplan text,
-                    monatsbudget_tokens int null)        -- null = keine Monatsgrenze (Req 13.6)
-  -- überschreibt die Startwerte je Mandant (A19)
+                    monatsbudget_tokens int null)        -- null = Startwert archiv.wissen.monatsbudget-tokens (Req 13.6)
+  -- überschreibt die Startwerte je Mandant (A19); null = Startwert; Wert ≤ 0 → 422 (Req 13.6)
 ```
 
 ## Error Handling
@@ -462,9 +464,9 @@ getrennt. Oberfläche mit Cucumber.js + Playwright.
 | Last | Suche nach Wissensseiten bei 2'000 Seiten p95 ≤ 1 s, Messbedingungen wie Spec 01, 3.2 |
 
 ## Folgeänderungen in anderen Dokumenten
-Diese Spec ändert die folgenden Dateien nicht selbst; sie werden nach dem Merge von PR #15 und PR #16 in einem
-eigenen PR nachgezogen (Aufgabe 13.1). Grund: Die Dateien sind in den parallelen PRs in Arbeit, und Spec 01 bleibt
-im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt …» beschrieben ist.
+Diese Spec ändert die folgenden Dateien nicht selbst; sie werden nach dem Merge von PR #15 (PR #16 ist gemergt) in
+einem eigenen PR nachgezogen (Aufgabe 13.1). Grund: Spec 01 (Abschnitt «KI» in design.md) ist in PR #15 in Arbeit, die
+Folgeänderungen kommen gesammelt in einem PR, und Spec 01 bleibt im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt …» beschrieben ist.
 
 ### Spec 01 (`.kiro/specs/01-archiv-kern/`)
 1. **requirements.md, Req 2.6 (Rechtematrix):** Zeilen A15–A19 aus Spec 04, Req 12.1 aufnehmen oder auf Spec 04
@@ -494,8 +496,8 @@ im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt 
    `WISSEN_INGEST`, `WISSEN_LINT`; `EXPORTIEREN` und `VERWEIGERT` auf die Wissens-Endpunkte erweitern. Grund: Die
    Tabelle ist die Liste der protokollierten Endpunkte.
 10. **design.md, Fehlercodes:** `KEINE_WISSENSQUELLE`, `ENTWURF_BEFUND`, `VERTRAULICHKEIT_ZU_TIEF`,
-    `VERTRAULICHKEIT_UNGUELTIG`, `ANALYSE_NICHT_MOEGLICH`. Grund: Die Liste der Problem-Details-Codes ist in Spec 01
-    abschliessend.
+    `VERTRAULICHKEIT_UNGUELTIG`, `ANALYSE_NICHT_MOEGLICH` in die abschliessende Code-Liste aufnehmen, per Folge-PR
+    (entschieden von Fabian am 09.11.2026). Grund: Die Liste der Problem-Details-Codes ist in Spec 01 abschliessend.
 11. **design.md, `ki_verbrauch.zweck`:** Werte `WISSEN_INGEST`, `WISSEN_LINT`, `WISSEN_EMBEDDING`. Grund: Monatsbericht
     nach Zweck (Spec 03, 8.1) und Monatsbudget der Wissensbasis (Spec 04, 13.6).
 12. **design.md, Suche (Req 14):** Abschnitt «Wissen» auf der Suchseite (Spec 04, 9.4). Grund: UI-Beschreibung der
@@ -504,11 +506,12 @@ im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt 
     `/dokument/:id?seite=n` (Spec 04, 16.2).
 14. **design.md, Open Points / Req 9.9 (Löschfunktion):** Hinweis auf den offenen Konflikt «nur anfügende
     Seitenversionen vs. Löschung nach revDSG» (Spec 04, 15.5). Grund: Die Spec zur Löschfunktion muss das lösen.
-15. **Feld titel (eigener PR, Entscheid 09.11.2026):** Spec 04 setzt `dokument.titel` mit Herkunftsmarkierung
-    voraus. Hinweis: Die Spalte `titel` gibt es bereits (design.md, Datenmodell und Suchgewicht A); der PR ändert
-    Erzeugung, Markierung «erzeugt», Trefferzeile und Zitat. Der PR sollte Spec 04 als Nutzer erwähnen.
-16. **Rückverfolgung, Zeile D8:** gestrichen (Entscheid 09.11.2026). Gehört zu PR #16, nicht zu Spec 04; Spec 04
-    erwähnt D8 nicht.
+15. **Feld titel (eigener PR, Entscheid 09.11.2026):** Das Feld gibt es in Spec 01 bereits (Req 7.2,
+    `dokument.titel`; design.md, Datenmodell und Suchgewicht A); Spec 04 nutzt es unverändert. Der eigene PR
+    präzisiert es (aufgedruckter Titel, sonst KI-Vorschlag mit Herkunft «erzeugt», Trefferliste). Er sollte Spec 04
+    als Nutzer erwähnen.
+16. **Rückverfolgung, Zeile D8:** entfällt. D8 ist mit PR #16 in Spec 01 gestrichen (nur Web-App); nichts
+    nachzuziehen.
 
 ### Spec 02 (`.kiro/specs/02-abgleich-chat/`)
 1. **requirements.md, Req 3.1:** Werkzeugliste um `wissen_index` und `wissen_seite_zeigen` ergänzen (Spec 04, 8.1).
@@ -534,7 +537,8 @@ im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt 
    aufgezählt; ohne Zugriffsstufe wäre eine Wissensquelle nach Veröffentlichung für alle Besucher abrufbar.
 5. **design.md, `mandant_budget`:** Hinweis, dass die Wissensbasis ein eigenes Monatsbudget in `m_<code>` führt und
    `mandant_budget` nicht belastet (Spec 04, 13.6). Grund: Ein Ingest soll den Chatbot nicht sperren und umgekehrt.
-6. **Rechte der Geschäftsstelle:** A19 für die Geschäftsstelle zusammen mit A11–A14 entscheiden (offen in beiden Specs).
+6. **Rechte der Geschäftsstelle:** A19 für die Geschäftsstelle ist 403 (entschieden von Fabian am 09.11.2026); bei den Rechten der
+   Geschäftsstelle (A11–A14) vermerken.
 
 ### Steering
 1. **`.kiro/steering/product.md`:**
@@ -553,22 +557,21 @@ im Umfang stabil. Bis dahin gilt das Verhalten, das hier als «Spec 04 ergänzt 
 ### `docs/umsetzungsplan.md`
 1. §1 Spec-Tabelle: Spec 04.
 2. «13 Wellen und 4 Phasen» auf 17 Wellen und 5 Phasen (Zeile 6).
-3. §4 Mermaid und Wellentabelle: Wellen 13–16 mit Abhängigkeiten (Gate Phase 2, Feld titel, Spec 02 Wellen 6–7;
-   Teile für `vhf-gsk` nach Spec 03, Aufgabe 10.2); Aufwand; Total.
-4. §5 Zeitplan: Spec 04 nach Spec 02 (Entscheid 09.11.2026). Lage zu Spec 03:
-   [offen: Lage von Spec 04 zu Spec 03 – Entscheid in umsetzungsplan.md].
+3. §4 Mermaid und Wellentabelle: Wellen 13–16 nach den Wellen 10–12 von Spec 03, mit Abhängigkeiten (Gate Phase 2,
+   Gate Phase 3, Spec 02 Wellen 6–7); Aufwand; Total.
+4. §5 Zeitplan: Spec 04 nach Spec 02 und nach Spec 03 (entschieden von Fabian am 09.11.2026); Wellen 13–16.
 5. §6: Gate 4 und Entscheide vom 09.11.2026 als P20 ff.:
    - Pflege: KI schreibt nur Entwürfe, Freigabe per Diff durch Inhaber bzw. Geschäftsstelle.
    - Quelle: Dokumentart `WISSENSQUELLE` ohne gesetzliche Pflicht, gleicher Erfassungsweg.
-   - Zeitpunkt: Spec 04 nach Spec 02, Spec 01 bleibt stabil.
-   - D8 gestrichen (falls nicht schon durch PR #16).
-6. Die offenen Entscheide aus Spec 04 in die Entscheidliste aufnehmen (siehe Spec 04, design.md, Open Points).
+   - Zeitpunkt: Spec 04 nach Spec 02 und Spec 03, Spec 01 bleibt stabil.
+6. Die Entscheide vom 09.11.2026 zu Spec 04 in die Entscheidliste aufnehmen und den einzigen offenen Punkt (revDSG)
+   nennen (siehe Spec 04, design.md, Open Points).
 
 ### `docs/adr/README.md`
 Zeile ergänzen: «[ADR-013](ADR-013-wissensbasis-nach-llm-wiki-muster.md) | Die Wissensbasis folgt dem LLM-Wiki-Muster
 (OKF), liegt im Mandanten-Schema, und die KI schreibt nur Entwürfe, die ein Mensch mit Recht A17 freigibt. |
-Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04)». Vor dem Push prüfen, ob PR #16 ADR-013 belegt hat; sonst
-umnummerieren.
+Vorgeschlagen (Freigabe per eigenem Merge mit Spec 04)». PR #16 ist gemergt und belegt ADR-013 nicht (geprüft
+09.11.2026); vor dem Merge erneut prüfen, falls ein anderer PR einen ADR hinzufügt.
 
 ### Bestehende ADRs (nicht ändern, nur Nachtrag erwägen)
 - **ADR-006:** Nachtrag «Punkt 1 (genau ein Aufruf je Beleg) gilt unverändert für den Metadaten-Vorschlag; der Ingest
@@ -585,11 +588,27 @@ Nach dem Merge von Spec 04: Projektseite des UriNet-Archivs um Spec 04, ADR-013 
 ergänzen und einen Log-Eintrag schreiben (globale Anweisung «Wiki sofort nachführen»).
 
 ## Open Points
-- [offen: Lage von Spec 04 zu Spec 03 – Entscheid in umsetzungsplan.md] (tasks.md). Entschieden ist nur «Spec 04 nach
-  Spec 02» (09.11.2026); die Teile für `vhf-gsk` hängen ohnehin an Spec 03, Aufgabe 10.2.
-- [offen: weitere Seitentypen für den Mandanten `vhf-gsk` – Entscheid vor Welle 13] (Requirement 2.3)
-- [offen: Recht A19 der Geschäftsstelle – Entscheid vor Welle 13] (Requirement 12.1)
-- [offen: Ingest auch für archivierte Dokumente anderer Arten über «Zur Wissensbasis hinzufügen» – Entscheid vor Welle 14] (Requirement 5.7). Das Design ist vorbereitet: Der Ingest braucht nur ein archiviertes Dokument mit Volltext, PDF/A mit Seitentrennern und Vertraulichkeit ≠ `PERSONAL`; der Ausschluss aus dem Jahresexport (Requirement 1.6) gilt nur für die Art `WISSENSQUELLE`.
-- [offen: Tokenbudget je Ingest, Vorschlag 300'000 Tokens – Entscheid vor Welle 14] (Requirement 13.4)
-- [offen: Stichprobengrösse und Schwellen Gate Phase 4 – Entscheid vor Welle 16] (Requirement 18.1–18.4)
+Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
+1. Lage zu Spec 03: Spec 04 wird nach Spec 03 umgesetzt, Wellen 13–16 (tasks.md). Der Nachtrag in
+   `docs/umsetzungsplan.md` bleibt eine Folgeänderung.
+2. Seitentypen in `vhf-gsk`: nur die sechs Standardtypen, keine weiteren (Requirement 2.3).
+3. Recht A19 der Geschäftsstelle: 403; Einstellungen und OKF-Export nur `inhaber` (Requirement 12.1). Im Mandanten `vhf-gsk` (nur `geschaeftsstelle`, Spec 03) gelten damit die Startwerte; OKF-Export nur über den Vollexport des Betreibers (Spec 03, 8.2).
+4. Ingest nur für die Art `WISSENSQUELLE`; «Zur Wissensbasis hinzufügen» für andere Arten vorerst nicht, Antwort 422
+   `KEINE_WISSENSQUELLE` (Requirement 5.7). Das Design bleibt vorbereitet: Der Ingest braucht nur ein archiviertes
+   Dokument mit Volltext, PDF/A mit Seitentrennern und Vertraulichkeit ≠ `PERSONAL`; der Ausschluss aus dem
+   Jahresexport (Requirement 1.6) gilt nur für die Art `WISSENSQUELLE`.
+5. Tokenbudget je Ingest: Startwert 300'000 Tokens, konfigurierbar (Requirement 13.4).
+6. Gate Phase 4: 5 Wissensquellen, mindestens 47 von 50 Fussnoten belegt, mindestens 14 von 15 Fragen korrekt mit Seite und Quelldokument beantwortet
+   (Requirement 18.1–18.4).
+7. `WISSENSQUELLE` nur von Hand wählbar; ein KI-Vorschlag der Art bleibt Option (Requirement 1.5).
+8. `ueberblick` nur aus `NORMAL`-Wissen; `ueberblick-intern` nur bei Bedarf als Option (Requirement 11.8).
+9. Kontextstufe: Ändert ein `INTERN`-Ingest eine `NORMAL`-Seite, wird sie dauerhaft `INTERN` (Hinweis
+   `STUFE_STEIGT`), akzeptiert (Requirement 6.8, 11.1).
+10. Ein offener Ingest je Mandant, akzeptiert (Requirement 5.13).
+11. Monatsbudget der Wissensbasis je Mandant: Startwert 1'000'000 Tokens, konfigurierbar, immer mit Grenze
+    (Requirement 13.6).
+12. Fehlercodes `VERTRAULICHKEIT_UNGUELTIG` und `ANALYSE_NICHT_MOEGLICH` (mit den übrigen neuen Codes) kommen per
+    Folge-PR in die abschliessende Code-Liste von Spec 01 (Folgeänderung Spec 01, Nr. 10).
+
+Offen:
 - [offen: Umgang mit Seitenversionen, die auf einem gelöschten Dokument beruhen (revDSG) – Entscheid in der Spec zur Löschfunktion] (Requirement 15.5). Konflikt: `wissensseite_version` ist nur anfügend.

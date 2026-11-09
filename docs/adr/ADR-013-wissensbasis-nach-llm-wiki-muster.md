@@ -36,7 +36,8 @@ aufgebaut ist (Auftrag 09.11.2026, Spec 04). Kräfte und Randbedingungen:
    gesammeltes Annehmen gibt es nicht. Das erweitert den Grundsatz von ADR-006 von Metadaten auf Wissen. ADR-006,
    Punkt 1 («genau ein Aufruf je Beleg») gilt unverändert für den Metadaten-Vorschlag (`KI_VORSCHLAG`); der Ingest ist
    ein eigener, nachgelagerter Zweck mit mehreren Aufrufen (Entscheid 8) und ändert keine Metadaten. Die Art
-   `WISSENSQUELLE` wählt ein Mensch; der KI-Vorschlag kennt sie nicht, damit Gate 0 gültig bleibt.
+   `WISSENSQUELLE` wählt ein Mensch; der KI-Vorschlag kennt sie nicht, damit Gate 0 gültig bleibt (entschieden von Fabian am 09.11.2026).
+   Ingest gibt es vorerst nur für diese Art (entschieden von Fabian am 09.11.2026); eine Erweiterung auf andere Arten steht als Option in Spec 04.
 4. **Belege werden deterministisch geprüft.** Dokument-ID, PDF-Seite und Auszug stammen aus dem Schritt
    «Kernaussagen» und werden gegen den Seitentext geprüft. Der Schritt, der Seiten schreibt, verweist nur auf
    vorgegebene Schlüssel. Entfernte Aussagen ohne Begründung und externe Links sperren die Annahme.
@@ -48,13 +49,13 @@ aufgebaut ist (Auftrag 09.11.2026, Spec 04). Kräfte und Randbedingungen:
    weil sich nicht prüfen lässt, ob Wissen ohne Fussnote in den Text gelangt ist. Die Regel wird live über den
    `VertraulichkeitFilter` ausgewertet, für jede Version mit deren eigener Hülle. Beim Ingest sieht die KI nur Seiten
    bis zur Stufe der Wissensquelle. `PERSONAL`-Dokumente sind bei keinem Anlass Quelle einer Seite (Ingest, Lint,
-   manuell, Analyse); Seiten tragen nur `NORMAL` oder `INTERN`, und `ueberblick` bleibt `NORMAL`.
+   manuell, Analyse); Seiten tragen nur `NORMAL` oder `INTERN`, und `ueberblick` entsteht nur aus `NORMAL`-Wissen (entschieden von Fabian am 09.11.2026).
 7. **Schrittweise Erschliessung statt ganzes Wiki.** Die KI liest Index und höchstens `max-seiten` Seiten; der Chat
    nutzt zuerst Index und Seiten, dann die Quelldokumente. Die Hybridsuche aus Spec 02 ergänzt das (Eingrenzung
    grosser Indizes, Suche nach Seiten).
 8. **Teilaufträge mit Budget, Quellen einzeln.** Höchstens ein KI-Aufruf je Teilauftrag in `public.auftrag`,
-   Tokenbudget je Ingest und Lint und ein eigenes Monatsbudget der Wissensbasis im Mandanten-Schema (nicht das Budget
-   des öffentlichen Chatbots); lange PDFs abschnittsweise oder nach Seitenbereich. Je Mandant ist höchstens ein
+   Tokenbudget je Ingest (Startwert 300'000) und Lint und ein eigenes Monatsbudget der Wissensbasis im Mandanten-Schema
+   (Startwert 1'000'000 Tokens je Mandant, entschieden von Fabian am 09.11.2026; nicht das Budget des öffentlichen Chatbots); lange PDFs abschnittsweise oder nach Seitenbereich. Je Mandant ist höchstens ein
    Ingest in Arbeit oder zur Freigabe offen; weitere warten und planen danach gegen die neuen Versionen (wie im LLM-Wiki:
    Quellen einzeln einarbeiten).
 
@@ -93,10 +94,11 @@ aufgebaut ist (Auftrag 09.11.2026, Spec 04). Kräfte und Randbedingungen:
   Gemildert durch Diff je Seite und die Prüfung ohne KI vor der Freigabe; ein gesammeltes Annehmen gibt es bewusst
   nicht, weil `verified` mit `human:` sonst eine Prüfung behauptete, die nicht stattfand.
 - **Negativ:** Weil je Mandant nur ein Ingest offen sein darf, staut ein nicht freigegebener Entwurf alle weiteren
-  Wissensquellen. Das ist der Preis dafür, dass jede Quelle gegen den aktuellen Stand geplant wird.
+  Wissensquellen. Das ist der Preis dafür, dass jede Quelle gegen den aktuellen Stand geplant wird (akzeptiert,
+  entschieden von Fabian am 09.11.2026).
 - **Negativ:** Strenge Sichtbarkeit: Eine Seite mit einem einzigen `INTERN`-Dokument in der Hülle oder mit
   Mindeststufe `INTERN` ist für `mitarbeiter` ganz unsichtbar. Ändert ein Ingest einer `INTERN`-Quelle eine
-  `NORMAL`-Seite, wird diese dauerhaft `INTERN` (die Freigabe zeigt das an). `ueberblick` bleibt `NORMAL` und nimmt
+  `NORMAL`-Seite, wird diese dauerhaft `INTERN` (die Freigabe zeigt das mit `STUFE_STEIGT` an; akzeptiert, entschieden von Fabian am 09.11.2026). `ueberblick` bleibt `NORMAL` und nimmt
   deshalb kein `INTERN`-Wissen auf.
 - **Negativ:** Das Wissen kann nach Vertraulichkeit zerfallen: Ein `NORMAL`-Ingest sieht `INTERN`-Seiten nicht. Einen
   belegten Pfad erkennt das Archiv (Hinweis «Seite auf höherer Stufe vorhanden – von Hand zusammenführen»), eine
