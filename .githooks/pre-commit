@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Leitplanke: Der Schlüssel dangerous-clean-slate der FTP-Action leert den ganzen Docroot.
+# Muster gleich wie in secret-scan.yml; Kommentare und Erwähnungen in Skripten zählen nicht.
+if git grep --cached -nE '^([^#]*[[:space:]{,])?dangerous-clean-slate[[:space:]]*:' -- '.github/workflows/*' >&2; then
+  echo "pre-commit: dangerous-clean-slate in einem Workflow. Schlüssel weglassen, der Sync-State genügt." >&2
+  exit 1
+fi
+
+# Kein Commit ohne Secret-Scan: Fehlt gitleaks, schlägt der Commit fehl, statt still
+# ungeprüft durchzugehen.
+command -v gitleaks >/dev/null || { echo "pre-commit: gitleaks fehlt (brew install gitleaks)." >&2; exit 1; }
+config=(); [[ -f .gitleaks.toml ]] && config=(--config .gitleaks.toml)
+exec gitleaks git --pre-commit --staged --redact --no-banner --log-level warn "${config[@]}" .

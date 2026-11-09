@@ -1,0 +1,7 @@
+# Harness-Vorlage: gitleaks-Standardregeln; SOPS-Dateien sind verschlüsselt und melden
+# sonst Fehlalarme.
+[extend]
+useDefault = true
+
+[allowlist]
+paths = ['''.*\.enc\.ya?ml$''']

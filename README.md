@@ -72,3 +72,22 @@ cd backend && mvn quarkus:dev
 
 - Secrets liegen nur als Dateien vor (`/run/secrets/`, tech.md Regel 7), nie in Umgebungsvariablen oder im Repo. Die
   festen Zugangswerte der Dev-Container und des Test-Realms sind keine Secrets und gelten nur lokal.
+
+## Leitplanken
+Die Leitplanken stammen aus der Harness-Vorlage der Skill-Werkstatt (`~/git/ai-entwicklung/vorlagen/harness`) und
+werden nur mit deren Werkzeug ausgerollt, nie von Hand geändert (ausser `.claude/harness.yml`, die dem Repo gehört).
+
+```bash
+brew install gitleaks          # der pre-commit-Hook bricht ohne gitleaks ab
+git config core.hooksPath      # muss «.githooks» melden (setzt harness.sh)
+ZIEL=$PWD ~/git/ai-entwicklung/werkzeuge/harness.sh --diff   # Drift-Check: überall «identisch»
+```
+
+- `pre-commit` prüft jeden Commit mit gitleaks; ein Commit mit Secret wird abgewiesen.
+- `pre-push` sperrt `main` lokal: Branch-Schutz gibt es im GitHub-Free-Plan für private Repos nicht, darum geht
+  alles über PRs (Entscheid Fabian 09.11.2026).
+- Der Workflow «Secret-Scan» prüft jeden Push auf allen Branches mit gitleaks, «CI-Fehler» legt bei rotem `main` ein
+  Issue an.
+- Claude-Code-Hooks (`.claude/settings.json`) fragen nach, bevor Leitplanken, Secret-Dateien oder geschützte Pfade aus
+  `.claude/harness.yml` (Liquibase-Changesets, Realm-Export, `.github/scripts/`) geändert werden.
+- Dependabot (`.github/dependabot.yml`) hält Actions (per SHA gepinnt), Docker-Images, npm und Maven wöchentlich aktuell.

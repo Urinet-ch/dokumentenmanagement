@@ -5,7 +5,7 @@ name: urinet-archiv-dev
 services:
   minio:
     # MinIO veröffentlicht keine Images mehr auf Docker Hub; Chainguard baut sie aus dem Quellcode
-    image: cgr.dev/chainguard/minio@sha256:616286de6ef3a1892876b126e745e152d8e03add6357203f8a1f854bdd1dce76
+    image: cgr.dev/chainguard/minio:latest@sha256:616286de6ef3a1892876b126e745e152d8e03add6357203f8a1f854bdd1dce76
     command: ["server", "/tmp/daten"]
     environment:
       MINIO_ROOT_USER: archiv-dev
