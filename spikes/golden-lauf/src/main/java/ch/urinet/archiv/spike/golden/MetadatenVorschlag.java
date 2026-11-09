@@ -7,7 +7,6 @@ import java.util.List;
 
 /** Antwortformat nach design.md «KI» (Datumsfelder als ISO-Text, Sicherheit als Record; Spike 0.3). */
 public record MetadatenVorschlag(
-        @Description("Name im Briefkopf (Absender), nicht der Empfänger im Adressfeld") String absender,
         @Description("Code der Dokumentart aus der Liste") ArtCode art,
         String titel,
         @Description("Belegdatum als ISO-Datum JJJJ-MM-TT") String datum,

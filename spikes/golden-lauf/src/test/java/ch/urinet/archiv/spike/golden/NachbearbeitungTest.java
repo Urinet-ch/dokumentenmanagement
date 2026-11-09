@@ -30,12 +30,7 @@ class NachbearbeitungTest {
     }
 
     static MetadatenVorschlag vorschlag(String art, String nummer, String datum, Vertraulichkeit vertraulichkeit) {
-        return vorschlag(null, "Ki Partner", art, nummer, datum, vertraulichkeit);
-    }
-
-    static MetadatenVorschlag vorschlag(String absender, String partner, String art, String nummer, String datum,
-                                        Vertraulichkeit vertraulichkeit) {
-        return new MetadatenVorschlag(absender, art == null ? null : MetadatenVorschlag.ArtCode.valueOf(art), "t", datum, partner, null, null, null, nummer, Richtung.AUSGABE,
+        return new MetadatenVorschlag(art == null ? null : MetadatenVorschlag.ArtCode.valueOf(art), "t", datum, "Ki Partner", null, null, null, nummer, Richtung.AUSGABE,
                 new BigDecimal("99.999"), "CHF", null, null, vertraulichkeit, List.of(), S);
     }
 
@@ -174,25 +169,6 @@ class NachbearbeitungTest {
         assertThat(e.betrag()).isEqualByComparingTo("100.00");
         // Standard der endgültigen Art OFFERTE (NORMAL), nicht der KI-Art AUSGANGSRECHNUNG (INTERN)
         assertThat(e.vertraulichkeit()).isEqualTo("NORMAL");
-    }
-
-    @Test
-    void partnerWacheFremderBelegNimmtAbsender() throws IOException {
-        var e = Nachbearbeitung.bearbeite(vorschlag("Beck AG", "Muster Mandant", "QUITTUNG", null, "2026-03-01", null),
-                Optional.empty(), "Kassenbon", MANDANT, arten(), EIGENE, HEUTE);
-        assertThat(e.partner()).isEqualTo("Beck AG");
-        assertThat(e.sicherheit()).containsEntry(Feld.PARTNER, 0.6);
-    }
-
-    @Test
-    void partnerWacheOhneBrauchbarenAbsenderSicherheitNull() throws IOException {
-        var ohne = Nachbearbeitung.bearbeite(vorschlag(null, "Muster Mandant", "QUITTUNG", null, "2026-03-01", null),
-                Optional.empty(), "Kassenbon", MANDANT, arten(), EIGENE, HEUTE);
-        assertThat(ohne.partner()).isEqualTo("Muster Mandant");
-        assertThat(ohne.sicherheit()).containsEntry(Feld.PARTNER, 0.0);
-        var eigener = Nachbearbeitung.bearbeite(vorschlag("Muster Mandant", "Muster Mandant", "OFFERTE", null, "2026-03-01", null),
-                Optional.of(EIGENER_QR), "Offerte", MANDANT, arten(), EIGENE, HEUTE);
-        assertThat(eigener.sicherheit()).containsEntry(Feld.PARTNER, 0.0);
     }
 
     @Test

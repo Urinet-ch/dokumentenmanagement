@@ -90,16 +90,6 @@ public final class Nachbearbeitung {
         // Vorrang: Ein QR-Code mit fremder IBAN schliesst den Mandanten als Aussteller aus, auch bei eigener UID im Kopf
         boolean qrFremd = qr.isPresent() && !qrVomMandant;
         boolean aussteller = !qrFremd && (qrVomMandant || kopfOderFussEnthaeltKennung(text, mandant));
-        // Partner-Wache (v6): Der Mandant ist nie die Gegenpartei; bei fremden Belegen gilt der Absender im Briefkopf
-        if (!leer(partner) && Normalisierung.name(partner).equals(Normalisierung.name(mandant.name()))) {
-            String absender = v.absender();
-            if (!aussteller && !leer(absender)
-                    && !Normalisierung.name(absender).equals(Normalisierung.name(mandant.name()))) {
-                partner = absender.strip();
-            } else {
-                sicherheit.put(Feld.PARTNER, 0.0);
-            }
-        }
         if (aussteller && belegnummer != null) {
             for (Map.Entry<Pattern, String> m : MUSTER.entrySet()) {
                 if (m.getKey().matcher(belegnummer).matches()) {
