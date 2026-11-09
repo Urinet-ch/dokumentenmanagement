@@ -40,6 +40,7 @@
 - **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen: [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
 
 ## Verweise
+- Spike 0.2 (Vorbehalt): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007
 - Req 0.4, 6.1–6.9, 6.12, 6.13, 9.3, 9.7, 9.8, 15.10
 - P2, P12
 - Aufgaben 0.2, 2.3, 3.4, 5.3
