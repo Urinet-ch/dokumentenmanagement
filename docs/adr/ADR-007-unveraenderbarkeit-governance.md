@@ -1,6 +1,6 @@
 # ADR-007: Unveränderbarkeit über Object Lock GOVERNANCE, Schlüssel ohne Bypass und zeitgestempeltes Manifest
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Schlüssel ohne `s3:BypassGovernanceRetention`, Verfügbarkeit von COMPLIANCE).
+**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Vorbehalt: Spike 0.2 (Schlüssel ohne `s3:BypassGovernanceRetention`, Verfügbarkeit von COMPLIANCE) – durchgeführt, Befund und Optionen im [Nachtrag 09.11.2026](#nachtrag-09112026-spike-02); der Optionsentscheid ist offen.
 
 **Datum:** 08.11.2026
 
@@ -36,7 +36,24 @@
 - **Tests:** Testcontainers MinIO: App-Schlüssel kann gesperrte Versionen nicht löschen und Sperren nicht verkürzen, Verlängern gelingt. WireMock für den Zeitstempeldienst. JUnit für Kanonisierung (RFC 8785) und Signatur. Der Nachweis zu Req 6.10 ist manuell.
 - **Betrieb:** Der Ablauf einer Korrektur mit dem Bypass-Schlüssel sowie Löschfunktion, Sperrvermerk und Auskunft folgen später (P12); diese Spec beschreibt sie nicht.
 
+## Nachtrag 09.11.2026 (Spike 0.2)
+
+**Status:** **Entschieden von Fabian am 09.11.2026: Option B.** Wirksam mit der Freigabe der ADRs an Gate 0 (Aufgabe 0.6). Abweichend vom Entscheid oben gibt es keinen App-Schlüssel ohne Bypass-Recht; Req 6.5 wird in einem eigenen PR angepasst (alt → neu).
+
+Befund der Live-Tests vom 08.11.2026 (Infomaniak Object Storage, Ceph-Dienst `s3.gva2.infomaniak.cloud`; Einzelheiten und Testnummern in [`docs/spikes/s3-object-lock.md`](../spikes/s3-object-lock.md)):
+- **Object Lock pro Objekt, GOVERNANCE und COMPLIANCE funktionieren** wie bei AWS [T 1, 3a–3d, 4a–4f]: GOVERNANCE verhindert Löschen und Verkürzen ohne Bypass-Header; COMPLIANCE verhindert beides auch mit Bypass, verbietet den Wechsel zu GOVERNANCE und erlaubt das Verlängern.
+- **Ein App-Schlüssel ohne Bypass-Recht ist im selben Projekt nicht möglich** [T 6b–7g]: Eine Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` greift zwar [T 6c], aber jeder Schlüssel des Projekts kann sie löschen oder überschreiben, auch wenn sie `s3:PutBucketPolicy`/`s3:DeleteBucketPolicy` verbietet; danach gelingt das Bypass-Löschen. Punkt 2 des Entscheids lässt sich so nicht umsetzen.
+- **Folge:** Es gilt der Rückfall aus Punkt 7 und Req 6.11: COMPLIANCE mindestens für `manifest/`.
+
+Optionen (Abwägung im Spike-Bericht, Abschnitt «Optionen»):
+- **A:** ein Projekt, COMPLIANCE für alle Arten mit `gesetzliche_pflicht` und für `manifest/`. Voller Schutz gegen vorzeitiges Löschen; eine falsch gesetzte Frist bleibt bis zum Ablauf, darum Frist im Code begrenzen. Weicht von P2 ab (COMPLIANCE für alle gesperrten Objekte war abgelehnt, siehe «Betrachtete Alternativen»).
+- **B (gewählt 09.11.2026):** ein Projekt, GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` – der in tasks.md (0.2) und Punkt 7 vorgesehene Rückfall. Dokumente sind gegen Fehler der App und Versehen geschützt; eine Manipulation mit gestohlenem App-Schlüssel ist nicht verhindert, fällt aber über das COMPLIANCE-gesperrte, zeitgestempelte Manifest auf. Req 6.5 ist damit nur eingeschränkt erfüllt, weil der App-Schlüssel technisch das Bypass-Recht hat.
+- **C:** zwei Projekte, Policy mit Deny auf Bypass für das App-Projekt. Nur abgeleitet, nicht getestet; verlangt einen eigenen Spike (zweites Projekt, Java SDK v2, Zugriff über Projektgrenzen).
+
+Mit Option B ist noch zu klären, wie Req 6.5 («App-Schlüssel ohne Recht `s3:BypassGovernanceRetention`») zu lesen ist; eine Änderung des Kriteriums gehört als ausgewiesene Anforderungsänderung in einen eigenen PR nach dem Optionsentscheid (Aufgabe 0.6), nicht in diesen Nachtrag.
+
 ## Verweise
+- Nachtrag: `docs/spikes/s3-object-lock.md` (Spike 0.2), `docs/umsetzungsplan.md` Abschnitt 6 (P2, Abnahme Gate 0)
 - Req 0.4, 6.3, 6.5, 6.9, 6.10, 6.11, 9.7, 15.1–15.5, 15.8, 15.9, 16.9, 16.12
 - P2, P12, P17
 - Aufgaben 0.2, 2.3, 4.9, 5.2, 5.3, 5.4, 5.10

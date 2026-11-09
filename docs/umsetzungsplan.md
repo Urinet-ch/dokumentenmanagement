@@ -111,9 +111,9 @@ noch klassisch).
 
 | Gate / Entscheid | Wann | Kriterium / Frage | Ergebnis |
 | --- | --- | --- | --- |
-| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | [offen] |
-| E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | [offen] |
-| E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | [offen] |
+| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | **Zwischenstand 09.11.2026:** Abstimmungsteil (30 synthetische Belege), Prompt v3 `v3-24e40a6cf5ab`, OCR-Text: 123/150 Felder (82 %), 18/30 Belege mit Art, Datum, Partner, Betrag richtig (60 %; hochgerechnet auf den Prüfteil rund 12/20, Gate verlangt 18/20), 13 Fehler ≥ 0.8, kleinste Schwelle mit höchstens 1 Fehler 0.91 (Lauf 2026-11-09-0616; je nach Lauf 0.91 bis > 1.0 und 8–13 Fehler ≥ 0.8 bei gleichem Prompt v3, Laufschwankung golden-ergebnis.md Befund 6); Variante K1 (Bild): 134/150, 18/30, 12 Fehler ≥ 0.8 (`docs/spikes/golden-ergebnis.md`). Prüfteil: [offen: Gate-Lauf `--gate`, Fabian]. Realitätsprüfung: 0 bestätigte echte Belege. Spikes 0.2, 0.3, 0.4 dokumentiert (0.4 ohne Verkaufschancen, Nachexport vor Welle 4). Abnahme siehe Vorlage unten |
+| E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
+| E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
 | K5 Server | vor Welle 5 (früher, falls 1.10 abbricht oder 16.18 später eintritt) | Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (P1) | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
 | E5 Papier | vor Welle 5 | Papieroriginale nach Scan vernichten? Verfahrensbeschreibung anpassen | [offen] |
 | Gate 1 | Ende Welle 5 | Belege 2026 im Archiv, Prüflauf ohne Abweichung | [offen] |
@@ -121,6 +121,36 @@ noch klassisch).
 | Gate 2 | Ende Welle 9 | 7 Beispielfragen + ≥ 18/20 | [offen] |
 | E4 VHF/GSK | nach 19.11.2026 | Archiv in Etappe 2 der Offerte O-2026-002 oder später | [offen] |
 | Gate 3 | Ende Welle 12 | Archiv online, Geschäftsstelle veröffentlicht selbständig | [offen] |
+
+**Abnahme Gate 0** (Vorlage, füllt Fabian aus)
+
+Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `docs/spikes/infomaniak-ai.md`,
+`docs/spikes/21crm-export.md`, ADR-007 (Nachtrag 09.11.2026). Kriterien: Req 0.3, 0.9, 0.10.
+
+| Feld | Wert |
+| --- | --- |
+| Datum der Abnahme | [offen] |
+| Prompt-Fassung und Hash im Gate-Lauf | [offen] (Abstimmungsteil zuletzt: v3 `v3-24e40a6cf5ab`) |
+| Eingabe | [offen: OCR-Text oder K1 für Fotos] |
+| Schwelle (Req 0.9, gilt für Req 7.6) | [offen] (Startwert 0.8; Abstimmungsteil: kleinste Schwelle mit höchstens 1 Fehler 0.91 im Lauf 2026-11-09-0616, je nach Lauf 0.91 bis > 1.0 – Laufschwankung, golden-ergebnis.md Befund 6) |
+| Prüfteil: Belege mit Art, Datum, Partner, Betrag richtig | [offen] / 20 (Gate: ≥ 18; Hochrechnung aus dem Abstimmungsteil rund 12/20) |
+| Prüfteil: Fehler mit Sicherheit ≥ Schwelle | [offen] (Gate: ≤ 1) |
+| Realitätsprüfung (Req 0.10): bestätigte echte Belege | [offen] von 20 |
+| Realitätsprüfung: Quote | [offen] |
+| Gate 0 | [offen: bestanden / nicht bestanden] |
+
+| Entscheid | Stand |
+| --- | --- |
+| Umstufung der Art bei eigener Art und fremdem QR-Zahlungsempfänger (statt nur Sicherheit 0) | **entschieden von Fabian am 09.11.2026**: ja – nur aus AUSGANGSRECHNUNG oder OFFERTE, nie aus LOHNABRECHNUNG (golden-ergebnis.md, Befund 3); Umsetzung im Prototyp (Aufgabe 0.5, nachschärfen) |
+| K1: Bild an das Modell nur für Fotos, Volltext weiter per OCR | **entschieden von Fabian am 09.11.2026**: ja (golden-ergebnis.md, Befund 2; «nur Fotos» wird im Prototyp nachgemessen, Aufgabe 0.5) |
+| Offerten: Betrag = einmaliges Total der Umsetzung | **festgelegt von Fabian am 09.11.2026** bei der Durchsicht der echten Belege (Bestätigung der Belege noch offen), für den Golden-Datensatz: der Betrag der Umsetzung zählt, eine monatliche Wartungsgebühr nicht. Verallgemeinerung auf alle Offerten bzw. Behördenschreiben und Übernahme in Prompt und design.md: **entschieden von Fabian am 09.11.2026** |
+| Belegnummer bei Behördenschreiben | **festgelegt von Fabian am 09.11.2026** bei der Durchsicht der echten Belege (Bestätigung der Belege noch offen), für den Golden-Datensatz: bei einer EasyGov-Vollmacht ist die Antrags-ID die Belegnummer. Verallgemeinerung auf alle Offerten bzw. Behördenschreiben und Übernahme in Prompt und design.md: **entschieden von Fabian am 09.11.2026** |
+| Abgrenzung BEHOERDE/VERSICHERUNG | **entschieden von Fabian am 09.11.2026:** Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften. UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG (entschieden von Fabian am 09.11.2026). Regel kommt in Prompt und design.md «KI» (Aufgabe 0.5); Beschreibungsspalte in der Dokumentarten-Tabelle nur vorgeschlagen · [offen] |
+| Object Lock: Option A / B / C (ADR-007, Nachtrag) | **entschieden von Fabian am 09.11.2026**: Option B (GOVERNANCE für Dokumente, COMPLIANCE für `manifest/`); Anpassung von Req 6.5 als eigener PR (alt → neu) |
+| E2 Eigenbau | **bestätigt von Fabian am 09.11.2026** |
+| E3 PWA | **bestätigt von Fabian am 09.11.2026** |
+| D8 | **von Fabian am 09.11.2026:** einer Folge-Spec zuordnen, nicht streichen – [offen: Spec 02 oder 03] |
+| Freigabe ADR-001 bis ADR-012 (per Merge) | [offen] |
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
@@ -130,7 +160,7 @@ P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS star
 | Nr. | Thema | Entscheid | Noch offen |
 | --- | --- | --- | --- |
 | P1 | Zielplattform | **geändert 08.11.2026:** zwei Stufen mit gleichem Muster (Traefik, Bundle-Deploy, Compose-Policy) + Public-Cloud-Projekt nur für Object Storage (unverändert). **Stufe A** ab Welle 1 auf der bestehenden Infomaniak-VPS: nur Test- und anonymisierte Daten, Speicherbudget ≤ 700 MiB / 0.75 CPU (in Welle 1 gemessen, Aufgabe 1.10), API und Worker in einem Container, keine Leistungsziele, Sicherung nur als Funktionstest. **Stufe B** eigene, grössere Infomaniak-VPS: Wechsel (Aufgabe 5.11) spätestens vor echten Belegen (Übernahme/Produktion in Welle 5), früher bei Budgetüberschreitung oder wenn andere Apps der VPS leiden; Leistungsziele und Lasttests erst hier; K5 vor Welle 5. Bisher: eigene VPS ab Welle 1, K5 vor Welle 1 | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
-| P2 | Unveränderbarkeit | Object Lock GOVERNANCE, App-Schlüssel ohne Bypass, Bypass-Schlüssel offline beim Inhaber, RFC-3161-Zeitstempel Pflicht; Spike prüft Schlüssel ohne Bypass und COMPLIANCE, sonst COMPLIANCE mindestens für `manifest/` | [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5] |
+| P2 | Unveränderbarkeit | Object Lock GOVERNANCE, App-Schlüssel ohne Bypass, Bypass-Schlüssel offline beim Inhaber, RFC-3161-Zeitstempel Pflicht; Spike prüft Schlüssel ohne Bypass und COMPLIANCE, sonst COMPLIANCE mindestens für `manifest/` | [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5]; Spike 0.2 (08.11.2026): COMPLIANCE verfügbar, kein Schlüssel ohne Bypass-Recht im selben Projekt, damit gilt COMPLIANCE mindestens für `manifest/` (Req 6.11); Option B entschieden 09.11.2026 (ADR-007, Nachtrag 09.11.2026)  |
 | P3 | Rollen | eng: `mitarbeiter` erfasst, liest `NORMAL` und eigene `PERSONAL`; nur `inhaber` bestätigt, ändert Vertraulichkeit, verwirft; `INTERN` nur `inhaber`/`treuhaender`; `treuhaender` liest `PERSONAL`; gilt für Mandant `urinet`, `geschaeftsstelle` (Mandant 2) nach Matrix; Matrix Rolle × Aktion in Req 2 | – |
 | P4 | Sicherung Belegdateien | Datenbank (inkl. Keycloak, Realm) und Bucket; Zweitkopie bei zweitem Schweizer Anbieter; über GitHub Actions (Muster `maintenance`), Server verschlüsselt vorher asymmetrisch; Ausnahme in Req 16.7; Restore-Probe automatisiert inkl. Dateien und Anmeldung | [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5] |
 | P5 | Anmeldung | Keycloak bleibt, auf der VPS aus P1, nach P4 gesichert | – |
