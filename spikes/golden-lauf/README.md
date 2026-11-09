@@ -68,21 +68,31 @@ sind dadurch gleich. Abstimmen und `--gate` nutzen denselben synthetischen Manda
 - Eigene Art ohne Kennung des Mandanten: Sicherheit der Art 0; bei fremdem QR-Zahlungsempfänger werden
   `AUSGANGSRECHNUNG` und `OFFERTE` zu `LIEFERANTENBELEG` (Sicherheit 0.5, Standard-Vertraulichkeit), `LOHNABRECHNUNG`
   nie. `mandant.kennungen.ibans` muss auch die QR-IBANs des Mandanten enthalten.
+- R3: Belegdatum strikt nach `golden.eingangsdatum` (Standard `2026-11-10`) → Datum-Sicherheit 0; der gleiche Tag nicht.
+- E1: Betrag 0 des Modells ohne QR-Betrag → leer (ein QR-Betrag, auch 0.00, bleibt).
+- E2: rohe und nachbearbeitete Art `LIEFERANTENBELEG`, kein Swiss QR Code, keine `partnerIban`, keine Fälligkeit und
+  Art nicht vom Belegnummer-Muster gesetzt → `QUITTUNG` mit Art-Sicherheit 0.5.
+- R3, E1 und E2 sind Prototyp-Regeln (Fabian, 09.11.2026), auf dem Abstimmungsteil gefunden und gemessen.
+
+## Laufidentität
+
+Konsole, `kennzahlen.md` und `ergebnisse.json` nennen Prompt-Hash, Modell (`archiv.ki.chat-modell`), Fassung der
+Nachbearbeitung (`Nachbearbeitung.FASSUNG`, bei jeder Regeländerung hochgezählt) und `golden.eingangsdatum`.
 
 ## Gate-Lauf (nur Fabian)
 
-1. Vorläufig: main mit PR #15, `cd spikes/golden-lauf && mvn package`. Kein Gate-Lauf vor Abschluss von Aufgabe 0.5
-   Gate-Vorbereitung (Req 0.9 neu, Regeln R3/E1/E2, Modellvergleich). Der Gate-Lauf läuft auf dem Commit, mit dem
-   Prompt-Hash, Modell und Nachbearbeitung eingefroren werden (Merge-Commit des PR, der sie zuletzt festlegt), ohne
-   spätere Änderungen im Spike.
-2. Schwelle festlegen: Vorschlag `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei Abstimmungsläufe
-   der übernommenen Variante (Wert in [golden-ergebnis.md](../../docs/spikes/golden-ergebnis.md), «Offen für Gate 0»);
-   meldet einer davon «keine ≤ 1.0», gibt es keinen Vorschlag. Den Wert setzt Fabian.
-3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.schwelle=<wert> -jar target/quarkus-app/quarkus-run.jar --gate`
-   (ohne Zusatzschalter, der Bildweg für Fotos ist Standard).
-4. Prompt-Hash der Konsole mit dem eingefrorenen Hash in golden-ergebnis.md vergleichen; weicht er ab, gilt der Lauf nicht.
+1. Commit = Merge-Commit von PR #21 (Gate-Vorbereitung), ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
+   Kein Gate-Lauf, bevor Fabian den Vorschlag (Modell, Schwelle) im Review bestätigt hat.
+2. Schwelle festlegen: Regel `max(0.8, kleinste Schwelle)` mit der grösseren kleinsten Schwelle der zwei Abstimmungsläufe
+   der gewählten Variante (Werte in [golden-ergebnis.md](../../docs/spikes/golden-ergebnis.md)). **Vorschlag: 0.8**
+   (gemma-4-31B-it). Den Wert setzt Fabian.
+3. `java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -Darchiv.ki.chat-modell=google/gemma-4-31B-it -Dgolden.preis.ein-chf-pro-mio=0.20 -Dgolden.preis.aus-chf-pro-mio=0.40 -Darchiv.ki.schwelle=0.8 -jar target/quarkus-app/quarkus-run.jar --gate`
+   (Vorschlag; `golden.eingangsdatum` und Bildweg für Fotos sind Standard).
+4. Prompt-Hash, Modell, Fassung der Nachbearbeitung und Eingangsdatum der Konsolenzeile mit den eingefrorenen Werten
+   vergleichen (Vorschlag: `v5-fb5c021d33fc`, `google/gemma-4-31B-it`, `nb-2026-11-09`, `2026-11-10`); weicht einer ab,
+   gilt der Lauf nicht.
    Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht QR-Format, Kürzung, Bildaufbereitung und
-   Modell/Parameter; massgeblich sind deshalb auch der Commit nach Schritt 1 und das Modell in `kennzahlen.md`.
+   Modell/Parameter; massgeblich ist deshalb auch der Commit nach Schritt 1.
 5. Kennzahlen des Prüfteils in golden-ergebnis.md eintragen. Bestanden bei mindestens 18/20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3); «keine ≤ 1.0» im Prüfteil heisst nicht bestanden.
 
