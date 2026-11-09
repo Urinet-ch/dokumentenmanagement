@@ -23,8 +23,14 @@ public final class Nachbearbeitung {
     public record Ergebnis(String art, LocalDate datum, String partner, String partnerIban, BigDecimal betrag,
                            String waehrung, String belegnummer, String richtung, LocalDate faelligkeit,
                            String vertraulichkeit, boolean mandantIstAussteller, Map<Feld, Double> sicherheit,
-                           String artRoh, double artRohSicherheit, boolean umgestuft) {
+                           String artRoh, double artRohSicherheit, boolean umgestuft, String umstufungGrund,
+                           boolean datumNachEingang) {
     }
+
+    /** Fassung der Regeln, Teil der Laufidentität; bei jeder Regeländerung hochzählen. */
+    public static final String FASSUNG = "nb-2026-11-09";
+    static final String GRUND_QR = "QR";
+    static final String GRUND_E2 = "E2";
 
     /** structure.md «Belegnummern»; das Muster setzt die Art nur, wenn der Mandant Aussteller ist. */
     private static final Map<Pattern, String> MUSTER = Map.of(
@@ -50,7 +56,7 @@ public final class Nachbearbeitung {
     }
 
     public static Ergebnis bearbeite(MetadatenVorschlag v, Optional<QrDaten> qr, String text, Mandant mandant,
-                                     List<Dokumentarten.Art> arten, List<String> eigeneArten, LocalDate heute) {
+                                     List<Dokumentarten.Art> arten, List<String> eigeneArten, LocalDate eingang) {
         Sicherheit s = v.sicherheit() == null ? new Sicherheit(null, null, null, null, null, null, null, null, null, null)
                 : v.sicherheit();
         Map<Feld, Double> sicherheit = new EnumMap<>(Feld.class);
@@ -61,11 +67,18 @@ public final class Nachbearbeitung {
         sicherheit.put(Feld.BELEGNUMMER, wert(s.belegnummer()));
 
         String art = v.art() == null ? null : v.art().name();
+        String artRoh = art;
         LocalDate datum = datum(v.datum());
-        if (datum == null || datum.isAfter(heute.plusYears(1))) {
+        // R3: ein Beleg kann nicht nach seinem Eingang datiert sein; der gleiche Tag ist zulässig
+        boolean datumNachEingang = datum != null && datum.isAfter(eingang);
+        if (datum == null || datumNachEingang) {
             sicherheit.put(Feld.DATUM, 0.0);
         }
         BigDecimal betrag = v.betrag() == null ? null : v.betrag().setScale(2, RoundingMode.HALF_UP);
+        // E1: Betrag 0 des Modells heisst «kein Betrag»; ein QR-Betrag (auch 0.00) setzt ihn unten wieder (Req 7.11)
+        if (betrag != null && betrag.signum() == 0) {
+            betrag = null;
+        }
         String waehrung = v.waehrung();
         String partner = v.partnerName();
         String partnerIban = v.partnerIban();
@@ -90,25 +103,36 @@ public final class Nachbearbeitung {
         // Vorrang: Ein QR-Code mit fremder IBAN schliesst den Mandanten als Aussteller aus, auch bei eigener UID im Kopf
         boolean qrFremd = qr.isPresent() && !qrVomMandant;
         boolean aussteller = !qrFremd && (qrVomMandant || kopfOderFussEnthaeltKennung(text, mandant));
+        boolean musterGesetzt = false;
         if (aussteller && belegnummer != null) {
             for (Map.Entry<Pattern, String> m : MUSTER.entrySet()) {
                 if (m.getKey().matcher(belegnummer).matches()) {
                     art = m.getValue();
                     sicherheit.put(Feld.ART, 1.0);
+                    musterGesetzt = true;
                 }
             }
         }
         // Eigene Art ohne Kennung des Mandanten: bei fremdem QR umstufen, sonst unverändert (Req 7.12) und prüfen lassen
-        boolean umgestuft = false;
+        String umstufungGrund = null;
         if (!aussteller && art != null && eigeneArten.contains(art)) {
             if (qrFremd && UMSTUFBAR.contains(art)) {
                 art = UMSTUFUNG_ZIEL;
                 sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
-                umgestuft = true;
+                umstufungGrund = GRUND_QR;
             } else {
                 sicherheit.put(Feld.ART, 0.0);
             }
         }
+        // E2: Lieferantenbeleg ohne QR, ohne IBAN und ohne Fälligkeit ist meist ein bezahlter Beleg
+        LocalDate faelligkeit = datum(v.faelligkeit());
+        if (!musterGesetzt && UMSTUFUNG_ZIEL.equals(artRoh) && UMSTUFUNG_ZIEL.equals(art) && qr.isEmpty()
+                && leer(partnerIban) && faelligkeit == null) {
+            art = "QUITTUNG";
+            sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
+            umstufungGrund = GRUND_E2;
+        }
+        boolean umgestuft = umstufungGrund != null;
 
         String endArt = art;
         String standard = arten.stream().filter(a -> a.code().equals(endArt)).map(Dokumentarten.Art::vertraulichkeit)
@@ -116,8 +140,8 @@ public final class Nachbearbeitung {
         // Bei Umstufung gehört der Modellwert zur verworfenen Art
         String vertraulichkeit = !umgestuft && v.vertraulichkeit() != null ? v.vertraulichkeit().name() : standard;
         return new Ergebnis(art, datum, partner, partnerIban, betrag, waehrung, belegnummer,
-                v.richtung() == null ? null : v.richtung().name(), datum(v.faelligkeit()), vertraulichkeit,
-                aussteller, sicherheit, v.art() == null ? null : v.art().name(), wert(s.art()), umgestuft);
+                v.richtung() == null ? null : v.richtung().name(), faelligkeit, vertraulichkeit,
+                aussteller, sicherheit, artRoh, wert(s.art()), umgestuft, umstufungGrund, datumNachEingang);
     }
 
     static boolean enthaeltIban(Mandant m, String iban) {

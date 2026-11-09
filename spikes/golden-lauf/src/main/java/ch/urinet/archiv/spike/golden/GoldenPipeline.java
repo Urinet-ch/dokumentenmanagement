@@ -59,6 +59,8 @@ public class GoldenPipeline {
     Duration zeitgrenze;
     @ConfigProperty(name = "golden.eigene-arten")
     List<String> eigeneArten;
+    @ConfigProperty(name = "golden.eingangsdatum")
+    LocalDate eingangsdatum;
 
     /** Weg nach dem Typ des Originals (Inhalt, Req 3.3), nie nach der Kategorie der Erwartung; --k1 schickt jeden Beleg als Bild. */
     static Eingabe eingabe(Erwartung e, boolean k1) {
@@ -145,7 +147,7 @@ public class GoldenPipeline {
             return fehlschlag(e, weg, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, "KI: " + fehler);
         }
         Nachbearbeitung.Ergebnis v = Nachbearbeitung.bearbeite(antwort.content(), qr, ocr.text(), mandant, arten,
-                eigeneArten, LocalDate.now());
+                eigeneArten, eingangsdatum);
         Map<Feld, Boolean> richtig = new EnumMap<>(Feld.class);
         richtig.put(Feld.ART, Vergleich.art(e.art(), v.art()));
         richtig.put(Feld.DATUM, Vergleich.datum(e.datum(), v.datum()));
