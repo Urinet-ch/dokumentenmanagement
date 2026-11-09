@@ -31,7 +31,7 @@ damit die Plattform für weitere Verbände wiederverwendbar ist.
 2. Die Dokumentarten SOLLEN mindestens Bulletin, Merkblatt, Protokoll und Jahresbericht umfassen, mit den Zusatzfeldern Reihe, Ausgabe-Nr., Erscheinungsjahr, Fachgebiet (Bad, Eis, Technik, Recht, Allgemein) und Zugriffsstufe (Pflicht), je Art mit Standard-Vertraulichkeit und `gesetzliche_pflicht` ([offen: `gesetzliche_pflicht` und Standard-Vertraulichkeit je Art VHF/GSK – Entscheid vor Welle 10]).
 3. Der Mandant `vhf-gsk` SOLL keine Finanz-Dokumentarten und keine Finanzwerkzeuge erhalten.
 4. FALLS ein Benutzer des Mandanten `urinet` auf Daten von `vhf-gsk` zugreifen will oder umgekehrt, DANN SOLL das Archiv dies auf allen Wegen (UI, API, Chat, öffentliche Schnittstelle, S3-Links) verhindern.
-5. WENN der Mandant angelegt ist, DANN SOLL die Anwendung auf seinen Bucket nur mit dem App-Schlüssel ohne Recht `s3:BypassGovernanceRetention` zugreifen (Spec 01, 6.5), und Schema und Bucket SOLLEN in Sicherung, Zweitkopie und Restore-Probe enthalten sein (Spec 01, 16.2, 16.3, 16.8).
+5. WENN der Mandant angelegt ist, DANN SOLL die Anwendung auf seinen Bucket nur mit dem App-Schlüssel zugreifen und dabei nie den Header `x-amz-bypass-governance-retention` setzen (Spec 01, 6.5), und Schema und Bucket SOLLEN in Sicherung, Zweitkopie und Restore-Probe enthalten sein (Spec 01, 16.2, 16.3, 16.8).
 
 ### Requirement 2: Branding und Domain (M2)
 **User Story:** Als Geschäftsstelle möchte ich das Archiv unter dem Namen und Logo des Verbands sehen,

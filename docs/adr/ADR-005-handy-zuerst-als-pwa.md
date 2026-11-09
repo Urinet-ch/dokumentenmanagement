@@ -34,14 +34,14 @@ Suche, Import und Verwaltung abdeckt (design.md, Frontend):
 - Anmeldung per OIDC mit PKCE gegen Keycloak; die Oberfläche blendet Aktionen ohne Recht aus, die API
   prüft trotzdem (ADR-009).
 
-Eine native Hülle mit Capacitor folgt später (design.md, Overview); den Zeitpunkt legt Spec 01 nicht fest.
+Eine native Hülle mit Capacitor folgt später (design.md, Overview); den Zeitpunkt legt Spec 01 nicht fest. (D8 gestrichen, entschieden von Fabian am 09.11.2026: keine native App, nur Web-App; requirements.md, Rückverfolgung)
 
 ## Betrachtete Alternativen
 1. **Native Apps (Swift, Kotlin)** – abgelehnt: zwei zusätzliche Codebasen neben Angular, Verteilung über
    App Stores, kein Wiederverwenden von Eingangskorb und Suche; zu viel Aufwand für das Zeitbudget.
 2. **Capacitor-Hülle von Anfang an** – zurückgestellt: brächte native Kamera- und Hintergrundfunktionen,
    aber App-Store-Konten, Signierung, Review und eine zweite Build-Kette. Weil Capacitor eine Web-App
-   einpackt, bleibt der PWA-Code für diesen Schritt nutzbar.
+   einpackt, bleibt der PWA-Code für diesen Schritt nutzbar. (D8 gestrichen, entschieden von Fabian am 09.11.2026: keine native App, nur Web-App; requirements.md, Rückverfolgung)
 3. **Fotos-App oder fremde Scanner-App, danach Upload im Browser** – abgelehnt: kein Original nach P13
    (Rohaufnahme), keine Offline-Warteschlange mit Zähler (Req 4.4), Medienbruch beim Erfassen; ein Weg über
    E-Mail gehört erst zu Spec 02.

@@ -5,7 +5,7 @@
 **Datum:** 08.11.2026
 
 ## Kontext
-- Object Lock (ADR-007) schützt vor Löschen und Überschreiben, nicht vor dem Ausfall des Anbieters, dem Verlust des Kontos oder einer beschädigten Datenbank. Ohne Datenbank fehlen die Metadaten, ohne Bucket die Belege.
+- Object Lock (ADR-007) schützt vor Löschen und Überschreiben (Dokumente unter GOVERNANCE nur gegen Fehler der App und Versehen, siehe ADR-007, Nachtrag 09.11.2026), nicht vor dem Ausfall des Anbieters, dem Verlust des Kontos oder einer beschädigten Datenbank. Ohne Datenbank fehlen die Metadaten, ohne Bucket die Belege.
 - Die Belege müssen während der ganzen Aufbewahrungsfrist verfügbar und lesbar bleiben (Req 6, 15; Leitsatz in product.md).
 - Alle echten Daten bleiben in der Schweiz (tech.md Regel 6, Req 16.7). Der Betrieb sichert seine Apps aber über einen zentralen Workflow in GitHub Actions (maintenance-Muster), dessen Runner ausserhalb der Schweiz laufen.
 - Ein kompromittierter Server soll die Sicherung weder lesen noch löschen können.
@@ -36,7 +36,7 @@
 - **Negativ:** Kosten für den zweiten Anbieter und Platz auf der VPS für den täglichen Export; der Bucket-Export ist deshalb inkrementell.
 - **Umsetzung:** Export unter `deploy/backup/` im Repository; Workflow, `backup-gate.sh` und Restore-Probe im Infra-Repo der VPS (Aufgabe 5.5); Alarm (Aufgabe 5.6). Die Aufbewahrung nach Req 16.2 gilt erst ab Stufe B (Aufgabe 5.11).
 - **Tests:** Nachweis manuell über Sicherungs- und Restore-Protokoll (Req 16.2, 16.8); die Restore-Probe ist der wiederkehrende Betriebstest (design.md, Testing Strategy).
-- **Betrieb:** Die Zweitkopie trägt keine Object-Lock-Sperren. Nach einer Wiederherstellung in einen neuen Bucket sind die Sperren nach ADR-004 und ADR-007 neu zu setzen; die Spec regelt das noch nicht ausdrücklich (zu klären in `docs/wiederherstellung.md`, Aufgabe 5.5).
+- **Betrieb:** Die Zweitkopie trägt keine Object-Lock-Sperren. Nach einer Wiederherstellung in einen neuen Bucket sind die Sperren nach ADR-004 und ADR-007 neu zu setzen; die Spec regelt das noch nicht ausdrücklich (zu klären in `docs/wiederherstellung.md`, Aufgabe 5.5). Für die Restore-Probe: [offen: ob die Restore-Probe im Probe-Bucket Sperren setzt – Entscheid vor Welle 5]; läuft die Probe mit den Stufenwerten der Stufe B (Sperrmodus von `manifest/` fest COMPLIANCE, Aufgabe 2.3), wären Manifeste dort (Req 6.11, Option B) bis zum Ablauf ihrer Sperre nicht löschbar.
 
 ## Verweise
 - Req 15.5, 16.2, 16.3, 16.5, 16.7, 16.8, 16.12, 16.15, 16.19

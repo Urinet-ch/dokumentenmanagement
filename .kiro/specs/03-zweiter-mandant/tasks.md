@@ -14,7 +14,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 8.4, 2.2, 1.2, 3.5_
 
 - [ ] 10.2 Seed und Mandant anlegen [Backend]
-  - `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` mit Zusatz-Schema, Standard-Vertraulichkeit und `gesetzliche_pflicht`; keine Finanzarten; Provisionierung nach Spec 01 (Liquibase `db/mandant`, Bucket mit Object Lock und Versionierung, App-Schlüssel ohne Bypass-Recht); Keycloak-Client `archiv-vhf-gsk`
+  - `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` mit Zusatz-Schema, Standard-Vertraulichkeit und `gesetzliche_pflicht`; keine Finanzarten; Provisionierung nach Spec 01 (Liquibase `db/mandant`, Bucket mit Object Lock, Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`, Zugriff mit dem App-Schlüssel `s3_app_zugang`, nie mit Bypass-Header nach Spec 01, 6.5); Keycloak-Client `archiv-vhf-gsk`
   - Szenario: Finanzwerkzeuge für `vhf-gsk` nicht verfügbar
   - _Anforderungen: 1.1, 1.2, 1.3, 1.5_
 

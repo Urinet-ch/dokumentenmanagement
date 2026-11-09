@@ -80,7 +80,7 @@ quarkus.s3.aws.region=gva2
 quarkus.s3.aws.credentials.type=static
 ```
 
-Schlüssel nur über Secret-Dateien bzw. Umgebungsvariablen (Req 16.9) [D 25].
+Schlüssel nur über Secret-Dateien unter `/run/secrets/`, nie über Umgebungsvariablen (Req 16.9) [D 25] (korrigiert 09.11.2026).
 
 ## Offene Punkte
 
