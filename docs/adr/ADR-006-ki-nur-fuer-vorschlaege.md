@@ -73,7 +73,8 @@ Grundsatz «KI nur für Vorschläge», siehe ADR-013.
 ## Nachtrag 09.11.2026 (Gate 0, Modell der Erfassung)
 Golden-Lauf 0.5 und Gate-Lauf liegen vor (`docs/spikes/golden-ergebnis.md`): Prüfteil 20/20 Belege mit Art, Datum,
 Partner und Betrag richtig, 1 falsches Feld mit Sicherheit ab 0.8, Schwelle `archiv.ki.schwelle=0.8`. Gemessen mit
-`google/gemma-4-31B-it`; Mistral-Small-4 verfehlte das Gate im Abstimmungsteil. Entschieden von Fabian am 09.11.2026:
+`google/gemma-4-31B-it`; Mistral-Small-4 war im Abstimmungsteil nicht gate-reif (27/30 und 24/30, keine Schwelle ≤ 1.0
+mit höchstens einem Fehler). Entschieden von Fabian am 09.11.2026:
 Den Metadaten-Vorschlag macht `archiv.ki.erfassung-modell=google/gemma-4-31B-it`, getrennt von `archiv.ki.chat-modell`
 (Chat und Wissensbasis bleiben bei Mistral-Small-4, bis Gate 2 bzw. Gate 4 messen). Ein anderes Erfassungsmodell gilt
 erst nach einem neuen Golden-Lauf (design.md «KI»). Der Satz «design.md setzt weiterhin auf den OCR-Volltext» unter

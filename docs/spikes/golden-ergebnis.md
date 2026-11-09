@@ -308,8 +308,8 @@ Konsolenzeile und `kennzahlen.md` zeigen die eingefrorenen Werte: Prompt `v5-fb5
 
 **Ergebnis:** Req 0.3 (≥ 18/20) und Req 0.9 (höchstens 1 Fehler ab der Schwelle) sind erfüllt. Wie im Abstimmungsteil
 war das einzige falsche Feld eine Belegnummer mit hoher Sicherheit; der eine erlaubte Fehler ist damit ausgeschöpft.
-Befund für Welle 3 (KI-Vorschläge im Produkt): Belegnummern kurzer Belege prüfen, ohne den eingefrorenen Stand zu
-ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
+Befund für Welle 3 (KI-Vorschläge im Produkt): Die Belegnummer ist in Abstimmungs- und Prüfteil die einzige Fehlerquelle
+mit hoher Sicherheit; in Aufgabe 3.2 gezielt prüfen, ohne den eingefrorenen Stand des Prototyps zu ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
 
 ## Offen für Gate 0 (Aufgabe 0.6, Fabian)
 

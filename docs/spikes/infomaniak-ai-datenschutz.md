@@ -225,3 +225,12 @@ Stand: Prüfung der öffentlichen Infomaniak-Dokumente am 08.11.2026. Massgebend
 ```
 
 Die heruntergeladenen Originale liegen in `/private/tmp/claude-501/-Users-fabian-git-ai-entwicklung/0ef95298-9209-4edd-995a-76d6aee761c2/scratchpad/dl/`. Die AVV-PDFs heissen `dpafr.pdf`, `dpade.pdf` und `dpaen.pdf`, die TOMs `toms.pdf`, die LLM-Bedingungen `cgu87fr.pdf`.
+
+## Nachtrag 09.11.2026 (Gate 0, Modell der Erfassung)
+Seit Gate 0 macht `google/gemma-4-31B-it` den Metadaten-Vorschlag (`archiv.ki.erfassung-modell`, entschieden von Fabian
+am 09.11.2026, ADR-006, Nachtrag 09.11.2026). Damit gehen alle erfassten Belege, auch Lohnabrechnungen und Bild-Originale,
+an ein Modell, für das Abschnitt 2 keine Aussage pro Modell findet. Vertraglich gilt der Standort Schweiz für alle
+Kundendaten (ANB Art. 15.1); die Rückfrage an dpo@infomaniak.com oben nennt Gemma bereits. Das Modell trägt kein
+Beta-Kennzeichen (`meta.is_beta: false`, `GET /1/ai/models`, 09.11.2026); die Liste unter «Beta-Modelle» im
+Formulierungsvorschlag gilt damit um `google/gemma-4-31B-it` ergänzt.
+[offen: Bestätigung von Infomaniak, dass google/gemma-4-31B-it ausschliesslich auf eigenen GPUs in der Schweiz läuft – Entscheid vor Welle 5]
