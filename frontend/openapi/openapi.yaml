@@ -1,0 +1,6 @@
+---
+openapi: 3.1.0
+info:
+  title: UriNet Archiv API
+  version: v1
+paths: {}

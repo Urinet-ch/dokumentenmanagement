@@ -19,7 +19,7 @@ inclusion: always
 | CSV | Apache Commons CSV, ICU4J (Zeichensatz-Erkennung) | |
 | Betrieb | Docker Compose (`deploy/infomaniak/compose.yml`), Traefik (Labels), in zwei Stufen: Stufe A auf der bestehenden Infomaniak-VPS (nur Testdaten), Stufe B auf einer eigenen Infomaniak-VPS | Domains `archiv.apps.urinet.ch`, `archiv-auth.apps.urinet.ch`; Details unter «Plattform und Betrieb» |
 | Sicherung | `pg_dump` + Bucket-Kopie → restic, Zweitkopie bei einem zweiten Schweizer Anbieter | [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5]; Details unter «Plattform und Betrieb» |
-| Tests | Cucumber (Features mit Tag `@req-<x.y>`), JUnit 5 für Unit-Tests, Quarkus Dev Services (PostgreSQL, Keycloak), Testcontainers (MinIO mit Object Lock), WireMock, AssertJ, ArchUnit, REST-assured, Playwright | Backend-Szenarien mit Java-Runner, Browser-Szenarien mit Cucumber.js + Playwright gegen den Prod-Build |
+| Tests | Cucumber (Features mit Tag `@req-<x.y>`), JUnit (Jupiter 6, über die Quarkus-BOM) für Unit-Tests, Quarkus Dev Services (PostgreSQL, Keycloak), Testcontainers (MinIO mit Object Lock), WireMock, AssertJ, ArchUnit, REST-assured, Playwright | Backend-Szenarien mit Java-Runner, Browser-Szenarien mit Cucumber.js + Playwright gegen den Prod-Build |
 
 ## Nicht verhandelbare Regeln
 1. **Mandant nie aus Benutzereingaben.** Der Mandant stammt ausschliesslich aus dem verifizierten Token (`mandant`-Claim) bzw. aus dem API-Token. Kein Header, kein Query-Parameter, kein Prompt setzt ihn.
@@ -78,9 +78,10 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 
 ## Tests und Qualität
 - Jedes Akzeptanzkriterium hat mindestens ein Cucumber-Szenario mit dem Tag `@req-<x.y>` (z. B. `@req-3.4` für Requirement 3, Kriterium 4). EARS-Kriterien werden direkt als Szenario geschrieben. Feature-Dateien unter `backend/src/test/resources/features/<fachbereich>/`, per Tag an Java-Runner (REST-assured) oder Cucumber.js + Playwright geroutet.
-- Domain-Logik zusätzlich mit JUnit-5-Unit-Tests, ohne Quarkus.
+- Jede Feature-Datei trägt auf Feature-Ebene genau einen Spec-Tag (`@spec-01` bis `@spec-04`). Die Abdeckungsprüfung (Req 16.14) vergleicht `@req`-Tags nur innerhalb derselben Spec; fehlt der Spec-Tag oder stehen mehrere, bricht sie ab.
+- Domain-Logik zusätzlich mit JUnit-Unit-Tests (Jupiter 6, über die Quarkus-BOM), ohne Quarkus.
 - Mandantentrennung wird in jedem Repository-Test mit zwei Mandanten geprüft.
 - KI-Aufrufe in Unit- und Integrationstests mit WireMock.
 - **Golden-Datensatz** nur ausserhalb des Repos im Verzeichnis aus `ARCHIV_GOLDEN_DIR`. Im Repo liegen nur Schema und Test; `GoldenDatensatzIT` wird manuell gestartet, nicht in der CI.
 - **Ausnahmen vom Szenario:** Kriterien mit dem Vermerk «Nachweis: manuell [Fabian]» oder «Nachweis: Dokument» brauchen kein automatisiertes Szenario, Kriterien mit «Nachweis: JUnit» (z. B. ArchUnit) kein Cucumber-Szenario. Der Nachweis (Protokoll, Bericht, Dokument oder Test) wird im PR verlinkt.
-- **Definition of Done pro Aufgabe:** Szenarien und Tests grün, `mvn verify` grün (inkl. ArchUnit), keine neuen Sonar-/SpotBugs-Funde der Stufe hoch, OpenAPI aktualisiert, bestehende Liquibase-Changesets unverändert, erfüllte Akzeptanzkriterien mit `@req`-Tags im PR genannt, Checkbox in `tasks.md` im selben PR abgehakt.
+- **Definition of Done pro Aufgabe:** Szenarien und Tests grün, `mvn verify` grün (inkl. ArchUnit), keine neuen SpotBugs-Funde der Stufe hoch, OpenAPI aktualisiert, bestehende Liquibase-Changesets unverändert, erfüllte Akzeptanzkriterien mit `@req`-Tags im PR genannt, Checkbox in `tasks.md` im selben PR abgehakt.

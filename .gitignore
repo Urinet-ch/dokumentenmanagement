@@ -1,0 +1,5 @@
+# Build-Ausgaben
+target/
+
+# Systemdateien
+.DS_Store

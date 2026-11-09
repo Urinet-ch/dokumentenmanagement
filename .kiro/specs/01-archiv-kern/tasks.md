@@ -74,7 +74,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 1 — Fundament (Voraussetzung: Gate 0, Stufe A aus 0.7 bereit)
 
-- [ ] 1.1 Repository-Gerüst und CI [Infra]
+- [x] 1.1 Repository-Gerüst und CI [Infra]
   - Struktur gemäss `structure.md`, Paketstruktur hexagonal je Fachbereich (`domain`, `application`, `adapter`)
   - Quarkus-Projekt `backend` (Java 25, Extensions: rest-jackson, hibernate-orm-panache, jdbc-postgresql, liquibase, oidc, smallrye-openapi, smallrye-health, micrometer, scheduler, amazon-s3, langchain4j-openai, quinoa); Hibernate nur `validate`
   - Angular-Projekt `frontend` (Standalone, Material, PWA), über Quinoa im API-Artefakt ausgeliefert
@@ -86,6 +86,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Quarkus Dev Services für PostgreSQL 17 + pgvector und Keycloak; MinIO (Object Lock) und Mailpit für Entwicklung und Tests
   - Keycloak-Realm-Export `deploy/keycloak/realm-export.json` (Realm `urinet-archiv`) mit den Rollen `inhaber`, `mitarbeiter`, `treuhaender`, `geschaeftsstelle`, Claim-Mapper `mandant`, TOTP-Pflicht, Testbenutzer je Rolle
   - Dev-Stubs der Driven Ports (Ablage, KI, OCR, Integration) im Profil `dev`
+  - Datasource aktiv, OIDC (`quarkus.oidc.tenant-enabled`), Dev Services und automatisches OpenAPI-Security-Schema wieder einschalten (in 1.1 vorübergehend aus)
   - _Anforderungen: 2.1, 2.2, 16.13_
 
 - [ ] 1.3 Mandantenregister und Provisionierung [Backend]

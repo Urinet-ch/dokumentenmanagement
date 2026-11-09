@@ -1,0 +1,11 @@
+api.base.service.ts
+api.module.ts
+api/api.ts
+configuration.ts
+encoder.ts
+index.ts
+model/models.ts
+param.ts
+provide-api.ts
+query.params.ts
+variables.ts

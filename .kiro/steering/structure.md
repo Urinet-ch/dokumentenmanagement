@@ -38,7 +38,7 @@ dokumentenmanagement/
 │       ├── db/mandant/      Liquibase: Schema je Mandant
 │       ├── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten
 │       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
-│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>); Spec 04 unter features/wissen/
+│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/
 ├── frontend/                Angular PWA (Build über Quinoa)
 │   └── src/app/
 │       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/  wissen/ (Spec 04)

@@ -1,0 +1,2 @@
+/** protokoll – Zugriffsprotokoll, Tages-Manifest. Domain: Records, Invarianten, Domain-Services – ohne Quarkus, JPA oder Jackson (ADR-011). */
+package ch.urinet.archiv.protokoll.domain;

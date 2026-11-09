@@ -1,0 +1,5 @@
+# Generierter API-Client (design.md, Frontend): nicht von Hand ändern, sondern mit `npm run api:generieren`
+# neu erzeugen. Diese Dateien erzeugt der Generator nicht:
+git_push.sh
+README.md
+.gitignore
