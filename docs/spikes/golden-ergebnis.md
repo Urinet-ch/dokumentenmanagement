@@ -331,10 +331,11 @@ Fabian bestätigt (Req 0.10); zählt nie für das Gate. Nur Kennzahlen, keine We
   (`golden.mandant-name`).
 
 **Einordnung:** Die synthetischen Belege sind deutlich einfacher als die echten (Prüfteil 20/20, echte 13/20). Gate 0 ist
-nach Req 0.3 und 0.9 erfüllt; Fabian hat es am 09.11.2026 mit den Auflagen A1 (Belegnummer immer prüfen) und A2 (Ziel für
-echte Belege vor der Übernahme) abgenommen (`docs/umsetzungsplan.md`, Abschnitt 6). E2 bleibt unverändert.
+nach Req 0.3 und 0.9 erfüllt; Fabian hat es am 09.11.2026 mit den Auflagen A1 (Belegnummer prüfen, ausser eigene Belege) und A2 (Ziel für
+echte Belege vor der Übernahme) abgenommen (`docs/umsetzungsplan.md`, Abschnitt 6). Die Prototyp-Regel E2
+(`LIEFERANTENBELEG` → `QUITTUNG`) bleibt unverändert (Fabian, 09.11.2026).
 
-## Offen für Gate 0 (Aufgabe 0.6, Fabian)
+## Ablauf des Gate-Laufs (durchgeführt 09.11.2026) und weiter offen
 
 Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.md)):
 1. Commit = Merge-Commit von PR #21 (Gate-Vorbereitung), ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
@@ -347,7 +348,7 @@ Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.m
    der Lauf nicht. Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht
    QR-Format, Kürzung (`MAX_ZEICHEN`), Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich ist deshalb
    auch der Commit nach Schritt 1.
-5. Kennzahlen des Prüfteils hier eintragen. «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
+5. Erledigt: Kennzahlen im Abschnitt «Gate-Lauf», Abnahme in `docs/umsetzungsplan.md`, Abschnitt 6. Damals: «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3). Meldet der Prüfteil «keine ≤ 1.0», ist das Gate nicht
    bestanden (Req 0.9); wie es weitergeht, entscheidet Fabian.
 

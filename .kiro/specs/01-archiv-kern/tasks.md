@@ -8,10 +8,10 @@ Arbeitsweise je Aufgabe (Claude Code):
 - Eine Sitzung, ein Branch (`feature/01-<aufgabe>-<stichwort>`), ein PR. Der PR nennt die erfüllten Kriterien als `@req-<x.y>` und hakt die Checkbox hier ab.
 - Szenarien und Tests zuerst bzw. mitliefern: Cucumber-Features mit `@req-<x.y>`, Domain-Logik zusätzlich mit JUnit. Es gilt die Definition of Done aus `tech.md`.
 - Kriterien mit «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder «Nachweis: JUnit» brauchen kein Cucumber-Szenario; der Nachweis wird im PR verlinkt.
-- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 1.7, 1.10, 2.8, 4.9, 5.5, 5.11).
+- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 1.7, 1.10, 2.8, 2.9, 4.9, 5.5, 5.11).
 - Aufgabennummern bleiben stabil; neue Aufgaben erhalten die nächste freie Nummer ihrer Welle.
 
-## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert, Stufe A vorbereitet)
+## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert; Stufe A aus 0.7 ist Voraussetzung für Welle 1, nicht für Gate 0)
 
 - [x] 0.1 Golden-Datensatz zusammenstellen [Fabian]
   - 50 Belege gemäss Requirement 0.1 auswählen (genau 10 je Kategorie), Personendaten schwärzen (AHV-Nr., IBAN Dritter)
@@ -210,6 +210,11 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Mindestversionen iOS (Safari) und Android (Chrome) festlegen [offen: Mindestversionen iOS und Android – Entscheid vor Welle 3] und per PR in Requirement 4.1 nachtragen; Testgeräte für 3.7 bereitstellen
   - _Anforderungen: 4.1_
 
+- [ ] 2.9 Ziel für echte Belege festlegen (Auflage A2 aus Gate 0) [Fabian]
+  - Zielwerte für die Realitätsprüfung vor der Übernahme, Aufteilung der echten Belege in Abstimmungs- und zurückgehaltenen Teil und Umgang mit Änderungen aus dem Abstimmen (Prompt, Regeln, Parameter: neuer Golden-Lauf nach Req 0.9 oder nur Regeln, die Sicherheiten senken wie A1) entscheiden: [offen: Zielwerte und Aufteilung der echten Belege, Umgang mit Änderungen aus dem Abstimmen – Entscheid vor Welle 3]; Ergebnis in `docs/umsetzungsplan.md`, Abschnitt 6, und per PR in Req 0.10 (alt → neu) nachtragen
+  - Der erneute Lauf vor der Übernahme ist Voraussetzung von 5.8
+  - _Anforderungen: 0.10_
+
 ## Welle 3 — KI-Vorschläge, Eingangskorb, Handy-Erfassung
 
 - [ ] 3.1 Kontakte und Partner-Abgleich [Backend]
@@ -224,7 +229,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter; Logs nur mit IDs
   - WireMock-Tests für gültige, ungültige und fehlende Antworten; ein WireMock-Test prüft den Request: `model` = Wert von `archiv.ki.erfassung-modell` (nicht `archiv.ki.chat-modell`), `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `response_format` `json_schema` mit `strict`
   - Befund Gate-Lauf (`docs/spikes/golden-ergebnis.md`): Belegnummer-Vorschläge mit hoher Sicherheit gezielt prüfen, ohne Prompt, Modell oder Aufrufparameter gegenüber Gate 0 zu ändern (sonst neuer Golden-Lauf)
-  - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser das Belegnummer-Muster bestätigt sie (design.md «KI», Nachbearbeitung); Unit-Test für beide Fälle
+  - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
@@ -376,12 +381,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 16.6, 16.12_
 
 - [ ] 5.8 Übernahme Belege 2026 und Abnahme [Fabian] [QA]
-  - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün; Realitätsprüfung nach Auflage A2 aus Gate 0 erfüllt (`docs/umsetzungsplan.md`, Abschnitt 6)
+  - Voraussetzung: Wechsel auf Stufe B abgeschlossen (5.11, 16.17), Zeitstempeldienst angebunden (15.3), Sicherung und Restore-Probe grün; Realitätsprüfung nach Auflage A2 aus Gate 0 erneut gelaufen und Ziel aus 2.9 erreicht (`docs/umsetzungsplan.md`, Abschnitt 6)
   - CRM-Kontakte per CSV importieren, Drive-Altbestand importieren und im Eingangskorb bestätigen, Papierbelege 2026 fotografieren, Generatoren umstellen
   - Abnahmetest: Stichprobe 20 Dokumente auffindbar, Schlussbericht des Drive-Imports geht auf, Prüflauf ohne Abweichung, Mandantentrennung mit Testmandant `test` geprüft
   - **Gate Phase 1:** alle Belege 2026 im Archiv, Prüflauf grün
   - _Anforderungen: 1.4, 12.7, 13.6, 15.3, 15.5, 16.3, 16.17_
-  - _Abhängig von: 5.1–5.7, 5.9, 5.10, 5.11_
+  - _Abhängig von: 2.9, 5.1–5.7, 5.9, 5.10, 5.11_
 
 - [ ] 5.9 Anbindung an das Monitoring der VPS [Infra]
   - interne Kennzahlen und Detail-Health an das Monitoring der VPS (Stufe B aus 5.11) anbinden; Alarme für Erreichbarkeit, Health und Fehleraufträge; Eintrag im Infra-Repo der VPS
