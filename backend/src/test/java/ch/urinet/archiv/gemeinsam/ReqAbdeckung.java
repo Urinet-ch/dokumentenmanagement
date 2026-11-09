@@ -24,8 +24,11 @@ import java.util.stream.Stream;
 public final class ReqAbdeckung {
 
     private static final Pattern AUFGABE = Pattern.compile("^\\s*- \\[([ xX])](\\*?) (\\S+)");
+    private static final Pattern CHECKBOX = Pattern.compile("^\\s*[-*] \\[[ xX]]");
+    private static final Pattern LABEL = Pattern.compile("^\\s*-?\\s*[*_]*Anforderungen[*_]*\\s*:");
     private static final Pattern WELLE = Pattern.compile("^(\\d+)\\.\\d+$");
-    private static final Pattern ANFORDERUNGEN = Pattern.compile("_Anforderungen: ([^_]*)_");
+    private static final Pattern OPTIONAL = Pattern.compile("^O\\.\\d+$");
+    private static final Pattern ANFORDERUNGEN = Pattern.compile("^\\s*(?:- )?_Anforderungen: ([^_]*)_\\s*$");
     private static final Pattern KRITERIEN = Pattern.compile("^(\\d+)\\.(\\d+)(\\s*–\\s*(?:(\\d+)\\.)?(\\d+))?$");
     private static final Pattern SPEC_TAG = Pattern.compile("@spec-(\\d{2})\\b");
     private static final Pattern FEATURE = Pattern.compile("^\\s*(Funktionalität|Funktion|Feature):");
@@ -73,17 +76,30 @@ public final class ReqAbdeckung {
             }
             Matcher aufgabe = AUFGABE.matcher(zeile);
             if (aufgabe.find()) {
-                Matcher welle = WELLE.matcher(aufgabe.group(3));
-                zaehlt = !aufgabe.group(1).isBlank() && aufgabe.group(2).isEmpty()
+                String kennung = aufgabe.group(3);
+                Matcher welle = WELLE.matcher(kennung);
+                boolean optional = !aufgabe.group(2).isEmpty();
+                if (!optional && !welle.matches() && !OPTIONAL.matcher(kennung).matches()) {
+                    throw new IllegalArgumentException("Ungültige Aufgabenkennung: " + kennung);
+                }
+                zaehlt = !aufgabe.group(1).isBlank() && !optional
                         && welle.matches() && Integer.parseInt(welle.group(1)) >= 1;
                 continue;
             }
+            if (CHECKBOX.matcher(zeile).find()) {
+                throw new IllegalArgumentException("Checkbox nicht im Format «- [x] x.y Titel»: " + zeile.strip());
+            }
+            if (!zeile.contains("_Anforderungen") && !LABEL.matcher(zeile).find()) {
+                continue;
+            }
             Matcher anforderungen = ANFORDERUNGEN.matcher(zeile);
-            if (anforderungen.find()) {
-                List<String> liste = kriterien(anforderungen.group(1));
-                if (zaehlt) {
-                    kriterien.addAll(liste);
-                }
+            if (!anforderungen.matches()) {
+                throw new IllegalArgumentException("Anforderungszeile nicht im Format «_Anforderungen: x.y, …_»: "
+                        + zeile.strip());
+            }
+            List<String> liste = kriterien(anforderungen.group(1));
+            if (zaehlt) {
+                kriterien.addAll(liste);
             }
         }
         return kriterien;
@@ -92,7 +108,7 @@ public final class ReqAbdeckung {
     /** «1.7, 16.20–16.22» → 1.7, 16.20, 16.21, 16.22; jedes Teil muss ganz passen, sonst Abbruch. */
     static List<String> kriterien(String liste) {
         List<String> ergebnis = new ArrayList<>();
-        for (String teil : liste.split(",")) {
+        for (String teil : liste.split(",", -1)) {
             Matcher m = KRITERIEN.matcher(teil.strip());
             if (!m.matches()) {
                 throw new IllegalArgumentException("Ungültige Anforderung: " + teil.strip());

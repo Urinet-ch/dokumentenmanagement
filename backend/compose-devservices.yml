@@ -1,0 +1,27 @@
+# Compose Dev Services (Quarkus startet sie in dev und in Tests, nie in prod): MinIO mit Object Lock und Mailpit.
+# PostgreSQL 17 mit pgvector und Keycloak kommen aus den Dev Services der Extensions (application.properties).
+# Zugangsdaten hier sind feste Werte nur für lokale Wegwerf-Container, keine Secrets (tech.md Regel 7).
+name: urinet-archiv-dev
+services:
+  minio:
+    # MinIO veröffentlicht keine Images mehr auf Docker Hub; Chainguard baut sie aus dem Quellcode
+    image: cgr.dev/chainguard/minio@sha256:616286de6ef3a1892876b126e745e152d8e03add6357203f8a1f854bdd1dce76
+    command: ["server", "/tmp/daten"]
+    environment:
+      MINIO_ROOT_USER: archiv-dev
+      MINIO_ROOT_PASSWORD: archiv-dev-zugang
+    ports:
+      - '9000'
+    labels:
+      io.quarkus.devservices.compose.config_map.port.9000: archiv.entwicklung.minio-port
+      io.quarkus.devservices.compose.config_map.env.MINIO_ROOT_USER: quarkus.s3.aws.credentials.static-provider.access-key-id
+      io.quarkus.devservices.compose.config_map.env.MINIO_ROOT_PASSWORD: quarkus.s3.aws.credentials.static-provider.secret-access-key
+      io.quarkus.devservices.compose.wait_for.logs: .*API:.*
+  mailpit:
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    ports:
+      - '1025'
+      - '8025'
+    labels:
+      io.quarkus.devservices.compose.config_map.port.1025: quarkus.mailer.port
+      io.quarkus.devservices.compose.config_map.port.8025: archiv.entwicklung.mailpit-port

@@ -17,7 +17,7 @@ Die Specs folgen dem Kiro-Format; umgesetzt wird mit Claude Code, nicht mit dem 
 Eine Spec ist freigegeben, wenn Fabian den PR auf `main` merged. Start: `docs/umsetzungsplan.md`, Abschnitt 3.
 
 ## Bauen und Testen
-Voraussetzungen: Java 25, Maven 3.9, Node 22 mit npm, Docker (nur für das Image).
+Voraussetzungen: Java 25, Maven 3.9, Node 22 mit npm, Docker mit `docker compose` (Dev Services in Tests und dev).
 
 ```bash
 # Frontend-Abhängigkeiten (einmalig bzw. nach Änderungen an package-lock.json)
@@ -46,3 +46,29 @@ docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv backend
 Die CI (`.github/workflows/ci.yml`) führt dieselben Schritte bei jedem PR aus, ohne Secrets, ohne echte KI und
 ohne Golden-Lauf. Die Szenario-Prüfung «Abdeckung» verlangt für jedes Kriterium unter `_Anforderungen_` einer
 abgehakten Aufgabe ab Welle 1 ein Szenario `@req-x.y` oder einen Nachweis-Vermerk in `requirements.md`.
+
+## Entwicklung lokal
+```bash
+cd frontend && npm ci && cd ..
+cd backend && mvn quarkus:dev
+```
+- Startet über Dev Services PostgreSQL 17 mit pgvector, Keycloak mit dem Realm `urinet-archiv` aus
+  `deploy/keycloak/realm-test.json` sowie MinIO (Object Lock) und Mailpit aus `backend/compose-devservices.yml`.
+  Die Adressen zeigt die Dev UI unter `http://localhost:8080/q/dev-ui`. Mailpit läuft auf einem zufälligen Host-Port:
+  Weboberfläche über `archiv.entwicklung.mailpit-port` (Dev UI, Configuration) oder
+  `docker compose -p urinet-archiv-dev port mailpit 8025`.
+- Im Profil `dev` laufen Ablage, KI, OCR und Integration als Dev-Stubs (`archiv.<port>.stub=true`).
+- Testbenutzer (nur im Test-Realm, nie im Export für Stufe A und B), Passwort `Test-Passwort-1`, TOTP mit dem
+  Test-Secret aus `realm-test.json` (`urinet-archiv-test-otp-nur-lokal`; für eine Authenticator-App als Base32
+  `OVZGS3TFOQWWC4TDNBUXMLLUMVZXILLPORYC23TVOIWWY33LMFWA`):
+
+  | Benutzer | Rolle | Mandant |
+  | --- | --- | --- |
+  | `inhaber-urinet` | `inhaber` | `urinet` |
+  | `mitarbeiter-urinet` | `mitarbeiter` | `urinet` |
+  | `treuhaender-urinet` | `treuhaender` | `urinet` |
+  | `inhaber-vhf-gsk` | `inhaber` | `vhf-gsk` |
+  | `geschaeftsstelle-vhf-gsk` | `geschaeftsstelle` | `vhf-gsk` |
+
+- Secrets liegen nur als Dateien vor (`/run/secrets/`, tech.md Regel 7), nie in Umgebungsvariablen oder im Repo. Die
+  festen Zugangswerte der Dev-Container und des Test-Realms sind keine Secrets und gelten nur lokal.

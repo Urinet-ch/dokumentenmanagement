@@ -39,6 +39,12 @@
 - **Tests:** Testcontainers MinIO mit Object Lock und Versionierung: archivierte Datei nicht löschbar (unter Option B: ohne Bypass-Header, siehe ADR-007, Nachtrag 09.11.2026), Abweichung der Prüfsumme bricht ab, Art ohne Pflicht ohne Sperre, Verwerfen löscht alle Versionen. Cucumber-Szenarien zu Req 6.x.
 - **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; mit Option B (entschieden 09.11.2026, ADR-007) hat der App-Schlüssel technisch das Bypass-Recht, Spike 0.2 [T 6b–7g]) (siehe ADR-007, Nachtrag 09.11.2026: die Anwendung setzt den Header nie, Req 6.5; Manifeste in COMPLIANCE sind mit keinem Schlüssel des Projekts löschbar [T 4b/4c], darum darf der Sperrmodus von `manifest/` auf Stufe A per Konfiguration abweichen, Req 6.11, Aufgabe 2.3): [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
 
+## Nachtrag 09.11.2026 (Testumgebung)
+MinIO läuft in Tests und in `dev` aus den Compose Dev Services (`backend/compose-devservices.yml`, Image
+`cgr.dev/chainguard/minio` mit festem Digest), nicht als Testcontainers-Container (entschieden von Fabian am
+09.11.2026, Aufgabe 1.2). «Testcontainers MinIO» unter «Folgen» heisst damit «MinIO aus den Compose Dev Services»;
+die Tests selbst bleiben gleich.
+
 ## Verweise
 - Spike 0.2 (Vorbehalt – durchgeführt 08.11.2026): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007
 - Req 0.4, 6.1–6.9, 6.12, 6.13, 9.3, 9.7, 9.8, 15.10

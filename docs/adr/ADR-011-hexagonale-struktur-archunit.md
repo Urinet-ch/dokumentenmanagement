@@ -47,6 +47,10 @@ Spec 04 fügt den Fachbereich `wissen` hinzu; die Regeln aus Punkt 5 gelten für
 (Spec 04, Aufgabe 13.3). Vom Fachbereich `dokument` zu `wissen` führt nur der Port `DokumentEreignisse` in
 `dokument/application` (Spec 01, design.md, «Dokument»), siehe ADR-013.
 
+## Nachtrag 09.11.2026 (JUnit-Version)
+«JUnit 5» in Kontext und Folgen heisst jetzt «JUnit (Jupiter 6, über die Quarkus-BOM)», wie in tech.md (PR #24). Die
+Quarkus-BOM bringt JUnit Jupiter 6; am Entscheid ändert das nichts.
+
 ## Verweise
 - Req 16.13 (Nachweis: JUnit, ArchUnit-Tests), 16.14
 - tech.md Regeln 6, 7, 9 und 12, Konventionen Backend, Tests und Qualität; structure.md, Paketstruktur je Fachbereich

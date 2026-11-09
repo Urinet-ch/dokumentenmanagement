@@ -17,6 +17,7 @@ dokumentenmanagement/
 │       ├── 03-zweiter-mandant/
 │       └── 04-wissensbasis/
 ├── backend/                 Quarkus (API + Worker), liefert die PWA über Quinoa aus
+│   ├── compose-devservices.yml   MinIO und Mailpit als Compose Dev Services (dev und Tests)
 │   └── src/main/java/ch/urinet/archiv/
 │       ├── mandant/         Mandant, TenantResolver, Provisionierung
 │       ├── sicherheit/      Rollen, API-Tokens, Verschlüsselung
@@ -51,6 +52,7 @@ dokumentenmanagement/
 ├── deploy/
 │   ├── infomaniak/compose.yml   Produktion: Dienste mit Traefik-Labels, Secrets als Dateien
 │   ├── keycloak/realm-export.json
+│   ├── keycloak/realm-test.json   nur dev und Tests: Export plus Testbenutzer und Client archiv-test
 │   └── backup/              Verschlüsselung und Export für die zentrale Sicherung
 ├── .github/workflows/       CI, Deploy (SSH-Bundle, Health-Prüfung)
 └── docs/
