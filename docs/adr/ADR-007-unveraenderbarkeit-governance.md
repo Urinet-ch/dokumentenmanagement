@@ -1,6 +1,6 @@
 # ADR-007: Unveränderbarkeit über Object Lock GOVERNANCE, Schlüssel ohne Bypass und zeitgestempeltes Manifest
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Spike 0.2 (Schlüssel ohne `s3:BypassGovernanceRetention`, Verfügbarkeit von COMPLIANCE) durchgeführt 08.11.2026: kein Schlüssel ohne Bypass-Recht im selben Projekt, COMPLIANCE verfügbar. **Option B entschieden von Fabian am 09.11.2026**; die Punkte 1, 2, 4 und 7 gelten mit den Abweichungen im [Nachtrag 09.11.2026](#nachtrag-09112026-spike-02).
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Spike 0.2 (Schlüssel ohne `s3:BypassGovernanceRetention`, Verfügbarkeit von COMPLIANCE) durchgeführt 08.11.2026: kein Schlüssel ohne Bypass-Recht im selben Projekt, COMPLIANCE verfügbar. **Option B entschieden von Fabian am 09.11.2026**; die Punkte 1, 2, 4 und 7 gelten mit den Abweichungen im [Nachtrag 09.11.2026](#nachtrag-09112026-spike-02).
 
 **Datum:** 08.11.2026
 

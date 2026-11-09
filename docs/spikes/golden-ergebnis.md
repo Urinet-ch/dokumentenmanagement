@@ -23,8 +23,8 @@ Vorschlag und Sicherheit je Beleg liegen in `$ARCHIV_GOLDEN_DIR/berichte/<Zeitpu
 - **Grösste Fehlerquelle:** Handy-Fotos über OCR (5 von 6 Fotos im Abstimmungsteil weitgehend falsch). Mit Variante K1
   (Bild statt OCR-Text) sind die Fotos überwiegend richtig.
 - **Zweite Fehlerquelle:** Lieferantenrechnungen werden als `AUSGANGSRECHNUNG` eingestuft, darunter der Testfall `2026-123` (Req 7.12).
-- **Realitätsprüfung (Req 0.10):** 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35);
-  `--realitaet` noch nicht gelaufen.
+- **Realitätsprüfung (Req 0.10):** Lauf 2026-11-09-191327 auf dem eingefrorenen Stand: 13/20 echte Belege mit Art,
+  Datum, Partner, Betrag richtig, 12 falsche Felder mit Sicherheit ≥ 0.8 (Abschnitt «Realitätsprüfung» unten).
 - Kosten: rund CHF 0.014 je 30 Belege (Text) bzw. CHF 0.025 (K1); KI rund 3–4 s je Beleg.
 
 ## Läufe auf dem Abstimmungsteil
@@ -311,7 +311,31 @@ war das einzige falsche Feld eine Belegnummer mit hoher Sicherheit; der eine erl
 Befund für Welle 3 (KI-Vorschläge im Produkt): Die Belegnummer ist in Abstimmungs- und Prüfteil die einzige Fehlerquelle
 mit hoher Sicherheit; in Aufgabe 3.2 gezielt prüfen, ohne den eingefrorenen Stand des Prototyps zu ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
 
-## Offen für Gate 0 (Aufgabe 0.6, Fabian)
+## Realitätsprüfung (echte Belege, 09.11.2026)
+
+Lauf `2026-11-09-191327-realitaet`, gestartet von Fabian auf demselben Stand wie der Gate-Lauf (Prompt
+`v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Nachbearbeitung `nb-2026-11-09`, Schwelle 0.8). 20 echte Belege, von
+Fabian bestätigt (Req 0.10); zählt nie für das Gate. Nur Kennzahlen, keine Werte und keine IDs echter Belege
+(CLAUDE.md Regel 9).
+
+| Art | Datum | Partner | Betrag | Beleg-Nr. | Felder | Belege mit Art, Datum, Partner, Betrag | Fehler ≥ 0.8 | kleinste Schwelle |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 17 | 18 | 18 | 19 | 13 | 85/100 | 13/20 | 12 | keine ≤ 1.0 |
+
+- Belege 20, ohne Vorschlag 0, Nachfragen 0, Swiss QR gelesen 3; Eingabe Bild 2, Text 18; Kosten ca. CHF 0.0106.
+- Fehler ≥ 0.8 je Feld: Belegnummer 7, Datum 2, Partner 2, Betrag 1.
+- Art: Die rohe Art des Modells war 20/20 richtig. Die drei Fehler entstehen in der Nachbearbeitung: Regel E2 stufte
+  drei echte Lieferantenrechnungen ohne Swiss QR Code, IBAN und Fälligkeit zu `QUITTUNG` um (Art-Sicherheit 0.5, also
+  «bitte prüfen»). Ohne E2 wären es 15/20 Belege. Bei gemma griff E2 im Abstimmungsteil und im Gate-Lauf nie.
+- Der Prompt-Hash ist gleich wie im Gate-Lauf, weil der Mandantenname der echten Belege gleich ist wie der synthetische
+  (`golden.mandant-name`).
+
+**Einordnung:** Die synthetischen Belege sind deutlich einfacher als die echten (Prüfteil 20/20, echte 13/20). Gate 0 ist
+nach Req 0.3 und 0.9 erfüllt; Fabian hat es am 09.11.2026 mit den Auflagen A1 (Belegnummer prüfen, ausser eigene Belege) und A2 (Ziel für
+echte Belege vor der Übernahme) abgenommen (`docs/umsetzungsplan.md`, Abschnitt 6). Die Prototyp-Regel E2
+(`LIEFERANTENBELEG` → `QUITTUNG`) bleibt unverändert (Fabian, 09.11.2026).
+
+## Ablauf des Gate-Laufs (durchgeführt 09.11.2026) und weiter offen
 
 Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.md)):
 1. Commit = Merge-Commit von PR #21 (Gate-Vorbereitung), ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
@@ -324,7 +348,7 @@ Gate-Lauf in fünf Schritten (auch im [README](../../spikes/golden-lauf/README.m
    der Lauf nicht. Der Hash deckt Vorlagen, Schema, ArtCodes und Bildweg ab, nicht
    QR-Format, Kürzung (`MAX_ZEICHEN`), Bildaufbereitung (`Seitenbild`) und Modell/Parameter; massgeblich ist deshalb
    auch der Commit nach Schritt 1.
-5. Kennzahlen des Prüfteils hier eintragen. «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
+5. Erledigt: Kennzahlen im Abschnitt «Gate-Lauf», Abnahme in `docs/umsetzungsplan.md`, Abschnitt 6. Damals: «Phase 0 bestanden» bei mindestens 18 von 20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3). Meldet der Prüfteil «keine ≤ 1.0», ist das Gate nicht
    bestanden (Req 0.9); wie es weitergeht, entscheidet Fabian.
 
@@ -333,8 +357,7 @@ Weiter offen:
 - Modellwechsel: umgesetzt in PR #22. gemma-4-31B-it gilt nur für die Erfassung (`archiv.ki.erfassung-modell`), Chat
   und Wissensbasis bleiben bei Mistral-Small-4 (entschieden von Fabian am 09.11.2026). Req 0.5, Aufgabe 0.3 und Spec 04
   bleiben unverändert, weil sie Chat-Modell und Tool Calling betreffen.
-- Realitätsprüfung: 20 echte Belege bestätigt, 0 ausgeschlossen (Fabian, 09.11.2026, 14:35); `--realitaet` noch nicht
-  gelaufen (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
+- Realitätsprüfung: gelaufen (Abschnitt «Realitätsprüfung»); Auflagen A1 und A2 aus der Abnahme von Gate 0.
 - Welche Bildfassung das Produkt sendet: entschieden von Fabian am 09.11.2026, design.md «KI», Bildweg.
 - «Geschäftsnummer» als Beschriftung der Belegnummer (nur Vorschlag, nicht umgesetzt).
 - Historie: Die Git-Historie enthält einen frühen Commit, der die Zugehörigkeit von drei Belegen zum Prüfteil mit

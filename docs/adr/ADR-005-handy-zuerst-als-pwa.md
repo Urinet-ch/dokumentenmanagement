@@ -1,6 +1,6 @@
 # ADR-005: Handy zuerst als PWA, Capacitor später
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6). Dort wird auch Konzept-Entscheid E3 bestätigt.
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026). Dort wird auch Konzept-Entscheid E3 bestätigt.
 
 **Datum:** 08.11.2026
 

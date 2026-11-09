@@ -126,7 +126,7 @@ noch klassisch).
 
 | Gate / Entscheid | Wann | Kriterium / Frage | Ergebnis |
 | --- | --- | --- | --- |
-| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | **Gate-Lauf 09.11.2026** (Lauf 2026-11-09-185812 auf dem Merge-Commit von PR #21, `2c36441`): Prompt v5 `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Bildweg für Fotos, Nachbearbeitung `nb-2026-11-09`, Schwelle 0.8. Prüfteil: 20/20 Belege mit Art, Datum, Partner, Betrag richtig, 99/100 Felder, 1 Fehler mit Sicherheit ≥ 0.8, kleinste Schwelle mit höchstens 1 Fehler 0.00; Req 0.3 und 0.9 erfüllt (`docs/spikes/golden-ergebnis.md`, Abstimmungsteil und frühere Zwischenstände dort). Realitätsprüfung: 20 echte Belege bestätigt, [offen: Lauf `--realitaet`, Fabian]. Spikes 0.2, 0.3, 0.4 dokumentiert (0.4 ohne Verkaufschancen, Nachexport vor Welle 4). Abnahme siehe Vorlage unten |
+| Gate 0 | Ende Welle 0 | Golden-Datensatz 30 Belege zum Abstimmen, 20 zurückgehalten; ≥ 18/20 zurückgehaltene in Art, Datum, Partner, Betrag korrekt (Vergleichsregeln je Feld); höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle (≥, Startwert 0.8, nach Req 0.9 anheben); Spikes dokumentiert | **Gate-Lauf 09.11.2026** (Lauf 2026-11-09-185812 auf dem Merge-Commit von PR #21, `2c36441`): Prompt v5 `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Bildweg für Fotos, Nachbearbeitung `nb-2026-11-09`, Schwelle 0.8. Prüfteil: 20/20 Belege mit Art, Datum, Partner, Betrag richtig, 99/100 Felder, 1 Fehler mit Sicherheit ≥ 0.8, kleinste Schwelle mit höchstens 1 Fehler 0.00; Req 0.3 und 0.9 erfüllt (`docs/spikes/golden-ergebnis.md`, Abstimmungsteil und frühere Zwischenstände dort). Realitätsprüfung (Req 0.10, kein Gate-Kriterium): 20 echte Belege bestätigt; 13/20 Belege mit Art, Datum, Partner, Betrag richtig (65 %), 85/100 Felder, 12 falsche Felder mit Sicherheit ≥ 0.8 (davon 7 Belegnummern), keine Schwelle ≤ 1.0 mit höchstens 1 Fehler (Lauf 2026-11-09-191327). **Bestanden mit Auflagen A1 und A2, abgenommen von Fabian am 09.11.2026**. Spikes 0.2, 0.3, 0.4 dokumentiert (0.4 ohne Verkaufschancen, Nachexport vor Welle 4). Abnahme Gate 0 unten |
 | E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
 | E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
 | K5 Server | vor Welle 5 (früher, falls 1.10 abbricht oder 16.18 später eintritt) | Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (P1) | [offen: VPS-Grösse K5 – Entscheid vor Welle 5] |
@@ -138,22 +138,22 @@ noch klassisch).
 | Gate 3 | Ende Welle 12 | Archiv online, Geschäftsstelle veröffentlicht selbständig | [offen] |
 | Gate 4 | Ende Welle 16 | Stichprobe 5 Wissensquellen; Belegtreue ≥ 47 von 50 Fussnoten, kein stilles Überschreiben, ≥ 14 von 15 Fragen korrekt mit Seite und Quelldokument; Isolationstest grün; Lauf manuell auf Stufe B (Spec 04, Req 18) | [offen] |
 
-**Abnahme Gate 0** (Vorlage, füllt Fabian aus)
+**Abnahme Gate 0** (abgenommen von Fabian am 09.11.2026)
 
 Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `docs/spikes/infomaniak-ai.md`,
 `docs/spikes/21crm-export.md`, ADR-007 (Nachtrag 09.11.2026). Kriterien: Req 0.3, 0.9, 0.10.
 
 | Feld | Wert |
 | --- | --- |
-| Datum der Abnahme | [offen] |
-| Prompt-Fassung und Hash im Gate-Lauf | [offen] (Abstimmungsteil zuletzt: v3 `v3-24e40a6cf5ab`) |
-| Eingabe | [offen: OCR-Text oder K1 für Fotos] |
-| Schwelle (Req 0.9, gilt für Req 7.6) | [offen] (Startwert 0.8; Abstimmungsteil: kleinste Schwelle mit höchstens 1 Fehler 0.91 im Lauf 2026-11-09-0616, je nach Lauf 0.91 bis > 1.0 – Laufschwankung, golden-ergebnis.md Befund 6) |
-| Prüfteil: Belege mit Art, Datum, Partner, Betrag richtig | [offen] / 20 (Gate: ≥ 18; Hochrechnung aus dem Abstimmungsteil rund 12/20) |
-| Prüfteil: Fehler mit Sicherheit ≥ Schwelle | [offen] (Gate: ≤ 1) |
-| Realitätsprüfung (Req 0.10): bestätigte echte Belege | [offen] von 20 |
-| Realitätsprüfung: Quote | [offen] |
-| Gate 0 | [offen: bestanden / nicht bestanden] |
+| Datum der Abnahme | 09.11.2026 (Fabian) |
+| Prompt-Fassung und Hash im Gate-Lauf | v5 `v5-fb5c021d33fc`, Modell `google/gemma-4-31B-it`, Nachbearbeitung `nb-2026-11-09`, Merge-Commit PR #21 `2c36441` |
+| Eingabe | OCR-Text, für Bild-Originale (Fotos) die gerenderten Seiten (K1 nur für Fotos, Bildweg Req 7.1) |
+| Schwelle (Req 0.9, gilt für Req 7.6) | 0.8 (festgelegt auf dem Abstimmungsteil vor dem Gate-Lauf: `max(0.8, 0.00)`, Entscheid Fabian 09.11.2026; im Prüfteil kleinste Schwelle mit höchstens 1 Fehler ebenfalls 0.00) |
+| Prüfteil: Belege mit Art, Datum, Partner, Betrag richtig | 20 / 20 (Gate: ≥ 18) |
+| Prüfteil: Fehler mit Sicherheit ≥ Schwelle | 1 (Gate: ≤ 1) |
+| Realitätsprüfung (Req 0.10): bestätigte echte Belege | 20 von 20 |
+| Realitätsprüfung: Quote | 13/20 Belege mit Art, Datum, Partner, Betrag richtig (65 %), 85/100 Felder, 12 falsche Felder mit Sicherheit ≥ 0.8 (davon 7 Belegnummern), keine Schwelle ≤ 1.0 mit höchstens 1 Fehler (Lauf 2026-11-09-191327) |
+| Gate 0 | **bestanden mit Auflagen** (Fabian, 09.11.2026). **A1 Belegnummer prüfen, ausser eigene Belege:** Die Sicherheit der Belegnummer wird in der Nachbearbeitung auf höchstens 0.7 begrenzt, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Aufgabe 3.2). **A2 Ziel für echte Belege:** Vor der Übernahme (5.8) läuft die Realitätsprüfung erneut mit Ziel; abgestimmt wird nur auf einem Teil der echten Belege, der andere bleibt zurückgehalten. Ändert das Abstimmen Prompt, Regeln oder Parameter, ist offen, ob ein neuer Golden-Lauf nötig ist (Req 0.9, der synthetische Prüfteil ist verbraucht). [offen: Zielwerte und Aufteilung der echten Belege, Umgang mit Änderungen aus dem Abstimmen – Entscheid vor Welle 3] (Aufgabe 2.9; Vorschlag ≥ 16/20 und ≤ 3 Fehler ab der Schwelle) |
 
 | Entscheid | Stand |
 | --- | --- |
@@ -168,7 +168,7 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 | D8 | **entschieden von Fabian am 09.11.2026:** bewusst gestrichen («Ich möchte keine native App, nur Web-App.»); ersetzt den früheren Stand «einer Folge-Spec zuordnen, nicht streichen»; Rückverfolgung in requirements.md nachgetragen |
 | Spec 04 Wissensbasis (zwölf Entscheide, Spec 04, design.md, Open Points) | **entschieden von Fabian am 09.11.2026** (alle Empfehlungen übernommen): (1) Spec 04 nach Spec 03, Wellen 13–16; (2) in `vhf-gsk` nur die sechs Standard-Seitentypen; (3) A19 der Geschäftsstelle 403, Einstellungen und OKF-Export nur `inhaber`; (4) Ingest nur für die Art `WISSENSQUELLE`, sonst 422 `KEINE_WISSENSQUELLE`; (5) Tokenbudget je Ingest 300'000, konfigurierbar; (6) Gate Phase 4: 5 Wissensquellen, ≥ 47/50 Fussnoten, ≥ 14/15 Fragen; (7) `WISSENSQUELLE` nur von Hand, KI-Vorschlag der Art bleibt Option; (8) `ueberblick` nur aus `NORMAL`-Wissen; (9) Kontextstufe: eine `NORMAL`-Seite bleibt nach `INTERN`-Ingest dauerhaft `INTERN` (`STUFE_STEIGT`), akzeptiert; (10) ein offener Ingest je Mandant, akzeptiert; (11) Monatsbudget der Wissensbasis 1'000'000 Tokens je Mandant, konfigurierbar; (12) neue Fehlercodes per Folge-PR in die Code-Liste von Spec 01. Einziger offener Punkt: [offen: Umgang mit Seitenversionen, die auf einem gelöschten Dokument beruhen (revDSG) – Entscheid in der Spec zur Löschfunktion] (Spec 04, Req 15.5) |
 | Modell der Erfassung (ADR-006, Nachtrag 09.11.2026) | **entschieden von Fabian am 09.11.2026**: `archiv.ki.erfassung-modell=google/gemma-4-31B-it` (Gate 0), `archiv.ki.chat-modell` bleibt `mistralai/Mistral-Small-4-119B-2603` für Chat (Spec 02) und Wissensbasis (Spec 04), bis Gate 2 bzw. Gate 4 messen; ein anderes Erfassungsmodell erst nach neuem Golden-Lauf (design.md «KI») |
-| Freigabe ADR-001 bis ADR-012 (per Merge) | [offen] – nach dem Gate-Lauf, ein PR mit dem Gate-Ergebnis (Fabian, 09.11.2026); ADR-012 per eigenem Merge (nicht Teil von 0.6) |
+| Freigabe ADR-001 bis ADR-012 (per Merge) | **ADR-001 bis ADR-011 freigegeben** per Merge von PR #23 (Gate 0, Fabian, 09.11.2026); ADR-012 per eigenem Merge (nicht Teil von 0.6), ADR-013 mit Spec 04 (Aufgabe 13.1) |
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
@@ -208,6 +208,7 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Risiko | Wirkung | Massnahme |
 | --- | --- | --- |
 | KI-Erkennung unter 18/20 | Phase 1 bringt weniger Zeitersparnis | Prompt und Beispiele verbessern; sonst Vorschläge nur für Art/Partner, Rest manuell |
+| Echte Belege schlechter erkannt als synthetische (Realitätsprüfung Gate 0: 13/20, 12 sichere Fehler) | weniger Zeitersparnis, mehr Korrekturen im Eingangskorb | Bestätigung durch Menschen bleibt Pflicht (ADR-006); Auflagen A1 (Belegnummer prüfen, ausser eigene Belege) und A2 (Ziel für echte Belege vor 5.8), Abschnitt 6 |
 | Infomaniak zieht `google/gemma-4-31B-it` zurück oder ändert es | Erfassung ohne Gate-Nachweis | Modellliste vor jedem Deploy prüfen (Name, `is_beta`); bei Ankündigung neuer Golden-Lauf mit einem anderen Modell (Req 0.3, 0.9), bis dahin weiter mit Vorschlägen und Bestätigung durch Menschen (ADR-006) |
 | Object Lock pro Objekt nicht verfügbar | zweistufige Ablage nicht möglich | Rückfall: getrennte Buckets `…-eingang` (ohne Sperre), `…-archiv` (Standard-Aufbewahrung) und `…-ablage` für Arten ohne `gesetzliche_pflicht` (design.md) |
 | Kein S3-Schlüssel ohne Bypass-Recht (eingetreten, Spike 0.2 [T 6b–7g]) | GOVERNANCE schützt Dokumente nur gegen Fehler der App und Versehen, nicht gegen einen gestohlenen App-Schlüssel | Option B (09.11.2026; ADR-007, Nachtrag): COMPLIANCE fest für `manifest/`, die Anwendung setzt den Bypass-Header nie (Req 6.5); Manipulation fällt über Manifest und Prüflauf auf, Wiederherstellung aus der Zweitkopie, soweit der Stand dort gesichert ist (ADR-008) |

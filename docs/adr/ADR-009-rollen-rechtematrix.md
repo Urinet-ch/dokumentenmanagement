@@ -1,6 +1,6 @@
 # ADR-009: Rollen eng nach Rechtematrix, 404 vor 403
 
-**Status:** Vorgeschlagen – Freigabe per Merge an Gate 0 (Aufgabe 0.6)
+**Status:** Angenommen – freigegeben per Merge an Gate 0 (Aufgabe 0.6, PR #23, Fabian, 09.11.2026)
 
 **Datum:** 08.11.2026
 
