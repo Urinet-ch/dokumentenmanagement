@@ -3,6 +3,7 @@ package ch.urinet.archiv.spike.golden;
 import ch.urinet.archiv.spike.golden.Erwartung.Mandant;
 import ch.urinet.archiv.spike.golden.SwissQrLeser.QrDaten;
 import ch.urinet.archiv.spike.golden.Vergleich.Feld;
+import dev.langchain4j.data.image.Image;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.Result;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,13 +19,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /** Ein Beleg: OCR → Swiss QR → genau ein KI-Aufruf (bei Schemafehler eine Nachfrage, Req 7.3) → Nachbearbeitung → Vergleich. */
 @ApplicationScoped
@@ -78,18 +77,32 @@ public class GoldenPipeline {
         long ein = 0, aus = 0;
         Result<MetadatenVorschlag> antwort = null;
         String fehler = null;
+        Image bild = null;
+        if (k1) {
+            try {
+                bild = Seitenbild.aus(ocr.seiten());
+            } catch (IOException | RuntimeException ex) {
+                return fehlschlag(e, 0, 0, 0, ocrMs, 0, "K1-Bild: " + KiFehler.grund(ex));
+            }
+        }
         try {
             aufrufe++;
             antwort = k1
-                    ? extraktor.extrahiereBild(mandant.name(), artenListe, Prompt.qr(qr), Seitenbild.aus(ocr.seiten()))
+                    ? extraktor.extrahiereBild(mandant.name(), artenListe, Prompt.qr(qr), bild)
                     : extraktor.extrahiere(mandant.name(), artenListe, Prompt.qr(qr), text);
-        } catch (RuntimeException | IOException ex) {
-            fehler = ex.getClass().getSimpleName();
-            try {
-                aufrufe++;
-                antwort = extraktor.nachfrage(mandant.name(), artenListe, Prompt.qr(qr), text, fehler);
-            } catch (RuntimeException ex2) {
-                fehler = fehler + ", Nachfrage: " + ex2.getClass().getSimpleName();
+        } catch (RuntimeException ex) {
+            if (KiFehler.istSchemafehler(ex)) {
+                fehler = "Schemafehler";
+                try {
+                    aufrufe++;
+                    antwort = k1
+                            ? extraktor.nachfrageBild(mandant.name(), artenListe, Prompt.qr(qr), bild, fehler)
+                            : extraktor.nachfrage(mandant.name(), artenListe, Prompt.qr(qr), text, fehler);
+                } catch (RuntimeException ex2) {
+                    fehler = fehler + ", Nachfrage: " + KiFehler.grund(ex2);
+                }
+            } else {
+                fehler = KiFehler.grund(ex);
             }
         }
         long kiMs = (System.nanoTime() - kiStart) / 1_000_000;
@@ -125,12 +138,9 @@ public class GoldenPipeline {
     /** OCR-Ergebnis je Dateiinhalt (SHA-256) und Image zwischenspeichern, damit Prompt-Iterationen nicht neu OCRen. */
     private Ocr.Resultat ocrMitCache(Path datei, Path cache) throws IOException, InterruptedException {
         Path arbeit = cache.resolve(sha256(datei).substring(0, 24) + "-" + image.replaceAll("[^A-Za-z0-9.]", "_"));
-        if (Files.isRegularFile(arbeit.resolve("text.txt"))) {
-            List<Path> seiten;
-            try (Stream<Path> s = Files.list(arbeit)) {
-                seiten = new ArrayList<>(s.filter(p -> p.getFileName().toString().matches("seite-\\d+\\.png")).sorted().toList());
-            }
-            return new Ocr.Resultat(Files.readString(arbeit.resolve("text.txt")), seiten);
+        Optional<Ocr.Resultat> fertig = Ocr.ausCache(arbeit);
+        if (fertig.isPresent()) {
+            return fertig.get();
         }
         return new Ocr(image, sprachen, zeitgrenze).verarbeite(datei, arbeit);
     }

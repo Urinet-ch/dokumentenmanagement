@@ -309,7 +309,10 @@ Feld für Feld mit dem Seed (Felder mit `_` am Anfang ausgenommen). [offen: Wert
   Lieferantenrechnungen oft als `AUSGANGSRECHNUNG` ein. Prototyp-Regel: eigene Art, aber QR-Zahlungsempfänger nicht in
   `mandant.kennungen` → Art unverändert (Req 7.12), Sicherheit der Art 0 («bitte prüfen»). Ob umgestuft wird, entscheidet Gate 0.
 - Der QR-Zahlungsempfänger ersetzt `partnerName` und `partnerIban` nur bei fremden Belegen; bei eigenen Belegen ist er der Mandant.
-- «Briefkopf» wurde im Prototyp vereinfacht als «UID oder IBAN des Mandanten irgendwo im Volltext» geprüft.
+- «Briefkopf» wurde im Prototyp vereinfacht als «UID oder IBAN des Mandanten irgendwo im Volltext» geprüft. **Nur Prototyp,
+  für Welle 3 nicht übernehmen:** Lieferanten und Behörden drucken oft UID oder MWST-Nummer des Kunden; dann gälte der
+  Mandant fälschlich als Aussteller und das Belegnummer-Muster würde einen fremden Beleg umstufen (verboten nach Req 7.12).
+  Massgeblich sind der Absenderblock (Briefkopf) bzw. der Zahlungsempfänger im Swiss QR Code.
 - OCR: `-l deu+fra+ita+eng` (fremdsprachige Belege); das offizielle OCRmyPDF-Image enthält weder `ita` noch poppler,
   daher ein abgeleitetes, versioniertes Image (`spikes/golden-lauf/ocr/Dockerfile`). Rohfotos liefern über Tesseract
   kaum brauchbaren Text; ein Seitenbild direkt an Mistral-Small-4 (K1) war bei Fotos deutlich besser.

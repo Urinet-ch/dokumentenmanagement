@@ -11,7 +11,9 @@ Docker-Image → `pdftotext` → `pdftoppm -r 300` → Swiss QR Code (ZXing) →
   docker build -t golden-ocr:17.13.0 spikes/golden-lauf/ocr
   ```
   `pdftotext` und `pdftoppm` laufen im Container, `brew install poppler` ist nicht nötig. HEIC wandelt macOS mit
-  `sips -s format jpeg` vor der OCR.
+  `sips -s format jpeg` vor der OCR. Gepinnt ist nur der Basis-Tag `jbarlow83/ocrmypdf:v17.13.0`; die apt-Pakete
+  (`tesseract-ocr-ita`, `poppler-utils`) sind nicht versioniert und entsprechen dem Stand beim Bauen. Der Container
+  läuft wie das Basis-Image als Benutzer `app` (uid 1000).
 - Token als Datei (Regel 7), nie als Umgebungsvariable: `-Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token`.
 - `ARCHIV_GOLDEN_DIR` (Standard `~/urinet-archiv-golden`) mit `synthetisch/erwartet.json` (ab golden_synth mit Kopfeintrag
   `mandant`), optional `erwartet.json` und `mandant-kennungen.json` für die echten Belege. Docker muss diesen Ordner
@@ -34,16 +36,19 @@ java -Darchiv.ki.token-datei=$HOME/.config/urinet-archiv/infomaniak_ai_token -ja
 | `--k1` | wie ohne Schalter | Variante K1: Seitenbild statt OCR-Text (nur Abstimmungsteil) |
 | `--limit N` | erste N | Probelauf |
 
-Vor dem ersten Beleg bricht die App ab, wenn `archiv.ki.basis-url` nicht per `https` exakt auf `api.infomaniak.com`
-zeigt (Req 16.22). Kein Profil `lokal`, kein LM Studio (ADR-012).
+Vor dem ersten Beleg bricht die App ab, wenn `archiv.ki.basis-url` oder die vom Client tatsächlich verwendete
+`quarkus.langchain4j.openai.base-url` nicht per `https` exakt auf `api.infomaniak.com` zeigt (Req 16.22). Kein Profil
+`lokal`, kein LM Studio (ADR-012). Eine Nachfrage (Req 7.3) gibt es nur bei Parse- oder Schemafehlern; Timeouts und
+HTTP-Fehler zählen als Fehlschlag mit Grund.
 
 ## Ausgabe
 
 - Konsole: nur Beleg-ID (synthetisch Dateiname, echt die ersten 8 Zeichen des SHA-256 des Dateinamens), Feld, richtig/falsch.
 - `$ARCHIV_GOLDEN_DIR/berichte/<JJJJ-MM-TT-HHMM>-<modus>[-k1]/`: `ergebnisse.json` (Vollbericht je Beleg) und
   `kennzahlen.md` (nur Zahlen und IDs, für `docs/spikes/golden-ergebnis.md`).
-- OCR-Cache: `$ARCHIV_GOLDEN_DIR/.cache-golden-lauf/` (Text, Seitenbilder je Dateiinhalt). Enthält Kopien der Belege und
-  bleibt deshalb im Golden-Ordner; zum Löschen den Ordner entfernen.
+- OCR-Cache: `$ARCHIV_GOLDEN_DIR/.cache-golden-lauf/` (Text, Seitenbilder je Dateiinhalt). Ein Eintrag gilt erst mit der
+  Datei `fertig` als vollständig; schlägt ein OCR-Schritt fehl, wird der Arbeitsordner gelöscht. Enthält Kopien der
+  Belege und bleibt deshalb im Golden-Ordner; zum Löschen den Ordner entfernen.
 
 ## Tests
 

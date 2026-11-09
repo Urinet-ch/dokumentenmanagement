@@ -3,6 +3,9 @@ package ch.urinet.archiv.spike.golden;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Map;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -42,5 +45,38 @@ class HostpruefungTest {
     @org.junit.jupiter.api.Test
     void nullWirdAbgelehnt() {
         assertThat(Hostpruefung.zulaessig(null)).isFalse();
+    }
+
+    static final String INFOMANIAK = "https://api.infomaniak.com/2/ai/113354/openai/v1";
+
+    @org.junit.jupiter.api.Test
+    void abweichendeClientUrlWirdAbgelehnt() {
+        Map<String, String> konfiguration = Map.of(
+                "archiv.ki.basis-url", INFOMANIAK,
+                "quarkus.langchain4j.openai.base-url", "http://localhost:1234/v1");
+        assertThatThrownBy(() -> Hostpruefung.pruefeKonfiguration(k -> Optional.ofNullable(konfiguration.get(k))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("quarkus.langchain4j.openai.base-url").hasMessageContaining("localhost");
+    }
+
+    @org.junit.jupiter.api.Test
+    void abweichendeArchivUrlWirdAbgelehnt() {
+        Map<String, String> konfiguration = Map.of(
+                "archiv.ki.basis-url", "https://api.infomaniak.com.example.org/v1",
+                "quarkus.langchain4j.openai.base-url", INFOMANIAK);
+        assertThatThrownBy(() -> Hostpruefung.pruefeKonfiguration(k -> Optional.ofNullable(konfiguration.get(k))))
+                .hasMessageContaining("archiv.ki.basis-url");
+    }
+
+    @org.junit.jupiter.api.Test
+    void fehlendeClientUrlWirdAbgelehnt() {
+        Map<String, String> konfiguration = Map.of("archiv.ki.basis-url", INFOMANIAK);
+        assertThatThrownBy(() -> Hostpruefung.pruefeKonfiguration(k -> Optional.ofNullable(konfiguration.get(k))))
+                .hasMessageContaining("quarkus.langchain4j.openai.base-url");
+    }
+
+    @org.junit.jupiter.api.Test
+    void beideUrlsBeiInfomaniakSindZulaessig() {
+        Hostpruefung.pruefeKonfiguration(k -> Optional.of(INFOMANIAK));
     }
 }

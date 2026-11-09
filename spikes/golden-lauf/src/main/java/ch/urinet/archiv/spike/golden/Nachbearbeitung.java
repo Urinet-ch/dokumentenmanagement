@@ -11,7 +11,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -86,8 +85,9 @@ public final class Nachbearbeitung {
             sicherheit.put(Feld.ART, 0.0);
         }
 
+        String endArt = art;
         String vertraulichkeit = v.vertraulichkeit() != null ? v.vertraulichkeit().name()
-                : arten.stream().filter(a -> a.code().equals(finalArt(v))).map(Dokumentarten.Art::vertraulichkeit)
+                : arten.stream().filter(a -> a.code().equals(endArt)).map(Dokumentarten.Art::vertraulichkeit)
                 .findFirst().orElse(null);
         return new Ergebnis(art, datum, partner, partnerIban, betrag, waehrung, belegnummer,
                 v.richtung() == null ? null : v.richtung().name(), datum(v.faelligkeit()), vertraulichkeit,
@@ -108,10 +108,6 @@ public final class Nachbearbeitung {
         boolean iban = m.ibans().stream().map(Normalisierung::iban).anyMatch(i -> !i.isEmpty() && kompakt.contains(i));
         boolean uid = m.uid() != null && kompakt.contains(Normalisierung.iban(m.uid()));
         return iban || uid;
-    }
-
-    private static String finalArt(MetadatenVorschlag v) {
-        return v.art() == null ? null : v.art().name();
     }
 
     private static double wert(Double d) {

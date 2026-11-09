@@ -70,6 +70,8 @@ class NachbearbeitungTest {
                 "Muster Mandant · IBAN CH93 0076 2011 6238 5295 7", MANDANT, arten(), EIGENE, HEUTE);
         assertThat(e.art()).isEqualTo("OFFERTE");
         assertThat(e.betrag()).isEqualByComparingTo("100.00");
+        // Standard der endgültigen Art OFFERTE (NORMAL), nicht der KI-Art AUSGANGSRECHNUNG (INTERN)
+        assertThat(e.vertraulichkeit()).isEqualTo("NORMAL");
     }
 
     @Test

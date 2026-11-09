@@ -27,4 +27,10 @@ public interface MetadatenExtraktor {
     @SystemMessage(Prompt.SYSTEM)
     @UserMessage(Prompt.BENUTZER_K1)
     Result<MetadatenVorschlag> extrahiereBild(String mandant, String dokumentarten, String qr, @ImageUrl Image bild);
+
+    /** Req 7.3 für K1: Nachfrage mit demselben Bild. */
+    @SystemMessage(Prompt.SYSTEM)
+    @UserMessage(Prompt.BENUTZER_K1 + Prompt.NACHFRAGE)
+    Result<MetadatenVorschlag> nachfrageBild(String mandant, String dokumentarten, String qr, @ImageUrl Image bild,
+                                             String fehler);
 }

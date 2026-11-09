@@ -6,6 +6,8 @@ import ch.urinet.archiv.spike.golden.GoldenPipeline.BelegErgebnis;
 import ch.urinet.archiv.spike.golden.Vergleich.Feld;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.Config;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -26,8 +28,6 @@ public class GoldenLaufDienst {
     @Inject
     GoldenPipeline pipeline;
 
-    @ConfigProperty(name = "archiv.ki.basis-url")
-    String basisUrl;
     @ConfigProperty(name = "archiv.ki.token-datei")
     Path tokenDatei;
     @ConfigProperty(name = "archiv.ki.chat-modell")
@@ -53,8 +53,9 @@ public class GoldenLaufDienst {
         if (k1 && modus != Modus.ABSTIMMEN) {
             throw new IllegalArgumentException("--k1 nur im Abstimmungsteil");
         }
-        // Req 16.22: vor dem ersten Beleg
-        Hostpruefung.pruefe(basisUrl);
+        // Req 16.22: vor dem ersten Beleg, mit den Werten, die der Client tatsächlich verwendet
+        Config config = ConfigProvider.getConfig();
+        Hostpruefung.pruefeKonfiguration(schluessel -> config.getOptionalValue(schluessel, String.class));
         if (!Files.isReadable(tokenDatei)) {
             throw new IllegalStateException("Token-Datei fehlt oder ist nicht lesbar: " + tokenDatei);
         }
