@@ -140,7 +140,8 @@ ist ein Einzellauf und ebenfalls nur Referenz.
 | 2026-11-09-1442 | V4 `v6-35426948c145` (verworfen) | Bild für Fotos | 25 | 28 | 26 | 27 | 29 | 135/150 | 19/30 | 11 |
 | 2026-11-09-1445¹ | V4 `v6-35426948c145` (verworfen) | Bild für Fotos | 24 | 29 | 27 | 29 | 29 | 138/150 | 22/30 | 6 |
 
-¹ Vollbericht durch Prüflauf (v5, 1 Beleg) überschrieben, Zahlen nur aus der Konsole.
+¹ Vollbericht durch Prüflauf (v5, 1 Beleg) überschrieben; die Zahlen hat Copilot vorher mit seinem Auswertungsskript aus
+dem Vollbericht gelesen, nachprüfen lassen sie sich nicht mehr.
 
 Je Variante (Belege mit Art, Datum, Partner, Betrag richtig; Mittel und Spannweite der zwei Läufe):
 
@@ -171,8 +172,8 @@ Verbleibende Fehlschläge V3 (Beleg-ID: Feld):
 Befunde aus dem Nachschärfen (Fortsetzung der Nummerierung oben):
 
 7. **Bildweg für Fotos ist der grösste Hebel.** V1 → V2: Gate-Belege im Mittel 19 → 23, Fehler ≥ 0.8 im Mittel 11 → 7,
-   Kosten rund +20 %. Kontrolle: in allen V2- bis V4-Läufen liefen genau die 6 `HANDY_FOTO` als Bild (V4 Lauf 2 nur
-   aus der Konsole¹).
+   Kosten rund +20 %. Kontrolle: in allen V2- bis V4-Läufen liefen genau die 6 `HANDY_FOTO` als Bild (V4 Lauf 2
+   nicht mehr nachprüfbar¹).
 8. **v5 verschiebt den Rückfallwert der Art.** Mit fremden Arten zuerst meldet das Modell bei Unsicherheit
    `LIEFERANTENBELEG` statt `AUSGANGSRECHNUNG`: Die rohe Art sinkt (20–21 statt 23–27 richtig), auch eigene Rechnungen
    kommen roh als `LIEFERANTENBELEG`; QR und Belegnummer-Muster korrigieren sie (nach Nachbearbeitung 25–26). V3 liegt
@@ -233,3 +234,6 @@ Weiter offen:
   gelaufen (sendet bei Bild-Originalen die gerenderten Seiten an Infomaniak AI).
 - Welche Bildfassung das Produkt sendet: entschieden von Fabian am 09.11.2026, design.md «KI», Bildweg.
 - «Geschäftsnummer» als Beschriftung der Belegnummer (nur Vorschlag, nicht umgesetzt).
+- Historie: Die Git-Historie enthält einen frühen Commit, der die Zugehörigkeit von drei Belegen zum Prüfteil mit
+  erwarteter Art nennt; die erwartete Art ergibt sich ohnehin aus dem Generator-Code. Entscheid Fabian 09.11.2026:
+  akzeptiert, keine Umschreibung; Agenten durchsuchen die Git-Historie nicht nach Golden-Daten (CLAUDE.md Regel 9).

@@ -48,8 +48,8 @@ gibt es nur bei Parse- oder Schemafehlern; Timeouts und HTTP-Fehler zählen als 
 ## Prompt-Hash
 
 Die Konsole zeigt `Prompt v5-<12 Hex>`. Der Digest deckt den fertig gerenderten System-Prompt (Arten-Liste mit
-Anzeigetexten, Reihenfolge, Mandantenname, Markierungen aus `golden.eigene-arten`), die Benutzer- und
-Nachfrage-Vorlagen, das erzeugte JSON-Schema, die Reihenfolge von `ArtCode` und den Bildweg (`fotos`, bei `--k1`
+Anzeigetexten, Reihenfolge, Mandantenname, Markierungen aus `golden.eigene-arten`), die Benutzer-, Nachfrage- und
+K1-Vorlage (`BENUTZER_K1`, Bildweg), das erzeugte JSON-Schema, die Reihenfolge von `ArtCode` und den Bildweg (`fotos`, bei `--k1`
 `alle`) ab. Der System-Prompt wird in Java gerendert und fertig an das Modell übergeben; gehashter und gesendeter Text
 sind dadurch gleich. Abstimmen und `--gate` nutzen denselben synthetischen Mandanten und haben denselben Hash; bei
 `--realitaet` weicht er wegen des Mandantennamens der echten Belege ab. Nicht abgedeckt sind QR-Format, Kürzung

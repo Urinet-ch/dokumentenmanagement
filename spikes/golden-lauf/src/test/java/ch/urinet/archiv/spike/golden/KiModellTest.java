@@ -72,7 +72,10 @@ class KiModellTest {
                 .withRequestBody(matchingJsonPath("$.model", equalTo("mistralai/Mistral-Small-4-119B-2603")))
                 .withRequestBody(matchingJsonPath("$.response_format.type", equalTo("json_schema")))
                 .withRequestBody(matchingJsonPath("$.response_format.json_schema.strict", equalTo("true")))
-                .withRequestBody(matchingJsonPath("$[?(@.temperature == 0)]")));
+                .withRequestBody(matchingJsonPath("$[?(@.temperature == 0)]"))
+                .withRequestBody(matchingJsonPath("$[?(@.top_p == 1)]"))
+                .withRequestBody(matchingJsonPath("$[?(@.presence_penalty == 0)]"))
+                .withRequestBody(matchingJsonPath("$[?(@.frequency_penalty == 0)]")));
         assertThat(tokenZaehler.stand()).isEqualTo(new TokenZaehler.Stand(11, 7, 1, 0));
     }
 

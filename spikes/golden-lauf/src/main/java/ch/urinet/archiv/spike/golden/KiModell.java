@@ -50,6 +50,10 @@ public class KiModell implements Supplier<ChatModel> {
                 .apiKey(apiKey)
                 .modelName(modell)
                 .temperature(0.0)
+                // wie das frühere Standardmodell der Extension, damit Messungen vergleichbar bleiben
+                .topP(1.0)
+                .presencePenalty(0.0)
+                .frequencyPenalty(0.0)
                 .supportedCapabilities(Capability.RESPONSE_FORMAT_JSON_SCHEMA)
                 .strictJsonSchema(true)
                 .timeout(timeout)
