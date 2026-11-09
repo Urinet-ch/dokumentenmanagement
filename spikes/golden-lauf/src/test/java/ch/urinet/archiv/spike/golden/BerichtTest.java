@@ -20,14 +20,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BerichtTest {
 
     static BelegErgebnis ergebnis(String id, Map<Feld, Double> sicherheit, Feld... falsch) {
+        return ergebnis(id, "QUITTUNG", GoldenPipeline.Eingabe.TEXT, false, sicherheit, falsch);
+    }
+
+    static BelegErgebnis ergebnis(String id, String kategorie, GoldenPipeline.Eingabe eingabe, boolean umgestuft,
+                                  Map<Feld, Double> sicherheit, Feld... falsch) {
         Map<Feld, Boolean> richtig = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
             richtig.put(f, !List.of(falsch).contains(f));
         }
         Nachbearbeitung.Ergebnis v = new Nachbearbeitung.Ergebnis("QUITTUNG", null, null, null, null, null, null, null,
-                null, null, false, sicherheit, "AUSGANGSRECHNUNG", 0.9);
-        Erwartung e = new Erwartung(id, null, false, "abstimmen", "QUITTUNG", null, null, null, null, null, List.of());
-        return new BelegErgebnis(e, v, richtig, false, 1, 100, 50, false, 10, 20, null);
+                null, null, false, sicherheit, "AUSGANGSRECHNUNG", 0.9, umgestuft);
+        Erwartung e = new Erwartung(id, null, false, "abstimmen", kategorie, "QUITTUNG", null, null, null, null, List.of());
+        return new BelegErgebnis(e, v, richtig, false, 1, 100, 50, false, 10, 20, null, eingabe);
     }
 
     static Map<Feld, Double> s(double wert) {
@@ -76,5 +81,24 @@ class BerichtTest {
         assertThat(beleg.path("artRoh").asText()).isEqualTo("AUSGANGSRECHNUNG");
         assertThat(beleg.path("artRohSicherheit").asDouble()).isEqualTo(0.9);
         assertThat(beleg.path("vorschlag").path("art").asText()).isEqualTo("QUITTUNG");
+        assertThat(beleg.path("eingabe").asText()).isEqualTo("TEXT");
+    }
+
+    @Test
+    void bildUndTextGetrenntKontrolleFotosArtRohUndUmstufungen() {
+        List<BelegErgebnis> r = List.of(
+                ergebnis("foto", "HANDY_FOTO", GoldenPipeline.Eingabe.BILD, false, s(0.9)),
+                ergebnis("foto-text", "HANDY_FOTO", GoldenPipeline.Eingabe.TEXT, false, s(0.9)),
+                ergebnis("pdf", "QUITTUNG", GoldenPipeline.Eingabe.TEXT, true, s(0.9)));
+        Bericht.Kennzahlen k = Bericht.berechne(r, 0.8, 0.20, 0.75);
+        assertThat(k.belegeBild()).isEqualTo(1);
+        assertThat(k.tokensEinBild()).isEqualTo(100);
+        assertThat(k.tokensAusBild()).isEqualTo(50);
+        assertThat(k.kostenBild() + k.kostenText()).isCloseTo(k.kostenChf(), org.assertj.core.data.Offset.offset(1e-12));
+        assertThat(k.fotosNichtAlsBild()).containsExactly("foto-text");
+        assertThat(k.artRohRichtig()).isZero();
+        assertThat(k.umstufungen()).containsExactly("pdf: AUSGANGSRECHNUNG → QUITTUNG");
+        String md = Bericht.kennzahlenMarkdown(new Bericht.Lauf(Modus.ABSTIMMEN, false, "t", "v5-x", "m", 0.8, 0, 0, 0.2, 0.75), k);
+        assertThat(md).contains("Abweichung bei foto-text").contains("Umstufungen: 1").contains("Art roh (Modell) richtig: 0/3");
     }
 }

@@ -93,9 +93,9 @@ public class GoldenLaufDienst {
         return new Ausgang(ordner, ergebnisse, k);
     }
 
-    /** Kennung des Bildwegs für den Prompt-Hash. */
+    /** Kennung des Bildwegs für den Prompt-Hash: Standard «fotos» (Bilder als Bild), --k1 «alle». */
     static String bildweg(boolean k1) {
-        return k1 ? "alle" : "ohne";
+        return k1 ? "alle" : "fotos";
     }
 
     /** Konsole: nur Beleg-ID (synthetisch Dateiname, echt Kurz-ID), Feld, richtig/falsch. */

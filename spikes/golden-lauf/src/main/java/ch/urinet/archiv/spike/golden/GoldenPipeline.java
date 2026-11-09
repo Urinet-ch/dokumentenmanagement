@@ -29,9 +29,12 @@ import java.util.Optional;
 @ApplicationScoped
 public class GoldenPipeline {
 
+    /** Was das Modell erhält: Seitenbild (Original ist ein Bild, oder --k1) oder OCR-Text. */
+    public enum Eingabe { BILD, TEXT }
+
     public record BelegErgebnis(Erwartung erwartung, Nachbearbeitung.Ergebnis vorschlag, Map<Feld, Boolean> richtig,
                                 boolean qrGefunden, int aufrufe, long tokensEin, long tokensAus,
-                                boolean tokensUnvollstaendig, long ocrMs, long kiMs, String fehler) {
+                                boolean tokensUnvollstaendig, long ocrMs, long kiMs, String fehler, Eingabe eingabe) {
 
         public boolean gateRichtig() {
             for (Feld f : Vergleich.GATE_FELDER) {
@@ -57,8 +60,22 @@ public class GoldenPipeline {
     @ConfigProperty(name = "golden.eigene-arten")
     List<String> eigeneArten;
 
+    /** Weg nach dem Typ des Originals (Inhalt, Req 3.3), nie nach der Kategorie der Erwartung; --k1 schickt jeden Beleg als Bild. */
+    static Eingabe eingabe(Erwartung e, boolean k1) {
+        if (k1) {
+            return Eingabe.BILD;
+        }
+        try {
+            return Dateityp.erkenne(e.datei()).istBild() ? Eingabe.BILD : Eingabe.TEXT;
+        } catch (IOException ex) {
+            return Eingabe.TEXT;
+        }
+    }
+
     public BelegErgebnis verarbeite(Erwartung e, Mandant mandant, String systemPrompt, List<Dokumentarten.Art> arten,
                                     Path cache, boolean k1) {
+        Eingabe weg = eingabe(e, k1);
+        boolean alsBild = weg == Eingabe.BILD;
         long start = System.nanoTime();
         Ocr.Resultat ocr;
         Optional<QrDaten> qr;
@@ -69,7 +86,7 @@ public class GoldenPipeline {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            return fehlschlag(e, 0, 0, 0, false, (System.nanoTime() - start) / 1_000_000, 0, "OCR: " + Ocr.grund(ex));
+            return fehlschlag(e, weg, 0, 0, 0, false, (System.nanoTime() - start) / 1_000_000, 0, "OCR: " + Ocr.grund(ex));
         }
         long ocrMs = (System.nanoTime() - start) / 1_000_000;
 
@@ -80,17 +97,17 @@ public class GoldenPipeline {
         Result<MetadatenVorschlag> antwort = null;
         String fehler = null;
         Image bild = null;
-        if (k1) {
+        if (alsBild) {
             try {
                 bild = Seitenbild.aus(ocr.seiten());
             } catch (IOException | RuntimeException ex) {
-                return fehlschlag(e, 0, 0, 0, false, ocrMs, 0, "K1-Bild: " + KiFehler.grund(ex));
+                return fehlschlag(e, weg, 0, 0, 0, false, ocrMs, 0, "Bild: " + KiFehler.grund(ex));
             }
         }
         zaehler.zuruecksetzen();
         try {
             aufrufe++;
-            antwort = k1
+            antwort = alsBild
                     ? extraktor.extrahiereBild(systemPrompt, Prompt.qr(qr), bild)
                     : extraktor.extrahiere(systemPrompt, Prompt.qr(qr), text);
         } catch (RuntimeException ex) {
@@ -98,7 +115,7 @@ public class GoldenPipeline {
                 fehler = "Schemafehler";
                 try {
                     aufrufe++;
-                    antwort = k1
+                    antwort = alsBild
                             ? extraktor.nachfrageBild(systemPrompt, Prompt.qr(qr), bild, fehler)
                             : extraktor.nachfrage(systemPrompt, Prompt.qr(qr), text, fehler);
                 } catch (RuntimeException ex2) {
@@ -125,7 +142,7 @@ public class GoldenPipeline {
             unvollstaendig = aufrufe > 0;
         }
         if (antwort == null || antwort.content() == null) {
-            return fehlschlag(e, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, "KI: " + fehler);
+            return fehlschlag(e, weg, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, "KI: " + fehler);
         }
         Nachbearbeitung.Ergebnis v = Nachbearbeitung.bearbeite(antwort.content(), qr, ocr.text(), mandant, arten,
                 eigeneArten, LocalDate.now());
@@ -136,16 +153,16 @@ public class GoldenPipeline {
         richtig.put(Feld.BETRAG, Vergleich.betrag(e.betrag(), v.betrag()));
         richtig.put(Feld.BELEGNUMMER, Vergleich.belegnummer(e.belegnummer(), v.belegnummer()));
         return new BelegErgebnis(e, v, richtig, qr.isPresent(), aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs,
-                aufrufe > 1 ? "Nachfrage nach " + fehler : null);
+                aufrufe > 1 ? "Nachfrage nach " + fehler : null, weg);
     }
 
-    private static BelegErgebnis fehlschlag(Erwartung e, int aufrufe, long ein, long aus, boolean unvollstaendig,
-                                            long ocrMs, long kiMs, String fehler) {
+    private static BelegErgebnis fehlschlag(Erwartung e, Eingabe weg, int aufrufe, long ein, long aus,
+                                            boolean unvollstaendig, long ocrMs, long kiMs, String fehler) {
         Map<Feld, Boolean> falsch = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
             falsch.put(f, false);
         }
-        return new BelegErgebnis(e, null, falsch, false, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, fehler);
+        return new BelegErgebnis(e, null, falsch, false, aufrufe, ein, aus, unvollstaendig, ocrMs, kiMs, fehler, weg);
     }
 
     /** OCR-Ergebnis je Dateiinhalt (SHA-256) und Image zwischenspeichern, damit Prompt-Iterationen nicht neu OCRen. */
