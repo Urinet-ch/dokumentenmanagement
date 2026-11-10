@@ -69,6 +69,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 - Optimistisches Locking über `version` und `If-Match`/`ETag` bei `PATCH`.
 - Lange Arbeiten (OCR, KI, Archivierung, Import, Manifest) laufen als Auftrag in der Tabelle `public.auftrag`, abgeholt mit `SELECT … FOR UPDATE SKIP LOCKED`. Kein Message-Broker.
 - Konfiguration in `application.properties` mit Profilen `dev`, `test`, `prod`, dazu `lokal` (nur Entwicklerrechner, ADR-012); Infomaniak-Endpunkte und Modellnamen konfigurierbar.
+- Zusatz-Schemas der Dokumentarten (JSON Schema Draft 2020-12): Reguläre Ausdrücke in `pattern`, `patternProperties` und `propertyNames` laufen mit der JDK-Regex (`java.util.regex`), nicht nach ECMA-262; JDK-Konstrukte wie possessive Quantoren oder `\p{javaLowerCase}` werden darum angenommen. Jede Prüfung bricht nach `archiv.dokumentart.muster-zeitgrenze` ab (Spec 01, design.md «Umsetzung 2.1»).
 - Logging strukturiert (JSON in `prod`), nie Dokumentinhalte, Beträge oder Personendaten loggen – nur IDs.
 
 ## Konventionen Frontend
