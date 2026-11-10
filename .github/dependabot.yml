@@ -14,6 +14,14 @@ updates:
       # Der Wechsel auf die nächste LTS (Java 29) ist ein eigener Entscheid.
       - dependency-name: eclipse-temurin
         update-types: ["version-update:semver-major"]
+  # Basis-Images von PostgreSQL und Keycloak für den Deploy (Aufgabe 1.9), per Digest gepinnt. Dieselben Images nennt
+  # application.properties für die Dev Services; DeployImagesTest bricht ab, bis der Dependabot-PR sie dort nachzieht.
+  - package-ecosystem: docker
+    directories:
+      - /deploy/infomaniak/db
+      - /deploy/infomaniak/keycloak
+    schedule:
+      interval: weekly
   - package-ecosystem: docker-compose
     directory: /backend
     schedule:
