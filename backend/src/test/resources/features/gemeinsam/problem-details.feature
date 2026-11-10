@@ -18,6 +18,17 @@ Funktionalität: Fehlerantworten als Problem Details (design.md «Error Handling
     Dann antwortet das Archiv mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und enthält die Antwort «EINGABE-GEHEIM-4711» nicht
 
+  @req-16.7
+  # Vorab-Korrektur 3 aus dem Review von PR #35: Hibernate, Narayana und der OIDC-Provider loggten Werte.
+  Szenario: Ein Constraint-Verstoss in der Datenbank und ein verfälschtes Token hinterlassen keine Werte im Log
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und das ganze Log wird mitgeschnitten
+    Wenn «inhaber-urinet» zweimal die Dokumentart «PROBE_LOGWERT_4711» über das Probe-Dokument «NORMAL» anlegt
+    Und «inhaber-urinet» mit verfälschter Signatur die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+    Dann scheitert die zweite Anlage mit Status 500 und Fehlercode «INTERNER_FEHLER»
+    Und wird das verfälschte Token mit Status 401 und Fehlercode «NICHT_ANGEMELDET» abgelehnt
+    Und enthält weder eine Antwort noch das ganze Log einen dieser Werte
+
   # Vorab-Korrektur 4 aus dem Review von PR #35: Die Grenze der Anfrage gab einen leeren 413. Im Testprofil liegt sie
   # bei 1 MB (application.properties); die Grenze für Uploads (Req 3.6) setzt Aufgabe 2.4.
   Szenario: Eine Anfrage über der Grenze gibt 413 als Problem Details
