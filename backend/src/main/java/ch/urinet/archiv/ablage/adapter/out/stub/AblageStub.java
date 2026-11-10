@@ -89,7 +89,7 @@ public class AblageStub implements AblagePort {
             }
             abgelegt.add(datei(ziel, kopie));
         }
-        return new ArchiviertesDokument(abgelegt, bis);
+        return ArchiviertesDokument.aus(abgelegt);
     }
 
     @Override

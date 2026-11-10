@@ -72,7 +72,7 @@ public class S3Ablage implements AblagePort {
      * Ceph-Quelltext ({@code rgw_common.cc}, nicht live gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration}
      * (AWS, MinIO mit 400). Jeder andere Fehler, auch {@code NoSuchKey} oder {@code NoSuchVersion}, ist ein Fehler.
      */
-    private static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
+    public static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
             "ObjectLockConfigurationNotFoundError");
     private static final Set<String> FEHLT = Set.of("NoSuchKey", "NoSuchVersion");
 
@@ -149,7 +149,7 @@ public class S3Ablage implements AblagePort {
             AbgelegteDatei kopie = kopieUebernehmen(bucket, datei).orElseGet(() -> kopieren(bucket, datei));
             abgelegt.add(bis.map(b -> sperren(bucket, kopie, b)).orElse(kopie));
         }
-        return new ArchiviertesDokument(abgelegt, bis);
+        return ArchiviertesDokument.aus(abgelegt);
     }
 
     @Override
@@ -256,22 +256,24 @@ public class S3Ablage implements AblagePort {
     /**
      * Neuer Versuch (Req 15.10): eine korrekte Kopie übernehmen, eine fehlerhafte und ungesperrte entfernen. Gelöscht
      * wird erst, wenn die Quelle unter {@code eingang/} über ihre Versions-ID lesbar ist und ihre SHA-256 stimmt; sonst
-     * wäre die Kopie unter {@code archiv/} womöglich die einzige.
+     * wäre die Kopie unter {@code archiv/} womöglich die einzige. Liegen mehrere korrekte Kopien vor, gilt die mit der
+     * längsten Sperre (sonst die neueste); weitere korrekte, ungesperrte Kopien werden entfernt, gesperrte bleiben.
+     * Die übernommene Kopie trägt ihre bestehende Sperre.
      */
     private Optional<AbgelegteDatei> kopieUebernehmen(String bucket, ZuArchivieren datei) {
         String ziel = datei.schluessel().pfad(Ablageort.ARCHIV);
-        Optional<AbgelegteDatei> korrekt = Optional.empty();
         List<String> loeschmarken = new ArrayList<>();
         for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).prefix(ziel))) {
             seite.deleteMarkers().stream().filter(m -> m.key().equals(ziel)).forEach(m -> loeschmarken.add(m.versionId()));
         }
+        List<AbgelegteDatei> korrekte = new ArrayList<>();
         List<String> fehlerhaft = new ArrayList<>();
         for (ObjectVersion version : versionen(bucket, ziel)) {
             Lesung lesung = lesen(bucket, ziel, version.versionId());
-            if (lesung.sha256().equals(datei.sha256()) && korrekt.isEmpty()) {
-                korrekt = Optional.of(new AbgelegteDatei(ziel, version.versionId(), lesung.sha256(), lesung.groesse(),
-                        Optional.empty()));
-            } else if (gesperrt(bucket, ziel, version.versionId())) {
+            Optional<Instant> sperre = aktiveSperre(bucket, ziel, version.versionId());
+            if (lesung.sha256().equals(datei.sha256())) {
+                korrekte.add(new AbgelegteDatei(ziel, version.versionId(), lesung.sha256(), lesung.groesse(), sperre));
+            } else if (sperre.isPresent()) {
                 // eine gesperrte fremde Version lässt sich nicht entfernen: nicht weiter archivieren
                 throw new ArchivierungAbgebrochen(ArchivierungAbgebrochen.Grund.PRUEFSUMME, ziel);
             } else {
@@ -281,8 +283,22 @@ public class S3Ablage implements AblagePort {
         if (!fehlerhaft.isEmpty()) {
             quellePruefen(bucket, datei);
         }
+        // bei gleicher Sperre gewinnt die erste, also die neueste Version
+        Optional<AbgelegteDatei> korrekt = korrekte.stream()
+                .max(Comparator.comparing(k -> k.sperreBis().orElse(Instant.MIN)));
         for (String versionId : fehlerhaft) {
             versionLoeschen(bucket, ziel, versionId);
+        }
+        for (AbgelegteDatei doppelt : korrekte) {
+            if (doppelt == korrekt.orElseThrow()) {
+                continue;
+            }
+            if (doppelt.sperreBis().isEmpty()) {
+                // gleicher Inhalt wie die übernommene Kopie: Entfernen verliert nichts
+                versionLoeschen(bucket, ziel, doppelt.versionId());
+            } else {
+                LOG.warnf("Gesperrte zweite Archiv-Kopie bleibt: %s (Version %s)", ziel, doppelt.versionId());
+            }
         }
         for (String marke : loeschmarken) {
             versionLoeschen(bucket, ziel, marke);
@@ -412,8 +428,9 @@ public class S3Ablage implements AblagePort {
         }
     }
 
-    private boolean gesperrt(String bucket, String key, String versionId) {
-        return retention(bucket, key, versionId).map(r -> r.retainUntilDate().isAfter(uhr.instant())).orElse(false);
+    private Optional<Instant> aktiveSperre(String bucket, String key, String versionId) {
+        return retention(bucket, key, versionId).map(ObjectLockRetention::retainUntilDate)
+                .filter(bis -> bis.isAfter(uhr.instant()));
     }
 
     private static String fehlercode(S3Exception e) {

@@ -36,6 +36,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -237,6 +238,44 @@ class S3AblageTest {
         var rest = verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix(ziel));
         assertThat(rest.versions()).singleElement().satisfies(v -> assertThat(v.versionId()).isEqualTo(kopie.versionId()));
         assertThat(rest.deleteMarkers()).isEmpty();
+    }
+
+    @Test
+    void neuerVersuchMitZweiGleichenKopienUebernimmtDieGesperrteOhneAbbruch() {
+        S3Ablage ablage = ablage();
+        var schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren zu = eingang(ablage, schluessel, inhalt("Original"));
+        String ziel = schluessel.pfad(Ablageort.ARCHIV);
+        // zwei frühere Versuche: die ältere Kopie gesperrt, die neuere gleiche ungesperrt
+        String gesperrt = verwaltung.putObject(r -> r.bucket(bucket).key(ziel), RequestBody.fromString("Original"))
+                .versionId();
+        Instant bis = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.SECONDS);
+        verwaltung.putObjectRetention(r -> r.bucket(bucket).key(ziel).versionId(gesperrt)
+                .retention(s -> s.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(bis)));
+        verwaltung.putObject(r -> r.bucket(bucket).key(ziel), RequestBody.fromString("Original"));
+
+        ArchiviertesDokument archiviert = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.ohnePflicht());
+
+        AbgelegteDatei kopie = archiviert.dateien().getFirst();
+        assertThat(kopie.versionId()).isEqualTo(gesperrt);
+        assertThat(kopie.sperreBis()).contains(bis);
+        assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix(ziel)).versions())
+                .singleElement().satisfies(v -> assertThat(v.versionId()).isEqualTo(gesperrt));
+    }
+
+    @Test
+    void neuerVersuchMeldetDieSperreDerUebernommenenKopie() {
+        S3Ablage ablage = ablage();
+        ZuArchivieren zu = eingang(ablage, DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"), inhalt("G"));
+        AbgelegteDatei erste = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.unbefristet()).dateien().getFirst();
+        Instant sperre = retention(erste.schluessel(), erste.versionId()).orElseThrow().retainUntilDate();
+
+        // inzwischen ohne Pflicht: die Kopie bleibt gesperrt, das Ergebnis muss das melden
+        ArchiviertesDokument zweiter = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.ohnePflicht());
+
+        assertThat(zweiter.dateien().getFirst().versionId()).isEqualTo(erste.versionId());
+        assertThat(zweiter.dateien().getFirst().sperreBis()).contains(sperre);
+        assertThat(zweiter.sperreBis()).contains(sperre);
     }
 
     @Test

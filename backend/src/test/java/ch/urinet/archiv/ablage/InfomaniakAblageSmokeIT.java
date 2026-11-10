@@ -69,8 +69,7 @@ class InfomaniakAblageSmokeIT {
             "https://s3.gva2.infomaniak.cloud"));
     private static final Region REGION = Region.of(System.getProperty("archiv.smoke.region", "gva2"));
     private static final String PRAEFIX = "urinet-archiv-smoke-";
-    private static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
-            "ObjectLockConfigurationNotFoundError");
+    private static final Set<String> KEINE_SPERRE = S3Ablage.KEINE_SPERRE;
 
     @Test
     void ablageGegenInfomaniak() throws Exception {
