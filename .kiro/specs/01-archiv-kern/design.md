@@ -419,6 +419,25 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - `GoldenLauf` und `GoldenDatensatzIT` laufen nur per HTTPS gegen `api.infomaniak.com`, sonst Abbruch
   vor dem ersten Beleg (Req 16.22, umgesetzt in Aufgabe 0.5).
 
+**Umsetzung Aufgabe 1.11 (10.11.2026), Präzisierungen und Abweichungen** (vorsichtigere Auslegung, im PR unter
+«Offen für Fabian»):
+- `lokal` erbt per `%lokal.quarkus.config.profile.parent=dev`; Quarkus wertet das nur aus, wenn das Profil über
+  `quarkus.profile` gesetzt ist (`-Dquarkus.profile=lokal`), zur Laufzeit belegt mit «Profiles lokal,dev activated».
+- Eigene Stub-Schalter `archiv.ki.embedding-stub` und `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, in
+  `lokal` `true`); der Reranker-Schalter steuert die Prüfung von `archiv.ki.reranker-url`. Die Ports selbst kommen mit
+  Spec 02. In `lokal` sind `archiv.ki.product-id` und `archiv.ki.reranker-url` leer.
+- Geprüft wird zusätzlich `quarkus.langchain4j.openai.base-url`, weil der LangChain4j-Client sonst an der Prüfung
+  vorbei einen Endpunkt erhalten könnte.
+- Bei aktivem Stub entfällt die Prüfung nur für eine **leere** URL; eine gesetzte URL wird auch dann geprüft.
+- Ein gepacktes Artefakt (Quarkus `LaunchMode.NORMAL`) gilt immer als `prod`; `-Dquarkus.profile=lokal` bricht dort
+  ab (Req 16.22). Ist `test` aktiv, gilt die Regel von `test` (strenger als `lokal`).
+- `localhost` und `127.0.0.1` nur per `http`; IPv6 (`[::1]`) ist abgelehnt.
+- Port der WireMock-Testressource: Schlüssel `archiv.ki.wiremock-port` (in `test` fest `8089`, die Test-URLs
+  verwenden ihn). Die Testressource setzt ihn ab Aufgabe 3.2 beim Start; bis dahin deckt der Unit-Test den Fall mit dem
+  Port als Eingabe ab.
+- OCR in `lokal`: Die Port-Auswahl aus Aufgabe 1.2 wirft erst beim ersten Zugriff, eine Startprüfung gibt es nicht.
+  `lokal` startet darum mit `archiv.ocr.stub=false`, auch bevor der OCR-Adapter aus 2.6 besteht.
+
 ### Kontakt und Importe (`kontakt`, `importe`)
 CSV-Import-Ablauf:
 
