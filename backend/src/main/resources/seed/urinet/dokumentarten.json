@@ -1,12 +1,12 @@
 {
-  "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2). Werte entschieden von Fabian am 10.11.2026.",
+  "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2). Werte entschieden von Fabian am 10.11.2026; ebenso die Anpassungen F3 (AUSGANGSRECHNUNG ohne Pflichtfeld faelligkeit), F5 (BEHOERDE mit Gruppe finanz) und F7 (LOHNABRECHNUNG: periode JJJJ-MM oder JJJJ für den Lohnausweis) sowie die Beschreibungen (entschieden von Fabian am 10.11.2026).",
   "dokumentarten": [
     {
       "code": "AUSGANGSRECHNUNG",
       "name": "Ausgangsrechnung",
-      "beschreibung": "Rechnung oder Gutschrift von Urinet an einen Kunden, mit Belegnummer wie 2026-003 (Altbestand R0001). Rechnungen an Urinet sind LIEFERANTENBELEG, Mahnungen sind KORRESPONDENZ.",
+      "beschreibung": "Rechnung oder Gutschrift von Urinet an einen Kunden, Belegnummer wie 2026-003 (Altbestand R0001). Massgebend ist der Aussteller Urinet, nicht das Nummernformat. Rechnungen an Urinet = LIEFERANTENBELEG, Mahnungen = KORRESPONDENZ.",
       "gruppen": ["finanz"],
-      "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "richtung", "betrag", "waehrung", "faelligkeit"],
+      "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
       "vertraulichkeit": "INTERN",
       "aufbewahrung_jahre": 10,
@@ -17,7 +17,7 @@
     {
       "code": "OFFERTE",
       "name": "Offerte",
-      "beschreibung": "Angebot von Urinet an einen Kunden mit Betrag und Gültigkeit, Belegnummer wie O-2026-005. Offerten von Lieferanten und Auftragsbestätigungen sind KORRESPONDENZ.",
+      "beschreibung": "Angebot von Urinet an einen Kunden mit Betrag und Gültigkeit, Belegnummer wie O-2026-005. Bestellung oder Auftrag eines Kunden auf eine Offerte = VERTRAG. Offerten von Lieferanten und Auftragsbestätigungen = KORRESPONDENZ.",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "betrag", "waehrung"],
       "zusatz_schema": {
@@ -34,7 +34,7 @@
     {
       "code": "LIEFERANTENBELEG",
       "name": "Lieferantenbeleg",
-      "beschreibung": "Rechnung oder Gutschrift eines Lieferanten an Urinet, auch für Abos, Telefon und Hosting. Rechnungen von Ämtern und Ausgleichskassen sind BEHOERDE, Prämienrechnungen von Versicherern VERSICHERUNG.",
+      "beschreibung": "Rechnung oder Gutschrift eines Lieferanten an Urinet, auch bereits per Karte bezahlte Online-Rechnungen (Abo, Telefon, Hosting), Rechnungen öffentlicher Werke (Strom, Wasser), Prämienrechnungen von Versicherern und Mahnungen mit Mahngebühr oder Verzugszins. Rechnungen von Ämtern und Ausgleichskassen = BEHOERDE.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -47,7 +47,7 @@
     {
       "code": "QUITTUNG",
       "name": "Quittung / Spesen",
-      "beschreibung": "Kassenzettel und Quittungen über bar oder mit Karte bezahlte Ausgaben, auch Spesenbelege wie Bahn, Parkplatz und Verpflegung. Eine Rechnung mit Zahlungsfrist ist LIEFERANTENBELEG.",
+      "beschreibung": "Kassenzettel und Quittungen über bar oder mit Karte bezahlte Ausgaben, auch Spesenbelege wie Bahn, Parkplatz und Verpflegung. Eine Rechnung an Urinet, auch eine bereits bezahlte, = LIEFERANTENBELEG.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -60,13 +60,13 @@
     {
       "code": "LOHNABRECHNUNG",
       "name": "Lohnabrechnung",
-      "beschreibung": "Monatliche Lohnabrechnung einer mitarbeitenden Person, Periode im Format JJJJ-MM. Lohndeklarationen und Beitragsrechnungen sind BEHOERDE (AHV, IV, EO, FAK) bzw. VERSICHERUNG (UVG, Krankentaggeld).",
+      "beschreibung": "Monatliche Lohnabrechnung oder jährlicher Lohnausweis einer mitarbeitenden Person. Lohndeklarationen und Beitragsrechnungen = BEHOERDE (AHV, IV, EO, ALV, FAK, Quellensteuer) bzw. VERSICHERUNG (UVG, Krankentaggeld, BVG).",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung", "zusatz.periode", "zusatz.person"],
       "zusatz_schema": {
         "type": "object",
         "properties": {
-          "periode": {"type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"},
+          "periode": {"type": "string", "pattern": "^\\d{4}(-(0[1-9]|1[0-2]))?$"},
           "person": {"type": "string", "minLength": 1}
         },
         "additionalProperties": false
@@ -80,7 +80,7 @@
     {
       "code": "VERTRAG",
       "name": "Vertrag",
-      "beschreibung": "Vertrag mit Laufzeit, etwa Arbeits-, Miet-, Leasing-, Kunden- oder Lieferantenvertrag, samt Nachträgen und Kündigungen. Policen und Kündigungen von Versicherungen sind VERSICHERUNG.",
+      "beschreibung": "Befristeter oder unbefristeter Vertrag, etwa Arbeits-, Miet-, Leasing-, Kunden- oder Lieferantenvertrag, samt Nachträgen und Kündigungen, auch der Auftrag eines Kunden auf eine Offerte. Policen und Kündigungen von Versicherungsverträgen = VERSICHERUNG.",
       "gruppen": ["vertrag"],
       "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -93,7 +93,7 @@
     {
       "code": "VERSICHERUNG",
       "name": "Versicherung",
-      "beschreibung": "Police, Nachtrag, Prämienrechnung oder Kündigung eines Versicherers, darunter UVG, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. AHV, IV, EO und FAK der Ausgleichskasse sind BEHOERDE.",
+      "beschreibung": "Police, Nachtrag oder Kündigung eines Versicherungsvertrags (durch Urinet oder den Versicherer), darunter SUVA und andere UVG-Versicherer, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. Prämienrechnungen = LIEFERANTENBELEG; AHV, IV, EO, ALV und FAK der Ausgleichskasse = BEHOERDE.",
       "gruppen": ["vertrag", "finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -106,8 +106,8 @@
     {
       "code": "BEHOERDE",
       "name": "Behörde",
-      "beschreibung": "Verfügung, Veranlagung oder Rechnung eines Amtes, etwa Steuern, MWST und Handelsregister, sowie AHV, IV, EO und FAK der Ausgleichskasse. UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG.",
-      "gruppen": ["frei"],
+      "beschreibung": "Verfügung, Veranlagung, Rechnung oder Gutschrift eines Amtes, etwa Steuern, MWST, Handelsregister und Betreibungsamt, sowie AHV, IV, EO, ALV und FAK der Ausgleichskasse, auch Rückerstattungen; dazu eigene Eingaben wie Steuererklärung und MWST-Abrechnung. UVG- und Krankentaggeld-Versicherer = VERSICHERUNG.",
+      "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "partner"],
       "zusatz_schema": {
         "type": "object",
@@ -126,7 +126,7 @@
     {
       "code": "BANK",
       "name": "Bank",
-      "beschreibung": "Kontoauszug, Zins- oder Gebührenabrechnung von Bank, PostFinance oder Kreditkarte für eine Periode, auch einzelne Belastungs- und Gutschriftsanzeigen (Periode ist der Buchungstag). Rechnungen bleiben bei ihrer eigenen Art.",
+      "beschreibung": "Kontoauszug, Zins- oder Gebührenabrechnung von Bank, PostFinance oder Kreditkarte für eine Periode, auch einzelne Belastungsanzeigen und Gutschriftsanzeigen der Bank (Zahlungseingang). Kredit- und Kontoverträge = VERTRAG, Rechnungen bleiben bei ihrer eigenen Art.",
       "gruppen": ["frei"],
       "pflichtfelder": ["titel", "datum", "partner", "zusatz.periode_von", "zusatz.periode_bis"],
       "zusatz_schema": {
@@ -159,7 +159,7 @@
     {
       "code": "KORRESPONDENZ",
       "name": "Korrespondenz",
-      "beschreibung": "Brief oder E-Mail ohne eigene Art, etwa Anfrage, Auftragsbestätigung, Mahnung oder Offerte eines Lieferanten. Passt ein Schreiben zu einer anderen Art (Rechnung, Vertrag, Verfügung), gilt diese.",
+      "beschreibung": "Brief oder E-Mail ohne eigene Art, etwa Anfrage, Auftragsbestätigung, Mahnung ohne Gebühr oder Offerte eines Lieferanten. Passt ein Schreiben zu einer anderen Art (Rechnung, Vertrag, Verfügung), gilt diese.",
       "gruppen": ["frei"],
       "pflichtfelder": ["titel", "datum", "partner"],
       "zusatz_schema": {
