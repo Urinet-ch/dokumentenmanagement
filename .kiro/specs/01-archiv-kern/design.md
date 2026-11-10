@@ -264,6 +264,12 @@ stateDiagram-v2
 - Neuberechnung bei Änderung von Belegdatum, Art, Geschäftsjahr oder `gueltig_bis` (Req 9.7): siehe «Ablage».
 - Zusatzfelder: `zusatz_schema` ist JSON Schema (Draft 2020-12). Validiert werden die Werte beim Speichern und das Schema selbst beim Anlegen einer Art; Fehler → 422 `ZUSATZ_UNGUELTIG` (Req 9.5). Pflichtfelder in Zusatzfeldern heissen `zusatz.<feld>`.
 - Löschen einer Art mit Dokumenten (auch verworfenen) → 409 `DOKUMENTART_IN_GEBRAUCH`; erlaubt bleibt `aktiv = false` (Req 9.4).
+- Umsetzung 2.1 (Erkenntnisse):
+  - Schema-Prüfung mit `com.networknt:json-schema-validator` (Draft 2020-12, Apache-2.0) hinter dem Port `ZusatzSchemaPruefer`. Keine Remote-Referenzen (`fetchRemoteResources(false)`); `$ref`, `$dynamicRef` und `$recursiveRef` nur lokal (`#…`); `$id`, `$anchor`, `$dynamicAnchor`, `$recursiveAnchor` und `$vocabulary` abgelehnt; `$schema` nur 2020-12. Die Wurzel ist ein Objekt mit `type: object`. Grenzen: Schema höchstens 16 KiB und 10 Ebenen tief, Werte höchstens 64 KiB. Doppelte Schlüssel und Zeichen nach dem JSON-Wert sind ungültig. Das Schema wird gegen das Meta-Schema geprüft und vollständig vorkompiliert (z. B. ungültiges `pattern`, fehlendes `$ref`-Ziel → 422). Pflichtfelder `zusatz.<feld>` müssen unter `properties` stehen. `format` wird geprüft.
+  - Die Zahl der Dokumente einer Art liefert der Port `DokumentZaehlerPort`; bis zur Tabelle `dokument` (2.2) zählt `OhneDokumenteZaehler` 0, 2.2 ersetzt ihn durch eine Abfrage auf `dokument` (auch `VERWORFEN`).
+  - Löschen ist physisch (`DELETE`), nur ohne Dokumente. `PATCH` ohne `ETag`/`If-Match`, weil `dokumentart` keine Spalte `version` hat und nur der `inhaber` ändert.
+  - `POST` verlangt `code`, `name`, `vertraulichkeit`, `gesetzlichePflicht` und `aufbewahrungJahre` (`null` = unbefristet) ausdrücklich; ohne `zusatzSchema` gilt `{"type":"object","properties":{},"additionalProperties":false}`. Doppelter Code → 400 `ANFRAGE_UNGUELTIG`.
+  - Eine gespeicherte Art, die die Domain-Regeln verletzt, ist ein Serverfehler (500), keine ungültige Anfrage.
 
 #### Stammdaten der Dokumentarten (Req 9.2, P6)
 Massgeblich ist der Seed `backend/src/main/resources/seed/urinet/dokumentarten.json`; die Tabelle
@@ -274,22 +280,22 @@ Arbeitsverträge geschützt sind; einen Kundenvertrag stellt der `inhaber` bei d
 `NORMAL`, wenn ihn Mitarbeitende sehen sollen (keine eigene Art für Kundenaufträge).
 
 <!-- seed:dokumentarten:start -->
-| Code | Name | Gruppen | Pflichtfelder | Vertraulichkeit | Jahre | ab | Pflicht |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `AUSGANGSRECHNUNG` | Ausgangsrechnung | finanz | titel, datum, partner, belegnummer, richtung, betrag, waehrung, faelligkeit | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `OFFERTE` | Offerte | finanz, frei | titel, datum, partner, belegnummer, betrag, waehrung | NORMAL | 10 | GESCHAEFTSJAHR | nein |
-| `LIEFERANTENBELEG` | Lieferantenbeleg | finanz | titel, datum, partner, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `QUITTUNG` | Quittung / Spesen | finanz | titel, datum, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `LOHNABRECHNUNG` | Lohnabrechnung | finanz, frei | titel, datum, richtung, betrag, waehrung, zusatz.periode, zusatz.person | PERSONAL | 10 | GESCHAEFTSJAHR | ja |
-| `VERTRAG` | Vertrag | vertrag | titel, datum, partner, gueltig_ab | PERSONAL | 10 | GUELTIG_BIS | ja |
-| `VERSICHERUNG` | Versicherung | vertrag, finanz | titel, datum, partner, gueltig_ab | INTERN | 10 | GUELTIG_BIS | ja |
-| `BEHOERDE` | Behörde | frei | titel, datum, partner | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `BANK` | Bank | frei | titel, datum, partner, zusatz.periode_von, zusatz.periode_bis | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `PROJEKTDOKUMENT` | Projektdokument | – | titel, projekt | NORMAL | unbefristet | – | nein |
-| `KORRESPONDENZ` | Korrespondenz | frei | titel, datum, partner | INTERN | 10 | GESCHAEFTSJAHR | nein |
+| Code | Name | Gruppen | Pflichtfelder | Vertraulichkeit | Jahre | ab | Pflicht | Beschreibung |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `AUSGANGSRECHNUNG` | Ausgangsrechnung | finanz | titel, datum, partner, belegnummer, richtung, betrag, waehrung, faelligkeit | INTERN | 10 | GESCHAEFTSJAHR | ja | Rechnung oder Gutschrift von Urinet an einen Kunden, mit Belegnummer wie 2026-003 (Altbestand R0001). Rechnungen an Urinet sind LIEFERANTENBELEG, Mahnungen sind KORRESPONDENZ. |
+| `OFFERTE` | Offerte | finanz, frei | titel, datum, partner, belegnummer, betrag, waehrung | NORMAL | 10 | GESCHAEFTSJAHR | nein | Angebot von Urinet an einen Kunden mit Betrag und Gültigkeit, Belegnummer wie O-2026-005. Offerten von Lieferanten und Auftragsbestätigungen sind KORRESPONDENZ. |
+| `LIEFERANTENBELEG` | Lieferantenbeleg | finanz | titel, datum, partner, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja | Rechnung oder Gutschrift eines Lieferanten an Urinet, auch für Abos, Telefon und Hosting. Rechnungen von Ämtern und Ausgleichskassen sind BEHOERDE, Prämienrechnungen von Versicherern VERSICHERUNG. |
+| `QUITTUNG` | Quittung / Spesen | finanz | titel, datum, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja | Kassenzettel und Quittungen über bar oder mit Karte bezahlte Ausgaben, auch Spesenbelege wie Bahn, Parkplatz und Verpflegung. Eine Rechnung mit Zahlungsfrist ist LIEFERANTENBELEG. |
+| `LOHNABRECHNUNG` | Lohnabrechnung | finanz, frei | titel, datum, richtung, betrag, waehrung, zusatz.periode, zusatz.person | PERSONAL | 10 | GESCHAEFTSJAHR | ja | Monatliche Lohnabrechnung einer mitarbeitenden Person, Periode im Format JJJJ-MM. Lohndeklarationen und Beitragsrechnungen sind BEHOERDE (AHV, IV, EO, FAK) bzw. VERSICHERUNG (UVG, Krankentaggeld). |
+| `VERTRAG` | Vertrag | vertrag | titel, datum, partner, gueltig_ab | PERSONAL | 10 | GUELTIG_BIS | ja | Vertrag mit Laufzeit, etwa Arbeits-, Miet-, Leasing-, Kunden- oder Lieferantenvertrag, samt Nachträgen und Kündigungen. Policen und Kündigungen von Versicherungen sind VERSICHERUNG. |
+| `VERSICHERUNG` | Versicherung | vertrag, finanz | titel, datum, partner, gueltig_ab | INTERN | 10 | GUELTIG_BIS | ja | Police, Nachtrag, Prämienrechnung oder Kündigung eines Versicherers, darunter UVG, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. AHV, IV, EO und FAK der Ausgleichskasse sind BEHOERDE. |
+| `BEHOERDE` | Behörde | frei | titel, datum, partner | INTERN | 10 | GESCHAEFTSJAHR | ja | Verfügung, Veranlagung oder Rechnung eines Amtes, etwa Steuern, MWST und Handelsregister, sowie AHV, IV, EO und FAK der Ausgleichskasse. UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG. |
+| `BANK` | Bank | frei | titel, datum, partner, zusatz.periode_von, zusatz.periode_bis | INTERN | 10 | GESCHAEFTSJAHR | ja | Kontoauszug, Zins- oder Gebührenabrechnung von Bank, PostFinance oder Kreditkarte für eine Periode, auch einzelne Belastungs- und Gutschriftsanzeigen (Periode ist der Buchungstag). Rechnungen bleiben bei ihrer eigenen Art. |
+| `PROJEKTDOKUMENT` | Projektdokument | – | titel, projekt | NORMAL | unbefristet | – | nein | Arbeitsunterlage zu einem Projekt ohne Buchungsbezug, etwa Plan, Konzept, Protokoll oder Foto. Offerten, Rechnungen und Verträge zum Projekt erhalten ihre eigene Art. |
+| `KORRESPONDENZ` | Korrespondenz | frei | titel, datum, partner | INTERN | 10 | GESCHAEFTSJAHR | nein | Brief oder E-Mail ohne eigene Art, etwa Anfrage, Auftragsbestätigung, Mahnung oder Offerte eines Lieferanten. Passt ein Schreiben zu einer anderen Art (Rechnung, Vertrag, Verfügung), gilt diese. |
 <!-- seed:dokumentarten:ende -->
 
-Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026).
+Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026) nennt die Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`) und fliesst in den KI-Prompt (3.2). Sie steht im Seed und in der Spalte `dokumentart.beschreibung` (Changeset `003-dokumentart-beschreibung`), ist ohne Personendaten und enthält kein `|`.
 
 ### Verarbeitung (`verarbeitung`)
 - Tabelle `public.auftrag`; `AuftragPoller` (Quarkus Scheduler, alle 2 s) holt `LIMIT n FOR UPDATE SKIP LOCKED`, Parallelität `archiv.worker.parallel=2` (Stufe A: 1).
@@ -656,7 +662,8 @@ api_client(id text pk, mandant text fk, name text, scope text,   -- generator|im
 ### Schema je Mandant `m_<code>`
 ```sql
 -- Liquibase-Changelog db/mandant
-dokumentart(code text pk, name text, gruppen text[], pflichtfelder text[],
+dokumentart(code text pk, name text, beschreibung text null,   -- Abgrenzung für den KI-Prompt (2.1)
+            gruppen text[], pflichtfelder text[],
             zusatz_schema jsonb, vertraulichkeit text, aufbewahrung_jahre int null,  -- null = unbefristet
             aufbewahrung_ab text null,   -- GESCHAEFTSJAHR | GUELTIG_BIS; null bei unbefristet
             gesetzliche_pflicht bool not null,   -- Object Lock nur bei true (Req 6.3, 6.12)

@@ -156,7 +156,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 2 — Dokumente, Ablage, Verarbeitung
 
-- [ ] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
+- [x] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
   - Entität `Dokumentart` mit Standard-Vertraulichkeit und `gesetzliche_pflicht`; REST `/api/v1/dokumentarten` (CRUD nur mit Recht A11; Löschen nur ohne Dokumente, sonst 409 `DOKUMENTART_IN_GEBRAUCH` → inaktiv); JSON-Schema-Validierung für `zusatz` (422 `ZUSATZ_UNGUELTIG`)
   - Seed `backend/src/main/resources/seed/urinet/dokumentarten.json` mit den 11 Arten aus 1.7; ein Test prüft den Seed Feld für Feld gegen die Stammdaten-Tabelle in design.md
   - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026)
