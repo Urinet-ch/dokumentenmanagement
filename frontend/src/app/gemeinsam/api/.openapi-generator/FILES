@@ -2,12 +2,15 @@ api.base.service.ts
 api.module.ts
 api/api-tokens.service.ts
 api/api.ts
+api/dokumentarten.service.ts
 configuration.ts
 encoder.ts
 index.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
+model/dokumentart-aenderung.ts
+model/dokumentart.ts
 model/models.ts
 param.ts
 provide-api.ts

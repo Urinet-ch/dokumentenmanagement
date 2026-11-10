@@ -4,7 +4,7 @@
     {
       "code": "PROBE_VHF_BULLETIN",
       "name": "Probe-Bulletin",
-      "gruppen": ["verband"],
+      "gruppen": ["frei"],
       "pflichtfelder": ["titel"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
       "vertraulichkeit": "NORMAL",

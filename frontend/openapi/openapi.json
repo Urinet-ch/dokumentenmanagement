@@ -1,5 +1,4 @@
 {
-  "openapi" : "3.1.0",
   "components" : {
     "schemas" : {
       "ApiToken" : {
@@ -68,10 +67,122 @@
           }
         }
       },
+      "Dokumentart" : {
+        "type" : "object",
+        "required" : [ "code", "name", "gruppen", "pflichtfelder", "zusatzSchema", "vertraulichkeit", "gesetzlichePflicht", "aktiv" ],
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "pattern" : "^[A-Z][A-Z0-9_]{1,39}$"
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 100
+          },
+          "beschreibung" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 1000,
+            "description" : "Abgrenzung zu ähnlichen Arten; geht in den KI-Prompt (Req 9.2)"
+          },
+          "gruppen" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Teilmenge von finanz, vertrag, frei"
+          },
+          "pflichtfelder" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Felder des Dokuments oder zusatz.<feld>"
+          },
+          "zusatzSchema" : {
+            "description" : "JSON Schema Draft 2020-12 der Zusatzfelder",
+            "type" : "object",
+            "$ref" : "#/components/schemas/JsonObjekt"
+          },
+          "vertraulichkeit" : {
+            "type" : "string",
+            "enum" : [ "NORMAL", "INTERN", "PERSONAL" ]
+          },
+          "aufbewahrungJahre" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 1,
+            "description" : "null = unbefristet"
+          },
+          "aufbewahrungAb" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "GESCHAEFTSJAHR", "GUELTIG_BIS" ]
+          },
+          "gesetzlichePflicht" : {
+            "type" : "boolean"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "DokumentartAenderung" : {
+        "description" : "Beim Anlegen sind code, name, vertraulichkeit, gesetzlichePflicht und aufbewahrungJahre Pflicht; beim Ändern ersetzen die angegebenen Felder die bisherigen. Unbekannte Felder → 400.",
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : [ "string", "null" ]
+          },
+          "gruppen" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "pflichtfelder" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "zusatzSchema" : {
+            "$ref" : "#/components/schemas/JsonObjekt"
+          },
+          "vertraulichkeit" : {
+            "type" : "string",
+            "enum" : [ "NORMAL", "INTERN", "PERSONAL" ]
+          },
+          "aufbewahrungJahre" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 1
+          },
+          "aufbewahrungAb" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "GESCHAEFTSJAHR", "GUELTIG_BIS" ]
+          },
+          "gesetzlichePflicht" : {
+            "type" : "boolean"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Instant" : {
         "type" : "string",
         "format" : "date-time",
         "examples" : [ "2022-03-10T16:15:50Z" ]
+      },
+      "JsonObjekt" : {
+        "type" : "object"
       }
     },
     "securitySchemes" : {
@@ -82,8 +193,11 @@
       }
     }
   },
+  "openapi" : "3.1.0",
   "tags" : [ {
     "name" : "API-Tokens"
+  }, {
+    "name" : "Dokumentarten"
   } ],
   "paths" : {
     "/api/v1/api-tokens" : {
@@ -171,6 +285,148 @@
         "responses" : {
           "204" : {
             "description" : "Widerrufen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumentarten" : {
+      "get" : {
+        "summary" : "Dokumentarten des Mandanten auflisten (aktive und inaktive)",
+        "tags" : [ "Dokumentarten" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Dokumentart"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Dokumentart anlegen",
+        "description" : "Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 400.",
+        "tags" : [ "Dokumentarten" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DokumentartAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Dokumentart"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumentarten/{code}" : {
+      "delete" : {
+        "summary" : "Dokumentart löschen",
+        "description" : "Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.",
+        "tags" : [ "Dokumentarten" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Gelöscht"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "Dokumentart ändern oder deaktivieren",
+        "description" : "Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false deaktiviert.",
+        "tags" : [ "Dokumentarten" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DokumentartAenderung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Dokumentart"
+                }
+              }
+            }
           },
           "401" : {
             "description" : "Not Authorized"
