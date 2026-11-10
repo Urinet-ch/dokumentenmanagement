@@ -4,7 +4,7 @@ Funktionalität: Anmeldung über Keycloak mit zweitem Faktor und Rollen
 
   @req-2.1
   Szenario: Ohne Token lehnt die API ab
-    Wenn jemand ohne Token «/api/v1/dokumente» abfragt
+    Wenn jemand ohne Token «/api/v1/anmeldung-probe» abfragt
     Dann lehnt das Archiv die Anfrage mit Status 401 ab
 
   @req-2.1
@@ -15,14 +15,14 @@ Funktionalität: Anmeldung über Keycloak mit zweitem Faktor und Rollen
   @req-2.1
   Szenario: Mit Passwort und TOTP ist die Anfrage angemeldet
     Wenn sich «inhaber-urinet» mit Passwort und TOTP anmeldet
-    Und mit diesem Token «/api/v1/dokumente» abfragt
-    # angemeldet; den Pfad gibt es noch nicht
+    Und mit diesem Token «/api/v1/anmeldung-probe» abfragt
+    # angemeldet; den Pfad unter /api/ gibt es nie
     Dann antwortet das Archiv angemeldet mit Status 404
 
   @req-2.1
   Szenario: Ein Token ohne Audience archiv-api lehnt die API ab
     Wenn sich «mitarbeiter-urinet» über den Client «archiv-test-fremd» mit Passwort und TOTP anmeldet
-    Und mit diesem Token «/api/v1/dokumente» abfragt
+    Und mit diesem Token «/api/v1/anmeldung-probe» abfragt
     Dann lehnt das Archiv die Anfrage mit Status 401 ab
 
   # Der importierte Export (kein Token ohne TOTP über irgendeinen Client oder Ablauf) prüft RealmExportKeycloakTest.

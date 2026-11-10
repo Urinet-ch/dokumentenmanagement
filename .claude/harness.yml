@@ -1,0 +1,24 @@
+# Leitplanken dieses Repos. Gehört dem Repo: harness.sh legt die Datei einmal an
+# und überschreibt sie danach nie. Einfaches Format (kein volles YAML): Schlüssel
+# ohne Einzug, Listeneinträge mit «  - "glob"»; ** und * passen auch über «/».
+
+# implement: /autoship verweigert, ein Mensch startet und mergt.
+# autoship:  /autoship darf laufen, stoppt aber ab Risikoklasse hoch vor dem Merge.
+max-autonomie: implement
+
+# Zusätzlich zu den festen Pfaden in geschuetzte-pfade.sh: Änderungen fragen nach.
+geschuetzte-pfade:
+  - "backend/src/main/resources/db/**"
+  - "deploy/keycloak/realm-export.json"
+  - ".github/scripts/**"
+
+# Die höchste Klasse im Diff bestimmt den Ablauf (_shared/risikoklassen.md).
+# Was nirgends passt, ist mittel.
+risiko-hoch:
+  - ".github/workflows/**"
+  - ".claude/**"
+  - ".githooks/**"
+  - "*.enc.yaml"
+risiko-niedrig:
+  - "*.md"
+  - "docs/**"

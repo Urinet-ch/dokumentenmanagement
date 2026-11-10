@@ -7,11 +7,14 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @QuarkusTest
 @TestProfile(RealmExportKeycloakTest.MitExport.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RealmExportKeycloakTest {
 
     public static class MitExport implements QuarkusTestProfile {
@@ -42,7 +46,8 @@ class RealmExportKeycloakTest {
 
     private static final String REALM = "/admin/realms/urinet-archiv";
     private static final String PASSWORT = "Probe-Passwort-1";
-    private static final List<String> OTP_SCHRITTE = List.of("auth-otp-form", "direct-grant-validate-otp");
+    // Pfad unter /api/, den es nie geben wird: angemeldet ergibt immer 404
+    private static final String PROBE_PFAD = "/api/v1/anmeldung-probe";
 
     private String admin;
 
@@ -62,18 +67,65 @@ class RealmExportKeycloakTest {
     }
 
     @Test
+    @Order(1)
+    void positivkontrolleMitEingebautemDirectGrant() {
+        String eingebaut = null;
+        for (Map<String, Object> flow : adminGet(REALM + "/authentication/flows").jsonPath().<Map<String, Object>>getList("$")) {
+            if ("direct grant".equals(flow.get("alias"))) {
+                eingebaut = (String) flow.get("id");
+            }
+        }
+        assertThat(eingebaut).as("eingebauter Ablauf «direct grant»").isNotNull();
+        Map<String, Object> client = new HashMap<>(probeClient("probe-override", false));
+        client.put("authenticationFlowBindingOverrides", Map.of("direct_grant", eingebaut));
+        importieren(Map.of("ifResourceExists", "SKIP", "clients", List.of(client)));
+        try {
+            // Der Test erkennt ein Token, wo es eines gibt, und die Prüfung je Client schlägt an
+            Response antwort = Testanmeldung.anmelden(realmUrl(), "probe-override", "ohne-totp", PASSWORT, null);
+            assertThat(antwort.statusCode()).isEqualTo(200);
+            assertThat(ungeschuetzteClients()).containsExactly("probe-override");
+        } finally {
+            loeschen("/clients/" + clientId("probe-override"));
+        }
+    }
+
+    @Test
+    @Order(2)
     void jedeFlowBindungVerlangtTotpOhneBedingung() {
         Map<String, Object> realm = adminGet(REALM).as(Map.class);
         for (String bindung : List.of("browserFlow", "directGrantFlow", "resetCredentialsFlow")) {
             String alias = (String) realm.get(bindung);
-            List<Map<String, Object>> schritte = adminGet(REALM + "/authentication/flows/{alias}/executions", alias)
-                    .jsonPath().getList("$");
-            assertThat(otpOhneBedingung(schritte)).as(bindung + " = " + alias).isTrue();
+            assertThat(OtpPruefung.otpOhneBedingung(schritte(alias))).as(bindung + " = " + alias).isTrue();
         }
-        assertThat((List<?>) realm.getOrDefault("identityProviders", List.of())).as("keine Identity Provider").isEmpty();
     }
 
     @Test
+    @Order(2)
+    void keinClientUeberschreibtDieFlowBindung() {
+        assertThat(ungeschuetzteClients()).isEmpty();
+    }
+
+    @Test
+    @Order(2)
+    void keineIdentityProvider() {
+        assertThat(identityProvider()).isEmpty();
+        // Gegenprobe: ein angelegter IdP wird erkannt
+        given().auth().oauth2(admin).contentType(ContentType.JSON)
+                .body(Map.of("alias", "probe-idp", "providerId", "oidc", "enabled", true,
+                        "config", Map.of("authorizationUrl", "https://idp.example.invalid/auth",
+                                "tokenUrl", "https://idp.example.invalid/token", "clientId", "probe",
+                                "clientAuthMethod", "client_secret_post")))
+                .post(ExportKeycloak.basisUrl + REALM + "/identity-provider/instances").then().statusCode(201);
+        try {
+            assertThat(identityProvider()).containsExactly("probe-idp");
+        } finally {
+            loeschen("/identity-provider/instances/probe-idp");
+        }
+        assertThat(identityProvider()).isEmpty();
+    }
+
+    @Test
+    @Order(3)
     void ohneTotpKeinTokenUeberIrgendeinenClient() {
         for (Map<String, Object> client : adminGet(REALM + "/clients").jsonPath().<Map<String, Object>>getList("$")) {
             String clientId = (String) client.get("clientId");
@@ -84,6 +136,7 @@ class RealmExportKeycloakTest {
     }
 
     @Test
+    @Order(3)
     void mitTotpAberOhneCodeKeinToken() {
         Response antwort = Testanmeldung.anmelden(realmUrl(), "probe-mit-audience", "mit-totp-1", PASSWORT, null);
         assertThat(antwort.statusCode()).isNotEqualTo(200);
@@ -91,6 +144,7 @@ class RealmExportKeycloakTest {
     }
 
     @Test
+    @Order(3)
     void apiNimmtNurTokensMitAudienceArchivApi() {
         String fremd = Testanmeldung.anmelden(realmUrl(), "probe-fremd", "mit-totp-1", PASSWORT,
                 Testanmeldung.OTP_SECRET).path("access_token");
@@ -98,30 +152,39 @@ class RealmExportKeycloakTest {
                 Testanmeldung.OTP_SECRET).path("access_token");
         assertThat(fremd).isNotNull();
         assertThat(eigen).isNotNull();
-        given().auth().oauth2(fremd).get("/api/v1/dokumente").then().statusCode(401);
-        // Gegenkontrolle: angemeldet; den Pfad gibt es noch nicht
-        given().auth().oauth2(eigen).get("/api/v1/dokumente").then().statusCode(404);
+        given().auth().oauth2(fremd).get(PROBE_PFAD).then().statusCode(401);
+        given().auth().oauth2(eigen).get(PROBE_PFAD).then().statusCode(404);
     }
 
-    /** OTP-Schritt ist REQUIRED, und kein übergeordneter Ablauf ist CONDITIONAL oder DISABLED. */
-    static boolean otpOhneBedingung(List<Map<String, Object>> schritte) {
-        Deque<String> vorfahren = new ArrayDeque<>();
-        for (Map<String, Object> schritt : schritte) {
-            int ebene = ((Number) schritt.get("level")).intValue();
-            while (vorfahren.size() > ebene) {
-                vorfahren.pop();
-            }
-            String anforderung = (String) schritt.get("requirement");
-            if (Boolean.TRUE.equals(schritt.get("authenticationFlow"))) {
-                vorfahren.push(anforderung);
-                continue;
-            }
-            if (OTP_SCHRITTE.contains(schritt.get("providerId")) && "REQUIRED".equals(anforderung)
-                    && vorfahren.stream().noneMatch(a -> a.equals("CONDITIONAL") || a.equals("DISABLED"))) {
-                return true;
+    /** Clients, deren eigene Flow-Bindung keinen OTP-Schritt ohne Bedingung verlangt. */
+    private List<String> ungeschuetzteClients() {
+        List<String> ungeschuetzt = new ArrayList<>();
+        for (Map<String, Object> client : adminGet(REALM + "/clients").jsonPath().<Map<String, Object>>getList("$")) {
+            Map<String, String> bindungen = (Map<String, String>) client.getOrDefault("authenticationFlowBindingOverrides", Map.of());
+            for (String flowId : bindungen.values()) {
+                String alias = adminGet(REALM + "/authentication/flows/{id}", flowId).path("alias");
+                if (!OtpPruefung.otpOhneBedingung(schritte(alias))) {
+                    ungeschuetzt.add((String) client.get("clientId"));
+                }
             }
         }
-        return false;
+        return ungeschuetzt;
+    }
+
+    private List<Map<String, Object>> schritte(String alias) {
+        return adminGet(REALM + "/authentication/flows/{alias}/executions", alias).jsonPath().getList("$");
+    }
+
+    private List<String> identityProvider() {
+        return adminGet(REALM + "/identity-provider/instances").jsonPath().getList("alias");
+    }
+
+    private String clientId(String clientId) {
+        return adminGet(REALM + "/clients?clientId={c}", clientId).path("[0].id");
+    }
+
+    private void loeschen(String pfad) {
+        given().auth().oauth2(admin).delete(ExportKeycloak.basisUrl + REALM + pfad).then().statusCode(204);
     }
 
     private static Map<String, Object> benutzer(String name, boolean mitTotp) {

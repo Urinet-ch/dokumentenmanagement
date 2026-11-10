@@ -1,0 +1,47 @@
+# Rotes main wird ein Issue mit gekürzten Logs (Harness-Vorlage). Es startet keinen
+# Agenten: Der Mensch nimmt das Issue auf, die Logs sind dann schon da.
+# Neue Workflows, die main bewachen, unten bei «workflows» eintragen.
+name: CI-Fehler
+
+on:
+  workflow_run:
+    workflows: [Secret-Scan, CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Lauf-ID, zum Nachtragen oder Testen
+        required: true
+
+permissions:
+  actions: read
+  issues: write
+
+jobs:
+  issue:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+    steps:
+      - name: Issue anlegen oder ergänzen
+        run: |
+          name=$(gh run view "$RUN_ID" --json workflowName -q .workflowName)
+          url=$(gh run view "$RUN_ID" --json url -q .url)
+          {
+            echo "Lauf: $url"
+            echo
+            echo '```'
+            gh run view "$RUN_ID" --log-failed | cut -f3- | tail -n 60 | cut -c1-300 || echo "(keine Logs)"
+            echo '```'
+          } > body.md
+          titel="CI rot auf main: $name"
+          nr=$(gh issue list --state open --label ci-fehler --search "\"$titel\" in:title" --json number -q '.[0].number // empty')
+          if [ -n "$nr" ]; then
+            gh issue comment "$nr" --body-file body.md
+          else
+            gh issue create --title "$titel" --label ci-fehler --body-file body.md
+          fi

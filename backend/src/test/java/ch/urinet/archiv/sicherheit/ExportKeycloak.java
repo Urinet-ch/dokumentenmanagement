@@ -1,10 +1,14 @@
 package ch.urinet.archiv.sicherheit;
 
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
+import io.smallrye.config.PropertiesConfigSource;
+import io.smallrye.config.SmallRyeConfigBuilder;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -24,7 +28,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     @Override
     public Map<String, String> start() {
         Path export = Path.of(System.getProperty("archiv.realm-export", "../deploy/keycloak/realm-export.json"));
-        keycloak = new GenericContainer<>("quay.io/keycloak/keycloak:26.8.2")
+        keycloak = new GenericContainer<>(image())
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                 .withCopyFileToContainer(MountableFile.forHostPath(export.toAbsolutePath()),
@@ -42,6 +46,19 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     public void stop() {
         if (keycloak != null) {
             keycloak.stop();
+        }
+    }
+
+    /** Dasselbe Image wie die Dev Services, eine Quelle: {@code quarkus.keycloak.devservices.image-name}. */
+    static String image() {
+        try {
+            return new SmallRyeConfigBuilder()
+                    .withSources(new PropertiesConfigSource(
+                            Path.of("src/main/resources/application.properties").toUri().toURL()))
+                    .build()
+                    .getValue("quarkus.keycloak.devservices.image-name", String.class);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 }

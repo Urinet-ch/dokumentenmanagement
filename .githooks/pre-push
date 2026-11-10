@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# main nur über PR. Auf privaten Repos im GitHub-Gratis-Plan gibt es keine Branch
+# Protection, darum sperrt dieser Hook lokal. Er bindet nur Klone mit
+# core.hooksPath=.githooks; ein Mensch kann im Notfall --no-verify nehmen, Claude nicht.
+while read -r _lokal _sha ziel _rest; do
+  if [[ "$ziel" == refs/heads/main ]]; then
+    echo "pre-push: direkter Push auf main ist gesperrt, bitte über einen PR." >&2
+    exit 1
+  fi
+done
+exit 0

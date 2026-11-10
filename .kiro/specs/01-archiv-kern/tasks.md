@@ -118,10 +118,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Freigabe per Merge; ersetzt den [offen]-Vermerk in Requirement 9.2
   - _Anforderungen: 9.1, 9.2_
 
-- [ ] 1.8 Leitplanken im Repository [Infra] [Fabian]
+- [x] 1.8 Leitplanken im Repository [Infra] [Fabian]
   - Git-Hooks `pre-commit` und `pre-push` mit Secret-Scan; Secret-Scan zusätzlich als CI-Workflow, Pflicht vor dem Merge
-  - Claude-Code-Hooks in `.claude/settings.json`: nach dem Bearbeiten einer Java-Datei die betroffenen Tests ausführen, Bearbeiten bestehender Changesets unter `db/**` blockieren, keine Secret-Dateien lesen oder schreiben
-  - [Fabian] Leitplanken-Vorlage des Betriebs übernehmen und Branch-Schutz für `main` setzen (PR und grüne CI Pflicht)
+  - Claude-Code-Hooks der Harness-Vorlage in `.claude/settings.json`: Änderungen an bestehenden Changesets unter `db/**` nachfragen (harness.yml) und in der CI blockieren (pruefe-liquibase.sh), keine Secret-Dateien lesen oder schreiben; die Tests laufen in `mvn verify` und in der CI (Entscheid Fabian 09.11.2026: kein Hook, der nach dem Bearbeiten einer Java-Datei Tests ausführt)
+  - [Fabian] Leitplanken-Vorlage übernehmen; `main` per pre-push-Hook gesperrt (Branch-Schutz im Free-Plan nicht verfügbar, Entscheid Fabian 09.11.2026)
   - _Anforderungen: 16.9, 16.14_
 
 - [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]

@@ -24,7 +24,9 @@ class RealmExportTest {
     private static final Path KEYCLOAK = Path.of("../deploy/keycloak");
     /** Felder der Keycloak-Darstellung, die Benutzer oder Geheimnisse tragen (Realm, Clients, SMTP, Schlüssel, IdP, LDAP). */
     private static final Set<String> HEIKLE_FELDER = Set.of("users", "federatedUsers", "credentials", "secret",
-            "secretData", "password", "privateKey", "clientSecret", "bindCredential");
+            "secretData", "password", "privateKey", "clientSecret", "bindCredential", "registrationAccessToken",
+            "keystorePassword", "keyPassword", "client.secret.rotated", "authTokenClientSecret",
+            "saml.signing.private.key", "saml.encryption.private.key");
     private static final String LOKAL = "http://localhost:8080";
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -37,6 +39,7 @@ class RealmExportTest {
             assertThat(ohneSecret).as(client.path("clientId").asText()).isTrue();
         }
         assertThat(export.toString()).doesNotContain("localhost");
+        assertThat(export.path("identityProviders")).as("keine Identity Provider").isEmpty();
     }
 
     @Test
@@ -65,7 +68,8 @@ class RealmExportTest {
         JsonNode probe = JSON.valueToTree(Map.of(
                 "users", List.of(),
                 "smtpServer", Map.of("host", "mail.example.invalid", "password", "x"),
-                "clients", List.of(Map.of("clientId", "c", "secret", "x")),
+                "clients", List.of(Map.of("clientId", "c", "secret", "x", "registrationAccessToken", "x",
+                        "attributes", Map.of("client.secret.rotated", "x", "saml.signing.private.key", "x"))),
                 "components", Map.of("keys", List.of(Map.of("config", Map.of("privateKey", List.of("x"))))),
                 "identityProviders", List.of(Map.of("config", Map.of("clientSecret", "x"))),
                 "resetPasswordAllowed", false,
@@ -73,7 +77,9 @@ class RealmExportTest {
                 "requiredCredentials", List.of("password"),
                 "otpPolicyType", "totp"));
         assertThat(heikleFelder(probe)).containsExactlyInAnyOrder("$.users", "$.smtpServer.password",
-                "$.clients[0].secret", "$.components.keys[0].config.privateKey", "$.identityProviders[0].config.clientSecret");
+                "$.clients[0].secret", "$.clients[0].registrationAccessToken",
+                "$.clients[0].attributes.client.secret.rotated", "$.clients[0].attributes.saml.signing.private.key",
+                "$.components.keys[0].config.privateKey", "$.identityProviders[0].config.clientSecret");
     }
 
     private static List<String> heikleFelder(JsonNode wurzel) {
