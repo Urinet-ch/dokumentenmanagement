@@ -2,7 +2,8 @@
 # Teilnachweis bis Aufgabe 2.4: Die Szenarien prüfen die Upload-Seite der PWA gegen eine Attrappe von
 # POST /api/v1/dokumente (frontend/e2e/schritte/upload.mjs), die wie in design.md «Upload» antwortet. Die Prüfungen am
 # Inhalt (Typ, Grösse, Dubletten) belegen die Java-Szenarien von 2.4 gegen das echte Backend.
-@spec-01 @browser
+# @attrappe: Für Kriterien von [Backend]-Aufgaben zählt diese Datei in der Abdeckungsprüfung nicht (ReqAbdeckung).
+@spec-01 @browser @attrappe
 Funktionalität: Upload im Browser
 
   Hintergrund:

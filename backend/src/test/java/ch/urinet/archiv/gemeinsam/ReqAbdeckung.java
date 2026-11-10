@@ -20,6 +20,8 @@ import java.util.stream.Stream;
  * hat ein Szenario mit Tag {@code @req-x.y} oder einen Nachweis-Vermerk («manuell», «Dokument», «JUnit»), jeweils
  * innerhalb derselben Spec: Jede Feature-Datei trägt auf Feature-Ebene genau einen Tag {@code @spec-NN}.
  * Welle 0 bleibt aussen vor; ihre Kriterien weist der Gate-Bericht nach. Optionale Aufgaben ({@code - [x]* O.n}) zählen nicht.
+ * Feature-Dateien mit {@code @attrappe} (nur auf Feature-Ebene) prüfen gegen Attrappen statt gegen das echte Backend und
+ * sind nur Teilnachweis: Für Kriterien abgehakter {@code [Backend]}-Aufgaben zählen sie nicht.
  */
 public final class ReqAbdeckung {
 
@@ -36,13 +38,20 @@ public final class ReqAbdeckung {
     private static final Pattern KRITERIUM = Pattern.compile("^(\\d+)\\. ");
     private static final Pattern NACHWEIS = Pattern.compile("Nachweis: (manuell|Dokument|JUnit)");
     private static final Pattern TAG = Pattern.compile("@req-(\\d+\\.\\d+)\\b");
+    private static final Pattern ATTRAPPE = Pattern.compile("@attrappe\\b");
+    private static final String BACKEND = "[Backend]";
+
+    /** {@code @req}-Tags einer Spec: aus allen Feature-Dateien und nur aus denen ohne {@code @attrappe}. */
+    record Szenarien(Set<String> alle, Set<String> ohneAttrappe) {
+        static final Szenarien KEINE = new Szenarien(Set.of(), Set.of());
+    }
 
     private ReqAbdeckung() {
     }
 
     /** Fehlende Abdeckung als «spec: x.y», sortiert; leer, wenn alles abgedeckt ist. Nur IDs, keine Inhalte (Req 16.7). */
     public static List<String> luecken(Path repo) {
-        Map<String, Set<String>> tags = tags(repo.resolve("backend/src/test/resources/features"));
+        Map<String, Szenarien> tags = tags(repo.resolve("backend/src/test/resources/features"));
         List<String> luecken = new ArrayList<>();
         try (Stream<Path> specs = Files.list(repo.resolve(".kiro/specs"))) {
             for (Path spec : specs.sorted().toList()) {
@@ -52,10 +61,17 @@ public final class ReqAbdeckung {
                     continue;
                 }
                 Set<String> nachweis = mitNachweis(lesen(requirements));
-                Set<String> szenarien = tags.getOrDefault(spec.getFileName().toString().split("-", 2)[0], Set.of());
-                for (String kriterium : gefordert(lesen(tasks))) {
-                    if (!nachweis.contains(kriterium) && !szenarien.contains(kriterium)) {
+                Szenarien szenarien = tags.getOrDefault(spec.getFileName().toString().split("-", 2)[0], Szenarien.KEINE);
+                List<String> aufgaben = lesen(tasks);
+                Set<String> backend = gefordert(aufgaben, true);
+                for (String kriterium : gefordert(aufgaben)) {
+                    if (nachweis.contains(kriterium) || szenarien.ohneAttrappe().contains(kriterium)) {
+                        continue;
+                    }
+                    if (!szenarien.alle().contains(kriterium)) {
                         luecken.add(spec.getFileName() + ": " + kriterium);
+                    } else if (backend.contains(kriterium)) {
+                        luecken.add(spec.getFileName() + ": " + kriterium + " (nur @attrappe)");
                     }
                 }
             }
@@ -67,6 +83,11 @@ public final class ReqAbdeckung {
 
     /** Kriterien aus {@code _Anforderungen_} abgehakter Aufgaben ab Welle 1. */
     static Set<String> gefordert(List<String> tasks) {
+        return gefordert(tasks, false);
+    }
+
+    /** Wie {@link #gefordert(List)}, mit {@code nurBackend} nur aus Aufgaben mit {@code [Backend]} im Titel. */
+    static Set<String> gefordert(List<String> tasks, boolean nurBackend) {
         Set<String> kriterien = new TreeSet<>();
         boolean zaehlt = false;
         for (String zeile : tasks) {
@@ -83,7 +104,8 @@ public final class ReqAbdeckung {
                     throw new IllegalArgumentException("Ungültige Aufgabenkennung: " + kennung);
                 }
                 zaehlt = !aufgabe.group(1).isBlank() && !optional
-                        && welle.matches() && Integer.parseInt(welle.group(1)) >= 1;
+                        && welle.matches() && Integer.parseInt(welle.group(1)) >= 1
+                        && (!nurBackend || zeile.contains(BACKEND));
                 continue;
             }
             if (CHECKBOX.matcher(zeile).find()) {
@@ -156,9 +178,12 @@ public final class ReqAbdeckung {
         return ergebnis;
     }
 
-    /** {@code @req}-Tags je Spec-Nummer («01»); bricht ab, wenn eine Feature-Datei nicht genau einen {@code @spec-NN} trägt. */
-    static Map<String, Set<String>> tags(Path features) {
-        Map<String, Set<String>> ergebnis = new TreeMap<>();
+    /**
+     * {@code @req}-Tags je Spec-Nummer («01»); bricht ab, wenn eine Feature-Datei nicht genau einen {@code @spec-NN} trägt
+     * oder {@code @attrappe} unterhalb der Feature-Ebene steht.
+     */
+    static Map<String, Szenarien> tags(Path features) {
+        Map<String, Szenarien> ergebnis = new TreeMap<>();
         if (!Files.isDirectory(features)) {
             return ergebnis;
         }
@@ -167,12 +192,19 @@ public final class ReqAbdeckung {
                 List<String> specs = new ArrayList<>();
                 Set<String> reqs = new TreeSet<>();
                 boolean kopf = true;
+                boolean attrappe = false;
                 for (String zeile : lesen(datei)) {
                     if (FEATURE.matcher(zeile).find()) {
                         kopf = false;
                     }
                     if (!zeile.strip().startsWith("@")) {
                         continue;
+                    }
+                    if (ATTRAPPE.matcher(zeile).find()) {
+                        if (!kopf) {
+                            throw new IllegalStateException("@attrappe nur auf Feature-Ebene: " + features.relativize(datei));
+                        }
+                        attrappe = true;
                     }
                     Matcher spec = SPEC_TAG.matcher(zeile);
                     while (spec.find()) {
@@ -187,7 +219,12 @@ public final class ReqAbdeckung {
                     throw new IllegalStateException("Feature-Datei braucht auf Feature-Ebene genau einen Tag @spec-NN: "
                             + features.relativize(datei));
                 }
-                ergebnis.computeIfAbsent(specs.getFirst(), s -> new TreeSet<>()).addAll(reqs);
+                Szenarien szenarien = ergebnis.computeIfAbsent(specs.getFirst(),
+                        s -> new Szenarien(new TreeSet<>(), new TreeSet<>()));
+                szenarien.alle().addAll(reqs);
+                if (!attrappe) {
+                    szenarien.ohneAttrappe().addAll(reqs);
+                }
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
