@@ -35,6 +35,11 @@ public final class TestHandler {
     public static final AuftragTyp STUR = new AuftragTyp("TEST_STUR");
     /** Liest in einer Transaktion im Schema des Mandanten und scheitert dann mit einem SQL-Fehler (Rollback). */
     public static final AuftragTyp SQL_FEHLER = new AuftragTyp("TEST_SQL_FEHLER");
+    /**
+     * Scheitert im Handler; der Hook nach dem letzten Fehlversuch ignoriert jede Unterbrechung und endet erst mit
+     * {@link #sturFreigeben()} (höchstens nach 30 s), dann erfolgreich.
+     */
+    public static final AuftragTyp HOOK_STUR = new AuftragTyp("TEST_HOOK_STUR");
     /** Steht in der Meldung der Ausnahme von {@code TEST_FEHLER}; darf nie im Log oder im Auftrag landen (Req 16.7). */
     public static final String GEHEIM = "geheimer-belegwert-4711";
 
@@ -55,6 +60,10 @@ public final class TestHandler {
     public static final Map<Long, AtomicInteger> STUR_JETZT = new ConcurrentHashMap<>();
     public static final Map<Long, AtomicInteger> STUR_HOECHSTENS = new ConcurrentHashMap<>();
     public static final AtomicInteger STUR_GESTARTET = new AtomicInteger();
+    /** Aufrufe des Hooks von {@code TEST_HOOK_STUR}, gleichzeitig laufende jetzt und höchstens. */
+    public static final AtomicInteger HOOK_STUR_AUFRUFE = new AtomicInteger();
+    public static final AtomicInteger HOOK_STUR_JETZT = new AtomicInteger();
+    public static final AtomicInteger HOOK_STUR_HOECHSTENS = new AtomicInteger();
     private static volatile CountDownLatch sturFreigabe = new CountDownLatch(1);
 
     /** Schema ({@code current_schema()}), Hibernate-Tenant und Backend-Prozess der Verbindung. */
@@ -77,6 +86,9 @@ public final class TestHandler {
         STUR_JETZT.clear();
         STUR_HOECHSTENS.clear();
         STUR_GESTARTET.set(0);
+        HOOK_STUR_AUFRUFE.set(0);
+        HOOK_STUR_JETZT.set(0);
+        HOOK_STUR_HOECHSTENS.set(0);
     }
 
     /** Lässt alle laufenden {@code TEST_STUR}-Handler enden. */
@@ -173,25 +185,55 @@ public final class TestHandler {
             STUR_GESTARTET.incrementAndGet();
             int jetzt = STUR_JETZT.computeIfAbsent(auftrag.id(), id -> new AtomicInteger()).incrementAndGet();
             STUR_HOECHSTENS.computeIfAbsent(auftrag.id(), id -> new AtomicInteger()).accumulateAndGet(jetzt, Math::max);
-            CountDownLatch freigabe = sturFreigabe;
-            long bis = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-            boolean unterbrochen = false;
             try {
-                while (freigabe.getCount() > 0 && System.nanoTime() - bis < 0) {
-                    try {
-                        freigabe.await(bis - System.nanoTime(), TimeUnit.NANOSECONDS);
-                    } catch (InterruptedException e) {
-                        // wie blockierendes I/O, das den Interrupt nicht beachtet
-                        unterbrochen = true;
-                    }
+                if (sturWarten()) {
+                    UNTERBROCHEN.add(auftrag.id());
                 }
             } finally {
                 STUR_JETZT.get(auftrag.id()).decrementAndGet();
-                if (unterbrochen) {
-                    UNTERBROCHEN.add(auftrag.id());
-                }
             }
         }
+    }
+
+    @ApplicationScoped
+    public static class HookStur implements AuftragHandler {
+
+        @Override
+        public AuftragTyp typ() {
+            return HOOK_STUR;
+        }
+
+        @Override
+        public void ausfuehren(Auftrag auftrag) throws Exception {
+            throw new Exception("Beleg nicht lesbar");
+        }
+
+        @Override
+        public void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
+            HOOK_STUR_AUFRUFE.incrementAndGet();
+            HOOK_STUR_HOECHSTENS.accumulateAndGet(HOOK_STUR_JETZT.incrementAndGet(), Math::max);
+            try {
+                sturWarten();
+            } finally {
+                HOOK_STUR_JETZT.decrementAndGet();
+            }
+        }
+    }
+
+    /** Wartet auf {@link #sturFreigeben()} (höchstens 30 s) und ignoriert Unterbrechungen; {@code true}, wenn welche kamen. */
+    private static boolean sturWarten() {
+        CountDownLatch freigabe = sturFreigabe;
+        long bis = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        boolean unterbrochen = false;
+        while (freigabe.getCount() > 0 && System.nanoTime() - bis < 0) {
+            try {
+                freigabe.await(bis - System.nanoTime(), TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                // wie blockierendes I/O, das den Interrupt nicht beachtet
+                unterbrochen = true;
+            }
+        }
+        return unterbrochen;
     }
 
     @ApplicationScoped

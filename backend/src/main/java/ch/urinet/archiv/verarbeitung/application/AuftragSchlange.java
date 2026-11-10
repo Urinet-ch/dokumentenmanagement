@@ -48,7 +48,9 @@ public interface AuftragSchlange {
 
     /**
      * {@code FEHLER}-Aufträge aktiver Mandanten ohne {@code nachbearbeitet}, deren Ende länger als die Zeitgrenze
-     * ihres Typs zurückliegt (der Worker hat den Hook nicht abgeschlossen, z. B. nach einem Absturz).
+     * ihres Typs zurückliegt (der Worker hat den Hook nicht abgeschlossen, z. B. nach einem Absturz), mit weniger als
+     * {@link ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung#MAX_VERSUCHE} gescheiterten Nachbearbeitungen und
+     * abgelaufener Wartezeit ({@code nachbearbeitung_nicht_vor}).
      */
     List<Fehlgeschlagen> ohneNachbearbeitung(Map<AuftragTyp, Duration> zeitgrenzen);
 
@@ -57,4 +59,18 @@ public interface AuftragSchlange {
      * (Endzustand, darum ohne Abgleich von {@code versuche}).
      */
     boolean nachbearbeitet(Auftrag auftrag);
+
+    /**
+     * Hook gescheitert: {@code nachbearbeitung_versuche = bisher + 1}, mit Wartezeit
+     * {@code nachbearbeitung_nicht_vor = now() + wartezeit}; nur, solange der Auftrag {@code FEHLER} ohne
+     * {@code nachbearbeitet} ist und {@code bisher} noch stimmt.
+     */
+    boolean nachbearbeitungGescheitert(Auftrag auftrag, int bisher, Optional<Duration> wartezeit);
+
+    /**
+     * Sperrt die Zeile des Auftrags in der laufenden Transaktion des Aufrufers
+     * ({@code select … where id = ? and versuche = ? and status = 'LAEUFT' for update}); {@code false}, wenn der
+     * Anspruch nicht mehr hält. Bricht ohne laufende Transaktion ab, weil die Sperre sonst sofort wieder frei wäre.
+     */
+    boolean anspruchSperren(Auftrag auftrag);
 }

@@ -8,16 +8,21 @@ import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.verarbeitung.application.AuftragAufraeumen;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
 import ch.urinet.archiv.verarbeitung.application.AuftragSchlange;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
+import io.agroal.api.AgroalDataSource;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,7 +41,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Nachbesserung Aufgabe 2.5 (Review PR #41): Platz und Auftrag bleiben belegt, solange der Handler läuft (Req 5.6,
  * 5.7); Nachbearbeitung nach dem letzten Fehlversuch ist dauerhaft (Req 5.4); eine unlesbare Zeile hält niemanden auf;
- * Absicherung des Anspruchs über {@code versuche}; Herunterfahren ohne Versuch. Jeder Test arbeitet mit einem eigenen
+ * Absicherung des Anspruchs über {@code versuche}; Herunterfahren ohne Versuch. Zweite Nachbesserung: keine ID läuft in
+ * derselben JVM doppelt, der Hook belegt einen Platz und wird mit Wartezeit und Obergrenze wiederholt, Handler sichern
+ * ihren Anspruch in ihrer Transaktion. Jeder Test arbeitet mit einem eigenen
  * {@link AuftragArbeiter}, damit ein absichtlich hängender Handler keinen Platz eines anderen Tests belegt.
  */
 @QuarkusTest
@@ -58,6 +66,12 @@ class AuftragArbeiterTest {
 
     @Inject
     AuftragAufraeumen aufraeumen;
+
+    @Inject
+    AuftragService service;
+
+    @Inject
+    AgroalDataSource datenquelle;
 
     private final List<AuftragArbeiter> arbeiter = new ArrayList<>();
     private final List<CompletableFuture<Void>> laeufe = new ArrayList<>();
@@ -191,6 +205,153 @@ class AuftragArbeiterTest {
         assertThat(hilfe.zeile(ok).status()).isEqualTo("FERTIG");
     }
 
+    // Zweite Nachbesserung, Soll 1: dieselbe ID läuft in derselben JVM nie doppelt
+
+    @Test
+    void wiederGeholteIdLaeuftNichtNebenIhremHaengendenThread() throws Exception {
+        AuftragArbeiter worker = arbeiter(schlange, 2);
+        AuftragAufraeumen aufraeumer = new AuftragAufraeumen(schlange, verzeichnis, worker);
+        long id = hilfe.einreihen("urinet", TestHandler.STUR);
+        starten(worker, 1);
+        // hängend nach 2 × Zeitgrenze (1 s), danach keine Lebenszeichen: der Aufräumer gibt frei
+        Thread.sleep(3_700);
+        assertThat(aufraeumer.aufraeumen()).isEqualTo(1);
+        hilfe.aendern(id, "nicht_vor = null");
+
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            // ein Platz ist frei, und der Auftrag ist fällig: geholt, aber nicht gestartet
+            assertThat(worker.abholen()).isEmpty();
+            assertThat(log.volltext()).contains("in dieser JVM läuft noch ein Thread für den Auftrag; nicht gestartet");
+        }
+        assertThat(TestHandler.STUR_GESTARTET).hasValue(1);
+        assertThat(TestHandler.STUR_HOECHSTENS.get(id)).hasValue(1);
+        AuftragTestHilfe.Zeile zeile = hilfe.zeile(id);
+        assertThat(zeile.status()).isEqualTo("LAEUFT");
+        assertThat(zeile.versuche()).isEqualTo(1);
+        // der geparkte Anspruch belegt keinen Platz
+        long ok = hilfe.einreihen("urinet", TestHandler.OK);
+        List<CompletableFuture<Void>> okLauf = worker.abholen();
+        assertThat(okLauf).hasSize(1);
+        okLauf.getFirst().get(10, TimeUnit.SECONDS);
+        assertThat(hilfe.zeile(ok).status()).isEqualTo("FERTIG");
+
+        // endet der alte Thread, geht der geparkte Anspruch ohne Versuch zurück und läuft dann allein
+        TestHandler.sturFreigeben();
+        warten();
+        zeile = hilfe.zeile(id);
+        assertThat(zeile.status()).isEqualTo("OFFEN");
+        assertThat(zeile.versuche()).isEqualTo(1);
+        starten(worker, 1);
+        warten();
+        assertThat(hilfe.zeile(id).status()).isEqualTo("FERTIG");
+        assertThat(TestHandler.STUR_GESTARTET).hasValue(2);
+        assertThat(TestHandler.STUR_HOECHSTENS.get(id)).hasValue(1);
+    }
+
+    // Soll 1b: Handler schreiben nur, solange ihr Anspruch hält
+
+    @Test
+    void anspruchSichernSperrtDieZeileBisZumEndeDerTransaktion() throws Exception {
+        long id = hilfe.einreihen("urinet", TestHandler.OK);
+        Auftrag geholt = schlange.holen(Set.of(TestHandler.OK), 1).getFirst();
+
+        String innen = QuarkusTransaction.requiringNew().call(() -> {
+            service.anspruchSichern(geholt);
+            return sperrenVonAussen(id);
+        });
+        // 55P03: lock_not_available, die Zeile war bis zum Ende der Transaktion gesperrt
+        assertThat(innen).isEqualTo("55P03");
+        assertThat(sperrenVonAussen(id)).isNull();
+
+        hilfe.aendern(id, "versuche = 1");
+        assertThatThrownBy(() -> QuarkusTransaction.requiringNew().run(() -> service.anspruchSichern(geholt)))
+                .isInstanceOf(AuftragService.AnspruchVerloren.class);
+        assertThatThrownBy(() -> service.anspruchSichern(geholt)).isInstanceOf(IllegalStateException.class);
+    }
+
+    // Zweite Nachbesserung, Soll 2: der Hook belegt einen Platz, läuft nie doppelt und endet mit Obergrenze
+
+    @Test
+    void haengenderHookBelegtSeinenPlatzUndLaeuftNieDoppelt() throws Exception {
+        AuftragArbeiter worker = arbeiter(schlange, 2);
+        AuftragAufraeumen aufraeumer = new AuftragAufraeumen(schlange, verzeichnis, worker);
+        long id = hilfe.einreihen("urinet", TestHandler.HOOK_STUR);
+        hilfe.aendern(id, "versuche = 2");
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            starten(worker, 1);
+            // Zeitgrenze des Hooks 1 s: abgebrochen und als gescheitert gezählt, der Thread läuft weiter
+            Thread.sleep(2_300);
+            assertThat(log.volltext()).containsPattern("Fehler [0-9a-f-]{36}, Nachbearbeitung endet seit dem Abbruch "
+                    + "nicht und gilt als hängend");
+        }
+        assertThat(TestHandler.HOOK_STUR_AUFRUFE).hasValue(1);
+        assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(1);
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isFalse();
+
+        // der Hook hält seinen Platz: von zwei fälligen Aufträgen startet nur einer
+        long ok1 = hilfe.einreihen("urinet", TestHandler.OK);
+        long ok2 = hilfe.einreihen("urinet", TestHandler.OK);
+        List<CompletableFuture<Void>> okLauf = worker.abholen();
+        assertThat(okLauf).hasSize(1);
+        okLauf.getFirst().get(10, TimeUnit.SECONDS);
+        assertThat(List.of(hilfe.zeile(ok1).status(), hilfe.zeile(ok2).status()))
+                .containsExactlyInAnyOrder("FERTIG", "OFFEN");
+
+        // Wartezeit abgelaufen, Platz frei: der Aufräumer startet den Hook trotzdem nicht neben dem alten
+        hilfe.aendern(id, "beendet = now() - interval '1 hour', nachbearbeitung_nicht_vor = null");
+        assertThat(aufraeumer.nachbearbeitungNachholen()).isZero();
+        assertThat(TestHandler.HOOK_STUR_AUFRUFE).hasValue(1);
+        assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(1);
+
+        TestHandler.sturFreigeben();
+        warten();
+        assertThat(aufraeumer.nachbearbeitungNachholen()).isEqualTo(1);
+        assertThat(TestHandler.HOOK_STUR_AUFRUFE).hasValue(2);
+        assertThat(TestHandler.HOOK_STUR_HOECHSTENS).hasValue(1);
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isTrue();
+    }
+
+    @Test
+    void aufraeumerHoltDenHookNurAufEinemFreienPlatzNach() throws Exception {
+        AuftragArbeiter worker = arbeiter(schlange, 1);
+        AuftragAufraeumen aufraeumer = new AuftragAufraeumen(schlange, verzeichnis, worker);
+        hilfe.einreihen("urinet", TestHandler.STUR);
+        starten(worker, 1);
+        long id = hilfe.einreihen("urinet", TestHandler.FEHLER);
+        hilfe.aendern(id, "status = 'FEHLER', versuche = 3, fehler = 'fehlgeschlagen fehler-id=" + UUID.randomUUID()
+                + "', beendet = now() - interval '1 hour'");
+
+        assertThat(aufraeumer.nachbearbeitungNachholen()).isZero();
+        assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(0);
+        assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(0);
+
+        TestHandler.sturFreigeben();
+        warten();
+        assertThat(aufraeumer.nachbearbeitungNachholen()).isEqualTo(1);
+        assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(1);
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isTrue();
+    }
+
+    @Test
+    void nachbearbeitungWirdNachFuenfFehlschlaegenAufgegeben() throws Exception {
+        AuftragAufraeumen aufraeumer = new AuftragAufraeumen(schlange, verzeichnis, arbeiter(schlange, 1));
+        long id = hilfe.einreihen("urinet", TestHandler.FEHLER);
+        hilfe.aendern(id, "status = 'FEHLER', versuche = 3, fehler = 'fehlgeschlagen fehler-id=" + UUID.randomUUID()
+                + "', beendet = now() - interval '1 hour', nachbearbeitung_versuche = 4");
+        TestHandler.HOOK_SCHEITERT.set(true);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            assertThat(aufraeumer.nachbearbeitungNachholen()).isZero();
+            aufraeumer.nachbearbeitungNachholen();
+            assertThat(log.volltext()).containsPattern("Fehler [0-9a-f-]{36}, Nachbearbeitung nach 5 Versuchen "
+                    + "aufgegeben").doesNotContain(TestHandler.GEHEIM);
+            assertThat(log.volltext().split("Nachbearbeitung nach 5 Versuchen aufgegeben", -1)).hasSize(2);
+        }
+        assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(1);
+        assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(5);
+        assertThat(hilfe.wert(id, "nachbearbeitung_nicht_vor")).isNull();
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isFalse();
+    }
+
     // Soll 2: Nachbearbeitung nach dem letzten Fehlversuch ist dauerhaft
 
     @Test
@@ -231,6 +392,14 @@ class AuftragArbeiterTest {
         assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(1);
 
         hilfe.aendern(id, "beendet = now() - interval '1 hour'");
+        // Wartezeit nach dem ersten Fehlschlag: 2 Minuten
+        assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(1);
+        assertThat((Long) hilfe.wert(id, "extract(epoch from nachbearbeitung_nicht_vor - now())::bigint"))
+                .isBetween(100L, 120L);
+        aufraeumen.aufraeumen();
+        assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(1);
+
+        hilfe.aendern(id, "nachbearbeitung_nicht_vor = now() - interval '1 second'");
         aufraeumen.aufraeumen();
         assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(2);
         assertThat(TestHandler.NACH_LETZTEM).containsEntry(id, new MandantCode("urinet"));
@@ -285,6 +454,30 @@ class AuftragArbeiterTest {
 
         assertThat(hilfe.zeile(kaputt).status()).isEqualTo("FEHLER");
         assertThat(hilfe.zeile(gut).status()).isEqualTo("OFFEN");
+    }
+
+    @Test
+    void scheitertDasSpeichernEinerUnlesbarenZeileLaufenDieAnderenWeiter() throws Exception {
+        long kaputt = hilfe.rohEinreihen("urinet", TestHandler.OK, "{\"kunde\":\"FC Beispiel\"}");
+        long gut = hilfe.einreihen("urinet", TestHandler.OK);
+        hilfe.ausfuehren("create or replace function public.test_unlesbar_stoeren() returns trigger language plpgsql "
+                + "as $$ begin if new.fehler like 'unlesbar%' then raise exception 'gestoert'; end if; return new; "
+                + "end $$");
+        hilfe.ausfuehren("create trigger test_unlesbar_stoeren before update on public.auftrag for each row "
+                + "execute function public.test_unlesbar_stoeren()");
+        AuftragArbeiter worker = arbeiter(schlange, 2);
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            laeufe.addAll(worker.abholen());
+            warten();
+            assertThat(log.volltext()).containsPattern("Auftrag " + kaputt + ": Fehler [0-9a-f-]{36}, Zeile nicht "
+                    + "lesbar \\(.+\\), Status FEHLER nicht gespeichert \\(SQLState P0001\\), übersprungen")
+                    .doesNotContain("FC Beispiel");
+        } finally {
+            hilfe.ausfuehren("drop trigger test_unlesbar_stoeren on public.auftrag");
+            hilfe.ausfuehren("drop function public.test_unlesbar_stoeren()");
+        }
+        assertThat(hilfe.zeile(gut).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.zeile(kaputt).status()).isEqualTo("LAEUFT");
     }
 
     @Test
@@ -397,6 +590,21 @@ class AuftragArbeiterTest {
         assertThat(hilfe.zeile(id).status()).isEqualTo("LAEUFT");
     }
 
+    /** Versucht die Zeile aus einem fremden Thread ohne Transaktion zu sperren; SQLState oder {@code null}. */
+    private String sperrenVonAussen(long id) throws Exception {
+        FutureTask<String> versuch = new FutureTask<>(() -> {
+            try (Connection verbindung = datenquelle.getConnection(); Statement anweisung =
+                    verbindung.createStatement()) {
+                anweisung.execute("select 1 from public.auftrag where id = " + id + " for update nowait");
+                return null;
+            } catch (SQLException e) {
+                return e.getSQLState();
+            }
+        });
+        Thread.ofPlatform().start(versuch);
+        return versuch.get(10, TimeUnit.SECONDS);
+    }
+
     private AuftragArbeiter arbeiter(AuftragSchlange mit, int parallel) {
         AuftragArbeiter neu = new AuftragArbeiter(mit, verzeichnis, kontext, parallel, LEBENSZEICHEN,
                 Duration.ofSeconds(1));
@@ -482,6 +690,16 @@ class AuftragArbeiterTest {
         @Override
         public boolean nachbearbeitet(Auftrag auftrag) {
             return echt.nachbearbeitet(auftrag);
+        }
+
+        @Override
+        public boolean nachbearbeitungGescheitert(Auftrag auftrag, int bisher, Optional<Duration> wartezeit) {
+            return echt.nachbearbeitungGescheitert(auftrag, bisher, wartezeit);
+        }
+
+        @Override
+        public boolean anspruchSperren(Auftrag auftrag) {
+            return echt.anspruchSperren(auftrag);
         }
     }
 }

@@ -38,6 +38,25 @@ public class AuftragService {
         return schlange.einfuegen(mandant(), typ, nutzlast);
     }
 
+    /**
+     * Für Handler (ab 2.6, design.md «Verarbeitung»): in derselben Transaktion vor dem Schreiben der Ergebnisse
+     * aufrufen. Sperrt die Zeile des Auftrags bis zum Ende der Transaktion, solange der Anspruch hält
+     * ({@code id}, {@code versuche}, {@code LAEUFT}); sonst {@link AnspruchVerloren}, und die Transaktion rollt zurück.
+     * So schreibt ein Handler, den der Aufräumer schon freigegeben hat, nichts mehr.
+     */
+    public void anspruchSichern(Auftrag auftrag) {
+        if (!schlange.anspruchSperren(auftrag)) {
+            throw new AnspruchVerloren();
+        }
+    }
+
+    /** Der Auftrag gehört nicht mehr diesem Lauf (freigegeben oder neu geholt). */
+    public static final class AnspruchVerloren extends RuntimeException {
+        AnspruchVerloren() {
+            super("Anspruch auf den Auftrag verloren", null, false, false);
+        }
+    }
+
     private MandantCode mandant() {
         Optional<MandantCode> ausKontext = kontext.aktuell();
         Optional<MandantCode> ausAnmeldung = anmeldung.ermitteln() instanceof MandantAusAnmeldung.Gueltig g

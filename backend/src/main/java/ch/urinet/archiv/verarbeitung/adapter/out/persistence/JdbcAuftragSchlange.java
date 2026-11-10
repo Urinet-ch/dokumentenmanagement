@@ -6,11 +6,13 @@ import ch.urinet.archiv.verarbeitung.application.AuftragSchlange;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
 import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
+import ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import org.jboss.logging.Logger;
@@ -20,6 +22,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -165,11 +168,13 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
         if (zeitgrenzen.isEmpty()) {
             return List.of();
         }
-        String sql = "select " + SPALTEN + ", a.fehler from public.auftrag a "
+        String sql = "select " + SPALTEN + ", a.fehler, a.nachbearbeitung_versuche from public.auftrag a "
                 + "join public.mandant m on m.code = a.mandant and m.aktiv "
                 + "join unnest(?::text[], ?::bigint[]) as g(typ, ms) on g.typ = a.typ "
                 + "where a.status = 'FEHLER' and a.nachbearbeitet is null "
                 + "and a.beendet < now() - g.ms * interval '1 millisecond' "
+                + "and a.nachbearbeitung_versuche < ? "
+                + "and (a.nachbearbeitung_nicht_vor is null or a.nachbearbeitung_nicht_vor <= now()) "
                 + "order by a.id";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
@@ -181,6 +186,7 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
             });
             abfrage.setArray(1, verbindung.createArrayOf("text", typen.toArray()));
             abfrage.setArray(2, verbindung.createArrayOf("bigint", grenzen.toArray()));
+            abfrage.setInt(3, Nachbearbeitung.MAX_VERSUCHE);
             List<Fehlgeschlagen> offen = new ArrayList<>();
             try (ResultSet zeile = abfrage.executeQuery()) {
                 while (zeile.next()) {
@@ -188,7 +194,8 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
                     if (auftrag.isPresent()) {
                         AuftragFehler fehler = AuftragFehler.lesen(zeile.getString("fehler"))
                                 .orElseGet(() -> AuftragFehler.neu("unbekannt"));
-                        offen.add(new Fehlgeschlagen(auftrag.get(), fehler));
+                        offen.add(new Fehlgeschlagen(auftrag.get(), fehler,
+                                zeile.getInt("nachbearbeitung_versuche")));
                     }
                 }
             }
@@ -210,6 +217,43 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
         }
     }
 
+    @Override
+    public boolean nachbearbeitungGescheitert(Auftrag auftrag, int bisher, Optional<Duration> wartezeit) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update public.auftrag set "
+                        + "nachbearbeitung_versuche = nachbearbeitung_versuche + 1, nachbearbeitung_nicht_vor = "
+                        + "case when ?::bigint is null then null else now() + ?::bigint * interval '1 millisecond' end "
+                        + "where id = ? and status = 'FEHLER' and nachbearbeitet is null "
+                        + "and nachbearbeitung_versuche = ?")) {
+            Long ms = wartezeit.map(Duration::toMillis).orElse(null);
+            aendern.setObject(1, ms, Types.BIGINT);
+            aendern.setObject(2, ms, Types.BIGINT);
+            aendern.setLong(3, auftrag.id());
+            aendern.setInt(4, bisher);
+            return aendern.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw fehler("Gescheiterte Nachbearbeitung nicht gespeichert", e);
+        }
+    }
+
+    @Override
+    public boolean anspruchSperren(Auftrag auftrag) {
+        if (!QuarkusTransaction.isActive()) {
+            throw new IllegalStateException("Anspruch nur in einer laufenden Transaktion sperren");
+        }
+        // in der Transaktion liefert Agroal dieselbe Verbindung wie für Hibernate; close gibt sie erst am Ende frei
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement sperren =
+                verbindung.prepareStatement("select 1 from public.auftrag" + ANSPRUCH + " for update")) {
+            sperren.setLong(1, auftrag.id());
+            sperren.setInt(2, auftrag.versuche());
+            try (ResultSet zeile = sperren.executeQuery()) {
+                return zeile.next();
+            }
+        } catch (SQLException e) {
+            throw fehler("Anspruch nicht geprüft", e);
+        }
+    }
+
     /**
      * Wandelt eine Zeile um. Ist sie unlesbar, setzt sie ihren Auftrag (sofern noch im erwarteten Status) mit Fehler-ID
      * auf {@code FEHLER} und gleich auf {@code nachbearbeitet}: Ohne lesbare Nutzlast kann kein Handler nachbearbeiten.
@@ -220,7 +264,7 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
             return Optional.of(auftrag(zeile));
         } catch (IllegalArgumentException | IllegalStateException e) {
             AuftragFehler fehler = AuftragFehler.neu(UNLESBAR);
-            boolean gesetzt;
+            String ergebnis;
             try (PreparedStatement aendern = verbindung.prepareStatement("update public.auftrag set "
                     + "status = 'FEHLER', versuche = versuche + 1, fehler = ?, beendet = coalesce(beendet, now()), "
                     + "nachbearbeitet = now() where id = ? and versuche = ? and status = ?")) {
@@ -228,11 +272,14 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
                 aendern.setLong(2, id);
                 aendern.setInt(3, zeile.getInt("versuche"));
                 aendern.setString(4, status);
-                gesetzt = aendern.executeUpdate() == 1;
+                ergebnis = aendern.executeUpdate() == 1 ? ", Status FEHLER" : "";
+            } catch (SQLException sql) {
+                // die übrigen Zeilen laufen weiter; die Zeile bleibt, wie sie ist, und kommt beim Aufräumen wieder
+                ergebnis = ", Status FEHLER nicht gespeichert (SQLState " + sql.getSQLState() + ")";
             }
             // ohne Ursache und Meldung: beide können Werte der Zeile enthalten
             LOG.errorf("Auftrag %d: Fehler %s, Zeile nicht lesbar (%s)%s, übersprungen", id, fehler.fehlerId(),
-                    e.getClass().getName(), gesetzt ? ", Status FEHLER" : "");
+                    e.getClass().getName(), ergebnis);
             return Optional.empty();
         }
     }
@@ -241,7 +288,7 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
         String sql = "update public.auftrag set versuche = versuche + 1, fehler = ?, "
                 + (wartezeit.isPresent()
                 ? "status = 'OFFEN', nicht_vor = now() + ? * interval '1 millisecond'"
-                : "status = 'FEHLER', beendet = now()")
+                : "status = 'FEHLER', beendet = now(), nachbearbeitung_versuche = 0, nachbearbeitung_nicht_vor = null")
                 + ANSPRUCH
                 + (stillSeit == null ? ""
                 : " and coalesce(lebenszeichen, gestartet, erstellt) < now() - ? * interval '1 millisecond'");

@@ -111,6 +111,18 @@ public class AuftragTestHilfe {
         }
     }
 
+    /** Wert eines SQL-Ausdrucks über die Zeile des Auftrags, z. B. {@code nachbearbeitung_versuche}. */
+    public Object wert(long id, String ausdruck) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select " + ausdruck + " from public.auftrag where id = ?")) {
+            abfrage.setLong(1, id);
+            try (ResultSet z = abfrage.executeQuery()) {
+                z.next();
+                return z.getObject(1);
+            }
+        }
+    }
+
     /** Ändert einen Auftrag direkt, z. B. um einen abgestürzten Worker nachzustellen. */
     public void aendern(long id, String setzen) throws SQLException {
         ausfuehren("update public.auftrag set " + setzen + " where id = " + id);
