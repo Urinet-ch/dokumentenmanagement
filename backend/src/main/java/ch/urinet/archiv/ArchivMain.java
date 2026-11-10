@@ -1,6 +1,7 @@
 package ch.urinet.archiv;
 
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
+import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
@@ -13,7 +14,8 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet}.
+ * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet} oder
+ * {@code archiv token erstellen urinet Rechnungsgenerator generator}.
  * Exit-Codes des Kommandos: 0 ok, 1 fachlicher Fehler, 2 falscher Aufruf (geprüft, bevor Quarkus startet),
  * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}).
  */
@@ -31,6 +33,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     MandantKommando mandant;
+
+    @Inject
+    TokenKommando token;
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
@@ -58,11 +63,15 @@ public class ArchivMain implements QuarkusApplication {
     /** Leer, wenn der Aufruf gültig ist, sonst die Aufrufhilfe. */
     static Optional<String> aufrufPruefen(String... argumente) {
         List<String> liste = List.of(argumente);
-        if (!liste.getFirst().equals("mandant")) {
-            return Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF);
-        }
-        return MandantKommando.lesen(liste.subList(1, liste.size())).isPresent()
-                ? Optional.empty() : Optional.of(MandantKommando.AUFRUF);
+        List<String> rest = liste.subList(1, liste.size());
+        return switch (liste.getFirst()) {
+            case "mandant" -> MandantKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(MandantKommando.AUFRUF);
+            case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(TokenKommando.AUFRUF);
+            default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
+                    + TokenKommando.AUFRUF);
+        };
     }
 
     private static Throwable grundursache(Throwable fehler) {
@@ -80,6 +89,8 @@ public class ArchivMain implements QuarkusApplication {
             return 0;
         }
         List<String> liste = List.of(argumente);
-        return mandant.ausfuehren(liste.subList(1, liste.size()), System.out, System.err);
+        List<String> rest = liste.subList(1, liste.size());
+        return liste.getFirst().equals("token") ? token.ausfuehren(rest, System.out, System.err)
+                : mandant.ausfuehren(rest, System.out, System.err);
     }
 }
