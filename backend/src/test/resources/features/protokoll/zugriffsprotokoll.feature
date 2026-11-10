@@ -50,6 +50,16 @@ Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
       | ohne-rolle-urinet  | die Dokumentart «PROBE_VHF_BULLETIN» abfragt | 403    | NICHT_ERLAUBT  |             |          |       | ohne Archiv-Rolle         |
 
   @req-10.7
+  Szenario: Die Dokument-ID eines anderen Mandanten wird im eigenen Mandanten als VERWEIGERT protokolliert
+    Angenommen der Stand des Zugriffsprotokolls von «vhf-gsk» ist gemerkt
+    Wenn «inhaber-vhf-gsk» das Probe-Dokument «NORMAL» liest
+    Dann antwortet das Archiv mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und das Zugriffsprotokoll von «vhf-gsk» hat genau einen neuen Eintrag:
+      | benutzer        | rolle   | aktion     | dokument | ip | grund | fehlercode     |
+      | inhaber-vhf-gsk | INHABER | VERWEIGERT | NORMAL   |    | A2    | NICHT_GEFUNDEN |
+    Und das Zugriffsprotokoll von «urinet» hat keinen neuen Eintrag
+
+  @req-10.7
   Szenario: Ohne gültigen Mandanten gibt es kein Mandanten-Schema und keinen Eintrag
     Wenn «unbekannt-mandant» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
