@@ -47,6 +47,7 @@ class AuftragSchemaNachFehlerTest {
         assertThat(hilfe.zeile(a).fehler()).startsWith("fehlgeschlagen fehler-id=");
         hilfe.einenStarten().get();
 
+        assertThat(TestHandler.SICHTEN).containsKeys(a, b);
         TestHandler.Sicht sichtA = TestHandler.SICHTEN.get(a);
         TestHandler.Sicht sichtB = TestHandler.SICHTEN.get(b);
         assertThat(sichtA.schema()).isEqualTo("m_urinet");
