@@ -64,14 +64,15 @@ public class ProblemDetailsSchritte {
         assertThat(eintraege).extracting(this::volltext).noneMatch(zeile -> zeile.contains(text));
     }
 
-    @Dann("das Log nennt nur Fehler-ID, Status und Fehlercode")
+    @Dann("das Log nennt nur Fehler-ID, Status, Fehlercode und die Klassen der Ursachen")
     public void nurIds() {
         String instanz = antwort.jsonPath().getString("instance").substring("urn:uuid:".length());
         assertThat(eintraege).filteredOn(e -> PROBLEM_LOGGER.equals(e.getLoggerName())).singleElement()
                 .satisfies(e -> {
                     assertThat(e.getThrown()).isNull();
                     assertThat(nachricht(e))
-                            .isEqualTo("Fehler " + instanz + ": status=500 fehlercode=INTERNER_FEHLER");
+                            .isEqualTo("Fehler " + instanz
+                            + ": status=500 fehlercode=INTERNER_FEHLER ursache=java.lang.IllegalStateException");
                 });
     }
 

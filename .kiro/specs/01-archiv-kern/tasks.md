@@ -102,7 +102,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
-- [ ] 1.5 API-Tokens für Generatoren und Import [Backend]
+- [x] 1.5 API-Tokens für Generatoren und Import [Backend]
   - `ApiTokenAuthMechanism`, Argon2id, an einen Mandanten gebunden, Scopes `generator` und `import`; ein Token erreicht nur die Endpunkte seines Scopes, sonst 403
   - Kommando `archiv token erstellen <mandant> <name> <scope>` (gibt Geheimnis einmal aus); Anlegen, Anzeigen und Widerruf nur mit Recht A14
   - _Anforderungen: 2.5, 2.20_
@@ -413,3 +413,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Leistungsmessung auf Stufe B mit den Lastskripten aus 2.4, 2.6 und 4.5 unter den Messbedingungen aus 4.9; Messbericht im PR verlinken; bei vorgezogenem Wechsel die Leistungsmessung nachholen, sobald 2.4, 2.6 und 4.5 fertig sind, spätestens vor 5.4
   - _Anforderungen: 3.2, 5.5, 14.3, 16.1, 16.2, 16.10, 16.15, 16.16, 16.17, 16.18, 16.19_
   - _Abhängig von: 1.9, 2.4, 2.6, 4.5, 4.9 (bei vorgezogenem Wechsel nur der Entscheid K5 aus 4.9)_
+
+## Optionen
+Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04).
+
+- [ ]* O.7 Übersicht und Ablauf der API-Tokens vor Stufe B [Backend] [Frontend]
+  - Herkunft: Review von PR #37 (Aufgabe 1.5); Grundlage: Tokens laufen nicht ab, sie gelten bis zum Widerruf (entschieden von Fabian am 10.11.2026)
+  - ungenutzte Tokens nach `zuletzt` in der Token-Verwaltung anzeigen
+  - optionales `gueltig_bis` je Token, vor dem Wechsel auf Stufe B (5.11); ohne Wert gilt das Token weiter bis zum Widerruf
+  - _Anforderungen: 2.5_

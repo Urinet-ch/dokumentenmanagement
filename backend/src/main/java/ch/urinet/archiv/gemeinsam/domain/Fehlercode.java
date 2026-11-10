@@ -29,7 +29,10 @@ public enum Fehlercode {
     DATEI_ZU_GROSS(413, "Datei zu gross",
             "Die Datei oder die Anfrage ist zu gross. Bitte teilen Sie die Datei auf oder verkleinern Sie sie."),
     DATEITYP_UNBEKANNT(415, "Dateityp nicht unterstützt",
-            "Dieser Dateityp wird nicht unterstützt. Bitte senden Sie ein PDF, ein Bild oder ein Office-Dokument."),
+            "Dieser Dateityp wird nicht unterstützt. Bitte senden Sie ein PDF oder ein Bild (JPEG, PNG, HEIC, TIFF)."),
+    MEDIENTYP_FALSCH(415, "Format der Anfrage nicht unterstützt",
+            "Die Anfrage hat ein Format (Content-Type), das hier nicht angenommen wird. Bitte senden Sie die Daten im "
+                    + "erwarteten Format."),
     DATEI_UNGUELTIG(422, "Datei ungültig",
             "Die Datei ist leer oder beschädigt. Bitte erfassen Sie sie erneut."),
     PFLICHTFELD_FEHLT(422, "Pflichtfeld fehlt",
@@ -55,8 +58,11 @@ public enum Fehlercode {
     VERSION_FEHLT(428, "Version fehlt",
             "Für Änderungen ist die Version des Dokuments nötig (If-Match). Bitte laden Sie das Dokument neu."),
     INTERNER_FEHLER(500, "Interner Fehler",
-            "Im Archiv ist ein Fehler aufgetreten; nichts wurde geändert. Bitte versuchen Sie es später erneut und "
+            "Im Archiv ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut und "
                     + "nennen Sie bei Rückfragen die Fehler-ID."),
+    UEBERLASTET(503, "Archiv ausgelastet",
+            "Das Archiv prüft gerade zu viele Anmeldungen gleichzeitig. Bitte versuchen Sie es in einigen Sekunden "
+                    + "erneut."),
     SPEICHER_NICHT_ERREICHBAR(503, "Speicher nicht erreichbar",
             "Der Speicher ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.");
 

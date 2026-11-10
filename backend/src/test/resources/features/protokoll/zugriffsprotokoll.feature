@@ -81,3 +81,25 @@ Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
     Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
       | benutzer       | rolle   | aktion  | dokument | ip | grund | fehlercode |
       | inhaber-urinet | INHABER | AENDERN | NORMAL   |    |       |            |
+
+  @req-10.7
+  Szenariogrundriss: Eine Verweigerung wird nie auf dem Event-Loop protokolliert
+    Angenommen die Threads des Verweigerungs-Melders werden beobachtet
+    Wenn «<benutzer>» <anfrage>
+    Dann antwortet das Archiv mit Status 403 und Fehlercode «<fehlercode>»
+    Und lief der Melder nur auf Threads, die blockieren dürfen
+
+    Beispiele:
+      | benutzer           | anfrage                               | fehlercode    | fall                     |
+      | treuhaender-urinet | ein Dokument erfasst                  | NICHT_ERLAUBT | Rolle nach @RolesAllowed |
+      | ohne-rolle-urinet  | ein Dokument erfasst                  | NICHT_ERLAUBT | ohne Archiv-Rolle        |
+      | mitarbeiter-urinet | das Probe-Dokument «NORMAL» bestätigt | NICHT_ERLAUBT | im ZugangFilter          |
+
+  @req-10.2
+  # Vorab-Korrektur 7 aus dem Review von PR #35: geerbte Methode, @Protokolliert nur an der Klasse, ID über @RestPath.
+  Szenario: Eine geerbte Methode mit @RestPath wird mit Dokument-ID protokolliert
+    Wenn «inhaber-urinet» das Probe-Dokument «NORMAL» über die geerbte Probe-Methode liest
+    Dann antwortet das Archiv mit Status 200 und liefert das Probe-Dokument «NORMAL»
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer       | rolle   | aktion   | dokument | ip | grund | fehlercode |
+      | inhaber-urinet | INHABER | ANZEIGEN | NORMAL   |    |       |            |

@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.AuthenticationRedirectException;
 import io.quarkus.security.UnauthorizedException;
@@ -28,12 +29,21 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper({UnauthorizedException.class, AuthenticationFailedException.class})
     public Response nichtAngemeldet(RuntimeException fehler) {
-        return nichtAngemeldet();
+        return nichtAngemeldetBuilder(fehler).build();
     }
 
     @ServerExceptionMapper
     public Response umleitung(AuthenticationRedirectException fehler) {
         return nichtAngemeldet();
+    }
+
+    /**
+     * Falscher Feldtyp im JSON: Der eingebaute Mapper von Quarkus für diese Ausnahme gäbe in dev/test den Eingabewert
+     * zurück und in prod einen leeren 400; dieser hier gewinnt und nennt keinen Wert (Req 16.7).
+     */
+    @ServerExceptionMapper
+    public Response feldtyp(MismatchedInputException fehler) {
+        return antwort(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG));
     }
 
     @ServerExceptionMapper
@@ -47,14 +57,14 @@ public class ProblemAbbildung {
         int status = ursprung == null ? 500 : ursprung.getStatus();
         Response.ResponseBuilder antwort = switch (status) {
             case 400 -> builder(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG));
-            case 401 -> nichtAngemeldetBuilder();
+            case 401 -> nichtAngemeldetBuilder(fehler);
             case 403 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_ERLAUBT));
             case 404 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_GEFUNDEN));
             case 413 -> builder(ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS));
-            case 415 -> builder(ProblemAntwort.fuer(Fehlercode.DATEITYP_UNBEKANNT));
+            case 415 -> builder(ProblemAntwort.fuer(Fehlercode.MEDIENTYP_FALSCH));
             default -> status >= 400 && status < 500
                     ? builder(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG, status))
-                    : builder(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER));
+                    : builder(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER, fehler));
         };
         if (status == 405 && ursprung.getHeaderString(HttpHeaders.ALLOW) != null) {
             antwort.header(HttpHeaders.ALLOW, ursprung.getHeaderString(HttpHeaders.ALLOW));
@@ -64,15 +74,15 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response unerwartet(Throwable fehler) {
-        return antwort(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER));
+        return antwort(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER, fehler));
     }
 
     static Response nichtAngemeldet() {
-        return nichtAngemeldetBuilder().build();
+        return nichtAngemeldetBuilder(null).build();
     }
 
-    private static Response.ResponseBuilder nichtAngemeldetBuilder() {
-        return builder(ProblemAntwort.fuer(Fehlercode.NICHT_ANGEMELDET)).header("WWW-Authenticate", BEARER);
+    private static Response.ResponseBuilder nichtAngemeldetBuilder(Throwable ursache) {
+        return builder(ProblemAntwort.fuer(Fehlercode.NICHT_ANGEMELDET, ursache)).header("WWW-Authenticate", BEARER);
     }
 
     public static Response antwort(ProblemAntwort problem) {

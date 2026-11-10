@@ -1,6 +1,79 @@
 {
   "openapi" : "3.1.0",
   "components" : {
+    "schemas" : {
+      "ApiToken" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "scope" : {
+            "type" : "string",
+            "enum" : [ "generator", "import" ]
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "zuletzt" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        }
+      },
+      "ApiTokenErstellt" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "scope" : {
+            "type" : "string",
+            "enum" : [ "generator", "import" ]
+          },
+          "erstellt" : {
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "token" : {
+            "type" : "string",
+            "description" : "Das Token `ua_<id>_<geheimnis>`; wird nur dieses eine Mal ausgegeben."
+          }
+        }
+      },
+      "ApiTokenNeu" : {
+        "type" : "object",
+        "required" : [ "name", "scope" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "description" : "Bezeichnung, z. B. «Rechnungsgenerator»"
+          },
+          "scope" : {
+            "type" : "string",
+            "enum" : [ "generator", "import" ]
+          }
+        }
+      },
+      "Instant" : {
+        "type" : "string",
+        "format" : "date-time",
+        "examples" : [ "2022-03-10T16:15:50Z" ]
+      }
+    },
     "securitySchemes" : {
       "SecurityScheme" : {
         "type" : "openIdConnect",
@@ -9,9 +82,111 @@
       }
     }
   },
+  "tags" : [ {
+    "name" : "API-Tokens"
+  } ],
+  "paths" : {
+    "/api/v1/api-tokens" : {
+      "get" : {
+        "summary" : "API-Tokens des Mandanten auflisten (ohne Geheimnis)",
+        "tags" : [ "API-Tokens" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ApiToken"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "API-Token anlegen",
+        "description" : "Das Token steht nur in dieser Antwort.",
+        "tags" : [ "API-Tokens" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApiTokenNeu"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Angelegt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiTokenErstellt"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/api-tokens/{tokenId}" : {
+      "delete" : {
+        "summary" : "API-Token widerrufen",
+        "description" : "Wirkt sofort; fremde oder unbekannte IDs → 404.",
+        "tags" : [ "API-Tokens" ],
+        "parameters" : [ {
+          "name" : "tokenId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Widerrufen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    }
+  },
   "info" : {
     "title" : "UriNet Archiv API",
     "version" : "v1"
-  },
-  "paths" : { }
+  }
 }

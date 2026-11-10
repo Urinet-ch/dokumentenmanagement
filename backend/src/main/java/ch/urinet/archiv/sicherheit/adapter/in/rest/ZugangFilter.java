@@ -5,7 +5,9 @@ import ch.urinet.archiv.mandant.application.MandantVerweigert;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
+import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -26,6 +28,9 @@ import java.util.UUID;
  * Erklärung ({@link ErfordertAktion}, {@link AlleArchivRollen}, {@link Oeffentlich}) antwortet 403 (fail closed);
  * {@code EndpunktWaechterTest} verlangt die Erklärung schon im Build. Ohne gültigen Mandanten antwortet er 403
  * {@code MANDANT_FEHLT}; jede Verweigerung meldet {@link Berechtigung} (Zugriffsprotokoll, Req 10.7).
+ * <p>
+ * Ein API-Token (Attribut {@link TokenIdentitaet#SCOPE}, Req 2.5) hat keine Archiv-Rolle: Nach der Mandantenprüfung
+ * zählt nur, ob die Methode mit {@link ErlaubtScope} genau seinen Scope erlaubt; sonst 403 {@code NICHT_ERLAUBT}.
  */
 public class ZugangFilter {
 
@@ -55,9 +60,14 @@ public class ZugangFilter {
         } catch (MandantVerweigert e) {
             berechtigung.ohneMandant(benutzerId);
         }
-        Optional<Rolle> rolle = Rolle.ausRealmRollen(identitaet.getRoles());
         ErfordertAktion erklaerung = methode.getAnnotation(ErfordertAktion.class);
         Optional<Aktion> aktion = Optional.ofNullable(erklaerung).map(ErfordertAktion::value);
+        Object scope = identitaet.getAttribute(TokenIdentitaet.SCOPE);
+        if (scope != null) {
+            scopePruefen(methode, scope, benutzerId, aktion);
+            return;
+        }
+        Optional<Rolle> rolle = Rolle.ausRealmRollen(identitaet.getRoles());
         if (rolle.isEmpty() || benutzerId.isEmpty()) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
             return;
@@ -67,6 +77,14 @@ public class ZugangFilter {
                     anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
+        }
+    }
+
+    /** API-Token (Req 2.5): nur der Endpunkt, der seinen Scope erlaubt; keine Archiv-Rolle, keine Rechtematrix. */
+    private void scopePruefen(Method methode, Object scope, Optional<String> benutzerId, Optional<Aktion> aktion) {
+        ErlaubtScope erlaubt = methode.getAnnotation(ErlaubtScope.class);
+        if (benutzerId.isEmpty() || erlaubt == null || erlaubt.value() != scope) {
+            berechtigung.ohneZugang(benutzerId, Optional.empty(), aktion);
         }
     }
 

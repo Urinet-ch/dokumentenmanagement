@@ -16,6 +16,8 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.restassured.RestAssured;
+import io.restassured.config.HttpClientConfig;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -39,6 +41,7 @@ public class MandantenkontextSchritte {
 
     private static final String DOKUMENTARTEN = "/api/v1/probe/dokumentarten/";
     private static final String DOKUMENTE = "/api/v1/probe/dokumente/";
+    private static final String ANFRAGE = "/api/v1/probe/anfrage";
 
     @Inject
     MandantProvisionierung provisionierung;
@@ -113,6 +116,41 @@ public class MandantenkontextSchritte {
     public void dokumentBestaetigen(String benutzer, String dokument) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
                 .post(DOKUMENTE + dokumentId(dokument) + "/bestaetigen");
+    }
+
+    @Wenn("«{word}» das Probe-Dokument «{word}» über die geerbte Probe-Methode liest")
+    public void dokumentGeerbtLesen(String benutzer, String dokument) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get("/api/v1/probe/geerbt/dokumente/" + dokumentId(dokument));
+    }
+
+    @Wenn("«{word}» an die Probe-Anfrage im Zahlenfeld den Text «{word}» sendet")
+    public void falscherFeldtyp(String benutzer, String text) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
+                .body("{\"anzahl\": \"" + text + "\"}").when().post(ANFRAGE);
+    }
+
+    @Wenn("«{word}» an die Probe-Anfrage JSON mit dem Content-Type «{}» sendet")
+    public void falscherMedientyp(String benutzer, String medientyp) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(medientyp)
+                .body("{\"anzahl\": 1}").when().post(ANFRAGE);
+    }
+
+    @Wenn("«{word}» an die Probe-Anfrage {int} MB sendet")
+    public void zuGross(String benutzer, int megabyte) {
+        byte[] inhalt = new byte[megabyte * 1024 * 1024];
+        Arrays.fill(inhalt, (byte) ' ');
+        // mit «Expect: 100-continue» liest der Client die frühe 413, statt den Rest in eine geschlossene Verbindung zu schreiben
+        antwort = given().config(RestAssured.config().httpClient(HttpClientConfig.httpClientConfig()
+                        .setParam("http.protocol.expect-continue", true)))
+                .auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
+                .body(inhalt).when().post(ANFRAGE);
+    }
+
+    @Dann("enthält die Antwort «{word}» nicht")
+    public void ohneEingabewert(String text) {
+        assertThat(antwort.asString()).doesNotContain(text);
+        assertThat(antwort.headers().toString()).doesNotContain(text);
     }
 
     @Dann("antwortet das Archiv mit Status {int} und liefert das Probe-Dokument «{word}»")
