@@ -113,8 +113,8 @@ Arbeitsweise je Aufgabe (Claude Code):
   - ArchUnit-Regeln aus `structure.md` (Blueprint)
   - _Anforderungen: 10.2, 10.3, 10.7, 10.8, 16.13_
 
-- [ ] 1.7 Stammdaten der Dokumentarten festlegen [Fabian]
-  - Entwurf der Stammdaten-Tabelle in design.md prüfen und je Art Code, Gruppen, Pflichtfelder, Standard-Vertraulichkeit, Aufbewahrung (Jahre, ab wann) und `gesetzliche_pflicht` festlegen [offen: Werte der 11 Dokumentarten – Entscheid vor Welle 2]
+- [x] 1.7 Stammdaten der Dokumentarten festlegen [Fabian]
+  - Entwurf der Stammdaten-Tabelle in design.md prüfen und je Art Code, Gruppen, Pflichtfelder, Standard-Vertraulichkeit, Aufbewahrung (Jahre, ab wann) und `gesetzliche_pflicht` festlegen – entschieden von Fabian am 10.11.2026
   - Freigabe per Merge; ersetzt den [offen]-Vermerk in Requirement 9.2
   - _Anforderungen: 9.1, 9.2_
 

@@ -1,11 +1,5 @@
 {
-  "_entwurf": "Werte von Fabian im PR zu bestätigen",
-  "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2).",
-  "_fragen": [
-    "Standard-Vertraulichkeit: NORMAL nur für OFFERTE und PROJEKTDOKUMENT, damit die Rolle mitarbeiter Offerten und Projektdokumente lesen kann – passt das?",
-    "gesetzliche_pflicht = false nur für KORRESPONDENZ und PROJEKTDOKUMENT (P12). Sollen OFFERTE, VERTRAG und VERSICHERUNG wirklich mit WORM gesperrt werden?",
-    "VERTRAG ist PERSONAL wie im Konzept (Arbeitsverträge). Kundenaufträge wären damit für die Rolle mitarbeiter unsichtbar – oder eigene Art für Kundenaufträge?"
-  ],
+  "_quelle": "Konzept «UriNet Archiv — Konzept und Anforderungen», Tabelle «Dokumentarten UriNet» und Kapitel GeBüV (Art. 958f OR: Bücher und Buchungsbelege 10 Jahre ab Ende Geschäftsjahr); Prüfentscheide P6 und P12. Muss mit der Stammdaten-Tabelle in .kiro/specs/01-archiv-kern/design.md übereinstimmen (Req 9.2). Werte entschieden von Fabian am 10.11.2026.",
   "dokumentarten": [
     {
       "code": "AUSGANGSRECHNUNG",
@@ -32,7 +26,7 @@
       "vertraulichkeit": "NORMAL",
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
-      "gesetzliche_pflicht": true,
+      "gesetzliche_pflicht": false,
       "aktiv": true
     },
     {
