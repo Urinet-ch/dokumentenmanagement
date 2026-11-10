@@ -37,6 +37,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -73,6 +74,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     private static final Set<String> AM_ORT_LISTE = Set.of("allOf", "anyOf", "oneOf");
 
     private final long zeitgrenzeNanos;
+    private final LongSupplier uhr;
     private final ThreadLocal<Long> frist = new ThreadLocal<>();
     private final SchemaRegistry registry;
     private final Schema metaSchema;
@@ -87,10 +89,16 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     @Inject
     public NetworkntZusatzSchemaPruefer(
             @ConfigProperty(name = "archiv.dokumentart.muster-zeitgrenze") Duration zeitgrenze) {
+        this(zeitgrenze, System::nanoTime);
+    }
+
+    /** Mit eigener Uhr in Nanosekunden, damit Tests die Frist ohne Wanduhr prüfen. */
+    NetworkntZusatzSchemaPruefer(Duration zeitgrenze, LongSupplier uhr) {
         if (zeitgrenze == null || zeitgrenze.isNegative() || zeitgrenze.isZero()) {
             throw new IllegalArgumentException("archiv.dokumentart.muster-zeitgrenze muss grösser als 0 sein");
         }
         this.zeitgrenzeNanos = zeitgrenze.toNanos();
+        this.uhr = uhr;
         Dialect standard = Dialects.getDraft202012();
         // Der Builder ergänzt die Schlüsselwörter der Vokabulare erst beim Bauen; «format» lässt er nicht ersetzen.
         Dialect mitFrist = Dialect.builder(standard)
@@ -183,7 +191,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         if (frist.get() != null) {
             return aufruf.get();
         }
-        frist.set(System.nanoTime() + zeitgrenzeNanos);
+        frist.set(uhr.getAsLong() + zeitgrenzeNanos);
         try {
             return aufruf.get();
         } finally {
@@ -197,7 +205,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
                 RegularExpressions.replaceLongformCharacterProperties(RegularExpressions.replaceDollarAnchors(regex)));
         return text -> {
             Long gesetzt = frist.get();
-            long bis = gesetzt != null ? gesetzt : System.nanoTime() + zeitgrenzeNanos;
+            long bis = gesetzt != null ? gesetzt : uhr.getAsLong() + zeitgrenzeNanos;
             fristPruefen(bis);
             return pattern.matcher(new MitFrist(text, bis)).find();
         };
@@ -211,8 +219,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
     }
 
-    private static void fristPruefen(long bis) {
-        if (System.nanoTime() - bis > 0) {
+    private void fristPruefen(long bis) {
+        if (uhr.getAsLong() - bis > 0) {
             throw new FristAbgelaufen();
         }
     }
@@ -400,7 +408,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     /** Text für den Matcher, der nach Ablauf der Frist abbricht; geprüft wird jeden 1024. Zugriff. */
-    private static final class MitFrist implements CharSequence {
+    private final class MitFrist implements CharSequence {
         private final CharSequence text;
         private final long bis;
         private int zugriffe;
