@@ -88,6 +88,7 @@ ZIEL=$PWD ~/git/ai-entwicklung/werkzeuge/harness.sh --diff   # Drift-Check: übe
   alles über PRs (Entscheid Fabian 09.11.2026).
 - Der Workflow «Secret-Scan» prüft jeden Push auf allen Branches mit gitleaks, «CI-Fehler» legt bei rotem `main` ein
   Issue an.
-- Claude-Code-Hooks (`.claude/settings.json`) fragen nach, bevor Leitplanken, Secret-Dateien oder geschützte Pfade aus
-  `.claude/harness.yml` (Liquibase-Changesets, Realm-Export, `.github/scripts/`) geändert werden.
+- Claude-Code-Hooks (`.claude/settings.json`) fragen beim Bearbeiten mit Edit/Write nach, bevor Leitplanken,
+  Secret-Dateien oder geschützte Pfade aus `.claude/harness.yml` (Liquibase-Changesets, Realm-Export,
+  `.github/scripts/`) geändert werden. Änderungen per Bash prüft der Hook nicht; die eigentliche Sperre ist die CI.
 - Dependabot (`.github/dependabot.yml`) hält Actions (per SHA gepinnt), Docker-Images, npm und Maven wöchentlich aktuell.

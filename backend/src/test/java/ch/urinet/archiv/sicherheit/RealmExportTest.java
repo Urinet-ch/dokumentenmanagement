@@ -67,19 +67,24 @@ class RealmExportTest {
     void erkenntHeikleFelderUndUebergehtHarmlose() {
         JsonNode probe = JSON.valueToTree(Map.of(
                 "users", List.of(),
-                "smtpServer", Map.of("host", "mail.example.invalid", "password", "x"),
+                "smtpServer", Map.of("host", "mail.example.invalid", "password", "x", "authTokenClientSecret", "x"),
                 "clients", List.of(Map.of("clientId", "c", "secret", "x", "registrationAccessToken", "x",
-                        "attributes", Map.of("client.secret.rotated", "x", "saml.signing.private.key", "x"))),
-                "components", Map.of("keys", List.of(Map.of("config", Map.of("privateKey", List.of("x"))))),
+                        "attributes", Map.of("client.secret.rotated", "x", "saml.signing.private.key", "x",
+                                "saml.encryption.private.key", "x"))),
+                "components", Map.of("keys", List.of(Map.of("config", Map.of("privateKey", List.of("x"),
+                        "keystorePassword", List.of("x"), "keyPassword", List.of("x"))))),
                 "identityProviders", List.of(Map.of("config", Map.of("clientSecret", "x"))),
                 "resetPasswordAllowed", false,
                 "passwordPolicy", "length(12)",
                 "requiredCredentials", List.of("password"),
                 "otpPolicyType", "totp"));
         assertThat(heikleFelder(probe)).containsExactlyInAnyOrder("$.users", "$.smtpServer.password",
+                "$.smtpServer.authTokenClientSecret",
                 "$.clients[0].secret", "$.clients[0].registrationAccessToken",
                 "$.clients[0].attributes.client.secret.rotated", "$.clients[0].attributes.saml.signing.private.key",
-                "$.components.keys[0].config.privateKey", "$.identityProviders[0].config.clientSecret");
+                "$.clients[0].attributes.saml.encryption.private.key",
+                "$.components.keys[0].config.privateKey", "$.components.keys[0].config.keystorePassword",
+                "$.components.keys[0].config.keyPassword", "$.identityProviders[0].config.clientSecret");
     }
 
     private static List<String> heikleFelder(JsonNode wurzel) {

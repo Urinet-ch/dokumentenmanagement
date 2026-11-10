@@ -37,13 +37,21 @@
 - **Negativ:** Unter `archiv/` dürfen keine fremden Versionen entstehen. Der Prüflauf meldet fremde Versionen und Löschmarken als Abweichung (Req 15.10).
 - **Umsetzung:** `AblageService` mit Port `AblagePort`, S3-Adapter und Dev-Stub (Aufgabe 2.3); Bestätigen, Archivieren, Verwerfen und Wiederholen in Aufgabe 3.4. Sperre bei Metadatenänderung nur verlängern (Req 9.7, ADR-007).
 - **Tests:** Testcontainers MinIO mit Object Lock und Versionierung: archivierte Datei nicht löschbar (unter Option B: ohne Bypass-Header, siehe ADR-007, Nachtrag 09.11.2026), Abweichung der Prüfsumme bricht ab, Art ohne Pflicht ohne Sperre, Verwerfen löscht alle Versionen. Cucumber-Szenarien zu Req 6.x.
-- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; mit Option B (entschieden 09.11.2026, ADR-007) hat der App-Schlüssel technisch das Bypass-Recht, Spike 0.2 [T 6b–7g]) (siehe ADR-007, Nachtrag 09.11.2026: die Anwendung setzt den Header nie, Req 6.5; Manifeste in COMPLIANCE sind mit keinem Schlüssel des Projekts löschbar [T 4b/4c], darum darf der Sperrmodus von `manifest/` auf Stufe A per Konfiguration abweichen, Req 6.11, Aufgabe 2.3): [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1].
+- **Betrieb:** Gesperrte Testobjekte der Stufe A lassen sich mit dem App-Schlüssel nicht löschen (ohne Bypass-Header; mit Option B (entschieden 09.11.2026, ADR-007) hat der App-Schlüssel technisch das Bypass-Recht, Spike 0.2 [T 6b–7g]) (siehe ADR-007, Nachtrag 09.11.2026: die Anwendung setzt den Header nie, Req 6.5; Manifeste in COMPLIANCE sind mit keinem Schlüssel des Projekts löschbar [T 4b/4c], darum darf der Sperrmodus von `manifest/` auf Stufe A per Konfiguration abweichen, Req 6.11, Aufgabe 2.3): entschieden von Fabian am 09.11.2026, siehe Nachtrag (Buckets der Stufe A).
 
 ## Nachtrag 09.11.2026 (Testumgebung)
 MinIO läuft in Tests und in `dev` aus den Compose Dev Services (`backend/compose-devservices.yml`, Image
 `cgr.dev/chainguard/minio` mit festem Digest), nicht als Testcontainers-Container (entschieden von Fabian am
 09.11.2026, Aufgabe 1.2). «Testcontainers MinIO» unter «Folgen» heisst damit «MinIO aus den Compose Dev Services»;
 die Tests selbst bleiben gleich.
+
+## Nachtrag 09.11.2026 (Buckets der Stufe A)
+Entschieden von Fabian am 09.11.2026 (Option A): Der Bucket heisst `<archiv.ablage.bucket-praefix><code>`, Standard
+`urinet-archiv-`, auf Stufe A `urinet-archiv-a-`; den produktiven Bucket `urinet-archiv-urinet` gibt es erst auf Stufe B
+(Aufgabe 5.4). Mit `archiv.stufe=A` sperrt das Archiv auch Dokumente unter `archiv/` höchstens 1 Tag (GOVERNANCE,
+`archiv.ablage.max-sperrfrist=P1D`). Ab Stufe B bricht der Start ab, wenn eine Höchstfrist gesetzt ist oder der Präfix
+der Stufe A gilt (Req 6.11). Beim Wechsel (5.11) löscht der App-Schlüssel frühestens 1 Tag nach dem letzten Upload alle
+Versionen der Test-Buckets ohne Bypass-Header, danach die Buckets; der Inhaber-Zugang wird nicht gebraucht.
 
 ## Verweise
 - Spike 0.2 (Vorbehalt – durchgeführt 08.11.2026): `docs/spikes/s3-object-lock.md` (Sperre pro Objekt, Löschbarkeit ungesperrter Objekte), Modus der Sperre im Nachtrag 09.11.2026 von ADR-007

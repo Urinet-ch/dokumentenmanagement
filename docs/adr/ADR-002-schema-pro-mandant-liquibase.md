@@ -38,7 +38,15 @@
 - **Umsetzung:** Rückwärtskompatible Migrationen verlangen schrittweises Vorgehen: Eine Spalte wird zuerst hinzugefügt, entfernt wird sie frühestens ein Release später, wenn das Vorgänger-Image sie nicht mehr braucht.
 - **Umsetzung:** Code eines Mandanten greift auf `public` nur über `auftrag` zu. ArchUnit prüft das (ADR-011).
 - **Tests:** Jeder Repository-Test läuft mit zwei Mandanten (tech.md). Der Provisionierungstest legt zwei Mandanten an und prüft, dass Schemas und Buckets getrennt sind (Aufgabe 1.3).
-- **Betrieb:** Welchen Bucket `MandantProvisionierung` in Stufe A anlegt, ist noch offen: [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim Wechsel – Entscheid vor Welle 1] (design.md, Open Points).
+- **Betrieb:** Welchen Bucket `MandantProvisionierung` in Stufe A anlegt: entschieden von Fabian am 09.11.2026, siehe Nachtrag.
+
+## Nachtrag 09.11.2026 (Buckets der Stufe A)
+Entschieden von Fabian am 09.11.2026 (Option A): Der Bucket heisst `<archiv.ablage.bucket-praefix><code>`, Standard
+`urinet-archiv-`, auf Stufe A `urinet-archiv-a-`; den produktiven Bucket `urinet-archiv-urinet` gibt es erst auf Stufe B
+(Aufgabe 5.4). Mit `archiv.stufe=A` sperrt das Archiv auch Dokumente unter `archiv/` höchstens 1 Tag (GOVERNANCE,
+`archiv.ablage.max-sperrfrist=P1D`). Ab Stufe B bricht der Start ab, wenn eine Höchstfrist gesetzt ist oder der Präfix
+der Stufe A gilt (Req 6.11). Beim Wechsel (5.11) löscht der App-Schlüssel frühestens 1 Tag nach dem letzten Upload alle
+Versionen der Test-Buckets ohne Bypass-Header, danach die Buckets; der Inhaber-Zugang wird nicht gebraucht.
 
 ## Verweise
 - Req 1.1–1.7, 16.11
