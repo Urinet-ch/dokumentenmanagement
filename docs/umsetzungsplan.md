@@ -29,7 +29,7 @@ Claude Code; Einstieg ist `CLAUDE.md`.
 
 | Rolle | Wer | Aufgaben |
 | --- | --- | --- |
-| Product Owner / Reviewer | Fabian | Requirements und Design per Merge freigeben, PRs prüfen und mergen, Gates abnehmen, Aufgaben **[Fabian]** |
+| Product Owner / Reviewer | Fabian | Requirements und Design per Merge freigeben, Spec-PRs, PRs zu Gates und Aufgaben **[Fabian]** sowie PRs mit «Offen für Fabian» prüfen und mergen, Gates abnehmen, Aufgaben **[Fabian]** |
 | Backend-Agent | Claude Code (Spec-Aufgaben **[Backend]**) | Quarkus, Datenbank, Worker, KI |
 | Frontend-Agent | Claude Code bzw. Joel (**[Frontend]**) | Angular-PWA, WordPress-Plugin |
 | Infra-Agent | Claude Code (**[Infra]**), Fabian für Zugänge und Secrets | Docker, Infomaniak, Deploy-Workflow, Sicherung |
@@ -44,7 +44,7 @@ jeweils mit Review durch Fabian.
 2. Claude Code liest `CLAUDE.md`; diese bindet die drei Steering-Dateien per `@`-Import ein (Ersatz für `inclusion: always`).
 3. **Requirements freigeben:** Jede Fassung von `requirements.md` kommt als PR. Freigabe = Fabian merged den PR auf `main`.
 4. **Design freigeben:** ebenso per PR – das ist der wichtigste Prüfpunkt (Architektur, nicht Syntax).
-5. **Tasks wellenweise:** Jede Aufgabe einer Welle bearbeitet eine eigene Claude-Code-Sitzung auf eigenem Branch; Aufgaben derselben Welle laufen parallel nach Rolle. Fabian prüft und merged die PRs; die Welle ist abgeschlossen, wenn alle ihre Checkboxen in `tasks.md` auf `main` abgehakt sind.
+5. **Tasks wellenweise:** Jede Aufgabe einer Welle bearbeitet eine eigene Claude-Code-Sitzung auf eigenem Branch; Aufgaben derselben Welle laufen parallel nach Rolle. Gemergt wird nach der Merge-Regel in `CLAUDE.md` (Entscheid Fabian 10.11.2026): Umsetzungs-PRs von Copilot merged Claude Code bei grüner CI (inkl. Secret-Scan), ohne Muss-Befund im Review und ohne Punkt «Offen für Fabian»; Spec-PRs, PRs zu Gates und zu Aufgaben **[Fabian]** sowie PRs mit «Offen für Fabian» merged Fabian. Copilot erhält seine Aufträge von Claude Code über die Copilot CLI, in der Reihenfolge dieses Plans; die Welle ist abgeschlossen, wenn alle ihre Checkboxen in `tasks.md` auf `main` abgehakt sind.
 6. Nach Welle 0, 5, 9, 12 und 16 das Gate abnehmen und in Abschnitt 6 eintragen.
 7. Erkenntnisse aus Spikes (Welle 0) per PR zurück in `design.md` schreiben, bevor Welle 1 startet.
 

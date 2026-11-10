@@ -127,6 +127,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
   - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
   - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
+  - `archiv_db_owner` nur dem Dienst `archiv-api` mounten; das Admin-Kommando läuft per `exec` im API-Container
   - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
   - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
@@ -234,7 +235,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)
   - `KiBasisUrlPruefung` prüft die wirksame Konfiguration (`LangChain4jOpenAiConfig`: `defaultConfig()` und alle `namedConfig()`) statt einzelner Schlüssel; Testfall benannter Client ohne `base-url` → Abbruch (Req 16.21)
   - Die WireMock-Testressource setzt `archiv.ki.wiremock-port` dynamisch beim Start (bis 3.2 fest `8089`, Req 16.21)
-  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
+  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
