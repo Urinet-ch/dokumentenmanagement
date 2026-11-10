@@ -2,6 +2,7 @@ package ch.urinet.archiv.verarbeitung.adapter.in.job;
 
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import io.quarkus.scheduler.Scheduled;
@@ -34,6 +35,14 @@ public class AuftragPoller {
     /** Handler und Zeitgrenzen beim Start prüfen, auch für die API, die Aufträge einreiht. */
     void beimStart(@Observes StartupEvent start) {
         verzeichnis.typen();
+    }
+
+    /**
+     * Geordneter Stopp (z. B. Deploy): Laufende Aufträge gehen ohne Erhöhung von {@code versuche} zurück auf
+     * {@code OFFEN}, sofern ihr Handler innerhalb von {@code archiv.worker.stopp-frist} endet.
+     */
+    void beimStopp(@Observes ShutdownEvent stopp) {
+        arbeiter.herunterfahren();
     }
 
     @Scheduled(identity = "auftrag-poller", every = "${archiv.worker.intervall}",

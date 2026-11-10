@@ -28,7 +28,13 @@ public class AuftragTestHilfe {
 
     /** Zustand einer Zeile in {@code public.auftrag}; Wartezeit in Sekunden ab jetzt, falls {@code nicht_vor} gesetzt. */
     public record Zeile(String mandant, String status, int versuche, String fehler, Long wartezeitSekunden,
-                        boolean beendet, boolean lebenszeichenNachStart) {
+                        boolean beendet, boolean lebenszeichenNachStart, boolean nachbearbeitet,
+                        Long lebenszeichenAlterMs) {
+
+        /** Fehler-ID aus {@code fehler} ({@code <art> fehler-id=<uuid>}). */
+        public String fehlerId() {
+            return fehler.substring(fehler.indexOf('=') + 1);
+        }
     }
 
     // lazy: in Testprofilen ohne Datenbank ist die Datasource inaktiv
@@ -90,7 +96,8 @@ public class AuftragTestHilfe {
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
                 "select mandant, status, versuche, fehler, "
                         + "case when nicht_vor is null then null else extract(epoch from nicht_vor - now())::bigint end, "
-                        + "beendet is not null, coalesce(lebenszeichen > gestartet, false) "
+                        + "beendet is not null, coalesce(lebenszeichen > gestartet, false), nachbearbeitet is not null, "
+                        + "(extract(epoch from now() - lebenszeichen) * 1000)::bigint "
                         + "from public.auftrag where id = ?")) {
             abfrage.setLong(1, id);
             try (ResultSet z = abfrage.executeQuery()) {
@@ -98,7 +105,8 @@ public class AuftragTestHilfe {
                     throw new IllegalStateException("Auftrag " + id + " fehlt");
                 }
                 return new Zeile(z.getString(1), z.getString(2), z.getInt(3), z.getString(4),
-                        z.getObject(5) == null ? null : z.getLong(5), z.getBoolean(6), z.getBoolean(7));
+                        z.getObject(5) == null ? null : z.getLong(5), z.getBoolean(6), z.getBoolean(7),
+                        z.getBoolean(8), z.getObject(9) == null ? null : z.getLong(9));
             }
         }
     }
@@ -108,10 +116,26 @@ public class AuftragTestHilfe {
         ausfuehren("update public.auftrag set " + setzen + " where id = " + id);
     }
 
-    private void ausfuehren(String sql) throws SQLException {
+    /** Fügt einen Auftrag mit roher Nutzlast ein, an {@code Nutzlast} vorbei (z. B. eine unlesbare Zeile). */
+    public long rohEinreihen(String mandant, AuftragTyp typ, String nutzlastJson) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement einfuegen =
+                verbindung.prepareStatement("insert into public.auftrag (mandant, typ, nutzlast) "
+                        + "values (?, ?, cast(? as jsonb)) returning id")) {
+            einfuegen.setString(1, mandant);
+            einfuegen.setString(2, typ.wert());
+            einfuegen.setString(3, nutzlastJson);
+            try (ResultSet zeile = einfuegen.executeQuery()) {
+                zeile.next();
+                return zeile.getLong(1);
+            }
+        }
+    }
+
+    /** Führt eine Änderung aus und liefert die Zahl betroffener Zeilen. */
+    public int ausfuehren(String sql) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement anweisung = verbindung.prepareStatement(sql)) {
-            anweisung.executeUpdate();
+            return anweisung.executeUpdate();
         }
     }
 

@@ -198,6 +198,29 @@ class ArchitekturTest {
     static final ArchRule probeNurInTests = noClasses().should().resideInAPackage("ch.urinet.archiv.probe..")
             .orShould().haveSimpleNameStartingWith("Probe");
 
+    /**
+     * Aufträge entstehen nur über den Anwendungsfall {@code AuftragService} und damit nur mit einer geprüften
+     * {@code Nutzlast} (Aufgabe 2.5); der JDBC-Weg zu {@code public.auftrag} liegt nur im Adapter der Verarbeitung.
+     * Auslegung: Geprüft werden die Aufrufer von {@code AuftragSchlange.einfuegen} und die Nutzer von
+     * {@code JdbcAuftragSchlange}; dass kein anderer Code per SQL in {@code public.auftrag} schreibt, kann ArchUnit
+     * nicht sehen.
+     */
+    @ArchTest
+    static final ArchRule auftraegeNurUeberNutzlast = noClasses()
+            .that().doNotHaveFullyQualifiedName(WURZEL + ".verarbeitung.application.AuftragService")
+            .should().callMethodWhere(DescribedPredicate.describe("AuftragSchlange.einfuegen", aufruf ->
+                    aufruf.getTarget().getName().equals("einfuegen")
+                            && aufruf.getTarget().getOwner().isAssignableTo(WURZEL
+                            + ".verarbeitung.application.AuftragSchlange")))
+            .because("ein Auftrag entsteht nur über AuftragService.einreihen mit einer Nutzlast (Aufgabe 2.5)");
+
+    @ArchTest
+    static final ArchRule auftragJdbcNurImAdapter = noClasses()
+            .that().resideOutsideOfPackage(WURZEL + ".verarbeitung.adapter.out.persistence..")
+            .should().dependOnClassesThat()
+            .haveFullyQualifiedName(WURZEL + ".verarbeitung.adapter.out.persistence.JdbcAuftragSchlange")
+            .because("der JDBC-Weg zu public.auftrag liegt nur im Adapter der Verarbeitung (Aufgabe 2.5)");
+
     private static DescribedPredicate<JavaClass> implementierenPortAusApplication() {
         return DescribedPredicate.describe("einen Port aus application implementieren", klasse -> !klasse.isInterface()
                 && klasse.getAllRawInterfaces().stream()

@@ -13,6 +13,8 @@ import java.util.Set;
 /**
  * Driven Port: die Auftragsschlange in {@code public.auftrag} (ADR-003). Alle Änderungen an einem geholten Auftrag
  * greifen nur, solange er {@code LAEUFT} und {@code versuche} unverändert ist; sonst liefern sie {@code false}.
+ * Eine Zeile, deren Nutzlast nicht lesbar ist, setzen Lesemethoden mit Fehler-ID auf {@code FEHLER} und überspringen
+ * sie, damit sie weder Poller noch Aufräumer für alle Mandanten aufhält.
  */
 public interface AuftragSchlange {
 
@@ -35,9 +37,24 @@ public interface AuftragSchlange {
      */
     boolean fehlversuch(Auftrag auftrag, String fehler, Optional<Duration> wartezeit);
 
+    /** Geordneter Stopp: zurück auf {@code OFFEN} und sofort fällig, ohne {@code versuche} zu erhöhen. */
+    boolean freigeben(Auftrag auftrag);
+
     /** {@code LAEUFT}-Aufträge der Typen, deren letztes Lebenszeichen älter ist als ihre Zeitgrenze (Req 5.7). */
     List<Auftrag> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen);
 
     /** Wie {@link #fehlversuch}, aber nur, wenn das Lebenszeichen weiter seit der Zeitgrenze ausbleibt. */
     boolean verwaistFreigeben(Auftrag auftrag, Duration zeitgrenze, String fehler, Optional<Duration> wartezeit);
+
+    /**
+     * {@code FEHLER}-Aufträge aktiver Mandanten ohne {@code nachbearbeitet}, deren Ende länger als die Zeitgrenze
+     * ihres Typs zurückliegt (der Worker hat den Hook nicht abgeschlossen, z. B. nach einem Absturz).
+     */
+    List<Fehlgeschlagen> ohneNachbearbeitung(Map<AuftragTyp, Duration> zeitgrenzen);
+
+    /**
+     * Hook nach dem letzten Fehlversuch erledigt: setzt {@code nachbearbeitet}, solange der Auftrag {@code FEHLER} ist
+     * (Endzustand, darum ohne Abgleich von {@code versuche}).
+     */
+    boolean nachbearbeitet(Auftrag auftrag);
 }

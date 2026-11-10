@@ -7,7 +7,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
-/** Gibt alle {@code archiv.auftrag.aufraeumen-intervall} verwaiste Aufträge frei (Req 5.7), nur mit der Rolle {@code worker}. */
+/**
+ * Gibt alle {@code archiv.auftrag.aufraeumen-intervall} verwaiste Aufträge frei (Req 5.7) und holt fehlende
+ * Nachbearbeitungen nach (Req 5.4), nur mit der Rolle {@code worker}.
+ */
 @ApplicationScoped
 public class AuftragAufraeumer {
 

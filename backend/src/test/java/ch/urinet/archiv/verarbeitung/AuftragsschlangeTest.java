@@ -105,7 +105,10 @@ class AuftragsschlangeTest {
             assertThat(zeile.beendet()).isTrue();
             assertThat(zeile.fehler()).matches("fehlgeschlagen " + FEHLER_ID).doesNotContain(TestHandler.GEHEIM);
             assertThat(TestHandler.NACH_LETZTEM).containsEntry(id, new MandantCode("vhf-gsk"));
-            String fehlerId = zeile.fehler().substring(zeile.fehler().indexOf('=') + 1);
+            String fehlerId = zeile.fehlerId();
+            // der Hook erhält dieselbe Fehler-ID, ohne Meldungstext, und ist danach vermerkt
+            assertThat(TestHandler.NACH_LETZTEM_FEHLER.get(id)).hasToString(fehlerId);
+            assertThat(zeile.nachbearbeitet()).isTrue();
             assertThat(log.volltext()).contains(fehlerId, "Versuch 3 von 3", "Status FEHLER", "java.lang.Exception")
                     .doesNotContain(TestHandler.GEHEIM);
         }
@@ -157,6 +160,8 @@ class AuftragsschlangeTest {
 
         assertThat(hilfe.zeile(id).status()).isEqualTo("FEHLER");
         assertThat(TestHandler.NACH_LETZTEM).containsEntry(id, new MandantCode("vhf-gsk"));
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isTrue();
+        assertThat(TestHandler.NACH_LETZTEM_FEHLER.get(id)).hasToString(hilfe.zeile(id).fehlerId());
     }
 
     @Test
