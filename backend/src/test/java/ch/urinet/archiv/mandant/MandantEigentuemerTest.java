@@ -1,5 +1,6 @@
 package ch.urinet.archiv.mandant;
 
+import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -41,6 +42,9 @@ class MandantEigentuemerTest {
 
     @Inject
     MandantProvisionierung provisionierung;
+
+    @Inject
+    MandantDatenbank datenbank;
 
     @Test
     void appRolleNurDml() throws SQLException {
@@ -89,6 +93,47 @@ class MandantEigentuemerTest {
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'USAGE')")).isTrue();
             assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'SELECT')")).isTrue();
         }
+    }
+
+    /**
+     * {@code berechtigen()} ist atomar (Review PR #29): Scheitert das REVOKE auf {@code databasechangelog*} nach den GRANTs,
+     * bleibt kein Recht der App-Rolle zurück – weder auf die Changelog-Tabellen noch auf die übrigen Tabellen.
+     */
+    @Test
+    void berechtigenAtomar() throws SQLException {
+        String schema = "m_probe_atomar";
+        try (Connection admin = verbinden(); Statement befehl = admin.createStatement()) {
+            befehl.execute("create function public.probe_revoke_scheitert() returns event_trigger language plpgsql as $$ "
+                    + "begin if current_setting('search_path') = '" + schema + "' then "
+                    + "raise exception 'Probe: Fehler zwischen GRANT und REVOKE'; end if; end $$");
+            befehl.execute("create event trigger probe_revoke_scheitert on ddl_command_start when tag in ('REVOKE') "
+                    + "execute function public.probe_revoke_scheitert()");
+        }
+        try {
+            assertThatThrownBy(() -> datenbank.schemaAnlegen(schema)).hasMessageContaining(schema);
+        } finally {
+            try (Connection admin = verbinden(); Statement befehl = admin.createStatement()) {
+                befehl.execute("drop event trigger probe_revoke_scheitert");
+                befehl.execute("drop function public.probe_revoke_scheitert()");
+            }
+        }
+        try (Connection admin = verbinden(); Statement befehl = admin.createStatement()) {
+            assertThat(wahr(befehl, "has_schema_privilege('archiv_app', '" + schema + "', 'USAGE')")).as("USAGE").isFalse();
+            for (String recht : DML) {
+                for (String tabelle : List.of("databasechangelog", "databasechangeloglock", "dokumentart")) {
+                    assertThat(wahr(befehl, "has_table_privilege('archiv_app', '" + schema + "." + tabelle + "', '"
+                            + recht + "')"))
+                            .as(tabelle + " " + recht).isFalse();
+                }
+            }
+        }
+    }
+
+    private static Connection verbinden() throws SQLException {
+        var config = ConfigProvider.getConfig();
+        return DriverManager.getConnection(config.getValue("quarkus.datasource.jdbc.url", String.class),
+                config.getValue("quarkus.datasource.username", String.class),
+                config.getValue("quarkus.datasource.password", String.class));
     }
 
     private static Connection verbinden(String benutzer, String passwort) throws SQLException {
