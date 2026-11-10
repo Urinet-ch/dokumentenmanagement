@@ -62,12 +62,13 @@ public class AnmeldungSchritte {
 
     @Dann("lehnt das Archiv die Anfrage mit Status 401 ab")
     public void abgelehnt() {
-        assertThat(antwort.statusCode()).isEqualTo(401);
+        assertThat(ProblemDetails.pruefen(antwort, 401)).isEqualTo("NICHT_ANGEMELDET");
+        assertThat(antwort.header("WWW-Authenticate")).startsWith("Bearer");
     }
 
     @Dann("antwortet das Archiv angemeldet mit Status {int}")
     public void angemeldet(int status) {
-        assertThat(antwort.statusCode()).isEqualTo(status);
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo("NICHT_GEFUNDEN");
     }
 
     @Dann("enthält das Token die Rolle «{word}» und den Mandanten «{word}»")

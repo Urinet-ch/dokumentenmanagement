@@ -7,10 +7,12 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 /**
- * Jede Verbindung kommt mit dem Schema {@code public} aus dem Pool (fail closed, design.md «Mandant»). Quarkus setzt den
- * Mandanten per {@code Connection.setSchema} und Agroal setzt das Schema bei der Rückgabe nicht zurück; ohne diesen
- * Interceptor könnte rohes JDBC sonst unbemerkt im Schema des vorherigen Mandanten lesen. Hibernate setzt den Mandanten
- * erst nach dem Ausleihen.
+ * Ausserhalb einer Transaktion kommt jede Verbindung mit dem Schema {@code public} aus dem Pool (fail closed, design.md
+ * «Mandant»). Quarkus setzt den Mandanten per {@code Connection.setSchema} und Agroal setzt das Schema bei der Rückgabe
+ * nicht zurück; ohne diesen Interceptor könnte rohes JDBC sonst unbemerkt im Schema des vorherigen Mandanten lesen.
+ * Hibernate setzt den Mandanten erst nach dem Ausleihen. Innerhalb einer Transaktion liefert Agroal dagegen die
+ * Verbindung, die an der Transaktion hängt, mit dem Schema der Session; rohes JDBC qualifiziert Tabellen darum immer mit
+ * dem Schema.
  */
 @ApplicationScoped
 public class PublicSchemaBeimAusleihen implements AgroalPoolInterceptor {

@@ -110,8 +110,8 @@ den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mi
 - `MandantTenantResolver implements TenantResolver` (`@PersistenceUnitExtension`): liest `mandant` aus `SecurityIdentity` (OIDC-Claim oder API-Token-Principal). Ohne Mandant → `ForbiddenException`.
 - Worker setzt den Mandanten über `MandantKontext.mit(mandant, () -> …)` (ThreadLocal + `@ActivateRequestContext`), der Resolver liest dort, wenn keine Identität vorhanden ist.
   - Umsetzung (Aufgabe 1.4): `quarkus.hibernate-orm.multitenant=SCHEMA`. `MandantTenantResolver` (`@RequestScoped`) fragt `MandantAufloesung` (application); den Mandanten liefert der Port `MandantAusAnmeldung`, umgesetzt von `AnmeldungMandantAdapter`: zuerst das Identitäts-Attribut `mandant` (Anschluss für den API-Token-Principal `token:<id>` aus 1.5, ohne Umbau), sonst der JWT-Claim `mandant`. Gültig ist nur genau ein Text, der `MandantCode` erfüllt (`^[a-z0-9]+(-[a-z0-9]+)*$`, höchstens 40 Zeichen; den Bucket-Namen `<präfix><code>` prüft `MandantCode.bucket` zusätzlich nach den S3-Regeln, 3–63 Zeichen); fehlend, leer, mehrwertig (JSON-Array) oder anders → ungültig. Den Schemanamen liefert immer `public.mandant.schema_name` (`JdbcMandantVerzeichnis`, `… where code = ? and aktiv`, ohne Cache, damit ein Deaktivieren sofort greift), nie der Claim-Text. Ungültig, unbekannt oder inaktiv → `MandantVerweigert` → 403 ohne Inhalt (Req 1.3). Ohne Anmeldung und ohne Kontext ist der Tenant `public` (dort gibt es keine Mandanten-Tabellen, ein Zugriff scheitert); in einem Thread ohne Request-Kontext liefert Hibernate keinen Tenant und bricht ab.
-  - `MandantKontext.mit` aktiviert den Request-Kontext selbst (`RequestContextController`), setzt das ThreadLocal und räumt in `finally` auf. Ein verschachteltes `mit` mit anderem Mandanten bricht ab (`IllegalStateException`), mit demselben läuft es durch. Ist schon ein Request-Kontext aktiv, muss die Anmeldung genau diesen Mandanten tragen, sonst Abbruch: Eine offene Session könnte sonst den Tenant der Anfrage behalten (fail closed). Der Worker ruft `mit` darum aus seinem eigenen Thread ohne Request-Kontext auf. Ein neuer Kontext darf auch nicht in einer laufenden JTA-Transaktion beginnen: Die Hibernate-Session hängt an der Transaktion und behielte den Mandanten des ersten `mit`, ein zweites `mit` mit anderem Mandanten in derselben Transaktion läse im fremden Schema. `mit` bricht darum ab (`IllegalStateException`), wenn `TransactionManager.getStatus()` nicht `STATUS_NO_TRANSACTION` ist; die Transaktion gehört in den Block (`mit(code, () -> QuarkusTransaction.requiringNew().call(…))`). Ein verschachteltes `mit` mit demselben Mandanten bleibt erlaubt. Hinweis für 2.5: Quarkus aktiviert in `@Scheduled`-Methoden immer einen Request-Kontext; der Poller übergibt den Auftrag darum an einen eigenen Executor ohne Context Propagation und ruft `mit` erst dort auf. Pool-Verbindungen behalten kein Mandanten-Schema: Agroal setzt ein per `setSchema` geändertes Schema bei der Rückgabe nicht zurück, darum stellt der `AgroalPoolInterceptor` `PublicSchemaBeimAusleihen` jede ausgeliehene Verbindung auf `public`, bevor Hibernate den Mandanten setzt (Nachweis `MandantVerbindungTest`). Widersprechen sich Kontext und Anmeldung beim Auflösen, bricht `MandantAufloesung` ebenfalls ab.
-  - Quarkus setzt beim Tenant-Wechsel nur `Connection.setSchema` und beim Zurückgeben der Verbindung nicht zurück; `PublicSchemaBeimAusleihen` stellt beim Ausleihen wieder `public` ein. Rohes JDBC (Agroal) qualifiziert Tabellen trotzdem immer mit Schema (`public.mandant`), unabhängig vom Zustand der Verbindung.
+  - `MandantKontext.mit` aktiviert den Request-Kontext selbst (`RequestContextController`), setzt das ThreadLocal und räumt in `finally` auf. Ein verschachteltes `mit` mit anderem Mandanten bricht ab (`IllegalStateException`), mit demselben läuft es durch. Ist schon ein Request-Kontext aktiv, muss die Anmeldung genau diesen Mandanten tragen, sonst Abbruch: Eine offene Session könnte sonst den Tenant der Anfrage behalten (fail closed). Der Worker ruft `mit` darum aus seinem eigenen Thread ohne Request-Kontext auf. Ein neuer Kontext darf auch nicht in einer laufenden JTA-Transaktion beginnen: Die Hibernate-Session hängt an der Transaktion und behielte den Mandanten des ersten `mit`, ein zweites `mit` mit anderem Mandanten in derselben Transaktion läse im fremden Schema. `mit` bricht darum ab (`IllegalStateException`), wenn `TransactionManager.getStatus()` nicht `STATUS_NO_TRANSACTION` ist; die Transaktion gehört in den Block (`mit(code, () -> QuarkusTransaction.requiringNew().call(…))`). Ein verschachteltes `mit` mit demselben Mandanten bleibt erlaubt. Hinweis für 2.5: Quarkus aktiviert in `@Scheduled`-Methoden immer einen Request-Kontext; der Poller übergibt den Auftrag darum an einen eigenen Executor ohne Context Propagation und ruft `mit` erst dort auf. Pool-Verbindungen behalten kein Mandanten-Schema: Agroal setzt ein per `setSchema` geändertes Schema bei der Rückgabe nicht zurück, darum stellt der `AgroalPoolInterceptor` `PublicSchemaBeimAusleihen` jede ausserhalb einer Transaktion ausgeliehene Verbindung auf `public`, bevor Hibernate den Mandanten setzt (Nachweis `MandantVerbindungTest`). Innerhalb einer Transaktion liefert Agroal die Verbindung, die an der Transaktion hängt, mit dem Schema der Session. Widersprechen sich Kontext und Anmeldung beim Auflösen, bricht `MandantAufloesung` ebenfalls ab.
+  - Quarkus setzt beim Tenant-Wechsel nur `Connection.setSchema` und beim Zurückgeben der Verbindung nicht zurück; `PublicSchemaBeimAusleihen` stellt beim Ausleihen ausserhalb einer Transaktion wieder `public` ein; innerhalb einer Transaktion trägt die Verbindung das Schema der Session. Rohes JDBC (Agroal) qualifiziert Tabellen darum immer mit Schema (`public.mandant`, `m_<code>.zugriff_protokoll`), unabhängig vom Zustand der Verbindung.
   - Mandanten-Entitäten tragen `@Table` ohne Schema (z. B. `DokumentartEintrag`), gemeinsame Tabellen `@Table(schema = "public")`.
 - `MandantProvisionierung`: legt Schema `m_<code>` an, führt den Liquibase-Changelog `db/mandant/changelog.xml` mit `defaultSchemaName=m_<code>` aus, erstellt Bucket `<archiv.ablage.bucket-praefix><code>` (Standard `urinet-archiv-<code>`, Stufe A `urinet-archiv-a-<code>`) mit `ObjectLockEnabledForBucket=true` und Versionierung (ohne Standard-Aufbewahrung) und setzt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` (siehe «Ablage»), spielt die Dokumentarten aus `seed/<code>/dokumentarten.json` ein (für `urinet`: `backend/src/main/resources/seed/urinet/dokumentarten.json`, siehe «Stammdaten der Dokumentarten»).
   - Umsetzung (Aufgabe 1.3): Das Admin-Kommando `archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]` ist der Einstiegspunkt `ArchivMain` derselben Anwendung (ohne Argumente startet der Server), im laufenden Container also per `exec` `java -jar quarkus-run.jar mandant anlegen <code>`. Mit Argumenten setzt `ArchivMain.main` vor dem Start `archiv.rolle=kommando`, `quarkus.http.host-enabled=false` und `quarkus.oidc.tenant-enabled=false`: kein HTTP-Server (kein Port-Konflikt mit dem Dienst), keine OIDC-Verbindung, keine Start-Migration der Mandanten; `db/public` migriert das Kommando (nur neue Changesets), damit es auch vor dem ersten Start der API läuft. Exit-Code 0 ok, 1 `MandantFehler`, 2 falscher Aufruf, 3 technischer Fehler, auch wenn schon der Start der Anwendung abbricht (z. B. falscher Zugang `archiv_db_owner`, fehlende Secret-Datei); `ArchivMain` gibt dann «Start fehlgeschlagen: <Ursache>» aus. Den Aufruf prüft `ArchivMain` vor dem Start: ein falscher Aufruf endet mit 2 und der Aufrufhilfe, ohne Quarkus zu starten und ohne Migration. Ein Startfehler des Dienstes (ohne Argumente) endet weiter mit 1. Felder im Seed, deren Name mit `_` beginnt, gelten als Kommentar und fallen weg; unbekannte Felder brechen ab, ebenso ein fehlendes oder nicht boolesches `gesetzliche_pflicht` und ein `aufbewahrung_jahre`, das weder Zahl noch ausdrücklich `null` ist (`SEED_UNGUELTIG`). Gibt es die Rolle `archiv.db.app-rolle` (Standard `archiv_app`), erhält sie im Mandanten-Schema nur DML-Rechte (auch für künftige Tabellen), keine auf `databasechangelog*`; Liquibase läuft mit `archiv_owner` über eine eigene Verbindung, die nach der Migration auf `autoCommit` zurückgesetzt wird (Liquibase lässt sie sonst in einer offenen Transaktion, und die Rechte gingen beim Schliessen verloren). Zugangsdaten nur als Dateien unter `/run/secrets` (`archiv_db_app`, `archiv_db_owner`, `s3_app_zugang_id`, `s3_app_zugang_geheimnis`; Startprüfung siehe «Secrets und Konfiguration»). Die Rechte (GRANT, ALTER DEFAULT PRIVILEGES, REVOKE auf `databasechangelog*`) vergibt eine eigene Transaktion nach dem Commit der Migration; bricht sie ab, wird sie ganz zurückgerollt, und `archiv_app` hat nie DML auf `databasechangelog*`. Die Rollenliste `archiv.rolle` lesen Start-Migration und Interceptor gleich (`Rollen.lesen`, getrimmt).
@@ -538,6 +538,24 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 | `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`, `WISSEN_INGEST`, `WISSEN_LINT` | Endpunkte der Wissensbasis (Spec 04, design.md, «Zugriffsprotokoll»); `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN` mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, `WISSEN_INGEST` mit Dokument-ID |
 
 - `zugriff_protokoll` und `dokument_version` sind INSERT-only: Trigger `BEFORE UPDATE OR DELETE → RAISE EXCEPTION`, und die DB-Rolle `archiv_app` hat auf beiden nur `INSERT` und `SELECT` (Req 10.3). Aufbewahrung: [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
+- Umsetzung (Aufgabe 1.6; `dokument_version` folgt mit 2.2):
+  - Changeset `db/mandant/changesets/002-zugriff-protokoll.xml`: Trigger `BEFORE UPDATE OR DELETE` je Zeile und
+    `BEFORE TRUNCATE` je Anweisung mit «nur Einfügen erlaubt»; er gilt auch für den Eigentümer `archiv_owner`. Die
+    Rechte entzieht die Provisionierung nach jeder Migration (`NUR_EINFUEGEN` in `LiquibaseMandantDatenbank`), also
+    auch gegen die Default Privileges und für bestehende Schemas.
+  - `@Protokolliert` (`protokoll.application`) an Methode oder Klasse; der Interceptor schreibt per JDBC über den Port
+    `ZugriffProtokoll` vor der Aktion und tritt der laufenden Transaktion bei, sonst öffnet er eine eigene. `benutzer`
+    ist der Principal (Keycloak-`sub`, bei API-Tokens ab Aufgabe 1.5 `token:<id>`), `rolle` die Archivrolle oder leer,
+    `dokument_id` der Pfadparameter `{id}`.
+  - `X-Real-Ip` gilt nur als einzelne IPv4- oder IPv6-Adresse (ohne Namensauflösung); sonst bleibt `ip` leer, die
+    Anfrage läuft weiter.
+  - `VERWEIGERT` schreibt `ProtokollVerweigerungMelder` (`sicherheit`) in einer eigenen Transaktion
+    (`REQUIRES_NEW`), damit der Eintrag den Abbruch übersteht; `details` enthält `fehlercode` und als `grund` die
+    Zeile der Rechtematrix (z. B. `A7`), falls bekannt. Bei `MANDANT_FEHLT` gibt es kein Mandanten-Schema: nur ein
+    Log-Eintrag mit IDs und Fehlercode. Scheitert das Schreiben des `VERWEIGERT`-Eintrags, bleibt die Antwort
+    403 bzw. 404.
+  - `EndpunktWaechterTest` prüft, dass jeder Endpunkt mit einer Aktion aus der Tabelle die passende
+    `@Protokolliert`-Aktion trägt (A2–A4 nur mit `{id}`, `…/datei` → `HERUNTERLADEN`).
 
 **Manifest** (Req 15, P2):
 - Lauf täglich um 03:30 Europe/Zurich (`@Scheduled(cron = "0 30 3 * * ?", timeZone = "Europe/Zurich")`) und einmal beim Start der API: je Mandant ein Auftrag `MANIFEST`.
@@ -724,10 +742,18 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 
 ## Error Handling
 - Alle Fehler als Problem Details (`type`, `title` deutsch, `status`, `detail`, `instance`, `fehlercode`).
+  Umsetzung (Aufgabe 1.6): `Content-Type: application/problem+json`; `type` ist `urn:urinet:archiv:fehler:<FEHLERCODE>`,
+  `instance` die Fehler-ID `urn:uuid:<uuid>`, die auch im Log steht; `title` und `detail` sind feste deutsche Texte je
+  Fehlercode (`gemeinsam.domain.Fehlercode`) ohne Eingabewerte, Inhalte oder Klassennamen. Fachfehler werfen
+  `FachFehler` mit Fehlercode; die Abbildung liegt in `gemeinsam.adapter.in.rest` (`ProblemAbbildung`, für Fehler vor
+  der Resource ein Failure-Handler am Router). Die Antwort 401 ohne Token entsteht nicht als Fehler, sondern als
+  Challenge; unter `/api/` schreibt sie `ProblemAnmeldung` als Problem Details.
 - Fehlercodes:
 
 | HTTP | `fehlercode` | Wann |
 | --- | --- | --- |
+| 400 | `ANFRAGE_UNGUELTIG` | Anfrage formal ungültig (Pfad, Parameter, JSON), auch andere 4xx des Frameworks mit ihrem Status (z. B. 405, 406) |
+| 401 | `NICHT_ANGEMELDET` | Token fehlt, ungültig oder abgelaufen, mit `WWW-Authenticate: Bearer` |
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 404 | `NICHT_GEFUNDEN` | fremder Mandant oder unsichtbar, vor 403 (Req 1.4, 2.3) |
@@ -749,6 +775,7 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
+| 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort und Log nur mit Fehler-ID |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
 
 - Eine Dublette ist kein Fehler, sondern ein Ergebnis je Datei (`status: "DUBLETTE"`, siehe «Upload»).
@@ -794,6 +821,23 @@ Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die
 | KI-Qualität | `GoldenDatensatzIT`, nur manuell gestartet, Daten aus `ARCHIV_GOLDEN_DIR` ausserhalb des Repos, echter AI-Aufruf | Bericht je Feld, getrennt nach Abstimmungs- (30) und Prüfteil (20); Gate ≥ 18/20 und Req 0.9 (Nachweis manuell) |
 | Frontend | Vitest, Playwright (mobile Viewport 375 px) | Erfassen mit Testbild mit und ohne Kanten, Offline-Warteschlange (Dublette, 4xx, 5xx, offline), Eingangskorb bestätigen in ≤ 2 Tipps |
 | Betrieb | Restore-Probe, automatisiert und wiederkehrend; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3) |
+
+Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
+- `domain` hängt nur vom JDK und von Domain-Typen ab. `application` hängt zusätzlich nur von `application`, CDI,
+  Interceptor-Bindung, JTA, MicroProfile Config und JBoss Logging ab; REST, JPA, Vert.x, Quarkus und Jackson sind
+  ausgeschlossen.
+- Schichten je Fachbereich: `domain` → `domain`, `application` → `application`/`domain`, `adapter` → alles im
+  eigenen Fachbereich. `gemeinsam` ist der gemeinsame Kern und darf in derselben Schicht von jedem Fachbereich
+  genutzt werden, hängt aber selbst von keinem ab. Einen fremden Fachbereich erreicht `application` bzw. `adapter`
+  nur über dessen `application` und die `domain`-Typen in dessen Signaturen, nie über dessen `adapter`.
+  `ArchivMain` im Wurzelpaket ist ausgenommen.
+- Driven Ports: Klassen unter `adapter.out` implementieren nur Interfaces aus `application`, und Implementierungen
+  von `application`-Interfaces liegen in `application` oder unter `adapter.out`; Klassen mit `Stub` im Namen liegen
+  unter `adapter.out`.
+- Felder und Methoden mit Betragsnamen (`betrag`, `summe`, `preis`, `total`, `mwst`, `saldo`) sind nie `double` oder
+  `float`; kein Aufruf von `System.getenv` und von `bypassGovernanceRetention`; JPA-Entitäten auf `public` nur für
+  `auftrag`, dazu `mandant` im Fachbereich `mandant` und `api_client` im Fachbereich `sicherheit`. Zugriffe per
+  JDBC-SQL erkennt ArchUnit nicht, sie bleiben Sache des Reviews.
 
 ## Open Points
 - ~~Object Lock pro Objekt, Schlüssel ohne Bypass-Recht, COMPLIANCE bei Infomaniak~~ geklärt im Spike Object Storage (Aufgabe 0.2, `docs/spikes/s3-object-lock.md`, Live-Tests 08.11.2026): Sperre pro Objekt mit Versionierung, GOVERNANCE und COMPLIANCE funktionieren, Objekte ohne Retention (`eingang/`) bleiben löschbar; der Rückfall mit getrennten Buckets entfällt damit. Einen Schlüssel ohne Bypass-Recht gibt es im selben Projekt nicht (jeder Schlüssel kann eine schützende Bucket Policy löschen), darum gilt Option B (entschieden 09.11.2026; ADR-007, Nachtrag 09.11.2026): GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` (Req 6.11). `x-amz-checksum-sha256` wurde nicht geprüft (Antwort beim Upload mit `ChecksumCRC64NVME`); bis zum Nachweis mit dem Java SDK in Aufgabe 2.3 gilt der Rückfall aus «Ablage» (Kopie über die Versions-ID neu lesen).

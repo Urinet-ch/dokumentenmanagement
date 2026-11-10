@@ -1,19 +1,34 @@
 package ch.urinet.archiv.sicherheit.application;
 
-/** Zugriff verweigert; der Adapter übersetzt {@link Grund} in den HTTP-Status (404 bzw. 403). */
-public class Verweigerung extends RuntimeException {
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+
+/** Zugriff verweigert; die REST-Schicht antwortet mit dem {@link Fehlercode} des {@link Grund}s (Problem Details). */
+public class Verweigerung extends FachFehler {
 
     public enum Grund {
         /** HTTP 404: fremder Mandant oder für den Benutzer unsichtbar (Req 1.4, 2.3) */
-        NICHT_GEFUNDEN,
-        /** HTTP 403: Recht der Aktion fehlt, kein gültiger Mandant oder keine eindeutige Archiv-Rolle (Req 1.3, 2.6) */
-        NICHT_ERLAUBT
+        NICHT_GEFUNDEN(Fehlercode.NICHT_GEFUNDEN),
+        /** HTTP 403: Recht der Aktion fehlt oder keine Archiv-Rolle (Req 2.2, 2.6) */
+        NICHT_ERLAUBT(Fehlercode.NICHT_ERLAUBT),
+        /** HTTP 403: kein gültiger, aktiver Mandant (Req 1.3); ohne Mandanten-Schema nicht protokolliert */
+        MANDANT_FEHLT(Fehlercode.MANDANT_FEHLT);
+
+        private final Fehlercode fehlercode;
+
+        Grund(Fehlercode fehlercode) {
+            this.fehlercode = fehlercode;
+        }
+
+        public Fehlercode fehlercode() {
+            return fehlercode;
+        }
     }
 
     private final Grund grund;
 
     public Verweigerung(Grund grund) {
-        super(grund.name());
+        super(grund.fehlercode());
         this.grund = grund;
     }
 

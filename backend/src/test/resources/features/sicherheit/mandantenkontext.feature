@@ -14,6 +14,7 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
   Szenariogrundriss: Ohne gültigen Mandanten antwortet das Archiv mit 403 und liefert keine Daten
     Wenn «<benutzer>» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
+    Und antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
 
     Beispiele:
       | benutzer          | fall                             |
@@ -25,6 +26,7 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
     Angenommen im Register steht der inaktive Mandant «probe-inaktiv»
     Wenn «inaktiv-mandant» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
+    Und antwortet das Archiv mit Status 403 und Fehlercode «MANDANT_FEHLT»
 
   @req-1.4
   # Teilnachweis: Die Tabelle dokument entsteht mit 2.2; dort folgt «fremde Dokument-ID → 404».
@@ -50,6 +52,7 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
   Szenario: Ohne Archiv-Rolle antwortet das Archiv mit 403
     Wenn «ohne-rolle-urinet» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
+    Und antwortet das Archiv mit Status 403 und Fehlercode «NICHT_ERLAUBT»
 
   @req-2.2
   Szenario: Bei mehreren Archiv-Rollen gilt die stärkste (inhaber vor treuhaender)

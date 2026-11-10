@@ -15,6 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
@@ -33,6 +34,11 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     // Namen gehen als Bezeichner in SQL ein; nur dieses Muster ist erlaubt
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final Pattern ROLLE = Pattern.compile("^[a-z_][a-z0-9_]*$");
+    /**
+     * Tabellen, in die die App-Rolle nur einfügt und aus denen sie nur liest (Req 10.3); {@code dokument_version}
+     * folgt mit Aufgabe 2.2. Zusätzlich verhindert je ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
+     */
+    static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;
@@ -169,7 +175,11 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
         }
     }
 
-    /** Die App-Rolle liest und schreibt, legt aber keine Tabellen an; ohne die Rolle (Dev Services) entfällt das. */
+    /**
+     * Die App-Rolle liest und schreibt, legt aber keine Tabellen an; ohne die Rolle (Dev Services) entfällt das. Auf den
+     * Tabellen aus {@link #NUR_EINFUEGEN} entzieht sie UPDATE, DELETE und TRUNCATE wieder, in derselben Transaktion wie
+     * das GRANT (auch über die Default Privileges vergebene Rechte).
+     */
     private void berechtigen(Statement befehl, String schema) throws SQLException {
         if (!rolleVorhanden(befehl.getConnection())) {
             return;
@@ -181,6 +191,20 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                 + " grant select, insert, update, delete on tables to " + appRolle);
         befehl.execute("alter default privileges in schema " + schema + " grant usage, select on sequences to " + appRolle);
         befehl.execute("revoke all on " + schema + ".databasechangelog, " + schema + ".databasechangeloglock from " + appRolle);
+        for (String tabelle : NUR_EINFUEGEN) {
+            if (tabelleVorhanden(befehl.getConnection(), schema, tabelle)) {
+                befehl.execute("revoke update, delete, truncate on " + schema + "." + tabelle + " from " + appRolle);
+            }
+        }
+    }
+
+    private static boolean tabelleVorhanden(Connection verbindung, String schema, String tabelle) throws SQLException {
+        try (PreparedStatement abfrage = verbindung.prepareStatement("select to_regclass(?) is not null")) {
+            abfrage.setString(1, schema + "." + tabelle);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next() && zeile.getBoolean(1);
+            }
+        }
     }
 
     private boolean rolleVorhanden(Connection verbindung) throws SQLException {
