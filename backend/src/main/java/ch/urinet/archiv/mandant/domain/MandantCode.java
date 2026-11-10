@@ -9,9 +9,12 @@ public record MandantCode(String wert) {
     // S3-Regeln für Bucket-Namen: 3 bis 63 Zeichen, Kleinbuchstaben, Ziffern, Bindestrich, nicht am Rand
     private static final Pattern BUCKET = Pattern.compile("^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$");
     private static final int MAX_LAENGE = 40;
+    // reserviert: Auf Stufe B ergäbe «a-<x>» den Bucket der Stufe A von Mandant <x> (Präfix urinet-archiv-a-, Req 6.11)
+    private static final String RESERVIERT_STUFE_A = "a-";
 
     public MandantCode {
-        if (wert == null || wert.length() > MAX_LAENGE || !CODE.matcher(wert).matches()) {
+        if (wert == null || wert.length() > MAX_LAENGE || !CODE.matcher(wert).matches()
+                || wert.startsWith(RESERVIERT_STUFE_A)) {
             throw new IllegalArgumentException("Ungültiger Mandant-Code: " + wert);
         }
     }

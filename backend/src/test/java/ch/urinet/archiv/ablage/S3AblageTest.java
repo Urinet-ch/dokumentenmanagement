@@ -192,6 +192,69 @@ class S3AblageTest {
     }
 
     @Test
+    void neuerVersuchLoeschtDieArchivKopieNichtOhneGepruefteQuelle() {
+        S3Ablage ablage = ablage();
+        var ohneEingang = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren fehlt = eingang(ablage, ohneEingang, inhalt("Original"));
+        // einzige, ungesperrte Kopie unter archiv/ weicht ab, der Eingang ist schon gelöscht
+        verwaltung.putObject(r -> r.bucket(bucket).key(ohneEingang.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("abweichend"));
+        ablage.loeschenEingang(mandant, 2026, ohneEingang.docId());
+        var andereQuelle = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren quelle = eingang(ablage, andereQuelle, inhalt("Original"));
+        // Quelle vorhanden, aber ihre SHA-256 stimmt nicht mit der erwarteten
+        var falsch = new ZuArchivieren(andereQuelle, quelle.eingangVersionId(), Pruefsumme.von(inhalt("anders")));
+        verwaltung.putObject(r -> r.bucket(bucket).key(andereQuelle.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("Original"));
+        var nieKopiert = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren ohneKopie = eingang(ablage, nieKopiert, inhalt("Z"));
+        ablage.loeschenEingang(mandant, 2026, nieKopiert.docId());
+
+        for (ZuArchivieren zu : List.of(fehlt, falsch, ohneKopie)) {
+            assertThatThrownBy(() -> ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.unbefristet()))
+                    .as(zu.schluessel().docId().toString())
+                    .isInstanceOfSatisfying(ArchivierungAbgebrochen.class,
+                            e -> assertThat(e.grund()).isEqualTo(ArchivierungAbgebrochen.Grund.PRUEFSUMME));
+        }
+        for (DateiSchluessel s : List.of(ohneEingang, andereQuelle)) {
+            assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix(s.pfad(Ablageort.ARCHIV))).versions())
+                    .as(s.pfad(Ablageort.ARCHIV)).hasSize(1);
+        }
+    }
+
+    @Test
+    void neuerVersuchErsetztEineFehlerhafteKopieNachGepruefterQuelle() {
+        S3Ablage ablage = ablage();
+        var schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren zu = eingang(ablage, schluessel, inhalt("Original"));
+        String ziel = schluessel.pfad(Ablageort.ARCHIV);
+        verwaltung.putObject(r -> r.bucket(bucket).key(ziel), RequestBody.fromString("abweichend"));
+        verwaltung.deleteObject(r -> r.bucket(bucket).key(ziel));
+
+        AbgelegteDatei kopie = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.ohnePflicht()).dateien().getFirst();
+
+        assertThat(kopie.sha256()).isEqualTo(zu.sha256());
+        var rest = verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix(ziel));
+        assertThat(rest.versions()).singleElement().satisfies(v -> assertThat(v.versionId()).isEqualTo(kopie.versionId()));
+        assertThat(rest.deleteMarkers()).isEmpty();
+    }
+
+    @Test
+    void eineFehlendeVersionGiltNichtAlsOhneSperre() {
+        S3Ablage ablage = ablage();
+        ZuArchivieren zu = eingang(ablage, DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"), inhalt("V"));
+        AbgelegteDatei kopie = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.ohnePflicht()).dateien().getFirst();
+        assertThat(ablage.sperreVerlaengern(mandant, List.of(kopie), Sperrvorgabe.ohnePflicht()).getFirst().ergebnis())
+                .isEqualTo(SperrAenderung.Ergebnis.KEINE_SPERRE);
+
+        verwaltung.deleteObject(b -> b.bucket(bucket).key(kopie.schluessel()).versionId(kopie.versionId()));
+
+        assertThatThrownBy(() -> ablage.sperreVerlaengern(mandant, List.of(kopie), Sperrvorgabe.ohnePflicht()))
+                .isInstanceOfSatisfying(S3Exception.class, e -> assertThat(e.awsErrorDetails().errorCode())
+                        .isIn("NoSuchKey", "NoSuchVersion"));
+    }
+
+    @Test
     void sperreWirdNurVerlaengertNieVerkuerzt() {
         ZuArchivieren zu = eingang(ablage(), DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"), inhalt("X"));
         AbgelegteDatei kopie = ablage(Optional.of(Duration.ofHours(2)), Sperrmodus.GOVERNANCE, Optional.empty())
@@ -294,6 +357,35 @@ class S3AblageTest {
                 .isEqualTo(datei.versionId());
         assertThatThrownBy(() -> ablage.ablegenManifest(mandant, datum, ManifestTeil.JSON, inhalt("anders"),
                 Optional.empty())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void vorhandenesManifestGiltNurMitPassenderSperre() {
+        LocalDate datum = LocalDate.of(2026, 11, 11);
+        byte[] manifest = inhalt("{\"dateien\":[1]}");
+        S3Ablage kurz = ablage(Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofMinutes(1)));
+        S3Ablage lang = ablage(Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofMinutes(10)));
+        S3Ablage compliance = ablage(Optional.of(Duration.ofDays(1)), Sperrmodus.COMPLIANCE,
+                Optional.of(Duration.ofSeconds(20)));
+
+        AbgelegteDatei erst = kurz.ablegenManifest(mandant, datum, ManifestTeil.JSON, manifest, Optional.empty());
+        Instant vorher = retention(erst.schluessel(), erst.versionId()).orElseThrow().retainUntilDate();
+        AbgelegteDatei wieder = lang.ablegenManifest(mandant, datum, ManifestTeil.JSON, manifest, Optional.empty());
+        Instant verlaengert = retention(erst.schluessel(), erst.versionId()).orElseThrow().retainUntilDate();
+        assertThat(wieder.versionId()).isEqualTo(erst.versionId());
+        assertThat(verlaengert).isAfter(vorher.plus(Duration.ofMinutes(5)));
+        assertThat(wieder.sperreBis()).contains(verlaengert);
+        // nie verkürzt
+        assertThat(kurz.ablegenManifest(mandant, datum, ManifestTeil.JSON, manifest, Optional.empty()).sperreBis())
+                .contains(verlaengert);
+        // anderer Modus
+        assertThatThrownBy(() -> compliance.ablegenManifest(mandant, datum, ManifestTeil.JSON, manifest,
+                Optional.empty())).isInstanceOf(IllegalStateException.class);
+        // ohne Sperre
+        verwaltung.putObject(r -> r.bucket(bucket).key(ManifestTeil.SIG.pfad(datum)), RequestBody.fromBytes(manifest));
+        assertThatThrownBy(() -> lang.ablegenManifest(mandant, datum, ManifestTeil.SIG, manifest, Optional.empty()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("manifest/")).versions()).hasSize(2);
     }
 
     @Test

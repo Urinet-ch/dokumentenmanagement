@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ablage;
 
+import ch.urinet.archiv.ablage.adapter.out.s3.BypassVerbot;
 import software.amazon.awssdk.core.interceptor.Context;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
@@ -8,12 +9,12 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Nachweis Req 6.5 (JUnit): hängt in den Tests am S3-Client der Anwendung ({@code %test.quarkus.s3.interceptors}),
- * hält jeden Aufruf mit {@code x-amz-bypass-governance-retention} fest und lässt ihn nicht hinaus.
+ * Nachweis Req 6.5 (JUnit): hängt in den Tests am S3-Client der Anwendung ({@code %test.quarkus.s3.interceptors}) vor
+ * {@link BypassVerbot}, hält jeden Aufruf mit dem Bypass-Header fest und lässt ihn nicht hinaus.
  */
 public class KeinBypassInterceptor implements ExecutionInterceptor {
 
-    static final String HEADER = "x-amz-bypass-governance-retention";
+    static final String HEADER = BypassVerbot.HEADER;
     static final String SELBSTTEST = "bypass-selbsttest";
     private static final List<String> GESENDET = new CopyOnWriteArrayList<>();
 

@@ -50,6 +50,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -57,8 +58,8 @@ import java.util.UUID;
  * dem App-Schlüssel ({@code s3_app_zugang_id}, {@code s3_app_zugang_geheimnis}). Setzt nie den Bypass-Header, verkürzt
  * nie eine Sperre und löscht unter {@code archiv/} nur eine eigene, fehlerhafte und ungesperrte Kopie (Req 6.5, 15.10).
  * Die SHA-256 entsteht immer durch erneutes Lesen über die Versions-ID: Infomaniak liefert {@code ChecksumCRC64NVME},
- * keinen {@code x-amz-checksum-sha256} (Spike 0.2, T 6a). Logs enthalten nur Schlüssel und Versions-IDs, nie
- * Inhalte oder signierte URLs.
+ * keine SHA-256-Prüfsumme (Spike 0.2, T 6a). Logs enthalten nur Schlüssel und Versions-IDs, nie Inhalte oder
+ * signierte URLs. Der S3-Client muss {@link BypassVerbot} tragen, sonst scheitert das Anlegen der Ablage.
  */
 @ApplicationScoped
 @Typed(S3Ablage.class)
@@ -66,6 +67,14 @@ public class S3Ablage implements AblagePort {
 
     private static final Logger LOG = Logger.getLogger(S3Ablage.class);
     private static final String ARCHIV = Ablageort.ARCHIV.praefix() + "/";
+    /**
+     * «Keine Sperre» bei {@code GetObjectRetention}: {@code ObjectLockConfigurationNotFoundError} (404) aus dem
+     * Ceph-Quelltext ({@code rgw_common.cc}, nicht live gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration}
+     * (AWS, MinIO mit 400). Jeder andere Fehler, auch {@code NoSuchKey} oder {@code NoSuchVersion}, ist ein Fehler.
+     */
+    private static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
+            "ObjectLockConfigurationNotFoundError");
+    private static final Set<String> FEHLT = Set.of("NoSuchKey", "NoSuchVersion");
 
     private final S3Client s3;
     private final S3Presigner presigner;
@@ -79,7 +88,7 @@ public class S3Ablage implements AblagePort {
     }
 
     public S3Ablage(S3Client s3, S3Presigner presigner, AblageEinstellungen einstellungen, Clock uhr) {
-        this.s3 = Objects.requireNonNull(s3, "s3");
+        this.s3 = BypassVerbot.pruefen(Objects.requireNonNull(s3, "s3"));
         this.presigner = Objects.requireNonNull(presigner, "presigner");
         this.einstellungen = Objects.requireNonNull(einstellungen, "einstellungen");
         this.uhr = Objects.requireNonNull(uhr, "uhr");
@@ -201,16 +210,16 @@ public class S3Ablage implements AblagePort {
         String bucket = bucket(mandant);
         String key = teil.pfad(datum);
         String sha256 = Pruefsumme.von(inhalt);
+        Instant bis = Sperrfrist.manifest(spaetestesAufbewahrenBis, uhr.instant(), einstellungen.manifestHoechstfrist());
+        ObjectLockMode modus = ObjectLockMode.fromValue(einstellungen.manifestSperrmodus().name());
         for (ObjectVersion vorhanden : versionen(bucket, key)) {
             Lesung lesung = lesen(bucket, key, vorhanden.versionId());
             if (!lesung.sha256().equals(sha256)) {
                 throw new IllegalStateException("Unter " + key + " liegt schon ein anderes Manifest");
             }
-            return new AbgelegteDatei(key, vorhanden.versionId(), sha256, lesung.groesse(),
-                    retention(bucket, key, vorhanden.versionId()).map(ObjectLockRetention::retainUntilDate));
+            return vorhandenesManifest(bucket, new AbgelegteDatei(key, vorhanden.versionId(), sha256, lesung.groesse(),
+                    Optional.empty()), modus, bis);
         }
-        Instant bis = Sperrfrist.manifest(spaetestesAufbewahrenBis, uhr.instant(), einstellungen.manifestHoechstfrist());
-        ObjectLockMode modus = ObjectLockMode.fromValue(einstellungen.manifestSperrmodus().name());
         String versionId = s3.putObject(b -> b.bucket(bucket).key(key).objectLockMode(modus)
                 .objectLockRetainUntilDate(bis), RequestBody.fromBytes(inhalt)).versionId();
         pruefeVersion(versionId, bucket);
@@ -223,7 +232,32 @@ public class S3Ablage implements AblagePort {
         return new AbgelegteDatei(key, versionId, sha256, inhalt.length, Optional.of(ist.get().retainUntilDate()));
     }
 
-    /** Neuer Versuch (Req 15.10): eine korrekte Kopie übernehmen, eine fehlerhafte und ungesperrte entfernen. */
+    /**
+     * Ein vorhandenes Manifest gilt nur als abgelegt, wenn es im verlangten Modus gesperrt ist; eine kürzere Sperre
+     * wird auf {@code bis} verlängert (nie verkürzt), eine fehlende oder eine in anderem Modus bricht ab.
+     */
+    private AbgelegteDatei vorhandenesManifest(String bucket, AbgelegteDatei datei, ObjectLockMode modus, Instant bis) {
+        Optional<ObjectLockRetention> ist = retention(bucket, datei.schluessel(), datei.versionId());
+        if (ist.isEmpty() || !ist.get().modeAsString().equals(modus.toString())) {
+            throw new IllegalStateException("Sperre des vorhandenen Manifests fehlt oder weicht ab: " + datei.schluessel());
+        }
+        if (ist.get().retainUntilDate().isBefore(bis)) {
+            setzen(bucket, datei, ist.get().mode(), bis);
+            ist = retention(bucket, datei.schluessel(), datei.versionId());
+            if (ist.isEmpty() || !ist.get().modeAsString().equals(modus.toString())
+                    || ist.get().retainUntilDate().isBefore(bis)) {
+                throw new IllegalStateException("Sperre des Manifests nicht gesetzt: " + datei.schluessel());
+            }
+        }
+        return new AbgelegteDatei(datei.schluessel(), datei.versionId(), datei.sha256(), datei.groesse(),
+                Optional.of(ist.get().retainUntilDate()));
+    }
+
+    /**
+     * Neuer Versuch (Req 15.10): eine korrekte Kopie übernehmen, eine fehlerhafte und ungesperrte entfernen. Gelöscht
+     * wird erst, wenn die Quelle unter {@code eingang/} über ihre Versions-ID lesbar ist und ihre SHA-256 stimmt; sonst
+     * wäre die Kopie unter {@code archiv/} womöglich die einzige.
+     */
     private Optional<AbgelegteDatei> kopieUebernehmen(String bucket, ZuArchivieren datei) {
         String ziel = datei.schluessel().pfad(Ablageort.ARCHIV);
         Optional<AbgelegteDatei> korrekt = Optional.empty();
@@ -231,6 +265,7 @@ public class S3Ablage implements AblagePort {
         for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).prefix(ziel))) {
             seite.deleteMarkers().stream().filter(m -> m.key().equals(ziel)).forEach(m -> loeschmarken.add(m.versionId()));
         }
+        List<String> fehlerhaft = new ArrayList<>();
         for (ObjectVersion version : versionen(bucket, ziel)) {
             Lesung lesung = lesen(bucket, ziel, version.versionId());
             if (lesung.sha256().equals(datei.sha256()) && korrekt.isEmpty()) {
@@ -240,8 +275,14 @@ public class S3Ablage implements AblagePort {
                 // eine gesperrte fremde Version lässt sich nicht entfernen: nicht weiter archivieren
                 throw new ArchivierungAbgebrochen(ArchivierungAbgebrochen.Grund.PRUEFSUMME, ziel);
             } else {
-                versionLoeschen(bucket, ziel, version.versionId());
+                fehlerhaft.add(version.versionId());
             }
+        }
+        if (!fehlerhaft.isEmpty()) {
+            quellePruefen(bucket, datei);
+        }
+        for (String versionId : fehlerhaft) {
+            versionLoeschen(bucket, ziel, versionId);
         }
         for (String marke : loeschmarken) {
             versionLoeschen(bucket, ziel, marke);
@@ -250,11 +291,41 @@ public class S3Ablage implements AblagePort {
         return korrekt;
     }
 
+    /** Liest die Quelle über ihre Versions-ID; fehlt sie oder weicht ihre SHA-256 ab, bricht die Archivierung ab. */
+    private void quellePruefen(String bucket, ZuArchivieren datei) {
+        String quelle = datei.schluessel().pfad(Ablageort.EINGANG);
+        String ziel = datei.schluessel().pfad(Ablageort.ARCHIV);
+        Lesung lesung;
+        try {
+            lesung = lesen(bucket, quelle, datei.eingangVersionId());
+        } catch (S3Exception e) {
+            throw quelleFehlt(e, quelle, datei.eingangVersionId(), ziel);
+        }
+        if (!lesung.sha256().equals(datei.sha256())) {
+            LOG.warnf("Prüfsumme der Quelle weicht ab: %s (Version %s)", quelle, datei.eingangVersionId());
+            throw new ArchivierungAbgebrochen(ArchivierungAbgebrochen.Grund.PRUEFSUMME, ziel);
+        }
+    }
+
+    private static RuntimeException quelleFehlt(S3Exception e, String quelle, String versionId, String ziel) {
+        if (!FEHLT.contains(fehlercode(e))) {
+            return e;
+        }
+        LOG.warnf("Quelle fehlt: %s (Version %s)", quelle, versionId);
+        return new ArchivierungAbgebrochen(ArchivierungAbgebrochen.Grund.PRUEFSUMME, ziel, e);
+    }
+
     private AbgelegteDatei kopieren(String bucket, ZuArchivieren datei) {
         String quelle = datei.schluessel().pfad(Ablageort.EINGANG);
         String ziel = datei.schluessel().pfad(Ablageort.ARCHIV);
-        String versionId = s3.copyObject(b -> b.sourceBucket(bucket).sourceKey(quelle)
-                .sourceVersionId(datei.eingangVersionId()).destinationBucket(bucket).destinationKey(ziel)).versionId();
+        String versionId;
+        try {
+            versionId = s3.copyObject(b -> b.sourceBucket(bucket).sourceKey(quelle)
+                    .sourceVersionId(datei.eingangVersionId()).destinationBucket(bucket).destinationKey(ziel))
+                    .versionId();
+        } catch (S3Exception e) {
+            throw quelleFehlt(e, quelle, datei.eingangVersionId(), ziel);
+        }
         pruefeVersion(versionId, bucket);
         Lesung lesung = lesen(bucket, ziel, versionId);
         if (!lesung.sha256().equals(datei.sha256())) {
@@ -334,8 +405,7 @@ public class S3Ablage implements AblagePort {
             return Optional.ofNullable(s3.getObjectRetention(b -> b.bucket(bucket).key(key).versionId(versionId))
                     .retention()).filter(r -> r.retainUntilDate() != null);
         } catch (S3Exception e) {
-            // ohne Sperre: 404 (NoSuchObjectLockConfiguration) bzw. bei MinIO 400 (NoSuchObjectLockConfiguration)
-            if (e.statusCode() == 404 || "NoSuchObjectLockConfiguration".equals(fehlercode(e))) {
+            if (KEINE_SPERRE.contains(fehlercode(e))) {
                 return Optional.empty();
             }
             throw e;

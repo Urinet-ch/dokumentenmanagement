@@ -20,7 +20,7 @@ import java.util.UUID;
 /**
  * Driven Port der Ablage im Object Storage (design.md «Ablage»; ADR-011, Req 16.13): Adapter {@code S3Ablage}, Dev-Stub
  * im Dateisystem über {@code archiv.ablage.stub}. Der Bucket folgt aus dem Mandanten ({@code <präfix><code>}).
- * Kein Aufruf setzt {@code x-amz-bypass-governance-retention}, keiner verkürzt eine Sperre, keiner überschreibt oder
+ * Kein Aufruf setzt den Bypass-Header, keiner verkürzt eine Sperre, keiner überschreibt oder
  * löscht eine Datei unter {@code archiv/} oder {@code manifest/} (Req 6.5).
  */
 public interface AblagePort {
