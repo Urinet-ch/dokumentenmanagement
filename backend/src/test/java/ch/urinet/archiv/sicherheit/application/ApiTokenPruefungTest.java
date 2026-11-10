@@ -1,5 +1,7 @@
 package ch.urinet.archiv.sicherheit.application;
 
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
@@ -15,8 +17,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Prüfung eines API-Tokens ohne Datenbank und ohne Argon2 (Req 2.5). */
 class ApiTokenPruefungTest {
@@ -27,7 +33,7 @@ class ApiTokenPruefungTest {
     private final ZaehlenderHasher hasher = new ZaehlenderHasher();
     private final FakeRegister register = new FakeRegister();
     private final StellbareUhr uhr = new StellbareUhr();
-    private final ApiTokenPruefung pruefung = new ApiTokenPruefung(register, hasher, uhr);
+    private final ApiTokenPruefung pruefung = new ApiTokenPruefung(register, hasher, uhr, 2, Duration.ofMillis(200));
 
     @Test
     void unbekannteIdVergleichtTrotzdemEinmalGegenDieAttrappe() {
@@ -39,6 +45,47 @@ class ApiTokenPruefungTest {
         // gleich viel Argon2-Arbeit wie bei einer bekannten ID: Die Antwortzeit verrät nicht, ob die ID existiert
         assertThat(hasher.vergleiche).isEqualTo(2);
         assertThat(hasher.gepruefteHashes).allMatch(h -> h.startsWith("hash:"));
+    }
+
+    @Test
+    void attrappeEntstehtEinmalUndVorDerErstenAnfrage() {
+        String attrappe = pruefung.attrappeBerechnen();
+
+        pruefung.pruefen(ApiToken.neu(zufall));
+        pruefung.pruefen(ApiToken.neu(zufall));
+
+        assertThat(hasher.hashes).isEqualTo(1);
+        assertThat(hasher.gepruefteHashes).containsOnly(attrappe);
+    }
+
+    @Test
+    void ohnePlatzInDerSperreUeberlastetOhneArgon2() throws Exception {
+        CountDownLatch drin = new CountDownLatch(1);
+        CountDownLatch los = new CountDownLatch(1);
+        hasher.bremse = () -> {
+            drin.countDown();
+            warten(los);
+        };
+        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, 1, Duration.ofMillis(50));
+        ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
+        CompletableFuture<Optional<ApiClient>> erste = CompletableFuture.supplyAsync(() -> eng.pruefen(bekannt));
+        assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // auch die Attrappe für eine unbekannte ID nimmt den Weg durch die Sperre
+        assertThatThrownBy(() -> eng.pruefen(ApiToken.neu(zufall))).isInstanceOfSatisfying(FachFehler.class,
+                f -> assertThat(f.code()).isEqualTo(Fehlercode.UEBERLASTET));
+        assertThat(hasher.vergleiche).isEqualTo(1);
+
+        los.countDown();
+        assertThat(erste.get(5, TimeUnit.SECONDS)).isPresent();
+        hasher.bremse = () -> { };
+        assertThat(eng.pruefen(bekannt)).as("Platz wieder frei").isPresent();
+    }
+
+    @Test
+    void mindestensEinePruefung() {
+        assertThatThrownBy(() -> new ApiTokenPruefung(register, hasher, uhr, 0, Duration.ofMillis(200)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -82,13 +129,24 @@ class ApiTokenPruefungTest {
         assertThat(pruefung.pruefen(token)).isPresent();
     }
 
-    /** Hash = "hash:" + Geheimnis; zählt die Vergleiche. */
+    private static void warten(CountDownLatch latch) {
+        try {
+            latch.await(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Hash = "hash:" + Geheimnis; zählt Hashes und Vergleiche, die Bremse hält einen Vergleich an. */
     private static final class ZaehlenderHasher implements GeheimnisHasher {
-        int vergleiche;
-        final List<String> gepruefteHashes = new ArrayList<>();
+        volatile int hashes;
+        volatile int vergleiche;
+        volatile Runnable bremse = () -> { };
+        final List<String> gepruefteHashes = java.util.Collections.synchronizedList(new ArrayList<>());
 
         @Override
         public String hashen(String geheimnis) {
+            hashes++;
             return "hash:" + geheimnis;
         }
 
@@ -96,7 +154,8 @@ class ApiTokenPruefungTest {
         public boolean pruefen(String geheimnis, String hash) {
             vergleiche++;
             gepruefteHashes.add(hash);
-            return hash.equals(hashen(geheimnis));
+            bremse.run();
+            return hash.equals("hash:" + geheimnis);
         }
     }
 

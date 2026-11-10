@@ -60,6 +60,9 @@ public enum Fehlercode {
     INTERNER_FEHLER(500, "Interner Fehler",
             "Im Archiv ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut und "
                     + "nennen Sie bei Rückfragen die Fehler-ID."),
+    UEBERLASTET(503, "Archiv ausgelastet",
+            "Das Archiv prüft gerade zu viele Anmeldungen gleichzeitig. Bitte versuchen Sie es in einigen Sekunden "
+                    + "erneut."),
     SPEICHER_NICHT_ERREICHBAR(503, "Speicher nicht erreichbar",
             "Der Speicher ist gerade nicht erreichbar. Bitte versuchen Sie es später erneut.");
 

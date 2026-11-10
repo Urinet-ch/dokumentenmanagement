@@ -1,5 +1,6 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import io.quarkus.security.AuthenticationCompletionException;
 import io.quarkus.security.AuthenticationFailedException;
@@ -26,11 +27,16 @@ import java.util.Optional;
  * antwortet mit Problem Details; die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht
  * gelesen wird. Eine Anfrage ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet
  * Quarkus weiter selbst mit 413 ohne Inhalt.
+ * <p>
+ * {@code UEBERLASTET} aus der Prüfung eines API-Tokens (Req 2.5) entsteht bei der proaktiven Anmeldung auf jedem Pfad,
+ * auch unter {@code /q/}; {@link #ueberlastet} antwortet darum auf allen Pfaden mit 503, {@code Retry-After} und Problem
+ * Details.
  */
 @ApplicationScoped
 public class ProblemFehlerRoute {
 
     static final String API = "/api/*";
+    static final String NOCHMALS_NACH_SEKUNDEN = "1";
 
     private final Optional<MemorySize> grenze;
 
@@ -40,7 +46,18 @@ public class ProblemFehlerRoute {
 
     void einrichten(@Observes Router router) {
         router.route(API).order(RouteConstants.ROUTE_ORDER_UPLOAD_LIMIT - 1).handler(this::grenzePruefen);
+        router.route().order(-2).failureHandler(this::ueberlastet);
         router.route(API).order(-1).failureHandler(this::behandeln);
+    }
+
+    void ueberlastet(RoutingContext kontext) {
+        if (kontext.failure() instanceof FachFehler fehler && fehler.code() == Fehlercode.UEBERLASTET
+                && !kontext.response().headWritten()) {
+            kontext.response().putHeader("Retry-After", NOCHMALS_NACH_SEKUNDEN);
+            senden(kontext, ProblemAntwort.fuer(Fehlercode.UEBERLASTET), false);
+            return;
+        }
+        kontext.next();
     }
 
     void grenzePruefen(RoutingContext kontext) {
