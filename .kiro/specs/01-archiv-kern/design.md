@@ -156,11 +156,11 @@ den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mi
 -- treuhaender (nur lesend, A2–A4):
 d.bestaetigt is not null
 -- mitarbeiter:
-(d.bestaetigt is null and d.erstellt_von = :benutzer)
-or (d.bestaetigt is not null and (d.vertraulichkeit = 'NORMAL'
-                                  or (d.vertraulichkeit = 'PERSONAL' and d.person_benutzer = :benutzer)))
+v_eff = 'NORMAL'
+or (v_eff = 'PERSONAL' and (d.person_benutzer = :benutzer
+                            or (d.bestaetigt is null and d.erstellt_von = :benutzer)))
 ```
-  Umsetzung 2.2: Unbestätigt sehen nur Rollen mit A7 und der Erfasser (Req 2.21); `person_benutzer` zählt erst nach der Bestätigung (die frühere Fassung liess einen `mitarbeiter` auch ein fremd erfasstes, unbestätigtes Dokument mit seinem `person_benutzer` sehen). Die Regel je Rolle steht framework-frei in `Sichtregel` (`sicherheit/domain`), der `VertraulichkeitFilter` (`dokument/adapter/out/persistence`) übersetzt sie in ein HQL-Prädikat.
+  Umsetzung 2.2: Die Regel je Rolle steht framework-frei in `Sichtregel` (`sicherheit/domain`, aus der Rechtematrix abgeleitet), der `VertraulichkeitFilter` (`dokument/adapter/out/persistence`) übersetzt sie in ein HQL-Prädikat, gleichwertig zum SQL oben. Ein unbestätigtes Dokument sieht damit ein `mitarbeiter` auch, wenn es ein anderer erfasst hat und `person_benutzer` er selbst ist (Fussnote ²); Req 2.21 («nur für Rollen mit Recht A7 und für den Erfasser») liest sich strenger. Den Widerspruch zwischen Req 2.21 und Fussnote ² löst nur Fabian (PR #45, «Offen für Fabian»); bis dahin gilt dieses SQL.
 - Eingangskorb (A5): `mitarbeiter` zusätzlich nur `d.erstellt_von = :benutzer` (Req 2.24); `treuhaender` 403 (Req 2.11).
 - `vertraulichkeit` und `person_benutzer` ändern nur Aktion A8 (`PATCH`, `bestaetigen`) und die Generator-Metadaten (Req 2.23); ein `PATCH` mit diesen Feldern ohne A8 antwortet 403 als Ganzes.
 

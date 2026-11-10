@@ -268,6 +268,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`
   - Vertraulichkeit und `person_benutzer` nur mit Recht A8
   - Änderung von Belegdatum, Art, Geschäftsjahr oder `gueltig_bis` → `aufbewahren_bis` neu berechnen, Sperre nur verlängern (`sperreVerlaengern`), Konflikt protokollieren
+  - Die Szenarien zu 9.5 und 10.1 vom Probe-Endpunkt `PATCH /probe/dokumente/{id}/zusatz` (Teilnachweis aus 2.2) auf `PATCH /api/v1/dokumente/{id}` umhängen; erst damit sind 9.5 und 10.1 voll nachgewiesen (Review PR #45)
   - _Anforderungen: 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6_
 
 - [ ] 3.6 Eingangskorb-Oberfläche [Frontend]

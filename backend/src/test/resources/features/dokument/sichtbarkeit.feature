@@ -15,7 +15,9 @@ Funktionalität: Sichtbarkeit der Dokumente nach Rolle und Vertraulichkeit (Aufg
       | U_PERSONAL_FREMD  |     | PERSONAL        | ja         | inhaber-urinet     | inhaber-urinet     | ARCHIVIERT          |
       | U_OFFEN_EIGEN     |     | NORMAL          | nein       | mitarbeiter-urinet |                    | EINGANGSKORB        |
       | U_OFFEN_FREMD     |     | NORMAL          | nein       | inhaber-urinet     | mitarbeiter-urinet | EINGANGSKORB        |
+      | U_OFFEN_KEINER    |     | NORMAL          | nein       | inhaber-urinet     |                    | EINGANGSKORB        |
       | U_FEHLER_INTERN   |     | INTERN          | ja         | mitarbeiter-urinet |                    | ARCHIVIERUNG_FEHLER |
+      | U_FEHLER_FREMD    |     | NORMAL          | ja         | inhaber-urinet     |                    | FEHLER              |
     Und im Mandanten «vhf-gsk» liegen diese Dokumente:
       | name       | art | vertraulichkeit | bestaetigt | erfasser                 | person | status       |
       | V_NORMAL   |     | NORMAL          | ja         | geschaeftsstelle-vhf-gsk |        | ARCHIVIERT   |
@@ -37,13 +39,15 @@ Funktionalität: Sichtbarkeit der Dokumente nach Rolle und Vertraulichkeit (Aufg
       | mitarbeiter-urinet       | U_PERSONAL_EIGEN | 200    | person_benutzer ist er selbst (Fussnote ²)             |
       | mitarbeiter-urinet       | U_PERSONAL_FREMD | 404    | PERSONAL, nicht seines (2.10)                          |
       | mitarbeiter-urinet       | U_OFFEN_EIGEN    | 200    | unbestätigt, selbst erfasst (2.21)                     |
-      | mitarbeiter-urinet       | U_OFFEN_FREMD    | 404    | unbestätigt, fremd erfasst – person_benutzer zählt erst nach der Bestätigung (2.21) |
+      | mitarbeiter-urinet       | U_OFFEN_FREMD    | 200    | unbestätigt, fremd erfasst, person_benutzer ist er selbst (Fussnote ², design.md) |
+      | mitarbeiter-urinet       | U_OFFEN_KEINER   | 404    | unbestätigt, fremd erfasst, ohne person_benutzer (2.21) |
       | mitarbeiter-urinet       | V_NORMAL         | 404    | fremder Mandant (1.4)                                  |
       | treuhaender-urinet       | U_NORMAL         | 200    | A2                                                     |
       | treuhaender-urinet       | U_INTERN         | 200    | A3 nur lesend                                          |
       | treuhaender-urinet       | U_PERSONAL_FREMD | 200    | A4 nur lesend                                          |
       | treuhaender-urinet       | U_OFFEN_EIGEN    | 404    | unbestätigt, ohne Recht A7 (2.21)                      |
       | treuhaender-urinet       | U_OFFEN_FREMD    | 404    | unbestätigt, ohne Recht A7 (2.21)                      |
+      | treuhaender-urinet       | U_FEHLER_FREMD   | 200    | A2                                                     |
       | geschaeftsstelle-vhf-gsk | V_NORMAL         | 200    | A2                                                     |
       | geschaeftsstelle-vhf-gsk | V_INTERN         | 200    | A3                                                     |
       | geschaeftsstelle-vhf-gsk | V_PERSONAL       | 200    | A4                                                     |
@@ -69,8 +73,11 @@ Funktionalität: Sichtbarkeit der Dokumente nach Rolle und Vertraulichkeit (Aufg
       | bestaetigt      | null         |
     Und trägt die Antwort das ETag der Version des Dokuments
 
+  # U_OFFEN_FREMD (person_benutzer) und U_FEHLER_FREMD (NORMAL) sieht er im Direktzugriff, im Eingangskorb nicht (A5).
   @req-2.24 @req-2.3
   Szenario: mitarbeiter sieht im Eingangskorb nur selbst erfasste und für ihn sichtbare Dokumente
+    Wenn «mitarbeiter-urinet» das Dokument «U_FEHLER_FREMD» liest
+    Dann antwortet der Dokument-Endpunkt mit Status 200
     Wenn «mitarbeiter-urinet» den Eingangskorb abruft
     Dann liefert der Eingangskorb die Gesamtzahl 1 und diese Dokumente:
       | U_OFFEN_EIGEN |
@@ -78,12 +85,14 @@ Funktionalität: Sichtbarkeit der Dokumente nach Rolle und Vertraulichkeit (Aufg
   @req-2.3
   Szenario: inhaber sieht den ganzen Eingangskorb; Gesamtzahl und Paging zählen nur sichtbare Dokumente
     Wenn «inhaber-urinet» den Eingangskorb abruft
-    Dann liefert der Eingangskorb die Gesamtzahl 3 und diese Dokumente:
+    Dann liefert der Eingangskorb die Gesamtzahl 5 und diese Dokumente:
       | U_OFFEN_EIGEN   |
       | U_OFFEN_FREMD   |
+      | U_OFFEN_KEINER  |
       | U_FEHLER_INTERN |
-    Wenn «inhaber-urinet» den Eingangskorb mit Seite 1 und Grösse 2 abruft
-    Dann liefert der Eingangskorb die Gesamtzahl 3 und 1 Dokument
+      | U_FEHLER_FREMD  |
+    Wenn «inhaber-urinet» den Eingangskorb mit Seite 2 und Grösse 2 abruft
+    Dann liefert der Eingangskorb die Gesamtzahl 5 und 1 Dokument
     Wenn «geschaeftsstelle-vhf-gsk» den Eingangskorb abruft
     Dann liefert der Eingangskorb die Gesamtzahl 1 und diese Dokumente:
       | V_OFFEN |

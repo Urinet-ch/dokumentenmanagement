@@ -71,9 +71,10 @@ Funktionalität: Datenmodell Dokument – Versionen, Zusatzfelder und Indizes (A
     Und das Dokument «ZWEITES» ein Original mit der Prüfsumme «a» erhält
     Dann nimmt die Datenbank es an
 
+  # Nur eigene Arten (Urinet ist Aussteller) landen in «belegnummer_eigen»; die Auswahl trifft die Anwendung (3.x, 11.x).
   Szenario: Eine eigene Belegnummer ist je Art eindeutig
-    Angenommen das Dokument «ARCHIV» hat die eigene Belegnummer «Q-1» der Art «QUITTUNG»
-    Wenn das Dokument «KORB» die eigene Belegnummer «Q-1» der Art «QUITTUNG» erhält
+    Angenommen das Dokument «ARCHIV» hat die eigene Belegnummer «2026-001» der Art «AUSGANGSRECHNUNG»
+    Wenn das Dokument «KORB» die eigene Belegnummer «2026-001» der Art «AUSGANGSRECHNUNG» erhält
     Dann weist die Datenbank es mit «belegnummer_eigen_pk» ab
-    Wenn das Dokument «KORB» die eigene Belegnummer «Q-1» der Art «LIEFERANTENBELEG» erhält
+    Wenn das Dokument «KORB» die eigene Belegnummer «2026-001» der Art «OFFERTE» erhält
     Dann nimmt die Datenbank es an

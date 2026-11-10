@@ -103,6 +103,14 @@ public class DokumentartVerwaltungSchritte {
         }
     }
 
+    /** Legt im Mandanten {@code urinet} ein verworfenes Dokument der Art an (Req 9.4: «auch verworfene»). */
+    @Angenommen("die Dokumentart «{word}» hat nur 1 verworfenes Dokument")
+    public void verworfenesDokument(String code) throws SQLException {
+        benutzt = true;
+        dokumente.add(Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben("urinet", code, "NORMAL", false, "probe", null, "VERWORFEN")));
+    }
+
     @Dann("antwortet die Dokumentart-Verwaltung mit Status {int}")
     public void status(int status) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);

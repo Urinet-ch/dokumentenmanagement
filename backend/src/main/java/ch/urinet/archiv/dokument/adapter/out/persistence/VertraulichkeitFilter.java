@@ -26,14 +26,15 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
         if (regel.uneingeschraenkt()) {
             return new VertraulichkeitFilter("1 = 1", parameter);
         }
-        // Unbestätigte Art wirkt als PERSONAL: Rollen mit A7 und der Erfasser (Req 2.21)
-        String unbestaetigt;
-        if (regel.alleUnbestaetigten()) {
-            unbestaetigt = "bestaetigt is null";
-        } else {
-            unbestaetigt = "(bestaetigt is null and erstelltVon = :benutzer)";
-            parameter.put("benutzer", regel.benutzer());
-        }
+        // Unbestätigte Art wirkt als PERSONAL (Req 2.21, Fussnote ², design.md «Sicherheit»)
+        String unbestaetigt = switch (regel.unbestaetigt()) {
+            case ALLE -> "bestaetigt is null";
+            case EIGENE -> {
+                parameter.put("benutzer", regel.benutzer());
+                yield "(bestaetigt is null and (personBenutzer = :benutzer or erstelltVon = :benutzer))";
+            }
+            case KEINE -> "1 = 0";
+        };
         List<String> stufen = new ArrayList<>();
         if (regel.normal()) {
             stufen.add("vertraulichkeit = 'NORMAL'");

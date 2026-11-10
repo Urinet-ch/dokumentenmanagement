@@ -204,6 +204,17 @@ Funktionalität: Dokumentarten verwalten
     Und hat die Dokumentart in der Antwort diese Werte:
       | aktiv | false |
 
+  @req-9.4
+  Szenario: Auch ein verworfenes Dokument verhindert das Löschen der Art
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_VERWORFEN", "name": "Verworfen", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false}
+      """
+    Und die Dokumentart «PROBE_DA_VERWORFEN» hat nur 1 verworfenes Dokument
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_VERWORFEN» löscht
+    Dann antwortet die Dokumentart-Verwaltung mit Status 409 und Fehlercode «DOKUMENTART_IN_GEBRAUCH»
+
   @req-9.1
   Szenario: Arten eines anderen Mandanten sind unsichtbar und unveränderbar
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:

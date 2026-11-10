@@ -11,22 +11,25 @@ class SichtregelTest {
     void inhaberUndGeschaeftsstelleSehenAlles() {
         for (Rolle rolle : new Rolle[] {Rolle.INHABER, Rolle.GESCHAEFTSSTELLE}) {
             Sichtregel regel = Sichtregel.fuer(new Benutzer("b", rolle));
+            assertThat(regel.unbestaetigt()).as(rolle.name()).isEqualTo(Sichtregel.Unbestaetigt.ALLE);
             assertThat(regel.uneingeschraenkt()).as(rolle.name()).isTrue();
             assertThat(regel.eingangskorbNurErfasste()).as(rolle.name()).isFalse();
         }
     }
 
     @Test
-    void mitarbeiterSiehtNormalEigenePersonalUndSelbstErfassteUnbestaetigte() {
+    void mitarbeiterSiehtNormalUndEigenePersonalAuchUnbestaetigt() {
         Sichtregel regel = Sichtregel.fuer(new Benutzer("joel", Rolle.MITARBEITER));
-        assertThat(regel).isEqualTo(new Sichtregel("joel", false, true, false, Sichtregel.Personal.NUR_EIGENE, true));
+        assertThat(regel).isEqualTo(new Sichtregel("joel", Sichtregel.Unbestaetigt.EIGENE, true, false,
+                Sichtregel.Personal.NUR_EIGENE, true));
         assertThat(regel.uneingeschraenkt()).isFalse();
     }
 
     @Test
     void treuhaenderLiestAlleBestaetigtenAberKeineUnbestaetigten() {
         Sichtregel regel = Sichtregel.fuer(new Benutzer("t", Rolle.TREUHAENDER));
-        assertThat(regel).isEqualTo(new Sichtregel("t", false, true, true, Sichtregel.Personal.ALLE, false));
+        assertThat(regel).isEqualTo(new Sichtregel("t", Sichtregel.Unbestaetigt.KEINE, true, true,
+                Sichtregel.Personal.ALLE, false));
         assertThat(regel.uneingeschraenkt()).isFalse();
     }
 }
