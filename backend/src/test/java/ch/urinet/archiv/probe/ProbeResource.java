@@ -1,6 +1,8 @@
 package ch.urinet.archiv.probe;
 
 import ch.urinet.archiv.dokumentart.adapter.out.persistence.DokumentartEintrag;
+import ch.urinet.archiv.protokoll.application.Protokolliert;
+import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -11,9 +13,11 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 import java.util.Map;
@@ -49,6 +53,7 @@ public class ProbeResource {
     @Path("/erfassen")
     @ErfordertAktion(Aktion.A1)
     @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle"})
+    @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
     public void erfassen() {
         // nur die Rechteprüfung zählt
     }
@@ -59,6 +64,7 @@ public class ProbeResource {
     @Produces(MediaType.APPLICATION_JSON)
     @ErfordertAktion(Aktion.A2)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
     public Map<String, String> dokument(@PathParam("id") String id) {
         return Map.of("id", id);
     }
@@ -68,8 +74,37 @@ public class ProbeResource {
     @Path("/dokumente/{id}/bestaetigen")
     @ErfordertAktion(Aktion.A7)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Protokolliert(aktion = ProtokollAktion.BESTAETIGEN)
     public void bestaetigen(@PathParam("id") String id) {
         // nur die Rechteprüfung zählt
+    }
+
+    /**
+     * Steht für «Metadaten ändern» (A6, {@code PATCH /dokumente/{id}}) mit Protokoll (Req 10.8): legt als Wirkung die
+     * Dokumentart {@code art} an. Scheitert das Protokoll, ist auch die Dokumentart nicht angelegt.
+     */
+    @PATCH
+    @Path("/dokumente/{id}")
+    @ErfordertAktion(Aktion.A6)
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Protokolliert(aktion = ProtokollAktion.AENDERN)
+    @Transactional
+    public void aendern(@PathParam("id") String id, @QueryParam("art") String code) {
+        DokumentartEintrag art = new DokumentartEintrag();
+        art.code = code;
+        art.name = code;
+        art.vertraulichkeit = "NORMAL";
+        art.aktiv = true;
+        art.persist();
+    }
+
+    /** Unerwarteter Fehler mit vertraulichem Text in der Meldung (Req 16.7): Er darf weder in Antwort noch Log stehen. */
+    @GET
+    @Path("/fehler/{text}")
+    @AlleArchivRollen
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    public void fehler(@PathParam("text") String text) {
+        throw new IllegalStateException("Beleg " + text);
     }
 
     /** Benutzer-ID der Anmeldung (Claim {@code sub}, design.md «Sicherheit»). */

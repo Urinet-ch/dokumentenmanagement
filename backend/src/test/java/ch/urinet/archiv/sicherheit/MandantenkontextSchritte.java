@@ -97,6 +97,18 @@ public class MandantenkontextSchritte {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(DOKUMENTE + dokumentId(dokument));
     }
 
+    @Wenn("«{word}» das Probe-Dokument «{word}» über die IP «{}» liest")
+    public void dokumentLesenMitIp(String benutzer, String dokument, String ip) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("X-Real-Ip", ip).when()
+                .get(DOKUMENTE + dokumentId(dokument));
+    }
+
+    @Wenn("«{word}» das Probe-Dokument «{word}» ändert und dabei die Dokumentart «{word}» anlegt")
+    public void dokumentAendern(String benutzer, String dokument, String code) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("art", code).when()
+                .patch(DOKUMENTE + dokumentId(dokument));
+    }
+
     @Wenn("«{word}» das Probe-Dokument «{word}» bestätigt")
     public void dokumentBestaetigen(String benutzer, String dokument) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
@@ -113,10 +125,20 @@ public class MandantenkontextSchritte {
         return ProbeSichtbarkeit.NAMEN.containsKey(name) ? ProbeSichtbarkeit.NAMEN.get(name).toString() : name;
     }
 
+    /** Erfolg ohne Inhalt (204) oder Problem Details ohne Daten (RFC 9457, design.md «Error Handling»). */
     @Dann("antwortet das Archiv mit Status {int} und liefert keine Daten")
     public void ohneDaten(int status) {
         assertThat(antwort.statusCode()).isEqualTo(status);
-        assertThat(antwort.body().asString()).isEmpty();
+        if (status < 400) {
+            assertThat(antwort.body().asString()).isEmpty();
+        } else {
+            ProblemDetails.pruefen(antwort, status);
+        }
+    }
+
+    @Dann("antwortet das Archiv mit Status {int} und Fehlercode «{word}»")
+    public void mitFehlercode(int status, String fehlercode) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(fehlercode);
     }
 
     @Dann("antwortet das Archiv mit Status {int} und liefert die Dokumentart «{word}»")

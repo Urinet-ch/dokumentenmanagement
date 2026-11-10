@@ -96,6 +96,40 @@ class MandantEigentuemerTest {
     }
 
     /**
+     * Zugriffsprotokoll nur Einfügen (Req 10.3): {@code archiv_app} hat auf {@code zugriff_protokoll} nur INSERT und
+     * SELECT (dazu die Sequenz), kein UPDATE, DELETE oder TRUNCATE – auch nicht über die Default Privileges. Selbst der
+     * Eigentümer scheitert am Trigger.
+     */
+    @Test
+    void zugriffProtokollNurEinfuegen() throws SQLException {
+        provisionierung.anlegen("probe-protokoll", null, null);
+        String tabelle = "m_probe_protokoll.zugriff_protokoll";
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
+            for (String recht : List.of("UPDATE", "DELETE", "TRUNCATE")) {
+                assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', '" + recht + "')")).as(recht).isFalse();
+            }
+            assertThat(wahr(befehl, "has_sequence_privilege('m_probe_protokoll.zugriff_protokoll_id_seq', 'USAGE')"))
+                    .isTrue();
+            befehl.execute("insert into " + tabelle + " (benutzer, rolle, aktion) values ('probe', 'INHABER', 'ANZEIGEN')");
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            verweigert(befehl, "update " + tabelle + " set benutzer = 'x'");
+            verweigert(befehl, "delete from " + tabelle);
+            verweigert(befehl, "truncate " + tabelle);
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String sql : List.of("update " + tabelle + " set benutzer = 'x'", "delete from " + tabelle,
+                    "truncate " + tabelle)) {
+                assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("nur Einfügen erlaubt");
+            }
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+        }
+    }
+
+    /**
      * {@code berechtigen()} ist atomar (Review PR #29): Scheitert das REVOKE auf {@code databasechangelog*} nach den GRANTs,
      * bleibt kein Recht der App-Rolle zurück – weder auf die Changelog-Tabellen noch auf die übrigen Tabellen.
      */

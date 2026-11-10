@@ -24,7 +24,8 @@ import java.util.UUID;
  * Rechtematrix. Bei dokumentbezogenen Aktionen (A2–A10) mit Pfad-Parameter {@code id} gilt 404 vor 403
  * ({@link Berechtigung#dokumentAktion}); {@code @RolesAllowed} lässt dort alle Archiv-Rollen zu. Ein Endpunkt ohne
  * Erklärung ({@link ErfordertAktion}, {@link AlleArchivRollen}, {@link Oeffentlich}) antwortet 403 (fail closed);
- * {@code EndpunktWaechterTest} verlangt die Erklärung schon im Build.
+ * {@code EndpunktWaechterTest} verlangt die Erklärung schon im Build. Ohne gültigen Mandanten antwortet er 403
+ * {@code MANDANT_FEHLT}; jede Verweigerung meldet {@link Berechtigung} (Zugriffsprotokoll, Req 10.7).
  */
 public class ZugangFilter {
 
@@ -52,19 +53,20 @@ public class ZugangFilter {
         try {
             aufloesung.pruefen();
         } catch (MandantVerweigert e) {
-            berechtigung.ohneZugang(benutzerId);
+            berechtigung.ohneMandant(benutzerId);
         }
         Optional<Rolle> rolle = Rolle.ausRealmRollen(identitaet.getRoles());
+        ErfordertAktion erklaerung = methode.getAnnotation(ErfordertAktion.class);
+        Optional<Aktion> aktion = Optional.ofNullable(erklaerung).map(ErfordertAktion::value);
         if (rolle.isEmpty() || benutzerId.isEmpty()) {
-            berechtigung.ohneZugang(benutzerId);
+            berechtigung.ohneZugang(benutzerId, rolle, aktion);
             return;
         }
-        ErfordertAktion erklaerung = methode.getAnnotation(ErfordertAktion.class);
-        if (erklaerung != null) {
-            aktion(new Benutzer(benutzerId.get(), rolle.get()), erklaerung.value(),
+        if (aktion.isPresent()) {
+            aktion(new Benutzer(benutzerId.get(), rolle.get()), aktion.get(),
                     anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
-            berechtigung.ohneZugang(benutzerId);
+            berechtigung.ohneZugang(benutzerId, rolle, aktion);
         }
     }
 

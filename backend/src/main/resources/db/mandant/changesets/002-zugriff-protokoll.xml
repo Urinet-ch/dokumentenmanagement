@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Zugriffsprotokoll je Mandant (design.md «Protokoll und Manifest», Data Models; Req 10.2, 10.3, 10.7).
+         Nur Einfügen: Trigger gegen UPDATE und DELETE je Zeile und gegen TRUNCATE je Anweisung (ein DELETE-Trigger
+         erfasst TRUNCATE nicht); die App-Rolle hat nur INSERT und SELECT (LiquibaseMandantDatenbank). -->
+    <changeSet id="002-zugriff-protokoll" author="archiv">
+        <createTable tableName="zugriff_protokoll">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="zugriff_protokoll_pk"/>
+            </column>
+            <column name="zeit" type="timestamptz" defaultValueComputed="clock_timestamp()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="benutzer" type="text"/>
+            <column name="rolle" type="text"/>
+            <column name="aktion" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dokument_id" type="uuid"/>
+            <column name="ip" type="inet"/>
+            <column name="details" type="jsonb"/>
+        </createTable>
+        <sql>
+            alter table zugriff_protokoll add constraint zugriff_protokoll_rolle_ck
+                check (rolle in ('INHABER', 'MITARBEITER', 'TREUHAENDER', 'GESCHAEFTSSTELLE'));
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN', 'VERWERFEN',
+                    'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT', 'WISSEN_ANZEIGEN',
+                    'WISSEN_ANNEHMEN', 'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT'));
+            alter table zugriff_protokoll add constraint zugriff_protokoll_details_ck
+                check (details is null or jsonb_typeof(details) = 'object');
+        </sql>
+        <sql splitStatements="false">
+            create function zugriff_protokoll_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception 'zugriff_protokoll: nur Einfügen erlaubt (% verweigert)', tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger zugriff_protokoll_nur_einfuegen before update or delete on zugriff_protokoll
+                for each row execute function zugriff_protokoll_nur_einfuegen();
+            create trigger zugriff_protokoll_kein_truncate before truncate on zugriff_protokoll
+                for each statement execute function zugriff_protokoll_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>
