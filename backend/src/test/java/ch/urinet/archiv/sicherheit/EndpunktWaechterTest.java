@@ -4,8 +4,10 @@ import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -53,6 +55,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link Protokolliert} mit der passenden Protokoll-Aktion ({@link #erwartetesProtokoll}); ausgenommen sind Listen und
  * Suchen ohne {@code {id}} (A2–A4), der Eingangskorb (A5) und A11–A14 (dort protokolliert nur {@code VERWEIGERT}).
  * <p>
+ * Req 2.5: {@link ErlaubtScope} steht nur an {@code POST /dokumente} ({@code import}) und
+ * {@code POST /dokumente/generator} ({@code generator}), beide mit A1; {@code @RolesAllowed} nennt dort zusätzlich die
+ * Scope-Rolle, sonst nirgends.
+ * <p>
  * Geprüft werden alle konkreten Klassen (main und test), in deren Hierarchie (Oberklassen, Interfaces) ein
  * {@code @Path} steht. Das HTTP-Verb und {@code @Path} der Methode dürfen aus Interface oder Oberklasse stammen, die
  * Sicherheitsannotationen werden an der Implementierung gelesen (dort liest sie der Filter). Eine Methode mit
@@ -66,7 +72,12 @@ class EndpunktWaechterTest {
     // Attrappen mit @Path in der Hierarchie registrierte Quarkus sonst als echte Ressourcen; die Eigenschaft ist nie gesetzt
     static final String ATTRAPPE = "archiv.test.waechter-attrappe";
     private static final Pattern PARAMETER = Pattern.compile("\\{");
-    private static final Pattern DOKUMENT_ID = Pattern.compile("\\{\\s*id\\s*(:[^}]*)?}");
+    // {id} mit optionalem Regex, der selbst Klammern enthalten darf, z. B. {id:[0-9a-f-]{36}}
+    private static final String ID = "\\{\\s*id\\s*(:([^{}]|\\{[^{}]*})*)?}";
+    private static final Pattern DOKUMENT_ID = Pattern.compile(ID);
+    private static final Pattern HERUNTERLADEN = Pattern.compile(".*" + ID + "/datei/?$");
+    private static final Map<ApiTokenScope, String> SCOPE_PFAD =
+            Map.of(ApiTokenScope.IMPORT, "/dokumente", ApiTokenScope.GENERATOR, "/dokumente/generator");
 
     @Test
     void jederEndpunktFragtDieRegelAb() {
@@ -99,7 +110,16 @@ class EndpunktWaechterTest {
                 .contains("A7 verlangt @Protokolliert(BESTAETIGEN) statt keiner");
         assertThat(verstoesse(FalschesProtokoll.class)).singleElement().asString()
                 .contains("A2 verlangt @Protokolliert(HERUNTERLADEN) statt ANZEIGEN");
+        assertThat(verstoesse(ScopeFalscherPfad.class)).singleElement().asString()
+                .contains("@ErlaubtScope(IMPORT) nur an POST /dokumente");
+        assertThat(verstoesse(ScopeFalscheAktion.class)).singleElement().asString()
+                .contains("@ErlaubtScope(GENERATOR) nur an POST /dokumente/generator");
+        assertThat(verstoesse(ScopeOhneRolle.class)).singleElement().asString().contains("@RolesAllowed");
+        assertThat(verstoesse(ScopeRolleOhneErklaerung.class)).singleElement().asString().contains("@RolesAllowed");
+        assertThat(verstoesse(IdMitRegex.class)).singleElement().asString()
+                .contains("A2 verlangt @Protokolliert(HERUNTERLADEN) statt ANZEIGEN");
         assertThat(verstoesse(Korrekt.class)).isEmpty();
+        assertThat(verstoesse(KorrektMitScope.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
     }
 
@@ -167,8 +187,19 @@ class EndpunktWaechterTest {
                 verstoesse.add(name + ": " + aktion.value() + " verlangt @Protokolliert(" + protokoll.get() + ") statt "
                         + (erklaert == null ? "keiner" : erklaert.aktion()));
             }
-            Set<String> erwartet = alle || dokumentbezogen ? ALLE
-                    : Rechtematrix.zugelassen(aktion.value()).stream().map(Rolle::code).collect(Collectors.toSet());
+            Set<String> erwartet = new LinkedHashSet<>(alle || dokumentbezogen ? ALLE
+                    : Rechtematrix.zugelassen(aktion.value()).stream().map(Rolle::code).collect(Collectors.toSet()));
+            ErlaubtScope scope = methode.getAnnotation(ErlaubtScope.class);
+            if (scope != null) {
+                boolean post = deklarationen.stream().anyMatch(m -> m.isAnnotationPresent(POST.class));
+                if (aktion == null || aktion.value() != Aktion.A1 || !post
+                        || !normalisiert(pfad).equals(SCOPE_PFAD.get(scope.value()))) {
+                    verstoesse.add(name + ": @ErlaubtScope(" + scope.value() + ") nur an POST "
+                            + SCOPE_PFAD.get(scope.value()) + " mit A1 (" + pfad + ")");
+                    continue;
+                }
+                erwartet.add(scope.value().rolle());
+            }
             Set<String> ist = rollen == null ? Set.of() : Set.of(rollen.value());
             if (!ist.equals(erwartet)) {
                 verstoesse.add(name + ": @RolesAllowed " + ist + " statt " + erwartet);
@@ -177,13 +208,20 @@ class EndpunktWaechterTest {
         return verstoesse;
     }
 
+    /** Pfad ohne doppelte und abschliessende Schrägstriche. */
+    private static String normalisiert(String pfad) {
+        String ohneDoppelte = pfad.replaceAll("/{2,}", "/");
+        return ohneDoppelte.length() > 1 && ohneDoppelte.endsWith("/")
+                ? ohneDoppelte.substring(0, ohneDoppelte.length() - 1) : ohneDoppelte;
+    }
+
     /** Protokoll-Aktion nach der Tabelle in design.md «Protokoll und Manifest»; leer, wo nicht einzeln protokolliert. */
     static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad) {
         boolean mitId = DOKUMENT_ID.matcher(pfad).find();
         return Optional.ofNullable(switch (aktion) {
             case A1 -> ProtokollAktion.ERFASSEN;
             case A2, A3, A4 -> !mitId ? null
-                    : pfad.matches(".*\\{\\s*id\\s*(:[^}]*)?}/datei/?$") ? ProtokollAktion.HERUNTERLADEN
+                    : HERUNTERLADEN.matcher(pfad).matches() ? ProtokollAktion.HERUNTERLADEN
                     : ProtokollAktion.ANZEIGEN;
             case A6, A8 -> ProtokollAktion.AENDERN;
             case A7 -> ProtokollAktion.BESTAETIGEN;
@@ -422,6 +460,85 @@ class EndpunktWaechterTest {
         @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
         public void lesen(String id) {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/dokumente")
+    static class ScopeFalscherPfad {
+        @POST
+        @Path("/hochladen")
+        @ErfordertAktion(Aktion.A1)
+        @ErlaubtScope(ApiTokenScope.IMPORT)
+        @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle", ApiTokenScope.ROLLE_IMPORT})
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
+        public void erfassen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/dokumente")
+    static class ScopeFalscheAktion {
+        @POST
+        @Path("/generator")
+        @ErfordertAktion(Aktion.A11)
+        @ErlaubtScope(ApiTokenScope.GENERATOR)
+        @RolesAllowed({"inhaber", ApiTokenScope.ROLLE_GENERATOR})
+        public void erfassen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/dokumente")
+    static class ScopeOhneRolle {
+        @POST
+        @ErfordertAktion(Aktion.A1)
+        @ErlaubtScope(ApiTokenScope.IMPORT)
+        @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle"})
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
+        public void erfassen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/dokumente")
+    static class ScopeRolleOhneErklaerung {
+        @POST
+        @ErfordertAktion(Aktion.A1)
+        @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle", ApiTokenScope.ROLLE_IMPORT})
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
+        public void erfassen() {
+        }
+    }
+
+    static class IdMitRegex {
+        @GET
+        @Path("/dokumente/{id:[0-9a-f-]{36}}/datei")
+        @ErfordertAktion(Aktion.A2)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
+        public void datei() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/dokumente/")
+    static class KorrektMitScope {
+        @POST
+        @ErfordertAktion(Aktion.A1)
+        @ErlaubtScope(ApiTokenScope.IMPORT)
+        @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle", ApiTokenScope.ROLLE_IMPORT})
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
+        public void erfassen() {
+        }
+
+        @POST
+        @Path("/generator/")
+        @ErfordertAktion(Aktion.A1)
+        @ErlaubtScope(ApiTokenScope.GENERATOR)
+        @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle", ApiTokenScope.ROLLE_GENERATOR})
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
+        public void generator() {
         }
     }
 }
