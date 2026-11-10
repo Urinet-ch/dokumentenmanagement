@@ -111,6 +111,13 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
       - name: Archiv starten
+        env:
+          # ohne Datenbank (Readiness DOWN): seit Aufgabe 1.3 gibt es Entitäten, die Persistence Unit muss mit aus
+          QUARKUS_HIBERNATE_ORM_ACTIVE: 'false'
+          # Platzhalter, keine echten Zugangsdaten: quarkus-amazon-s3 verlangt beim Start statische Schlüssel
+          # (seit Aufgabe 1.3); die Browser-Szenarien greifen nie auf S3 zu.
+          QUARKUS_S3_AWS_CREDENTIALS_STATIC_PROVIDER_ACCESS_KEY_ID: ci-platzhalter
+          QUARKUS_S3_AWS_CREDENTIALS_STATIC_PROVIDER_SECRET_ACCESS_KEY: ci-platzhalter
         run: |
           java -jar backend/target/quarkus-app/quarkus-run.jar > /dev/null 2>&1 &
           for i in $(seq 1 60); do
