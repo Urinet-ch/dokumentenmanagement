@@ -52,7 +52,7 @@ public class MandantProvisionierung {
             throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT, "Mandant existiert schon: " + code);
         }
         List<DokumentartVorlage> arten = seed.lesen(mandantCode);
-        datenbank.schemaEinrichten(mandantCode.schema());
+        datenbank.schemaAnlegen(mandantCode.schema());
         datenbank.dokumentartenEinspielen(mandantCode.schema(), arten);
         bucket.einrichten(bucketName);
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,

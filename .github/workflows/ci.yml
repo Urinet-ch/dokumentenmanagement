@@ -115,7 +115,8 @@ jobs:
           # ohne Datenbank (Readiness DOWN): seit Aufgabe 1.3 gibt es Entitäten, die Persistence Unit muss mit aus
           QUARKUS_HIBERNATE_ORM_ACTIVE: 'false'
           # Platzhalter, keine echten Zugangsdaten: quarkus-amazon-s3 verlangt beim Start statische Schlüssel
-          # (seit Aufgabe 1.3); die Browser-Szenarien greifen nie auf S3 zu.
+          # (seit Aufgabe 1.3); die Browser-Szenarien greifen nie auf S3 zu. Nur hier sind Umgebungsvariablen für S3
+          # zulässig; in prod kommen sie aus den Secret-Dateien s3_app_zugang_id und _geheimnis (design.md).
           QUARKUS_S3_AWS_CREDENTIALS_STATIC_PROVIDER_ACCESS_KEY_ID: ci-platzhalter
           QUARKUS_S3_AWS_CREDENTIALS_STATIC_PROVIDER_SECRET_ACCESS_KEY: ci-platzhalter
         run: |

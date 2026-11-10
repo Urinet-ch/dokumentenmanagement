@@ -65,9 +65,9 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                     liste(art.path("pflichtfelder")),
                     art.path("zusatz_schema").isMissingNode() ? null : art.path("zusatz_schema").toString(),
                     text(art, "vertraulichkeit", pfad),
-                    art.path("aufbewahrung_jahre").isNumber() ? art.path("aufbewahrung_jahre").asInt() : null,
+                    jahre(art, pfad),
                     art.path("aufbewahrung_ab").isTextual() ? art.path("aufbewahrung_ab").asText() : null,
-                    art.path("gesetzliche_pflicht").asBoolean(false),
+                    pflicht(art, pfad),
                     art.path("aktiv").asBoolean(true)));
         }
         return ergebnis;
@@ -78,6 +78,26 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
             throw ungueltig(pfad, "Feld " + feld + " fehlt");
         }
         return art.path(feld).asText();
+    }
+
+    // ohne ausdrückliche Angabe gäbe es für die Art keine Sperre (GeBüV)
+    private static boolean pflicht(JsonNode art, String pfad) {
+        if (!art.path("gesetzliche_pflicht").isBoolean()) {
+            throw ungueltig(pfad, "Feld gesetzliche_pflicht fehlt oder ist nicht boolesch");
+        }
+        return art.path("gesetzliche_pflicht").booleanValue();
+    }
+
+    /** Zahl oder ausdrücklich {@code null} (unbefristet). */
+    private static Integer jahre(JsonNode art, String pfad) {
+        JsonNode jahre = art.path("aufbewahrung_jahre");
+        if (jahre.isNull()) {
+            return null;
+        }
+        if (!jahre.isIntegralNumber() || !jahre.canConvertToInt()) {
+            throw ungueltig(pfad, "Feld aufbewahrung_jahre fehlt oder ist keine Zahl");
+        }
+        return jahre.intValue();
     }
 
     private static List<String> liste(JsonNode knoten) {

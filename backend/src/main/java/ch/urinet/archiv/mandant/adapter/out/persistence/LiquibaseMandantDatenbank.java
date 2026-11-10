@@ -47,13 +47,38 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     }
 
     @Override
-    public void schemaEinrichten(String schema) {
+    public void schemaAnlegen(String schema) {
+        einrichten(schema, true);
+    }
+
+    @Override
+    public void schemaMigrieren(String schema) {
+        einrichten(schema, false);
+    }
+
+    @Override
+    public boolean schemaVorhanden(String schema) {
+        pruefen(schema);
+        try (Connection verbindung = eigentuemer.oeffnen();
+             PreparedStatement abfrage = verbindung.prepareStatement("select 1 from pg_namespace where nspname = ?")) {
+            abfrage.setString(1, schema);
+            return abfrage.executeQuery().next();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Schema " + schema + " nicht prüfbar", e);
+        }
+    }
+
+    private void einrichten(String schema, boolean anlegen) {
         pruefen(schema);
         try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
-            befehl.execute("create schema if not exists " + schema);
+            if (anlegen) {
+                befehl.execute("create schema if not exists " + schema);
+            }
             befehl.execute("set search_path to " + schema);
             try {
                 migrieren(verbindung, schema);
+                // Liquibase lässt autoCommit=false stehen; ohne Commit rollt close() die Rechte zurück
+                verbindung.setAutoCommit(true);
                 berechtigen(befehl, schema);
             } finally {
                 befehl.execute("reset search_path");
@@ -70,6 +95,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                 + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv) "
                 + "values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?) on conflict (code) do nothing";
         try (Connection verbindung = eigentuemer.oeffnen(); PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
+            verbindung.setAutoCommit(true);
             for (DokumentartVorlage art : arten) {
                 einfuegen.setString(1, art.code());
                 einfuegen.setString(2, art.name());
@@ -96,6 +122,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     @Override
     public void gemeinsamesSchemaBerechtigen() {
         try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+            verbindung.setAutoCommit(true);
             if (!rolleVorhanden(verbindung)) {
                 return;
             }

@@ -1,15 +1,23 @@
 package ch.urinet.archiv.mandant;
 
+import ch.urinet.archiv.ArchivMain;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Admin-Kommando {@code archiv mandant anlegen <code>} (ADR-002) über denselben Einstieg wie der Dienst. */
+/** Admin-Kommando {@code archiv mandant anlegen <code>} (ADR-002) über denselben Einstieg wie der Dienst, ohne Server. */
 @QuarkusMainTest
 class MandantKommandoTest {
+
+    /** {@code ArchivMain.main} setzt sie als System-Properties; danach laufende Tests bräuchten den HTTP-Server. */
+    @AfterAll
+    static void kommandoEinstellungenEntfernen() {
+        ArchivMain.KOMMANDO.keySet().forEach(System::clearProperty);
+    }
 
     @Test
     @Launch(value = {"mandant", "anlegen", "probe-kommando", "--geschaeftsjahr-ende", "03-31"})
@@ -17,6 +25,14 @@ class MandantKommandoTest {
         assertThat(ergebnis.exitCode()).isZero();
         assertThat(ergebnis.getOutput()).contains("Mandant probe-kommando angelegt", "Schema m_probe_kommando",
                 "Bucket urinet-archiv-probe-kommando", "Geschäftsjahresende 03-31");
+        assertThat(ergebnis.getOutput()).as("kein HTTP-Server, keine Start-Migration")
+                .doesNotContain("Listening on: http", "aktive Mandanten migriert");
+    }
+
+    @Test
+    @Launch(value = {"mandant", "anlegen", "Ungueltig"}, exitCode = 1)
+    void fachlicherFehler(LaunchResult ergebnis) {
+        assertThat(ergebnis.getErrorOutput()).contains("UNGUELTIG");
     }
 
     @Test

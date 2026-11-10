@@ -8,4 +8,5 @@
     <include file="changesets/001-mandant.xml" relativeToChangelogFile="true"/>
     <include file="changesets/002-auftrag.xml" relativeToChangelogFile="true"/>
     <include file="changesets/003-api-client.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/004-mandant-checks.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

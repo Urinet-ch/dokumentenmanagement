@@ -6,6 +6,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Und;
@@ -50,6 +51,8 @@ public class MandantSchritte {
     ObjectMapper json;
 
     private MandantFehler fehler;
+
+    private final List<String> eingetragen = new ArrayList<>();
 
     @Wenn("der Betreiber die Mandanten «{word}» und «{word}» anlegt")
     public void mandantenAnlegen(String a, String b) throws SQLException {
@@ -120,12 +123,20 @@ public class MandantSchritte {
             boolean deny = false;
             for (JsonNode regel : richtlinie.path("Statement")) {
                 if ("Deny".equals(regel.path("Effect").asText()) && regel.path("Action").toString().contains(aktion)
-                        && regel.path("Resource").toString().contains("arn:aws:s3:::" + bucket + "/*")) {
+                        && regel.path("Resource").toString().contains("arn:aws:s3:::" + bucket + "/*")
+                        && alle(regel.path("Principal")) && regel.path("Condition").isMissingNode()) {
                     deny = true;
                 }
             }
             assertThat(deny).as(bucket).isTrue();
         }
+    }
+
+    /** Principal {@code "*"} oder {@code {"AWS": "*"}} (MinIO gibt die zweite Form zurück). */
+    private static boolean alle(JsonNode principal) {
+        JsonNode aws = principal.path("AWS");
+        return "*".equals(principal.asText()) || "*".equals(aws.asText())
+                || (aws.isArray() && aws.size() == 1 && "*".equals(aws.get(0).asText()));
     }
 
     @Dann("enthält das Schema «{word}» genau die Dokumentarten aus «{word}»")
@@ -148,22 +159,64 @@ public class MandantSchritte {
 
     @Angenommen("im Register steht der aktive Mandant «{word}» ohne Schema")
     public void ohneSchema(String code) throws SQLException {
+        eintragen(code, false);
+    }
+
+    @Angenommen("im Register steht der aktive Mandant «{word}» mit leerem Schema")
+    public void leeresSchema(String code) throws SQLException {
+        eintragen(code, true);
+    }
+
+    private void eintragen(String code, boolean leeresSchema) throws SQLException {
+        String schema = "m_" + code.replace('-', '_');
+        eingetragen.add(code);
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement einfuegen = verbindung.prepareStatement(
                 "insert into public.mandant (code, name, schema_name, bucket) values (?, ?, ?, ?) on conflict do nothing")) {
             einfuegen.setString(1, code);
             einfuegen.setString(2, code);
-            einfuegen.setString(3, "m_" + code.replace('-', '_'));
+            einfuegen.setString(3, schema);
             einfuegen.setString(4, "urinet-archiv-" + code);
             einfuegen.executeUpdate();
             try (Statement befehl = verbindung.createStatement()) {
-                befehl.execute("drop schema if exists m_" + code.replace('-', '_') + " cascade");
+                befehl.execute("drop schema if exists " + schema + " cascade");
+                if (leeresSchema) {
+                    befehl.execute("create schema " + schema);
+                }
             }
         }
     }
 
+    /** Ohne Aufräumen bräche jeder spätere Start im selben Container am fehlenden Schema ab. */
+    @After
+    public void aufraeumen() throws SQLException {
+        for (String code : eingetragen) {
+            try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement loeschen =
+                    verbindung.prepareStatement("delete from public.mandant where code = ?")) {
+                loeschen.setString(1, code);
+                loeschen.executeUpdate();
+            }
+        }
+        eingetragen.clear();
+    }
+
     @Wenn("das Archiv die aktiven Mandanten migriert")
     public void migrieren() {
-        assertThat(migration.aktiveMigrieren()).isPositive();
+        fehler = null;
+        try {
+            migration.aktiveMigrieren();
+        } catch (MandantFehler e) {
+            fehler = e;
+        }
+    }
+
+    @Dann("bricht das Archiv mit «{word}» ab")
+    public void abgebrochen(String grund) {
+        abgelehnt(grund);
+    }
+
+    @Und("es gibt das Schema «{word}» nicht")
+    public void schemaFehlt(String schema) throws SQLException {
+        assertThat(werte("select schema_name from information_schema.schemata where schema_name = ?", schema)).isEmpty();
     }
 
     @Dann("führt das Register für «{word}» das Geschäftsjahresende «{word}»")

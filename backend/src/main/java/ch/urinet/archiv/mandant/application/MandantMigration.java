@@ -22,7 +22,13 @@ public class MandantMigration {
         datenbank.gemeinsamesSchemaBerechtigen();
         int anzahl = 0;
         for (Mandant mandant : register.aktive()) {
-            datenbank.schemaEinrichten(mandant.schema());
+            // ein fehlendes Schema (z. B. nach unvollständiger Wiederherstellung) nie still leer neu anlegen
+            if (!datenbank.schemaVorhanden(mandant.schema())) {
+                LOG.errorf("Schema fehlt für aktiven Mandanten %s, Start abgebrochen", mandant.code().wert());
+                throw new MandantFehler(MandantFehler.Grund.SCHEMA_FEHLT,
+                        "Schema fehlt für aktiven Mandanten " + mandant.code().wert());
+            }
+            datenbank.schemaMigrieren(mandant.schema());
             anzahl++;
         }
         LOG.infof("%d aktive Mandanten migriert", anzahl);

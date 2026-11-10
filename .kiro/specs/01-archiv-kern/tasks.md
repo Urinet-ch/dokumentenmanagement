@@ -357,7 +357,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
   - Produktion auf Stufe B (VPS aus 5.11) mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
   - Bucket `urinet-archiv-urinet` im Public-Cloud-Projekt produktiv, mit der Bucket Policy aus 1.3 (Deny auf `s3:BypassGovernanceRetention`)
-  - [Fabian] App-Schlüssel (`s3_app_zugang`; hat technisch das Bypass-Recht, Option B, ADR-007, Nachtrag 09.11.2026) als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Inhaber-Zugang zum Public-Cloud-Projekt des Object Storage (Zugangsdaten, mit denen Schlüssel ausgestellt und Korrekturen ausgeführt werden) nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
+  - [Fabian] App-Schlüssel (`s3_app_zugang`, als zwei GitHub-Secrets `s3_app_zugang_id` und `s3_app_zugang_geheimnis`; hat technisch das Bypass-Recht, Option B, ADR-007, Nachtrag 09.11.2026) als GitHub-Secret hinterlegen (auf dem Server nur unter `/run/secrets/`); Inhaber-Zugang zum Public-Cloud-Projekt des Object Storage (Zugangsdaten, mit denen Schlüssel ausgestellt und Korrekturen ausgeführt werden) nur offline ablegen (Notfallunterlagen, 5.10), nie auf dem Server oder in GitHub-Secrets
   - produktives Archivieren erst, wenn der Zeitstempeldienst angebunden ist (15.3)
   - _Anforderungen: 6.5, 6.10, 15.3, 16.1, 16.7, 16.9, 16.10, 16.17_
   - _Abhängig von: 1.9, 4.9, 5.11_

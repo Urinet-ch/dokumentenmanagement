@@ -3,7 +3,7 @@ package ch.urinet.archiv.mandant.application;
 /** Fachlicher Fehler beim Anlegen oder Migrieren eines Mandanten; die Meldung nennt nur Codes. */
 public class MandantFehler extends RuntimeException {
 
-    public enum Grund { UNGUELTIG, MANDANT_EXISTIERT, SEED_FEHLT, SEED_UNGUELTIG }
+    public enum Grund { UNGUELTIG, MANDANT_EXISTIERT, SEED_FEHLT, SEED_UNGUELTIG, SCHEMA_FEHLT }
 
     private final Grund grund;
 

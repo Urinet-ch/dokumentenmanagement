@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * {@code archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]} (ADR-002). Exit 0 = angelegt,
- * 1 = fachlicher Fehler, 2 = falscher Aufruf. Die Ausgabe nennt nur Codes, Schema und Bucket.
+ * 1 = fachlicher Fehler ({@code MandantFehler}), 2 = falscher Aufruf, 3 = technischer Fehler. Die Ausgabe nennt nur
+ * Codes, Schema und Bucket.
  */
 @ApplicationScoped
 public class MandantKommando {
@@ -53,6 +54,9 @@ public class MandantKommando {
         } catch (MandantFehler e) {
             fehler.println(e.grund() + ": " + e.getMessage());
             return 1;
+        } catch (RuntimeException e) {
+            fehler.println("Technischer Fehler: " + e.getMessage());
+            return 3;
         }
     }
 }

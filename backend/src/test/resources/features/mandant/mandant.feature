@@ -30,9 +30,16 @@ Funktionalität: Mandanten anlegen und migrieren
 
   @req-1.5
   Szenario: Beim Start bringt das Archiv alle aktiven Mandanten auf den aktuellen Stand
-    Angenommen im Register steht der aktive Mandant «probe-migration» ohne Schema
+    Angenommen im Register steht der aktive Mandant «probe-migration» mit leerem Schema
     Wenn das Archiv die aktiven Mandanten migriert
     Dann gibt es das Schema «m_probe_migration» mit der Tabelle «dokumentart»
+
+  @req-1.5
+  Szenario: Fehlt das Schema eines aktiven Mandanten, legt der Start es nicht leer neu an
+    Angenommen im Register steht der aktive Mandant «probe-ohne-schema» ohne Schema
+    Wenn das Archiv die aktiven Mandanten migriert
+    Dann bricht das Archiv mit «SCHEMA_FEHLT» ab
+    Und es gibt das Schema «m_probe_ohne_schema» nicht
 
   @req-9.6
   Szenario: Ohne Angabe gilt das Geschäftsjahresende 12-31

@@ -7,8 +7,13 @@ import java.util.List;
 /** Driven Port: Schema je Mandant (Liquibase {@code db/mandant}, Rechte der App-Rolle, Seed). */
 public interface MandantDatenbank {
 
-    /** Legt das Schema an, falls es fehlt, und bringt es über {@code db/mandant} auf den aktuellen Stand. */
-    void schemaEinrichten(String schema);
+    /** Legt das Schema an (nur bei der Provisionierung) und bringt es über {@code db/mandant} auf den aktuellen Stand. */
+    void schemaAnlegen(String schema);
+
+    /** Bringt ein vorhandenes Schema über {@code db/mandant} auf den aktuellen Stand; legt nie ein Schema an. */
+    void schemaMigrieren(String schema);
+
+    boolean schemaVorhanden(String schema);
 
     /** Spielt die Dokumentarten ein; vorhandene Codes bleiben unverändert. */
     void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten);

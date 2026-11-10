@@ -73,6 +73,15 @@ cd backend && mvn quarkus:dev
 - Secrets liegen nur als Dateien vor (`/run/secrets/`, tech.md Regel 7), nie in Umgebungsvariablen oder im Repo. Die
   festen Zugangswerte der Dev-Container und des Test-Realms sind keine Secrets und gelten nur lokal.
 
+## Mandant anlegen
+```bash
+java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
+```
+- Im laufenden Container per `exec`; das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber
+  die Secret-Dateien von Datenbank (`archiv_db_owner`) und Object Storage. Seed: `seed/<code>/dokumentarten.json`.
+- Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf,
+  3 technischer Fehler (design.md, «Mandant»).
+
 ## Leitplanken
 Die Leitplanken stammen aus der Harness-Vorlage der Skill-Werkstatt (`~/git/ai-entwicklung/vorlagen/harness`) und
 werden nur mit deren Werkzeug ausgerollt, nie von Hand geändert (ausser `.claude/harness.yml`, die dem Repo gehört).

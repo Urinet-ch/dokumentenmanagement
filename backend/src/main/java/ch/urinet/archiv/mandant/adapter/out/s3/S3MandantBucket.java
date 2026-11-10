@@ -25,11 +25,15 @@ public class S3MandantBucket implements MandantBucket {
         try {
             s3.createBucket(b -> b.bucket(bucket).objectLockEnabledForBucket(true));
         } catch (BucketAlreadyOwnedByYouException e) {
-            // erneuter Lauf nach einem Abbruch: nur weiter, wenn Object Lock wirklich an ist
-            var sperre = s3.getObjectLockConfiguration(b -> b.bucket(bucket)).objectLockConfiguration();
-            if (sperre == null || sperre.objectLockEnabled() != ObjectLockEnabled.ENABLED) {
-                throw new IllegalStateException("Bucket " + bucket + " existiert ohne Object Lock", e);
-            }
+            // erneuter Lauf nach einem Abbruch: die Prüfung unten entscheidet
+        }
+        var sperre = s3.getObjectLockConfiguration(b -> b.bucket(bucket)).objectLockConfiguration();
+        if (sperre == null || sperre.objectLockEnabled() != ObjectLockEnabled.ENABLED) {
+            throw new IllegalStateException("Bucket " + bucket + " ohne Object Lock");
+        }
+        // eine Standard-Aufbewahrung sperrte auch eingang/
+        if (sperre.rule() != null) {
+            throw new IllegalStateException("Bucket " + bucket + " hat eine Standard-Aufbewahrung");
         }
         s3.putBucketVersioning(b -> b.bucket(bucket).versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
         s3.putBucketPolicy(b -> b.bucket(bucket).policy(policy(bucket)));

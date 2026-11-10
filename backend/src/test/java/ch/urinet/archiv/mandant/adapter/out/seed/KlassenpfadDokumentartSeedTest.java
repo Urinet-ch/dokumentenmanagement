@@ -36,17 +36,27 @@ class KlassenpfadDokumentartSeedTest {
     void unbekanntesFeldBrichtAbUnterstrichFaelltWeg() throws Exception {
         var gueltig = json.readTree("""
                 {"_fragen": ["?"], "dokumentarten": [{"code": "A", "name": "A", "_notiz": "x",
-                 "vertraulichkeit": "NORMAL", "gesetzliche_pflicht": false}]}""");
+                 "vertraulichkeit": "NORMAL", "aufbewahrung_jahre": null, "gesetzliche_pflicht": false}]}""");
         assertThat(KlassenpfadDokumentartSeed.vorlagen(gueltig, "probe")).extracting(DokumentartVorlage::code)
                 .containsExactly("A");
         for (String inhalt : List.of(
                 "{\"dokumentarten\": [{\"code\": \"A\", \"name\": \"A\", \"vertraulichkeit\": \"NORMAL\", \"farbe\": \"rot\"}]}",
                 "{\"arten\": []}",
                 "{\"dokumentarten\": []}",
-                "{\"dokumentarten\": [{\"name\": \"ohne Code\", \"vertraulichkeit\": \"NORMAL\"}]}")) {
+                "{\"dokumentarten\": [{\"name\": \"ohne Code\", \"vertraulichkeit\": \"NORMAL\"}]}",
+                art("\"aufbewahrung_jahre\": 10"),
+                art("\"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": \"ja\""),
+                art("\"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": null"),
+                art("\"gesetzliche_pflicht\": true"),
+                art("\"aufbewahrung_jahre\": \"10\", \"gesetzliche_pflicht\": true"),
+                art("\"aufbewahrung_jahre\": 1.5, \"gesetzliche_pflicht\": true"))) {
             assertThatThrownBy(() -> KlassenpfadDokumentartSeed.vorlagen(json.readTree(inhalt), "probe")).as(inhalt)
                     .isInstanceOfSatisfying(MandantFehler.class,
                             e -> assertThat(e.grund()).isEqualTo(MandantFehler.Grund.SEED_UNGUELTIG));
         }
+    }
+
+    private static String art(String felder) {
+        return "{\"dokumentarten\": [{\"code\": \"A\", \"name\": \"A\", \"vertraulichkeit\": \"NORMAL\", " + felder + "}]}";
     }
 }
