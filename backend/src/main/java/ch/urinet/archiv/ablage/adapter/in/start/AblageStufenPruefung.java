@@ -29,6 +29,11 @@ public class AblageStufenPruefung {
                    AblageEinstellungen einstellungen) {
         Stufe wirksam = Stufe.aus(stufe);
         Stufenregel.pruefe(wirksam, einstellungen.fuerStufenregel());
+        var warnungen = Stufenregel.warnungen(wirksam, einstellungen.fuerStufenregel());
+        if (!warnungen.isEmpty()) {
+            LOG.warnf("Ablage Stufe A: %s weichen ab (Höchstfrist höchstens %s, Präfix %s, Req 6.11)",
+                    String.join(", ", warnungen), Stufenregel.HOECHSTFRIST_STUFE_A, Stufenregel.PRAEFIX_STUFE_A);
+        }
         LOG.infof("Ablage: Stufe %s, Manifeste %s", wirksam, einstellungen.manifestSperrmodus());
     }
 }

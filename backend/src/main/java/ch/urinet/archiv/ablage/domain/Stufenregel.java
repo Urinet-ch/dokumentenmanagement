@@ -13,6 +13,7 @@ import java.util.Optional;
 public final class Stufenregel {
 
     public static final String PRAEFIX_STUFE_A = "urinet-archiv-a-";
+    public static final Duration HOECHSTFRIST_STUFE_A = Duration.ofDays(1);
 
     private Stufenregel() {
     }
@@ -40,6 +41,25 @@ public final class Stufenregel {
             verstoesse.add("archiv.ablage.bucket-praefix");
         }
         return verstoesse;
+    }
+
+    /**
+     * Hinweise für Stufe A (Req 6.11, Review PR #43 K2): Höchstfrist für {@code archiv/} fehlt oder liegt über 1 Tag,
+     * oder der Bucket-Präfix ist nicht der von Stufe A. Nur Warnung, weil dev und test mit {@code archiv.stufe=A} und
+     * dem Präfix {@code urinet-archiv-} laufen; die Werte der Stufe A setzt Aufgabe 1.10.
+     */
+    public static List<String> warnungen(Stufe stufe, Ablageeinstellungen einstellungen) {
+        List<String> warnungen = new ArrayList<>();
+        if (stufe != Stufe.A) {
+            return warnungen;
+        }
+        if (einstellungen.archivHoechstfrist().filter(f -> f.compareTo(HOECHSTFRIST_STUFE_A) <= 0).isEmpty()) {
+            warnungen.add("archiv.ablage.max-sperrfrist");
+        }
+        if (!PRAEFIX_STUFE_A.equals(einstellungen.bucketPraefix())) {
+            warnungen.add("archiv.ablage.bucket-praefix");
+        }
+        return warnungen;
     }
 
     /** Bricht ab, wenn die Einstellungen nicht zur Stufe passen; die Meldung nennt nur Schlüssel, keine Werte. */

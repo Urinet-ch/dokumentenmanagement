@@ -203,6 +203,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - signierte PDFs: PDF/A auch bei Verlust der Signatur, Original unverändert; keine PDF/A möglich (z. B. verschlüsselt) → Vermerk `pdfa_fehlt` und Eingangskorb
   - veraPDF-Prüfung im Test; Lastskript für die Laufzeit einseitiges Foto als p95 ≤ 30 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16)
   - Pflicht für jeden Handler und Hook (aus 2.5, design.md «Pflichten der Handler»): eigene Zeitgrenzen für jede Ein- und Ausgabe unter der Zeitgrenze des Typs (JDBC `queryTimeout`/`statement_timeout`, S3 `apiCallTimeout`, Prozesse `waitFor` + `destroyForcibly()`); Ergebnisse nur in einer kurzen Transaktion schreiben, die zuerst `AuftragService.anspruchSichern(auftrag)` aufruft (`select … from public.auftrag where id = ? and versuche = ? and status = 'LAEUFT' for update`); Test je Handler: verlorener Anspruch schreibt nichts
+  - in `OcrAuswahl` `folgtMit` entfernen, damit in `prod` ein fehlender OCR-Adapter den Start abbricht (design.md «Ablage», Startprüfungen); Handler `ARCHIVIEREN`: `archivieren` nur bei Status ungleich `ARCHIVIERT` und nie parallel für dasselbe Dokument (design.md «Ablage», Umsetzung)
   - _Anforderungen: 5.1–5.10_
 
 - [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
@@ -235,6 +236,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - WireMock-Tests für gültige, ungültige und fehlende Antworten; ein WireMock-Test prüft den Request: `model` = Wert von `archiv.ki.erfassung-modell` (nicht `archiv.ki.chat-modell`), `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `response_format` `json_schema` mit `strict`
   - Befund Gate-Lauf (`docs/spikes/golden-ergebnis.md`): Belegnummer-Vorschläge mit hoher Sicherheit gezielt prüfen, ohne Prompt, Modell oder Aufrufparameter gegenüber Gate 0 zu ändern (sonst neuer Golden-Lauf)
   - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)
+  - in `KiAuswahl` `folgtMit` entfernen, damit in `prod` ein fehlender KI-Adapter den Start abbricht (design.md «Ablage», Startprüfungen)
   - `KiBasisUrlPruefung` prüft die wirksame Konfiguration (`LangChain4jOpenAiConfig`: `defaultConfig()` und alle `namedConfig()`) statt einzelner Schlüssel; Testfall benannter Client ohne `base-url` → Abbruch (Req 16.21)
   - Die WireMock-Testressource setzt `archiv.ki.wiremock-port` dynamisch beim Start (bis 3.2 fest `8089`, Req 16.21)
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_

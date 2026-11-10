@@ -55,4 +55,17 @@ class StufenregelTest {
     void stufeADarfAbweichen() {
         assertThat(Stufenregel.verstoesse(Stufe.A, WIE_A)).isEmpty();
     }
+
+    @Test
+    void stufeAWarntBeiFehlenderOderZuLangerHoechstfristUndAnderemPraefix() {
+        assertThat(Stufenregel.warnungen(Stufe.A, WIE_A)).isEmpty();
+        var ohneFrist = new Stufenregel.Ablageeinstellungen(Sperrmodus.GOVERNANCE, Optional.empty(), Optional.empty(),
+                "urinet-archiv-");
+        assertThat(Stufenregel.warnungen(Stufe.A, ohneFrist))
+                .containsExactly("archiv.ablage.max-sperrfrist", "archiv.ablage.bucket-praefix");
+        var zuLang = new Stufenregel.Ablageeinstellungen(Sperrmodus.GOVERNANCE, Optional.empty(),
+                Optional.of(Duration.ofDays(2)), Stufenregel.PRAEFIX_STUFE_A);
+        assertThat(Stufenregel.warnungen(Stufe.A, zuLang)).containsExactly("archiv.ablage.max-sperrfrist");
+        assertThat(Stufenregel.warnungen(Stufe.B, ohneFrist)).isEmpty();
+    }
 }
