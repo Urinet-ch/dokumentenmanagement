@@ -174,7 +174,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
   - _Anforderungen: 1.4, 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
 
-- [ ] 2.3 Ablage-Service S3 [Backend]
+- [x] 2.3 Ablage-Service S3 [Backend]
   - Port `AblagePort` mit S3-Adapter und Dev-Stub: `ablegenEingang`, `archivieren`, `sperreVerlaengern`, `loeschenEingang`, `vorsignierteUrl`
   - `archivieren`: Original, Arbeitsfassung (falls vorhanden) und PDF/A nach `archiv/` kopieren, Prüfsummen vergleichen, Versions-ID je Datei in `dokument_datei` speichern; Sperre GOVERNANCE bis `aufbewahren_bis` nur bei `gesetzliche_pflicht`, unbefristete Dokumente dieser Arten 10 Jahre (Reihenfolge der Prüfung gemäss design.md, `retainUntil`); danach `eingang/` löschen
   - nur der App-Schlüssel aus `s3_app_zugang_id` und `s3_app_zugang_geheimnis`; der S3-Adapter setzt nie `x-amz-bypass-governance-retention` (SDK: `bypassGovernanceRetention`) und verkürzt keine Sperre (6.5; Option B, ADR-007, Nachtrag 09.11.2026); `vorsignierteUrl` nur für die gespeicherte Versions-ID; Manifeste unter `manifest/` im Modus COMPLIANCE (6.11)
