@@ -41,6 +41,12 @@ Funktionalität: API-Tokens für Skripte
     Angenommen für «urinet» gibt es das Token «import» mit Scope «import»
     Wenn das Token «import» die Tokens auflistet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Wenn das Token «import» ein Token anlegt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Wenn das Token «import» das Token «import» widerruft
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Wenn das Token «import» an «/api/v1/dokumente» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
 
   @req-2.5
   Szenario: Ein Token ist an seinen Mandanten gebunden
@@ -61,15 +67,24 @@ Funktionalität: API-Tokens für Skripte
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «MANDANT_FEHLT»
 
   @req-2.5
+  Szenario: Das Kommando legt für einen inaktiven Mandanten kein Token an
+    Angenommen der aktive Mandant «probe-token» steht nur im Register
+    Und der Mandant «probe-token» wird deaktiviert
+    Wenn das Kommando «token erstellen probe-token Kommando import» läuft
+    Dann endet das Kommando mit Exit 1 und meldet «MANDANT_FEHLT»
+
+  @req-2.5
   Szenario: Falsche, unbekannte und fehlerhafte Tokens erhalten 401
     Angenommen für «urinet» gibt es das Token «import» mit Scope «import»
     Wenn das Token «import» mit falschem Geheimnis an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 401
     Wenn ein Token mit unbekannter ID an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 401
+    Wenn das Token «import» mit fremder ID an «/api/v1/dokumente» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 401
     Wenn ein Bearer-Token «ua_kaputt» an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 401
-    Und kein Logeintrag enthält das Geheimnis eines Tokens
+    Und kein Logeintrag enthält einen gesendeten Token-Wert oder das Geheimnis eines Tokens
 
   @req-2.5
   Szenario: Der Inhaber legt ein Token an, sieht es in der Liste und widerruft es
@@ -97,6 +112,13 @@ Funktionalität: API-Tokens für Skripte
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn das Token «vhf» an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
+
+  @req-2.5
+  Szenario: Unbekannte und ungültige Token-IDs beim Widerruf erhalten 404
+    Wenn «inhaber-urinet» ein Token mit unbekannter gültiger ID widerruft
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn «inhaber-urinet» ein Token mit der ID «KEINE-ID» widerruft
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
   @req-2.5
   Szenariogrundriss: Ungültige Angaben beim Anlegen werden abgelehnt

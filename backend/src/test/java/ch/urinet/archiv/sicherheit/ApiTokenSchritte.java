@@ -3,6 +3,7 @@ package ch.urinet.archiv.sicherheit;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.agroal.api.AgroalDataSource;
@@ -16,6 +17,10 @@ import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -43,11 +48,19 @@ public class ApiTokenSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
+    @Inject
+    TokenKommando kommando;
+
     /** Name im Szenario → Token-Text. */
     private final Map<String, String> tokens = new LinkedHashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
     private final List<String> mandanten = new ArrayList<>();
     private final Map<String, Long> stand = new HashMap<>();
+    /** Alles, was ein Szenario als Bearer-Wert gesendet hat: weder der ganze Wert noch sein Geheimnis darf ins Log. */
+    private final List<String> gesendet = new ArrayList<>();
+    private final SecureRandom zufall = new SecureRandom();
+    private int exitCode;
+    private String kommandoFehler;
     private LogMitschnitt mitschnitt;
     private Response antwort;
 
@@ -89,18 +102,25 @@ public class ApiTokenSchritte {
     @Wenn("das Token «{word}» mit falschem Geheimnis an «{}» sendet")
     public void falschesGeheimnis(String name, String pfad) {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
-        String fremdesGeheimnis = ApiToken.neu(new java.security.SecureRandom()).geheimnis();
-        antwort = mitToken(ApiToken.PRAEFIX + id + "_" + fremdesGeheimnis).when().post(pfad);
+        String fremdesGeheimnis = ApiToken.neu(zufall).geheimnis();
+        antwort = gesendet(ApiToken.PRAEFIX + id + "_" + fremdesGeheimnis).when().post(pfad);
+    }
+
+    @Wenn("das Token «{word}» mit fremder ID an «{}» sendet")
+    public void fremdeId(String name, String pfad) {
+        String geheimnis = ApiToken.lesen(tokens.get(name)).orElseThrow().geheimnis();
+        String fremdeId = ApiToken.neu(zufall).id();
+        antwort = gesendet(ApiToken.PRAEFIX + fremdeId + "_" + geheimnis).when().post(pfad);
     }
 
     @Wenn("ein Token mit unbekannter ID an «{}» sendet")
     public void unbekannteId(String pfad) {
-        antwort = mitToken(ApiToken.neu(new java.security.SecureRandom()).text()).when().post(pfad);
+        antwort = gesendet(ApiToken.neu(zufall).text()).when().post(pfad);
     }
 
     @Wenn("ein Bearer-Token «{word}» an «{}» sendet")
     public void kaputtesToken(String wert, String pfad) {
-        antwort = mitToken(wert).when().post(pfad);
+        antwort = gesendet(wert).when().post(pfad);
     }
 
     @Wenn("«{word}» ein Token «{word}» mit Scope «{word}» anlegt")
@@ -131,6 +151,39 @@ public class ApiTokenSchritte {
     @Wenn("das Token «{word}» die Tokens auflistet")
     public void tokenListet(String name) {
         antwort = mitToken(tokens.get(name)).when().get(VERWALTUNG);
+    }
+
+    @Wenn("das Token «{word}» ein Token anlegt")
+    public void tokenLegtAn(String name) {
+        antwort = mitToken(tokens.get(name)).contentType(ContentType.JSON)
+                .body(Map.of("name", "Probe von Token", "scope", "import")).when().post(VERWALTUNG);
+    }
+
+    @Wenn("das Token «{word}» das Token «{word}» widerruft")
+    public void tokenWiderruft(String name, String ziel) {
+        antwort = mitToken(tokens.get(name)).when()
+                .delete(VERWALTUNG + "/" + ApiToken.lesen(tokens.get(ziel)).orElseThrow().id());
+    }
+
+    @Wenn("«{word}» ein Token mit unbekannter gültiger ID widerruft")
+    public void widerrufenUnbekannt(String benutzer) {
+        widerrufenId(benutzer, ApiToken.neu(zufall).id());
+    }
+
+    @Wenn("das Kommando «token erstellen {word} {word} {word}» läuft")
+    public void kommandoLaeuft(String mandant, String name, String scope) {
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        ByteArrayOutputStream fehler = new ByteArrayOutputStream();
+        exitCode = kommando.ausfuehren(List.of("erstellen", mandant, name, scope),
+                new PrintStream(aus, true, StandardCharsets.UTF_8), new PrintStream(fehler, true, StandardCharsets.UTF_8));
+        assertThat(aus.toString(StandardCharsets.UTF_8)).as("kein Token auf stdout").isEmpty();
+        kommandoFehler = fehler.toString(StandardCharsets.UTF_8);
+    }
+
+    @Dann("endet das Kommando mit Exit {int} und meldet «{word}»")
+    public void kommandoEndet(int erwartet, String fehlercode) {
+        assertThat(exitCode).as(kommandoFehler).isEqualTo(erwartet);
+        assertThat(kommandoFehler).contains(fehlercode);
     }
 
     @Dann("antwortet das Archiv auf die Token-Anfrage mit Status {int}")
@@ -204,6 +257,12 @@ public class ApiTokenSchritte {
         geheimnisseFehlenIn(mitschnitt.volltext());
     }
 
+    @Dann("kein Logeintrag enthält einen gesendeten Token-Wert oder das Geheimnis eines Tokens")
+    public void logOhneGesendeteWerte() {
+        assertThat(gesendet).isNotEmpty();
+        logOhneGeheimnis();
+    }
+
     @After
     public void aufraeumen() throws SQLException {
         if (mitschnitt != null) {
@@ -227,6 +286,15 @@ public class ApiTokenSchritte {
         for (String token : tokens.values()) {
             assertThat(text).doesNotContain(ApiToken.lesen(token).orElseThrow().geheimnis());
         }
+        for (String wert : gesendet) {
+            assertThat(text).as("gesendeter Wert im Text").doesNotContain(wert);
+            ApiToken.lesen(wert).ifPresent(t -> assertThat(text).doesNotContain(t.geheimnis()));
+        }
+    }
+
+    private RequestSpecification gesendet(String wert) {
+        gesendet.add(wert);
+        return mitToken(wert);
     }
 
     private static RequestSpecification mitToken(String token) {
