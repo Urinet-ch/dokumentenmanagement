@@ -53,6 +53,9 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     static String image() {
         try {
             return new SmallRyeConfigBuilder()
+                    .addDefaultSources()
+                    .addDefaultInterceptors()
+                    .withProfile("test")
                     .withSources(new PropertiesConfigSource(
                             Path.of("src/main/resources/application.properties").toUri().toURL()))
                     .build()

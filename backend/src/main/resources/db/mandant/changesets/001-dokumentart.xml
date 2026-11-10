@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Dokumentarten je Mandant (design.md, Schema je Mandant; Seed beim Anlegen, Req 1.5) -->
+    <changeSet id="001-dokumentart" author="archiv">
+        <createTable tableName="dokumentart">
+            <column name="code" type="text">
+                <constraints primaryKey="true" primaryKeyName="dokumentart_pk"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gruppen" type="text[]"/>
+            <column name="pflichtfelder" type="text[]"/>
+            <column name="zusatz_schema" type="jsonb"/>
+            <column name="vertraulichkeit" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="aufbewahrung_jahre" type="int"/>
+            <column name="aufbewahrung_ab" type="text"/>
+            <column name="gesetzliche_pflicht" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table dokumentart add constraint dokumentart_vertraulichkeit_ck
+                check (vertraulichkeit in ('NORMAL', 'INTERN', 'PERSONAL'));
+            alter table dokumentart add constraint dokumentart_aufbewahrung_ab_ck
+                check (aufbewahrung_ab in ('GESCHAEFTSJAHR', 'GUELTIG_BIS'));
+            alter table dokumentart add constraint dokumentart_unbefristet_ck
+                check ((aufbewahrung_jahre is null) = (aufbewahrung_ab is null));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

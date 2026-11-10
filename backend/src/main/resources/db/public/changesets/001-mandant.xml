@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Mandantenregister (design.md, Schema public; Req 1.1, 9.6) -->
+    <changeSet id="001-mandant" author="archiv">
+        <createTable tableName="mandant">
+            <column name="code" type="text">
+                <constraints primaryKey="true" primaryKeyName="mandant_pk"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="schema_name" type="text">
+                <constraints nullable="false" unique="true" uniqueConstraintName="mandant_schema_name_uk"/>
+            </column>
+            <column name="bucket" type="text">
+                <constraints nullable="false" unique="true" uniqueConstraintName="mandant_bucket_uk"/>
+            </column>
+            <column name="domain" type="text"/>
+            <column name="branding" type="jsonb"/>
+            <column name="geschaeftsjahr_ende" type="char(5)" defaultValue="12-31">
+                <constraints nullable="false"/>
+            </column>
+            <column name="eigene_arten" type="text[]"/>
+            <column name="kennungen" type="jsonb"/>
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="erstellt" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table mandant add constraint mandant_code_ck check (code ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
+            alter table mandant add constraint mandant_geschaeftsjahr_ende_ck
+                check (geschaeftsjahr_ende ~ '^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+        </sql>
+    </changeSet>
+</databaseChangeLog>

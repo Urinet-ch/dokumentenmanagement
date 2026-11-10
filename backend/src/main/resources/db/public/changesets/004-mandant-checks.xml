@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Checks so streng wie die Domain (MandantCode, Geschaeftsjahresende): Länge des Codes, nur gültige Tage -->
+    <changeSet id="004-mandant-checks" author="archiv">
+        <sql>
+            alter table mandant add constraint mandant_code_laenge_ck check (char_length(code) &lt;= 40);
+            alter table mandant add constraint mandant_geschaeftsjahr_ende_tag_ck check (
+                substr(geschaeftsjahr_ende, 4, 2)::int &lt;= case substr(geschaeftsjahr_ende, 1, 2)
+                    when '02' then 29 when '04' then 30 when '06' then 30 when '09' then 30 when '11' then 30
+                    else 31 end);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

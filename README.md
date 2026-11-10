@@ -76,6 +76,16 @@ cd backend && mvn quarkus:dev
 - Secrets liegen nur als Dateien vor (`/run/secrets/`, tech.md Regel 7), nie in Umgebungsvariablen oder im Repo. Die
   festen Zugangswerte der Dev-Container und des Test-Realms sind keine Secrets und gelten nur lokal.
 
+## Mandant anlegen
+```bash
+java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
+```
+- Im laufenden Container per `exec`; das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber
+  die Secret-Dateien `archiv_db_app`, `archiv_db_owner`, `s3_app_zugang_id` und `s3_app_zugang_geheimnis` unter
+  `/run/secrets/`; fehlt eine oder ist sie leer, bricht der Start ab. Seed: `seed/<code>/dokumentarten.json`.
+- Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
+  vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
+
 ## Leitplanken
 Die Leitplanken stammen aus der Harness-Vorlage der Skill-Werkstatt (`~/git/ai-entwicklung/vorlagen/harness`) und
 werden nur mit deren Werkzeug ausgerollt, nie von Hand geändert (ausser `.claude/harness.yml`, die dem Repo gehört).
@@ -91,6 +101,7 @@ ZIEL=$PWD ~/git/ai-entwicklung/werkzeuge/harness.sh --diff   # Drift-Check: übe
   alles über PRs (Entscheid Fabian 09.11.2026).
 - Der Workflow «Secret-Scan» prüft jeden Push auf allen Branches mit gitleaks, «CI-Fehler» legt bei rotem `main` ein
   Issue an.
-- Claude-Code-Hooks (`.claude/settings.json`) fragen nach, bevor Leitplanken, Secret-Dateien oder geschützte Pfade aus
-  `.claude/harness.yml` (Liquibase-Changesets, Realm-Export, `.github/scripts/`) geändert werden.
+- Claude-Code-Hooks (`.claude/settings.json`) fragen beim Bearbeiten mit Edit/Write nach, bevor Leitplanken,
+  Secret-Dateien oder geschützte Pfade aus `.claude/harness.yml` (Liquibase-Changesets, Realm-Export,
+  `.github/scripts/`) geändert werden. Änderungen per Bash prüft der Hook nicht; die eigentliche Sperre ist die CI.
 - Dependabot (`.github/dependabot.yml`) hält Actions (per SHA gepinnt), Docker-Images, npm und Maven wöchentlich aktuell.

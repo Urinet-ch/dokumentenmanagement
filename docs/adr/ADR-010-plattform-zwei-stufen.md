@@ -49,8 +49,7 @@
    - Umfang: neue VPS nach dem Muster, Deploy-Ziel umstellen (Host und Zugang nur als
      GitHub-Secrets), DNS beider Domains umstellen, Stufe B leer starten, Archiv-Dienste auf
      Stufe A entfernen, Leistung messen.
-   - Test-Buckets: [offen: Bucket-Namen der Stufe A und Umgang mit gesperrten Testobjekten beim
-     Wechsel – Entscheid vor Welle 1].
+   - Test-Buckets: entschieden von Fabian am 09.11.2026, siehe Nachtrag.
 7. **Keycloak bleibt (P5)**, weil der externe Treuhänder und Mandant 2 eigene Zugänge brauchen. Es
    läuft auf der VPS der jeweiligen Stufe und wird nach ADR-008 gesichert.
 
@@ -82,6 +81,14 @@
 - **Tests:** Lasttests (2.4, 2.6, 4.5) nur auf Stufe B (5.11), auf Stufe A nur Funktion.
 - **Betrieb:** Die Restore-Probe zählt zum Speicherbudget. Monitoring auf Stufe B (5.9); die
   Übernahme der Belege 2026 (5.8) setzt den abgeschlossenen Wechsel voraus.
+
+## Nachtrag 09.11.2026 (Buckets der Stufe A)
+Entschieden von Fabian am 09.11.2026 (Option A): Der Bucket heisst `<archiv.ablage.bucket-praefix><code>`, Standard
+`urinet-archiv-`, auf Stufe A `urinet-archiv-a-`; den produktiven Bucket `urinet-archiv-urinet` gibt es erst auf Stufe B
+(Aufgabe 5.4). Mit `archiv.stufe=A` sperrt das Archiv auch Dokumente unter `archiv/` höchstens 1 Tag (GOVERNANCE,
+`archiv.ablage.max-sperrfrist=P1D`). Ab Stufe B bricht der Start ab, wenn eine Höchstfrist gesetzt ist oder der Präfix
+der Stufe A gilt (Req 6.11). Beim Wechsel (5.11) löscht der App-Schlüssel frühestens 1 Tag nach dem letzten Upload alle
+Versionen der Test-Buckets ohne Bypass-Header, danach die Buckets; der Inhaber-Zugang wird nicht gebraucht.
 
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19; P1 (geändert 08.11.2026), P5, P15, K5
