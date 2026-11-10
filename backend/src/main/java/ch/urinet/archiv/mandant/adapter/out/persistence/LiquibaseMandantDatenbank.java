@@ -11,6 +11,7 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import liquibase.ui.LoggerUIService;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.sql.Connection;
@@ -147,8 +148,10 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                     .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
             datenbank.setDefaultSchemaName(schema);
             datenbank.setLiquibaseSchemaName(schema);
+            // Meldungen wie «UPDATE SUMMARY» ins Log statt auf stdout
             Scope.child(Map.of(Scope.Attr.resourceAccessor.name(),
-                    new ClassLoaderResourceAccessor(LiquibaseMandantDatenbank.class.getClassLoader())), () ->
+                    new ClassLoaderResourceAccessor(LiquibaseMandantDatenbank.class.getClassLoader()),
+                    Scope.Attr.ui.name(), new LoggerUIService()), () ->
                     new CommandScope(UpdateCommandStep.COMMAND_NAME)
                             .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, datenbank)
                             .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG, CHANGELOG)

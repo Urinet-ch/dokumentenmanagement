@@ -8,6 +8,7 @@ import io.quarkus.runtime.QuarkusApplication;
 import io.quarkus.runtime.annotations.QuarkusMain;
 import jakarta.inject.Inject;
 
+import java.io.PrintStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,14 +23,21 @@ import java.util.function.BiConsumer;
 @QuarkusMain
 public class ArchivMain implements QuarkusApplication {
 
-    /** Kommandos laufen neben dem Dienst im selben Container: kein HTTP-Server, kein OIDC, keine Rollen-Funktion. */
+    /**
+     * Kommandos laufen neben dem Dienst im selben Container: kein HTTP-Server, kein OIDC, keine Rollen-Funktion. Logs
+     * gehen auf stderr, damit {@code archiv token erstellen … > token} nur das Token in die Datei schreibt.
+     */
     public static final Map<String, String> KOMMANDO = Map.of(
             "archiv.rolle", "kommando",
             "quarkus.http.host-enabled", "false",
-            "quarkus.oidc.tenant-enabled", "false");
+            "quarkus.oidc.tenant-enabled", "false",
+            "quarkus.log.console.stderr", "true");
 
     static final int FALSCHER_AUFRUF = 2;
     static final int TECHNISCHER_FEHLER = 3;
+
+    /** stdout gehört im Kommando-Modus nur dem Ergebnis des Kommandos. */
+    private static PrintStream ergebnis = System.out;
 
     @Inject
     MandantKommando mandant;
@@ -51,7 +59,12 @@ public class ArchivMain implements QuarkusApplication {
             return;
         }
         KOMMANDO.forEach(System::setProperty);
+        // Liquibase 4.33 schreibt als Bibliothek fest auf System.out (ConsoleUIService; liquibase.uiService gilt nur
+        // in seiner CLI). Alles ausser dem Ergebnis geht darum auf stderr.
+        ergebnis = System.out;
+        System.setOut(System.err);
         Quarkus.run(ArchivMain.class, (code, ursache) -> {
+            System.setOut(ergebnis);
             if (ursache != null) {
                 // mit eigenem Handler meldet Quarkus den Startfehler nicht selbst; nur die Meldung, kein Stacktrace
                 System.err.println("Start fehlgeschlagen: " + grundursache(ursache).getMessage());
@@ -90,7 +103,7 @@ public class ArchivMain implements QuarkusApplication {
         }
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
-        return liste.getFirst().equals("token") ? token.ausfuehren(rest, System.out, System.err)
-                : mandant.ausfuehren(rest, System.out, System.err);
+        return liste.getFirst().equals("token") ? token.ausfuehren(rest, ergebnis, System.err)
+                : mandant.ausfuehren(rest, ergebnis, System.err);
     }
 }
