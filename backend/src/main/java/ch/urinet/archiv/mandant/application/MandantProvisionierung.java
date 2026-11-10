@@ -11,8 +11,8 @@ import org.jboss.logging.Logger;
 import java.util.List;
 
 /**
- * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Schema {@code m_<code>} über {@code db/mandant}, Seed der
- * Dokumentarten, Prüfung des neuen Schemas gegen das Mapping (Req 1.7), Bucket {@code <präfix><code>}; erst danach der
+ * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Prüfung des Seeds ({@link SeedPruefung}, vor jeder
+ * Änderung), Schema {@code m_<code>} über {@code db/mandant}, Seed der Dokumentarten, Prüfung des neuen Schemas gegen das Mapping (Req 1.7), Bucket {@code <präfix><code>}; erst danach der
  * Eintrag im Register, damit ein abgebrochener Lauf keinen aktiven Mandanten hinterlässt. Ein erneuter Lauf nach einem
  * Abbruch setzt fort.
  */
@@ -26,16 +26,19 @@ public class MandantProvisionierung {
     private final MandantBucket bucket;
     private final DokumentartSeed seed;
     private final MandantSchemaPruefung schemaPruefung;
+    private final SeedPruefung seedPruefung;
     private final String bucketPraefix;
 
     public MandantProvisionierung(MandantRegister register, MandantDatenbank datenbank, MandantBucket bucket,
                                   DokumentartSeed seed, MandantSchemaPruefung schemaPruefung,
+                                  SeedPruefung seedPruefung,
                                   @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
         this.register = register;
         this.datenbank = datenbank;
         this.bucket = bucket;
         this.seed = seed;
         this.schemaPruefung = schemaPruefung;
+        this.seedPruefung = seedPruefung;
         this.bucketPraefix = bucketPraefix;
     }
 
@@ -55,6 +58,7 @@ public class MandantProvisionierung {
             throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT, "Mandant existiert schon: " + code);
         }
         List<DokumentartVorlage> arten = seed.lesen(mandantCode);
+        seedPruefung.pruefen(mandantCode, arten);
         datenbank.schemaAnlegen(mandantCode.schema());
         datenbank.dokumentartenEinspielen(mandantCode.schema(), arten);
         schemaPruefung.pruefen(mandantCode.schema());

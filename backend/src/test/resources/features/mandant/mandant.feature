@@ -22,6 +22,12 @@ Funktionalität: Mandanten anlegen und migrieren
     Dann lehnt das Archiv mit «SEED_FEHLT» ab
     Und es gibt weder den Registereintrag «ohne-seed» noch das Schema «m_ohne_seed»
 
+  @req-1.5 @req-9.5
+  Szenario: Ein ungültiger Seed bricht ab, bevor etwas angelegt ist
+    Wenn der Betreiber den Mandanten «probe-seed-ungueltig» anlegt
+    Dann lehnt das Archiv mit «SEED_UNGUELTIG» ab
+    Und es gibt weder den Registereintrag «probe-seed-ungueltig» noch das Schema «m_probe_seed_ungueltig»
+
   @req-1.5
   Szenario: Einen Mandanten gibt es nur einmal
     Wenn der Betreiber die Mandanten «urinet» und «probe» anlegt

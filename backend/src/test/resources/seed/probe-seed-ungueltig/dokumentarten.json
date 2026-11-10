@@ -1,0 +1,17 @@
+{
+  "_zweck": "Synthetischer Seed nur für Tests (Review PR #40): Das Zusatz-Schema verweist ohne Fortschritt auf sich selbst; die Provisionierung muss mit SEED_UNGUELTIG abbrechen, bevor sie etwas anlegt",
+  "dokumentarten": [
+    {
+      "code": "PROBE_ZYKLUS",
+      "name": "Probe mit zyklischem Schema",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel"],
+      "zusatz_schema": {"type": "object", "$ref": "#"},
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "aufbewahrung_ab": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true
+    }
+  ]
+}
