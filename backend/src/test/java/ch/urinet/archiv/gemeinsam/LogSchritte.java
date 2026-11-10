@@ -6,6 +6,7 @@ import ch.urinet.archiv.sicherheit.ProblemDetails;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.security.AuthenticationFailedException;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
@@ -93,6 +94,25 @@ public class LogSchritte {
                 assertThat(antwort.asString()).as("Antwort").doesNotContain(wert);
             }
         }
+    }
+
+    @Dann("nennt das Log zur zweiten Anlage die Ursachen-Klassen mit SQLState «{word}»")
+    public void ursacheDerAnlage(String sqlState) {
+        assertThat(ursache(antworten.get(1))).contains("[sqlstate=" + sqlState + "]");
+    }
+
+    @Dann("nennt das Log zum verfälschten Token die Ursachen-Klassen")
+    public void ursacheDesTokens() {
+        assertThat(ursache(antworten.getLast())).startsWith(AuthenticationFailedException.class.getName());
+    }
+
+    /** Teil {@code ursache=…} des Eintrags zur Fehler-ID der Antwort. */
+    private String ursache(Response antwort) {
+        String fehlerId = antwort.jsonPath().getString("instance").substring("urn:uuid:".length());
+        List<String> zeilen = mitschnitt.eintraege().stream().map(mitschnitt::nachricht)
+                .filter(zeile -> zeile.startsWith("Fehler " + fehlerId + ":")).toList();
+        assertThat(zeilen).as("Logeintrag zur Fehler-ID").singleElement().asString().contains(" ursache=");
+        return zeilen.getFirst().substring(zeilen.getFirst().indexOf(" ursache=") + " ursache=".length());
     }
 
     @After

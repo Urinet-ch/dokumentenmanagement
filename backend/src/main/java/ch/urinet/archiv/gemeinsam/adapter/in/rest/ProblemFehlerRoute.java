@@ -88,7 +88,7 @@ public class ProblemFehlerRoute {
         }
         if (fehler instanceof AuthenticationFailedException || fehler instanceof UnauthorizedException
                 || fehler instanceof AuthenticationCompletionException) {
-            senden(kontext, ProblemAntwort.fuer(Fehlercode.NICHT_ANGEMELDET), true);
+            senden(kontext, ProblemAntwort.fuer(Fehlercode.NICHT_ANGEMELDET, fehler), true);
         } else if (fehler instanceof ForbiddenException) {
             senden(kontext, ProblemAntwort.fuer(Fehlercode.NICHT_ERLAUBT), false);
         } else {

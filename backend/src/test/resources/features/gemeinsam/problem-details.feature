@@ -8,7 +8,7 @@ Funktionalität: Fehlerantworten als Problem Details (design.md «Error Handling
     Wenn «inhaber-urinet» einen unerwarteten Fehler mit dem Text «VERTRAULICH-4711» auslöst
     Dann antwortet das Archiv mit 500 und Fehlercode «INTERNER_FEHLER»
     Und weder die Antwort noch das Log enthalten «VERTRAULICH-4711»
-    Und das Log nennt nur Fehler-ID, Status und Fehlercode
+    Und das Log nennt nur Fehler-ID, Status, Fehlercode und die Klassen der Ursachen
 
   @req-16.7
   # Vorab-Korrektur 2 aus dem Review von PR #35: Der eingebaute Mapper von Quarkus gab den Eingabewert zurück.
@@ -28,6 +28,9 @@ Funktionalität: Fehlerantworten als Problem Details (design.md «Error Handling
     Dann scheitert die zweite Anlage mit Status 500 und Fehlercode «INTERNER_FEHLER»
     Und wird das verfälschte Token mit Status 401 und Fehlercode «NICHT_ANGEMELDET» abgelehnt
     Und enthält weder eine Antwort noch das ganze Log einen dieser Werte
+    # Kann 7 aus dem Review von PR #37: Ursache ohne Werte – Klassen der Ursachen-Kette und SQLState zur Fehler-ID
+    Und nennt das Log zur zweiten Anlage die Ursachen-Klassen mit SQLState «23505»
+    Und nennt das Log zum verfälschten Token die Ursachen-Klassen
 
   # Vorab-Korrektur 4 aus dem Review von PR #35: Die Grenze der Anfrage gab einen leeren 413. Im Testprofil liegt sie
   # bei 1 MB (application.properties); die Grenze für Uploads (Req 3.6) setzt Aufgabe 2.4.
