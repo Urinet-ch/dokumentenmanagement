@@ -43,4 +43,5 @@ Gilt wie in `tech.md`, Abschnitt «Tests und Qualität». Gemergt wird nur mit �
 - Umsetzungs-PRs von Copilot merged Claude Code, wenn die CI grün ist (inkl. Secret-Scan), das Review von Claude Code keinen Muss-Befund hat und unter «Offen für Fabian» nichts steht; die Auslegungen entscheidet das Review und nennt sie im Bericht an Fabian.
 - «Offen für Fabian» heisst nur echte Entscheide: was eine Anforderung, Rechte oder Produktverhalten ändert. Technische Auslegungen innerhalb der Spec stehen im PR im Abschnitt «Auslegungen (Review entscheidet)» (Entscheid Fabian 10.11.2026).
 - Fabian merged weiterhin selbst: Spec-PRs mit neuen Anforderungen oder Entscheiden (die Freigabe ist der Merge), PRs zu Gates und zu Aufgaben **[Fabian]** sowie jeden PR mit Punkten «Offen für Fabian».
+- Ändert ein Umsetzungs-PR `requirements.md` oder `design.md` nur nach einem schon gefallenen und datierten Entscheid von Fabian (Entscheid mit Datum im Text), merged ihn ebenfalls Claude Code. Fabian merged nur, wenn ein PR einen **neuen** Entscheid braucht.
 - Copilot erhält seine Aufträge von Claude Code über die Copilot CLI; die Reihenfolge der Aufgaben bleibt die des Umsetzungsplans.
