@@ -69,7 +69,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - [Fabian] Zugang des Deploy-Workflows zur bestehenden Infomaniak-VPS (Deploy-Befehl für das SSH-Bundle) als GitHub-Secret bereitstellen; DNS für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch` auf diese VPS
     - Ergebnis 09.11.2026: Deploy-Key `archiv` im Infra-Repo (`deploy-keys/archiv.pub`, `einrichten.sh` gelaufen, Forced Command `deploy-app.sh archiv`); im Repo Secret `INFOMANIAK_SSH_KEY` und Variablen `INFOMANIAK_HOST`, `INFOMANIAK_KNOWN_HOSTS` gesetzt. DNS über den bestehenden Wildcard-Eintrag `*.apps.urinet.ch`, beide Namen lösen auf die VPS auf; `archiv-auth.apps.urinet.ch` deckt die Compose-Policy als `<app>-…` ohne Eintrag in `etc/app-hosts` ab
   - [Infra] Einträge im Infra-Repo der VPS (Compose-Policy, umgetaggte Images, internes Netz des Archivs); Ausgangswerte vor dem ersten Deploy festhalten (verfügbarer Speicher, freie Disk; Stand 08.11.2026: rund 1'140 MB, 15 GB; 09.11.2026: 1'130 MB verfügbar, 15 GB frei)
+    - Stand 10.11.2026 (Aufgabe 1.9): Infra-Repo PR #4 «eine Datei je Secret» (Ordner `secrets/` im Bundle) auf `main`; PR #5 «mehrere Images je App» (`archiv:<sha>`, `archiv:db-…`, `archiv:kc-…`) noch offen, `compose.yml` des Archivs besteht die Policy aus diesem Branch. Bisher hier: «umgetaggte Images» ohne Schema; neu: nach PR #5. Ausgangswerte vor dem ersten Deploy noch festhalten
   - Datenregel Stufe A festhalten: nur Test- und anonymisierte Daten, keine echten Belege, keine Personal- oder Lohndaten
+    - Ergebnis: von Fabian bestätigt (Auftrag 1.9, 10.11.2026)
   - _Anforderungen: 16.1, 16.10, 16.15_
 
 ## Welle 1 — Fundament (Voraussetzung: Gate 0, Stufe A aus 0.7 bereit)
@@ -131,6 +133,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
   - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
+  - Stand 10.11.2026 (PR #42, Copilot): `compose.yml`, abgeleitete Images, `infomaniak-deploy.yml` (nur `workflow_dispatch` und Tags `v*`), Szenarien `@req-16.7` (Allowlist) und `@req-16.11`; lokal gemessen braucht das Gerüst 820 MiB (api 320, db 100, kc 400) statt höchstens 700 MiB, der Workflow sperrt den Deploy deshalb (16.18, design.md «Stufen der Plattform»). Haken erst nach dem ersten Deploy durch Fabian
   - _Anforderungen: 16.1, 16.9, 16.10, 16.11, 16.18_
   - _Abhängig von: 0.7, 1.1_
 
