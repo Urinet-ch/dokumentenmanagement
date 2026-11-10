@@ -102,7 +102,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
-- [ ] 1.5 API-Tokens für Generatoren und Import [Backend]
+- [x] 1.5 API-Tokens für Generatoren und Import [Backend]
   - `ApiTokenAuthMechanism`, Argon2id, an einen Mandanten gebunden, Scopes `generator` und `import`; ein Token erreicht nur die Endpunkte seines Scopes, sonst 403
   - Kommando `archiv token erstellen <mandant> <name> <scope>` (gibt Geheimnis einmal aus); Anlegen, Anzeigen und Widerruf nur mit Recht A14
   - _Anforderungen: 2.5, 2.20_
