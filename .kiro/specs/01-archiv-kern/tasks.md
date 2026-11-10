@@ -89,11 +89,11 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Datasource aktiv, OIDC (`quarkus.oidc.tenant-enabled`), Dev Services und automatisches OpenAPI-Security-Schema wieder einschalten (in 1.1 vorübergehend aus)
   - _Anforderungen: 2.1, 2.2, 16.13_
 
-- [ ] 1.3 Mandantenregister und Provisionierung [Backend]
+- [x] 1.3 Mandantenregister und Provisionierung [Backend]
   - Liquibase `db/public`: `mandant` (inkl. Geschäftsjahresende), `auftrag`, `api_client`
-  - `MandantProvisionierung` (Schema, Liquibase `db/mandant`, Bucket mit Object Lock + Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` als Schutz gegen Versehen (design.md «Ablage»; entschieden von Fabian am 09.11.2026), Seed der Dokumentarten aus `seed/<code>/dokumentarten.json`); Admin-Kommando `archiv mandant anlegen <code>`
+  - `MandantProvisionierung` (Schema, Liquibase `db/mandant`, Bucket `<archiv.ablage.bucket-praefix><code>` mit Object Lock + Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention` als Schutz gegen Versehen (design.md «Ablage»; entschieden von Fabian am 09.11.2026), Seed der Dokumentarten aus `seed/<code>/dokumentarten.json`); Admin-Kommando `archiv mandant anlegen <code>`
   - beim Start Migration aller aktiven Mandanten über Liquibase, Hibernate nur `validate`
-  - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt; jeder Bucket trägt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`
+  - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt; jeder Bucket trägt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`; Bucket-Namen mit den Präfixen `urinet-archiv-` und `urinet-archiv-a-`
   - _Anforderungen: 1.1, 1.5, 1.7, 9.6_
 
 - [ ] 1.4 Mandanten-Kontext und Rechtematrix [Backend]

@@ -18,7 +18,9 @@ class BereitschaftOhneDatasourceTest {
     public static class OhneDatasource implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
-            return Map.of("quarkus.datasource.active", "false");
+            return Map.of("quarkus.datasource.active", "false",
+                    // ohne Datasource darf auch die Persistence Unit nicht starten (seit Aufgabe 1.3 mit Entität)
+                    "quarkus.hibernate-orm.active", "false");
         }
     }
 

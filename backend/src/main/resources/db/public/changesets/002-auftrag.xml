@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Auftragsschlange (design.md, Verarbeitung; ADR-003) -->
+    <changeSet id="002-auftrag" author="archiv">
+        <createTable tableName="auftrag">
+            <column name="id" type="bigint" autoIncrement="true">
+                <constraints primaryKey="true" primaryKeyName="auftrag_pk"/>
+            </column>
+            <column name="mandant" type="text">
+                <constraints foreignKeyName="auftrag_mandant_fk" references="mandant(code)"/>
+            </column>
+            <column name="typ" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nutzlast" type="jsonb"/>
+            <column name="status" type="text" defaultValue="OFFEN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="versuche" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nicht_vor" type="timestamptz"/>
+            <column name="fehler" type="text"/>
+            <column name="erstellt" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gestartet" type="timestamptz"/>
+            <column name="lebenszeichen" type="timestamptz"/>
+            <column name="beendet" type="timestamptz"/>
+        </createTable>
+        <sql>
+            alter table auftrag add constraint auftrag_status_ck check (status in ('OFFEN', 'LAEUFT', 'FERTIG', 'FEHLER'));
+        </sql>
+        <createIndex tableName="auftrag" indexName="auftrag_status_nicht_vor_ix">
+            <column name="status"/>
+            <column name="nicht_vor"/>
+        </createIndex>
+        <createIndex tableName="auftrag" indexName="auftrag_status_lebenszeichen_ix">
+            <column name="status"/>
+            <column name="lebenszeichen"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>
