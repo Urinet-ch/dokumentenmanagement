@@ -3,10 +3,10 @@
 # .github/workflows/infomaniak-deploy.yml; das Bundle bringt archiv:<sha>, archiv:db-<version> und archiv:kc-<version>
 # mit, deploy-app.sh setzt daraus archiv:current, archiv:db-current und archiv:kc-current.
 # Secrets nur als Dateien unter /run/secrets (tech.md Regel 7), je Dienst nur die eigenen.
-# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 700 MiB, cpus höchstens 0.75 (Richtwert, Messung 1.10).
-# Die Limits unten entsprechen dem lokal gemessenen Bedarf (Spitzen unter Last: api 309, db 66, kc 358 MiB) und
-# ergeben zusammen 820 MiB. Der Deploy-Workflow bricht vor dem Bundle ab, solange die Summe über dem Budget liegt
-# (Req 16.18); den Entscheid trifft Fabian (Budget anpassen oder Stufe B vorziehen, 5.11).
+# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 900 MiB (geändert 10.11.2026, Entscheid Fabian;
+# bisher 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Die Limits unten entsprechen dem lokal gemessenen
+# Bedarf (Spitzen unter Last: api 309, db 66, kc 358 MiB) und ergeben zusammen 820 MiB. Der Deploy-Workflow bricht vor
+# dem Bundle ab, sobald die Summe über dem Budget liegt (Req 16.18).
 name: archiv
 
 services:
@@ -44,8 +44,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Die Readiness umfasst Keycloak (quarkus.oidc.health.enabled); startet api vor kc, bleibt sie DOWN
+      kc:
+        condition: service_healthy
     healthcheck:
-      # Readiness umfasst die Datenbank (Agroal); das Image hat kein curl
+      # Readiness umfasst Datenbank (Agroal) und Keycloak (OIDC); das Image hat kein curl
       test:
         - CMD
         - bash

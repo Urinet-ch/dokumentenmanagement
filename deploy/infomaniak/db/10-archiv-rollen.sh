@@ -15,6 +15,15 @@ for name in archiv_db_owner_scram archiv_db_app_scram keycloak_db_scram; do
   fi
 done
 
+# Der Superuser postgres meldet sich nur über den lokalen Socket im Container an, nie über TCP (Nachbesserung PR #42):
+# Die Regel steht vor der allgemeinen «host all all all …», die das Image beim Init anhängt.
+hba="$PGDATA/pg_hba.conf"
+if ! grep -Eq '^host[[:space:]]+all[[:space:]]+all[[:space:]]+all[[:space:]]' "$hba"; then
+  echo "pg_hba.conf ohne Regel «host all all all»: Image von PostgreSQL prüfen (Aufgabe 1.9)." >&2
+  exit 1
+fi
+sed -i '0,/^host[[:space:]]\+all[[:space:]]\+all[[:space:]]\+all[[:space:]]/s//host all postgres all reject\n&/' "$hba"
+
 # Werte nur über psql-Variablen (\set mit Backticks), nie auf der Kommandozeile
 psql -v ON_ERROR_STOP=1 --no-psqlrc --username "$POSTGRES_USER" --dbname postgres <<'SQL'
 \set owner `cat /run/secrets/archiv_db_owner_scram`

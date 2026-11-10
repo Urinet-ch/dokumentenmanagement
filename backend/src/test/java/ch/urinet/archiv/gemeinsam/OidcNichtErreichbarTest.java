@@ -14,7 +14,8 @@ import static org.hamcrest.Matchers.containsString;
 
 /**
  * Keycloak nicht erreichbar (z. B. nach einem Deploy, solange {@code kc} noch startet): Die API antwortet 401 statt 500
- * (Aufgabe 1.9, Review PR #37); die Liveness bleibt UP, damit der Container nicht neu startet.
+ * (Aufgabe 1.9, Review PR #37); die Liveness bleibt UP, damit der Container nicht neu startet, die Readiness meldet
+ * Keycloak DOWN ({@code quarkus.oidc.health.enabled}).
  */
 @QuarkusTest
 @TestProfile(OidcNichtErreichbarTest.OhneKeycloak.class)
@@ -40,6 +41,12 @@ class OidcNichtErreichbarTest {
     @Test
     void livenessBleibtUp() {
         given().when().get("/q/health/live").then().statusCode(200);
+    }
+
+    @Test
+    void readinessMeldetKeycloakDown() {
+        given().when().get("/q/health/ready").then().statusCode(503)
+                .body(containsString("OIDC Provider Health Check"));
     }
 
     /** Formal gültiges, unsigniertes JWT; geprüft werden kann es ohne Keycloak ohnehin nicht. */

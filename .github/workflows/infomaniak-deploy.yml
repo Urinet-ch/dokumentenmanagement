@@ -1,8 +1,8 @@
 # Deploy auf die Infomaniak-VPS, Stufe A (Aufgabe 1.9; Req 16.1, 16.9, 16.10, 16.11, 16.18; design.md «Betrieb auf
-# der VPS»). Einziger Weg auf den Server: Bundle (image.tar, compose.yml, secrets/) per SSH an den Forced Command
+# der VPS»). Einziger Weg auf den Server: Bundle (image.tar, compose.yml, bundle/secrets/) per SSH an den Forced Command
 # deploy-app.sh der VPS, danach Health-Prüfung; schlägt sie fehl, Rollback auf den Vorgänger-Stand.
 # Kein Server-Zugriff aus Sitzungen, kein manuelles «docker compose up» auf dem Server (CLAUDE.md, Arbeitsweise 8).
-# Secrets nur als Dateien im Bundle (tech.md Regel 7), Werte erscheinen nie im Log; Logs nennen nur Namen und IDs.
+# Geheimnisse nur als Dateien im Bundle (tech.md Regel 7), Werte erscheinen nie im Log; Logs nennen nur Namen und IDs.
 name: Infomaniak Deploy
 
 on:
@@ -22,8 +22,9 @@ env:
   APP: archiv
   HOST_ARCHIV: archiv.apps.urinet.ch
   HOST_AUTH: archiv-auth.apps.urinet.ch
-  # Speicherbudget Stufe A aus tech.md; liegt compose.yml darüber, gilt Req 16.18 (kein Deploy auf Stufe A)
-  BUDGET_MEM_MIB: '700'
+  # Speicherbudget Stufe A aus tech.md (900 MiB, geändert 10.11.2026, Entscheid Fabian); liegt compose.yml darüber,
+  # gilt Req 16.18 (kein Deploy auf Stufe A)
+  BUDGET_MEM_MIB: '900'
   BUDGET_CPUS: '0.75'
 
 jobs:
@@ -37,6 +38,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # ganze Historie für die Prüfung «Commit liegt auf main»
+          fetch-depth: 0
+
+      - name: Commit liegt auf main
+        run: |
+          # Auch ein Release-Tag deployt nur einen Stand, der über einen PR auf main kam (Req 16.10)
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Commit $GITHUB_SHA liegt nicht auf main. Nur Stände von main deployen; Tag auf einen Commit von main setzen."
+            exit 1
+          fi
 
       - name: Speicherbudget Stufe A (Req 16.18)
         run: |
@@ -54,7 +65,7 @@ jobs:
             exit 1
           fi
 
-      - name: Secrets und Variablen vorhanden
+      - name: Geheimnisse und Variablen vorhanden
         env:
           SSH_KEY: ${{ secrets.INFOMANIAK_SSH_KEY }}
           KNOWN_HOSTS: ${{ vars.INFOMANIAK_KNOWN_HOSTS }}
@@ -127,7 +138,7 @@ jobs:
           read -r -a tags <<< "$TAGS"
           docker save "${tags[@]}" -o bundle/image.tar
           cp deploy/infomaniak/compose.yml bundle/compose.yml
-          # Eine Datei je Secret, nur der Wert (deploy-app.sh: secrets/<name>)
+          # Eine Datei je Secret, nur der Wert (deploy-app.sh liest bundle/secrets/<name>)
           schreibe() { printf '%s' "$2" > "bundle/secrets/$1"; }
           schreibe archiv_db_postgres "$ARCHIV_DB_POSTGRES"
           schreibe archiv_db_owner "$ARCHIV_DB_OWNER"
@@ -138,7 +149,7 @@ jobs:
           schreibe s3_app_zugang_geheimnis "$S3_APP_ZUGANG_GEHEIMNIS"
           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
-            python3 .github/scripts/scram-verifier.py < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"
+            python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"
           done
           ls bundle bundle/secrets
 
@@ -174,22 +185,23 @@ jobs:
           tar -C bundle -cf - . \
             | ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "deploy@$HOST" "deploy $APP" 2>&1 \
             | tee deploy.log
-          # Secrets und Images verlassen den Runner nicht weiter
+          # Geheimnisse und Images verlassen den Runner nicht weiter
           rm -rf bundle
 
       - name: Container gesund
         env:
           HOST: ${{ vars.INFOMANIAK_HOST }}
         run: |
-          # status liefert «compose ps» und Logs; ausgewertet und ausgegeben werden nur die Zeilen der Container
+          # status liefert «compose ps» und Logs; pruefe-container.py wertet nur die Zeilen der Container aus und
+          # merkt sich ihre Laufzeit für die Prüfung auf Neustarts (Speicherabbrüche)
           for _ in $(seq 1 30); do
-            zeilen=$(ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null \
-              | awk '$1 ~ /^archiv-(api|db|kc)-[0-9]+$/' || true)
-            gesund=$(grep -c '(healthy)' <<< "$zeilen" || true)
-            if [ "$gesund" -eq 3 ]; then awk '{print $1, "healthy"}' <<< "$zeilen"; exit 0; fi
+            ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null > status.txt || true
+            if python3 .github/scripts/pruefe-container.py gesund "$RUNNER_TEMP/container.json" < status.txt > stand.txt; then
+              cat stand.txt; rm -f status.txt stand.txt; exit 0
+            fi
             sleep 15
           done
-          awk '{print $1}' <<< "$zeilen"
+          cat stand.txt; rm -f status.txt stand.txt
           echo "::error::api, db und kc sind nach 7.5 Minuten nicht alle healthy."
           exit 1
 
@@ -220,14 +232,17 @@ jobs:
         env:
           HOST: ${{ vars.INFOMANIAK_HOST }}
         run: |
-          # Nach einer Minute Betrieb: kein Container im Neustart, keine Abbruchmeldung von JVM oder Kernel im Log.
-          # Gezählt wird nur, Log-Inhalte erscheinen nicht in der Ausgabe. Speicherabbrüche anderer Apps sieht der
-          # Deploy-Befehl nicht; die prüft Fabian auf der VPS (Nachweis 16.18 manuell).
+          # Nach einer Minute Betrieb: alle Container wieder healthy und seit «Container gesund» nicht neu gestartet
+          # (Laufzeit aus «compose ps»; ein cgroup-OOM mit restart: unless-stopped zeigt sich nur so), keine
+          # Abbruchmeldung von JVM oder Kernel im Log. Log-Inhalte erscheinen nicht in der Ausgabe, nur Zählungen.
+          # Speicherabbrüche anderer Apps sieht der Deploy-Befehl nicht; die prüft Fabian auf der VPS (Nachweis 16.18
+          # manuell).
           sleep 60
           ausgabe=$(ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null || true)
-          neustart=$(awk '$1 ~ /^archiv-(api|db|kc)-[0-9]+$/' <<< "$ausgabe" | grep -c -E 'Restarting|Exited' || true)
+          neustart=0
+          python3 .github/scripts/pruefe-container.py unveraendert "$RUNNER_TEMP/container.json" <<< "$ausgabe" || neustart=1
           abbruch=$(grep -c -E 'OutOfMemoryError|Killed|oom-kill' <<< "$ausgabe" || true)
-          echo "Container im Neustart: $neustart, Abbruchmeldungen im Log: $abbruch"
+          echo "Abbruchmeldungen im Log: $abbruch"
           if [ "$neustart" -ne 0 ] || [ "$abbruch" -ne 0 ]; then
             echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 und Wechsel (5.11) vorziehen."
             exit 1
@@ -264,10 +279,18 @@ jobs:
             echo "Deploy vor dem Umschalten abgebrochen; auf dem Server ist nichts geändert."
             exit 0
           fi
-          ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "rollback $APP" 2>&1 \
-            | grep -E '^(rollback|  Dienst|kein )' || true
-          echo "::error::Deploy fehlgeschlagen, Rollback auf den Vorgänger-Stand ausgelöst."
+          rc=0
+          ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "rollback $APP" > rollback.log 2>&1 || rc=$?
+          grep -E '^(rollback|  Dienst|kein )' rollback.log || true
+          if grep -q "^kein $APP:previous vorhanden" rollback.log; then
+            echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren, Archiv-Dienste prüfen oder stoppen."
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error::Deploy fehlgeschlagen, und der Rollback ist ebenfalls fehlgeschlagen (Exit $rc). Fabian informieren, Zustand auf der VPS prüfen."
+          else
+            echo "::error::Deploy fehlgeschlagen, Rollback auf den Vorgänger-Stand ausgeführt."
+          fi
+          rm -f rollback.log
 
       - name: Aufräumen
         if: always()
-        run: rm -rf ~/.ssh/deploy bundle deploy.log
+        run: rm -rf ~/.ssh/deploy bundle deploy.log rollback.log status.txt stand.txt "$RUNNER_TEMP/container.json"

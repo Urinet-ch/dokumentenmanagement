@@ -125,7 +125,7 @@ jobs:
           QUARKUS_DATASOURCE_ACTIVE: 'false'
           QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:1/keine-datenbank
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
-        # bricht der Start ab (design.md «Secrets und Konfiguration»); die Browser-Szenarien greifen nie auf S3 oder DB zu
+        # bricht der Start ab (design.md, Abschnitt zu Konfiguration und Geheimnissen); die Browser-Szenarien greifen nie auf S3 oder DB zu
         run: |
           DATEIEN="$RUNNER_TEMP/secret-dateien"
           mkdir -p "$DATEIEN"

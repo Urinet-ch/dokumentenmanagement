@@ -90,6 +90,14 @@ Entschieden von Fabian am 09.11.2026 (Option A): Der Bucket heisst `<archiv.abla
 der Stufe A gilt (Req 6.11). Beim Wechsel (5.11) löscht der App-Schlüssel frühestens 1 Tag nach dem letzten Upload alle
 Versionen der Test-Buckets ohne Bypass-Header, danach die Buckets; der Inhaber-Zugang wird nicht gebraucht.
 
+## Nachtrag 10.11.2026 (Speicherbudget der Stufe A)
+Entschieden von Fabian am 10.11.2026: Das Speicherbudget der Stufe A steigt von 700 auf **900 MiB** (Summe `mem_limit`);
+`cpus` bleibt bei höchstens 0.75. Grund: Die erste Messung in Aufgabe 1.9 (lokal, ganzer Stack) ergab 820 MiB, vor
+allem wegen Keycloak (rund 318 MiB im Leerlauf); mit tieferen Limits beendete der cgroup-OOM Keycloak. Die VPS hat
+rund 1'140 MB frei. Das Abbruchkriterium aus Req 16.18 bleibt: Ein Speicherabbruch auf der VPS oder eine kranke andere
+App beendet den Deploy, das Archiv wird auf Stufe A gestoppt und Stufe B (5.11) vorgezogen. Punkt 4 «Budget» oben gilt
+mit dem neuen Wert; nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.9, 1.10) und im Deploy-Workflow.
+
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19; P1 (geändert 08.11.2026), P5, P15, K5
 - `tech.md` «Plattform und Betrieb»; design.md «Betrieb auf der VPS», «Stufen der Plattform»

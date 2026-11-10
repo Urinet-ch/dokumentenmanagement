@@ -26,7 +26,7 @@ def main() -> int:
     print(f"Summe: {summe_mib:.0f} MiB (Budget {budget_mib}), {summe_cpus} CPU (Budget {budget_cpus})")
     if summe_mib > budget_mib or summe_cpus > budget_cpus:
         fehler.append("Summe über dem Speicherbudget der Stufe A: Req 16.18 tritt ein (Abbruchkriterium 1.10). "
-                      "Kein Deploy auf Stufe A; Fabian entscheidet über Budget oder vorgezogenen Wechsel auf Stufe B (5.11).")
+                      "Kein Deploy auf Stufe A; Fabian informieren, K5 und Wechsel auf Stufe B (5.11) vorziehen.")
     for f in fehler:
         print(f"::error::{f}")
     return 1 if fehler else 0

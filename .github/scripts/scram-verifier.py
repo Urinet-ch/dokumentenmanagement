@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """SCRAM-SHA-256-Verifier für PostgreSQL aus einem Passwort auf stdin (Deploy-Workflow, Aufgabe 1.9).
 
+Aufruf: scram-verifier.py [<name des Secrets>] < passwort; der Name erscheint nur in der Fehlermeldung.
+
 Der Datenbank-Container bekommt nur den Verifier, nie das Passwort der Rolle (deploy/infomaniak/db/10-archiv-rollen.sh).
 Format wie PostgreSQL: SCRAM-SHA-256$<iterationen>:<salt>$<StoredKey>:<ServerKey>, alles Base64.
 Nur druckbares ASCII ohne Leerzeichen, damit SASLprep (RFC 4013) das Passwort nicht verändert.
@@ -25,9 +27,11 @@ def verifier(passwort: str, salt: bytes, iterationen: int = ITERATIONEN) -> str:
 
 
 def main() -> int:
+    rolle = sys.argv[1] if len(sys.argv) > 1 else "Passwort"
     passwort = sys.stdin.read().removesuffix("\n")
     if len(passwort) < 16 or not all(33 <= ord(z) <= 126 for z in passwort):
-        print("Passwort fehlt, ist kürzer als 16 Zeichen oder enthält anderes als druckbares ASCII ohne Leerzeichen.",
+        print(f"{rolle}: fehlt, ist kürzer als 16 Zeichen oder enthält anderes als druckbares ASCII ohne Leerzeichen. "
+              "GitHub-Secret neu setzen (vor dem ersten Deploy; danach nur zusammen mit ALTER ROLE).",
               file=sys.stderr)
         return 1
     print(verifier(passwort, os.urandom(16)))

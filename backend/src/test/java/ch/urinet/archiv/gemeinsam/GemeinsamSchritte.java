@@ -12,9 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
@@ -25,19 +23,6 @@ public class GemeinsamSchritte {
 
     /** Tests laufen in {@code backend/}; das Repository liegt eine Ebene höher. */
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
-
-    /**
-     * Workflows, die Secrets brauchen dürfen, mit den erlaubten Namen (Req 16.7, 16.9): nur der Deploy (Aufgabe 1.9).
-     * Er schreibt die Werte als Dateien ins Bundle für den Server und verarbeitet keine Daten.
-     */
-    static final Map<String, Set<String>> WORKFLOWS_MIT_SECRETS = Map.of("infomaniak-deploy.yml", Set.of(
-            "INFOMANIAK_SSH_KEY", "ARCHIV_DB_POSTGRES", "ARCHIV_DB_OWNER", "ARCHIV_DB_APP", "KEYCLOAK_DB",
-            "KEYCLOAK_ADMIN", "S3_APP_ZUGANG_ID", "S3_APP_ZUGANG_GEHEIMNIS"));
-
-    private static final Pattern SECRETS = Pattern.compile("\\bsecrets\\b");
-
-    /** Zugriff auf den Secrets-Kontext eines Workflows ({@code secrets.NAME}, {@code secrets[...]}, {@code toJSON(secrets)}). */
-    private static final Pattern SECRET_AUSDRUCK = Pattern.compile("\\bsecrets\\s*(?:\\.\\s*([A-Za-z0-9_]+)|(\\[)|(\\)))");
 
     private Response antwort;
 
@@ -62,16 +47,9 @@ public class GemeinsamSchritte {
         for (Path workflow : workflows) {
             String name = workflow.getFileName().toString();
             String inhalt = Files.readString(workflow, StandardCharsets.UTF_8);
-            Set<String> erlaubt = WORKFLOWS_MIT_SECRETS.get(name);
-            if (erlaubt == null) {
-                assertThat(SECRETS.matcher(inhalt).find()).as("Secret in %s", name).isFalse();
-            } else {
-                var treffer = SECRET_AUSDRUCK.matcher(inhalt);
-                while (treffer.find()) {
-                    assertThat(treffer.group(1)).as("Secret-Zugriff ohne Namen in %s", name).isNotNull();
-                    assertThat(erlaubt).as("Secret in %s", name).contains(treffer.group(1));
-                }
-            }
+            // Nur der Deploy darf Secrets nutzen (Aufgabe 1.9); er schreibt sie ins Bundle und verarbeitet keine Daten
+            assertThat(WorkflowSecrets.funde(inhalt, WorkflowSecrets.ERLAUBT.getOrDefault(name, Set.of())))
+                    .as("unerlaubte Secrets in %s", name).isEmpty();
             assertThat(inhalt).as(name).doesNotContain("ARCHIV_GOLDEN_DIR", "-Dgolden", "GoldenDatensatzIT");
         }
     }
