@@ -159,11 +159,12 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [x] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
   - Entität `Dokumentart` mit Standard-Vertraulichkeit und `gesetzliche_pflicht`; REST `/api/v1/dokumentarten` (CRUD nur mit Recht A11; Löschen nur ohne Dokumente, sonst 409 `DOKUMENTART_IN_GEBRAUCH` → inaktiv); JSON-Schema-Validierung für `zusatz` (422 `ZUSATZ_UNGUELTIG`)
   - Seed `backend/src/main/resources/seed/urinet/dokumentarten.json` mit den 11 Arten aus 1.7; ein Test prüft den Seed Feld für Feld gegen die Stammdaten-Tabelle in design.md
-  - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026)
+  - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026; Texte abgenommen von Fabian am 10.11.2026)
+  - Entscheide F1–F7 (entschieden von Fabian am 10.11.2026): Neuberechnung ohne Sperre übernimmt auch ein früheres Ergebnis, mit Sperre bleibt der Konflikt (9.7); Regel einer Art mit Dokumenten änderbar, Änderung mit alter und neuer Regel im Zugriffsprotokoll (`REGEL_AENDERN`, 9.10; Wirkung auf bestehende Dokumente mit 2.2/2.3); `AUSGANGSRECHNUNG` ohne Pflichtfeld `faelligkeit`; `BEHOERDE` mit Gruppe `finanz`; `LOHNABRECHNUNG` mit Lohnausweis (`zusatz.periode` `JJJJ-MM` oder `JJJJ`)
   - `AufbewahrungRechner`: Ende des bestätigten Geschäftsjahres (Geschäftsjahresende des Mandanten) plus Jahre der Regel; ohne Belegdatum Eingangsdatum; Verträge ab `gueltig_bis`, ohne `gueltig_bis` unbefristet; Neuberechnung verlängert nur; Frist in der Vergangenheit → «Frist abgelaufen»; keine Löschung bei Fristablauf
-  - Unit-Tests: Beleg 2026 → 31.12.2036; abweichendes Geschäftsjahresende; ohne Belegdatum; Vertrag ohne `gueltig_bis`; Neuberechnung mit früherem Datum → Sperre bleibt, Konflikt protokolliert
+  - Unit-Tests: Beleg 2026 → 31.12.2036; abweichendes Geschäftsjahresende; ohne Belegdatum; Vertrag ohne `gueltig_bis`; Neuberechnung mit früherem Datum → mit Sperre bleibt die Frist, Konflikt protokolliert, ohne Sperre gilt das neue Ergebnis (entschieden von Fabian am 10.11.2026)
   - [Fabian] Abnahme: Seed gegen die freigegebene Tabelle prüfen
-  - _Anforderungen: 2.17, 9.1–9.9_
+  - _Anforderungen: 2.17, 9.1–9.10_
   - _Abhängig von: 1.7_
 
 - [ ] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
