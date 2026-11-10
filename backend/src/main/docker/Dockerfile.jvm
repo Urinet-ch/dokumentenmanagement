@@ -1,7 +1,7 @@
 # Ein Image für beide Laufarten (tech.md: archiv.rolle=api, worker oder api,worker); die PWA steckt über Quinoa im Artefakt.
 # Bauen nach `mvn -f backend/pom.xml package`: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv backend
 # OCR-Werkzeuge (OCRmyPDF, Tesseract, img2pdf, libheif) kommen mit der Verarbeitung (Aufgabe 2.6) dazu.
-FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce
+FROM eclipse-temurin:26.0.2.1_1-jre-noble@sha256:adfd44c114916dc79fa9a24087fbac34252096edb9892d1c2d9d82db3f8947b3
 
 ENV JAVA_OPTS_APPEND="-Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 
