@@ -22,7 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>
  * Invariante gegen Timing: Auch für eine unbekannte ID läuft genau ein Vergleich, gegen einen festen Attrappen-Hash.
  * Sonst verriete die Antwortzeit, welche IDs es gibt. Der Vergleich läuft immer vor der Prüfung von {@code aktiv}.
- * Die Attrappe entsteht beim Start ({@link #attrappeBerechnen()}), nicht bei der ersten Anfrage.
+ * Die Attrappe entsteht beim Start ({@link #attrappeBerechnen()}), nicht bei der ersten Anfrage, und zwar über die
+ * {@link HashSperre}: So entsteht auch die Sperre beim Start, und ungültige Einstellungen brechen ihn ab.
  * <p>
  * Jeder Vergleich kostet rund 19 MiB Heap. Darum läuft er über die {@link HashSperre}, auch der gegen die Attrappe
  * (gleicher Weg, gleiche Laufzeit); so erschöpfen Anfragen ohne Anmeldung den Heap nicht.
@@ -104,7 +105,8 @@ public class ApiTokenPruefung {
             synchronized (this) {
                 wert = attrappe;
                 if (wert == null) {
-                    wert = hasher.hashen(ApiToken.neu(ZUFALL).geheimnis());
+                    String geheimnis = ApiToken.neu(ZUFALL).geheimnis();
+                    wert = sperre.ausfuehren(() -> hasher.hashen(geheimnis));
                     attrappe = wert;
                 }
             }
