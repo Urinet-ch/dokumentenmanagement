@@ -231,6 +231,8 @@ Arbeitsweise je Aufgabe (Claude Code):
   - WireMock-Tests für gültige, ungültige und fehlende Antworten; ein WireMock-Test prüft den Request: `model` = Wert von `archiv.ki.erfassung-modell` (nicht `archiv.ki.chat-modell`), `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `response_format` `json_schema` mit `strict`
   - Befund Gate-Lauf (`docs/spikes/golden-ergebnis.md`): Belegnummer-Vorschläge mit hoher Sicherheit gezielt prüfen, ohne Prompt, Modell oder Aufrufparameter gegenüber Gate 0 zu ändern (sonst neuer Golden-Lauf)
   - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)
+  - `KiBasisUrlPruefung` prüft die wirksame Konfiguration (`LangChain4jOpenAiConfig`: `defaultConfig()` und alle `namedConfig()`) statt einzelner Schlüssel; Testfall benannter Client ohne `base-url` → Abbruch (Req 16.21)
+  - Die WireMock-Testressource setzt `archiv.ki.wiremock-port` dynamisch beim Start (bis 3.2 fest `8089`, Req 16.21)
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]

@@ -426,8 +426,11 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - Eigene Stub-Schalter `archiv.ki.embedding-stub` und `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, in
   `lokal` `true`); der Reranker-Schalter steuert die Prüfung von `archiv.ki.reranker-url`. Die Ports selbst kommen mit
   Spec 02. In `lokal` sind `archiv.ki.product-id` und `archiv.ki.reranker-url` leer.
-- Geprüft wird zusätzlich `quarkus.langchain4j.openai.base-url`, weil der LangChain4j-Client sonst an der Prüfung
-  vorbei einen Endpunkt erhalten könnte.
+- Geprüft wird zusätzlich `quarkus.langchain4j.openai.base-url` (nur der Default-Client von LangChain4j), weil
+  dieser Client sonst an der Prüfung vorbei einen Endpunkt erhalten könnte. Benannte Clients
+  (`quarkus.langchain4j.openai."<name>".base-url`, Standardwert `https://api.openai.com/v1/`) prüft 1.11 nicht; es
+  gibt noch keinen. Die Prüfung der wirksamen Konfiguration aller Clients folgt in Aufgabe 3.2.
+- Schema und Host werden ohne Unterscheidung von Gross- und Kleinschreibung verglichen (`HTTPS://…` ist zulässig).
 - Bei aktivem Stub entfällt die Prüfung nur für eine **leere** URL; eine gesetzte URL wird auch dann geprüft.
 - Ein gepacktes Artefakt (Quarkus `LaunchMode.NORMAL`) gilt immer als `prod`; `-Dquarkus.profile=lokal` bricht dort
   ab (Req 16.22). Ist `test` aktiv, gilt die Regel von `test` (strenger als `lokal`).
