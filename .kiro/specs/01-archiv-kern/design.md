@@ -257,7 +257,7 @@ stateDiagram-v2
   - SHA-256 der Kopie: Der Adapter liest die Kopie immer über ihre Versions-ID neu und hasht sie. `x-amz-checksum-sha256` wird nicht genutzt, denn eine CopyObject-Antwort von Ceph mit SHA-256 ist nicht nachgewiesen (Open Points).
   - `ablegenEingang` schreibt den Datenstrom zuerst in eine temporäre Datei und berechnet dabei die SHA-256. So kann das SDK einen Versuch mit demselben Inhalt wiederholen.
   - `GetObjectRetention` ohne Sperre: Ceph antwortet mit 404, MinIO mit 400. Beide liefern den Fehlercode `NoSuchObjectLockConfiguration` und gelten als «keine Sperre».
-  - `vorsignierteUrl` signiert nur `GET` mit `versionId`. Die Gültigkeit kommt aus `archiv.ablage.url-gueltigkeit` (Standard `PT5M`); ein Wert über 5 Minuten verhindert den Start (Req 14.6).
+  - `vorsignierteUrl` signiert nur `GET` mit `versionId`. Die Gültigkeit kommt aus `archiv.ablage.url-gueltigkeit` (Standard `PT5M`); einen Wert über 5 Minuten lehnt `AblageEinstellungen` ab (Req 14.6).
   - Startprüfungen:
     - `AblageStufenPruefung` (API und Worker) prüft die Regel `Stufenregel` mit `archiv.stufe` (fehlt der Wert, gilt `B`). Ab Stufe B bricht der Start ab bei einem Sperrmodus von `manifest/` ungleich COMPLIANCE, einer Höchstfrist von `manifest/` oder `archiv/` oder dem Präfix `urinet-archiv-a-`.
     - `PortAuswahlPruefung` bricht in `prod` ab, wenn ein Port auf den Dev-Stub fällt (Req 16.13).
