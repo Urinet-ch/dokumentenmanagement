@@ -58,6 +58,9 @@ cd backend && mvn quarkus:dev
   Weboberfläche über `archiv.entwicklung.mailpit-port` (Dev UI, Configuration) oder
   `docker compose -p urinet-archiv-dev port mailpit 8025`.
 - Im Profil `dev` laufen Ablage, KI, OCR und Integration als Dev-Stubs (`archiv.<port>.stub=true`).
+- Profil `lokal` (nur Entwicklerrechner, ADR-012): Sprachmodell über LM Studio auf `127.0.0.1`, Start mit
+  `mvn quarkus:dev -Dquarkus.profile=lokal`. Anleitung und Verbote: [backend/README.md](backend/README.md),
+  «Lokales Modell (LM Studio)».
 - Testbenutzer (nur im Test-Realm, nie im Export für Stufe A und B), Passwort `Test-Passwort-1`, TOTP mit dem
   Test-Secret aus `realm-test.json` (`urinet-archiv-test-otp-nur-lokal`; für eine Authenticator-App als Base32
   `OVZGS3TFOQWWC4TDNBUXMLLUMVZXILLPORYC23TVOIWWY33LMFWA`):
