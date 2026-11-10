@@ -43,10 +43,13 @@ public class AufbewahrungSchritte {
         assertThat(ergebnis.fristAbgelaufen()).isEqualTo("abgelaufen".equals(zustand));
     }
 
-    @Wenn("eine bestehende Frist «{}» neu als «{}» berechnet wird")
-    public void neuBerechnen(String bisher, String neu) {
+    @Wenn("eine bestehende Frist «{}» {word} Sperre neu als «{}» berechnet wird")
+    public void neuBerechnen(String bisher, String sperre, String neu) {
+        if (!"mit".equals(sperre) && !"ohne".equals(sperre)) {
+            throw new IllegalArgumentException("«mit» oder «ohne» Sperre erwartet: " + sperre);
+        }
         entscheid = Aufbewahrung.entscheiden(UNBEFRISTET.equals(bisher) ? null : datum(bisher),
-                UNBEFRISTET.equals(neu) ? null : datum(neu));
+                UNBEFRISTET.equals(neu) ? null : datum(neu), "mit".equals(sperre));
     }
 
     @Dann("lautet der Entscheid «{word}»")

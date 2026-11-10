@@ -138,22 +138,31 @@ class AufbewahrungTest {
         LocalDate neu = Aufbewahrung.berechne(new Aufbewahrungsregel(5, AufbewahrungAb.GESCHAEFTSJAHR), beleg, null,
                 null, null, ende("12-31"), HEUTE).bis();
         assertThat(neu).isEqualTo(LocalDate.of(2031, 12, 31));
-        assertThat(Aufbewahrung.entscheiden(alt, neu)).isEqualTo(Neuberechnung.KONFLIKT);
+        assertThat(Aufbewahrung.entscheiden(alt, neu, true)).isEqualTo(Neuberechnung.KONFLIKT);
+        assertThat(Aufbewahrung.entscheiden(alt, neu, false)).isEqualTo(Neuberechnung.FRUEHER_UEBERNEHMEN);
         LocalDate unbefristet = Aufbewahrung.berechne(Aufbewahrungsregel.UNBEFRISTET, beleg, null, null, null,
                 ende("12-31"), HEUTE).bis();
-        assertThat(Aufbewahrung.entscheiden(alt, unbefristet)).isEqualTo(Neuberechnung.VERLAENGERN);
+        assertThat(Aufbewahrung.entscheiden(alt, unbefristet, true)).isEqualTo(Neuberechnung.VERLAENGERN);
     }
 
-    @ParameterizedTest(name = "bisher {0}, neu {1} → {2}")
+    /** Req 9.7, entschieden von Fabian am 10.11.2026: mit Sperre nur verlängern, ohne Sperre gilt das neue Ergebnis. */
+    @ParameterizedTest(name = "bisher {0}, neu {1}, gesperrt {2} → {3}")
     @CsvSource({
-            "2036-12-31, 2036-12-31, GLEICH",
-            "2036-12-31, 2037-12-31, VERLAENGERN",
-            "2036-12-31,           , VERLAENGERN",
-            "2036-12-31, 2035-12-31, KONFLIKT",
-            "          , 2036-12-31, KONFLIKT",
-            "          ,           , GLEICH"})
-    void neuberechnungVerlaengertNurUndBehaeltSonstDieFrist(LocalDate bisher, LocalDate neu, Neuberechnung erwartet) {
-        assertThat(Aufbewahrung.entscheiden(bisher, neu)).isEqualTo(erwartet);
+            "2036-12-31, 2036-12-31, true,  GLEICH",
+            "2036-12-31, 2037-12-31, true,  VERLAENGERN",
+            "2036-12-31,           , true,  VERLAENGERN",
+            "2036-12-31, 2035-12-31, true,  KONFLIKT",
+            "          , 2036-12-31, true,  KONFLIKT",
+            "          ,           , true,  GLEICH",
+            "2036-12-31, 2036-12-31, false, GLEICH",
+            "2036-12-31, 2037-12-31, false, VERLAENGERN",
+            "2036-12-31,           , false, VERLAENGERN",
+            "2036-12-31, 2035-12-31, false, FRUEHER_UEBERNEHMEN",
+            "          , 2036-12-31, false, FRUEHER_UEBERNEHMEN",
+            "          ,           , false, GLEICH"})
+    void neuberechnungVerlaengertMitSperreNurUndUebernimmtOhneSperre(LocalDate bisher, LocalDate neu, boolean gesperrt,
+                                                                      Neuberechnung erwartet) {
+        assertThat(Aufbewahrung.entscheiden(bisher, neu, gesperrt)).isEqualTo(erwartet);
     }
 
     @ParameterizedTest

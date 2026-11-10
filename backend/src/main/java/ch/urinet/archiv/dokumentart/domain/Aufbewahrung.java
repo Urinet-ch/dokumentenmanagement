@@ -27,8 +27,13 @@ public record Aufbewahrung(LocalDate bis, boolean fristAbgelaufen) {
         GLEICH,
         /** neue Frist ist später oder unbefristet: übernehmen */
         VERLAENGERN,
-        /** neue Frist wäre früher: bisherige Frist belassen und Konflikt protokollieren */
-        KONFLIKT
+        /** mit Sperre: neue Frist wäre früher oder befristet: bisherige Frist belassen und Konflikt protokollieren */
+        KONFLIKT,
+        /**
+         * ohne Sperre: neue Frist ist früher oder befristet eine unbefristete: neue Frist übernehmen (entschieden von
+         * Fabian am 10.11.2026)
+         */
+        FRUEHER_UEBERNEHMEN
     }
 
     /**
@@ -84,14 +89,21 @@ public record Aufbewahrung(LocalDate bis, boolean fristAbgelaufen) {
         }
     }
 
-    /** Vergleicht eine neu berechnete Frist mit der bestehenden (Req 9.7); {@code null} heisst unbefristet. */
-    public static Neuberechnung entscheiden(LocalDate bisher, LocalDate neu) {
+    /**
+     * Vergleicht eine neu berechnete Frist mit der bestehenden (Req 9.7); {@code null} heisst unbefristet. Mit Sperre
+     * wird nur verlängert: ein früheres Datum oder ein Datum statt «unbefristet» ist ein {@code KONFLIKT}. Ohne Sperre
+     * gilt das neue Ergebnis, auch wenn es früher liegt (entschieden von Fabian am 10.11.2026).
+     *
+     * @param gesperrt {@code true}, wenn die bisherige oder die neue Art {@code gesetzliche_pflicht} hat oder das
+     *                 Dokument schon eine Sperre trägt
+     */
+    public static Neuberechnung entscheiden(LocalDate bisher, LocalDate neu, boolean gesperrt) {
         if (Objects.equals(bisher, neu)) {
             return Neuberechnung.GLEICH;
         }
-        if (bisher == null) {
-            return Neuberechnung.KONFLIKT;
+        if (neu == null || bisher != null && neu.isAfter(bisher)) {
+            return Neuberechnung.VERLAENGERN;
         }
-        return neu == null || neu.isAfter(bisher) ? Neuberechnung.VERLAENGERN : Neuberechnung.KONFLIKT;
+        return gesperrt ? Neuberechnung.KONFLIKT : Neuberechnung.FRUEHER_UEBERNEHMEN;
     }
 }

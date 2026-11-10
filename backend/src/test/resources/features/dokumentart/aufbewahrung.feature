@@ -20,18 +20,24 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
       | 10 Jahre ab GUELTIG_BIS   | 01.02.2026 | –                    | –    | –          | 12-31 | unbefristet |
       | unbefristet               | 01.02.2026 | –                    | –    | –          | 12-31 | unbefristet |
 
+  # Entschieden von Fabian am 10.11.2026: Mit Sperre (gesetzliche Pflicht) wird «unbefristet» nie befristet und ein
+  # früheres Datum ist ein Konflikt; ohne Sperre gilt das neue Ergebnis, auch wenn es früher liegt.
   @req-9.7
-  Szenariogrundriss: Eine Neuberechnung verlängert nur, ein früheres Datum ist ein Konflikt (Teilnachweis)
-    Wenn eine bestehende Frist «<bisher>» neu als «<neu>» berechnet wird
+  Szenariogrundriss: Mit Sperre verlängert eine Neuberechnung nur, ohne Sperre gilt das neue Ergebnis (Teilnachweis)
+    Wenn eine bestehende Frist «<bisher>» <sperre> Sperre neu als «<neu>» berechnet wird
     Dann lautet der Entscheid «<entscheid>»
 
     Beispiele:
-      | bisher      | neu         | entscheid   |
-      | 31.12.2036  | 31.12.2036  | GLEICH      |
-      | 31.12.2036  | 31.12.2037  | VERLAENGERN |
-      | 31.12.2036  | unbefristet | VERLAENGERN |
-      | 31.12.2036  | 31.12.2035  | KONFLIKT    |
-      | unbefristet | 31.12.2036  | KONFLIKT    |
+      | bisher      | sperre | neu         | entscheid           |
+      | 31.12.2036  | mit    | 31.12.2036  | GLEICH              |
+      | 31.12.2036  | mit    | 31.12.2037  | VERLAENGERN         |
+      | 31.12.2036  | mit    | unbefristet | VERLAENGERN         |
+      | 31.12.2036  | mit    | 31.12.2035  | KONFLIKT            |
+      | unbefristet | mit    | 31.12.2036  | KONFLIKT            |
+      | 31.12.2036  | ohne   | 31.12.2037  | VERLAENGERN         |
+      | 31.12.2036  | ohne   | unbefristet | VERLAENGERN         |
+      | 31.12.2036  | ohne   | 31.12.2035  | FRUEHER_UEBERNEHMEN |
+      | unbefristet | ohne   | 31.12.2036  | FRUEHER_UEBERNEHMEN |
 
   @req-9.8
   Szenario: Eine Frist in der Vergangenheit wird als abgelaufen erkannt (Teilnachweis)
