@@ -107,7 +107,7 @@ damit Lohn- und Vertragsdaten geschützt sind.
 
 #### Acceptance Criteria
 1. Das Archiv SOLL die Anmeldung über Keycloak (OIDC mit PKCE) mit Zwei-Faktor (TOTP) für alle Rollen verlangen.
-2. Das Archiv SOLL die Rollen `inhaber`, `mitarbeiter`, `treuhaender` und `geschaeftsstelle` kennen und gemäss der Rechtematrix (2.6) durchsetzen.
+2. Das Archiv SOLL die Rollen `inhaber`, `mitarbeiter`, `treuhaender` und `geschaeftsstelle` kennen und gemäss der Rechtematrix (2.6) durchsetzen. Hat ein Benutzer mehrere dieser Rollen, gilt nur die stärkste in der Rangfolge `inhaber`, `geschaeftsstelle`, `mitarbeiter`, `treuhaender`; die Rechte werden nicht vereinigt (entschieden von Fabian am 10.11.2026).
 3. FALLS ein Benutzer ein Dokument anfragt, das er nach den Zeilen A2 bis A4 der Rechtematrix nicht sehen darf, DANN SOLL das Archiv es weder in Listen noch in Suchtreffern noch in Zählern liefern und auf Direktzugriff mit HTTP 404 antworten.
 4. FALLS ein Benutzer mit Rolle `treuhaender` eine schreibende Aktion ausführt, DANN SOLL das Archiv mit HTTP 403 antworten.
 5. Das Archiv SOLL für Skripte API-Tokens mit Scope `generator` (Requirement 11) und `import` (Requirement 12) unterstützen, die an einen Mandanten gebunden sind, nur gehasht (Argon2id) gespeichert werden und widerrufbar sind; ein Token SOLL nur die Endpunkte seines Scopes erreichen, sonst HTTP 403.
