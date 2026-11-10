@@ -26,8 +26,8 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
  * Regeln aus structure.md «Paketstruktur je Fachbereich», ADR-011 und design.md «Testing Strategy», Zeile
- * «Architektur» (Req 16.13). Geprüft wird nur Produktionscode ({@code DoNotIncludeTests}); {@code ArchivMain} im
- * Wurzelpaket ist der Einstieg und von den Schichtregeln ausgenommen.
+ * «Architektur» (Req 16.13). Geprüft wird nur Produktionscode ({@code DoNotIncludeTests}); nur {@code ArchivMain} im
+ * Wurzelpaket ist der Einstieg und von den Schichtregeln ausgenommen, jede andere Klasse dort verstösst.
  * <p>
  * Auslegung: {@code gemeinsam} ist der gemeinsame Kern (Fehler, Problem Details, Zeit, Geld) und darf von jedem
  * Fachbereich in derselben Schicht genutzt werden, hängt selbst aber von keinem Fachbereich ab. Ein Fachbereich nutzt
@@ -74,7 +74,7 @@ class ArchitekturTest {
      */
     @ArchTest
     static final ArchRule schichtenUndFachbereiche = classes().that().resideInAPackage("ch.urinet.archiv..")
-            .and().resideOutsideOfPackage(WURZEL)
+            .and().doNotBelongToAnyOf(ArchivMain.class)
             .should(new ArchCondition<>("nur erlaubte Schichten und Fachbereiche nutzen (structure.md)") {
                 @Override
                 public void check(JavaClass klasse, ConditionEvents ereignisse) {
@@ -150,17 +150,21 @@ class ArchitekturTest {
             .allowEmptyShould(true)
             .because("Beträge sind BigDecimal (tech.md Regel 9)");
 
-    /** Secrets nur aus Dateien unter {@code /run/secrets/}, nie aus Umgebungsvariablen (tech.md Regel 7). */
+    /**
+     * Secrets nur aus Dateien unter {@code /run/secrets/}, nie aus Umgebungsvariablen (tech.md Regel 7); erfasst Aufrufe
+     * und Methodenreferenzen ({@code System::getenv}).
+     */
     @ArchTest
-    static final ArchRule keineUmgebungsvariablen = noClasses().should().callMethod(System.class, "getenv")
-            .orShould().callMethod(System.class, "getenv", String.class)
+    static final ArchRule keineUmgebungsvariablen = noClasses().should().accessTargetWhere(
+                    DescribedPredicate.describe("System.getenv", zugriff -> zugriff.getTarget().getOwner()
+                            .isEquivalentTo(System.class) && zugriff.getTarget().getName().equals("getenv")))
             .because("Secrets liegen nur als Dateien unter /run/secrets/ (tech.md Regel 7)");
 
     /** Die Anwendung setzt nie {@code bypassGovernanceRetention} (tech.md Regel 2, Req 6.5). */
     @ArchTest
-    static final ArchRule keinBypassGovernance = noClasses().should().callMethodWhere(
+    static final ArchRule keinBypassGovernance = noClasses().should().accessTargetWhere(
                     DescribedPredicate.describe("bypassGovernanceRetention",
-                            aufruf -> aufruf.getTarget().getName().equals("bypassGovernanceRetention")))
+                            zugriff -> zugriff.getTarget().getName().equals("bypassGovernanceRetention")))
             .because("die Anwendung verkürzt nie eine Sperre (tech.md Regel 2, Req 6.5)");
 
     /**
