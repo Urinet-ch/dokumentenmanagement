@@ -16,4 +16,9 @@ class ArchitekturTest {
             .should().dependOnClassesThat()
             .resideInAnyPackage("io.quarkus..", "jakarta..", "com.fasterxml.jackson..", "org.hibernate..")
             .allowEmptyShould(true);
+
+    /** Probe-Endpunkte aus Aufgabe 1.4 liegen nur unter src/test und gelangen nie ins Produktionsartefakt. */
+    @ArchTest
+    static final ArchRule probeNurInTests = noClasses().should().resideInAPackage("ch.urinet.archiv.probe..")
+            .orShould().haveSimpleNameStartingWith("Probe");
 }

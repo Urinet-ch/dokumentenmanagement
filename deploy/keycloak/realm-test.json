@@ -1140,6 +1140,156 @@
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
+    },
+    {
+      "username": "ohne-mandant",
+      "enabled": true,
+      "email": "ohne-mandant@example.invalid",
+      "emailVerified": true,
+      "firstName": "Ohne",
+      "lastName": "Mandant",
+      "realmRoles": [
+        "inhaber",
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
+    },
+    {
+      "username": "unbekannt-mandant",
+      "enabled": true,
+      "email": "unbekannt-mandant@example.invalid",
+      "emailVerified": true,
+      "firstName": "Unbekannt",
+      "lastName": "Mandant",
+      "attributes": {
+        "mandant": [
+          "gibt-es-nicht"
+        ]
+      },
+      "realmRoles": [
+        "inhaber",
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
+    },
+    {
+      "username": "inaktiv-mandant",
+      "enabled": true,
+      "email": "inaktiv-mandant@example.invalid",
+      "emailVerified": true,
+      "firstName": "Inaktiv",
+      "lastName": "Mandant",
+      "attributes": {
+        "mandant": [
+          "probe-inaktiv"
+        ]
+      },
+      "realmRoles": [
+        "inhaber",
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
+    },
+    {
+      "username": "zwei-rollen-urinet",
+      "enabled": true,
+      "email": "zwei-rollen-urinet@example.invalid",
+      "emailVerified": true,
+      "firstName": "Zwei Rollen",
+      "lastName": "urinet",
+      "attributes": {
+        "mandant": [
+          "urinet"
+        ]
+      },
+      "realmRoles": [
+        "inhaber",
+        "treuhaender",
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
+    },
+    {
+      "username": "ohne-rolle-urinet",
+      "enabled": true,
+      "email": "ohne-rolle-urinet@example.invalid",
+      "emailVerified": true,
+      "firstName": "Ohne Rolle",
+      "lastName": "urinet",
+      "attributes": {
+        "mandant": [
+          "urinet"
+        ]
+      },
+      "realmRoles": [
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
     }
   ]
 }
