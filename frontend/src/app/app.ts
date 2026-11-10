@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
@@ -34,10 +34,12 @@ export class App {
   protected readonly menue = computed(() => MENUE.filter((punkt) => this.anmeldung.darf(punkt.aktion)));
 
   constructor() {
-    // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»
+    // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»; die Seite bleibt als Ziel
     effect(() => {
       if (this.anmeldung.zustand() === 'abgelaufen') {
-        void this.router.navigateByUrl('/');
+        const ziel = untracked(() => this.router.url);
+        const queryParams = ziel.startsWith('/?') || ziel === '/' ? {} : { ziel };
+        void this.router.navigate(['/'], { queryParams });
       }
     });
   }

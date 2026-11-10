@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { DOCUMENT, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
+import { DOCUMENT, DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { UMGEBUNG } from '../../../umgebung/umgebung';
 import { codeChallengeS256, jwtNutzlast, zufall } from './pkce';
@@ -77,6 +77,7 @@ export class AnmeldungService {
   private readonly tokens = signal<Tokens | null>(null);
   private readonly zustandIntern = signal<Sitzungszustand>('abgemeldet');
   private erneuerungsTimer: ReturnType<typeof setTimeout> | undefined;
+  private laufendeErneuerung: Promise<void> | null = null;
 
   readonly zustand = this.zustandIntern.asReadonly();
   readonly angemeldet = computed(() => this.zustandIntern() === 'angemeldet');
@@ -95,6 +96,21 @@ export class AnmeldungService {
     };
   });
 
+  constructor() {
+    // Mobile Browser halten Timer im Hintergrund an; beim Zurückkehren die Frist selbst prüfen
+    const dokument = inject(DOCUMENT);
+    const sichtbar = () => {
+      if (dokument.visibilityState !== 'hidden' && this.erneuerungFaellig()) {
+        void this.erneuern();
+      }
+    };
+    dokument.addEventListener('visibilitychange', sichtbar);
+    inject(DestroyRef).onDestroy(() => {
+      dokument.removeEventListener('visibilitychange', sichtbar);
+      clearTimeout(this.erneuerungsTimer);
+    });
+  }
+
   /** Ohne Mandant im Token gibt es kein Recht (fail closed, wie im Backend). */
   darf(aktion: Aktion): boolean {
     const benutzer = this.benutzer();
@@ -103,6 +119,14 @@ export class AnmeldungService {
 
   accessToken(): string | null {
     return this.angemeldet() ? (this.tokens()?.accessToken ?? null) : null;
+  }
+
+  /** Access-Token für eine API-Anfrage; läuft es bald ab (z. B. Timer im Ruhezustand verpasst), erst erneuern. */
+  async gueltigesAccessToken(): Promise<string | null> {
+    if (this.erneuerungFaellig()) {
+      await this.erneuern();
+    }
+    return this.accessToken();
   }
 
   async anmelden(ziel = '/'): Promise<void> {
@@ -127,7 +151,9 @@ export class AnmeldungService {
     this.fenster.sessionStorage.removeItem(VORGANG_SCHLUESSEL);
     const vorgang = gespeichert ? (JSON.parse(gespeichert) as Vorgang) : null;
     const code = parameter.get('code');
-    if (parameter.has('error') || !vorgang || !code || parameter.get('state') !== vorgang.state) {
+    // RFC 9207: Schickt der Aussteller `iss` mit, muss er unserer sein (Schutz vor Mix-up)
+    const fremderAussteller = parameter.has('iss') && parameter.get('iss') !== this.konfiguration.aussteller;
+    if (parameter.has('error') || fremderAussteller || !vorgang || !code || parameter.get('state') !== vorgang.state) {
       throw new AnmeldungFehler('Rückruf ungültig');
     }
     const antwort = await this.tokenAnfrage({
@@ -186,7 +212,18 @@ export class AnmeldungService {
     this.erneuerungsTimer = setTimeout(() => void this.erneuern(), inMs);
   }
 
-  private async erneuern(): Promise<void> {
+  private erneuerungFaellig(): boolean {
+    const aktuell = this.tokens();
+    return this.angemeldet() && !!aktuell && aktuell.ablauf - Date.now() < ERNEUERN_VOR_ABLAUF_MS;
+  }
+
+  /** Höchstens eine Erneuerung gleichzeitig (Timer, Rückkehr in den Vordergrund und API-Anfragen teilen sie). */
+  private erneuern(): Promise<void> {
+    this.laufendeErneuerung ??= this.erneuernEinmal().finally(() => (this.laufendeErneuerung = null));
+    return this.laufendeErneuerung;
+  }
+
+  private async erneuernEinmal(): Promise<void> {
     const aktuell = this.tokens();
     if (!aktuell?.refreshToken || this.zustandIntern() !== 'angemeldet') {
       this.sitzungAbgelaufen();

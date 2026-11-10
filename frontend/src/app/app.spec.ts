@@ -1,6 +1,6 @@
-import { computed, signal } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
 import { AnmeldungService, Benutzer, Sitzungszustand } from './gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
@@ -27,6 +27,9 @@ class ZaehlerAttrappe extends EingangskorbZaehler {
   readonly anzahl = signal<number | null>(null);
 }
 
+@Component({ template: '' })
+class Leer {}
+
 describe('App (Req 2.6, 8.6)', () => {
   let anmeldung: AnmeldungAttrappe;
   let zaehler: ZaehlerAttrappe;
@@ -37,7 +40,10 @@ describe('App (Req 2.6, 8.6)', () => {
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
-        provideRouter([]),
+        provideRouter([
+          { path: '', component: Leer },
+          { path: 'erfassen', component: Leer },
+        ]),
         { provide: AnmeldungService, useValue: anmeldung },
         { provide: EingangskorbZaehler, useValue: zaehler },
       ],
@@ -110,5 +116,26 @@ describe('App (Req 2.6, 8.6)', () => {
     );
     abmelden!.click();
     expect(anmeldung.abmelden).toHaveBeenCalledOnce();
+  });
+
+  it('bietet «Abmelden» auch nach Ablauf der Sitzung an (Keycloak-Sitzung beenden)', async () => {
+    anmeldung.zustand.set('abgelaufen');
+    const element = await zeigen();
+    const abmelden = [...element.querySelectorAll('button')].find(
+      (b) => b.textContent?.trim() === TEXTE.anmeldung.abmelden,
+    );
+    abmelden!.click();
+    expect(anmeldung.abmelden).toHaveBeenCalledOnce();
+  });
+
+  it('führt bei abgelaufener Sitzung zur Startseite und merkt sich die Seite als Ziel', async () => {
+    anmeldung.als('mitarbeiter');
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/erfassen');
+    await fixture.whenStable();
+    anmeldung.zustand.set('abgelaufen');
+    await fixture.whenStable();
+    expect(router.url).toBe('/?ziel=%2Ferfassen');
   });
 });

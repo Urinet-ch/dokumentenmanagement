@@ -1,6 +1,7 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { anmeldungInterceptor } from './anmeldung.interceptor';
 import { AnmeldungFehler, AnmeldungService, FENSTER, OIDC_KONFIGURATION, sicheresZiel } from './anmeldung.service';
 import { base64url, codeChallengeS256 } from './pkce';
 
@@ -49,7 +50,7 @@ describe('AnmeldungService (Req 2.1)', () => {
     weiterleitung = vi.fn<(url: string) => void>();
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(),
+        provideHttpClient(withInterceptors([anmeldungInterceptor])),
         provideHttpClientTesting(),
         { provide: OIDC_KONFIGURATION, useValue: { aussteller: AUSSTELLER, clientId: 'archiv-pwa' } },
         {
@@ -63,8 +64,13 @@ describe('AnmeldungService (Req 2.1)', () => {
   });
 
   afterEach(() => {
-    http.verify();
     vi.useRealTimers();
+    try {
+      http.verify();
+    } finally {
+      // Auch nach einem Fehlschlag zurücksetzen, sonst schlagen die folgenden Tests mit fehl
+      TestBed.resetTestingModule();
+    }
   });
 
   async function anmeldungStarten(ziel = '/erfassen'): Promise<URL> {
@@ -142,6 +148,26 @@ describe('AnmeldungService (Req 2.1)', () => {
     expect(dienst.angemeldet()).toBe(false);
   });
 
+  it('lehnt einen Rückruf mit fremdem Aussteller im Parameter iss ab (RFC 9207)', async () => {
+    const adresse = await anmeldungStarten();
+    const state = adresse.searchParams.get('state')!;
+    await expect(
+      dienst.rueckrufVerarbeiten(new URLSearchParams({ code: 'c', state, iss: 'https://fremd.test' })),
+    ).rejects.toThrow(AnmeldungFehler);
+    http.expectNone(TOKEN_URL);
+    expect(dienst.angemeldet()).toBe(false);
+  });
+
+  it('nimmt einen Rückruf mit dem eigenen Aussteller im Parameter iss an', async () => {
+    const adresse = await anmeldungStarten();
+    const rueckruf = dienst.rueckrufVerarbeiten(
+      new URLSearchParams({ code: 'c', state: adresse.searchParams.get('state')!, iss: AUSSTELLER }),
+    );
+    http.expectOne(TOKEN_URL).flush({ access_token: accessToken, id_token: idToken(adresse), expires_in: 300 });
+    await rueckruf;
+    expect(dienst.angemeldet()).toBe(true);
+  });
+
   it('lehnt ein ID-Token mit falscher nonce oder fremdem Aussteller ab', async () => {
     for (const falsch of [{ nonce: 'fremd' }, { iss: 'https://fremd.test' }, { aud: 'anderer-client' }]) {
       const adresse = await anmeldungStarten();
@@ -215,6 +241,66 @@ describe('AnmeldungService (Req 2.1)', () => {
     http.expectOne(TOKEN_URL).error(new ProgressEvent('error'));
     await vi.advanceTimersByTimeAsync(0);
     expect(dienst.zustand()).toBe('abgelaufen');
+  });
+
+  describe('Timer im Ruhezustand verpasst (Handy gesperrt)', () => {
+    const neu = jwt({ sub: 'u-1', mandant: 'urinet', realm_access: { roles: ['inhaber'] }, neu: true });
+
+    async function schlafen(): Promise<void> {
+      vi.useFakeTimers();
+      await anmelden(60);
+      // Die Uhr läuft weiter, der Erneuerungs-Timer nicht (setSystemTime löst keine Timer aus)
+      vi.setSystemTime(Date.now() + 10 * 60_000);
+    }
+
+    it('erneuert das abgelaufene Token, bevor die API-Anfrage rausgeht', async () => {
+      await schlafen();
+      let antwort: unknown;
+      TestBed.inject(HttpClient).get('/api/v1/dokumente').subscribe((wert) => (antwort = wert));
+      await vi.advanceTimersByTimeAsync(0);
+      http.expectNone('/api/v1/dokumente');
+      const erneuerung = http.expectOne(TOKEN_URL);
+      expect(new URLSearchParams(erneuerung.request.body as string).get('grant_type')).toBe('refresh_token');
+      erneuerung.flush({ access_token: neu, refresh_token: 'refresh-2', expires_in: 60 });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const api = http.expectOne('/api/v1/dokumente');
+      expect(api.request.headers.get('Authorization')).toBe(`Bearer ${neu}`);
+      api.flush([]);
+      expect(antwort).toEqual([]);
+      expect(dienst.zustand()).toBe('angemeldet');
+    });
+
+    it('teilt eine Erneuerung zwischen gleichzeitigen API-Anfragen', async () => {
+      await schlafen();
+      const client = TestBed.inject(HttpClient);
+      client.get('/api/v1/a').subscribe();
+      client.get('/api/v1/b').subscribe();
+      await vi.advanceTimersByTimeAsync(0);
+      http.expectOne(TOKEN_URL).flush({ access_token: neu, refresh_token: 'refresh-2', expires_in: 60 });
+      await vi.advanceTimersByTimeAsync(0);
+      for (const pfad of ['/api/v1/a', '/api/v1/b']) {
+        expect(http.expectOne(pfad).request.headers.get('Authorization')).toBe(`Bearer ${neu}`);
+      }
+    });
+
+    it('erneuert beim Zurückkehren in den Vordergrund', async () => {
+      await schlafen();
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      http.expectOne(TOKEN_URL).flush({ access_token: neu, refresh_token: 'refresh-2', expires_in: 60 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(dienst.accessToken()).toBe(neu);
+    });
+
+    it('erneuert nicht vor jeder Anfrage, solange das Token noch gilt', async () => {
+      vi.useFakeTimers();
+      await anmelden(300);
+      TestBed.inject(HttpClient).get('/api/v1/dokumente').subscribe();
+      await vi.advanceTimersByTimeAsync(0);
+      http.expectNone(TOKEN_URL);
+      expect(http.expectOne('/api/v1/dokumente').request.headers.get('Authorization')).toBe(`Bearer ${accessToken}`);
+    });
   });
 
   it('lässt als Ziel nur Pfade innerhalb der App zu', () => {

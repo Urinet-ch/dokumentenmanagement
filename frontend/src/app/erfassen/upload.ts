@@ -65,7 +65,8 @@ export class Upload {
   protected readonly abgeschlossen = computed(() => this.ergebnisse() !== null);
   protected readonly zeilen = computed<Zeile[]>(() => {
     const ergebnisse = this.ergebnisse();
-    return this.dateien().map((datei, index) => ({ datei, ...auswerten(zuordnen(ergebnisse, datei, index), !!ergebnisse) }));
+    const dateien = this.dateien();
+    return dateien.map((datei, index) => ({ datei, ...auswerten(zuordnen(ergebnisse, dateien, index), !!ergebnisse) }));
   });
 
   private readonly dateiwahl = viewChild.required<ElementRef<HTMLInputElement>>('dateiwahl');
@@ -165,12 +166,19 @@ function istBild(datei: File): boolean {
   return BILD_TYP.test(datei.type) || BILD_ENDUNG.test(datei.name);
 }
 
-// Die Antwort führt die Dateien in der gesendeten Reihenfolge; passt der Name nicht, wird über den Namen gesucht.
-function zuordnen(ergebnisse: readonly UploadErgebnis[] | null, datei: File, index: number): UploadErgebnis | undefined {
-  if (!ergebnisse) {
-    return undefined;
+// Die Antwort führt die Dateien in der gesendeten Reihenfolge. Passt der Name an dieser Stelle nicht, wird nur dann über
+// den Namen gesucht, wenn er in Auswahl und Antwort je genau einmal vorkommt (zweimal «image.jpg» vom iPhone).
+function zuordnen(
+  ergebnisse: readonly UploadErgebnis[] | null,
+  dateien: readonly File[],
+  index: number,
+): UploadErgebnis | undefined {
+  const name = dateien[index].name;
+  if (!ergebnisse || ergebnisse[index]?.datei === name) {
+    return ergebnisse?.[index];
   }
-  return ergebnisse[index]?.datei === datei.name ? ergebnisse[index] : ergebnisse.find((e) => e.datei === datei.name);
+  const treffer = ergebnisse.filter((e) => e.datei === name);
+  return treffer.length === 1 && dateien.filter((d) => d.name === name).length === 1 ? treffer[0] : undefined;
 }
 
 function auswerten(ergebnis: UploadErgebnis | undefined, abgeschlossen: boolean): Omit<Zeile, 'datei'> {

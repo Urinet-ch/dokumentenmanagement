@@ -25,6 +25,8 @@
         }
       </span>
     }
+  }
+  @if (anmeldung.zustand() !== 'abgemeldet') {
     <button mat-button type="button" (click)="anmeldung.abmelden()">{{ texte.anmeldung.abmelden }}</button>
   }
 </mat-toolbar>

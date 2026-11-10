@@ -7,7 +7,8 @@ import { AnmeldungService } from './anmeldung.service';
 describe('anmeldungInterceptor (Req 2.1)', () => {
   let http: HttpClient;
   let kontrolle: HttpTestingController;
-  const anmeldung = { accessToken: () => 'token-1', sitzungAbgelaufen: vi.fn() };
+  const anmeldung = { gueltigesAccessToken: async () => 'token-1', sitzungAbgelaufen: vi.fn() };
+  const tokenAbwarten = () => new Promise((fertig) => setTimeout(fertig));
 
   beforeEach(() => {
     anmeldung.sitzungAbgelaufen.mockReset();
@@ -24,10 +25,11 @@ describe('anmeldungInterceptor (Req 2.1)', () => {
 
   afterEach(() => kontrolle.verify());
 
-  it('sendet das Token nur an die eigene API', () => {
+  it('sendet das Token nur an die eigene API', async () => {
     http.get('/api/v1/dokumente').subscribe();
     http.get('https://archiv-auth.apps.urinet.ch/realms/x').subscribe();
     http.get('https://fremd.test/api/v1/x').subscribe();
+    await tokenAbwarten();
     expect(kontrolle.expectOne('/api/v1/dokumente').request.headers.get('Authorization')).toBe('Bearer token-1');
     expect(kontrolle.expectOne('https://archiv-auth.apps.urinet.ch/realms/x').request.headers.has('Authorization')).toBe(
       false,
@@ -35,9 +37,10 @@ describe('anmeldungInterceptor (Req 2.1)', () => {
     expect(kontrolle.expectOne('https://fremd.test/api/v1/x').request.headers.has('Authorization')).toBe(false);
   });
 
-  it('beendet die Sitzung bei 401, nicht bei 403', () => {
+  it('beendet die Sitzung bei 401, nicht bei 403', async () => {
     http.get('/api/v1/a').subscribe({ error: () => undefined });
     http.get('/api/v1/b').subscribe({ error: () => undefined });
+    await tokenAbwarten();
     kontrolle.expectOne('/api/v1/a').flush(null, { status: 403, statusText: 'Forbidden' });
     expect(anmeldung.sitzungAbgelaufen).not.toHaveBeenCalled();
     kontrolle.expectOne('/api/v1/b').flush(null, { status: 401, statusText: 'Unauthorized' });

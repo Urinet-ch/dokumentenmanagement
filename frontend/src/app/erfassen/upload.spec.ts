@@ -169,4 +169,28 @@ describe('Upload (Req 3.1, 3.3–3.8)', () => {
     expect(namen()).toEqual([]);
     expect(element.textContent).toContain(TEXTE.upload.keineDateien);
   });
+
+  it('ordnet Ergebnisse bei gleichen Dateinamen nicht über den Namen zu', async () => {
+    await waehlen(bild('image.jpg'), bild('image.jpg'));
+    await senden({
+      typ: 'fertig',
+      ergebnisse: [{ datei: 'image.jpg', status: 'ABGELEHNT', fehler: { status: 422, fehlercode: 'DATEI_UNGUELTIG' } }],
+    });
+    expect(ergebnisse()).toEqual([
+      `! ${TEXTE.upload.abgelehnt}: ${TEXTE.upload.fehlercode['DATEI_UNGUELTIG']} (DATEI_UNGUELTIG)`,
+      `! ${TEXTE.upload.abgelehnt}: ${TEXTE.upload.fehlerUnbekannt}`,
+    ]);
+  });
+
+  it('ordnet über den Namen zu, wenn die Antwort die Reihenfolge nicht einhält und der Name eindeutig ist', async () => {
+    await waehlen(pdf('a.pdf'), pdf('b.pdf'));
+    await senden({
+      typ: 'fertig',
+      ergebnisse: [
+        { datei: 'b.pdf', status: 'DUBLETTE' },
+        { datei: 'a.pdf', status: 'NEU', id: 'd-1' },
+      ],
+    });
+    expect(ergebnisse()).toEqual([`✓ ${TEXTE.upload.angenommen}`, `= ${TEXTE.upload.bereitsVorhanden}`]);
+  });
 });
