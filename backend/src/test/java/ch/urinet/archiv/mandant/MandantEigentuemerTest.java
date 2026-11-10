@@ -77,13 +77,17 @@ class MandantEigentuemerTest {
             verweigert(befehl, "insert into m_probe_eigner.databasechangeloglock (id, locked) values (99, false)");
         }
 
-        // Default Privileges: eine später von archiv_owner angelegte Tabelle ist für archiv_app nutzbar
+        // Default Privileges: eine später von archiv_owner angelegte Tabelle und Sequenz ist für archiv_app nutzbar
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test"); Statement befehl = eigentuemer.createStatement()) {
             befehl.execute("create table m_probe_eigner.spaeter (id int)");
+            befehl.execute("create sequence m_probe_eigner.spaeter_seq");
         }
         try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
             befehl.execute("insert into m_probe_eigner.spaeter values (1)");
             assertThat(wert(befehl, "select count(*) from m_probe_eigner.spaeter")).isEqualTo("1");
+            assertThat(wert(befehl, "select nextval('m_probe_eigner.spaeter_seq')")).isEqualTo("1");
+            assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'USAGE')")).isTrue();
+            assertThat(wahr(befehl, "has_sequence_privilege('m_probe_eigner.spaeter_seq', 'SELECT')")).isTrue();
         }
     }
 

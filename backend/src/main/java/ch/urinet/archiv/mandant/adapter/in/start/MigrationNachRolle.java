@@ -6,7 +6,6 @@ import io.smallrye.config.ConfigValue;
 import io.smallrye.config.Priorities;
 import jakarta.annotation.Priority;
 
-import java.util.Arrays;
 import java.util.Set;
 
 /**
@@ -26,8 +25,8 @@ public class MigrationNachRolle implements ConfigSourceInterceptor {
             return wert;
         }
         ConfigValue rolle = context.proceed("archiv.rolle");
-        boolean migriert = rolle != null && rolle.getValue() != null
-                && Arrays.stream(rolle.getValue().split(",")).map(String::trim).anyMatch(MIGRIERENDE_ROLLEN::contains);
+        boolean migriert = rolle != null
+                && Rollen.lesen(rolle.getValue()).stream().anyMatch(MIGRIERENDE_ROLLEN::contains);
         return migriert ? wert : wert.withValue("false");
     }
 }

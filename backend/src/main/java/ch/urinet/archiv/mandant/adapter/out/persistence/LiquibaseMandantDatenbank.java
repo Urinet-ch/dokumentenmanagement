@@ -77,9 +77,9 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
             befehl.execute("set search_path to " + schema);
             try {
                 migrieren(verbindung, schema);
-                // Liquibase lässt autoCommit=false stehen; ohne Commit rollt close() die Rechte zurück
+                // Liquibase lässt autoCommit=false stehen; das schreibt die Migration fest
                 verbindung.setAutoCommit(true);
-                berechtigen(befehl, schema);
+                berechtigenAtomar(verbindung, befehl, schema);
             } finally {
                 befehl.execute("reset search_path");
             }
@@ -149,6 +149,23 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                             .execute());
         } catch (Exception e) {
             throw new IllegalStateException("Liquibase db/mandant für " + schema + " fehlgeschlagen", e);
+        }
+    }
+
+    /**
+     * Alle Rechte in einer Transaktion: Sonst hätte die App-Rolle zwischen dem GRANT auf alle Tabellen und dem REVOKE
+     * (nach einem Fehler dazwischen auch länger) DML auf {@code databasechangelog*}.
+     */
+    private void berechtigenAtomar(Connection verbindung, Statement befehl, String schema) throws SQLException {
+        verbindung.setAutoCommit(false);
+        try {
+            berechtigen(befehl, schema);
+            verbindung.commit();
+        } catch (SQLException | RuntimeException e) {
+            verbindung.rollback();
+            throw e;
+        } finally {
+            verbindung.setAutoCommit(true);
         }
     }
 

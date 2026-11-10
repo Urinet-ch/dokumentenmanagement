@@ -20,6 +20,8 @@ class MigrationNachRolleTest {
         assertThat(migriert("kommando", "true")).isTrue();
         assertThat(migriert("worker", "true")).isFalse();
         assertThat(migriert(" worker ", "true")).isFalse();
+        assertThat(migriert("worker , api ", "true")).isTrue();
+        assertThat(Rollen.lesen("worker , api ,")).containsExactlyInAnyOrder("worker", "api");
     }
 
     @Test

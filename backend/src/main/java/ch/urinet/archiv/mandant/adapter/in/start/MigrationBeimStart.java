@@ -9,8 +9,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.List;
-
 /**
  * Nach der Migration von {@code db/public} (Quarkus Liquibase) migriert die API beim Start jedes aktive Mandanten-Schema
  * (design.md «Mandant»); der Worker migriert nie. Ohne aktive Datasource oder mit {@code migrate-at-start=false} entfällt
@@ -20,11 +18,11 @@ import java.util.List;
 public class MigrationBeimStart {
 
     void beimStart(@Observes StartupEvent start,
-                   @ConfigProperty(name = "archiv.rolle") List<String> rollen,
+                   @ConfigProperty(name = "archiv.rolle") String rollen,
                    @ConfigProperty(name = "quarkus.liquibase.migrate-at-start") boolean migrieren,
                    InjectableInstance<AgroalDataSource> datenquelle,
                    Instance<MandantMigration> migration) {
-        if (migrieren && rollen.contains("api") && !datenquelle.listActive().isEmpty()) {
+        if (migrieren && Rollen.lesen(rollen).contains("api") && !datenquelle.listActive().isEmpty()) {
             migration.get().aktiveMigrieren();
         }
     }
