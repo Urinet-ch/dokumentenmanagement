@@ -44,11 +44,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # Die Readiness umfasst Keycloak (quarkus.oidc.health.enabled); startet api vor kc, bleibt sie DOWN
+      # Nur Startreihenfolge beim Deploy (weniger 401 direkt danach). Beim Neustart der VPS startet Docker die
+      # Container ohne depends_on; die Readiness hängt darum nicht an Keycloak, die API verbindet bei der ersten
+      # angemeldeten Anfrage neu.
       kc:
         condition: service_healthy
     healthcheck:
-      # Readiness umfasst Datenbank (Agroal) und Keycloak (OIDC); das Image hat kein curl
+      # Readiness nur Datenbank (Agroal, DatenbankBereitschaft), nicht Keycloak; das Image hat kein curl
       test:
         - CMD
         - bash

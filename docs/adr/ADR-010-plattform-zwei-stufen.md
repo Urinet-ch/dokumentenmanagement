@@ -33,7 +33,7 @@
 4. **Stufe A** (ab Welle 1 bis zum Wechsel) auf der bestehenden VPS:
    - Nur Test- und anonymisierte Daten (Req 16.15). Geschwärzte echte Belege und der
      Golden-Datensatz gelten als echt und sind ausgeschlossen.
-   - Budget: Summe `mem_limit` ≤ 700 MiB, `cpus` ≤ 0.75 (Richtwert, gemessen in 1.10).
+   - Budget: Summe `mem_limit` ≤ 700 MiB, `cpus` ≤ 0.75 (Richtwert, gemessen in 1.10; ab 10.11.2026 900 MiB, siehe Nachtrag unten).
    - API und Worker laufen in einem Container: Image `archiv-worker`, `archiv.rolle=api,worker`,
      Parallelität 1, OCR mit `--jobs 1`.
    - Leistungsziele gelten nicht (Req 16.16). Die Sicherung läuft nur als Funktionstest

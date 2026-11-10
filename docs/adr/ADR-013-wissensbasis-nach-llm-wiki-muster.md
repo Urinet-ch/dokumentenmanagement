@@ -16,7 +16,7 @@ aufgebaut ist (Auftrag 09.11.2026, Spec 04). Kräfte und Randbedingungen:
   Aggregate. Eine Seite fasst Wissen aus mehreren Dokumenten mit verschiedener Vertraulichkeit zusammen.
 - **Mandanten (ADR-002):** ein Schema je Mandant, Schema nur über Liquibase; Sicherung über die bestehende Zweitkopie
   (ADR-008).
-- **Plattform (ADR-010):** Stufe A mit 700 MiB Speicherbudget und Worker-Parallelität 1; Auftragsschlange in
+- **Plattform (ADR-010):** Stufe A mit 700 MiB Speicherbudget (ab 10.11.2026 900 MiB, siehe Nachtrag in ADR-010) und Worker-Parallelität 1; Auftragsschlange in
   PostgreSQL statt Broker (ADR-003).
 - **Prompt-Injection:** Eine Wissensquelle ist fremder Text. Spec 02, 5.3 verlangt nur lesende Chat-Werkzeuge.
 - **Quellen:** Wissens-PDFs sollen normale Archivdokumente sein (eigene Art `WISSENSQUELLE`, ohne gesetzliche

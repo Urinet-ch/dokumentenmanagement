@@ -158,9 +158,9 @@ jobs:
           SSH_KEY: ${{ secrets.INFOMANIAK_SSH_KEY }}
           KNOWN_HOSTS: ${{ vars.INFOMANIAK_KNOWN_HOSTS }}
         run: |
+          umask 077
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
-          chmod 600 ~/.ssh/deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Andere Apps der VPS vor dem Deploy (Req 16.18)
@@ -234,17 +234,20 @@ jobs:
         run: |
           # Nach einer Minute Betrieb: alle Container wieder healthy und seit «Container gesund» nicht neu gestartet
           # (Laufzeit aus «compose ps»; ein cgroup-OOM mit restart: unless-stopped zeigt sich nur so), keine
-          # Abbruchmeldung von JVM oder Kernel im Log. Log-Inhalte erscheinen nicht in der Ausgabe, nur Zählungen.
+          # Abbruchmeldung im Log: JVM (OutOfMemoryError, mit -XX:+ExitOnOutOfMemoryError «Terminating due to …»),
+          # PostgreSQL (ein Prozess «terminated by signal 9: Killed», der Container läuft dabei weiter) und Kernel
+          # (oom-kill); kein blosses «Killed», das auch in harmlosen Meldungen steht. Log-Inhalte erscheinen nicht in
+          # der Ausgabe, nur Zählungen.
           # Speicherabbrüche anderer Apps sieht der Deploy-Befehl nicht; die prüft Fabian auf der VPS (Nachweis 16.18
           # manuell).
           sleep 60
           ausgabe=$(ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null || true)
           neustart=0
           python3 .github/scripts/pruefe-container.py unveraendert "$RUNNER_TEMP/container.json" <<< "$ausgabe" || neustart=1
-          abbruch=$(grep -c -E 'OutOfMemoryError|Killed|oom-kill' <<< "$ausgabe" || true)
+          abbruch=$(grep -c -E 'OutOfMemoryError|terminated by signal 9|oom-kill' <<< "$ausgabe" || true)
           echo "Abbruchmeldungen im Log: $abbruch"
           if [ "$neustart" -ne 0 ] || [ "$abbruch" -ne 0 ]; then
-            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 und Wechsel (5.11) vorziehen."
+            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Fabian informieren; er stoppt die Archiv-Dienste auf der VPS (der Deploy-Befehl kennt kein Stoppen), K5 und Wechsel (5.11) vorziehen."
             exit 1
           fi
 
@@ -259,7 +262,7 @@ jobs:
             if curl -fsS -o /dev/null --max-time 15 "$url"; then echo "ok: $url"; else echo "::error::nicht gesund: $url"; fehler=1; fi
           done
           if [ "$fehler" -ne 0 ]; then
-            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Archiv-Dienste auf Stufe A stoppen, Fabian informieren, K5 und Wechsel (5.11) vorziehen."
+            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Fabian informieren; er stoppt die Archiv-Dienste auf der VPS (der Deploy-Befehl kennt kein Stoppen), K5 und Wechsel (5.11) vorziehen."
           fi
           exit "$fehler"
 
@@ -283,7 +286,7 @@ jobs:
           ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "rollback $APP" > rollback.log 2>&1 || rc=$?
           grep -E '^(rollback|  Dienst|kein )' rollback.log || true
           if grep -q "^kein $APP:previous vorhanden" rollback.log; then
-            echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren, Archiv-Dienste prüfen oder stoppen."
+            echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren; er prüft oder stoppt die Archiv-Dienste auf der VPS."
           elif [ "$rc" -ne 0 ]; then
             echo "::error::Deploy fehlgeschlagen, und der Rollback ist ebenfalls fehlgeschlagen (Exit $rc). Fabian informieren, Zustand auf der VPS prüfen."
           else
