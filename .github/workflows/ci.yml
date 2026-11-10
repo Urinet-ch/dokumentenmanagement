@@ -118,8 +118,12 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Archiv starten
         env:
-          # ohne Datenbank (Readiness DOWN): seit Aufgabe 1.3 gibt es Entitäten, die Persistence Unit muss mit aus
+          # ohne Datenbank (Readiness DOWN): seit Aufgabe 1.3 gibt es Entitäten, die Persistence Unit muss mit aus.
+          # prod verlangt seit Aufgabe 1.9 eine Adresse der Datenbank (sonst Abbruch); hier eine nie erreichte
+          # Platzhalter-Adresse und die Datasource ausdrücklich aus
           QUARKUS_HIBERNATE_ORM_ACTIVE: 'false'
+          QUARKUS_DATASOURCE_ACTIVE: 'false'
+          ARCHIV_DB_URL: jdbc:postgresql://localhost:1/keine-datenbank
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
         # bricht der Start ab (design.md «Secrets und Konfiguration»); die Browser-Szenarien greifen nie auf S3 oder DB zu
         run: |
