@@ -96,10 +96,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt; jeder Bucket trägt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`; Bucket-Namen mit den Präfixen `urinet-archiv-` und `urinet-archiv-a-`
   - _Anforderungen: 1.1, 1.5, 1.7, 9.6_
 
-- [ ] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
+- [x] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
   - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
-  - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; fremde Dokument-ID → 404; `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
 - [ ] 1.5 API-Tokens für Generatoren und Import [Backend]
@@ -170,9 +170,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
   - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
   - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
-  - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten
+  - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten; Szenario «fremde Dokument-ID → 404» (Req 1.4, aus 1.4 übernommen)
   - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
-  - _Anforderungen: 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
+  - _Anforderungen: 1.4, 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
 
 - [ ] 2.3 Ablage-Service S3 [Backend]
   - Port `AblagePort` mit S3-Adapter und Dev-Stub: `ablegenEingang`, `archivieren`, `sperreVerlaengern`, `loeschenEingang`, `vorsignierteUrl`
