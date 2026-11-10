@@ -189,6 +189,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; bis dahin braucht 2.4 im Test einen Handler für `VERARBEITEN` (nur unter `src/test`).
+  - generierten OpenAPI-Client an die Upload-Seite der PWA anschliessen (`UploadPort`, aus 2.7) und die Browser-Szenarien `dokument/upload-pwa.feature` gegen das echte Backend laufen lassen
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
 - [x] 2.5 Auftragsschlange [Backend]
@@ -205,10 +206,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Pflicht für jeden Handler und Hook (aus 2.5, design.md «Pflichten der Handler»): eigene Zeitgrenzen für jede Ein- und Ausgabe unter der Zeitgrenze des Typs (JDBC `queryTimeout`/`statement_timeout`, S3 `apiCallTimeout`, Prozesse `waitFor` + `destroyForcibly()`); Ergebnisse nur in einer kurzen Transaktion schreiben, die zuerst `AuftragService.anspruchSichern(auftrag)` aufruft (`select … from public.auftrag where id = ? and versuche = ? and status = 'LAEUFT' for update`); Test je Handler: verlorener Anspruch schreibt nichts
   - _Anforderungen: 5.1–5.10_
 
-- [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
+- [x] 2.7 Frontend-Grundgerüst und Upload [Frontend]
   - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE) gegen Keycloak, Navigation mit Eingangskorb-Zähler, Menüpunkte nach Rechtematrix
   - Seite Upload mit Drag & Drop, Mehrfachauswahl, «als ein Dokument», Fortschritt, Ergebnis je Datei (angenommen, «bereits vorhanden», Fehlermeldung)
-  - API-Client aus OpenAPI generieren
+  - API-Client aus OpenAPI generieren (Generator `npm run api:generieren` besteht; der Upload-Endpunkt fehlt noch, darum Upload-Seite hinter `UploadPort` und Anschluss an den generierten Client in 2.4)
   - _Anforderungen: 3.1, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
 
 - [ ] 2.8 Mindestversionen der Handys festlegen [Fabian]

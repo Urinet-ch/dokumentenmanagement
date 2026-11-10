@@ -1,7 +1,69 @@
-<mat-toolbar>
-  <h1>{{ texte.appTitel }}</h1>
+<button type="button" class="sprunglink" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
+<mat-toolbar class="kopf">
+  @if (menue().length > 0 && mobil()) {
+    <button
+      mat-icon-button
+      type="button"
+      [attr.aria-label]="nav.opened ? texte.menueSchliessen : texte.menueOeffnen"
+      [attr.aria-expanded]="nav.opened"
+      aria-controls="hauptnavigation"
+      (click)="nav.toggle()"
+    >
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" />
+      </svg>
+    </button>
+  }
+  <a class="titel" routerLink="/">{{ texte.appTitel }}</a>
+  <span class="abstand"></span>
+  @if (anmeldung.angemeldet()) {
+    @if (anmeldung.benutzer(); as benutzer) {
+      <span class="benutzer" data-test="benutzer">
+        {{ benutzer.name }}
+        @if (benutzer.mandant) {
+          <span class="mandant">· {{ benutzer.mandant }}</span>
+        }
+      </span>
+    }
+    <button mat-button type="button" (click)="anmeldung.abmelden()">{{ texte.anmeldung.abmelden }}</button>
+  }
 </mat-toolbar>
-<main>
-  <p>{{ texte.willkommen }}</p>
-  <router-outlet />
-</main>
+<mat-sidenav-container class="rahmen">
+  <mat-sidenav
+    #nav
+    id="hauptnavigation"
+    [mode]="mobil() ? 'over' : 'side'"
+    [opened]="menue().length > 0 && !mobil()"
+    [disableClose]="!mobil()"
+    [class.leer]="menue().length === 0"
+  >
+    @if (menue().length > 0) {
+      <nav [attr.aria-label]="texte.hauptnavigation">
+        <mat-nav-list>
+          @for (punkt of menue(); track punkt.pfad) {
+            <a
+              mat-list-item
+              [routerLink]="punkt.pfad"
+              routerLinkActive="aktiv"
+              ariaCurrentWhenActive="page"
+              (click)="mobil() && nav.close()"
+            >
+              <span class="punkt">
+                {{ punkt.text }}
+                @if (punkt.eingangskorbZaehler && zaehler.anzahl() !== null) {
+                  <span class="zaehler" aria-hidden="true" data-test="eingangskorb-zaehler">{{ zaehler.anzahl() }}</span>
+                  <span class="nur-screenreader">, {{ texte.eingangskorbAnzahl(zaehler.anzahl()!) }}</span>
+                }
+              </span>
+            </a>
+          }
+        </mat-nav-list>
+      </nav>
+    }
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <main #inhalt id="inhalt" tabindex="-1">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -29,7 +29,10 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss"]
+            "styles": [
+              "@fontsource-variable/inter/index.css",
+              "src/styles.scss"
+            ]
           },
           "configurations": {
             "production": {
@@ -51,7 +54,13 @@
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/umgebung/umgebung.ts",
+                  "with": "src/umgebung/umgebung.development.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"

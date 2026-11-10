@@ -1,3 +1,36 @@
-import { Routes } from '@angular/router';
+import { Route, Routes } from '@angular/router';
+import { HttpUploadService } from './erfassen/http-upload.service';
+import { UploadPort } from './erfassen/upload-port';
+import { Folgt } from './folgt/folgt';
+import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
+import { Aktion } from './gemeinsam/anmeldung/rechte';
+import { TEXTE } from './gemeinsam/texte.de-CH';
+import { Rueckruf } from './start/rueckruf';
+import { Start } from './start/start';
 
-export const routes: Routes = [];
+const titel = (seite: string) => `${seite} · ${TEXTE.appTitel}`;
+
+// Seiten späterer Aufgaben: Route und Recht stehen, der Inhalt folgt (design.md «Frontend»)
+function folgt(path: string, seite: string, aktion: Aktion): Route {
+  return { path, component: Folgt, canActivate: [rechtGuard(aktion)], data: { titel: seite }, title: titel(seite) };
+}
+
+export const routes: Routes = [
+  { path: '', pathMatch: 'full', component: Start, title: TEXTE.appTitel },
+  { path: 'anmeldung', component: Rueckruf, title: TEXTE.appTitel },
+  {
+    path: 'erfassen',
+    loadComponent: () => import('./erfassen/upload').then((m) => m.Upload),
+    canActivate: [rechtGuard('A1')],
+    providers: [{ provide: UploadPort, useClass: HttpUploadService }],
+    title: titel(TEXTE.menue.erfassen),
+  },
+  folgt('eingangskorb', TEXTE.menue.eingangskorb, 'A5'),
+  folgt('suche', TEXTE.menue.suche, 'A2'),
+  folgt('dokument/:id', 'Dokument', 'A2'),
+  folgt('importe', TEXTE.menue.importe, 'A12'),
+  folgt('importe/:id', TEXTE.menue.importe, 'A12'),
+  folgt('verwaltung/dokumentarten', TEXTE.menue.dokumentarten, 'A11'),
+  folgt('verwaltung/protokoll', TEXTE.menue.protokoll, 'A13'),
+  { path: '**', redirectTo: '' },
+];

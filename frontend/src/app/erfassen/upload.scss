@@ -1,0 +1,88 @@
+:host {
+  display: block;
+  max-width: 48rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+}
+
+.ablage {
+  border: 2px dashed var(--urinet-linie);
+  text-align: center;
+  padding: 2rem 1rem;
+
+  &.ziehen {
+    border-color: var(--urinet-gelb);
+  }
+}
+
+.ablage-text {
+  font: var(--mat-sys-title-medium);
+  margin: 0;
+}
+
+.ablage-oder {
+  color: var(--urinet-gedaempft);
+}
+
+.dateien {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.datei {
+  padding: 0.5rem 0.75rem;
+}
+
+.datei-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.datei-name {
+  overflow-wrap: anywhere;
+}
+
+.datei-ergebnis {
+  margin: 0.25rem 0 0;
+}
+
+.marke {
+  display: inline-block;
+  min-width: 1.25rem;
+  font-weight: 700;
+
+  &.angenommen {
+    color: var(--urinet-erfolg);
+  }
+  &.vorhanden {
+    color: var(--urinet-gelb);
+  }
+  &.abgelehnt {
+    color: var(--urinet-fehler);
+  }
+}
+
+.fehlercode,
+.hinweis {
+  color: var(--urinet-gedaempft);
+}
+
+.hinweis {
+  margin: 0 0 1rem;
+}
+
+.gesamtfehler {
+  color: var(--urinet-fehler);
+}

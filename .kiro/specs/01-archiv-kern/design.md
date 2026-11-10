@@ -629,6 +629,21 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
   - 4xx ausser 401 → sofort «fehlerhaft» mit der Meldung des Servers; 401 → neu anmelden, der Eintrag bleibt.
 - Eingangskorb: Kennzeichen für `pdfa_fehlt`, «Frist abgelaufen», Warnung `BELEGNUMMER_BEKANNT` und «bitte prüfen»; bei `FEHLER` Fehlertext mit «erneut verarbeiten» und «verwerfen», bei `ARCHIVIERUNG_FEHLER` «Archivierung wiederholen» (Req 8.7). Aktionen ohne Recht werden nicht angezeigt; die API prüft trotzdem.
 - API-Client aus OpenAPI generiert (`openapi-generator`, typescript-angular).
+- Grundgerüst (Aufgabe 2.7, Erkenntnisse):
+  - Anmeldung mit eigenem schlankem OIDC-Client (Authorization Code mit PKCE S256, Client `archiv-pwa`) ohne
+    Bibliothek: Tokens nur im Arbeitsspeicher; `sessionStorage` hält nur während der Weiterleitung `state`, `nonce`,
+    `code_verifier` und das Ziel und wird beim Rückruf (`/anmeldung`) gelöscht. Nach einem Neuladen ist eine neue
+    Anmeldung nötig (bei laufender Keycloak-Sitzung ohne Passworteingabe). Die Signatur prüft die API, nicht die PWA.
+  - Erneuerung per Refresh Token 30 s vor Ablauf; lehnt Keycloak ab oder antwortet die API mit 401, meldet die PWA
+    «Sitzung abgelaufen» und verwirft die Tokens. Abmelden über den Logout-Endpunkt von Keycloak mit `id_token_hint`.
+  - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A13); ohne Mandant oder ohne
+    Archiv-Rolle kein Menü. Die Oberfläche blendet nur aus, die API prüft.
+  - Eingangskorb-Zähler hinter einem Port (`EingangskorbZaehler`); bis 3.6 ohne Endpunkt und ohne Anzeige.
+  - Upload hinter dem Port `UploadPort` mit HTTP-Adapter (Multipart, Feld `dateien` je Datei in der Reihenfolge der
+    Liste, `zusammenfassen=true` ab zwei Bildern); den generierten Client schliesst 2.4 an.
+  - Keycloak im Dev-Modus auf festem Port 8180 (`%dev.quarkus.keycloak.devservices.port`).
+  - Browser-Szenarien laufen gegen eine Keycloak-Attrappe in Playwright (`frontend/e2e/hilfen/`), die PKCE S256 prüft
+    und unsignierte Tokens ausstellt; der Service Worker ist dabei blockiert.
 
 ## Data Models
 
