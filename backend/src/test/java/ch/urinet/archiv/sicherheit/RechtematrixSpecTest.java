@@ -20,12 +20,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Die Rechtematrix der Domain stimmt Zelle für Zelle mit der Tabelle in Req 2.6 überein; {@code requirements.md} ist
- * die einzige Quelle. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile machen den Test rot.
+ * die einzige Quelle. Unbekannter Zellentext, eine fehlende oder eine zusätzliche Zeile, eine Zeile ohne Nummer
+ * {@code A<n>} (z. B. {@code | B1 |} oder {@code |A15|}) und eine abweichende Aktion machen den Test rot.
  */
 class RechtematrixSpecTest {
 
     private static final Path REQUIREMENTS = Path.of("../.kiro/specs/01-archiv-kern/requirements.md");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
+    private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final List<String> KOPF = List.of("Nr.", "Aktion", "`inhaber`", "`mitarbeiter`", "`treuhaender`",
             "`geschaeftsstelle` ¹");
 
@@ -42,7 +44,7 @@ class RechtematrixSpecTest {
     void unbekannterZellentextIstRot() {
         assertThatThrownBy(() -> lesen(List.of(
                 "| Nr. | Aktion | `inhaber` | `mitarbeiter` | `treuhaender` | `geschaeftsstelle` ¹ |",
-                "| A1 | Dokumente erfassen | erlaubt | erlaubt | vielleicht | erlaubt |")))
+                "| A1 | Dokumente erfassen (Upload, Handy) | erlaubt | erlaubt | vielleicht | erlaubt |")))
                 .hasMessageContaining("vielleicht");
     }
 
@@ -52,6 +54,25 @@ class RechtematrixSpecTest {
                 "| Nr. | Aktion | `inhaber` | `mitarbeiter` | `treuhaender` | `geschaeftsstelle` ¹ |",
                 "| A99 | Neu | erlaubt | erlaubt | erlaubt | erlaubt |")))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void zeileOhneNummerIstRot() {
+        for (String zeile : List.of("| B1 | Neu | erlaubt | erlaubt | erlaubt | erlaubt |",
+                "|A15| Neu | erlaubt | erlaubt | erlaubt | erlaubt |")) {
+            assertThatThrownBy(() -> lesen(List.of(
+                    "| Nr. | Aktion | `inhaber` | `mitarbeiter` | `treuhaender` | `geschaeftsstelle` ¹ |",
+                    "| --- | --- | --- | --- | --- | --- |", zeile)))
+                    .as(zeile).hasMessageContaining("ohne Nummer");
+        }
+    }
+
+    @Test
+    void abweichendeAktionIstRot() {
+        assertThatThrownBy(() -> lesen(List.of(
+                "| Nr. | Aktion | `inhaber` | `mitarbeiter` | `treuhaender` | `geschaeftsstelle` ¹ |",
+                "| A7 | Freigeben | erlaubt | 403 | 403 | erlaubt |")))
+                .hasMessageContaining("Bestätigen");
     }
 
     /** Liest die Zeilen A1 … der ersten Tabelle mit dem Kopf von Req 2.6; spätere Tabellen (z. B. A15–A19) nicht. */
@@ -68,17 +89,22 @@ class RechtematrixSpecTest {
                 inTabelle = false;
                 continue;
             }
-            if (inTabelle && ZEILE.matcher(zeile).matches()) {
-                List<String> z = zellen(zeile);
-                assertThat(z).as(zeile).hasSize(KOPF.size());
-                Aktion aktion = Aktion.valueOf(z.getFirst());
-                Map<Rolle, Ergebnis> ergebnisse = new EnumMap<>(Rolle.class);
-                Rolle[] rollen = Rolle.values();
-                for (int i = 0; i < rollen.length; i++) {
-                    ergebnisse.put(rollen[i], RechtematrixZelle.ergebnis(z.get(2 + i)));
-                }
-                assertThat(matrix.put(aktion, ergebnisse)).as("doppelte Zeile " + aktion).isNull();
+            if (!inTabelle || TRENNZEILE.matcher(zeile).matches()) {
+                continue;
             }
+            if (!ZEILE.matcher(zeile).matches()) {
+                throw new IllegalArgumentException("Zeile der Rechtematrix ohne Nummer A<n>: " + zeile);
+            }
+            List<String> z = zellen(zeile);
+            assertThat(z).as(zeile).hasSize(KOPF.size());
+            Aktion aktion = Aktion.valueOf(z.getFirst());
+            assertThat(z.get(1).replace("`", "")).as("Aktion " + aktion).isEqualTo(aktion.bezeichnung());
+            Map<Rolle, Ergebnis> ergebnisse = new EnumMap<>(Rolle.class);
+            Rolle[] rollen = Rolle.values();
+            for (int i = 0; i < rollen.length; i++) {
+                ergebnisse.put(rollen[i], RechtematrixZelle.ergebnis(z.get(2 + i)));
+            }
+            assertThat(matrix.put(aktion, ergebnisse)).as("doppelte Zeile " + aktion).isNull();
         }
         return matrix;
     }

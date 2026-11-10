@@ -6,17 +6,25 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Genau eine Archiv-Rolle, sonst keine (fail closed, Req 2.2). */
+/** Die stärkste Archiv-Rolle gilt, ohne Archiv-Rolle keine (Req 2.2, entschieden von Fabian am 10.11.2026). */
 class RolleTest {
 
     @Test
-    void genauEineArchivRolle() {
+    void eineArchivRolle() {
         assertThat(Rolle.ausRealmRollen(List.of("treuhaender", "offline_access"))).contains(Rolle.TREUHAENDER);
     }
 
     @Test
-    void keineOderMehrereArchivRollen() {
+    void keineArchivRolle() {
         assertThat(Rolle.ausRealmRollen(List.of("offline_access", "INHABER"))).isEmpty();
-        assertThat(Rolle.ausRealmRollen(List.of("inhaber", "treuhaender"))).isEmpty();
+    }
+
+    @Test
+    void mehrereArchivRollenDieStaerksteGilt() {
+        assertThat(Rolle.ausRealmRollen(List.of("treuhaender", "inhaber"))).contains(Rolle.INHABER);
+        assertThat(Rolle.ausRealmRollen(List.of("mitarbeiter", "geschaeftsstelle"))).contains(Rolle.GESCHAEFTSSTELLE);
+        assertThat(Rolle.ausRealmRollen(List.of("inhaber", "geschaeftsstelle"))).contains(Rolle.INHABER);
+        // keine Vereinigung: treuhaender liest INTERN, mitarbeiter nicht; es gilt nur mitarbeiter
+        assertThat(Rolle.ausRealmRollen(List.of("treuhaender", "mitarbeiter"))).contains(Rolle.MITARBEITER);
     }
 }

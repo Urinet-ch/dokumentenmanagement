@@ -3,7 +3,9 @@
 Funktionalität: Mandanten-Kontext und Rechtematrix
   Bis es fachliche Endpunkte gibt (2.1, 2.2), prüfen Probe-Endpunkte unter src/test die Regeln:
   «/api/v1/probe/dokumentarten/{code}» liest eine Dokumentart im Schema des Mandanten (alle Archiv-Rollen),
-  «/api/v1/probe/erfassen» steht für Aktion A1.
+  «/api/v1/probe/erfassen» steht für Aktion A1, «/api/v1/probe/dokumente/{id}» für A2 und
+  «/api/v1/probe/dokumente/{id}/bestaetigen» für A7. Die Probe-Dokumente «NORMAL» und «INTERN» liegen im Mandanten
+  «urinet» (ProbeSichtbarkeit unter src/test, bis 2.2 den VertraulichkeitFilter bringt).
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -45,14 +47,25 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
     Dann findet der Worker die Dokumentart nicht
 
   @req-2.2
-  Szenariogrundriss: Ohne genau eine Archiv-Rolle antwortet das Archiv mit 403
-    Wenn «<benutzer>» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
+  Szenario: Ohne Archiv-Rolle antwortet das Archiv mit 403
+    Wenn «ohne-rolle-urinet» die Dokumentart «PROBE_VHF_BULLETIN» abfragt
     Dann antwortet das Archiv mit Status 403 und liefert keine Daten
 
-    Beispiele:
-      | benutzer           | fall                          |
-      | ohne-rolle-urinet  | keine Archiv-Rolle            |
-      | zwei-rollen-urinet | inhaber und treuhaender       |
+  @req-2.2
+  Szenario: Bei mehreren Archiv-Rollen gilt die stärkste (inhaber vor treuhaender)
+    Wenn «treuhaender-urinet» ein Dokument erfasst
+    Dann antwortet das Archiv mit Status 403 und liefert keine Daten
+    Wenn «zwei-rollen-urinet» ein Dokument erfasst
+    Dann antwortet das Archiv mit Status 204 und liefert keine Daten
+
+  @req-2.2
+  Szenario: Bei mehreren Archiv-Rollen werden die Rechte nicht vereinigt (mitarbeiter vor treuhaender)
+    Wenn «treuhaender-urinet» das Probe-Dokument «INTERN» liest
+    Dann antwortet das Archiv mit Status 200 und liefert das Probe-Dokument «INTERN»
+    Wenn «mitarbeiter-treuhaender-urinet» das Probe-Dokument «INTERN» liest
+    Dann antwortet das Archiv mit Status 404 und liefert keine Daten
+    Wenn «mitarbeiter-treuhaender-urinet» ein Dokument erfasst
+    Dann antwortet das Archiv mit Status 204 und liefert keine Daten
 
   @req-2.2 @req-2.4
   Szenariogrundriss: Erfassen (A1) nach Rolle
@@ -65,6 +78,21 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
       | mitarbeiter-urinet       | 204    |
       | treuhaender-urinet       | 403    |
       | geschaeftsstelle-vhf-gsk | 204    |
+
+  @req-2.3 @req-2.6
+  Szenariogrundriss: Auf einem Dokument gilt 404 vor 403 (Bestätigen, A7)
+    Wenn «<benutzer>» das Probe-Dokument «<dokument>» bestätigt
+    Dann antwortet das Archiv mit Status <status> und liefert keine Daten
+
+    Beispiele:
+      | benutzer           | dokument  | status | fall                                 |
+      | mitarbeiter-urinet | INTERN    | 404    | nicht sichtbar und ohne Recht        |
+      | mitarbeiter-urinet | NORMAL    | 403    | sichtbar, aber ohne Recht            |
+      | treuhaender-urinet | UNBEKANNT | 404    | Dokument gibt es nicht               |
+      | treuhaender-urinet | NORMAL    | 403    | sichtbar, aber ohne Recht            |
+      | inhaber-vhf-gsk    | NORMAL    | 404    | Dokument eines anderen Mandanten     |
+      | inhaber-urinet     | kein-uuid | 404    | keine gültige Dokument-ID            |
+      | inhaber-urinet     | NORMAL    | 204    | sichtbar und berechtigt              |
 
   @req-2.6
   Szenario: Die Rechtematrix der Domain entspricht der Tabelle aus Requirement 2.6

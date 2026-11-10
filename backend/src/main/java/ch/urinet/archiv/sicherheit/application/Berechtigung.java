@@ -45,7 +45,12 @@ public class Berechtigung {
         }
     }
 
-    /** Ohne gültigen Mandanten oder ohne eindeutige Archiv-Rolle (Req 1.3, 2.2): 403, bevor Daten gelesen werden. */
+    /** Dokument-ID, die keine gültige ID ist: gilt wie ein unsichtbares Dokument als nicht vorhanden (404). */
+    public void unbekanntesDokument(Benutzer benutzer, Aktion aktion) {
+        verweigern(Optional.of(benutzer.id()), Optional.of(aktion), Optional.empty(), Verweigerung.Grund.NICHT_GEFUNDEN);
+    }
+
+    /** Ohne gültigen Mandanten oder ohne Archiv-Rolle (Req 1.3, 2.2): 403, bevor Daten gelesen werden. */
     public void ohneZugang(Optional<String> benutzerId) {
         verweigern(benutzerId, Optional.empty(), Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
     }

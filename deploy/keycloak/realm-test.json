@@ -1262,6 +1262,38 @@
       ]
     },
     {
+      "username": "mitarbeiter-treuhaender-urinet",
+      "enabled": true,
+      "email": "mitarbeiter-treuhaender-urinet@example.invalid",
+      "emailVerified": true,
+      "firstName": "Mitarbeiter Treuhaender",
+      "lastName": "urinet",
+      "attributes": {
+        "mandant": [
+          "urinet"
+        ]
+      },
+      "realmRoles": [
+        "mitarbeiter",
+        "treuhaender",
+        "default-roles-urinet-archiv"
+      ],
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test-Passwort-1",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Test",
+          "secretData": "{\"value\": \"urinet-archiv-test-otp-nur-lokal\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
+        }
+      ]
+    },
+    {
       "username": "ohne-rolle-urinet",
       "enabled": true,
       "email": "ohne-rolle-urinet@example.invalid",

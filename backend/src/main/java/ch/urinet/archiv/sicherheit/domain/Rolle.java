@@ -9,18 +9,21 @@ import java.util.Optional;
 public enum Rolle {
     INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE;
 
+    /** Rangfolge nach Req 2.2 (entschieden von Fabian am 10.11.2026), stärkste zuerst. */
+    private static final List<Rolle> RANGFOLGE = List.of(INHABER, GESCHAEFTSSTELLE, MITARBEITER, TREUHAENDER);
+
     /** Name der Realm-Rolle in Keycloak, z. B. {@code inhaber}. */
     public String code() {
         return name().toLowerCase(Locale.ROOT);
     }
 
     /**
-     * Genau eine Archiv-Rolle unter den Realm-Rollen, sonst leer: ohne Archiv-Rolle oder mit mehreren (fail closed;
-     * eine Vereinigung der Rechte würde etwa {@code treuhaender}, nur lesend, aufweichen). Andere Realm-Rollen zählen
-     * nicht.
+     * Die stärkste Archiv-Rolle unter den Realm-Rollen (Req 2.2: {@code inhaber} > {@code geschaeftsstelle} >
+     * {@code mitarbeiter} > {@code treuhaender}); die übrigen Archiv-Rollen zählen nicht, auch nicht aus Composite- oder
+     * Default-Rollen. Die Rechte werden nicht vereinigt: Wer {@code mitarbeiter} und {@code treuhaender} hat, bekommt
+     * nur die Rechte von {@code mitarbeiter}. Ohne Archiv-Rolle leer; andere Realm-Rollen zählen nicht.
      */
     public static Optional<Rolle> ausRealmRollen(Collection<String> realmRollen) {
-        List<Rolle> gefunden = List.of(values()).stream().filter(r -> realmRollen.contains(r.code())).toList();
-        return gefunden.size() == 1 ? Optional.of(gefunden.getFirst()) : Optional.empty();
+        return RANGFOLGE.stream().filter(r -> realmRollen.contains(r.code())).findFirst();
     }
 }

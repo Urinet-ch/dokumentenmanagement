@@ -60,7 +60,10 @@ public final class Rechtematrix {
         return ZEILEN.get(aktion).get(rolle);
     }
 
-    /** Rollen, für die die Aktion nicht 403 ist; genau diese gehören in {@code @RolesAllowed}. */
+    /**
+     * Rollen, für die die Aktion nicht 403 ist; genau diese gehören in {@code @RolesAllowed} von Aktionen ohne
+     * Dokumentbezug (dokumentbezogene Aktionen: alle Rollen, siehe {@link Aktion#dokumentbezogen()}).
+     */
     public static Set<Rolle> zugelassen(Aktion aktion) {
         return ZEILEN.get(aktion).entrySet().stream().filter(z -> z.getValue().zugaenglich()).map(Map.Entry::getKey)
                 .collect(Collectors.toUnmodifiableSet());

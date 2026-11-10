@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.probe.ProbeSichtbarkeit;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -33,10 +34,11 @@ import java.util.concurrent.Executors;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Schritte zu Req 1.2, 1.3, 1.4 (Teilnachweis), 1.6, 2.2, 2.4 und 2.6 über die Probe-Endpunkte unter src/test. */
+/** Schritte zu Req 1.2, 1.3, 1.4 (Teilnachweis), 1.6, 2.2, 2.3, 2.4 und 2.6 über die Probe-Endpunkte unter src/test. */
 public class MandantenkontextSchritte {
 
     private static final String DOKUMENTARTEN = "/api/v1/probe/dokumentarten/";
+    private static final String DOKUMENTE = "/api/v1/probe/dokumente/";
 
     @Inject
     MandantProvisionierung provisionierung;
@@ -88,6 +90,27 @@ public class MandantenkontextSchritte {
     @Wenn("«{word}» ein Dokument erfasst")
     public void erfassen(String benutzer) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().post("/api/v1/probe/erfassen");
+    }
+
+    @Wenn("«{word}» das Probe-Dokument «{word}» liest")
+    public void dokumentLesen(String benutzer, String dokument) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(DOKUMENTE + dokumentId(dokument));
+    }
+
+    @Wenn("«{word}» das Probe-Dokument «{word}» bestätigt")
+    public void dokumentBestaetigen(String benutzer, String dokument) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .post(DOKUMENTE + dokumentId(dokument) + "/bestaetigen");
+    }
+
+    @Dann("antwortet das Archiv mit Status {int} und liefert das Probe-Dokument «{word}»")
+    public void mitDokument(int status, String dokument) {
+        assertThat(antwort.statusCode()).isEqualTo(status);
+        assertThat(antwort.<String>path("id")).isEqualTo(dokumentId(dokument));
+    }
+
+    private static String dokumentId(String name) {
+        return ProbeSichtbarkeit.NAMEN.containsKey(name) ? ProbeSichtbarkeit.NAMEN.get(name).toString() : name;
     }
 
     @Dann("antwortet das Archiv mit Status {int} und liefert keine Daten")

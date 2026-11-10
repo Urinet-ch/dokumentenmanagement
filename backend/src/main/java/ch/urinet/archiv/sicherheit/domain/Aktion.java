@@ -29,4 +29,12 @@ public enum Aktion {
     public String bezeichnung() {
         return bezeichnung;
     }
+
+    /**
+     * A2–A10 betreffen ein einzelnes Dokument: Endpunkte mit {@code {id}} prüfen zuerst die Sichtbarkeit (404), dann
+     * das Recht (403); {@code @RolesAllowed} lässt darum alle Archiv-Rollen zu (Req 2.6, ADR-009 Entscheid 7).
+     */
+    public boolean dokumentbezogen() {
+        return compareTo(A2) >= 0 && compareTo(A10) <= 0;
+    }
 }
