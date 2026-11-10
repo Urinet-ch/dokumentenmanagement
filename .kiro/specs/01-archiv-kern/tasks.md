@@ -202,6 +202,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Port `OcrPort` mit Adapter und Dev-Stub; `VerarbeitenHandler`: Status `VERARBEITUNG`, HEIC→JPEG, Bilder→PDF, bei Handy-Erfassung PDF/A aus der Arbeitsfassung, OCRmyPDF (`--skip-text` bei Textebene), `pdftotext`, Vorschaubilder; Folgeauftrag `KI_VORSCHLAG`; nach 3 Fehlversuchen `FEHLER` mit Fehlertext
   - signierte PDFs: PDF/A auch bei Verlust der Signatur, Original unverändert; keine PDF/A möglich (z. B. verschlüsselt) → Vermerk `pdfa_fehlt` und Eingangskorb
   - veraPDF-Prüfung im Test; Lastskript für die Laufzeit einseitiges Foto als p95 ≤ 30 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16)
+  - Pflicht für jeden Handler und Hook (aus 2.5, design.md «Pflichten der Handler»): eigene Zeitgrenzen für jede Ein- und Ausgabe unter der Zeitgrenze des Typs (JDBC `queryTimeout`/`statement_timeout`, S3 `apiCallTimeout`, Prozesse `waitFor` + `destroyForcibly()`); Ergebnisse nur in einer kurzen Transaktion schreiben, die zuerst `AuftragService.anspruchSichern(auftrag)` aufruft (`select … from public.auftrag where id = ? and versuche = ? and status = 'LAEUFT' for update`); Test je Handler: verlorener Anspruch schreibt nichts
   - _Anforderungen: 5.1–5.10_
 
 - [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
