@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Aufgabe 2.5 (Req 1.6): Jeder Auftrag führt seinen Mandanten mit, der Worker arbeitet in dessen Kontext; ohne
+         Mandant gäbe es keinen Kontext (fail closed). Rückwärtskompatibel: Bis 2.5 reiht niemand Aufträge ein. -->
+    <changeSet id="005-auftrag-mandant-pflicht" author="archiv">
+        <addNotNullConstraint tableName="auftrag" columnName="mandant" columnDataType="text"/>
+    </changeSet>
+</databaseChangeLog>
