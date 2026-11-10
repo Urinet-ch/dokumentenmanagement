@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.AuthenticationRedirectException;
 import io.quarkus.security.UnauthorizedException;
@@ -34,6 +35,15 @@ public class ProblemAbbildung {
     @ServerExceptionMapper
     public Response umleitung(AuthenticationRedirectException fehler) {
         return nichtAngemeldet();
+    }
+
+    /**
+     * Falscher Feldtyp im JSON: Der eingebaute Mapper von Quarkus für diese Ausnahme gäbe in dev/test den Eingabewert
+     * zurück und in prod einen leeren 400; dieser hier gewinnt und nennt keinen Wert (Req 16.7).
+     */
+    @ServerExceptionMapper
+    public Response feldtyp(MismatchedInputException fehler) {
+        return antwort(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG));
     }
 
     @ServerExceptionMapper

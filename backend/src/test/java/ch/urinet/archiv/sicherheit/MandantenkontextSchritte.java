@@ -116,10 +116,22 @@ public class MandantenkontextSchritte {
                 .post(DOKUMENTE + dokumentId(dokument) + "/bestaetigen");
     }
 
+    @Wenn("«{word}» an die Probe-Anfrage im Zahlenfeld den Text «{word}» sendet")
+    public void falscherFeldtyp(String benutzer, String text) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
+                .body("{\"anzahl\": \"" + text + "\"}").when().post(ANFRAGE);
+    }
+
     @Wenn("«{word}» an die Probe-Anfrage JSON mit dem Content-Type «{}» sendet")
     public void falscherMedientyp(String benutzer, String medientyp) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(medientyp)
                 .body("{\"anzahl\": 1}").when().post(ANFRAGE);
+    }
+
+    @Dann("enthält die Antwort «{word}» nicht")
+    public void ohneEingabewert(String text) {
+        assertThat(antwort.asString()).doesNotContain(text);
+        assertThat(antwort.headers().toString()).doesNotContain(text);
     }
 
     @Dann("antwortet das Archiv mit Status {int} und liefert das Probe-Dokument «{word}»")
