@@ -55,7 +55,7 @@ das Kriterium ist erst nach diesem Entscheid umsetzbar.
 - **Golden-Datensatz** – 50 anonymisierte echte Belege mit erwarteten Metadaten zur Messung der KI; 30 zum Abstimmen, 20 zurückgehalten für das Gate. Liegt nur ausserhalb des Repositorys (`ARCHIV_GOLDEN_DIR`).
 - **Manifest** – tägliche, signierte und zeitgestempelte Liste der Prüfsummen aller Dateien, die seit dem letzten Manifest archiviert wurden, verkettet mit dem vorherigen Manifest.
 - **Zeitstempel** – RFC-3161-Zeitstempel eines Zeitstempeldienstes in der Schweiz; belegt den Speicherzeitpunkt (Art. 9 GeBüV).
-- **App-Schlüssel** – S3-Zugangsdaten der Anwendung (Secret-Datei `s3_app_zugang`); sie liegen auf dem Server (16.9). Bei Infomaniak hat jeder S3-Schlüssel des Projekts technisch das Recht `s3:BypassGovernanceRetention` (Spike 0.2), die Anwendung nutzt es nie (6.5).
+- **App-Schlüssel** – S3-Zugangsdaten der Anwendung (Secret-Dateien `s3_app_zugang_id` und `s3_app_zugang_geheimnis`); sie liegen auf dem Server (16.9). Bei Infomaniak hat jeder S3-Schlüssel des Projekts technisch das Recht `s3:BypassGovernanceRetention` (Spike 0.2), die Anwendung nutzt es nie (6.5).
 - **Inhaber-Zugang** – Zugangsdaten des Inhabers zum Public-Cloud-Projekt des Object Storage bei Infomaniak, mit denen S3-Schlüssel ausgestellt und Korrekturen an gesperrten Dateien ausgeführt werden; offline beim Inhaber, nie auf dem Server. Ersetzt den früheren «Bypass-Schlüssel», weil bei Infomaniak jeder S3-Schlüssel des Projekts das Recht `s3:BypassGovernanceRetention` hat (Spike 0.2).
 - **Zweitkopie** – verschlüsselte Sicherung von Datenbanken und Bucket bei einem zweiten Schweizer Anbieter.
 - **Notfallunterlagen** – versiegelte Zugangsdaten ausserhalb des Systems für den Notfall (Requirement 16.12).

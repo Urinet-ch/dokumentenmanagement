@@ -78,9 +78,10 @@ cd backend && mvn quarkus:dev
 java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
 ```
 - Im laufenden Container per `exec`; das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber
-  die Secret-Dateien von Datenbank (`archiv_db_owner`) und Object Storage. Seed: `seed/<code>/dokumentarten.json`.
-- Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf,
-  3 technischer Fehler (design.md, «Mandant»).
+  die Secret-Dateien `archiv_db_app`, `archiv_db_owner`, `s3_app_zugang_id` und `s3_app_zugang_geheimnis` unter
+  `/run/secrets/`; fehlt eine oder ist sie leer, bricht der Start ab. Seed: `seed/<code>/dokumentarten.json`.
+- Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
+  vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
 
 ## Leitplanken
 Die Leitplanken stammen aus der Harness-Vorlage der Skill-Werkstatt (`~/git/ai-entwicklung/vorlagen/harness`) und
