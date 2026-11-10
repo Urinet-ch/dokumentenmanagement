@@ -90,15 +90,20 @@ java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsja
 Ein API-Token `ua_<id>_<geheimnis>` gilt für genau einen Mandanten und einen Scope (`generator` oder `import`) und
 erreicht nur die Endpunkte dieses Scopes (Req 2.5). Das Archiv speichert nur den Argon2id-Hash; das Token wird nur beim
 Anlegen ein einziges Mal angezeigt. Anlegen, Auflisten und Widerrufen darf nur der `inhaber` (A14, Req 2.20): in der
-Verwaltung (`/api/v1/api-tokens`) oder per Kommando (im Container per `exec`, wie `mandant anlegen`; stdout direkt in
-die Token-Datei des Clients umleiten):
+Verwaltung (`/api/v1/api-tokens`) oder per Kommando (im Container per `exec`, wie `mandant anlegen`; stdout in eine
+neue Datei mit Rechten 600 umleiten und erst bei Erfolg an ihren Platz schieben, damit ein Fehlschlag kein gültiges
+Token überschreibt):
 ```bash
-umask 077 && mkdir -p ~/.config/urinet-archiv
-java -jar quarkus-run.jar token erstellen <mandant> <name> <generator|import> > ~/.config/urinet-archiv/token
-chmod 600 ~/.config/urinet-archiv/token
+mkdir -p ~/.config/urinet-archiv
+(umask 077; java -jar quarkus-run.jar token erstellen <mandant> <name> <generator|import> > token.neu) \
+  && mv token.neu ~/.config/urinet-archiv/token
 ```
-- Das Token steht nur auf stdout; die Zeile mit ID, Mandant und Scope geht auf stderr. Exit-Codes wie bei
-  `mandant anlegen` (0 angelegt, 1 fachlicher Fehler, 2 falscher Aufruf, 3 technischer Fehler).
+- Das Token steht nur auf stdout; die Zeile mit ID, Mandant und Scope und das Log gehen auf stderr. Exit-Codes wie bei
+  `mandant anlegen` (0 angelegt, 1 fachlicher Fehler, 2 falscher Aufruf, 3 technischer Fehler); nach einem Fehler
+  `token.neu` löschen.
+- Entsteht das Token nicht auf dem Client-Rechner (Kommando auf dem Server, Anzeige in der Verwaltung), kommt es nur
+  über einen sicheren Kanal dorthin (z. B. Passwort-Manager oder `scp`), nie per E-Mail, Chat oder Ticket; auf dem
+  Client wie oben mit `umask 077` in `token.neu` schreiben und verschieben.
 - Lokale Clients lesen das Token aus `~/.config/urinet-archiv/token` (Rechte 600) oder aus der Datei, deren Pfad
   `ARCHIV_TOKEN_DATEI` nennt – **nie** das Token selbst aus einer Umgebungsvariable (tech.md Regel 7), nie im Repo.
 - Ein verlorenes oder offengelegtes Token sofort widerrufen (`DELETE /api/v1/api-tokens/{tokenId}`) und neu anlegen.
