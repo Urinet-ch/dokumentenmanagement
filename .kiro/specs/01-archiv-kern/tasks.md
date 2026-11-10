@@ -107,7 +107,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Kommando `archiv token erstellen <mandant> <name> <scope>` (gibt Geheimnis einmal aus); Anlegen, Anzeigen und Widerruf nur mit Recht A14
   - _Anforderungen: 2.5, 2.20_
 
-- [ ] 1.6 Querschnitt: Problem Details, Protokoll-Grundlage, ArchUnit [Backend]
+- [x] 1.6 Querschnitt: Problem Details, Protokoll-Grundlage, ArchUnit [Backend]
   - `ExceptionMapper` → RFC 9457 mit `fehlercode`
   - Tabelle `zugriff_protokoll` mit Trigger (nur `INSERT`); `@Protokolliert`-Interceptor schreibt synchron in derselben Transaktion, IP aus `X-Real-Ip`; schlägt der Eintrag fehl, wird die Aktion nicht ausgeführt; verweigerte Zugriffe mit Aktion `VERWEIGERT`
   - ArchUnit-Regeln aus `structure.md` (Blueprint)

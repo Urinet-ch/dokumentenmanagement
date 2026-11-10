@@ -538,6 +538,24 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
 | `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`, `WISSEN_INGEST`, `WISSEN_LINT` | Endpunkte der Wissensbasis (Spec 04, design.md, «Zugriffsprotokoll»); `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN` mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, `WISSEN_INGEST` mit Dokument-ID |
 
 - `zugriff_protokoll` und `dokument_version` sind INSERT-only: Trigger `BEFORE UPDATE OR DELETE → RAISE EXCEPTION`, und die DB-Rolle `archiv_app` hat auf beiden nur `INSERT` und `SELECT` (Req 10.3). Aufbewahrung: [offen: Aufbewahrungsfrist des Zugriffsprotokolls – Entscheid vor Welle 5].
+- Umsetzung (Aufgabe 1.6; `dokument_version` folgt mit 2.2):
+  - Changeset `db/mandant/changesets/002-zugriff-protokoll.xml`: Trigger `BEFORE UPDATE OR DELETE` je Zeile und
+    `BEFORE TRUNCATE` je Anweisung mit «nur Einfügen erlaubt»; er gilt auch für den Eigentümer `archiv_owner`. Die
+    Rechte entzieht die Provisionierung nach jeder Migration (`NUR_EINFUEGEN` in `LiquibaseMandantDatenbank`), also
+    auch gegen die Default Privileges und für bestehende Schemas.
+  - `@Protokolliert` (`protokoll.application`) an Methode oder Klasse; der Interceptor schreibt per JDBC über den Port
+    `ZugriffProtokoll` vor der Aktion und tritt der laufenden Transaktion bei, sonst öffnet er eine eigene. `benutzer`
+    ist der Principal (Keycloak-`sub`, bei API-Tokens ab Aufgabe 1.5 `token:<id>`), `rolle` die Archivrolle oder leer,
+    `dokument_id` der Pfadparameter `{id}`.
+  - `X-Real-Ip` gilt nur als einzelne IPv4- oder IPv6-Adresse (ohne Namensauflösung); sonst bleibt `ip` leer, die
+    Anfrage läuft weiter.
+  - `VERWEIGERT` schreibt `ProtokollVerweigerungMelder` (`sicherheit`) in einer eigenen Transaktion
+    (`REQUIRES_NEW`), damit der Eintrag den Abbruch übersteht; `details` enthält `fehlercode` und als `grund` die
+    Zeile der Rechtematrix (z. B. `A7`), falls bekannt. Bei `MANDANT_FEHLT` gibt es kein Mandanten-Schema: nur ein
+    Log-Eintrag mit IDs und Fehlercode. Scheitert das Schreiben des `VERWEIGERT`-Eintrags, bleibt die Antwort
+    403 bzw. 404.
+  - `EndpunktWaechterTest` prüft, dass jeder Endpunkt mit einer Aktion aus der Tabelle die passende
+    `@Protokolliert`-Aktion trägt (A2–A4 nur mit `{id}`, `…/datei` → `HERUNTERLADEN`).
 
 **Manifest** (Req 15, P2):
 - Lauf täglich um 03:30 Europe/Zurich (`@Scheduled(cron = "0 30 3 * * ?", timeZone = "Europe/Zurich")`) und einmal beim Start der API: je Mandant ein Auftrag `MANIFEST`.
@@ -724,10 +742,18 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 
 ## Error Handling
 - Alle Fehler als Problem Details (`type`, `title` deutsch, `status`, `detail`, `instance`, `fehlercode`).
+  Umsetzung (Aufgabe 1.6): `Content-Type: application/problem+json`; `type` ist `urn:urinet:archiv:fehler:<FEHLERCODE>`,
+  `instance` die Fehler-ID `urn:uuid:<uuid>`, die auch im Log steht; `title` und `detail` sind feste deutsche Texte je
+  Fehlercode (`gemeinsam.domain.Fehlercode`) ohne Eingabewerte, Inhalte oder Klassennamen. Fachfehler werfen
+  `FachFehler` mit Fehlercode; die Abbildung liegt in `gemeinsam.adapter.in.rest` (`ProblemAbbildung`, für Fehler vor
+  der Resource ein Failure-Handler am Router). Die Antwort 401 ohne Token entsteht nicht als Fehler, sondern als
+  Challenge; unter `/api/` schreibt sie `ProblemAnmeldung` als Problem Details.
 - Fehlercodes:
 
 | HTTP | `fehlercode` | Wann |
 | --- | --- | --- |
+| 400 | `ANFRAGE_UNGUELTIG` | Anfrage formal ungültig (Pfad, Parameter, JSON), auch andere 4xx des Frameworks mit ihrem Status (z. B. 405, 406) |
+| 401 | `NICHT_ANGEMELDET` | Token fehlt, ungültig oder abgelaufen, mit `WWW-Authenticate: Bearer` |
 | 403 | `MANDANT_FEHLT` | kein gültiger oder inaktiver Mandant (Req 1.3) |
 | 403 | `NICHT_ERLAUBT` | Rolle oder Token-Scope ohne Recht (Req 2.4–2.20) |
 | 404 | `NICHT_GEFUNDEN` | fremder Mandant oder unsichtbar, vor 403 (Req 1.4, 2.3) |
@@ -749,6 +775,7 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
+| 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort und Log nur mit Fehler-ID |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
 
 - Eine Dublette ist kein Fehler, sondern ein Ergebnis je Datei (`status: "DUBLETTE"`, siehe «Upload»).
@@ -794,6 +821,23 @@ Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die
 | KI-Qualität | `GoldenDatensatzIT`, nur manuell gestartet, Daten aus `ARCHIV_GOLDEN_DIR` ausserhalb des Repos, echter AI-Aufruf | Bericht je Feld, getrennt nach Abstimmungs- (30) und Prüfteil (20); Gate ≥ 18/20 und Req 0.9 (Nachweis manuell) |
 | Frontend | Vitest, Playwright (mobile Viewport 375 px) | Erfassen mit Testbild mit und ohne Kanten, Offline-Warteschlange (Dublette, 4xx, 5xx, offline), Eingangskorb bestätigen in ≤ 2 Tipps |
 | Betrieb | Restore-Probe, automatisiert und wiederkehrend; in Stufe A nur als Funktionstest (Req 16.19) | Datenbanken und Dateien wiederherstellen, Anmeldung, Dokument öffnen, Prüflauf grün (Req 16.3) |
+
+Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
+- `domain` hängt nur vom JDK und von Domain-Typen ab. `application` hängt zusätzlich nur von `application`, CDI,
+  Interceptor-Bindung, JTA, MicroProfile Config und JBoss Logging ab; REST, JPA, Vert.x, Quarkus und Jackson sind
+  ausgeschlossen.
+- Schichten je Fachbereich: `domain` → `domain`, `application` → `application`/`domain`, `adapter` → alles im
+  eigenen Fachbereich. `gemeinsam` ist der gemeinsame Kern und darf in derselben Schicht von jedem Fachbereich
+  genutzt werden, hängt aber selbst von keinem ab. Einen fremden Fachbereich erreicht `application` bzw. `adapter`
+  nur über dessen `application` und die `domain`-Typen in dessen Signaturen, nie über dessen `adapter`.
+  `ArchivMain` im Wurzelpaket ist ausgenommen.
+- Driven Ports: Klassen unter `adapter.out` implementieren nur Interfaces aus `application`, und Implementierungen
+  von `application`-Interfaces liegen in `application` oder unter `adapter.out`; Klassen mit `Stub` im Namen liegen
+  unter `adapter.out`.
+- Felder und Methoden mit Betragsnamen (`betrag`, `summe`, `preis`, `total`, `mwst`, `saldo`) sind nie `double` oder
+  `float`; kein Aufruf von `System.getenv` und von `bypassGovernanceRetention`; JPA-Entitäten auf `public` nur für
+  `auftrag`, dazu `mandant` im Fachbereich `mandant` und `api_client` im Fachbereich `sicherheit`. Zugriffe per
+  JDBC-SQL erkennt ArchUnit nicht, sie bleiben Sache des Reviews.
 
 ## Open Points
 - ~~Object Lock pro Objekt, Schlüssel ohne Bypass-Recht, COMPLIANCE bei Infomaniak~~ geklärt im Spike Object Storage (Aufgabe 0.2, `docs/spikes/s3-object-lock.md`, Live-Tests 08.11.2026): Sperre pro Objekt mit Versionierung, GOVERNANCE und COMPLIANCE funktionieren, Objekte ohne Retention (`eingang/`) bleiben löschbar; der Rückfall mit getrennten Buckets entfällt damit. Einen Schlüssel ohne Bypass-Recht gibt es im selben Projekt nicht (jeder Schlüssel kann eine schützende Bucket Policy löschen), darum gilt Option B (entschieden 09.11.2026; ADR-007, Nachtrag 09.11.2026): GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` (Req 6.11). `x-amz-checksum-sha256` wurde nicht geprüft (Antwort beim Upload mit `ChecksumCRC64NVME`); bis zum Nachweis mit dem Java SDK in Aufgabe 2.3 gilt der Rückfall aus «Ablage» (Kopie über die Versions-ID neu lesen).
