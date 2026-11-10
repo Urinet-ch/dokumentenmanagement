@@ -96,10 +96,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Test: zwei Mandanten anlegen, Schemas und Buckets getrennt; jeder Bucket trägt die Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`; Bucket-Namen mit den Präfixen `urinet-archiv-` und `urinet-archiv-a-`
   - _Anforderungen: 1.1, 1.5, 1.7, 9.6_
 
-- [ ] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
+- [x] 1.4 Mandanten-Kontext und Rechtematrix [Backend]
   - `MandantTenantResolver`, `MandantKontext` für Worker, `@RolesAllowed` je Endpunkt
   - Rechtematrix A1–A14 als eine Domain-Regel (Rolle × Aktion), die alle Endpunkte abfragen; 404 vor 403 bei unsichtbaren Dokumenten; spätere Aufgaben ergänzen je Endpunkt die Szenarien ihrer Matrixzeilen
-  - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; fremde Dokument-ID → 404; `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
+  - Szenarien: ohne Claim → 403; inaktiver Mandant → 403; Mandantentrennung per Probe (Teilnachweis, voll in 2.2); `treuhaender` schreibt → 403; Matrix-Tabelle gegen die Domain-Regel
   - _Anforderungen: 1.2, 1.3, 1.4, 1.6, 2.2, 2.4, 2.6_
 
 - [ ] 1.5 API-Tokens für Generatoren und Import [Backend]
@@ -127,6 +127,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
   - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
   - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
+  - `archiv_db_owner` nur dem Dienst `archiv-api` mounten; das Admin-Kommando läuft per `exec` im API-Container
   - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
   - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
@@ -169,9 +170,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
   - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
   - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
-  - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten
+  - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten; Szenario «fremde Dokument-ID → 404» (Req 1.4, aus 1.4 übernommen)
   - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
-  - _Anforderungen: 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
+  - _Anforderungen: 1.4, 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
 
 - [ ] 2.3 Ablage-Service S3 [Backend]
   - Port `AblagePort` mit S3-Adapter und Dev-Stub: `ablegenEingang`, `archivieren`, `sperreVerlaengern`, `loeschenEingang`, `vorsignierteUrl`
@@ -234,7 +235,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)
   - `KiBasisUrlPruefung` prüft die wirksame Konfiguration (`LangChain4jOpenAiConfig`: `defaultConfig()` und alle `namedConfig()`) statt einzelner Schlüssel; Testfall benannter Client ohne `base-url` → Abbruch (Req 16.21)
   - Die WireMock-Testressource setzt `archiv.ki.wiremock-port` dynamisch beim Start (bis 3.2 fest `8089`, Req 16.21)
-  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12_
+  - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster

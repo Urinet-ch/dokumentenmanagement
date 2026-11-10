@@ -39,4 +39,8 @@ Claude Code und GitHub Copilot (Agent-Modus, eigene VS-Code-Instanz) arbeiten gl
 4. **Vor «Ready for review»** auf aktuellen `origin/main` rebasen und die Tests laufen lassen.
 
 ## Definition of Done
-Gilt wie in `tech.md`, Abschnitt «Tests und Qualität». Fabian prüft und merged jeden PR, nur mit «Squash and merge» (andere Merge-Arten sind im Repo abgeschaltet, Branches werden nach dem Merge gelöscht).
+Gilt wie in `tech.md`, Abschnitt «Tests und Qualität». Gemergt wird nur mit «Squash and merge» (andere Merge-Arten sind im Repo abgeschaltet, Branches werden nach dem Merge gelöscht). Wer merged (Entscheid Fabian 10.11.2026):
+- Umsetzungs-PRs von Copilot merged Claude Code, wenn die CI grün ist (inkl. Secret-Scan), das Review von Claude Code keinen Muss-Befund hat und unter «Offen für Fabian» nichts steht; die Auslegungen entscheidet das Review und nennt sie im Bericht an Fabian.
+- «Offen für Fabian» heisst nur echte Entscheide: was eine Anforderung, Rechte oder Produktverhalten ändert. Technische Auslegungen innerhalb der Spec stehen im PR im Abschnitt «Auslegungen (Review entscheidet)» (Entscheid Fabian 10.11.2026).
+- Fabian merged weiterhin selbst: Spec-PRs mit neuen Anforderungen oder Entscheiden (die Freigabe ist der Merge), PRs zu Gates und zu Aufgaben **[Fabian]** sowie jeden PR mit Punkten «Offen für Fabian».
+- Copilot erhält seine Aufträge von Claude Code über die Copilot CLI; die Reihenfolge der Aufgaben bleibt die des Umsetzungsplans.

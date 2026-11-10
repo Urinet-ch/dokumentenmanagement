@@ -12,8 +12,9 @@ import java.util.List;
 
 /**
  * Legt einen Mandanten an (Req 1.1, 1.5, 9.6; ADR-002): Schema {@code m_<code>} über {@code db/mandant}, Seed der
- * Dokumentarten, Bucket {@code <präfix><code>}; erst danach der Eintrag im Register, damit ein abgebrochener Lauf keinen
- * aktiven Mandanten hinterlässt. Ein erneuter Lauf nach einem Abbruch setzt fort.
+ * Dokumentarten, Prüfung des neuen Schemas gegen das Mapping (Req 1.7), Bucket {@code <präfix><code>}; erst danach der
+ * Eintrag im Register, damit ein abgebrochener Lauf keinen aktiven Mandanten hinterlässt. Ein erneuter Lauf nach einem
+ * Abbruch setzt fort.
  */
 @ApplicationScoped
 public class MandantProvisionierung {
@@ -24,15 +25,17 @@ public class MandantProvisionierung {
     private final MandantDatenbank datenbank;
     private final MandantBucket bucket;
     private final DokumentartSeed seed;
+    private final MandantSchemaPruefung schemaPruefung;
     private final String bucketPraefix;
 
     public MandantProvisionierung(MandantRegister register, MandantDatenbank datenbank, MandantBucket bucket,
-                                  DokumentartSeed seed,
+                                  DokumentartSeed seed, MandantSchemaPruefung schemaPruefung,
                                   @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
         this.register = register;
         this.datenbank = datenbank;
         this.bucket = bucket;
         this.seed = seed;
+        this.schemaPruefung = schemaPruefung;
         this.bucketPraefix = bucketPraefix;
     }
 
@@ -54,6 +57,7 @@ public class MandantProvisionierung {
         List<DokumentartVorlage> arten = seed.lesen(mandantCode);
         datenbank.schemaAnlegen(mandantCode.schema());
         datenbank.dokumentartenEinspielen(mandantCode.schema(), arten);
+        schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,
                 mandantCode.schema(), bucketName, ende, true);

@@ -5,11 +5,14 @@ import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
 
+/** Register in {@code public.mandant}; auch beim Start und im Admin-Kommando, darum mit eigenem Request-Kontext (Tenant-Resolver). */
 @ApplicationScoped
+@ActivateRequestContext
 public class PanacheMandantRegister implements MandantRegister {
 
     @Override

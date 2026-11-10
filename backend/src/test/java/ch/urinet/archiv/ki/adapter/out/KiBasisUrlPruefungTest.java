@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -210,7 +211,19 @@ class KiBasisUrlPruefungTest {
         for (String name : wirksam) {
             String roh = Expressions.withoutExpansion(() -> config.getConfigValue(name).getRawValue());
             if (roh != null) {
-                assertThat(roh).as(name).doesNotContain("infomaniak_ai_token").doesNotContain("/run/secrets");
+                // klein geschrieben, sonst ginge ${INFOMANIAK_AI_TOKEN} durch
+                assertThat(roh.toLowerCase(Locale.ROOT)).as(name)
+                        .doesNotContain("infomaniak_ai_token").doesNotContain("/run/secrets");
+            }
+            String expandiert;
+            try {
+                expandiert = config.getConfigValue(name).getValue();
+            } catch (RuntimeException nichtAufloesbar) {
+                expandiert = null;
+            }
+            if (expandiert != null) {
+                assertThat(expandiert.toLowerCase(Locale.ROOT)).as(name + " (expandiert)")
+                        .doesNotContain("infomaniak_ai_token").doesNotContain("/run/secrets");
             }
         }
         assertThatCode(() -> KiBasisUrlPruefung.pruefe(config.getProfiles(), config)).doesNotThrowAnyException();

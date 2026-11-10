@@ -1,0 +1,17 @@
+{
+  "_zweck": "Synthetischer Seed nur für Tests (Aufgabe 1.4, Mandantentrennung); der echte Seed für vhf-gsk folgt mit Spec 03",
+  "dokumentarten": [
+    {
+      "code": "PROBE_VHF_BULLETIN",
+      "name": "Probe-Bulletin",
+      "gruppen": ["verband"],
+      "pflichtfelder": ["titel"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "aufbewahrung_ab": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true
+    }
+  ]
+}

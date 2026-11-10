@@ -209,6 +209,30 @@ public class MandantSchritte {
         }
     }
 
+    @Wenn("das Archiv die aktiven Mandanten nur prüft")
+    public void nurPruefen() {
+        fehler = null;
+        try {
+            migration.aktivePruefen();
+        } catch (MandantFehler e) {
+            fehler = e;
+        }
+    }
+
+    @Und("im Schema «{word}» fehlt die Spalte «{word}» der Tabelle «{word}»")
+    public void spalteEntfernen(String schema, String spalte, String tabelle) throws SQLException {
+        assertThat(fehler).as("Migration vorher ohne Fehler").isNull();
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("alter table " + schema + "." + tabelle + " drop column " + spalte);
+        }
+    }
+
+    @Dann("ist das Schema «{word}» migriert und ohne Abweichung geprüft")
+    public void ohneAbweichung(String schema) throws SQLException {
+        assertThat(fehler).as("keine Abweichung erwartet").isNull();
+        tabelleVorhanden(schema, "dokumentart");
+    }
+
     @Dann("bricht das Archiv mit «{word}» ab")
     public void abgebrochen(String grund) {
         abgelehnt(grund);
