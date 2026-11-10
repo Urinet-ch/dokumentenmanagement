@@ -21,7 +21,7 @@ import java.util.Set;
 @ApplicationScoped
 public class KlassenpfadDokumentartSeed implements DokumentartSeed {
 
-    private static final Set<String> FELDER = Set.of("code", "name", "gruppen", "pflichtfelder", "zusatz_schema",
+    private static final Set<String> FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder", "zusatz_schema",
             "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv");
 
     private final ObjectMapper json;
@@ -61,7 +61,7 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                 }
             }
             ergebnis.add(new DokumentartVorlage(
-                    text(art, "code", pfad), text(art, "name", pfad), liste(art.path("gruppen")),
+                    text(art, "code", pfad), text(art, "name", pfad), beschreibung(art, pfad), liste(art.path("gruppen")),
                     liste(art.path("pflichtfelder")),
                     art.path("zusatz_schema").isMissingNode() ? null : art.path("zusatz_schema").toString(),
                     text(art, "vertraulichkeit", pfad),
@@ -78,6 +78,11 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
             throw ungueltig(pfad, "Feld " + feld + " fehlt");
         }
         return art.path(feld).asText();
+    }
+
+    /** Optional; wenn angegeben, ein nicht leerer Text. */
+    private static String beschreibung(JsonNode art, String pfad) {
+        return art.path("beschreibung").isMissingNode() ? null : text(art, "beschreibung", pfad);
     }
 
     // ohne ausdrückliche Angabe gäbe es für die Art keine Sperre (GeBüV)

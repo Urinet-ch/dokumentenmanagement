@@ -21,19 +21,23 @@ final class StammdatenTabelle {
 
     static final Path DESIGN = Path.of("../.kiro/specs/01-archiv-kern/design.md");
 
-    private static final String START = "<!-- seed:dokumentarten:start -->";
-    private static final String ENDE = "<!-- seed:dokumentarten:ende -->";
-    private static final List<String> KOPF = List.of("Code", "Name", "Gruppen", "Pflichtfelder", "Vertraulichkeit",
-            "Jahre", "ab", "Pflicht");
+    static final String START = "<!-- seed:dokumentarten:start -->";
+    static final String ENDE = "<!-- seed:dokumentarten:ende -->";
+    /** Einzige Stelle des Tabellenkopfs (Review PR #38). */
+    static final List<String> KOPF = List.of("Code", "Name", "Gruppen", "Pflichtfelder", "Vertraulichkeit",
+            "Jahre", "ab", "Pflicht", "Beschreibung");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final Pattern CODE = Pattern.compile("^`([A-Z_]+)`$");
     private static final String LEER = "–";
-    private static final Set<String> SEED_FELDER = Set.of("code", "name", "gruppen", "pflichtfelder", "zusatz_schema",
+    private static final Set<String> SEED_FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder", "zusatz_schema",
             "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv");
 
-    /** Eine Zeile der Tabelle; {@code jahre} und {@code ab} sind {@code null} bei «unbefristet» bzw. «–». */
+    /**
+     * Eine Zeile der Tabelle; {@code jahre} und {@code ab} sind {@code null} bei «unbefristet» bzw. «–»,
+     * {@code beschreibung} bei «–».
+     */
     record Art(String code, String name, List<String> gruppen, List<String> pflichtfelder, String vertraulichkeit,
-               Integer jahre, String ab, boolean pflicht, boolean aktiv) {
+               Integer jahre, String ab, boolean pflicht, boolean aktiv, String beschreibung) {
 
         Art {
             gruppen = List.copyOf(gruppen);
@@ -42,6 +46,11 @@ final class StammdatenTabelle {
     }
 
     private StammdatenTabelle() {
+    }
+
+    /** Kopf- und Trennzeile der Tabelle in Markdown, aus {@link #KOPF}. */
+    static List<String> kopfzeilen() {
+        return List.of("| " + String.join(" | ", KOPF) + " |", "|" + " --- |".repeat(KOPF.size()));
     }
 
     static List<Art> ausDesign() throws IOException {
@@ -71,11 +80,16 @@ final class StammdatenTabelle {
             }
             arten.add(new Art(code.group(1), z.get(1), liste(z.get(2)), liste(z.get(3)), z.get(4),
                     z.get(5).equals("unbefristet") ? null : Integer.valueOf(z.get(5)),
-                    z.get(6).equals(LEER) ? null : z.get(6), janein(z.get(7)), true));
+                    z.get(6).equals(LEER) ? null : z.get(6), janein(z.get(7)), true,
+                    z.get(8).equals(LEER) ? null : z.get(8)));
         }
         return arten;
     }
 
+    /**
+     * Liest den Seed so streng wie {@code KlassenpfadDokumentartSeed}: {@code gesetzliche_pflicht} muss boolesch sein,
+     * {@code aufbewahrung_jahre} eine Zahl oder ausdrücklich {@code null}.
+     */
     static List<Art> ausSeed(JsonNode seed) {
         seed.fieldNames().forEachRemaining(feld -> {
             if (!feld.startsWith("_") && !feld.equals("dokumentarten")) {
@@ -91,11 +105,29 @@ final class StammdatenTabelle {
             });
             arten.add(new Art(art.path("code").asText(), art.path("name").asText(), texte(art.path("gruppen")),
                     texte(art.path("pflichtfelder")), art.path("vertraulichkeit").asText(),
-                    art.path("aufbewahrung_jahre").isNull() ? null : art.path("aufbewahrung_jahre").intValue(),
-                    art.path("aufbewahrung_ab").isNull() ? null : art.path("aufbewahrung_ab").asText(),
-                    art.path("gesetzliche_pflicht").booleanValue(), art.path("aktiv").booleanValue()));
+                    jahre(art), art.path("aufbewahrung_ab").isNull() ? null : art.path("aufbewahrung_ab").asText(),
+                    pflicht(art), art.path("aktiv").booleanValue(),
+                    art.path("beschreibung").isTextual() ? art.path("beschreibung").asText() : null));
         }
         return arten;
+    }
+
+    private static Integer jahre(JsonNode art) {
+        JsonNode jahre = art.path("aufbewahrung_jahre");
+        if (jahre.isNull()) {
+            return null;
+        }
+        if (!jahre.isIntegralNumber() || !jahre.canConvertToInt()) {
+            throw new IllegalArgumentException("aufbewahrung_jahre fehlt oder ist keine Zahl: " + art.path("code"));
+        }
+        return jahre.intValue();
+    }
+
+    private static boolean pflicht(JsonNode art) {
+        if (!art.path("gesetzliche_pflicht").isBoolean()) {
+            throw new IllegalArgumentException("gesetzliche_pflicht fehlt oder ist nicht boolesch: " + art.path("code"));
+        }
+        return art.path("gesetzliche_pflicht").booleanValue();
     }
 
     private static List<String> zellen(String zeile) {

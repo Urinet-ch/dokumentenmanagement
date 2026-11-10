@@ -4,6 +4,7 @@
     {
       "code": "AUSGANGSRECHNUNG",
       "name": "Ausgangsrechnung",
+      "beschreibung": "Rechnung oder Gutschrift von Urinet an einen Kunden, mit Belegnummer wie 2026-003 (Altbestand R0001). Rechnungen an Urinet sind LIEFERANTENBELEG, Mahnungen sind KORRESPONDENZ.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "richtung", "betrag", "waehrung", "faelligkeit"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -16,6 +17,7 @@
     {
       "code": "OFFERTE",
       "name": "Offerte",
+      "beschreibung": "Angebot von Urinet an einen Kunden mit Betrag und Gültigkeit, Belegnummer wie O-2026-005. Offerten von Lieferanten und Auftragsbestätigungen sind KORRESPONDENZ.",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "betrag", "waehrung"],
       "zusatz_schema": {
@@ -32,6 +34,7 @@
     {
       "code": "LIEFERANTENBELEG",
       "name": "Lieferantenbeleg",
+      "beschreibung": "Rechnung oder Gutschrift eines Lieferanten an Urinet, auch für Abos, Telefon und Hosting. Rechnungen von Ämtern und Ausgleichskassen sind BEHOERDE, Prämienrechnungen von Versicherern VERSICHERUNG.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -44,6 +47,7 @@
     {
       "code": "QUITTUNG",
       "name": "Quittung / Spesen",
+      "beschreibung": "Kassenzettel und Quittungen über bar oder mit Karte bezahlte Ausgaben, auch Spesenbelege wie Bahn, Parkplatz und Verpflegung. Eine Rechnung mit Zahlungsfrist ist LIEFERANTENBELEG.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -56,6 +60,7 @@
     {
       "code": "LOHNABRECHNUNG",
       "name": "Lohnabrechnung",
+      "beschreibung": "Monatliche Lohnabrechnung einer mitarbeitenden Person, Periode im Format JJJJ-MM. Lohndeklarationen und Beitragsrechnungen sind BEHOERDE (AHV, IV, EO, FAK) bzw. VERSICHERUNG (UVG, Krankentaggeld).",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung", "zusatz.periode", "zusatz.person"],
       "zusatz_schema": {
@@ -75,6 +80,7 @@
     {
       "code": "VERTRAG",
       "name": "Vertrag",
+      "beschreibung": "Vertrag mit Laufzeit, etwa Arbeits-, Miet-, Leasing-, Kunden- oder Lieferantenvertrag, samt Nachträgen und Kündigungen. Policen und Kündigungen von Versicherungen sind VERSICHERUNG.",
       "gruppen": ["vertrag"],
       "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -87,6 +93,7 @@
     {
       "code": "VERSICHERUNG",
       "name": "Versicherung",
+      "beschreibung": "Police, Nachtrag, Prämienrechnung oder Kündigung eines Versicherers, darunter UVG, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. AHV, IV, EO und FAK der Ausgleichskasse sind BEHOERDE.",
       "gruppen": ["vertrag", "finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -99,6 +106,7 @@
     {
       "code": "BEHOERDE",
       "name": "Behörde",
+      "beschreibung": "Verfügung, Veranlagung oder Rechnung eines Amtes, etwa Steuern, MWST und Handelsregister, sowie AHV, IV, EO und FAK der Ausgleichskasse. UVG- und Krankentaggeld-Versicherer sind VERSICHERUNG.",
       "gruppen": ["frei"],
       "pflichtfelder": ["titel", "datum", "partner"],
       "zusatz_schema": {
@@ -118,6 +126,7 @@
     {
       "code": "BANK",
       "name": "Bank",
+      "beschreibung": "Kontoauszug, Zins- oder Gebührenabrechnung von Bank, PostFinance oder Kreditkarte für eine Periode, auch einzelne Belastungs- und Gutschriftsanzeigen (Periode ist der Buchungstag). Rechnungen bleiben bei ihrer eigenen Art.",
       "gruppen": ["frei"],
       "pflichtfelder": ["titel", "datum", "partner", "zusatz.periode_von", "zusatz.periode_bis"],
       "zusatz_schema": {
@@ -137,6 +146,7 @@
     {
       "code": "PROJEKTDOKUMENT",
       "name": "Projektdokument",
+      "beschreibung": "Arbeitsunterlage zu einem Projekt ohne Buchungsbezug, etwa Plan, Konzept, Protokoll oder Foto. Offerten, Rechnungen und Verträge zum Projekt erhalten ihre eigene Art.",
       "gruppen": [],
       "pflichtfelder": ["titel", "projekt"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -149,6 +159,7 @@
     {
       "code": "KORRESPONDENZ",
       "name": "Korrespondenz",
+      "beschreibung": "Brief oder E-Mail ohne eigene Art, etwa Anfrage, Auftragsbestätigung, Mahnung oder Offerte eines Lieferanten. Passt ein Schreiben zu einer anderen Art (Rechnung, Vertrag, Verfügung), gilt diese.",
       "gruppen": ["frei"],
       "pflichtfelder": ["titel", "datum", "partner"],
       "zusatz_schema": {

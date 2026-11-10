@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Beschreibung je Dokumentart mit den Abgrenzungen zwischen den Arten; fliesst in den KI-Prompt (Aufgabe 2.1,
+         entschieden von Fabian am 09.11.2026). Nullable, damit der Vorgänger-Release weiter schreiben kann (Regel 11). -->
+    <changeSet id="003-dokumentart-beschreibung" author="archiv">
+        <addColumn tableName="dokumentart">
+            <column name="beschreibung" type="text"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>
