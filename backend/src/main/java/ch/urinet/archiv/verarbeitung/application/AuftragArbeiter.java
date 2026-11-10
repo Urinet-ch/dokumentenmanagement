@@ -198,6 +198,10 @@ public class AuftragArbeiter {
     private Lauf starten(Auftrag auftrag, Arbeit arbeit) {
         Lauf lauf = new Lauf();
         lauf.future = ausfuehrung.submit(() -> {
+            if (!lauf.gestartet.compareAndSet(false, true)) {
+                // vor dem Start abgebrochen: abbrechen() hat beendet schon gezählt
+                return;
+            }
             try {
                 kontext.mit(auftrag.mandant(), () -> {
                     try {
@@ -258,7 +262,7 @@ public class AuftragArbeiter {
                 long jetzt = System.nanoTime();
                 if (abbruch == Abbruch.KEINER && jetzt - frist >= 0) {
                     abbruch = Abbruch.ZEITGRENZE;
-                    lauf.future.cancel(true);
+                    abbrechen(lauf);
                 } else if (abbruch != Abbruch.KEINER && jetzt - haengend >= 0) {
                     LOG.errorf("Auftrag %d (%s, Mandant %s): Fehler %s, Handler endet seit dem Abbruch nicht und gilt "
                                     + "als hängend; Platz bleibt belegt, Auftrag bleibt LAEUFT bis zum Aufräumen",
@@ -269,7 +273,7 @@ public class AuftragArbeiter {
                     LOG.warnf("Auftrag %d (%s): Anspruch verloren (freigegeben), Ausführung abgebrochen; Platz bleibt "
                             + "belegt, bis der Handler endet", auftrag.id(), auftrag.typ());
                     abbruch = Abbruch.ANSPRUCH_VERLOREN;
-                    lauf.future.cancel(true);
+                    abbrechen(lauf);
                 }
             }
         } catch (InterruptedException e) {
@@ -297,15 +301,20 @@ public class AuftragArbeiter {
         }
     }
 
-    /** Herunterfahren: Handler unterbrechen und kurz abwarten; ein Abbruch durch den Stopp kostet keinen Versuch. */
+    /**
+     * Herunterfahren: Handler unterbrechen und kurz abwarten; ein Abbruch durch den Stopp kostet keinen Versuch. Wurde
+     * der Handler mitten in der Arbeit unterbrochen, gilt sein Ergebnis nie als Abschluss, auch wenn er die
+     * Unterbrechung schluckt und normal zurückkehrt: Der Auftrag geht ohne Versuch zurück auf {@code OFFEN} und läuft
+     * erneut (Handler sind idempotent).
+     */
     private void beimStopp(Auftrag auftrag, Lauf lauf, Abbruch abbruch) {
-        lauf.future.cancel(true);
+        boolean unterbrochen = abbrechen(lauf);
         if (!warten(lauf, stoppFrist)) {
             LOG.warnf("Auftrag %d (%s): Handler endet beim Herunterfahren nicht, Auftrag bleibt LAEUFT bis zum "
                     + "Aufräumen", auftrag.id(), auftrag.typ());
             return;
         }
-        if (abbruch != Abbruch.KEINER || lauf.fehler == null) {
+        if (abbruch != Abbruch.KEINER || (!unterbrochen && lauf.fehler == null)) {
             abgeschlossen(auftrag, lauf, abbruch);
             return;
         }
@@ -456,12 +465,12 @@ public class AuftragArbeiter {
             if (hook.beendet.await(verzeichnis.zeitgrenze(auftrag.typ()).toNanos(), TimeUnit.NANOSECONDS)) {
                 fehler = hook.fehler;
             } else {
-                hook.future.cancel(true);
+                abbrechen(hook);
                 fehler = new TimeoutException();
             }
         } catch (InterruptedException e) {
             // Herunterfahren: kein Fehlschlag des Hooks, zählt nicht
-            hook.future.cancel(true);
+            abbrechen(hook);
             Thread.currentThread().interrupt();
             LOG.warnf("Auftrag %d (%s): Nachbearbeitung nach Fehler %s beim Herunterfahren abgebrochen, folgt beim "
                     + "Aufräumen", auftrag.id(), auftrag.typ(), fehlerId);
@@ -536,6 +545,21 @@ public class AuftragArbeiter {
         }
     }
 
+    /**
+     * Unterbricht einen Handler- oder Hook-Lauf. Kam der Abbruch vor dem Start des Threads (z. B. Herunterfahren
+     * zwischen {@code submit} und Thread-Start), läuft die Arbeit nie; dann zählt diese Methode {@code beendet}, damit
+     * niemand ewig wartet.
+     *
+     * @return {@code true}, wenn der Lauf noch nicht fertig war (mitten in der Arbeit unterbrochen oder nie gestartet)
+     */
+    private static boolean abbrechen(Lauf lauf) {
+        boolean abgebrochen = lauf.future.cancel(true);
+        if (lauf.gestartet.compareAndSet(false, true)) {
+            lauf.beendet.countDown();
+        }
+        return abgebrochen;
+    }
+
     /** Wartet ohne Unterbrechung, bis der Handler-Thread endet; bei einem hängenden Handler unbegrenzt. */
     private static void bisBeendet(Lauf lauf) {
         boolean unterbrochen = false;
@@ -563,6 +587,8 @@ public class AuftragArbeiter {
     /** Zustand eines Handler- oder Hook-Laufs; {@code fehler} ist {@code null}, wenn er normal endete. */
     private static final class Lauf {
         final CountDownLatch beendet = new CountDownLatch(1);
+        /** Wer zuerst setzt, zählt {@code beendet}: der Thread beim Start oder {@link #abbrechen} vor dem Start. */
+        final AtomicBoolean gestartet = new AtomicBoolean();
         volatile Throwable fehler;
         volatile Future<?> future;
     }

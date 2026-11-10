@@ -33,6 +33,8 @@ public final class TestHandler {
     public static final AuftragTyp HAENGT = new AuftragTyp("TEST_HAENGT");
     /** Ignoriert jede Unterbrechung und endet erst mit {@link #sturFreigeben()} (höchstens nach 30 s). */
     public static final AuftragTyp STUR = new AuftragTyp("TEST_STUR");
+    /** Schläft 60 s; schluckt eine Unterbrechung und kehrt normal zurück (Verstoss gegen die Handler-Pflichten). */
+    public static final AuftragTyp SCHLUCKT = new AuftragTyp("TEST_SCHLUCKT");
     /** Liest in einer Transaktion im Schema des Mandanten und scheitert dann mit einem SQL-Fehler (Rollback). */
     public static final AuftragTyp SQL_FEHLER = new AuftragTyp("TEST_SQL_FEHLER");
     /**
@@ -168,6 +170,24 @@ public final class TestHandler {
             } catch (InterruptedException e) {
                 UNTERBROCHEN.add(auftrag.id());
                 throw e;
+            }
+        }
+    }
+
+    @ApplicationScoped
+    public static class Schluckt implements AuftragHandler {
+
+        @Override
+        public AuftragTyp typ() {
+            return SCHLUCKT;
+        }
+
+        @Override
+        public void ausfuehren(Auftrag auftrag) {
+            try {
+                Thread.sleep(60_000);
+            } catch (InterruptedException e) {
+                UNTERBROCHEN.add(auftrag.id());
             }
         }
     }

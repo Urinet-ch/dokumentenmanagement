@@ -27,6 +27,10 @@ public interface AuftragSchlange {
      */
     List<Auftrag> holen(Set<AuftragTyp> typen, int anzahl);
 
+    /**
+     * Wartet höchstens 5 s auf eine Zeilensperre (z. B. eine zu lange Transaktion eines
+     * Handlers auf der Auftragszeile), dann Ausnahme (wie «Datenbank kurz weg»).
+     */
     boolean lebenszeichen(Auftrag auftrag);
 
     boolean abschliessen(Auftrag auftrag);
@@ -40,10 +44,16 @@ public interface AuftragSchlange {
     /** Geordneter Stopp: zurück auf {@code OFFEN} und sofort fällig, ohne {@code versuche} zu erhöhen. */
     boolean freigeben(Auftrag auftrag);
 
-    /** {@code LAEUFT}-Aufträge der Typen, deren letztes Lebenszeichen älter ist als ihre Zeitgrenze (Req 5.7). */
-    List<Auftrag> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen);
+    /**
+     * {@code LAEUFT}-Aufträge der Typen, deren letztes Lebenszeichen älter ist als ihre Zeitgrenze (Req 5.7), aller
+     * Mandanten, je mit dem Zustand {@code aktiv} des Mandanten.
+     */
+    List<Verwaist> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen);
 
-    /** Wie {@link #fehlversuch}, aber nur, wenn das Lebenszeichen weiter seit der Zeitgrenze ausbleibt. */
+    /**
+     * Wie {@link #fehlversuch}, aber nur, wenn das Lebenszeichen weiter seit der Zeitgrenze ausbleibt. Wartet höchstens
+     * 5 s auf eine Zeilensperre, dann Ausnahme (wie «Datenbank kurz weg»).
+     */
     boolean verwaistFreigeben(Auftrag auftrag, Duration zeitgrenze, String fehler, Optional<Duration> wartezeit);
 
     /**

@@ -9,7 +9,9 @@ import java.util.UUID;
  * Auftrag auf, in einem eigenen Thread ohne Transaktion; die Transaktion gehört in den Handler. Ein Handler muss
  * idempotent sein: Nach einer Zeitüberschreitung, einem verwaisten Lauf oder einem nicht gespeicherten Abschluss kommt
  * derselbe Auftrag erneut. Eine Unterbrechung ({@link Thread#interrupted()}) heisst Abbruch wegen Zeitgrenze,
- * verlorenem Anspruch oder Herunterfahren; ein Handler soll darauf enden, sonst bleibt sein Platz belegt.
+ * verlorenem Anspruch oder Herunterfahren; ein Handler soll darauf enden, sonst bleibt sein Platz belegt. Nach einer
+ * Unterbrechung kehrt er nie normal zurück, sondern wirft {@link InterruptedException} (oder eine andere Ausnahme); der
+ * Worker wertet einen beim Herunterfahren unterbrochenen Lauf ohnehin nie als Abschluss.
  * <p>
  * Pflicht für jeden Handler (design.md «Verarbeitung»): Jede Ein- und Ausgabe hat eine eigene Zeitgrenze unter der
  * Zeitgrenze des Typs (JDBC {@code queryTimeout} bzw. {@code statement_timeout}, S3 {@code apiCallTimeout}, externe

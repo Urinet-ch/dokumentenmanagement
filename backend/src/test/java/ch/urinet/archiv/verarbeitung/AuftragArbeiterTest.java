@@ -10,6 +10,7 @@ import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
 import ch.urinet.archiv.verarbeitung.application.AuftragSchlange;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
+import ch.urinet.archiv.verarbeitung.application.Verwaist;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import io.agroal.api.AgroalDataSource;
@@ -547,6 +548,79 @@ class AuftragArbeiterTest {
         assertThat(worker.abholen()).isEmpty();
     }
 
+    // Dritte Nachbesserung, Soll 1: ein Handler, der den Interrupt schluckt, gilt beim Herunterfahren nicht als fertig
+
+    @Test
+    void herunterfahrenMitGeschlucktemInterruptGibtOhneVersuchFrei() throws Exception {
+        AuftragArbeiter worker = arbeiter(schlange, 1);
+        long id = hilfe.einreihen("urinet", TestHandler.SCHLUCKT);
+        starten(worker, 1);
+        Thread.sleep(300);
+
+        worker.herunterfahren();
+        warten();
+
+        assertThat(TestHandler.UNTERBROCHEN).contains(id);
+        AuftragTestHilfe.Zeile zeile = hilfe.zeile(id);
+        assertThat(zeile.status()).isEqualTo("OFFEN");
+        assertThat(zeile.versuche()).isZero();
+    }
+
+    // Dritte Nachbesserung, Soll 2: verwaist auf FEHLER bei inaktivem Mandanten ruft den Hook erst nach der Aktivierung
+
+    @Test
+    void verwaistAufFehlerBeiInaktivemMandantenRuftDenHookErstNachDerAktivierung() throws Exception {
+        long id = hilfe.einreihen("vhf-gsk", TestHandler.FEHLER);
+        hilfe.aendern(id, "status = 'LAEUFT', versuche = 2, lebenszeichen = now() - interval '1 hour'");
+        hilfe.ausfuehren("update public.mandant set aktiv = false where code = 'vhf-gsk'");
+        try {
+            assertThat(aufraeumen.aufraeumen()).isEqualTo(1);
+            assertThat(hilfe.zeile(id).status()).isEqualTo("FEHLER");
+            assertThat(TestHandler.NACH_LETZTEM_AUFRUFE).hasValue(0);
+            assertThat(hilfe.zeile(id).nachbearbeitet()).isFalse();
+            assertThat(hilfe.wert(id, "nachbearbeitung_versuche")).isEqualTo(0);
+        } finally {
+            hilfe.ausfuehren("update public.mandant set aktiv = true where code = 'vhf-gsk'");
+        }
+
+        hilfe.aendern(id, "beendet = now() - interval '1 hour'");
+        aufraeumen.aufraeumen();
+        assertThat(TestHandler.NACH_LETZTEM).containsEntry(id, new MandantCode("vhf-gsk"));
+        assertThat(hilfe.zeile(id).nachbearbeitet()).isTrue();
+    }
+
+    // Dritte Nachbesserung, Kann 3: eine gesperrte Zeile hält Lebenszeichen und Aufräumer nicht fest
+
+    @Test
+    void gesperrteZeileHaeltLebenszeichenUndAufraeumerNichtFest() throws Exception {
+        long gesperrt = hilfe.einreihen("urinet", TestHandler.OK);
+        long frei = hilfe.einreihen("urinet", TestHandler.OK);
+        for (long id : List.of(gesperrt, frei)) {
+            hilfe.aendern(id, "status = 'LAEUFT', lebenszeichen = now() - interval '1 hour'");
+        }
+        Auftrag alt = new Auftrag(gesperrt, new MandantCode("urinet"), TestHandler.OK, Nutzlast.leer(), 0);
+        try (Connection sperre = datenquelle.getConnection()) {
+            sperre.setAutoCommit(false);
+            try (Statement befehl = sperre.createStatement()) {
+                befehl.execute("select 1 from public.auftrag where id = " + gesperrt + " for update");
+            }
+            try {
+                CompletableFuture<Integer> aufgeraeumt = CompletableFuture.supplyAsync(aufraeumen::aufraeumen);
+                assertThat(aufgeraeumt.get(15, TimeUnit.SECONDS)).isEqualTo(1);
+                assertThat(hilfe.zeile(frei).status()).isEqualTo("OFFEN");
+
+                CompletableFuture<Boolean> lebenszeichen =
+                        CompletableFuture.supplyAsync(() -> schlange.lebenszeichen(alt));
+                assertThatThrownBy(() -> lebenszeichen.get(15, TimeUnit.SECONDS))
+                        .hasCauseInstanceOf(IllegalStateException.class).cause()
+                        .hasMessageContaining("SQLState 57014");
+            } finally {
+                sperre.rollback();
+            }
+        }
+        assertThat(hilfe.zeile(gesperrt).status()).isEqualTo("LAEUFT");
+    }
+
     @Test
     void herunterfahrenLaesstEinenNichtEndendenHandlerAufLaeuft() throws Exception {
         AuftragArbeiter worker = new AuftragArbeiter(schlange, verzeichnis, kontext, 1, LEBENSZEICHEN,
@@ -672,7 +746,7 @@ class AuftragArbeiterTest {
         }
 
         @Override
-        public List<Auftrag> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen) {
+        public List<Verwaist> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen) {
             return echt.verwaiste(zeitgrenzen);
         }
 

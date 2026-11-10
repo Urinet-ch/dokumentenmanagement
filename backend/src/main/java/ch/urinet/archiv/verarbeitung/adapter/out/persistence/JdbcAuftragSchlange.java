@@ -4,6 +4,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragSchlange;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
+import ch.urinet.archiv.verarbeitung.application.Verwaist;
 import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung;
@@ -51,6 +52,11 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
     };
     private static final String SPALTEN = "a.id, a.mandant, a.typ, a.nutzlast::text as nutzlast, a.versuche";
     private static final String ANSPRUCH = " where id = ? and versuche = ? and status = 'LAEUFT'";
+    /**
+     * Höchste Wartezeit auf eine Zeilensperre für Lebenszeichen und Freigabe verwaister Aufträge: Hält eine andere
+     * Transaktion die Zeile, wirkt das wie «Datenbank kurz weg», statt Überwachung oder Aufräumer festzuhalten.
+     */
+    static final int SPERR_WARTEZEIT_SEKUNDEN = 5;
 
     // lazy: ohne Datasource (z. B. Bereitschaftsprüfung) ist die Bean inaktiv
     private final Instance<AgroalDataSource> datenquelle;
@@ -106,7 +112,8 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
 
     @Override
     public boolean lebenszeichen(Auftrag auftrag) {
-        return aendern("update public.auftrag set lebenszeichen = now()" + ANSPRUCH, auftrag);
+        return aendern("update public.auftrag set lebenszeichen = now()" + ANSPRUCH, auftrag,
+                SPERR_WARTEZEIT_SEKUNDEN);
     }
 
     @Override
@@ -121,12 +128,14 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
     }
 
     @Override
-    public List<Auftrag> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen) {
+    public List<Verwaist> verwaiste(Map<AuftragTyp, Duration> zeitgrenzen) {
         if (zeitgrenzen.isEmpty()) {
             return List.of();
         }
-        String sql = "select " + SPALTEN + " from public.auftrag a "
+        // left join: verwaiste Aufträge aller Mandanten freigeben, auch unbekannter (Zeile unlesbar → FEHLER)
+        String sql = "select " + SPALTEN + ", coalesce(m.aktiv, false) as mandant_aktiv from public.auftrag a "
                 + "join unnest(?::text[], ?::bigint[]) as g(typ, ms) on g.typ = a.typ "
+                + "left join public.mandant m on m.code = a.mandant "
                 + "where a.status = 'LAEUFT' "
                 + "and coalesce(a.lebenszeichen, a.gestartet, a.erstellt) < now() - g.ms * interval '1 millisecond' "
                 + "order by a.id";
@@ -140,10 +149,11 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
             });
             abfrage.setArray(1, verbindung.createArrayOf("text", typen.toArray()));
             abfrage.setArray(2, verbindung.createArrayOf("bigint", grenzen.toArray()));
-            List<Auftrag> verwaist = new ArrayList<>();
+            List<Verwaist> verwaist = new ArrayList<>();
             try (ResultSet zeile = abfrage.executeQuery()) {
                 while (zeile.next()) {
-                    lesen(verbindung, zeile, "LAEUFT").ifPresent(verwaist::add);
+                    boolean aktiv = zeile.getBoolean("mandant_aktiv");
+                    lesen(verbindung, zeile, "LAEUFT").ifPresent(auftrag -> verwaist.add(new Verwaist(auftrag, aktiv)));
                 }
             }
             return verwaist;
@@ -294,6 +304,9 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
                 : " and coalesce(lebenszeichen, gestartet, erstellt) < now() - ? * interval '1 millisecond'");
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            if (stillSeit != null) {
+                aendern.setQueryTimeout(SPERR_WARTEZEIT_SEKUNDEN);
+            }
             int i = 1;
             aendern.setString(i++, fehler);
             if (wartezeit.isPresent()) {
@@ -311,8 +324,14 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
     }
 
     private boolean aendern(String sql, Auftrag auftrag) {
+        return aendern(sql, auftrag, 0);
+    }
+
+    /** @param sperrWartezeit Sekunden bis zum Abbruch, {@code 0} ohne Grenze */
+    private boolean aendern(String sql, Auftrag auftrag, int sperrWartezeit) {
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            aendern.setQueryTimeout(sperrWartezeit);
             aendern.setLong(1, auftrag.id());
             aendern.setInt(2, auftrag.versuche());
             return aendern.executeUpdate() == 1;
