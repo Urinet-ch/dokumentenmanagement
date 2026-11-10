@@ -259,15 +259,16 @@ stateDiagram-v2
 #### Stammdaten der Dokumentarten (Req 9.2, P6)
 Massgeblich ist der Seed `backend/src/main/resources/seed/urinet/dokumentarten.json`; die Tabelle
 spiegelt ihn. `DokumentartSeedTest` liest die Tabelle zwischen den Markierungen und vergleicht sie
-Feld für Feld mit dem Seed (Felder mit `_` am Anfang ausgenommen). [offen: Werte der 11 Dokumentarten
-– Entscheid vor Welle 2]; bis dahin trägt der Seed `_entwurf`. Alle Arten `aktiv`;
-`zusatz_schema` steht nur im Seed.
+Feld für Feld mit dem Seed (Felder mit `_` am Anfang ausgenommen). Werte entschieden von Fabian am
+10.11.2026. Alle Arten `aktiv`; `zusatz_schema` steht nur im Seed. `VERTRAG` bleibt `PERSONAL`, damit
+Arbeitsverträge geschützt sind; einen Kundenvertrag stellt der `inhaber` bei der Bestätigung per A8 auf
+`NORMAL`, wenn ihn Mitarbeitende sehen sollen (keine eigene Art für Kundenaufträge).
 
 <!-- seed:dokumentarten:start -->
 | Code | Name | Gruppen | Pflichtfelder | Vertraulichkeit | Jahre | ab | Pflicht |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `AUSGANGSRECHNUNG` | Ausgangsrechnung | finanz | titel, datum, partner, belegnummer, richtung, betrag, waehrung, faelligkeit | INTERN | 10 | GESCHAEFTSJAHR | ja |
-| `OFFERTE` | Offerte | finanz, frei | titel, datum, partner, belegnummer, betrag, waehrung | NORMAL | 10 | GESCHAEFTSJAHR | ja |
+| `OFFERTE` | Offerte | finanz, frei | titel, datum, partner, belegnummer, betrag, waehrung | NORMAL | 10 | GESCHAEFTSJAHR | nein |
 | `LIEFERANTENBELEG` | Lieferantenbeleg | finanz | titel, datum, partner, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja |
 | `QUITTUNG` | Quittung / Spesen | finanz | titel, datum, richtung, betrag, waehrung | INTERN | 10 | GESCHAEFTSJAHR | ja |
 | `LOHNABRECHNUNG` | Lohnabrechnung | finanz, frei | titel, datum, richtung, betrag, waehrung, zusatz.periode, zusatz.person | PERSONAL | 10 | GESCHAEFTSJAHR | ja |
@@ -846,7 +847,7 @@ Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
 - Speicherbudget der Stufe A (700 MiB, 0.75 CPU) ist ein Richtwert; Messung und Ergebnis in Aufgabe 1.10.
 - Testobjekte der Stufe A im Object Storage: Gesperrte Dokumente lassen sich ohne Bypass-Header nicht löschen [T 3b]; jeder Schlüssel des Projekts, auch der App-Schlüssel, hat technisch das Bypass-Recht [T 6b–7g], die Anwendung setzt den Header aber nie (Req 6.5; Option B, ADR-007, Nachtrag 09.11.2026). Manifeste liegen in COMPLIANCE und lassen sich bis zum Ablauf ihrer Sperre (Req 15.4) mit keinem Schlüssel des Projekts löschen, auch nicht mit Bypass-Header [T 4b/4c]; deshalb darf der Sperrmodus von `manifest/` auf Stufe A per Konfiguration abweichen (GOVERNANCE oder kürzere Frist, Req 6.11, Aufgabe 2.3; entschieden von Fabian am 09.11.2026). Gesperrte Dokumente in Test-Buckets lassen sich erst nach Entfernen der Bucket Policy mit Bypass-Header löschen (Korrektur mit dem Inhaber-Zugang, siehe «Ablage»). `MandantProvisionierung` legt `<archiv.ablage.bucket-praefix><code>` an. Namen der Test-Buckets und Umgang mit gesperrten Testobjekten: entschieden von Fabian am 09.11.2026 (Option A): Präfix `urinet-archiv-a-` auf Stufe A, Sperrfrist der Dokumente dort höchstens 1 Tag (`archiv.ablage.max-sperrfrist=P1D`), Startabbruch ab Stufe B bei gesetzter Höchstfrist oder Präfix der Stufe A, Aufräumen beim Wechsel mit dem App-Schlüssel ohne Bypass-Header (siehe «Protokoll und Manifest», Sperrmodus).
 - [offen: Zuordnung der Verkaufschancen aus 21.CRM mit einem Nachexport mit Testdaten bestätigen – Entscheid vor Welle 4] (`docs/spikes/21crm-export.md`).
-- [offen: Werte der 11 Dokumentarten – Entscheid vor Welle 2]; Entwurf im Seed mit Fragen unter `_fragen`.
+- ~~Werte der 11 Dokumentarten~~ entschieden von Fabian am 10.11.2026 (Aufgabe 1.7): Werte wie im Seed-Entwurf, nur `OFFERTE` ohne `gesetzliche_pflicht` (kein Buchungsbeleg, 10 Jahre ohne Sperre, damit sich verworfene Offerten löschen lassen); `NORMAL` nur für `OFFERTE` und `PROJEKTDOKUMENT`; `VERTRAG` und `VERSICHERUNG` gesperrt; `VERTRAG` bleibt `PERSONAL`, Kundenverträge per A8 auf `NORMAL`, keine eigene Art für Kundenaufträge (siehe «Stammdaten der Dokumentarten»).
 - [offen: Schweizer TSA-Anbieter – Entscheid vor Welle 5].
 - [offen: zweiter Schweizer Backup-Anbieter – Entscheid vor Welle 5].
 - [offen: Rhythmus der Restore-Probe – Entscheid vor Welle 5]; [offen: Schlüsselweg der Restore-Probe – Entscheid vor Welle 5]; [offen: ob die Restore-Probe im Probe-Bucket Sperren setzt – Entscheid vor Welle 5] (siehe «Sicherung und Wiederherstellung»).
