@@ -38,8 +38,14 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
     Wenn die Frist für die Regel «10 Jahre ab GESCHAEFTSJAHR» mit Belegdatum «15.03.2010», Eingang «–», Geschäftsjahr «–», gültig bis «–» und Geschäftsjahresende «12-31» am «10.11.2026» berechnet wird
     Dann ist aufbewahren_bis «31.12.2020» und die Frist abgelaufen
 
+  # Teilnachweis: Dokumente und Dateien gibt es erst ab Aufgabe 2.2. Belegt ist hier nur, dass die Frist-Regel nichts
+  # löscht und die API ausser den freigegebenen Pfaden keinen DELETE-Endpunkt hat; ein neuer DELETE-Pfad macht das
+  # Szenario rot, bis er hier ausdrücklich zugelassen ist. Den vollen Nachweis (abgelaufenes Dokument bleibt samt Datei
+  # erhalten) bringen die Aufgaben zu Dokument und Ablage.
   @req-9.9
-  Szenario: Ein Fristablauf löscht nichts (Teilnachweis)
+  Szenario: Ein Fristablauf löscht nichts (Teilnachweis bis Dokument und Ablage)
     Wenn die Frist für die Regel «10 Jahre ab GESCHAEFTSJAHR» mit Belegdatum «15.03.2010», Eingang «–», Geschäftsjahr «–», gültig bis «–» und Geschäftsjahresende «12-31» am «10.11.2026» berechnet wird
     Dann ist aufbewahren_bis «31.12.2020» und die Frist abgelaufen
-    Und bietet die API keinen Endpunkt, der ein Dokument oder seine Datei löscht
+    Und bietet die API DELETE nur für diese Pfade an:
+      | /api/v1/api-tokens/{tokenId} |
+      | /api/v1/dokumentarten/{code} |

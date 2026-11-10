@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokumentart.domain;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.MonthDay;
@@ -69,9 +70,18 @@ public record Aufbewahrung(LocalDate bis, boolean fristAbgelaufen) {
                 yield gjEnde.atYear(gj + regel.jahre());
             }
             // plusYears setzt den 29.02. im Nicht-Schaltjahr auf den 28.02. (Art. 77 Abs. 3 OR)
-            case GUELTIG_BIS -> gueltigBis == null ? null : gueltigBis.plusYears(regel.jahre());
+            case GUELTIG_BIS -> gueltigBis == null ? null : plusJahre(gueltigBis, regel.jahre());
         };
         return new Aufbewahrung(bis, bis != null && bis.isBefore(heute));
+    }
+
+    // ein gueltig_bis nahe LocalDate.MAX ist eine falsche Eingabe, kein technischer Fehler
+    private static LocalDate plusJahre(LocalDate datum, int jahre) {
+        try {
+            return datum.plusYears(jahre);
+        } catch (DateTimeException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
     }
 
     /** Vergleicht eine neu berechnete Frist mit der bestehenden (Req 9.7); {@code null} heisst unbefristet. */

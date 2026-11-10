@@ -88,7 +88,8 @@ final class StammdatenTabelle {
 
     /**
      * Liest den Seed so streng wie {@code KlassenpfadDokumentartSeed}: {@code gesetzliche_pflicht} muss boolesch sein,
-     * {@code aufbewahrung_jahre} eine Zahl oder ausdrücklich {@code null}.
+     * {@code aufbewahrung_jahre} eine Zahl oder ausdrücklich {@code null}, {@code beschreibung} fehlt oder ist ein nicht
+     * leerer Text, {@code aktiv} gilt ohne Angabe als {@code true}.
      */
     static List<Art> ausSeed(JsonNode seed) {
         seed.fieldNames().forEachRemaining(feld -> {
@@ -106,8 +107,7 @@ final class StammdatenTabelle {
             arten.add(new Art(art.path("code").asText(), art.path("name").asText(), texte(art.path("gruppen")),
                     texte(art.path("pflichtfelder")), art.path("vertraulichkeit").asText(),
                     jahre(art), art.path("aufbewahrung_ab").isNull() ? null : art.path("aufbewahrung_ab").asText(),
-                    pflicht(art), art.path("aktiv").booleanValue(),
-                    art.path("beschreibung").isTextual() ? art.path("beschreibung").asText() : null));
+                    pflicht(art), art.path("aktiv").asBoolean(true), beschreibung(art)));
         }
         return arten;
     }
@@ -121,6 +121,17 @@ final class StammdatenTabelle {
             throw new IllegalArgumentException("aufbewahrung_jahre fehlt oder ist keine Zahl: " + art.path("code"));
         }
         return jahre.intValue();
+    }
+
+    private static String beschreibung(JsonNode art) {
+        JsonNode beschreibung = art.path("beschreibung");
+        if (beschreibung.isMissingNode()) {
+            return null;
+        }
+        if (!beschreibung.isTextual() || beschreibung.asText().isBlank()) {
+            throw new IllegalArgumentException("beschreibung ist kein Text oder leer: " + art.path("code"));
+        }
+        return beschreibung.asText();
     }
 
     private static boolean pflicht(JsonNode art) {

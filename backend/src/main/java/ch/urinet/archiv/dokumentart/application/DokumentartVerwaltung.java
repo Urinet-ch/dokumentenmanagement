@@ -10,9 +10,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Dokumentarten des eigenen Mandanten verwalten (Req 9.1, 9.4, 9.5; Recht A11 prüft die REST-Schicht). Der Mandant
@@ -24,12 +22,14 @@ public class DokumentartVerwaltung {
 
     private final DokumentartRepository repository;
     private final ZusatzSchemaPruefer schemaPruefer;
+    private final DokumentartPruefung pruefung;
     private final DokumentZaehlerPort zaehler;
 
     public DokumentartVerwaltung(DokumentartRepository repository, ZusatzSchemaPruefer schemaPruefer,
-                                 DokumentZaehlerPort zaehler) {
+                                 DokumentartPruefung pruefung, DokumentZaehlerPort zaehler) {
         this.repository = repository;
         this.schemaPruefer = schemaPruefer;
+        this.pruefung = pruefung;
         this.zaehler = zaehler;
     }
 
@@ -42,29 +42,34 @@ public class DokumentartVerwaltung {
     }
 
     /**
-     * Legt eine Art an. Pflicht sind {@code code}, {@code name}, {@code vertraulichkeit}, {@code gesetzlichePflicht}
-     * und {@code aufbewahrungJahre} ({@code null} = unbefristet), damit keine Regel still entsteht; ohne Schema gilt
-     * {@link Dokumentart#OHNE_ZUSATZ}.
+     * Legt eine Art an. Pflicht sind {@code code}, {@code name}, {@code vertraulichkeit} und
+     * {@code gesetzlichePflicht}. Ohne {@code aufbewahrungJahre} gelten {@value Aufbewahrungsregel#JAHRE_STANDARD}
+     * Jahre (Req 9.3), ohne {@code aufbewahrungAb} das Geschäftsjahr; ausdrücklich {@code null} heisst unbefristet.
+     * Ohne Schema gilt {@link Dokumentart#OHNE_ZUSATZ}. Ein vergebener Code ergibt 409
+     * {@code DOKUMENTART_EXISTIERT}.
      */
     public Dokumentart anlegen(DokumentartAngaben angaben) {
-        for (Feld pflicht : List.of(Feld.CODE, Feld.NAME, Feld.VERTRAULICHKEIT, Feld.GESETZLICHE_PFLICHT,
-                Feld.AUFBEWAHRUNG_JAHRE)) {
+        for (Feld pflicht : List.of(Feld.CODE, Feld.NAME, Feld.VERTRAULICHKEIT, Feld.GESETZLICHE_PFLICHT)) {
             if (!angaben.hat(pflicht)) {
                 throw ungueltig();
             }
         }
+        Integer jahre = angaben.hat(Feld.AUFBEWAHRUNG_JAHRE) ? angaben.aufbewahrungJahre()
+                : Integer.valueOf(Aufbewahrungsregel.JAHRE_STANDARD);
+        String ab = angaben.hat(Feld.AUFBEWAHRUNG_AB) ? angaben.aufbewahrungAb()
+                : jahre == null ? null : AufbewahrungAb.GESCHAEFTSJAHR.name();
         Dokumentart art = new Dokumentart(angaben.code(), angaben.name(),
                 angaben.hat(Feld.BESCHREIBUNG) ? angaben.beschreibung() : null,
                 angaben.hat(Feld.GRUPPEN) ? pflichtwert(angaben.gruppen()) : List.of(),
                 angaben.hat(Feld.PFLICHTFELDER) ? pflichtwert(angaben.pflichtfelder()) : List.of(),
                 angaben.hat(Feld.ZUSATZ_SCHEMA) ? pflichtwert(angaben.zusatzSchema()) : Dokumentart.OHNE_ZUSATZ,
                 vertraulichkeit(angaben.vertraulichkeit()),
-                regel(angaben.aufbewahrungJahre(), angaben.hat(Feld.AUFBEWAHRUNG_AB) ? angaben.aufbewahrungAb() : null),
+                regel(jahre, ab),
                 pflichtwert(angaben.gesetzlichePflicht()),
                 !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()));
-        schemaPassend(art);
+        pruefung.pruefen(art);
         if (repository.existiert(art.code())) {
-            throw ungueltig();
+            throw new FachFehler(Fehlercode.DOKUMENTART_EXISTIERT);
         }
         repository.anlegen(art);
         return art;
@@ -93,7 +98,7 @@ public class DokumentartVerwaltung {
                 angaben.hat(Feld.GESETZLICHE_PFLICHT) ? pflichtwert(angaben.gesetzlichePflicht())
                         : bisher.gesetzlichePflicht(),
                 angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv());
-        schemaPassend(art);
+        pruefung.pruefen(art);
         repository.speichern(art);
         return art;
     }
@@ -110,14 +115,6 @@ public class DokumentartVerwaltung {
     /** Prüft Zusatzwerte (JSON-Objekt) gegen das Schema der Art (Req 9.5); für das Speichern von Dokumenten (2.2). */
     public void zusatzPruefen(String code, String werteJson) {
         schemaPruefer.wertePruefen(finden(code).zusatzSchema(), werteJson);
-    }
-
-    /** Das Schema ist gültig, und jedes Pflichtfeld {@code zusatz.<feld>} ist darin beschrieben (Req 9.5). */
-    private void schemaPassend(Dokumentart art) {
-        Set<String> felder = new HashSet<>(schemaPruefer.schemaPruefen(art.zusatzSchema()));
-        if (!felder.containsAll(art.zusatzPflichtfelder())) {
-            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
-        }
     }
 
     private static Aufbewahrungsregel regel(Integer jahre, String ab) {

@@ -65,10 +65,20 @@ class DokumentartSeedTest {
                 "{\"code\": \"A\", \"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": \"ja\"}",
                 "{\"code\": \"A\", \"gesetzliche_pflicht\": true}",
                 "{\"code\": \"A\", \"aufbewahrung_jahre\": \"10\", \"gesetzliche_pflicht\": true}",
-                "{\"code\": \"A\", \"aufbewahrung_jahre\": 10.5, \"gesetzliche_pflicht\": true}")) {
+                "{\"code\": \"A\", \"aufbewahrung_jahre\": 10.5, \"gesetzliche_pflicht\": true}",
+                "{\"code\": \"A\", \"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": true, \"beschreibung\": \" \"}",
+                "{\"code\": \"A\", \"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": true, \"beschreibung\": 1}")) {
             var seed = json.readTree("{\"dokumentarten\": [" + art + "]}");
             assertThatThrownBy(() -> StammdatenTabelle.ausSeed(seed)).as(art).isInstanceOf(IllegalArgumentException.class);
         }
+    }
+
+    /** Wie {@code KlassenpfadDokumentartSeed}: ohne {@code aktiv} ist die Art aktiv (Review PR #40). */
+    @Test
+    void seedOhneAktivIstAktiv() throws IOException {
+        var seed = new ObjectMapper().readTree("""
+                {"dokumentarten": [{"code": "A", "aufbewahrung_jahre": null, "gesetzliche_pflicht": false}]}""");
+        assertThat(StammdatenTabelle.ausSeed(seed)).extracting(StammdatenTabelle.Art::aktiv).containsExactly(true);
     }
 
     private static List<StammdatenTabelle.Art> tabelle(String zeile) {

@@ -10,6 +10,8 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 public record Aufbewahrungsregel(Integer jahre, AufbewahrungAb ab) {
 
     public static final int JAHRE_MAX = 100;
+    /** Req 9.3: «plus Jahre der Regel (Standard 10)». */
+    public static final int JAHRE_STANDARD = 10;
     public static final Aufbewahrungsregel UNBEFRISTET = new Aufbewahrungsregel(null, null);
 
     public Aufbewahrungsregel {

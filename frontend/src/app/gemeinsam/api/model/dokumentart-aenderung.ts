@@ -10,7 +10,7 @@
 
 
 /**
- * Beim Anlegen sind code, name, vertraulichkeit, gesetzlichePflicht und aufbewahrungJahre Pflicht; beim Ändern ersetzen die angegebenen Felder die bisherigen. Unbekannte Felder → 400.
+ * Beim Anlegen sind code, name, vertraulichkeit und gesetzlichePflicht Pflicht; ohne aufbewahrungJahre gelten 10 Jahre, ohne aufbewahrungAb GESCHAEFTSJAHR, aufbewahrungJahre=null heisst unbefristet. Beim Ändern ersetzen die angegebenen Felder die bisherigen. Unbekannte Felder, doppelte Schlüssel → 400.
  */
 export interface DokumentartAenderung { 
     code?: string;

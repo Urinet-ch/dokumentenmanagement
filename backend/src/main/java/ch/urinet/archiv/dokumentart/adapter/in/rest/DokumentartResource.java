@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokumentart.adapter.in.rest;
 
+import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben.Feld;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
@@ -44,7 +45,8 @@ import java.util.function.Predicate;
 /**
  * Dokumentarten des eigenen Mandanten (Req 9.1, 9.4, 9.5): lesen alle Archiv-Rollen, pflegen nur {@code inhaber}
  * (A11, Req 2.17). Der Mandant kommt nur aus der Anmeldung; jede Anfrage arbeitet im Schema dieses Mandanten.
- * Unbekannte Felder im Body lehnt die Resource ab (400), statt sie still zu übergehen.
+ * Unbekannte Felder, doppelte Schlüssel und Zeichen nach dem JSON-Wert im Body lehnt die Resource ab (400), statt sie
+ * still zu übergehen.
  */
 @Path("/dokumentarten")
 @Tag(name = "Dokumentarten")
@@ -89,8 +91,10 @@ public class DokumentartResource {
     }
 
     @Schema(name = "DokumentartAenderung",
-            description = "Beim Anlegen sind code, name, vertraulichkeit, gesetzlichePflicht und aufbewahrungJahre "
-                    + "Pflicht; beim Ändern ersetzen die angegebenen Felder die bisherigen. Unbekannte Felder → 400.")
+            description = "Beim Anlegen sind code, name, vertraulichkeit und gesetzlichePflicht Pflicht; ohne "
+                    + "aufbewahrungJahre gelten 10 Jahre, ohne aufbewahrungAb GESCHAEFTSJAHR, aufbewahrungJahre=null "
+                    + "heisst unbefristet. Beim Ändern ersetzen die angegebenen Felder die bisherigen. Unbekannte "
+                    + "Felder, doppelte Schlüssel → 400.")
     public record DokumentartAenderungDto(String code, String name, @Schema(nullable = true) String beschreibung,
             List<String> gruppen, List<String> pflichtfelder,
             @Schema(type = SchemaType.OBJECT) JsonNode zusatzSchema,
@@ -115,12 +119,13 @@ public class DokumentartResource {
     @ErfordertAktion(Aktion.A11)
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentart anlegen",
-            description = "Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 400.")
+            description = "Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 "
+                    + "DOKUMENTART_EXISTIERT.")
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
     @APIResponse(responseCode = "201", description = "Angelegt", content = @Content(
             mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DokumentartDto.class)))
-    public Response anlegen(JsonNode body) {
+    public Response anlegen(String body) {
         aufloesung.pruefen();
         Dokumentart art = verwaltung.anlegen(angaben(body));
         return Response.status(Response.Status.CREATED).entity(dto(art)).build();
@@ -135,7 +140,7 @@ public class DokumentartResource {
             description = "Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false deaktiviert.")
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
-    public DokumentartDto aendern(@PathParam("code") String code, JsonNode body) {
+    public DokumentartDto aendern(@PathParam("code") String code, String body) {
         aufloesung.pruefen();
         return dto(verwaltung.aendern(code, angaben(body)));
     }
@@ -165,7 +170,13 @@ public class DokumentartResource {
                 art.aktiv());
     }
 
-    private static DokumentartAngaben angaben(JsonNode body) {
+    private static DokumentartAngaben angaben(String text) {
+        JsonNode body;
+        try {
+            body = text == null ? null : StrengesJson.lesen(text);
+        } catch (JsonProcessingException e) {
+            throw ungueltig();
+        }
         if (body == null || !body.isObject()) {
             throw ungueltig();
         }

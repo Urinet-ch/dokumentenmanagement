@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.MonthDay;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
@@ -53,16 +54,15 @@ public class AufbewahrungSchritte {
         assertThat(entscheid).isEqualTo(Aufbewahrung.Neuberechnung.valueOf(erwartet));
     }
 
-    @Dann("bietet die API keinen Endpunkt, der ein Dokument oder seine Datei löscht")
-    public void keinLoeschen() {
+    /** Kein Pfad ausser den genannten kennt DELETE; Dokumente und ihre Dateien also gar nicht (Req 9.9). */
+    @Dann("bietet die API DELETE nur für diese Pfade an:")
+    public void loeschenNurFuer(List<String> erlaubt) {
         Map<String, Map<String, Object>> pfade = JsonPath.from(given().queryParam("format", "json")
                 .when().get("/q/openapi").then().statusCode(200).extract().asString()).getMap("paths");
         assertThat(pfade).isNotEmpty();
-        pfade.forEach((pfad, methoden) -> {
-            if (pfad.startsWith("/api/v1/dokumente")) {
-                assertThat(methoden).as(pfad).doesNotContainKey("delete");
-            }
-        });
+        List<String> mitDelete = pfade.entrySet().stream().filter(e -> e.getValue().containsKey("delete"))
+                .map(Map.Entry::getKey).toList();
+        assertThat(mitDelete).containsExactlyInAnyOrderElementsOf(erlaubt);
     }
 
     private static Aufbewahrungsregel regel(String text) {

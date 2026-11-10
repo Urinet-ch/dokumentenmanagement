@@ -120,9 +120,10 @@ components:
         aktiv:
           type: boolean
     DokumentartAenderung:
-      description: "Beim Anlegen sind code, name, vertraulichkeit, gesetzlichePflicht\
-        \ und aufbewahrungJahre Pflicht; beim Ändern ersetzen die angegebenen Felder\
-        \ die bisherigen. Unbekannte Felder → 400."
+      description: "Beim Anlegen sind code, name, vertraulichkeit und gesetzlichePflicht\
+        \ Pflicht; ohne aufbewahrungJahre gelten 10 Jahre, ohne aufbewahrungAb GESCHAEFTSJAHR,\
+        \ aufbewahrungJahre=null heisst unbefristet. Beim Ändern ersetzen die angegebenen\
+        \ Felder die bisherigen. Unbekannte Felder, doppelte Schlüssel → 400."
       type: object
       properties:
         code:
@@ -281,7 +282,7 @@ paths:
     post:
       summary: Dokumentart anlegen
       description: Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code
-        → 400.
+        → 409 DOKUMENTART_EXISTIERT.
       tags:
       - Dokumentarten
       requestBody:

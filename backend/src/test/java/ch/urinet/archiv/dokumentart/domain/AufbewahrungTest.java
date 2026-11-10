@@ -46,6 +46,26 @@ class AufbewahrungTest {
         assertThat(Aufbewahrung.geschaeftsjahrVorschlagen(null, eingang, ende("12-31"))).isEqualTo(erwartet);
     }
 
+    /** Sommerzeit: 30.06.2026 22:30 UTC ist in Zürich (UTC+2) der 01.07.; mit fester Zone +01:00 wäre es der 30.06. */
+    @ParameterizedTest(name = "Eingang {0}, GJ-Ende {1} → GJ {2}")
+    @CsvSource({
+            "2026-06-30T22:30:00Z, 06-30, 2027",
+            "2026-06-30T21:30:00Z, 06-30, 2026"})
+    void eingangGiltInZuerichAuchImSommer(Instant eingang, String gjEnde, int erwartet) {
+        assertThat(Aufbewahrung.geschaeftsjahrVorschlagen(null, eingang, ende(gjEnde))).isEqualTo(erwartet);
+    }
+
+    /** Belegdatum und Eingang in verschiedenen Geschäftsjahren: Das Belegdatum gilt (Req 9.3, Review PR #40). */
+    @ParameterizedTest(name = "Beleg {0}, Eingang {1}, GJ-Ende {2} → GJ {3}, bis {4}")
+    @CsvSource({
+            "2026-12-15, 2027-01-05T10:00:00Z, 12-31, 2026, 2036-12-31",
+            "2026-06-15, 2026-07-03T10:00:00Z, 06-30, 2026, 2036-06-30"})
+    void belegdatumGehtDemEingangVor(LocalDate beleg, Instant eingang, String gjEnde, int gj, LocalDate bis) {
+        assertThat(Aufbewahrung.geschaeftsjahrVorschlagen(beleg, eingang, ende(gjEnde))).isEqualTo(gj);
+        assertThat(Aufbewahrung.berechne(ZEHN_GJ, beleg, eingang, null, null, ende(gjEnde), HEUTE).bis())
+                .isEqualTo(bis);
+    }
+
     @Test
     void geschaeftsjahrOhneBelegdatumUndEingangIstUngueltig() {
         assertThatThrownBy(() -> Aufbewahrung.geschaeftsjahrVorschlagen(null, null, ende("12-31")))
@@ -78,6 +98,13 @@ class AufbewahrungTest {
     void abGueltigBis(LocalDate gueltigBis, LocalDate erwartet) {
         assertThat(Aufbewahrung.berechne(ZEHN_VERTRAG, LocalDate.of(2026, 1, 5), null, null, gueltigBis,
                 ende("12-31"), HEUTE)).isEqualTo(new Aufbewahrung(erwartet, false));
+    }
+
+    @Test
+    void extremesGueltigBisIstUngueltig() {
+        assertThatThrownBy(() -> Aufbewahrung.berechne(ZEHN_VERTRAG, null, null, null, LocalDate.MAX, ende("12-31"),
+                HEUTE)).isInstanceOfSatisfying(FachFehler.class,
+                        f -> assertThat(f.code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
     }
 
     @Test

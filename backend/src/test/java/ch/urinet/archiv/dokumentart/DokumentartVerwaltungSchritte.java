@@ -55,6 +55,12 @@ public class DokumentartVerwaltungSchritte {
                     loeschen.setString(1, PRAEFIX + "%");
                     loeschen.executeUpdate();
                 }
+                // Szenarien ändern an Seed-Arten nur «aktiv» (z. B. Req 9.4 an KORRESPONDENZ)
+                try (PreparedStatement aktivieren = verbindung.prepareStatement("update "
+                        + new MandantCode(mandant).schema() + ".dokumentart set aktiv = true where not aktiv and code not like ?")) {
+                    aktivieren.setString(1, PRAEFIX + "%");
+                    aktivieren.executeUpdate();
+                }
             }
         }
     }

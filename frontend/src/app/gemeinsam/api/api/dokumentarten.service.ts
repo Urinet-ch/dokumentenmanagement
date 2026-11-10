@@ -227,7 +227,7 @@ export class DokumentartenService extends BaseService {
 
     /**
      * Dokumentart anlegen
-     * Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 400.
+     * Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 DOKUMENTART_EXISTIERT.
      * @endpoint post /api/v1/dokumentarten
      * @param dokumentartAenderung 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.

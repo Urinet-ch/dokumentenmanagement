@@ -3,14 +3,18 @@ package ch.urinet.archiv.dokumentart.adapter.out.schema;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
-/** Req 9.5: Zusatz-Schema und Zusatzwerte; Schutz gegen SSRF und übergrosse Eingaben. */
+/** Req 9.5: Zusatz-Schema und Zusatzwerte; Schutz gegen SSRF, übergrosse Eingaben, Rechenzeit und Zyklen. */
 class NetworkntZusatzSchemaPrueferTest {
 
     private static final String SCHEMA = """
@@ -21,7 +25,7 @@ class NetworkntZusatzSchemaPrueferTest {
                            "betrag":{"$ref":"#/$defs/betrag"}},
              "$defs":{"betrag":{"type":"number","minimum":0}}}""";
 
-    private final NetworkntZusatzSchemaPruefer pruefer = new NetworkntZusatzSchemaPruefer();
+    private final NetworkntZusatzSchemaPruefer pruefer = new NetworkntZusatzSchemaPruefer(Duration.ofMillis(50));
 
     @Test
     void gueltigesSchemaLiefertFeldnamen() {
@@ -50,7 +54,15 @@ class NetworkntZusatzSchemaPrueferTest {
             "{\"type\":\"object\",\"$id\":\"https://example.org/s\"}",
             "{\"type\":\"object\",\"$vocabulary\":{}}",
             "{\"type\":\"object\",\"$schema\":\"http://json-schema.org/draft-07/schema#\"}",
-            "{\"type\":\"object\",\"$schema\":\"https://example.org/meta\"}"
+            "{\"type\":\"object\",\"$schema\":\"https://example.org/meta\"}",
+            // Verweise im Kreis ohne Fortschritt in den Daten (Review PR #40, Soll 3)
+            "{\"type\":\"object\",\"$ref\":\"#\"}",
+            "{\"type\":\"object\",\"not\":{\"$ref\":\"#\"}}",
+            "{\"type\":\"object\",\"$defs\":{\"a\":{\"$ref\":\"#/$defs/a\"}}}",
+            "{\"type\":\"object\",\"properties\":{\"x\":{\"$ref\":\"#/$defs/a\"}},"
+                    + "\"$defs\":{\"a\":{\"allOf\":[{\"$ref\":\"#/$defs/b\"}]},\"b\":{\"anyOf\":[{\"$ref\":\"#/$defs/a\"}]}}}",
+            "{\"type\":\"object\",\"dependentSchemas\":{\"x\":{\"$ref\":\"#\"}}}",
+            "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"#anker\"}}}"
     })
     void ungueltigesSchemaIstZusatzUngueltig(String schema) {
         assertUngueltig(() -> pruefer.schemaPruefen(schema));
@@ -92,6 +104,41 @@ class NetworkntZusatzSchemaPrueferTest {
     void werteUeberDerGrenzeSindUngueltig() {
         String gross = "{\"periode\":\"" + "x".repeat(NetworkntZusatzSchemaPruefer.MAX_WERTE_BYTES) + "\"}";
         assertUngueltig(() -> pruefer.wertePruefen("{\"type\":\"object\"}", gross));
+    }
+
+    @Test
+    void rekursionUeberDieDatenBleibtErlaubt() {
+        String baum = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},"
+                + "\"kind\":{\"$ref\":\"#\"}}}";
+        assertThat(pruefer.schemaPruefen(baum)).containsExactlyInAnyOrder("name", "kind");
+        assertThatCode(() -> pruefer.wertePruefen(baum, "{\"name\":\"a\",\"kind\":{\"kind\":{\"name\":\"c\"}}}"))
+                .doesNotThrowAnyException();
+        assertUngueltig(() -> pruefer.wertePruefen(baum, "{\"kind\":{\"name\":1}}"));
+    }
+
+    /**
+     * Rückfallreiches Muster (ReDoS, Review PR #40, Soll 2): ohne Zeitgrenze rechnet {@code ^(.*a){8}x$} gegen 100
+     * Zeichen «a» Stunden; mit Grenze endet die Prüfung nach rund 50 ms mit {@code ZUSATZ_UNGUELTIG}.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "{\"type\":\"object\",\"properties\":{\"a\":{\"type\":\"string\",\"pattern\":\"^(.*a){8}x$\"}}} | {\"a\":\"%s\"}",
+            "{\"type\":\"object\",\"patternProperties\":{\"^(.*a){8}x$\":{}}} | {\"%s\":1}",
+            "{\"type\":\"object\",\"propertyNames\":{\"pattern\":\"^(.*a){8}x$\"}} | {\"%s\":1}"
+    })
+    void rueckfallreichesMusterBrichtNachDerZeitgrenzeAb(String schema, String werte) {
+        String text = werte.formatted("a".repeat(100));
+        assertThat(pruefer.schemaPruefen(schema)).isNotNull();
+        long start = System.nanoTime();
+        assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> assertUngueltig(() -> pruefer.wertePruefen(schema, text)));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
+    }
+
+    @Test
+    void zeitgrenzeMussPositivSein() {
+        assertThatThrownBy(() -> new NetworkntZusatzSchemaPruefer(Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("archiv.dokumentart.muster-zeitgrenze");
     }
 
     private static void assertUngueltig(org.assertj.core.api.ThrowableAssert.ThrowingCallable aufruf) {

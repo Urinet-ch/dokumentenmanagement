@@ -5,7 +5,7 @@ Funktionalität: Dokumentarten verwalten
   Pflichtfelder, Zusatz-Schema (JSON Schema Draft 2020-12), Vertraulichkeit, Aufbewahrungsregel und gesetzliche
   Pflicht (Req 9.1). Lesen dürfen alle Archiv-Rollen, Anlegen, Ändern und Löschen nur der «inhaber» (A11, Req 2.17).
   Jede Art liegt im Schema ihres Mandanten. Die Probe-Arten tragen das Präfix «PROBE_DA_» und werden nach jedem
-  Szenario gelöscht; die Seed-Arten bleiben unverändert.
+  Szenario gelöscht; eine geänderte Seed-Art wird nach dem Szenario wieder aktiv (nur «aktiv» wird an ihr geändert).
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -53,6 +53,38 @@ Funktionalität: Dokumentarten verwalten
       | aufbewahrungJahre                  | null  |
       | aufbewahrungAb                     | null  |
       | beschreibung                       | null  |
+
+  @req-9.1 @req-9.3
+  Szenario: Ohne Aufbewahrungsregel gilt der Standard von 10 Jahren ab Geschäftsjahr
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_STANDARD", "name": "Standard", "vertraulichkeit": "NORMAL", "gesetzlichePflicht": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Und hat die Dokumentart in der Antwort diese Werte:
+      | aufbewahrungJahre | 10             |
+      | aufbewahrungAb    | GESCHAEFTSJAHR |
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_JAHRE", "name": "Nur Jahre", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 6,
+       "gesetzlichePflicht": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Und hat die Dokumentart in der Antwort diese Werte:
+      | aufbewahrungJahre | 6              |
+      | aufbewahrungAb    | GESCHAEFTSJAHR |
+
+  @req-9.1
+  Szenario: Einen Code gibt es im Mandanten nur einmal
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "AUSGANGSRECHNUNG", "name": "x", "vertraulichkeit": "NORMAL", "gesetzlichePflicht": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 409 und Fehlercode «DOKUMENTART_EXISTIERT»
+    Wenn «inhaber-urinet» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «AUSGANGSRECHNUNG» mit diesen Werten:
+      | name               | Ausgangsrechnung |
+      | gesetzlichePflicht | true             |
 
   @req-9.1
   Szenario: Der Inhaber ändert, deaktiviert und löscht eine Art
@@ -107,13 +139,14 @@ Funktionalität: Dokumentarten verwalten
 
     Beispiele:
       | fall                                   | body                                                                                                                                                  |
-      | Code vergeben (Seed-Art)               | {"code": "AUSGANGSRECHNUNG", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10, "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": true} |
-      | Aufbewahrung nicht angegeben           | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "gesetzlichePflicht": false}                                                         |
+      | Pflicht nicht angegeben                | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL"}                                                                                      |
+      | doppelter Schlüssel                    | {"code": "PROBE_DA_X", "code": "PROBE_DA_Y", "name": "x", "vertraulichkeit": "NORMAL", "gesetzlichePflicht": false}                                  |
+      | Zeichen nach dem Objekt                | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "gesetzlichePflicht": false} {}                                                     |
       | unbekanntes Feld                       | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null, "gesetzlichePflicht": false, "mandant": "vhf-gsk"}          |
       | Code klein geschrieben                 | {"code": "probe_da_x", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null, "gesetzlichePflicht": false}                               |
       | unbekannte Gruppe                      | {"code": "PROBE_DA_X", "name": "x", "gruppen": ["lohn"], "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null, "gesetzlichePflicht": false}           |
       | Pflichtfeld ohne seine Gruppe          | {"code": "PROBE_DA_X", "name": "x", "pflichtfelder": ["betrag"], "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null, "gesetzlichePflicht": false}   |
-      | Jahre ohne Beginn                      | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10, "gesetzlichePflicht": false}                                 |
+      | Beginn ohne Jahre (unbefristet)        | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null, "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": false} |
       | unbekannte Vertraulichkeit             | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "GEHEIM", "aufbewahrungJahre": null, "gesetzlichePflicht": false}                               |
       | Jahre als Text                         | {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": "10", "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": false} |
 
@@ -136,6 +169,9 @@ Funktionalität: Dokumentarten verwalten
       | externer Verweis (SSRF)                | []                  | {"type": "object", "properties": {"a": {"$ref": "https://example.org/schema.json"}}}       |
       | eigene Schema-ID                       | []                  | {"type": "object", "$id": "http://127.0.0.1/schema"}                                        |
       | Schema als Text                        | []                  | "{\"type\": \"object\"}"                                                                    |
+      | Verweis auf sich selbst                | []                  | {"type": "object", "$ref": "#"}                                                            |
+      | Kreis über $defs                       | []                  | {"type": "object", "$ref": "#/$defs/a", "$defs": {"a": {"$ref": "#/$defs/a"}}}             |
+      | Kreis über not                         | []                  | {"type": "object", "not": {"$ref": "#"}}                                                   |
 
   @req-9.5
   Szenario: Auch beim Ändern wird das Zusatz-Schema geprüft
@@ -190,29 +226,62 @@ Funktionalität: Dokumentarten verwalten
 
   @req-2.17
   Szenariogrundriss: Ohne Rolle «inhaber» keine Pflege der Dokumentarten, jede Verweigerung wird protokolliert
+    Angenommen der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
     Wenn «<benutzer>» eine Dokumentart anlegt:
       """
       {"code": "PROBE_DA_X", "name": "x", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
        "gesetzlichePflicht": false}
       """
     Dann antwortet die Dokumentart-Verwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
-    Wenn «<benutzer>» die Dokumentart «KORRESPONDENZ» ändert:
-      """
-      {"aktiv": false}
-      """
-    Dann antwortet die Dokumentart-Verwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
+      | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+    Wenn «<inhaber>» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «PROBE_DA_X» nicht
     Angenommen der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
-    Wenn «<benutzer>» die Dokumentart «KORRESPONDENZ» löscht
+    Wenn «<benutzer>» die Dokumentart «<art>» ändert:
+      """
+      {"name": "Geändert", "aktiv": false}
+      """
     Dann antwortet die Dokumentart-Verwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
     Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
       | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
       | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+    Wenn «<inhaber>» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «<art>» mit diesen Werten:
+      | name  | <name> |
+      | aktiv | true   |
+    Angenommen der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» die Dokumentart «<art>» löscht
+    Dann antwortet die Dokumentart-Verwaltung mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag:
+      | benutzer   | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | <benutzer> | <rolle> | VERWEIGERT |          |    | A11   | NICHT_ERLAUBT |
+    Wenn «<inhaber>» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «<art>» mit diesen Werten:
+      | name  | <name> |
+      | aktiv | true   |
 
     Beispiele:
-      | benutzer                 | mandant | rolle            |
-      | mitarbeiter-urinet       | urinet  | MITARBEITER      |
-      | treuhaender-urinet       | urinet  | TREUHAENDER      |
-      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE |
+      | benutzer                 | mandant | rolle            | inhaber         | art                | name          |
+      | mitarbeiter-urinet       | urinet  | MITARBEITER      | inhaber-urinet  | KORRESPONDENZ      | Korrespondenz |
+      | treuhaender-urinet       | urinet  | TREUHAENDER      | inhaber-urinet  | KORRESPONDENZ      | Korrespondenz |
+      | geschaeftsstelle-vhf-gsk | vhf-gsk | GESCHAEFTSSTELLE | inhaber-vhf-gsk | PROBE_VHF_BULLETIN | Probe-Bulletin |
+
+  @req-9.4
+  Szenario: Auch eine Art aus dem Seed lässt sich nur deaktivieren, solange sie Dokumente hat
+    Angenommen die Dokumentart «KORRESPONDENZ» hat 1 Dokument
+    Wenn «inhaber-urinet» die Dokumentart «KORRESPONDENZ» löscht
+    Dann antwortet die Dokumentart-Verwaltung mit Status 409 und Fehlercode «DOKUMENTART_IN_GEBRAUCH»
+    Wenn «inhaber-urinet» die Dokumentart «KORRESPONDENZ» ändert:
+      """
+      {"aktiv": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 200
+    Wenn «mitarbeiter-urinet» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «KORRESPONDENZ» mit diesen Werten:
+      | name  | Korrespondenz |
+      | aktiv | false         |
 
   @req-2.17
   Szenariogrundriss: Ein API-Token erreicht die Dokumentarten nicht
