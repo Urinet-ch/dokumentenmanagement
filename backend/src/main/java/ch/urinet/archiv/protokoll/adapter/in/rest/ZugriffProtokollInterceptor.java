@@ -15,10 +15,8 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
-import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.UriInfo;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +24,10 @@ import java.util.UUID;
  * Schreibt für {@link Protokolliert} den Eintrag vor der Aktion und in derselben Transaktion (Req 10.2, 10.8): Läuft
  * schon eine ({@code @Transactional} liegt aussen, Priorität +200), tritt er ihr bei, sonst umschliesst er die Aktion mit
  * einer eigenen. Scheitert der Eintrag oder später der Commit, ist beides zurückgerollt und die Antwort 500.
+ * <p>
+ * Die Erklärung ist die Bindung, mit der CDI den Interceptor aufruft (an der Methode, sonst an der Bean-Klasse, auch für
+ * geerbte Methoden) – dieselbe Stelle, die {@code EndpunktWaechterTest} prüft. Die Dokument-ID kommt wie im
+ * {@code ZugangFilter} aus dem Pfad-Parameter {@code id} der Anfrage, unabhängig davon, wie die Methode ihn annimmt.
  */
 @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
 @Interceptor
@@ -38,28 +40,25 @@ public class ZugriffProtokollInterceptor {
     private final ZugriffProtokoll protokoll;
     private final SecurityIdentity identitaet;
     private final Instance<HttpServerRequest> anfrage;
+    private final Instance<UriInfo> pfad;
 
     public ZugriffProtokollInterceptor(ZugriffProtokoll protokoll, SecurityIdentity identitaet,
-                                       Instance<HttpServerRequest> anfrage) {
+                                       Instance<HttpServerRequest> anfrage, Instance<UriInfo> pfad) {
         this.protokoll = protokoll;
         this.identitaet = identitaet;
         this.anfrage = anfrage;
+        this.pfad = pfad;
     }
 
     @AroundInvoke
     Object protokollieren(InvocationContext aufruf) throws Exception {
-        Protokolliert erklaerung = erklaerung(aufruf.getMethod());
-        ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(), dokumentId(aufruf),
+        Protokolliert erklaerung = aufruf.getInterceptorBinding(Protokolliert.class);
+        ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(), dokumentId(),
                 ip(), ProtokollDetails.KEINE);
         return QuarkusTransaction.joiningExisting().call(() -> {
             protokoll.schreiben(eintrag);
             return aufruf.proceed();
         });
-    }
-
-    private static Protokolliert erklaerung(Method methode) {
-        Protokolliert an = methode.getAnnotation(Protokolliert.class);
-        return an != null ? an : methode.getDeclaringClass().getAnnotation(Protokolliert.class);
     }
 
     private Optional<String> benutzer() {
@@ -70,25 +69,22 @@ public class ZugriffProtokollInterceptor {
         return Rolle.ausRealmRollen(identitaet.getRoles()).map(Rolle::name);
     }
 
-    private static Optional<UUID> dokumentId(InvocationContext aufruf) {
-        Annotation[][] annotationen = aufruf.getMethod().getParameterAnnotations();
-        Object[] werte = aufruf.getParameters();
-        for (int i = 0; i < annotationen.length; i++) {
-            for (Annotation a : annotationen[i]) {
-                if (a instanceof PathParam p && DOKUMENT_ID.equals(p.value()) && werte[i] != null) {
-                    return uuid(werte[i]);
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static Optional<UUID> uuid(Object wert) {
-        if (wert instanceof UUID id) {
-            return Optional.of(id);
+    private Optional<UUID> dokumentId() {
+        if (!pfad.isResolvable()) {
+            return Optional.empty();
         }
         try {
-            return Optional.of(UUID.fromString(wert.toString()));
+            return Optional.ofNullable(pfad.get().getPathParameters().getFirst(DOKUMENT_ID))
+                    .flatMap(ZugriffProtokollInterceptor::uuid);
+        } catch (RuntimeException e) {
+            // ausserhalb einer HTTP-Anfrage (z. B. Worker) gibt es keinen Pfad
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<UUID> uuid(String wert) {
+        try {
+            return Optional.of(UUID.fromString(wert));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }

@@ -118,6 +118,12 @@ public class MandantenkontextSchritte {
                 .post(DOKUMENTE + dokumentId(dokument) + "/bestaetigen");
     }
 
+    @Wenn("«{word}» das Probe-Dokument «{word}» über die geerbte Probe-Methode liest")
+    public void dokumentGeerbtLesen(String benutzer, String dokument) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get("/api/v1/probe/geerbt/dokumente/" + dokumentId(dokument));
+    }
+
     @Wenn("«{word}» an die Probe-Anfrage im Zahlenfeld den Text «{word}» sendet")
     public void falscherFeldtyp(String benutzer, String text) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")

@@ -94,3 +94,12 @@ Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
       | treuhaender-urinet | ein Dokument erfasst                  | NICHT_ERLAUBT | Rolle nach @RolesAllowed |
       | ohne-rolle-urinet  | ein Dokument erfasst                  | NICHT_ERLAUBT | ohne Archiv-Rolle        |
       | mitarbeiter-urinet | das Probe-Dokument «NORMAL» bestätigt | NICHT_ERLAUBT | im ZugangFilter          |
+
+  @req-10.2
+  # Vorab-Korrektur 7 aus dem Review von PR #35: geerbte Methode, @Protokolliert nur an der Klasse, ID über @RestPath.
+  Szenario: Eine geerbte Methode mit @RestPath wird mit Dokument-ID protokolliert
+    Wenn «inhaber-urinet» das Probe-Dokument «NORMAL» über die geerbte Probe-Methode liest
+    Dann antwortet das Archiv mit Status 200 und liefert das Probe-Dokument «NORMAL»
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer       | rolle   | aktion   | dokument | ip | grund | fehlercode |
+      | inhaber-urinet | INHABER | ANZEIGEN | NORMAL   |    |       |            |
