@@ -39,6 +39,7 @@ public class MandantenkontextSchritte {
 
     private static final String DOKUMENTARTEN = "/api/v1/probe/dokumentarten/";
     private static final String DOKUMENTE = "/api/v1/probe/dokumente/";
+    private static final String ANFRAGE = "/api/v1/probe/anfrage";
 
     @Inject
     MandantProvisionierung provisionierung;
@@ -113,6 +114,12 @@ public class MandantenkontextSchritte {
     public void dokumentBestaetigen(String benutzer, String dokument) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
                 .post(DOKUMENTE + dokumentId(dokument) + "/bestaetigen");
+    }
+
+    @Wenn("«{word}» an die Probe-Anfrage JSON mit dem Content-Type «{}» sendet")
+    public void falscherMedientyp(String benutzer, String medientyp) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(medientyp)
+                .body("{\"anzahl\": 1}").when().post(ANFRAGE);
     }
 
     @Dann("antwortet das Archiv mit Status {int} und liefert das Probe-Dokument «{word}»")

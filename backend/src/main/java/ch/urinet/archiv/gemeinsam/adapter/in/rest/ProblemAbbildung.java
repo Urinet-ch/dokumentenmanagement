@@ -51,7 +51,7 @@ public class ProblemAbbildung {
             case 403 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_ERLAUBT));
             case 404 -> builder(ProblemAntwort.fuer(Fehlercode.NICHT_GEFUNDEN));
             case 413 -> builder(ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS));
-            case 415 -> builder(ProblemAntwort.fuer(Fehlercode.DATEITYP_UNBEKANNT));
+            case 415 -> builder(ProblemAntwort.fuer(Fehlercode.MEDIENTYP_FALSCH));
             default -> status >= 400 && status < 500
                     ? builder(ProblemAntwort.fuer(Fehlercode.ANFRAGE_UNGUELTIG, status))
                     : builder(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER));

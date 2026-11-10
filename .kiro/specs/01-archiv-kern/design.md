@@ -765,6 +765,7 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 | 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4) |
 | 413 | `DATEI_ZU_GROSS` | Datei über 50 MB oder Anfrage über der Gesamtgrenze (Req 3.6) |
 | 415 | `DATEITYP_UNBEKANNT` | Inhalt kein unterstützter Typ (Req 3.3) |
+| 415 | `MEDIENTYP_FALSCH` | `Content-Type` der Anfrage passt nicht zum Endpunkt (Framework, z. B. Text statt JSON); nicht für den Dateityp eines Uploads |
 | 422 | `DATEI_UNGUELTIG` | leere oder beschädigte Datei (Req 3.7) |
 | 422 | `PFLICHTFELD_FEHLT` | mit Liste der Felder (Req 8.3, 11.6) |
 | 422 | `PARTNER_UNBEKANNT` | unbekannte `crmId` (Req 11.7) |
