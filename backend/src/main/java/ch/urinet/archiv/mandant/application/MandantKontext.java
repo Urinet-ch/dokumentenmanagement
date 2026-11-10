@@ -4,6 +4,9 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.RequestContextController;
 import jakarta.enterprise.inject.Instance;
+import jakarta.transaction.Status;
+import jakarta.transaction.SystemException;
+import jakarta.transaction.TransactionManager;
 
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -13,6 +16,10 @@ import java.util.function.Supplier;
  * stammt aus dem Auftrag bzw. der Konfiguration, nie aus Benutzereingaben. Jeder Aufruf läuft in einem eigenen
  * Request-Kontext, damit die Hibernate-Session mit diesem Mandanten geöffnet wird; der Mandant gilt nur für den
  * aktuellen Thread und wird auch bei Ausnahmen entfernt.
+ * <p>
+ * Ein neuer Kontext darf nicht in einer laufenden JTA-Transaktion beginnen: Die Hibernate-Session hängt an der
+ * Transaktion und behielte den Mandanten des ersten {@code mit}, ein zweites {@code mit} mit anderem Mandanten läse und
+ * schriebe im fremden Schema (fail closed, design.md «Mandant»). Die Transaktion gehört darum in den Block.
  */
 @ApplicationScoped
 public class MandantKontext {
@@ -21,10 +28,13 @@ public class MandantKontext {
 
     private final Instance<RequestContextController> kontrollen;
     private final MandantAusAnmeldung anmeldung;
+    private final TransactionManager transaktionen;
 
-    public MandantKontext(Instance<RequestContextController> kontrollen, MandantAusAnmeldung anmeldung) {
+    public MandantKontext(Instance<RequestContextController> kontrollen, MandantAusAnmeldung anmeldung,
+                          TransactionManager transaktionen) {
         this.kontrollen = kontrollen;
         this.anmeldung = anmeldung;
+        this.transaktionen = transaktionen;
     }
 
     public Optional<MandantCode> aktuell() {
@@ -46,6 +56,9 @@ public class MandantKontext {
             }
             return arbeit.get();
         }
+        if (transaktionAktiv()) {
+            throw new IllegalStateException("Mandanten-Kontext in einer laufenden Transaktion ist nicht erlaubt");
+        }
         RequestContextController kontrolle = kontrollen.get();
         boolean neu = kontrolle.activate();
         try {
@@ -61,6 +74,14 @@ public class MandantKontext {
                 kontrolle.deactivate();
             }
             kontrollen.destroy(kontrolle);
+        }
+    }
+
+    private boolean transaktionAktiv() {
+        try {
+            return transaktionen.getStatus() != Status.STATUS_NO_TRANSACTION;
+        } catch (SystemException e) {
+            throw new IllegalStateException("Transaktionsstatus nicht lesbar", e);
         }
     }
 }

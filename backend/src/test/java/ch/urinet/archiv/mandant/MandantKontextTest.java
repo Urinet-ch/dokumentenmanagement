@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -29,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Worker-Kontext (Req 1.6): {@code MandantKontext.mit} setzt den Mandanten für Hibernate, räumt in {@code finally} auf
  * und bricht bei einem Mandantenwechsel ab; ohne Mandant gibt es keinen Zugriff auf Mandanten-Tabellen (Req 1.3).
- * Die Aufrufe laufen in eigenen Threads ohne Request-Kontext, wie im Worker.
+ * Die Aufrufe laufen in eigenen Threads ohne Request-Kontext, wie im Worker. In einer äusseren Transaktion bricht
+ * {@code mit} ab, weil die Session an der Transaktion hängt und den ersten Mandanten behielte.
  */
 @QuarkusTest
 class MandantKontextTest {
@@ -100,6 +102,28 @@ class MandantKontextTest {
     }
 
     @Test
+    void zweiMitInEinerAeusserenTransaktionBrechenAb() throws Exception {
+        List<String> schemas = new ArrayList<>();
+        String ergebnis = threads.submit(() -> {
+            try {
+                QuarkusTransaction.requiringNew().run(() -> {
+                    schemas.add(kontext.mit(new MandantCode("vhf-gsk"), this::aktuellesSchema));
+                    schemas.add(kontext.mit(new MandantCode("urinet"), this::aktuellesSchema));
+                });
+                return "kein Abbruch";
+            } catch (RuntimeException e) {
+                return meldungen(e).contains("laufenden Transaktion") && kontext.aktuell().isEmpty()
+                        ? "abgebrochen" : "anderer Fehler: " + meldungen(e);
+            }
+        }).get();
+        assertThat(ergebnis).as("Schemas " + schemas).isEqualTo("abgebrochen");
+        assertThat(schemas).isEmpty();
+        // die Transaktion gehört in den Block: so bleibt jeder Mandant in seinem Schema
+        assertThat(threads.submit(() -> kontext.mit(new MandantCode("urinet"),
+                () -> QuarkusTransaction.requiringNew().call(this::aktuellesSchema))).get()).isEqualTo("m_urinet");
+    }
+
+    @Test
     void imAktivenRequestKontextOhnePassendeAnmeldungBrichtAb() {
         // der Test-Thread hat einen aktiven Request-Kontext ohne Anmeldung: kein stiller Mandantenwechsel
         assertThatThrownBy(() -> kontext.mit(new MandantCode("urinet"), () -> "nie"))
@@ -124,6 +148,19 @@ class MandantKontextTest {
             gleichzeitig.await();
             return (String) em.createNativeQuery("select current_schema()").getSingleResult();
         }));
+    }
+
+    private String aktuellesSchema() {
+        DokumentartEintrag.count();
+        return (String) em.createNativeQuery("select current_schema()").getSingleResult();
+    }
+
+    private static String meldungen(Throwable fehler) {
+        StringBuilder text = new StringBuilder();
+        for (Throwable f = fehler; f != null; f = f.getCause()) {
+            text.append(f.getMessage()).append(" | ");
+        }
+        return text.toString();
     }
 
     private boolean imRegister(String code) throws SQLException {

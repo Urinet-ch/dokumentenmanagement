@@ -13,19 +13,21 @@ Funktionalität: Schema nur über versionierte Migrationen
     Und das Schema «public» enthält keine Sequenz ausser «auftrag_id_seq»
     Und Hibernate bildet die Entität «MandantEintrag» auf die Tabelle «mandant» ab
 
-  Szenario: Nach der Migration prüft das Archiv jedes Mandanten-Schema gegen das Mapping
+  # Die Szenarien rufen MandantMigration direkt auf; welche Laufart beim Start migriert oder nur prüft
+  # (api, worker, kommando), belegen MigrationEntscheidTest und MigrationBeimStartTest.
+  Szenario: Nach der Migration prüft MandantMigration jedes Mandanten-Schema gegen das Mapping
     Angenommen im Register steht der aktive Mandant «probe-pruefung» mit leerem Schema
     Wenn das Archiv die aktiven Mandanten migriert
     Dann ist das Schema «m_probe_pruefung» migriert und ohne Abweichung geprüft
 
-  Szenario: Weicht ein Mandanten-Schema vom Mapping ab, bricht die API beim Start ab
+  Szenario: Weicht ein Mandanten-Schema vom Mapping ab, bricht MandantMigration ab (Start der API)
     Angenommen im Register steht der aktive Mandant «probe-abweichung» mit leerem Schema
     Und das Archiv die aktiven Mandanten migriert
     Und im Schema «m_probe_abweichung» fehlt die Spalte «aktiv» der Tabelle «dokumentart»
     Wenn das Archiv die aktiven Mandanten migriert
     Dann bricht das Archiv mit «SCHEMA_ABWEICHUNG» ab
 
-  Szenario: Der Worker migriert nicht, prüft aber jedes Mandanten-Schema
+  Szenario: MandantMigration ohne Migration (Start des Workers) prüft jedes Mandanten-Schema und bricht ab
     Angenommen im Register steht der aktive Mandant «probe-worker» mit leerem Schema
     Wenn das Archiv die aktiven Mandanten nur prüft
     Dann bricht das Archiv mit «SCHEMA_ABWEICHUNG» ab

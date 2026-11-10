@@ -17,14 +17,14 @@ class MandantAufloesungTest {
 
     private static MandantAufloesung mit(MandantAusAnmeldung.Ergebnis ergebnis) {
         MandantAusAnmeldung anmeldung = () -> ergebnis;
-        return new MandantAufloesung(new MandantKontext(null, anmeldung), anmeldung, REGISTER);
+        return new MandantAufloesung(new MandantKontext(null, anmeldung, null), anmeldung, REGISTER);
     }
 
     @Test
     void schemaKommtAusDemRegister() {
         MandantVerzeichnis anderesSchema = code -> Optional.of("m_aus_register");
         MandantAusAnmeldung anmeldung = () -> new MandantAusAnmeldung.Gueltig(new MandantCode("urinet"));
-        assertThat(new MandantAufloesung(new MandantKontext(null, anmeldung), anmeldung, anderesSchema).schema())
+        assertThat(new MandantAufloesung(new MandantKontext(null, anmeldung, null), anmeldung, anderesSchema).schema())
                 .isEqualTo("m_aus_register");
         assertThat(mit(new MandantAusAnmeldung.Gueltig(new MandantCode("urinet"))).pruefen()).isEqualTo(new MandantCode("urinet"));
     }
