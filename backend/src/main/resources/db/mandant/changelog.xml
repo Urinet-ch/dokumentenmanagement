@@ -8,4 +8,5 @@
     <include file="changesets/001-dokumentart.xml" relativeToChangelogFile="true"/>
     <include file="changesets/002-zugriff-protokoll.xml" relativeToChangelogFile="true"/>
     <include file="changesets/003-dokumentart-beschreibung.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/004-protokoll-regel-aendern.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

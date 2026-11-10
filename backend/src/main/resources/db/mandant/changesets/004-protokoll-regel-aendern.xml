@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Aktion REGEL_AENDERN: Änderung der Aufbewahrungsregel einer Dokumentart mit alter und neuer Regel (Req 9.10,
+         entschieden von Fabian am 10.11.2026). Der Check wird nur erweitert, der Vorgänger-Release schreibt weiter nur
+         erlaubte Aktionen (Regel 11). -->
+    <changeSet id="004-protokoll-regel-aendern" author="archiv">
+        <sql>
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN', 'VERWERFEN',
+                    'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT', 'REGEL_AENDERN', 'WISSEN_ANZEIGEN',
+                    'WISSEN_ANNEHMEN', 'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

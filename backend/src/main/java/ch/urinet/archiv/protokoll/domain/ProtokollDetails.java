@@ -4,15 +4,16 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Inhalt der Spalte {@code details} (jsonb): nur Grund, SHA-256 und Fehlercode, nie Dokumentinhalte (Req 10.2, 16.7).
- * Jedes Feld darf fehlen ({@code null}).
+ * Inhalt der Spalte {@code details} (jsonb): nur Grund, SHA-256, Fehlercode und bei {@code REGEL_AENDERN} die alte und
+ * neue Regel einer Dokumentart, nie Dokumentinhalte (Req 9.10, 10.2, 16.7). Jedes Feld darf fehlen ({@code null}).
  */
-public record ProtokollDetails(String grund, String sha256, String fehlercode) {
+public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
 
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-f]{64}$");
-    private static final Pattern FEHLERCODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
+    /** Fehlercode, Code einer Dokumentart oder Wert eines Enums */
+    private static final Pattern CODE = Pattern.compile("^[A-Z][A-Z0-9_]*$");
 
     public ProtokollDetails {
         if (sha256 != null) {
@@ -21,7 +22,7 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode) {
                 throw new IllegalArgumentException("sha256 ist keine SHA-256-Prüfsumme in Hex");
             }
         }
-        if (fehlercode != null && !FEHLERCODE.matcher(fehlercode).matches()) {
+        if (fehlercode != null && !CODE.matcher(fehlercode).matches()) {
             throw new IllegalArgumentException("fehlercode ist kein Fehlercode");
         }
         if (grund != null && grund.isBlank()) {
@@ -29,11 +30,45 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode) {
         }
     }
 
+    public ProtokollDetails(String grund, String sha256, String fehlercode) {
+        this(grund, sha256, fehlercode, null);
+    }
+
     public static ProtokollDetails fehlercode(String fehlercode) {
         return new ProtokollDetails(null, null, fehlercode);
     }
 
+    public static ProtokollDetails regelAenderung(RegelAenderung aenderung) {
+        return new ProtokollDetails(null, null, null, aenderung);
+    }
+
     public boolean leer() {
-        return grund == null && sha256 == null && fehlercode == null;
+        return grund == null && sha256 == null && fehlercode == null && regelAenderung == null;
+    }
+
+    /**
+     * Aufbewahrungsregel einer Dokumentart: Jahre und «ab» (beide {@code null} heisst unbefristet) sowie die
+     * gesetzliche Pflicht, die über die Sperre entscheidet. Nur Werte der Regel, keine Werte eines Dokuments.
+     */
+    public record Regel(Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht) {
+
+        public Regel {
+            if (aufbewahrungAb != null && !CODE.matcher(aufbewahrungAb).matches()) {
+                throw new IllegalArgumentException("aufbewahrungAb ist kein Code");
+            }
+        }
+    }
+
+    /** Alte und neue Regel der Dokumentart mit dem Code {@code dokumentart}. */
+    public record RegelAenderung(String dokumentart, Regel alt, Regel neu) {
+
+        public RegelAenderung {
+            if (dokumentart == null || !CODE.matcher(dokumentart).matches()) {
+                throw new IllegalArgumentException("dokumentart ist kein Code");
+            }
+            if (alt == null || neu == null) {
+                throw new IllegalArgumentException("alte und neue Regel sind Pflicht");
+            }
+        }
     }
 }

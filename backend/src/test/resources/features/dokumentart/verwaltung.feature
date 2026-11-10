@@ -295,3 +295,74 @@ Funktionalität: Dokumentarten verwalten
       | POST    | /api/v1/dokumentarten                |
       | PATCH   | /api/v1/dokumentarten/KORRESPONDENZ  |
       | DELETE  | /api/v1/dokumentarten/KORRESPONDENZ  |
+
+  # Entschieden von Fabian am 10.11.2026: Die Regel einer Art darf sich auch ändern, wenn sie schon Dokumente hat; sie
+  # wirkt auf neue Dokumente und Neuberechnungen. Die Wirkung auf bestehende Dokumente und Sperren folgt mit 2.2/2.3.
+  @req-9.10
+  Szenario: Die Regel einer Art mit Dokumenten lässt sich ändern, jede Regeländerung kommt mit alt und neu ins Protokoll (Teilnachweis bis 2.2/2.3)
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_REGEL", "name": "Regel", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10,
+       "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": true}
+      """
+    Und die Dokumentart «PROBE_DA_REGEL» hat 1 Dokument
+    Und der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_REGEL» ändert:
+      """
+      {"aufbewahrungJahre": 6, "gesetzlichePflicht": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 200
+    Und hat die Dokumentart in der Antwort diese Werte:
+      | aufbewahrungJahre  | 6              |
+      | aufbewahrungAb     | GESCHAEFTSJAHR |
+      | gesetzlichePflicht | false          |
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer       | rolle   | aktion        | dokument | ip | grund | fehlercode |
+      | inhaber-urinet | INHABER | REGEL_AENDERN |          |    |       |            |
+    Und der neue Eintrag im Zugriffsprotokoll von «urinet» hält für die Dokumentart «PROBE_DA_REGEL» diese Regeln fest:
+      | regel | aufbewahrungJahre | aufbewahrungAb | gesetzlichePflicht |
+      | alt   | 10                | GESCHAEFTSJAHR | true               |
+      | neu   | 6                 | GESCHAEFTSJAHR | false              |
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_REGEL» ändert:
+      """
+      {"aufbewahrungJahre": null}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 200
+    Und der neue Eintrag im Zugriffsprotokoll von «urinet» hält für die Dokumentart «PROBE_DA_REGEL» diese Regeln fest:
+      | regel | aufbewahrungJahre | aufbewahrungAb | gesetzlichePflicht |
+      | alt   | 6                 | GESCHAEFTSJAHR | false              |
+      | neu   |                   |                | false              |
+
+  @req-9.10
+  Szenario: Ohne Änderung der Regel gibt es keinen Protokolleintrag (Gegenprobe)
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_REGEL", "name": "Regel", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10,
+       "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": true}
+      """
+    Und der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_REGEL» ändert:
+      """
+      {"name": "Regel neu", "beschreibung": "Nur der Text ändert.", "vertraulichkeit": "INTERN",
+       "aufbewahrungJahre": 10, "gesetzlichePflicht": true, "aktiv": false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 200
+    Und das Zugriffsprotokoll von «urinet» hat keinen neuen Eintrag
+
+  @req-9.10
+  Szenario: Lässt sich die Regeländerung nicht protokollieren, bleibt die Regel unverändert
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_REGEL", "name": "Regel", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10,
+       "aufbewahrungAb": "GESCHAEFTSJAHR", "gesetzlichePflicht": false}
+      """
+    Und im Schema von «urinet» scheitert jeder neue Eintrag ins Zugriffsprotokoll beim Festschreiben
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_REGEL» ändert:
+      """
+      {"aufbewahrungJahre": 5}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 500 und Fehlercode «INTERNER_FEHLER»
+    Wenn «inhaber-urinet» die Dokumentarten auflistet
+    Dann enthält die Liste der Dokumentarten «PROBE_DA_REGEL» mit diesen Werten:
+      | aufbewahrungJahre | 10 |

@@ -13,7 +13,7 @@ import jakarta.transaction.Transactional;
 import java.util.List;
 
 /**
- * Dokumentarten des eigenen Mandanten verwalten (Req 9.1, 9.4, 9.5; Recht A11 prüft die REST-Schicht). Der Mandant
+ * Dokumentarten des eigenen Mandanten verwalten (Req 9.1, 9.4, 9.5, 9.10; Recht A11 prüft die REST-Schicht). Der Mandant
  * kommt nur aus der Anmeldung: Das Repository arbeitet im Schema der laufenden Anfrage.
  */
 @ApplicationScoped
@@ -24,13 +24,16 @@ public class DokumentartVerwaltung {
     private final ZusatzSchemaPruefer schemaPruefer;
     private final DokumentartPruefung pruefung;
     private final DokumentZaehlerPort zaehler;
+    private final RegelProtokollPort regelProtokoll;
 
     public DokumentartVerwaltung(DokumentartRepository repository, ZusatzSchemaPruefer schemaPruefer,
-                                 DokumentartPruefung pruefung, DokumentZaehlerPort zaehler) {
+                                 DokumentartPruefung pruefung, DokumentZaehlerPort zaehler,
+                                 RegelProtokollPort regelProtokoll) {
         this.repository = repository;
         this.schemaPruefer = schemaPruefer;
         this.pruefung = pruefung;
         this.zaehler = zaehler;
+        this.regelProtokoll = regelProtokoll;
     }
 
     public List<Dokumentart> alle() {
@@ -77,7 +80,10 @@ public class DokumentartVerwaltung {
 
     /**
      * Ändert die angegebenen Felder; der Code bleibt. {@code aktiv = false} deaktiviert die Art (Req 9.4). Wird
-     * {@code aufbewahrungJahre} auf {@code null} gesetzt, entfällt {@code aufbewahrungAb} mit.
+     * {@code aufbewahrungJahre} auf {@code null} gesetzt, entfällt {@code aufbewahrungAb} mit. Die Aufbewahrungsregel
+     * (Jahre, «ab», gesetzliche Pflicht) darf sich auch ändern, wenn die Art schon Dokumente hat; jede solche Änderung
+     * kommt mit alter und neuer Regel ins Zugriffsprotokoll (Req 9.10, entschieden von Fabian am 10.11.2026). Sie
+     * wirkt auf neue Dokumente und Neuberechnungen nach Req 9.7, bestehende Sperren werden nur verlängert.
      */
     public Dokumentart aendern(String code, DokumentartAngaben angaben) {
         Dokumentart bisher = finden(code);
@@ -99,6 +105,9 @@ public class DokumentartVerwaltung {
                         : bisher.gesetzlichePflicht(),
                 angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv());
         pruefung.pruefen(art);
+        if (!art.aufbewahrung().equals(bisher.aufbewahrung()) || art.gesetzlichePflicht() != bisher.gesetzlichePflicht()) {
+            regelProtokoll.regelGeaendert(bisher, art);
+        }
         repository.speichern(art);
         return art;
     }
