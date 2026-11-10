@@ -51,6 +51,8 @@ public class ArchivMain implements QuarkusApplication {
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
+            // auch im Dienst geht die Liquibase-Ausgabe der public-Migration ins Log statt roh auf stdout
+            liquibaseInsLog();
             Quarkus.run(ArchivMain.class, argumente);
             return;
         }
@@ -82,7 +84,8 @@ public class ArchivMain implements QuarkusApplication {
      * Liquibase 4.33 schreibt als Bibliothek über seinen Standard-{@code ConsoleUIService} fest auf System.out
      * ({@code liquibase.uiService} gilt nur in seiner CLI). Der Wurzel-Scope gilt für alle Liquibase-Aufrufe des
      * Prozesses, auch für die public-Migration beim Start; mit {@link LoggerUIService} landet die Ausgabe im Log wie bei
-     * der Mandanten-Migration ({@code LiquibaseMandantDatenbank}).
+     * der Mandanten-Migration ({@code LiquibaseMandantDatenbank}). Gilt für Kommando und Dienst; der Dienst verlässt
+     * den Scope nicht, er gilt bis zum Ende des Prozesses.
      */
     static String liquibaseInsLog() {
         try {
