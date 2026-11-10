@@ -25,6 +25,7 @@ class MandantKommandoTest {
         assertThat(ergebnis.exitCode()).isZero();
         assertThat(ergebnis.getOutput()).contains("Mandant probe-kommando angelegt", "Schema m_probe_kommando",
                 "Bucket urinet-archiv-probe-kommando", "Geschäftsjahresende 03-31");
+        assertThat(ergebnis.getOutput()).as("Quarkus gestartet").contains("Installed features");
         assertThat(ergebnis.getOutput()).as("kein HTTP-Server, keine Start-Migration")
                 .doesNotContain("Listening on: http", "aktive Mandanten migriert");
     }
@@ -35,15 +36,25 @@ class MandantKommandoTest {
         assertThat(ergebnis.getErrorOutput()).contains("UNGUELTIG");
     }
 
+    /** Falscher Aufruf: Exit 2, ohne Quarkus zu starten (keine Migration von {@code db/public}). */
     @Test
-    @Launch(value = {"mandant", "anlegen"}, exitCode = 2)
+    @Launch(value = {"mandant", "foo"}, exitCode = 2)
     void falscherAufruf(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains("Aufruf: archiv mandant anlegen");
+        assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features", "Liquibase");
+    }
+
+    @Test
+    @Launch(value = {"mandant", "anlegen", "probe-x", "--name"}, exitCode = 2)
+    void optionOhneWert(LaunchResult ergebnis) {
+        assertThat(ergebnis.getErrorOutput()).contains("Aufruf: archiv mandant anlegen");
+        assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
     }
 
     @Test
     @Launch(value = {"unbekannt"}, exitCode = 2)
     void unbekanntesKommando(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains("Unbekanntes Kommando");
+        assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
     }
 }
