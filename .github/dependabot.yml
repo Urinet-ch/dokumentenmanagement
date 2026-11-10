@@ -9,6 +9,11 @@ updates:
     directory: /backend/src/main/docker
     schedule:
       interval: weekly
+    ignore:
+      # Das Projekt bleibt auf Java 25 LTS (tech.md); Patch- und Minor-Updates auf 25.x kommen weiter.
+      # Der Wechsel auf die nächste LTS (Java 29) ist ein eigener Entscheid.
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker-compose
     directory: /backend
     schedule:
@@ -17,6 +22,10 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    ignore:
+      # TypeScript-Major folgt dem Update von Angular.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: maven
     directory: /backend
     schedule:
