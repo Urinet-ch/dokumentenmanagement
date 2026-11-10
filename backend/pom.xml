@@ -101,6 +101,11 @@
             <groupId>io.smallrye.config</groupId>
             <artifactId>smallrye-config-source-file-system</artifactId>
         </dependency>
+        <!-- Argon2id für API-Tokens (Aufgabe 1.5); Version aus dem Quarkus-BOM -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>
             <artifactId>quarkus-amazon-s3</artifactId>
