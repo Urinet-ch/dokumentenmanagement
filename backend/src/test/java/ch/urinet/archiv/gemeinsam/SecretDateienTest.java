@@ -39,6 +39,7 @@ public class SecretDateienTest {
                 Path.of("src/test/resources/secrets-test", verzeichnis).toAbsolutePath().toString(),
                 "quarkus.datasource.devservices.enabled", "false",
                 "quarkus.hibernate-orm.active", "false",
+                "archiv.db.url-pflicht", "false",
                 "quarkus.oidc.tenant-enabled", "false",
                 "quarkus.quinoa", "false",
                 "quarkus.compose.devservices.enabled", "false");

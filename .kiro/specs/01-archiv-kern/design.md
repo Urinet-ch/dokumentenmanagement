@@ -856,10 +856,10 @@ das Archiv ohne Angabe den Standard der Art (Req 11.10).
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
 | 503 | `UEBERLASTET` | zu viele gleichzeitige Argon2-Rechnungen für API-Tokens (Prüfen und Anlegen, seit 2.1), mit `Retry-After: 1` (Aufgabe 1.5); kein Platz nach `archiv.api-token.wartezeit`, bei `0` ohne Warten |
+| 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
 
 - Keycloak nicht erreichbar (Aufgabe 1.9, z. B. nach einem Deploy, solange `kc` noch startet): Eine `OIDCException` beim Prüfen eines JWT gilt als nicht angemeldet, die API antwortet 401 `NICHT_ANGEMELDET` statt 500 (`ProblemAbbildung`, `ProblemFehlerRoute`); Nachweis `OidcNichtErreichbarTest`.
-- Adresse der Datenbank (Aufgabe 1.9): `%prod.quarkus.datasource.jdbc.url=${archiv.db.url}` ohne Default; fehlt `archiv.db.url` (`ARCHIV_DB_URL` in `compose.yml`), bricht `DatenbankAdressePruefung` den Start ab, statt mit still abgeschalteter Datasource zu laufen. Der Browser-Job der CI schaltet die Datasource dafür ausdrücklich ab.
-| 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
+- Adresse der Datenbank (Aufgabe 1.9): In `prod` steht keine Adresse in `application.properties`; `compose.yml` setzt `QUARKUS_DATASOURCE_JDBC_URL`. Fehlt sie, schaltet Quarkus die Datasource still ab; `DatenbankAdressePruefung` (`%prod.archiv.db.url-pflicht=true`) bricht den Start dann ab. Ein Platzhalter `${archiv.db.url}` in den Properties verhinderte den DB-Devservice der `prod`-Tests, darum keine Abbildung.
 
 - Eine Dublette ist kein Fehler, sondern ein Ergebnis je Datei (`status: "DUBLETTE"`, siehe «Upload»).
 - Worker: Eine Ausnahme wird im Auftrag nur als Art und Fehler-ID gespeichert (`fehler = '<art> fehler-id=<uuid>'`, Art `fehlgeschlagen`, `zeitgrenze`, `verwaist` oder `unlesbar`), erst wenn der Handler beendet ist (siehe «Umsetzung (Aufgabe 2.5)»); Klassen der Ursachen und SQLState stehen nur im Log unter derselben Fehler-ID, nie Meldungen. Dokumentstatus `FEHLER` bzw. `ARCHIVIERUNG_FEHLER` erst nach dem dritten Versuch, bei Prüfsummen- oder Sperrfehlern sofort (Req 6.4).

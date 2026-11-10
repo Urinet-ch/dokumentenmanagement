@@ -123,7 +123,7 @@ jobs:
           # Platzhalter-Adresse und die Datasource ausdrücklich aus
           QUARKUS_HIBERNATE_ORM_ACTIVE: 'false'
           QUARKUS_DATASOURCE_ACTIVE: 'false'
-          ARCHIV_DB_URL: jdbc:postgresql://localhost:1/keine-datenbank
+          QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:1/keine-datenbank
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
         # bricht der Start ab (design.md «Secrets und Konfiguration»); die Browser-Szenarien greifen nie auf S3 oder DB zu
         run: |

@@ -12,7 +12,7 @@ class DatenbankAdressePruefungTest {
     @Test
     void ohneAdresseBrichtProdAb() {
         assertThatThrownBy(() -> DatenbankAdressePruefung.pruefen(true, Optional.empty()))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("archiv.db.url");
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("QUARKUS_DATASOURCE_JDBC_URL");
         assertThatThrownBy(() -> DatenbankAdressePruefung.pruefen(true, Optional.of(" ")))
                 .isInstanceOf(IllegalStateException.class);
     }

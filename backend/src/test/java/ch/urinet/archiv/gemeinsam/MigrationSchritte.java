@@ -28,10 +28,11 @@ public class MigrationSchritte {
                     + "|modifyDataType|addNotNullConstraint|mergeColumns|dropAllForeignKeyConstraints)\\b");
 
     private static final Pattern SQL_BRUCH = Pattern.compile(
-            "(?is)\\b(drop\\s+(table|column|view|schema|sequence|type)"
+            "(?ism)\\b(drop\\s+(table|column|view|schema|sequence|type)"
                     + "|rename\\s+(to|column)"
-                    + "|alter\\s+column\\s+\\S+\\s+(set\\s+not\\s+null|(set\\s+data\\s+)?type)"
-                    + "|truncate)\\b");
+                    + "|alter\\s+column\\s+\\S+\\s+(set\\s+not\\s+null|(set\\s+data\\s+)?type))\\b"
+                    // TRUNCATE nur als Anweisung, nicht im Trigger «before … or truncate» der append-only-Tabellen
+                    + "|(^|;|>)\\s*truncate\\b");
 
     @Dann("enthält kein Changeset unter «{word}» eine Änderung, die das Vorgänger-Release bricht")
     public void changesetsRueckwaertskompatibel(String verzeichnis) throws IOException {

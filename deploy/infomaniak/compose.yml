@@ -24,7 +24,7 @@ services:
     init: true
     environment:
       # Keine Geheimnisse: nur Adressen und Stufenwerte
-      ARCHIV_DB_URL: jdbc:postgresql://db:5432/archiv
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
       ARCHIV_ROLLE: api,worker
       MALLOC_ARENA_MAX: "2"
       ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
