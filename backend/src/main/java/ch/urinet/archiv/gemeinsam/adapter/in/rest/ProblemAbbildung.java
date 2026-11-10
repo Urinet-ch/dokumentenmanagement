@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import io.quarkus.oidc.OIDCException;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.AuthenticationRedirectException;
 import io.quarkus.security.UnauthorizedException;
@@ -29,6 +30,15 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper({UnauthorizedException.class, AuthenticationFailedException.class})
     public Response nichtAngemeldet(RuntimeException fehler) {
+        return nichtAngemeldetBuilder(fehler).build();
+    }
+
+    /**
+     * Keycloak nicht erreichbar (z. B. beim Start, solange {@code kc} noch hochfährt): Das Token lässt sich nicht
+     * prüfen, also gilt es als nicht angemeldet (401 statt 500, Aufgabe 1.9). Die Ursache steht mit Stufe INFO im Log.
+     */
+    @ServerExceptionMapper
+    public Response oidcNichtErreichbar(OIDCException fehler) {
         return nichtAngemeldetBuilder(fehler).build();
     }
 
