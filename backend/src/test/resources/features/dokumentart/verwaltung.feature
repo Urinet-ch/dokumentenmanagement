@@ -187,7 +187,7 @@ Funktionalität: Dokumentarten verwalten
     Dann antwortet die Dokumentart-Verwaltung mit Status 422 und Fehlercode «ZUSATZ_UNGUELTIG»
 
   @req-9.4
-  Szenario: Eine Art mit Dokumenten wird nicht gelöscht, nur deaktiviert (Teilnachweis mit Zähler-Attrappe bis 2.2)
+  Szenario: Eine Art mit Dokumenten wird nicht gelöscht, nur deaktiviert (Dokumente als Zeilen in «dokument», seit 2.2)
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:
       """
       {"code": "PROBE_DA_ALT", "name": "Alt", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
@@ -297,11 +297,11 @@ Funktionalität: Dokumentarten verwalten
       | DELETE  | /api/v1/dokumentarten/KORRESPONDENZ  |
 
   # Entschieden von Fabian am 10.11.2026: Die Regel einer Art darf sich auch ändern, wenn sie schon Dokumente hat; sie
-  # wirkt auf neue Dokumente und Neuberechnungen. Die Wirkung auf bestehende Dokumente und Sperren folgt mit 2.2/2.3.
+  # wirkt auf neue Dokumente und Neuberechnungen. Die Wirkung auf bestehende Dokumente und Sperren folgt mit 2.3.
   # Entschieden von Fabian am 11.11.2026: Auch eine gesetzlich pflichtige Art darf gesenkt werden (`gesetzlichePflicht`
   # ja → nein, weniger als 10 Jahre); das Archiv verhindert das nicht, es protokolliert die Änderung nur.
   @req-9.10
-  Szenario: Die Regel einer Art mit Dokumenten lässt sich ändern, jede Regeländerung kommt mit alt und neu ins Protokoll (Teilnachweis bis 2.2/2.3)
+  Szenario: Die Regel einer Art mit Dokumenten lässt sich ändern, jede Regeländerung kommt mit alt und neu ins Protokoll (Teilnachweis bis 2.3)
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:
       """
       {"code": "PROBE_DA_REGEL", "name": "Regel", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10,

@@ -4,8 +4,8 @@ Funktionalität: Mandanten-Kontext und Rechtematrix
   Bis es fachliche Endpunkte gibt (2.1, 2.2), prüfen Probe-Endpunkte unter src/test die Regeln:
   «/api/v1/probe/dokumentarten/{code}» liest eine Dokumentart im Schema des Mandanten (alle Archiv-Rollen),
   «/api/v1/probe/erfassen» steht für Aktion A1, «/api/v1/probe/dokumente/{id}» für A2 und
-  «/api/v1/probe/dokumente/{id}/bestaetigen» für A7. Die Probe-Dokumente «NORMAL» und «INTERN» liegen im Mandanten
-  «urinet» (ProbeSichtbarkeit unter src/test, bis 2.2 den VertraulichkeitFilter bringt).
+  «/api/v1/probe/dokumente/{id}/bestaetigen» für A7. Die Probe-Dokumente «NORMAL» und «INTERN» liegen bestätigt in der
+  Tabelle «dokument» des Mandanten «urinet»; sichtbar sind sie nach dem VertraulichkeitFilter (seit 2.2).
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

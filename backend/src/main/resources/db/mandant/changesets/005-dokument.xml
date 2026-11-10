@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Dokument mit Dateien, Finanz- und Vertragsfeldern, eigenen Belegnummern und Versionen (Aufgabe 2.2; design.md
+         «Data Models», «Suche»; Req 2.3, 2.21, 3.4, 8.9, 10.1, 10.3, 14.1). partner_id ohne Fremdschlüssel, bis es
+         die Tabelle kontakt gibt. -->
+    <changeSet id="005-dokument" author="archiv">
+        <sql splitStatements="false">
+            create function archiv_tags_text(tags text[]) returns text language sql immutable parallel safe as $$
+                select coalesce(array_to_string(tags, ' '), '')
+            $$
+        </sql>
+        <sql>
+            create table dokument (
+                id uuid not null constraint dokument_pk primary key,
+                art text constraint dokument_art_fk references dokumentart (code),
+                titel text,
+                datum date,
+                eingang timestamptz not null default clock_timestamp(),
+                quelle text not null constraint dokument_quelle_ck
+                    check (quelle in ('SCAN', 'UPLOAD', 'GENERATOR', 'DRIVE', 'EMAIL', 'ABANINJA')),
+                partner_id uuid,
+                partner_name text,
+                projekt text,
+                tags text[] not null default '{}',
+                vertraulichkeit text not null default 'PERSONAL' constraint dokument_vertraulichkeit_ck
+                    check (vertraulichkeit in ('NORMAL', 'INTERN', 'PERSONAL')),
+                person_benutzer text,
+                erstellt_von text not null,
+                status text not null constraint dokument_status_ck
+                    check (status in ('NEU', 'VERARBEITUNG', 'EINGANGSKORB', 'ARCHIVIERUNG', 'ARCHIVIERUNG_FEHLER',
+                        'ARCHIVIERT', 'FEHLER', 'VERWORFEN')),
+                status_grund text,
+                fehler text,
+                bestaetigt timestamptz,
+                bestaetigt_von text,
+                geschaeftsjahr int,
+                aufbewahren_bis date,
+                sperre_bis date,
+                frist_abgelaufen boolean not null default false,
+                archiviert timestamptz,
+                sha256_pdfa text,
+                s3_pdfa text,
+                s3_version_pdfa text,
+                pdfa_fehlt boolean not null default false,
+                seiten int,
+                volltext text,
+                volltext_tsv tsvector generated always as (
+                    setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(partner_name, '')), 'B')
+                    || setweight(to_tsvector('german'::regconfig, archiv_tags_text(tags)), 'B')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(volltext, '')), 'C')) stored,
+                ki_vorschlag jsonb,
+                ki_sicherheit jsonb,
+                hinweis text,
+                zusatz jsonb constraint dokument_zusatz_ck check (zusatz is null or jsonb_typeof(zusatz) = 'object'),
+                version int not null default 0,
+                erstellt timestamptz not null default clock_timestamp(),
+                geaendert timestamptz not null default clock_timestamp()
+            );
+            create index dokument_volltext_ix on dokument using gin (volltext_tsv);
+            create index dokument_tags_ix on dokument using gin (tags);
+            create index dokument_art_ix on dokument (art);
+            create index dokument_partner_ix on dokument (partner_id);
+            create index dokument_datum_ix on dokument (datum);
+            create index dokument_geschaeftsjahr_ix on dokument (geschaeftsjahr);
+            create index dokument_status_ix on dokument (status);
+            create index dokument_archiviert_ix on dokument (archiviert);
+
+            create table dokument_datei (
+                dokument_id uuid not null constraint dokument_datei_dokument_fk references dokument (id),
+                nr int not null,
+                rolle text not null constraint dokument_datei_rolle_ck check (rolle in ('ORIGINAL', 'ARBEITSFASSUNG')),
+                sha256 text not null constraint dokument_datei_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                s3_schluessel text,
+                s3_version text,
+                mime text,
+                groesse bigint,
+                empfangen timestamptz not null default clock_timestamp(),
+                status text not null default 'AKTIV' constraint dokument_datei_status_ck
+                    check (status in ('AKTIV', 'VERWORFEN')),
+                constraint dokument_datei_pk primary key (dokument_id, rolle, nr)
+            );
+            -- Dublettenprüfung je Datei nur über nicht verworfene Dokumente (Req 3.4)
+            create unique index dokument_datei_dublette_ux on dokument_datei (sha256)
+                where rolle = 'ORIGINAL' and status &lt;&gt; 'VERWORFEN';
+
+            create table dokument_finanz (
+                dokument_id uuid not null constraint dokument_finanz_pk primary key
+                    constraint dokument_finanz_dokument_fk references dokument (id),
+                belegnummer text,
+                richtung text constraint dokument_finanz_richtung_ck check (richtung in ('EINNAHME', 'AUSGABE')),
+                betrag numeric(12, 2),
+                waehrung char(3) not null default 'CHF' constraint dokument_finanz_waehrung_ck
+                    check (waehrung ~ '^[A-Z]{3}$'),
+                faelligkeit date,
+                zahlstatus text,
+                bezahlt_am date,
+                qr_referenz text,
+                konto text,
+                abaninja_uuid text
+            );
+            create index dokument_finanz_belegnummer_ix on dokument_finanz (belegnummer);
+            create index dokument_finanz_betrag_ix on dokument_finanz (betrag);
+            create index dokument_finanz_richtung_ix on dokument_finanz (richtung);
+
+            -- Belegnummer eindeutig je Art, nur für eigene Arten (Req 8.9, 11.3); Fremdbelege nur Warnung (Req 8.10)
+            create table belegnummer_eigen (
+                art text not null constraint belegnummer_eigen_art_fk references dokumentart (code),
+                belegnummer text not null,
+                dokument_id uuid not null constraint belegnummer_eigen_dokument_fk references dokument (id)
+                    constraint belegnummer_eigen_dokument_uk unique,
+                constraint belegnummer_eigen_pk primary key (art, belegnummer)
+            );
+
+            create table dokument_vertrag (
+                dokument_id uuid not null constraint dokument_vertrag_pk primary key
+                    constraint dokument_vertrag_dokument_fk references dokument (id),
+                gueltig_ab date,
+                gueltig_bis date,
+                kuendigungsfrist text,
+                naechste_frist date
+            );
+
+            -- Vorherige Fassungen der Metadaten (Req 10.1); nur Einfügen (Req 10.3)
+            create table dokument_version (
+                id bigserial constraint dokument_version_pk primary key,
+                dokument_id uuid not null constraint dokument_version_dokument_fk references dokument (id),
+                version int not null,
+                daten jsonb not null constraint dokument_version_daten_ck check (jsonb_typeof(daten) = 'object'),
+                geaendert_von text not null,
+                zeit timestamptz not null default clock_timestamp(),
+                grund text
+            );
+            create index dokument_version_dokument_ix on dokument_version (dokument_id, version);
+        </sql>
+        <sql splitStatements="false">
+            create function dokument_version_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception 'dokument_version: nur Einfügen erlaubt (% verweigert)', tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger dokument_version_nur_einfuegen before update or delete on dokument_version
+                for each row execute function dokument_version_nur_einfuegen();
+            create trigger dokument_version_kein_truncate before truncate on dokument_version
+                for each statement execute function dokument_version_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>

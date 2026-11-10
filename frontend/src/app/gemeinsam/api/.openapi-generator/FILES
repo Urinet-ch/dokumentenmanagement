@@ -3,14 +3,17 @@ api.module.ts
 api/api-tokens.service.ts
 api/api.ts
 api/dokumentarten.service.ts
+api/dokumente.service.ts
 configuration.ts
 encoder.ts
 index.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
+model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
+model/eingangskorb-seite.ts
 model/models.ts
 param.ts
 provide-api.ts

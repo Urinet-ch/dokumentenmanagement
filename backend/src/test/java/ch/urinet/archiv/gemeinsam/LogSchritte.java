@@ -1,7 +1,7 @@
 package ch.urinet.archiv.gemeinsam;
 
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.mandant.domain.MandantCode;
-import ch.urinet.archiv.probe.ProbeSichtbarkeit;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,7 +51,7 @@ public class LogSchritte {
         werte.add(code);
         for (int i = 0; i < 2; i++) {
             antworten.add(given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("art", code).when()
-                    .patch("/api/v1/probe/dokumente/" + ProbeSichtbarkeit.NAMEN.get(dokument)));
+                    .patch("/api/v1/probe/dokumente/" + Testdokumente.NAMEN.get(dokument)));
         }
     }
 

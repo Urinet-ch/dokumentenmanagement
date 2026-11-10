@@ -1,11 +1,11 @@
 package ch.urinet.archiv.sicherheit;
 
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.dokumentart.adapter.out.persistence.DokumentartEintrag;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
-import ch.urinet.archiv.probe.ProbeSichtbarkeit;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -63,6 +63,7 @@ public class MandantenkontextSchritte {
                 provisionierung.anlegen(code, null, null);
             }
         }
+        Testdokumente.probeDokumenteAnlegen(datenbank.get());
     }
 
     @Angenommen("im Register steht der inaktive Mandant «{word}»")
@@ -160,7 +161,7 @@ public class MandantenkontextSchritte {
     }
 
     private static String dokumentId(String name) {
-        return ProbeSichtbarkeit.NAMEN.containsKey(name) ? ProbeSichtbarkeit.NAMEN.get(name).toString() : name;
+        return Testdokumente.NAMEN.containsKey(name) ? Testdokumente.NAMEN.get(name).toString() : name;
     }
 
     /** Erfolg ohne Inhalt (204) oder Problem Details ohne Daten (RFC 9457, design.md «Error Handling»). */

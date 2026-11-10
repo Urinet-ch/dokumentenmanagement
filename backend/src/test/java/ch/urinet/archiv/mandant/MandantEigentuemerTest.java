@@ -130,6 +130,42 @@ class MandantEigentuemerTest {
     }
 
     /**
+     * Versionen der Metadaten nur Einfügen (Req 10.3, Aufgabe 2.2): wie beim Zugriffsprotokoll hat {@code archiv_app}
+     * auf {@code dokument_version} nur INSERT und SELECT, und selbst der Eigentümer scheitert am Trigger.
+     */
+    @Test
+    void dokumentVersionNurEinfuegen() throws SQLException {
+        provisionierung.anlegen("probe-version", null, null);
+        String tabelle = "m_probe_version.dokument_version";
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
+            for (String recht : List.of("UPDATE", "DELETE", "TRUNCATE")) {
+                assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', '" + recht + "')")).as(recht).isFalse();
+            }
+            assertThat(wahr(befehl, "has_sequence_privilege('m_probe_version.dokument_version_id_seq', 'USAGE')"))
+                    .isTrue();
+            befehl.execute("insert into m_probe_version.dokument (id, quelle, erstellt_von, status) values "
+                    + "('00000000-0000-4000-8000-0000000000a1', 'UPLOAD', 'probe', 'NEU')");
+            befehl.execute("insert into " + tabelle + " (dokument_id, version, daten, geaendert_von, grund) values "
+                    + "('00000000-0000-4000-8000-0000000000a1', 0, '{}', 'probe', 'Probe')");
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+            verweigert(befehl, "update " + tabelle + " set grund = 'x'");
+            verweigert(befehl, "delete from " + tabelle);
+            verweigert(befehl, "truncate " + tabelle);
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String sql : List.of("update " + tabelle + " set grund = 'x'", "delete from " + tabelle,
+                    "truncate " + tabelle)) {
+                assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("nur Einfügen erlaubt");
+            }
+            assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
+        }
+    }
+
+    /**
      * {@code berechtigen()} ist atomar (Review PR #29): Scheitert das REVOKE auf {@code databasechangelog*} nach den GRANTs,
      * bleibt kein Recht der App-Rolle zurück – weder auf die Changelog-Tabellen noch auf die übrigen Tabellen.
      */

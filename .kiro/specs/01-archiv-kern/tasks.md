@@ -168,7 +168,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.17, 9.1–9.10_
   - _Abhängig von: 1.7_
 
-- [ ] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
+- [x] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
   - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
   - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
   - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
