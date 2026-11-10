@@ -11,10 +11,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -133,13 +134,15 @@ class KiBasisUrlPruefungTest {
     // zulässig
 
     @ParameterizedTest
-    @ValueSource(strings = {INFOMANIAK_URL, "https://API.Infomaniak.COM/2/ai/1/cohere/v2/rerank"})
+    @ValueSource(strings = {INFOMANIAK_URL, "https://API.Infomaniak.COM/2/ai/1/cohere/v2/rerank",
+            "HTTPS://api.infomaniak.com/2/ai/1/openai/v1"})
     void infomaniakImProfilProdGelingt(String url) {
         assertThatCode(() -> KiBasisUrlPruefung.pruefe(PROD, url, false, OHNE_WIREMOCK)).doesNotThrowAnyException();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"http://localhost:1234/v1", "http://127.0.0.1:1234/v1", "http://LOCALHOST:4321/v1"})
+    @ValueSource(strings = {"http://localhost:1234/v1", "http://127.0.0.1:1234/v1", "http://LOCALHOST:4321/v1",
+            "hTTp://localhost:1234/v1"})
     void localhostImProfilLokalGelingt(String url) {
         assertThatCode(() -> KiBasisUrlPruefung.pruefe(LOKAL, url, false, OHNE_WIREMOCK)).doesNotThrowAnyException();
     }
@@ -198,11 +201,18 @@ class KiBasisUrlPruefungTest {
     void profilLokalLiestKeinInfomaniakTokenUndHatKeineProduktId() {
         SmallRyeConfig config = konfiguration("lokal", Map.of());
         assertThat(config.getOptionalValue("archiv.ki.product-id", String.class)).isEmpty();
+        // nur die in lokal wirksamen Namen (ohne %-Präfix); %prod.… darf auf /run/secrets zeigen
+        Set<String> wirksam = new TreeSet<>();
         for (String name : config.getPropertyNames()) {
-            String roh = Expressions.withoutExpansion(() -> config.getConfigValue(name).getRawValue());
-            assertThat(roh).as(name).doesNotContain("infomaniak_ai_token").doesNotContain("/run/secrets");
+            wirksam.add(name.startsWith("%") ? name.substring(name.indexOf('.') + 1) : name);
         }
-        assertThat(Path.of("/run/secrets/infomaniak_ai_token")).doesNotExist();
+        assertThat(wirksam).contains("archiv.ki.basis-url");
+        for (String name : wirksam) {
+            String roh = Expressions.withoutExpansion(() -> config.getConfigValue(name).getRawValue());
+            if (roh != null) {
+                assertThat(roh).as(name).doesNotContain("infomaniak_ai_token").doesNotContain("/run/secrets");
+            }
+        }
         assertThatCode(() -> KiBasisUrlPruefung.pruefe(config.getProfiles(), config)).doesNotThrowAnyException();
     }
 

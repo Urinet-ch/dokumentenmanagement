@@ -94,7 +94,8 @@ public class KiBasisUrlPruefung {
         if (host == null) {
             throw abgelehnt("(kein Host)", profile);
         }
-        if (uri.getRawUserInfo() == null && zulaessig(profile, uri.getScheme(), host, uri.getPort(), wiremockPort)) {
+        String schema = uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
+        if (uri.getRawUserInfo() == null && zulaessig(profile, schema, host, uri.getPort(), wiremockPort)) {
             return;
         }
         throw abgelehnt(host, profile);
