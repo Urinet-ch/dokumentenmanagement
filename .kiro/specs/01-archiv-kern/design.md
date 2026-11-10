@@ -318,6 +318,14 @@ Mit Aufgabe 2.1 erhalten Seed und Tabelle eine Spalte «Beschreibung» mit den A
 - Lebenszeichen (Req 5.7): Der Worker schreibt während eines Auftrags alle 30 s `auftrag.lebenszeichen`. `AuftragAufraeumer` (jede Minute) setzt `LAEUFT`-Aufträge mit `lebenszeichen < now() - zeitgrenze(typ)` auf `OFFEN`, `versuche + 1`, `fehler = 'verwaist'`.
 - Wiederholung (Req 5.4): insgesamt 3 Versuche; nach dem n-ten Fehlschlag `nicht_vor = now() + 2^n Minuten`. Nach dem dritten: Auftrag `FEHLER`, Dokument `FEHLER` (bei `VERARBEITEN`) bzw. `ARCHIVIERUNG_FEHLER` (bei `ARCHIVIEREN`). `KI_VORSCHLAG` setzt nie `FEHLER`: ohne Antwort geht das Dokument ohne Vorschlag in den Eingangskorb.
 - `wiederholen` legt einen neuen Auftrag mit `versuche = 0` an: aus `FEHLER` `VERARBEITEN` (Status `NEU`), aus `ARCHIVIERUNG_FEHLER` nur `ARCHIVIEREN` (Status `ARCHIVIERUNG`, Req 6.8).
+- Umsetzung (Aufgabe 2.5):
+  - `public.auftrag` per JDBC (`JdbcAuftragSchlange`), nicht als JPA-Entität: Die Hibernate-Session hängt am Mandanten, die Schlange gilt für alle. SQL immer mit `public.` qualifiziert, weil eine Verbindung in einer Transaktion auf dem Schema des Mandanten stehen kann; `einreihen` nimmt an der Transaktion des Aufrufers teil (z. B. Dokument und Auftrag `VERARBEITEN` zusammen).
+  - `mandant` ist Pflicht (Changeset `005-auftrag-mandant-pflicht`, Req 1.6). `AuftragService.einreihen(typ, nutzlast)` nimmt den Mandanten aus `MandantKontext` oder der verifizierten Anmeldung, nie aus einem Parameter; ohne Mandant, bei Widerspruch oder für einen Typ ohne Handler bricht es ab. Die Nutzlast trägt nur UUIDs, Ganzzahlen und Wahrheitswerte (Req 16.7).
+  - Holen in einer Anweisung (`with … for update of a skip locked` + `update … returning`), nur Typen mit Handler und nur Mandanten mit `aktiv`; Aufträge eines inaktiven Mandanten bleiben `OFFEN`. Jede spätere Änderung prüft den Anspruch (`id`, `versuche`, `LAEUFT`); wer ihn verloren hat (Aufräumer war schneller), ändert nichts und bricht ab.
+  - Handler implementieren `AuftragHandler` (`typ()`, `ausfuehren(auftrag)`, optional `nachLetztemFehlversuch(auftrag)` für den Dokumentstatus nach dem dritten Versuch). Ohne `archiv.auftrag.zeitgrenze.<TYP>` (Typ in Grossbuchstaben) startet das Archiv nicht.
+  - `AuftragArbeiter` führt jeden Auftrag in einem eigenen Thread ohne Request-Kontext und ohne Transaktion in `MandantKontext.mit(mandant)` aus (der Scheduler aktiviert einen Request-Kontext, in dem `mit` abbricht); ein zweiter Thread je Auftrag schreibt das Lebenszeichen (`archiv.auftrag.lebenszeichen=30s`) und unterbricht den Handler bei der Zeitgrenze. Der Fehlversuch wird sofort gespeichert; der Platz bleibt belegt, bis der Handler-Thread wirklich endet, damit nie mehr als `archiv.worker.parallel` Handler laufen (Speicherbudget Stufe A: je Platz zwei Threads, den Heap bestimmen die Handler).
+  - `fehler` enthält nur Art und Fehler-ID: `fehlgeschlagen|zeitgrenze|verwaist fehler-id=<uuid>`; das Log nennt dieselbe ID und die Klassennamen der Ursachen, nie Meldungen (Req 16.7). Ein verwaister Auftrag zählt wie ein Fehlversuch mit Wartezeit und wird nach dem dritten Versuch `FEHLER` (Req 5.7 «als fehlgeschlagenen Versuch nach 5.4»).
+  - Poller (`archiv.worker.intervall=2s`) und Aufräumer (`archiv.auftrag.aufraeumen-intervall=1m`) laufen nur, wenn `archiv.rolle` `worker` enthält; im Profil `test` sind beide aus (`off`), die Tests rufen sie selbst. Beim Herunterfahren bleibt ein laufender Auftrag `LAEUFT`, der Aufräumer gibt ihn nach der Zeitgrenze frei.
 - Überwachung (Req 16.5): `Ueberwachung` prüft alle 15 Minuten Dokumente, die länger als 1 Stunde in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER` stehen, fehlende oder ungültige Manifeste (Req 15.8) und das Alter des letzten Sicherungs-Exports. Je Befund geht genau eine E-Mail an den Inhaber, nur mit IDs und Status (Tabelle `alarm`). Den Fehlschlag des Sicherungs-Workflows meldet zusätzlich der Workflow selbst.
 
 ### KI (`ki`)
@@ -627,7 +635,7 @@ mandant(code text pk, name text, schema_name text unique, bucket text, domain te
         eigene_arten text[],    -- Arten, die der Mandant selbst ausstellt (Req 8.9, 11.3)
         kennungen jsonb,        -- {uid, ibans[]} des Mandanten (Req 7.5)
         aktiv bool, erstellt timestamptz)
-auftrag(id bigserial pk, mandant text fk, typ text, nutzlast jsonb, status text,   -- OFFEN|LAEUFT|FERTIG|FEHLER
+auftrag(id bigserial pk, mandant text fk not null, typ text, nutzlast jsonb, status text,   -- OFFEN|LAEUFT|FERTIG|FEHLER; not null ab 2.5
         versuche int default 0, nicht_vor timestamptz, fehler text,
         erstellt timestamptz, gestartet timestamptz, lebenszeichen timestamptz, beendet timestamptz)
   index (status, nicht_vor), index (status, lebenszeichen)

@@ -190,7 +190,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
-- [ ] 2.5 Auftragsschlange [Backend]
+- [x] 2.5 Auftragsschlange [Backend]
   - `AuftragService.einreihen(typ, nutzlast)`, `AuftragPoller` mit `SKIP LOCKED`, insgesamt 3 Versuche mit wachsender Wartezeit, Mandantenkontext pro Auftrag
   - Zeitgrenze je Auftragstyp (design.md) und Lebenszeichen; verwaiste `LAEUFT`-Aufträge nach Ablauf der Zeitgrenze freigeben, zählt als Versuch
   - Tests: zwei Worker holen denselben Auftrag nie doppelt; Zeitüberschreitung und verwaister Auftrag zählen als Fehlversuch
