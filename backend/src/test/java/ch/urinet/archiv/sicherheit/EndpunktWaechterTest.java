@@ -1,5 +1,7 @@
 package ch.urinet.archiv.sicherheit;
 
+import ch.urinet.archiv.protokoll.application.Protokolliert;
+import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
@@ -47,6 +49,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * genau die Rollen, für die die Rechtematrix nicht 403 ergibt. Eine dokumentbezogene Aktion mit Pfad-Parameter muss das
  * Dokument als {@code {id}} führen, sonst fiele die Sichtbarkeitsprüfung weg (fail closed).
  * <p>
+ * Req 10.2: Jede Methode, deren Aktion in der Tabelle «Protokoll und Manifest» (design.md) steht, trägt
+ * {@link Protokolliert} mit der passenden Protokoll-Aktion ({@link #erwartetesProtokoll}); ausgenommen sind Listen und
+ * Suchen ohne {@code {id}} (A2–A4), der Eingangskorb (A5) und A11–A14 (dort protokolliert nur {@code VERWEIGERT}).
+ * <p>
  * Geprüft werden alle konkreten Klassen (main und test), in deren Hierarchie (Oberklassen, Interfaces) ein
  * {@code @Path} steht. Das HTTP-Verb und {@code @Path} der Methode dürfen aus Interface oder Oberklasse stammen, die
  * Sicherheitsannotationen werden an der Implementierung gelesen (dort liest sie der Filter). Eine Methode mit
@@ -89,6 +95,10 @@ class EndpunktWaechterTest {
                 .contains("keine Erklärung");
         assertThat(verstoesse(GeerbtVonOberklasse.class)).singleElement().asString().contains("keine Erklärung");
         assertThat(verstoesse(MitSubRessource.class)).singleElement().asString().contains("Sub-Resource-Locator");
+        assertThat(verstoesse(OhneProtokoll.class)).singleElement().asString()
+                .contains("A7 verlangt @Protokolliert(BESTAETIGEN) statt keiner");
+        assertThat(verstoesse(FalschesProtokoll.class)).singleElement().asString()
+                .contains("A2 verlangt @Protokolliert(HERUNTERLADEN) statt ANZEIGEN");
         assertThat(verstoesse(Korrekt.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
     }
@@ -149,6 +159,14 @@ class EndpunktWaechterTest {
                         + pfad + ")");
                 continue;
             }
+            Optional<ProtokollAktion> protokoll = aktion == null ? Optional.empty()
+                    : erwartetesProtokoll(aktion.value(), pfad);
+            Protokolliert erklaert = Optional.ofNullable(methode.getAnnotation(Protokolliert.class))
+                    .orElse(ressource.getAnnotation(Protokolliert.class));
+            if (protokoll.isPresent() && (erklaert == null || erklaert.aktion() != protokoll.get())) {
+                verstoesse.add(name + ": " + aktion.value() + " verlangt @Protokolliert(" + protokoll.get() + ") statt "
+                        + (erklaert == null ? "keiner" : erklaert.aktion()));
+            }
             Set<String> erwartet = alle || dokumentbezogen ? ALLE
                     : Rechtematrix.zugelassen(aktion.value()).stream().map(Rolle::code).collect(Collectors.toSet());
             Set<String> ist = rollen == null ? Set.of() : Set.of(rollen.value());
@@ -157,6 +175,22 @@ class EndpunktWaechterTest {
             }
         }
         return verstoesse;
+    }
+
+    /** Protokoll-Aktion nach der Tabelle in design.md «Protokoll und Manifest»; leer, wo nicht einzeln protokolliert. */
+    static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad) {
+        boolean mitId = DOKUMENT_ID.matcher(pfad).find();
+        return Optional.ofNullable(switch (aktion) {
+            case A1 -> ProtokollAktion.ERFASSEN;
+            case A2, A3, A4 -> !mitId ? null
+                    : pfad.matches(".*\\{\\s*id\\s*(:[^}]*)?}/datei/?$") ? ProtokollAktion.HERUNTERLADEN
+                    : ProtokollAktion.ANZEIGEN;
+            case A6, A8 -> ProtokollAktion.AENDERN;
+            case A7 -> ProtokollAktion.BESTAETIGEN;
+            case A9 -> ProtokollAktion.VERWERFEN;
+            case A10 -> ProtokollAktion.WIEDERHOLEN;
+            case A5, A11, A12, A13, A14 -> null;
+        });
     }
 
     /** Klasse, Oberklassen und alle Interfaces, die nächstliegenden zuerst. */
@@ -221,6 +255,7 @@ class EndpunktWaechterTest {
     static class FalscheRollen {
         @POST
         @ErfordertAktion(Aktion.A1)
+        @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
         public void erfassen() {
         }
@@ -257,6 +292,7 @@ class EndpunktWaechterTest {
         @Path("/dokumente/{id}/bestaetigen")
         @ErfordertAktion(Aktion.A7)
         @RolesAllowed("inhaber")
+        @Protokolliert(aktion = ProtokollAktion.BESTAETIGEN)
         public void bestaetigen() {
         }
     }
@@ -320,6 +356,25 @@ class EndpunktWaechterTest {
         }
     }
 
+    static class OhneProtokoll {
+        @POST
+        @Path("/dokumente/{id}/bestaetigen")
+        @ErfordertAktion(Aktion.A7)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        public void bestaetigen() {
+        }
+    }
+
+    static class FalschesProtokoll {
+        @GET
+        @Path("/dokumente/{id}/datei")
+        @ErfordertAktion(Aktion.A2)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
+        public void herunterladen() {
+        }
+    }
+
     static class Korrekt {
         @PUT
         @ErfordertAktion(Aktion.A11)
@@ -331,7 +386,23 @@ class EndpunktWaechterTest {
         @Path("/dokumente/{id}/bestaetigen")
         @ErfordertAktion(Aktion.A7)
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        @Protokolliert(aktion = ProtokollAktion.BESTAETIGEN)
         public void bestaetigen() {
+        }
+
+        @GET
+        @Path("/dokumente")
+        @ErfordertAktion(Aktion.A2)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        public void liste() {
+        }
+
+        @GET
+        @Path("/dokumente/{id}/datei")
+        @ErfordertAktion(Aktion.A2)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        @Protokolliert(aktion = ProtokollAktion.HERUNTERLADEN)
+        public void herunterladen() {
         }
 
         @GET
@@ -348,6 +419,7 @@ class EndpunktWaechterTest {
     static class KorrektUeberInterface implements Schnittstelle {
         @Override
         @ErfordertAktion(Aktion.A2)
+        @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
         public void lesen(String id) {
         }
