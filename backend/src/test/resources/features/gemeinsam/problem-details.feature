@@ -10,6 +10,14 @@ Funktionalität: Fehlerantworten als Problem Details (design.md «Error Handling
     Und weder die Antwort noch das Log enthalten «VERTRAULICH-4711»
     Und das Log nennt nur Fehler-ID, Status und Fehlercode
 
+  @req-16.7
+  # Vorab-Korrektur 2 aus dem Review von PR #35: Der eingebaute Mapper von Quarkus gab den Eingabewert zurück.
+  Szenario: Ein falscher Feldtyp im JSON gibt 400 als Problem Details ohne den Eingabewert
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» an die Probe-Anfrage im Zahlenfeld den Text «EINGABE-GEHEIM-4711» sendet
+    Dann antwortet das Archiv mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und enthält die Antwort «EINGABE-GEHEIM-4711» nicht
+
   # Vorab-Korrektur 4 aus dem Review von PR #35: Die Grenze der Anfrage gab einen leeren 413. Im Testprofil liegt sie
   # bei 1 MB (application.properties); die Grenze für Uploads (Req 3.6) setzt Aufgabe 2.4.
   Szenario: Eine Anfrage über der Grenze gibt 413 als Problem Details
