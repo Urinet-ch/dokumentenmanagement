@@ -12,7 +12,13 @@ import com.networknt.schema.SchemaException;
 import com.networknt.schema.SchemaLocation;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
-import com.networknt.schema.SpecificationVersion;
+import com.networknt.schema.ExecutionContext;
+import com.networknt.schema.SchemaContext;
+import com.networknt.schema.dialect.Dialect;
+import com.networknt.schema.dialect.Dialects;
+import com.networknt.schema.keyword.Keyword;
+import com.networknt.schema.keyword.KeywordValidator;
+import com.networknt.schema.path.NodePath;
 import com.networknt.schema.regex.RegularExpression;
 import com.networknt.schema.regex.RegularExpressions;
 import io.quarkus.runtime.Startup;
@@ -42,11 +48,13 @@ import java.util.regex.Pattern;
  * ungültig; {@code $schema} ist nur der Dialekt 2020-12. Die Bibliothek lädt zudem keine entfernten Ressourcen; das
  * Meta-Schema kommt aus dem JAR. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7).
  * <p>
- * Schutz gegen Rechenzeit (Review PR #40): Reguläre Ausdrücke ({@code pattern}, {@code patternProperties},
- * {@code pattern} unter {@code propertyNames}) laufen mit der JDK-Syntax gegen eine Frist; ein Aufruf von
- * {@link #schemaPruefen} oder {@link #wertePruefen} hat dafür zusammen höchstens
- * {@code archiv.dokumentart.muster-zeitgrenze}, danach ist das Ergebnis {@code ZUSATZ_UNGUELTIG}. Verweise, die ohne
- * Fortschritt in den Daten auf sich selbst zurückführen ({@code {"$ref":"#"}} an der Wurzel), sind ungültig.
+ * Schutz gegen Rechenzeit (Review PR #40): Ein Aufruf von {@link #schemaPruefen} oder {@link #wertePruefen} hat
+ * zusammen höchstens {@code archiv.dokumentart.muster-zeitgrenze}, danach ist das Ergebnis {@code ZUSATZ_UNGUELTIG}.
+ * Die Frist prüft jedes Schlüsselwort des Dialekts ausser {@code format} vor seiner Prüfung (auch {@code $ref}, gegen
+ * Verweis-Graphen mit exponentiell vielen Pfaden), jede Musterprüfung vor dem Suchen (gegen viele kurze Treffer) und
+ * der Text während des Suchens (gegen ein einzelnes rückfallreiches Muster). Reguläre Ausdrücke ({@code pattern},
+ * {@code patternProperties}, {@code pattern} unter {@code propertyNames}) laufen mit der JDK-Syntax. Verweise, die
+ * ohne Fortschritt in den Daten auf sich selbst zurückführen ({@code {"$ref":"#"}} an der Wurzel), sind ungültig.
  */
 @Startup
 @ApplicationScoped
@@ -83,7 +91,16 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             throw new IllegalArgumentException("archiv.dokumentart.muster-zeitgrenze muss grösser als 0 sein");
         }
         this.zeitgrenzeNanos = zeitgrenze.toNanos();
-        this.registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,
+        Dialect standard = Dialects.getDraft202012();
+        // Der Builder ergänzt die Schlüsselwörter der Vokabulare erst beim Bauen; «format» lässt er nicht ersetzen.
+        Dialect mitFrist = Dialect.builder(standard)
+                .keywords(k -> standard.getKeywords().forEach((name, keyword) -> {
+                    if (!"format".equals(name)) {
+                        k.put(name, new FristKeyword(keyword));
+                    }
+                }))
+                .build();
+        this.registry = SchemaRegistry.withDefaultDialect(mitFrist,
                 b -> b.schemaLoader(l -> l.fetchRemoteResources(false))
                         .schemaRegistryConfig(SchemaRegistryConfig.builder()
                                 .formatAssertionsEnabled(true)
@@ -138,7 +155,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         boolean metaGueltig;
         try {
             metaGueltig = metaSchema.validate(schema).isEmpty();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | StackOverflowError e) {
             throw ungueltig();
         }
         if (!metaGueltig) {
@@ -174,15 +191,86 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
     }
 
-    /** Wie die JDK-Fabrik der Bibliothek, aber mit Frist beim Suchen. */
+    /** Wie die JDK-Fabrik der Bibliothek, aber mit Frist vor und beim Suchen. */
     private RegularExpression muster(String regex) {
         Pattern pattern = Pattern.compile(
                 RegularExpressions.replaceLongformCharacterProperties(RegularExpressions.replaceDollarAnchors(regex)));
         return text -> {
             Long gesetzt = frist.get();
             long bis = gesetzt != null ? gesetzt : System.nanoTime() + zeitgrenzeNanos;
+            fristPruefen(bis);
             return pattern.matcher(new MitFrist(text, bis)).find();
         };
+    }
+
+    /** Bricht ab, wenn die Frist des laufenden Aufrufs abgelaufen ist; ausserhalb eines Aufrufs gilt keine Frist. */
+    private void fristPruefen() {
+        Long bis = frist.get();
+        if (bis != null) {
+            fristPruefen(bis);
+        }
+    }
+
+    private static void fristPruefen(long bis) {
+        if (System.nanoTime() - bis > 0) {
+            throw new FristAbgelaufen();
+        }
+    }
+
+    /** Schlüsselwort des Dialekts, dessen Validator vor jeder Prüfung die Frist prüft. */
+    private final class FristKeyword implements Keyword {
+        private final Keyword keyword;
+
+        FristKeyword(Keyword keyword) {
+            this.keyword = keyword;
+        }
+
+        @Override
+        public String getValue() {
+            return keyword.getValue();
+        }
+
+        @Override
+        public KeywordValidator newValidator(SchemaLocation ort, JsonNode knoten, Schema schema, SchemaContext kontext)
+                throws Exception {
+            KeywordValidator validator = keyword.newValidator(ort, knoten, schema, kontext);
+            return validator == null ? null : new FristValidator(validator);
+        }
+    }
+
+    private final class FristValidator implements KeywordValidator {
+        private final KeywordValidator validator;
+
+        FristValidator(KeywordValidator validator) {
+            this.validator = validator;
+        }
+
+        @Override
+        public void validate(ExecutionContext kontext, JsonNode knoten, JsonNode wurzel, NodePath ort) {
+            fristPruefen();
+            validator.validate(kontext, knoten, wurzel, ort);
+        }
+
+        @Override
+        public void walk(ExecutionContext kontext, JsonNode knoten, JsonNode wurzel, NodePath ort, boolean pruefen) {
+            fristPruefen();
+            validator.walk(kontext, knoten, wurzel, ort, pruefen);
+        }
+
+        @Override
+        public SchemaLocation getSchemaLocation() {
+            return validator.getSchemaLocation();
+        }
+
+        @Override
+        public String getKeyword() {
+            return validator.getKeyword();
+        }
+
+        @Override
+        public void preloadSchema() {
+            validator.preloadSchema();
+        }
     }
 
     private JsonNode lesen(String text, int maxBytes) {
@@ -324,8 +412,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
         @Override
         public char charAt(int index) {
-            if ((++zugriffe & 1023) == 0 && System.nanoTime() - bis > 0) {
-                throw new MusterAbgebrochen();
+            if ((++zugriffe & 1023) == 0) {
+                fristPruefen(bis);
             }
             return text.charAt(index);
         }
@@ -350,11 +438,11 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
      * Abbruch nach der Frist. Als {@link SchemaException}, weil die Bibliothek diese ohne Log weiterreicht; andere
      * Ausnahmen loggt sie mit Muster und Ort.
      */
-    static final class MusterAbgebrochen extends SchemaException {
+    static final class FristAbgelaufen extends SchemaException {
         private static final long serialVersionUID = 1L;
 
-        MusterAbgebrochen() {
-            super("Musterprüfung nach der Zeitgrenze abgebrochen");
+        FristAbgelaufen() {
+            super("Prüfung nach der Zeitgrenze abgebrochen");
         }
     }
 }

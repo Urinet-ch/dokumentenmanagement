@@ -1,10 +1,17 @@
 package ch.urinet.archiv.dokumentart;
 
+import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPruefer;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,6 +86,36 @@ class DokumentartSeedTest {
         var seed = new ObjectMapper().readTree("""
                 {"dokumentarten": [{"code": "A", "aufbewahrung_jahre": null, "gesetzliche_pflicht": false}]}""");
         assertThat(StammdatenTabelle.ausSeed(seed)).extracting(StammdatenTabelle.Art::aktiv).containsExactly(true);
+    }
+
+    /**
+     * F7 (entschieden von Fabian am 10.11.2026): {@code zusatz.periode} der LOHNABRECHNUNG nimmt {@code JJJJ}
+     * (Lohnausweis) und {@code JJJJ-MM} an (Review PR #40 Nacht, S3).
+     */
+    @ParameterizedTest
+    @CsvSource({"2026, true", "2026-03, true", "2026-12, true", "2026-13, false", "2026-00, false", "2026-3, false",
+            "26, false", "20261, false", "2026-, false"})
+    void periodeDerLohnabrechnungNimmtJahrUndMonatAn(String periode, boolean gueltig) throws IOException {
+        JsonNode seed;
+        try (InputStream inhalt = DokumentartSeedTest.class.getClassLoader().getResourceAsStream(SEED_URINET)) {
+            seed = new ObjectMapper().readTree(inhalt);
+        }
+        String schema = null;
+        for (JsonNode art : seed.path("dokumentarten")) {
+            if ("LOHNABRECHNUNG".equals(art.path("code").asText())) {
+                schema = art.path("zusatz_schema").toString();
+            }
+        }
+        assertThat(schema).isNotNull();
+        var pruefer = new NetworkntZusatzSchemaPruefer(Duration.ofMillis(50));
+        String werte = "{\"periode\":\"" + periode + "\",\"person\":\"Testperson\"}";
+        if (gueltig) {
+            pruefer.wertePruefen(schema, werte);
+        } else {
+            String s = schema;
+            assertThatThrownBy(() -> pruefer.wertePruefen(s, werte)).isInstanceOfSatisfying(FachFehler.class,
+                    f -> assertThat(f.code()).isEqualTo(Fehlercode.ZUSATZ_UNGUELTIG));
+        }
     }
 
     private static List<StammdatenTabelle.Art> tabelle(String zeile) {

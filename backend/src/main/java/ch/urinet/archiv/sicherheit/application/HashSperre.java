@@ -16,10 +16,13 @@ import java.util.function.Supplier;
  * Prüfen und Anlegen eines API-Tokens teilen sich dieselben Plätze, damit das Speicherbudget der Stufe A
  * (tech.md, 2 × 19 MiB) für jede Rechnung gilt. Wer innerhalb von {@code archiv.api-token.wartezeit} keinen Platz
  * erhält, bekommt ohne Argon2 den Fehler {@code UEBERLASTET} (503). Wartezeit 0 heisst: nicht warten.
- * Ungültige Werte (weniger als ein Platz, negative Wartezeit) brechen den Start ab.
+ * Ungültige Werte (weniger als ein oder mehr als {@value #MAX_PLAETZE} Plätze, negative Wartezeit) brechen den Start ab.
  */
 @ApplicationScoped
 public class HashSperre {
+
+    /** Obergrenze, damit ein Tippfehler nicht {@code n} × 19 MiB Heap freigibt (Review PR #40 Nacht, K2). */
+    public static final int MAX_PLAETZE = 16;
 
     private final Semaphore plaetze;
     private final Duration wartezeit;
@@ -27,8 +30,9 @@ public class HashSperre {
     @Inject
     public HashSperre(@ConfigProperty(name = "archiv.api-token.parallele-pruefungen") int parallelePruefungen,
                       @ConfigProperty(name = "archiv.api-token.wartezeit") Duration wartezeit) {
-        if (parallelePruefungen < 1) {
-            throw new IllegalArgumentException("archiv.api-token.parallele-pruefungen muss mindestens 1 sein");
+        if (parallelePruefungen < 1 || parallelePruefungen > MAX_PLAETZE) {
+            throw new IllegalArgumentException(
+                    "archiv.api-token.parallele-pruefungen muss zwischen 1 und " + MAX_PLAETZE + " liegen");
         }
         if (wartezeit == null || wartezeit.isNegative()) {
             throw new IllegalArgumentException("archiv.api-token.wartezeit darf nicht negativ sein");

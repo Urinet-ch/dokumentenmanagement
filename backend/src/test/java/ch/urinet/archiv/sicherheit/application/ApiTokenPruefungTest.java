@@ -23,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Prüfung eines API-Tokens ohne Datenbank und ohne Argon2 (Req 2.5). */
@@ -115,6 +116,10 @@ class ApiTokenPruefungTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("parallele-pruefungen");
         assertThatThrownBy(() -> new HashSperre(2, Duration.ofMillis(-1)))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("wartezeit");
+        // Review PR #40 Nacht, K2: mehr als 16 × 19 MiB Argon2 gleichzeitig sprengt jedes Speicherbudget
+        assertThatThrownBy(() -> new HashSperre(HashSperre.MAX_PLAETZE + 1, Duration.ofMillis(200)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("parallele-pruefungen");
+        assertThatCode(() -> new HashSperre(HashSperre.MAX_PLAETZE, Duration.ofMillis(200))).doesNotThrowAnyException();
     }
 
     @Test

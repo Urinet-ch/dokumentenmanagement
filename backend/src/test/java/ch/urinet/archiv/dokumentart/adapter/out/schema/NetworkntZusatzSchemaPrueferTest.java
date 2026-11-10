@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -132,6 +133,59 @@ class NetworkntZusatzSchemaPrueferTest {
         long start = System.nanoTime();
         assertTimeoutPreemptively(Duration.ofSeconds(10),
                 () -> assertUngueltig(() -> pruefer.wertePruefen(schema, text)));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
+    }
+
+    /**
+     * Viele kurze Treffer (Review PR #40 Nacht, S1): Jeder Treffer bleibt unter 1'024 Zeichenzugriffen, darum muss die
+     * Frist auch vor jeder Musterprüfung greifen, sonst rechnet die Prüfung rund eine Sekunde und nimmt die Werte an.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"items", "patternProperties"})
+    void vieleKurzeTrefferBrechenNachDerZeitgrenzeAb(String art) {
+        String schema;
+        String werte;
+        if ("items".equals(art)) {
+            schema = "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"array\",\"items\":{\"allOf\":["
+                    + String.join(",", Collections.nCopies(400, "{\"pattern\":\"^(a|aa)*$\"}")) + "]}}}}";
+            werte = "{\"x\":[" + String.join(",", Collections.nCopies(3000, "\"aaaaaaaaaaaaa\"")) + "]}";
+        } else {
+            StringBuilder muster = new StringBuilder();
+            for (int i = 0; i < 400; i++) {
+                muster.append(i == 0 ? "" : ",").append("\"^(a|aa)*b").append(i).append("\":{}");
+            }
+            schema = "{\"type\":\"object\",\"patternProperties\":{" + muster + "}}";
+            StringBuilder schluessel = new StringBuilder();
+            for (int i = 0; i < 2500; i++) {
+                schluessel.append(i == 0 ? "" : ",").append("\"aaaaaaaaaaaa%04d\":1".formatted(i));
+            }
+            werte = "{" + schluessel + "}";
+        }
+        assertThat(pruefer.schemaPruefen(schema)).isNotNull();
+        long start = System.nanoTime();
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> assertUngueltig(() -> pruefer.wertePruefen(schema, werte)));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
+    }
+
+    /**
+     * Verweise ohne Kreis, aber mit 2^k Pfaden (Review PR #40 Nacht, S2): Die Frist gilt für die ganze Werteprüfung,
+     * nicht nur für Muster; ohne sie rechnet k=26 mehrere Sekunden.
+     */
+    @Test
+    void exponentiellerVerweisGraphBrichtNachDerZeitgrenzeAb() {
+        int k = 26;
+        StringBuilder defs = new StringBuilder();
+        for (int i = 0; i < k; i++) {
+            String naechster = "{\"$ref\":\"#/$defs/d" + (i + 1) + "\"}";
+            defs.append("\"d").append(i).append("\":{\"allOf\":[").append(naechster).append(',').append(naechster)
+                    .append("]},");
+        }
+        defs.append("\"d").append(k).append("\":{\"type\":\"string\"}");
+        String schema = "{\"type\":\"object\",\"properties\":{\"x\":{\"$ref\":\"#/$defs/d0\"}},\"$defs\":{" + defs + "}}";
+        assertThat(pruefer.schemaPruefen(schema)).containsExactly("x");
+        long start = System.nanoTime();
+        assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"x\":\"a\"}")));
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
     }
 
