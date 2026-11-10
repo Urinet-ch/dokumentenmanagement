@@ -3,6 +3,7 @@ package ch.urinet.archiv.sicherheit.adapter.in.kommando;
 import ch.urinet.archiv.sicherheit.application.ApiClientRegister;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.GeheimnisHasher;
+import ch.urinet.archiv.sicherheit.application.HashSperre;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +28,8 @@ class TokenKommandoTest {
     private final ByteArrayOutputStream fehler = new ByteArrayOutputStream();
 
     private final TokenKommando kommando = new TokenKommando(new ApiTokenVerwaltung(new Register(), new Hasher(),
-            code -> code.wert().equals("urinet") ? Optional.of("m_urinet") : Optional.empty()));
+            code -> code.wert().equals("urinet") ? Optional.of("m_urinet") : Optional.empty(),
+            new HashSperre(1, Duration.ZERO)));
 
     @Test
     void erstelltUndGibtDasTokenNurAufStdoutAus() {
