@@ -164,7 +164,10 @@ class WerkzeugstarterTest {
         assertThat(lauf.resolve(datei)).exists();
     }
 
-    /** Beendet und abgeholt: kein Prozess mehr, auch kein Zombie (ProcessHandle sieht Zombies als lebend). */
+    /**
+     * Beendet und abgeholt: kein Prozess mehr, auch kein Zombie (ProcessHandle sieht Zombies als lebend). Verwaiste
+     * Nachfahren holt hier der Init des Hosts ab, im Image tini (WerkzeugImageInitTest).
+     */
     private static void assertBeendet(long pid) throws InterruptedException {
         Instant ende = Instant.now().plusSeconds(10);
         while (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false) && Instant.now().isBefore(ende)) {

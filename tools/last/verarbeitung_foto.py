@@ -10,7 +10,10 @@ Auftrags bis EINGANGSKORB»: Wartezeit in der Schlange und Abfrageintervall zäh
 gegen ein Archiv mit KI-Stub messen oder die KI-Zeit aus `ki_verbrauch` abziehen (Festlegung in 5.11).
 
 Token: aus der Datei in ARCHIV_TOKEN_DATEI oder ~/.config/urinet-archiv/token, Rechte 600, nie aus einer
-Umgebungsvariable (tech.md, Regel 7). Das Token braucht die Rechte A1 (Upload) und A2 (Dokument lesen).
+Umgebungsvariable (tech.md, Regel 7). Das Token braucht die Rechte A1 (Upload) und A2 (Dokument lesen). Ein
+API-Token mit Scope `import` reicht nicht: Es erreicht nur `POST /api/v1/dokumente`, jeder andere Endpunkt antwortet
+mit 403 (Req 2.5). Die Datei enthält darum ein Keycloak-Access-Token eines Benutzers mit A1 und A2; die endgültige
+Festlegung trifft Aufgabe 5.11.
 """
 
 import argparse

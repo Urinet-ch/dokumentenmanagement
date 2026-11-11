@@ -35,13 +35,14 @@ Port meldet aber, dass noch kein Adapter besteht.
 
 **OCR-Werkzeuge lokal:** OCRmyPDF, Tesseract, img2pdf, libheif und Poppler müssen nicht auf dem Mac installiert
 sein. Der Adapter startet jeden Aufruf im Image der Stufe `werkzeuge` (ohne Netz, ohne Rechte, nur das Laufverzeichnis
-als Volume). Einmal bauen:
+als Volume). Bauen, und nach jeder Änderung an `Dockerfile.jvm` erneut:
 ```bash
 cd backend
 docker build --target werkzeuge -t urinet-archiv-werkzeuge:lokal -f src/main/docker/Dockerfile.jvm .
 ```
 Das Arbeitsverzeichnis liegt unter `$HOME`, weil Colima `/tmp` und `/var/folders` nicht in die VM mountet. Die Tests
-bauen ihr Image `urinet-archiv-werkzeuge:test` selbst und arbeiten unter `target/ocr-arbeit`.
+bauen ihr Image `urinet-archiv-werkzeuge:test` bei jedem Lauf selbst (mit dem Cache von Docker) und arbeiten unter
+`target/ocr-arbeit`.
 
 Die Startprüfung `KiBasisUrlPruefung` bricht den Start ab, wenn eine KI-URL weder per HTTPS auf `api.infomaniak.com`
 noch – nur in `lokal` – per HTTP auf `localhost` bzw. `127.0.0.1` zeigt, oder wenn `lokal` zusammen mit `prod`

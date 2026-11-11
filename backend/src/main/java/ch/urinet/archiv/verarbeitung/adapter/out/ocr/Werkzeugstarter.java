@@ -20,8 +20,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * Startet ein Werkzeug per {@link ProcessBuilder} mit fester Argumentliste, ohne Shell (design.md «Verarbeitung»).
  * Jeder Aufruf hat eine Frist (Rest des Zeitbudgets): Läuft sie ab oder wird der Thread unterbrochen, beendet der
- * Starter den Prozess und seine Nachfahren mit {@code destroyForcibly} und wartet auf das Ende, damit kein Zombie
- * bleibt (Pflicht der Handler aus PR #41). Im Container-Modus (nur Tests und Profil {@code lokal}) entfernt er zusätzlich
+ * Starter den Prozess und seine Nachfahren mit {@code destroyForcibly} und wartet auf das Ende des Prozesses (Pflicht der
+ * Handler aus PR #41). Die Nachfahren hängen danach am Init und werden dort abgeholt, im Image von {@code tini}
+ * ({@code Dockerfile.jvm}); die JVM holt nur ihre eigenen Kinder ab. Im Container-Modus (nur Tests und Profil {@code lokal}) entfernt er zusätzlich
  * den Container mit {@code docker rm -f}.
  * <p>
  * Die Ausgabe der Werkzeuge landet in einer Datei im Laufverzeichnis, nie im Log (Req 16.7); gelesen wird nur das Ende

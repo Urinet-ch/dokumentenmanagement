@@ -41,6 +41,8 @@ public class OcrMyPdfAdapter implements OcrPort {
 
     /** Exit-Codes von OCRmyPDF ({@code ocrmypdf.ExitCode}). */
     static final int OCRMYPDF_EINGABE = 2;
+    /** Seite hat schon Text, obwohl {@code pdftotext} keinen fand (z. B. erst ab Seite 51 oder nur Satzzeichen). */
+    static final int OCRMYPDF_TEXT_VORHANDEN = 6;
     static final int OCRMYPDF_VERSCHLUESSELT = 8;
     static final int OCRMYPDF_PDFA_GESCHEITERT = 10;
 
@@ -112,6 +114,11 @@ public class OcrMyPdfAdapter implements OcrPort {
                 Files.deleteIfExists(pdfa);
                 ocr = ocrmypdf(eingang, pdfa, textebene, true);
                 signaturUngueltig = true;
+            }
+            if (ocr.exitCode() == OCRMYPDF_TEXT_VORHANDEN && !textebene) {
+                Files.deleteIfExists(pdfa);
+                textebene = true;
+                ocr = ocrmypdf(eingang, pdfa, true, signaturUngueltig);
             }
             Optional<PdfaFehlt> fehlt = pdfaFehlt(ocr);
             Path fassung = fehlt.isEmpty() ? pdfa : eingang;

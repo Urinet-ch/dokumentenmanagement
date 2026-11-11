@@ -114,6 +114,17 @@ class OcrMyPdfAdapterTest {
         assertThat(ocrmypdf().argumente()).contains("--skip-text");
     }
 
+    /** Textebene nur aus Satzzeichen: pdftotext findet keinen Text, OCRmyPDF schon (Exit-Code 6) → mit --skip-text. */
+    @Test
+    void nichtErkannteTextebeneWirdMitSkipTextWiederholt() throws Exception {
+        Pruefung p = verarbeiten(OcrEingabe.von(quelle(Quelltyp.PDF, OcrTestdateien.textPdf("... --- ... !!! ???"))));
+
+        assertThat(p.pdfa).isTrue();
+        assertThat(p.ergebnis.ocrAusgefuehrt()).isFalse();
+        assertThat(befehle).filteredOn(b -> b.programm().equals("ocrmypdf")).hasSize(2)
+                .extracting(b -> b.argumente().contains("--skip-text")).containsExactly(false, true);
+    }
+
     @Test
     void signiertesPdfErhaeltPdfaUndOriginalBleibtUnveraendert() throws Exception {
         Path original = Files.createDirectories(BASIS.getParent().resolve("quellen")).resolve("signiert.pdf");
