@@ -35,6 +35,9 @@ updates:
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
   - package-ecosystem: maven
-    directory: /backend
+    directories:
+      - /backend
+      # Drive-Import-Werkzeug (Aufgabe 4.8), eigenes Maven-Projekt
+      - /tools/drive_import
     schedule:
       interval: weekly

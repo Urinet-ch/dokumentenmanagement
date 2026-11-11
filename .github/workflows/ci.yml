@@ -54,6 +54,9 @@ jobs:
       - name: mvn verify (Cucumber, JUnit, ArchUnit, Abdeckung @req) und Build über Quinoa
         run: mvn -B -ntp -f backend/pom.xml verify
 
+      - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
+        run: mvn -B -ntp -f tools/drive_import/pom.xml verify
+
       - name: OpenAPI und generierter Client aktuell
         working-directory: frontend
         run: |
