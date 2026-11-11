@@ -4,6 +4,7 @@ api/api-tokens.service.ts
 api/api.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
+api/kontakte.service.ts
 configuration.ts
 encoder.ts
 index.ts
@@ -14,6 +15,8 @@ model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/eingangskorb-seite.ts
+model/kontakt-angaben.ts
+model/kontakt.ts
 model/models.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts

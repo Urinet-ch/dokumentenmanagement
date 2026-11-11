@@ -10,7 +10,7 @@
 
 
 /**
- * Bei PATCH bleibt ein fehlendes Feld unverändert, ein leerer Text löscht es; Name und Typ lassen sich nicht leeren.
+ * Bei PATCH bleibt ein fehlendes Feld unverändert, ein leerer Text löscht es; Name und Typ lassen sich nicht leeren. Ein Wert über der Höchstlänge (ohne Leerraum am Rand) → 400.
  */
 export interface KontaktAngaben { 
     /**
