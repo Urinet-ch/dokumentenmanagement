@@ -25,7 +25,7 @@ chmod 600 ~/.config/urinet-archiv/token
 
 Gesucht wird der Reihe nach: `--token-datei <pfad>`, dann der Pfad aus `ARCHIV_TOKEN_DATEI`, dann
 `~/.config/urinet-archiv/token`. Das Werkzeug bricht ab, wenn die Datei nicht dem aktuellen Benutzer gehört, ein
-symbolischer Link ist, Rechte für Gruppe oder andere hat oder kein gültiges Token enthält.
+symbolischer Link ist, andere Rechte als 600 oder 400 hat (auch Ausführen) oder kein gültiges Token enthält.
 
 ## Aufruf
 
@@ -68,7 +68,9 @@ Jede Datei bekommt den Hinweis `Drive-Import; Ordner: <pfad>`, dazu erkannte Mus
 - Google-Formate (`.gdoc`, `.gsheet`, `.gslides` u. a.): Liste «Bitte als PDF exportieren».
 - Office-Dateien (`.docx`, `.xlsx`, `.pptx`, `.odt`, `.rtf` u. a.), E-Mails (`.eml`, `.msg`) und Archive (`.zip`,
   `.7z`, `.rar` u. a.): in Phase 1 nicht übernommen.
-- Versteckte Dateien und Systemdateien (`.DS_Store`, `desktop.ini`, `~$…`) sowie symbolische Links.
+- Versteckte Dateien und Systemdateien (`.DS_Store`, `desktop.ini`, `~$…`), alle Dateien in versteckten Ordnern
+  (z. B. `.tmp.drivedownload`, `.tmp.driveupload` von Google Drive für Desktop) sowie symbolische Links; Links folgt
+  das Werkzeug nie.
 
 Alles, was nicht übertragen wurde, steht mit Pfad und Grund unter «Nicht übernommen», auch Dateien, die das Archiv
 abgelehnt hat (z. B. zu gross, Dateityp unbekannt).

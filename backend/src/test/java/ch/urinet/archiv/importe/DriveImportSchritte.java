@@ -105,6 +105,26 @@ public class DriveImportSchritte {
         }
     }
 
+    @Angenommen("ausserhalb des Ordners liegen diese synthetischen Dateien:")
+    public void ausserhalb(DataTable tabelle) throws IOException {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Path datei = verzeichnis.resolve("ausserhalb").resolve(zeile.get("pfad"));
+            Files.createDirectories(datei.getParent());
+            byte[] inhalt = inhalt(zeile.get("typ"));
+            Files.write(datei, inhalt);
+            pruefsummen.put("ausserhalb/" + zeile.get("pfad"), sha256(inhalt));
+        }
+    }
+
+    @Angenommen("im Ordner «{word}» liegen diese symbolischen Links nach ausserhalb:")
+    public void links(String name, DataTable tabelle) throws IOException {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Path link = verzeichnis.resolve(name).resolve(zeile.get("link"));
+            Files.createDirectories(link.getParent());
+            Files.createSymbolicLink(link, verzeichnis.resolve("ausserhalb").resolve(zeile.get("ziel")));
+        }
+    }
+
     @Angenommen("ein Token vom Scope «{word}» für «{word}» liegt in einer Datei mit Rechten {int}")
     public void tokenDatei(String scope, String mandantCode, int rechte) throws IOException {
         mandant = mandantCode;
@@ -210,11 +230,12 @@ public class DriveImportSchritte {
                         + abgelehnt + " (geht auf)");
     }
 
-    @Dann("geht der Bericht des Trockenlaufs auf: {int} gefunden = {int} würde übertragen + {int} übersprungen")
-    public void bilanzTrockenlauf(int gefunden, int wuerde, int uebersprungen) {
-        assertThat(gefunden).isEqualTo(wuerde + uebersprungen);
+    @Dann("geht der Bericht des Trockenlaufs auf: {int} gefunden = {int} würde übertragen + {int} übersprungen + "
+            + "{int} abgelehnt")
+    public void bilanzTrockenlauf(int gefunden, int wuerde, int uebersprungen, int abgelehnt) {
+        assertThat(gefunden).isEqualTo(wuerde + uebersprungen + abgelehnt);
         assertThat(ausgabe).contains("Schlussbericht (Trockenlauf: nichts übertragen)",
-                "Kontrolle: " + gefunden + " = " + wuerde + " + " + uebersprungen + " (geht auf)");
+                "Kontrolle: " + gefunden + " = " + wuerde + " + " + uebersprungen + " + " + abgelehnt + " (geht auf)");
     }
 
     @Dann("ist im Mandanten «{word}» keine Datei des Ordners gespeichert")

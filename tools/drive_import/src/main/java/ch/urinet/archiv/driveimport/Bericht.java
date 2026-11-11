@@ -7,7 +7,8 @@ import java.util.List;
 /**
  * Schlussbericht eines Laufs (Req 12.3, 12.5, 12.6, 12.7). Jede gefundene Datei landet in genau einem Zähler:
  * gefunden = übertragen + schon vorhanden + übersprungen + abgelehnt; im Trockenlauf
- * gefunden = würde übertragen + übersprungen.
+ * gefunden = würde übertragen + übersprungen + abgelehnt (nicht lesbar). «Gefunden» ist die Zahl der Dateien aus dem
+ * Durchsuchen, nicht die Summe der Zähler; die Kontrolle deckt so eine Datei auf, die keinen Zähler erreicht hat.
  */
 final class Bericht {
 
@@ -15,7 +16,7 @@ final class Bericht {
     }
 
     private final boolean trockenlauf;
-    private int gefunden;
+    private final int gefunden;
     private int uebertragen;
     private int schonVorhanden;
     private int uebersprungen;
@@ -23,34 +24,30 @@ final class Bericht {
     private final List<String> pdfExport = new ArrayList<>();
     private final List<Eintrag> nichtUebernommen = new ArrayList<>();
 
-    Bericht(boolean trockenlauf) {
+    Bericht(boolean trockenlauf, int gefunden) {
         this.trockenlauf = trockenlauf;
+        this.gefunden = gefunden;
     }
 
     void uebertragen() {
-        gefunden++;
         uebertragen++;
     }
 
     void schonVorhanden() {
-        gefunden++;
         schonVorhanden++;
     }
 
     void googleFormat(String pfad) {
-        gefunden++;
         uebersprungen++;
         pdfExport.add(pfad);
     }
 
     void uebersprungen(String pfad, String grund) {
-        gefunden++;
         uebersprungen++;
         nichtUebernommen.add(new Eintrag(pfad, grund));
     }
 
     void abgelehnt(String pfad, String grund) {
-        gefunden++;
         abgelehnt++;
         nichtUebernommen.add(new Eintrag(pfad, grund));
     }
@@ -81,7 +78,8 @@ final class Bericht {
         if (trockenlauf) {
             aus.println("Würde übertragen: " + uebertragen);
             aus.println("Übersprungen:    " + uebersprungen);
-            aus.println("Kontrolle: " + gefunden + " = " + uebertragen + " + " + uebersprungen
+            aus.println("Abgelehnt:       " + abgelehnt);
+            aus.println("Kontrolle: " + gefunden + " = " + uebertragen + " + " + uebersprungen + " + " + abgelehnt
                     + (gehtAuf() ? " (geht auf)" : " (GEHT NICHT AUF)"));
         } else {
             aus.println("Übertragen:      " + uebertragen);

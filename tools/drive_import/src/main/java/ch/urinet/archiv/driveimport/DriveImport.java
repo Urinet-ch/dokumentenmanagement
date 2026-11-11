@@ -132,7 +132,7 @@ public final class DriveImport implements Callable<Integer> {
             }
         }
         List<Fund> funde = durchsuchen(wurzel);
-        Bericht bericht = new Bericht(trockenlauf);
+        Bericht bericht = new Bericht(trockenlauf, funde.size());
         aus.println((trockenlauf ? "Trockenlauf" : "Import nach " + ziel) + ": " + funde.size() + " Dateien in "
                 + anzeige(wurzel, wurzel));
         String abbruch = null;
@@ -212,7 +212,9 @@ public final class DriveImport implements Callable<Integer> {
             Files.walkFileTree(wurzel, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path datei, BasicFileAttributes attribute) {
-                    if (attribute.isSymbolicLink()) {
+                    if (versteckt(wurzel, datei, false)) {
+                        funde.add(new Fund(datei, Einordnung.GRUND_VERSTECKTER_ORDNER, false));
+                    } else if (attribute.isSymbolicLink()) {
                         funde.add(new Fund(datei, "symbolischer Link, nicht verfolgt", false));
                     } else if (!attribute.isRegularFile()) {
                         funde.add(new Fund(datei, "keine gewöhnliche Datei", false));
@@ -224,7 +226,11 @@ public final class DriveImport implements Callable<Integer> {
 
                 @Override
                 public FileVisitResult visitFileFailed(Path datei, IOException e) {
-                    funde.add(new Fund(datei, "nicht lesbar, Inhalt nicht geprüft", true));
+                    if (versteckt(wurzel, datei, true)) {
+                        funde.add(new Fund(datei, Einordnung.GRUND_SYSTEM, false));
+                    } else {
+                        funde.add(new Fund(datei, "nicht lesbar, Inhalt nicht geprüft", true));
+                    }
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -233,6 +239,26 @@ public final class DriveImport implements Callable<Integer> {
         }
         funde.sort(Comparator.comparing(f -> f.pfad().toString()));
         return funde;
+    }
+
+    /**
+     * Liegt der Pfad unterhalb eines versteckten Ordners (Name beginnt mit «.», z. B. die Zwischenablagen
+     * {@code .tmp.drivedownload} und {@code .tmp.driveupload} von Google Drive für Desktop)? Der Startordner selbst
+     * zählt nicht; mit {@code mitName} zählt auch der letzte Teil des Pfads. Jede Datei darin wird einzeln als
+     * «übersprungen» gezählt, damit die Bilanz je Datei aufgeht.
+     */
+    static boolean versteckt(Path wurzel, Path pfad, boolean mitName) {
+        if (!pfad.startsWith(wurzel) || pfad.equals(wurzel)) {
+            return false;
+        }
+        Path relativ = wurzel.relativize(pfad);
+        int teile = mitName ? relativ.getNameCount() : relativ.getNameCount() - 1;
+        for (int i = 0; i < teile; i++) {
+            if (relativ.getName(i).toString().startsWith(".")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String anzeige(Path wurzel, Path pfad) {

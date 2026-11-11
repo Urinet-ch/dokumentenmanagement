@@ -9,8 +9,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.HexFormat;
@@ -29,6 +32,8 @@ final class ArchivClient {
     static final int MAX_VERSUCHE = 5;
     static final Duration MAX_WARTEN = Duration.ofSeconds(60);
     static final Duration NETZ_PAUSE = Duration.ofSeconds(5);
+    static final String NICHT_LESBAR = "Datei nicht lesbar, bitte Leserechte prüfen (bei Google Drive für Desktop "
+            + "die Datei offline verfügbar machen)";
 
     enum Status { UEBERTRAGEN, SCHON_VORHANDEN, ABGELEHNT, ABBRUCH }
 
@@ -64,6 +69,9 @@ final class ArchivClient {
         if (dateiname.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL)) {
             return abgelehnt("Dateiname enthält Steuerzeichen, bitte umbenennen");
         }
+        if (!lesbar(datei)) {
+            return abgelehnt(NICHT_LESBAR);
+        }
         String grund = null;
         for (int versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
             HttpResponse<String> antwort;
@@ -71,7 +79,7 @@ final class ArchivClient {
                 antwort = http.send(anfrage(datei, dateiname, hinweis),
                         HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             } catch (FileNotFoundException e) {
-                return abgelehnt("Datei nicht lesbar");
+                return abgelehnt(NICHT_LESBAR);
             } catch (IOException e) {
                 grund = "Archiv nicht erreichbar (" + e.getClass().getSimpleName() + "), bitte später erneut starten";
                 if (versuch < MAX_VERSUCHE) {
@@ -90,6 +98,18 @@ final class ArchivClient {
             return auswerten(antwort);
         }
         return abgelehnt(grund);
+    }
+
+    /**
+     * Öffnet die Datei einmal zur Probe, bevor sie gesendet wird: Fehlt das Leserecht, meldet {@code ofFile} das
+     * sonst erst beim Senden als {@link IOException}, und der Lauf hielte es für einen Netzfehler (Review PR #64, S3).
+     */
+    private static boolean lesbar(Path datei) {
+        try (SeekableByteChannel kanal = Files.newByteChannel(datei, StandardOpenOption.READ)) {
+            return kanal.isOpen();
+        } catch (IOException | SecurityException e) {
+            return false;
+        }
     }
 
     private HttpRequest anfrage(Path datei, String dateiname, String hinweis) throws FileNotFoundException {

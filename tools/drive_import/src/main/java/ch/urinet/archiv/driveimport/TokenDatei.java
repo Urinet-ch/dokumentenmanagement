@@ -1,10 +1,12 @@
 package ch.urinet.archiv.driveimport;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -16,16 +18,17 @@ import java.util.regex.Pattern;
  * Liest das API-Token (Scope {@code import}) aus einer Datei mit Rechten 600 (tech.md, Regel 7; tasks.md 4.7, 4.8):
  * Pfad aus {@code --token-datei}, sonst aus {@code ARCHIV_TOKEN_DATEI}, sonst {@code ~/.config/urinet-archiv/token}.
  * Das Token selbst kommt nie aus einer Umgebungsvariable. Verweigert wird eine Datei, die nicht regulär ist (auch ein
- * symbolischer Link), nicht dem angemeldeten Benutzer gehört, für Gruppe oder andere lesbar oder schreibbar ist oder
+ * symbolischer Link), nicht dem angemeldeten Benutzer gehört, andere Rechte als Lesen und Schreiben für den Eigentümer
+ * hat (600 oder 400) oder
  * kein Token im Format des Archivs enthält. Keine Meldung enthält den Inhalt der Datei.
  */
 final class TokenDatei {
 
     static final String UMGEBUNG = "ARCHIV_TOKEN_DATEI";
+    private static final int MAX_GROESSE = 4096;
     private static final Pattern FORMAT = Pattern.compile("ua_[a-z0-9]{12}_[A-Za-z0-9_-]{43}");
     private static final Set<PosixFilePermission> ERLAUBT =
-            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
-                    PosixFilePermission.OWNER_EXECUTE);
+            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
 
     /** Ungültige Token-Datei; die Meldung nennt nur den Pfad und den Grund. */
     static final class Ungueltig extends Exception {
@@ -69,12 +72,16 @@ final class TokenDatei {
             throw new Ungueltig("Token-Datei " + datei + " gehört nicht dem angemeldeten Benutzer.");
         }
         if (!ERLAUBT.containsAll(attribute.permissions())) {
-            throw new Ungueltig("Token-Datei " + datei + " ist auch für andere lesbar oder schreibbar. "
+            throw new Ungueltig("Token-Datei " + datei + " hat zu weite Rechte (nur Lesen und Schreiben für den "
+                    + "Eigentümer erlaubt). "
                     + "Bitte mit «chmod 600 " + datei + "» einschränken.");
         }
         String token;
         try {
-            token = Files.readString(datei, StandardCharsets.UTF_8).strip();
+            // NOFOLLOW_LINKS auch beim Lesen: Ein zwischen Prüfung und Lesen eingeschobener Link wird nicht gelesen.
+            try (InputStream ein = Files.newInputStream(datei, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
+                token = new String(ein.readNBytes(MAX_GROESSE), StandardCharsets.UTF_8).strip();
+            }
         } catch (IOException e) {
             throw new Ungueltig("Token-Datei " + datei + " ist nicht lesbar.");
         }

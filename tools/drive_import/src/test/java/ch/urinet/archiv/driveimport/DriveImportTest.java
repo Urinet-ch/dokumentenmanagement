@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /** Lauf gegen einen Stub des Archivs: Wiederholung bei 503, Abbruch bei 401, Ablehnungen, Bilanz (Req 12.7). */
 class DriveImportTest {
@@ -177,7 +178,64 @@ class DriveImportTest {
         assertThat(anfragen).isEmpty();
         assertThat(aus.toString()).contains("würde übertragen: UriNet/Buchhaltung 2026/a.pdf  [Drive-Import; "
                 + "Ordner: UriNet/Buchhaltung 2026; Bereich: Buchhaltung; Jahr: 2026]",
-                "Kontrolle: 2 = 1 + 1 (geht auf)");
+                "Kontrolle: 2 = 1 + 1 + 0 (geht auf)");
+    }
+
+    @Test
+    void unlesbareDateiGiltSofortAlsNichtLesbarOhneAnfrageUndOhneWiederholung() throws IOException {
+        datei("a.pdf", "%PDF-a");
+        datei("gesperrt.pdf", "%PDF-b");
+        Path gesperrt = tmp.resolve("UriNet/gesperrt.pdf");
+        Files.setPosixFilePermissions(gesperrt, PosixFilePermissions.fromString("---------"));
+        assumeFalse(Files.isReadable(gesperrt), "läuft als root, Leserechte greifen nicht");
+
+        assertThat(lauf()).isEqualTo(DriveImport.ABGELEHNT);
+        assertThat(anfragen).hasSize(1);
+        assertThat(gewartet).isEmpty();
+        assertThat(aus.toString()).contains("UriNet/gesperrt.pdf – " + ArchivClient.NICHT_LESBAR,
+                "Kontrolle: 2 = 1 + 0 + 0 + 1 (geht auf)").doesNotContain("nicht erreichbar");
+    }
+
+    @Test
+    void trockenlaufZaehltUnlesbarenOrdnerInDerKontrolle() throws IOException {
+        datei("a.pdf", "%PDF-a");
+        datei("zu/b.pdf", "%PDF-b");
+        Path zu = tmp.resolve("UriNet/zu");
+        Files.setPosixFilePermissions(zu, PosixFilePermissions.fromString("---------"));
+        try {
+            assumeFalse(Files.isReadable(zu), "läuft als root, Leserechte greifen nicht");
+            assertThat(lauf("--trockenlauf")).isEqualTo(DriveImport.ABGELEHNT);
+            assertThat(aus.toString()).contains("Abgelehnt:       1", "Kontrolle: 2 = 1 + 0 + 1 (geht auf)");
+        } finally {
+            Files.setPosixFilePermissions(zu, PosixFilePermissions.fromString("rwx------"));
+        }
+    }
+
+    @Test
+    void versteckterStartordnerZaehltNichtAlsVersteckt() throws IOException {
+        Path wurzel = tmp.resolve(".drive");
+        Files.createDirectories(wurzel.resolve(".tmp.drivedownload"));
+        Files.writeString(wurzel.resolve("a.pdf"), "%PDF-a");
+        Files.writeString(wurzel.resolve(".tmp.drivedownload/teil.pdf"), "%PDF-t");
+
+        assertThat(DriveImport.ausfuehren(new PrintWriter(aus), new PrintWriter(fehler), Map.of(), gewartet::add,
+                "--trockenlauf", wurzel.toString())).isEqualTo(DriveImport.OK);
+        assertThat(aus.toString()).contains("würde übertragen: .drive/a.pdf",
+                "übersprungen:     .drive/.tmp.drivedownload/teil.pdf – " + Einordnung.GRUND_VERSTECKTER_ORDNER,
+                "Kontrolle: 2 = 1 + 1 + 0 (geht auf)");
+    }
+
+    @Test
+    void dateinameMitSteuerzeichenGehtNieAlsAnfrageRaus() throws Exception {
+        datei("a.pdf", "%PDF-a");
+        ArchivClient client = new ArchivClient(java.net.URI.create("http://127.0.0.1:"
+                + server.getAddress().getPort()), TokenDateiTest.TOKEN, gewartet::add);
+
+        ArchivClient.Ergebnis ergebnis = client.senden(tmp.resolve("UriNet/a.pdf"), "a\r\nX-Kopf: b.pdf", "h");
+
+        assertThat(ergebnis.status()).isEqualTo(ArchivClient.Status.ABGELEHNT);
+        assertThat(ergebnis.grund()).contains("Steuerzeichen");
+        assertThat(anfragen).isEmpty();
     }
 
     @Test

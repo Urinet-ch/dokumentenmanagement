@@ -23,11 +23,12 @@ class TokenDateiTest {
     void liestTokenAusDateiMitRechten600() throws Exception {
         Path datei = datei(TOKEN + "\n", "rw-------");
         assertThat(TokenDatei.lesen(datei)).isEqualTo(TOKEN);
+        assertThat(TokenDatei.lesen(datei(TOKEN, "r--------"))).isEqualTo(TOKEN);
     }
 
     @Test
     void verweigertLockereRechteOhneDenInhaltZuNennen() throws Exception {
-        for (String rechte : new String[] {"rw-r-----", "rw----r--", "rw-rw-rw-", "rw-----w-"}) {
+        for (String rechte : new String[] {"rw-r-----", "rw----r--", "rw-rw-rw-", "rw-----w-", "rwx------"}) {
             Path datei = datei(TOKEN, rechte);
             assertThatThrownBy(() -> TokenDatei.lesen(datei)).isInstanceOf(TokenDatei.Ungueltig.class)
                     .hasMessageNotContaining(TOKEN.substring(16));

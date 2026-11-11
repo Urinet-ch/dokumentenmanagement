@@ -33,6 +33,7 @@ record Einordnung(Weg weg, String grund) {
     static final String GRUND_EMAIL = "E-Mail-Datei, in Phase 1 nicht übernommen";
     static final String GRUND_ARCHIV = "Archivdatei (ZIP o. ä.), in Phase 1 nicht übernommen (bitte entpacken)";
     static final String GRUND_SYSTEM = "versteckte Datei oder Systemdatei";
+    static final String GRUND_VERSTECKTER_ORDNER = "in verstecktem Ordner (z. B. Zwischenablage von Google Drive)";
 
     static Einordnung von(String dateiname) {
         String name = dateiname.toLowerCase(Locale.ROOT);

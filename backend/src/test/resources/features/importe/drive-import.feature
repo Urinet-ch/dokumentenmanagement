@@ -63,7 +63,7 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
       | UriNet/Kunden/FC Muster/Rechnungen/r.pdf | würde übertragen | Ordner: UriNet/Kunden/FC Muster/Rechnungen; Partner: FC Muster; Art: AUSGANGSRECHNUNG |
       | UriNet/Ablage/Notiz.gdoc                 | übersprungen     | bitte in Google Drive als PDF exportieren                                             |
       | UriNet/Ablage/Brief.docx                 | übersprungen     | Office-Datei                                                                          |
-    Und geht der Bericht des Trockenlaufs auf: 3 gefunden = 1 würde übertragen + 2 übersprungen
+    Und geht der Bericht des Trockenlaufs auf: 3 gefunden = 1 würde übertragen + 2 übersprungen + 0 abgelehnt
     Und ist im Mandanten «urinet» keine Datei des Ordners gespeichert
 
   @req-12.4
@@ -116,6 +116,50 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
     Und hat das Archiv im Mandanten «urinet» nur diese Dateien des Ordners gespeichert:
       | pfad           |
       | Ablage/gut.pdf |
+
+  @req-12.1 @req-12.6
+  Szenario: Symbolische Links auf Dateien oder Ordner ausserhalb des Startordners folgt das Werkzeug nie
+    Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:
+      | pfad      | typ |
+      | a/gut.pdf | pdf |
+    Und ausserhalb des Ordners liegen diese synthetischen Dateien:
+      | pfad                     | typ |
+      | privat/geheim.pdf        | pdf |
+      | privat/ordner/privat.pdf | pdf |
+    Und im Ordner «UriNet» liegen diese symbolischen Links nach ausserhalb:
+      | link        | ziel              |
+      | a/link.pdf  | privat/geheim.pdf |
+      | link-ordner | privat/ordner     |
+    Und ein Token vom Scope «import» für «urinet» liegt in einer Datei mit Rechten 600
+    Wenn der Drive-Import den Ordner «UriNet» ins Archiv lädt
+    Dann endet der Drive-Import mit Exit-Code 0
+    Und steht unter «Nicht übernommen» im Bericht des Drive-Imports genau:
+      | eintrag            | grund             |
+      | UriNet/a/link.pdf  | symbolischer Link |
+      | UriNet/link-ordner | symbolischer Link |
+    Und hat das Archiv im Mandanten «urinet» nur diese Dateien des Ordners gespeichert:
+      | pfad      |
+      | a/gut.pdf |
+    Und geht der Schlussbericht auf: 3 gefunden = 1 übertragen + 0 schon vorhanden + 2 übersprungen + 0 abgelehnt
+
+  @req-12.6
+  Szenario: Dateien in versteckten Ordnern wie den Zwischenablagen von Google Drive werden nicht übertragen
+    Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:
+      | pfad                            | typ  |
+      | .tmp.drivedownload/teil.pdf     | pdf  |
+      | Kunden/.tmp.driveupload/neu.jpg | jpeg |
+      | a/gut.pdf                       | pdf  |
+    Und ein Token vom Scope «import» für «urinet» liegt in einer Datei mit Rechten 600
+    Wenn der Drive-Import den Ordner «UriNet» ins Archiv lädt
+    Dann endet der Drive-Import mit Exit-Code 0
+    Und steht unter «Nicht übernommen» im Bericht des Drive-Imports genau:
+      | eintrag                                | grund                 |
+      | UriNet/.tmp.drivedownload/teil.pdf     | in verstecktem Ordner |
+      | UriNet/Kunden/.tmp.driveupload/neu.jpg | in verstecktem Ordner |
+    Und hat das Archiv im Mandanten «urinet» nur diese Dateien des Ordners gespeichert:
+      | pfad      |
+      | a/gut.pdf |
+    Und geht der Schlussbericht auf: 3 gefunden = 1 übertragen + 0 schon vorhanden + 2 übersprungen + 0 abgelehnt
 
   @req-12.7
   Szenario: Der Schlussbericht geht auf
