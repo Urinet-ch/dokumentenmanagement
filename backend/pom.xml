@@ -29,6 +29,8 @@
         <!-- 2.0.x ist die letzte Linie auf Jackson 2 (Quarkus 3.40); 3.x braucht Jackson 3 (tools.jackson) -->
         <json-schema-validator.version>2.0.8</json-schema-validator.version>
         <tika.version>4.2.0</tika.version>
+        <commons-csv.version>1.14.1</commons-csv.version>
+        <icu4j.version>79.1</icu4j.version>
     </properties>
 
     <dependencyManagement>
@@ -135,6 +137,17 @@
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-openai</artifactId>
+        </dependency>
+        <!-- CSV-Import (Aufgabe 4.1): Parser nach RFC 4180 und Zeichensatz-Erkennung, nicht im Quarkus-BOM -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${commons-csv.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+            <version>${icu4j.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.quinoa</groupId>

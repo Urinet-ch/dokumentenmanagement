@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- CSV-Import der CRM-Daten (Aufgabe 4.1; design.md «Kontakt und Importe», Data Models; Req 13.1, 13.2, 13.10).
+         Zusätzlich zum Datenmodell: import_lauf.kopfzeile (Spaltennamen für den Zuordnungsdialog) und das Ergebnis
+         UEBERSPRUNGEN (Profil «21.CRM»: «Ist gelöscht = true»). import_zeile.kontakt_id ohne Fremdschlüssel: Die Tabelle
+         kontakt entsteht in Aufgabe 3.1; der Abgleich (4.2) setzt die Spalte. -->
+    <changeSet id="007-import" author="archiv">
+        <createTable tableName="import_zuordnung">
+            <column name="art" type="text">
+                <constraints primaryKey="true" primaryKeyName="import_zuordnung_pk"/>
+            </column>
+            <column name="spalten" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kopf_hash" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="geaendert" type="timestamptz" defaultValueComputed="clock_timestamp()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createTable tableName="import_lauf">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" primaryKeyName="import_lauf_pk"/>
+            </column>
+            <column name="art" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vollexport" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="dateiname" type="text"/>
+            <column name="sha256" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="zeichensatz" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="trennzeichen" type="char(1)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="kopfzeile" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="zeilen" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="neu" type="int"/>
+            <column name="geaendert" type="int"/>
+            <column name="unveraendert" type="int"/>
+            <column name="dubletten" type="int"/>
+            <column name="fehler" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="benutzer" type="text"/>
+            <column name="erstellt" type="timestamptz" defaultValueComputed="clock_timestamp()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="uebernommen" type="timestamptz"/>
+        </createTable>
+        <createTable tableName="import_zeile">
+            <column name="lauf_id" type="uuid">
+                <constraints nullable="false" foreignKeyName="import_zeile_lauf_fk" references="import_lauf(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="nr" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="daten" type="jsonb"/>
+            <column name="ergebnis" type="text"/>
+            <column name="kontakt_id" type="uuid"/>
+            <column name="kandidaten" type="uuid[]"/>
+            <column name="meldung" type="text"/>
+        </createTable>
+        <addPrimaryKey tableName="import_zeile" columnNames="lauf_id, nr" constraintName="import_zeile_pk"/>
+        <sql>
+            alter table import_zuordnung add constraint import_zuordnung_art_ck
+                check (art in ('kontakt', 'verkaufschance'));
+            alter table import_zuordnung add constraint import_zuordnung_spalten_ck
+                check (jsonb_typeof(spalten) = 'object');
+            alter table import_lauf add constraint import_lauf_art_ck
+                check (art in ('kontakt', 'verkaufschance'));
+            alter table import_lauf add constraint import_lauf_trennzeichen_ck
+                check (trennzeichen in (';', ','));
+            alter table import_lauf add constraint import_lauf_kopfzeile_ck
+                check (jsonb_typeof(kopfzeile) = 'array');
+            alter table import_lauf add constraint import_lauf_status_ck
+                check (status in ('VORSCHAU_AUSSTEHEND', 'ZUORDNUNG_NOETIG', 'VORSCHAU', 'UEBERNOMMEN', 'ABGEBROCHEN'));
+            alter table import_zeile add constraint import_zeile_ergebnis_ck
+                check (ergebnis is null or ergebnis in ('NEU', 'GEAENDERT', 'UNVERAENDERT', 'DUBLETTE', 'FEHLER',
+                    'UEBERSPRUNGEN'));
+            alter table import_zeile add constraint import_zeile_daten_ck
+                check (daten is null or jsonb_typeof(daten) = 'object');
+            create index import_lauf_erstellt_ix on import_lauf (erstellt desc);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

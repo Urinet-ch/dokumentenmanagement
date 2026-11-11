@@ -45,9 +45,10 @@ public enum Fehlercode {
     ZUSATZ_UNGUELTIG(422, "Zusatzfelder ungültig",
             "Die Zusatzfelder passen nicht zur Dokumentart. Bitte prüfen Sie die Angaben."),
     CSV_UNGUELTIG(422, "CSV-Datei ungültig",
-            "Die CSV-Datei hat nicht das erwartete Format. Bitte exportieren Sie sie erneut aus dem CRM."),
+            "Die CSV-Datei hat nicht das erwartete Format (UTF-8 oder Windows-1252, Semikolon oder Komma), mehr als "
+                    + "10'000 Datenzeilen oder keine Spalte für den Namen. Bitte prüfen Sie Datei und Zuordnung."),
     CSV_LEER(422, "CSV-Datei leer",
-            "Die CSV-Datei enthält keine Zeilen. Bitte exportieren Sie sie erneut aus dem CRM."),
+            "Die CSV-Datei enthält keine Datenzeilen. Bitte exportieren Sie sie erneut aus dem CRM."),
     KEINE_WISSENSQUELLE(422, "Keine Wissensquelle",
             "Nur Dokumente der Art «Wissensquelle» können in die Wissensbasis übernommen werden."),
     ENTWURF_BEFUND(422, "Entwurf mit Befund",

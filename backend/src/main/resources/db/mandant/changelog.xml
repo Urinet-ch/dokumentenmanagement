@@ -11,4 +11,5 @@
     <include file="changesets/004-protokoll-regel-aendern.xml" relativeToChangelogFile="true"/>
     <include file="changesets/005-dokument.xml" relativeToChangelogFile="true"/>
     <include file="changesets/006-kontakt.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/007-import.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
