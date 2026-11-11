@@ -232,7 +232,10 @@ public class DokumentResource {
             JsonNode vorschlag,
             @Schema(required = true, description = "Felder des Vorschlags unter der Schwelle archiv.ki.schwelle "
                     + "(«bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)")
-            List<String> unsicher) {
+            List<String> unsicher,
+            @Schema(nullable = true) String projekt,
+            @Schema(nullable = true, description = "Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments")
+            String personBenutzer) {
     }
 
     @GET
@@ -528,7 +531,7 @@ public class DokumentResource {
                 d.wirksameVertraulichkeit(), d.status().name(), d.bestaetigt(), d.geschaeftsjahr(), d.aufbewahrenBis(),
                 d.sperreBis(), d.fristAbgelaufen(), lesenJson(d, d.zusatz(), "zusatz", json), d.version(),
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
-                d.partnerId(), d.partnerName(), vorschlag, unsicher);
+                d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer());
     }
 
     // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst

@@ -68,6 +68,11 @@ export interface Dokument {
      * Felder des Vorschlags unter der Schwelle archiv.ki.schwelle («bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)
      */
     unsicher: Array<string>;
+    projekt?: string | null;
+    /**
+     * Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
+     */
+    personBenutzer?: string | null;
 }
 export namespace Dokument {
     export const QuelleEnum = {

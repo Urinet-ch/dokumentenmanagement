@@ -18,7 +18,7 @@ public record Dokument(UUID id, String art, String titel, LocalDate datum, Insta
                        DokumentStatus status, Instant bestaetigt, Integer geschaeftsjahr, LocalDate aufbewahrenBis,
                        LocalDate sperreBis, boolean fristAbgelaufen, String zusatz, int version, String fehler,
                        boolean pdfaFehlt, Integer seiten, UUID partnerId, String partnerName, String kiVorschlag,
-                       String kiSicherheit) {
+                       String kiSicherheit, String projekt) {
 
     public static final String PERSONAL = "PERSONAL";
 

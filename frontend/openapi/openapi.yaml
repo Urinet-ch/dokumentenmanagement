@@ -345,6 +345,15 @@ components:
             type: string
           description: "Felder des Vorschlags unter der Schwelle archiv.ki.schwelle\
             \ («bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)"
+        projekt:
+          type:
+          - string
+          - "null"
+        personBenutzer:
+          type:
+          - string
+          - "null"
+          description: Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
     DokumentAenderung:
       description: "Änderung der Metadaten (A6, Aufgabe 3.5). Nur die angegebenen\
         \ Felder ändern sich; null oder ein leerer Text leert ein Feld (tags: null\
