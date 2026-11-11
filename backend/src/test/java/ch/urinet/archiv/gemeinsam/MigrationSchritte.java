@@ -7,7 +7,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -34,6 +38,19 @@ public class MigrationSchritte {
                     // TRUNCATE nur als Anweisung, nicht im Trigger «before … or truncate» der append-only-Tabellen
                     + "|(^|;|>)\\s*truncate\\b");
 
+    /**
+     * Geprüfte Ausnahmen: Changeset und SHA-256 seines Inhalts. Nur für schon gemergte Changesets, die das Muster
+     * treffen, den Vorgänger aber nachweislich nicht brechen (Changesets werden nie geändert, tech.md Regel 11); ändert
+     * sich die Datei, gilt die Ausnahme nicht mehr.
+     * <ul>
+     * <li>005 (PR #41, Aufgabe 2.5): {@code NOT NULL} auf {@code auftrag.mandant}. Der Vorgänger-Stand (vor #41)
+     * schreibt nicht in {@code auftrag}, es gibt keine Zeile ohne Mandant.</li>
+     * </ul>
+     */
+    private static final Map<String, String> GEPRUEFT = Map.of(
+            "backend/src/main/resources/db/public/changesets/005-auftrag-mandant-pflicht.xml",
+            "5510f05bce3c6a4952ea29ed5f1076d0fe6cf4452d724ae7f964ee28ea59eee0");
+
     @Dann("enthält kein Changeset unter «{word}» eine Änderung, die das Vorgänger-Release bricht")
     public void changesetsRueckwaertskompatibel(String verzeichnis) throws IOException {
         List<Path> changesets;
@@ -44,11 +61,22 @@ public class MigrationSchritte {
         }
         assertThat(changesets).isNotEmpty();
         for (Path changeset : changesets) {
+            String name = REPO.relativize(changeset).toString().replace('\\', '/');
+            if (GEPRUEFT.containsKey(name) && GEPRUEFT.get(name).equals(sha256(changeset))) {
+                continue;
+            }
             String inhalt = Files.readString(changeset, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
-            String name = REPO.relativize(changeset).toString();
             assertThat(LIQUIBASE_BRUCH.matcher(inhalt).find()).as("Liquibase-Änderung bricht Vorgänger in %s", name)
                     .isFalse();
             assertThat(SQL_BRUCH.matcher(inhalt).find()).as("SQL bricht Vorgänger in %s", name).isFalse();
+        }
+    }
+
+    private static String sha256(Path datei) throws IOException {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(datei)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
     }
 
