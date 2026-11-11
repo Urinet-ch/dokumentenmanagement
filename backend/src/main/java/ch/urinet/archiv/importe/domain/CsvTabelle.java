@@ -18,6 +18,18 @@ public final class CsvTabelle {
      */
     public static final int MAX_SPALTEN = 1_000;
 
+    /**
+     * Höchstlänge eines Spaltennamens in Zeichen (Codepoints); der längste Name im 21.CRM-Beispielexport hat 48. Eine
+     * Kopfzeile mit längerem Namen lehnt das Archiv vor dem Parsen ab (Speicher, Entscheid Fabian 11.11.2026).
+     */
+    public static final int MAX_KOPF_NAME = 256;
+
+    /**
+     * Höchstlänge der ganzen Kopfzeile in Zeichen (Codepoints, mit Trenn- und Anführungszeichen, ohne Zeilenende);
+     * der 21.CRM-Beispielexport hat 2'646 (151 Spalten). Grössere Kopfzeilen lehnt das Archiv vor dem Parsen ab.
+     */
+    public static final int MAX_KOPF = 64 * 1024;
+
     private CsvTabelle() {
     }
 

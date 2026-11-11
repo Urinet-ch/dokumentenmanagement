@@ -15,7 +15,7 @@ import java.util.Locale;
  */
 public record Kopfzeile(List<String> namen) {
 
-    private static final char TRENNER = '\u001F';
+    private static final byte TRENNER = 0x1F;
 
     public Kopfzeile {
         namen = List.copyOf(namen);
@@ -30,16 +30,17 @@ public record Kopfzeile(List<String> namen) {
      * Kleinschreibung. Eine andere Reihenfolge, ein zusätzlicher oder fehlender Name ergibt einen anderen Hash.
      */
     public String hash() {
-        StringBuilder text = new StringBuilder();
-        for (String name : namen) {
-            text.append(normalisiert(name)).append(TRENNER);
-        }
+        MessageDigest digest;
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(text.toString().getBytes(StandardCharsets.UTF_8)));
+            digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 fehlt in der JVM", e);
         }
+        for (String name : namen) {
+            digest.update(normalisiert(name).getBytes(StandardCharsets.UTF_8));
+            digest.update(TRENNER);
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     /** Erste Position des Namens (normalisiert verglichen), sonst -1. */

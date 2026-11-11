@@ -47,8 +47,9 @@ import java.util.Set;
  * Konfidenz einen nicht-lateinischen Zeichensatz erkennt (z. B. Big5, EUC-KR, windows-1256). Andere Latin-Kodierungen,
  * die ICU4J für kurze Windows-1252-Dateien oft nennt (ISO-8859-2, windows-1254 …), gelten als Windows-1252.
  * Trennzeichen: das häufigere von {@code ;} und {@code ,} ausserhalb von Anführungszeichen in der Kopfzeile, bei
- * Gleichstand {@code ;} (21.CRM). Mehr als {@link CsvTabelle#MAX_SPALTEN} Spalten in einem Datensatz oder mehr als
- * {@link CsvTabelle#MAX_ZEILEN} Datenzeilen lehnt die Vorprüfung ab. Leere Zeilen zählen nicht; die Nummer einer Zeile
+ * Gleichstand {@code ;} (21.CRM). Mehr als {@link CsvTabelle#MAX_SPALTEN} Spalten in einem Datensatz, mehr als
+ * {@link CsvTabelle#MAX_ZEILEN} Datenzeilen oder eine Kopfzeile über {@link CsvTabelle#MAX_KOPF} Zeichen bzw. mit einem
+ * Namen über {@link CsvTabelle#MAX_KOPF_NAME} Zeichen lehnt die Vorprüfung ab. Leere Zeilen zählen nicht; die Nummer einer Zeile
  * ist ihre Datensatznummer (Kopfzeile = 1). Meldungen des Parsers enthalten Dateiinhalt und werden nie weitergegeben
  * oder geloggt.
  */
@@ -71,10 +72,10 @@ public class CommonsCsvLeser implements CsvLeser {
     private static final int PUFFER = 8 * 1024;
 
     @Override
-    public void lesen(Path datei, Empfaenger empfaenger) {
+    public void lesen(Path datei, int feldGrenze, Empfaenger empfaenger) {
         Erkennung erkennung = erkennen(datei);
         vorpruefen(datei, erkennung);
-        parsen(datei, erkennung, empfaenger);
+        parsen(datei, erkennung, feldGrenze, empfaenger);
     }
 
     /** Erkannter Zeichensatz, Länge des BOM und Trennzeichen. */
@@ -227,7 +228,8 @@ public class CommonsCsvLeser implements CsvLeser {
      * Durchgang 1 ohne Werte: dekodiert die ganze Datei streng und zählt nach RFC 4180 die Spalten jedes Datensatzes
      * und die Datensätze. Leere Zeilen zählen nicht. {@code CSV_LEER} ohne Datensatz; {@code CSV_UNGUELTIG} bei
      * ungültigem Byte, NUL-Zeichen, mehr als {@link CsvTabelle#MAX_SPALTEN} Spalten, mehr als
-     * {@link CsvTabelle#MAX_ZEILEN} Datenzeilen oder einem nicht geschlossenen Anführungszeichen am Dateiende.
+     * {@link CsvTabelle#MAX_ZEILEN} Datenzeilen, einer zu langen Kopfzeile oder einem nicht geschlossenen
+     * Anführungszeichen am Dateiende.
      */
     static void vorpruefen(Path datei, Erkennung erkennung) {
         Zaehler zaehler = new Zaehler(erkennung.trennzeichen());
@@ -246,50 +248,125 @@ public class CommonsCsvLeser implements CsvLeser {
         zaehler.ende();
     }
 
-    /** Zustandsautomat der Vorprüfung; verarbeitet ein Zeichen nach dem anderen (auch über Puffergrenzen). */
-    private static final class Zaehler {
+    /**
+     * Art eines Zeichens nach RFC 4180, so wie Commons CSV mit {@code CSVFormat.RFC4180} es liest: Ein zitiertes Feld
+     * beginnt nur mit {@code "} am Feldanfang, {@code ""} darin ist ein Anführungszeichen, Zeichen zwischen dem
+     * schliessenden {@code "} und dem nächsten Trennzeichen gehören nicht zum Feld ({@link Art#NACH_ZITAT}).
+     */
+    static final class Zustand {
+
+        enum Art {
+            /** Zeichen des Feldwerts; bei {@code ""} das zweite. */
+            INHALT,
+            /** Anführungszeichen, das ein Zitat öffnet oder (falls kein zweites folgt) schliesst. */
+            ANFUEHRUNG,
+            NACH_ZITAT,
+            TRENNER,
+            ZEILENENDE
+        }
 
         private final char trennzeichen;
+        private boolean zitiert;
+        private boolean anfuehrungImZitat;
+        private boolean nachZitat;
+        private boolean feldanfang = true;
+
+        Zustand(char trennzeichen) {
+            this.trennzeichen = trennzeichen;
+        }
+
+        Art art(char zeichen) {
+            if (anfuehrungImZitat) {
+                anfuehrungImZitat = false;
+                if (zeichen == '"') {
+                    return Art.INHALT;
+                }
+                zitiert = false;
+                nachZitat = true;
+            } else if (zitiert) {
+                anfuehrungImZitat = zeichen == '"';
+                return anfuehrungImZitat ? Art.ANFUEHRUNG : Art.INHALT;
+            }
+            if (zeichen == '\n' || zeichen == '\r') {
+                feldEnde();
+                return Art.ZEILENENDE;
+            }
+            if (zeichen == trennzeichen) {
+                feldEnde();
+                return Art.TRENNER;
+            }
+            if (nachZitat) {
+                return Art.NACH_ZITAT;
+            }
+            if (zeichen == '"' && feldanfang) {
+                zitiert = true;
+                feldanfang = false;
+                return Art.ANFUEHRUNG;
+            }
+            feldanfang = false;
+            return Art.INHALT;
+        }
+
+        /** Ein {@code "} im Zitat wartet auf das nächste Zeichen: {@code ""} oder Ende des Zitats. */
+        boolean anfuehrungOffen() {
+            return anfuehrungImZitat;
+        }
+
+        /** Ein Zitat ist offen (am Dateiende ein Formatfehler). */
+        boolean zitatOffen() {
+            return zitiert && !anfuehrungImZitat;
+        }
+
+        private void feldEnde() {
+            feldanfang = true;
+            nachZitat = false;
+        }
+    }
+
+    /**
+     * Zustandsautomat der Vorprüfung; verarbeitet ein Zeichen nach dem anderen (auch über Puffergrenzen). In der
+     * Kopfzeile zählt er zusätzlich die Zeichen je Spaltenname ({@link CsvTabelle#MAX_KOPF_NAME}) und die der ganzen
+     * Zeile ({@link CsvTabelle#MAX_KOPF}), damit eine übergrosse Kopfzeile nie geparst wird (Entscheid Fabian
+     * 11.11.2026: höchstens ~32 MiB Heap je Import, unabhängig von der Datei).
+     */
+    private static final class Zaehler {
+
+        private final Zustand zustand;
         private int datensaetze;
         private int spalten = 1;
         private boolean leer = true;
-        private boolean zitiert;
-        private boolean anfuehrungImZitat;
-        private boolean feldanfang = true;
+        private int kopfLaenge;
+        private int nameLaenge;
 
         Zaehler(char trennzeichen) {
-            this.trennzeichen = trennzeichen;
+            this.zustand = new Zustand(trennzeichen);
         }
 
         void zeichen(char zeichen) {
             if (zeichen == 0) {
                 throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
             }
-            if (anfuehrungImZitat) {
-                anfuehrungImZitat = false;
-                if (zeichen == '"') {
-                    return;
-                }
-                zitiert = false;
-            } else if (zitiert) {
-                anfuehrungImZitat = zeichen == '"';
-                return;
-            }
-            if (zeichen == '\n' || zeichen == '\r') {
+            Zustand.Art art = zustand.art(zeichen);
+            if (art == Zustand.Art.ZEILENENDE) {
                 datensatzEnde();
                 return;
             }
             leer = false;
-            if (zeichen == '"' && feldanfang) {
-                zitiert = true;
-                feldanfang = false;
-            } else if (zeichen == trennzeichen) {
+            if (art == Zustand.Art.TRENNER) {
                 if (++spalten > CsvTabelle.MAX_SPALTEN) {
                     throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
                 }
-                feldanfang = true;
-            } else {
-                feldanfang = false;
+                nameLaenge = 0;
+            }
+            if (datensaetze == 0 && !Character.isLowSurrogate(zeichen)) {
+                kopf(art);
+            }
+        }
+
+        private void kopf(Zustand.Art art) {
+            if (++kopfLaenge > CsvTabelle.MAX_KOPF
+                    || art == Zustand.Art.INHALT && ++nameLaenge > CsvTabelle.MAX_KOPF_NAME) {
+                throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
             }
         }
 
@@ -299,11 +376,11 @@ public class CommonsCsvLeser implements CsvLeser {
             }
             spalten = 1;
             leer = true;
-            feldanfang = true;
+            nameLaenge = 0;
         }
 
         void ende() {
-            if (zitiert && !anfuehrungImZitat) {
+            if (zustand.zitatOffen()) {
                 throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
             }
             datensatzEnde();
@@ -314,13 +391,109 @@ public class CommonsCsvLeser implements CsvLeser {
     }
 
     /**
-     * Durchgang 2: parst Zeile für Zeile und meldet Kopf und Datenzeilen. Nur Fehler des Parsers werden zu
+     * Kürzt jedes Feld vor Commons CSV auf {@code grenze + 1} Zeichen (Codepoints), ohne die Struktur zu ändern
+     * (Trennzeichen, Zeilenenden, Anführungszeichen und Zeichen nach einem Zitat bleiben). Ein Feld über der Grenze
+     * bleibt damit über der Grenze und macht seine Zeile wie bisher «fehlerhaft» (Req 13.10), aber Commons CSV legt
+     * nie einen String an, der grösser ist als die Grenze (Speicher, Entscheid Fabian 11.11.2026).
+     */
+    static final class FeldKuerzer extends Reader {
+
+        private final Reader quelle;
+        private final Zustand zustand;
+        private final int behalten;
+        private int laenge;
+        private boolean verworfen;
+        private int ausstehend = -1;
+        private boolean ende;
+
+        FeldKuerzer(Reader quelle, char trennzeichen, int feldGrenze) {
+            this.quelle = quelle;
+            this.zustand = new Zustand(trennzeichen);
+            this.behalten = feldGrenze + 1;
+        }
+
+        @Override
+        public int read(char[] ziel, int start, int anzahl) throws IOException {
+            if (anzahl == 0) {
+                return 0;
+            }
+            int n = 0;
+            for (int zeichen; n < anzahl && (zeichen = naechstes()) >= 0; n++) {
+                ziel[start + n] = (char) zeichen;
+            }
+            return n == 0 ? -1 : n;
+        }
+
+        private int naechstes() throws IOException {
+            if (ausstehend >= 0) {
+                int zeichen = ausstehend;
+                ausstehend = -1;
+                return zeichen;
+            }
+            while (!ende) {
+                boolean anfuehrungOffen = zustand.anfuehrungOffen();
+                int gelesen = quelle.read();
+                if (gelesen < 0) {
+                    ende = true;
+                    return anfuehrungOffen ? '"' : -1;
+                }
+                char zeichen = (char) gelesen;
+                Zustand.Art art = zustand.art(zeichen);
+                if (anfuehrungOffen) {
+                    if (art == Zustand.Art.INHALT) {
+                        if (behalten(zeichen)) {
+                            ausstehend = '"';
+                            return '"';
+                        }
+                        continue;
+                    }
+                    ausstehend = ausgabe(zeichen, art);
+                    return '"';
+                }
+                if (art == Zustand.Art.ANFUEHRUNG && zustand.anfuehrungOffen()) {
+                    continue;
+                }
+                int ausgabe = ausgabe(zeichen, art);
+                if (ausgabe >= 0) {
+                    return ausgabe;
+                }
+            }
+            return -1;
+        }
+
+        private int ausgabe(char zeichen, Zustand.Art art) {
+            if (art == Zustand.Art.TRENNER || art == Zustand.Art.ZEILENENDE) {
+                laenge = 0;
+                verworfen = false;
+            } else if (art == Zustand.Art.INHALT && !behalten(zeichen)) {
+                return -1;
+            }
+            return zeichen;
+        }
+
+        private boolean behalten(char zeichen) {
+            if (!Character.isLowSurrogate(zeichen)) {
+                verworfen = ++laenge > behalten;
+            }
+            return !verworfen;
+        }
+
+        @Override
+        public void close() throws IOException {
+            quelle.close();
+        }
+    }
+
+    /**
+     * Durchgang 2: parst Zeile für Zeile (Felder über {@code feldGrenze} gekürzt, {@link FeldKuerzer}) und meldet Kopf
+     * und Datenzeilen. Nur Fehler des Parsers werden zu
      * {@code CSV_UNGUELTIG}; Fehler des Empfängers (z. B. der Datenbank) gehen unverändert weiter.
      */
-    private static void parsen(Path datei, Erkennung erkennung, Empfaenger empfaenger) {
+    private static void parsen(Path datei, Erkennung erkennung, int feldGrenze, Empfaenger empfaenger) {
         CSVFormat format = CSVFormat.RFC4180.builder().setDelimiter(erkennung.trennzeichen())
                 .setIgnoreEmptyLines(true).get();
-        try (Reader leser = new BufferedReader(leser(datei, erkennung.zeichensatz(), erkennung.bom()), PUFFER);
+        try (Reader leser = new FeldKuerzer(new BufferedReader(leser(datei, erkennung.zeichensatz(), erkennung.bom()),
+                PUFFER), erkennung.trennzeichen(), feldGrenze);
              CSVParser parser = CSVParser.builder().setReader(leser).setFormat(format).get()) {
             Iterator<CSVRecord> datensaetze = parser.iterator();
             CSVRecord kopf = naechster(datensaetze);

@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CommonsCsvLeserTest {
 
     private static final Charset CP1252 = Charset.forName("windows-1252");
+    private static final int GRENZE = 10_000;
     private final CommonsCsvLeser leser = new CommonsCsvLeser();
 
     @TempDir
@@ -214,8 +215,8 @@ class CommonsCsvLeserTest {
         String tausend = ";".repeat(CsvTabelle.MAX_SPALTEN - 1);
         assertThat(lesen(("N" + tausend + "\nA" + tausend + "\n").getBytes(StandardCharsets.UTF_8)).kopf()
                 .spalten()).isEqualTo(CsvTabelle.MAX_SPALTEN);
-        assertThat(lesen(("N;\"" + ";".repeat(5_000) + "\"\nA;B\n").getBytes(StandardCharsets.UTF_8)).kopf()
-                .spalten()).isEqualTo(2);
+        assertThat(lesen(("N;O\nA;\"" + ";".repeat(5_000) + "\"\n").getBytes(StandardCharsets.UTF_8)).zeilen()
+                .getFirst().werte()).containsExactly("A", ";".repeat(5_000));
         for (String text : List.of("N" + tausend + ";\nA\n", "N;O\nA" + tausend + ";\n",
                 "N;O\n\nA;B\n" + ";".repeat(1_000_000) + "\n")) {
             assertThatThrownBy(() -> lesen(text.getBytes(StandardCharsets.UTF_8))).isInstanceOf(FachFehler.class)
@@ -292,12 +293,83 @@ class CommonsCsvLeserTest {
     }
 
     @Test
-    void riesigesFeldWirdGelesen() {
+    void riesigesFeldKommtAufGrenzePlusEinsGekuerztUndBleibtUeberDerGrenze() {
         String riesig = "x".repeat(200_000);
 
-        Tabelle tabelle = lesen(("Name;Notiz\nA;\"" + riesig + "\"\n").getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen(("Name;Notiz;PLZ\nA;\"" + riesig + "\";6000\nB;" + riesig + ";6460\n")
+                .getBytes(StandardCharsets.UTF_8));
 
-        assertThat(tabelle.zeilen().getFirst().werte().get(1)).hasSize(200_000);
+        assertThat(tabelle.zeilen()).extracting(CsvTabelle.Zeile::nr).containsExactly(2, 3);
+        assertThat(tabelle.zeilen()).allSatisfy(z -> {
+            assertThat(z.werte()).hasSize(3);
+            assertThat(z.werte().get(1)).isEqualTo("x".repeat(GRENZE + 1));
+        });
+        assertThat(tabelle.zeilen()).extracting(z -> z.werte().get(2)).containsExactly("6000", "6460");
+    }
+
+    @Test
+    void kuerzenZaehltCodepointsUndVerwirftDoppelteAnfuehrungszeichenAlsPaar() {
+        String emoji = "\uD83D\uDE00";
+        String zitiert = "\"\"".repeat(GRENZE) + "\"\";\nx";
+        String text = "A;B;C\n" + "\"" + emoji.repeat(GRENZE + 5) + "\";\"" + zitiert + "\";\"kurz \"\"x\"\"\"\n"
+                + "ä".repeat(GRENZE) + ";" + "ä".repeat(GRENZE + 1) + ";z\n";
+
+        Tabelle tabelle = lesen(text.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(tabelle.zeilen()).extracting(CsvTabelle.Zeile::nr).containsExactly(2, 3);
+        List<String> erste = tabelle.zeilen().getFirst().werte();
+        assertThat(erste.get(0)).isEqualTo(emoji.repeat(GRENZE + 1));
+        assertThat(erste.get(1)).isEqualTo("\"".repeat(GRENZE + 1));
+        assertThat(erste.get(2)).isEqualTo("kurz \"x\"");
+        assertThat(tabelle.zeilen().getLast().werte())
+                .containsExactly("ä".repeat(GRENZE), "ä".repeat(GRENZE + 1), "z");
+    }
+
+    @Test
+    void kuerzenLaesstFormatfehlerNachDemZitatStehen() {
+        String lang = "x".repeat(GRENZE + 10);
+
+        for (String zeile : List.of("\"abc\"x;1", "\"" + lang + "\"x;1")) {
+            assertThatThrownBy(() -> lesen(("A;B\n" + zeile + "\n").getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(FachFehler.class).extracting(f -> ((FachFehler) f).code())
+                    .isEqualTo(Fehlercode.CSV_UNGUELTIG);
+        }
+        assertThat(lesen(("A;B\n\"" + lang + "\"  ;1\n").getBytes(StandardCharsets.UTF_8)).zeilen().getFirst()
+                .werte()).containsExactly("x".repeat(GRENZE + 1), "1");
+    }
+
+    @Test
+    void spaltennameUeber256ZeichenWirdAbgelehnt() {
+        String erlaubt = "€".repeat(CsvTabelle.MAX_KOPF_NAME);
+        String zitiert = "\"" + "\"\"".repeat(CsvTabelle.MAX_KOPF_NAME) + "\"";
+
+        assertThat(lesen(("A;" + erlaubt + ";" + zitiert + "\n1;2;3\n").getBytes(StandardCharsets.UTF_8)).kopf()
+                .namen()).containsExactly("A", erlaubt, "\"".repeat(CsvTabelle.MAX_KOPF_NAME));
+        for (String name : List.of(erlaubt + "€", "\"" + erlaubt + "€\"", "\uD83D\uDE00".repeat(257))) {
+            Sammler sammler = new Sammler();
+            byte[] inhalt = ("A;" + name + "\n1;2\n").getBytes(StandardCharsets.UTF_8);
+            assertThatThrownBy(() -> leser.lesen(schreiben(inhalt), GRENZE, sammler)).isInstanceOf(FachFehler.class)
+                    .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
+            assertThat(sammler.kopf).isNull();
+        }
+        assertThat(lesen(("A\n" + "x".repeat(CsvTabelle.MAX_KOPF_NAME + 1) + "\n").getBytes(StandardCharsets.UTF_8))
+                .zeilen()).hasSize(1);
+    }
+
+    @Test
+    void kopfzeileUeber64KiZeichenWirdAbgelehnt() {
+        String name = "€".repeat(CsvTabelle.MAX_KOPF_NAME - 1);
+        int spalten = CsvTabelle.MAX_KOPF / CsvTabelle.MAX_KOPF_NAME;
+        String kopf = String.join(";", java.util.Collections.nCopies(spalten, name));
+        String genau = kopf + "x".repeat(CsvTabelle.MAX_KOPF - kopf.length());
+        assertThat(genau).hasSize(CsvTabelle.MAX_KOPF);
+
+        assertThat(lesen((genau + "\r\n1\r\n").getBytes(StandardCharsets.UTF_8)).kopf().spalten()).isEqualTo(spalten);
+        Sammler sammler = new Sammler();
+        byte[] zuLang = (genau + ";\n1\n").getBytes(CP1252);
+        assertThatThrownBy(() -> leser.lesen(schreiben(zuLang), GRENZE, sammler)).isInstanceOf(FachFehler.class)
+                .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
+        assertThat(sammler.kopf).isNull();
     }
 
     @Test
@@ -349,7 +421,7 @@ class CommonsCsvLeserTest {
 
     private Tabelle lesen(byte[] inhalt) {
         Sammler sammler = new Sammler();
-        leser.lesen(schreiben(inhalt), sammler);
+        leser.lesen(schreiben(inhalt), GRENZE, sammler);
         return new Tabelle(sammler.zeichensatz, sammler.trennzeichen, sammler.kopf, sammler.zeilen);
     }
 
@@ -373,7 +445,7 @@ class CommonsCsvLeserTest {
         byte[] gemischt = mitPraefix(anfang.getBytes(StandardCharsets.UTF_8), "Grüter;Bürglen\n".getBytes(CP1252));
         Sammler sammler = new Sammler();
 
-        assertThatThrownBy(() -> leser.lesen(schreiben(gemischt), sammler)).isInstanceOf(FachFehler.class)
+        assertThatThrownBy(() -> leser.lesen(schreiben(gemischt), GRENZE, sammler)).isInstanceOf(FachFehler.class)
                 .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
         assertThat(sammler.kopf).isNull();
         assertThat(sammler.zeilen).isEmpty();
@@ -383,7 +455,7 @@ class CommonsCsvLeserTest {
     void zuVieleZeilenWerdenAbgelehntBevorEineZeileGemeldetWird() {
         Sammler sammler = new Sammler();
 
-        assertThatThrownBy(() -> leser.lesen(schreiben(zeilen(CsvTabelle.MAX_ZEILEN + 1)), sammler))
+        assertThatThrownBy(() -> leser.lesen(schreiben(zeilen(CsvTabelle.MAX_ZEILEN + 1)), GRENZE, sammler))
                 .isInstanceOf(FachFehler.class);
         assertThat(sammler.kopf).isNull();
     }
@@ -402,7 +474,7 @@ class CommonsCsvLeserTest {
             }
         };
 
-        assertThatThrownBy(() -> leser.lesen(schreiben("Name\nA\n".getBytes(StandardCharsets.UTF_8)), empfaenger))
+        assertThatThrownBy(() -> leser.lesen(schreiben("Name\nA\n".getBytes(StandardCharsets.UTF_8)), GRENZE, empfaenger))
                 .isSameAs(datenbank);
     }
 

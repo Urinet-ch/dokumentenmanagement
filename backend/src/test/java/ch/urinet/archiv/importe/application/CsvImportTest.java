@@ -88,6 +88,18 @@ class CsvImportTest {
     }
 
     @Test
+    void langeFelderBegrenzenDenBlockNachZeichen() throws IOException {
+        Path datei = Files.write(ordner.resolve("k.csv"), new byte[]{'x'});
+        leser.wert = "x".repeat(9_999);
+        leser.zeilen = 250;
+
+        csvImport.hochladen(ImportArt.KONTAKT, false, "k.csv", datei, "inhaber");
+
+        int jeBlock = CsvImport.STAPEL_ZEICHEN / (2 * 9_999) + 1;
+        assertThat(repository.bloecke).containsExactly(jeBlock, jeBlock, jeBlock, jeBlock, 250 - 4 * jeBlock);
+    }
+
+    @Test
     void nurKopfzeileIstLeer() throws IOException {
         Path datei = Files.write(ordner.resolve("k.csv"), new byte[]{'x'});
 
@@ -102,14 +114,15 @@ class CsvImportTest {
         int aufrufe;
         int zeilen;
         int spalten = 2;
+        String wert;
 
         @Override
-        public void lesen(Path datei, Empfaenger empfaenger) {
+        public void lesen(Path datei, int feldGrenze, Empfaenger empfaenger) {
             aufrufe++;
             List<String> namen = IntStream.range(0, spalten).mapToObj(i -> "S" + i).toList();
             empfaenger.kopf("UTF-8", ';', new Kopfzeile(namen));
             for (int i = 0; i < zeilen; i++) {
-                empfaenger.zeile(new CsvTabelle.Zeile(i + 2, Collections.nCopies(spalten, "N" + i)));
+                empfaenger.zeile(new CsvTabelle.Zeile(i + 2, Collections.nCopies(spalten, wert != null ? wert : "N" + i)));
             }
         }
     }
@@ -151,7 +164,7 @@ class CsvImportTest {
         }
 
         @Override
-        public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl) {
+        public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl, int zeichen) {
             return List.of();
         }
 

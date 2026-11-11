@@ -40,7 +40,9 @@ import java.util.UUID;
  * Lauf und Zeilen speichern, Zuordnung vorschlagen, bestätigen und speichern. Vorschau mit Abgleich (4.2) und Übernahme
  * (4.3) folgen; ein Lauf mit gültiger Zuordnung wartet im Status {@code VORSCHAU_AUSSTEHEND}. Die Datei wird nie als
  * Ganzes gehalten: Der Leser meldet Zeile für Zeile, gespeichert und neu geprüft wird in Blöcken zu höchstens
- * {@link #STAPEL} Zeilen und {@link #STAPEL_WERTE} Werten (Entscheid Fabian 11.11.2026). Geloggt werden nur IDs, Prüfsumme, Zahlen und Status, nie Feldwerte.
+ * {@link #STAPEL} Zeilen, {@link #STAPEL_WERTE} Werten und {@link #STAPEL_ZEICHEN} Zeichen (Entscheid Fabian 11.11.2026:
+ * höchstens ~32 MiB Heap je Import, unabhängig von der Datei). Geloggt werden nur IDs, Prüfsumme, Zahlen und Status,
+ * nie Feldwerte.
  */
 @ApplicationScoped
 public class CsvImport {
@@ -50,6 +52,11 @@ public class CsvImport {
     static final int STAPEL = 500;
     /** Werte je Block höchstens; begrenzt den Heap bei breiten Dateien (bis 1'000 Spalten). */
     static final int STAPEL_WERTE = 50_000;
+    /**
+     * Zeichen je Block höchstens (beim Speichern die Werte, beim erneuten Prüfen das JSON der Zeilen); begrenzt den Heap
+     * bei langen Feldern. Ein Block hat immer mindestens eine Zeile.
+     */
+    static final int STAPEL_ZEICHEN = 1024 * 1024;
     private static final Logger LOG = Logger.getLogger(CsvImport.class);
     private static final EnumSet<LaufStatus> ZUORDENBAR = EnumSet.of(LaufStatus.ZUORDNUNG_NOETIG,
             LaufStatus.VORSCHAU_AUSSTEHEND);
@@ -89,7 +96,7 @@ public class CsvImport {
         }
         Erfassung erfassung = new Erfassung(id, art, vollexport, dateiname(dateiname), sha256, benutzer);
         try {
-            leser.lesen(datei, erfassung);
+            leser.lesen(datei, einstellungen.feldGrenze(), erfassung);
             erfassung.abschliessen();
         } catch (FachFehler fehler) {
             LOG.infof("CSV-Import abgelehnt: lauf=%s fehlercode=%s", id, fehler.code());
@@ -116,6 +123,7 @@ public class CsvImport {
         private Optional<Zuordnung> gueltig = Optional.empty();
         private ImportLauf lauf;
         private int werte;
+        private long zeichen;
         private int zeilen;
         private int fehler;
         private int uebersprungen;
@@ -151,7 +159,8 @@ public class CsvImport {
             zaehlen(gespeichert.ergebnis());
             block.add(gespeichert);
             werte += zeile.werte().size();
-            if (block.size() == STAPEL || werte >= STAPEL_WERTE) {
+            zeichen += zeichen(gespeichert.werte());
+            if (block.size() == STAPEL || werte >= STAPEL_WERTE || zeichen >= STAPEL_ZEICHEN) {
                 speichern();
             }
         }
@@ -166,6 +175,7 @@ public class CsvImport {
             repository.zeilenAnlegen(id, block);
             block.clear();
             werte = 0;
+            zeichen = 0;
         }
 
         void abschliessen() {
@@ -216,7 +226,7 @@ public class CsvImport {
         int nachNr = 0;
         int stapel = stapel(repository.breite(laufId));
         List<ImportZeile> block;
-        while (!(block = repository.zeilen(laufId, nachNr, stapel)).isEmpty()) {
+        while (!(block = repository.zeilen(laufId, nachNr, stapel, STAPEL_ZEICHEN)).isEmpty()) {
             List<ImportZeile> geprueft = new ArrayList<>(block.size());
             for (ImportZeile zeile : block) {
                 ImportZeile neu = zeile.werte() == null ? zeile : zeile(zeile.nr(), zeile.werte(),
@@ -257,6 +267,17 @@ public class CsvImport {
     /** Zeilen je Block beim erneuten Prüfen, damit ein Block höchstens {@link #STAPEL_WERTE} Werte hält. */
     static int stapel(int breite) {
         return Math.max(1, Math.min(STAPEL, STAPEL_WERTE / Math.max(1, breite)));
+    }
+
+    /** Zeichen der gespeicherten Werte einer Zeile (UTF-16-Einheiten); verworfene Werte zählen nicht. */
+    private static long zeichen(List<String> werte) {
+        long summe = 0;
+        if (werte != null) {
+            for (String wert : werte) {
+                summe += wert == null ? 0 : wert.length();
+            }
+        }
+        return summe;
     }
 
     private static ImportZeile zeile(int nr, List<String> werte, Befund befund) {

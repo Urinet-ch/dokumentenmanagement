@@ -13,14 +13,17 @@ import java.nio.file.Path;
 public interface CsvLeser {
 
     /**
-     * Prüft die ganze Datei vor (Zeichensatz, Spalten- und Zeilenzahl), meldet dann die Kopfzeile und danach jede
-     * Datenzeile einzeln an den {@code empfaenger}. Fehler des Empfängers gehen unverändert weiter.
+     * Prüft die ganze Datei vor (Zeichensatz, Spalten- und Zeilenzahl, Länge der Kopfzeile), meldet dann die Kopfzeile
+     * und danach jede Datenzeile einzeln an den {@code empfaenger}. Ein Feld über {@code feldGrenze} Zeichen meldet der
+     * Leser auf {@code feldGrenze + 1} Zeichen gekürzt: Es bleibt über der Grenze (die Zeile ist «fehlerhaft»), belegt
+     * aber nie mehr Speicher. Fehler des Empfängers gehen unverändert weiter.
      *
      * @throws ch.urinet.archiv.gemeinsam.domain.FachFehler {@code CSV_LEER} ohne Kopfzeile, {@code CSV_UNGUELTIG} bei
-     *         unbekanntem Zeichensatz, kaputtem Format, mehr als {@link CsvTabelle#MAX_SPALTEN} Spalten oder mehr als
-     *         {@link CsvTabelle#MAX_ZEILEN} Datenzeilen
+     *         unbekanntem Zeichensatz, kaputtem Format, mehr als {@link CsvTabelle#MAX_SPALTEN} Spalten, mehr als
+     *         {@link CsvTabelle#MAX_ZEILEN} Datenzeilen oder einer Kopfzeile über {@link CsvTabelle#MAX_KOPF} Zeichen
+     *         bzw. mit einem Namen über {@link CsvTabelle#MAX_KOPF_NAME} Zeichen
      */
-    void lesen(Path datei, Empfaenger empfaenger);
+    void lesen(Path datei, int feldGrenze, Empfaenger empfaenger);
 
     /** Nimmt Kopfzeile und Datenzeilen in der Reihenfolge der Datei entgegen. */
     interface Empfaenger {

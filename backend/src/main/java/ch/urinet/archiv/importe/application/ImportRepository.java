@@ -31,8 +31,12 @@ public interface ImportRepository {
     /** Grösste Anzahl Werte einer gespeicherten Zeile des Laufs; 0, wenn keine Zeile Werte hat. */
     int breite(UUID laufId);
 
-    /** Höchstens {@code anzahl} Zeilen mit {@code nr > nachNr}, aufsteigend nach {@code nr}. */
-    List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl);
+    /**
+     * Höchstens {@code anzahl} Zeilen mit {@code nr > nachNr}, aufsteigend nach {@code nr}; nach der Zeile, mit der die
+     * gespeicherten Daten (JSON) zusammen {@code zeichen} Zeichen erreichen, ist Schluss. Mindestens eine Zeile, wenn es
+     * noch eine gibt.
+     */
+    List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl, int zeichen);
 
     /** Schreibt Ergebnis und Meldung der Zeilen. */
     void zeilenAktualisieren(UUID laufId, List<ImportZeile> zeilen);

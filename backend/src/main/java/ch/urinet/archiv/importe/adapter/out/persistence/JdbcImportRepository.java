@@ -174,15 +174,18 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
-    public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl) {
-        String sql = "select nr, daten::text, ergebnis, meldung from " + schema()
-                + ".import_zeile where lauf_id = ? and nr > ? order by nr limit ?";
+    public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl, int zeichen) {
+        String sql = "select nr, daten, ergebnis, meldung from (select nr, daten, ergebnis, meldung, "
+                + "sum(coalesce(length(daten), 0)) over (order by nr) - coalesce(length(daten), 0) as davor "
+                + "from (select nr, daten::text as daten, ergebnis, meldung from " + schema()
+                + ".import_zeile where lauf_id = ? and nr > ? order by nr limit ?) z) b where davor < ? order by nr";
         List<ImportZeile> zeilen = new ArrayList<>();
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setObject(1, laufId, Types.OTHER);
             abfrage.setInt(2, nachNr);
             abfrage.setInt(3, anzahl);
+            abfrage.setLong(4, zeichen);
             try (ResultSet ergebnis = abfrage.executeQuery()) {
                 while (ergebnis.next()) {
                     String text = ergebnis.getString("daten");

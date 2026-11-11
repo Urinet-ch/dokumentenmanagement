@@ -6,8 +6,8 @@
 
     <!-- CSV-Import der CRM-Daten (Aufgabe 4.1; design.md «Kontakt und Importe», Data Models; Req 13.1, 13.2, 13.10).
          Zusätzlich zum Datenmodell: import_lauf.kopfzeile (Spaltennamen für den Zuordnungsdialog) und das Ergebnis
-         UEBERSPRUNGEN (Profil «21.CRM»: «Ist gelöscht = true»). import_zeile.kontakt_id ohne Fremdschlüssel: Die Tabelle
-         kontakt entsteht in Aufgabe 3.1; der Abgleich (4.2) setzt die Spalte. -->
+         UEBERSPRUNGEN (Profil «21.CRM»: «Ist gelöscht = true»). import_zeile.kontakt_id vorerst ohne Fremdschlüssel: Die
+         Spalte setzt erst der Abgleich (Aufgabe 4.2) gegen kontakt (006-kontakt.xml), dort auch der Fremdschlüssel. -->
     <changeSet id="007-import" author="archiv">
         <createTable tableName="import_zuordnung">
             <column name="art" type="text">
