@@ -1,9 +1,13 @@
-// Upload-Seite gegen eine Attrappe von POST /api/v1/dokumente (Teilnachweis bis Aufgabe 2.4): Die Attrappe antwortet
-// wie in design.md «Upload» beschrieben und prüft Token, Reihenfolge der Dateien und «zusammenfassen».
-import { Given, Then, When } from '@cucumber/cucumber';
+// Upload-Seite gegen das echte Backend (Aufgabe 2.4): Die Anfragen der PWA an POST /api/v1/dokumente leitet
+// Playwright an das Archiv im Testmodus weiter (hilfen/echtes-backend.mjs) und tauscht dabei das Token der
+// Keycloak-Attrappe gegen ein echtes Token desselben Testbenutzers. Die Dateien sind synthetisch, keine echten Belege.
+import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
+import { backend, direktHochladen, echtesToken, inhalt } from '../hilfen/echtes-backend.mjs';
 
 const MIME = {
   pdf: 'application/pdf',
@@ -16,83 +20,151 @@ const MIME = {
   txt: 'text/plain',
 };
 
-function dateien(liste) {
-  return liste.split(', ').map((name) => ({
-    name,
-    mimeType: MIME[name.split('.').pop().toLowerCase()] ?? 'application/octet-stream',
-    buffer: Buffer.from(`Testinhalt ${name}`),
-  }));
+function zustand(welt) {
+  welt.upload ??= { inhalte: new Map(), vorhanden: new Map(), anfragen: [], sitzungAbgelaufen: false };
+  return welt.upload;
 }
 
-function ergebnis(datei, antwort) {
-  const [art, wert] = antwort.split(' ');
-  if (art === 'NEU') {
-    return { datei, id: randomUUID(), status: 'NEU' };
-  }
-  if (art === 'DUBLETTE') {
-    return wert ? { datei, status: 'DUBLETTE', vorhandenId: wert } : { datei, status: 'DUBLETTE', meldung: 'bereits vorhanden' };
-  }
-  return { datei, status: 'ABGELEHNT', fehler: { status: Number(art), fehlercode: wert } };
-}
-
-async function uploadAttrappe(welt) {
-  if (welt.upload) {
-    return welt.upload;
-  }
-  const upload = { antworten: new Map(), anfragen: [], sitzungAbgelaufen: false };
-  welt.upload = upload;
-  await welt.seite.route(`${basisUrl}/api/v1/dokumente`, async (route) => {
-    const anfrage = route.request();
-    const inhalt = (anfrage.postDataBuffer() ?? Buffer.alloc(0)).toString('latin1');
-    const namen = [...inhalt.matchAll(/name="dateien"; filename="([^"]+)"/g)].map((treffer) => treffer[1]);
-    const zusammenfassen = /name="zusammenfassen"\r\n\r\ntrue\r\n/.test(inhalt);
-    upload.anfragen.push({ namen, zusammenfassen });
-    const problem = (status, fehlercode, erweiterung = {}) =>
-      route.fulfill({
-        status,
-        contentType: 'application/problem+json',
-        body: JSON.stringify({ title: 'Fehler', status, fehlercode, instance: '/api/v1/dokumente', ...erweiterung }),
-      });
-    if (upload.sitzungAbgelaufen || (await anfrage.headerValue('authorization')) !== `Bearer ${welt.keycloak.accessToken}`) {
-      return problem(401, 'NICHT_ANGEMELDET');
+/** Dateien mit dem Inhalt aus dem Szenario oder nach Endung; dieselbe Datei behält im Szenario ihren Inhalt. */
+function dateien(welt, liste) {
+  const { inhalte } = zustand(welt);
+  return liste.split(', ').map((name) => {
+    if (!inhalte.has(name)) {
+      inhalte.set(name, inhalt(name));
     }
-    const ergebnisse = namen.map((name) => ergebnis(name, upload.antworten.get(name) ?? 'NEU'));
-    if (zusammenfassen) {
-      const id = randomUUID();
-      ergebnisse.filter((e) => e.status === 'NEU').forEach((e) => (e.id = id));
-    }
-    const abgelehnt = ergebnisse.filter((e) => e.status === 'ABGELEHNT');
-    if (ergebnisse.length > 0 && abgelehnt.length === ergebnisse.length) {
-      return problem(abgelehnt[0].fehler.status, abgelehnt[0].fehler.fehlercode, { ergebnisse });
-    }
-    return route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify(ergebnisse) });
+    return {
+      name,
+      mimeType: MIME[name.split('.').pop().toLowerCase()] ?? 'application/octet-stream',
+      buffer: inhalte.get(name),
+    };
   });
-  return upload;
 }
 
-Given('das Archiv antwortet auf Uploads so:', async function (tabelle) {
-  const upload = await uploadAttrappe(this);
-  for (const zeile of tabelle.hashes()) {
-    upload.antworten.set(zeile.datei, zeile.antwort);
+async function weiterleiten(welt) {
+  const upload = zustand(welt);
+  if (upload.weitergeleitet) {
+    return;
+  }
+  upload.weitergeleitet = true;
+  const { api } = backend();
+  await welt.seite.addInitScript(formularMitschreiben);
+  await welt.seite.evaluate(formularMitschreiben);
+  welt.seite.on('response', async (antwort) => {
+    if (antwort.request().method() === 'POST' && new URL(antwort.url()).pathname === '/api/v1/dokumente') {
+      const eintrag = upload.anfragen.at(-1);
+      eintrag.status = antwort.status();
+      eintrag.antwort = await antwort.json().catch(() => null);
+    }
+  });
+  await welt.seite.route(`${basisUrl}/api/v1/dokumente`, (route) =>
+    weiterleitenAnfrage(welt, upload, api, route).catch((fehler) => {
+      upload.fehler = fehler;
+      return route.abort('failed');
+    }),
+  );
+}
+
+// Chromium gibt den Inhalt von Dateien aus dem Dateisystem nicht an Playwright heraus (postDataBuffer bleibt leer);
+// darum hält die Seite selbst fest, welche Felder die PWA im FormData an XMLHttpRequest.send übergibt.
+function formularMitschreiben() {
+  if (window.__archivUploads) {
+    return;
+  }
+  window.__archivUploads = [];
+  const mitschreiben = (inhalt) => {
+    if (inhalt instanceof FormData) {
+      window.__archivUploads.push({
+        namen: inhalt.getAll('dateien').map((datei) => datei.name),
+        zusammenfassen: inhalt.get('zusammenfassen') === 'true',
+      });
+    }
+  };
+  const senden = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (inhalt) {
+    mitschreiben(inhalt);
+    return senden.call(this, inhalt);
+  };
+  const holen = window.fetch;
+  window.fetch = function (eingabe, optionen) {
+    mitschreiben(optionen?.body);
+    return holen.call(this, eingabe, optionen);
+  };
+}
+
+async function weiterleitenAnfrage(welt, upload, api, route) {
+  const anfrage = route.request();
+  const eintrag = (await welt.seite.evaluate(() => window.__archivUploads?.shift())) ?? { namen: [], zusammenfassen: false };
+  upload.anfragen.push(eintrag);
+  // Die PWA muss das Token der Anmeldung senden; getauscht wird nur dieses.
+  assert.equal(await anfrage.headerValue('authorization'), `Bearer ${welt.keycloak.accessToken}`);
+  const { rollen: [rolle], mandant } = welt.keycloak.benutzer;
+  const headers = { ...anfrage.headers() };
+  if (!upload.sitzungAbgelaufen) {
+    // Bei «abgelaufen» bleibt das unsignierte Token der Attrappe: Das echte Backend lehnt es mit 401 ab.
+    headers.authorization = `Bearer ${await echtesToken(rolle, mandant)}`;
+  }
+  // continue statt fetch: Den Inhalt der Dateien sendet der Browser selbst an die geänderte Adresse.
+  await route.continue({ url: `${api}/api/v1/dokumente`, headers });
+}
+
+/** Wartet auf das Ergebnis der Upload-Seite; scheitert die Weiterleitung, kommt ihr Fehler statt eines Timeouts. */
+async function ergebnisAbwarten(welt) {
+  const ueberschrift = welt.seite.getByRole('heading', { name: 'Ergebnis je Datei' });
+  for (let versuch = 0; versuch < 1200; versuch++) {
+    if (welt.upload?.fehler) {
+      throw welt.upload.fehler;
+    }
+    if (await ueberschrift.isVisible()) {
+      return ueberschrift;
+    }
+    await welt.seite.waitForTimeout(100);
+  }
+  throw new Error('Kein Ergebnis nach 120 s');
+}
+
+After(function () {
+  if (this.upload?.verzeichnis) {
+    rmSync(this.upload.verzeichnis, { recursive: true, force: true });
   }
 });
 
 Given('die API meldet die Sitzung als abgelaufen', async function () {
-  (await uploadAttrappe(this)).sitzungAbgelaufen = true;
+  await weiterleiten(this);
+  zustand(this).sitzungAbgelaufen = true;
+});
+
+Given(/^die Datei «(.+)» ist (ein Text|leer|abgeschnitten|grösser als 50 MB)$/, function (name, art) {
+  zustand(this).inhalte.set(name, inhalt(name, art));
+});
+
+Given(/^«(.+)» im Mandanten «(.+)» hat die Datei «(.+)» schon hochgeladen$/, async function (rolle, mandant, name) {
+  const [ergebnis] = await direktHochladen(rolle, mandant, dateien(this, name));
+  assert.equal(ergebnis.status, 'NEU', JSON.stringify(ergebnis));
+  zustand(this).vorhanden.set(name, ergebnis.id);
 });
 
 When(/^ich die Dateien «(.+)» auswähle$/, async function (liste) {
-  await uploadAttrappe(this);
-  await this.seite.locator('input[type=file]').setInputFiles(dateien(liste));
+  await weiterleiten(this);
+  // Playwright nimmt Puffer nur bis 50 MB an; darum gehen die Dateien über ein temporäres Verzeichnis. Chromium liest
+  // sie erst beim Senden, das Verzeichnis bleibt darum bis zum Ende des Szenarios (After).
+  const upload = zustand(this);
+  upload.verzeichnis ??= mkdtempSync(join(tmpdir(), 'archiv-e2e-'));
+  const pfade = dateien(this, liste).map((datei) => {
+    const pfad = join(upload.verzeichnis, datei.name);
+    writeFileSync(pfad, datei.buffer);
+    return pfad;
+  });
+  await this.seite.locator('input[type=file]').setInputFiles(pfade);
 });
 
 When(/^ich die Dateien «(.+)» in die Ablage ziehe$/, async function (liste) {
-  await uploadAttrappe(this);
-  const daten = dateien(liste).map((d) => ({ name: d.name, typ: d.mimeType, inhalt: d.buffer.toString() }));
+  await weiterleiten(this);
+  const daten = dateien(this, liste).map((d) => ({ name: d.name, typ: d.mimeType, inhalt: d.buffer.toString('base64') }));
   const uebertragung = await this.seite.evaluateHandle((liste) => {
     const dt = new DataTransfer();
     for (const d of liste) {
-      dt.items.add(new File([d.inhalt], d.name, { type: d.typ }));
+      const bytes = Uint8Array.from(atob(d.inhalt), (zeichen) => zeichen.charCodeAt(0));
+      dt.items.add(new File([bytes], d.name, { type: d.typ }));
     }
     return dt;
   }, daten);
@@ -126,14 +198,25 @@ Then(/^sehe ich die Dateien «(.+)» in dieser Reihenfolge$/, async function (li
   assert.deepEqual(namen, erwartet);
 });
 
-Then(/^hat das Archiv einen Upload mit «(.+)» (mit|ohne) «zusammenfassen» erhalten$/, async function (liste, art) {
-  await this.seite.getByRole('heading', { name: 'Ergebnis je Datei' }).waitFor();
-  assert.deepEqual(this.upload.anfragen, [{ namen: liste.split(', '), zusammenfassen: art === 'mit' }]);
+Then(/^hat das Archiv einen Upload mit «(.+)» (mit|ohne) «zusammenfassen» erhalten$/, { timeout: 150_000 }, async function (liste, art) {
+  await ergebnisAbwarten(this);
+  const anfragen = this.upload.anfragen.map(({ namen, zusammenfassen }) => ({ namen, zusammenfassen }));
+  assert.deepEqual(anfragen, [{ namen: liste.split(', '), zusammenfassen: art === 'mit' }]);
 });
 
-Then('sehe ich je Datei das Ergebnis:', async function (tabelle) {
-  const ueberschrift = this.seite.getByRole('heading', { name: 'Ergebnis je Datei' });
-  await ueberschrift.waitFor();
+Then(/^hat das Archiv daraus (ein Dokument|je Datei ein Dokument) angelegt$/, async function (art) {
+  for (let versuch = 0; versuch < 50 && this.upload.anfragen[0]?.antwort === undefined; versuch++) {
+    await this.seite.waitForTimeout(100);
+  }
+  const [{ status, antwort }] = this.upload.anfragen;
+  assert.equal(status, 202, JSON.stringify(antwort));
+  assert.ok(antwort.every((e) => e.status === 'NEU' && e.id), JSON.stringify(antwort));
+  const ids = new Set(antwort.map((e) => e.id));
+  assert.equal(ids.size, art === 'ein Dokument' ? 1 : antwort.length, JSON.stringify(antwort));
+});
+
+Then('sehe ich je Datei das Ergebnis:', { timeout: 150_000 }, async function (tabelle) {
+  const ueberschrift = await ergebnisAbwarten(this);
   assert.equal(await ueberschrift.evaluate((e) => e === document.activeElement), true, 'Fokus nicht auf dem Ergebnis');
   for (const zeile of tabelle.hashes()) {
     const eintrag = this.seite.locator('li.datei', { has: this.seite.getByText(zeile.datei, { exact: true }) });
@@ -143,9 +226,9 @@ Then('sehe ich je Datei das Ergebnis:', async function (tabelle) {
   }
 });
 
-Then(/^führt «(.+)» zum vorhandenen Dokument «(.+)»$/, async function (datei, id) {
+Then(/^führt «(.+)» zum vorhandenen Dokument$/, async function (datei) {
   const eintrag = this.seite.locator('li.datei', { has: this.seite.getByText(datei, { exact: true }) });
-  assert.equal(await eintrag.getByRole('link').getAttribute('href'), `/dokument/${id}`);
+  assert.equal(await eintrag.getByRole('link').getAttribute('href'), `/dokument/${this.upload.vorhanden.get(datei)}`);
 });
 
 Then(/^bietet «(.+)» keinen Link$/, async function (datei) {
