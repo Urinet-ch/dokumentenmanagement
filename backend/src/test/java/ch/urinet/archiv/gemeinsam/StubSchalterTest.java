@@ -50,7 +50,7 @@ class StubSchalterTest {
         IntegrationStub integration = new IntegrationStub();
         assertThat(new AblageAuswahl().ablage(true, ablage, null)).isSameAs(ablage);
         assertThat(new KiAuswahl().ki(true, ki)).isSameAs(ki);
-        assertThat(new OcrAuswahl().ocr(true, ocr)).isSameAs(ocr);
+        assertThat(new OcrAuswahl().ocr(true, ocr, null)).isSameAs(ocr);
         assertThat(new IntegrationAuswahl().integration(true, integration)).isSameAs(integration);
     }
 
@@ -60,7 +60,7 @@ class StubSchalterTest {
                 new OcrAuswahl().auswahl(false), new IntegrationAuswahl().auswahl(false));
         var befund = PortAuswahl.pruefe(ports);
         assertThat(befund.abbrueche()).isEmpty();
-        assertThat(befund.warnungen()).hasSize(3).noneMatch(w -> w.startsWith("AblagePort"));
+        assertThat(befund.warnungen()).hasSize(2).noneMatch(w -> w.startsWith("AblagePort") || w.startsWith("OcrPort"));
 
         assertThat(PortAuswahl.pruefe(List.of(new AblageAuswahl().auswahl(true))).abbrueche())
                 .containsExactly("AblagePort: Dev-Stub ist in prod nicht zulässig");
@@ -72,8 +72,6 @@ class StubSchalterTest {
     void ohneStubUndOhneAdapterBrichtDieAuswahlAb() {
         assertThatThrownBy(() -> new KiAuswahl().ki(false, new KiStub()))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("3.2");
-        assertThatThrownBy(() -> new OcrAuswahl().ocr(false, new OcrStub()))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("2.6");
         assertThatThrownBy(() -> new IntegrationAuswahl().integration(false, new IntegrationStub()))
                 .isInstanceOf(IllegalStateException.class);
     }

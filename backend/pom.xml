@@ -20,6 +20,8 @@
         <quarkus-cucumber.version>1.4.0</quarkus-cucumber.version>
         <archunit.version>1.5.1</archunit.version>
         <assertj.version>3.27.7</assertj.version>
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <verapdf.version>1.30.4</verapdf.version>
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
@@ -163,6 +165,24 @@
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- OCR-Adapter (Aufgabe 2.6): synthetische Test-PDFs (Textebene, verschlüsselt, signiert) und PDF/A-Prüfung -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.verapdf</groupId>
+            <artifactId>validation-model-jakarta</artifactId>
+            <version>${verapdf.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
