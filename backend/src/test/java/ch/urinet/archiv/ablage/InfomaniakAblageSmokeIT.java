@@ -69,6 +69,7 @@ class InfomaniakAblageSmokeIT {
             "https://s3.gva2.infomaniak.cloud"));
     private static final Region REGION = Region.of(System.getProperty("archiv.smoke.region", "gva2"));
     private static final String PRAEFIX = "urinet-archiv-smoke-";
+    private static final Path ZWISCHENABLAGE = Path.of("target", "arbeit-smoke", "ablage").toAbsolutePath();
     private static final Set<String> KEINE_SPERRE = S3Ablage.KEINE_SPERRE;
 
     @Test
@@ -170,7 +171,7 @@ class InfomaniakAblageSmokeIT {
         // 9. Manifest in COMPLIANCE, gleicher Inhalt gilt als abgelegt
         S3Ablage manifestAblage = new S3Ablage(s3, S3Ablage.presigner(s3, true), new AblageEinstellungen(PRAEFIX,
                 Optional.of(Duration.ofMinutes(1)), Sperrmodus.COMPLIANCE, Optional.of(Duration.ofMinutes(1)),
-                Duration.ofMinutes(1)), Clock.systemUTC());
+                Duration.ofMinutes(1), ZWISCHENABLAGE), Clock.systemUTC());
         byte[] manifest = "{\"smoke\":true}".getBytes(StandardCharsets.UTF_8);
         LocalDate datum = LocalDate.now();
         AbgelegteDatei abgelegt = manifestAblage.ablegenManifest(mandant, datum, ManifestTeil.JSON, manifest,
@@ -191,7 +192,8 @@ class InfomaniakAblageSmokeIT {
 
     private static S3Ablage ablage(S3Client s3, Duration hoechstfrist) {
         return new S3Ablage(s3, S3Ablage.presigner(s3, true), new AblageEinstellungen(PRAEFIX, Optional.of(hoechstfrist),
-                Sperrmodus.GOVERNANCE, Optional.of(Duration.ofMinutes(1)), Duration.ofMinutes(1)), Clock.systemUTC());
+                Sperrmodus.GOVERNANCE, Optional.of(Duration.ofMinutes(1)), Duration.ofMinutes(1), ZWISCHENABLAGE),
+                Clock.systemUTC());
     }
 
     private static ZuArchivieren eingang(S3Ablage ablage, MandantCode mandant, DateiSchluessel schluessel, String text) {

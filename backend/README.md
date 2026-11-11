@@ -28,7 +28,7 @@ lokal. Echte Belege dürfen so verarbeitet werden, weil sie den Rechner nicht ve
 | `archiv.ki.product-id`, `archiv.ki.reranker-url` | leer – kein Infomaniak-Token, keine Produkt-ID |
 | `archiv.ocr.stub` | `false` – echter OCR-Adapter (Aufgabe 2.6) |
 | `archiv.ocr.container-image` | `urinet-archiv-werkzeuge:lokal` – Werkzeuge laufen per `docker run` (siehe unten) |
-| `archiv.ocr.arbeitsverzeichnis` | `~/.cache/urinet-archiv/ocr` |
+| `archiv.arbeit.verzeichnis` | `~/.cache/urinet-archiv/arbeit` – Uploads (`upload/`), OCR (`ocr/`), Zwischenkopien der Ablage (`ablage/`) |
 
 Stand Welle 2: Der Adapter hinter `KiPort` kommt mit Aufgabe 3.2. Bis dahin startet das Profil, ein Zugriff auf den
 Port meldet aber, dass noch kein Adapter besteht.
@@ -42,7 +42,7 @@ docker build --target werkzeuge -t urinet-archiv-werkzeuge:lokal -f src/main/doc
 ```
 Das Arbeitsverzeichnis liegt unter `$HOME`, weil Colima `/tmp` und `/var/folders` nicht in die VM mountet. Die Tests
 bauen ihr Image `urinet-archiv-werkzeuge:test` bei jedem Lauf selbst (mit dem Cache von Docker) und arbeiten unter
-`target/ocr-arbeit`.
+`target/arbeit`.
 
 Die Startprüfung `KiBasisUrlPruefung` bricht den Start ab, wenn eine KI-URL weder per HTTPS auf `api.infomaniak.com`
 noch – nur in `lokal` – per HTTP auf `localhost` bzw. `127.0.0.1` zeigt, oder wenn `lokal` zusammen mit `prod`

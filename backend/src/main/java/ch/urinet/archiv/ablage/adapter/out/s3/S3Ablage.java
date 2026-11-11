@@ -124,7 +124,8 @@ public class S3Ablage implements AblagePort {
         Path temp = null;
         try {
             // zwischenspeichern: ein Retry des SDK braucht einen wiederholbaren Inhalt, die SHA-256 entsteht dabei
-            temp = Files.createTempFile("ablage-", ".tmp");
+            Files.createDirectories(einstellungen.zwischenablage());
+            temp = Files.createTempFile(einstellungen.zwischenablage(), "ablage-", ".tmp");
             MessageDigest digest = Pruefsumme.sha256();
             long gelesen;
             try (InputStream ein = new DigestInputStream(inhalt, digest); OutputStream aus = Files.newOutputStream(temp)) {

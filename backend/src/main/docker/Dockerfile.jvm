@@ -21,6 +21,9 @@ RUN apt-get update \
 
 # Numerische uid ungleich 0 (Compose-Policy der VPS, tech.md)
 RUN groupadd --system --gid 10001 archiv && useradd --system --uid 10001 --gid archiv --no-create-home archiv
+# Arbeitsverzeichnis (archiv.arbeit.verzeichnis): Mountpunkt des Volumes archiv_arbeit; ein neues, leeres Volume übernimmt
+# Besitzer und Rechte von hier. Kein VOLUME-Befehl, das Volume legt nur compose.yml an.
+RUN install -d -o 10001 -g 10001 -m 700 /var/lib/archiv/arbeit
 USER 10001
 
 # Init-Prozess: Bricht der Worker ein Werkzeug ab (Zeitgrenze, Unterbrechung), hängen dessen Nachfahren (tesseract, gs)
