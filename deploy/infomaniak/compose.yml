@@ -1,0 +1,236 @@
+# UriNet Archiv auf der Infomaniak-VPS (Aufgabe 1.9; design.md «Betrieb auf der VPS», «Stufen der Plattform»).
+# Stufe A: API, PWA und Worker in einem Container (archiv.rolle=api,worker). Deploy nur über
+# .github/workflows/infomaniak-deploy.yml; das Bundle bringt archiv:<sha>, archiv:db-<version> und archiv:kc-<version>
+# mit, deploy-app.sh setzt daraus archiv:current, archiv:db-current und archiv:kc-current.
+# Secrets nur als Dateien unter /run/secrets (tech.md Regel 7), je Dienst nur die eigenen.
+# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 900 MiB (geändert 10.11.2026, Entscheid Fabian;
+# bisher 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Die Limits unten entsprechen dem lokal gemessenen
+# Bedarf (Spitzen unter Last: api 309, db 66, kc 358 MiB) und ergeben zusammen 820 MiB. Der Deploy-Workflow bricht vor
+# dem Bundle ab, sobald die Summe über dem Budget liegt (Req 16.18).
+name: archiv
+
+services:
+  api:
+    image: archiv:current
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 320m
+    cpus: 0.3
+    init: true
+    environment:
+      # Keine Geheimnisse: nur Adressen und Stufenwerte
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
+      ARCHIV_ROLLE: api,worker
+      MALLOC_ARENA_MAX: "2"
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
+      QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
+      JAVA_OPTS_APPEND: >-
+        -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+        -Xmx112m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m
+        -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    secrets:
+      - archiv_db_app
+      - archiv_db_owner
+      - s3_app_zugang_id
+      - s3_app_zugang_geheimnis
+    networks:
+      intern: {}
+      web: {}
+    depends_on:
+      db:
+        condition: service_healthy
+      # Startreihenfolge beim Deploy. Beim Neustart der VPS startet Docker die Container ohne depends_on; war Keycloak
+      # beim Start der API nicht erreichbar, bleibt ihre Readiness DOWN, und sie beendet sich nach 5 Minuten mit
+      # Exit-Code 75 (OIDC-Wächter); restart: unless-stopped startet sie neu (entschieden von Fabian am 11.11.2026).
+      kc:
+        condition: service_healthy
+    healthcheck:
+      # Readiness: Datenbank (Agroal, DatenbankBereitschaft) und OIDC-Tenant (Keycloak); das Image hat kein curl
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /q/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 120s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: web
+      traefik.http.services.archiv.loadbalancer.server.port: "8080"
+      # Drosselung je Client-IP (design.md «Sicherheit», Argon2-Sperre): jede Anfrage mit «Bearer ua_…» rechnet
+      # Argon2, auf allen Pfaden (proaktive Anmeldung)
+      traefik.http.middlewares.archiv-drossel.ratelimit.average: "10"
+      traefik.http.middlewares.archiv-drossel.ratelimit.period: 1s
+      traefik.http.middlewares.archiv-drossel.ratelimit.burst: "50"
+      traefik.http.middlewares.archiv-drossel-health.ratelimit.average: "2"
+      traefik.http.middlewares.archiv-drossel-health.ratelimit.period: 1s
+      traefik.http.middlewares.archiv-drossel-health.ratelimit.burst: "10"
+      # API
+      traefik.http.routers.archiv-api.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/api/`)
+      traefik.http.routers.archiv-api.entrypoints: websecure
+      traefik.http.routers.archiv-api.tls.certresolver: le
+      traefik.http.routers.archiv-api.service: archiv
+      traefik.http.routers.archiv-api.middlewares: archiv-drossel
+      # PWA: alles ausser /api/ und /q/ (Readiness und Kennzahlen bleiben intern, Req 16.4)
+      traefik.http.routers.archiv.rule: Host(`archiv.apps.urinet.ch`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`)
+      traefik.http.routers.archiv.entrypoints: websecure
+      traefik.http.routers.archiv.tls.certresolver: le
+      traefik.http.routers.archiv.service: archiv
+      traefik.http.routers.archiv.middlewares: archiv-drossel
+      # Schlanker öffentlicher Health-Pfad
+      traefik.http.routers.archiv-health.rule: Host(`archiv.apps.urinet.ch`) && Path(`/q/health/live`)
+      traefik.http.routers.archiv-health.entrypoints: websecure
+      traefik.http.routers.archiv-health.tls.certresolver: le
+      traefik.http.routers.archiv-health.service: archiv
+      traefik.http.routers.archiv-health.middlewares: archiv-drossel-health
+
+  db:
+    image: archiv:db-current
+    restart: unless-stopped
+    user: "999:999"
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql:size=1m,uid=999,gid=999,mode=0775
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 100m
+    cpus: 0.15
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/archiv_db_postgres
+    command:
+      - postgres
+      - -c
+      - shared_buffers=24MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - max_connections=30
+      - -c
+      - effective_cache_size=64MB
+    secrets:
+      - archiv_db_postgres
+      - archiv_db_owner_scram
+      - archiv_db_app_scram
+      - keycloak_db_scram
+    volumes:
+      - type: volume
+        source: daten
+        target: /var/lib/postgresql/data
+    networks:
+      intern: {}
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, archiv, -h, 127.0.0.1]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  kc:
+    image: archiv:kc-current
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+      - /opt/keycloak/data/tmp:size=32m,uid=1000,gid=1000,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 400m
+    cpus: 0.3
+    environment:
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_POOL_MAX_SIZE: "8"
+      KC_HOSTNAME: https://archiv-auth.apps.urinet.ch
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_BOOTSTRAP_ADMIN_USERNAME: archiv-admin
+      MALLOC_ARENA_MAX: "2"
+      # ersetzt die Vorgaben von kc.sh (G1, Metaspace 256m), damit Keycloak in mem_limit passt
+      JAVA_OPTS: >-
+        -XX:+UseSerialGC -Xms32m -Xmx96m -XX:MaxMetaspaceSize=160m
+        -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=32m
+        -XX:MaxDirectMemorySize=32m -Xss512k
+        -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom
+        -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.err.encoding=UTF-8
+        -Djdk.tls.rejectClientInitiatedRenegotiation=true
+    secrets:
+      - keycloak_db
+      - keycloak_admin
+    networks:
+      intern: {}
+      web: {}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # Management-Port 9000 bleibt intern; das Image hat kein curl
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 180s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: web
+      traefik.http.services.archiv-auth.loadbalancer.server.port: "8080"
+      traefik.http.middlewares.archiv-auth-drossel.ratelimit.average: "10"
+      traefik.http.middlewares.archiv-auth-drossel.ratelimit.period: 1s
+      traefik.http.middlewares.archiv-auth-drossel.ratelimit.burst: "50"
+      # Nur der Realm des Archivs und die statischen Dateien; Admin-Konsole und Realm master bleiben intern
+      traefik.http.routers.archiv-auth.rule: Host(`archiv-auth.apps.urinet.ch`) && (PathPrefix(`/realms/urinet-archiv/`) || PathPrefix(`/resources/`))
+      traefik.http.routers.archiv-auth.entrypoints: websecure
+      traefik.http.routers.archiv-auth.tls.certresolver: le
+      traefik.http.routers.archiv-auth.service: archiv-auth
+      traefik.http.routers.archiv-auth.middlewares: archiv-auth-drossel
+
+networks:
+  intern:
+    name: archiv_intern
+    driver: bridge
+    internal: true
+  web:
+    external: true
+
+volumes:
+  daten:
+    name: archiv_daten
+
+secrets:
+  archiv_db_app:
+    file: ./secrets/archiv_db_app
+  archiv_db_owner:
+    file: ./secrets/archiv_db_owner
+  s3_app_zugang_id:
+    file: ./secrets/s3_app_zugang_id
+  s3_app_zugang_geheimnis:
+    file: ./secrets/s3_app_zugang_geheimnis
+  archiv_db_postgres:
+    file: ./secrets/archiv_db_postgres
+  archiv_db_owner_scram:
+    file: ./secrets/archiv_db_owner_scram
+  archiv_db_app_scram:
+    file: ./secrets/archiv_db_app_scram
+  keycloak_db_scram:
+    file: ./secrets/keycloak_db_scram
+  keycloak_db:
+    file: ./secrets/keycloak_db
+  keycloak_admin:
+    file: ./secrets/keycloak_admin

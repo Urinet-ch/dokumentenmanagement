@@ -9,7 +9,7 @@
 - Die Daten enthalten Personal- und Lohndaten (`PERSONAL`). Ein Leck zwischen Mandanten wäre der schwerste denkbare Fehler. Der Mandant stammt nur aus dem verifizierten Token, nie aus Benutzereingaben (tech.md Regel 1, Req 1.2).
 - Einige Daten sind gemeinsam: Mandantenregister, Auftragsschlange (ADR-003) und API-Clients.
 - Das Schema wächst über die Specs 02 und 03. Ein Rollback auf das Vorgänger-Image darf keinen Rückbau der Datenbank verlangen (Req 16.11, Deploy mit Rollback nach ADR-010).
-- Es gibt eine PostgreSQL-17-Instanz auf einer kleinen VPS. In Stufe A gilt ein Speicherbudget von höchstens 700 MiB für alle Archiv-Dienste (P1).
+- Es gibt eine PostgreSQL-17-Instanz auf einer kleinen VPS. In Stufe A gilt ein Speicherbudget von höchstens 700 MiB für alle Archiv-Dienste (P1) (ab 10.11.2026 900 MiB, siehe Nachtrag in ADR-010).
 - Zwei Agenten arbeiten parallel am Code (CLAUDE.md). Schemaänderungen müssen nachvollziehbar sein und dürfen sich nicht gegenseitig überschreiben.
 
 ## Entscheid

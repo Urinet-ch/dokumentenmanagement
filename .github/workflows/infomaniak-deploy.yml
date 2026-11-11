@@ -1,0 +1,314 @@
+# Deploy auf die Infomaniak-VPS, Stufe A (Aufgabe 1.9; Req 16.1, 16.9, 16.10, 16.11, 16.18; design.md «Betrieb auf
+# der VPS»). Einziger Weg auf den Server: Bundle (image.tar, compose.yml, bundle/secrets/) per SSH an den Forced Command
+# deploy-app.sh der VPS, danach Health-Prüfung; schlägt sie fehl, Rollback auf den Vorgänger-Stand.
+# Kein Server-Zugriff aus Sitzungen, kein manuelles «docker compose up» auf dem Server (CLAUDE.md, Arbeitsweise 8).
+# Geheimnisse nur als Dateien im Bundle (tech.md Regel 7), Werte erscheinen nie im Log; Logs nennen nur Namen und IDs.
+name: Infomaniak Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  actions: read
+  # CI-Nachweis über den PR des Squash-Merges (Schritt «CI für diesen Stand grün»)
+  pull-requests: read
+
+concurrency:
+  group: infomaniak-deploy-archiv
+  cancel-in-progress: false
+
+env:
+  APP: archiv
+  HOST_ARCHIV: archiv.apps.urinet.ch
+  HOST_AUTH: archiv-auth.apps.urinet.ch
+  # Speicherbudget Stufe A aus tech.md (900 MiB, geändert 10.11.2026, Entscheid Fabian); liegt compose.yml darüber,
+  # gilt Req 16.18 (kein Deploy auf Stufe A)
+  BUDGET_MEM_MIB: '900'
+  BUDGET_CPUS: '0.75'
+  # Solange Push auf main ohne CI läuft (Entscheid Fabian 11.11.2026, PR #50), gilt bis zum Vortag dieses Datums auch
+  # die grüne PR-CI des Squash-Merges mit gleichem Stand; ab dann nur noch ein Lauf auf dem Commit (Review PR #42, S1)
+  PR_CI_BIS: '2026-12-01'
+
+jobs:
+  deploy:
+    name: Deploy Stufe A
+    # Nur main oder ein Release-Tag; ohne Server-Variable läuft nichts
+    if: vars.INFOMANIAK_HOST != '' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # ganze Historie für die Prüfung «Commit liegt auf main»
+          fetch-depth: 0
+
+      - name: Commit liegt auf main
+        run: |
+          # Auch ein Release-Tag deployt nur einen Stand, der über einen PR auf main kam (Req 16.10)
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Commit $GITHUB_SHA liegt nicht auf main. Nur Stände von main deployen; Tag auf einen Commit von main setzen."
+            exit 1
+          fi
+
+      - name: Speicherbudget Stufe A (Req 16.18)
+        run: |
+          docker compose -p "$APP" -f deploy/infomaniak/compose.yml config --format json \
+            | python3 .github/scripts/pruefe-speicherbudget.py "$BUDGET_MEM_MIB" "$BUDGET_CPUS"
+
+      - name: CI für diesen Stand grün
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Grüner ci.yml-Lauf auf dem Commit oder (bis PR_CI_BIS) grüne PR-CI des Squash-Merges mit gleichem Stand;
+          # sonst Abbruch mit dem Hinweis, die CI auf main von Hand zu starten
+          python3 .github/scripts/pruefe-ci-nachweis.py "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$PR_CI_BIS"
+
+      - name: Geheimnisse und Variablen vorhanden
+        env:
+          SSH_KEY: ${{ secrets.INFOMANIAK_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.INFOMANIAK_KNOWN_HOSTS }}
+          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+          ARCHIV_DB_POSTGRES: ${{ secrets.ARCHIV_DB_POSTGRES }}
+          ARCHIV_DB_OWNER: ${{ secrets.ARCHIV_DB_OWNER }}
+          ARCHIV_DB_APP: ${{ secrets.ARCHIV_DB_APP }}
+          KEYCLOAK_DB: ${{ secrets.KEYCLOAK_DB }}
+          KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
+          S3_APP_ZUGANG_ID: ${{ secrets.S3_APP_ZUGANG_ID }}
+          S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
+        run: |
+          fehlt=0
+          pruefe() { if [ -z "$2" ]; then echo "::error::$1 fehlt (Secret bzw. Variable im Repo setzen)"; fehlt=1; fi; }
+          pruefe INFOMANIAK_SSH_KEY "$SSH_KEY"
+          pruefe INFOMANIAK_KNOWN_HOSTS "$KNOWN_HOSTS"
+          pruefe INFOMANIAK_ANDERE_APPS_HEALTH "$ANDERE_APPS"
+          pruefe ARCHIV_DB_POSTGRES "$ARCHIV_DB_POSTGRES"
+          pruefe ARCHIV_DB_OWNER "$ARCHIV_DB_OWNER"
+          pruefe ARCHIV_DB_APP "$ARCHIV_DB_APP"
+          pruefe KEYCLOAK_DB "$KEYCLOAK_DB"
+          pruefe KEYCLOAK_ADMIN "$KEYCLOAK_ADMIN"
+          pruefe S3_APP_ZUGANG_ID "$S3_APP_ZUGANG_ID"
+          pruefe S3_APP_ZUGANG_GEHEIMNIS "$S3_APP_ZUGANG_GEHEIMNIS"
+          exit "$fehlt"
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Archiv bauen (Quarkus mit PWA über Quinoa)
+        run: |
+          (cd frontend && npm ci)
+          # Tests liefen in der CI für diesen Stand (Schritt oben)
+          mvn -B -ntp -f backend/pom.xml package -DskipTests
+
+      - name: Images bauen
+        id: images
+        run: |
+          kurz=${GITHUB_SHA::7}
+          version() { sed -n 's/^FROM [^:]*:\([^@ ]*\)@sha256:.*/\1/p' "$1" | head -n1; }
+          db_tag="db-$(version deploy/infomaniak/db/Dockerfile)-$kurz"
+          kc_tag="kc-$(version deploy/infomaniak/keycloak/Dockerfile)-$kurz"
+          docker build -q -f backend/src/main/docker/Dockerfile.jvm -t "$APP:$kurz" backend
+          docker build -q -t "$APP:$db_tag" deploy/infomaniak/db
+          docker build -q -f deploy/infomaniak/keycloak/Dockerfile -t "$APP:$kc_tag" deploy
+          echo "tags=$APP:$kurz $APP:$db_tag $APP:$kc_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Bundle schnüren
+        env:
+          TAGS: ${{ steps.images.outputs.tags }}
+          ARCHIV_DB_POSTGRES: ${{ secrets.ARCHIV_DB_POSTGRES }}
+          ARCHIV_DB_OWNER: ${{ secrets.ARCHIV_DB_OWNER }}
+          ARCHIV_DB_APP: ${{ secrets.ARCHIV_DB_APP }}
+          KEYCLOAK_DB: ${{ secrets.KEYCLOAK_DB }}
+          KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
+          S3_APP_ZUGANG_ID: ${{ secrets.S3_APP_ZUGANG_ID }}
+          S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
+        run: |
+          umask 077
+          mkdir -p bundle/secrets
+          # read -a statt Wortaufteilung ohne Anführungszeichen (die Tags enthalten keine Leerzeichen)
+          read -r -a tags <<< "$TAGS"
+          docker save "${tags[@]}" -o bundle/image.tar
+          cp deploy/infomaniak/compose.yml bundle/compose.yml
+          # Eine Datei je Secret, nur der Wert (deploy-app.sh liest bundle/secrets/<name>)
+          schreibe() { printf '%s' "$2" > "bundle/secrets/$1"; }
+          schreibe archiv_db_postgres "$ARCHIV_DB_POSTGRES"
+          schreibe archiv_db_owner "$ARCHIV_DB_OWNER"
+          schreibe archiv_db_app "$ARCHIV_DB_APP"
+          schreibe keycloak_db "$KEYCLOAK_DB"
+          schreibe keycloak_admin "$KEYCLOAK_ADMIN"
+          schreibe s3_app_zugang_id "$S3_APP_ZUGANG_ID"
+          schreibe s3_app_zugang_geheimnis "$S3_APP_ZUGANG_GEHEIMNIS"
+          # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
+          for rolle in archiv_db_owner archiv_db_app keycloak_db; do
+            python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"
+          done
+          ls bundle bundle/secrets
+
+      - name: SSH vorbereiten
+        env:
+          SSH_KEY: ${{ secrets.INFOMANIAK_SSH_KEY }}
+          KNOWN_HOSTS: ${{ vars.INFOMANIAK_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Andere Apps der VPS vor dem Deploy (Req 16.18)
+        env:
+          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+        run: |
+          fehler=0
+          for url in $ANDERE_APPS; do
+            if curl -fsS -o /dev/null --max-time 15 "$url"; then echo "ok: $url"; else echo "::error::nicht gesund: $url"; fehler=1; fi
+          done
+          if [ "$fehler" -ne 0 ]; then
+            echo "::error::Eine andere App ist schon vor dem Deploy nicht gesund; kein Deploy, Fabian prüft die VPS."
+          fi
+          exit "$fehler"
+
+      - name: Deployen
+        id: deploy
+        env:
+          HOST: ${{ vars.INFOMANIAK_HOST }}
+        run: |
+          umask 077
+          set -o pipefail
+          tar -C bundle -cf - . \
+            | ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "deploy@$HOST" "deploy $APP" 2>&1 \
+            | tee deploy.log
+          # Geheimnisse und Images verlassen den Runner nicht weiter
+          rm -rf bundle
+
+      - name: Container gesund
+        env:
+          HOST: ${{ vars.INFOMANIAK_HOST }}
+        run: |
+          umask 077
+          # status liefert «compose ps» und Logs; pruefe-container.py wertet nur die Zeilen der Container aus und
+          # merkt sich ihre Laufzeit für die Prüfung auf Neustarts (Speicherabbrüche). Die Readiness der API umfasst
+          # Keycloak (entschieden von Fabian am 11.11.2026, PR #42 P42-1): Die Wartezeit (10 Minuten) deckt die Frist des
+          # OIDC-Wächters (5 Minuten, dazu Takt und Zeitlimit), einen Neustart der API und ihren Healthcheck; so heilt
+          # sich ein beim Start noch nicht erreichbares Keycloak, ein falsch konfiguriertes endet hier und im Rollback.
+          for _ in $(seq 1 40); do
+            ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null > status.txt || true
+            if python3 .github/scripts/pruefe-container.py gesund "$RUNNER_TEMP/container.json" < status.txt > stand.txt; then
+              cat stand.txt; rm -f status.txt stand.txt; exit 0
+            fi
+            sleep 15
+          done
+          cat stand.txt
+          # nur die Zählung, keine Log-Inhalte
+          oidc=$(grep -c 'fehlercode=OIDC_NICHT_BEREIT' status.txt || true)
+          rm -f status.txt stand.txt
+          echo "OIDC_NICHT_BEREIT im Log: $oidc"
+          if [ "$oidc" -ne 0 ]; then
+            echo "::error::Die API meldet Keycloak nicht bereit (OIDC_NICHT_BEREIT): Realm, Adresse (quarkus.oidc.auth-server-url) und Erreichbarkeit von archiv-auth prüfen."
+          fi
+          echo "::error::api, db und kc sind nach 10 Minuten nicht alle healthy."
+          exit 1
+
+      - name: Öffentliche Prüfung
+        run: |
+          code() { curl -s -o /dev/null --max-time 15 -w '%{http_code}' "$1"; }
+          warte() {
+            for _ in $(seq 1 30); do [ "$(code "$1")" = 200 ] && return 0; sleep 10; done
+            echo "::error::$1 liefert nach 5 Minuten nicht 200"; return 1
+          }
+          warte "https://$HOST_ARCHIV/q/health/live"
+          warte "https://$HOST_AUTH/realms/urinet-archiv/.well-known/openid-configuration"
+          fehler=0
+          erwarte() {
+            ist=$(code "$2")
+            if [ "$ist" = "$1" ]; then echo "ok: $2 → $ist"; else echo "::error::$2 → $ist, erwartet $1"; fehler=1; fi
+          }
+          # API ohne Anmeldung, interne Health- und Admin-Pfade nicht öffentlich
+          erwarte 401 "https://$HOST_ARCHIV/api/v1/api-tokens"
+          erwarte 404 "https://$HOST_ARCHIV/q/health/ready"
+          erwarte 404 "https://$HOST_ARCHIV/q/openapi"
+          erwarte 404 "https://$HOST_AUTH/admin/"
+          erwarte 404 "https://$HOST_AUTH/realms/master/.well-known/openid-configuration"
+          exit "$fehler"
+
+      - name: Speicherabbrüche des Archivs (Req 16.18)
+        id: speicher
+        env:
+          HOST: ${{ vars.INFOMANIAK_HOST }}
+        run: |
+          # Nach einer Minute Betrieb: alle Container wieder healthy und seit «Container gesund» nicht neu gestartet
+          # (Laufzeit aus «compose ps»; ein cgroup-OOM mit restart: unless-stopped zeigt sich nur so), keine
+          # Abbruchmeldung im Log: JVM (OutOfMemoryError, mit -XX:+ExitOnOutOfMemoryError «Terminating due to …»),
+          # PostgreSQL (ein Prozess «terminated by signal 9: Killed», der Container läuft dabei weiter) und Kernel
+          # (oom-kill); kein blosses «Killed», das auch in harmlosen Meldungen steht. Log-Inhalte erscheinen nicht in
+          # der Ausgabe, nur Zählungen.
+          # Speicherabbrüche anderer Apps sieht der Deploy-Befehl nicht; die prüft Fabian auf der VPS (Nachweis 16.18
+          # manuell).
+          sleep 60
+          ausgabe=$(ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null || true)
+          neustart=0
+          python3 .github/scripts/pruefe-container.py unveraendert "$RUNNER_TEMP/container.json" <<< "$ausgabe" || neustart=1
+          abbruch=$(grep -c -E 'OutOfMemoryError|terminated by signal 9|oom-kill' <<< "$ausgabe" || true)
+          echo "Abbruchmeldungen im Log: $abbruch"
+          if [ "$neustart" -ne 0 ] || [ "$abbruch" -ne 0 ]; then
+            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Fabian informieren; er stoppt die Archiv-Dienste auf der VPS (der Deploy-Befehl kennt kein Stoppen), K5 und Wechsel (5.11) vorziehen."
+            exit 1
+          fi
+
+      - name: Andere Apps der VPS nach dem Deploy (Req 16.18)
+        id: andere
+        if: always() && steps.deploy.outcome != 'skipped'
+        env:
+          ANDERE_APPS: ${{ vars.INFOMANIAK_ANDERE_APPS_HEALTH }}
+        run: |
+          fehler=0
+          for url in $ANDERE_APPS; do
+            if curl -fsS -o /dev/null --max-time 15 "$url"; then echo "ok: $url"; else echo "::error::nicht gesund: $url"; fehler=1; fi
+          done
+          if [ "$fehler" -ne 0 ]; then
+            echo "::error::Req 16.18 eingetreten: Abbruchkriterium 1.10. Fabian informieren; er stoppt die Archiv-Dienste auf der VPS (der Deploy-Befehl kennt kein Stoppen), K5 und Wechsel (5.11) vorziehen."
+          fi
+          exit "$fehler"
+
+      - name: Rollback
+        # Nur wenn der Server den neuen Stand übernommen hat: entweder lief der Deploy durch, oder compose hat
+        # schon Container neu erstellt. Ein abgelehnter Deploy hat nichts geändert und braucht keinen Rollback.
+        # Tritt 16.18 ein (Speicherabbruch, andere App krank), gilt das Abbruchkriterium aus 1.10 (stoppen), kein
+        # Rollback: Der Vorgänger-Stand bräuchte denselben Speicher.
+        if: >-
+          failure() && steps.deploy.outcome != 'skipped'
+          && steps.speicher.outcome != 'failure' && steps.andere.outcome != 'failure'
+        env:
+          HOST: ${{ vars.INFOMANIAK_HOST }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          umask 077
+          if [ "$DEPLOY_OUTCOME" = failure ] && ! grep -q "Container $APP-" deploy.log 2>/dev/null; then
+            echo "Deploy vor dem Umschalten abgebrochen; auf dem Server ist nichts geändert."
+            exit 0
+          fi
+          rc=0
+          ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "rollback $APP" > rollback.log 2>&1 || rc=$?
+          grep -E '^(rollback|  Dienst|kein )' rollback.log || true
+          if grep -q "^kein $APP:previous vorhanden" rollback.log; then
+            echo "::error::Deploy fehlgeschlagen; erster Deploy: kein Rollback möglich (kein Vorgänger-Stand). Fabian informieren; er prüft oder stoppt die Archiv-Dienste auf der VPS."
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error::Deploy fehlgeschlagen, und der Rollback ist ebenfalls fehlgeschlagen (Exit $rc). Fabian informieren, Zustand auf der VPS prüfen."
+          else
+            echo "::error::Deploy fehlgeschlagen, Rollback auf den Vorgänger-Stand ausgeführt."
+          fi
+          rm -f rollback.log
+
+      - name: Aufräumen
+        if: always()
+        run: rm -rf ~/.ssh/deploy bundle deploy.log rollback.log status.txt stand.txt "$RUNNER_TEMP/container.json"

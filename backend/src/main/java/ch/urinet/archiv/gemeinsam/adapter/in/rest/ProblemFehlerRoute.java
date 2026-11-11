@@ -2,6 +2,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import io.quarkus.oidc.OIDCException;
 import io.quarkus.security.AuthenticationCompletionException;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.ForbiddenException;
@@ -20,7 +21,8 @@ import java.util.Optional;
 /**
  * Problem Details auch für Fehler vor der Resource (RFC 9457): Die Anmeldung und die HTTP-Rechte unter {@code /api/*}
  * scheitern in Vert.x, bevor eine {@code ServerExceptionMapper} greift. 401 mit {@code WWW-Authenticate: Bearer}, 403
- * {@code NICHT_ERLAUBT}; andere Fehler gehen an den nächsten Handler.
+ * {@code NICHT_ERLAUBT}; Keycloak nicht erreichbar ({@code OIDCException}) gilt als nicht angemeldet. Andere Fehler gehen
+ * an den nächsten Handler.
  * <p>
  * Die Grenze der Anfrage ({@code quarkus.http.limits.max-body-size}) prüft Quarkus vor allen Handlern und antwortet mit
  * einer leeren 413. Darum prüft {@link #grenzePruefen} sie für {@code /api/*} kurz davor am {@code Content-Length} und
@@ -87,7 +89,7 @@ public class ProblemFehlerRoute {
             return;
         }
         if (fehler instanceof AuthenticationFailedException || fehler instanceof UnauthorizedException
-                || fehler instanceof AuthenticationCompletionException) {
+                || fehler instanceof AuthenticationCompletionException || fehler instanceof OIDCException) {
             senden(kontext, ProblemAntwort.fuer(Fehlercode.NICHT_ANGEMELDET, fehler), true);
         } else if (fehler instanceof ForbiddenException) {
             senden(kontext, ProblemAntwort.fuer(Fehlercode.NICHT_ERLAUBT), false);

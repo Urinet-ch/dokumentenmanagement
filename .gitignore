@@ -3,3 +3,7 @@ target/
 
 # Systemdateien
 .DS_Store
+
+# Deploy: Secrets und lokale Umgebung nie ins Repository (tech.md Regel 7)
+deploy/infomaniak/secrets/
+deploy/infomaniak/.env

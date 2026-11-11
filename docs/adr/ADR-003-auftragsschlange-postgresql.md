@@ -8,7 +8,7 @@
 - Lange Arbeiten dürfen die API nicht blockieren: Verarbeitung mit OCR, KI-Vorschlag, Archivierung, CSV-Vorschau und -Übernahme, Manifest und Prüflauf. Der Upload antwortet deshalb mit 202 und reiht einen Auftrag ein (Aufgabe 2.4).
 - Ein Auftrag muss einen Neustart und einen Rollback-Deploy überstehen. Er hat höchstens 3 Versuche mit wachsender Wartezeit (Req 5.4) und eine Zeitgrenze je Typ (Req 5.6). Verwaiste Aufträge werden wieder freigegeben (Req 5.7), und jeder Auftrag führt seinen Mandanten mit (Req 1.6).
 - Das Volumen eines Kleinbetriebs ist gering, verlangt wird Verlässlichkeit, nicht Durchsatz.
-- In Stufe A gilt ein Budget von höchstens 700 MiB und 0.75 CPU für alle Archiv-Dienste. API und Worker laufen in einem Container, mit Parallelität 1 (P1, ADR-010). Jeder zusätzliche Dienst müsste gesichert, überwacht und nach der Compose-Policy betrieben werden.
+- In Stufe A gilt ein Budget von höchstens 700 MiB (ab 10.11.2026 900 MiB, siehe Nachtrag in ADR-010) und 0.75 CPU für alle Archiv-Dienste. API und Worker laufen in einem Container, mit Parallelität 1 (P1, ADR-010). Jeder zusätzliche Dienst müsste gesichert, überwacht und nach der Compose-Policy betrieben werden.
 - Der Statuswechsel eines Dokuments und das Einreihen des Folgeauftrags gehören fachlich zusammen, etwa bei `NEU` und `VERARBEITEN` oder bei `ARCHIVIERUNG` und `ARCHIVIEREN`.
 
 ## Entscheid

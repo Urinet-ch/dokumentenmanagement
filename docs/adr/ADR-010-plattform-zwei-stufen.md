@@ -33,7 +33,7 @@
 4. **Stufe A** (ab Welle 1 bis zum Wechsel) auf der bestehenden VPS:
    - Nur Test- und anonymisierte Daten (Req 16.15). Geschwärzte echte Belege und der
      Golden-Datensatz gelten als echt und sind ausgeschlossen.
-   - Budget: Summe `mem_limit` ≤ 700 MiB, `cpus` ≤ 0.75 (Richtwert, gemessen in 1.10).
+   - Budget: Summe `mem_limit` ≤ 700 MiB, `cpus` ≤ 0.75 (Richtwert, gemessen in 1.10; ab 10.11.2026 900 MiB, siehe Nachtrag unten).
    - API und Worker laufen in einem Container: Image `archiv-worker`, `archiv.rolle=api,worker`,
      Parallelität 1, OCR mit `--jobs 1`.
    - Leistungsziele gelten nicht (Req 16.16). Die Sicherung läuft nur als Funktionstest
@@ -89,6 +89,14 @@ Entschieden von Fabian am 09.11.2026 (Option A): Der Bucket heisst `<archiv.abla
 `archiv.ablage.max-sperrfrist=P1D`). Ab Stufe B bricht der Start ab, wenn eine Höchstfrist gesetzt ist oder der Präfix
 der Stufe A gilt (Req 6.11). Beim Wechsel (5.11) löscht der App-Schlüssel frühestens 1 Tag nach dem letzten Upload alle
 Versionen der Test-Buckets ohne Bypass-Header, danach die Buckets; der Inhaber-Zugang wird nicht gebraucht.
+
+## Nachtrag 10.11.2026 (Speicherbudget der Stufe A)
+Entschieden von Fabian am 10.11.2026: Das Speicherbudget der Stufe A steigt von 700 auf **900 MiB** (Summe `mem_limit`);
+`cpus` bleibt bei höchstens 0.75. Grund: Die erste Messung in Aufgabe 1.9 (lokal, ganzer Stack) ergab 820 MiB, vor
+allem wegen Keycloak (rund 318 MiB im Leerlauf); mit tieferen Limits beendete der cgroup-OOM Keycloak. Die VPS hat
+rund 1'140 MB frei. Das Abbruchkriterium aus Req 16.18 bleibt: Ein Speicherabbruch auf der VPS oder eine kranke andere
+App beendet den Deploy, das Archiv wird auf Stufe A gestoppt und Stufe B (5.11) vorgezogen. Punkt 4 «Budget» oben gilt
+mit dem neuen Wert; nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.9, 1.10) und im Deploy-Workflow.
 
 ## Verweise
 - Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19; P1 (geändert 08.11.2026), P5, P15, K5

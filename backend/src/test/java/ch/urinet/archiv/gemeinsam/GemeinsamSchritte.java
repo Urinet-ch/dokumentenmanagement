@@ -13,7 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
@@ -24,11 +23,6 @@ public class GemeinsamSchritte {
 
     /** Tests laufen in {@code backend/}; das Repository liegt eine Ebene höher. */
     static final Path REPO = Path.of("..").toAbsolutePath().normalize();
-
-    /** Workflows, die Secrets brauchen dürfen (Req 16.7); heute keiner, später der Deploy (1.9). */
-    static final Set<String> WORKFLOWS_MIT_SECRETS = Set.of();
-
-    private static final Pattern SECRETS = Pattern.compile("\\bsecrets\\b");
 
     private Response antwort;
 
@@ -43,7 +37,7 @@ public class GemeinsamSchritte {
         assertThat(antwort.body().asString()).contains(text);
     }
 
-    @Dann("verwendet kein Workflow unter «{word}» ein Secret oder einen Golden-Lauf")
+    @Dann("verwendet kein Workflow unter «{word}» einen Golden-Lauf oder ein Secret ausser den freigegebenen des Deploys")
     public void workflowsOhneSecretUndGolden(String verzeichnis) throws IOException {
         List<Path> workflows;
         try (Stream<Path> dateien = Files.list(REPO.resolve(verzeichnis))) {
@@ -53,9 +47,9 @@ public class GemeinsamSchritte {
         for (Path workflow : workflows) {
             String name = workflow.getFileName().toString();
             String inhalt = Files.readString(workflow, StandardCharsets.UTF_8);
-            if (!WORKFLOWS_MIT_SECRETS.contains(name)) {
-                assertThat(SECRETS.matcher(inhalt).find()).as("Secret in %s", name).isFalse();
-            }
+            // Nur der Deploy darf Secrets nutzen (Aufgabe 1.9); er schreibt sie ins Bundle und verarbeitet keine Daten
+            assertThat(WorkflowSecrets.funde(inhalt, WorkflowSecrets.ERLAUBT.getOrDefault(name, Set.of())))
+                    .as("unerlaubte Secrets in %s", name).isEmpty();
             assertThat(inhalt).as(name).doesNotContain("ARCHIV_GOLDEN_DIR", "-Dgolden", "GoldenDatensatzIT");
         }
     }

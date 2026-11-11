@@ -1,0 +1,3 @@
+# Build-Kontext des Keycloak-Images ist deploy/: Secrets und lokale Umgebung nie ins Image
+infomaniak/secrets
+**/.env
