@@ -80,10 +80,126 @@
           }
         }
       },
+      "Bestaetigung" : {
+        "description" : "Bestätigte Metadaten (A7, Req 8.2–8.5, 8.8, 8.9). Ersetzt die Grundfelder sowie die Felder der Gruppen finanz und vertrag vollständig; fehlende Felder sind leer. Zusatzfelder kommen aus dem gespeicherten Dokument.",
+        "type" : "object",
+        "required" : [ "art" ],
+        "properties" : {
+          "art" : {
+            "type" : "string",
+            "description" : "Code einer aktiven Dokumentart"
+          },
+          "titel" : {
+            "type" : [ "string", "null" ]
+          },
+          "datum" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "partnerId" : {
+            "description" : "ID eines Kontakts des Mandanten",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "projekt" : {
+            "type" : [ "string", "null" ]
+          },
+          "tags" : {
+            "type" : [ "array", "null" ],
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "vertraulichkeit" : {
+            "type" : [ "string", "null" ],
+            "description" : "Fehlt sie, gilt die Standardvertraulichkeit der Art",
+            "enum" : [ "NORMAL", "INTERN", "PERSONAL" ]
+          },
+          "personBenutzer" : {
+            "type" : [ "string", "null" ]
+          },
+          "geschaeftsjahr" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Fehlt es, schlägt das Archiv das Geschäftsjahr vor"
+          },
+          "belegnummer" : {
+            "type" : [ "string", "null" ]
+          },
+          "richtung" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "EINNAHME", "AUSGABE" ]
+          },
+          "betrag" : {
+            "type" : [ "number", "null" ]
+          },
+          "waehrung" : {
+            "type" : [ "string", "null" ],
+            "description" : "ISO 4217, Standard CHF"
+          },
+          "faelligkeit" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "qrReferenz" : {
+            "type" : [ "string", "null" ]
+          },
+          "konto" : {
+            "type" : [ "string", "null" ]
+          },
+          "gueltigAb" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "kuendigungsfrist" : {
+            "type" : [ "string", "null" ]
+          },
+          "naechsteFrist" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "ohnePdfa" : {
+            "type" : "boolean",
+            "description" : "Ohne PDF/A bestätigen, wenn die PDF/A-Fassung fehlt (Req 5.9)"
+          },
+          "fristAbgelaufenAkzeptiert" : {
+            "type" : "boolean",
+            "description" : "Ablauf der Aufbewahrungsfrist ausdrücklich bestätigen (Req 9.8)"
+          }
+        }
+      },
       "Dokument" : {
         "description" : "Metadaten eines sichtbaren Dokuments",
         "type" : "object",
-        "required" : [ "id", "eingang", "quelle", "tags", "vertraulichkeit", "status", "fristAbgelaufen", "version" ],
+        "required" : [ "id", "eingang", "quelle", "tags", "vertraulichkeit", "status", "fristAbgelaufen", "version", "warnungen" ],
         "properties" : {
           "id" : {
             "$ref" : "#/components/schemas/UUID"
@@ -170,6 +286,13 @@
             "type" : "integer",
             "format" : "int32",
             "description" : "Version für If-Match (auch als ETag)"
+          },
+          "warnungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Warnung"
+            },
+            "description" : "Nur im Eingangskorb, sonst leer (Req 8.10)"
           }
         }
       },
@@ -592,6 +715,37 @@
           },
           "detail" : {
             "type" : "string"
+          }
+        }
+      },
+      "Verwerfen" : {
+        "description" : "Grund des Verwerfens (Req 6.6)",
+        "type" : "object",
+        "required" : [ "grund" ],
+        "properties" : {
+          "grund" : {
+            "type" : "string",
+            "maxLength" : 1000
+          }
+        }
+      },
+      "Warnung" : {
+        "type" : "object",
+        "description" : "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)",
+        "required" : [ "code" ],
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "enum" : [ "BELEGNUMMER_BEKANNT" ]
+          },
+          "vorhandenId" : {
+            "description" : "Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       }
@@ -1122,6 +1276,60 @@
         } ]
       }
     },
+    "/api/v1/dokumente/{id}/bestaetigen" : {
+      "post" : {
+        "summary" : "Dokument bestätigen und archivieren",
+        "description" : "Nur aus EINGANGSKORB (sonst 409 STATUS_KONFLIKT). Pflichtfelder der Art fehlen → 422 PFLICHTFELD_FEHLT mit felder; Partner unbekannt → 422 PARTNER_UNBEKANNT; Belegnummer einer eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN; Aufbewahrungsfrist abgelaufen ohne fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Bestaetigung"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Bestätigt, Archivierung eingereiht",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Version des Dokuments"
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
     "/api/v1/dokumente/{id}/datei" : {
       "get" : {
         "summary" : "Datei eines Dokuments herunterladen",
@@ -1159,6 +1367,96 @@
             "headers" : {
               "Location" : {
                 "description" : "vorsignierte URL, nur für GET"
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumente/{id}/verwerfen" : {
+      "post" : {
+        "summary" : "Dokument verwerfen",
+        "description" : "Nur aus EINGANGSKORB und FEHLER (sonst 409 STATUS_KONFLIKT, nichts wird gelöscht). Löscht alle Dateien unter eingang/ und protokolliert je Datei SHA-256 und Grund (Req 6.6, 6.7).",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Verwerfen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Verworfen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumente/{id}/wiederholen" : {
+      "post" : {
+        "summary" : "Verarbeitung oder Archivierung wiederholen",
+        "description" : "FEHLER → NEU (neue Verarbeitung), ARCHIVIERUNG_FEHLER → ARCHIVIERUNG (neue Archivierung, Metadaten unverändert); sonst 409 STATUS_KONFLIKT (Req 6.8, 6.13).",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "required" : true,
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "description" : "Neuer Auftrag eingereiht",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Version des Dokuments"
               }
             }
           },

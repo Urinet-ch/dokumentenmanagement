@@ -7,6 +7,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
@@ -61,8 +62,10 @@ public class EingangskorbResource {
     public EingangskorbDto eingangskorb(@QueryParam("seite") @DefaultValue("0") int seite,
                                         @QueryParam("groesse") @DefaultValue("50") int groesse) {
         aufloesung.pruefen();
-        Seite<Dokument> treffer = lesen.eingangskorb(DokumentResource.benutzer(identitaet), seite, groesse);
-        return new EingangskorbDto(treffer.eintraege().stream().map(d -> DokumentResource.dto(d, json)).toList(), treffer.gesamt(), seite,
-                groesse);
+        Benutzer benutzer = DokumentResource.benutzer(identitaet);
+        Seite<Dokument> treffer = lesen.eingangskorb(benutzer, seite, groesse);
+        return new EingangskorbDto(treffer.eintraege().stream()
+                .map(d -> DokumentResource.dto(d, json, lesen.warnungen(benutzer, d))).toList(), treffer.gesamt(),
+                seite, groesse);
     }
 }

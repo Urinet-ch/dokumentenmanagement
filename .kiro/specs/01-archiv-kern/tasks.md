@@ -213,6 +213,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 5.1–5.10_
   - Teil a erledigt (PR #46, ohne Abhängigkeit zu 2.2): Werkzeuge im gemeinsamen Image `Dockerfile.jvm` (uid 10001); `OcrPort` mit `OcrMyPdfAdapter` (HEIC→JPEG, Bilder→PDF, Arbeitsfassungen, OCRmyPDF mit `--skip-text`, signierte PDFs, `pdfa_fehlt`, `pdftotext`, Vorschaubilder; Zeitgrenze mit `destroyForcibly`, ohne Shell, ein Laufverzeichnis je Lauf) und Dev-Stub; `folgtMit` in `OcrAuswahl` entfernt; Startprüfung `OcrPruefung`; Tests mit veraPDF auf synthetischen Dateien; Lastskript `tools/last/verarbeitung_foto.py`. Offen für Teil b (nach 2.2): `VerarbeitenHandler` mit Status `VERARBEITUNG`, Speichern von PDF/A, Volltext und Vorschau, Anspruch sichern, Folgeauftrag `KI_VORSCHLAG`, `FEHLER` nach 3 Fehlversuchen, Handler `ARCHIVIEREN`; Cucumber-Szenarien `@req-5.x`
   - Teil b erledigt (PR #54): `VerarbeitenHandler` mit Status `VERARBEITUNG`, Quellen aus `eingang/` mit SHA-256-Prüfung, PDF/A unter `eingang/<jahr>/<docId>/pdfa.pdf`, Vorschau unter `vorschau/<docId>/`, Volltext, Seiten und `pdfa_fehlt` in `dokument`, Anspruch sichern vor jedem Schreiben, Folgeauftrag `KI_VORSCHLAG` in derselben Transaktion, `FEHLER` mit Fehlertext nach 3 Fehlversuchen; Szenarien `features/verarbeitung/verarbeiten.feature` (`@req-5.1`–`5.4`, `5.8`–`5.10`), JUnit-Tests zu Anspruch, Mandant, Idempotenz und Zeitüberschreitung (design.md «Umsetzung (Aufgabe 2.6, Teil b)»). Offen bleiben: Handler `ARCHIVIEREN` (mit 3.4), Verarbeitung von Generator-Dokumenten und `ohneKi` (mit 4.7), Swiss QR Code (mit 3.2), Nachweis 5.5 auf Stufe B (5.11). Die Checkbox bleibt offen, bis `ARCHIVIEREN` steht.
+  - Handler `ARCHIVIEREN` erledigt mit 3.4 (PR #57, `ArchivierenHandler`: nur bei Status `ARCHIVIERUNG`, bei `ARCHIVIERT` nur Aufräumen von `eingang/`; ein Auftrag je Dokument, weil `wiederholen` nur aus `ARCHIVIERUNG_FEHLER` neu einreiht). Die Checkbox bleibt offen für Generator und `ohneKi` (4.7), Swiss QR Code (3.2) und den Nachweis 5.5 (5.11).
 
 - [x] 2.7 Frontend-Grundgerüst und Upload [Frontend]
   - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE) gegen Keycloak, Navigation mit Eingangskorb-Zähler, Menüpunkte nach Rechtematrix
@@ -263,13 +264,14 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 7.7, 7.9, 7.10_
   - _Abhängig von: 3.2_
 
-- [ ] 3.4 Bestätigen, Verwerfen, Archivieren, Wiederholen [Backend]
+- [x] 3.4 Bestätigen, Verwerfen, Archivieren, Wiederholen [Backend]
   - `POST /api/v1/dokumente/{id}/bestaetigen` (Recht A7): nur aus `EINGANGSKORB`, sonst 409; Pflichtfelder (422 `PFLICHTFELD_FEHLT`); Vertraulichkeit übernehmen; `aufbewahren_bis`; Frist in der Vergangenheit → «Frist abgelaufen», der Inhaber entscheidet; Belegnummer einer eigenen Art schon vergeben → 409, bei Fremdbelegen nur Warnung; Status `ARCHIVIERUNG` und Auftrag `ARCHIVIEREN`
   - `ArchivierenHandler`: `AblageService.archivieren`; Status `ARCHIVIERT` erst nach Kopie, Prüfsummenvergleich und Sperre; bei Fehler `ARCHIVIERUNG_FEHLER`, bestätigte Metadaten bleiben, E-Mail an den Inhaber (nur Dokument-ID)
   - `POST /api/v1/dokumente/{id}/verwerfen` (Recht A9): aus `EINGANGSKORB` und `FEHLER` Dateien löschen, Protokoll mit Prüfsumme und Grund, Status `VERWORFEN`; aus `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER` oder `ARCHIVIERT` → 409
   - `POST /api/v1/dokumente/{id}/wiederholen` (Recht A10): `FEHLER` → `NEU` (Verarbeitung neu), `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` (nur Archivierung, Metadaten unverändert), sonst 409
   - Dokument mit `pdfa_fehlt`: der Inhaber archiviert das Original allein oder verwirft
   - _Anforderungen: 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6, 6.7, 6.8, 6.13, 8.2, 8.3, 8.5, 8.8, 8.9, 8.10, 9.8_
+  - erledigt (PR #57): `DokumentBestaetigen`, `DokumentVerwerfen`, `DokumentWiederholen`, `ArchivierenHandler` mit Mail an den Inhaber (nur IDs); Szenarien `features/dokument/bestaetigen.feature`, `verwerfen.feature`, `wiederholen.feature`, `features/verarbeitung/archivieren.feature`; JUnit `DokumentBestaetigenTest`, `ArchivierenHandlerTest` (design.md «Umsetzung (Aufgabe 3.4, 11.11.2026)»). Offen: Empfänger und SMTP der Benachrichtigung in `prod`; `SPERRE_KONFLIKT` und Änderungen nach `ARCHIVIERT` folgen mit 3.5
 
 - [ ] 3.5 Metadaten ändern und Versionen [Backend]
   - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`

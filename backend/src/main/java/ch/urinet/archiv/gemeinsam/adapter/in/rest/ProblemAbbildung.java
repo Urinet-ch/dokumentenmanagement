@@ -2,6 +2,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.oidc.OIDCException;
@@ -27,6 +28,9 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
+        if (fehler instanceof PflichtfelderFehlen fehlen) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "felder", fehlen.felder())).build();
+        }
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
         if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
