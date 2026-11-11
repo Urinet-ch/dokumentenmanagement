@@ -2,6 +2,8 @@ package ch.urinet.archiv.dokument;
 
 import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.dokument.application.DokumentErfassen;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
@@ -92,10 +94,15 @@ public class UploadSchritte {
     private Set<Path> tempVorher = Set.of();
     private Response antwort;
     private HttpResponse<String> rohAntwort;
+    private LogMitschnitt mitschnitt;
 
     @After
     public void aufraeumen() throws SQLException {
         S3Stoerung.aus();
+        if (mitschnitt != null) {
+            mitschnitt.close();
+            mitschnitt = null;
+        }
         for (Map.Entry<String, Set<UUID>> eintrag : angelegt.entrySet()) {
             List<UUID> ids = List.copyOf(eintrag.getValue());
             ausfuehren("delete from public.auftrag where typ in ('VERARBEITEN', 'KI_VORSCHLAG') "
@@ -111,6 +118,11 @@ public class UploadSchritte {
         for (String id : tokenIds) {
             ausfuehren("delete from public.api_client where id = ?", id);
         }
+    }
+
+    @Angenommen("das Log des Uploads wird mitgeschnitten")
+    public void logMitschneiden() {
+        mitschnitt = LogMitschnitt.starten();
     }
 
     @Wenn("«{word}» diese Dateien hochlädt:")
@@ -384,6 +396,28 @@ public class UploadSchritte {
         Map<String, Object> ergebnis = ergebnis(name);
         assertThat(ergebnis).containsEntry("status", "NEU");
         assertThat(ergebnis.get("id")).isNotEqualTo(dokumentVon.get(name).toString());
+    }
+
+    @Dann("hält das Log zu jeder gesendeten Datei Mandant, Prüfsumme, Grösse und Ergebnis fest, ohne Dateinamen:")
+    public void spurImLog(DataTable tabelle) {
+        List<String> zeilen = mitschnitt.eintraege().stream()
+                .filter(eintrag -> DokumentErfassen.class.getName().equals(eintrag.getLoggerName()))
+                .map(mitschnitt::nachricht).toList();
+        String mandantWert = "mandant=" + mandant + " ";
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            Datei datei = gesendet.stream().filter(d -> d.name().equals(zeile.get("datei"))).findFirst().orElseThrow();
+            String sha = "sha256=" + sha256(datei.inhalt());
+            assertThat(zeilen).as(datei.name() + " empfangen").filteredOn(z -> z.startsWith("Datei empfangen:"))
+                    .filteredOn(z -> z.contains(sha)).singleElement().asString().contains(mandantWert)
+                    .contains("rolle=ORIGINAL").endsWith("bytes=" + datei.inhalt().length);
+            assertThat(zeilen).as(datei.name() + " Ergebnis").filteredOn(z -> !z.startsWith("Datei empfangen:"))
+                    .filteredOn(z -> z.contains(sha)).singleElement().asString().contains(mandantWert)
+                    .contains("ergebnis=" + zeile.get("ergebnis"));
+        }
+        String log = mitschnitt.volltext();
+        for (Datei datei : gesendet) {
+            assertThat(log).as("Log").doesNotContain(datei.name());
+        }
     }
 
     @Dann("bleiben keine temporären Dateien des Uploads zurück")

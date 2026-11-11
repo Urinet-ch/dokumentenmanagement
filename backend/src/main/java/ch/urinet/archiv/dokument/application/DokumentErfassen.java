@@ -57,6 +57,9 @@ import java.util.UUID;
  * schon abgelegten Dateien unter {@code eingang/} wieder.
  * <p>
  * Abgelehnte Dateien hinterlassen nichts: kein Dokument, keine Zeile in {@code dokument_datei}, nichts in der Ablage.
+ * Ihre Spur ist das Log: Zu jeder empfangenen Datei hält es Mandant, Rolle, SHA-256 und Grösse fest, bevor das Archiv
+ * sie weiter prüft, und danach das Ergebnis (angenommen mit Dokument-ID, Dublette oder Fehlercode); nie den Dateinamen
+ * oder den Inhalt (Regel 3, Req 6.1, 16.7).
  */
 @ApplicationScoped
 @Transactional
@@ -107,7 +110,15 @@ public class DokumentErfassen {
     /** Ein Ergebnis je Seite in der gesendeten Reihenfolge; Fehler der ganzen Anfrage als {@link FachFehler}. */
     public List<UploadErgebnis> erfassen(UploadAnfrage anfrage) {
         MandantCode mandant = aufloesung.pruefen();
-        if (anfrage.seiten().isEmpty() || anfrage.hinweis().map(DokumentErfassen::hinweisUngueltig).orElse(false)) {
+        // Regel 3: jede empfangene Datei zuerst prüfen und ihre Prüfsumme festhalten, auch wenn danach die ganze
+        // Anfrage abgelehnt wird
+        List<Empfangen> empfangen = anfrage.seiten().stream().map(seite -> new Empfangen(
+                pruefen(mandant, seite.original(), ALLE, DateiRolle.ORIGINAL),
+                seite.arbeitsfassung().map(datei -> pruefen(mandant, datei, ARBEITSFASSUNG,
+                        DateiRolle.ARBEITSFASSUNG)))).toList();
+        if (empfangen.isEmpty() || anfrage.hinweis().map(DokumentErfassen::hinweisUngueltig).orElse(false)) {
+            LOG.infof("Upload abgelehnt: mandant=%s dateien=%d fehlercode=%s", mandant.wert(), empfangen.size(),
+                    Fehlercode.ANFRAGE_UNGUELTIG);
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         Instant eingang = uhr.instant();
@@ -116,24 +127,28 @@ public class DokumentErfassen {
         Set<UUID> neue = new LinkedHashSet<>();
         UUID gemeinsam = null;
         int nr = 0;
-        for (UploadAnfrage.Seite seite : anfrage.seiten()) {
+        for (int i = 0; i < anfrage.seiten().size(); i++) {
+            UploadAnfrage.Seite seite = anfrage.seiten().get(i);
             DateiName name = DateiName.aus(seite.name());
-            Geprueft original = pruefen(seite.original(), ALLE);
+            Geprueft original = empfangen.get(i).original();
+            Optional<Geprueft> arbeitsfassung = empfangen.get(i).arbeitsfassung();
             Optional<Fehlercode> fehler = original.fehler();
             if (fehler.isEmpty() && !name.gueltig()) {
                 fehler = Optional.of(Fehlercode.ANFRAGE_UNGUELTIG);
             }
-            Optional<Geprueft> arbeitsfassung = Optional.empty();
-            if (fehler.isEmpty() && seite.arbeitsfassung().isPresent()) {
-                arbeitsfassung = Optional.of(pruefen(seite.arbeitsfassung().get(), ARBEITSFASSUNG));
+            if (fehler.isEmpty() && arbeitsfassung.isPresent()) {
                 fehler = arbeitsfassung.get().fehler();
             }
             if (fehler.isPresent()) {
+                LOG.infof("Datei abgelehnt: mandant=%s sha256=%s ergebnis=%s", mandant.wert(), original.sha256(),
+                        fehler.get());
                 ergebnisse.add(new UploadErgebnis.Abgelehnt(name.anzeige(), fehler.get()));
                 continue;
             }
             Optional<UUID> vorhanden = repository.dubletteSperren(original.sha256());
             if (vorhanden.isPresent()) {
+                LOG.infof("Datei ist Dublette: mandant=%s sha256=%s ergebnis=DUBLETTE vorhanden=%s", mandant.wert(),
+                        original.sha256(), vorhanden.get());
                 ergebnisse.add(new UploadErgebnis.Dublette(name.anzeige(), sichtbar(anfrage, vorhanden.get())));
                 continue;
             }
@@ -153,6 +168,8 @@ public class DokumentErfassen {
                 ablegen(mandant, DateiSchluessel.arbeitsfassung(jahr, id, nr), DateiRolle.ARBEITSFASSUNG,
                         seite.arbeitsfassung().get(), arbeitsfassung.get());
             }
+            LOG.infof("Datei angenommen: mandant=%s sha256=%s ergebnis=ANGENOMMEN dokument=%s nr=%d", mandant.wert(),
+                    original.sha256(), id, nr);
             ergebnisse.add(new UploadErgebnis.Angenommen(name.anzeige(), id));
         }
         for (UUID id : neue) {
@@ -188,7 +205,7 @@ public class DokumentErfassen {
         repository.dateiAbgelegt(schluessel.docId(), rolle, schluessel.nr(), abgelegt.versionId());
     }
 
-    private Geprueft pruefen(Path datei, Set<Dateityp> erlaubt) {
+    private Geprueft pruefen(MandantCode mandant, Path datei, Set<Dateityp> erlaubt, DateiRolle rolle) {
         MessageDigest digest = Pruefsumme.sha256();
         long groesse;
         try (InputStream ein = new DigestInputStream(Files.newInputStream(datei), digest)) {
@@ -197,6 +214,8 @@ public class DokumentErfassen {
             throw new UncheckedIOException("Upload-Datei nicht lesbar", e);
         }
         Geprueft geprueft = new Geprueft(Pruefsumme.hex(digest), groesse, uhr.instant(), null, Optional.empty());
+        LOG.infof("Datei empfangen: mandant=%s rolle=%s sha256=%s bytes=%d", mandant.wert(), rolle, geprueft.sha256(),
+                groesse);
         if (groesse > grenzen.maxDatei()) {
             return geprueft.abgelehnt(Fehlercode.DATEI_ZU_GROSS);
         }
@@ -232,6 +251,9 @@ public class DokumentErfassen {
     private static boolean hinweisUngueltig(String hinweis) {
         return hinweis.codePointCount(0, hinweis.length()) > MAX_HINWEIS
                 || hinweis.codePoints().anyMatch(Character::isISOControl);
+    }
+
+    private record Empfangen(Geprueft original, Optional<Geprueft> arbeitsfassung) {
     }
 
     private record Geprueft(String sha256, long groesse, Instant empfangen, Dateityp typ, Optional<Fehlercode> fehler) {

@@ -140,6 +140,36 @@ Funktionalität: Upload von Dateien
       | merkblatt.pdf | NEU    |
     Und steht jedes neue Dokument im Status «NEU» als «PERSONAL» mit Quelle «UPLOAD» und Erfasser «geschaeftsstelle-vhf-gsk»
 
+  @req-3.4 @req-2.3
+  Szenario: Die Geschäftsstelle erkennt eine Datei ihres Mandanten mit ID wieder
+    Angenommen «geschaeftsstelle-vhf-gsk» hat die Datei «bulletin.pdf» (pdf) hochgeladen
+    Wenn «geschaeftsstelle-vhf-gsk» die Datei «bulletin.pdf» erneut hochlädt
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei        | status   |
+      | bulletin.pdf | DUBLETTE |
+    Und nennt das Ergebnis von «bulletin.pdf» das vorhandene Dokument
+    Und ist im Mandanten «vhf-gsk» nichts gespeichert
+
+  @req-6.1
+  Szenario: Zu jeder empfangenen Datei hält das Log Prüfsumme und Ergebnis fest, auch bei Ablehnung und Dublette
+    Angenommen «inhaber-urinet» hat die Datei «spur-alt.pdf» (pdf) hochgeladen
+    Und das Log des Uploads wird mitgeschnitten
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei            | typ              |
+      | spur-neu.pdf     | pdf              |
+      | spur-wieder.pdf  | wie:spur-alt.pdf |
+      | spur-notiz.pdf   | text             |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei           | status    | fehlercode         | http |
+      | spur-neu.pdf    | NEU       |                    |      |
+      | spur-wieder.pdf | DUBLETTE  |                    |      |
+      | spur-notiz.pdf  | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+    Und hält das Log zu jeder gesendeten Datei Mandant, Prüfsumme, Grösse und Ergebnis fest, ohne Dateinamen:
+      | datei           | ergebnis           |
+      | spur-neu.pdf    | ANGENOMMEN         |
+      | spur-wieder.pdf | DUBLETTE           |
+      | spur-notiz.pdf  | DATEITYP_UNBEKANNT |
+
   @req-3.5
   Szenario: Mehrere Bilder als ein Dokument in der gewählten Reihenfolge
     Wenn «inhaber-urinet» diese Dateien als ein Dokument mit dem Hinweis "Quittungen Oktober – Reise «Zürich»" hochlädt:
