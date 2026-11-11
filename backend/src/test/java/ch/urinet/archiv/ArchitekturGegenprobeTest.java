@@ -38,6 +38,20 @@ class ArchitekturGegenprobeTest {
         assertThat(ArchitekturTest.keinBypassGovernance.evaluate(klassen).hasViolation()).isTrue();
     }
 
+    @Test
+    void ganzeDateiImHeapVerstoesstAusserImStub() {
+        JavaClasses klassen = new ClassFileImporter().importClasses(
+                ch.urinet.archiv.dokument.application.GanzeDateiGegenprobe.class,
+                ch.urinet.archiv.ablage.adapter.out.stub.GanzeDateiGegenprobeStub.class);
+
+        var ergebnis = ArchitekturTest.dateienNieGanzImHeap.evaluate(klassen);
+
+        assertThat(ergebnis.hasViolation()).isTrue();
+        assertThat(ergebnis.getFailureReport().getDetails())
+                .anyMatch(zeile -> zeile.contains("GanzeDateiGegenprobe.lesen"))
+                .noneMatch(zeile -> zeile.contains("GanzeDateiGegenprobeStub"));
+    }
+
     static final class WurzelKlasse {
     }
 

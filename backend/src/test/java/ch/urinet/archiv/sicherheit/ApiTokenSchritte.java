@@ -1,5 +1,8 @@
 package ch.urinet.archiv.sicherheit;
 
+import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.dokument.Testdateien;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -27,20 +30,26 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Schritte zu Req 2.5 und 2.20 über die Verwaltung {@code /api/v1/api-tokens} und die Probe-Endpunkte unter src/test
- * ({@code ProbeTokenResource}). Tokens entstehen zur Laufzeit; jedes angelegte Token wird nach dem Szenario gelöscht.
+ * Schritte zu Req 2.5 und 2.20 über die Verwaltung {@code /api/v1/api-tokens}, den Upload {@code POST /api/v1/dokumente}
+ * (Scope {@code import}, Aufgabe 2.4; je Anfrage eine frische synthetische PDF) und den Probe-Endpunkt
+ * {@code /api/v1/dokumente/generator} unter src/test ({@code ProbeTokenResource}). Tokens entstehen zur Laufzeit; jedes
+ * angelegte Token und jedes hochgeladene Dokument wird nach dem Szenario gelöscht.
  */
 public class ApiTokenSchritte {
 
     private static final String VERWALTUNG = "/api/v1/api-tokens";
+    private static final String UPLOAD = "/api/v1/dokumente";
 
     @Inject
     ApiTokenVerwaltung verwaltung;
@@ -53,6 +62,10 @@ public class ApiTokenSchritte {
 
     /** Name im Szenario → Token-Text. */
     private final Map<String, String> tokens = new LinkedHashMap<>();
+    /** Name im Szenario → Mandant des Tokens. */
+    private final Map<String, String> tokenMandant = new HashMap<>();
+    /** Mandant → hochgeladene Dokumente, fürs Aufräumen. */
+    private final Map<String, List<UUID>> hochgeladen = new HashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
     private final List<String> mandanten = new ArrayList<>();
     private final Map<String, Long> stand = new HashMap<>();
@@ -73,6 +86,7 @@ public class ApiTokenSchritte {
     public void tokenAnlegen(String mandant, String name, String scope) {
         ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant, "Probe " + name, scope);
         merken(name, erstellt.token().text());
+        tokenMandant.put(name, mandant);
     }
 
     @Angenommen("der aktive Mandant «{word}» steht nur im Register")
@@ -96,7 +110,24 @@ public class ApiTokenSchritte {
 
     @Wenn("das Token «{word}» an «{}» sendet")
     public void senden(String name, String pfad) {
-        antwort = mitToken(tokens.get(name)).when().post(pfad);
+        antwort = posten(mitToken(tokens.get(name)), pfad);
+        if (UPLOAD.equals(pfad) && antwort.statusCode() == 202) {
+            hochgeladen.computeIfAbsent(tokenMandant.get(name), m -> new ArrayList<>())
+                    .add(UUID.fromString(antwort.path("[0].id")));
+        }
+    }
+
+    @Dann("liegt das zuletzt hochgeladene Dokument des Tokens «{word}» im Mandanten «{word}» mit Quelle «DRIVE»")
+    public void imMandanten(String name, String mandant) throws SQLException {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(202);
+        assertThat(antwort.<String>path("[0].status")).isEqualTo("NEU");
+        String id = antwort.path("[0].id");
+        assertThat(abfragen("select quelle, erstellt_von from " + schema(mandant) + ".dokument where id = ?::uuid", id))
+                .singleElement().satisfies(z -> {
+                    assertThat(z.get("quelle")).isEqualTo("DRIVE");
+                    assertThat(z.get("erstellt_von"))
+                            .isEqualTo(ApiToken.principal(ApiToken.lesen(tokens.get(name)).orElseThrow().id()));
+                });
     }
 
     @Wenn("das Token «{word}» {word} «{}» mit einem leeren JSON-Objekt aufruft")
@@ -108,24 +139,24 @@ public class ApiTokenSchritte {
     public void falschesGeheimnis(String name, String pfad) {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
         String fremdesGeheimnis = ApiToken.neu(zufall).geheimnis();
-        antwort = gesendet(ApiToken.PRAEFIX + id + "_" + fremdesGeheimnis).when().post(pfad);
+        antwort = posten(gesendet(ApiToken.PRAEFIX + id + "_" + fremdesGeheimnis), pfad);
     }
 
     @Wenn("das Token «{word}» mit fremder ID an «{}» sendet")
     public void fremdeId(String name, String pfad) {
         String geheimnis = ApiToken.lesen(tokens.get(name)).orElseThrow().geheimnis();
         String fremdeId = ApiToken.neu(zufall).id();
-        antwort = gesendet(ApiToken.PRAEFIX + fremdeId + "_" + geheimnis).when().post(pfad);
+        antwort = posten(gesendet(ApiToken.PRAEFIX + fremdeId + "_" + geheimnis), pfad);
     }
 
     @Wenn("ein Token mit unbekannter ID an «{}» sendet")
     public void unbekannteId(String pfad) {
-        antwort = gesendet(ApiToken.neu(zufall).text()).when().post(pfad);
+        antwort = posten(gesendet(ApiToken.neu(zufall).text()), pfad);
     }
 
     @Wenn("ein Bearer-Token «{word}» an «{}» sendet")
     public void kaputtesToken(String wert, String pfad) {
-        antwort = gesendet(wert).when().post(pfad);
+        antwort = posten(gesendet(wert), pfad);
     }
 
     @Wenn("«{word}» ein Token «{word}» mit Scope «{word}» anlegt")
@@ -134,6 +165,7 @@ public class ApiTokenSchritte {
                 .body(Map.of("name", "Probe " + name, "scope", scope)).when().post(VERWALTUNG);
         if (antwort.statusCode() == 201) {
             merken(name, antwort.path("token"));
+            tokenMandant.put(name, benutzer.substring(benutzer.indexOf('-') + 1));
         }
     }
 
@@ -273,6 +305,14 @@ public class ApiTokenSchritte {
         if (mitschnitt != null) {
             mitschnitt.close();
         }
+        for (Map.Entry<String, List<UUID>> eintrag : hochgeladen.entrySet()) {
+            ausfuehren("delete from public.auftrag where typ = 'VERARBEITEN' "
+                    + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))",
+                    String.join(",", eintrag.getValue().stream().map(UUID::toString).toList()));
+            Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), eintrag.getValue());
+            Set<String> ordner = new HashSet<>(eintrag.getValue().stream().map(id -> "/" + id + "/").toList());
+            TestAblage.loeschen(eintrag.getKey(), "eingang/", s -> ordner.stream().anyMatch(s::contains));
+        }
         for (String id : tokenIds) {
             ausfuehren("delete from public.api_client where id = ?", id);
         }
@@ -295,6 +335,14 @@ public class ApiTokenSchritte {
             assertThat(text).as("gesendeter Wert im Text").doesNotContain(wert);
             ApiToken.lesen(wert).ifPresent(t -> assertThat(text).doesNotContain(t.geheimnis()));
         }
+    }
+
+    /** Der Upload bekommt eine frische synthetische PDF (multipart), die anderen Pfade eine leere Anfrage. */
+    private static Response posten(RequestSpecification anfrage, String pfad) {
+        if (UPLOAD.equals(pfad)) {
+            return anfrage.multiPart("dateien", "probe.pdf", Testdateien.pdf(), "application/pdf").when().post(pfad);
+        }
+        return anfrage.when().post(pfad);
     }
 
     private RequestSpecification gesendet(String wert) {

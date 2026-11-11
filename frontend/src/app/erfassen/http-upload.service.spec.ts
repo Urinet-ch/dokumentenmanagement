@@ -1,6 +1,7 @@
 import { HttpEventType, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideApi } from '../gemeinsam/api';
 import { HttpUploadService, UPLOAD_PFAD } from './http-upload.service';
 import { UploadEreignis } from './upload-port';
 
@@ -11,7 +12,9 @@ describe('HttpUploadService (Req 3.1, 3.7)', () => {
   const b = new File(['b'], 'b.jpg', { type: 'image/jpeg' });
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), HttpUploadService] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideApi(''), HttpUploadService],
+    });
     dienst = TestBed.inject(HttpUploadService);
     http = TestBed.inject(HttpTestingController);
   });
@@ -26,6 +29,8 @@ describe('HttpUploadService (Req 3.1, 3.7)', () => {
     const formular = anfrage.request.body as FormData;
     expect(formular.getAll('dateien').map((d) => (d as File).name)).toEqual(['b.jpg', 'a.jpg']);
     expect(formular.get('zusammenfassen')).toBe('true');
+    expect(formular.has('arbeitsfassungen')).toBe(false);
+    expect(formular.has('hinweis')).toBe(false);
 
     anfrage.event({ type: HttpEventType.UploadProgress, loaded: 1, total: 4 });
     anfrage.flush([{ datei: 'b.jpg', status: 'NEU', id: '1' }]);

@@ -143,6 +143,21 @@ public class AuftragTestHilfe {
         }
     }
 
+    /** Hält gerade eine Transaktion die Zeilensperre des Auftrags ({@code for update nowait} scheitert)? */
+    public boolean gesperrt(long id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select 1 from public.auftrag where id = ? for update nowait")) {
+            abfrage.setLong(1, id);
+            abfrage.executeQuery().close();
+            return false;
+        } catch (SQLException e) {
+            if ("55P03".equals(e.getSQLState())) {
+                return true;
+            }
+            throw e;
+        }
+    }
+
     /** Führt eine Änderung aus und liefert die Zahl betroffener Zeilen. */
     public int ausfuehren(String sql) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection();

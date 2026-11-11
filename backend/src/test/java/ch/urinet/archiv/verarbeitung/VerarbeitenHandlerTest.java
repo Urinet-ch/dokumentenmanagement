@@ -1,5 +1,6 @@
 package ch.urinet.archiv.verarbeitung;
 
+import ch.urinet.archiv.ablage.S3Verzoegerung;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
@@ -27,8 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien.seite;
@@ -111,8 +114,12 @@ class VerarbeitenHandlerTest {
         var ergebnis = new Verarbeitungsergebnis(HexFormat.of().formatHex(new byte[32]),
                 VerarbeitungTestHilfe.pdfaSchluessel(id), "v1", false, null, 1, "Text");
 
-        assertThatThrownBy(() -> imMandanten(URINET, () -> speichern.beginnen(fremd, id, VerarbeitungTestHilfe.JAHR)))
+        assertThatThrownBy(() -> imMandanten(URINET, () -> speichern.beginnen(fremd, id)))
                 .hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
+        assertThatThrownBy(() -> imMandanten(URINET, () -> {
+            speichern.anspruchPruefen(fremd);
+            return null;
+        })).hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
         assertThatThrownBy(() -> imMandanten(URINET, () -> speichern.ergebnisSpeichern(fremd, id, ergebnis)))
                 .hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
 
@@ -168,6 +175,62 @@ class VerarbeitenHandlerTest {
         assertThat(hilfe.dokument(URINET, id)).isEqualTo(vorher);
         assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).isEmpty();
         assertThat(hilfe.versionen(URINET, VerarbeitungTestHilfe.vorschauOrdner(id))).isEmpty();
+    }
+
+    @Test
+    void ohneAnspruchLoeschtDasBereinigenNichts() throws Exception {
+        UUID id = hilfe.anlegen(URINET, "SCAN", foto("Anspruch verloren"));
+        byte[] alt = OcrTestdateien.textPdf("Fassung eines späteren Laufs");
+        ablage.ablegenEingang(new MandantCode(URINET), DateiSchluessel.pdfa(VerarbeitungTestHilfe.JAHR, id),
+                new ByteArrayInputStream(alt), alt.length);
+        String pdfa = VerarbeitungTestHilfe.pdfaSchluessel(id);
+        List<String> vorher = hilfe.versionen(URINET, pdfa);
+        Auftrag fremd = new Auftrag(Long.MAX_VALUE, new MandantCode(URINET), VerarbeitenHandler.TYP,
+                new Nutzlast(Map.of(VerarbeitenHandler.DOKUMENT_ID, id)), 1);
+
+        assertThatThrownBy(() -> ablage.abgeleiteteBereinigen(new MandantCode(URINET), VerarbeitungTestHilfe.JAHR, id,
+                List.of(), () -> speichern.anspruchPruefen(fremd)))
+                .isInstanceOf(AuftragService.AnspruchVerloren.class);
+
+        assertThat(vorher).hasSize(1);
+        assertThat(hilfe.versionen(URINET, pdfa)).isEqualTo(vorher);
+    }
+
+    /**
+     * Review PR #54, S2: Das Bereinigen abgeleiteter Dateien läuft nach dem Commit von {@code VERARBEITUNG}, ohne
+     * Zeilensperre. Ein langsamer Object Storage hält darum weder das Lebenszeichen noch den Aufräumer auf.
+     */
+    @Test
+    void einLangsamerObjectStorageBlockiertDasLebenszeichenNicht() throws Exception {
+        UUID id = hilfe.anlegen(URINET, "SCAN", "VERARBEITUNG", foto("langsamer Speicher"));
+        byte[] alt = OcrTestdateien.textPdf("veraltete Fassung");
+        ablage.ablegenEingang(new MandantCode(URINET), DateiSchluessel.pdfa(VerarbeitungTestHilfe.JAHR, id),
+                new ByteArrayInputStream(alt), alt.length);
+        long auftrag = hilfe.einreihen(URINET, id);
+        S3Verzoegerung.anhalten(id.toString());
+        CompletableFuture<Void> lauf;
+        try {
+            lauf = CompletableFuture.runAsync(() -> {
+                try {
+                    hilfe.abarbeiten();
+                } catch (Exception e) {
+                    throw new CompletionException(e);
+                }
+            }, threads);
+            assertThat(S3Verzoegerung.erreicht(60)).as("Bereinigen erreicht").isTrue();
+            Thread.sleep(1_000);
+
+            assertThat(auftraege.gesperrt(auftrag)).as("Zeilensperre während des Bereinigens").isFalse();
+            assertThat(auftraege.zeile(auftrag).lebenszeichenAlterMs()).isLessThan(800L);
+        } finally {
+            S3Verzoegerung.freigeben();
+        }
+        lauf.get(5, TimeUnit.MINUTES);
+
+        Map<String, Object> dokument = hilfe.dokument(URINET, id);
+        String pdfa = VerarbeitungTestHilfe.pdfaSchluessel(id);
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.versionen(URINET, pdfa)).containsExactly(pdfa + "@" + dokument.get("s3_version_pdfa"));
     }
 
     private <T> T imMandanten(String mandant, Supplier<T> arbeit) throws Exception {

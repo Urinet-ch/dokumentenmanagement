@@ -44,7 +44,8 @@ import java.util.UUID;
  * <p>
  * Idempotent: Hat ein früherer Lauf das Ergebnis gespeichert oder ist das Dokument nicht mehr {@code NEU} oder
  * {@code VERARBEITUNG}, endet der Lauf ohne Änderung. Abgeleitete Dateien eines abgebrochenen Laufs löscht der nächste
- * Lauf unter dem Anspruch, nach dem Speichern bleibt nur die gespeicherte Fassung; Originale und Arbeitsfassungen
+ * Lauf nach dem Commit von {@code VERARBEITUNG} ohne Sperre; zwischen Auflisten und Löschen prüft er den Anspruch
+ * erneut. Nach dem Speichern bleibt nur die gespeicherte Fassung; Originale und Arbeitsfassungen
  * bleiben unverändert (Req 5.8, 5.10). Ohne Anspruch schreibt der Lauf weder Dokument noch Folgeauftrag
  * ({@link VerarbeitungSpeichern}).
  */
@@ -96,10 +97,13 @@ public class VerarbeitenHandler implements AuftragHandler {
         MandantCode mandant = auftrag.mandant();
         int jahr = stand.eingang().atZone(ZUERICH).getYear();
         List<Quelle> quellen = quellen(stand, jahr);
-        if (!speichern.beginnen(auftrag, id, jahr)) {
+        if (!speichern.beginnen(auftrag, id)) {
             LOG.infof("Verarbeitung übersprungen: Dokument %s inzwischen verarbeitet oder nicht mehr offen", id);
             return;
         }
+        unterbrochen();
+        // ohne Sperre, damit Lebenszeichen und Aufräumer nicht auf den Object Storage warten (Review PR #54, S2)
+        ablage.abgeleiteteBereinigen(mandant, jahr, id, List.of(), () -> speichern.anspruchPruefen(auftrag));
         unterbrochen();
         Path verzeichnis = verzeichnisAnlegen();
         try {

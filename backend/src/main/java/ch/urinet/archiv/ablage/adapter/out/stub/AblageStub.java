@@ -190,7 +190,7 @@ public class AblageStub implements AblagePort {
 
     @Override
     public synchronized int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId,
-                                                  Collection<AbgelegteDatei> behalten) {
+                                                  Collection<AbgelegteDatei> behalten, Runnable vorDemLoeschen) {
         String pdfa = mandant.wert() + "/" + DateiSchluessel.pdfa(jahr, docId).pfad(Ablageort.EINGANG);
         String vorschau = mandant.wert() + "/" + Vorschau.ordner(docId);
         int anzahl = 0;
@@ -206,6 +206,9 @@ public class AblageStub implements AblagePort {
                 boolean bleibt = behalten.stream().anyMatch(d -> d.schluessel().equals(schluessel)
                         && d.versionId().equals(v.versionId()));
                 if (!bleibt) {
+                    if (anzahl == 0) {
+                        vorDemLoeschen.run();
+                    }
                     loeschen(v.datei());
                     iterator.remove();
                     anzahl++;

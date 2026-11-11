@@ -26,9 +26,11 @@ import java.util.Optional;
  * <p>
  * Die Grenze der Anfrage ({@code quarkus.http.limits.max-body-size}) prüft Quarkus vor allen Handlern und antwortet mit
  * einer leeren 413. Darum prüft {@link #grenzePruefen} sie für {@code /api/*} kurz davor am {@code Content-Length} und
- * antwortet mit Problem Details; die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht
- * gelesen wird. Eine Anfrage ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet
- * Quarkus weiter selbst mit 413 ohne Inhalt.
+ * antwortet mit Problem Details. Seit Aufgabe 2.4 ist die Grenze von Quarkus die für Uploads ({@code multipart/form-data},
+ * {@code archiv.upload.max-anfrage}); alle anderen Anfragen prüft sie gegen die kleinere {@code archiv.http.max-anfrage}.
+ * Die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht gelesen wird. Eine Anfrage
+ * ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet Quarkus weiter selbst mit 413
+ * ohne Inhalt.
  * <p>
  * {@code UEBERLASTET} aus der Prüfung eines API-Tokens (Req 2.5) entsteht bei der proaktiven Anmeldung auf jedem Pfad,
  * auch unter {@code /q/}; {@link #ueberlastet} antwortet darum auf allen Pfaden mit 503, {@code Retry-After} und Problem
@@ -40,10 +42,15 @@ public class ProblemFehlerRoute {
     static final String API = "/api/*";
     static final String NOCHMALS_NACH_SEKUNDEN = "1";
 
-    private final Optional<MemorySize> grenze;
+    static final String MULTIPART = "multipart/form-data";
 
-    public ProblemFehlerRoute(@ConfigProperty(name = "quarkus.http.limits.max-body-size") Optional<MemorySize> grenze) {
+    private final Optional<MemorySize> grenze;
+    private final MemorySize grenzeOhneUpload;
+
+    public ProblemFehlerRoute(@ConfigProperty(name = "quarkus.http.limits.max-body-size") Optional<MemorySize> grenze,
+                              @ConfigProperty(name = "archiv.http.max-anfrage") MemorySize grenzeOhneUpload) {
         this.grenze = grenze;
+        this.grenzeOhneUpload = grenzeOhneUpload;
     }
 
     void einrichten(@Observes Router router) {
@@ -64,13 +71,20 @@ public class ProblemFehlerRoute {
 
     void grenzePruefen(RoutingContext kontext) {
         String laenge = kontext.request().getHeader(HttpHeaders.CONTENT_LENGTH);
-        if (laenge != null && grenze.isPresent() && zuGross(laenge, grenze.get().asLongValue())) {
+        if (laenge != null && zuGross(laenge, grenze(kontext.request().getHeader(HttpHeaders.CONTENT_TYPE)))) {
             kontext.response().putHeader(HttpHeaders.CONNECTION, "close")
                     .endHandler(ende -> kontext.request().connection().close());
             senden(kontext, ProblemAntwort.fuer(Fehlercode.DATEI_ZU_GROSS), false);
             return;
         }
         kontext.next();
+    }
+
+    /** Grenze je Art der Anfrage; die kleinere Grenze gilt für alles ausser {@code multipart/form-data}. */
+    long grenze(String inhaltstyp) {
+        long gesamt = grenze.map(MemorySize::asLongValue).orElse(Long.MAX_VALUE);
+        boolean upload = inhaltstyp != null && inhaltstyp.strip().toLowerCase(java.util.Locale.ROOT).startsWith(MULTIPART);
+        return upload ? gesamt : Math.min(gesamt, grenzeOhneUpload.asLongValue());
     }
 
     private static boolean zuGross(String laenge, long grenze) {

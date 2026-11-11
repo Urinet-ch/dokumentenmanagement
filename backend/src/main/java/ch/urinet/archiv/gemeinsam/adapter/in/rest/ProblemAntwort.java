@@ -41,7 +41,17 @@ public record ProblemAntwort(String fehlerId, int status, Fehlercode code, Strin
         return fuer(code, status, null);
     }
 
+    /** Mit einer Erweiterung nach RFC 9457, Abschnitt 3.2 (z. B. {@code ergebnisse} des Uploads). */
+    public static ProblemAntwort mitErweiterung(Fehlercode code, String name, Object wert) {
+        return fuer(code, code.status(), null, Map.of(name, wert));
+    }
+
     private static ProblemAntwort fuer(Fehlercode code, int status, Throwable ursache) {
+        return fuer(code, status, ursache, Map.of());
+    }
+
+    private static ProblemAntwort fuer(Fehlercode code, int status, Throwable ursache,
+                                       Map<String, Object> erweiterungen) {
         String fehlerId = UUID.randomUUID().toString();
         Map<String, Object> inhalt = new LinkedHashMap<>();
         inhalt.put("type", TYP_PRAEFIX + code.name());
@@ -50,6 +60,7 @@ public record ProblemAntwort(String fehlerId, int status, Fehlercode code, Strin
         inhalt.put("detail", code.detail());
         inhalt.put("instance", "urn:uuid:" + fehlerId);
         inhalt.put("fehlercode", code.name());
+        inhalt.putAll(erweiterungen);
         String zusatz = ursache == null ? "" : " ursache=" + ursachen(ursache);
         if (status >= 500) {
             LOG.errorf("Fehler %s: status=%d fehlercode=%s%s", fehlerId, status, code.name(), zusatz);

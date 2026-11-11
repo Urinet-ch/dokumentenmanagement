@@ -1,20 +1,18 @@
 # language: de
-# Teilnachweis bis Aufgabe 2.4: Die Szenarien prüfen die Upload-Seite der PWA gegen eine Attrappe von
-# POST /api/v1/dokumente (frontend/e2e/schritte/upload.mjs), die wie in design.md «Upload» antwortet. Die Prüfungen am
-# Inhalt (Typ, Grösse, Dubletten) belegen die Java-Szenarien von 2.4 gegen das echte Backend.
-# @attrappe: Für Kriterien von [Backend]-Aufgaben zählt diese Datei in der Abdeckungsprüfung nicht (ReqAbdeckung).
-@spec-01 @browser @attrappe
+# Upload-Seite der PWA gegen das echte Backend (Aufgabe 2.4): Playwright leitet POST /api/v1/dokumente an das Archiv im
+# Testmodus weiter (BrowserBackendTest mit PostgreSQL, Keycloak und MinIO) und tauscht das Token der Keycloak-Attrappe
+# gegen ein echtes Token desselben Testbenutzers (frontend/e2e/hilfen/echtes-backend.mjs). Die Dateien sind synthetisch.
+@spec-01 @browser
 Funktionalität: Upload im Browser
-
-  Hintergrund:
-    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
-    Und ich im Menü «Erfassen» wähle
 
   @req-3.1
   Szenario: Mehrere Dateien aller unterstützten Typen in einem Vorgang hochladen
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «rechnung.pdf, quittung.jpg, scan.png, foto.heic, fax.tif» auswähle
     Und ich hochlade
     Dann hat das Archiv einen Upload mit «rechnung.pdf, quittung.jpg, scan.png, foto.heic, fax.tif» ohne «zusammenfassen» erhalten
+    Und hat das Archiv daraus je Datei ein Dokument angelegt
     Und sehe ich je Datei das Ergebnis:
       | datei        | ausgang    | meldung                      |
       | rechnung.pdf | angenommen | Angenommen, wird verarbeitet |
@@ -25,16 +23,19 @@ Funktionalität: Upload im Browser
 
   @req-3.1
   Szenario: Dateien per Drag & Drop ablegen
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «brief.pdf, beleg.jpg» in die Ablage ziehe
     Dann sehe ich die Dateien «brief.pdf, beleg.jpg» in dieser Reihenfolge
     Wenn ich hochlade
     Dann hat das Archiv einen Upload mit «brief.pdf, beleg.jpg» ohne «zusammenfassen» erhalten
+    Und hat das Archiv daraus je Datei ein Dokument angelegt
 
   @req-3.3
   Szenario: Ein nicht unterstützter Dateityp wird mit verständlicher Meldung abgelehnt
-    Angenommen das Archiv antwortet auf Uploads so:
-      | datei     | antwort                |
-      | notiz.pdf | 415 DATEITYP_UNBEKANNT |
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Datei «notiz.pdf» ist ein Text
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «notiz.pdf» auswähle
     Und ich hochlade
     Dann sehe ich je Datei das Ergebnis:
@@ -43,62 +44,76 @@ Funktionalität: Upload im Browser
       | notiz.pdf | abgelehnt | DATEITYP_UNBEKANNT                         |
 
   @req-3.4
-  Szenario: Eine Dublette meldet «bereits vorhanden», mit Link nur auf ein sichtbares Dokument
-    Angenommen das Archiv antwortet auf Uploads so:
-      | datei        | antwort                 |
-      | sichtbar.pdf | DUBLETTE d-vorhanden-1  |
-      | geheim.pdf   | DUBLETTE                |
-    Wenn ich die Dateien «sichtbar.pdf, geheim.pdf» auswähle
+  Szenario: Eine Dublette meldet «bereits vorhanden» mit Link auf das sichtbare Dokument
+    Angenommen «inhaber» im Mandanten «urinet» hat die Datei «sichtbar.pdf» schon hochgeladen
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Erfassen» wähle
+    Wenn ich die Dateien «sichtbar.pdf» auswähle
     Und ich hochlade
     Dann sehe ich je Datei das Ergebnis:
       | datei        | ausgang   | meldung           |
       | sichtbar.pdf | vorhanden | bereits vorhanden |
-      | geheim.pdf   | vorhanden | bereits vorhanden |
-    Und führt «sichtbar.pdf» zum vorhandenen Dokument «d-vorhanden-1»
+    Und führt «sichtbar.pdf» zum vorhandenen Dokument
+
+  @req-3.4
+  Szenario: Eine Dublette eines unsichtbaren Dokuments meldet «bereits vorhanden» ohne Link
+    Angenommen «inhaber» im Mandanten «urinet» hat die Datei «geheim.pdf» schon hochgeladen
+    Und ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Erfassen» wähle
+    Wenn ich die Dateien «geheim.pdf» auswähle
+    Und ich hochlade
+    Dann sehe ich je Datei das Ergebnis:
+      | datei      | ausgang   | meldung           |
+      | geheim.pdf | vorhanden | bereits vorhanden |
     Und bietet «geheim.pdf» keinen Link
 
   @req-3.5
   Szenario: Mehrere Bilder in der gewählten Reihenfolge als ein Dokument hochladen
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «seite-2.jpg, seite-1.jpg, seite-3.jpg» auswähle
     Und ich «seite-1.jpg» nach oben verschiebe
     Dann sehe ich die Dateien «seite-1.jpg, seite-2.jpg, seite-3.jpg» in dieser Reihenfolge
     Wenn ich «als ein Dokument» wähle
     Und ich hochlade
     Dann hat das Archiv einen Upload mit «seite-1.jpg, seite-2.jpg, seite-3.jpg» mit «zusammenfassen» erhalten
+    Und hat das Archiv daraus ein Dokument angelegt
 
   @req-3.6
   Szenario: Eine Datei über 50 MB wird mit DATEI_ZU_GROSS abgelehnt
-    Angenommen das Archiv antwortet auf Uploads so:
-      | datei      | antwort            |
-      | riesig.pdf | 413 DATEI_ZU_GROSS |
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Datei «riesig.pdf» ist grösser als 50 MB
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «riesig.pdf» auswähle
     Und ich hochlade
     Dann sehe ich je Datei das Ergebnis:
-      | datei      | ausgang   | meldung                             |
-      | riesig.pdf | abgelehnt | Die Datei ist grösser als 50 MB.    |
-      | riesig.pdf | abgelehnt | DATEI_ZU_GROSS                      |
+      | datei      | ausgang   | meldung                                  |
+      | riesig.pdf | abgelehnt | Die Datei oder die Anfrage ist zu gross. |
+      | riesig.pdf | abgelehnt | DATEI_ZU_GROSS                           |
 
   @req-3.7
   Szenario: Eine leere oder beschädigte Datei wird mit DATEI_UNGUELTIG abgelehnt
-    Angenommen das Archiv antwortet auf Uploads so:
-      | datei    | antwort             |
-      | leer.pdf | 422 DATEI_UNGUELTIG |
-    Wenn ich die Dateien «leer.pdf» auswähle
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Datei «leer.pdf» ist leer
+    Und die Datei «kaputt.pdf» ist abgeschnitten
+    Und ich im Menü «Erfassen» wähle
+    Wenn ich die Dateien «leer.pdf, kaputt.pdf» auswähle
     Und ich hochlade
     Dann sehe ich je Datei das Ergebnis:
-      | datei    | ausgang   | meldung                              |
-      | leer.pdf | abgelehnt | Die Datei ist leer oder beschädigt.  |
-      | leer.pdf | abgelehnt | DATEI_UNGUELTIG                      |
+      | datei      | ausgang   | meldung                              |
+      | leer.pdf   | abgelehnt | Die Datei ist leer oder beschädigt.  |
+      | leer.pdf   | abgelehnt | DATEI_UNGUELTIG                      |
+      | kaputt.pdf | abgelehnt | Die Datei ist leer oder beschädigt.  |
+      | kaputt.pdf | abgelehnt | DATEI_UNGUELTIG                      |
 
   @req-3.8
   Szenario: Je Datei ein eigenes Ergebnis, gültige Dateien trotz abgelehnter Nachbarn
-    Angenommen das Archiv antwortet auf Uploads so:
-      | datei       | antwort                 |
-      | gut.pdf     | NEU                     |
-      | doppelt.pdf | DUBLETTE d-vorhanden-2  |
-      | falsch.pdf  | 415 DATEITYP_UNBEKANNT  |
-      | gross.pdf   | 413 DATEI_ZU_GROSS      |
-      | kaputt.pdf  | 422 DATEI_UNGUELTIG     |
+    Angenommen «inhaber» im Mandanten «urinet» hat die Datei «doppelt.pdf» schon hochgeladen
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und die Datei «falsch.pdf» ist ein Text
+    Und die Datei «gross.pdf» ist grösser als 50 MB
+    Und die Datei «kaputt.pdf» ist abgeschnitten
+    Und ich im Menü «Erfassen» wähle
     Wenn ich die Dateien «gut.pdf, doppelt.pdf, falsch.pdf, gross.pdf, kaputt.pdf» auswähle
     Und ich hochlade
     Dann sehe ich je Datei das Ergebnis:
@@ -108,3 +123,4 @@ Funktionalität: Upload im Browser
       | falsch.pdf  | abgelehnt  | DATEITYP_UNBEKANNT           |
       | gross.pdf   | abgelehnt  | DATEI_ZU_GROSS               |
       | kaputt.pdf  | abgelehnt  | DATEI_UNGUELTIG              |
+    Und führt «doppelt.pdf» zum vorhandenen Dokument

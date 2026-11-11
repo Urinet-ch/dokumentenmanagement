@@ -20,6 +20,8 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 import { Dokument } from '../model/dokument';
 // @ts-ignore
 import { EingangskorbSeite } from '../model/eingangskorb-seite';
+// @ts-ignore
+import { UploadErgebnis } from '../model/upload-ergebnis';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -87,6 +89,113 @@ export class DokumenteService extends BaseService {
         return this.httpClient.request<Dokument>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Dateien hochladen
+     * PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».
+     * @endpoint post /api/v1/dokumente
+     * @param dateien 
+     * @param arbeitsfassungen 
+     * @param zusammenfassen 
+     * @param hinweis 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<UploadErgebnis>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<UploadErgebnis>>>;
+    public apiV1DokumentePost(dateien?: Array<Blob>, arbeitsfassungen?: Array<Blob>, zusammenfassen?: boolean, hinweis?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'multipart/form-data'
+        ];
+
+        const canConsumeForm = this.canConsumeForm(consumes);
+
+        let localVarFormParams: { append(param: string, value: any): any; };
+        let localVarUseForm = false;
+        let localVarConvertFormParamsToString = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        // see https://stackoverflow.com/questions/4007969/application-x-www-form-urlencoded-or-multipart-form-data
+        localVarUseForm = canConsumeForm;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        // see https://stackoverflow.com/questions/4007969/application-x-www-form-urlencoded-or-multipart-form-data
+        localVarUseForm = canConsumeForm;
+        if (localVarUseForm) {
+            localVarFormParams = new FormData();
+        } else {
+            localVarFormParams = new HttpParams({encoder: this.encoder});
+        }
+
+        if (dateien) {
+            if (localVarUseForm) {
+                dateien.forEach((element) => {
+                    localVarFormParams = localVarFormParams.append('dateien', <any>element) as any || localVarFormParams;
+            })
+            } else {
+                localVarFormParams = localVarFormParams.append('dateien', [...dateien].join(COLLECTION_FORMATS['csv'])) as any || localVarFormParams;
+            }
+        }
+        if (arbeitsfassungen) {
+            if (localVarUseForm) {
+                arbeitsfassungen.forEach((element) => {
+                    localVarFormParams = localVarFormParams.append('arbeitsfassungen', <any>element) as any || localVarFormParams;
+            })
+            } else {
+                localVarFormParams = localVarFormParams.append('arbeitsfassungen', [...arbeitsfassungen].join(COLLECTION_FORMATS['csv'])) as any || localVarFormParams;
+            }
+        }
+        if (zusammenfassen !== undefined) {
+            localVarFormParams = localVarFormParams.append('zusammenfassen', <any>zusammenfassen) as any || localVarFormParams;
+        }
+        if (hinweis !== undefined) {
+            localVarFormParams = localVarFormParams.append('hinweis', <any>hinweis) as any || localVarFormParams;
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/dokumente`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Array<UploadErgebnis>>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: localVarConvertFormParamsToString ? localVarFormParams.toString() : localVarFormParams,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

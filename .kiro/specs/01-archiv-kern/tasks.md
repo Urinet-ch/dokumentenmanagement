@@ -189,11 +189,11 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachweis 6.5 (JUnit): Request-Interceptor in den Integrationstests prüft, dass kein S3-Aufruf der Anwendung `x-amz-bypass-governance-retention` sendet; ergänzend ArchUnit-Regel gegen `bypassGovernanceRetention` im Produktionscode (Testklassen ausgenommen)
   - _Anforderungen: 6.2, 6.3, 6.4, 6.5, 6.9, 6.11, 6.12, 14.6_
 
-- [ ] 2.4 Upload-Endpunkt [Backend]
+- [x] 2.4 Upload-Endpunkt [Backend]
   - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
-  - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; bis dahin braucht 2.4 im Test einen Handler für `VERARBEITEN` (nur unter `src/test`).
+  - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; 2.4 nutzt den echten Handler aus 2.6 (Teil b), Szenario Upload → `VERARBEITUNG` → `KI_VORSCHLAG` in `upload.feature`.
   - generierten OpenAPI-Client an die Upload-Seite der PWA anschliessen (`UploadPort`, aus 2.7) und die Browser-Szenarien `dokument/upload-pwa.feature` gegen das echte Backend laufen lassen (danach `@attrappe` entfernen)
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
@@ -245,6 +245,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Swiss QR Code vor dem KI-Aufruf deterministisch auslesen, seine Werte vor den KI-Werten verwenden
   - Vorschlag inkl. Vertraulichkeit (vorbelegt mit dem Standard der Art); das Belegnummer-Muster setzt die Art nur, wenn der Mandant Aussteller ist (Testfall Lieferantenrechnung `2026-123`)
   - `KiVorschlagHandler`: Vorschlag speichern, Partner verknüpfen, Status `EINGANGSKORB`; bei KI-Ausfall ohne Vorschlag weiter; Logs nur mit IDs
+  - `KiVorschlagHandler` nimmt auch Dokumente in `EINGANGSKORB` mit `pdfa_fehlt` an. Er überschreibt nur, solange das Dokument nicht bestätigt und nicht vom Benutzer geändert ist (`version`), und ändert den Status nicht zurück (Review PR #54, S1; design.md «Umsetzung (Aufgabe 2.6, Teil b)»)
   - WireMock-Tests für gültige, ungültige und fehlende Antworten; ein WireMock-Test prüft den Request: `model` = Wert von `archiv.ki.erfassung-modell` (nicht `archiv.ki.chat-modell`), `temperature` 0, `top_p` 1, `presence_penalty` und `frequency_penalty` 0, `response_format` `json_schema` mit `strict`
   - Befund Gate-Lauf (`docs/spikes/golden-ergebnis.md`): Belegnummer-Vorschläge mit hoher Sicherheit gezielt prüfen, ohne Prompt, Modell oder Aufrufparameter gegenüber Gate 0 zu ändern (sonst neuer Golden-Lauf)
   - Auflage A1 (Gate 0): Sicherheit der Belegnummer höchstens 0.7, ausser die Belegnummer entspricht einem Muster des Mandanten und der Mandant ist Aussteller (design.md «KI», Nachbearbeitung); Unit-Tests: eigener Beleg im Muster (keine Begrenzung), Fremdbeleg ohne Muster (Begrenzung), Lieferantenrechnung `2026-123` im Muster des Mandanten (Req 7.12, Begrenzung)

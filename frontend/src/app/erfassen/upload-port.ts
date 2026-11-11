@@ -1,7 +1,7 @@
 import { Observable } from 'rxjs';
 
-// Schnittstelle nach design.md «Upload» (POST /api/v1/dokumente, Req 3); den generierten OpenAPI-Client schliesst
-// Aufgabe 2.4 mit dem Endpunkt an.
+// Schnittstelle nach design.md «Upload» (POST /api/v1/dokumente, Req 3); HttpUploadService setzt sie mit dem
+// generierten OpenAPI-Client um (Aufgabe 2.4).
 
 export interface UploadFehler {
   status: number;
