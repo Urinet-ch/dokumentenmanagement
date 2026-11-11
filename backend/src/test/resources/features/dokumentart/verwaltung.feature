@@ -298,8 +298,8 @@ Funktionalität: Dokumentarten verwalten
 
   # Entschieden von Fabian am 10.11.2026: Die Regel einer Art darf sich auch ändern, wenn sie schon Dokumente hat; sie
   # wirkt auf neue Dokumente und Neuberechnungen. Die Wirkung auf bestehende Dokumente und Sperren folgt mit 2.2/2.3.
-  # Dass auch `gesetzlichePflicht` (ja → nein) änderbar ist und protokolliert wird, ist eine Auslegung von 2.1
-  # (Endpunkt-Tabelle: PATCH ohne Einschränkung), kein Entscheid; offen für Fabian (PR #40).
+  # Entschieden von Fabian am 11.11.2026: Auch eine gesetzlich pflichtige Art darf gesenkt werden (`gesetzlichePflicht`
+  # ja → nein, weniger als 10 Jahre); das Archiv verhindert das nicht, es protokolliert die Änderung nur.
   @req-9.10
   Szenario: Die Regel einer Art mit Dokumenten lässt sich ändern, jede Regeländerung kommt mit alt und neu ins Protokoll (Teilnachweis bis 2.2/2.3)
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:

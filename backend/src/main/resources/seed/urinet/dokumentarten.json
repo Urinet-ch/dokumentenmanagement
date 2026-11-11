@@ -60,7 +60,7 @@
     {
       "code": "LOHNABRECHNUNG",
       "name": "Lohnabrechnung",
-      "beschreibung": "Monatliche Lohnabrechnung oder jährlicher Lohnausweis einer mitarbeitenden Person. Lohndeklarationen und Beitragsrechnungen = BEHOERDE (AHV, IV, EO, ALV, FAK, Quellensteuer) bzw. VERSICHERUNG (UVG, Krankentaggeld, BVG).",
+      "beschreibung": "Monatliche Lohnabrechnung oder jährlicher Lohnausweis einer mitarbeitenden Person. Lohndeklarationen und Beitragsrechnungen der Ausgleichskasse = BEHOERDE (AHV, IV, EO, ALV, FAK, Quellensteuer), Prämienrechnungen von UVG-, Krankentaggeld- und BVG-Versicherern = LIEFERANTENBELEG.",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "richtung", "betrag", "waehrung", "zusatz.periode", "zusatz.person"],
       "zusatz_schema": {
@@ -106,7 +106,7 @@
     {
       "code": "BEHOERDE",
       "name": "Behörde",
-      "beschreibung": "Verfügung, Veranlagung, Rechnung oder Gutschrift eines Amtes, etwa Steuern, MWST, Handelsregister und Betreibungsamt, sowie AHV, IV, EO, ALV und FAK der Ausgleichskasse, auch Rückerstattungen; dazu eigene Eingaben wie Steuererklärung und MWST-Abrechnung. UVG- und Krankentaggeld-Versicherer = VERSICHERUNG.",
+      "beschreibung": "Verfügung, Veranlagung, Rechnung oder Gutschrift eines Amtes, etwa Steuern, MWST, Handelsregister und Betreibungsamt, sowie AHV, IV, EO, ALV und FAK der Ausgleichskasse, auch Rückerstattungen; dazu eigene Eingaben wie Steuererklärung und MWST-Abrechnung. Policen von UVG- und Krankentaggeld-Versicherern = VERSICHERUNG, ihre Prämienrechnungen = LIEFERANTENBELEG.",
       "gruppen": ["finanz", "frei"],
       "pflichtfelder": ["titel", "datum", "partner"],
       "zusatz_schema": {

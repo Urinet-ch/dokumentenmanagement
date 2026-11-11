@@ -83,7 +83,8 @@ public class DokumentartVerwaltung {
      * {@code aufbewahrungJahre} auf {@code null} gesetzt, entfällt {@code aufbewahrungAb} mit. Die Aufbewahrungsregel
      * (Jahre, «ab») darf sich auch ändern, wenn die Art schon Dokumente hat; jede solche Änderung kommt mit alter und
      * neuer Regel ins Zugriffsprotokoll (Req 9.10, entschieden von Fabian am 10.11.2026). Eine Änderung der
-     * gesetzlichen Pflicht wird ebenfalls protokolliert (Auslegung 2.1, offen für Fabian, PR #40). Sie
+     * gesetzlichen Pflicht wird ebenfalls protokolliert; auch eine pflichtige Art darf gesenkt werden (Pflicht auf
+     * «nein», weniger als 10 Jahre), sie wird dabei nur protokolliert (entschieden von Fabian am 11.11.2026). Sie
      * wirkt auf neue Dokumente und Neuberechnungen nach Req 9.7, bestehende Sperren werden nur verlängert.
      */
     public Dokumentart aendern(String code, DokumentartAngaben angaben) {

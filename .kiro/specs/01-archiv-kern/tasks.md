@@ -159,8 +159,9 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [x] 2.1 Dokumentarten und Aufbewahrung [Backend] [Fabian]
   - Entität `Dokumentart` mit Standard-Vertraulichkeit und `gesetzliche_pflicht`; REST `/api/v1/dokumentarten` (CRUD nur mit Recht A11; Löschen nur ohne Dokumente, sonst 409 `DOKUMENTART_IN_GEBRAUCH` → inaktiv); JSON-Schema-Validierung für `zusatz` (422 `ZUSATZ_UNGUELTIG`)
   - Seed `backend/src/main/resources/seed/urinet/dokumentarten.json` mit den 11 Arten aus 1.7; ein Test prüft den Seed Feld für Feld gegen die Stammdaten-Tabelle in design.md
-  - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026; Texte abgenommen von Fabian am 10.11.2026)
+  - Spalte «Beschreibung» in Seed und Stammdaten-Tabelle (design.md) mit den Abgrenzungen zwischen den Arten (z. B. Sozialversicherungen AHV, IV, EO, FAK = `BEHOERDE`; Policen der UVG- und Krankentaggeld-Versicherer = `VERSICHERUNG`, ihre Prämienrechnungen = `LIEFERANTENBELEG`); sie fliesst in den KI-Prompt (entschieden von Fabian am 09.11.2026; Texte abgenommen von Fabian am 10.11.2026; Prämienrechnungen von UVG-, Krankentaggeld- und BVG-Versicherern = `LIEFERANTENBELEG` entschieden von Fabian am 11.11.2026)
   - Entscheide F1–F7 (entschieden von Fabian am 10.11.2026): Neuberechnung ohne Sperre übernimmt auch ein früheres Ergebnis, mit Sperre bleibt der Konflikt (9.7); Regel einer Art mit Dokumenten änderbar, Änderung mit alter und neuer Regel im Zugriffsprotokoll (`REGEL_AENDERN`, 9.10; Wirkung auf bestehende Dokumente mit 2.2/2.3); `AUSGANGSRECHNUNG` ohne Pflichtfeld `faelligkeit`; `BEHOERDE` mit Gruppe `finanz`; `LOHNABRECHNUNG` mit Lohnausweis (`zusatz.periode` `JJJJ-MM` oder `JJJJ`)
+  - Entscheide P40-1 und P40-2 (entschieden von Fabian am 11.11.2026): Eine gesetzlich pflichtige Art darf gesenkt werden (`gesetzliche_pflicht` auf «nein», weniger als 10 Jahre), die Änderung wird nur protokolliert (9.10); Prämienrechnungen von UVG-, Krankentaggeld- und BVG-Versicherern = `LIEFERANTENBELEG` (Beschreibungen `LOHNABRECHNUNG` und `BEHOERDE`)
   - `AufbewahrungRechner`: Ende des bestätigten Geschäftsjahres (Geschäftsjahresende des Mandanten) plus Jahre der Regel; ohne Belegdatum Eingangsdatum; Verträge ab `gueltig_bis`, ohne `gueltig_bis` unbefristet; Neuberechnung verlängert nur; Frist in der Vergangenheit → «Frist abgelaufen»; keine Löschung bei Fristablauf
   - Unit-Tests: Beleg 2026 → 31.12.2036; abweichendes Geschäftsjahresende; ohne Belegdatum; Vertrag ohne `gueltig_bis`; Neuberechnung mit früherem Datum → mit Sperre bleibt die Frist, Konflikt protokolliert, ohne Sperre gilt das neue Ergebnis (entschieden von Fabian am 10.11.2026)
   - [Fabian] Abnahme: Seed gegen die freigegebene Tabelle prüfen
@@ -228,6 +229,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `PartnerAbgleich` (E-Mail, UID, IBAN, Ähnlichkeit ≥ 0.6, «unsicher» bei Abstand < 0.1) mit Tests
   - _Anforderungen: 2.18, 7.4_
 
+- [ ] 3.8 Golden-Generator nach F4/F6 anpassen, neuer Golden-Lauf durch Fabian (Entscheid 11.11.2026)
+  - Eigener Folgeauftrag vor 3.2 (`tools/golden_synth`): Prämienrechnungen von Versicherern (auch UVG, Krankentaggeld, BVG) und Mahnungen mit Mahngebühr oder Verzugszins = `LIEFERANTENBELEG`, Mahnungen ohne Gebühr = `KORRESPONDENZ` (F4/F6, entschieden von Fabian am 10.11.2026; P40-2, entschieden von Fabian am 11.11.2026); in PR #40 nicht geändert; Nummer 3.8, weil bestehende Nummern bleiben, steht aber vor 3.2
+  - _Anforderungen: 0.9, 0.10_
+
 - [ ] 3.2 Metadaten-Extraktor [Backend]
   - Port `KiPort` mit Adapter (LangChain4j) und Dev-Stub; `MetadatenExtraktor` mit Prompt aus Welle 0, Schema-Validierung + eine Nachfrage, Sicherheiten je Feld, Modell (`archiv.ki.erfassung-modell`), Aufrufparameter und Schwelle aus Gate 0 (design.md «KI»), `ki_verbrauch`
   - Swiss QR Code vor dem KI-Aufruf deterministisch auslesen, seine Werte vor den KI-Werten verwenden
@@ -239,6 +244,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `KiBasisUrlPruefung` prüft die wirksame Konfiguration (`LangChain4jOpenAiConfig`: `defaultConfig()` und alle `namedConfig()`) statt einzelner Schlüssel; Testfall benannter Client ohne `base-url` → Abbruch (Req 16.21)
   - Die WireMock-Testressource setzt `archiv.ki.wiremock-port` dynamisch beim Start (bis 3.2 fest `8089`, Req 16.21)
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_
+  - _Abhängig von: 3.8_
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
