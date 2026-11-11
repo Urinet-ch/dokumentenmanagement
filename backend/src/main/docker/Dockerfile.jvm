@@ -1,12 +1,37 @@
 # Ein Image für beide Laufarten (tech.md: archiv.rolle=api, worker oder api,worker); die PWA steckt über Quinoa im Artefakt.
 # Bauen nach `mvn -f backend/pom.xml package`: docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv backend
-# OCR-Werkzeuge (OCRmyPDF, Tesseract, img2pdf, libheif) kommen mit der Verarbeitung (Aufgabe 2.6) dazu.
-FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce
+# Stufe A: API und Worker in einem Container, darum trägt dieses Image die OCR-Werkzeuge (Aufgabe 2.6, design.md
+# «Verarbeitung»); ein eigenes Worker-Image kommt erst mit Stufe B.
 
-ENV JAVA_OPTS_APPEND="-Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+# Stufe «werkzeuge»: JRE und OCR-Werkzeuge ohne Anwendung. Tests und das Profil lokal rufen die Werkzeuge darin auf
+# (archiv.ocr.container-image): docker build --target werkzeuge -t urinet-archiv-werkzeuge:lokal - < backend/src/main/docker/Dockerfile.jvm
+FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce AS werkzeuge
+
+# OCRmyPDF mit Tesseract (deu, eng, osd für --rotate-pages), Ghostscript (PDF/A), img2pdf, libheif mit HEVC-Decoder
+# (heif-convert), poppler-utils (pdftotext, pdftoppm) und tini; die Versionsabfragen brechen den Build ab, falls eines fehlt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ocrmypdf tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng tesseract-ocr-osd \
+        ghostscript img2pdf libheif-examples libheif-plugin-libde265 poppler-utils tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && tini --version && ocrmypdf --version && img2pdf --version && gs --version && pdftotext -v && pdftoppm -v \
+    && command -v heif-convert \
+    && tesseract --list-langs | grep -qx deu && tesseract --list-langs | grep -qx eng \
+    && tesseract --list-langs | grep -qx osd
 
 # Numerische uid ungleich 0 (Compose-Policy der VPS, tech.md)
 RUN groupadd --system --gid 10001 archiv && useradd --system --uid 10001 --gid archiv --no-create-home archiv
+USER 10001
+
+# Init-Prozess: Bricht der Worker ein Werkzeug ab (Zeitgrenze, Unterbrechung), hängen dessen Nachfahren (tesseract, gs)
+# danach am Init. Die JVM holt nur ihre eigenen Kinder ab; ohne Init blieben sie als Zombies stehen. -s (Subreaper)
+# wirkt auch, wenn tini nicht PID 1 ist (z. B. unter «init: true» in Compose). Die Stufe «archiv» erbt den ENTRYPOINT
+# und setzt nur CMD; WerkzeugImageInitTest prüft das.
+ENTRYPOINT ["tini", "-s", "--"]
+
+FROM werkzeuge AS archiv
+
+ENV JAVA_OPTS_APPEND="-Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 
 COPY --chown=10001:10001 target/quarkus-app/lib/ /deployments/lib/
 COPY --chown=10001:10001 target/quarkus-app/*.jar /deployments/
@@ -16,4 +41,4 @@ COPY --chown=10001:10001 target/quarkus-app/quarkus/ /deployments/quarkus/
 USER 10001
 EXPOSE 8080
 WORKDIR /deployments
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar"]
+CMD ["sh", "-c", "exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar"]
