@@ -18,10 +18,12 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,15 +48,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * wie {@code JdbcImportRepository} mit dem PG-Treiber: Es hält je Block alle JSON-Strings und ihre UTF-8-Bytes bis
  * zum Schreiben (Batch bis {@code executeBatch}) und beim erneuten Prüfen alle Bytes des Fensters, bevor es die erste
  * Zeile parst (ResultSet); die Antwort wird als JSON serialisiert. Die kleine Young-Generation nähert den Live-Peak an.
- * Gemessen (11.11.2026, kleinste {@code -Xmx}): Basis ohne nennenswerte Datei 17 MiB; Blöcke mit langen «€»-Feldern
- * (524 × 9'999, Zeilen an der Zeilengrenze, Block knapp unter 1 Mi plus eine Zeile) 25 MiB, alle anderen 17 MiB.
- * Ohne Kopfgrenzen, Kürzen, Zeichengrenze der Blöcke und Zeilengrenze brauchten dieselben Formen bis 145 MiB (eine
- * Zeile aus 520 Feldern mit 10'000 Steuerzeichen); die Grenze {@value #XMX_MIB} MiB lässt Reserve für andere JVMs und
- * schlägt bei jeder dieser Formen an.
+ * Die Kind-JVM bekommt nur die Jars, die der Import braucht ({@link #klassenpfad()}); mit dem vollen Klassenpfad von
+ * Surefire misst der Test vor allem die Zentralverzeichnisse der Jars.
+ * Gemessen (12.11.2026, kleinste {@code -Xmx}, fester Klassenpfad): Basis ohne nennenswerte Datei 4 MiB (macOS/arm64)
+ * bzw. 5 MiB (Linux/amd64, wie die CI); höchster Fall 9 MiB bzw. 13 MiB (Blöcke knapp unter 1 Mi Zeichen plus eine
+ * Zeile). Ohne Kopfgrenzen, Kürzen, Zeichengrenze der Blöcke und Zeilengrenze brauchten die Formen mit langen Feldern,
+ * Zeilen oder Köpfen mindestens 17 MiB, bis 129 MiB. Die Grenze {@value #XMX_MIB} MiB lässt auf amd64 3 MiB Reserve
+ * und schlägt bei jeder dieser Formen an.
  */
 class CsvImportSpeicherTest {
 
-    static final int XMX_MIB = 28;
+    static final int XMX_MIB = 16;
     private static final Charset CP1252 = Charset.forName("windows-1252");
     private static final long MAX_GROESSE = 5L * 1024 * 1024;
     private static final int FELD_GRENZE = 10_000;
@@ -115,13 +120,37 @@ class CsvImportSpeicherTest {
 
         Process prozess = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
                 "-XX:+UseSerialGC", "-Xmn2m", "-Xmx" + XMX_MIB + "m", "-XX:+ExitOnOutOfMemoryError",
-                "-cp", System.getProperty("java.class.path"), Lauf.class.getName(), datei.toString(),
+                "-cp", klassenpfad(), Lauf.class.getName(), datei.toString(),
                 ordner.toString()).redirectErrorStream(true).start();
         String ausgabe = new String(prozess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertThat(prozess.waitFor(2, TimeUnit.MINUTES)).isTrue();
 
         assertThat(prozess.exitValue()).as(ausgabe).isZero();
         assertThat(ausgabe).contains("ok");
+    }
+
+    /**
+     * Fester Klassenpfad der Kind-JVM, nur die Orte der Klassen, die {@link Lauf} lädt: Der Klassenpfad der Tests
+     * (Surefire, rund 450 Einträge) brächte das Zentralverzeichnis jedes geöffneten Jars in den Heap, je nach Umgebung
+     * verschieden viel (gemessen 12.11.2026, Fall «24 Zeilen …»: 25 MiB auf macOS/arm64, 29 MiB auf Linux/amd64,
+     * mit diesem Klassenpfad 9 MiB bzw. 13 MiB). Fehlt hier ein Jar, scheitert die Kind-JVM mit
+     * {@code NoClassDefFoundError}, und der Test ist rot.
+     */
+    private static String klassenpfad() {
+        return Stream.of(Lauf.class, CsvImport.class, ObjectMapper.class, com.fasterxml.jackson.core.JsonFactory.class,
+                        com.fasterxml.jackson.annotation.JsonProperty.class, org.apache.commons.csv.CSVFormat.class,
+                        org.apache.commons.io.IOUtils.class, org.apache.commons.codec.binary.Base64.class,
+                        com.ibm.icu.text.CharsetDetector.class, org.jboss.logging.Logger.class,
+                        org.assertj.core.api.Assertions.class)
+                .map(klasse -> {
+                    try {
+                        return Path.of(klasse.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
+                    } catch (URISyntaxException e) {
+                        throw new IllegalStateException(e);
+                    }
+                })
+                .distinct()
+                .collect(Collectors.joining(File.pathSeparator));
     }
 
     /** {@code anzahl} Zeilen mit {@code spalten} gleichen Feldern; Kopfzeile {@code Name;S;S;…}. */

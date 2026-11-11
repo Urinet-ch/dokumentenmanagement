@@ -143,20 +143,36 @@ public class AuftragTestHilfe {
         }
     }
 
-    /** Hält gerade eine Transaktion die Zeilensperre des Auftrags ({@code for update nowait} scheitert)? */
+    /**
+     * Hält eine Transaktion die Zeilensperre des Auftrags länger als {@value #SPERRE_GEHALTEN_MS} ms? Ein
+     * Lebenszeichen ({@code archiv.auftrag.lebenszeichen}, im Test alle 200 ms) sperrt die Zeile für die Dauer seines
+     * {@code UPDATE} – {@code for update nowait} traf das je nach Zeitpunkt (rot in der CI zu PR #48). Gewartet wird
+     * darum mit {@code lock_timeout}; eine über einen angehaltenen Aufruf gehaltene Sperre bleibt länger bestehen.
+     */
     public boolean gesperrt(long id) throws SQLException {
-        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
-                verbindung.prepareStatement("select 1 from public.auftrag where id = ? for update nowait")) {
-            abfrage.setLong(1, id);
-            abfrage.executeQuery().close();
-            return false;
-        } catch (SQLException e) {
-            if ("55P03".equals(e.getSQLState())) {
-                return true;
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            verbindung.setAutoCommit(false);
+            try (PreparedStatement frist = verbindung.prepareStatement(
+                    "select set_config('lock_timeout', '" + SPERRE_GEHALTEN_MS + "ms', true)");
+                 PreparedStatement abfrage = verbindung.prepareStatement(
+                         "select 1 from public.auftrag where id = ? for update")) {
+                frist.executeQuery().close();
+                abfrage.setLong(1, id);
+                abfrage.executeQuery().close();
+                return false;
+            } catch (SQLException e) {
+                if ("55P03".equals(e.getSQLState())) {
+                    return true;
+                }
+                throw e;
+            } finally {
+                verbindung.rollback();
+                verbindung.setAutoCommit(true);
             }
-            throw e;
         }
     }
+
+    private static final int SPERRE_GEHALTEN_MS = 2_000;
 
     /** Führt eine Änderung aus und liefert die Zahl betroffener Zeilen. */
     public int ausfuehren(String sql) throws SQLException {
