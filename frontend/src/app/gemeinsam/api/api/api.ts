@@ -7,3 +7,6 @@ import { DokumenteService } from './dokumente.service';
 export * from './kontakte.service';
 import { KontakteService } from './kontakte.service';
 export const APIS = [APITokensService, DokumentartenService, DokumenteService, KontakteService];
+export * from './importe.service';
+import { ImporteService } from './importe.service';
+export const APIS = [APITokensService, DokumentartenService, DokumenteService, ImporteService];

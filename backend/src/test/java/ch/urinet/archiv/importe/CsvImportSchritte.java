@@ -109,6 +109,31 @@ public class CsvImportSchritte {
                 text.replace("{RIESIG}", "x".repeat(10_001)).getBytes(StandardCharsets.UTF_8));
     }
 
+    @Wenn("«{word}» diese Kontakt-CSV im Zeichensatz «{word}» hochlädt:")
+    public void textInZeichensatzHochladen(String benutzer, String zeichensatz, String text) {
+        hochladen(benutzer, "kontakt", "false", "kontakte.csv", text.getBytes(Charset.forName(zeichensatz)));
+    }
+
+    @Wenn("«{word}» eine Kontakt-CSV mit {int} Spalten hochlädt")
+    public void vieleSpalten(String benutzer, int spalten) {
+        StringBuilder kopf = new StringBuilder("Name");
+        StringBuilder zeile = new StringBuilder("A");
+        for (int i = 1; i < spalten; i++) {
+            kopf.append(";S").append(i);
+            zeile.append(';');
+        }
+        hochladen(benutzer, "kontakt", "false", "kontakte.csv",
+                (kopf + "\n" + zeile + "\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Wenn("«{word}» die Verkaufschancen-Kopfzeile aus 21.CRM mit einer erfundenen Zeile hochlädt")
+    public void verkaufschancenHochladen(String benutzer) {
+        String kopf = new String(datei("csv/21crm-verkaufschancen-beispiel.csv"), CP1252).strip();
+        String zeile = "x" + ";x".repeat(kopf.split(";", -1).length - 1);
+        hochladen(benutzer, "verkaufschance", "false", "verkaufschancen.csv",
+                (kopf + "\n" + zeile + "\n").getBytes(CP1252));
+    }
+
     @Wenn("«{word}» eine Kontakt-CSV mit {int} Datenzeilen hochlädt")
     public void vieleZeilen(String benutzer, int anzahl) {
         StringBuilder text = new StringBuilder("Name;PLZ\n");
@@ -164,6 +189,11 @@ public class CsvImportSchritte {
     @Wenn("«{word}» für den Lauf die Kontakt-Zuordnung «21.CRM» bestätigt")
     public void profilBestaetigen(String benutzer) {
         zuordnen(benutzer, "kontakt", Map.of("laufId", laufId, "profil", "21.CRM"));
+    }
+
+    @Wenn("«{word}» für den Lauf die Verkaufschancen-Zuordnung «21.CRM» bestätigt")
+    public void verkaufschancenProfilBestaetigen(String benutzer) {
+        zuordnen(benutzer, "verkaufschance", Map.of("laufId", laufId, "profil", "21.CRM"));
     }
 
     private void zuordnen(String benutzer, String art, Map<String, ?> body) {

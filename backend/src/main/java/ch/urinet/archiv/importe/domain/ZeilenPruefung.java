@@ -21,12 +21,22 @@ public final class ZeilenPruefung {
         }
         for (int i = 0; i < werte.size(); i++) {
             String wert = werte.get(i);
-            if (wert != null && wert.length() > feldGrenze) {
+            if (zuLang(wert, feldGrenze)) {
                 return new Befund(Ergebnis.FEHLER, "Feld in Spalte " + (i + 1) + " länger als " + feldGrenze
                         + " Zeichen", true);
             }
         }
         return Befund.OFFEN;
+    }
+
+    /** Kopfzeile mit einem Spaltennamen über der Feldgrenze: Das Archiv lehnt die Datei ab (Req 13.10). */
+    public static boolean kopfZuLang(Kopfzeile kopf, int feldGrenze) {
+        return kopf.namen().stream().anyMatch(name -> zuLang(name, feldGrenze));
+    }
+
+    /** Länge in Unicode-Zeichen (Codepoints), nicht in UTF-16-Einheiten. */
+    static boolean zuLang(String wert, int feldGrenze) {
+        return wert != null && wert.length() > feldGrenze && wert.codePointCount(0, wert.length()) > feldGrenze;
     }
 
     /** Vollständige Prüfung mit gültiger Zuordnung; die Struktur zuerst, weil Positionen sonst nicht stimmen. */

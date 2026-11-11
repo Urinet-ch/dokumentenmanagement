@@ -104,12 +104,21 @@ public class JdbcImportRepository implements ImportRepository {
 
     @Override
     public Optional<ImportLauf> lauf(UUID id) {
+        return lauf(id, false);
+    }
+
+    @Override
+    public Optional<ImportLauf> laufSperren(UUID id) {
+        return lauf(id, true);
+    }
+
+    private Optional<ImportLauf> lauf(UUID id, boolean sperren) {
         String schema = schema();
         String sql = "select l.id, l.art, l.vollexport, l.dateiname, l.sha256, l.zeichensatz, l.trennzeichen, "
                 + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, "
                 + "(select count(*) from " + schema + ".import_zeile z where z.lauf_id = l.id "
                 + "and z.ergebnis = 'UEBERSPRUNGEN') as uebersprungen "
-                + "from " + schema + ".import_lauf l where l.id = ?";
+                + "from " + schema + ".import_lauf l where l.id = ?" + (sperren ? " for update of l" : "");
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setObject(1, id, Types.OTHER);

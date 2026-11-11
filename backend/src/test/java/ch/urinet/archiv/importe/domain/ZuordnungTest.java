@@ -96,6 +96,25 @@ class ZuordnungTest {
     }
 
     @Test
+    void feldgrenzeZaehltUnicodeZeichen() {
+        String zehnEmoji = "😀".repeat(10);
+
+        assertThat(ZeilenPruefung.struktur(List.of("a", zehnEmoji), 2, 10)).isEqualTo(ZeilenPruefung.Befund.OFFEN);
+        assertThat(ZeilenPruefung.struktur(List.of("a", zehnEmoji + "x"), 2, 10).ergebnis())
+                .isEqualTo(ZeilenPruefung.Ergebnis.FEHLER);
+        assertThat(ZeilenPruefung.kopfZuLang(new Kopfzeile(List.of("Name", zehnEmoji)), 10)).isFalse();
+        assertThat(ZeilenPruefung.kopfZuLang(new Kopfzeile(List.of("Name", "x".repeat(11))), 10)).isTrue();
+    }
+
+    @Test
+    void verkaufschancenHabenKeinProfil21Crm() {
+        Kopfzeile kopf = new Kopfzeile(List.of("GGUID", "ACCOUNTGUID", "Name", "Phase", "Gesamt", "Beginn"));
+
+        assertThat(Zuordnungsvorschlag.profil21Crm(ImportArt.VERKAUFSCHANCE, kopf)).isEmpty();
+        assertThat(Zuordnungsvorschlag.fuer(ImportArt.VERKAUFSCHANCE, kopf).profil()).isNull();
+    }
+
+    @Test
     void formelwerteBleibenUnveraendert() {
         List<String> zeile = zeile(Map.of(3, "=HYPERLINK(\"x\")", 10, "4", 11, "+41 41 000 00 00"));
 

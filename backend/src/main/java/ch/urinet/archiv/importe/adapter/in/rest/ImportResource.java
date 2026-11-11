@@ -106,7 +106,8 @@ public class ImportResource {
     public record ZuordnenDto(
             @Schema(required = true, description = "Lauf, dessen Kopfzeile zugeordnet wird") String laufId,
             @Schema(nullable = true, enumeration = {"21.CRM"},
-                    description = "Profil; die Positionen rechnet das Archiv aus der Kopfzeile") String profil,
+                    description = "Profil (nur Importart kontakt); die Positionen rechnet das Archiv aus der Kopfzeile")
+            String profil,
             @Schema(nullable = true, description = "Feld → Spaltenposition (ab 0); übersteuert das Profil")
             Map<String, Integer> felder) {
     }

@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * Vorschlag für den Zuordnungsdialog (Req 13.2): das Profil «21.CRM», wenn die Kopfzeile die kennzeichnenden Spalten des
- * 21.CRM-Exports hat (design.md, {@code docs/spikes/21crm-export.md}), sonst die Synonymliste. Ein Vorschlag gilt erst,
+ * 21.CRM-Kontaktexports hat (design.md, {@code docs/spikes/21crm-export.md}), sonst die Synonymliste. Ein Vorschlag gilt erst,
  * wenn der Benutzer ihn bestätigt.
  */
 public final class Zuordnungsvorschlag {
@@ -33,19 +33,6 @@ public final class Zuordnungsvorschlag {
             ImportFeld.MOBIL_GESCHAEFT, "Mobil (Geschäft)");
     private static final List<String> KENNSPALTEN_KONTAKT = List.of("GGUID", "Kontakt ist eine Organisation",
             "Organisation", "Name", "Vorname", "Ist gelöscht", "Standard-E-Mail", "Standard-Telefon 1");
-
-    // design.md: [offen: Zuordnung der Verkaufschancen aus 21.CRM mit einem Nachexport mit Testdaten bestätigen]
-    // – bis dahin gilt das Profil nur als Vorschlag, den der Benutzer bestätigt
-    private static final Map<String, String> VERKAUFSCHANCE_21CRM = geordnet(
-            ImportFeld.CRM_ID, "GGUID",
-            ImportFeld.KONTAKT_CRM_ID, "ACCOUNTGUID",
-            ImportFeld.TITEL, "Name",
-            ImportFeld.PHASE, "Phase",
-            ImportFeld.BETRAG, "Gesamt",
-            ImportFeld.DATUM, "Beginn",
-            ImportFeld.GELOESCHT, "Ist gelöscht");
-    private static final List<String> KENNSPALTEN_VERKAUFSCHANCE = List.of("GGUID", "ACCOUNTGUID", "Name", "Phase",
-            "Gesamt", "Beginn", "Ist gelöscht");
 
     /** Synonyme je Feld, in Vorrangreihenfolge (design.md: {@code Firma|Organisation|Name|Nachname → name} …). */
     private static final Map<String, List<String>> SYNONYME_KONTAKT = geordnetListe(
@@ -78,14 +65,17 @@ public final class Zuordnungsvorschlag {
         return profil21Crm(art, kopf).orElseGet(() -> synonyme(art, kopf));
     }
 
-    /** Profil «21.CRM» mit den Positionen dieser Kopfzeile, wenn alle kennzeichnenden Spalten vorhanden sind. */
+    /**
+     * Profil «21.CRM» mit den Positionen dieser Kopfzeile, wenn alle kennzeichnenden Spalten vorhanden sind. Nur für
+     * Kontakte: Die Zuordnung der Verkaufschancen ist in design.md noch {@code [offen]} (Nachexport mit Testdaten), bis
+     * dahin gibt es für sie nur den Vorschlag aus der Synonymliste.
+     */
     public static Optional<Zuordnung> profil21Crm(ImportArt art, Kopfzeile kopf) {
-        List<String> kennspalten = art == ImportArt.KONTAKT ? KENNSPALTEN_KONTAKT : KENNSPALTEN_VERKAUFSCHANCE;
-        if (kennspalten.stream().anyMatch(name -> kopf.position(name) < 0)) {
+        if (art != ImportArt.KONTAKT || KENNSPALTEN_KONTAKT.stream().anyMatch(name -> kopf.position(name) < 0)) {
             return Optional.empty();
         }
         Map<String, Integer> felder = new LinkedHashMap<>();
-        (art == ImportArt.KONTAKT ? KONTAKT_21CRM : VERKAUFSCHANCE_21CRM).forEach((feld, spalte) -> {
+        KONTAKT_21CRM.forEach((feld, spalte) -> {
             int position = kopf.position(spalte);
             if (position >= 0) {
                 felder.put(feld, position);

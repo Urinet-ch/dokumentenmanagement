@@ -19,6 +19,9 @@ public interface ImportRepository {
 
     Optional<ImportLauf> lauf(UUID id);
 
+    /** Wie {@link #lauf(UUID)}, sperrt den Lauf aber bis zum Ende der Transaktion (gleichzeitige Zuordnungen). */
+    Optional<ImportLauf> laufSperren(UUID id);
+
     List<ImportZeile> zeilen(UUID laufId);
 
     /** Schreibt Ergebnis und Meldung der Zeilen und Status und Zähler des Laufs. */

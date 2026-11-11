@@ -5,6 +5,7 @@ api/api.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
 api/kontakte.service.ts
+api/importe.service.ts
 configuration.ts
 encoder.ts
 index.ts
@@ -18,6 +19,12 @@ model/dokumentart.ts
 model/eingangskorb-seite.ts
 model/kontakt-angaben.ts
 model/kontakt.ts
+model/import-hochgeladen.ts
+model/import-lauf.ts
+model/import-spalte.ts
+model/import-zuordnung-bestaetigen.ts
+model/import-zuordnung-gespeichert.ts
+model/import-zuordnung.ts
 model/models.ts
 model/suchergebnis.ts
 model/suchtreffer.ts

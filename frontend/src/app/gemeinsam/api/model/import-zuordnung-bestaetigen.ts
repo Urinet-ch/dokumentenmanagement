@@ -15,7 +15,7 @@ export interface ImportZuordnungBestaetigen {
      */
     laufId: string;
     /**
-     * Profil; die Positionen rechnet das Archiv aus der Kopfzeile
+     * Profil (nur Importart kontakt); die Positionen rechnet das Archiv aus der Kopfzeile
      */
     profil?: ImportZuordnungBestaetigen.ProfilEnum | null;
     /**

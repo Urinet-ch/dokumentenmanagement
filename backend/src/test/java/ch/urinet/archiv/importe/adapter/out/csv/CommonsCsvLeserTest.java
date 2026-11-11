@@ -16,7 +16,9 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -68,13 +70,14 @@ class CommonsCsvLeserTest {
     }
 
     @Test
-    void beispielVerkaufschancenNurKopfzeileMitProfil() {
+    void beispielVerkaufschancenNurKopfzeileOhneProfil() {
         CsvTabelle tabelle = leser.lesen(datei("csv/21crm-verkaufschancen-beispiel.csv"));
 
         assertThat(tabelle.kopf().spalten()).isEqualTo(32);
         assertThat(tabelle.zeilen()).isEmpty();
+        assertThat(Zuordnungsvorschlag.profil21Crm(ImportArt.VERKAUFSCHANCE, tabelle.kopf())).isEmpty();
         Zuordnung profil = Zuordnungsvorschlag.fuer(ImportArt.VERKAUFSCHANCE, tabelle.kopf());
-        assertThat(profil.profil()).isEqualTo(Zuordnung.PROFIL_21CRM);
+        assertThat(profil.profil()).isNull();
         assertThat(profil.felder()).containsOnlyKeys(ImportFeld.CRM_ID, ImportFeld.KONTAKT_CRM_ID, ImportFeld.TITEL,
                 ImportFeld.PHASE, ImportFeld.BETRAG, ImportFeld.DATUM, ImportFeld.GELOESCHT);
     }
@@ -119,6 +122,109 @@ class CommonsCsvLeserTest {
 
         assertThat(tabelle.zeichensatz()).isEqualTo("windows-1252");
         assertThat(tabelle.zeilen().getFirst().werte()).containsExactly("Müller AG", "Zürich");
+    }
+
+    @Test
+    void kurzeWindows1252DateienMitAnderemIcuTrefferBleibenWindows1252() {
+        for (String zeile : List.of("A;Schönenberg", "Café Crème;Genève", "Škoda Garage;Bern", "Niño Peña;Lugano",
+                "Gül;Yilmaz", "Grüter;Bürglen", "Müller AG;Zürich")) {
+            CsvTabelle tabelle = leser.lesen(("Name;Ort\n" + zeile + "\n").getBytes(CP1252));
+
+            assertThat(tabelle.zeichensatz()).as("Zeile %s", zeile).isEqualTo("windows-1252");
+            assertThat(String.join(";", tabelle.zeilen().getFirst().werte())).isEqualTo(zeile);
+        }
+    }
+
+    @Test
+    void varianteDerKontaktBeispieldateiBleibenWindows1252() {
+        String text = new String(datei("csv/21crm-kontakte-beispiel.csv"), CP1252);
+        List<String> zeilen = text.lines().toList();
+        List<String> varianten = new ArrayList<>();
+        for (int i = 1; i < zeilen.size(); i++) {
+            varianten.add(zeilen.getFirst() + "\n" + zeilen.get(i) + "\n");
+            varianten.add(String.join("\n", zeilen.subList(0, i + 1)) + "\n");
+            varianten.add(String.join("\n", zeilen.subList(i, zeilen.size())) + "\n");
+        }
+        for (int laenge = 40; laenge < text.length(); laenge += 97) {
+            varianten.add(text.substring(0, laenge));
+        }
+        for (String variante : varianten) {
+            byte[] inhalt = variante.getBytes(CP1252);
+            boolean nurAscii = variante.chars().allMatch(c -> c < 0x80);
+
+            assertThat(CommonsCsvLeser.dekodieren(inhalt).zeichensatz()).as("Variante der Länge %d", inhalt.length)
+                    .isEqualTo(nurAscii ? "UTF-8" : "windows-1252");
+        }
+    }
+
+    @Test
+    void synthetischeSchweizerDateienBleibenWindows1252() {
+        List<String> woerter = List.of("Müller", "Zürich", "Bürglen", "Göschenen", "Altdorf", "Genève", "Neuchâtel",
+                "Délémont", "Biel/Bienne", "Café", "Crème", "Fâcheux", "Château-d'Œx", "Lugano", "Niño", "Peña",
+                "Gül", "Škoda", "Ærø", "Straße", "Hôtel", "Säntis", "Flüelen", "Erstfeld", "Seedorf", "Gärtnerei",
+                "Bäckerei", "Malerei", "AG", "GmbH", "Gebr.", "Söhne", "Œuvre", "François", "Jürg", "Rüegg", "Kälin",
+                "Föhn", "Spiringen", "Bürgi", "6460", "6454", "1204", "€ 120.50", "Tel. 041 870 00 00", "",
+                "«Zitat»", "Nr. 5", "Ü-Wagen", "Ölwechsel", "Ärzte", "José", "Zoë", "Müsli", "Brünig");
+        Random zufall = new Random(4711);
+        for (int datei = 0; datei < 2_000; datei++) {
+            int spalten = 2 + zufall.nextInt(5);
+            int zeilen = 1 + zufall.nextInt(5);
+            StringBuilder text = new StringBuilder();
+            for (int z = 0; z <= zeilen; z++) {
+                for (int s = 0; s < spalten; s++) {
+                    text.append(s > 0 ? ";" : "").append(woerter.get(zufall.nextInt(woerter.size())));
+                    if (zufall.nextInt(3) == 0) {
+                        text.append(' ').append(woerter.get(zufall.nextInt(woerter.size())));
+                    }
+                }
+                text.append(zufall.nextBoolean() ? "\n" : "\r\n");
+            }
+            byte[] inhalt = text.toString().getBytes(CP1252);
+
+            assertThat(CommonsCsvLeser.dekodieren(inhalt).zeichensatz()).as("Datei %d", datei)
+                    .isEqualTo("windows-1252");
+        }
+    }
+
+    @Test
+    void nichtLateinischeDateienWerdenAbgelehnt() {
+        List<byte[]> ungueltig = List.of(
+                "姓名;城市\n張偉;台北\n王芳;高雄\n".getBytes(Charset.forName("Big5")),
+                "姓名;城市\n张伟;北京\n王芳;上海\n".getBytes(Charset.forName("GB18030")),
+                "이름;도시\n김민수;서울\n이영희;부산\n".getBytes(Charset.forName("EUC-KR")),
+                "الاسم;المدينة\nمحمد;القاهرة\nأحمد;دبي\n".getBytes(Charset.forName("windows-1256")),
+                "名前;都市\n田中;東京\n鈴木;大阪\n".getBytes(Charset.forName("Shift_JIS")),
+                mitPraefix("Name;Ort\nA;".getBytes(CP1252), new byte[]{(byte) 0x81, '\n'}));
+        for (byte[] inhalt : ungueltig) {
+            assertThatThrownBy(() -> leser.lesen(inhalt)).isInstanceOf(FachFehler.class)
+                    .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
+        }
+    }
+
+    @Test
+    void mehrAlsTausendSpaltenWerdenVorDemParsenAbgelehnt() {
+        String tausend = ";".repeat(CsvTabelle.MAX_SPALTEN - 1);
+        assertThat(leser.lesen(("N" + tausend + "\nA" + tausend + "\n").getBytes(StandardCharsets.UTF_8)).kopf()
+                .spalten()).isEqualTo(CsvTabelle.MAX_SPALTEN);
+        assertThat(leser.lesen(("N;\"" + ";".repeat(5_000) + "\"\nA;B\n").getBytes(StandardCharsets.UTF_8)).kopf()
+                .spalten()).isEqualTo(2);
+        for (String text : List.of("N" + tausend + ";\nA\n", "N;O\nA" + tausend + ";\n",
+                "N;O\n\nA;B\n" + ";".repeat(1_000_000) + "\n")) {
+            assertThatThrownBy(() -> leser.lesen(text.getBytes(StandardCharsets.UTF_8))).isInstanceOf(FachFehler.class)
+                    .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
+        }
+    }
+
+    @Test
+    void anfuehrungszeichenMittenImFeldBeginntKeinZitat() {
+        String text = "Name,Firma \"X;Ort;PLZ;Land;Kanton\nA,B Y;Altdorf;6460;CH;UR\n";
+
+        CsvTabelle tabelle = leser.lesen(text.getBytes(StandardCharsets.UTF_8));
+
+        assertThat(CommonsCsvLeser.trennzeichen(text)).isEqualTo(';');
+        assertThat(tabelle.trennzeichen()).isEqualTo(';');
+        assertThat(tabelle.kopf().spalten()).isEqualTo(5);
+        assertThat(tabelle.zeilen().getFirst().werte()).hasSize(5);
     }
 
     @Test

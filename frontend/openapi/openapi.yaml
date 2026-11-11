@@ -307,6 +307,141 @@ components:
         groesse:
           type: integer
           format: int32
+    ImportHochgeladen:
+      type: object
+      properties:
+        lauf:
+          $ref: "#/components/schemas/ImportLauf"
+        spalten:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportSpalte"
+        vorschlagZuordnung:
+          description: nur bei Status ZUORDNUNG_NOETIG
+          type: object
+          anyOf:
+          - $ref: "#/components/schemas/ImportZuordnung"
+          - type: "null"
+    ImportLauf:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        art:
+          type: string
+          enum:
+          - kontakt
+          - verkaufschance
+        vollexport:
+          type: boolean
+        dateiname:
+          type:
+          - string
+          - "null"
+        sha256:
+          type: string
+        zeichensatz:
+          type: string
+          enum:
+          - UTF-8
+          - windows-1252
+        trennzeichen:
+          type: string
+          enum:
+          - ;
+          - ","
+        zeilen:
+          type: integer
+          format: int32
+          description: Datenzeilen ohne Kopfzeile
+        fehler:
+          type: integer
+          format: int32
+          description: "Zeilen «fehlerhaft» (Spaltenzahl, Feldgrenze, Name bzw. Titel\
+            \ fehlt)"
+        uebersprungen:
+          type: integer
+          format: int32
+          description: Zeilen «Ist gelöscht = true»
+        status:
+          type: string
+          enum:
+          - VORSCHAU_AUSSTEHEND
+          - ZUORDNUNG_NOETIG
+          - VORSCHAU
+          - UEBERNOMMEN
+          - ABGEBROCHEN
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+    ImportSpalte:
+      type: object
+      properties:
+        position:
+          type: integer
+          format: int32
+          description: Position ab 0
+        name:
+          type: string
+    ImportZuordnung:
+      type: object
+      properties:
+        profil:
+          type:
+          - string
+          - "null"
+          enum:
+          - 21.CRM
+        felder:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Feld → Spaltenposition (ab 0)
+    ImportZuordnungBestaetigen:
+      type: object
+      required:
+      - laufId
+      properties:
+        laufId:
+          type: string
+          description: "Lauf, dessen Kopfzeile zugeordnet wird"
+        profil:
+          type:
+          - string
+          - "null"
+          description: Profil (nur Importart kontakt); die Positionen rechnet das
+            Archiv aus der Kopfzeile
+          enum:
+          - 21.CRM
+        felder:
+          type:
+          - object
+          - "null"
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Feld → Spaltenposition (ab 0); übersteuert das Profil
+    ImportZuordnungGespeichert:
+      type: object
+      properties:
+        art:
+          type: string
+          enum:
+          - kontakt
+          - verkaufschance
+        profil:
+          type:
+          - string
+          - "null"
+          enum:
+          - 21.CRM
+        felder:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        geaendert:
+          $ref: "#/components/schemas/Instant"
     Instant:
       type: string
       format: date-time
@@ -314,115 +449,6 @@ components:
       - 2022-03-10T16:15:50Z
     JsonObjekt:
       type: object
-    Kontakt:
-      type: object
-      properties:
-        id:
-          type: string
-        crmId:
-          type:
-          - string
-          - "null"
-        typ:
-          type: string
-          enum:
-          - ORGANISATION
-          - PERSON
-        name:
-          type: string
-        vorname:
-          type:
-          - string
-          - "null"
-        strasse:
-          type:
-          - string
-          - "null"
-        plz:
-          type:
-          - string
-          - "null"
-        ort:
-          type:
-          - string
-          - "null"
-        email:
-          type:
-          - string
-          - "null"
-        telefon:
-          type:
-          - string
-          - "null"
-        uid:
-          type:
-          - string
-          - "null"
-        iban:
-          type:
-          - string
-          - "null"
-        kategorie:
-          type:
-          - string
-          - "null"
-        quelle:
-          type: string
-          description: MANUELL oder CRM_CSV
-        nichtImExport:
-          type: boolean
-        erstellt:
-          $ref: "#/components/schemas/Instant"
-        geaendert:
-          $ref: "#/components/schemas/Instant"
-        version:
-          type: integer
-          format: int32
-          description: Version für If-Match (auch als ETag)
-    KontaktAngaben:
-      description: "Bei PATCH bleibt ein fehlendes Feld unverändert, ein leerer Text\
-        \ löscht es; Name und Typ lassen sich nicht leeren. Ein Wert über der Höchstlä\
-        nge (ohne Leerraum am Rand) → 400."
-      type: object
-      properties:
-        typ:
-          type: string
-          description: Pflicht beim Anlegen
-          enum:
-          - ORGANISATION
-          - PERSON
-        name:
-          type: string
-          maxLength: 200
-          description: Firmen- bzw. Nachname; Pflicht beim Anlegen
-        vorname:
-          type: string
-          maxLength: 200
-        strasse:
-          type: string
-          maxLength: 200
-        plz:
-          type: string
-          maxLength: 20
-        ort:
-          type: string
-          maxLength: 200
-        email:
-          type: string
-          maxLength: 200
-        telefon:
-          type: string
-          maxLength: 50
-        uid:
-          type: string
-          maxLength: 30
-          description: "UID, z. B. «CHE-123.456.789 MWST»"
-        iban:
-          type: string
-          maxLength: 40
-        kategorie:
-          type: string
-          maxLength: 100
     LocalDate:
       type: string
       format: date
@@ -602,7 +628,7 @@ tags:
 - name: API-Tokens
 - name: Dokumentarten
 - name: Dokumente
-- name: Kontakte
+- name: Importe
 paths:
   /api/v1/api-tokens:
     get:
@@ -1088,28 +1114,48 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
-  /api/v1/kontakte:
-    get:
-      summary: Kontakte suchen (Partnerauswahl)
-      description: "Ähnliche oder enthaltene Namen, die besten zuerst; höchstens 20\
-        \ Treffer."
+  /api/v1/importe/crm:
+    post:
+      summary: CSV aus dem CRM hochladen
+      description: Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte
+        oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog);
+        bekannte → 202 (VORSCHAU_AUSSTEHEND).
       tags:
-      - Kontakte
+      - Importe
       parameters:
-      - description: Suchtext (Name)
-        name: q
+      - name: art
         in: query
         schema:
           type: string
+      - name: vollexport
+        in: query
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                datei:
+                  type: string
+                  format: binary
+        required: true
       responses:
         "200":
-          description: OK
+          description: Zuordnung nötig
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Kontakt"
+                $ref: "#/components/schemas/ImportHochgeladen"
+        "202":
+          description: "Zuordnung bekannt, Vorschau ausstehend"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportHochgeladen"
+        "422":
+          description: CSV_UNGUELTIG oder CSV_LEER
         "401":
           description: Not Authorized
         "403":
@@ -1117,76 +1163,58 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
-    post:
-      summary: Kontakt anlegen
+  /api/v1/importe/crm/zuordnung:
+    get:
+      summary: Gespeicherte Spaltenzuordnung der Importart lesen
       tags:
-      - Kontakte
+      - Importe
+      parameters:
+      - name: art
+        in: query
+        schema:
+          type: string
+      responses:
+        "404":
+          description: Keine Zuordnung gespeichert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+    put:
+      summary: Spaltenzuordnung bestätigen und speichern
+      description: Speichert die Zuordnung für Mandant und Importart und prüft die
+        Zeilen des Laufs neu.
+      tags:
+      - Importe
+      parameters:
+      - name: art
+        in: query
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/KontaktAngaben"
+              $ref: "#/components/schemas/ImportZuordnungBestaetigen"
         required: true
       responses:
-        "201":
-          description: Angelegt
-          headers:
-            ETag:
-              description: Version des Kontakts für If-Match
+        "200":
+          description: "Gespeichert, Lauf VORSCHAU_AUSSTEHEND"
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Kontakt"
+                $ref: "#/components/schemas/ImportLauf"
+        "422":
+          description: "CSV_UNGUELTIG: keine Spalte für Name bzw. Titel"
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
         "400":
           description: Bad Request
-      security:
-      - SecurityScheme:
-        - inhaber
-  /api/v1/kontakte/{kontaktId}:
-    patch:
-      summary: Kontakt ändern
-      description: "Optimistisches Locking über If-Match; fremde oder unbekannte IDs\
-        \ → 404, fehlendes If-Match → 428, veraltete Version → 412."
-      tags:
-      - Kontakte
-      parameters:
-      - name: kontaktId
-        in: path
-        required: true
-        schema:
-          type: string
-      - required: true
-        name: If-Match
-        in: header
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/KontaktAngaben"
-        required: true
-      responses:
-        "200":
-          description: Geändert
-          headers:
-            ETag:
-              description: Neue Version des Kontakts
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Kontakt"
-        "401":
-          description: Not Authorized
-        "403":
-          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber

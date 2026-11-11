@@ -76,6 +76,10 @@ public class CsvImport {
             LOG.infof("CSV-Import abgelehnt: lauf=%s fehlercode=%s", id, fehler.code());
             throw fehler;
         }
+        if (ZeilenPruefung.kopfZuLang(tabelle.kopf(), feldGrenze)) {
+            LOG.infof("CSV-Import abgelehnt: lauf=%s fehlercode=%s", id, Fehlercode.CSV_UNGUELTIG);
+            throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
+        }
         if (tabelle.zeilen().isEmpty()) {
             LOG.infof("CSV-Import abgelehnt: lauf=%s fehlercode=%s", id, Fehlercode.CSV_LEER);
             throw new FachFehler(Fehlercode.CSV_LEER);
@@ -115,7 +119,7 @@ public class CsvImport {
      */
     @Transactional
     public ImportLauf zuordnen(ImportArt art, UUID laufId, String profil, Map<String, Integer> felder) {
-        ImportLauf lauf = repository.lauf(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        ImportLauf lauf = repository.laufSperren(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (lauf.art() != art) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -151,7 +155,7 @@ public class CsvImport {
         if (profil == null) {
             return new Zuordnung(null, felder);
         }
-        if (!Zuordnung.PROFIL_21CRM.equals(profil)) {
+        if (!Zuordnung.PROFIL_21CRM.equals(profil) || art != ImportArt.KONTAKT) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         Zuordnung erkannt = Zuordnungsvorschlag.profil21Crm(art, lauf.kopf())

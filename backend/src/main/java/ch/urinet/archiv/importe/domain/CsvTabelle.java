@@ -12,6 +12,12 @@ public record CsvTabelle(String zeichensatz, char trennzeichen, Kopfzeile kopf, 
     /** Höchstzahl der Datenzeilen ohne Kopfzeile (Req 13.10). */
     public static final int MAX_ZEILEN = 10_000;
 
+    /**
+     * Höchstzahl der Spalten eines Datensatzes; schützt den Speicher schon vor dem Parsen (der 21.CRM-Export hat 151).
+     * Eine Datei mit einem breiteren Datensatz lehnt das Archiv ab.
+     */
+    public static final int MAX_SPALTEN = 1_000;
+
     public CsvTabelle {
         Objects.requireNonNull(zeichensatz, "zeichensatz");
         Objects.requireNonNull(kopf, "kopf");

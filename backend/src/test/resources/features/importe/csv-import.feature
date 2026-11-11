@@ -39,6 +39,41 @@ Funktionalität: CSV-Import aus 21.CRM – Erkennung und Spaltenzuordnung (Aufga
       | komma-crlf | windows-1252 | ,            |
 
   @req-13.1
+  Szenariogrundriss: Kurze Windows-1252-Dateien nimmt das Archiv an, auch wenn ICU4J eine andere Latin-Kodierung vermutet
+    Wenn «inhaber-urinet» diese Kontakt-CSV im Zeichensatz «windows-1252» hochlädt:
+      """
+      Name;Ort
+      <name>;<ort>
+      """
+    Dann erkennt der CSV-Import Zeichensatz «windows-1252», Trennzeichen «;» und 1 Datenzeilen
+
+    Beispiele:
+      | name         | ort         |
+      | A            | Schönenberg |
+      | Café Crème   | Genève      |
+      | Škoda Garage | Bern        |
+      | Niño Peña    | Lugano      |
+      | Gül          | Yilmaz      |
+
+  @req-13.1
+  Szenariogrundriss: Dateien in einem nicht-lateinischen Zeichensatz lehnt das Archiv ab
+    Wenn «inhaber-urinet» diese Kontakt-CSV im Zeichensatz «<zeichensatz>» hochlädt:
+      """
+      <kopf>
+      <zeile1>
+      <zeile2>
+      """
+    Dann lehnt der CSV-Import mit Status 422 und Fehlercode «CSV_UNGUELTIG» ab
+    Und ist im Schema von «urinet» kein Importlauf gespeichert
+
+    Beispiele:
+      | zeichensatz  | kopf          | zeile1      | zeile2      |
+      | Big5         | 姓名;城市     | 張偉;台北   | 王芳;高雄   |
+      | GB18030      | 姓名;城市     | 张伟;北京   | 王芳;上海   |
+      | EUC-KR       | 이름;도시     | 김민수;서울 | 이영희;부산 |
+      | windows-1256 | الاسم;المدينة | محمد;القاهرة | أحمد;دبي   |
+
+  @req-13.1
   Szenario: Felder in Anführungszeichen mit Trennzeichen und Zeilenumbruch bleiben ein Feld
     Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
       """
@@ -109,6 +144,36 @@ Funktionalität: CSV-Import aus 21.CRM – Erkennung und Spaltenzuordnung (Aufga
     Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» mit 1 Datenzeilen, 0 fehlerhaft und 0 übersprungen
     Wenn «inhaber-urinet» für den Lauf die Kontakt-Zuordnung «21.CRM» bestätigt
     Dann lehnt der CSV-Import mit Status 422 und Fehlercode «CSV_UNGUELTIG» ab
+
+  @req-13.2
+  Szenario: Für Verkaufschancen gibt es nur den Vorschlag aus der Synonymliste, kein Profil «21.CRM»
+    Wenn «inhaber-urinet» die Verkaufschancen-Kopfzeile aus 21.CRM mit einer erfundenen Zeile hochlädt
+    Dann zeigt der CSV-Import den Zuordnungsdialog mit 32 Spalten ohne Profil und den Feldern:
+      | crm_id         | 11 |
+      | kontakt_crm_id | 18 |
+      | titel          | 3  |
+      | phase          | 8  |
+      | betrag         | 22 |
+      | datum          | 6  |
+      | geloescht      | 26 |
+    Wenn «inhaber-urinet» für den Lauf die Verkaufschancen-Zuordnung «21.CRM» bestätigt
+    Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+
+  @req-13.10
+  Szenario: Mehr als 1'000 Spalten oder ein zu langer Spaltenname: Das Archiv lehnt die Datei ab
+    Wenn «inhaber-urinet» eine Kontakt-CSV mit 1001 Spalten hochlädt
+    Dann lehnt der CSV-Import mit Status 422 und Fehlercode «CSV_UNGUELTIG» ab
+    Und nennt die Meldung «mehr als 1'000 Spalten»
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Name;{RIESIG}
+      Muster AG;x
+      """
+    Dann lehnt der CSV-Import mit Status 422 und Fehlercode «CSV_UNGUELTIG» ab
+    Und nennt die Meldung «einen zu langen Spaltennamen»
+    Und ist im Schema von «urinet» kein Importlauf gespeichert
+    Wenn «inhaber-urinet» eine Kontakt-CSV mit 1000 Spalten hochlädt
+    Dann steht der Lauf auf «ZUORDNUNG_NOETIG» mit 1 Datenzeilen, 0 fehlerhaft und 0 übersprungen
 
   @req-13.10
   Szenario: Ohne Spalte für den Namen lehnt das Archiv die Zuordnung ab
