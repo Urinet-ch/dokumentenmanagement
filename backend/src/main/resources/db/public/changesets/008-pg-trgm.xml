@@ -6,8 +6,9 @@
 
     <!-- Aufgabe 3.1 (Req 7.4, design.md «Kontakt und Importe»): pg_trgm für die Namensähnlichkeit der Kontakte.
          Angelegt im Migrationspfad des Owners (archiv_owner, Quarkus Liquibase beim Start), nicht von archiv_app.
-         pg_trgm ist seit PostgreSQL 13 «trusted»: archiv_owner braucht nur CREATE auf der Datenbank (auf der VPS legt
-         sie schon die DB-Initialisierung an, dann wirkt «if not exists»). Immer im Schema public, damit jedes
+         pg_trgm ist seit PostgreSQL 13 «trusted»: archiv_owner braucht nur CREATE auf der Datenbank, dasselbe Recht wie
+         für das Anlegen der Mandanten-Schemas; besteht die Extension schon, wirkt «if not exists». Das Image muss die
+         contrib-Erweiterungen enthalten (pgvector/pgvector:…-pg17 tut das). Immer im Schema public, damit jedes
          Mandanten-Schema die Funktionen qualifiziert (public.similarity, public.gin_trgm_ops) erreicht. -->
     <changeSet id="008-pg-trgm" author="archiv">
         <sql>create extension if not exists pg_trgm with schema public</sql>
