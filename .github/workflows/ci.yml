@@ -142,6 +142,9 @@ jobs:
           QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://localhost:1/keine-datenbank
           # ohne Keycloak beendet sich das Archiv sonst nach 5 Minuten mit Exit-Code 75 (OIDC-Wächter)
           ARCHIV_OIDC_WAECHTER_FRIST: PT60M
+          # prod nutzt /var/lib/archiv/arbeit (im Image angelegt, Volume archiv_arbeit); auf dem Runner darf der
+          # Prozess es nicht anlegen, und der Start bricht ab (PR #55). Hier ein Verzeichnis des Runners
+          ARCHIV_ARBEIT_VERZEICHNIS: ${{ runner.temp }}/arbeit
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
         # bricht der Start ab (design.md, Abschnitt zu Konfiguration und Geheimnissen). Dieses Archiv liefert nur die
         # PWA aus; die Uploads leiten die Szenarien an das echte Archiv im Testmodus weiter (frontend/e2e/schritte/upload.mjs)
@@ -151,12 +154,17 @@ jobs:
           for datei in archiv_db_app archiv_db_owner s3_app_zugang_id s3_app_zugang_geheimnis; do
             printf 'ci-platzhalter' > "$DATEIEN/$datei"
           done
-          java -Dsmallrye.config.source.file.locations="$DATEIEN" -jar backend/target/quarkus-app/quarkus-run.jar > /dev/null 2>&1 &
-          for i in $(seq 1 60); do
+          # Log in eine Datei; bei einem Fehler die letzten 80 Zeilen (nur Platzhalter, keine echten Geheimnisse)
+          java -Dsmallrye.config.source.file.locations="$DATEIEN" -jar backend/target/quarkus-app/quarkus-run.jar \
+            > "$RUNNER_TEMP/archiv.log" 2>&1 &
+          PID=$!
+          for _ in $(seq 1 60); do
             curl -sf http://localhost:8080/q/health/live > /dev/null && exit 0
+            kill -0 "$PID" 2> /dev/null || break
             sleep 1
           done
           echo "Archiv nicht gestartet"
+          tail -n 80 "$RUNNER_TEMP/archiv.log"
           exit 1
       - working-directory: frontend
         run: npx cucumber-js
