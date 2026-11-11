@@ -4,12 +4,12 @@
 name: CI
 
 on:
-  # Entwürfe (Draft) laufen nicht: Actions-Minuten sind knapp (Free-Plan), Agenten prüfen lokal vor «Ready for review».
-  # ready_for_review startet den ersten Lauf, danach jeder Push (Entscheid Fabian 10.11.2026).
+  # Entwürfe (Draft) laufen nicht (Entscheid Fabian 10.11.2026); seit das Repo öffentlich ist (11.11.2026), kosten Läufe
+  # keine Minuten mehr, die Regel bleibt: Agenten prüfen lokal vor «Ready for review».
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  # Push auf main vorübergehend ohne CI (Entscheid Fabian 11.11.2026, Actions-Minuten bis 1.12.): Jeder PR steht vor dem
-  # Merge auf dem aktuellen main und hat dort eine grüne CI. Wieder einschalten: «push: branches: [main]» ergänzen.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
