@@ -6,7 +6,8 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
   laufen in derselben Abfrage unter dem VertraulichkeitFilter (Req 2.3) und im Schema des Mandanten aus dem Token.
   Alle Daten sind synthetisch. Jedes Szenario versieht seine Dokumente mit einem eigenen Lauf-Tag und jede Suche
   filtert zusätzlich auf diesen Tag, damit Dokumente anderer Szenarien die Zähler nicht verfälschen. Ohne
-  Suchbegriff sortiert die Suche nach Belegdatum (neueste zuerst).
+  Suchbegriff sortiert die Suche nach Belegdatum (neueste zuerst). «{n Tags}» sendet n Tags einschliesslich des
+  Lauf-Tags, «{leer}» einen leeren Wert.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -70,6 +71,9 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
       | Rechnung -Trikots    | U_RECHNUNG_B, U_LIEFERANT, U_INTERN, U_PERSONAL_JOEL, U_PERSONAL_FAB, U_OFFEN_EIGEN, U_OFFEN_FREMD | Ausschluss          |
       | Webseite or Clubhaus | U_RECHNUNG_B, U_OFFERTE                                                                          | oder                |
       | Quittung             |                                                                                                  | kein Treffer        |
+      | fällig               | U_LIEFERANT                                                                                      | Umlaut              |
+      | FÄLLIG               | U_LIEFERANT                                                                                      | Grossschreibung     |
+      | Bürobedarf           | U_OFFEN_FREMD                                                                                    | Umlaut im Titel     |
 
   @req-14.3
   Szenario: Mit Suchbegriff sortiert die Suche nach Relevanz, auf Wunsch nach Datum
@@ -96,6 +100,7 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
       | tag=web&tag=wartung                     | U_RECHNUNG_B                                 |
       | status=EINGANGSKORB                     | U_OFFEN_FREMD, U_OFFEN_EIGEN                 |
       | status=VERWORFEN                        | U_VERWORFEN                                  |
+      | art=AUSGANGSRECHNUNG&status=            | U_INTERN, U_RECHNUNG_A, U_RECHNUNG_B         |
       | geschaeftsjahr=2025                     | U_RECHNUNG_B                                 |
       | belegnummer=O-2026-005                  | U_OFFERTE                                    |
       | belegnummer=o-2026-005                  |                                              |
@@ -107,14 +112,16 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
       | art=AUSGANGSRECHNUNG&geschaeftsjahr=2026&richtung=EINNAHME&betragBis=1000 | U_INTERN, U_RECHNUNG_A |
       | partner=FC Muster&tag=sport&datumBis=2026-03-15&status=ARCHIVIERT         | U_RECHNUNG_A           |
       | q=Rechnung&art=AUSGANGSRECHNUNG&datumVon=2026-01-01&sortierung=DATUM      | U_INTERN, U_RECHNUNG_A |
+      | belegnummer=2026-002                                                      | U_INTERN               |
     Und findet «mitarbeiter-urinet» mit diesen Filtern diese Dokumente in dieser Reihenfolge:
       | filter               | treffer                      |
       | art=AUSGANGSRECHNUNG | U_RECHNUNG_A, U_RECHNUNG_B   |
       | richtung=AUSGABE     | U_PERSONAL_JOEL, U_LIEFERANT |
       | status=EINGANGSKORB  | U_OFFEN_EIGEN                |
+      | belegnummer=2026-002 |                              |
 
-  @req-14.7
-  Szenario: Eine Belegnummer als Suchbegriff liefert genau dieses Dokument zuerst, nur im eigenen Mandanten
+  @req-14.7 @req-14.5
+  Szenario: Eine Belegnummer als Suchbegriff liefert genau dieses Dokument zuerst, nur im eigenen Mandanten und nur, wenn es sichtbar ist
     Wenn «inhaber-urinet» sucht mit:
       | q | 2026-001 |
     Dann ist der erste Treffer «U_RECHNUNG_A»
@@ -125,6 +132,13 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
     Wenn «geschaeftsstelle-vhf-gsk» sucht mit:
       | q | 2026-001 |
     Dann lauten die Treffer der Reihe nach «V_RECHNUNG»
+    Wenn «treuhaender-urinet» sucht mit:
+      | q | 2026-002 |
+    Dann ist der erste Treffer «U_INTERN»
+    Wenn «mitarbeiter-urinet» sucht mit:
+      | q | 2026-002 |
+    Dann ist die Gesamtzahl 0
+    Und die Seite enthält 0 Treffer
 
   @req-14.4
   Szenario: Treffer zeigen eine Textstelle mit hervorgehobenem Suchbegriff
@@ -158,11 +172,16 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
       | betragVon         | abc                         | 400    | keine Zahl                          |
       | richtung          | SEITWAERTS                  | 400    | unbekannte Richtung                 |
       | status            | ARCHIVIERT' or '1'='1       | 400    | unbekannter Status                  |
+      | status            | {leer}                      | 200    | leer gilt als nicht gesetzt         |
       | geschaeftsjahr    | 2026 or 1=1                 | 400    | keine Zahl                          |
       | sortierung        | id; drop table dokument     | 400    | unbekannte Sortierung               |
       | seite             | -1                          | 400    | negative Seite                      |
+      | seite             | 9999                        | 200    | grösste Seite                       |
+      | seite             | 10000                       | 400    | Seite zu gross                      |
+      | groesse           | 100                         | 200    | grösste Seitengrösse                |
       | groesse           | 101                         | 400    | zu gross                            |
       | groesse           | 0                           | 400    | zu klein                            |
+      | tag               | {10 Tags}                   | 200    | höchstens 10 Tags                   |
       | tag               | {11 Tags}                   | 400    | zu viele Tags                       |
     Und finden die Benutzer mit dem Suchbegriff «Rechnung» diese Dokumente:
       | benutzer       | treffer                                                                                                          | gesamt | grund               |

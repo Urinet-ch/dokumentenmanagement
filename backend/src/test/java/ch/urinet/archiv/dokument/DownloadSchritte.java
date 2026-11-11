@@ -164,6 +164,15 @@ public class DownloadSchritte {
 
     @Und("das Zugriffsprotokoll von «{word}» enthält HERUNTERLADEN von «{word}» für «{word}»")
     public void protokoll(String mandant, String benutzer, String name) throws SQLException {
+        assertThat(heruntergeladen(mandant, benutzer, name)).isEqualTo(1);
+    }
+
+    @Und("das Zugriffsprotokoll von «{word}» enthält kein HERUNTERLADEN von «{word}» für «{word}»")
+    public void keinProtokoll(String mandant, String benutzer, String name) throws SQLException {
+        assertThat(heruntergeladen(mandant, benutzer, name)).isZero();
+    }
+
+    private long heruntergeladen(String mandant, String benutzer, String name) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
                 verbindung.prepareStatement("select count(*) from " + new MandantCode(mandant).schema()
                         + ".zugriff_protokoll where id > ? and aktion = 'HERUNTERLADEN' and benutzer = ? "
@@ -173,7 +182,7 @@ public class DownloadSchritte {
             abfrage.setObject(3, dokumente.get(name).id());
             try (ResultSet zeile = abfrage.executeQuery()) {
                 zeile.next();
-                assertThat(zeile.getLong(1)).isEqualTo(1);
+                return zeile.getLong(1);
             }
         }
     }

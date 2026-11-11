@@ -32,6 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +49,8 @@ public class SucheSchritte {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    private static final Pattern TAGS = Pattern.compile("\\{(\\d+) Tags}");
 
     private final String lauf = "lauf" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
@@ -193,12 +197,18 @@ public class SucheSchritte {
                 switch (werte[i]) {
                     case "{201 Zeichen}" -> parameter.add(new String[] {namenListe[i], "a".repeat(201)});
                     case "{Steuerzeichen}" -> parameter.add(new String[] {namenListe[i], "Rech\u0007nung"});
-                    case "{11 Tags}" -> {
-                        for (int t = 0; t < 11; t++) {
-                            parameter.add(new String[] {namenListe[i], "t" + t});
+                    case "{leer}" -> parameter.add(new String[] {namenListe[i], ""});
+                    default -> {
+                        Matcher tags = TAGS.matcher(werte[i]);
+                        if (tags.matches()) {
+                            // der Lauf-Tag zählt mit (suchen hängt ihn an)
+                            for (int t = 1; t < Integer.parseInt(tags.group(1)); t++) {
+                                parameter.add(new String[] {namenListe[i], "t" + t});
+                            }
+                        } else {
+                            parameter.add(new String[] {namenListe[i], werte[i]});
                         }
                     }
-                    default -> parameter.add(new String[] {namenListe[i], werte[i]});
                 }
             }
             Response r = suchen(benutzer, parameter);

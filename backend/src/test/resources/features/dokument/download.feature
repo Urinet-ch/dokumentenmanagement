@@ -55,3 +55,5 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | inhaber-urinet           | D_NORMAL    | variante=pdfa&nr=1        | 400    | ANFRAGE_UNGUELTIG | PDF/A hat keine Nummer         |
       | inhaber-urinet           | D_NORMAL    | variante=original&nr=0    | 400    | ANFRAGE_UNGUELTIG | Nummer ab 1                    |
       | inhaber-urinet           | D_NORMAL    | variante=original&nr=eins | 400    | ANFRAGE_UNGUELTIG | keine Zahl                     |
+    Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «mitarbeiter-urinet» für «D_INTERN»
+    Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «inhaber-urinet» für «D_VERWORFEN»
