@@ -48,7 +48,14 @@ import java.util.regex.Pattern;
 @Produces(MediaType.APPLICATION_JSON)
 public class KontaktResource {
 
-    private static final Pattern VERSION = Pattern.compile("^(?:W/)?\"?(\\d{1,9})\"?$");
+    // nur ein starkes ETag passt (RFC 9110, If-Match vergleicht stark)
+    private static final Pattern VERSION = Pattern.compile("^\"(\\d{1,9})\"$");
+    private static final int TEXT_MAX = 200;
+    private static final int PLZ_MAX = 20;
+    private static final int TELEFON_MAX = 50;
+    private static final int UID_MAX = 30;
+    private static final int IBAN_MAX = 40;
+    private static final int KATEGORIE_MAX = 100;
 
     private final KontaktVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
@@ -59,17 +66,29 @@ public class KontaktResource {
     }
 
     @Schema(name = "KontaktAngaben", description = "Bei PATCH bleibt ein fehlendes Feld unverändert, ein leerer Text "
-            + "löscht es; Name und Typ lassen sich nicht leeren.")
+            + "löscht es; Name und Typ lassen sich nicht leeren. Ein Wert über der Höchstlänge (ohne Leerraum am Rand) "
+            + "→ 400.")
     public record KontaktAngabenDto(
             @Schema(enumeration = {"ORGANISATION", "PERSON"}, description = "Pflicht beim Anlegen") String typ,
-            @Schema(maxLength = 200, description = "Firmen- bzw. Nachname; Pflicht beim Anlegen") String name,
-            @Schema(maxLength = 200) String vorname, @Schema(maxLength = 200) String strasse,
-            @Schema(maxLength = 20) String plz, @Schema(maxLength = 200) String ort,
-            @Schema(maxLength = 200) String email, @Schema(maxLength = 50) String telefon,
-            @Schema(maxLength = 30, description = "UID, z. B. «CHE-123.456.789 MWST»") String uid,
-            @Schema(maxLength = 40) String iban, @Schema(maxLength = 100) String kategorie) {
+            @Schema(maxLength = TEXT_MAX, description = "Firmen- bzw. Nachname; Pflicht beim Anlegen") String name,
+            @Schema(maxLength = TEXT_MAX) String vorname, @Schema(maxLength = TEXT_MAX) String strasse,
+            @Schema(maxLength = PLZ_MAX) String plz, @Schema(maxLength = TEXT_MAX) String ort,
+            @Schema(maxLength = TEXT_MAX) String email, @Schema(maxLength = TELEFON_MAX) String telefon,
+            @Schema(maxLength = UID_MAX, description = "UID, z. B. «CHE-123.456.789 MWST»") String uid,
+            @Schema(maxLength = IBAN_MAX) String iban, @Schema(maxLength = KATEGORIE_MAX) String kategorie) {
 
+        /** Prüft die Höchstlängen aus OpenAPI (in Zeichen, ohne Leerraum am Rand); zu lang → 400. */
         KontaktAngaben angaben() {
+            hoechstens(name, TEXT_MAX);
+            hoechstens(vorname, TEXT_MAX);
+            hoechstens(strasse, TEXT_MAX);
+            hoechstens(plz, PLZ_MAX);
+            hoechstens(ort, TEXT_MAX);
+            hoechstens(email, TEXT_MAX);
+            hoechstens(telefon, TELEFON_MAX);
+            hoechstens(uid, UID_MAX);
+            hoechstens(iban, IBAN_MAX);
+            hoechstens(kategorie, KATEGORIE_MAX);
             return new KontaktAngaben(kontaktTyp(typ), name, vorname, strasse, plz, ort, email, telefon, uid, iban, kategorie);
         }
     }
@@ -152,7 +171,10 @@ public class KontaktResource {
         }
     }
 
-    /** Fehlt If-Match → 428; alles, was keine Version ist (auch {@code *}), passt nie → 412. */
+    /**
+     * Fehlt If-Match → 428; alles, was kein starkes ETag {@code "<version>"} ist (auch {@code *}, {@code W/"…"} oder
+     * eine Zahl ohne Anführungszeichen), passt nie → 412.
+     */
     static int version(String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
             throw new FachFehler(Fehlercode.VERSION_FEHLT);
@@ -162,6 +184,15 @@ public class KontaktResource {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
         return Integer.parseInt(treffer.group(1));
+    }
+
+    private static void hoechstens(String wert, int max) {
+        if (wert != null) {
+            String bereinigt = wert.strip();
+            if (bereinigt.codePointCount(0, bereinigt.length()) > max) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+        }
     }
 
     private static KontaktTyp kontaktTyp(String text) {

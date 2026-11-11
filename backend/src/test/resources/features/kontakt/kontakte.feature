@@ -58,6 +58,60 @@ Funktionalität: Kontakte und Partner-Abgleich
     Und der Kontakt «Musterfirma Probe AG» hat noch Version 0
 
   @req-2.18
+  Szenariogrundriss: Nur ein starkes ETag passt zu If-Match
+    Angenommen «inhaber-urinet» hat den Kontakt «Musterfirma Probe AG» angelegt
+    Wenn «inhaber-urinet» den Kontakt «Musterfirma Probe AG» mit If-Match «<if-match>» umbenennt
+    Dann antwortet die Kontakt-Schnittstelle mit Status 412 und Fehlercode «VERSION_KONFLIKT»
+    Und der Kontakt «Musterfirma Probe AG» hat noch Version 0
+
+    Beispiele:
+      | if-match |
+      | W/"0"    |
+      | 0        |
+      | "0       |
+      | 0"       |
+
+  @req-2.18
+  Szenariogrundriss: Angaben bis zur Höchstlänge werden übernommen
+    Wenn «inhaber-urinet» einen Kontakt anlegt, dessen Feld «<feld>» <laenge> Zeichen hat
+    Dann antwortet die Kontakt-Schnittstelle mit Status 201
+
+    Beispiele:
+      | feld      | laenge |
+      | name      | 200    |
+      | plz       | 20     |
+      | telefon   | 50     |
+      | uid       | 30     |
+      | iban      | 40     |
+      | kategorie | 100    |
+
+  @req-2.18
+  Szenariogrundriss: Zu lange Angaben werden abgewiesen
+    Wenn «inhaber-urinet» einen Kontakt anlegt, dessen Feld «<feld>» <laenge> Zeichen hat
+    Dann antwortet die Kontakt-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und es gibt keine Kontakte mehr
+
+    Beispiele:
+      | feld      | laenge |
+      | name      | 201    |
+      | vorname   | 201    |
+      | strasse   | 201    |
+      | plz       | 21     |
+      | ort       | 201    |
+      | email     | 201    |
+      | telefon   | 51     |
+      | uid       | 31     |
+      | iban      | 41     |
+      | kategorie | 101    |
+
+  @req-2.18
+  Szenario: Eine zu lange Änderung ändert nichts
+    Angenommen «inhaber-urinet» hat den Kontakt «Musterfirma Probe AG» angelegt
+    Wenn «inhaber-urinet» den Kontakt «Musterfirma Probe AG» so ändert, dass das Feld «name» 201 Zeichen hat
+    Dann antwortet die Kontakt-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und der Kontakt «Musterfirma Probe AG» hat noch Version 0
+
+  @req-2.18
   Szenario: Ein Kontakt ohne Name wird nicht angelegt
     Wenn «inhaber-urinet» einen Kontakt ohne Name anlegt
     Dann antwortet die Kontakt-Schnittstelle mit Status 422 und Fehlercode «PFLICHTFELD_FEHLT»
@@ -94,6 +148,27 @@ Funktionalität: Kontakte und Partner-Abgleich
     Wenn «inhaber-vhf-gsk» den Kontakt «Musterfirma Probe AG» in «Fremd AG» umbenennt
     Dann antwortet die Kontakt-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Und der Kontakt «Musterfirma Probe AG» hat noch Version 0
+
+  @req-1.2
+  Szenariogrundriss: Der Partner-Abgleich findet nur Kontakte des eigenen Mandanten
+    Angenommen im Mandanten «<eigener>» gibt es die Kontakte:
+      | name               | typ          | email               | uid                  | iban                       |
+      | Sportclub Seeblick | ORGANISATION | sekretariat@sc.test | CHE-100.200.300 MWST | CH93 0076 2011 6238 5295 7 |
+    Wenn der Abgleich in «<fremder>» den Partner «<name>» mit E-Mail «<email>», UID «<uid>» und IBAN «<iban>» sucht
+    Dann ergibt der Abgleich «neuer Partner»
+    Wenn der Abgleich in «<eigener>» den Partner «<name>» mit E-Mail «<email>», UID «<uid>» und IBAN «<iban>» sucht
+    Dann verknüpft der Abgleich den Kontakt «Sportclub Seeblick» über «<merkmal>»
+
+    Beispiele:
+      | eigener | fremder | name               | email               | uid             | iban                  | merkmal |
+      | urinet  | vhf-gsk |                    | sekretariat@sc.test |                 |                       | EMAIL   |
+      | urinet  | vhf-gsk |                    |                     | CHE-100.200.300 |                       | UID     |
+      | urinet  | vhf-gsk |                    |                     |                 | CH9300762011623852957 | IBAN    |
+      | urinet  | vhf-gsk | Sportclub Seeblick |                     |                 |                       | NAME    |
+      | vhf-gsk | urinet  |                    | sekretariat@sc.test |                 |                       | EMAIL   |
+      | vhf-gsk | urinet  |                    |                     | CHE-100.200.300 |                       | UID     |
+      | vhf-gsk | urinet  |                    |                     |                 | CH9300762011623852957 | IBAN    |
+      | vhf-gsk | urinet  | Sportclub Seeblick |                     |                 |                       | NAME    |
 
   @req-7.4
   Szenariogrundriss: Exakte Merkmale gehen vor dem Namen

@@ -124,6 +124,19 @@ public class KontaktSchritte {
         senden(benutzer, Map.of("typ", "ORGANISATION", "name", " "), null);
     }
 
+    @Wenn("«{word}» einen Kontakt anlegt, dessen Feld «{word}» {int} Zeichen hat")
+    public void anlegenMitLaenge(String benutzer, String feld, int laenge) {
+        Map<String, String> koerper = new HashMap<>(Map.of("typ", "ORGANISATION", "name", "Musterfirma Probe AG"));
+        koerper.put(feld, "x".repeat(laenge));
+        senden(benutzer, koerper, null);
+    }
+
+    @Wenn("«{word}» den Kontakt «{}» so ändert, dass das Feld «{word}» {int} Zeichen hat")
+    public void aendernMitLaenge(String benutzer, String name, String feld, int laenge) {
+        antwort = anfrage(benutzer).header("If-Match", "\"" + version(name) + "\"")
+                .body(Map.of(feld, "x".repeat(laenge))).when().patch(KONTAKTE + "/" + ids.get(name));
+    }
+
     @Wenn("«{word}» den Kontakt «{}» in «{}» umbenennt")
     public void umbenennen(String benutzer, String name, String neu) {
         aendern(benutzer, name, neu, "\"" + version(name) + "\"");
