@@ -17,6 +17,13 @@ public interface DokumentRepository {
 
     boolean sichtbar(UUID id, Sichtregel regel);
 
+    /**
+     * Pfad und Versions-ID einer Datei des sichtbaren, nicht verworfenen Dokuments (Req 14.6): {@code PDFA} aus dem
+     * Dokument ({@code nr} 0), sonst die aktive Zeile in {@code dokument_datei}. Leer, wenn das Dokument unsichtbar
+     * oder verworfen ist oder die Datei (noch) keine Versions-ID hat.
+     */
+    Optional<DateiFundstelle> dateiFinden(UUID id, Sichtregel regel, DateiRolle rolle, int nr);
+
     /** Eingangskorb nach A5, neueste zuerst; {@code seite} beginnt bei 0. */
     Seite<Dokument> eingangskorb(Sichtregel regel, int seite, int groesse);
 

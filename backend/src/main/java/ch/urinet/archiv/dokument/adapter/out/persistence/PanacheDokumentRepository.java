@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
+import ch.urinet.archiv.dokument.application.DateiFundstelle;
 import ch.urinet.archiv.dokument.application.DokumentRepository;
 import ch.urinet.archiv.dokument.application.NeueDatei;
 import ch.urinet.archiv.dokument.application.NeuesDokument;
@@ -78,6 +79,25 @@ public class PanacheDokumentRepository implements DokumentRepository {
     public boolean sichtbar(UUID id, Sichtregel regel) {
         VertraulichkeitFilter filter = VertraulichkeitFilter.fuer(regel).und("id = :id", Map.of("id", id));
         return DokumentEintrag.count(filter.bedingung(), filter.parameter()) > 0;
+    }
+
+    @Override
+    public Optional<DateiFundstelle> dateiFinden(UUID id, Sichtregel regel, DateiRolle rolle, int nr) {
+        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
+        String sql = rolle == DateiRolle.PDFA
+                ? "select d.s3_pdfa, d.s3_version_pdfa from dokument d where d.id = :id and d.status <> 'VERWORFEN' "
+                + "and d.s3_pdfa is not null and d.s3_version_pdfa is not null and " + sicht.bedingung()
+                : "select f.s3_schluessel, f.s3_version from dokument d join dokument_datei f on f.dokument_id = d.id "
+                + "where d.id = :id and d.status <> 'VERWORFEN' and f.rolle = :rolle and f.nr = :nr "
+                + "and f.status = 'AKTIV' and f.s3_version is not null and " + sicht.bedingung();
+        var abfrage = DokumentEintrag.getEntityManager().createNativeQuery(sql).setParameter("id", id);
+        sicht.parameter().forEach(abfrage::setParameter);
+        if (rolle != DateiRolle.PDFA) {
+            abfrage.setParameter("rolle", rolle.name()).setParameter("nr", nr);
+        }
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = abfrage.getResultList();
+        return zeilen.stream().findFirst().map(z -> new DateiFundstelle((String) z[0], (String) z[1]));
     }
 
     @Override
