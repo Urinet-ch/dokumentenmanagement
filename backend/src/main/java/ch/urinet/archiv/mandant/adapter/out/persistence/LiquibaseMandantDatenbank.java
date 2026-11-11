@@ -99,8 +99,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     public void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten) {
         pruefen(schema);
         String sql = "insert into " + schema + ".dokumentart (code, name, gruppen, pflichtfelder, zusatz_schema, "
-                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv) "
-                + "values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?) on conflict (code) do nothing";
+                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung) "
+                + "values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?) on conflict (code) do nothing";
         try (Connection verbindung = eigentuemer.oeffnen(); PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
             verbindung.setAutoCommit(true);
             for (DokumentartVorlage art : arten) {
@@ -118,6 +118,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                 einfuegen.setString(8, art.aufbewahrungAb());
                 einfuegen.setBoolean(9, art.gesetzlichePflicht());
                 einfuegen.setBoolean(10, art.aktiv());
+                einfuegen.setString(11, art.beschreibung());
                 einfuegen.addBatch();
             }
             einfuegen.executeBatch();

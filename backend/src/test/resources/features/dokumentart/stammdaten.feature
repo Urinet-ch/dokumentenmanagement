@@ -2,8 +2,8 @@
 @spec-01
 Funktionalität: Stammdaten der Dokumentarten
   Die Werte der 11 Dokumentarten hat Fabian am 10.11.2026 entschieden (Aufgabe 1.7). Massgeblich ist der Seed
-  «seed/urinet/dokumentarten.json»; die Stammdaten-Tabelle in design.md spiegelt ihn. Pflege, Zusatzfelder und
-  Aufbewahrung der Arten folgen mit Aufgabe 2.1.
+  «seed/urinet/dokumentarten.json»; die Stammdaten-Tabelle in design.md spiegelt ihn. Die Pflege der Arten
+  prüft «verwaltung.feature», Zusatzfelder und Aufbewahrung zusätzlich JUnit (Aufgabe 2.1).
 
   @req-9.2
   Szenario: Der Seed stimmt Feld für Feld mit der Stammdaten-Tabelle überein

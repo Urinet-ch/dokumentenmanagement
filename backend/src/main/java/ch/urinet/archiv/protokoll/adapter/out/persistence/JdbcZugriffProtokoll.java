@@ -77,10 +77,21 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         if (details.fehlercode() != null) {
             knoten.put("fehlercode", details.fehlercode());
         }
+        if (details.regelAenderung() != null) {
+            knoten.put("dokumentart", details.regelAenderung().dokumentart());
+            regel(knoten.putObject("alt"), details.regelAenderung().alt());
+            regel(knoten.putObject("neu"), details.regelAenderung().neu());
+        }
         try {
             return JSON.writeValueAsString(knoten);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Details nicht serialisierbar", e);
         }
+    }
+
+    private static void regel(ObjectNode knoten, ProtokollDetails.Regel regel) {
+        knoten.put("aufbewahrungJahre", regel.aufbewahrungJahre());
+        knoten.put("aufbewahrungAb", regel.aufbewahrungAb());
+        knoten.put("gesetzlichePflicht", regel.gesetzlichePflicht());
     }
 }

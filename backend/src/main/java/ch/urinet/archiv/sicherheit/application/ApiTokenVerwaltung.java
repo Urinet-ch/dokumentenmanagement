@@ -17,7 +17,8 @@ import java.util.Optional;
 
 /**
  * API-Tokens anlegen, auflisten und widerrufen (Req 2.5, 2.20; REST nur mit A14, sonst das Admin-Kommando). Das
- * Geheimnis gibt nur {@link #erstellen} einmal zurück; gespeichert wird sein Argon2id-Hash. Geloggt werden nur ID,
+ * Geheimnis gibt nur {@link #erstellen} einmal zurück; gespeichert wird sein Argon2id-Hash. Der Hash entsteht über die
+ * {@link HashSperre} wie jede Prüfung, damit auch das Anlegen im Speicherbudget bleibt. Geloggt werden nur ID,
  * Mandant und Scope.
  */
 @ApplicationScoped
@@ -29,12 +30,15 @@ public class ApiTokenVerwaltung {
     private final ApiClientRegister register;
     private final GeheimnisHasher hasher;
     private final MandantVerzeichnis verzeichnis;
+    private final HashSperre sperre;
     private final SecureRandom zufall = new SecureRandom();
 
-    public ApiTokenVerwaltung(ApiClientRegister register, GeheimnisHasher hasher, MandantVerzeichnis verzeichnis) {
+    public ApiTokenVerwaltung(ApiClientRegister register, GeheimnisHasher hasher, MandantVerzeichnis verzeichnis,
+                              HashSperre sperre) {
         this.register = register;
         this.hasher = hasher;
         this.verzeichnis = verzeichnis;
+        this.sperre = sperre;
     }
 
     /** Das neue Token mit seinem Eintrag; {@code token} ist die einzige Stelle, an der das Geheimnis vorkommt. */
@@ -43,7 +47,8 @@ public class ApiTokenVerwaltung {
 
     /**
      * Legt ein Token im Mandanten an. Fehler: Mandant ungültig oder inaktiv → {@code MANDANT_FEHLT}; Name oder Scope
-     * fehlt → {@code PFLICHTFELD_FEHLT}; Name zu lang oder mit Steuerzeichen, Scope unbekannt → {@code ANFRAGE_UNGUELTIG}.
+     * fehlt → {@code PFLICHTFELD_FEHLT}; Name zu lang oder mit Steuerzeichen, Scope unbekannt → {@code ANFRAGE_UNGUELTIG};
+     * kein Platz für den Hash innerhalb der Wartezeit → {@code UEBERLASTET}.
      */
     public Erstellt erstellen(String mandant, String name, String scope) {
         MandantCode code = aktiverMandant(mandant);
@@ -59,7 +64,8 @@ public class ApiTokenVerwaltung {
         ApiToken token = ApiToken.neu(zufall);
         ApiClient client = new ApiClient(token.id(), code.wert(), bereinigt, gueltig, true, Instant.now(),
                 Optional.empty());
-        register.anlegen(client, hasher.hashen(token.geheimnis()));
+        String hash = sperre.ausfuehren(() -> hasher.hashen(token.geheimnis()));
+        register.anlegen(client, hash);
         LOG.infof("API-Token angelegt: id=%s mandant=%s scope=%s", client.id(), client.mandant(), gueltig.code());
         return new Erstellt(client, token);
     }

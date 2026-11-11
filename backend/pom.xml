@@ -23,6 +23,8 @@
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
+        <!-- 2.0.x ist die letzte Linie auf Jackson 2 (Quarkus 3.40); 3.x braucht Jackson 3 (tools.jackson) -->
+        <json-schema-validator.version>2.0.8</json-schema-validator.version>
     </properties>
 
     <dependencyManagement>
@@ -105,6 +107,12 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
+        </dependency>
+        <!-- JSON Schema Draft 2020-12 für zusatz_schema (Aufgabe 2.1, Req 9.5) -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>${json-schema-validator.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>

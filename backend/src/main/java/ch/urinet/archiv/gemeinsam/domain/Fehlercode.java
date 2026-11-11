@@ -24,6 +24,9 @@ public enum Fehlercode {
             "Die Aufbewahrungsfrist liegt in der Vergangenheit. Bitte prüfen Sie Datum und Dokumentart."),
     DOKUMENTART_IN_GEBRAUCH(409, "Dokumentart in Gebrauch",
             "Die Dokumentart wird noch verwendet und kann nicht gelöscht werden. Sie können sie deaktivieren."),
+    DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
+            "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
+                    + "bestehende Art."),
     VERSION_KONFLIKT(412, "Version veraltet",
             "Jemand hat das Dokument inzwischen geändert. Bitte laden Sie es neu und ändern Sie es erneut."),
     DATEI_ZU_GROSS(413, "Datei zu gross",

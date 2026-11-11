@@ -1,6 +1,7 @@
 package ch.urinet.archiv.sicherheit.application;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
@@ -22,6 +23,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Prüfung eines API-Tokens ohne Datenbank und ohne Argon2 (Req 2.5). */
@@ -33,7 +35,8 @@ class ApiTokenPruefungTest {
     private final ZaehlenderHasher hasher = new ZaehlenderHasher();
     private final FakeRegister register = new FakeRegister();
     private final StellbareUhr uhr = new StellbareUhr();
-    private final ApiTokenPruefung pruefung = new ApiTokenPruefung(register, hasher, uhr, 2, Duration.ofMillis(200));
+    private final ApiTokenPruefung pruefung = new ApiTokenPruefung(register, hasher, uhr,
+            new HashSperre(2, Duration.ofMillis(200)));
 
     @Test
     void unbekannteIdVergleichtTrotzdemEinmalGegenDieAttrappe() {
@@ -66,7 +69,7 @@ class ApiTokenPruefungTest {
             drin.countDown();
             warten(los);
         };
-        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, 1, Duration.ofMillis(50));
+        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, new HashSperre(1, Duration.ofMillis(50)));
         ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
         CompletableFuture<Optional<ApiClient>> erste = CompletableFuture.supplyAsync(() -> eng.pruefen(bekannt));
         assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
@@ -83,9 +86,60 @@ class ApiTokenPruefungTest {
     }
 
     @Test
-    void mindestensEinePruefung() {
-        assertThatThrownBy(() -> new ApiTokenPruefung(register, hasher, uhr, 0, Duration.ofMillis(200)))
-                .isInstanceOf(IllegalArgumentException.class);
+    void anlegenTeiltDiePlaetzeMitDerPruefung() throws Exception {
+        CountDownLatch drin = new CountDownLatch(1);
+        CountDownLatch los = new CountDownLatch(1);
+        hasher.bremse = () -> {
+            drin.countDown();
+            warten(los);
+        };
+        HashSperre sperre = new HashSperre(1, Duration.ofMillis(50));
+        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, sperre);
+        ApiTokenVerwaltung verwaltung = new ApiTokenVerwaltung(register, hasher,
+                code -> Optional.of("m_" + code.wert()), sperre);
+        ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
+        CompletableFuture<Optional<ApiClient>> erste = CompletableFuture.supplyAsync(() -> eng.pruefen(bekannt));
+        assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // 19 MiB je Hash: Auch das Anlegen wartet auf einen Platz, statt das Budget zu überschreiten
+        assertThatThrownBy(() -> verwaltung.erstellen("urinet", "Probe", "import"))
+                .isInstanceOfSatisfying(FachFehler.class, f -> assertThat(f.code()).isEqualTo(Fehlercode.UEBERLASTET));
+        assertThat(hasher.hashes).isZero();
+
+        los.countDown();
+        assertThat(erste.get(5, TimeUnit.SECONDS)).isPresent();
+    }
+
+    @Test
+    void ungueltigeEinstellungenBrechenDenStartAb() {
+        assertThatThrownBy(() -> new HashSperre(0, Duration.ofMillis(200)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("parallele-pruefungen");
+        assertThatThrownBy(() -> new HashSperre(2, Duration.ofMillis(-1)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("wartezeit");
+        // Review PR #40 Nacht, K2: mehr als 16 × 19 MiB Argon2 gleichzeitig sprengt jedes Speicherbudget
+        assertThatThrownBy(() -> new HashSperre(HashSperre.MAX_PLAETZE + 1, Duration.ofMillis(200)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("parallele-pruefungen");
+        assertThatCode(() -> new HashSperre(HashSperre.MAX_PLAETZE, Duration.ofMillis(200))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void wartezeitNullHeisstNichtWarten() throws Exception {
+        HashSperre sperre = new HashSperre(1, Duration.ZERO);
+        CountDownLatch drin = new CountDownLatch(1);
+        CountDownLatch los = new CountDownLatch(1);
+        CompletableFuture<Boolean> erste = CompletableFuture.supplyAsync(() -> sperre.ausfuehren(() -> {
+            drin.countDown();
+            warten(los);
+            return true;
+        }));
+        assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
+
+        assertThatThrownBy(() -> sperre.ausfuehren(() -> true)).isInstanceOfSatisfying(FachFehler.class,
+                f -> assertThat(f.code()).isEqualTo(Fehlercode.UEBERLASTET));
+
+        los.countDown();
+        assertThat(erste.get(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(sperre.ausfuehren(() -> true)).as("Platz wieder frei").isTrue();
     }
 
     @Test
@@ -122,11 +176,16 @@ class ApiTokenPruefungTest {
     }
 
     @Test
-    void fehlerBeimNachfuehrenBrichtDieAnmeldungNichtAb() {
+    void fehlerBeimNachfuehrenBrichtDieAnmeldungNichtAbUndLoggtNurDieKette() {
         ApiToken token = register.anlegen(ApiToken.neu(zufall), true);
         register.zuletztFehler = true;
 
-        assertThat(pruefung.pruefen(token)).isPresent();
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            assertThat(pruefung.pruefen(token)).isPresent();
+
+            assertThat(log.volltext()).contains(token.id(), "java.lang.IllegalStateException <- "
+                    + "java.sql.SQLException[sqlstate=08006]").doesNotContain("GEHEIM-4711");
+        }
     }
 
     private static void warten(CountDownLatch latch) {
@@ -194,7 +253,8 @@ class ApiTokenPruefungTest {
         @Override
         public void zuletztSetzen(String id, Instant zeit) {
             if (zuletztFehler) {
-                throw new IllegalStateException("Datenbank weg");
+                throw new IllegalStateException("Datenbank weg: GEHEIM-4711",
+                        new java.sql.SQLException("Verbindung zu GEHEIM-4711 verloren", "08006"));
             }
             zuletzt.add(zeit);
         }

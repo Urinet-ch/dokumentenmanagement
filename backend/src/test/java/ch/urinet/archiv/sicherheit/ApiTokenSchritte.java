@@ -99,6 +99,11 @@ public class ApiTokenSchritte {
         antwort = mitToken(tokens.get(name)).when().post(pfad);
     }
 
+    @Wenn("das Token «{word}» {word} «{}» mit einem leeren JSON-Objekt aufruft")
+    public void aufrufen(String name, String methode, String pfad) {
+        antwort = mitToken(tokens.get(name)).contentType(ContentType.JSON).body("{}").when().request(methode, pfad);
+    }
+
     @Wenn("das Token «{word}» mit falschem Geheimnis an «{}» sendet")
     public void falschesGeheimnis(String name, String pfad) {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();

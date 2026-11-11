@@ -33,13 +33,13 @@ public class DokumentartSchritte {
         List<StammdatenTabelle.Art> arten = new ArrayList<>();
         try (Connection verbindung = datenbank.get().getConnection(); Statement abfrage = verbindung.createStatement();
              ResultSet zeilen = abfrage.executeQuery("select code, name, gruppen, pflichtfelder, vertraulichkeit, "
-                     + "aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv from " + schema + ".dokumentart")) {
+                     + "aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung from " + schema + ".dokumentart")) {
             while (zeilen.next()) {
                 arten.add(new StammdatenTabelle.Art(zeilen.getString("code"), zeilen.getString("name"),
                         texte(zeilen.getArray("gruppen")), texte(zeilen.getArray("pflichtfelder")),
                         zeilen.getString("vertraulichkeit"), zeilen.getObject("aufbewahrung_jahre", Integer.class),
                         zeilen.getString("aufbewahrung_ab"), zeilen.getBoolean("gesetzliche_pflicht"),
-                        zeilen.getBoolean("aktiv")));
+                        zeilen.getBoolean("aktiv"), zeilen.getString("beschreibung")));
             }
         }
         assertThat(arten).containsExactlyInAnyOrderElementsOf(StammdatenTabelle.ausDesign());

@@ -58,6 +58,11 @@ class TokenKommandoStartTest {
         assertThat(ergebnis.getErrorOutput()).doesNotContain(geheimnis);
         String log = Files.readString(LOG);
         assertThat(log).contains("Installed features").doesNotContain("Listening on: http").doesNotContain(geheimnis);
+        // Kann 4 aus dem Review von PR #37: Liquibase (UI-Meldungen und Zusammenfassung der public-Migration) nur ins Log
+        assertThat(log).contains("\"loggerName\":\"liquibase.ui\"", "UPDATE SUMMARY");
+        assertThat(ergebnis.getErrorOutput()).doesNotContain("UPDATE SUMMARY", "Database is up to date");
+        // Der Mitschnitt trennt Konsolen-Log und stdout nicht (siehe Klassenkommentar); darum hier die Einstellung selbst
+        assertThat(System.getProperty("quarkus.log.console.stderr")).as("Konsolen-Log im Kommando-Modus").isEqualTo("true");
     }
 
     @Test

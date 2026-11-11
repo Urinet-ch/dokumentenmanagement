@@ -28,7 +28,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Schritte zu Req 10.2, 10.3, 10.7 und 10.8 (Grundlage aus Aufgabe 1.6) über die Probe-Endpunkte unter src/test. */
+/**
+ * Schritte zu Req 10.2, 10.3, 10.7 und 10.8 (Grundlage aus Aufgabe 1.6) über die Probe-Endpunkte unter src/test, dazu
+ * die Regeländerung einer Dokumentart (Req 9.10).
+ */
 public class ZugriffProtokollSchritte {
 
     private static final String FEHLER_TRIGGER = "probe_protokoll_fehler";
@@ -66,9 +69,36 @@ public class ZugriffProtokollSchritte {
         assertThat(eintrag.get("grund")).isEqualTo(erwartet.get("grund"));
         assertThat(eintrag.get("fehlercode")).isEqualTo(erwartet.get("fehlercode"));
         if (eintrag.get("details_schluessel") != null) {
-            assertThat(eintrag.get("details_schluessel").split(",")).as("nur grund, sha256 und fehlercode")
-                    .isSubsetOf("grund", "sha256", "fehlercode");
+            assertThat(eintrag.get("details_schluessel").split(","))
+                    .as("nur grund, sha256, fehlercode und bei REGEL_AENDERN dokumentart, alt und neu")
+                    .isSubsetOf("grund", "sha256", "fehlercode", "dokumentart", "alt", "neu");
         }
+    }
+
+    /** Nur Werte der Regel, keine Werte eines Dokuments (Req 9.10, 10.2); leere Zelle heisst {@code null}. */
+    @Dann("der neue Eintrag im Zugriffsprotokoll von «{word}» hält für die Dokumentart «{word}» diese Regeln fest:")
+    public void regelFestgehalten(String mandant, String code, DataTable tabelle) throws Exception {
+        List<Map<String, String>> neu = neueEintraege(mandant);
+        assertThat(neu).hasSize(1);
+        JsonNode details = new ObjectMapper().readTree(neu.getFirst().get("details"));
+        assertThat(feldnamen(details)).containsExactlyInAnyOrder("dokumentart", "alt", "neu");
+        assertThat(details.path("dokumentart").asText()).isEqualTo(code);
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            JsonNode regel = details.path(zeile.get("regel"));
+            assertThat(feldnamen(regel)).as(zeile.get("regel"))
+                    .containsExactlyInAnyOrder("aufbewahrungJahre", "aufbewahrungAb", "gesetzlichePflicht");
+            for (String feld : List.of("aufbewahrungJahre", "aufbewahrungAb", "gesetzlichePflicht")) {
+                JsonNode wert = regel.get(feld);
+                assertThat(wert.isNull() ? null : wert.asText()).as(zeile.get("regel") + "." + feld)
+                        .isEqualTo(zeile.get(feld));
+            }
+        }
+    }
+
+    private static List<String> feldnamen(JsonNode knoten) {
+        List<String> namen = new ArrayList<>();
+        knoten.fieldNames().forEachRemaining(namen::add);
+        return namen;
     }
 
     @Dann("das Zugriffsprotokoll von «{word}» hat keinen neuen Eintrag")
@@ -147,7 +177,7 @@ public class ZugriffProtokollSchritte {
         List<Map<String, String>> eintraege = new ArrayList<>();
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
                 "select benutzer, rolle, aktion, dokument_id::text, host(ip), details->>'grund', details->>'fehlercode', "
-                        + "(select string_agg(k, ',' order by k) from jsonb_object_keys(details) k) "
+                        + "(select string_agg(k, ',' order by k) from jsonb_object_keys(details) k), details::text "
                         + "from " + schema(mandant) + ".zugriff_protokoll where id > ? order by id")) {
             abfrage.setLong(1, stand.get(mandant));
             try (ResultSet zeile = abfrage.executeQuery()) {
@@ -161,6 +191,7 @@ public class ZugriffProtokollSchritte {
                     eintrag.put("grund", zeile.getString(6));
                     eintrag.put("fehlercode", zeile.getString(7));
                     eintrag.put("details_schluessel", zeile.getString(8));
+                    eintrag.put("details", zeile.getString(9));
                     eintraege.add(eintrag);
                 }
             }
