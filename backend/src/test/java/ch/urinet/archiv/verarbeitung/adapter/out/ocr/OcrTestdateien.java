@@ -47,7 +47,7 @@ import java.util.List;
  * Mehrseiten-PDF ohne Textebene, PDF mit Textebene, verschlüsseltes und signiertes PDF. HEIC liegt als Fixture unter
  * {@code src/test/resources/ocr/} (Herkunft dort in der README).
  */
-final class OcrTestdateien {
+public final class OcrTestdateien {
 
     static {
         System.setProperty("java.awt.headless", "true");
@@ -57,7 +57,7 @@ final class OcrTestdateien {
     }
 
     /** Bild einer Seite mit Textzeilen, wahlweise um {@code grad} gedreht (schief fotografiert). */
-    static BufferedImage seite(double grad, String... zeilen) {
+    public static BufferedImage seite(double grad, String... zeilen) {
         BufferedImage bild = new BufferedImage(1240, 1754, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = bild.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -73,11 +73,11 @@ final class OcrTestdateien {
         return bild;
     }
 
-    static byte[] jpeg(BufferedImage bild) {
+    public static byte[] jpeg(BufferedImage bild) {
         return bild("jpg", bild);
     }
 
-    static byte[] png(BufferedImage bild) {
+    public static byte[] png(BufferedImage bild) {
         return bild("png", bild);
     }
 
@@ -93,7 +93,7 @@ final class OcrTestdateien {
         }
     }
 
-    static byte[] heic() {
+    public static byte[] heic() {
         try (InputStream ein = OcrTestdateien.class.getResourceAsStream("/ocr/foto.heic")) {
             return ein.readAllBytes();
         } catch (IOException e) {
@@ -102,7 +102,7 @@ final class OcrTestdateien {
     }
 
     /** PDF aus Bildern, ohne Textebene (gescannt). */
-    static byte[] bildPdf(List<BufferedImage> seiten) {
+    public static byte[] bildPdf(List<BufferedImage> seiten) {
         try (PDDocument dok = new PDDocument()) {
             for (BufferedImage bild : seiten) {
                 PDPage seite = new PDPage(PDRectangle.A4);
@@ -119,7 +119,7 @@ final class OcrTestdateien {
     }
 
     /** PDF mit Textebene (digital erzeugt). */
-    static byte[] textPdf(String... zeilen) {
+    public static byte[] textPdf(String... zeilen) {
         try (PDDocument dok = new PDDocument()) {
             textSeite(dok, zeilen);
             return speichern(dok);
@@ -129,7 +129,7 @@ final class OcrTestdateien {
     }
 
     /** PDF mit Benutzerpasswort: ohne Passwort nicht lesbar. */
-    static byte[] verschluesseltesPdf() {
+    public static byte[] verschluesseltesPdf() {
         try (PDDocument dok = new PDDocument()) {
             textSeite(dok, "Verschluesselter Testbeleg");
             var schutz = new StandardProtectionPolicy("eigner-test", "benutzer-test", new AccessPermission());
@@ -142,7 +142,7 @@ final class OcrTestdateien {
     }
 
     /** PDF mit Textebene und CMS-Signatur (selbstsigniertes Testzertifikat, nur im Speicher). */
-    static byte[] signiertesPdf() {
+    public static byte[] signiertesPdf() {
         try {
             byte[] unsigniert = textPdf("Signierter Testbeleg", "Vertrag Muster");
             KeyPairGenerator erzeuger = KeyPairGenerator.getInstance("RSA");

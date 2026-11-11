@@ -12,7 +12,9 @@ import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,4 +60,24 @@ public interface AblagePort {
      */
     AbgelegteDatei ablegenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil, byte[] inhalt,
                                    Optional<LocalDate> spaetestesAufbewahrenBis);
+
+    /**
+     * Lädt genau diese Version einer Datei aus {@code eingang/} nach {@code ziel} (darf noch nicht bestehen) und prüft
+     * ihre SHA-256 gegen die bei Eingang festgehaltene (Regel 3, Aufgabe 2.6); weicht sie ab, löscht der Aufruf
+     * {@code ziel} und bricht ab. Die Datei im Object Storage bleibt unverändert.
+     */
+    void lesenEingang(MandantCode mandant, DateiSchluessel schluessel, String versionId, String sha256, Path ziel);
+
+    /** Legt das Vorschaubild einer Seite unter {@code vorschau/<docId>/<seite>.png} ohne Sperre ab (Aufgabe 2.6). */
+    AbgelegteDatei ablegenVorschau(MandantCode mandant, UUID docId, int seite, Path datei);
+
+    /**
+     * Löscht alle Versionen und Löschmarken der abgeleiteten Dateien eines Dokuments, also von
+     * {@code eingang/<jahr>/<docId>/pdfa.pdf} und unter {@code vorschau/<docId>/}, ausser den Versionen in
+     * {@code behalten} (Schlüssel und Versions-ID). Originale und Arbeitsfassungen berührt der Aufruf nie. So bleiben
+     * nach einem erneuten Versuch der Verarbeitung keine doppelten Dateien (Aufgabe 2.6).
+     *
+     * @return Anzahl gelöschter Versionen und Löschmarken
+     */
+    int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten);
 }
