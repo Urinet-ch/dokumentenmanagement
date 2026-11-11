@@ -123,6 +123,16 @@ public class UploadSchritte {
         senden(benutzer, dateien(tabelle), true, hinweis);
     }
 
+    @Wenn("«{word}» diese Dateien als ein Dokument mit einem Hinweis aus {int} × «{}» hochlädt:")
+    public void langerHinweis(String benutzer, int anzahl, String zeichen, DataTable tabelle) {
+        senden(benutzer, dateien(tabelle), true, zeichen.repeat(anzahl));
+    }
+
+    @Dann("nennen alle Ergebnisse dasselbe Dokument mit einem Hinweis aus {int} × «{}»")
+    public void langerHinweisGespeichert(int anzahl, String zeichen) throws SQLException {
+        dasselbeDokument(zeichen.repeat(anzahl));
+    }
+
     @Wenn("«{word}» diese Seiten mit Arbeitsfassung als ein Dokument hochlädt:")
     public void seitenHochladen(String benutzer, DataTable tabelle) {
         senden(benutzer, dateien(tabelle), true, null);

@@ -156,6 +156,24 @@ Funktionalität: Upload von Dateien
     Und hat das Dokument die Originale in der gesendeten Reihenfolge
     Und ist für jedes neue Dokument genau ein Auftrag «VERARBEITEN» eingereiht
 
+  @req-3.5
+  Szenario: Ein Hinweis aus 1'000 Zeichen wird angenommen, auch wenn er mehr als 2'048 Bytes umfasst
+    Wenn «inhaber-urinet» diese Dateien als ein Dokument mit einem Hinweis aus 1000 × «€» hochlädt:
+      | datei      | typ  |
+      | seite1.jpg | jpeg |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei      | status |
+      | seite1.jpg | NEU    |
+    Und nennen alle Ergebnisse dasselbe Dokument mit einem Hinweis aus 1000 × «€»
+
+  @req-3.5
+  Szenario: Ein Hinweis über 1'000 Zeichen wird mit 400 abgelehnt und nichts gespeichert
+    Wenn «inhaber-urinet» diese Dateien als ein Dokument mit einem Hinweis aus 1001 × «€» hochlädt:
+      | datei      | typ  |
+      | seite1.jpg | jpeg |
+    Dann antwortet der Upload mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und ist im Mandanten «urinet» nichts gespeichert
+
   @req-3.6 @req-3.8
   Szenario: Eine Datei über 50 MB wird abgelehnt, die Nachbarin angenommen
     Wenn «inhaber-urinet» diese Dateien hochlädt:
