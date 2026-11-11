@@ -6,6 +6,8 @@ import ch.urinet.archiv.importe.application.CsvImport;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportLauf;
+import ch.urinet.archiv.importe.domain.ImportZeile;
+import ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis;
 import ch.urinet.archiv.importe.domain.Zuordnung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
@@ -13,10 +15,12 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -65,13 +69,41 @@ public class ImportResource {
             @Schema(description = "Zeilen «Ist gelöscht = true»") int uebersprungen,
             @Schema(enumeration = {"VORSCHAU_AUSSTEHEND", "ZUORDNUNG_NOETIG", "VORSCHAU", "UEBERNOMMEN",
                     "ABGEBROCHEN"}) String status,
-            Instant erstellt) {
+            Instant erstellt,
+            @Schema(nullable = true, description = "Vorschau: neue Kontakte; erst ab Status VORSCHAU") Integer neu,
+            @Schema(nullable = true, description = "Vorschau: geänderte Kontakte") Integer geaendert,
+            @Schema(nullable = true, description = "Vorschau: unveränderte Kontakte") Integer unveraendert,
+            @Schema(nullable = true, description = "Vorschau: mögliche Dubletten") Integer dubletten) {
 
         static LaufDto aus(ImportLauf lauf) {
+            ImportLauf.Zaehler v = lauf.vorschau();
             return new LaufDto(lauf.id(), lauf.art().code(), lauf.vollexport(), lauf.dateiname(), lauf.sha256(),
                     lauf.zeichensatz(), String.valueOf(lauf.trennzeichen()), lauf.zeilen(), lauf.fehler(),
-                    lauf.uebersprungen(), lauf.status().name(), lauf.erstellt());
+                    lauf.uebersprungen(), lauf.status().name(), lauf.erstellt(), v == null ? null : v.neu(),
+                    v == null ? null : v.geaendert(), v == null ? null : v.unveraendert(),
+                    v == null ? null : v.dubletten());
         }
+    }
+
+    @Schema(name = "ImportZeile")
+    public record ZeileDto(@Schema(description = "Zeile in der Datei (Kopfzeile = 1)") int nr,
+            @Schema(nullable = true, enumeration = {"NEU", "GEAENDERT", "UNVERAENDERT", "DUBLETTE", "FEHLER",
+                    "UEBERSPRUNGEN"}, description = "null: wartet auf Zuordnung oder Vorschau") String ergebnis,
+            @Schema(nullable = true) String meldung,
+            @Schema(nullable = true, description = "getroffener Kontakt bei GEAENDERT und UNVERAENDERT") UUID kontaktId,
+            @Schema(description = "Kandidaten einer möglichen Dublette") List<UUID> kandidaten,
+            @Schema(nullable = true, description = "Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern")
+            List<String> werte) {
+
+        static ZeileDto aus(ImportZeile zeile) {
+            return new ZeileDto(zeile.nr(), zeile.ergebnis() == Ergebnis.OFFEN ? null : zeile.ergebnis().name(),
+                    zeile.meldung(), zeile.kontaktId(), zeile.kandidaten(), zeile.werte());
+        }
+    }
+
+    @Schema(name = "ImportLaufMitZeilen")
+    public record LaufSeiteDto(LaufDto lauf, List<ZeileDto> eintraege,
+            @Schema(description = "Anzahl Zeilen des Laufs") long gesamt, int seite, int groesse) {
     }
 
     @Schema(name = "ImportSpalte")
@@ -182,6 +214,31 @@ public class ImportResource {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         return LaufDto.aus(csvImport.zuordnen(importArt, laufId, zuordnung.profil(), zuordnung.felder()));
+    }
+
+    @GET
+    @Path("/{id}")
+    @ErfordertAktion(Aktion.A12)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Import-Lauf mit Vorschau lesen",
+            description = "Lauf mit den Zählern der Vorschau (neu, geändert, unverändert, mögliche Dublette, "
+                    + "fehlerhaft) und einer Seite seiner Zeilen (Req 13.3). seite ab 0, groesse 1–100. Die Zähler "
+                    + "der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist (Status VORSCHAU).")
+    @APIResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = LaufSeiteDto.class)))
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten")
+    public LaufSeiteDto lauf(@PathParam("id") String id, @QueryParam("seite") @DefaultValue("0") int seite,
+                             @QueryParam("groesse") @DefaultValue("50") int groesse) {
+        aufloesung.pruefen();
+        UUID laufId;
+        try {
+            laufId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        CsvImport.LaufSeite ergebnis = csvImport.lauf(laufId, seite, groesse);
+        return new LaufSeiteDto(LaufDto.aus(ergebnis.lauf()),
+                ergebnis.zeilen().stream().map(ZeileDto::aus).toList(), ergebnis.lauf().zeilen(), seite, groesse);
     }
 
     private static ImportArt art(String art) {

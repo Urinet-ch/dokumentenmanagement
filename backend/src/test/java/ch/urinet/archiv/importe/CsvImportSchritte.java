@@ -2,6 +2,7 @@ package ch.urinet.archiv.importe;
 
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.gemeinsam.domain.Normalisierer;
 import ch.urinet.archiv.importe.domain.CsvTabelle;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -30,11 +31,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +65,7 @@ public class CsvImportSchritte {
     private LogMitschnitt mitschnitt;
     private boolean benutzt;
     private int erwarteteZeilen;
+    private final Map<String, UUID> kontakte = new LinkedHashMap<>();
 
     @After
     public void aufraeumen() throws SQLException {
@@ -80,8 +84,104 @@ public class CsvImportSchritte {
                         loeschen.executeUpdate();
                     }
                 }
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from " + schema + ".kontakt where id = any(?)")) {
+                    loeschen.setArray(1, verbindung.createArrayOf("uuid", kontakte.values().toArray()));
+                    loeschen.executeUpdate();
+                }
+            }
+            try (PreparedStatement loeschen = verbindung.prepareStatement(
+                    "delete from public.auftrag where typ = 'CSV_VORSCHAU'")) {
+                loeschen.executeUpdate();
             }
         }
+        kontakte.clear();
+    }
+
+    @Angenommen("im Mandanten «{word}» gibt es diese Kontakte für den Abgleich:")
+    public void kontakteFuerAbgleich(String mandant, DataTable tabelle) throws SQLException {
+        benutzt = true;
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement einfuegen =
+                verbindung.prepareStatement("insert into " + new MandantCode(mandant).schema() + ".kontakt (id, crm_id, "
+                        + "typ, name, vorname, name_normalisiert, plz, email, quelle) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'MANUELL')")) {
+            for (Map<String, String> zeile : tabelle.asMaps()) {
+                UUID id = UUID.randomUUID();
+                boolean person = "PERSON".equals(zeile.get("typ"));
+                einfuegen.setObject(1, id);
+                einfuegen.setString(2, zeile.get("crm_id"));
+                einfuegen.setString(3, zeile.get("typ"));
+                einfuegen.setString(4, zeile.get("name"));
+                einfuegen.setString(5, zeile.get("vorname"));
+                einfuegen.setString(6, person ? Normalisierer.personName(zeile.get("vorname"), zeile.get("name"))
+                        : Normalisierer.name(zeile.get("name")));
+                einfuegen.setString(7, zeile.get("plz"));
+                einfuegen.setString(8, zeile.get("email"));
+                einfuegen.executeUpdate();
+                kontakte.put(zeile.get("kontakt"), id);
+            }
+        }
+    }
+
+    @Wenn("«{word}» den Lauf abfragt")
+    public void laufAbfragen(String benutzer) {
+        seiteAbfragen(benutzer, 0, 100);
+    }
+
+    @Wenn("«{word}» die Seite {int} mit {int} Zeilen des Laufs abfragt")
+    public void seiteAbfragen(String benutzer, int seite, int groesse) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
+                .queryParam("groesse", groesse).when().get(UPLOAD.replace("/crm", "/") + laufId);
+    }
+
+    @Dann("zeigt die Vorschau {int} neu, {int} geändert, {int} unverändert, {int} mögliche Dubletten, {int} fehlerhaft "
+            + "und {int} übersprungen")
+    public void vorschau(int neu, int geaendert, int unveraendert, int dubletten, int fehler, int uebersprungen) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("lauf.status")).isEqualTo("VORSCHAU");
+        assertThat(List.of(antwort.<Integer>path("lauf.neu"), antwort.<Integer>path("lauf.geaendert"),
+                antwort.<Integer>path("lauf.unveraendert"), antwort.<Integer>path("lauf.dubletten"),
+                antwort.<Integer>path("lauf.fehler"), antwort.<Integer>path("lauf.uebersprungen")))
+                .containsExactly(neu, geaendert, unveraendert, dubletten, fehler, uebersprungen);
+    }
+
+    @Dann("zeigt die Vorschau diese Zeilen:")
+    public void vorschauZeilen(DataTable erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        Map<UUID, String> kennung = new HashMap<>();
+        kontakte.forEach((name, id) -> kennung.put(id, name));
+        List<Map<String, Object>> ist = antwort.path("eintraege");
+        List<Map<String, String>> soll = erwartet.asMaps();
+        assertThat(ist).hasSameSizeAs(soll);
+        for (int i = 0; i < soll.size(); i++) {
+            Map<String, String> s = soll.get(i);
+            Map<String, Object> z = ist.get(i);
+            String nr = s.get("nr");
+            assertThat(String.valueOf(z.get("nr"))).isEqualTo(nr);
+            assertThat(z.get("ergebnis")).as("Zeile %s", nr).isEqualTo(s.get("ergebnis"));
+            assertThat(nullAlsLeer((String) z.get("meldung"))).as("Zeile %s", nr)
+                    .isEqualTo(nullAlsLeer(s.get("meldung")));
+            String kontakt = z.get("kontaktId") == null ? "" : kennung.get(UUID.fromString((String) z.get("kontaktId")));
+            assertThat(kontakt).as("Zeile %s", nr).isEqualTo(nullAlsLeer(s.get("kontakt")));
+            @SuppressWarnings("unchecked")
+            List<String> kandidaten = ((List<String>) z.get("kandidaten")).stream()
+                    .map(id -> kennung.getOrDefault(UUID.fromString(id), "?")).sorted().toList();
+            assertThat(String.join(", ", kandidaten)).as("Zeile %s", nr).isEqualTo(nullAlsLeer(s.get("kandidaten")));
+        }
+    }
+
+    @Dann("enthält die Seite {int} von {int} Zeilen die Zeilen {int} bis {int}")
+    public void seite(int seite, int gesamt, int von, int bis) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Integer>path("seite")).isEqualTo(seite);
+        assertThat(antwort.<Integer>path("gesamt")).isEqualTo(gesamt);
+        assertThat(antwort.<List<Integer>>path("eintraege.nr"))
+                .containsExactlyElementsOf(IntStream.rangeClosed(von, bis).boxed().toList());
+    }
+
+    @Dann("enthält das Log keinen der Werte «{}» und «{}»")
+    public void logOhneVorschauWerte(String a, String b) {
+        assertThat(mitschnitt.volltext()).doesNotContain(a).doesNotContain(b);
     }
 
     @Angenommen("der CSV-Import schneidet das Log mit")

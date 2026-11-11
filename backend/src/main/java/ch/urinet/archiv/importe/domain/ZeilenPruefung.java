@@ -62,11 +62,23 @@ public final class ZeilenPruefung {
         return Befund.OFFEN;
     }
 
-    /** Ergebnis der Prüfung; {@code OFFEN} wartet auf den Abgleich (Aufgabe 4.2). */
+    /**
+     * Ergebnis der Prüfung; {@code OFFEN} wartet auf den Abgleich, {@code NEU} bis {@code DUBLETTE} setzt die Vorschau
+     * (Aufgabe 4.2, {@link KontaktAbgleich}).
+     */
     public enum Ergebnis {
         OFFEN,
         FEHLER,
-        UEBERSPRUNGEN
+        UEBERSPRUNGEN,
+        NEU,
+        GEAENDERT,
+        UNVERAENDERT,
+        DUBLETTE;
+
+        /** Zeilen, die der Abgleich bewertet; {@code FEHLER} und {@code UEBERSPRUNGEN} bleiben, wie sie sind. */
+        public boolean abzugleichen() {
+            return this != FEHLER && this != UEBERSPRUNGEN;
+        }
     }
 
     /**

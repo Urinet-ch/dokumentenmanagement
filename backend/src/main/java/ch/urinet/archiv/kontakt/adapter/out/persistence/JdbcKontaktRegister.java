@@ -1,6 +1,7 @@
 package ch.urinet.archiv.kontakt.adapter.out.persistence;
 
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
+import ch.urinet.archiv.kontakt.application.KontaktTreffer;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.kontakt.domain.KontaktTyp;
@@ -18,8 +19,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -37,6 +41,8 @@ public class JdbcKontaktRegister implements KontaktRegister {
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final String SPALTEN = "id, crm_id, typ, name, vorname, strasse, plz, ort, email, telefon, uid, iban, "
             + "kategorie, quelle, nicht_im_export, erstellt, geaendert, version";
+    /** Obergrenze je Abfrage des Abgleichs, nur für die laufende Transaktion. */
+    private static final String ZEITGRENZE = "select set_config('statement_timeout', '30s', true)";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -173,6 +179,81 @@ public class JdbcKontaktRegister implements KontaktRegister {
             return kandidaten;
         } catch (SQLException e) {
             throw new IllegalStateException("Namensähnlichkeit nicht lesbar", e);
+        }
+    }
+
+    @Override
+    public List<KontaktTreffer> mitSchluesseln(Collection<String> crmIds, Collection<String> emails,
+                                               List<String> namen, List<String> plz) {
+        if (namen.size() != plz.size()) {
+            throw new IllegalArgumentException("namen und plz verschieden lang");
+        }
+        if (crmIds.isEmpty() && emails.isEmpty() && namen.isEmpty()) {
+            return List.of();
+        }
+        transaktionPruefen();
+        String tabelle = tabelle();
+        String sql = "select " + SPALTEN + ", name_normalisiert from " + tabelle + " where id in ("
+                + "select id from " + tabelle + " where crm_id = any(?) "
+                + "union select id from " + tabelle + " where lower(email) = any(?) "
+                + "union select k.id from " + tabelle + " k join unnest(?::text[], ?::text[]) s(n, p) "
+                + "on k.name_normalisiert = s.n and k.plz = s.p) order by id";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement zeitgrenze = verbindung.prepareStatement(ZEITGRENZE);
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            zeitgrenze.execute();
+            abfrage.setArray(1, verbindung.createArrayOf("text", crmIds.toArray()));
+            abfrage.setArray(2, verbindung.createArrayOf("text", emails.toArray()));
+            abfrage.setArray(3, verbindung.createArrayOf("text", namen.toArray()));
+            abfrage.setArray(4, verbindung.createArrayOf("text", plz.toArray()));
+            List<KontaktTreffer> treffer = new ArrayList<>();
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    treffer.add(new KontaktTreffer(kontakt(zeile), zeile.getString("name_normalisiert")));
+                }
+            }
+            return treffer;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakte für den Abgleich nicht lesbar", e);
+        }
+    }
+
+    @Override
+    public Map<String, List<UUID>> aehnlichsteJe(Collection<String> namen, BigDecimal untergrenze, int anzahl) {
+        if (namen.isEmpty()) {
+            return Map.of();
+        }
+        transaktionPruefen();
+        String sql = "select s.n, k.id from unnest(?::text[]) s(n) cross join lateral (select id, "
+                + "round(public.similarity(name_normalisiert, s.n)::numeric, 4) as aehnlichkeit from " + tabelle()
+                + " where name_normalisiert operator(public.%) s.n order by aehnlichkeit desc, id limit ?) k "
+                + "order by s.n, k.aehnlichkeit desc, k.id";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement zeitgrenze = verbindung.prepareStatement(ZEITGRENZE);
+             PreparedStatement schwelle = verbindung.prepareStatement(
+                     "select set_config('pg_trgm.similarity_threshold', ?, true)");
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            zeitgrenze.execute();
+            schwelle.setString(1, untergrenze.toPlainString());
+            schwelle.execute();
+            abfrage.setArray(1, verbindung.createArrayOf("text", namen.toArray()));
+            abfrage.setInt(2, anzahl);
+            Map<String, List<UUID>> ergebnis = new HashMap<>();
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    ergebnis.computeIfAbsent(zeile.getString(1), n -> new ArrayList<>())
+                            .add(zeile.getObject(2, UUID.class));
+                }
+            }
+            return ergebnis;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Namensähnlichkeit nicht lesbar", e);
+        }
+    }
+
+    private static void transaktionPruefen() {
+        if (!QuarkusTransaction.isActive()) {
+            throw new IllegalStateException("Abgleich nur in einer Transaktion");
         }
     }
 

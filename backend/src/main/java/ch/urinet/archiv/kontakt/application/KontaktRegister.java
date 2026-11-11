@@ -5,7 +5,9 @@ import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.kontakt.domain.PartnerKandidat;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -35,4 +37,18 @@ public interface KontaktRegister {
 
     /** Die {@code anzahl} ähnlichsten Kontakte mit Ähnlichkeit ab {@code untergrenze}, absteigend. */
     List<PartnerKandidat> aehnlichste(String nameNormalisiert, BigDecimal untergrenze, int anzahl);
+
+    /**
+     * Abgleich des CSV-Imports (Req 13.4): alle Kontakte mit einer der {@code crmIds}, einer der {@code emails} (ohne
+     * Gross-/Kleinschreibung) oder einem der Paare {@code (namen[i], plz[i])} auf {@code (name_normalisiert, plz)},
+     * je exakt. {@code namen} und {@code plz} sind gleich lang. Nur in einer Transaktion.
+     */
+    List<KontaktTreffer> mitSchluesseln(Collection<String> crmIds, Collection<String> emails, List<String> namen,
+                                        List<String> plz);
+
+    /**
+     * Je Name die höchstens {@code anzahl} ähnlichsten Kontakte mit Ähnlichkeit ab {@code untergrenze}, absteigend;
+     * Namen ohne Treffer fehlen. Nur in einer Transaktion (wie {@link #aehnlichste}).
+     */
+    Map<String, List<UUID>> aehnlichsteJe(Collection<String> namen, BigDecimal untergrenze, int anzahl);
 }

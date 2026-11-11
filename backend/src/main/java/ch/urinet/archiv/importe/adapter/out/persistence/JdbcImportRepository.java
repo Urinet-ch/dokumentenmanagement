@@ -21,6 +21,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -28,6 +29,8 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +50,7 @@ public class JdbcImportRepository implements ImportRepository {
 
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String ZEILE = "nr, daten, ergebnis, meldung, kontakt_id, kandidaten";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -104,13 +108,20 @@ public class JdbcImportRepository implements ImportRepository {
 
     @Override
     public void laufAktualisieren(ImportLauf lauf) {
-        String sql = "update " + schema() + ".import_lauf set status = ?, zeilen = ?, fehler = ? where id = ?";
+        String sql = "update " + schema() + ".import_lauf set status = ?, zeilen = ?, fehler = ?, "
+                + "zuordnung = cast(? as jsonb), neu = ?, geaendert = ?, unveraendert = ?, dubletten = ? where id = ?";
+        ImportLauf.Zaehler vorschau = lauf.vorschau();
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
             aendern.setString(1, lauf.status().name());
             aendern.setInt(2, lauf.zeilen());
             aendern.setInt(3, lauf.fehler());
-            aendern.setObject(4, lauf.id(), Types.OTHER);
+            aendern.setString(4, lauf.zuordnung() == null ? null : json(zuordnungJson(lauf.zuordnung())));
+            aendern.setObject(5, vorschau == null ? null : vorschau.neu(), Types.INTEGER);
+            aendern.setObject(6, vorschau == null ? null : vorschau.geaendert(), Types.INTEGER);
+            aendern.setObject(7, vorschau == null ? null : vorschau.unveraendert(), Types.INTEGER);
+            aendern.setObject(8, vorschau == null ? null : vorschau.dubletten(), Types.INTEGER);
+            aendern.setObject(9, lauf.id(), Types.OTHER);
             aendern.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Import-Lauf nicht gespeichert", e);
@@ -130,7 +141,8 @@ public class JdbcImportRepository implements ImportRepository {
     private Optional<ImportLauf> lauf(UUID id, boolean sperren) {
         String schema = schema();
         String sql = "select l.id, l.art, l.vollexport, l.dateiname, l.sha256, l.zeichensatz, l.trennzeichen, "
-                + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, "
+                + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, l.zuordnung::text, "
+                + "l.neu, l.geaendert, l.unveraendert, l.dubletten, "
                 + "(select count(*) from " + schema + ".import_zeile z where z.lauf_id = l.id "
                 + "and z.ergebnis = 'UEBERSPRUNGEN') as uebersprungen "
                 + "from " + schema + ".import_lauf l where l.id = ?" + (sperren ? " for update of l" : "");
@@ -143,14 +155,22 @@ public class JdbcImportRepository implements ImportRepository {
                 }
                 ImportArt art = ImportArt.aus(ergebnis.getString("art"))
                         .orElseThrow(() -> new IllegalStateException("unbekannte Importart in import_lauf"));
+                String zuordnung = ergebnis.getString("zuordnung");
+                Integer neu = ergebnis.getObject("neu", Integer.class);
+                int fehler = ergebnis.getInt("fehler");
+                int uebersprungen = ergebnis.getInt("uebersprungen");
+                ImportLauf.Zaehler vorschau = neu == null ? null : new ImportLauf.Zaehler(neu,
+                        ergebnis.getInt("geaendert"), ergebnis.getInt("unveraendert"), ergebnis.getInt("dubletten"),
+                        fehler, uebersprungen);
                 return Optional.of(new ImportLauf(ergebnis.getObject("id", UUID.class), art,
                         ergebnis.getBoolean("vollexport"), ergebnis.getString("dateiname"),
                         ergebnis.getString("sha256"), ergebnis.getString("zeichensatz"),
                         ergebnis.getString("trennzeichen").charAt(0),
                         new Kopfzeile(JSON.readValue(ergebnis.getString("kopfzeile"), new TypeReference<>() {
-                        })), ergebnis.getInt("zeilen"), ergebnis.getInt("fehler"),
-                        ergebnis.getInt("uebersprungen"), LaufStatus.valueOf(ergebnis.getString("status")),
-                        ergebnis.getString("benutzer"), ergebnis.getTimestamp("erstellt").toInstant()));
+                        })), ergebnis.getInt("zeilen"), fehler, uebersprungen,
+                        LaufStatus.valueOf(ergebnis.getString("status")), ergebnis.getString("benutzer"),
+                        ergebnis.getTimestamp("erstellt").toInstant(),
+                        zuordnung == null ? null : zuordnungAus(JSON.readTree(zuordnung)), vorschau));
             }
         } catch (SQLException | JsonProcessingException e) {
             throw new IllegalStateException("Import-Lauf nicht gelesen", e);
@@ -175,9 +195,9 @@ public class JdbcImportRepository implements ImportRepository {
 
     @Override
     public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl, int zeichen) {
-        String sql = "select nr, daten, ergebnis, meldung from (select nr, daten, ergebnis, meldung, "
+        String sql = "select " + ZEILE + " from (select " + ZEILE + ", "
                 + "sum(coalesce(length(daten), 0)) over (order by nr) - coalesce(length(daten), 0) as davor "
-                + "from (select nr, daten::text as daten, ergebnis, meldung from " + schema()
+                + "from (select nr, daten::text as daten, ergebnis, meldung, kontakt_id, kandidaten from " + schema()
                 + ".import_zeile where lauf_id = ? and nr > ? order by nr limit ?) z) b where davor < ? order by nr";
         List<ImportZeile> zeilen = new ArrayList<>();
         try (Connection verbindung = datenquelle.get().getConnection();
@@ -188,17 +208,7 @@ public class JdbcImportRepository implements ImportRepository {
             abfrage.setLong(4, zeichen);
             try (ResultSet ergebnis = abfrage.executeQuery()) {
                 while (ergebnis.next()) {
-                    String text = ergebnis.getString("daten");
-                    List<String> werte = null;
-                    if (text != null) {
-                        werte = new ArrayList<>();
-                        for (JsonNode wert : JSON.readTree(text).path("werte")) {
-                            werte.add(wert.isNull() ? null : wert.asText());
-                        }
-                    }
-                    String code = ergebnis.getString("ergebnis");
-                    zeilen.add(new ImportZeile(ergebnis.getInt("nr"), werte,
-                            code == null ? Ergebnis.OFFEN : Ergebnis.valueOf(code), ergebnis.getString("meldung")));
+                    zeilen.add(zeile(ergebnis));
                 }
             }
         } catch (SQLException | JsonProcessingException e) {
@@ -208,21 +218,117 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
+    public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+        String sql = "select nr, daten::text as daten, ergebnis, meldung, kontakt_id, kandidaten from " + schema()
+                + ".import_zeile where lauf_id = ? order by nr limit ? offset ?";
+        List<ImportZeile> zeilen = new ArrayList<>();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, laufId, Types.OTHER);
+            abfrage.setInt(2, groesse);
+            abfrage.setLong(3, (long) seite * groesse);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                while (ergebnis.next()) {
+                    zeilen.add(zeile(ergebnis));
+                }
+            }
+        } catch (SQLException | JsonProcessingException e) {
+            throw new IllegalStateException("Import-Zeilen nicht gelesen", e);
+        }
+        return zeilen;
+    }
+
+    private static ImportZeile zeile(ResultSet ergebnis) throws SQLException, JsonProcessingException {
+        String text = ergebnis.getString("daten");
+        List<String> werte = null;
+        if (text != null) {
+            werte = new ArrayList<>();
+            for (JsonNode wert : JSON.readTree(text).path("werte")) {
+                werte.add(wert.isNull() ? null : wert.asText());
+            }
+        }
+        String code = ergebnis.getString("ergebnis");
+        Array kandidaten = ergebnis.getArray("kandidaten");
+        List<UUID> ids = kandidaten == null ? List.of() : List.of((UUID[]) kandidaten.getArray());
+        return new ImportZeile(ergebnis.getInt("nr"), werte, code == null ? Ergebnis.OFFEN : Ergebnis.valueOf(code),
+                ergebnis.getString("meldung"), ergebnis.getObject("kontakt_id", UUID.class), ids);
+    }
+
+    @Override
     public void zeilenAktualisieren(UUID laufId, List<ImportZeile> zeilen) {
-        String sql = "update " + schema() + ".import_zeile set ergebnis = ?, meldung = ? where lauf_id = ? and nr = ?";
+        schreiben(laufId, zeilen.stream().map(z -> new Abgeglichen(z, null)).toList());
+    }
+
+    @Override
+    public void abgleichSchreiben(UUID laufId, List<Abgeglichen> zeilen) {
+        schreiben(laufId, zeilen);
+    }
+
+    private void schreiben(UUID laufId, List<Abgeglichen> zeilen) {
+        String sql = "update " + schema() + ".import_zeile set ergebnis = ?, meldung = ?, kontakt_id = ?, "
+                + "kandidaten = ?, schluessel = ? where lauf_id = ? and nr = ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
-            for (ImportZeile zeile : zeilen) {
+            for (Abgeglichen abgeglichen : zeilen) {
+                ImportZeile zeile = abgeglichen.zeile();
                 aendern.setString(1, ergebnis(zeile.ergebnis()));
                 aendern.setString(2, zeile.meldung());
-                aendern.setObject(3, laufId, Types.OTHER);
-                aendern.setInt(4, zeile.nr());
+                aendern.setObject(3, zeile.kontaktId(), Types.OTHER);
+                aendern.setArray(4, zeile.kandidaten().isEmpty() ? null
+                        : verbindung.createArrayOf("uuid", zeile.kandidaten().toArray()));
+                aendern.setArray(5, abgeglichen.schluessel() == null || abgeglichen.schluessel().length == 0 ? null
+                        : verbindung.createArrayOf("bigint",
+                        Arrays.stream(abgeglichen.schluessel()).boxed().toArray()));
+                aendern.setObject(6, laufId, Types.OTHER);
+                aendern.setInt(7, zeile.nr());
                 aendern.addBatch();
             }
             aendern.executeBatch();
         } catch (SQLException e) {
             throw new IllegalStateException("Prüfung der Import-Zeilen nicht gespeichert", e);
         }
+    }
+
+    @Override
+    public int doppelteMarkieren(UUID laufId, String meldung) {
+        String schema = schema();
+        String sql = "update " + schema + ".import_zeile z set ergebnis = 'DUBLETTE', "
+                + "meldung = replace(?, '{}', d.erste::text), "
+                + "kandidaten = case when z.kontakt_id is null then z.kandidaten else array[z.kontakt_id] end, "
+                + "kontakt_id = null "
+                + "from (select nr, min(erste) as erste from (select y.nr, min(y.nr) over (partition by k) as erste "
+                + "from " + schema + ".import_zeile y cross join lateral unnest(y.schluessel) k where y.lauf_id = ?) x "
+                + "where erste < nr group by nr) d "
+                + "where z.lauf_id = ? and z.nr = d.nr and z.ergebnis is distinct from 'DUBLETTE'";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            aendern.setString(1, meldung);
+            aendern.setObject(2, laufId, Types.OTHER);
+            aendern.setObject(3, laufId, Types.OTHER);
+            return aendern.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Doppelte Import-Zeilen nicht markiert", e);
+        }
+    }
+
+    @Override
+    public ImportLauf.Zaehler zaehlen(UUID laufId) {
+        String sql = "select ergebnis, count(*) from " + schema() + ".import_zeile where lauf_id = ? group by ergebnis";
+        Map<String, Integer> anzahl = new HashMap<>();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, laufId, Types.OTHER);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                while (ergebnis.next()) {
+                    anzahl.put(String.valueOf(ergebnis.getString(1)), ergebnis.getInt(2));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Zeilen nicht gezählt", e);
+        }
+        return new ImportLauf.Zaehler(anzahl.getOrDefault("NEU", 0), anzahl.getOrDefault("GEAENDERT", 0),
+                anzahl.getOrDefault("UNVERAENDERT", 0), anzahl.getOrDefault("DUBLETTE", 0),
+                anzahl.getOrDefault("FEHLER", 0), anzahl.getOrDefault("UEBERSPRUNGEN", 0));
     }
 
     @Override
@@ -235,11 +341,7 @@ public class JdbcImportRepository implements ImportRepository {
                 if (!ergebnis.next()) {
                     return Optional.empty();
                 }
-                JsonNode spalten = JSON.readTree(ergebnis.getString("spalten"));
-                Map<String, Integer> felder = new LinkedHashMap<>();
-                spalten.path("felder").properties().forEach(e -> felder.put(e.getKey(), e.getValue().asInt()));
-                String profil = spalten.path("profil").isTextual() ? spalten.path("profil").asText() : null;
-                return Optional.of(new GespeicherteZuordnung(art, new Zuordnung(profil, felder),
+                return Optional.of(new GespeicherteZuordnung(art, zuordnungAus(JSON.readTree(ergebnis.getString("spalten"))),
                         ergebnis.getString("kopf_hash"), ergebnis.getTimestamp("geaendert").toInstant()));
             }
         } catch (SQLException | JsonProcessingException e) {
@@ -252,15 +354,7 @@ public class JdbcImportRepository implements ImportRepository {
         String sql = "insert into " + schema() + ".import_zuordnung (art, spalten, kopf_hash, geaendert) "
                 + "values (?, cast(? as jsonb), ?, ?) on conflict (art) do update set spalten = excluded.spalten, "
                 + "kopf_hash = excluded.kopf_hash, geaendert = excluded.geaendert";
-        ObjectNode spalten = JSON.createObjectNode();
-        if (zuordnung.zuordnung().profil() == null) {
-            spalten.putNull("profil");
-        } else {
-            spalten.put("profil", zuordnung.zuordnung().profil());
-        }
-        ObjectNode felder = spalten.putObject("felder");
-        zuordnung.zuordnung().felder().entrySet().stream().sorted(Map.Entry.comparingByKey())
-                .forEach(e -> felder.put(e.getKey(), e.getValue()));
+        ObjectNode spalten = zuordnungJson(zuordnung.zuordnung());
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement speichern = verbindung.prepareStatement(sql)) {
             speichern.setString(1, zuordnung.art().code());
@@ -271,6 +365,27 @@ public class JdbcImportRepository implements ImportRepository {
         } catch (SQLException e) {
             throw new IllegalStateException("Import-Zuordnung nicht gespeichert", e);
         }
+    }
+
+    /** {@code {"profil": …, "felder": {feld: spalte, …}}}, Felder sortiert (gleiche Zuordnung, gleicher Text). */
+    private static ObjectNode zuordnungJson(Zuordnung zuordnung) {
+        ObjectNode spalten = JSON.createObjectNode();
+        if (zuordnung.profil() == null) {
+            spalten.putNull("profil");
+        } else {
+            spalten.put("profil", zuordnung.profil());
+        }
+        ObjectNode felder = spalten.putObject("felder");
+        zuordnung.felder().entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .forEach(e -> felder.put(e.getKey(), e.getValue()));
+        return spalten;
+    }
+
+    private static Zuordnung zuordnungAus(JsonNode spalten) {
+        Map<String, Integer> felder = new LinkedHashMap<>();
+        spalten.path("felder").properties().forEach(e -> felder.put(e.getKey(), e.getValue().asInt()));
+        String profil = spalten.path("profil").isTextual() ? spalten.path("profil").asText() : null;
+        return new Zuordnung(profil, felder);
     }
 
     private String schema() {

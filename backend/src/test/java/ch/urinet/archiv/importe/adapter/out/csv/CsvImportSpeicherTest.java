@@ -190,7 +190,7 @@ class CsvImportSpeicherTest {
             ObjectMapper json = new ObjectMapper();
             try (JsonRepository repository = new JsonRepository(json, Path.of(args[1]).resolve("zeilen.jsonl"))) {
                 CsvImport csvImport = new CsvImport(new CommonsCsvLeser(), repository,
-                        new ImportEinstellungen(MAX_GROESSE, FELD_GRENZE));
+                        new ImportEinstellungen(MAX_GROESSE, FELD_GRENZE), laufId -> { });
                 CsvImport.Hochgeladen hochgeladen = csvImport.hochladen(ImportArt.KONTAKT, false, "messung.csv",
                         Path.of(args[0]), "inhaber");
                 String antwort = json.writeValueAsString(Map.of("kopf", hochgeladen.lauf().kopf().namen(),
@@ -326,6 +326,25 @@ class CsvImportSpeicherTest {
 
         @Override
         public void zeilenAktualisieren(UUID laufId, List<ImportZeile> zeilen) {
+        }
+
+        @Override
+        public void abgleichSchreiben(UUID laufId, List<Abgeglichen> zeilen) {
+        }
+
+        @Override
+        public int doppelteMarkieren(UUID laufId, String meldung) {
+            return 0;
+        }
+
+        @Override
+        public ImportLauf.Zaehler zaehlen(UUID laufId) {
+            return new ImportLauf.Zaehler(0, 0, 0, 0, 0, 0);
+        }
+
+        @Override
+        public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+            return List.of();
         }
 
         @Override

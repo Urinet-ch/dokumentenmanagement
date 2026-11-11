@@ -19,8 +19,10 @@ model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/eingangskorb-seite.ts
 model/import-hochgeladen.ts
+model/import-lauf-mit-zeilen.ts
 model/import-lauf.ts
 model/import-spalte.ts
+model/import-zeile.ts
 model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
