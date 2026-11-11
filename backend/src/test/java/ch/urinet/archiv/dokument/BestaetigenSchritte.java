@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -84,8 +85,9 @@ public class BestaetigenSchritte {
     @ConfigProperty(name = "archiv.ablage.bucket-praefix")
     String bucketPraefix;
 
+    // nur über Compose Dev Services gesetzt; als Pflichtwert bräche er die Starttests ohne Dev Services (prod)
     @ConfigProperty(name = "archiv.entwicklung.mailpit-port")
-    int mailpitPort;
+    Optional<Integer> mailpitPort;
 
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
     private final Map<String, Ort> kontakte = new LinkedHashMap<>();
@@ -394,12 +396,13 @@ public class BestaetigenSchritte {
     @Dann("hat der Inhaber eine Mail zur gescheiterten Archivierung von «{word}» erhalten, die nur IDs nennt")
     public void mail(String name) throws SQLException {
         Ort ort = ort(name);
-        Response nachrichten = given().baseUri("http://localhost:" + mailpitPort)
+        String mailpit = "http://localhost:" + mailpitPort.orElseThrow();
+        Response nachrichten = given().baseUri(mailpit)
                 .queryParam("query", "subject:\"" + ort.id() + "\"").when().get("/api/v1/search");
         assertThat(nachrichten.statusCode()).isEqualTo(200);
         List<String> ids = nachrichten.jsonPath().getList("messages.ID");
         assertThat(ids).as(nachrichten.asString()).hasSize(1);
-        Response nachricht = given().baseUri("http://localhost:" + mailpitPort).when()
+        Response nachricht = given().baseUri(mailpit).when()
                 .get("/api/v1/message/" + ids.getFirst());
         assertThat(nachricht.jsonPath().<String>getList("To.Address")).containsExactly("inhaber@example.invalid");
         String text = nachricht.jsonPath().getString("Text");

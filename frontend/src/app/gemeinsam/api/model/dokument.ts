@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Warnung } from './warnung';
 
 
 /**
@@ -41,6 +42,10 @@ export interface Dokument {
      * Version für If-Match (auch als ETag)
      */
     version: number;
+    /**
+     * Nur im Eingangskorb, sonst leer (Req 8.10)
+     */
+    warnungen: Array<Warnung>;
 }
 export namespace Dokument {
     export const QuelleEnum = {
