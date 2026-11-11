@@ -53,7 +53,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>
  * Req 10.2: Jede Methode, deren Aktion in der Tabelle «Protokoll und Manifest» (design.md) steht, trägt
  * {@link Protokolliert} mit der passenden Protokoll-Aktion ({@link #erwartetesProtokoll}); ausgenommen sind Listen und
- * Suchen ohne {@code {id}} (A2–A4), der Eingangskorb (A5) und A11–A14 (dort protokolliert nur {@code VERWEIGERT}).
+ * Suchen ohne {@code {id}} (A2–A4; bei A6 und A8 nur lesend per {@code GET}, z. B. die Partnerauswahl
+ * {@code GET /kontakte}), der Eingangskorb (A5) und A11–A14 (dort protokolliert nur {@code VERWEIGERT}).
  * <p>
  * Req 2.5: {@link ErlaubtScope} steht nur an {@code POST /dokumente} ({@code import}) und
  * {@code POST /dokumente/generator} ({@code generator}), beide mit A1; {@code @RolesAllowed} nennt dort zusätzlich die
@@ -118,6 +119,8 @@ class EndpunktWaechterTest {
         assertThat(verstoesse(ScopeRolleOhneErklaerung.class)).singleElement().asString().contains("@RolesAllowed");
         assertThat(verstoesse(IdMitRegex.class)).singleElement().asString()
                 .contains("A2 verlangt @Protokolliert(HERUNTERLADEN) statt ANZEIGEN");
+        assertThat(verstoesse(AendernOhneIdOhneProtokoll.class)).singleElement().asString()
+                .contains("A6 verlangt @Protokolliert(AENDERN) statt keiner");
         assertThat(verstoesse(Korrekt.class)).isEmpty();
         assertThat(verstoesse(KorrektMitScope.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
@@ -180,7 +183,8 @@ class EndpunktWaechterTest {
                 continue;
             }
             Optional<ProtokollAktion> protokoll = aktion == null ? Optional.empty()
-                    : erwartetesProtokoll(aktion.value(), pfad);
+                    : erwartetesProtokoll(aktion.value(), pfad,
+                    deklarationen.stream().anyMatch(m -> m.isAnnotationPresent(GET.class)));
             Protokolliert erklaert = Optional.ofNullable(methode.getAnnotation(Protokolliert.class))
                     .orElse(ressource.getAnnotation(Protokolliert.class));
             if (protokoll.isPresent() && (erklaert == null || erklaert.aktion() != protokoll.get())) {
@@ -215,15 +219,18 @@ class EndpunktWaechterTest {
                 ? ohneDoppelte.substring(0, ohneDoppelte.length() - 1) : ohneDoppelte;
     }
 
-    /** Protokoll-Aktion nach der Tabelle in design.md «Protokoll und Manifest»; leer, wo nicht einzeln protokolliert. */
-    static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad) {
+    /**
+     * Protokoll-Aktion nach der Tabelle in design.md «Protokoll und Manifest»; leer, wo nicht einzeln protokolliert
+     * (Listen und Suchen ohne Dokumentbezug, auch {@code GET} ohne {@code {id}} bei A6/A8).
+     */
+    static Optional<ProtokollAktion> erwartetesProtokoll(Aktion aktion, String pfad, boolean lesend) {
         boolean mitId = DOKUMENT_ID.matcher(pfad).find();
         return Optional.ofNullable(switch (aktion) {
             case A1 -> ProtokollAktion.ERFASSEN;
             case A2, A3, A4 -> !mitId ? null
                     : HERUNTERLADEN.matcher(pfad).matches() ? ProtokollAktion.HERUNTERLADEN
                     : ProtokollAktion.ANZEIGEN;
-            case A6, A8 -> ProtokollAktion.AENDERN;
+            case A6, A8 -> !mitId && lesend ? null : ProtokollAktion.AENDERN;
             case A7 -> ProtokollAktion.BESTAETIGEN;
             case A9 -> ProtokollAktion.VERWERFEN;
             case A10 -> ProtokollAktion.WIEDERHOLEN;
@@ -413,6 +420,15 @@ class EndpunktWaechterTest {
         }
     }
 
+    static class AendernOhneIdOhneProtokoll {
+        @PATCH
+        @Path("/kontakte")
+        @ErfordertAktion(Aktion.A6)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        public void aendern() {
+        }
+    }
+
     static class Korrekt {
         @PUT
         @ErfordertAktion(Aktion.A11)
@@ -441,6 +457,13 @@ class EndpunktWaechterTest {
         @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
         @Protokolliert(aktion = ProtokollAktion.HERUNTERLADEN)
         public void herunterladen() {
+        }
+
+        @GET
+        @Path("/kontakte")
+        @ErfordertAktion(Aktion.A6)
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        public void partnerSuchen() {
         }
 
         @GET
