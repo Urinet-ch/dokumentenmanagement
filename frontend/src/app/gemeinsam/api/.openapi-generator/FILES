@@ -14,6 +14,7 @@ model/api-token-neu.ts
 model/api-token.ts
 model/auszug-teil.ts
 model/bestaetigung.ts
+model/dokument-aenderung.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts

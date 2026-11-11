@@ -305,6 +305,138 @@ components:
           items:
             $ref: "#/components/schemas/Warnung"
           description: "Nur im Eingangskorb, sonst leer (Req 8.10)"
+    DokumentAenderung:
+      description: "Änderung der Metadaten (A6, Aufgabe 3.5). Nur die angegebenen\
+        \ Felder ändern sich; null oder ein leerer Text leert ein Feld (tags: null\
+        \ → keine Tags). Unbekannte Felder → 400. Finanz- und Vertragsfelder nur,\
+        \ wenn die Art die Gruppe hat."
+      type: object
+      properties:
+        art:
+          type:
+          - string
+          - "null"
+          description: Code einer aktiven Dokumentart; bei ARCHIVIERT nicht leer
+        titel:
+          type:
+          - string
+          - "null"
+        datum:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
+        partnerId:
+          description: ID eines Kontakts des Mandanten
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        projekt:
+          type:
+          - string
+          - "null"
+        tags:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+        vertraulichkeit:
+          type: string
+          description: Nur mit Recht A8 (sonst 403 für die ganze Änderung); nicht
+            leer
+          enum:
+          - NORMAL
+          - INTERN
+          - PERSONAL
+        personBenutzer:
+          type:
+          - string
+          - "null"
+          description: Nur mit Recht A8 (sonst 403 für die ganze Änderung)
+        geschaeftsjahr:
+          type:
+          - integer
+          - "null"
+          format: int32
+        belegnummer:
+          type:
+          - string
+          - "null"
+        richtung:
+          type:
+          - string
+          - "null"
+          enum:
+          - EINNAHME
+          - AUSGABE
+        betrag:
+          type:
+          - number
+          - "null"
+        waehrung:
+          type: string
+          description: ISO 4217; nicht leer
+        faelligkeit:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
+        qrReferenz:
+          type:
+          - string
+          - "null"
+        konto:
+          type:
+          - string
+          - "null"
+        gueltigAb:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
+        kuendigungsfrist:
+          type:
+          - string
+          - "null"
+        naechsteFrist:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
+        zusatz:
+          description: Zusatzfelder nach dem Schema der Art; ersetzt die bisherigen
+            vollständig
+          type:
+          - object
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/JsonObjekt"
+          - type: "null"
+        grund:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          description: Grund der Änderung; bei ARCHIVIERT Pflicht (Req 10.1)
     Dokumentart:
       type: object
       required:
@@ -1287,6 +1419,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokument"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+    patch:
+      summary: Metadaten eines Dokuments ändern
+      description: "Nur in EINGANGSKORB, FEHLER und ARCHIVIERT (sonst 409 STATUS_KONFLIKT).\
+        \ Vertraulichkeit oder personBenutzer ohne Recht A8 → 403 für die ganze Ä\
+        nderung. Bei ARCHIVIERT ist grund Pflicht (422 PFLICHTFELD_FEHLT), die vorherige\
+        \ Fassung geht nach dokument_version, kein Pflichtfeld der Art darf neu fehlen,\
+        \ und eine Änderung von datum, art, geschaeftsjahr oder gueltigBis berechnet\
+        \ die Aufbewahrungsfrist neu: Frist und Sperre werden nur verlängert, ein\
+        \ früheres Ergebnis bei gesperrten Dokumenten als SPERRE_KONFLIKT protokolliert\
+        \ (Req 9.7, 10.1). Ungültige Zusatzfelder → 422 ZUSATZ_UNGUELTIG; Partner\
+        \ unbekannt → 422 PARTNER_UNBEKANNT; Belegnummer einer eigenen Art schon vergeben\
+        \ → 409 BELEGNUMMER_VERGEBEN."
+      tags:
+      - Dokumente
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DokumentAenderung"
+        required: true
+      responses:
+        "200":
+          description: Geändertes Dokument
+          headers:
+            ETag:
+              description: Neue Version des Dokuments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dokument"
+        "412":
+          description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
+        "428":
+          description: If-Match fehlt (VERSION_FEHLT)
         "401":
           description: Not Authorized
         "403":

@@ -121,7 +121,7 @@ public class DokumentSchritte {
 
     @Dann("antwortet der Dokument-Endpunkt mit Status {int} und Fehlercode «{word}»")
     public void fehlercode(int status, String fehlercode) {
-        assertThat(ProblemDetails.pruefen(antwort, status)).as(antwort.asString()).isEqualTo(fehlercode);
+        assertThat(ProblemDetails.pruefen(antwort, status, "felder")).as(antwort.asString()).isEqualTo(fehlercode);
     }
 
     /** Werte als Text; {@code null} heisst fehlend oder JSON-null. */
@@ -242,12 +242,11 @@ public class DokumentSchritte {
     }
 
     private void zusatzSetzen(String benutzer, String name, int version, String zusatz, String grund) {
-        Map<String, Object> koerper = new HashMap<>();
-        koerper.put("zusatz", zusatz);
-        koerper.put("grund", grund);
+        String koerper = "{\"zusatz\": " + zusatz
+                + (grund == null ? "" : ", \"grund\": \"" + grund + "\"") + "}";
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
                 .header("If-Match", "\"" + version + "\"").body(koerper)
-                .when().patch("/api/v1/probe/dokumente/" + id(name) + "/zusatz");
+                .when().patch("/api/v1/dokumente/" + id(name));
     }
 
     private int version(String name) throws SQLException {

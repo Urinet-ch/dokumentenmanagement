@@ -8,15 +8,11 @@ import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
-import ch.urinet.archiv.gemeinsam.domain.FachFehler;
-import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.persistence.OptimisticLockException;
 
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -30,16 +26,6 @@ import java.util.UUID;
  */
 @ApplicationScoped
 public class PanacheDokumentRepository implements DokumentRepository {
-
-    /** Vorherige Fassung der Metadaten als JSON (Req 10.1); Volltext und Suchvektor sind keine Metadaten. */
-    private static final String VERSION_SICHERN = """
-            insert into dokument_version (dokument_id, version, daten, geaendert_von, grund)
-            select d.id, d.version, jsonb_build_object(
-                'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
-                'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
-                'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
-                :benutzer, :grund
-            from dokument d where d.id = :id""";
 
     /**
      * Sperrt die Prüfsumme im Schema des Mandanten bis zum Ende der Transaktion; zwei gleichzeitige Uploads derselben
@@ -120,31 +106,6 @@ public class PanacheDokumentRepository implements DokumentRepository {
     @Override
     public long anzahlMitArt(String art) {
         return DokumentEintrag.count("art", art);
-    }
-
-    @Override
-    public int zusatzSpeichern(UUID id, int erwarteteVersion, String zusatzJson, String benutzer, String grund,
-                               boolean versionSichern) {
-        DokumentEintrag eintrag = DokumentEintrag.findById(id);
-        if (eintrag == null) {
-            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
-        }
-        if (eintrag.version != erwarteteVersion) {
-            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
-        }
-        if (versionSichern) {
-            DokumentEintrag.getEntityManager().createNativeQuery(VERSION_SICHERN)
-                    .setParameter("id", id).setParameter("benutzer", benutzer).setParameter("grund", grund)
-                    .executeUpdate();
-        }
-        eintrag.zusatz = zusatzJson;
-        eintrag.geaendert = OffsetDateTime.now(ZoneOffset.UTC);
-        try {
-            DokumentEintrag.flush();
-        } catch (OptimisticLockException e) {
-            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
-        }
-        return eintrag.version;
     }
 
     @Override

@@ -4,6 +4,7 @@ export * from './api-token-neu';
 export * from './auszug-teil';
 export * from './bestaetigung';
 export * from './dokument';
+export * from './dokument-aenderung';
 export * from './dokumentart';
 export * from './dokumentart-aenderung';
 export * from './eingangskorb-seite';

@@ -31,16 +31,6 @@ public interface DokumentRepository {
     long anzahlMitArt(String art);
 
     /**
-     * Ersetzt die Zusatzfelder, wenn die Version noch {@code erwarteteVersion} ist, sonst 412 {@code VERSION_KONFLIKT}.
-     * Mit {@code versionSichern} geht die vorherige Fassung mit Benutzer und Grund nach {@code dokument_version}
-     * (Req 10.1).
-     *
-     * @return die neue Version
-     */
-    int zusatzSpeichern(UUID id, int erwarteteVersion, String zusatzJson, String benutzer, String grund,
-                        boolean versionSichern);
-
-    /**
      * Sperrt die Prüfsumme bis zum Ende der Transaktion (gleichzeitige Uploads derselben Datei warten aufeinander) und
      * liefert das nicht verworfene Dokument, zu dem sie schon als Original gehört (Req 3.4), ohne Sichtregel.
      */

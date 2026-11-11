@@ -17,6 +17,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -81,6 +82,12 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             knoten.put("dokumentart", details.regelAenderung().dokumentart());
             regel(knoten.putObject("alt"), details.regelAenderung().alt());
             regel(knoten.putObject("neu"), details.regelAenderung().neu());
+        }
+        if (details.fristKonflikt() != null) {
+            // null heisst unbefristet
+            ObjectNode frist = knoten.putObject("frist");
+            frist.put("bisher", Objects.toString(details.fristKonflikt().bisher(), null));
+            frist.put("neu", Objects.toString(details.fristKonflikt().neu(), null));
         }
         try {
             return JSON.writeValueAsString(knoten);

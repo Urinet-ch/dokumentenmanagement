@@ -36,6 +36,7 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -52,8 +53,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Schritte zu Aufgabe 3.4 (Req 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6–6.8, 6.13, 8.2, 8.3, 8.5, 8.8–8.10, 9.8):
- * Bestätigen, Verwerfen, Wiederholen über die REST-Schnittstelle und {@code ARCHIVIEREN} über den Worker. Dokumente
+ * Schritte zu Aufgabe 3.4 (Req 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6–6.8, 6.13, 8.2, 8.3, 8.5, 8.8–8.10, 9.8)
+ * und 3.5 (Req 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6): Bestätigen, Verwerfen, Wiederholen und Ändern über die
+ * REST-Schnittstelle und {@code ARCHIVIEREN} über den Worker. Dokumente
  * liegen wie nach der Verarbeitung mit Original und PDF/A unter {@code eingang/}; nur synthetische Inhalte (Req 16.15).
  */
 public class BestaetigenSchritte {
@@ -92,6 +94,7 @@ public class BestaetigenSchritte {
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
     private final Map<String, Ort> kontakte = new LinkedHashMap<>();
     private final Map<UUID, String> echtePruefsumme = new HashMap<>();
+    private final Map<String, Instant> gemerkteSperren = new HashMap<>();
     private Response antwort;
 
     @After
@@ -114,6 +117,7 @@ public class BestaetigenSchritte {
         dokumente.clear();
         kontakte.clear();
         echtePruefsumme.clear();
+        gemerkteSperren.clear();
     }
 
     @Angenommen("die Archivierung ist bereit")
@@ -242,6 +246,113 @@ public class BestaetigenSchritte {
     public void wiederholenVeraltet(String benutzer, String name) throws SQLException {
         antwort = mitVeralteterVersion(benutzer, name)
                 .when().post("/api/v1/dokumente/" + ort(name).id() + "/wiederholen");
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» so ändert:")
+    public void aendern(String benutzer, String name, Map<String, String> felder) throws SQLException {
+        antwort = mitVersion(benutzer, name).contentType(ContentType.JSON).body(body(felder))
+                .when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» ohne If-Match ändert")
+    public void aendernOhneIfMatch(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of("titel", "Neu")).when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» mit einer veralteten Version ändert")
+    public void aendernVeraltet(String benutzer, String name) throws SQLException {
+        antwort = mitVeralteterVersion(benutzer, name).contentType(ContentType.JSON).body(Map.of("titel", "Neu"))
+                .when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» mit dem Körper {string} ändert")
+    public void aendernRoh(String benutzer, String name, String koerper) throws SQLException {
+        antwort = mitVersion(benutzer, name).contentType(ContentType.JSON).body(koerper)
+                .when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
+    /**
+     * Merkt die Sperren unter {@code archiv/} und wartet bis in die nächste Sekunde: S3 speichert Sekunden, und mit
+     * der Höchstfrist der Tests (P1D) ist eine Verlängerung nur so von der bisherigen Sperre zu unterscheiden.
+     */
+    @Angenommen("die Sperren der Dateien von «{word}» sind gemerkt")
+    public void sperrenMerken(String name) throws Exception {
+        Ort ort = ort(name);
+        for (String[] datei : archivDateien(ort)) {
+            gemerkteSperren.put(datei[0], sperre(ort, datei));
+        }
+        assertThat(gemerkteSperren).isNotEmpty();
+        Thread.sleep(1100);
+    }
+
+    @Dann("sind die Sperren der Dateien von «{word}» verlängert")
+    public void sperrenVerlaengert(String name) throws SQLException {
+        Ort ort = ort(name);
+        for (String[] datei : archivDateien(ort)) {
+            assertThat(sperre(ort, datei)).as(datei[0]).isAfter(gemerkteSperren.get(datei[0]));
+        }
+    }
+
+    @Dann("sind die Sperren der Dateien von «{word}» unverändert")
+    public void sperrenUnveraendert(String name) throws SQLException {
+        Ort ort = ort(name);
+        for (String[] datei : archivDateien(ort)) {
+            assertThat(sperre(ort, datei)).as(datei[0]).isEqualTo(gemerkteSperren.get(datei[0]));
+        }
+    }
+
+    @Dann("hat das Dokument «{word}» {int} Fassung(en) mit Grund")
+    public void fassungen(String name, int anzahl) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".dokument_version where dokument_id = ? and grund is not null", ort.id()).get("anzahl")).intValue())
+                .isEqualTo(anzahl);
+    }
+
+    @Dann("hält die letzte Fassung von «{word}» den Titel {string} mit dem Grund {string} von «{word}» fest")
+    public void letzteFassung(String name, String titel, String grund, String benutzer) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> fassung = zeile("select daten -> 'dokument' ->> 'titel' as titel, grund, geaendert_von, "
+                + "version from " + schema(ort.mandant()) + ".dokument_version where dokument_id = ? "
+                + "order by version desc limit 1", ort.id());
+        assertThat(fassung.get("titel")).isEqualTo(titel);
+        assertThat(fassung.get("grund")).isEqualTo(grund);
+        assertThat(fassung.get("geaendert_von")).isEqualTo(Testanmeldung.sub(benutzer));
+        assertThat(((Number) fassung.get("version")).intValue())
+                .isLessThan(((Number) spalte(ort, "version")).intValue());
+    }
+
+    @Dann("steht im Zugriffsprotokoll für «{word}» {int} Mal «{word}» von «{word}»")
+    public void protokolliert(String name, int anzahl, String aktion, String benutzer) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".zugriff_protokoll where dokument_id = ? and aktion = ? and benutzer = ?", ort.id(), aktion,
+                Testanmeldung.sub(benutzer)).get("anzahl")).intValue()).isEqualTo(anzahl);
+    }
+
+    /** Req 9.7: nur die beiden Fristen, keine Werte des Dokuments (Req 10.2). */
+    @Dann("hält das Zugriffsprotokoll für «{word}» «SPERRE_KONFLIKT» von «{word}» mit der Frist bisher «{word}» und neu «{word}» fest")
+    public void sperrKonflikt(String name, String benutzer, String bisher, String neu) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> eintrag = zeile("select count(*) over () as anzahl, benutzer, "
+                + "details -> 'frist' ->> 'bisher' as bisher, details -> 'frist' ->> 'neu' as neu, "
+                + "(select string_agg(k, ',' order by k) from jsonb_object_keys(details) k) as schluessel from "
+                + schema(ort.mandant()) + ".zugriff_protokoll where dokument_id = ? and aktion = 'SPERRE_KONFLIKT'",
+                ort.id());
+        assertThat(((Number) eintrag.get("anzahl")).intValue()).isEqualTo(1);
+        assertThat(eintrag.get("benutzer")).isEqualTo(Testanmeldung.sub(benutzer));
+        assertThat(eintrag.get("bisher")).isEqualTo(bisher);
+        assertThat(eintrag.get("neu")).isEqualTo(neu);
+        assertThat(eintrag.get("schluessel")).isEqualTo("frist");
+    }
+
+    @Dann("hält das Zugriffsprotokoll für «{word}» kein «SPERRE_KONFLIKT» fest")
+    public void keinSperrKonflikt(String name) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'SPERRE_KONFLIKT'", ort.id())
+                .get("anzahl")).intValue()).isZero();
     }
 
     @Wenn("der Worker die Archivierung ausführt")
@@ -483,8 +594,10 @@ public class BestaetigenSchritte {
 
     private Map<String, Object> body(Map<String, String> felder) {
         Map<String, Object> body = new LinkedHashMap<>();
-        felder.forEach((feld, wert) -> body.put(feld.equals("partner") ? "partnerId" : feld, switch (feld) {
+        felder.forEach((feld, wert) -> body.put(feld.equals("partner") ? "partnerId" : feld, wert == null ? null
+                : switch (feld) {
             case "partner" -> kontakte.get(wert).id();
+            case "tags" -> Arrays.asList(wert.split(",\\s*"));
             case "betrag" -> new BigDecimal(wert);
             case "geschaeftsjahr" -> Integer.valueOf(wert);
             case "ohnePdfa", "fristAbgelaufenAkzeptiert" -> "ja".equals(wert);
@@ -503,6 +616,11 @@ public class BestaetigenSchritte {
             dateien.add(new String[]{(String) spalte(ort, "s3_pdfa"), (String) spalte(ort, "s3_version_pdfa")});
         }
         return dateien;
+    }
+
+    private Instant sperre(Ort ort, String[] datei) {
+        return s3.getObjectRetention(b -> b.bucket(bucket(ort.mandant())).key(datei[0]).versionId(datei[1]))
+                .retention().retainUntilDate();
     }
 
     private static String fehlerId(String fehlertext) {
