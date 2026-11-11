@@ -13,6 +13,7 @@ import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
+import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.annotation.PreDestroy;
@@ -23,6 +24,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
@@ -46,7 +48,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -450,6 +454,78 @@ public class S3Ablage implements AblagePort {
     private void versionLoeschen(String bucket, String key, String versionId) {
         s3.deleteObject(b -> b.bucket(bucket).key(key).versionId(versionId));
         LOG.debugf("Version gelöscht: %s (Version %s)", key, versionId);
+    }
+
+    @Override
+    public void lesenEingang(MandantCode mandant, DateiSchluessel schluessel, String versionId, String sha256,
+                             Path ziel) {
+        if (versionId == null || versionId.isBlank()) {
+            throw new IllegalArgumentException("Lesen aus dem Eingang nur mit Versions-ID");
+        }
+        String bucket = bucket(mandant);
+        String key = schluessel.pfad(Ablageort.EINGANG);
+        // ganz in eine Datei innerhalb des Aufrufs: apiCallTimeout begrenzt so auch das Lesen des Inhalts
+        s3.getObject(b -> b.bucket(bucket).key(key).versionId(versionId), ResponseTransformer.toFile(ziel));
+        String gelesen = pruefsumme(ziel, key);
+        if (!gelesen.equals(sha256)) {
+            loeschenTemp(ziel);
+            throw new IllegalStateException("Prüfsumme weicht ab: " + key + " (Version " + versionId + ")");
+        }
+        LOG.debugf("Eingang gelesen: %s (Version %s)", key, versionId);
+    }
+
+    @Override
+    public AbgelegteDatei ablegenVorschau(MandantCode mandant, UUID docId, int seite, Path datei) {
+        String bucket = bucket(mandant);
+        String key = Vorschau.schluessel(docId, seite);
+        String sha256 = pruefsumme(datei, key);
+        long groesse;
+        try {
+            groesse = Files.size(datei);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Vorschau nicht lesbar: " + key, e);
+        }
+        String versionId = s3.putObject(b -> b.bucket(bucket).key(key).contentType("image/png"),
+                RequestBody.fromFile(datei)).versionId();
+        pruefeVersion(versionId, bucket);
+        LOG.debugf("Vorschau abgelegt: %s (Version %s)", key, versionId);
+        return new AbgelegteDatei(key, versionId, sha256, groesse, Optional.empty());
+    }
+
+    @Override
+    public int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten) {
+        String bucket = bucket(mandant);
+        String pdfa = DateiSchluessel.pdfa(jahr, docId).pfad(Ablageort.EINGANG);
+        Set<String> bleiben = new HashSet<>();
+        behalten.forEach(d -> bleiben.add(d.schluessel() + "\n" + d.versionId()));
+        List<String[]> loeschen = new ArrayList<>();
+        for (String praefix : List.of(pdfa, Vorschau.ordner(docId))) {
+            for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).prefix(praefix))) {
+                seite.versions().forEach(v -> loeschen.add(new String[]{v.key(), v.versionId()}));
+                seite.deleteMarkers().forEach(m -> loeschen.add(new String[]{m.key(), m.versionId()}));
+            }
+        }
+        int anzahl = 0;
+        for (String[] version : loeschen) {
+            boolean abgeleitet = version[0].equals(pdfa) || version[0].startsWith(Vorschau.ordner(docId));
+            if (!abgeleitet || bleiben.contains(version[0] + "\n" + version[1])) {
+                continue;
+            }
+            versionLoeschen(bucket, version[0], version[1]);
+            anzahl++;
+        }
+        LOG.debugf("Abgeleitete Dateien bereinigt: %s (%d Versionen)", docId, anzahl);
+        return anzahl;
+    }
+
+    private static String pruefsumme(Path datei, String key) {
+        MessageDigest digest = Pruefsumme.sha256();
+        try (InputStream ein = new DigestInputStream(Files.newInputStream(datei), digest)) {
+            ein.transferTo(OutputStream.nullOutputStream());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Datei nicht lesbar: " + key, e);
+        }
+        return Pruefsumme.hex(digest);
     }
 
     private Lesung lesen(String bucket, String key, String versionId) {

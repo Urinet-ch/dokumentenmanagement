@@ -13,10 +13,12 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +44,13 @@ public final class TestHandler {
      * {@link #sturFreigeben()} (höchstens nach 30 s), dann erfolgreich.
      */
     public static final AuftragTyp HOOK_STUR = new AuftragTyp("TEST_HOOK_STUR");
+    /**
+     * Platzhalter für {@code KI_VORSCHLAG}, bis Aufgabe 3.2 den echten Handler bringt (dann entfällt er): merkt sich nur
+     * die Dokument-IDs, damit die Tests zu {@code VERARBEITEN} den Folgeauftrag sehen.
+     */
+    public static final AuftragTyp KI_VORSCHLAG = new AuftragTyp("KI_VORSCHLAG");
+    /** Dokument-IDs aus den Nutzlasten von {@code KI_VORSCHLAG}, in der Reihenfolge der Ausführung. */
+    public static final List<UUID> KI_DOKUMENTE = new CopyOnWriteArrayList<>();
     /** Steht in der Meldung der Ausnahme von {@code TEST_FEHLER}; darf nie im Log oder im Auftrag landen (Req 16.7). */
     public static final String GEHEIM = "geheimer-belegwert-4711";
 
@@ -91,6 +100,7 @@ public final class TestHandler {
         HOOK_STUR_AUFRUFE.set(0);
         HOOK_STUR_JETZT.set(0);
         HOOK_STUR_HOECHSTENS.set(0);
+        KI_DOKUMENTE.clear();
     }
 
     /** Lässt alle laufenden {@code TEST_STUR}-Handler enden. */
@@ -254,6 +264,20 @@ public final class TestHandler {
             }
         }
         return unterbrochen;
+    }
+
+    @ApplicationScoped
+    public static class KiVorschlag implements AuftragHandler {
+
+        @Override
+        public AuftragTyp typ() {
+            return KI_VORSCHLAG;
+        }
+
+        @Override
+        public void ausfuehren(Auftrag auftrag) {
+            KI_DOKUMENTE.add(auftrag.nutzlast().uuid("dokumentId").orElseThrow());
+        }
     }
 
     @ApplicationScoped

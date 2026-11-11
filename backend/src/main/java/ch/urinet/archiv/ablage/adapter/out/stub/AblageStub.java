@@ -12,6 +12,7 @@ import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
+import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -26,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +160,59 @@ public class AblageStub implements AblagePort {
         }
         Instant bis = Sperrfrist.manifest(spaetestesAufbewahrenBis, Instant.now(), Optional.empty());
         return datei(key, speichern(mandant, key, inhalt, bis));
+    }
+
+    @Override
+    public synchronized void lesenEingang(MandantCode mandant, DateiSchluessel schluessel, String versionId,
+                                          String sha256, Path ziel) {
+        String key = schluessel.pfad(Ablageort.EINGANG);
+        Version v = liste(mandant, key).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Version fehlt: " + key));
+        if (!v.sha256().equals(sha256)) {
+            throw new IllegalStateException("Prüfsumme weicht ab: " + key);
+        }
+        try {
+            Files.copy(v.datei(), ziel);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public synchronized AbgelegteDatei ablegenVorschau(MandantCode mandant, UUID docId, int seite, Path datei) {
+        String key = Vorschau.schluessel(docId, seite);
+        try {
+            return datei(key, speichern(mandant, key, Files.readAllBytes(datei), null));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public synchronized int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId,
+                                                  Collection<AbgelegteDatei> behalten) {
+        String pdfa = mandant.wert() + "/" + DateiSchluessel.pdfa(jahr, docId).pfad(Ablageort.EINGANG);
+        String vorschau = mandant.wert() + "/" + Vorschau.ordner(docId);
+        int anzahl = 0;
+        for (var eintrag : versionen.entrySet()) {
+            String key = eintrag.getKey();
+            if (!key.equals(pdfa) && !key.startsWith(vorschau)) {
+                continue;
+            }
+            String schluessel = key.substring(mandant.wert().length() + 1);
+            var iterator = eintrag.getValue().iterator();
+            while (iterator.hasNext()) {
+                Version v = iterator.next();
+                boolean bleibt = behalten.stream().anyMatch(d -> d.schluessel().equals(schluessel)
+                        && d.versionId().equals(v.versionId()));
+                if (!bleibt) {
+                    loeschen(v.datei());
+                    iterator.remove();
+                    anzahl++;
+                }
+            }
+        }
+        return anzahl;
     }
 
     private Version speichern(MandantCode mandant, String key, byte[] daten, Instant sperreBis) {

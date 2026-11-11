@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
  * eine geänderte Stufe gelangt sicher in die Tests. Die Tests rufen die Werkzeuge darin per {@code docker run} auf
  * (Container-Modus), damit sie auf jedem Rechner mit Docker dieselben Versionen nutzen wie das Image der VPS.
  */
-final class WerkzeugImage {
+public final class WerkzeugImage {
 
     static final String NAME = "urinet-archiv-werkzeuge:test";
     private static boolean bereit;
@@ -18,7 +18,7 @@ final class WerkzeugImage {
     private WerkzeugImage() {
     }
 
-    static synchronized String sicherstellen() throws IOException, InterruptedException {
+    public static synchronized String sicherstellen() throws IOException, InterruptedException {
         if (bereit) {
             return NAME;
         }

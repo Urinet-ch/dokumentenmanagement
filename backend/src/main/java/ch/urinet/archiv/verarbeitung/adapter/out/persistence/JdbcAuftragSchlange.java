@@ -58,6 +58,12 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
      */
     static final int SPERR_WARTEZEIT_SEKUNDEN = 5;
 
+    /**
+     * Höchste Wartezeit von {@link #anspruchSperren}: Lebenszeichen und Aufräumer halten die Zeile nur kurz; danach
+     * gilt es als Fehler des Handlers (Pflicht (1) der Handler, Aufgabe 2.6).
+     */
+    static final int ANSPRUCH_WARTEZEIT_SEKUNDEN = 30;
+
     // lazy: ohne Datasource (z. B. Bereitschaftsprüfung) ist die Bean inaktiv
     private final Instance<AgroalDataSource> datenquelle;
 
@@ -256,6 +262,7 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
                 verbindung.prepareStatement("select 1 from public.auftrag" + ANSPRUCH + " for update")) {
             sperren.setLong(1, auftrag.id());
             sperren.setInt(2, auftrag.versuche());
+            sperren.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
             try (ResultSet zeile = sperren.executeQuery()) {
                 return zeile.next();
             }

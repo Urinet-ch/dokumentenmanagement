@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /** Prüft eine Datei mit veraPDF gegen PDF/A-2b (Req 5.1). */
-final class PdfaPruefung {
+public final class PdfaPruefung {
 
     static {
         VeraGreenfieldFoundryProvider.initialise();
@@ -21,7 +21,7 @@ final class PdfaPruefung {
     private PdfaPruefung() {
     }
 
-    static boolean istPdfa2b(Path pdf) throws Exception {
+    public static boolean istPdfa2b(Path pdf) throws Exception {
         try (VeraPDFFoundry foundry = Foundries.defaultInstance();
              InputStream ein = Files.newInputStream(pdf);
              PDFAParser parser = foundry.createParser(ein, PDFAFlavour.PDFA_2_B);

@@ -32,10 +32,15 @@ public class AuftragService {
 
     /** ID des neuen Auftrags; nur Typen mit Handler, sonst bliebe der Auftrag für immer offen. */
     public long einreihen(AuftragTyp typ, Nutzlast nutzlast) {
-        if (!verzeichnis.typen().contains(typ)) {
+        if (!hatHandler(typ)) {
             throw new IllegalArgumentException("Kein Handler für den Auftragstyp " + typ);
         }
         return schlange.einfuegen(mandant(), typ, nutzlast);
+    }
+
+    /** Ob für den Typ ein Handler besteht, also {@link #einreihen} ihn annimmt. */
+    public boolean hatHandler(AuftragTyp typ) {
+        return verzeichnis.typen().contains(typ);
     }
 
     /**
