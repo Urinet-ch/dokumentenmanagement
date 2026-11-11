@@ -1,7 +1,7 @@
 package ch.urinet.archiv.sicherheit.application;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
-import ch.urinet.archiv.gemeinsam.domain.Ursachenkette;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -91,7 +91,7 @@ public class ApiTokenPruefung {
             register.zuletztSetzen(id, jetzt);
         } catch (RuntimeException e) {
             LOG.warnf("Letzte Verwendung des API-Tokens nicht nachgeführt: id=%s ursache=%s", id,
-                    Ursachenkette.beschreiben(e));
+                    Ursachen.kette(e));
         }
     }
 
