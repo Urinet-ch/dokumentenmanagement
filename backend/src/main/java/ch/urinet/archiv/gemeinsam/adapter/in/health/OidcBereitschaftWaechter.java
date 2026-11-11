@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.Bereitschaftsfrist.Lage;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import io.quarkus.runtime.Startup;
 import io.quarkus.scheduler.Scheduled;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
@@ -16,6 +17,7 @@ import org.jboss.logging.Logger;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Selbstheilung der Readiness (entschieden von Fabian am 11.11.2026, PR #42 P42-1; design.md «Betrieb auf der VPS»):
@@ -25,6 +27,13 @@ import java.util.UUID;
  * Ist der Tenant {@code archiv.oidc.waechter.frist} lang nicht bereit, beendet sich die API darum mit
  * {@value #EXIT_CODE}, und {@code restart: unless-stopped} startet sie neu. Jeder Neustart beginnt die Frist neu
  * (mindestens {@link Bereitschaftsfrist#MINDESTFRIST}), das verhindert eine schnelle Schleife.
+ * <p>
+ * Gilt auch im Betrieb (Review PR #42, Runde 2, K2): Fällt Keycloak aus, meldet die Readiness DOWN und Traefik leitet
+ * nicht mehr an die API, das Archiv ist nicht erreichbar (auch nicht für API-Tokens). Dauert der Ausfall länger als die
+ * Frist, startet die API je Frist einmal neu; abgebrochene Aufträge wiederholt die Auftragsschlange.
+ * <p>
+ * Jede Prüfung hat ein Zeitlimit ({@code archiv.oidc.waechter.zeitlimit}, Review PR #42, Runde 2, K1): Antwortet
+ * Keycloak nicht, zählt die Prüfung als «nicht bereit», statt den Wächter anzuhalten.
  * <p>
  * Das Log nennt eine Fehler-ID und den festen Code {@value #FEHLERCODE} (für den Deploy-Workflow), nie Adressen oder
  * Meldungen. Ohne OIDC-Health-Check (z. B. im Kommando-Modus, Tenant aus) prüft der Wächter nichts.
@@ -44,11 +53,14 @@ public class OidcBereitschaftWaechter {
     private final ProzessEnde ende;
     private final Bereitschaftsfrist frist;
     private final boolean aktiv;
+    private final BegrenzterAufruf<Boolean> aufruf;
+    private final Duration zeitlimit;
     private volatile Optional<HealthCheck> oidc;
     private volatile boolean beendet;
 
     public OidcBereitschaftWaechter(@Any Instance<HealthCheck> checks, ProzessEnde ende,
                                     @ConfigProperty(name = "archiv.oidc.waechter.frist") Duration frist,
+                                    @ConfigProperty(name = "archiv.oidc.waechter.zeitlimit") Duration zeitlimit,
                                     @ConfigProperty(name = "quarkus.oidc.health.enabled") boolean health,
                                     @ConfigProperty(name = "quarkus.oidc.tenant-enabled", defaultValue = "true")
                                     boolean tenant) {
@@ -57,6 +69,13 @@ public class OidcBereitschaftWaechter {
         // bricht den Start bei einer zu kurzen Frist ab (Schleifenschutz)
         this.frist = new Bereitschaftsfrist(frist);
         this.aktiv = health && tenant;
+        this.aufruf = new BegrenzterAufruf<>("oidc-waechter-pruefung", zeitlimit);
+        this.zeitlimit = zeitlimit;
+    }
+
+    @PreDestroy
+    void beenden() {
+        aufruf.close();
     }
 
     @Scheduled(identity = "oidc-waechter", every = "${archiv.oidc.waechter.intervall}",
@@ -74,13 +93,7 @@ public class OidcBereitschaftWaechter {
         if (check.isEmpty()) {
             return Optional.empty();
         }
-        boolean bereit;
-        try {
-            bereit = check.get().call().getStatus() == HealthCheckResponse.Status.UP;
-        } catch (RuntimeException e) {
-            LOG.warnf("OIDC-Bereitschaft nicht prüfbar, ursache=%s", Ursachen.kette(e));
-            bereit = false;
-        }
+        boolean bereit = bereit(check.get());
         Lage lage = frist.melden(bereit, jetztNanos);
         if (lage == Lage.WARTEN && frist.zaehler() == 1) {
             LOG.warnf("fehlercode=%s: OIDC-Tenant nicht bereit; bleibt es %d s so, startet die API neu",
@@ -93,6 +106,23 @@ public class OidcBereitschaftWaechter {
             ende.beenden(EXIT_CODE);
         }
         return Optional.of(lage);
+    }
+
+    private boolean bereit(HealthCheck check) {
+        try {
+            Optional<Boolean> ergebnis = aufruf.ausfuehren(
+                    () -> check.call().getStatus() == HealthCheckResponse.Status.UP);
+            if (ergebnis.isEmpty()) {
+                LOG.warnf("OIDC-Bereitschaft nicht prüfbar: keine Antwort innerhalb von %d s", zeitlimit.toSeconds());
+            }
+            return ergebnis.orElse(false);
+        } catch (ExecutionException e) {
+            LOG.warnf("OIDC-Bereitschaft nicht prüfbar, ursache=%s", Ursachen.kette(e.getCause()));
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     private Optional<HealthCheck> oidcCheck() {
