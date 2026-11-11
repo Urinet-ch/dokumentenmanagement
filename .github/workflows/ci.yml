@@ -8,8 +8,9 @@ on:
   # ready_for_review startet den ersten Lauf, danach jeder Push (Entscheid Fabian 10.11.2026).
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
+  # Push auf main vorübergehend ohne CI (Entscheid Fabian 11.11.2026, Actions-Minuten bis 1.12.): Jeder PR steht vor dem
+  # Merge auf dem aktuellen main und hat dort eine grüne CI. Wieder einschalten: «push: branches: [main]» ergänzen.
+  workflow_dispatch:
 
 permissions:
   contents: read
