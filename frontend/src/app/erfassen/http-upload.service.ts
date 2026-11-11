@@ -1,25 +1,22 @@
-import { HttpClient, HttpErrorResponse, HttpEventType } from '@angular/common/http';
+import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, filter, map, of } from 'rxjs';
+import { DokumenteService } from '../gemeinsam/api';
 import { UploadEreignis, UploadErgebnis, UploadPort } from './upload-port';
 
 export const UPLOAD_PFAD = '/api/v1/dokumente';
 
-/** Multipart-Upload an POST /api/v1/dokumente mit Fortschritt (design.md «Upload»). */
+/**
+ * Multipart-Upload an POST /api/v1/dokumente mit Fortschritt (design.md «Upload») über den generierten OpenAPI-Client;
+ * der Dateiname reist im Multipart-Teil mit (File), «zusammenfassen» nur, wenn gewählt.
+ */
 @Injectable()
 export class HttpUploadService extends UploadPort {
-  private readonly http = inject(HttpClient);
+  private readonly dokumente = inject(DokumenteService);
 
   hochladen(dateien: readonly File[], zusammenfassen: boolean): Observable<UploadEreignis> {
-    const formular = new FormData();
-    for (const datei of dateien) {
-      formular.append('dateien', datei, datei.name);
-    }
-    if (zusammenfassen) {
-      formular.append('zusammenfassen', 'true');
-    }
-    return this.http
-      .post<UploadErgebnis[]>(UPLOAD_PFAD, formular, { observe: 'events', reportProgress: true })
+    return this.dokumente
+      .apiV1DokumentePost([...dateien], undefined, zusammenfassen ? true : undefined, undefined, 'events', true)
       .pipe(
         map((ereignis): UploadEreignis | null => {
           if (ereignis.type === HttpEventType.UploadProgress) {

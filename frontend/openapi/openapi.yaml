@@ -311,6 +311,53 @@ components:
       type: string
       format: uuid
       pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+    UploadErgebnis:
+      description: "Ergebnis einer Datei (Req 3.2, 3.4, 3.8)"
+      type: object
+      required:
+      - datei
+      - status
+      properties:
+        datei:
+          type: string
+          description: "Dateiname ohne Pfad, nur zur Anzeige"
+        status:
+          type: string
+          enum:
+          - NEU
+          - DUBLETTE
+          - ABGELEHNT
+        id:
+          description: Neues Dokument (bei NEU)
+          type: string
+          $ref: "#/components/schemas/UUID"
+        vorhandenId:
+          description: Vorhandenes Dokument (bei DUBLETTE); fehlt ohne Leserecht (Req
+            2.3)
+          type: string
+          $ref: "#/components/schemas/UUID"
+        meldung:
+          type: string
+          description: "«bereits vorhanden», wenn vorhandenId fehlt"
+        fehler:
+          description: Grund der Ablehnung (bei ABGELEHNT)
+          type: object
+          $ref: "#/components/schemas/UploadFehler"
+    UploadFehler:
+      type: object
+      description: Fehler einer einzelnen Datei als Auszug aus Problem Details
+      required:
+      - status
+      - fehlercode
+      - detail
+      properties:
+        status:
+          type: integer
+          format: int32
+        fehlercode:
+          type: string
+        detail:
+          type: string
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
@@ -498,6 +545,70 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/dokumente:
+    post:
+      summary: Dateien hochladen
+      description: "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei\
+        \ ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details\
+        \ mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse»."
+      tags:
+      - Dokumente
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                dateien:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                arbeitsfassungen:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                zusammenfassen:
+                  type: boolean
+                hinweis:
+                  type: string
+        required: true
+      responses:
+        "202":
+          description: Mindestens eine Datei angenommen oder als Dublette erkannt
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UploadErgebnis"
+        "400":
+          description: "Anfrage ungültig (keine Datei, Hinweis zu lang, Anzahl Arbeitsfassungen\
+            \ passt nicht) oder alle Dateien abgelehnt, erste mit Steuerzeichen im\
+            \ Namen"
+        "413":
+          description: "Anfrage über archiv.upload.max-anfrage oder alle Dateien abgelehnt,\
+            \ erste über 50 MB"
+        "415":
+          description: "Alle Dateien abgelehnt, erste mit unbekanntem Typ"
+        "422":
+          description: "Alle Dateien abgelehnt, erste leer oder beschädigt"
+        "503":
+          description: Speicher nicht erreichbar; nichts wurde angelegt
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten Versuch
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - geschaeftsstelle
+        - api-token:import
   /api/v1/dokumente/{id}:
     get:
       summary: Metadaten eines Dokuments lesen

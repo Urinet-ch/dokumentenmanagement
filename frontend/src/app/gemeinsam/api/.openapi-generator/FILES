@@ -15,6 +15,8 @@ model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/eingangskorb-seite.ts
 model/models.ts
+model/upload-ergebnis.ts
+model/upload-fehler.ts
 param.ts
 provide-api.ts
 query.params.ts
