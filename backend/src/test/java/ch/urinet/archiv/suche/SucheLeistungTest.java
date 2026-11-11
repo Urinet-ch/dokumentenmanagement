@@ -185,8 +185,8 @@ class SucheLeistungTest {
         long median = dauer[SUCHEN / 2] / 1_000_000;
         long p95 = dauer[SUCHEN * 95 / 100] / 1_000_000;
         long max = dauer[SUCHEN - 1] / 1_000_000;
-        System.out.printf("Volltextsuche mit %d Dokumenten: Median %d ms, p95 %d ms, Max %d ms (%d Suchen)%n",
-                DOKUMENTE, median, p95, max, SUCHEN);
+        System.out.printf("Volltextsuche mit %d Dokumenten: Median %d ms, p95 %d ms, Max %d ms (%d Suchen, "
+                + "im Mittel %d Treffer)%n", DOKUMENTE, median, p95, max, SUCHEN, treffer / SUCHEN);
         assertThat(treffer).as("die Suchen finden Dokumente").isPositive();
         assertThat(p95).as("p95 in ms").isLessThan(1_000);
     }
