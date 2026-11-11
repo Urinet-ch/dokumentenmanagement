@@ -131,7 +131,7 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A14 | API-Tokens verwalten | erlaubt | 403 | 403 | 403 |
 
 ¹ `geschaeftsstelle` hat in Phase 1 keinen produktiven Benutzer (Mandant 2, `03-zweiter-mandant`); Dokumentrechte A1 bis A10 wie dort beschrieben. Verwaltungsrechte A11 bis A14: [offen: Rechte der Geschäftsstelle – Entscheid in `03-zweiter-mandant`], bis dahin 403.
-² eigene: `person_benutzer` ist der Benutzer selbst, oder er hat das Dokument erfasst und die Art ist noch nicht bestätigt (2.21).
+² eigene: Die Art ist bestätigt und `person_benutzer` ist der Benutzer selbst, oder die Art ist noch nicht bestätigt und er hat das Dokument erfasst (2.21). Ein unbestätigtes Dokument, das ein anderer erfasst hat, ist nicht seines, auch wenn `person_benutzer` er selbst ist (entschieden von Fabian am 11.11.2026).
 
 Die Zeilen A15 bis A19 (Wissensbasis) ergänzt Spec 04, Requirement 12.1; sie gehören zu dieser Matrix, mit derselben Bedeutung von «erlaubt», «403» und «404» und demselben Vorrang 404 vor 403. Massgeblich für ihren Wortlaut ist Spec 04, Requirement 12.1.
 

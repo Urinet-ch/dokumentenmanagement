@@ -168,10 +168,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.17, 9.1–9.10_
   - _Abhängig von: 1.7_
 
-- [ ] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
+- [x] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
   - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
   - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
-  - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
+  - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser, nicht über `person_benutzer`; entschieden von Fabian am 11.11.2026); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
   - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten; Szenario «fremde Dokument-ID → 404» (Req 1.4, aus 1.4 übernommen)
   - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
   - _Anforderungen: 1.4, 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_
@@ -268,6 +268,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`
   - Vertraulichkeit und `person_benutzer` nur mit Recht A8
   - Änderung von Belegdatum, Art, Geschäftsjahr oder `gueltig_bis` → `aufbewahren_bis` neu berechnen, Sperre nur verlängern (`sperreVerlaengern`), Konflikt protokollieren
+  - Die Szenarien zu 9.5 und 10.1 vom Probe-Endpunkt `PATCH /probe/dokumente/{id}/zusatz` (Teilnachweis aus 2.2) auf `PATCH /api/v1/dokumente/{id}` umhängen; erst damit sind 9.5 und 10.1 voll nachgewiesen (Review PR #45)
   - _Anforderungen: 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6_
 
 - [ ] 3.6 Eingangskorb-Oberfläche [Frontend]

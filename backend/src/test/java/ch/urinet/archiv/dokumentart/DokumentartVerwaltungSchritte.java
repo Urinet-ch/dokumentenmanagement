@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokumentart;
 
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -17,8 +18,10 @@ import jakarta.inject.Inject;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,15 +39,14 @@ public class DokumentartVerwaltungSchritte {
     @Inject
     Instance<AgroalDataSource> datenbank;
 
-    @Inject
-    DokumentZaehlerAttrappe zaehler;
-
     private Response antwort;
     private boolean benutzt;
+    private final List<UUID> dokumente = new ArrayList<>();
 
     @After
     public void aufraeumen() throws SQLException {
-        zaehler.leeren();
+        Testdokumente.loeschen(datenbank.get(), "urinet", dokumente);
+        dokumente.clear();
         if (!benutzt) {
             return;
         }
@@ -91,10 +93,22 @@ public class DokumentartVerwaltungSchritte {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(PFAD);
     }
 
+    /** Legt im Mandanten {@code urinet} bestätigte Dokumente der Art an (Tabelle {@code dokument}, Aufgabe 2.2). */
     @Angenommen("die Dokumentart «{word}» hat {int} Dokument(e)")
-    public void dokumente(String code, int anzahl) {
+    public void dokumente(String code, int anzahl) throws SQLException {
         benutzt = true;
-        zaehler.setzen(code, anzahl);
+        for (int i = 0; i < anzahl; i++) {
+            dokumente.add(Testdokumente.anlegen(datenbank.get(),
+                    new Testdokumente.Angaben("urinet", code, "NORMAL", true, "probe", null, "ARCHIVIERT")));
+        }
+    }
+
+    /** Legt im Mandanten {@code urinet} ein verworfenes Dokument der Art an (Req 9.4: «auch verworfene»). */
+    @Angenommen("die Dokumentart «{word}» hat nur 1 verworfenes Dokument")
+    public void verworfenesDokument(String code) throws SQLException {
+        benutzt = true;
+        dokumente.add(Testdokumente.anlegen(datenbank.get(),
+                new Testdokumente.Angaben("urinet", code, "NORMAL", false, "probe", null, "VERWORFEN")));
     }
 
     @Dann("antwortet die Dokumentart-Verwaltung mit Status {int}")

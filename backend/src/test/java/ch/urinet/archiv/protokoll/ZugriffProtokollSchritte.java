@@ -1,8 +1,8 @@
 package ch.urinet.archiv.protokoll;
 
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
-import ch.urinet.archiv.probe.ProbeSichtbarkeit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
@@ -13,14 +13,12 @@ import io.cucumber.java.de.Dann;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,11 +58,11 @@ public class ZugriffProtokollSchritte {
         assertThat(neu).hasSize(1);
         Map<String, String> eintrag = neu.getFirst();
         assertThat(eintrag.get("benutzer")).isEqualTo(erwartet.get("benutzer") == null ? null
-                : sub(erwartet.get("benutzer")));
+                : Testanmeldung.sub(erwartet.get("benutzer")));
         assertThat(eintrag.get("rolle")).isEqualTo(erwartet.get("rolle"));
         assertThat(eintrag.get("aktion")).isEqualTo(erwartet.get("aktion"));
         assertThat(eintrag.get("dokument")).isEqualTo(erwartet.get("dokument") == null ? null
-                : ProbeSichtbarkeit.NAMEN.get(erwartet.get("dokument")).toString());
+                : Testdokumente.NAMEN.get(erwartet.get("dokument")).toString());
         assertThat(eintrag.get("ip")).isEqualTo(erwartet.get("ip"));
         assertThat(eintrag.get("grund")).isEqualTo(erwartet.get("grund"));
         assertThat(eintrag.get("fehlercode")).isEqualTo(erwartet.get("fehlercode"));
@@ -197,12 +195,6 @@ public class ZugriffProtokollSchritte {
             }
         }
         return eintraege;
-    }
-
-    private static String sub(String benutzer) throws IOException {
-        String token = Testanmeldung.token(benutzer);
-        JsonNode claims = new ObjectMapper().readTree(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
-        return claims.path("sub").asText();
     }
 
     private static String schema(String mandant) {

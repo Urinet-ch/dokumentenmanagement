@@ -1,16 +1,21 @@
 package ch.urinet.archiv.probe;
 
+import ch.urinet.archiv.dokument.application.DokumentZusatzSpeichern;
 import ch.urinet.archiv.dokumentart.adapter.out.persistence.DokumentartEintrag;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PATCH;
@@ -21,17 +26,26 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Probe-Endpunkte nur für Tests (Aufgabe 1.4): liegen unter {@code src/test} und damit nie im Produktionsartefakt
  * (ArchUnit-Regel {@code ArchitekturTest.probeNurInTests}). Sie belegen Mandantentrennung und Rechteprüfung, bevor es
- * echte Endpunkte gibt. Die Probe-Dokumente liefert {@link ProbeSichtbarkeit}.
+ * echte Endpunkte gibt. Die Probe-Dokumente liegen seit Aufgabe 2.2 als Zeilen in {@code dokument}
+ * ({@code ch.urinet.archiv.dokument.Testdokumente}).
  */
 @Path("/probe")
 public class ProbeResource {
 
     @Inject
     SecurityIdentity identitaet;
+
+    @Inject
+    DokumentZusatzSpeichern zusatzSpeichern;
+
+    /** Körper von {@link #zusatz}: {@code zusatz} als JSON-Text, damit die Probe ihn unverändert weitergibt. */
+    public record ZusatzAenderung(String zusatz, String grund) {
+    }
 
     /** Liest eine Dokumentart im Schema des angemeldeten Mandanten; fremde Codes antworten 404 (Req 1.4). */
     @GET
@@ -96,6 +110,26 @@ public class ProbeResource {
         art.vertraulichkeit = "NORMAL";
         art.aktiv = true;
         art.persist();
+    }
+
+    /**
+     * Steht für «Metadaten ändern» (A6) an den Zusatzfeldern, bis 3.5 den {@code PATCH /dokumente/{id}} bringt: prüft
+     * das Schema der Art (Req 9.5) und sichert bei {@code ARCHIVIERT} die vorherige Fassung mit Grund (Req 10.1).
+     */
+    @PATCH
+    @Path("/dokumente/{id}/zusatz")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A6)
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Protokolliert(aktion = ProtokollAktion.AENDERN)
+    public Map<String, Integer> zusatz(@PathParam("id") UUID id, @HeaderParam("If-Match") String version,
+                                       ZusatzAenderung aenderung) {
+        Benutzer benutzer = new Benutzer(identitaet.getPrincipal().getName(),
+                Rolle.ausRealmRollen(identitaet.getRoles()).orElseThrow());
+        int neu = zusatzSpeichern.speichern(benutzer, id, Integer.parseInt(version.replace("\"", "")),
+                aenderung.zusatz(), aenderung.grund());
+        return Map.of("version", neu);
     }
 
     /** Unerwarteter Fehler mit vertraulichem Text in der Meldung (Req 16.7): Er darf weder in Antwort noch Log stehen. */

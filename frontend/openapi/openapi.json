@@ -67,6 +67,99 @@
           }
         }
       },
+      "Dokument" : {
+        "description" : "Metadaten eines sichtbaren Dokuments",
+        "type" : "object",
+        "required" : [ "id", "eingang", "quelle", "tags", "vertraulichkeit", "status", "fristAbgelaufen", "version" ],
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "art" : {
+            "type" : [ "string", "null" ],
+            "description" : "Code der Dokumentart; null, solange nicht erkannt"
+          },
+          "titel" : {
+            "type" : [ "string", "null" ]
+          },
+          "datum" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "eingang" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "quelle" : {
+            "type" : "string",
+            "enum" : [ "SCAN", "UPLOAD", "GENERATOR", "DRIVE", "EMAIL", "ABANINJA" ]
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "vertraulichkeit" : {
+            "type" : "string",
+            "description" : "Ohne bestätigte Art gilt PERSONAL (Req 2.21)",
+            "enum" : [ "NORMAL", "INTERN", "PERSONAL" ]
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "NEU", "VERARBEITUNG", "EINGANGSKORB", "ARCHIVIERUNG", "ARCHIVIERUNG_FEHLER", "ARCHIVIERT", "FEHLER", "VERWORFEN" ]
+          },
+          "bestaetigt" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "geschaeftsjahr" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "aufbewahrenBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "sperreBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "fristAbgelaufen" : {
+            "type" : "boolean"
+          },
+          "zusatz" : {
+            "description" : "Zusatzfelder nach dem Schema der Art",
+            "type" : [ "object", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/JsonObjekt"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Version für If-Match (auch als ETag)"
+          }
+        }
+      },
       "Dokumentart" : {
         "type" : "object",
         "required" : [ "code", "name", "gruppen", "pflichtfelder", "zusatzSchema", "vertraulichkeit", "gesetzlichePflicht", "aktiv" ],
@@ -176,6 +269,31 @@
           }
         }
       },
+      "EingangskorbSeite" : {
+        "type" : "object",
+        "required" : [ "eintraege", "gesamt", "seite", "groesse" ],
+        "properties" : {
+          "eintraege" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Dokument"
+            }
+          },
+          "gesamt" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Zahl aller sichtbaren Einträge"
+          },
+          "seite" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "groesse" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "Instant" : {
         "type" : "string",
         "format" : "date-time",
@@ -183,6 +301,16 @@
       },
       "JsonObjekt" : {
         "type" : "object"
+      },
+      "LocalDate" : {
+        "type" : "string",
+        "format" : "date",
+        "examples" : [ "2022-03-10" ]
+      },
+      "UUID" : {
+        "type" : "string",
+        "format" : "uuid",
+        "pattern" : "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
       }
     },
     "securitySchemes" : {
@@ -198,6 +326,8 @@
     "name" : "API-Tokens"
   }, {
     "name" : "Dokumentarten"
+  }, {
+    "name" : "Dokumente"
   } ],
   "paths" : {
     "/api/v1/api-tokens" : {
@@ -437,6 +567,92 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumente/{id}" : {
+      "get" : {
+        "summary" : "Metadaten eines Dokuments lesen",
+        "description" : "Unsichtbare und fremde Dokumente → 404 NICHT_GEFUNDEN (Req 1.4, 2.3).",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Dokument",
+            "headers" : {
+              "ETag" : {
+                "description" : "Version des Dokuments für If-Match"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Dokument"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/eingangskorb" : {
+      "get" : {
+        "summary" : "Eingangskorb lesen",
+        "description" : "Dokumente in EINGANGSKORB, FEHLER und ARCHIVIERUNG_FEHLER, neueste zuerst; mitarbeiter sehen nur selbst erfasste (A5, Req 2.24). seite ab 0, groesse 1–100.",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "groesse",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        }, {
+          "name" : "seite",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EingangskorbSeite"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
         } ]
       }
     }

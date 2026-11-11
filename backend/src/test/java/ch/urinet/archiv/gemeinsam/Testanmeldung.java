@@ -1,14 +1,18 @@
 package ch.urinet.archiv.gemeinsam;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,6 +35,16 @@ public final class Testanmeldung {
     private static final Map<String, Long> LETZTER_SCHRITT = new ConcurrentHashMap<>();
 
     private Testanmeldung() {
+    }
+
+    /** Benutzer-ID ({@code sub}) aus dem Token des Testbenutzers; so steht sie in {@code erstellt_von} und im Protokoll. */
+    public static String sub(String benutzer) {
+        String[] teile = token(benutzer).split("\\.");
+        try {
+            return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(teile[1])).path("sub").asText();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** Token über {@code archiv-test}; aus dem Cache, solange es noch mindestens 30 s gilt. */
