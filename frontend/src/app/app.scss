@@ -1,13 +1,91 @@
-mat-toolbar {
-  background-color: var(--urinet-dunkel);
-  color: var(--urinet-gelb);
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-h1 {
-  font-size: 1.25rem;
-  margin: 0;
+.sprunglink {
+  position: absolute;
+  left: -10000px;
+  z-index: 10;
+
+  &:focus {
+    left: 0.5rem;
+    top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--urinet-gelb);
+    color: var(--urinet-dunkel);
+    border: 0;
+    border-radius: 4px;
+  }
+}
+
+.kopf {
+  background-color: var(--urinet-dunkel);
+  border-bottom: 1px solid var(--urinet-linie);
+  color: var(--urinet-hell);
+  gap: 0.5rem;
+}
+
+.titel {
+  color: var(--urinet-gelb);
+  font: var(--mat-sys-title-large);
+  text-decoration: none;
+}
+
+.abstand {
+  flex: 1;
+}
+
+.benutzer {
+  font: var(--mat-sys-body-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40vw;
+}
+
+.rahmen {
+  flex: 1;
+}
+
+mat-sidenav {
+  width: 15rem;
+  background-color: var(--urinet-karte);
+  border-right: 1px solid var(--urinet-linie);
+
+  &.leer {
+    display: none;
+  }
+}
+
+.aktiv {
+  background-color: rgb(238 177 17 / 0.16);
+}
+
+.punkt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zaehler {
+  min-width: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 0.75rem;
+  background-color: var(--urinet-gelb);
+  color: var(--urinet-dunkel);
+  font-weight: 600;
+  text-align: center;
 }
 
 main {
   padding: 1rem;
+  outline: none;
+}
+
+@media (max-width: 599.98px) {
+  .mandant {
+    display: none;
+  }
 }

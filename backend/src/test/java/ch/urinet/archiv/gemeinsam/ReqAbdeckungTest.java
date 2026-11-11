@@ -143,4 +143,29 @@ class ReqAbdeckungTest {
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("a.feature");
         }
     }
+
+    @Test
+    void attrappeZaehltNichtFuerBackendAufgaben(@TempDir Path repo) throws IOException {
+        Path spec = Files.createDirectories(repo.resolve(".kiro/specs/01-test"));
+        Files.writeString(spec.resolve("tasks.md"), """
+                - [x] 2.4 Upload-Endpunkt [Backend]
+                  - _Anforderungen: 3.1, 3.3_
+                - [x] 2.7 Upload-Seite [Frontend]
+                  - _Anforderungen: 3.1, 3.3, 8.6_
+                """);
+        Files.writeString(spec.resolve("requirements.md"), "### Requirement 3: U\n1. Upload.\n3. Typ.\n");
+        Path features = Files.createDirectories(repo.resolve("backend/src/test/resources/features/dokument"));
+        Files.writeString(features.resolve("upload-pwa.feature"),
+                "@spec-01 @browser @attrappe\nFeature: a\n  @req-3.1 @req-3.3 @req-8.6\n  Scenario: s\n");
+        Files.writeString(features.resolve("upload.feature"), "@spec-01\nFeature: b\n  @req-3.1\n  Scenario: s\n");
+        assertThat(ReqAbdeckung.luecken(repo)).containsExactly("01-test: 3.3 (nur @attrappe)");
+    }
+
+    @Test
+    void attrappeUnterhalbDerFeatureEbeneBrichtAb(@TempDir Path repo) throws IOException {
+        Path features = Files.createDirectories(repo.resolve("features"));
+        Files.writeString(features.resolve("a.feature"), "@spec-01\nFeature: a\n  @attrappe @req-3.1\n  Scenario: s\n");
+        assertThatThrownBy(() -> ReqAbdeckung.tags(features)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@attrappe");
+    }
 }

@@ -674,6 +674,35 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
   - 4xx ausser 401 → sofort «fehlerhaft» mit der Meldung des Servers; 401 → neu anmelden, der Eintrag bleibt.
 - Eingangskorb: Kennzeichen für `pdfa_fehlt`, «Frist abgelaufen», Warnung `BELEGNUMMER_BEKANNT` und «bitte prüfen»; bei `FEHLER` Fehlertext mit «erneut verarbeiten» und «verwerfen», bei `ARCHIVIERUNG_FEHLER` «Archivierung wiederholen» (Req 8.7). Aktionen ohne Recht werden nicht angezeigt; die API prüft trotzdem.
 - API-Client aus OpenAPI generiert (`openapi-generator`, typescript-angular).
+- Grundgerüst (Aufgabe 2.7, Erkenntnisse):
+  - Anmeldung mit eigenem schlankem OIDC-Client (Authorization Code mit PKCE S256, Client `archiv-pwa`) ohne
+    Bibliothek: Tokens nur im Arbeitsspeicher; `sessionStorage` hält nur während der Weiterleitung `state`, `nonce`,
+    `code_verifier` und das Ziel und wird beim Rückruf (`/anmeldung`) gelöscht. Nach einem Neuladen ist eine neue
+    Anmeldung nötig (bei laufender Keycloak-Sitzung ohne Passworteingabe). Die Signatur prüft die API, nicht die PWA.
+  - Erneuerung per Refresh Token 30 s vor Ablauf; lehnt Keycloak ab oder antwortet die API mit 401, meldet die PWA
+    «Sitzung abgelaufen» und verwirft die Tokens. Abmelden über den Logout-Endpunkt von Keycloak mit `id_token_hint`;
+    der Knopf «Abmelden» bleibt auch nach «Sitzung abgelaufen» sichtbar (Keycloak-Sitzung beenden).
+  - Weil Timer auf gesperrten Handys ruhen (Review PR #44), erneuert die PWA zusätzlich vor jeder API-Anfrage, wenn
+    das Token in weniger als 30 s abläuft, und bei `visibilitychange` zurück in den Vordergrund; gleichzeitige Anlässe
+    teilen sich eine Erneuerung. Nach «Sitzung abgelaufen» bleibt das Ziel (z. B. `/erfassen`) für die neue Anmeldung
+    erhalten.
+  - Zeitgrenze der Erneuerung: Antwortet Keycloak nicht innert 10 s, bricht die PWA die Erneuerung ab und meldet
+    «Sitzung abgelaufen»; wartende API-Anfragen gehen ohne Token weiter (die API antwortet 401) statt unbegrenzt zu
+    warten (Kann-Befund Review PR #44, entschieden von Fabian am 11.11.2026).
+  - Nach einem Neuladen der PWA meldet man sich neu an; so belassen, die Lösung für die Offline-Erfassung folgt in 3.7
+    (entschieden von Fabian am 11.11.2026).
+  - Rückruf: `state` muss passen; liefert Keycloak den Parameter `iss` (RFC 9207), muss er dem Aussteller entsprechen,
+    sonst wird der Rückruf abgelehnt.
+  - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A13); ohne Mandant oder ohne
+    Archiv-Rolle kein Menü. Die Oberfläche blendet nur aus, die API prüft.
+  - Eingangskorb-Zähler hinter einem Port (`EingangskorbZaehler`); bis 3.6 ohne Endpunkt und ohne Anzeige.
+  - Upload hinter dem Port `UploadPort` mit HTTP-Adapter (Multipart, das Feld `dateien[]` aus «Upload» als wiederholter
+    Teil `dateien` je Datei in der Reihenfolge der Liste, `zusammenfassen=true` ab zwei Bildern); den genauen Feldnamen
+    und den generierten Client legt 2.4 fest. Die Ergebnisse ordnet die PWA über den Index der Datei zu, über den
+    Dateinamen nur, wenn er in Auswahl und Antwort je genau einmal vorkommt.
+  - Keycloak im Dev-Modus auf festem Port 8180 (`%dev.quarkus.keycloak.devservices.port`).
+  - Browser-Szenarien laufen gegen eine Keycloak-Attrappe in Playwright (`frontend/e2e/hilfen/`), die PKCE S256 prüft
+    und unsignierte Tokens ausstellt; der Service Worker ist dabei blockiert.
 
 ## Data Models
 
@@ -873,7 +902,10 @@ Reichweite der CI-Prüfung (Req 16.14, entschieden mit Aufgabe 1.1): Geprüft we
 `_Anforderungen_` abgehakter Aufgaben ab Welle 1; die Prüfung wächst mit jeder abgehakten Aufgabe. Optionale Aufgaben
 (`O.n`) zählen nicht. Abgedeckt ist ein Kriterium durch ein `@req`-Tag oder einen Nachweis-Vermerk, jeweils innerhalb
 derselben Spec. Die Kriterien der Welle 0 (u. a. 0.2, 0.7, 0.9) sind durch den Gate-Bericht nachgewiesen
-(`docs/spikes/golden-ergebnis.md`, `docs/umsetzungsplan.md` Abschnitt 6).
+(`docs/spikes/golden-ergebnis.md`, `docs/umsetzungsplan.md` Abschnitt 6). Feature-Dateien, die gegen Attrappen statt
+gegen das echte Backend prüfen, tragen auf Feature-Ebene `@attrappe` (auf Szenario-Ebene bricht die Prüfung ab); sie
+decken Kriterien von `[Frontend]`-Aufgaben ab, für Kriterien abgehakter `[Backend]`-Aufgaben zählen sie nicht
+(Review PR #44).
 
 Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 mit pgvector
 (`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2`, Realm aus

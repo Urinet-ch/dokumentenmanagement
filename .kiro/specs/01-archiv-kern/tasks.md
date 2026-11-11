@@ -191,6 +191,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; bis dahin braucht 2.4 im Test einen Handler für `VERARBEITEN` (nur unter `src/test`).
+  - generierten OpenAPI-Client an die Upload-Seite der PWA anschliessen (`UploadPort`, aus 2.7) und die Browser-Szenarien `dokument/upload-pwa.feature` gegen das echte Backend laufen lassen (danach `@attrappe` entfernen)
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
 - [x] 2.5 Auftragsschlange [Backend]
@@ -208,10 +209,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - in `OcrAuswahl` `folgtMit` entfernen, damit in `prod` ein fehlender OCR-Adapter den Start abbricht (design.md «Ablage», Startprüfungen); Handler `ARCHIVIEREN`: `archivieren` nur bei Status ungleich `ARCHIVIERT` und nie parallel für dasselbe Dokument (design.md «Ablage», Umsetzung)
   - _Anforderungen: 5.1–5.10_
 
-- [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]
+- [x] 2.7 Frontend-Grundgerüst und Upload [Frontend]
   - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE) gegen Keycloak, Navigation mit Eingangskorb-Zähler, Menüpunkte nach Rechtematrix
   - Seite Upload mit Drag & Drop, Mehrfachauswahl, «als ein Dokument», Fortschritt, Ergebnis je Datei (angenommen, «bereits vorhanden», Fehlermeldung)
-  - API-Client aus OpenAPI generieren
+  - API-Client aus OpenAPI generieren (Generator `npm run api:generieren` besteht; der Upload-Endpunkt fehlt noch, darum Upload-Seite hinter `UploadPort` und Anschluss an den generierten Client in 2.4)
   - _Anforderungen: 3.1, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
 
 - [ ] 2.8 Mindestversionen der Handys festlegen [Fabian]
@@ -282,6 +283,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), ohne erkannte Kanten das ganze Bild, Vorschau anpassen/verwerfen, JPEG 2'480 px
   - Upload je Seite: Rohaufnahme als Original, Zuschnitt als Arbeitsfassung
   - Offline-Warteschlange (IndexedDB) mit Zähler, automatischer Upload bei `online`; `DUBLETTE` gilt als übertragen und wird gelöscht; nur Netzwerkfehler und 5xx zählen als Fehlversuch, offline nicht; 3 Fehlversuche → manuell wiederholen; 4xx sofort fehlerhaft mit Meldung des Servers (401 → neu anmelden)
+  - Nach einem Neuladen der PWA meldet man sich neu an (Tokens nur im Arbeitsspeicher, aus 2.7). `/erfassen` ist darum offline auch ohne Anmeldung zugänglich und nimmt Aufnahmen in die Warteschlange; hochgeladen wird erst nach der Anmeldung (entschieden von Fabian am 11.11.2026, PR #44)
   - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_

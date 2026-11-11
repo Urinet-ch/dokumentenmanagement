@@ -8,7 +8,9 @@ setDefaultTimeout(30_000);
 
 Before(async function () {
   this.browser = await chromium.launch();
-  this.seite = await this.browser.newPage({ locale: 'de-CH' });
+  // Service Worker aus: Seine Anfragen liefen an den Attrappen (page.route) vorbei
+  this.kontext = await this.browser.newContext({ locale: 'de-CH', serviceWorkers: 'block' });
+  this.seite = await this.kontext.newPage();
 });
 
 After(async function () {

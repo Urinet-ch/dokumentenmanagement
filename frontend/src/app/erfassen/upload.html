@@ -1,0 +1,132 @@
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+
+<section
+  class="ablage karte"
+  [class.ziehen]="ziehen()"
+  [attr.aria-label]="texte.ablegen"
+  (dragover)="ueberZiehen($event)"
+  (dragleave)="ziehen.set(false)"
+  (drop)="abgelegt($event)"
+  data-test="ablage"
+>
+  <p class="ablage-text" aria-hidden="true">{{ texte.ablegen }}</p>
+  <p class="ablage-oder" aria-hidden="true">{{ texte.oder }}</p>
+  <button mat-flat-button type="button" (click)="auswaehlen()" [disabled]="laeuft()">{{ texte.auswaehlen }}</button>
+  <input
+    #dateiwahl
+    hidden
+    type="file"
+    multiple
+    [accept]="erlaubteTypen"
+    [attr.aria-label]="texte.dateiwahl"
+    (change)="gewaehlt(dateiwahl)"
+  />
+</section>
+
+<section class="liste" aria-labelledby="liste-titel">
+  @if (abgeschlossen()) {
+    <h2 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.ergebnisse }}</h2>
+  } @else {
+    <h2 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.liste }}</h2>
+  }
+  @if (zeilen().length === 0) {
+    <p>{{ texte.keineDateien }}</p>
+  } @else {
+    <ol class="dateien">
+      @for (zeile of zeilen(); track zeile.datei; let i = $index, erste = $first, letzte = $last) {
+        <li class="datei karte" [attr.data-ausgang]="zeile.ausgang ?? null">
+          <div class="datei-kopf">
+            <span class="datei-name">{{ zeile.datei.name }}</span>
+            @if (!abgeschlossen()) {
+              <span class="datei-aktionen">
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="laeuft() || erste"
+                  [attr.aria-label]="texte.nachOben(zeile.datei.name)"
+                  (click)="verschieben(i, -1)"
+                >
+                  ↑
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="laeuft() || letzte"
+                  [attr.aria-label]="texte.nachUnten(zeile.datei.name)"
+                  (click)="verschieben(i, 1)"
+                >
+                  ↓
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="laeuft()"
+                  [attr.aria-label]="texte.entfernen(zeile.datei.name)"
+                  (click)="entfernen(i)"
+                >
+                  ✕
+                </button>
+              </span>
+            }
+          </div>
+          @if (zeile.ausgang) {
+            <p class="datei-ergebnis" data-test="ergebnis">
+              @switch (zeile.ausgang) {
+                @case ('angenommen') {
+                  <span class="marke angenommen" aria-hidden="true">✓</span>
+                  {{ zeile.meldung }}
+                }
+                @case ('vorhanden') {
+                  <span class="marke vorhanden" aria-hidden="true">=</span>
+                  {{ zeile.meldung }}
+                  @if (zeile.vorhandenId) {
+                    – <a [routerLink]="['/dokument', zeile.vorhandenId]">{{ texte.zumVorhandenen }}</a>
+                  }
+                }
+                @case ('abgelehnt') {
+                  <span class="marke abgelehnt" aria-hidden="true">!</span>
+                  {{ texte.abgelehnt }}: {{ zeile.meldung }}
+                  @if (zeile.fehlercode) {
+                    <span class="fehlercode">({{ zeile.fehlercode }})</span>
+                  }
+                }
+              }
+            </p>
+          }
+        </li>
+      }
+    </ol>
+  }
+</section>
+
+@if (!abgeschlossen()) {
+  <section class="optionen">
+    <mat-checkbox
+      [checked]="zusammenfassen()"
+      [disabled]="!zusammenfassenMoeglich() || laeuft()"
+      (change)="zusammenfassenGewaehlt.set($event.checked)"
+      aria-describedby="zusammenfassen-hinweis"
+    >
+      {{ texte.alsEinDokument }}
+    </mat-checkbox>
+    <p id="zusammenfassen-hinweis" class="hinweis">{{ texte.alsEinDokumentHinweis }}</p>
+    <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || dateien().length === 0">
+      {{ texte.hochladen }}
+    </button>
+  </section>
+} @else {
+  <button mat-stroked-button type="button" (click)="neu()">{{ texte.neu }}</button>
+}
+
+@if (laeuft()) {
+  <mat-progress-bar mode="determinate" [value]="prozent()" [attr.aria-label]="texte.fortschritt" />
+}
+<p class="status" role="status" aria-live="polite">
+  @if (laeuft()) {
+    {{ texte.fortschrittProzent(prozent()) }}
+  }
+</p>
+@if (gesamtFehler()) {
+  <p class="gesamtfehler" role="alert">{{ gesamtFehler() }}</p>
+}
