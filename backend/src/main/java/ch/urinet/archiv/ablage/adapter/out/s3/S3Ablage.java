@@ -15,6 +15,8 @@ import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -133,8 +135,7 @@ public class S3Ablage implements AblagePort {
             }
             String sha256 = Pruefsumme.hex(digest);
             Path datei = temp;
-            String versionId = s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromFile(datei)).versionId();
-            pruefeVersion(versionId, bucket);
+            String versionId = hochladen(bucket, key, datei);
             LOG.debugf("Eingang abgelegt: %s (Version %s)", key, versionId);
             return new AbgelegteDatei(key, versionId, sha256, gelesen, Optional.empty());
         } catch (IOException e) {
@@ -142,6 +143,46 @@ public class S3Ablage implements AblagePort {
         } finally {
             loeschenTemp(temp);
         }
+    }
+
+    /** Die Datei liegt schon auf der Platte (Upload): hashen und ohne weitere Kopie hochladen. */
+    @Override
+    public AbgelegteDatei ablegenEingang(MandantCode mandant, DateiSchluessel schluessel, Path datei) {
+        String bucket = bucket(mandant);
+        String key = schluessel.pfad(Ablageort.EINGANG);
+        MessageDigest digest = Pruefsumme.sha256();
+        long gelesen;
+        try (InputStream ein = new DigestInputStream(Files.newInputStream(datei), digest)) {
+            gelesen = ein.transferTo(OutputStream.nullOutputStream());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Datei konnte nicht gelesen werden: " + key, e);
+        }
+        String versionId = hochladen(bucket, key, datei);
+        LOG.debugf("Eingang abgelegt: %s (Version %s)", key, versionId);
+        return new AbgelegteDatei(key, versionId, Pruefsumme.hex(digest), gelesen, Optional.empty());
+    }
+
+    /**
+     * Ein nicht erreichbarer Object Storage (Netz, Zeitlimit) oder eine Antwort 5xx ergibt
+     * {@code SPEICHER_NICHT_ERREICHBAR} (503 mit {@code Retry-After}, design.md «Error Handling»); 4xx bleibt ein Fehler
+     * der Anwendung oder Konfiguration.
+     */
+    private String hochladen(String bucket, String key, Path datei) {
+        String versionId;
+        try {
+            versionId = s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromFile(datei)).versionId();
+        } catch (SdkClientException e) {
+            LOG.warnf("Object Storage nicht erreichbar: %s (%s)", key, e.getClass().getSimpleName());
+            throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
+        } catch (S3Exception e) {
+            if (e.statusCode() >= 500) {
+                LOG.warnf("Object Storage antwortet mit HTTP %d: %s", e.statusCode(), key);
+                throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
+            }
+            throw e;
+        }
+        pruefeVersion(versionId, bucket);
+        return versionId;
     }
 
     @Override

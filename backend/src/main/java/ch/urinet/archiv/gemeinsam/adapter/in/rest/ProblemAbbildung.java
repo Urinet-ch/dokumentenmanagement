@@ -22,10 +22,16 @@ import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 public class ProblemAbbildung {
 
     static final String BEARER = "Bearer";
+    /** Wartezeit für {@code SPEICHER_NICHT_ERREICHBAR} (design.md «Error Handling»), Auslegung Aufgabe 2.4. */
+    static final String SPEICHER_NOCHMALS_NACH_SEKUNDEN = "30";
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
-        return antwort(ProblemAntwort.fuer(fehler.code()));
+        Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
+        if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
+            antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
+        }
+        return antwort.build();
     }
 
     @ServerExceptionMapper({UnauthorizedException.class, AuthenticationFailedException.class})

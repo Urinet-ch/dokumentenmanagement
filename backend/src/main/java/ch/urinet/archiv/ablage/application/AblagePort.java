@@ -11,7 +11,10 @@ import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -29,6 +32,21 @@ public interface AblagePort {
 
     /** Legt eine Datei unter {@code eingang/} ohne Sperre ab (Req 6.2) und liefert Versions-ID und SHA-256. */
     AbgelegteDatei ablegenEingang(MandantCode mandant, DateiSchluessel schluessel, InputStream inhalt, long laenge);
+
+    /**
+     * Wie {@link #ablegenEingang(MandantCode, DateiSchluessel, InputStream, long)} für eine Datei, die schon auf der
+     * Platte liegt (Upload, Aufgabe 2.4); der S3-Adapter lädt sie ohne weitere Kopie hoch.
+     *
+     * @throws ch.urinet.archiv.gemeinsam.domain.FachFehler {@code SPEICHER_NICHT_ERREICHBAR}, wenn der Object Storage
+     *                                                      nicht antwortet oder mit 5xx ablehnt
+     */
+    default AbgelegteDatei ablegenEingang(MandantCode mandant, DateiSchluessel schluessel, Path datei) {
+        try (InputStream inhalt = Files.newInputStream(datei)) {
+            return ablegenEingang(mandant, schluessel, inhalt, Files.size(datei));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Datei konnte nicht gelesen werden: " + schluessel.pfad(Ablageort.EINGANG), e);
+        }
+    }
 
     /**
      * Kopiert die Dateien eines Dokuments nach {@code archiv/}, vergleicht je Kopie die SHA-256 und sperrt sie nur bei

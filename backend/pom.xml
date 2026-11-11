@@ -27,6 +27,7 @@
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
         <!-- 2.0.x ist die letzte Linie auf Jackson 2 (Quarkus 3.40); 3.x braucht Jackson 3 (tools.jackson) -->
         <json-schema-validator.version>2.0.8</json-schema-validator.version>
+        <tika.version>4.2.0</tika.version>
     </properties>
 
     <dependencyManagement>
@@ -115,6 +116,12 @@
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
             <version>${json-schema-validator.version}</version>
+        </dependency>
+        <!-- Dateityp am Inhalt (Magic Bytes) beim Upload (Aufgabe 2.4, Req 3.3); nur der Detektor, keine Parser -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>

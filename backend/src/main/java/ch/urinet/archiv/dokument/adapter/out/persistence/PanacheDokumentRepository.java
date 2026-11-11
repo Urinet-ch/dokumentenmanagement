@@ -1,6 +1,9 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
+import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.application.DokumentRepository;
+import ch.urinet.archiv.dokument.application.NeueDatei;
+import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
@@ -36,6 +39,30 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
                 :benutzer, :grund
             from dokument d where d.id = :id""";
+
+    /**
+     * Sperrt die Prüfsumme im Schema des Mandanten bis zum Ende der Transaktion; zwei gleichzeitige Uploads derselben
+     * Datei laufen so nacheinander, der zweite sieht die erste als Dublette (Req 3.4).
+     */
+    private static final String DUBLETTE_SPERREN =
+            "select 1 from pg_advisory_xact_lock(hashtextextended(current_schema() || ':' || :sha, 0))";
+
+    private static final String DUBLETTE = """
+            select dokument_id from dokument_datei
+            where sha256 = :sha and rolle = 'ORIGINAL' and status <> 'VERWORFEN'
+            limit 1""";
+
+    private static final String DOKUMENT_ANLEGEN = """
+            insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis)
+            values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis)""";
+
+    private static final String DATEI_ANLEGEN = """
+            insert into dokument_datei (dokument_id, rolle, nr, sha256, s3_schluessel, mime, groesse, empfangen)
+            values (:id, :rolle, :nr, :sha, :schluessel, :mime, :groesse, :empfangen)""";
+
+    private static final String DATEI_ABGELEGT = """
+            update dokument_datei set s3_version = :version
+            where dokument_id = :id and rolle = :rolle and nr = :nr""";
 
     private static final List<String> EINGANGSKORB = DokumentStatus.EINGANGSKORB_STATUS.stream()
             .map(Enum::name).sorted().toList();
@@ -98,6 +125,48 @@ public class PanacheDokumentRepository implements DokumentRepository {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
         return eintrag.version;
+    }
+
+    @Override
+    public Optional<UUID> dubletteSperren(String sha256) {
+        var em = DokumentEintrag.getEntityManager();
+        em.createNativeQuery(DUBLETTE_SPERREN).setParameter("sha", sha256).getSingleResult();
+        @SuppressWarnings("unchecked")
+        List<UUID> treffer = em.createNativeQuery(DUBLETTE, UUID.class).setParameter("sha", sha256).getResultList();
+        return treffer.stream().findFirst();
+    }
+
+    @Override
+    public void anlegen(NeuesDokument dokument) {
+        DokumentEintrag.getEntityManager().createNativeQuery(DOKUMENT_ANLEGEN)
+                .setParameter("id", dokument.id())
+                .setParameter("eingang", dokument.eingang().atOffset(ZoneOffset.UTC))
+                .setParameter("quelle", dokument.quelle())
+                .setParameter("erstelltVon", dokument.erstelltVon())
+                .setParameter("hinweis", dokument.hinweis().orElse(null))
+                .executeUpdate();
+    }
+
+    @Override
+    public void dateiAnlegen(NeueDatei datei) {
+        DokumentEintrag.getEntityManager().createNativeQuery(DATEI_ANLEGEN)
+                .setParameter("id", datei.dokumentId())
+                .setParameter("rolle", datei.rolle().name())
+                .setParameter("nr", datei.nr())
+                .setParameter("sha", datei.sha256())
+                .setParameter("schluessel", datei.s3Schluessel())
+                .setParameter("mime", datei.mime())
+                .setParameter("groesse", datei.groesse())
+                .setParameter("empfangen", datei.empfangen().atOffset(ZoneOffset.UTC))
+                .executeUpdate();
+    }
+
+    @Override
+    public void dateiAbgelegt(UUID dokumentId, DateiRolle rolle, int nr, String s3Version) {
+        DokumentEintrag.getEntityManager().createNativeQuery(DATEI_ABGELEGT)
+                .setParameter("version", s3Version).setParameter("id", dokumentId)
+                .setParameter("rolle", rolle.name()).setParameter("nr", nr)
+                .executeUpdate();
     }
 
     private static Dokument dokument(DokumentEintrag e) {
