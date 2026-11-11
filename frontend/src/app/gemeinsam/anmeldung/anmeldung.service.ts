@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { DOCUMENT, DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { UMGEBUNG } from '../../../umgebung/umgebung';
 import { codeChallengeS256, jwtNutzlast, zufall } from './pkce';
 import { Aktion, Rolle, darf, rolleAusRealmRollen } from './rechte';
@@ -55,6 +55,8 @@ const VORGANG_SCHLUESSEL = 'archiv.anmeldung.vorgang';
 const ERNEUERN_VOR_ABLAUF_MS = 30_000;
 const ERNEUERN_MINDESTENS_MS = 5_000;
 const ERNEUERN_WIEDERHOLEN_MS = 15_000;
+// Hängt Keycloak, warten alle API-Anfragen auf die Erneuerung; danach «Sitzung abgelaufen» (Entscheid Fabian 11.11.2026)
+export const ERNEUERN_ZEITGRENZE_MS = 10_000;
 
 interface Vorgang {
   state: string;
@@ -230,11 +232,14 @@ export class AnmeldungService {
       return;
     }
     try {
-      const antwort = await this.tokenAnfrage({
-        grant_type: 'refresh_token',
-        refresh_token: aktuell.refreshToken,
-        client_id: this.konfiguration.clientId,
-      });
+      const antwort = await this.tokenAnfrage(
+        {
+          grant_type: 'refresh_token',
+          refresh_token: aktuell.refreshToken,
+          client_id: this.konfiguration.clientId,
+        },
+        ERNEUERN_ZEITGRENZE_MS,
+      );
       if (!antwort.access_token) {
         throw new AnmeldungFehler('Token fehlt');
       }
@@ -242,7 +247,7 @@ export class AnmeldungService {
         this.uebernehmen(antwort);
       }
     } catch (fehler) {
-      // Netz weg: wiederholen, solange das Token gilt; Keycloak lehnt ab (Sitzung beendet): abgelaufen
+      // Netz weg: wiederholen, solange das Token gilt; Keycloak lehnt ab oder antwortet nicht in der Zeitgrenze: abgelaufen
       const netzfehler = fehler instanceof HttpErrorResponse && fehler.status === 0;
       if (netzfehler && aktuell.ablauf - Date.now() > ERNEUERN_WIEDERHOLEN_MS) {
         this.erneuerungPlanen(ERNEUERN_WIEDERHOLEN_MS);
@@ -258,12 +263,11 @@ export class AnmeldungService {
     this.zustandIntern.set(zustand);
   }
 
-  private tokenAnfrage(felder: Record<string, string>): Promise<TokenAntwort> {
-    return firstValueFrom(
-      this.http.post<TokenAntwort>(this.endpunkt('token'), new URLSearchParams(felder).toString(), {
-        headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
-      }),
-    );
+  private tokenAnfrage(felder: Record<string, string>, zeitgrenzeMs = Infinity): Promise<TokenAntwort> {
+    const anfrage = this.http.post<TokenAntwort>(this.endpunkt('token'), new URLSearchParams(felder).toString(), {
+      headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+    });
+    return firstValueFrom(Number.isFinite(zeitgrenzeMs) ? anfrage.pipe(timeout(zeitgrenzeMs)) : anfrage);
   }
 
   private endpunkt(name: 'auth' | 'token' | 'logout'): string {

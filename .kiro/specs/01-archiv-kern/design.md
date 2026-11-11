@@ -641,6 +641,11 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
     das Token in weniger als 30 s abläuft, und bei `visibilitychange` zurück in den Vordergrund; gleichzeitige Anlässe
     teilen sich eine Erneuerung. Nach «Sitzung abgelaufen» bleibt das Ziel (z. B. `/erfassen`) für die neue Anmeldung
     erhalten.
+  - Zeitgrenze der Erneuerung: Antwortet Keycloak nicht innert 10 s, bricht die PWA die Erneuerung ab und meldet
+    «Sitzung abgelaufen»; wartende API-Anfragen gehen ohne Token weiter (die API antwortet 401) statt unbegrenzt zu
+    warten (Kann-Befund Review PR #44, entschieden von Fabian am 11.11.2026).
+  - Nach einem Neuladen der PWA meldet man sich neu an; so belassen, die Lösung für die Offline-Erfassung folgt in 3.7
+    (entschieden von Fabian am 11.11.2026).
   - Rückruf: `state` muss passen; liefert Keycloak den Parameter `iss` (RFC 9207), muss er dem Aussteller entsprechen,
     sonst wird der Rückruf abgelehnt.
   - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A13); ohne Mandant oder ohne

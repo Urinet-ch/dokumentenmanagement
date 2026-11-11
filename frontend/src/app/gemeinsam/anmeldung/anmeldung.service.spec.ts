@@ -2,7 +2,14 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { anmeldungInterceptor } from './anmeldung.interceptor';
-import { AnmeldungFehler, AnmeldungService, FENSTER, OIDC_KONFIGURATION, sicheresZiel } from './anmeldung.service';
+import {
+  AnmeldungFehler,
+  AnmeldungService,
+  ERNEUERN_ZEITGRENZE_MS,
+  FENSTER,
+  OIDC_KONFIGURATION,
+  sicheresZiel,
+} from './anmeldung.service';
 import { base64url, codeChallengeS256 } from './pkce';
 
 const AUSSTELLER = 'https://auth.test/realms/urinet-archiv';
@@ -282,6 +289,35 @@ describe('AnmeldungService (Req 2.1)', () => {
       for (const pfad of ['/api/v1/a', '/api/v1/b']) {
         expect(http.expectOne(pfad).request.headers.get('Authorization')).toBe(`Bearer ${neu}`);
       }
+    });
+
+    it('meldet «abgelaufen», wenn Keycloak nicht in der Zeitgrenze antwortet, statt API-Anfragen warten zu lassen', async () => {
+      await schlafen();
+      let fehler: unknown;
+      TestBed.inject(HttpClient).get('/api/v1/dokumente').subscribe({ error: (f) => (fehler = f) });
+      await vi.advanceTimersByTimeAsync(0);
+      const erneuerung = http.expectOne(TOKEN_URL);
+      await vi.advanceTimersByTimeAsync(ERNEUERN_ZEITGRENZE_MS - 1);
+      http.expectNone('/api/v1/dokumente');
+      expect(dienst.zustand()).toBe('angemeldet');
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(erneuerung.cancelled).toBe(true);
+      expect(dienst.zustand()).toBe('abgelaufen');
+      const api = http.expectOne('/api/v1/dokumente');
+      expect(api.request.headers.has('Authorization')).toBe(false);
+      api.flush(null, { status: 401, statusText: 'Unauthorized' });
+      expect(fehler).toBeDefined();
+    });
+
+    it('meldet «abgelaufen», wenn die Erneuerung per Timer nicht in der Zeitgrenze beantwortet wird', async () => {
+      vi.useFakeTimers();
+      await anmelden(60);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const erneuerung = http.expectOne(TOKEN_URL);
+      await vi.advanceTimersByTimeAsync(ERNEUERN_ZEITGRENZE_MS);
+      expect(erneuerung.cancelled).toBe(true);
+      expect(dienst.zustand()).toBe('abgelaufen');
     });
 
     it('erneuert beim Zurückkehren in den Vordergrund', async () => {

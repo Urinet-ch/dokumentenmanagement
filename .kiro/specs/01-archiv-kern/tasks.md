@@ -273,6 +273,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), ohne erkannte Kanten das ganze Bild, Vorschau anpassen/verwerfen, JPEG 2'480 px
   - Upload je Seite: Rohaufnahme als Original, Zuschnitt als Arbeitsfassung
   - Offline-Warteschlange (IndexedDB) mit Zähler, automatischer Upload bei `online`; `DUBLETTE` gilt als übertragen und wird gelöscht; nur Netzwerkfehler und 5xx zählen als Fehlversuch, offline nicht; 3 Fehlversuche → manuell wiederholen; 4xx sofort fehlerhaft mit Meldung des Servers (401 → neu anmelden)
+  - Nach einem Neuladen der PWA meldet man sich neu an (Tokens nur im Arbeitsspeicher, aus 2.7). `/erfassen` ist darum offline auch ohne Anmeldung zugänglich und nimmt Aufnahmen in die Warteschlange; hochgeladen wird erst nach der Anmeldung (entschieden von Fabian am 11.11.2026, PR #44)
   - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_
