@@ -2,7 +2,8 @@
 
 Voraussetzungen: Spec 05 auf `main` gemergt, Entscheide aus Aufgabe 17.1, Spec 01 bis einschliesslich Aufgabe 3.5
 umgesetzt (Bestätigen und Ändern sind die Prüfpunkte der Regeln). Die Wellen 17 und 18 folgen auf die Nummern von
-Spec 04; ihre Einordnung im Umsetzungsplan entscheidet Fabian (requirements.md, Introduction). Wellen, Rollen und
+Spec 04, umgesetzt werden sie nach Gate Phase 1 und spätestens vor Welle 10 (entschieden von Fabian am
+11.11.2026). Wellen, Rollen und
 Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`, Branch
 `feature/05-<aufgabe>-<stichwort>`. Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet
 auf den Entscheid. Abhängigkeiten zu anderen Specs stehen als `Spec 0n: <Aufgabe>`. Jede Aufgabe liefert für ihre
@@ -13,8 +14,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
 
 ## Welle 17 — Modell, Prüfung, Datei
 - [ ] 17.1 Entscheide und Folgeänderungen [Fabian]
-  - Einordnung der Wellen 17–18; Verfahren der KI-Abnahme ohne Golden-Datensatz (8.9, spätestens vor Welle 10).
-  - Folgeänderungen in Spec 01–04, Steering und Umsetzungsplan nach design.md «Folgeänderungen» als eigener PR.
+  - Verfahren der KI-Abnahme ohne Golden-Datensatz (8.9, spätestens vor Welle 10).
+  - Folgeänderungen in Spec 01–04 und Steering nach design.md «Folgeänderungen» als eigener PR.
   - _Anforderungen: 8.9_
 
 - [ ] 17.2 Konfigurationsversionen und Grundgerüst [Backend]

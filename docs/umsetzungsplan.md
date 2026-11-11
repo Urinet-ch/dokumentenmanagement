@@ -19,6 +19,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/02-abgleich-chat/` | Phase 2: 13 Requirements, Design, Aufgaben | 6–9 | ca. 10 Tage |
 | `.kiro/specs/03-zweiter-mandant/` | Phase 3: 9 Requirements, Design, Aufgaben | 10–12 | ca. 6 Tage |
 | `.kiro/specs/04-wissensbasis/` | Phase 4: 18 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
+| `.kiro/specs/05-mandanten-konfiguration/` | Konfiguration je Mandant: 9 Requirements, Design, Aufgaben (Dokumentarten, Klassifikationen, Fristen, Regeln) | 17–18, umgesetzt nach Gate Phase 1 und spätestens vor Welle 10 (Entscheid Fabian 11.11.2026) | noch nicht geschätzt |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
 `design.md` (Architektur, Schnittstellen, Datenmodell, Fehler, Tests), `tasks.md` (Aufgaben mit
