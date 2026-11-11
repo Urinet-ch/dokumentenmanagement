@@ -17,9 +17,11 @@ public final class Normalisierer {
             "genossenschaft", "stiftung", "ltd", "inc");
     private static final Pattern AKZENTE = Pattern.compile("\\p{M}+");
     private static final Pattern SATZZEICHEN = Pattern.compile("[\\p{P}\\p{S}]");
-    private static final Pattern LEERRAUM = Pattern.compile("\\s+");
+    // mit UNICODE_CHARACTER_CLASS erfasst \s auch geschützte Leerzeichen (U+00A0, U+202F) aus OCR- oder PDF-Text
+    private static final Pattern LEERRAUM = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Pattern RAND_LEERRAUM = Pattern.compile("^\\s+|\\s+$", Pattern.UNICODE_CHARACTER_CLASS);
     private static final Pattern NICHT_ZIFFER = Pattern.compile("[^0-9]");
-    private static final Pattern UID_TRENNER = Pattern.compile("[\\s.\\-]");
+    private static final Pattern UID_TRENNER = Pattern.compile("[\\s.\\-]", Pattern.UNICODE_CHARACTER_CLASS);
     private static final Pattern UID_ZUSATZ = Pattern.compile("(MWST|TVA|IVA|HR)$");
 
     private Normalisierer() {
@@ -53,12 +55,12 @@ public final class Normalisierer {
         return plz == null ? "" : NICHT_ZIFFER.matcher(plz).replaceAll("");
     }
 
-    /** Klein und getrimmt. */
+    /** Klein und getrimmt (auch geschützte Leerzeichen am Rand). */
     public static String email(String email) {
-        return email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
+        return email == null ? "" : RAND_LEERRAUM.matcher(email).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
-    /** Ohne Leerraum, gross. */
+    /** Ohne Leerraum (auch geschützte Leerzeichen), gross. */
     public static String iban(String iban) {
         return iban == null ? "" : LEERRAUM.matcher(iban).replaceAll("").toUpperCase(Locale.ROOT);
     }

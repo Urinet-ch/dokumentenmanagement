@@ -75,6 +75,7 @@ class NormalisiererTest {
             "CHE-123.456.789 IVA       | CHE123456789",
             "CHE-123.456.789 HR        | CHE123456789",
             "CHE123456789MWST          | CHE123456789",
+            "'\u00A0CHE\u00A0123.456.789\u202FMWST\u00A0' | CHE123456789",
             "' CHE-123.456.789  mwst ' | CHE123456789",
             "DE 123 456 789            | DE123456789",
             "NULL                      | ''"})
@@ -87,6 +88,7 @@ class NormalisiererTest {
             "CH93 0076 2011 6238 5295 7 | CH9300762011623852957",
             "ch9300762011623852957      | CH9300762011623852957",
             "'  CH93\t0076 2011  '      | CH9300762011",
+            "'CH93\u00A00076\u202F2011\u00A0' | CH9300762011",
             "NULL                       | ''"})
     void iban(String eingabe, String erwartet) {
         assertThat(Normalisierer.iban(eingabe)).isEqualTo(erwartet);
@@ -96,6 +98,7 @@ class NormalisiererTest {
     @CsvSource(delimiter = '|', nullValues = "NULL", value = {
             "' Info@Beispiel.CH '   | info@beispiel.ch",
             "MAX.MUSTER@EXAMPLE.ORG | max.muster@example.org",
+            "'\u00A0Info@Beispiel.CH\u202F' | info@beispiel.ch",
             "NULL                   | ''"})
     void email(String eingabe, String erwartet) {
         assertThat(Normalisierer.email(eingabe)).isEqualTo(erwartet);
