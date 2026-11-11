@@ -27,9 +27,10 @@ import java.util.Optional;
  * Die Grenze der Anfrage ({@code quarkus.http.limits.max-body-size}) prüft Quarkus vor allen Handlern und antwortet mit
  * einer leeren 413. Darum prüft {@link #grenzePruefen} sie für {@code /api/*} kurz davor am {@code Content-Length} und
  * antwortet mit Problem Details. Seit Aufgabe 2.4 ist die Grenze von Quarkus die für Uploads ({@code multipart/form-data},
- * {@code archiv.upload.max-anfrage}); alle anderen Anfragen prüft sie gegen die kleinere {@code archiv.http.max-anfrage}; die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht
- * gelesen wird. Eine Anfrage ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet
- * Quarkus weiter selbst mit 413 ohne Inhalt.
+ * {@code archiv.upload.max-anfrage}); alle anderen Anfragen prüft sie gegen die kleinere {@code archiv.http.max-anfrage}.
+ * Die Verbindung wird danach wie bei Quarkus geschlossen, weil der Rest der Anfrage nicht gelesen wird. Eine Anfrage
+ * ohne {@code Content-Length} (chunked), die erst beim Lesen zu gross wird, beantwortet Quarkus weiter selbst mit 413
+ * ohne Inhalt.
  * <p>
  * {@code UEBERLASTET} aus der Prüfung eines API-Tokens (Req 2.5) entsteht bei der proaktiven Anmeldung auf jedem Pfad,
  * auch unter {@code /q/}; {@link #ueberlastet} antwortet darum auf allen Pfaden mit 503, {@code Retry-After} und Problem

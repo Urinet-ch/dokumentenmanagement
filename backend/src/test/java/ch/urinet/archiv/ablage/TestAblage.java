@@ -1,0 +1,56 @@
+package ch.urinet.archiv.ablage;
+
+import org.eclipse.microprofile.config.ConfigProvider;
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
+
+/**
+ * Lesender Blick auf den Bucket eines Mandanten in MinIO für Szenarien ausserhalb von {@code ablage} (Aufgabe 2.4):
+ * Versionen unter einem Präfix zählen und eine Version lesen. Nutzt den Verwaltungs-Client ohne Interceptor, damit
+ * {@link S3Stoerung} ihn nicht trifft.
+ */
+public final class TestAblage {
+
+    private TestAblage() {
+    }
+
+    public static String bucket(String mandant) {
+        return ConfigProvider.getConfig().getValue("archiv.ablage.bucket-praefix", String.class) + mandant;
+    }
+
+    /** Alle Versionen (ohne Löschmarken) unter dem Präfix als {@code key@version}. */
+    public static List<String> versionen(String mandant, String praefix) {
+        List<String> versionen = new ArrayList<>();
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket(mandant)).prefix(praefix))) {
+                seite.versions().forEach(v -> versionen.add(v.key() + "@" + v.versionId()));
+            }
+        }
+        return versionen;
+    }
+
+    /** Löscht alle Versionen und Löschmarken unter dem Präfix, deren Schlüssel die Bedingung erfüllt. */
+    public static void loeschen(String mandant, String praefix, Predicate<String> schluessel) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket(mandant)).prefix(praefix))) {
+                seite.versions().stream().filter(v -> schluessel.test(v.key())).forEach(v -> s3.deleteObject(
+                        b -> b.bucket(bucket(mandant)).key(v.key()).versionId(v.versionId())));
+                seite.deleteMarkers().stream().filter(m -> schluessel.test(m.key())).forEach(m -> s3.deleteObject(
+                        b -> b.bucket(bucket(mandant)).key(m.key()).versionId(m.versionId())));
+            }
+        }
+    }
+
+    public static byte[] lesen(String mandant, String schluessel, String versionId) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            ResponseBytes<GetObjectResponse> inhalt = s3.getObjectAsBytes(b -> b.bucket(bucket(mandant))
+                    .key(schluessel).versionId(versionId));
+            return inhalt.asByteArray();
+        }
+    }
+}

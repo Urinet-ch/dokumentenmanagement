@@ -51,6 +51,11 @@ public final class TestHandler {
     public static final AuftragTyp KI_VORSCHLAG = new AuftragTyp("KI_VORSCHLAG");
     /** Dokument-IDs aus den Nutzlasten von {@code KI_VORSCHLAG}, in der Reihenfolge der Ausführung. */
     public static final List<UUID> KI_DOKUMENTE = new CopyOnWriteArrayList<>();
+    /**
+     * Platzhalter für {@code VERARBEITEN}, bis die Verarbeitung mit Aufgabe 2.6 kommt: Ohne Handler lehnt
+     * {@code AuftragService.einreihen} den Typ ab. Hält nur die Dokument-IDs fest.
+     */
+    public static final AuftragTyp VERARBEITEN = new AuftragTyp("VERARBEITEN");
     /** Steht in der Meldung der Ausnahme von {@code TEST_FEHLER}; darf nie im Log oder im Auftrag landen (Req 16.7). */
     public static final String GEHEIM = "geheimer-belegwert-4711";
 
@@ -64,6 +69,8 @@ public final class TestHandler {
     public static final AtomicInteger NACH_LETZTEM_AUFRUFE = new AtomicInteger();
     /** Lässt den nächsten Aufruf des Hooks scheitern (Absturz oder Fehler nach dem Speichern von FEHLER). */
     public static final AtomicBoolean HOOK_SCHEITERT = new AtomicBoolean();
+    /** Dokument-IDs, die {@code VERARBEITEN} erhalten hat. */
+    public static final Set<UUID> VERARBEITET = ConcurrentHashMap.newKeySet();
     public static final Set<Long> UNTERBROCHEN = ConcurrentHashMap.newKeySet();
     /** Auftrags-ID → was der Handler in der Datenbank gesehen hat. */
     public static final Map<Long, Sicht> SICHTEN = new ConcurrentHashMap<>();
@@ -93,6 +100,7 @@ public final class TestHandler {
         NACH_LETZTEM_AUFRUFE.set(0);
         HOOK_SCHEITERT.set(false);
         UNTERBROCHEN.clear();
+        VERARBEITET.clear();
         SICHTEN.clear();
         STUR_JETZT.clear();
         STUR_HOECHSTENS.clear();
@@ -135,6 +143,20 @@ public final class TestHandler {
             });
             SICHTEN.put(auftrag.id(), sicht);
             SCHEMAS.put(auftrag.id(), sicht.schema());
+        }
+    }
+
+    @ApplicationScoped
+    public static class Verarbeiten implements AuftragHandler {
+
+        @Override
+        public AuftragTyp typ() {
+            return VERARBEITEN;
+        }
+
+        @Override
+        public void ausfuehren(Auftrag auftrag) {
+            auftrag.nutzlast().uuid("dokumentId").ifPresent(VERARBEITET::add);
         }
     }
 
