@@ -65,12 +65,27 @@ public class VerarbeitungSpeichern {
      * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9, die KI läuft trotzdem) und, solange es keinen
      * Handler für {@code KI_VORSCHLAG} gibt (bis Aufgabe 3.2), ohne Vorschlag; sonst bleibt {@code VERARBEITUNG}, bis die
      * KI fertig ist.
+     * <p>
+     * {@code ohneKi} (Generator, Req 11.2): die Metadaten sind schon bestätigt, darum {@code ARCHIVIERUNG} und Auftrag
+     * {@code ARCHIVIEREN} statt {@code KI_VORSCHLAG}; bei {@code pdfa_fehlt} {@code EINGANGSKORB} ohne Folgeauftrag, der
+     * Inhaber bestätigt dort mit {@code ohnePdfa} (Req 5.9).
      *
      * @return {@code false}, wenn das Dokument nicht mehr in {@code VERARBEITUNG} ist (nichts geschrieben)
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean ergebnisSpeichern(Auftrag auftrag, UUID id, Verarbeitungsergebnis ergebnis) {
+    public boolean ergebnisSpeichern(Auftrag auftrag, UUID id, Verarbeitungsergebnis ergebnis, boolean ohneKi) {
         auftraege.anspruchSichern(auftrag);
+        if (ohneKi) {
+            DokumentStatus status = ergebnis.pdfaFehlt() ? DokumentStatus.EINGANGSKORB : DokumentStatus.ARCHIVIERUNG;
+            if (!dokumente.ergebnisSpeichern(id, ergebnis, status)) {
+                return false;
+            }
+            if (status == DokumentStatus.ARCHIVIERUNG) {
+                auftraege.einreihen(ArchivierenHandler.TYP,
+                        new Nutzlast(Map.of(VerarbeitenHandler.DOKUMENT_ID, id)));
+            }
+            return true;
+        }
         boolean ki = auftraege.hatHandler(KI_VORSCHLAG);
         DokumentStatus status = ergebnis.pdfaFehlt() || !ki ? DokumentStatus.EINGANGSKORB : DokumentStatus.VERARBEITUNG;
         if (!dokumente.ergebnisSpeichern(id, ergebnis, status)) {

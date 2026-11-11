@@ -71,6 +71,7 @@ public class DokumentErfassen {
     public static final String QUELLE_UPLOAD = "UPLOAD";
     public static final String QUELLE_SCAN = "SCAN";
     public static final String QUELLE_DRIVE = "DRIVE";
+    public static final String QUELLE_GENERATOR = "GENERATOR";
     static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
 
     private static final Logger LOG = Logger.getLogger(DokumentErfassen.class);
@@ -179,6 +180,42 @@ public class DokumentErfassen {
         return ergebnisse;
     }
 
+    /**
+     * Generator (Req 11.1; design.md «Generator-Pfad»): eine PDF wie beim Upload prüfen, die Prüfsumme zuerst
+     * festhalten (Regel 3). Eine abgelehnte Datei endet mit dem Fehlercode der Prüfung und hinterlässt nichts.
+     */
+    Geprueft pdfPruefen(Path datei) {
+        MandantCode mandant = aufloesung.pruefen();
+        Geprueft geprueft = pruefen(mandant, datei, Set.of(Dateityp.PDF), DateiRolle.ORIGINAL);
+        if (geprueft.fehler().isPresent()) {
+            LOG.infof("Datei abgelehnt: mandant=%s sha256=%s ergebnis=%s", mandant.wert(), geprueft.sha256(),
+                    geprueft.fehler().get());
+            throw new FachFehler(geprueft.fehler().get());
+        }
+        return geprueft;
+    }
+
+    Instant jetzt() {
+        return uhr.instant();
+    }
+
+    /**
+     * Legt das Generator-Dokument mit {@code quelle = GENERATOR} an und die geprüfte PDF unter {@code eingang/} ab;
+     * Metadaten und Auftrag folgen beim Aufrufer in derselben Transaktion. Rollt sie zurück, räumt das Archiv den
+     * Eingang wieder auf.
+     */
+    UUID generatorAnlegen(Geprueft pdf, Path datei, String erstelltVon, Instant eingang) {
+        MandantCode mandant = aufloesung.pruefen();
+        int jahr = eingang.atZone(ZUERICH).getYear();
+        UUID id = UUID.randomUUID();
+        repository.anlegen(new NeuesDokument(id, eingang, QUELLE_GENERATOR, erstelltVon, Optional.empty()));
+        transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
+        ablegen(mandant, DateiSchluessel.original(jahr, id, 1, pdf.typ().endung()), DateiRolle.ORIGINAL, datei, pdf);
+        LOG.infof("Datei angenommen: mandant=%s sha256=%s ergebnis=ANGENOMMEN dokument=%s nr=1", mandant.wert(),
+                pdf.sha256(), id);
+        return id;
+    }
+
     /** Ohne Benutzer (API-Token) oder ohne Leserecht keine ID (Req 2.3, 3.4). */
     private Optional<UUID> sichtbar(UploadAnfrage anfrage, UUID vorhanden) {
         return anfrage.erfasser().benutzer()
@@ -256,7 +293,7 @@ public class DokumentErfassen {
     private record Empfangen(Geprueft original, Optional<Geprueft> arbeitsfassung) {
     }
 
-    private record Geprueft(String sha256, long groesse, Instant empfangen, Dateityp typ, Optional<Fehlercode> fehler) {
+    record Geprueft(String sha256, long groesse, Instant empfangen, Dateityp typ, Optional<Fehlercode> fehler) {
         Geprueft abgelehnt(Fehlercode code) {
             return new Geprueft(sha256, groesse, empfangen, null, Optional.of(code));
         }

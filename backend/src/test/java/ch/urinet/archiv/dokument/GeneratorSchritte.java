@@ -1,0 +1,293 @@
+package ch.urinet.archiv.dokument;
+
+import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.ProblemDetails;
+import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
+import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
+import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
+import io.agroal.api.AgroalDataSource;
+import io.cucumber.java.After;
+import io.cucumber.java.de.Angenommen;
+import io.cucumber.java.de.Dann;
+import io.cucumber.java.de.Wenn;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Schritte zu Aufgabe 4.7 (Req 11.1–11.3, 11.6–11.8, 11.10, 11.11): {@code POST /api/v1/dokumente/generator} mit
+ * einem API-Token vom Scope {@code generator}, Verarbeitung und Archivierung über den Worker. Jede PDF ist eine frische
+ * synthetische Text-PDF (Req 16.15); dieselbe Bezeichnung im Szenario heisst dieselben Bytes.
+ */
+public class GeneratorSchritte {
+
+    private static final String PFAD = "/api/v1/dokumente/generator";
+    private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
+
+    private record Ort(String mandant, UUID id) {
+    }
+
+    @Inject
+    Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    VerarbeitungTestHilfe verarbeitung;
+
+    @Inject
+    ApiTokenVerwaltung tokens;
+
+    @Inject
+    AblagePort ablage;
+
+    private final Map<String, byte[]> pdfs = new HashMap<>();
+    private final Map<String, Ort> dokumente = new LinkedHashMap<>();
+    private final Map<String, String> tokenJeMandant = new HashMap<>();
+    private final List<String> tokenIds = new ArrayList<>();
+    private final List<Ort> kontakte = new ArrayList<>();
+    private String mandant;
+    private Response antwort;
+
+    @After
+    public void aufraeumen() throws Exception {
+        Map<String, List<UUID>> jeMandant = new HashMap<>();
+        for (Ort ort : dokumente.values()) {
+            ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = ?", ort.id().toString());
+            Map<String, Object> z = zeile(ort, "status, eingang");
+            if (!z.isEmpty() && !"ARCHIVIERT".equals(z.get("status"))) {
+                int jahr = ((Timestamp) z.get("eingang")).toInstant().atZone(ZUERICH).getYear();
+                ablage.loeschenEingang(new MandantCode(ort.mandant()), jahr, ort.id());
+            }
+            jeMandant.computeIfAbsent(ort.mandant(), m -> new ArrayList<>()).add(ort.id());
+        }
+        for (Map.Entry<String, List<UUID>> e : jeMandant.entrySet()) {
+            Testdokumente.loeschen(datenbank.get(), e.getKey(), e.getValue());
+        }
+        for (Ort kontakt : kontakte) {
+            ausfuehren("delete from " + schema(kontakt.mandant()) + ".kontakt where id = ?", kontakt.id());
+        }
+        for (String id : tokenIds) {
+            ausfuehren("delete from public.api_client where id = ?", id);
+        }
+    }
+
+    @Angenommen("der Generator ist bereit")
+    public void bereit() throws Exception {
+        verarbeitung.vorbereiten();
+        ausfuehren("delete from public.auftrag where typ = 'ARCHIVIEREN'");
+    }
+
+    @Angenommen("der Generator von «{word}» hat ein API-Token")
+    public void token(String code) {
+        ApiTokenVerwaltung.Erstellt erstellt = tokens.erstellen(code, "Probe Generator", "generator");
+        tokenJeMandant.put(code, erstellt.token().text());
+        tokenIds.add(erstellt.token().id());
+        mandant = code;
+    }
+
+    @Angenommen("im Mandanten «{word}» gibt es den CRM-Kontakt «{}» mit der crmId «{word}»")
+    public void kontakt(String code, String name, String crmId) throws SQLException {
+        UUID id = UUID.randomUUID();
+        ausfuehren("delete from " + schema(code) + ".kontakt where crm_id = ?", crmId);
+        ausfuehren("insert into " + schema(code) + ".kontakt (id, typ, name, name_normalisiert, quelle, crm_id) "
+                + "values (?, 'ORGANISATION', ?, ?, 'TEST', ?)", id, name, name.toLowerCase(), crmId);
+        kontakte.add(new Ort(code, id));
+    }
+
+    @Wenn("der Generator die PDF «{word}» mit diesen Metadaten sendet:")
+    public void senden(String pdf, String metadaten) {
+        antwort = senden(given().header("Authorization", "Bearer " + tokenJeMandant.get(mandant)), pdf, metadaten);
+    }
+
+    @Wenn("«{word}» die PDF «{word}» mit diesen Metadaten an den Generator sendet:")
+    public void sendenAlsBenutzer(String benutzer, String pdf, String metadaten) {
+        antwort = senden(given().auth().oauth2(Testanmeldung.token(benutzer)), pdf, metadaten);
+    }
+
+    @Angenommen("die Verarbeitung des Generator-Dokuments «{word}» ist gescheitert")
+    public void gescheitert(String name) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = ?", ort.id().toString());
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set status = 'FEHLER', "
+                + "fehler = 'Probe: Verarbeitung gescheitert' where id = ?", ort.id());
+    }
+
+    @Wenn("«{word}» das Generator-Dokument «{word}» verwirft")
+    public void verwerfen(String benutzer, String name) throws SQLException {
+        Ort ort = ort(name);
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .header("If-Match", "\"" + zeile(ort, "version").get("version") + "\"")
+                .contentType(ContentType.JSON).body(Map.of("grund", "Probe: falscher Betrag"))
+                .when().post("/api/v1/dokumente/" + ort.id() + "/verwerfen");
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(204);
+    }
+
+    @Wenn("der Worker die Generator-Aufträge abarbeitet")
+    public void abarbeiten() throws Exception {
+        verarbeitung.abarbeiten();
+    }
+
+    @Dann("antwortet der Generator mit 202 und dem neuen Dokument «{word}»")
+    public void neu(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(202);
+        assertThat(antwort.<String>path("status")).isEqualTo("NEU");
+        UUID id = UUID.fromString(antwort.path("id"));
+        assertThat(antwort.header("Location")).endsWith("/api/v1/dokumente/" + id);
+        assertThat(dokumente.values()).extracting(Ort::id).doesNotContain(id);
+        dokumente.put(name, new Ort(mandant, id));
+    }
+
+    @Dann("antwortet der Generator mit 200 und dem vorhandenen Dokument «{word}» im Status «{word}»")
+    public void vorhanden(String name, String status) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("id")).isEqualTo(ort(name).id().toString());
+        assertThat(antwort.<String>path("status")).isEqualTo(status);
+        assertThat(antwort.header("Location")).isNull();
+    }
+
+    @Dann("antwortet der Generator mit Status {int} und Fehlercode «{word}»")
+    public void fehler(int status, String code) {
+        assertThat(ProblemDetails.pruefen(antwort, status, "felder")).as(antwort.asString()).isEqualTo(code);
+    }
+
+    @Dann("nennt die Generator-Antwort die fehlenden Felder {string}")
+    public void felder(String felder) {
+        assertThat(antwort.jsonPath().<String>getList("felder"))
+                .containsExactlyInAnyOrderElementsOf(Arrays.asList(felder.split(",\\s*")));
+    }
+
+    @Dann("gibt es im Mandanten «{word}» kein Dokument zur PDF «{word}»")
+    public void keinDokument(String code, String pdf) throws Exception {
+        assertThat(dokumenteZurPdf(code, pdf)).isEmpty();
+    }
+
+    @Dann("gibt es im Mandanten «{word}» genau ein Dokument zur PDF «{word}»")
+    public void einDokument(String code, String pdf) throws Exception {
+        assertThat(dokumenteZurPdf(code, pdf)).hasSize(1);
+    }
+
+    /** Spalten von {@code dokument} als Text; {@code null} heisst leer, {@code TOKEN} der Principal des Tokens. */
+    @Dann("hat das Generator-Dokument «{word}» diese Werte:")
+    public void werte(String name, Map<String, String> erwartet) throws SQLException {
+        Ort ort = ort(name);
+        String principal = ApiToken.principal(ApiToken.lesen(tokenJeMandant.get(ort.mandant())).orElseThrow().id());
+        for (Map.Entry<String, String> e : erwartet.entrySet()) {
+            String wert = "TOKEN".equals(e.getValue()) ? principal : e.getValue() == null ? "null" : e.getValue();
+            assertThat(String.valueOf(zeile(ort, e.getKey()).get(e.getKey()))).as(e.getKey()).isEqualTo(wert);
+        }
+    }
+
+    @Dann("ist für das Generator-Dokument «{word}» ein Auftrag «VERARBEITEN» ohne KI eingereiht")
+    public void ohneKiEingereiht(String name) throws SQLException {
+        assertThat(abfragen("select nutzlast ->> 'ohneKi' as ohne_ki from public.auftrag where typ = 'VERARBEITEN' "
+                + "and status = 'OFFEN' and nutzlast ->> 'dokumentId' = ?", ort(name).id().toString()))
+                .singleElement().isEqualTo("true");
+    }
+
+    @Dann("ist das Generator-Dokument «{word}» archiviert, ohne KI-Vorschlag")
+    public void archiviert(String name) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> z = zeile(ort, "status, archiviert, s3_pdfa, sperre_bis, eingang");
+        assertThat(z.get("status")).isEqualTo("ARCHIVIERT");
+        assertThat(z.get("archiviert")).isNotNull();
+        assertThat(z.get("s3_pdfa")).asString().startsWith("archiv/");
+        assertThat(z.get("sperre_bis")).isNotNull();
+        assertThat(verarbeitung.auftraege("KI_VORSCHLAG", ort.id())).isEmpty();
+        int jahr = ((Timestamp) z.get("eingang")).toInstant().atZone(ZUERICH).getYear();
+        assertThat(verarbeitung.objektversionen(ort.mandant(), "archiv/" + jahr + "/" + ort.id() + "/")).isNotEmpty();
+    }
+
+    @Dann("ist das Generator-Dokument «{word}» im Status «{word}»")
+    public void status(String name, String status) throws SQLException {
+        assertThat(zeile(ort(name), "status").get("status")).isEqualTo(status);
+    }
+
+    private Response senden(RequestSpecification anfrage, String pdf, String metadaten) {
+        byte[] inhalt = pdfs.computeIfAbsent(pdf, n -> OcrTestdateien.textPdf("Synthetischer Generator-Beleg " + n,
+                "Kennung " + UUID.randomUUID()));
+        return anfrage.multiPart("datei", pdf + ".pdf", inhalt, "application/pdf")
+                .multiPart("metadaten", metadaten).when().post(PFAD);
+    }
+
+    private List<String> dokumenteZurPdf(String code, String pdf) throws Exception {
+        String sha = VerarbeitungTestHilfe.sha256(pdfs.get(pdf));
+        return abfragen("select dokument_id::text from " + schema(code) + ".dokument_datei where sha256 = ? "
+                + "and rolle = 'ORIGINAL'", sha);
+    }
+
+    private Ort ort(String name) {
+        Ort ort = dokumente.get(name);
+        if (ort == null) {
+            throw new IllegalArgumentException("Unbekanntes Generator-Dokument: " + name);
+        }
+        return ort;
+    }
+
+    private Map<String, Object> zeile(Ort ort, String spalten) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select " + spalten + " from " + schema(ort.mandant()) + ".dokument where id = ?")) {
+            abfrage.setObject(1, ort.id());
+            try (ResultSet z = abfrage.executeQuery()) {
+                Map<String, Object> zeile = new HashMap<>();
+                if (z.next()) {
+                    for (int i = 1; i <= z.getMetaData().getColumnCount(); i++) {
+                        zeile.put(z.getMetaData().getColumnLabel(i), z.getObject(i));
+                    }
+                }
+                return zeile;
+            }
+        }
+    }
+
+    private List<String> abfragen(String sql, Object... werte) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            for (int i = 0; i < werte.length; i++) {
+                abfrage.setObject(i + 1, werte[i]);
+            }
+            List<String> ergebnis = new ArrayList<>();
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    ergebnis.add(z.getString(1));
+                }
+            }
+            return ergebnis;
+        }
+    }
+
+    private void ausfuehren(String sql, Object... werte) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement(sql)) {
+            for (int i = 0; i < werte.length; i++) {
+                befehl.setObject(i + 1, werte[i]);
+            }
+            befehl.executeUpdate();
+        }
+    }
+
+    private static String schema(String code) {
+        return new MandantCode(code).schema();
+    }
+}

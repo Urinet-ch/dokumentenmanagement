@@ -439,6 +439,110 @@ components:
         groesse:
           type: integer
           format: int32
+    GeneratorAntwort:
+      type: object
+      required:
+      - id
+      - status
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        status:
+          type: string
+          description: "NEU bei 202, sonst der aktuelle Status des vorhandenen Dokuments"
+    GeneratorFinanz:
+      description: Nur bei Arten mit der Gruppe finanz; sonst ignoriert
+      type: object
+      properties:
+        belegnummer:
+          type: string
+        richtung:
+          type: string
+          enum:
+          - EINNAHME
+          - AUSGABE
+        betrag:
+          pattern: "^-?\\d{1,10}(\\.\\d{1,2})?$"
+          type: string
+          examples:
+          - "408.00"
+        waehrung:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: Standard CHF
+        faelligkeit:
+          $ref: "#/components/schemas/LocalDate"
+        qrReferenz:
+          type: string
+        konto:
+          type: string
+    GeneratorMetadaten:
+      description: "Metadaten des Generators (design.md, Beispiele). Pflicht sind\
+        \ art und die Pflichtfelder der Art; bei Arten mit Standard PERSONAL zusä\
+        tzlich vertraulichkeit und personBenutzer (Req 11.10), sonst gilt ohne Angabe\
+        \ die Standard-Vertraulichkeit der Art."
+      type: object
+      required:
+      - art
+      properties:
+        art:
+          type: string
+        titel:
+          type: string
+        datum:
+          $ref: "#/components/schemas/LocalDate"
+        vertraulichkeit:
+          type: string
+          enum:
+          - NORMAL
+          - INTERN
+          - PERSONAL
+        personBenutzer:
+          type: string
+          description: "Keycloak-ID (sub) des betroffenen Mitarbeiters, nicht der\
+            \ Benutzername"
+        partner:
+          $ref: "#/components/schemas/GeneratorPartner"
+        finanz:
+          $ref: "#/components/schemas/GeneratorFinanz"
+        vertrag:
+          $ref: "#/components/schemas/GeneratorVertrag"
+        tags:
+          type: array
+          items:
+            type: string
+        projekt:
+          type: string
+        geschaeftsjahr:
+          type: integer
+          format: int32
+          description: Ohne Angabe Vorschlag aus Belegdatum (Req 9.6)
+        zusatz:
+          description: Zusatzfelder nach dem Schema der Art
+          type: object
+          $ref: "#/components/schemas/JsonObjekt"
+    GeneratorPartner:
+      type: object
+      description: Partner aus 21.CRM; massgeblich ist nur crmId (Req 11.7)
+      properties:
+        crmId:
+          type: string
+          description: ID des Kontakts aus 21.CRM
+        name:
+          type: string
+          description: Nur zur Lesbarkeit; das Archiv übernimmt den Namen des Kontakts
+    GeneratorVertrag:
+      type: object
+      description: Nur bei Arten mit der Gruppe vertrag; sonst ignoriert
+      properties:
+        gueltigAb:
+          $ref: "#/components/schemas/LocalDate"
+        gueltigBis:
+          $ref: "#/components/schemas/LocalDate"
+        kuendigungsfrist:
+          type: string
+        naechsteFrist:
+          $ref: "#/components/schemas/LocalDate"
     ImportHochgeladen:
       type: object
       properties:
@@ -1264,6 +1368,72 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/dokumente/generator:
+    post:
+      summary: PDF mit Metadaten aus einem Generator ablegen
+      description: "Nur mit API-Token vom Scope generator (Req 11.1). Das Dokument\
+        \ wird ohne KI verarbeitet und archiviert (Req 11.2); 202 heisst angenommen,\
+        \ Status und Fehler zeigt das Dokument."
+      tags:
+      - Dokumente
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                datei:
+                  type: string
+                  format: binary
+                  description: PDF bis 50 MB
+                metadaten:
+                  type: string
+                  description: GeneratorMetadaten als JSON-Text
+        required: true
+      responses:
+        "202":
+          description: Angenommen; Verarbeitung und Archivierung folgen im Worker
+          headers:
+            Location:
+              description: URL des Dokuments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorAntwort"
+        "200":
+          description: Dieselbe PDF liegt schon im Archiv (Req 11.8)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratorAntwort"
+        "400":
+          description: "Metadaten kein gültiges JSON, unbekanntes Feld, unbekannte\
+            \ Art oder ungültiger Wert (Richtung, Währung, Betrag, Vertraulichkeit)"
+        "403":
+          description: Kein API-Token vom Scope generator
+        "409":
+          description: "BELEGNUMMER_VERGEBEN (Req 11.3) oder FRIST_ABGELAUFEN (Req\
+            \ 9.8); nichts angelegt, nicht erneut senden (Req 11.9)"
+        "413":
+          description: Datei über 50 MB
+        "415":
+          description: Keine PDF
+        "422":
+          description: "PFLICHTFELD_FEHLT mit Liste (Req 11.6, 11.10), PARTNER_UNBEKANNT\
+            \ (Req 11.7), ZUSATZ_UNGUELTIG oder Datei leer bzw. beschädigt"
+        "503":
+          description: Speicher nicht erreichbar; nichts wurde angelegt
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten Versuch
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - geschaeftsstelle
+        - api-token:generator
   /api/v1/dokumente/{id}:
     get:
       summary: Metadaten eines Dokuments lesen

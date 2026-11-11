@@ -49,6 +49,15 @@ public interface DokumentStatusPort {
      */
     boolean bestaetigen(UUID id, int version, Bestaetigt daten);
 
+    /**
+     * Generator (Req 11.2): schreibt die Metadaten wie {@link #bestaetigen} samt {@code zusatz} (JSON-Objekt oder
+     * {@code null}) an ein eben angelegtes Dokument; der Status bleibt {@code NEU}, die Verarbeitung ohne KI setzt danach
+     * {@code ARCHIVIERUNG}. Sperrt die Zeile mit {@code for update}.
+     *
+     * @return {@code false}, wenn das Dokument nicht (mehr) im Status {@code NEU} ist (nichts geändert)
+     */
+    boolean generatorMetadaten(UUID id, Bestaetigt daten, String zusatzJson);
+
     /** {@code VERWORFEN} mit Grund, Dateien als verworfen markiert (Req 6.6). */
     boolean verwerfen(UUID id, int version, String grund);
 

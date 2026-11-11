@@ -97,6 +97,32 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
         if (!DokumentStatus.EINGANGSKORB.name().equals(e.status) || e.version != version) {
             return false;
         }
+        e.status = DokumentStatus.ARCHIVIERUNG.name();
+        e.statusGrund = null;
+        e.fehler = null;
+        metadatenSchreiben(e, daten);
+        em().flush();
+        return true;
+    }
+
+    @Override
+    public boolean generatorMetadaten(UUID id, Bestaetigt daten, String zusatzJson) {
+        DokumentEintrag e = em().find(DokumentEintrag.class, id);
+        if (e == null) {
+            return false;
+        }
+        em().refresh(e, LockModeType.PESSIMISTIC_WRITE);
+        if (!DokumentStatus.NEU.name().equals(e.status)) {
+            return false;
+        }
+        e.zusatz = zusatzJson;
+        metadatenSchreiben(e, daten);
+        em().flush();
+        return true;
+    }
+
+    /** Bestätigte Metadaten, Finanz- und Vertragsteil; Zahlstatus und AbaNinja-Felder bleiben (Regel 8). */
+    private static void metadatenSchreiben(DokumentEintrag e, Bestaetigt daten) {
         OffsetDateTime jetzt = OffsetDateTime.now(ZoneOffset.UTC);
         e.art = daten.art();
         e.titel = daten.titel();
@@ -110,20 +136,16 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
         e.geschaeftsjahr = daten.geschaeftsjahr();
         e.aufbewahrenBis = daten.aufbewahrenBis();
         e.fristAbgelaufen = daten.fristAbgelaufen();
-        e.status = DokumentStatus.ARCHIVIERUNG.name();
-        e.statusGrund = null;
-        e.fehler = null;
         e.bestaetigt = jetzt;
         e.bestaetigtVon = daten.bestaetigtVon();
         e.geaendert = jetzt;
         daten.finanz().ifPresent(f -> {
-            DokumentFinanzEintrag z = em().find(DokumentFinanzEintrag.class, id);
+            DokumentFinanzEintrag z = em().find(DokumentFinanzEintrag.class, e.id);
             boolean neu = z == null;
             if (neu) {
                 z = new DokumentFinanzEintrag();
-                z.dokumentId = id;
+                z.dokumentId = e.id;
             }
-            // Zahlstatus und AbaNinja-Felder bleiben (Regel 8)
             z.belegnummer = f.belegnummer();
             z.richtung = f.richtung();
             z.betrag = f.betrag();
@@ -136,11 +158,11 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
             }
         });
         daten.vertrag().ifPresent(v -> {
-            DokumentVertragEintrag z = em().find(DokumentVertragEintrag.class, id);
+            DokumentVertragEintrag z = em().find(DokumentVertragEintrag.class, e.id);
             boolean neu = z == null;
             if (neu) {
                 z = new DokumentVertragEintrag();
-                z.dokumentId = id;
+                z.dokumentId = e.id;
             }
             z.gueltigAb = v.gueltigAb();
             z.gueltigBis = v.gueltigBis();
@@ -150,8 +172,6 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
                 em().persist(z);
             }
         });
-        em().flush();
-        return true;
     }
 
     @Override
