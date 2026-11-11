@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @QuarkusTest
 @TestProfile(SecretDateienTest.ProdMitSecretDateien.class)
-class SecretDateienTest {
+public class SecretDateienTest {
 
     public static class ProdMitSecretDateien implements QuarkusTestProfile {
         @Override
@@ -33,7 +33,7 @@ class SecretDateienTest {
     }
 
     /** Profil {@code prod} ohne Datenbank, Keycloak und PWA; nur die Secret-Dateien kommen aus {@code verzeichnis}. */
-    static Map<String, String> prodOhneDienste(String verzeichnis) {
+    public static Map<String, String> prodOhneDienste(String verzeichnis) {
         return Map.of(
                 "smallrye.config.source.file.locations",
                 Path.of("src/test/resources/secrets-test", verzeichnis).toAbsolutePath().toString(),

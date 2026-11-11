@@ -153,3 +153,46 @@ Vorgehen, **nur mit dem synthetischen Text unten, nie mit einem Beleg**:
    `strict` gilt als durchgesetzt, wenn auch die Gegenprobe schemakonform ist (`true`, `true`, `true`, `[]`).
    Sonst festhalten, welche Merkmale verletzt wurden (z. B. `anyOf`, Enum, `additionalProperties`).
 3. Aufräumen: `rm /tmp/strict-probe.json /tmp/strict-gegenprobe.json`.
+
+## Smoke-Test Ablage gegen Infomaniak
+
+Die Tests der Ablage (Aufgabe 2.3) laufen gegen MinIO. `InfomaniakAblageSmokeIT` prüft dieselben Wege einmal mit dem
+Java SDK gegen den Object Storage von Infomaniak (Spike 0.2, design.md «Ablage», Open Points). **Nur von Hand durch
+Fabian, vor Aufgabe 2.6, nie in der CI.** Ohne die Property `archiv.smoke.zugang` wird der Test übersprungen; als
+`*IT` führt ihn `mvn verify` ohnehin nicht aus.
+
+Was der Test tut:
+- legt einen eigenen Wegwerf-Bucket `urinet-archiv-smoke-<zufall>` mit Object Lock und Versionierung an (bestehende
+  Buckets fasst er nicht an) und arbeitet nur mit synthetischen Inhalten;
+- prüft Eingang, `GetObjectRetention` ohne Sperre und für eine fehlende Version (gibt die Fehlercodes aus), Archivieren
+  mit und ohne Pflicht, Löschen und Verkürzen ohne Bypass-Header, nur Verlängern, vorsignierte URL (GET 200, PUT 403),
+  neuer Versuch ohne Quelle (bricht ab, Kopie bleibt), Manifest in COMPLIANCE und dass der Bypass-Header den Rechner
+  nicht verlässt;
+- sperrt höchstens 2 Minuten, wartet danach und löscht alle Versionen und den Bucket ohne Bypass-Header. Gelingt das
+  nicht, nennt er den Bucket mit `NICHT aufgeräumt`; dann nach Ablauf der Sperren von Hand löschen.
+
+Ausgabe: Zeilen `SMOKE …` mit Schritt, Fehlercodes und Ergebnis, keine Inhalte und keine signierten URLs. Mit
+`-Darchiv.smoke.endpunkt=http://127.0.0.1:<port>` und `-Darchiv.smoke.region=us-east-1` läuft er probeweise gegen ein
+lokales MinIO (so am 10.11.2026 durchgelaufen); als Nachweis zählt nur der Lauf gegen Infomaniak.
+
+### Ausführen
+1. Einen EC2-Schlüssel eines OpenStack-Benutzers im Projekt des Object Storage verwenden (wie `archiv-apptest` im
+   Spike 0.2), **nicht** den Inhaber-Zugang. Den Schlüssel nur als Dateien ablegen, nie als Umgebungsvariable
+   (tech.md Regel 7):
+   ```bash
+   mkdir -p ~/.config/urinet-archiv/s3-smoke && chmod 700 ~/.config/urinet-archiv/s3-smoke
+   cd ~/.config/urinet-archiv/s3-smoke
+   (umask 077; pbpaste > zugang_id)          # Access Key aus der Zwischenablage
+   (umask 077; pbpaste > zugang_geheimnis)   # Secret Key aus der Zwischenablage
+   ```
+   Der Test liest die Dateien nur mit den Rechten 600 oder 400.
+2. Im Ordner `backend/` starten (ohne Docker, der Test startet kein Quarkus):
+   ```bash
+   mvn -ntp test -Dtest=InfomaniakAblageSmokeIT -Dsurefire.failIfNoSpecifiedTests=false \
+     -Darchiv.smoke.zugang=$HOME/.config/urinet-archiv/s3-smoke | grep -E "SMOKE|Tests run|FAIL"
+   ```
+   Dauer: rund 3–4 Minuten (Warten auf das Ende der Sperren).
+3. Ergebnis (die Zeilen `SMOKE`, ohne Schlüssel) in design.md, Open Points, Punkt «Ablage mit dem Java SDK gegen
+   Infomaniak», festhalten. Weicht ein Fehlercode ab (z. B. `GetObjectRetention` ohne Sperre), ist das ein Befund für
+   die Ablage, nicht für den Test.
+4. Aufräumen: `rm -r ~/.config/urinet-archiv/s3-smoke`, falls der Schlüssel nicht weiter gebraucht wird.

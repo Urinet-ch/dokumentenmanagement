@@ -8,6 +8,7 @@ import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
 import ch.urinet.archiv.ki.adapter.out.stub.KiStub;
 import ch.urinet.archiv.verarbeitung.adapter.out.OcrAuswahl;
 import ch.urinet.archiv.verarbeitung.adapter.out.stub.OcrStub;
+import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
 import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,16 +48,28 @@ class StubSchalterTest {
         KiStub ki = new KiStub();
         OcrStub ocr = new OcrStub();
         IntegrationStub integration = new IntegrationStub();
-        assertThat(new AblageAuswahl().ablage(true, ablage)).isSameAs(ablage);
+        assertThat(new AblageAuswahl().ablage(true, ablage, null)).isSameAs(ablage);
         assertThat(new KiAuswahl().ki(true, ki)).isSameAs(ki);
         assertThat(new OcrAuswahl().ocr(true, ocr)).isSameAs(ocr);
         assertThat(new IntegrationAuswahl().integration(true, integration)).isSameAs(integration);
     }
 
     @Test
+    void inProdBrichtNurEinStubOderEinFehlenderAdapterOhnePlanAb() {
+        var ports = List.of(new AblageAuswahl().auswahl(false), new KiAuswahl().auswahl(false),
+                new OcrAuswahl().auswahl(false), new IntegrationAuswahl().auswahl(false));
+        var befund = PortAuswahl.pruefe(ports);
+        assertThat(befund.abbrueche()).isEmpty();
+        assertThat(befund.warnungen()).hasSize(3).noneMatch(w -> w.startsWith("AblagePort"));
+
+        assertThat(PortAuswahl.pruefe(List.of(new AblageAuswahl().auswahl(true))).abbrueche())
+                .containsExactly("AblagePort: Dev-Stub ist in prod nicht zulässig");
+        assertThat(PortAuswahl.pruefe(List.of(new PortAuswahl("XPort", false, false, Optional.empty()))).abbrueche())
+                .containsExactly("XPort: kein Adapter");
+    }
+
+    @Test
     void ohneStubUndOhneAdapterBrichtDieAuswahlAb() {
-        assertThatThrownBy(() -> new AblageAuswahl().ablage(false, new AblageStub()))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("2.3");
         assertThatThrownBy(() -> new KiAuswahl().ki(false, new KiStub()))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("3.2");
         assertThatThrownBy(() -> new OcrAuswahl().ocr(false, new OcrStub()))

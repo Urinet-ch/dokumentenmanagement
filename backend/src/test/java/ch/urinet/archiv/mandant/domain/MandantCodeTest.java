@@ -21,6 +21,16 @@ class MandantCodeTest {
     }
 
     @Test
+    void codesMitAStrichSindFuerStufeAReserviert() {
+        for (String code : new String[]{"a-urinet", "a-x"}) {
+            assertThatThrownBy(() -> new MandantCode(code)).as(code).isInstanceOf(IllegalArgumentException.class);
+        }
+        for (String code : new String[]{"a", "ab-x", "aa-x", "x-a-y"}) {
+            assertThat(new MandantCode(code).wert()).isEqualTo(code);
+        }
+    }
+
+    @Test
     void ungueltigeCodesUndBuckets() {
         for (String code : new String[]{"Urinet", "m_x", "-urinet", "urinet-", "a--b", "", "x".repeat(41)}) {
             assertThatThrownBy(() -> new MandantCode(code)).as(code).isInstanceOf(IllegalArgumentException.class);
