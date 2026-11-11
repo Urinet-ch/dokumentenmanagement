@@ -189,7 +189,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nachweis 6.5 (JUnit): Request-Interceptor in den Integrationstests prüft, dass kein S3-Aufruf der Anwendung `x-amz-bypass-governance-retention` sendet; ergänzend ArchUnit-Regel gegen `bypassGovernanceRetention` im Produktionscode (Testklassen ausgenommen)
   - _Anforderungen: 6.2, 6.3, 6.4, 6.5, 6.9, 6.11, 6.12, 14.6_
 
-- [ ] 2.4 Upload-Endpunkt [Backend]
+- [x] 2.4 Upload-Endpunkt [Backend]
   - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
