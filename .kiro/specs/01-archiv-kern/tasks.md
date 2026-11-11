@@ -193,7 +193,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
-  - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; bis dahin braucht 2.4 im Test einen Handler für `VERARBEITEN` (nur unter `src/test`).
+  - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; 2.4 nutzt den echten Handler aus 2.6 (Teil b), Szenario Upload → `VERARBEITUNG` → `KI_VORSCHLAG` in `upload.feature`.
   - generierten OpenAPI-Client an die Upload-Seite der PWA anschliessen (`UploadPort`, aus 2.7) und die Browser-Szenarien `dokument/upload-pwa.feature` gegen das echte Backend laufen lassen (danach `@attrappe` entfernen)
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 

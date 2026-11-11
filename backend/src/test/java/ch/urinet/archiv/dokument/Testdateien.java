@@ -1,5 +1,7 @@
 package ch.urinet.archiv.dokument;
 
+import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -19,10 +21,14 @@ public final class Testdateien {
     private Testdateien() {
     }
 
-    /** Datei des Typs ({@code pdf}, {@code jpeg}, {@code png}, {@code heic}, {@code heif}, {@code tiff}, {@code text}). */
+    /**
+     * Datei des Typs ({@code pdf}, {@code jpeg}, {@code png}, {@code heic}, {@code heif}, {@code tiff}, {@code text});
+     * {@code pdf-text} ist ein vollständiges digitales PDF mit Textebene, das die echte Verarbeitung (OCRmyPDF) annimmt.
+     */
     public static byte[] erzeugen(String typ) {
         return switch (typ) {
             case "pdf" -> pdf();
+            case "pdf-text" -> OcrTestdateien.textPdf("Testrechnung Upload", zufall());
             case "jpeg" -> jpeg();
             case "png" -> png();
             case "heic" -> isoBmff("heic");

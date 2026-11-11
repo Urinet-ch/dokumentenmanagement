@@ -98,12 +98,14 @@ public class UploadSchritte {
         S3Stoerung.aus();
         for (Map.Entry<String, Set<UUID>> eintrag : angelegt.entrySet()) {
             List<UUID> ids = List.copyOf(eintrag.getValue());
-            ausfuehren("delete from public.auftrag where typ = 'VERARBEITEN' "
+            ausfuehren("delete from public.auftrag where typ in ('VERARBEITEN', 'KI_VORSCHLAG') "
                     + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))",
                     String.join(",", ids.stream().map(UUID::toString).toList()));
             Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), ids);
             Set<String> ordner = new HashSet<>(ids.stream().map(id -> "/" + id + "/").toList());
             TestAblage.loeschen(eintrag.getKey(), "eingang/", schluessel -> ordner.stream().anyMatch(schluessel::contains));
+            TestAblage.loeschen(eintrag.getKey(), "vorschau/", schluessel -> ordner.stream()
+                    .anyMatch(o -> schluessel.startsWith("vorschau" + o)));
         }
         angelegt.clear();
         for (String id : tokenIds) {
@@ -278,6 +280,36 @@ public class UploadSchritte {
             assertThat(abfragen("select status from public.auftrag where typ = 'VERARBEITEN' and mandant = ? "
                     + "and nutzlast->>'dokumentId' = ?", mandant, id.toString())).as(id.toString()).singleElement()
                     .satisfies(z -> assertThat(z.get("status")).isEqualTo("OFFEN"));
+        }
+    }
+
+    @Dann("ist der Auftrag «VERARBEITEN» jedes neuen Dokuments «FERTIG»")
+    public void verarbeitet() throws SQLException {
+        assertThat(neueIds()).isNotEmpty();
+        for (UUID id : neueIds()) {
+            assertThat(abfragen("select status from public.auftrag where typ = 'VERARBEITEN' and mandant = ? "
+                    + "and nutzlast->>'dokumentId' = ?", mandant, id.toString())).as(id.toString()).singleElement()
+                    .satisfies(z -> assertThat(z.get("status")).isEqualTo("FERTIG"));
+        }
+    }
+
+    @Dann("steht jedes neue Dokument im Status «VERARBEITUNG» mit PDF\\/A und Volltext")
+    public void inVerarbeitung() throws SQLException {
+        for (UUID id : neueIds()) {
+            Map<String, String> zeile = abfragen("select status, s3_pdfa, sha256_pdfa, volltext from " + schema()
+                    + ".dokument where id = ?::uuid", id.toString()).getFirst();
+            assertThat(zeile).containsEntry("status", "VERARBEITUNG");
+            assertThat(zeile.get("s3_pdfa")).startsWith("eingang/").endsWith("/" + id + "/pdfa.pdf");
+            assertThat(zeile.get("sha256_pdfa")).isNotBlank();
+            assertThat(zeile.get("volltext")).contains("Testrechnung Upload");
+        }
+    }
+
+    @Dann("ist für jedes neue Dokument genau ein Auftrag «KI_VORSCHLAG» eingereiht")
+    public void kiVorschlag() throws SQLException {
+        for (UUID id : neueIds()) {
+            assertThat(abfragen("select status from public.auftrag where typ = 'KI_VORSCHLAG' and mandant = ? "
+                    + "and nutzlast->>'dokumentId' = ?", mandant, id.toString())).as(id.toString()).hasSize(1);
         }
     }
 

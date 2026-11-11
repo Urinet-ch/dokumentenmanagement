@@ -33,6 +33,21 @@ Funktionalität: Upload von Dateien
     Und ist für jedes neue Dokument genau ein Auftrag «VERARBEITEN» eingereiht
     Und bleiben keine temporären Dateien des Uploads zurück
 
+  @req-3.2 @req-5.1
+  Szenario: Nach dem Upload verarbeitet der Worker das Dokument und reiht den KI-Vorschlag ein
+    Angenommen die Verarbeitung ist bereit
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei        | typ      |
+      | rechnung.pdf | pdf-text |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei        | status |
+      | rechnung.pdf | NEU    |
+    Und ist für jedes neue Dokument genau ein Auftrag «VERARBEITEN» eingereiht
+    Wenn der Worker die Aufträge bearbeitet
+    Dann ist der Auftrag «VERARBEITEN» jedes neuen Dokuments «FERTIG»
+    Und steht jedes neue Dokument im Status «VERARBEITUNG» mit PDF/A und Volltext
+    Und ist für jedes neue Dokument genau ein Auftrag «KI_VORSCHLAG» eingereiht
+
   @req-3.1 @req-3.6
   Szenario: Eine Datei von genau 50 MB wird angenommen
     Wenn «inhaber-urinet» diese Dateien hochlädt:
