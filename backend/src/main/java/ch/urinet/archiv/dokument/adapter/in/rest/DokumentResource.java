@@ -201,6 +201,8 @@ public class DokumentResource {
                     + "fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.")
     @APIResponse(responseCode = "202", description = "Bestätigt, Archivierung eingereiht",
             headers = @Header(name = "ETag", description = "Neue Version des Dokuments"))
+    @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response bestaetigen(@PathParam("id") UUID id,
                                 @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                                 BestaetigungDto angaben) {
@@ -223,6 +225,8 @@ public class DokumentResource {
             description = "Nur aus EINGANGSKORB und FEHLER (sonst 409 STATUS_KONFLIKT, nichts wird gelöscht). Löscht "
                     + "alle Dateien unter eingang/ und protokolliert je Datei SHA-256 und Grund (Req 6.6, 6.7).")
     @APIResponse(responseCode = "204", description = "Verworfen")
+    @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response verwerfen(@PathParam("id") UUID id,
                               @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                               VerwerfenDto angaben) {
@@ -242,6 +246,8 @@ public class DokumentResource {
                     + "Metadaten unverändert); sonst 409 STATUS_KONFLIKT (Req 6.8, 6.13).")
     @APIResponse(responseCode = "202", description = "Neuer Auftrag eingereiht",
             headers = @Header(name = "ETag", description = "Neue Version des Dokuments"))
+    @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
+    @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response wiederholen(@PathParam("id") UUID id,
                                 @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch) {
         aufloesung.pruefen();

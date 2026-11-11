@@ -205,9 +205,7 @@ public class BestaetigenSchritte {
 
     @Wenn("«{word}» das Dokument «{word}» mit einer veralteten Version bestätigt")
     public void veraltet(String benutzer, String name) throws SQLException {
-        int version = ((Number) spalte(ort(name), "version")).intValue();
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"" + (version - 1) + "\"")
-                .contentType(ContentType.JSON).body(Map.of("art", "QUITTUNG"))
+        antwort = mitVeralteterVersion(benutzer, name).contentType(ContentType.JSON).body(Map.of("art", "QUITTUNG"))
                 .when().post("/api/v1/dokumente/" + ort(name).id() + "/bestaetigen");
     }
 
@@ -220,6 +218,30 @@ public class BestaetigenSchritte {
     @Wenn("«{word}» für das Dokument «{word}» «wiederholen» wählt")
     public void wiederholen(String benutzer, String name) throws SQLException {
         antwort = mitVersion(benutzer, name).when().post("/api/v1/dokumente/" + ort(name).id() + "/wiederholen");
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» ohne If-Match verwirft")
+    public void verwerfenOhneIfMatch(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of("grund", "Versehen")).when().post("/api/v1/dokumente/" + ort(name).id() + "/verwerfen");
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» mit einer veralteten Version verwirft")
+    public void verwerfenVeraltet(String benutzer, String name) throws SQLException {
+        antwort = mitVeralteterVersion(benutzer, name).contentType(ContentType.JSON).body(Map.of("grund", "Versehen"))
+                .when().post("/api/v1/dokumente/" + ort(name).id() + "/verwerfen");
+    }
+
+    @Wenn("«{word}» für das Dokument «{word}» ohne If-Match «wiederholen» wählt")
+    public void wiederholenOhneIfMatch(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
+                .when().post("/api/v1/dokumente/" + ort(name).id() + "/wiederholen");
+    }
+
+    @Wenn("«{word}» für das Dokument «{word}» mit einer veralteten Version «wiederholen» wählt")
+    public void wiederholenVeraltet(String benutzer, String name) throws SQLException {
+        antwort = mitVeralteterVersion(benutzer, name)
+                .when().post("/api/v1/dokumente/" + ort(name).id() + "/wiederholen");
     }
 
     @Wenn("der Worker die Archivierung ausführt")
@@ -446,6 +468,17 @@ public class BestaetigenSchritte {
     private RequestSpecification mitVersion(String benutzer, String name) throws SQLException {
         return given().auth().oauth2(Testanmeldung.token(benutzer))
                 .header("If-Match", "\"" + spalte(ort(name), "version") + "\"");
+    }
+
+    /**
+     * Ein anderer hat das Dokument inzwischen geändert: die Version steigt in der Datenbank, die Anfrage nennt die
+     * bisherige. So erreicht der Konflikt den Anwendungsfall und nicht schon die ETag-Prüfung der Resource.
+     */
+    private RequestSpecification mitVeralteterVersion(String benutzer, String name) throws SQLException {
+        Ort ort = ort(name);
+        int version = ((Number) spalte(ort, "version")).intValue();
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set version = version + 1 where id = ?", ort.id());
+        return given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"" + version + "\"");
     }
 
     private Map<String, Object> body(Map<String, String> felder) {

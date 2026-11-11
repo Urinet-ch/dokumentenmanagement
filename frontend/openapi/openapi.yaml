@@ -1194,6 +1194,10 @@ paths:
           headers:
             ETag:
               description: Neue Version des Dokuments
+        "412":
+          description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
+        "428":
+          description: If-Match fehlt (VERSION_FEHLT)
         "401":
           description: Not Authorized
         "403":
@@ -1282,6 +1286,10 @@ paths:
       responses:
         "204":
           description: Verworfen
+        "412":
+          description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
+        "428":
+          description: If-Match fehlt (VERSION_FEHLT)
         "401":
           description: Not Authorized
         "403":
@@ -1319,6 +1327,10 @@ paths:
           headers:
             ETag:
               description: Neue Version des Dokuments
+        "412":
+          description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
+        "428":
+          description: If-Match fehlt (VERSION_FEHLT)
         "401":
           description: Not Authorized
         "403":

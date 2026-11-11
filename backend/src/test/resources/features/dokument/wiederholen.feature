@@ -20,6 +20,16 @@ Funktionalität: Verarbeitung oder Archivierung wiederholen
       | fehler | null |
 
   @req-6.13
+  Szenario: Ohne If-Match oder mit veralteter Version wiederholt das Archiv nichts
+    Angenommen im Mandanten «urinet» liegt das Dokument «W» im Status «FEHLER», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» für das Dokument «W» ohne If-Match «wiederholen» wählt
+    Dann meldet das Archiv Status 428 mit Fehlercode «VERSION_FEHLT»
+    Wenn «inhaber-urinet» für das Dokument «W» mit einer veralteten Version «wiederholen» wählt
+    Dann meldet das Archiv Status 412 mit Fehlercode «VERSION_KONFLIKT»
+    Und ist das Dokument «W» im Status «FEHLER»
+    Und ist für das Dokument «W» kein Auftrag «VERARBEITEN» eingereiht
+
+  @req-6.13
   Szenariogrundriss: In jedem anderen Status antwortet «wiederholen» mit 409
     Angenommen im Mandanten «urinet» liegt das Dokument «W» im Status «<status>», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» für das Dokument «W» «wiederholen» wählt

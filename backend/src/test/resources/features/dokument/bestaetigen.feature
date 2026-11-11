@@ -207,6 +207,24 @@ Funktionalität: Dokument bestätigen und archivieren
     Dann ist das Dokument «Q» im Status «ARCHIVIERT»
     Und liegen die Dateien von «Q» unter archiv/ ohne Sperre
 
+  @req-6.3 @req-6.12
+  Szenario: Eine Art ohne gesetzliche Pflicht wird ohne Sperre archiviert
+    Angenommen im Mandanten «urinet» gibt es den Kontakt «Partner_Probe»
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» so bestätigt:
+      | art     | KORRESPONDENZ |
+      | titel   | Anfrage Probe |
+      | datum   | 2026-03-10    |
+      | partner | Partner_Probe |
+    Dann meldet das Archiv Status 202
+    Und hat das Dokument «K» diese Werte:
+      | aufbewahren_bis  | 2036-12-31 |
+      | frist_abgelaufen | false      |
+    Wenn der Worker die Archivierung ausführt
+    Dann ist das Dokument «K» im Status «ARCHIVIERT»
+    Und liegen die Dateien von «K» unter archiv/ ohne Sperre
+    Und ist der Eingang von «K» leer
+
   @req-2.13
   Szenario: mitarbeiter und treuhaender dürfen nicht bestätigen
     Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «mitarbeiter-urinet»
