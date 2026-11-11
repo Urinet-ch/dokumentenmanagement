@@ -97,5 +97,16 @@ public interface AblagePort {
      *
      * @return Anzahl gelöschter Versionen und Löschmarken
      */
-    int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten);
+    default int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten) {
+        return abgeleiteteBereinigen(mandant, jahr, docId, behalten, () -> { });
+    }
+
+    /**
+     * Wie {@link #abgeleiteteBereinigen(MandantCode, int, UUID, Collection)}, aber {@code vorDemLoeschen} läuft nach dem
+     * Auflisten und vor dem ersten Löschen, nur wenn es etwas zu löschen gibt. Wirft er, löscht der Aufruf nichts und
+     * gibt die Ausnahme weiter. So prüft ein Handler seinen Anspruch, ohne die Sperre über die Aufrufe an den Object
+     * Storage zu halten: Was beim Auflisten schon da war, stammt nicht von einem späteren Lauf mit gültigem Anspruch.
+     */
+    int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten,
+                              Runnable vorDemLoeschen);
 }

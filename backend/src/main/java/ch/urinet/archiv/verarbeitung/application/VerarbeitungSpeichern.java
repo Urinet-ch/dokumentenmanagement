@@ -1,6 +1,5 @@
 package ch.urinet.archiv.verarbeitung.application;
 
-import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.Verarbeitungsergebnis;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.Verarbeitungsstand;
@@ -27,12 +26,10 @@ public class VerarbeitungSpeichern {
 
     private final DokumentVerarbeitungPort dokumente;
     private final AuftragService auftraege;
-    private final AblagePort ablage;
 
-    public VerarbeitungSpeichern(DokumentVerarbeitungPort dokumente, AuftragService auftraege, AblagePort ablage) {
+    public VerarbeitungSpeichern(DokumentVerarbeitungPort dokumente, AuftragService auftraege) {
         this.dokumente = dokumente;
         this.auftraege = auftraege;
-        this.ablage = ablage;
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
@@ -41,20 +38,26 @@ public class VerarbeitungSpeichern {
     }
 
     /**
-     * Setzt {@code VERARBEITUNG} und löscht danach abgeleitete Dateien früherer, abgebrochener Läufe (PDF/A und
-     * Vorschau, nie Originale oder Arbeitsfassungen). Das Löschen läuft unter der Sperre des Anspruchs: So kann kein
-     * späterer Lauf mit gültigem Anspruch in der Zwischenzeit Ergebnisse gespeichert haben, die hier verloren gingen.
+     * Sichert den Anspruch und setzt {@code VERARBEITUNG}. Die Transaktion enthält keinen Aufruf an den Object Storage:
+     * Abgeleitete Dateien früherer, abgebrochener Läufe löscht der Handler erst nach dem Commit, ohne Sperre, und prüft
+     * vor dem Löschen den Anspruch mit {@link #anspruchPruefen} (Review PR #54, S2).
      *
      * @return {@code false}, wenn das Dokument nicht mehr zu verarbeiten ist (nichts geändert)
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean beginnen(Auftrag auftrag, UUID id, int jahr) {
+    public boolean beginnen(Auftrag auftrag, UUID id) {
         auftraege.anspruchSichern(auftrag);
-        if (!dokumente.verarbeitungBeginnen(id)) {
-            return false;
-        }
-        ablage.abgeleiteteBereinigen(auftrag.mandant(), jahr, id, List.of());
-        return true;
+        return dokumente.verarbeitungBeginnen(id);
+    }
+
+    /**
+     * Prüft den Anspruch in einer eigenen, kurzen Transaktion; wirft {@link AuftragService.AnspruchVerloren}, wenn er
+     * nicht mehr hält. Hält er, kann seit dem Auflisten der abgeleiteten Dateien kein späterer Lauf welche abgelegt
+     * haben, weil ein späterer Lauf erst nach dem Verlust dieses Anspruchs beginnt.
+     */
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void anspruchPruefen(Auftrag auftrag) {
+        auftraege.anspruchSichern(auftrag);
     }
 
     /**

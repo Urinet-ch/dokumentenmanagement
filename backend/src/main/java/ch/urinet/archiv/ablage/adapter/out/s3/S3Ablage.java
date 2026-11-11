@@ -534,7 +534,8 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
-    public int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten) {
+    public int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten,
+                                     Runnable vorDemLoeschen) {
         String bucket = bucket(mandant);
         String pdfa = DateiSchluessel.pdfa(jahr, docId).pfad(Ablageort.EINGANG);
         Set<String> bleiben = new HashSet<>();
@@ -546,15 +547,15 @@ public class S3Ablage implements AblagePort {
                 seite.deleteMarkers().forEach(m -> loeschen.add(new String[]{m.key(), m.versionId()}));
             }
         }
-        int anzahl = 0;
-        for (String[] version : loeschen) {
-            boolean abgeleitet = version[0].equals(pdfa) || version[0].startsWith(Vorschau.ordner(docId));
-            if (!abgeleitet || bleiben.contains(version[0] + "\n" + version[1])) {
-                continue;
-            }
-            versionLoeschen(bucket, version[0], version[1]);
-            anzahl++;
+        loeschen.removeIf(version -> !(version[0].equals(pdfa) || version[0].startsWith(Vorschau.ordner(docId)))
+                || bleiben.contains(version[0] + "\n" + version[1]));
+        if (!loeschen.isEmpty()) {
+            vorDemLoeschen.run();
         }
+        for (String[] version : loeschen) {
+            versionLoeschen(bucket, version[0], version[1]);
+        }
+        int anzahl = loeschen.size();
         LOG.debugf("Abgeleitete Dateien bereinigt: %s (%d Versionen)", docId, anzahl);
         return anzahl;
     }
