@@ -44,13 +44,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # Nur Startreihenfolge beim Deploy (weniger 401 direkt danach). Beim Neustart der VPS startet Docker die
-      # Container ohne depends_on; die Readiness hängt darum nicht an Keycloak, die API verbindet bei der ersten
-      # angemeldeten Anfrage neu.
+      # Startreihenfolge beim Deploy. Beim Neustart der VPS startet Docker die Container ohne depends_on; war Keycloak
+      # beim Start der API nicht erreichbar, bleibt ihre Readiness DOWN, und sie beendet sich nach 5 Minuten mit
+      # Exit-Code 75 (OIDC-Wächter); restart: unless-stopped startet sie neu (entschieden von Fabian am 11.11.2026).
       kc:
         condition: service_healthy
     healthcheck:
-      # Readiness nur Datenbank (Agroal, DatenbankBereitschaft), nicht Keycloak; das Image hat kein curl
+      # Readiness: Datenbank (Agroal, DatenbankBereitschaft) und OIDC-Tenant (Keycloak); das Image hat kein curl
       test:
         - CMD
         - bash

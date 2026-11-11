@@ -181,6 +181,7 @@ jobs:
         env:
           HOST: ${{ vars.INFOMANIAK_HOST }}
         run: |
+          umask 077
           set -o pipefail
           tar -C bundle -cf - . \
             | ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "deploy@$HOST" "deploy $APP" 2>&1 \
@@ -192,8 +193,11 @@ jobs:
         env:
           HOST: ${{ vars.INFOMANIAK_HOST }}
         run: |
+          umask 077
           # status liefert «compose ps» und Logs; pruefe-container.py wertet nur die Zeilen der Container aus und
-          # merkt sich ihre Laufzeit für die Prüfung auf Neustarts (Speicherabbrüche)
+          # merkt sich ihre Laufzeit für die Prüfung auf Neustarts (Speicherabbrüche). Die Readiness der API umfasst
+          # Keycloak (entschieden von Fabian am 11.11.2026, PR #42 P42-1): Die Wartezeit (7.5 Minuten) liegt über der
+          # Frist des OIDC-Wächters (5 Minuten), ein falsch konfiguriertes Keycloak endet hier und im Rollback.
           for _ in $(seq 1 30); do
             ssh -i ~/.ssh/deploy -o BatchMode=yes "deploy@$HOST" "status $APP" 2>/dev/null > status.txt || true
             if python3 .github/scripts/pruefe-container.py gesund "$RUNNER_TEMP/container.json" < status.txt > stand.txt; then
@@ -201,7 +205,14 @@ jobs:
             fi
             sleep 15
           done
-          cat stand.txt; rm -f status.txt stand.txt
+          cat stand.txt
+          # nur die Zählung, keine Log-Inhalte
+          oidc=$(grep -c 'fehlercode=OIDC_NICHT_BEREIT' status.txt || true)
+          rm -f status.txt stand.txt
+          echo "OIDC_NICHT_BEREIT im Log: $oidc"
+          if [ "$oidc" -ne 0 ]; then
+            echo "::error::Die API meldet Keycloak nicht bereit (OIDC_NICHT_BEREIT): Realm, Adresse (quarkus.oidc.auth-server-url) und Erreichbarkeit von archiv-auth prüfen."
+          fi
           echo "::error::api, db und kc sind nach 7.5 Minuten nicht alle healthy."
           exit 1
 
@@ -278,6 +289,7 @@ jobs:
           HOST: ${{ vars.INFOMANIAK_HOST }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         run: |
+          umask 077
           if [ "$DEPLOY_OUTCOME" = failure ] && ! grep -q "Container $APP-" deploy.log 2>/dev/null; then
             echo "Deploy vor dem Umschalten abgebrochen; auf dem Server ist nichts geändert."
             exit 0

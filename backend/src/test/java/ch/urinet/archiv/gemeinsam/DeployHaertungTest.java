@@ -32,7 +32,12 @@ class DeployHaertungTest {
     private static final Pattern UID = Pattern.compile("[1-9]\\d*(:\\d+)?");
     private static final Pattern MEM = Pattern.compile("(\\d+)([kmg]?)b?");
     /** Schreibt in eine Datei (nicht {@code >&}, nicht {@code /dev/null}). */
-    private static final Pattern UMLEITUNG = Pattern.compile("(?<![0-9&])>{1,2}\\s*(?!&|/dev/null)\\S");
+    /** Schreibt eine Datei: Umleitung (auch {@code 2>}) ausser nach /dev/null, auf einen Deskriptor oder in die
+     *  Dateien von Actions ({@code $GITHUB_OUTPUT} u. a.), oder ein Befehl, der Dateien anlegt. */
+    private static final Pattern SCHREIBT = Pattern.compile(
+            "(?<![<>&])\\d?>{1,2}(?![>&])\\s*(?!/dev/null|\"?\\$\\{?GITHUB_(?:OUTPUT|ENV|PATH|STEP_SUMMARY)\\b)\\S"
+                    + "|\\b(?:tee|cp|mv|mkdir|install|touch)\\s|\\bdocker\\s+save\\b"
+                    + "|\\bcurl\\b[^\\n]*\\s-o\\s*(?!/dev/null)\\S");
 
     @Test
     void jederDienstGehaertet() throws IOException {
@@ -92,7 +97,8 @@ class DeployHaertungTest {
         assertThat(summeCpus).isLessThanOrEqualTo(budgetCpus);
     }
 
-    /** Schritte, die Geheimnisse in Dateien schreiben, setzen zuerst {@code umask 077} (kein Fenster mit 0644). */
+    /** Schritte, die Dateien schreiben, setzen zuerst {@code umask 077} (kein Fenster mit 0644): nicht nur die mit
+     *  Secrets aus {@code env:}, auch Status, Logs und Merkdateien vom Server (Review PR #42, Kann). */
     @Test
     void geheimnisseNurMitUmask077InDateien() throws IOException {
         List<String> fehler = new ArrayList<>();
@@ -100,14 +106,28 @@ class DeployHaertungTest {
             for (Object eintrag : (List<?>) karte(job).get("steps")) {
                 Map<String, Object> schritt = karte(eintrag);
                 String run = Objects.toString(schritt.get("run"), "");
-                boolean geheim = schritt.get("env") instanceof Map<?, ?> env
-                        && env.values().stream().anyMatch(w -> String.valueOf(w).contains("secrets."));
-                if (geheim && UMLEITUNG.matcher(run).find() && !ersteZeile(run).equals("umask 077")) {
+                if (schreibt(run) && !ersteZeile(run).equals("umask 077")) {
                     fehler.add(String.valueOf(schritt.get("name")));
                 }
             }
         }
         assertThat(fehler).as("Schritte ohne umask 077 am Anfang").isEmpty();
+    }
+
+    @Test
+    void erkenntSchreibendeBefehle() {
+        assertThat(List.of("ssh host status > status.txt", "x 2>fehler.log", "a | tee deploy.log", "cp a b",
+                "mkdir -p bundle", "install -d -m 700 ~/.ssh", "docker save t -o x.tar", "curl -s -o seite.html u",
+                "echo x >> \"$RUNNER_TEMP/merk\""))
+                .allSatisfy(run -> assertThat(schreibt(run)).as(run).isTrue());
+        assertThat(List.of("x 2>/dev/null", "x > /dev/null 2>&1", "echo a >> \"$GITHUB_OUTPUT\"",
+                "echo a >> $GITHUB_STEP_SUMMARY", "curl -s -o /dev/null u", "grep -c x <<< \"$a\"",
+                "rm -f status.txt", "[ \"$a\" -ne 0 ]"))
+                .allSatisfy(run -> assertThat(schreibt(run)).as(run).isFalse());
+    }
+
+    private static boolean schreibt(String run) {
+        return run.lines().map(String::strip).filter(z -> !z.startsWith("#")).anyMatch(z -> SCHREIBT.matcher(z).find());
     }
 
     private static String ersteZeile(String run) {
