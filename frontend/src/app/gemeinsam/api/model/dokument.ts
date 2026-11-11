@@ -46,6 +46,28 @@ export interface Dokument {
      * Nur im Eingangskorb, sonst leer (Req 8.10)
      */
     warnungen: Array<Warnung>;
+    /**
+     * Grund des Fehlers bei FEHLER oder ARCHIVIERUNG_FEHLER (Req 8.7)
+     */
+    fehler?: string | null;
+    /**
+     * PDF/A-Fassung fehlt (Req 5.9)
+     */
+    pdfaFehlt: boolean;
+    /**
+     * Seitenzahl; Vorschau je Seite unter /vorschau
+     */
+    seiten?: number | null;
+    partnerId?: string | null;
+    partnerName?: string | null;
+    /**
+     * Metadaten-Vorschlag der KI; nur im Eingangskorb, sonst null (Req 8.1)
+     */
+    vorschlag?: object | null;
+    /**
+     * Felder des Vorschlags unter der Schwelle archiv.ki.schwelle («bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)
+     */
+    unsicher: Array<string>;
 }
 export namespace Dokument {
     export const QuelleEnum = {

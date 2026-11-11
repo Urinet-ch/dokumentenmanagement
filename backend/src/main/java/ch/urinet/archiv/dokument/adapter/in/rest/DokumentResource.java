@@ -12,6 +12,8 @@ import ch.urinet.archiv.dokument.application.DokumentVerwerfen;
 import ch.urinet.archiv.dokument.application.DokumentWiederholen;
 import ch.urinet.archiv.dokument.application.Warnung;
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.dokument.domain.KiSicherheit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
@@ -56,8 +58,10 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -77,6 +81,7 @@ public class DokumentResource {
 
     // nur ein starkes ETag passt (RFC 9110, If-Match vergleicht stark)
     private static final Pattern VERSION = Pattern.compile("^\"(\\d{1,9})\"$");
+    private static final String SICHERHEIT = "sicherheit";
 
     private static final String GRUND = "grund";
 
@@ -215,7 +220,19 @@ public class DokumentResource {
             JsonNode zusatz,
             @Schema(required = true, description = "Version für If-Match (auch als ETag)") int version,
             @Schema(required = true, description = "Nur im Eingangskorb, sonst leer (Req 8.10)")
-            List<WarnungDto> warnungen) {
+            List<WarnungDto> warnungen,
+            @Schema(nullable = true, description = "Grund des Fehlers bei FEHLER oder ARCHIVIERUNG_FEHLER (Req 8.7)")
+            String fehler,
+            @Schema(required = true, description = "PDF/A-Fassung fehlt (Req 5.9)") boolean pdfaFehlt,
+            @Schema(nullable = true, description = "Seitenzahl; Vorschau je Seite unter /vorschau") Integer seiten,
+            @Schema(nullable = true) UUID partnerId,
+            @Schema(nullable = true) String partnerName,
+            @Schema(nullable = true, type = SchemaType.OBJECT,
+                    description = "Metadaten-Vorschlag der KI; nur im Eingangskorb, sonst null (Req 8.1)")
+            JsonNode vorschlag,
+            @Schema(required = true, description = "Felder des Vorschlags unter der Schwelle archiv.ki.schwelle "
+                    + "(«bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)")
+            List<String> unsicher) {
     }
 
     @GET
@@ -233,7 +250,7 @@ public class DokumentResource {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer(identitaet);
         Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument)))
+        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -501,21 +518,49 @@ public class DokumentResource {
                 Rolle.ausRealmRollen(identitaet.getRoles()).orElseThrow());
     }
 
-    static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen) {
+    static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle) {
+        boolean eingangskorb = DokumentStatus.EINGANGSKORB_STATUS.contains(d.status());
+        JsonNode vorschlag = eingangskorb ? lesenJson(d, d.kiVorschlag(), "ki_vorschlag", json) : null;
+        List<String> unsicher = eingangskorb
+                ? unsicher(vorschlag, lesenJson(d, d.kiSicherheit(), "ki_sicherheit", json), schwelle)
+                : List.of();
         return new DokumentDto(d.id(), d.art(), d.titel(), d.datum(), d.eingang(), d.quelle(), d.tags(),
                 d.wirksameVertraulichkeit(), d.status().name(), d.bestaetigt(), d.geschaeftsjahr(), d.aufbewahrenBis(),
-                d.sperreBis(), d.fristAbgelaufen(), zusatz(d, json), d.version(),
-                warnungen.stream().map(WarnungDto::aus).toList());
+                d.sperreBis(), d.fristAbgelaufen(), lesenJson(d, d.zusatz(), "zusatz", json), d.version(),
+                warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
+                d.partnerId(), d.partnerName(), vorschlag, unsicher);
     }
 
-    private static JsonNode zusatz(Dokument d, ObjectMapper json) {
-        if (d.zusatz() == null) {
+    // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst
+    private static List<String> unsicher(JsonNode vorschlag, JsonNode sicherheit, BigDecimal schwelle) {
+        if (vorschlag == null && sicherheit == null) {
+            return List.of();
+        }
+        Set<String> vorgeschlagen = new HashSet<>();
+        if (vorschlag != null && vorschlag.isObject()) {
+            vorschlag.properties().forEach(feld -> {
+                if (!feld.getKey().equals(SICHERHEIT) && !feld.getValue().isNull()) {
+                    vorgeschlagen.add(feld.getKey());
+                }
+            });
+        }
+        JsonNode quelle = sicherheit != null ? sicherheit : vorschlag == null ? null : vorschlag.get(SICHERHEIT);
+        Map<String, BigDecimal> werte = new HashMap<>();
+        if (quelle != null && quelle.isObject()) {
+            quelle.properties().forEach(feld -> werte.put(feld.getKey(),
+                    feld.getValue().isNumber() ? feld.getValue().decimalValue() : null));
+        }
+        return KiSicherheit.unsicher(vorgeschlagen, werte, schwelle);
+    }
+
+    private static JsonNode lesenJson(Dokument d, String wert, String spalte, ObjectMapper json) {
+        if (wert == null) {
             return null;
         }
         try {
-            return json.readTree(d.zusatz());
+            return json.readTree(wert);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("zusatz des Dokuments " + d.id() + " ist kein JSON", e);
+            throw new IllegalStateException(spalte + " des Dokuments " + d.id() + " ist kein JSON", e);
         }
     }
 }

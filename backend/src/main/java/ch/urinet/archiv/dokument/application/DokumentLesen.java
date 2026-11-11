@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokument.application;
 
+import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -10,7 +11,10 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,17 +33,43 @@ public class DokumentLesen {
     private final DokumentStatusPort status;
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
+    private final AblagePort ablage;
+    private final BigDecimal schwelle;
 
     public DokumentLesen(DokumentRepository repository, DokumentStatusPort status, MandantAufloesung aufloesung,
-                         MandantEinstellungen einstellungen) {
+                         MandantEinstellungen einstellungen, AblagePort ablage,
+                         @ConfigProperty(name = "archiv.ki.schwelle") BigDecimal schwelle) {
         this.repository = repository;
         this.status = status;
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
+        this.ablage = ablage;
+        this.schwelle = schwelle;
+    }
+
+    /** Sicherheit, unter der ein Feld des KI-Vorschlags «bitte prüfen» zeigt (Req 7.6). */
+    public BigDecimal schwelle() {
+        return schwelle;
     }
 
     public Dokument lesen(Benutzer benutzer, UUID id) {
         return repository.finden(id, Sichtregel.fuer(benutzer))
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+    }
+
+    /**
+     * Vorschaubild (PNG) einer Seite eines sichtbaren Dokuments (Req 8.1, design.md «REST-API»). Seite unter 1 → 400;
+     * unsichtbares Dokument, Seite über der Seitenzahl oder fehlendes Bild → 404. Der Aufrufer schliesst den Datenstrom.
+     */
+    public InputStream vorschau(Benutzer benutzer, UUID id, int seite) {
+        if (seite < 1) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        Dokument dokument = lesen(benutzer, id);
+        if (dokument.seiten() == null || seite > dokument.seiten()) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        return ablage.lesenVorschau(aufloesung.pruefen(), id, seite)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
     }
 

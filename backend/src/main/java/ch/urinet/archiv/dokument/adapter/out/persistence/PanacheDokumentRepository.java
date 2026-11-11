@@ -154,6 +154,7 @@ public class PanacheDokumentRepository implements DokumentRepository {
         return new Dokument(e.id, e.art, e.titel, e.datum, e.eingang.toInstant(), e.quelle,
                 e.tags == null ? List.of() : List.of(e.tags), e.vertraulichkeit, e.personBenutzer, e.erstelltVon,
                 DokumentStatus.valueOf(e.status), e.bestaetigt == null ? null : e.bestaetigt.toInstant(),
-                e.geschaeftsjahr, e.aufbewahrenBis, e.sperreBis, e.fristAbgelaufen, e.zusatz, e.version);
+                e.geschaeftsjahr, e.aufbewahrenBis, e.sperreBis, e.fristAbgelaufen, e.zusatz, e.version, e.fehler,
+                e.pdfaFehlt, e.seiten, e.partnerId, e.partnerName, e.kiVorschlag, e.kiSicherheit);
     }
 }

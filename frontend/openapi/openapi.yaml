@@ -207,6 +207,8 @@ components:
       - fristAbgelaufen
       - version
       - warnungen
+      - pdfaFehlt
+      - unsicher
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -305,6 +307,44 @@ components:
           items:
             $ref: "#/components/schemas/Warnung"
           description: "Nur im Eingangskorb, sonst leer (Req 8.10)"
+        fehler:
+          type:
+          - string
+          - "null"
+          description: Grund des Fehlers bei FEHLER oder ARCHIVIERUNG_FEHLER (Req
+            8.7)
+        pdfaFehlt:
+          type: boolean
+          description: PDF/A-Fassung fehlt (Req 5.9)
+        seiten:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Seitenzahl; Vorschau je Seite unter /vorschau
+        partnerId:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        partnerName:
+          type:
+          - string
+          - "null"
+        vorschlag:
+          description: "Metadaten-Vorschlag der KI; nur im Eingangskorb, sonst null\
+            \ (Req 8.1)"
+          type:
+          - object
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/JsonObjekt"
+          - type: "null"
+        unsicher:
+          type: array
+          items:
+            type: string
+          description: "Felder des Vorschlags unter der Schwelle archiv.ki.schwelle\
+            \ («bitte prüfen»); nur im Eingangskorb, sonst leer (Req 7.6)"
     DokumentAenderung:
       description: "Änderung der Metadaten (A6, Aufgabe 3.5). Nur die angegebenen\
         \ Felder ändern sich; null oder ein leerer Text leert ein Feld (tags: null\
@@ -1877,6 +1917,44 @@ paths:
           description: Not Allowed
         "400":
           description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/dokumente/{id}/vorschau:
+    get:
+      summary: Vorschaubild einer Seite lesen
+      description: "PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument,\
+        \ Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN;\
+        \ Seite unter 1 → 400."
+      tags:
+      - Dokumente
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - name: seite
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      responses:
+        "200":
+          description: Vorschaubild
+          content:
+            image/png:
+              schema:
+                format: binary
+                type: string
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber
