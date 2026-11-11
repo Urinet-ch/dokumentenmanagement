@@ -1256,7 +1256,7 @@
     "/api/v1/importe/crm" : {
       "post" : {
         "summary" : "CSV aus dem CRM hochladen",
-        "description" : "Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog); bekannte → 202 (VORSCHAU_AUSSTEHEND).",
+        "description" : "Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog); bekannte → 202 (VORSCHAU_AUSSTEHEND). Dateien über 5 MiB → 413 (DATEI_ZU_GROSS).",
         "tags" : [ "Importe" ],
         "parameters" : [ {
           "name" : "art",
@@ -1307,6 +1307,9 @@
                 }
               }
             }
+          },
+          "413" : {
+            "description" : "DATEI_ZU_GROSS: Datei über archiv.import.max-groesse (5 MiB)"
           },
           "422" : {
             "description" : "CSV_UNGUELTIG oder CSV_LEER"

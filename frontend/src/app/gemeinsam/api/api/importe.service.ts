@@ -41,7 +41,7 @@ export class ImporteService extends BaseService {
 
     /**
      * CSV aus dem CRM hochladen
-     * Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog); bekannte → 202 (VORSCHAU_AUSSTEHEND).
+     * Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog); bekannte → 202 (VORSCHAU_AUSSTEHEND). Dateien über 5 MiB → 413 (DATEI_ZU_GROSS).
      * @endpoint post /api/v1/importe/crm
      * @param art 
      * @param vollexport 

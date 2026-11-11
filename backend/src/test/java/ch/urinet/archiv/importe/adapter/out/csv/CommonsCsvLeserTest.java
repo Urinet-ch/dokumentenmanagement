@@ -2,6 +2,7 @@ package ch.urinet.archiv.importe.adapter.out.csv;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.importe.application.CsvLeser;
 import ch.urinet.archiv.importe.domain.CsvTabelle;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportFeld;
@@ -10,15 +11,19 @@ import ch.urinet.archiv.importe.domain.ZeilenPruefung;
 import ch.urinet.archiv.importe.domain.Zuordnung;
 import ch.urinet.archiv.importe.domain.Zuordnungsvorschlag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,9 +37,12 @@ class CommonsCsvLeserTest {
     private static final Charset CP1252 = Charset.forName("windows-1252");
     private final CommonsCsvLeser leser = new CommonsCsvLeser();
 
+    @TempDir
+    Path ordner;
+
     @Test
     void beispielKontakteWindows1252MitSemikolon() {
-        CsvTabelle tabelle = leser.lesen(datei("csv/21crm-kontakte-beispiel.csv"));
+        Tabelle tabelle = lesen(datei("csv/21crm-kontakte-beispiel.csv"));
 
         assertThat(tabelle.zeichensatz()).isEqualTo("windows-1252");
         assertThat(tabelle.trennzeichen()).isEqualTo(';');
@@ -47,7 +55,7 @@ class CommonsCsvLeserTest {
 
     @Test
     void beispielKontakteErgibtProfil21CrmOhneFehlerhafteZeilen() {
-        CsvTabelle tabelle = leser.lesen(datei("csv/21crm-kontakte-beispiel.csv"));
+        Tabelle tabelle = lesen(datei("csv/21crm-kontakte-beispiel.csv"));
         Kopfzeile kopf = tabelle.kopf();
 
         Zuordnung profil = Zuordnungsvorschlag.fuer(ImportArt.KONTAKT, kopf);
@@ -71,7 +79,7 @@ class CommonsCsvLeserTest {
 
     @Test
     void beispielVerkaufschancenNurKopfzeileOhneProfil() {
-        CsvTabelle tabelle = leser.lesen(datei("csv/21crm-verkaufschancen-beispiel.csv"));
+        Tabelle tabelle = lesen(datei("csv/21crm-verkaufschancen-beispiel.csv"));
 
         assertThat(tabelle.kopf().spalten()).isEqualTo(32);
         assertThat(tabelle.zeilen()).isEmpty();
@@ -85,7 +93,7 @@ class CommonsCsvLeserTest {
     @Test
     void utf8MitUndOhneBomErgibtDieselbenWerte() {
         byte[] original = datei("csv/21crm-kontakte-beispiel.csv");
-        CsvTabelle cp1252 = leser.lesen(original);
+        Tabelle cp1252 = lesen(original);
         byte[] ohneBom = new String(original, CP1252).getBytes(StandardCharsets.UTF_8);
         byte[] mitBom = new byte[ohneBom.length + 3];
         mitBom[0] = (byte) 0xEF;
@@ -93,22 +101,22 @@ class CommonsCsvLeserTest {
         mitBom[2] = (byte) 0xBF;
         System.arraycopy(ohneBom, 0, mitBom, 3, ohneBom.length);
 
-        CsvTabelle utf8 = leser.lesen(mitBom);
+        Tabelle utf8 = lesen(mitBom);
 
         assertThat(utf8.zeichensatz()).isEqualTo("UTF-8");
         assertThat(utf8.kopf()).isEqualTo(cp1252.kopf());
         assertThat(utf8.zeilen()).isEqualTo(cp1252.zeilen());
-        assertThat(leser.lesen(ohneBom).zeichensatz()).isEqualTo("UTF-8");
-        assertThat(leser.lesen(ohneBom).zeilen()).isEqualTo(cp1252.zeilen());
+        assertThat(lesen(ohneBom).zeichensatz()).isEqualTo("UTF-8");
+        assertThat(lesen(ohneBom).zeilen()).isEqualTo(cp1252.zeilen());
     }
 
     @Test
     void kommaUndCrlfAusBeispiel() {
-        CsvTabelle semikolon = leser.lesen(datei("csv/21crm-kontakte-beispiel.csv"));
+        Tabelle semikolon = lesen(datei("csv/21crm-kontakte-beispiel.csv"));
         StringBuilder text = new StringBuilder(zeile(semikolon.kopf().namen(), ','));
         semikolon.zeilen().forEach(z -> text.append(zeile(z.werte(), ',')));
 
-        CsvTabelle komma = leser.lesen(text.toString().getBytes(CP1252));
+        Tabelle komma = lesen(text.toString().getBytes(CP1252));
 
         assertThat(komma.trennzeichen()).isEqualTo(',');
         assertThat(komma.zeichensatz()).isEqualTo("windows-1252");
@@ -118,7 +126,7 @@ class CommonsCsvLeserTest {
 
     @Test
     void kurzeDateiInWindows1252() {
-        CsvTabelle tabelle = leser.lesen("Name;Ort\nMüller AG;Zürich\nGrüter;Bürglen\n".getBytes(CP1252));
+        Tabelle tabelle = lesen("Name;Ort\nMüller AG;Zürich\nGrüter;Bürglen\n".getBytes(CP1252));
 
         assertThat(tabelle.zeichensatz()).isEqualTo("windows-1252");
         assertThat(tabelle.zeilen().getFirst().werte()).containsExactly("Müller AG", "Zürich");
@@ -128,7 +136,7 @@ class CommonsCsvLeserTest {
     void kurzeWindows1252DateienMitAnderemIcuTrefferBleibenWindows1252() {
         for (String zeile : List.of("A;Schönenberg", "Café Crème;Genève", "Škoda Garage;Bern", "Niño Peña;Lugano",
                 "Gül;Yilmaz", "Grüter;Bürglen", "Müller AG;Zürich")) {
-            CsvTabelle tabelle = leser.lesen(("Name;Ort\n" + zeile + "\n").getBytes(CP1252));
+            Tabelle tabelle = lesen(("Name;Ort\n" + zeile + "\n").getBytes(CP1252));
 
             assertThat(tabelle.zeichensatz()).as("Zeile %s", zeile).isEqualTo("windows-1252");
             assertThat(String.join(";", tabelle.zeilen().getFirst().werte())).isEqualTo(zeile);
@@ -152,7 +160,7 @@ class CommonsCsvLeserTest {
             byte[] inhalt = variante.getBytes(CP1252);
             boolean nurAscii = variante.chars().allMatch(c -> c < 0x80);
 
-            assertThat(CommonsCsvLeser.dekodieren(inhalt).zeichensatz()).as("Variante der Länge %d", inhalt.length)
+            assertThat(CommonsCsvLeser.zeichensatz(inhalt, true)).as("Variante der Länge %d", inhalt.length)
                     .isEqualTo(nurAscii ? "UTF-8" : "windows-1252");
         }
     }
@@ -181,7 +189,7 @@ class CommonsCsvLeserTest {
             }
             byte[] inhalt = text.toString().getBytes(CP1252);
 
-            assertThat(CommonsCsvLeser.dekodieren(inhalt).zeichensatz()).as("Datei %d", datei)
+            assertThat(CommonsCsvLeser.zeichensatz(inhalt, true)).as("Datei %d", datei)
                     .isEqualTo("windows-1252");
         }
     }
@@ -196,7 +204,7 @@ class CommonsCsvLeserTest {
                 "名前;都市\n田中;東京\n鈴木;大阪\n".getBytes(Charset.forName("Shift_JIS")),
                 mitPraefix("Name;Ort\nA;".getBytes(CP1252), new byte[]{(byte) 0x81, '\n'}));
         for (byte[] inhalt : ungueltig) {
-            assertThatThrownBy(() -> leser.lesen(inhalt)).isInstanceOf(FachFehler.class)
+            assertThatThrownBy(() -> lesen(inhalt)).isInstanceOf(FachFehler.class)
                     .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
         }
     }
@@ -204,13 +212,13 @@ class CommonsCsvLeserTest {
     @Test
     void mehrAlsTausendSpaltenWerdenVorDemParsenAbgelehnt() {
         String tausend = ";".repeat(CsvTabelle.MAX_SPALTEN - 1);
-        assertThat(leser.lesen(("N" + tausend + "\nA" + tausend + "\n").getBytes(StandardCharsets.UTF_8)).kopf()
+        assertThat(lesen(("N" + tausend + "\nA" + tausend + "\n").getBytes(StandardCharsets.UTF_8)).kopf()
                 .spalten()).isEqualTo(CsvTabelle.MAX_SPALTEN);
-        assertThat(leser.lesen(("N;\"" + ";".repeat(5_000) + "\"\nA;B\n").getBytes(StandardCharsets.UTF_8)).kopf()
+        assertThat(lesen(("N;\"" + ";".repeat(5_000) + "\"\nA;B\n").getBytes(StandardCharsets.UTF_8)).kopf()
                 .spalten()).isEqualTo(2);
         for (String text : List.of("N" + tausend + ";\nA\n", "N;O\nA" + tausend + ";\n",
                 "N;O\n\nA;B\n" + ";".repeat(1_000_000) + "\n")) {
-            assertThatThrownBy(() -> leser.lesen(text.getBytes(StandardCharsets.UTF_8))).isInstanceOf(FachFehler.class)
+            assertThatThrownBy(() -> lesen(text.getBytes(StandardCharsets.UTF_8))).isInstanceOf(FachFehler.class)
                     .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
         }
     }
@@ -219,7 +227,7 @@ class CommonsCsvLeserTest {
     void anfuehrungszeichenMittenImFeldBeginntKeinZitat() {
         String text = "Name,Firma \"X;Ort;PLZ;Land;Kanton\nA,B Y;Altdorf;6460;CH;UR\n";
 
-        CsvTabelle tabelle = leser.lesen(text.getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen(text.getBytes(StandardCharsets.UTF_8));
 
         assertThat(CommonsCsvLeser.trennzeichen(text)).isEqualTo(';');
         assertThat(tabelle.trennzeichen()).isEqualTo(';');
@@ -231,7 +239,7 @@ class CommonsCsvLeserTest {
     void feldInAnfuehrungszeichenMitSemikolonUndZeilenumbruch() {
         String text = "Name;Notiz;PLZ\n\"Muster; AG\";\"erste Zeile\nzweite \"\"Zeile\"\"\";6000\nTest GmbH;;6460\n";
 
-        CsvTabelle tabelle = leser.lesen(text.getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen(text.getBytes(StandardCharsets.UTF_8));
 
         assertThat(tabelle.trennzeichen()).isEqualTo(';');
         assertThat(tabelle.zeilen()).extracting(CsvTabelle.Zeile::nr).containsExactly(2, 3);
@@ -241,14 +249,14 @@ class CommonsCsvLeserTest {
 
     @Test
     void falscheSpaltenzahlBleibtZeileMitIhrenWerten() {
-        CsvTabelle tabelle = leser.lesen("Name;PLZ\nA;6000;zu viel\nB\n".getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen("Name;PLZ\nA;6000;zu viel\nB\n".getBytes(StandardCharsets.UTF_8));
 
         assertThat(tabelle.zeilen()).extracting(z -> z.werte().size()).containsExactly(3, 1);
     }
 
     @Test
     void leereZeilenZaehlenNicht() {
-        CsvTabelle tabelle = leser.lesen("\nName;PLZ\n\nA;6000\n\n".getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen("\nName;PLZ\n\nA;6000\n\n".getBytes(StandardCharsets.UTF_8));
 
         assertThat(tabelle.kopf().namen()).containsExactly("Name", "PLZ");
         assertThat(tabelle.zeilen()).hasSize(1);
@@ -256,7 +264,7 @@ class CommonsCsvLeserTest {
 
     @Test
     void formelnBleibenUnveraendert() {
-        CsvTabelle tabelle = leser.lesen("Name;Telefon\n=1+1;+41 41 000 00 00\n@SUM(A1);-5\n"
+        Tabelle tabelle = lesen("Name;Telefon\n=1+1;+41 41 000 00 00\n@SUM(A1);-5\n"
                 .getBytes(StandardCharsets.UTF_8));
 
         assertThat(tabelle.zeilen()).extracting(CsvTabelle.Zeile::werte).containsExactly(
@@ -265,21 +273,21 @@ class CommonsCsvLeserTest {
 
     @Test
     void nurKopfzeileHatKeineDatenzeilen() {
-        assertThat(leser.lesen(datei("csv/nur-kopfzeile.csv")).zeilen()).isEmpty();
+        assertThat(lesen(datei("csv/nur-kopfzeile.csv")).zeilen()).isEmpty();
     }
 
     @Test
     void leereDateiIstLeer() {
         for (byte[] inhalt : List.of(new byte[0], "\n\n".getBytes(StandardCharsets.UTF_8))) {
-            assertThatThrownBy(() -> leser.lesen(inhalt)).isInstanceOf(FachFehler.class)
+            assertThatThrownBy(() -> lesen(inhalt)).isInstanceOf(FachFehler.class)
                     .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_LEER);
         }
     }
 
     @Test
     void zehntausendDatenzeilenGehenMehrNicht() {
-        assertThat(leser.lesen(zeilen(CsvTabelle.MAX_ZEILEN)).zeilen()).hasSize(CsvTabelle.MAX_ZEILEN);
-        assertThatThrownBy(() -> leser.lesen(zeilen(CsvTabelle.MAX_ZEILEN + 1))).isInstanceOf(FachFehler.class)
+        assertThat(lesen(zeilen(CsvTabelle.MAX_ZEILEN)).zeilen()).hasSize(CsvTabelle.MAX_ZEILEN);
+        assertThatThrownBy(() -> lesen(zeilen(CsvTabelle.MAX_ZEILEN + 1))).isInstanceOf(FachFehler.class)
                 .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
     }
 
@@ -287,7 +295,7 @@ class CommonsCsvLeserTest {
     void riesigesFeldWirdGelesen() {
         String riesig = "x".repeat(200_000);
 
-        CsvTabelle tabelle = leser.lesen(("Name;Notiz\nA;\"" + riesig + "\"\n").getBytes(StandardCharsets.UTF_8));
+        Tabelle tabelle = lesen(("Name;Notiz\nA;\"" + riesig + "\"\n").getBytes(StandardCharsets.UTF_8));
 
         assertThat(tabelle.zeilen().getFirst().werte().get(1)).hasSize(200_000);
     }
@@ -300,9 +308,111 @@ class CommonsCsvLeserTest {
                 "Name;PLZ\nA;\"offen\n".getBytes(StandardCharsets.UTF_8),
                 mitPraefix(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF}, "N;O\nM\u00fcller;x\n".getBytes(CP1252)));
         for (byte[] inhalt : ungueltig) {
-            assertThatThrownBy(() -> leser.lesen(inhalt)).isInstanceOf(FachFehler.class)
+            assertThatThrownBy(() -> lesen(inhalt)).isInstanceOf(FachFehler.class)
                     .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
         }
+    }
+
+    /** Gesammelte Meldungen des Lesers. */
+    record Tabelle(String zeichensatz, char trennzeichen, Kopfzeile kopf, List<CsvTabelle.Zeile> zeilen) {
+    }
+
+    private static final class Sammler implements CsvLeser.Empfaenger {
+
+        private String zeichensatz;
+        private char trennzeichen;
+        private Kopfzeile kopf;
+        private final List<CsvTabelle.Zeile> zeilen = new ArrayList<>();
+
+        @Override
+        public void kopf(String zeichensatz, char trennzeichen, Kopfzeile kopf) {
+            assertThat(this.kopf).as("Kopfzeile nur einmal").isNull();
+            this.zeichensatz = zeichensatz;
+            this.trennzeichen = trennzeichen;
+            this.kopf = kopf;
+        }
+
+        @Override
+        public void zeile(CsvTabelle.Zeile zeile) {
+            assertThat(kopf).as("Kopfzeile vor den Datenzeilen").isNotNull();
+            zeilen.add(zeile);
+        }
+    }
+
+    private Path schreiben(byte[] inhalt) {
+        try {
+            return Files.write(ordner.resolve(UUID.randomUUID() + ".csv"), inhalt);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private Tabelle lesen(byte[] inhalt) {
+        Sammler sammler = new Sammler();
+        leser.lesen(schreiben(inhalt), sammler);
+        return new Tabelle(sammler.zeichensatz, sammler.trennzeichen, sammler.kopf, sammler.zeilen);
+    }
+
+    @Test
+    void zeichensatzEntscheidetDerErsteBlockMitNichtAscii() {
+        String ascii = "Name;Ort\n" + "Meier;Altdorf\n".repeat(9_999);
+        assertThat(ascii.length()).isGreaterThan(2 * CommonsCsvLeser.ERKENNUNG);
+
+        Tabelle cp1252 = lesen((ascii + "Müller;Zürich\n").getBytes(CP1252));
+        Tabelle utf8 = lesen((ascii + "Müller;Zürich\n").getBytes(StandardCharsets.UTF_8));
+
+        assertThat(cp1252.zeichensatz()).isEqualTo("windows-1252");
+        assertThat(utf8.zeichensatz()).isEqualTo("UTF-8");
+        assertThat(cp1252.zeilen().getLast().werte()).containsExactly("Müller", "Zürich");
+        assertThat(utf8.zeilen()).isEqualTo(cp1252.zeilen());
+    }
+
+    @Test
+    void ungueltigesByteNachDemErkennungsblockLehntAbOhneZeileZuMelden() {
+        String anfang = "Name;Ort\nMüller;Zürich\n" + "Meier;Altdorf\n".repeat(10_000);
+        byte[] gemischt = mitPraefix(anfang.getBytes(StandardCharsets.UTF_8), "Grüter;Bürglen\n".getBytes(CP1252));
+        Sammler sammler = new Sammler();
+
+        assertThatThrownBy(() -> leser.lesen(schreiben(gemischt), sammler)).isInstanceOf(FachFehler.class)
+                .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
+        assertThat(sammler.kopf).isNull();
+        assertThat(sammler.zeilen).isEmpty();
+    }
+
+    @Test
+    void zuVieleZeilenWerdenAbgelehntBevorEineZeileGemeldetWird() {
+        Sammler sammler = new Sammler();
+
+        assertThatThrownBy(() -> leser.lesen(schreiben(zeilen(CsvTabelle.MAX_ZEILEN + 1)), sammler))
+                .isInstanceOf(FachFehler.class);
+        assertThat(sammler.kopf).isNull();
+    }
+
+    @Test
+    void fehlerDesEmpfaengersBleibenUnveraendert() {
+        IllegalStateException datenbank = new IllegalStateException("Datenbank");
+        CsvLeser.Empfaenger empfaenger = new CsvLeser.Empfaenger() {
+            @Override
+            public void kopf(String zeichensatz, char trennzeichen, Kopfzeile kopf) {
+            }
+
+            @Override
+            public void zeile(CsvTabelle.Zeile zeile) {
+                throw datenbank;
+            }
+        };
+
+        assertThatThrownBy(() -> leser.lesen(schreiben("Name\nA\n".getBytes(StandardCharsets.UTF_8)), empfaenger))
+                .isSameAs(datenbank);
+    }
+
+    @Test
+    void nulZeichenAuchMitBomUngueltig() {
+        byte[] inhalt = mitPraefix(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF},
+                "Name;PLZ\nA\u0000;6000\n".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> lesen(inhalt)).isInstanceOf(FachFehler.class)
+                .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.CSV_UNGUELTIG);
     }
 
     private static byte[] mitPraefix(byte[] praefix, byte[] text) {

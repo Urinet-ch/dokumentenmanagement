@@ -228,6 +228,14 @@ Funktionalität: CSV-Import aus 21.CRM – Erkennung und Spaltenzuordnung (Aufga
     Wenn «inhaber-urinet» eine Kontakt-CSV mit 10000 Datenzeilen hochlädt
     Dann steht der Lauf auf «ZUORDNUNG_NOETIG» mit 10000 Datenzeilen, 0 fehlerhaft und 0 übersprungen
 
+  @req-13.10
+  Szenario: Eine Datei über der Grössengrenze lehnt das Archiv mit 413 ab, bevor der Parser läuft
+    Wenn «inhaber-urinet» eine UTF-16-Datei mit 1 Byte über der Grenze des CSV-Imports hochlädt
+    Dann lehnt der CSV-Import mit Status 413 und Fehlercode «DATEI_ZU_GROSS» ab
+    Und ist im Schema von «urinet» kein Importlauf gespeichert
+    Wenn «inhaber-urinet» eine Kontakt-CSV mit genau der Grenze des CSV-Imports hochlädt
+    Dann nimmt der CSV-Import die Datei an der Grenze mit allen Datenzeilen an
+
   @req-13.11
   Szenariogrundriss: Eine Datei ohne Datenzeilen lehnt das Archiv mit «keine Datenzeilen» ab
     Wenn «inhaber-urinet» die Beispieldatei «<datei>» als Importart «<art>» hochlädt

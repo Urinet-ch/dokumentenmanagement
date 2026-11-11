@@ -30,9 +30,6 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -120,11 +117,12 @@ public class ImportResource {
     @Operation(summary = "CSV aus dem CRM hochladen",
             description = "Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte oder abweichende "
                     + "Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog); bekannte → 202 "
-                    + "(VORSCHAU_AUSSTEHEND).")
+                    + "(VORSCHAU_AUSSTEHEND). Dateien über 5 MiB → 413 (DATEI_ZU_GROSS).")
     @APIResponse(responseCode = "200", description = "Zuordnung nötig", content = @Content(
             mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = HochgeladenDto.class)))
     @APIResponse(responseCode = "202", description = "Zuordnung bekannt, Vorschau ausstehend", content = @Content(
             mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = HochgeladenDto.class)))
+    @APIResponse(responseCode = "413", description = "DATEI_ZU_GROSS: Datei über archiv.import.max-groesse (5 MiB)")
     @APIResponse(responseCode = "422", description = "CSV_UNGUELTIG oder CSV_LEER")
     public Response hochladen(@QueryParam("art") String art, @QueryParam("vollexport") String vollexport,
                               @RestForm("datei") @Schema(type = SchemaType.STRING, format = "binary") FileUpload datei) {
@@ -134,13 +132,8 @@ public class ImportResource {
         if (datei == null || datei.uploadedFile() == null) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        byte[] inhalt;
-        try {
-            inhalt = Files.readAllBytes(datei.uploadedFile());
-        } catch (IOException e) {
-            throw new UncheckedIOException("Upload nicht lesbar", e);
-        }
-        CsvImport.Hochgeladen ergebnis = csvImport.hochladen(importArt, voll, datei.fileName(), inhalt, benutzer());
+        CsvImport.Hochgeladen ergebnis = csvImport.hochladen(importArt, voll, datei.fileName(), datei.uploadedFile(),
+                benutzer());
         ImportLauf lauf = ergebnis.lauf();
         List<SpalteDto> spalten = new ArrayList<>();
         for (int i = 0; i < lauf.kopf().spalten(); i++) {

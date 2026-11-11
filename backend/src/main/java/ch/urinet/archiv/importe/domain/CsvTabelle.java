@@ -1,13 +1,13 @@
 package ch.urinet.archiv.importe.domain;
 
 import java.util.List;
-import java.util.Objects;
 
 /**
- * Gelesene CSV-Datei: erkannter Zeichensatz und Trennzeichen, Kopfzeile und Datenzeilen nach RFC 4180. Die Kopfzeile
- * ist Datensatz 1, die erste Datenzeile hat die Nummer 2 (wie in einer Tabellenkalkulation ohne Leerzeilen).
+ * Grenzen einer CSV-Datei und ihre Datenzeilen nach RFC 4180. Die Kopfzeile ist Datensatz 1, die erste Datenzeile hat
+ * die Nummer 2 (wie in einer Tabellenkalkulation ohne Leerzeilen). Die Datei wird nie als Ganzes gehalten, sondern
+ * Zeile für Zeile gelesen (Entscheid Fabian 11.11.2026).
  */
-public record CsvTabelle(String zeichensatz, char trennzeichen, Kopfzeile kopf, List<Zeile> zeilen) {
+public final class CsvTabelle {
 
     /** Höchstzahl der Datenzeilen ohne Kopfzeile (Req 13.10). */
     public static final int MAX_ZEILEN = 10_000;
@@ -18,10 +18,7 @@ public record CsvTabelle(String zeichensatz, char trennzeichen, Kopfzeile kopf, 
      */
     public static final int MAX_SPALTEN = 1_000;
 
-    public CsvTabelle {
-        Objects.requireNonNull(zeichensatz, "zeichensatz");
-        Objects.requireNonNull(kopf, "kopf");
-        zeilen = List.copyOf(zeilen);
+    private CsvTabelle() {
     }
 
     /** Eine Datenzeile mit ihrer Nummer und den Werten in Spaltenreihenfolge. */

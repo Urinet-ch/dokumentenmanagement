@@ -10,9 +10,11 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.runtime.configuration.MemorySize;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,6 +59,7 @@ public class CsvImportSchritte {
     private byte[] hochgeladen;
     private LogMitschnitt mitschnitt;
     private boolean benutzt;
+    private int erwarteteZeilen;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -141,6 +144,50 @@ public class CsvImportSchritte {
             text.append('N').append(i).append(";6000\n");
         }
         hochladen(benutzer, "kontakt", "false", "kontakte.csv", text.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Wenn("«{word}» eine UTF-16-Datei mit {int} Byte über der Grenze des CSV-Imports hochlädt")
+    public void ueberDerGrenze(String benutzer, int mehr) {
+        byte[] inhalt = new byte[Math.toIntExact(grenze() + mehr)];
+        byte[] utf16 = "Name;PLZ\nA;6000\n".getBytes(StandardCharsets.UTF_16LE);
+        for (int i = 0; i < inhalt.length; i++) {
+            inhalt[i] = utf16[i % utf16.length];
+        }
+        hochladen(benutzer, "kontakt", "false", "kontakte.csv", inhalt);
+    }
+
+    @Wenn("«{word}» eine Kontakt-CSV mit genau der Grenze des CSV-Imports hochlädt")
+    public void anDerGrenze(String benutzer) {
+        int grenze = Math.toIntExact(grenze());
+        String kopf = "Name;Notiz\n";
+        String zeile = "A;" + "x".repeat(97) + "\n";
+        StringBuilder text = new StringBuilder(kopf);
+        erwarteteZeilen = 0;
+        while (text.length() + zeile.length() <= grenze) {
+            text.append(zeile);
+            erwarteteZeilen++;
+        }
+        int rest = grenze - text.length();
+        if (rest >= 3) {
+            text.append("A;").append("x".repeat(rest - 3)).append('\n');
+            erwarteteZeilen++;
+        } else {
+            text.append("\n".repeat(rest));
+        }
+        hochladen(benutzer, "kontakt", "false", "kontakte.csv", text.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Dann("nimmt der CSV-Import die Datei an der Grenze mit allen Datenzeilen an")
+    public void anDerGrenzeAngenommen() {
+        assertThat(hochgeladen).hasSize(Math.toIntExact(grenze()));
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("lauf.sha256")).isEqualTo(sha256(hochgeladen));
+        assertThat(antwort.<Integer>path("lauf.zeilen")).isEqualTo(erwarteteZeilen);
+        assertThat(antwort.<Integer>path("lauf.fehler")).isZero();
+    }
+
+    private static long grenze() {
+        return ConfigProvider.getConfig().getValue("archiv.import.max-groesse", MemorySize.class).asLongValue();
     }
 
     @Wenn("«{word}» eine Kontakt-CSV mit art «{}» und vollexport «{}» hochlädt")

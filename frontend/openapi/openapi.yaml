@@ -1119,7 +1119,7 @@ paths:
       summary: CSV aus dem CRM hochladen
       description: Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte
         oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog);
-        bekannte → 202 (VORSCHAU_AUSSTEHEND).
+        bekannte → 202 (VORSCHAU_AUSSTEHEND). Dateien über 5 MiB → 413 (DATEI_ZU_GROSS).
       tags:
       - Importe
       parameters:
@@ -1154,6 +1154,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImportHochgeladen"
+        "413":
+          description: "DATEI_ZU_GROSS: Datei über archiv.import.max-groesse (5 MiB)"
         "422":
           description: CSV_UNGUELTIG oder CSV_LEER
         "401":

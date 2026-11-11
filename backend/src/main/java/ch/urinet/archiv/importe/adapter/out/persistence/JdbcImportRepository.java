@@ -37,7 +37,8 @@ import java.util.regex.Pattern;
 
 /**
  * Läufe, Zeilen und Zuordnungen per JDBC im Schema {@code m_<code>} des Mandanten der Anfrage (Schema immer qualifiziert,
- * design.md «Mandant»). Nur innerhalb einer Transaktion, damit ein Lauf nie ohne seine Zeilen festgeschrieben wird.
+ * design.md «Mandant»). Nur innerhalb einer Transaktion, damit ein Lauf nie ohne seine Zeilen festgeschrieben wird;
+ * Zeilen kommen in Blöcken (ein Batch je Aufruf).
  * {@code import_zeile.daten} hält die Rohwerte als {@code {"werte": [...]}}; ein offenes Ergebnis (wartet auf den
  * Abgleich, Aufgabe 4.2) ist {@code null}.
  */
@@ -46,7 +47,6 @@ public class JdbcImportRepository implements ImportRepository {
 
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final int STAPEL = 500;
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -57,46 +57,61 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
-    public void laufAnlegen(ImportLauf lauf, List<ImportZeile> zeilen) {
-        String schema = schema();
-        String laufSql = "insert into " + schema + ".import_lauf (id, art, vollexport, dateiname, sha256, zeichensatz, "
+    public void laufAnlegen(ImportLauf lauf) {
+        String sql = "insert into " + schema() + ".import_lauf (id, art, vollexport, dateiname, sha256, zeichensatz, "
                 + "trennzeichen, kopfzeile, zeilen, fehler, status, benutzer, erstellt) "
                 + "values (?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?)";
-        String zeileSql = "insert into " + schema + ".import_zeile (lauf_id, nr, daten, ergebnis, meldung) "
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
+            einfuegen.setObject(1, lauf.id(), Types.OTHER);
+            einfuegen.setString(2, lauf.art().code());
+            einfuegen.setBoolean(3, lauf.vollexport());
+            einfuegen.setString(4, lauf.dateiname());
+            einfuegen.setString(5, lauf.sha256());
+            einfuegen.setString(6, lauf.zeichensatz());
+            einfuegen.setString(7, String.valueOf(lauf.trennzeichen()));
+            einfuegen.setString(8, json(liste(lauf.kopf().namen())));
+            einfuegen.setInt(9, lauf.zeilen());
+            einfuegen.setInt(10, lauf.fehler());
+            einfuegen.setString(11, lauf.status().name());
+            einfuegen.setString(12, lauf.benutzer());
+            einfuegen.setTimestamp(13, Timestamp.from(lauf.erstellt()));
+            einfuegen.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Lauf nicht gespeichert", e);
+        }
+    }
+
+    @Override
+    public void zeilenAnlegen(UUID laufId, List<ImportZeile> zeilen) {
+        String sql = "insert into " + schema() + ".import_zeile (lauf_id, nr, daten, ergebnis, meldung) "
                 + "values (?, ?, cast(? as jsonb), ?, ?)";
         try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement laufEinfuegen = verbindung.prepareStatement(laufSql);
-             PreparedStatement zeileEinfuegen = verbindung.prepareStatement(zeileSql)) {
-            laufEinfuegen.setObject(1, lauf.id(), Types.OTHER);
-            laufEinfuegen.setString(2, lauf.art().code());
-            laufEinfuegen.setBoolean(3, lauf.vollexport());
-            laufEinfuegen.setString(4, lauf.dateiname());
-            laufEinfuegen.setString(5, lauf.sha256());
-            laufEinfuegen.setString(6, lauf.zeichensatz());
-            laufEinfuegen.setString(7, String.valueOf(lauf.trennzeichen()));
-            laufEinfuegen.setString(8, json(liste(lauf.kopf().namen())));
-            laufEinfuegen.setInt(9, lauf.zeilen());
-            laufEinfuegen.setInt(10, lauf.fehler());
-            laufEinfuegen.setString(11, lauf.status().name());
-            laufEinfuegen.setString(12, lauf.benutzer());
-            laufEinfuegen.setTimestamp(13, Timestamp.from(lauf.erstellt()));
-            laufEinfuegen.executeUpdate();
-            int imStapel = 0;
+             PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
             for (ImportZeile zeile : zeilen) {
-                zeileEinfuegen.setObject(1, lauf.id(), Types.OTHER);
-                zeileEinfuegen.setInt(2, zeile.nr());
-                zeileEinfuegen.setString(3, daten(zeile.werte()));
-                zeileEinfuegen.setString(4, ergebnis(zeile.ergebnis()));
-                zeileEinfuegen.setString(5, zeile.meldung());
-                zeileEinfuegen.addBatch();
-                if (++imStapel == STAPEL) {
-                    zeileEinfuegen.executeBatch();
-                    imStapel = 0;
-                }
+                einfuegen.setObject(1, laufId, Types.OTHER);
+                einfuegen.setInt(2, zeile.nr());
+                einfuegen.setString(3, daten(zeile.werte()));
+                einfuegen.setString(4, ergebnis(zeile.ergebnis()));
+                einfuegen.setString(5, zeile.meldung());
+                einfuegen.addBatch();
             }
-            if (imStapel > 0) {
-                zeileEinfuegen.executeBatch();
-            }
+            einfuegen.executeBatch();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Zeilen nicht gespeichert", e);
+        }
+    }
+
+    @Override
+    public void laufAktualisieren(ImportLauf lauf) {
+        String sql = "update " + schema() + ".import_lauf set status = ?, zeilen = ?, fehler = ? where id = ?";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            aendern.setString(1, lauf.status().name());
+            aendern.setInt(2, lauf.zeilen());
+            aendern.setInt(3, lauf.fehler());
+            aendern.setObject(4, lauf.id(), Types.OTHER);
+            aendern.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Import-Lauf nicht gespeichert", e);
         }
@@ -143,13 +158,31 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
-    public List<ImportZeile> zeilen(UUID laufId) {
+    public int breite(UUID laufId) {
+        String sql = "select coalesce(max(jsonb_array_length(daten -> 'werte')), 0) from " + schema()
+                + ".import_zeile where lauf_id = ?";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, laufId, Types.OTHER);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                return ergebnis.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Zeilen nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl) {
         String sql = "select nr, daten::text, ergebnis, meldung from " + schema()
-                + ".import_zeile where lauf_id = ? order by nr";
+                + ".import_zeile where lauf_id = ? and nr > ? order by nr limit ?";
         List<ImportZeile> zeilen = new ArrayList<>();
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setObject(1, laufId, Types.OTHER);
+            abfrage.setInt(2, nachNr);
+            abfrage.setInt(3, anzahl);
             try (ResultSet ergebnis = abfrage.executeQuery()) {
                 while (ergebnis.next()) {
                     String text = ergebnis.getString("daten");
@@ -172,34 +205,20 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
-    public void pruefungAktualisieren(ImportLauf lauf, List<ImportZeile> zeilen) {
-        String schema = schema();
-        String laufSql = "update " + schema + ".import_lauf set status = ?, fehler = ? where id = ?";
-        String zeileSql = "update " + schema + ".import_zeile set ergebnis = ?, meldung = ? where lauf_id = ? and nr = ?";
+    public void zeilenAktualisieren(UUID laufId, List<ImportZeile> zeilen) {
+        String sql = "update " + schema() + ".import_zeile set ergebnis = ?, meldung = ? where lauf_id = ? and nr = ?";
         try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement laufAendern = verbindung.prepareStatement(laufSql);
-             PreparedStatement zeileAendern = verbindung.prepareStatement(zeileSql)) {
-            laufAendern.setString(1, lauf.status().name());
-            laufAendern.setInt(2, lauf.fehler());
-            laufAendern.setObject(3, lauf.id(), Types.OTHER);
-            laufAendern.executeUpdate();
-            int imStapel = 0;
+             PreparedStatement aendern = verbindung.prepareStatement(sql)) {
             for (ImportZeile zeile : zeilen) {
-                zeileAendern.setString(1, ergebnis(zeile.ergebnis()));
-                zeileAendern.setString(2, zeile.meldung());
-                zeileAendern.setObject(3, lauf.id(), Types.OTHER);
-                zeileAendern.setInt(4, zeile.nr());
-                zeileAendern.addBatch();
-                if (++imStapel == STAPEL) {
-                    zeileAendern.executeBatch();
-                    imStapel = 0;
-                }
+                aendern.setString(1, ergebnis(zeile.ergebnis()));
+                aendern.setString(2, zeile.meldung());
+                aendern.setObject(3, laufId, Types.OTHER);
+                aendern.setInt(4, zeile.nr());
+                aendern.addBatch();
             }
-            if (imStapel > 0) {
-                zeileAendern.executeBatch();
-            }
+            aendern.executeBatch();
         } catch (SQLException e) {
-            throw new IllegalStateException("Prüfung des Import-Laufs nicht gespeichert", e);
+            throw new IllegalStateException("Prüfung der Import-Zeilen nicht gespeichert", e);
         }
     }
 
