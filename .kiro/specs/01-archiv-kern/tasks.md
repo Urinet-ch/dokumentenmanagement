@@ -188,9 +188,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `POST /api/v1/dokumente` multipart (Recht A1), je Datei: SHA-256 vor allem anderen in `dokument_datei`, Typprüfung per Tika-Detektor (415 `DATEITYP_UNBEKANNT`), über 50 MB (413 `DATEI_ZU_GROSS`), leer oder beschädigt (422 `DATEI_UNGUELTIG`), Dublettenprüfung (`DUBLETTE` mit `vorhandenId`, ohne Leserecht nur «bereits vorhanden»)
   - ein Ergebnis je Datei, gültige Dateien trotz abgelehnter Nachbarn; `zusammenfassen`; Handy-Upload mit Original und Arbeitsfassung je Seite
   - Antwort 202, Status `NEU`, Auftrag `VERARBEITEN` einreihen; Lastskript für ≤ 2 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
+  - Hinweis aus 2.5: `AuftragService.einreihen` nimmt nur Typen an, für die ein Handler besteht. `VERARBEITEN` lässt sich darum erst mit dem `VerarbeitenHandler` aus 2.6 einreihen; bis dahin braucht 2.4 im Test einen Handler für `VERARBEITEN` (nur unter `src/test`).
   - _Anforderungen: 2.7, 3.1–3.8, 4.7, 6.1_
 
-- [ ] 2.5 Auftragsschlange [Backend]
+- [x] 2.5 Auftragsschlange [Backend]
   - `AuftragService.einreihen(typ, nutzlast)`, `AuftragPoller` mit `SKIP LOCKED`, insgesamt 3 Versuche mit wachsender Wartezeit, Mandantenkontext pro Auftrag
   - Zeitgrenze je Auftragstyp (design.md) und Lebenszeichen; verwaiste `LAEUFT`-Aufträge nach Ablauf der Zeitgrenze freigeben, zählt als Versuch
   - Tests: zwei Worker holen denselben Auftrag nie doppelt; Zeitüberschreitung und verwaister Auftrag zählen als Fehlversuch
@@ -201,6 +202,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Port `OcrPort` mit Adapter und Dev-Stub; `VerarbeitenHandler`: Status `VERARBEITUNG`, HEIC→JPEG, Bilder→PDF, bei Handy-Erfassung PDF/A aus der Arbeitsfassung, OCRmyPDF (`--skip-text` bei Textebene), `pdftotext`, Vorschaubilder; Folgeauftrag `KI_VORSCHLAG`; nach 3 Fehlversuchen `FEHLER` mit Fehlertext
   - signierte PDFs: PDF/A auch bei Verlust der Signatur, Original unverändert; keine PDF/A möglich (z. B. verschlüsselt) → Vermerk `pdfa_fehlt` und Eingangskorb
   - veraPDF-Prüfung im Test; Lastskript für die Laufzeit einseitiges Foto als p95 ≤ 30 s bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16)
+  - Pflicht für jeden Handler und Hook (aus 2.5, design.md «Pflichten der Handler»): eigene Zeitgrenzen für jede Ein- und Ausgabe unter der Zeitgrenze des Typs (JDBC `queryTimeout`/`statement_timeout`, S3 `apiCallTimeout`, Prozesse `waitFor` + `destroyForcibly()`); Ergebnisse nur in einer kurzen Transaktion schreiben, die zuerst `AuftragService.anspruchSichern(auftrag)` aufruft (`select … from public.auftrag where id = ? and versuche = ? and status = 'LAEUFT' for update`); Test je Handler: verlorener Anspruch schreibt nichts
   - _Anforderungen: 5.1–5.10_
 
 - [ ] 2.7 Frontend-Grundgerüst und Upload [Frontend]

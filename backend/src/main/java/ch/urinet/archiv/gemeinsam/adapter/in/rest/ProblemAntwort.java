@@ -1,18 +1,14 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jboss.logging.Logger;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,8 +27,6 @@ public record ProblemAntwort(String fehlerId, int status, Fehlercode code, Strin
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Logger LOG = Logger.getLogger(ProblemAntwort.class);
-
-    private static final int MAX_URSACHEN = 10;
 
     public static ProblemAntwort fuer(Fehlercode code) {
         return fuer(code, code.status(), null);
@@ -73,15 +67,6 @@ public record ProblemAntwort(String fehlerId, int status, Fehlercode code, Strin
 
     /** Klassennamen der Ursachen-Kette, äusserste zuerst, mit SQLState; ohne Meldungen. */
     static String ursachen(Throwable fehler) {
-        List<String> kette = new ArrayList<>();
-        Set<Throwable> gesehen = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Throwable t = fehler; t != null && gesehen.add(t) && kette.size() < MAX_URSACHEN; t = t.getCause()) {
-            String name = t.getClass().getName();
-            if (t instanceof SQLException sql && sql.getSQLState() != null) {
-                name += "[sqlstate=" + sql.getSQLState() + "]";
-            }
-            kette.add(name);
-        }
-        return String.join(" <- ", kette);
+        return Ursachen.kette(fehler);
     }
 }

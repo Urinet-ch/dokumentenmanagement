@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Aufgabe 2.5, zweite Nachbesserung (Review PR #41, Req 5.4): Der Hook nach dem letzten Fehlversuch wird mit
+         Wartezeit und Obergrenze wiederholt. «nachbearbeitung_versuche» zählt die Fehlschläge, vor
+         «nachbearbeitung_nicht_vor» ruft ihn der Aufräumer nicht erneut auf. Rückwärtskompatibel: Ein älterer Release
+         kennt die Spalten nicht; neue Zeilen erhalten den Standardwert 0. -->
+    <changeSet id="007-auftrag-nachbearbeitung-versuche" author="archiv">
+        <addColumn tableName="auftrag">
+            <column name="nachbearbeitung_versuche" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nachbearbeitung_nicht_vor" type="timestamptz"/>
+        </addColumn>
+    </changeSet>
+</databaseChangeLog>
