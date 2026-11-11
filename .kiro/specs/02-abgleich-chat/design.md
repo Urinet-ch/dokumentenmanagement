@@ -91,12 +91,22 @@ flowchart LR
   Der Sichtbarkeitsfilter gilt in allen Werkzeug-Abfragen, auch für Summen, Anzahlen und Lücken (Requirement 5.2).
   Basis ZAHLUNGSDATUM nur, wenn `bezahlt_am` gefüllt ist (AbaNinja); sonst Hinweis an den Agenten.
 - `vollstaendigkeit`: Lücken in `^\d{4}-\d{3}$` je Jahr, Lohnabrechnungen je Monat ab erstem Beleg der Art, Kontoauszüge je Monat, AbaNinja-Belege ohne `dokument_id`.
+  Spec 05 ergänzt (Spec 05, Req 5.4): Die Lücken in Nummernfolgen und die fehlenden Monate kommen aus dem Lückenbericht
+  nach den Regeln `FOLGE` und `ERWARTET` der Konfiguration statt aus festen Mustern. Für `urinet` legt der Seed fest:
+  `FOLGE` mit `muster: true` auf `AUSGANGSRECHNUNG` (Belegnummer-Muster `^(?<jahr>\d{4})-(?<nr>\d{3})$`, Zeitraum
+  `GESCHAEFTSJAHR`), `ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (Bezug `BELEGDATUM`) und für `BANK`
+  (Bezug `zusatz.periode_bis`); Spec 05 design.md, «Regeltypen». Das Werkzeug erhalten nur Rollen, die A3 und A4
+  uneingeschränkt sehen; für andere fehlt es in der Liste (Requirement 4.2, 5.2). Die AbaNinja-Belege ohne
+  `dokument_id` bleiben unverändert Teil des Werkzeugs (Lückenbericht umgesetzt in Spec 05, Aufgabe 17.6).
+- Finanzfunktionen (Spec 05 ergänzt, Spec 05, Req 8.8): `kennzahl` und `offene_posten` stehen nur in der
+  Werkzeugliste, wenn `Funktionen.finanzVerfuegbar()` für den Mandanten gilt (mindestens eine aktive Art mit der Gruppe
+  `finanz`); umgesetzt in Spec 05, Aufgabe 18.2.
 - REST `POST /api/v1/chat` → `text/event-stream` mit Ereignissen `werkzeug {name}`, `text {delta}`, `quellen [{titel, link}|{datenstand}]`, `fertig {gespraechId, tokens}`, `fehler {meldung}`. Spec 04 ergänzt in `quellen` die Form `{wissen:{titel, link, stand}, dokumente:[{titel, link, seiten}]}` für Wissensseiten (Spec 04, Req 8.5).
 - Rate-Limit: Zähler pro Benutzer und Stunde (Tabelle oder Caffeine-Cache), 100/h.
 
 ### Jahresexport (`export`)
 - `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).
-- Rollen: `inhaber`, `treuhaender`; alle anderen 403 (Requirement 7.5).
+- Rollen: `inhaber`, `treuhaender`; alle anderen 403 (Requirement 7.5). Spec 05 ergänzt (Spec 05, Req 8.8): Ohne Finanzfunktionen des Mandanten (`Funktionen.finanzVerfuegbar()`) antwortet der Export für diese Rollen mit 404; für die übrigen Rollen bleibt es bei 403 (umgesetzt in Spec 05, Aufgabe 18.2).
 - Inhalt gemäss Requirement 7 (nur Status `ARCHIVIERT`, bei `pdfa_fehlt` das Original); `belegliste.csv` UTF-8 mit BOM, Semikolon (Excel CH).
 - Ohne Dokumente der Art `WISSENSQUELLE`, auch nicht in `belegliste.csv` (Spec 04 ergänzt, Spec 04, Req 1.6).
 - Zugriffsprotokoll (Ergänzung zur Endpunktliste in Spec 01, design.md): `POST /api/v1/exporte` (Aktion Exportieren) und `GET /api/v1/exporte/{id}` (Herunterladen), beide mit Export-ID statt Dokument-ID.

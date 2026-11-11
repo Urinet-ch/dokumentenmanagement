@@ -343,6 +343,11 @@ fehlt; für `vhf-gsk` ergänzt um die Zusatzfelder nach Spec 03, 1.2 (mindestens
 `mitglieder`, und `veroeffentlicht`, Standard `false`). Eigener `WissensquelleSeedTest`; `DokumentartSeedTest`
 (Spec 01) bleibt unverändert. Die Art steht nicht in der Artenliste des KI-Vorschlags (Requirement 1.5) und wird vom
 Jahresexport ausgenommen (Requirement 1.6).
+Spec 05 ergänzt (Spec 05, Req 2.6; umgesetzt in Spec 05, Aufgabe 17.3): Die Ergänzung für `vhf-gsk` (`zugriff`,
+`veroeffentlicht`) kommt aus der Konfiguration von `vhf-gsk` (`seed/vhf-gsk/konfiguration.json`), nicht aus diesem
+mandantenunabhängigen Seed-Teil; der Seed-Teil legt die Art an, wenn der Code fehlt. Code, Gruppe `frei`, die
+Pflichtfelder `titel` und `datum`, «unbefristet», `gesetzliche_pflicht = nein` und `ki_vorschlag = nein` sind in
+jeder Konfiguration fest.
 
 | Code | Name | Gruppen | Pflichtfelder | Zusatz | Vertraulichkeit | Aufbewahrung | `gesetzliche_pflicht` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
