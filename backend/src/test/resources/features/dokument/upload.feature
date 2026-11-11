@@ -58,6 +58,13 @@ Funktionalität: Upload von Dateien
       | grenze.pdf | NEU    |
     Und liegt jede neue Datei unverändert unter «eingang/» im Bucket von «urinet»
 
+  @req-3.1 @req-3.6
+  Szenario: Drei gleichzeitige Uploads von je 50 MB laufen über das Arbeitsverzeichnis und hinterlassen nichts
+    Wenn «inhaber-urinet» gleichzeitig in 3 Anfragen je eine Datei von 50 MB hochlädt
+    Dann antworten alle Anfragen mit Status 202 und je einem neuen Dokument im Status «NEU»
+    Und lagen die Teile der Uploads im Arbeitsverzeichnis, nicht im temporären Verzeichnis der JVM
+    Und bleibt im Arbeitsverzeichnis keine Datei zurück
+
   @req-3.3
   Szenario: Der Typ wird am Inhalt erkannt, nicht an der Endung
     Wenn «inhaber-urinet» diese Dateien hochlädt:

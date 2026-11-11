@@ -25,6 +25,7 @@ import org.apache.http.entity.mime.HttpMultipartMode;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -50,7 +51,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
@@ -64,7 +72,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class UploadSchritte {
 
     private static final String PFAD = "/api/v1/dokumente";
-    private static final Path TEMP = Path.of(System.getProperty("java.io.tmpdir"), "archiv-upload");
+    /** Teile eines Uploads (quarkus.http.body.uploads-directory) im Arbeitsverzeichnis archiv.arbeit.verzeichnis. */
+    private static final Path TEMP = Path.of(ConfigProvider.getConfig().getValue("quarkus.http.body.uploads-directory",
+            String.class));
+    private static final Path ARBEIT = Path.of(ConfigProvider.getConfig().getValue("archiv.arbeit.verzeichnis",
+            String.class));
     private static final RestAssuredConfig UTF8 = RestAssuredConfig.config().httpClient(
             HttpClientConfig.httpClientConfig().httpMultipartMode(HttpMultipartMode.BROWSER_COMPATIBLE));
 
@@ -92,6 +104,10 @@ public class UploadSchritte {
     /** Zeit der Datenbank vor dem Senden; neue Dateien tragen einen Empfangszeitpunkt danach. */
     private String gesendetAb;
     private Set<Path> tempVorher = Set.of();
+    private Set<Path> arbeitVorher = Set.of();
+    private List<Response> parallel = List.of();
+    /** Während paralleler Uploads beobachtete Teile im Upload-Verzeichnis. */
+    private final Set<Path> beobachtet = ConcurrentHashMap.newKeySet();
     private Response antwort;
     private HttpResponse<String> rohAntwort;
     private LogMitschnitt mitschnitt;
@@ -432,6 +448,97 @@ public class UploadSchritte {
         assertThat(neu).isEmpty();
     }
 
+    @Wenn("«{word}» gleichzeitig in {int} Anfragen je eine Datei von {int} MB hochlädt")
+    public void gleichzeitigHochladen(String benutzer, int anzahl, int megabyte) throws Exception {
+        String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
+        stand(mandantCode);
+        String token = Testanmeldung.token(benutzer);
+        List<List<Datei>> anfragen = new ArrayList<>();
+        for (int i = 1; i <= anzahl; i++) {
+            anfragen.add(List.of(new Datei("parallel-" + i + ".pdf", inhalt("parallel-" + i + ".pdf",
+                    "pdf:" + megabyte), null)));
+        }
+        arbeitVorher = arbeitsDateien();
+        beobachtet.clear();
+        CyclicBarrier start = new CyclicBarrier(anzahl);
+        AtomicBoolean laeuft = new AtomicBoolean(true);
+        try (ExecutorService pool = Executors.newFixedThreadPool(anzahl + 1)) {
+            Future<?> beobachter = pool.submit(() -> {
+                while (laeuft.get()) {
+                    beobachtet.addAll(tempDateien());
+                    Thread.sleep(5);
+                }
+                return null;
+            });
+            List<Future<Response>> laeufe = new ArrayList<>();
+            for (List<Datei> dateien : anfragen) {
+                laeufe.add(pool.submit(() -> {
+                    start.await(30, TimeUnit.SECONDS);
+                    return multipart(given().auth().oauth2(token), dateien, false, null).when().post(PFAD);
+                }));
+            }
+            List<Response> antworten = new ArrayList<>();
+            for (Future<Response> lauf : laeufe) {
+                antworten.add(lauf.get(5, TimeUnit.MINUTES));
+            }
+            laeuft.set(false);
+            beobachter.get(30, TimeUnit.SECONDS);
+            parallel = antworten;
+        }
+        gesendet = anfragen.stream().flatMap(List::stream).toList();
+        for (Response einzeln : parallel) {
+            antwort = einzeln;
+            merken(mandantCode);
+        }
+    }
+
+    @Dann("antworten alle Anfragen mit Status 202 und je einem neuen Dokument im Status «NEU»")
+    public void alleParallelAngenommen() throws SQLException {
+        assertThat(parallel).isNotEmpty().allSatisfy(einzeln -> {
+            assertThat(einzeln.statusCode()).as(einzeln.asString()).isEqualTo(202);
+            assertThat(einzeln.jsonPath().getList("status", String.class)).containsExactly("NEU");
+        });
+        assertThat(parallel.stream().map(e -> e.jsonPath().getString("[0].id")).distinct()).hasSize(parallel.size());
+        for (Datei datei : gesendet) {
+            assertThat(abfragen("select groesse from " + schema() + ".dokument_datei where sha256 = ? and rolle = "
+                    + "'ORIGINAL'", sha256(datei.inhalt()))).as(datei.name()).singleElement()
+                    .satisfies(z -> assertThat(Long.parseLong(z.get("groesse"))).isEqualTo(datei.inhalt().length));
+        }
+    }
+
+    @Dann("lagen die Teile der Uploads im Arbeitsverzeichnis, nicht im temporären Verzeichnis der JVM")
+    public void teileImArbeitsverzeichnis() {
+        assertThat(TEMP.toAbsolutePath().normalize()).startsWith(ARBEIT.toAbsolutePath().normalize());
+        Path jvmTemp = Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize();
+        assertThat(ARBEIT.toAbsolutePath().normalize().startsWith(jvmTemp)).as("unter java.io.tmpdir").isFalse();
+        assertThat(beobachtet).as("Teile im Upload-Verzeichnis während der Anfragen").isNotEmpty();
+    }
+
+    @Dann("bleibt im Arbeitsverzeichnis keine Datei zurück")
+    public void arbeitsverzeichnisLeer() throws InterruptedException {
+        long frist = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        Set<Path> neu = arbeitsDateien();
+        while (!arbeitVorher.containsAll(neu) && System.nanoTime() < frist) {
+            Thread.sleep(50);
+            neu = arbeitsDateien();
+        }
+        neu.removeAll(arbeitVorher);
+        assertThat(neu).isEmpty();
+    }
+
+    /** Reguläre Dateien im ganzen Arbeitsverzeichnis (Upload, OCR, Ablage). */
+    private static Set<Path> arbeitsDateien() {
+        if (!Files.isDirectory(ARBEIT)) {
+            return new LinkedHashSet<>();
+        }
+        try (Stream<Path> dateien = Files.walk(ARBEIT)) {
+            return new LinkedHashSet<>(dateien.filter(Files::isRegularFile).toList());
+        } catch (IOException | UncheckedIOException e) {
+            // eine Datei verschwand während des Durchlaufs: nochmals
+            return arbeitsDateien();
+        }
+    }
+
     private void senden(String benutzer, List<Datei> dateien, boolean zusammenfassen, String hinweis) {
         String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
         stand(mandantCode);
@@ -592,8 +699,12 @@ public class UploadSchritte {
         }
         try (Stream<Path> dateien = Files.list(TEMP)) {
             return new LinkedHashSet<>(dateien.toList());
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
+        } catch (IOException | UncheckedIOException e) {
+            if (Files.isDirectory(TEMP)) {
+                // eine Datei verschwand während des Durchlaufs: nochmals
+                return tempDateien();
+            }
+            return new LinkedHashSet<>();
         }
     }
 

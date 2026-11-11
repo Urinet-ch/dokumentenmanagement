@@ -15,8 +15,15 @@ services:
     restart: unless-stopped
     user: "10001:10001"
     read_only: true
+    # tmpfs zählt zum mem_limit: darum nur noch 16m für JVM-Kleinkram (hsperfdata, Vert.x-Cache). Uploads (bis 50 MB je
+    # Datei), OCR-Läufe und Zwischenkopien der Ablage liegen im Volume «arbeit» auf der Platte (archiv.arbeit.verzeichnis,
+    # design.md «Arbeitsverzeichnis und Plattenplatz»); flüchtig, nicht in der Sicherung.
     tmpfs:
-      - /tmp:size=64m
+      - /tmp:size=16m
+    volumes:
+      - type: volume
+        source: arbeit
+        target: /var/lib/archiv/arbeit
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
     mem_limit: 320m
@@ -212,6 +219,9 @@ networks:
 volumes:
   daten:
     name: archiv_daten
+  # Arbeitsverzeichnis der API (flüchtig): Docker übernimmt beim ersten Anlegen Besitzer 10001 aus dem Image
+  arbeit:
+    name: archiv_arbeit
 
 secrets:
   archiv_db_app:

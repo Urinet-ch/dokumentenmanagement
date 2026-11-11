@@ -28,10 +28,13 @@ import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +43,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -53,6 +57,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class S3AblageTest {
 
     private static final LocalDate IN_ZEHN_JAHREN = LocalDate.now().plusYears(10);
+    /** Eigenes Verzeichnis je Testklasse, damit «leer» nur von diesem Test abhängt. */
+    private static final Path ZWISCHENABLAGE = Path.of("target", "arbeit-s3ablage", "ablage").toAbsolutePath();
 
     @Inject
     S3Client s3;
@@ -82,7 +88,7 @@ class S3AblageTest {
     private S3Ablage ablage(Optional<Duration> archivHoechstfrist, Sperrmodus manifestModus,
                             Optional<Duration> manifestHoechstfrist) {
         var einstellungen = new AblageEinstellungen(TestBucket.PRAEFIX, archivHoechstfrist, manifestModus,
-                manifestHoechstfrist, Duration.ofMinutes(5));
+                manifestHoechstfrist, Duration.ofMinutes(5), ZWISCHENABLAGE);
         return new S3Ablage(s3, S3Ablage.presigner(s3, true), einstellungen, Clock.systemUTC());
     }
 
@@ -120,6 +126,22 @@ class S3AblageTest {
         assertThat(datei.sha256()).isEqualTo(Pruefsumme.von(daten));
         assertThat(datei.sperreBis()).isEmpty();
         assertThat(retention(datei.schluessel(), datei.versionId())).isEmpty();
+    }
+
+    /** Die Zwischenkopie liegt im Arbeitsverzeichnis, nie in /tmp, und ist danach gelöscht, auch im Fehlerfall. */
+    @Test
+    void zwischenkopieImArbeitsverzeichnisUndDanachGeloescht() throws IOException {
+        S3Ablage ablage = ablage();
+        byte[] daten = inhalt("Zwischenkopie");
+        ablage.ablegenEingang(mandant, DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"),
+                new ByteArrayInputStream(daten), daten.length);
+        assertThatThrownBy(() -> ablage.ablegenEingang(mandant, DateiSchluessel.original(2026, UUID.randomUUID(), 1,
+                "pdf"), new ByteArrayInputStream(daten), daten.length + 1L)).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(ZWISCHENABLAGE).isDirectory();
+        try (Stream<Path> rest = Files.list(ZWISCHENABLAGE)) {
+            assertThat(rest).isEmpty();
+        }
     }
 
     @Test
@@ -368,7 +390,7 @@ class S3AblageTest {
         assertThatThrownBy(() -> ablage.vorsignierteUrl(mandant, Ablageort.EINGANG, schluessel, null))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AblageEinstellungen(TestBucket.PRAEFIX, Optional.empty(), Sperrmodus.COMPLIANCE,
-                Optional.empty(), Duration.ofMinutes(6))).isInstanceOf(IllegalStateException.class);
+                Optional.empty(), Duration.ofMinutes(6), ZWISCHENABLAGE)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

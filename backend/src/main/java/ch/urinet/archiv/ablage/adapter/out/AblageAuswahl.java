@@ -12,6 +12,7 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -41,8 +42,9 @@ public class AblageAuswahl {
             @ConfigProperty(name = "archiv.ablage.manifest-sperrmodus", defaultValue = "COMPLIANCE")
             Sperrmodus manifestSperrmodus,
             @ConfigProperty(name = "archiv.ablage.manifest-max-sperrfrist") Optional<Duration> manifestHoechstfrist,
-            @ConfigProperty(name = "archiv.ablage.url-gueltigkeit", defaultValue = "PT5M") Duration urlGueltigkeit) {
+            @ConfigProperty(name = "archiv.ablage.url-gueltigkeit", defaultValue = "PT5M") Duration urlGueltigkeit,
+            @ConfigProperty(name = "archiv.ablage.zwischenablage") Path zwischenablage) {
         return new AblageEinstellungen(bucketPraefix, archivHoechstfrist, manifestSperrmodus, manifestHoechstfrist,
-                urlGueltigkeit);
+                urlGueltigkeit, zwischenablage);
     }
 }

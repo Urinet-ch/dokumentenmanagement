@@ -42,7 +42,9 @@ public class SecretDateienTest {
                 "archiv.db.url-pflicht", "false",
                 "quarkus.oidc.tenant-enabled", "false",
                 "quarkus.quinoa", "false",
-                "quarkus.compose.devservices.enabled", "false");
+                "quarkus.compose.devservices.enabled", "false",
+                // /var/lib/archiv/arbeit gibt es nur im Image
+                "archiv.arbeit.verzeichnis", Path.of("target", "arbeit-prod").toAbsolutePath().toString());
     }
 
     @Test

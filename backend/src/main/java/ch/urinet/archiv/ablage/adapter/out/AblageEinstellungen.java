@@ -3,6 +3,7 @@ package ch.urinet.archiv.ablage.adapter.out;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Stufenregel;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -10,17 +11,19 @@ import java.util.Optional;
 /**
  * Konfiguration der Ablage ({@code archiv.ablage.*}, design.md «Protokoll und Manifest»): Bucket-Präfix, Höchstfrist für
  * {@code archiv/} (nur Stufe A), Sperrmodus und Höchstfrist für {@code manifest/} (Standard COMPLIANCE ohne Höchstfrist)
- * und Gültigkeit der vorsignierten URL (höchstens 5 Minuten, Req 14.6).
+ * Gültigkeit der vorsignierten URL (höchstens 5 Minuten, Req 14.6) und Verzeichnis für Zwischenkopien
+ * ({@code archiv.ablage.zwischenablage}, im Arbeitsverzeichnis, nie {@code /tmp}).
  */
 public record AblageEinstellungen(String bucketPraefix, Optional<Duration> archivHoechstfrist,
                                   Sperrmodus manifestSperrmodus, Optional<Duration> manifestHoechstfrist,
-                                  Duration urlGueltigkeit) {
+                                  Duration urlGueltigkeit, Path zwischenablage) {
 
     public static final Duration URL_HOECHSTENS = Duration.ofMinutes(5);
 
     public AblageEinstellungen {
         Objects.requireNonNull(bucketPraefix, "bucketPraefix");
         Objects.requireNonNull(manifestSperrmodus, "manifestSperrmodus");
+        Objects.requireNonNull(zwischenablage, "zwischenablage");
         positiv(archivHoechstfrist, "archiv.ablage.max-sperrfrist");
         positiv(manifestHoechstfrist, "archiv.ablage.manifest-max-sperrfrist");
         if (urlGueltigkeit == null || urlGueltigkeit.isNegative() || urlGueltigkeit.isZero()
