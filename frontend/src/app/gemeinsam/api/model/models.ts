@@ -5,5 +5,7 @@ export * from './dokument';
 export * from './dokumentart';
 export * from './dokumentart-aenderung';
 export * from './eingangskorb-seite';
+export * from './kontakt';
+export * from './kontakt-angaben';
 export * from './upload-ergebnis';
 export * from './upload-fehler';

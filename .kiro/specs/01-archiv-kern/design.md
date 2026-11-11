@@ -490,6 +490,8 @@ Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026; 
 **Normalisierung** (`gemeinsam`, gilt für Gate-Vergleich Req 0.7, Partner-Abgleich und CSV-Import):
 - Name: Unicode NFKC, Kleinschreibung, `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`, übrige Akzente entfernt (`é→e`), `&` → `und`, Satzzeichen → Leerzeichen, Rechtsformen als ganzes Wort entfernt (`ag`, `gmbh`, `sa`, `sarl`, `sagl`, `kg`, `klg`, `verein`, `genossenschaft`, `stiftung`, `ltd`, `inc`), Mehrfachleerzeichen zusammengefasst, getrimmt.
 - PLZ nur Ziffern; E-Mail klein und getrimmt; IBAN ohne Leerzeichen, gross.
+- UID (Aufgabe 3.1, Auslegung): gross, ohne Leerraum, Punkte und Bindestriche, ohne Zusatz `MWST`/`TVA`/`IVA`/`HR` am Ende (`CHE-123.456.789 MWST` → `CHE123456789`). Nachweis `NormalisiererTest`.
+- Leerraum heisst überall auch geschützte Leerzeichen (z. B. U+00A0, U+202F aus OCR- oder PDF-Text); sie werden in IBAN und UID entfernt und bei der E-Mail am Rand abgeschnitten (Aufgabe 3.1, Review 11.11.2026). Nachweis `NormalisiererTest`.
 
 #### Profil `lokal` (Req 16.20–16.22, ADR-012)
 Nur für den Entwicklerrechner: Das Sprachmodell läuft in LM Studio (OpenAI-kompatibel). Der Adapter
@@ -625,6 +627,13 @@ Regeln des Abgleichs (Req 13), Normalisierung siehe «KI»:
 - Ablehnung: keine Spalte für `name` (Profil «21.CRM»: `Name` oder `Organisation`) oder mehr als 10'000 Zeilen → 422 `CSV_UNGUELTIG` (Req 13.10); keine Datenzeilen → 422 `CSV_LEER` «keine Datenzeilen», kein Kontakt wird geändert oder gekennzeichnet (Req 13.11).
 
 Profil «21.CRM» (K4, `docs/spikes/21crm-export.md`): Erkennt das Archiv die Kopfzeile des 21.CRM-Gesamtexports (`ADDRESS.csv`: Windows-1252, Semikolon, Felder nur bei Bedarf in Anführungszeichen nach RFC 4180, Datensätze mit LF, Spalte `Sekretär(in)` doppelt), schlägt der Zuordnungsdialog (Req 13.2) das Profil vor; nach einmaliger Bestätigung gilt es für den Mandanten wie jede gespeicherte Zuordnung. Regeln des Profils: `crm_id` = `GGUID`; `typ` aus `Kontakt ist eine Organisation`; `name` = `Organisation` bei Organisationen, sonst `Name`; `vorname` = `Vorname`; `name_normalisiert` bei Personen aus Vorname und Name; `strasse`/`plz`/`ort` aus den Feldern «(Geschäft)»; `email` gemäss Index `Standard-E-Mail` (1 Geschäft, 3 Privat, 5 Zentrale), sonst das erste gefüllte aus Geschäft, Zentrale, Geschäft 2, Privat; `telefon` gemäss `Standard-Telefon 1` (4 Geschäft, 10 Zentrale), sonst Geschäft, Zentrale, Mobil (Geschäft); Zeilen mit `Ist gelöscht = true` werden übersprungen; Zeitstempel `TT.MM.JJ HH:MM:SS` als Europe/Zurich. Verkaufschancen (`GWOPPORTUNITY.csv`): `crm_id` = `GGUID`, Kontakt über `ACCOUNTGUID`, `titel` = `Name`, `phase` = `Phase`, `betrag` = `Gesamt`, `datum` = `Beginn` [offen: Zuordnung der Verkaufschancen aus 21.CRM mit einem Nachexport mit Testdaten bestätigen – Entscheid vor Welle 4]. Die Zuordnung wird nach Spaltenposition gespeichert, weil Spaltennamen doppelt vorkommen können.
+
+- Umsetzung (Aufgabe 3.1, 11.11.2026):
+  - Schema: `pg_trgm` legt `db/public` (Changeset 008) mit dem Owner im Schema `public` an (`create extension if not exists … with schema public`); die Mandanten-Schemas sprechen es qualifiziert an (`public.gin_trgm_ops`, `public.similarity`, `operator(public.%)`), weil der `search_path` nur das Mandanten-Schema enthält. `kontakt` (Changeset `db/mandant` 006) hat zusätzlich `version int` (optimistisches Locking für `PATCH`) und Indizes auf `uid` und `iban`; `typ IN ('ORGANISATION','PERSON')`. `verkaufschance` hat zusätzlich `waehrung text not null default 'CHF'` (tech.md, Regel 9). E-Mail, UID, IBAN und PLZ werden normalisiert gespeichert, damit der exakte Abgleich ohne Funktionen auf der Spalte auskommt.
+  - REST: `GET /kontakte?q=` (A6, höchstens 20 Treffer, nach `public.similarity` sortiert, ohne Zugriffsprotokoll wie die Suche), `POST /kontakte` (A12, 201 mit `ETag "<version>"`, Quelle `MANUELL`), `PATCH /kontakte/{id}` (A12, `If-Match` Pflicht: fehlt → 428 `VERSION_FEHLT`; es passt nur ein starkes ETag `"<version>"` (RFC 9110), `*`, schwache ETags `W/"…"`, Werte ohne Anführungszeichen oder veraltete Versionen → 412 `VERSION_KONFLIKT`; `null` lässt ein Feld unverändert, `""` leert es; Name und Typ bleiben Pflicht → 422 `PFLICHTFELD_FEHLT`). `POST` und `PATCH` prüfen die Höchstlängen aus OpenAPI (Zeichen ohne Leerraum am Rand; Name, Vorname, Strasse, Ort, E-Mail 200, PLZ 20, Telefon 50, UID 30, IBAN 40, Kategorie 100) → sonst 400 `ANFRAGE_UNGUELTIG` wie bei den Dokumentarten; die Prüfung sitzt in der REST-Eingabe (DTO), nicht in `KontaktAngaben`. Ein `GET /kontakte/{id}` gibt es nicht. API-Tokens erreichen die Kontakte nicht (403). Logs nennen nur Kontakt-IDs.
+  - `PartnerAbgleich` (application, `@Transactional`, für den Worker in 3.2): Stufen E-Mail → UID → IBAN, leere Felder werden übersprungen. Mehrere Treffer auf einer Stufe oder Stufen, die auf verschiedene Kontakte zeigen, ergeben «unsicher» mit allen Kandidaten (wie die «mögliche Dublette» beim CSV-Import). Ohne exakten Treffer rechnet die Datenbank die Ähnlichkeit (`set_config('pg_trgm.similarity_threshold', …, true)`, dann `%` mit dem GIN-Index und `similarity`, auf 4 Stellen gerundet, weil `real` sonst z. B. 0.7 − 0.6 knapp unter 0.1 rechnet). Abgefragt wird ab `archiv.abgleich.aehnlichkeit − 0.1`: Der Beste muss die Schwelle erreichen; liegt der Zweite weniger als 0.1 dahinter, ist das Ergebnis «unsicher», auch wenn der Zweite selbst unter der Schwelle liegt. Ein Name, der nach der Normalisierung leer ist (z. B. nur «AG»), ergibt «neuer Partner». Nachweise: `AbgleichRegelTest` (Gleichstand, Abstand genau 0.1, leere Felder), Szenarien `features/kontakt/kontakte.feature` (`@req-7.4`, mit gemessenen `pg_trgm`-Werten, auch kurze Namen).
+  - Laufzeit (`PartnerAbgleichLeistungTest`, 10'000 synthetische Kontakte, PostgreSQL 17 als Dev Service auf einem Entwicklerrechner): Median 20 ms, p95 24 ms je Abgleich. Bei dieser Grösse wählt der Planer einen Seq Scan; der GIN-Index ist für `%` nutzbar (geprüft mit `enable_seqscan = off`) und greift bei mehr Zeilen.
+  - Die Verknüpfung `dokument.partner_id` und der Aufruf aus der Erfassung folgen mit Aufgabe 3.2.
 
 Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonymliste (`Firma|Organisation|Name|Nachname → name`, `PLZ|Postleitzahl → plz`, `E-Mail|Mail → email`, `ID|GGUID|Nummer|Kontakt-Nr → crm_id` …).
 
@@ -790,11 +799,11 @@ dokumentart(code text pk, name text, beschreibung text null,   -- Abgrenzung fü
 kontakt(id uuid pk, crm_id text unique null, typ text, name text, vorname text,
         name_normalisiert text, strasse text, plz text, ort text, email text, telefon text,
         uid text, iban text, kategorie text, quelle text, nicht_im_export bool,
-        abaninja_uuid text null, erstellt timestamptz, geaendert timestamptz)
-  index gin (name_normalisiert gin_trgm_ops), index (lower(email))
+        abaninja_uuid text null, erstellt timestamptz, geaendert timestamptz, version int)
+  index gin (name_normalisiert public.gin_trgm_ops), index (lower(email)), index (uid), index (iban)
 
 verkaufschance(id uuid pk, crm_id text unique, kontakt_id uuid fk, titel text, phase text,
-               betrag numeric(12,2), datum date, import_lauf uuid)
+               betrag numeric(12,2), waehrung text default 'CHF', datum date, import_lauf uuid)
 
 dokument(id uuid pk, art text fk null, titel text, datum date, eingang timestamptz,
          quelle text,            -- SCAN|UPLOAD|GENERATOR|DRIVE|EMAIL|ABANINJA

@@ -4,4 +4,6 @@ export * from './dokumentarten.service';
 import { DokumentartenService } from './dokumentarten.service';
 export * from './dokumente.service';
 import { DokumenteService } from './dokumente.service';
-export const APIS = [APITokensService, DokumentartenService, DokumenteService];
+export * from './kontakte.service';
+import { KontakteService } from './kontakte.service';
+export const APIS = [APITokensService, DokumentartenService, DokumenteService, KontakteService];

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Kontakte und Verkaufschancen (Aufgabe 3.1, design.md Data Models; Req 7.4, 13). Nummer 006, weil 003–005 in
+         offenen PRs (2.1, 2.2) vergeben sind. E-Mail, UID und IBAN stehen normalisiert (design.md «Normalisierung»).
+         «version» für If-Match/ETag bei PATCH (tech.md «Konventionen Backend»). Die pg_trgm-Objekte liegen in public
+         (db/public 008) und sind qualifiziert, weil die Migration nur das Mandanten-Schema im search_path hat. -->
+    <changeSet id="006-kontakt" author="archiv">
+        <createTable tableName="kontakt">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" primaryKeyName="kontakt_pk"/>
+            </column>
+            <column name="crm_id" type="text">
+                <constraints unique="true" uniqueConstraintName="kontakt_crm_id_uk"/>
+            </column>
+            <column name="typ" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vorname" type="text"/>
+            <column name="name_normalisiert" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="strasse" type="text"/>
+            <column name="plz" type="text"/>
+            <column name="ort" type="text"/>
+            <column name="email" type="text"/>
+            <column name="telefon" type="text"/>
+            <column name="uid" type="text"/>
+            <column name="iban" type="text"/>
+            <column name="kategorie" type="text"/>
+            <column name="quelle" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="nicht_im_export" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="abaninja_uuid" type="text"/>
+            <column name="erstellt" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="geaendert" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="int" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table kontakt add constraint kontakt_typ_ck check (typ in ('ORGANISATION', 'PERSON'));
+            create index kontakt_name_trgm_ix on kontakt using gin (name_normalisiert public.gin_trgm_ops);
+            create index kontakt_email_ix on kontakt (lower(email));
+            create index kontakt_uid_ix on kontakt (uid);
+            create index kontakt_iban_ix on kontakt (iban);
+        </sql>
+
+        <createTable tableName="verkaufschance">
+            <column name="id" type="uuid">
+                <constraints primaryKey="true" primaryKeyName="verkaufschance_pk"/>
+            </column>
+            <column name="crm_id" type="text">
+                <constraints unique="true" uniqueConstraintName="verkaufschance_crm_id_uk"/>
+            </column>
+            <column name="kontakt_id" type="uuid">
+                <constraints foreignKeyName="verkaufschance_kontakt_fk" references="kontakt(id)"/>
+            </column>
+            <column name="titel" type="text"/>
+            <column name="phase" type="text"/>
+            <column name="betrag" type="numeric(12,2)"/>
+            <column name="waehrung" type="text" defaultValue="CHF">
+                <constraints nullable="false"/>
+            </column>
+            <column name="datum" type="date"/>
+            <column name="import_lauf" type="uuid"/>
+        </createTable>
+        <sql>create index verkaufschance_kontakt_ix on verkaufschance (kontakt_id)</sql>
+    </changeSet>
+</databaseChangeLog>

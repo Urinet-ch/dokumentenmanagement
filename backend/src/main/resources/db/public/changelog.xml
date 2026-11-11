@@ -12,4 +12,5 @@
     <include file="changesets/005-auftrag-mandant-pflicht.xml" relativeToChangelogFile="true"/>
     <include file="changesets/006-auftrag-nachbearbeitung.xml" relativeToChangelogFile="true"/>
     <include file="changesets/007-auftrag-nachbearbeitung-versuche.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/008-pg-trgm.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

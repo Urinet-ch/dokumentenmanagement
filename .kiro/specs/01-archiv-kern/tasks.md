@@ -231,7 +231,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 3 — KI-Vorschläge, Eingangskorb, Handy-Erfassung
 
-- [ ] 3.1 Kontakte und Partner-Abgleich [Backend]
+- [x] 3.1 Kontakte und Partner-Abgleich [Backend]
   - Liquibase `kontakt`, `verkaufschance` mit `pg_trgm`; `Normalisierer` gemäss design.md; REST `/api/v1/kontakte` (lesen; ändern nur mit Recht A12)
   - `PartnerAbgleich` (E-Mail, UID, IBAN, Ähnlichkeit ≥ 0.6, «unsicher» bei Abstand < 0.1) mit Tests
   - _Anforderungen: 2.18, 7.4_
