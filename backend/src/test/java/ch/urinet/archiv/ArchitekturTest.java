@@ -168,6 +168,19 @@ class ArchitekturTest {
             .because("die Anwendung verkürzt nie eine Sperre (tech.md Regel 2, Req 6.5)");
 
     /**
+     * Uploads und abgelegte Dateien laufen als Strom oder über temporäre Dateien, nie ganz im Heap (Speicherbudget
+     * Stufe A, design.md «Umsetzung 2.4»; Review PR #53, K1). Die Stubs für dev und Tests sind ausgenommen.
+     */
+    @ArchTest
+    static final ArchRule dateienNieGanzImHeap = noClasses()
+            .that().resideInAnyPackage("ch.urinet.archiv.dokument..", "ch.urinet.archiv.ablage..")
+            .and().resideOutsideOfPackage("ch.urinet.archiv..adapter.out.stub..")
+            .should().accessTargetWhere(DescribedPredicate.describe("ganze Datei als byte[]",
+                    zugriff -> Set.of("readAllBytes", "toByteArray", "getObjectAsBytes", "asByteArray")
+                            .contains(zugriff.getTarget().getName())))
+            .because("Dateien bis 50 MB je Stück dürfen den Heap nicht füllen (Speicherbudget Stufe A, tech.md)");
+
+    /**
      * Code eines Mandanten greift auf Tabellen in {@code public} nur über {@code auftrag} zu (ADR-002): Entitäten mit
      * {@code schema = "public"} gibt es nur für {@code auftrag} – ausser im Mandantenregister ({@code mandant}) und
      * für die API-Clients ({@code sicherheit}).
