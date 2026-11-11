@@ -25,6 +25,7 @@
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
+        <build-helper-plugin.version>3.6.2</build-helper-plugin.version>
         <!-- 2.0.x ist die letzte Linie auf Jackson 2 (Quarkus 3.40); 3.x braucht Jackson 3 (tools.jackson) -->
         <json-schema-validator.version>2.0.8</json-schema-validator.version>
         <tika.version>4.2.0</tika.version>
@@ -162,6 +163,12 @@
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Drive-Import (tools/drive_import, Aufgabe 4.8): Quellen als Testquellen, Szenarien laufen in-process -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
@@ -208,6 +215,26 @@
                             <goal>generate-code</goal>
                             <goal>generate-code-tests</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Drive-Import (Aufgabe 4.8): die Cucumber-Szenarien @req-12.x rufen das Werkzeug direkt auf -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>${build-helper-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>drive-import-quellen</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../tools/drive_import/src/main/java</source>
+                            </sources>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
