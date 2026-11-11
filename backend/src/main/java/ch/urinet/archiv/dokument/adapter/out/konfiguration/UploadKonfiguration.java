@@ -1,4 +1,4 @@
-package ch.urinet.archiv.dokument.adapter.in.rest;
+package ch.urinet.archiv.dokument.adapter.out.konfiguration;
 
 import ch.urinet.archiv.dokument.application.UploadGrenzen;
 import io.quarkus.runtime.configuration.MemorySize;
