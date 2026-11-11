@@ -29,9 +29,9 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
         // Unbestätigte Art wirkt als PERSONAL (Req 2.21, Fussnote ², design.md «Sicherheit»)
         String unbestaetigt = switch (regel.unbestaetigt()) {
             case ALLE -> "bestaetigt is null";
-            case EIGENE -> {
+            case ERFASSTE -> {
                 parameter.put("benutzer", regel.benutzer());
-                yield "(bestaetigt is null and (personBenutzer = :benutzer or erstelltVon = :benutzer))";
+                yield "(bestaetigt is null and erstelltVon = :benutzer)";
             }
             case KEINE -> "1 = 0";
         };

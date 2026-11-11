@@ -9,10 +9,12 @@ import java.util.Set;
  * Paging unsichtbare Dokumente nie verraten.
  * <ul>
  *   <li>Unbestätigte Art: wirkt als {@code PERSONAL} (Req 2.21). Rollen mit Recht A7 sehen alle; bei A4 «nur eigene»
- *       gilt Fussnote ²: {@code person_benutzer} ist der Benutzer oder er hat das Dokument erfasst; alle übrigen Rollen
- *       sehen keine (design.md «Sicherheit», Filter-SQL: {@code treuhaender} nur {@code d.bestaetigt is not null}).</li>
+ *       nur die selbst erfassten ({@code erstellt_von}), auch wenn {@code person_benutzer} ein anderer ist; ein fremd
+ *       erfasstes sieht er nicht, auch wenn {@code person_benutzer} er selbst ist (Fussnote ², entschieden von Fabian
+ *       am 11.11.2026); alle übrigen Rollen sehen keine (design.md «Sicherheit», Filter-SQL: {@code treuhaender} nur
+ *       {@code d.bestaetigt is not null}).</li>
  *   <li>Bestätigt: {@code NORMAL} nach A2, {@code INTERN} nach A3, {@code PERSONAL} nach A4; «nur eigene» heisst
- *       {@code person_benutzer} ist der Benutzer (Fussnote ², der Erfasser-Teil gilt nur vor der Bestätigung).</li>
+ *       {@code person_benutzer} ist der Benutzer (Fussnote ²).</li>
  *   <li>Eingangskorb (A5): «nur selbst erfasste» heisst zusätzlich {@code erstellt_von} ist der Benutzer (Req 2.24).</li>
  * </ul>
  *
@@ -32,8 +34,8 @@ public record Sichtregel(String benutzer, Unbestaetigt unbestaetigt, boolean nor
     public enum Unbestaetigt {
         /** Recht A7 */
         ALLE,
-        /** {@code person_benutzer} = Benutzer oder {@code erstellt_von} = Benutzer (A4 «nur eigene», Fussnote ²) */
-        EIGENE,
+        /** nur {@code erstellt_von} = Benutzer (A4 «nur eigene», Fussnote ², Req 2.21) */
+        ERFASSTE,
         KEINE
     }
 
@@ -57,7 +59,7 @@ public record Sichtregel(String benutzer, Unbestaetigt unbestaetigt, boolean nor
         Personal personal = LESEND.contains(a4) ? Personal.ALLE
                 : a4 == Ergebnis.NUR_EIGENE ? Personal.NUR_EIGENE : Personal.KEINE;
         Unbestaetigt unbestaetigt = Rechtematrix.ergebnis(rolle, Aktion.A7) == Ergebnis.ERLAUBT ? Unbestaetigt.ALLE
-                : personal == Personal.NUR_EIGENE ? Unbestaetigt.EIGENE : Unbestaetigt.KEINE;
+                : personal == Personal.NUR_EIGENE ? Unbestaetigt.ERFASSTE : Unbestaetigt.KEINE;
         return new Sichtregel(benutzer.id(), unbestaetigt,
                 LESEND.contains(Rechtematrix.ergebnis(rolle, Aktion.A2)),
                 LESEND.contains(Rechtematrix.ergebnis(rolle, Aktion.A3)),

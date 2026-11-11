@@ -8,7 +8,7 @@ public enum Ergebnis {
     VERBOTEN,
     /** «404»: das Dokument gilt als nicht vorhanden (Req 2.3) */
     NICHT_SICHTBAR,
-    /** «nur eigene ²»: {@code person_benutzer} ist der Benutzer, oder er hat erfasst und die Art ist unbestätigt */
+    /** «nur eigene ²»: bestätigt mit {@code person_benutzer} = Benutzer, oder unbestätigt und von ihm erfasst */
     NUR_EIGENE,
     /** «erlaubt (nur lesend)» */
     NUR_LESEND,

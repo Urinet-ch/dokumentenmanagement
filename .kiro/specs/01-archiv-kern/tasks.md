@@ -171,7 +171,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [x] 2.2 Datenmodell Dokument und Sichtbarkeit [Backend]
   - Liquibase `db/mandant`: `dokument` (Status `NEU`, `VERARBEITUNG`, `EINGANGSKORB`, `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, `FEHLER`, `VERWORFEN`; Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL`; Erfasser, `person_benutzer`), `dokument_datei`, `dokument_finanz`, `dokument_vertrag`, `dokument_version` (Trigger: nur `INSERT`), generierte `volltext_tsv` inkl. Tags
   - Indizes gemäss design.md: Dubletten je Datei nur über nicht verworfene Dokumente, Belegnummer eindeutig je Art nur bei eigenen Arten, `gin(tags)`, `geschaeftsjahr`, `dokument_finanz(betrag)`, `richtung`, Belegnummer
-  - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
+  - Panache-Entitäten im Adapter; `VertraulichkeitFilter` nach A2–A4: unbestätigte Art gilt als `PERSONAL` (sichtbar für Rollen mit A7 und den Erfasser, nicht über `person_benutzer`; entschieden von Fabian am 11.11.2026); unsichtbare Dokumente fehlen in Listen, Treffern und Zählern, Direktzugriff 404
   - Szenarien je Rolle und Vertraulichkeit mit zwei Mandanten; Szenario «fremde Dokument-ID → 404» (Req 1.4, aus 1.4 übernommen)
   - Eingangskorb-Abfrage nach A5: `mitarbeiter` erhält nur selbst erfasste Dokumente
   - _Anforderungen: 1.4, 2.3, 2.8, 2.9, 2.10, 2.21, 2.24, 10.1, 10.3_

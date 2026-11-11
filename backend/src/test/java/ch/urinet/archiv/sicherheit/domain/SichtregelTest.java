@@ -18,9 +18,9 @@ class SichtregelTest {
     }
 
     @Test
-    void mitarbeiterSiehtNormalUndEigenePersonalAuchUnbestaetigt() {
+    void mitarbeiterSiehtNormalEigenePersonalUndUnbestaetigtNurSelbstErfasste() {
         Sichtregel regel = Sichtregel.fuer(new Benutzer("joel", Rolle.MITARBEITER));
-        assertThat(regel).isEqualTo(new Sichtregel("joel", Sichtregel.Unbestaetigt.EIGENE, true, false,
+        assertThat(regel).isEqualTo(new Sichtregel("joel", Sichtregel.Unbestaetigt.ERFASSTE, true, false,
                 Sichtregel.Personal.NUR_EIGENE, true));
         assertThat(regel.uneingeschraenkt()).isFalse();
     }
