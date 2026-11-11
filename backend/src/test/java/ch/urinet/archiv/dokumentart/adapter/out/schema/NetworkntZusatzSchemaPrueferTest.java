@@ -200,6 +200,47 @@ class NetworkntZusatzSchemaPrueferTest {
         brichtNachDerZeitgrenzeAb(schema, "{\"x\":\"a\"}");
     }
 
+    /**
+     * Werte mit {@code format: regex} (Auftrag 40): Die Bibliothek kompiliert jeden Wert über unsere Fabrik, ohne dass
+     * ein Schlüsselwort mit Frist dazwischen liegt; ohne Frist vor dem Kompilieren nimmt die Prüfung die Werte an.
+     */
+    @Test
+    void formatRegexBrichtNachDerZeitgrenzeAb() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"array\",\"items\":{\"format\":\"regex\"}}}}";
+        StringBuilder werte = new StringBuilder("{\"x\":[");
+        for (int i = 0; i < 200; i++) {
+            werte.append(i == 0 ? "" : ",").append("\"a").append(i).append('"');
+        }
+        brichtNachDerZeitgrenzeAb(schema, werte.append("]}").toString());
+    }
+
+    @Test
+    void formatRegexPrueftWerteUnterDerZeitgrenze() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\",\"format\":\"regex\"}}}";
+        assertThatCode(() -> pruefer.wertePruefen(schema, "{\"x\":\"^a+$\"}")).doesNotThrowAnyException();
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"x\":\"(\"}"));
+    }
+
+    /**
+     * Ohne Grenze rechnet ein einzelner langer Ausdruck ausserhalb jeder Fristprüfung: {@code Pattern.compile} braucht
+     * für ein Literal von 48'000 Zeichen rund 0.4 s (Boyer-Moore-Vorbereitung), die Ersetzungen der Bibliothek für
+     * offene Zeicheneigenschaften wachsen quadratisch.
+     */
+    @Test
+    void regulaererAusdruckHatHoechstens1000Zeichen() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\",\"format\":\"regex\"}}}";
+        int max = NetworkntZusatzSchemaPruefer.MAX_MUSTER_ZEICHEN;
+        assertThatCode(() -> pruefer.wertePruefen(schema, "{\"x\":\"" + "a".repeat(max) + "\"}"))
+                .doesNotThrowAnyException();
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"x\":\"" + "a".repeat(max + 1) + "\"}"));
+        assertThat(pruefer.schemaPruefen(musterSchema("a".repeat(max)))).containsExactly("x");
+        assertUngueltig(() -> pruefer.schemaPruefen(musterSchema("a".repeat(max + 1))));
+    }
+
+    private static String musterSchema(String muster) {
+        return "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\",\"pattern\":\"" + muster + "\"}}}";
+    }
+
     @Test
     void zeitgrenzeMussPositivSein() {
         assertThatThrownBy(() -> new NetworkntZusatzSchemaPruefer(Duration.ZERO))

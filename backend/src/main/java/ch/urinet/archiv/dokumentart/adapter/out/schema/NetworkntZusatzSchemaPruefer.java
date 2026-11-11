@@ -52,9 +52,14 @@ import java.util.regex.Pattern;
  * Schutz gegen Rechenzeit (Review PR #40): Ein Aufruf von {@link #schemaPruefen} oder {@link #wertePruefen} hat
  * zusammen höchstens {@code archiv.dokumentart.muster-zeitgrenze}, danach ist das Ergebnis {@code ZUSATZ_UNGUELTIG}.
  * Die Frist prüft jedes Schlüsselwort des Dialekts ausser {@code format} vor seiner Prüfung (auch {@code $ref}, gegen
- * Verweis-Graphen mit exponentiell vielen Pfaden), jede Musterprüfung vor dem Suchen (gegen viele kurze Treffer) und
- * der Text während des Suchens (gegen ein einzelnes rückfallreiches Muster). Reguläre Ausdrücke ({@code pattern},
- * {@code patternProperties}, {@code pattern} unter {@code propertyNames}) laufen mit der JDK-Syntax. Verweise, die
+ * Verweis-Graphen mit exponentiell vielen Pfaden), jeder reguläre Ausdruck vor dem Kompilieren (auch Werte mit
+ * {@code format: regex} und Muster, die das Meta-Schema über {@code format: regex} prüft), jede Musterprüfung vor dem
+ * Suchen (gegen viele kurze Treffer) und der Text während des Suchens (gegen ein einzelnes rückfallreiches Muster).
+ * Ein regulärer Ausdruck hat höchstens {@value #MAX_MUSTER_ZEICHEN} Zeichen, weil das Kompilieren selbst nicht
+ * unterbrochen werden kann; die Grenze greift vor den Ersetzungen der Bibliothek (quadratisch bei vielen offenen
+ * Zeicheneigenschaften) und vor {@code Pattern.compile} (rund 0.4 s für ein Literal von 48'000 Zeichen). Beim Start wird der Prüfer einmal ohne Frist aufgewärmt, damit Klassenladen und JIT nicht in die Frist
+ * der ersten Anfrage fallen. Reguläre Ausdrücke ({@code pattern}, {@code patternProperties}, {@code pattern} unter
+ * {@code propertyNames}) laufen mit der JDK-Syntax. Verweise, die
  * ohne Fortschritt in den Daten auf sich selbst zurückführen ({@code {"$ref":"#"}} an der Wurzel), sind ungültig.
  */
 @Startup
@@ -64,6 +69,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     static final int MAX_SCHEMA_BYTES = 16 * 1024;
     static final int MAX_WERTE_BYTES = 64 * 1024;
     static final int MAX_TIEFE = 10;
+    static final int MAX_MUSTER_ZEICHEN = 1_000;
     private static final int CACHE_GROESSE = 32;
     private static final String DIALEKT = "https://json-schema.org/draft/2020-12/schema";
     private static final Set<String> VERWEISE = Set.of("$ref", "$dynamicRef", "$recursiveRef");
@@ -72,6 +78,10 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     /** Schlüssel, deren Teilschema auf dieselbe Stelle der Daten wirkt (ohne Fortschritt in den Daten). */
     private static final Set<String> AM_ORT_EINZELN = Set.of("not", "if", "then", "else");
     private static final Set<String> AM_ORT_LISTE = Set.of("allOf", "anyOf", "oneOf");
+    private static final String AUFWAERMEN_SCHEMA = """
+            {"type":"object","properties":{"p":{"type":"string","pattern":"^\\\\d{4}$","format":"date"},
+             "r":{"type":"string","format":"regex"},"n":{"$ref":"#/$defs/n"}},
+             "patternProperties":{"^z":{"type":"integer"}},"$defs":{"n":{"type":"number","minimum":0}}}""";
 
     private final long zeitgrenzeNanos;
     private final LongSupplier uhr;
@@ -115,6 +125,14 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
                                 .regularExpressionFactory(this::muster)
                                 .build()));
         this.metaSchema = registry.getSchema(SchemaLocation.of(DIALEKT));
+        aufwaermen();
+    }
+
+    /** Ein Probelauf ohne Frist beim Start; das Ergebnis zählt nicht, das Schema bleibt nicht im Cache. */
+    private void aufwaermen() {
+        geprueft(AUFWAERMEN_SCHEMA).kompiliert().validate(lesen("{\"p\":\"2026-11-11\",\"r\":\"^a$\",\"n\":1}",
+                MAX_WERTE_BYTES));
+        cache.clear();
     }
 
     private record Geprueft(Schema kompiliert, Set<String> felder) {
@@ -199,8 +217,12 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
     }
 
-    /** Wie die JDK-Fabrik der Bibliothek, aber mit Frist vor und beim Suchen. */
+    /** Wie die JDK-Fabrik der Bibliothek, aber mit Frist vor dem Kompilieren, vor und beim Suchen. */
     private RegularExpression muster(String regex) {
+        fristPruefen();
+        if (regex.length() > MAX_MUSTER_ZEICHEN) {
+            throw new MusterZuLang();
+        }
         Pattern pattern = Pattern.compile(
                 RegularExpressions.replaceLongformCharacterProperties(RegularExpressions.replaceDollarAnchors(regex)));
         return text -> {
@@ -451,6 +473,15 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
         FristAbgelaufen() {
             super("Prüfung nach der Zeitgrenze abgebrochen");
+        }
+    }
+
+    /** Regulärer Ausdruck über {@value #MAX_MUSTER_ZEICHEN} Zeichen; als {@link SchemaException} wie oben. */
+    static final class MusterZuLang extends SchemaException {
+        private static final long serialVersionUID = 1L;
+
+        MusterZuLang() {
+            super("Regulärer Ausdruck zu lang");
         }
     }
 }
