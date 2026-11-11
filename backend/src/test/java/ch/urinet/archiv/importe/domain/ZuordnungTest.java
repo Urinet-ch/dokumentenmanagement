@@ -28,6 +28,14 @@ class ZuordnungTest {
         assertThat(new Kopfzeile(List.of("NamePLZ")).hash()).isNotEqualTo(kopf.hash());
     }
 
+    /** Gespeicherte Zuordnungen hängen am Wert des Hashes; jede Änderung des Verfahrens wäre ein Bruch (Req 13.2). */
+    @Test
+    void kopfHashHatFestenWert() {
+        // SHA-256 über "name␟straße (geschäft)␟plz␟" (UTF-8, Trenner 0x1F, NFKC, ohne Rand, klein)
+        assertThat(new Kopfzeile(List.of("Name", " Straße (Geschäft) ", "ＰＬＺ")).hash())
+                .isEqualTo("d11289205f51ae06c57e148ae6c497a6ef3664302e19aca0bd1654b5c337ea2d");
+    }
+
     @Test
     void profilNurMitAllenKennspalten() {
         assertThat(PROFIL.profil()).isEqualTo(Zuordnung.PROFIL_21CRM);

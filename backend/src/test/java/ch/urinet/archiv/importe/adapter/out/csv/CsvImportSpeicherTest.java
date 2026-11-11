@@ -41,11 +41,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Heap je CSV-Import (Entscheid Fabian 11.11.2026: höchstens ~32 MiB je Import, unabhängig von der Datei). Jede
  * synthetische Datei läuft in einer eigenen JVM mit {@code -XX:+UseSerialGC -Xmn2m -Xmx}{@value #XMX_MIB}{@code m}
- * durch Leser, {@link CsvImport#hochladen} und {@link CsvImport#zuordnen}. Das Repository serialisiert jeden Block wie
- * der JDBC-Batch als JSON und liest ihn beim erneuten Prüfen wieder als JSON; die Antwort wird als JSON serialisiert.
- * Die kleine Young-Generation nähert den Live-Peak an. Gemessen (11.11.2026, kleinste {@code -Xmx}): Basis ohne
- * nennenswerte Datei 17 MiB, jede Datei unten ebenfalls 17 MiB. Ohne Kopfgrenzen, Kürzen und Zeichengrenze der
- * Blöcke brauchten dieselben Formen 33 bis 65 MiB; die Grenze {@value #XMX_MIB} MiB lässt Reserve für andere JVMs und
+ * durch Leser, {@link CsvImport#hochladen} und {@link CsvImport#zuordnen}. Das Repository verhält sich beim Speicher
+ * wie {@code JdbcImportRepository} mit dem PG-Treiber: Es hält je Block alle JSON-Strings und ihre UTF-8-Bytes bis
+ * zum Schreiben (Batch bis {@code executeBatch}) und beim erneuten Prüfen alle Bytes des Fensters, bevor es die erste
+ * Zeile parst (ResultSet); die Antwort wird als JSON serialisiert. Die kleine Young-Generation nähert den Live-Peak an.
+ * Gemessen (11.11.2026, kleinste {@code -Xmx}): Basis ohne nennenswerte Datei 17 MiB; Blöcke mit langen «€»-Feldern
+ * (524 × 9'999, Zeilen an der Zeilengrenze, Block knapp unter 1 Mi plus eine Zeile) 25 MiB, alle anderen 17 MiB.
+ * Ohne Kopfgrenzen, Kürzen, Zeichengrenze der Blöcke und Zeilengrenze brauchten dieselben Formen bis 145 MiB (eine
+ * Zeile aus 520 Feldern mit 10'000 Steuerzeichen); die Grenze {@value #XMX_MIB} MiB lässt Reserve für andere JVMs und
  * schlägt bei jeder dieser Formen an.
  */
 class CsvImportSpeicherTest {
@@ -85,7 +88,23 @@ class CsvImportSpeicherTest {
             Map.entry("ein Feld mit 5 Mio. «€»", ziel -> schreiben(ziel,
                     "Name;Notiz\nA;" + "€".repeat(5_000_000) + "\n", CP1252)),
             Map.entry("ein Feld mit 5 Mio. «ä»", ziel -> schreiben(ziel,
-                    "Name;Notiz\nA;" + "ä".repeat(5_000_000) + "\n", CP1252)));
+                    "Name;Notiz\nA;" + "ä".repeat(5_000_000) + "\n", CP1252)),
+            Map.entry("1 Zeile x 520 Felder x 10'000 «€»", ziel -> zeilen(ziel, 1, 520, "€".repeat(FELD_GRENZE))),
+            Map.entry("1 Zeile x 520 Felder x 10'000 Steuerzeichen", ziel ->
+                    zeilen(ziel, 1, 520, "\u0001".repeat(FELD_GRENZE))),
+            Map.entry("5 Zeilen x 104 Felder x 10'000 «€»", ziel -> zeilen(ziel, 5, 104, "€".repeat(FELD_GRENZE))),
+            Map.entry("19 Zeilen an der Zeilengrenze («€»)", ziel -> {
+                String zeile = String.join(";", Collections.nCopies(26, "€".repeat(FELD_GRENZE))) + ";"
+                        + "€".repeat(CsvTabelle.MAX_ZEILE - 26 * FELD_GRENZE);
+                return schreiben(ziel, kopf(27) + "\n" + (zeile + "\n").repeat(19), CP1252);
+            }),
+            Map.entry("24 Zeilen, Block knapp unter 1 Mi Zeichen plus eine Zeile", ziel -> {
+                String zeile = String.join(";", Collections.nCopies(20, "€".repeat(FELD_GRENZE))) + ";"
+                        + "€".repeat(9_000);
+                return schreiben(ziel, kopf(21) + "\n" + (zeile + "\n").repeat(24), CP1252);
+            }),
+            Map.entry("119 Zeilen an der Zeilengrenze (Steuerzeichen)", ziel ->
+                    zeilen(ziel, 119, 5, "\u0001".repeat(CsvTabelle.MAX_ZEILE / 6 / 5))));
 
     @ParameterizedTest
     @MethodSource("dateien")
@@ -103,6 +122,16 @@ class CsvImportSpeicherTest {
 
         assertThat(prozess.exitValue()).as(ausgabe).isZero();
         assertThat(ausgabe).contains("ok");
+    }
+
+    /** {@code anzahl} Zeilen mit {@code spalten} gleichen Feldern; Kopfzeile {@code Name;S;S;…}. */
+    private static Path zeilen(Path ziel, int anzahl, int spalten, String feld) {
+        String zeile = String.join(";", Collections.nCopies(spalten, feld));
+        return schreiben(ziel, kopf(spalten) + "\n" + (zeile + "\n").repeat(anzahl), CP1252);
+    }
+
+    private static String kopf(int spalten) {
+        return "Name" + ";S".repeat(spalten - 1);
     }
 
     private static Path kopieren(String ressource, Path ziel) {
@@ -179,9 +208,12 @@ class CsvImportSpeicherTest {
                     block.add(text(daten));
                 }
             }
+            // wie der Batch des PG-Treibers: alle Strings des Blocks und ihre UTF-8-Bytes bis executeBatch
+            List<byte[]> gesendet = new ArrayList<>(zeilen.size());
+            block.forEach(text -> gesendet.add(text == null ? null : text.getBytes(StandardCharsets.UTF_8)));
             try {
                 for (int i = 0; i < zeilen.size(); i++) {
-                    byte[] bytes = block.get(i) == null ? null : block.get(i).getBytes(StandardCharsets.UTF_8);
+                    byte[] bytes = gesendet.get(i);
                     index.add(new long[]{zeilen.get(i).nr(), datei.getFilePointer(), bytes == null ? -1 : bytes.length,
                             block.get(i) == null ? 0 : block.get(i).length()});
                     ergebnisse.add(zeilen.get(i).ergebnis().name());
@@ -222,26 +254,39 @@ class CsvImportSpeicherTest {
 
         @Override
         public List<ImportZeile> zeilen(UUID laufId, int nachNr, int anzahl, int zeichen) {
-            List<ImportZeile> zeilen = new ArrayList<>();
+            // wie das Fenster in JdbcImportRepository (davor < zeichen) und das ResultSet des PG-Treibers: alle
+            // Bytes des Fensters liegen im Heap, bevor die erste Zeile geparst wird
+            List<Integer> fenster = new ArrayList<>();
+            List<byte[]> empfangen = new ArrayList<>();
             long summe = 0;
+            List<ImportZeile> zeilen = new ArrayList<>();
             try {
-                for (int i = 0; i < index.size() && zeilen.size() < anzahl && summe < zeichen; i++) {
+                for (int i = 0; i < index.size() && fenster.size() < anzahl && summe < zeichen; i++) {
                     long[] eintrag = index.get(i);
                     if (eintrag[0] <= nachNr) {
                         continue;
                     }
-                    List<String> werte = null;
+                    byte[] bytes = null;
                     if (eintrag[2] >= 0) {
-                        byte[] bytes = new byte[(int) eintrag[2]];
+                        bytes = new byte[(int) eintrag[2]];
                         datei.seek(eintrag[1]);
                         datei.readFully(bytes);
+                    }
+                    summe += eintrag[3];
+                    fenster.add(i);
+                    empfangen.add(bytes);
+                }
+                for (int j = 0; j < fenster.size(); j++) {
+                    int i = fenster.get(j);
+                    List<String> werte = null;
+                    if (empfangen.get(j) != null) {
                         werte = new ArrayList<>();
-                        for (JsonNode wert : json.readTree(new String(bytes, StandardCharsets.UTF_8)).path("werte")) {
+                        String text = new String(empfangen.get(j), StandardCharsets.UTF_8);
+                        for (JsonNode wert : json.readTree(text).path("werte")) {
                             werte.add(wert.isNull() ? null : wert.asText());
                         }
                     }
-                    summe += eintrag[3];
-                    zeilen.add(new ImportZeile((int) eintrag[0], werte, ZeilenPruefung.Ergebnis.valueOf(
+                    zeilen.add(new ImportZeile((int) index.get(i)[0], werte, ZeilenPruefung.Ergebnis.valueOf(
                             ergebnisse.get(i)), null));
                 }
             } catch (IOException e) {

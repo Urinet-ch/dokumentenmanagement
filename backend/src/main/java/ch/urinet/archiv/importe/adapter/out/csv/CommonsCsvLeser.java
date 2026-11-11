@@ -31,7 +31,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -395,16 +397,27 @@ public class CommonsCsvLeser implements CsvLeser {
      * (Trennzeichen, Zeilenenden, Anführungszeichen und Zeichen nach einem Zitat bleiben). Ein Feld über der Grenze
      * bleibt damit über der Grenze und macht seine Zeile wie bisher «fehlerhaft» (Req 13.10), aber Commons CSV legt
      * nie einen String an, der grösser ist als die Grenze (Speicher, Entscheid Fabian 11.11.2026).
+     * <p>
+     * Ebenso begrenzt er jede Datenzeile auf {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen der behaltenen Werte
+     * ({@link CsvTabelle#jsonZeichen(char)}): Ab dem Zeichen, das die Grenze überschreitet, verwirft er jeden Inhalt
+     * bis zum Ende des Datensatzes und merkt sich dessen Nummer ({@link #zuLang(int)}). Die Nummern zählt er wie
+     * {@code CSVRecord.getRecordNumber()} mit {@code ignoreEmptyLines} (Kopfzeile 1, leere Zeilen zählen nicht). Die
+     * Kopfzeile begrenzt schon die Vorprüfung ({@link CsvTabelle#MAX_KOPF}).
      */
     static final class FeldKuerzer extends Reader {
 
         private final Reader quelle;
         private final Zustand zustand;
         private final int behalten;
+        private final BitSet zuLang = new BitSet();
         private int laenge;
         private boolean verworfen;
         private int ausstehend = -1;
         private boolean ende;
+        /** Nummer des laufenden Datensatzes (Kopfzeile 1). */
+        private int datensatz = 1;
+        private boolean leer = true;
+        private long gewicht;
 
         FeldKuerzer(Reader quelle, char trennzeichen, int feldGrenze) {
             this.quelle = quelle;
@@ -462,6 +475,15 @@ public class CommonsCsvLeser implements CsvLeser {
         }
 
         private int ausgabe(char zeichen, Zustand.Art art) {
+            if (art == Zustand.Art.ZEILENENDE) {
+                if (!leer) {
+                    datensatz++;
+                }
+                leer = true;
+                gewicht = 0;
+            } else {
+                leer = false;
+            }
             if (art == Zustand.Art.TRENNER || art == Zustand.Art.ZEILENENDE) {
                 laenge = 0;
                 verworfen = false;
@@ -471,11 +493,31 @@ public class CommonsCsvLeser implements CsvLeser {
             return zeichen;
         }
 
+        /** Ein Zeichen des Feldwerts; ein Surrogatpaar zählt als ein Zeichen und wird nur ganz behalten. */
         private boolean behalten(char zeichen) {
             if (!Character.isLowSurrogate(zeichen)) {
-                verworfen = ++laenge > behalten;
+                verworfen = ++laenge > behalten || zeileVoll(zeichen);
             }
             return !verworfen;
+        }
+
+        private boolean zeileVoll(char zeichen) {
+            if (datensatz == 1) {
+                return false;
+            }
+            if (!zuLang.get(datensatz)) {
+                gewicht += Character.isHighSurrogate(zeichen) ? 2 : CsvTabelle.jsonZeichen(zeichen);
+                if (gewicht <= CsvTabelle.MAX_ZEILE) {
+                    return false;
+                }
+                zuLang.set(datensatz);
+            }
+            return true;
+        }
+
+        /** Datensatz {@code nr} (Kopfzeile 1) war länger als {@link CsvTabelle#MAX_ZEILE} und ist gekürzt. */
+        boolean zuLang(int nr) {
+            return zuLang.get(nr);
         }
 
         @Override
@@ -485,15 +527,15 @@ public class CommonsCsvLeser implements CsvLeser {
     }
 
     /**
-     * Durchgang 2: parst Zeile für Zeile (Felder über {@code feldGrenze} gekürzt, {@link FeldKuerzer}) und meldet Kopf
-     * und Datenzeilen. Nur Fehler des Parsers werden zu
+     * Durchgang 2: parst Zeile für Zeile (Felder über {@code feldGrenze} und Zeilen über {@link CsvTabelle#MAX_ZEILE}
+     * gekürzt, {@link FeldKuerzer}) und meldet Kopf und Datenzeilen; eine zu lange Zeile ohne Werte. Nur Fehler des Parsers werden zu
      * {@code CSV_UNGUELTIG}; Fehler des Empfängers (z. B. der Datenbank) gehen unverändert weiter.
      */
     private static void parsen(Path datei, Erkennung erkennung, int feldGrenze, Empfaenger empfaenger) {
         CSVFormat format = CSVFormat.RFC4180.builder().setDelimiter(erkennung.trennzeichen())
                 .setIgnoreEmptyLines(true).get();
-        try (Reader leser = new FeldKuerzer(new BufferedReader(leser(datei, erkennung.zeichensatz(), erkennung.bom()),
-                PUFFER), erkennung.trennzeichen(), feldGrenze);
+        try (FeldKuerzer leser = new FeldKuerzer(new BufferedReader(leser(datei, erkennung.zeichensatz(),
+                erkennung.bom()), PUFFER), erkennung.trennzeichen(), feldGrenze);
              CSVParser parser = CSVParser.builder().setReader(leser).setFormat(format).get()) {
             Iterator<CSVRecord> datensaetze = parser.iterator();
             CSVRecord kopf = naechster(datensaetze);
@@ -506,8 +548,9 @@ public class CommonsCsvLeser implements CsvLeser {
                 if (++zeilen > CsvTabelle.MAX_ZEILEN) {
                     throw new FachFehler(Fehlercode.CSV_UNGUELTIG);
                 }
-                empfaenger.zeile(new CsvTabelle.Zeile(Math.toIntExact(datensatz.getRecordNumber()),
-                        datensatz.toList()));
+                int nr = Math.toIntExact(datensatz.getRecordNumber());
+                empfaenger.zeile(leser.zuLang(nr) ? new CsvTabelle.Zeile(nr, List.of(), true)
+                        : new CsvTabelle.Zeile(nr, datensatz.toList()));
             }
         } catch (IOException e) {
             throw new FachFehler(Fehlercode.CSV_UNGUELTIG);

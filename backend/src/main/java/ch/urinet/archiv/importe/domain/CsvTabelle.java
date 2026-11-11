@@ -30,13 +30,56 @@ public final class CsvTabelle {
      */
     public static final int MAX_KOPF = 64 * 1024;
 
+    /**
+     * Höchstlänge einer Datenzeile, gemessen wie ihre Werte als JSON in {@code import_zeile.daten} ({@link #jsonZeichen}:
+     * Steuerzeichen sechsfach, {@code "} und {@code \} doppelt, sonst einfach; ohne Anführungszeichen und Kommas
+     * zwischen den Werten). Eine längere Zeile liest der Leser nur bis zur Grenze, sie ist «fehlerhaft» und ihre Werte
+     * werden nicht gespeichert (Speicher, Entscheid Fabian 11.11.2026: höchstens ~32 MiB Heap je Import).
+     */
+    public static final int MAX_ZEILE = 256 * 1024;
+
     private CsvTabelle() {
     }
 
-    /** Eine Datenzeile mit ihrer Nummer und den Werten in Spaltenreihenfolge. */
-    public record Zeile(int nr, List<String> werte) {
+    /**
+     * Zeichen, die {@code zeichen} in einem JSON-String belegt (wie Jackson schreibt): Steuerzeichen unter U+0020 als
+     * Unicode-Escape 6 (obere Schranke, {@code \n} u. ä. brauchen 2), {@code "} und {@code \} 2, sonst 1.
+     */
+    public static int jsonZeichen(char zeichen) {
+        if (zeichen < 0x20) {
+            return 6;
+        }
+        return zeichen == '"' || zeichen == '\\' ? 2 : 1;
+    }
+
+    /** Obere Schranke für die Länge der Werte als JSON-Array ({@code ["…","…"]}); {@code null} → 0. */
+    public static long jsonZeichen(List<String> werte) {
+        if (werte == null) {
+            return 0;
+        }
+        long summe = 2;
+        for (String wert : werte) {
+            summe += 3;
+            if (wert != null) {
+                for (int i = 0; i < wert.length(); i++) {
+                    summe += jsonZeichen(wert.charAt(i));
+                }
+            }
+        }
+        return summe;
+    }
+
+    /**
+     * Eine Datenzeile mit ihrer Nummer und den Werten in Spaltenreihenfolge. {@code zuLang}: Die Zeile ist länger als
+     * {@link #MAX_ZEILE}; der Leser hat sie nur bis zur Grenze gelesen, {@code werte} ist dann leer.
+     */
+    public record Zeile(int nr, List<String> werte, boolean zuLang) {
         public Zeile {
             werte = List.copyOf(werte);
+        }
+
+        public Zeile(int nr, List<String> werte) {
+            this(nr, werte, false);
         }
     }
 }

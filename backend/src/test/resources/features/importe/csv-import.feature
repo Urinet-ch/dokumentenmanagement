@@ -220,6 +220,18 @@ Funktionalität: CSV-Import aus 21.CRM – Erkennung und Spaltenzuordnung (Aufga
       | 7  | OFFEN        |                                            | ja                | =1+1            |
 
   @req-13.10
+  Szenario: Eine Zeile über 262'144 JSON-Zeichen ist fehlerhaft, ihre Werte werden nicht gespeichert
+    Wenn «inhaber-urinet» eine Kontakt-CSV mit einer Zeile genau an der Zeilengrenze und einer Zeile darüber hochlädt
+    Dann steht der Lauf auf «ZUORDNUNG_NOETIG» mit 3 Datenzeilen, 1 fehlerhaft und 0 übersprungen
+    Wenn «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» mit 3 Datenzeilen, 1 fehlerhaft und 0 übersprungen
+    Und hat der Lauf im Schema von «urinet» diese Zeilen:
+      | nr | ergebnis | meldung                          | werte gespeichert | daten enthalten |
+      | 2  | OFFEN    |                                  | ja                | Grenze AG       |
+      | 3  | FEHLER   | Zeile länger als 262144 Zeichen  | nein              |                 |
+      | 4  | OFFEN    |                                  | ja                | Danach AG       |
+
+  @req-13.10
   Szenario: Mehr als 10'000 Datenzeilen lehnt das Archiv ab
     Wenn «inhaber-urinet» eine Kontakt-CSV mit 10001 Datenzeilen hochlädt
     Dann lehnt der CSV-Import mit Status 422 und Fehlercode «CSV_UNGUELTIG» ab

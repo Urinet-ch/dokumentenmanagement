@@ -307,6 +307,56 @@ class CommonsCsvLeserTest {
         assertThat(tabelle.zeilen()).extracting(z -> z.werte().get(2)).containsExactly("6000", "6460");
     }
 
+    /**
+     * Grenze ±1 der Zeilenlänge in JSON-Zeichen (Steuerzeichen 6, {@code "} 2, Surrogatpaar 2), Nummern wie Commons
+     * CSV über leere Zeilen und CRLF hinweg; die Felder bleiben unter der Feldgrenze, damit nur die Zeile zählt.
+     */
+    @Test
+    void zeileUeberDerZeilengrenzeKommtOhneWerte() {
+        int max = CsvTabelle.MAX_ZEILE;
+        String steuer = "\u0001".repeat(max / 6) + "x".repeat(max % 6);
+        String zitat = "\"" + "\"\"".repeat(max / 2) + "\"";
+        String emoji = "\uD83D\uDE00".repeat(max / 2);
+        String text = "A;B\r\n"
+                + "x".repeat(max - 1) + ";y\r\n"
+                + "\r\n"
+                + "x".repeat(max) + ";y\r\n"
+                + steuer + ";\n"
+                + steuer + ";\u0001\n\n"
+                + zitat + ";\n"
+                + zitat + ";x\n"
+                + emoji + ";\n"
+                + emoji + ";x\n"
+                + "a;b";
+        Sammler sammler = new Sammler();
+
+        leser.lesen(schreiben(text.getBytes(StandardCharsets.UTF_8)), max + 10, sammler);
+
+        assertThat(sammler.zeilen).extracting(CsvTabelle.Zeile::nr).containsExactly(2, 3, 4, 5, 6, 7, 8, 9, 10);
+        assertThat(sammler.zeilen).extracting(CsvTabelle.Zeile::zuLang)
+                .containsExactly(false, true, false, true, false, true, false, true, false);
+        assertThat(sammler.zeilen).filteredOn(CsvTabelle.Zeile::zuLang).allSatisfy(z -> assertThat(z.werte()).isEmpty());
+        assertThat(sammler.zeilen.get(0).werte()).containsExactly("x".repeat(max - 1), "y");
+        assertThat(sammler.zeilen.get(2).werte()).containsExactly(steuer, "");
+        assertThat(sammler.zeilen.get(4).werte()).containsExactly("\"".repeat(max / 2), "");
+        assertThat(sammler.zeilen.get(6).werte()).containsExactly(emoji, "");
+        assertThat(sammler.zeilen.getLast().werte()).containsExactly("a", "b");
+    }
+
+    /** Die Kopfzeile begrenzt die Vorprüfung ({@link CsvTabelle#MAX_KOPF}); die Zeilengrenze kürzt sie nicht. */
+    @Test
+    void kopfzeileZaehltNichtZurZeilengrenze() {
+        String name = "\u0001".repeat(CsvTabelle.MAX_KOPF_NAME);
+        int spalten = 250;
+        String kopf = String.join(";", java.util.Collections.nCopies(spalten, name));
+        assertThat(spalten * (long) CsvTabelle.MAX_KOPF_NAME * 6).isGreaterThan(CsvTabelle.MAX_ZEILE);
+
+        Tabelle tabelle = lesen((kopf + "\n" + ";".repeat(spalten - 1) + "\n").getBytes(StandardCharsets.UTF_8));
+
+        assertThat(tabelle.kopf().namen()).hasSize(spalten).allSatisfy(n -> assertThat(n).isEqualTo(name));
+        assertThat(tabelle.zeilen().getFirst().zuLang()).isFalse();
+    }
+
     @Test
     void kuerzenZaehltCodepointsUndVerwirftDoppelteAnfuehrungszeichenAlsPaar() {
         String emoji = "\uD83D\uDE00";

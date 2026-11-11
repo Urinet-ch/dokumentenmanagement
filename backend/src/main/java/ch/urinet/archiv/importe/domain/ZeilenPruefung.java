@@ -5,7 +5,7 @@ import java.util.Objects;
 
 /**
  * Prüft eine Datenzeile vor dem Abgleich (Req 13.10, design.md «Fehlerhaft»): falsche Spaltenzahl nach dem Parsen,
- * ein Feld über der Feldgrenze, mit Zuordnung ein leeres Pflichtfeld ({@code name} bzw. {@code titel}) → «fehlerhaft»;
+ * ein Feld über der Feldgrenze, eine Zeile über {@link CsvTabelle#MAX_ZEILE}, mit Zuordnung ein leeres Pflichtfeld ({@code name} bzw. {@code titel}) → «fehlerhaft»;
  * im CRM gelöschte Zeilen ({@code geloescht = true}) → übersprungen. Die Meldungen nennen nur Spalten und Zahlen, nie
  * Werte.
  */
@@ -27,6 +27,14 @@ public final class ZeilenPruefung {
             }
         }
         return Befund.OFFEN;
+    }
+
+    /**
+     * Zeile über {@link CsvTabelle#MAX_ZEILE}: «fehlerhaft» wie ein Feld über der Feldgrenze, die Werte werden nicht
+     * gespeichert (Req 13.10; der Leser hat sie nur bis zur Grenze gelesen).
+     */
+    public static Befund zeileZuLang() {
+        return new Befund(Ergebnis.FEHLER, "Zeile länger als " + CsvTabelle.MAX_ZEILE + " Zeichen", true);
     }
 
     /** Kopfzeile mit einem Spaltennamen über der Feldgrenze: Das Archiv lehnt die Datei ab (Req 13.10). */
@@ -61,7 +69,10 @@ public final class ZeilenPruefung {
         UEBERSPRUNGEN
     }
 
-    /** {@code werteVerwerfen}: Die Zeile hat ein Feld über der Feldgrenze; ihre Werte werden nicht gespeichert. */
+    /**
+     * {@code werteVerwerfen}: Die Zeile hat ein Feld über der Feldgrenze oder ist länger als
+     * {@link CsvTabelle#MAX_ZEILE}; ihre Werte werden nicht gespeichert.
+     */
     public record Befund(Ergebnis ergebnis, String meldung, boolean werteVerwerfen) {
 
         public static final Befund OFFEN = new Befund(Ergebnis.OFFEN, null, false);

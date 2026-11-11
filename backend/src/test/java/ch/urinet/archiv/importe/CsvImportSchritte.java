@@ -2,6 +2,7 @@ package ch.urinet.archiv.importe;
 
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.importe.domain.CsvTabelle;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import io.agroal.api.AgroalDataSource;
@@ -28,6 +29,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -110,6 +112,21 @@ public class CsvImportSchritte {
     public void textHochladen(String benutzer, String text) {
         hochladen(benutzer, "kontakt", "false", "kontakte.csv",
                 text.replace("{RIESIG}", "x".repeat(10_001)).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Steuerzeichen wiegen in JSON 6 Zeichen ({@code CsvTabelle.jsonZeichen}), so passen zwei Zeilen an der Grenze von
+     * 262'144 in die Grenze des Profils {@code test} (512 KiB). Je Feld höchstens 8'738 Zeichen (Feldgrenze 10'000).
+     */
+    @Wenn("«{word}» eine Kontakt-CSV mit einer Zeile genau an der Zeilengrenze und einer Zeile darüber hochlädt")
+    public void zeilengrenzeHochladen(String benutzer) {
+        String name = "Grenze AG";
+        int rest = CsvTabelle.MAX_ZEILE - name.length();
+        String felder = String.join(";", Collections.nCopies(4, "\u0001".repeat(8_738))) + ";"
+                + "\u0001".repeat(rest / 6 - 4 * 8_738) + "x".repeat(rest % 6);
+        String text = "Name;N1;N2;N3;N4;N5\n" + name + ";" + felder + "\n" + "Darüber AG;" + felder + "\n"
+                + "Danach AG;;;;;\n";
+        hochladen(benutzer, "kontakt", "false", "kontakte.csv", text.getBytes(StandardCharsets.UTF_8));
     }
 
     @Wenn("«{word}» diese Kontakt-CSV im Zeichensatz «{word}» hochlädt:")

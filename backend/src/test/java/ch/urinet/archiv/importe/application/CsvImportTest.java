@@ -9,6 +9,7 @@ import ch.urinet.archiv.importe.domain.ImportLauf;
 import ch.urinet.archiv.importe.domain.ImportZeile;
 import ch.urinet.archiv.importe.domain.Kopfzeile;
 import ch.urinet.archiv.importe.domain.LaufStatus;
+import ch.urinet.archiv.importe.domain.ZeilenPruefung;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -95,8 +96,44 @@ class CsvImportTest {
 
         csvImport.hochladen(ImportArt.KONTAKT, false, "k.csv", datei, "inhaber");
 
-        int jeBlock = CsvImport.STAPEL_ZEICHEN / (2 * 9_999) + 1;
+        int jeBlock = jeBlock(2 + 2 * (3 + 9_999));
+        assertThat(jeBlock).isEqualTo(53);
         assertThat(repository.bloecke).containsExactly(jeBlock, jeBlock, jeBlock, jeBlock, 250 - 4 * jeBlock);
+    }
+
+    /** Der Block zählt JSON-Zeichen wie {@code length(daten)} beim erneuten Prüfen: Steuerzeichen sechsfach. */
+    @Test
+    void steuerzeichenZaehlenImBlockWieImJson() throws IOException {
+        Path datei = Files.write(ordner.resolve("k.csv"), new byte[]{'x'});
+        leser.wert = "\u0001".repeat(9_999);
+        leser.zeilen = 20;
+
+        csvImport.hochladen(ImportArt.KONTAKT, false, "k.csv", datei, "inhaber");
+
+        int jeBlock = jeBlock(2 + 2 * (3 + 6 * 9_999));
+        assertThat(jeBlock).isEqualTo(9);
+        assertThat(repository.bloecke).containsExactly(jeBlock, jeBlock, 20 - 2 * jeBlock);
+    }
+
+    @Test
+    void zuLangeZeileIstFehlerhaftOhneWerte() throws IOException {
+        Path datei = Files.write(ordner.resolve("k.csv"), new byte[]{'x'});
+        leser.zeilen = 3;
+        leser.zuLang = 3;
+
+        CsvImport.Hochgeladen ergebnis = csvImport.hochladen(ImportArt.KONTAKT, false, "k.csv", datei, "inhaber");
+
+        assertThat(ergebnis.lauf().fehler()).isOne();
+        assertThat(repository.gespeichert).extracting(ImportZeile::nr).containsExactly(2, 3, 4);
+        ImportZeile lang = repository.gespeichert.get(1);
+        assertThat(lang.ergebnis()).isEqualTo(ZeilenPruefung.Ergebnis.FEHLER);
+        assertThat(lang.meldung()).isEqualTo("Zeile länger als 262144 Zeichen");
+        assertThat(lang.werte()).isNull();
+        assertThat(repository.gespeichert.get(0).werte()).isNotNull();
+    }
+
+    private static int jeBlock(long jeZeile) {
+        return (int) ((CsvImport.STAPEL_ZEICHEN + jeZeile - 1) / jeZeile);
     }
 
     @Test
@@ -115,6 +152,7 @@ class CsvImportTest {
         int zeilen;
         int spalten = 2;
         String wert;
+        int zuLang;
 
         @Override
         public void lesen(Path datei, int feldGrenze, Empfaenger empfaenger) {
@@ -122,7 +160,8 @@ class CsvImportTest {
             List<String> namen = IntStream.range(0, spalten).mapToObj(i -> "S" + i).toList();
             empfaenger.kopf("UTF-8", ';', new Kopfzeile(namen));
             for (int i = 0; i < zeilen; i++) {
-                empfaenger.zeile(new CsvTabelle.Zeile(i + 2, Collections.nCopies(spalten, wert != null ? wert : "N" + i)));
+                empfaenger.zeile(i + 2 == zuLang ? new CsvTabelle.Zeile(i + 2, List.of(), true)
+                        : new CsvTabelle.Zeile(i + 2, Collections.nCopies(spalten, wert != null ? wert : "N" + i)));
             }
         }
     }
@@ -131,6 +170,7 @@ class CsvImportTest {
 
         final List<ImportLauf> laeufe = new ArrayList<>();
         final List<Integer> bloecke = new ArrayList<>();
+        final List<ImportZeile> gespeichert = new ArrayList<>();
         ImportLauf aktualisiert;
 
         @Override
@@ -141,6 +181,7 @@ class CsvImportTest {
         @Override
         public void zeilenAnlegen(UUID laufId, List<ImportZeile> zeilen) {
             bloecke.add(zeilen.size());
+            gespeichert.addAll(zeilen);
         }
 
         @Override

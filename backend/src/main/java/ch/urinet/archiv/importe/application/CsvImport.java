@@ -39,7 +39,8 @@ import java.util.UUID;
  * CSV-Import der CRM-Daten, Teil Erkennung und Zuordnung (Aufgabe 4.1; Req 13.1, 13.2, 13.10, 13.11): Upload lesen,
  * Lauf und Zeilen speichern, Zuordnung vorschlagen, bestätigen und speichern. Vorschau mit Abgleich (4.2) und Übernahme
  * (4.3) folgen; ein Lauf mit gültiger Zuordnung wartet im Status {@code VORSCHAU_AUSSTEHEND}. Die Datei wird nie als
- * Ganzes gehalten: Der Leser meldet Zeile für Zeile, gespeichert und neu geprüft wird in Blöcken zu höchstens
+ * Ganzes gehalten: Der Leser meldet Zeile für Zeile (jede höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen, eine
+ * längere ist «fehlerhaft»), gespeichert und neu geprüft wird in Blöcken zu höchstens
  * {@link #STAPEL} Zeilen, {@link #STAPEL_WERTE} Werten und {@link #STAPEL_ZEICHEN} Zeichen (Entscheid Fabian 11.11.2026:
  * höchstens ~32 MiB Heap je Import, unabhängig von der Datei). Geloggt werden nur IDs, Prüfsumme, Zahlen und Status,
  * nie Feldwerte.
@@ -53,8 +54,9 @@ public class CsvImport {
     /** Werte je Block höchstens; begrenzt den Heap bei breiten Dateien (bis 1'000 Spalten). */
     static final int STAPEL_WERTE = 50_000;
     /**
-     * Zeichen je Block höchstens (beim Speichern die Werte, beim erneuten Prüfen das JSON der Zeilen); begrenzt den Heap
-     * bei langen Feldern. Ein Block hat immer mindestens eine Zeile.
+     * JSON-Zeichen je Block höchstens (beim Speichern geschätzt mit {@link CsvTabelle#jsonZeichen(List)}, beim erneuten
+     * Prüfen die Länge von {@code daten}); begrenzt den Heap bei langen Feldern. Ein Block hat immer mindestens eine
+     * Zeile, eine Zeile höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen.
      */
     static final int STAPEL_ZEICHEN = 1024 * 1024;
     private static final Logger LOG = Logger.getLogger(CsvImport.class);
@@ -153,13 +155,14 @@ public class CsvImport {
         public void zeile(CsvTabelle.Zeile zeile) {
             int spalten = lauf.kopf().spalten();
             int grenze = einstellungen.feldGrenze();
-            Befund befund = gueltig.map(z -> ZeilenPruefung.pruefen(art, z, zeile.werte(), spalten, grenze))
+            Befund befund = zeile.zuLang() ? ZeilenPruefung.zeileZuLang()
+                    : gueltig.map(z -> ZeilenPruefung.pruefen(art, z, zeile.werte(), spalten, grenze))
                     .orElseGet(() -> ZeilenPruefung.struktur(zeile.werte(), spalten, grenze));
             ImportZeile gespeichert = CsvImport.zeile(zeile.nr(), zeile.werte(), befund);
             zaehlen(gespeichert.ergebnis());
             block.add(gespeichert);
             werte += zeile.werte().size();
-            zeichen += zeichen(gespeichert.werte());
+            zeichen += CsvTabelle.jsonZeichen(gespeichert.werte());
             if (block.size() == STAPEL || werte >= STAPEL_WERTE || zeichen >= STAPEL_ZEICHEN) {
                 speichern();
             }
@@ -267,17 +270,6 @@ public class CsvImport {
     /** Zeilen je Block beim erneuten Prüfen, damit ein Block höchstens {@link #STAPEL_WERTE} Werte hält. */
     static int stapel(int breite) {
         return Math.max(1, Math.min(STAPEL, STAPEL_WERTE / Math.max(1, breite)));
-    }
-
-    /** Zeichen der gespeicherten Werte einer Zeile (UTF-16-Einheiten); verworfene Werte zählen nicht. */
-    private static long zeichen(List<String> werte) {
-        long summe = 0;
-        if (werte != null) {
-            for (String wert : werte) {
-                summe += wert == null ? 0 : wert.length();
-            }
-        }
-        return summe;
     }
 
     private static ImportZeile zeile(int nr, List<String> werte, Befund befund) {
