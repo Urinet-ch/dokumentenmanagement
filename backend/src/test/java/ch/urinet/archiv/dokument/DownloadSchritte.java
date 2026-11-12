@@ -30,6 +30,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -141,6 +142,39 @@ public class DownloadSchritte {
         antwort = herunterladen(benutzer, name, anfrage);
     }
 
+    @Wenn("«{word}» die Download-Adresse von «{word}» als JSON anfragt")
+    public void alsJson(String benutzer, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).redirects().follow(false)
+                .accept("application/json").when().get("/api/v1/dokumente/" + dokumente.get(name).id() + "/datei");
+    }
+
+    @Wenn("«{word}» die Datei von «{word}» mit Accept «{}» öffnet")
+    public void mitAccept(String benutzer, String name, String accept) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).redirects().follow(false)
+                .header("Accept", accept).when().get("/api/v1/dokumente/" + dokumente.get(name).id() + "/datei");
+    }
+
+    @Dann("liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird")
+    public void json() {
+        assertThat(antwort.statusCode()).isEqualTo(200);
+        assertThat(antwort.header("Location")).isNull();
+        assertThat(antwort.header("Cache-Control")).contains("no-store");
+        String adresse = antwort.jsonPath().getString("url");
+        assertThat(adresse).contains("versionId=");
+        Matcher gueltig = GUELTIG.matcher(adresse);
+        assertThat(gueltig.find()).as("X-Amz-Expires in der Adresse").isTrue();
+        assertThat(Integer.parseInt(gueltig.group(1))).isPositive().isLessThanOrEqualTo(300);
+        Instant bis = Instant.parse(antwort.jsonPath().getString("gueltigBis"));
+        assertThat(bis).isAfter(Instant.now()).isBeforeOrEqualTo(Instant.now().plusSeconds(300));
+    }
+
+    @Dann("antwortet das Archiv mit {int} «{word}» ohne Adresse")
+    public void fehlerOhneAdresse(int status, String code) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
+        assertThat(antwort.header("Location")).isNull();
+        assertThat(antwort.asString()).doesNotContain("X-Amz-");
+    }
+
     @Dann("leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird")
     public void umleitung() {
         assertThat(antwort.statusCode()).isEqualTo(302);
@@ -155,7 +189,9 @@ public class DownloadSchritte {
     @Und("die Adresse liefert «{}»")
     public void inhalt(String erwartet) throws Exception {
         try (HttpClient http = HttpClient.newHttpClient()) {
-            var abruf = http.send(HttpRequest.newBuilder(URI.create(antwort.header("Location"))).GET().build(),
+            String adresse = antwort.statusCode() == 200 ? antwort.jsonPath().getString("url")
+                    : antwort.header("Location");
+            var abruf = http.send(HttpRequest.newBuilder(URI.create(adresse)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             assertThat(abruf.statusCode()).isEqualTo(200);
             assertThat(abruf.body()).isEqualTo(erwartet);

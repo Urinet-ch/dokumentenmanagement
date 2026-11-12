@@ -1,0 +1,132 @@
+<a class="zurueck" routerLink="/suche">← {{ texte.zurueck }}</a>
+
+@switch (laden()) {
+  @case ('laedt') {
+    <h1>{{ texte.titel }}</h1>
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laeuft" />
+    <p class="nur-screenreader" aria-live="polite">{{ texte.laeuft }}</p>
+  }
+  @case ('fehlt') {
+    <h1>{{ texte.titel }}</h1>
+    <p role="alert" class="fehler" data-test="fehler">{{ texte.nichtGefunden }}</p>
+  }
+  @case ('verbindung') {
+    <h1>{{ texte.titel }}</h1>
+    <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerVerbindung }}</p>
+  }
+  @case ('fehler') {
+    <h1>{{ texte.titel }}</h1>
+    <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerAllgemein }}</p>
+  }
+  @case ('ok') {
+    @if (dokument(); as d) {
+      <h1 data-test="titel">{{ titel() }}</h1>
+      @if (d.fristAbgelaufen) {
+        <p class="hinweis">{{ texte.fristAbgelaufen }}</p>
+      }
+      <div class="spalten">
+        <section class="karte metadaten" aria-labelledby="metadaten-titel">
+          <h2 id="metadaten-titel">{{ texte.metadaten }}</h2>
+          <dl>
+            <dt>{{ texte.art }}</dt>
+            <dd data-test="art">{{ artName() }}</dd>
+            @if (d.datum) {
+              <dt>{{ texte.datum }}</dt>
+              <dd data-test="datum">{{ datum(d.datum) }}</dd>
+            }
+            <dt>{{ texte.eingang }}</dt>
+            <dd>{{ zeitpunkt(d.eingang) }}</dd>
+            <dt>{{ texte.quelle }}</dt>
+            <dd>{{ d.quelle }}</dd>
+            <dt>{{ texte.status }}</dt>
+            <dd data-test="status">{{ stati[d.status] || d.status }}</dd>
+            <dt>{{ texte.vertraulichkeit }}</dt>
+            <dd>{{ texte.vertraulichkeiten[d.vertraulichkeit] || d.vertraulichkeit }}</dd>
+            <dt>{{ texte.bestaetigt }}</dt>
+            <dd>{{ d.bestaetigt ? zeitpunkt(d.bestaetigt) : texte.nichtBestaetigt }}</dd>
+            @if (d.geschaeftsjahr) {
+              <dt>{{ texte.geschaeftsjahr }}</dt>
+              <dd>{{ d.geschaeftsjahr }}</dd>
+            }
+            @if (d.tags.length > 0) {
+              <dt>{{ texte.tags }}</dt>
+              <dd>{{ d.tags.join(', ') }}</dd>
+            }
+            @if (d.aufbewahrenBis) {
+              <dt>{{ texte.aufbewahrenBis }}</dt>
+              <dd>{{ datum(d.aufbewahrenBis) }}</dd>
+            }
+            @if (d.sperreBis) {
+              <dt>{{ texte.sperreBis }}</dt>
+              <dd>{{ datum(d.sperreBis) }}</dd>
+            }
+          </dl>
+          @if (zusatz().length > 0) {
+            <h3>{{ texte.zusatz }}</h3>
+            <dl>
+              @for (z of zusatz(); track z.name) {
+                <dt>{{ z.name }}</dt>
+                <dd>{{ z.wert }}</dd>
+              }
+            </dl>
+          }
+        </section>
+
+        <section class="karte vorschau" aria-labelledby="vorschau-titel">
+          <h2 id="vorschau-titel">{{ texte.vorschau }}</h2>
+          @switch (vorschau()) {
+            @case ('laedt') {
+              <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.vorschauLaeuft" />
+            }
+            @case ('ok') {
+              <object
+                class="pdf"
+                type="application/pdf"
+                data-test="vorschau"
+                [attr.aria-label]="texte.vorschauTitel(titel())"
+                [data]="pdfaRessource()"
+              >
+                <p>{{ texte.vorschauErsatz }}</p>
+              </object>
+              <div class="aktionen">
+                <a
+                  mat-flat-button
+                  data-test="download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [href]="pdfaUrl()"
+                  (click)="pdfaKlick($event)"
+                >
+                  {{ texte.herunterladen }}
+                </a>
+              </div>
+              <p class="klein">{{ texte.downloadHinweis }}</p>
+            }
+            @case ('fehlt') {
+              <p data-test="vorschau-fehlt">{{ texte.vorschauFehlt }}</p>
+              <div class="aktionen">
+                <button mat-flat-button type="button" (click)="originalHerunterladen()">
+                  {{ texte.originalHerunterladen }}
+                </button>
+              </div>
+            }
+            @case ('fehler') {
+              <p class="fehler" role="alert">{{ texte.fehlerDatei }}</p>
+            }
+          }
+          @if (geholtUrl(); as url) {
+            <p class="klein" data-test="datei-bereit">
+              {{ texte.oeffnenHinweis }}
+              <a target="_blank" rel="noopener noreferrer" [href]="url" (click)="geholtKlick($event)">{{
+                texte.jetztOeffnen
+              }}</a>
+            </p>
+          }
+          @if (dateiFehler()) {
+            <p class="fehler" role="alert" data-test="datei-fehler">{{ texte.fehlerDatei }}</p>
+          }
+        </section>
+      </div>
+    }
+  }
+}

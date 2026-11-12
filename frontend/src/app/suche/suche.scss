@@ -1,0 +1,175 @@
+:host {
+  display: block;
+  max-width: 60rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+}
+
+.suchzeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+
+  .begriff {
+    flex: 1 1 14rem;
+  }
+
+  button {
+    margin-bottom: 1.4rem;
+  }
+}
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+
+  > span {
+    font: var(--mat-sys-label-large);
+  }
+
+  small {
+    color: var(--urinet-gedaempft);
+  }
+}
+
+input,
+select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 8px;
+  background-color: var(--urinet-dunkel);
+  color: var(--urinet-hell);
+  font: inherit;
+}
+
+.filter-schalter {
+  margin: 0.5rem 0;
+}
+
+.filterleiste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0 0 1rem;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.partner {
+  .gewaehlt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.vorschlaege {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  .leer {
+    color: var(--urinet-gedaempft);
+  }
+}
+
+.filter-aktionen {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
+
+.anzahl {
+  color: var(--urinet-gedaempft);
+  font: var(--mat-sys-body-medium);
+}
+
+.liste {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.eintrag {
+  padding: 0.75rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.titel {
+  font: var(--mat-sys-title-medium);
+}
+
+.angaben {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0.25rem 0;
+  color: var(--urinet-gedaempft);
+}
+
+.betrag {
+  color: var(--urinet-hell);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  color: var(--urinet-gelb);
+}
+
+.auszug {
+  margin: 0.25rem 0;
+
+  mark {
+    background-color: var(--urinet-gelb);
+    color: var(--urinet-dunkel);
+    border-radius: 2px;
+    padding: 0 0.1em;
+  }
+}
+
+.tags {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+
+  li {
+    border: 1px solid var(--urinet-linie);
+    border-radius: 1rem;
+    padding: 0 0.5rem;
+  }
+}
+
+.blaettern {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}

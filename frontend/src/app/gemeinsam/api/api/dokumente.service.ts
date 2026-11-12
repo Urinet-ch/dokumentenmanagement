@@ -23,6 +23,8 @@ import { Dokument } from '../model/dokument';
 // @ts-ignore
 import { DokumentAenderung } from '../model/dokument-aenderung';
 // @ts-ignore
+import { DownloadAdresse } from '../model/download-adresse';
+// @ts-ignore
 import { EingangskorbSeite } from '../model/eingangskorb-seite';
 // @ts-ignore
 import { GeneratorAntwort } from '../model/generator-antwort';
@@ -424,7 +426,7 @@ export class DokumenteService extends BaseService {
 
     /**
      * Datei eines Dokuments herunterladen
-     * Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.
+     * Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.
      * @endpoint get /api/v1/dokumente/{id}/datei
      * @param id 
      * @param nr Nummer der Datei (nur original und arbeitsfassung)
@@ -433,10 +435,10 @@ export class DokumenteService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<DownloadAdresse>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<DownloadAdresse>>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<DownloadAdresse>>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiV1DokumenteIdDateiGet.');
         }
@@ -467,6 +469,7 @@ export class DokumenteService extends BaseService {
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
 
         const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
         ]);
         if (localVarHttpHeaderAcceptSelected !== undefined) {
             localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
@@ -490,7 +493,7 @@ export class DokumenteService extends BaseService {
 
         let localVarPath = `/api/v1/dokumente/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/datei`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
+        return this.httpClient.request<DownloadAdresse>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),

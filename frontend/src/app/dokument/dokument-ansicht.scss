@@ -1,0 +1,81 @@
+:host {
+  display: block;
+  max-width: 72rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin: 0.5rem 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+  margin-top: 0;
+}
+
+h3 {
+  font: var(--mat-sys-title-small);
+}
+
+.zurueck {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+}
+
+.spalten {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+
+  @media (min-width: 960px) {
+    grid-template-columns: minmax(16rem, 1fr) minmax(0, 2fr);
+  }
+}
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+dt {
+  color: var(--urinet-gedaempft);
+}
+
+dd {
+  margin: 0;
+}
+
+.pdf {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  min-height: 20rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 8px;
+  background-color: var(--urinet-hell);
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.klein {
+  color: var(--urinet-gedaempft);
+  font: var(--mat-sys-body-small);
+}
+
+.hinweis {
+  color: var(--urinet-gelb);
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}

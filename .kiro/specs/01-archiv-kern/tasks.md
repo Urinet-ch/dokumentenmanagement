@@ -332,6 +332,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Richtung, Status, Tags, Geschäftsjahr, Belegnummer), Trefferliste mit Auszug
   - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
   - _Anforderungen: 10.1, 14.1, 14.2, 14.4, 14.7_
+  - Teilweise erledigt (PR #71): Suche mit Filterleiste und Auszug, Dokumentansicht mit Metadaten, PDF/A-Vorschau und Download (dazu `GET /dokumente/{id}/datei` mit `Accept: application/json`, 14.6), design.md «Frontend», «Suche und Dokumentansicht (Aufgabe 4.6)». Offen: Metadaten bearbeiten mit Grund (A6, 10.1; braucht 3.5), Versionsliste (`GET /dokumente/{id}` liefert laut Endpunkt-Tabelle die Versionen, `DokumentDto` noch nicht; folgt mit oder nach 3.5, PR #67), Vorschaubild (PR #68)
 
 - [x] 4.7 Generator-Endpunkt und Python-Client [Backend]
   - `POST /api/v1/dokumente/generator` (Scope `generator`): Pflichtfelder der Art (422 `PFLICHTFELD_FEHLT`), unbekannte `crmId` (422); `vertraulichkeit` und `personBenutzer` Pflicht bei Standard `PERSONAL`, sonst Standard der Art
