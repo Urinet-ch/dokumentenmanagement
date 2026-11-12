@@ -56,7 +56,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Infomaniak».
  *
  * <p>Endpunkt und Region lassen sich mit {@code -Darchiv.smoke.endpunkt} und {@code -Darchiv.smoke.region} für einen
- * Probelauf gegen ein lokales MinIO umstellen; als Nachweis zählt nur der Lauf gegen Infomaniak.
+ * Probelauf gegen ein lokales MinIO oder Ceph RGW umstellen (Workflow {@code ceph.yml}); als Nachweis zählt nur der Lauf gegen Infomaniak.
  *
  * <p>Legt einen eigenen Wegwerf-Bucket {@code urinet-archiv-smoke-<zufall>} mit Object Lock und Versionierung an,
  * arbeitet nur mit synthetischen Inhalten und kurzen Sperren (höchstens 2 Minuten) und räumt nach deren Ablauf ohne

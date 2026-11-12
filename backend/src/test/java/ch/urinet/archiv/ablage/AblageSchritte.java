@@ -42,7 +42,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Schritte zu Req 6.2, 6.3, 6.4, 6.9, 6.12 und 14.6: der Ablage-Port der Anwendung gegen MinIO. */
+/** Schritte zu Req 6.2, 6.3, 6.4, 6.9, 6.12 und 14.6: der Ablage-Port der Anwendung gegen MinIO oder Ceph RGW. */
 public class AblageSchritte {
 
     private static final DateTimeFormatter DATUM = DateTimeFormatter.ofPattern("dd.MM.yyyy");

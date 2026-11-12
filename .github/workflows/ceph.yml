@@ -1,0 +1,76 @@
+# Ablage-Tests zusätzlich gegen Ceph RGW (Infomaniak betreibt Ceph RGW; MinIO verdeckt Unterschiede wie die fehlende
+# Versions-ID bei CopyObject, PR #85). Nicht blockierend: läuft nächtlich, von Hand und nur bei Änderungen an der
+# Ceph-Einrichtung im PR, nie bei jedem Push. Die Standard-CI (ci.yml) bleibt bei MinIO.
+# Req 16.7: kein Secret (Zugang zufällig je Lauf, nur als Dateien mit Rechten 600), nur synthetische Testdaten.
+name: Ceph RGW
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/ceph.yml
+      - backend/src/test/ceph/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ceph-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ablage:
+    name: Ablage-Tests gegen Ceph RGW
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Ceph RGW starten (1 MON, 1 OSD mit memstore, radosgw auf 127.0.0.1:7480)
+        run: |
+          echo "ZUGANG=$RUNNER_TEMP/ceph-zugang" >> "$GITHUB_ENV"
+          backend/src/test/ceph/ceph-starten.sh "$RUNNER_TEMP/ceph-zugang"
+
+      - name: S3AblageTest und Ablage-Szenarien gegen Ceph (Profil ceph)
+        working-directory: backend
+        run: >-
+          mvn -B -ntp test -Dtest='S3AblageTest,AblageSzenarienIT' -Dsurefire.failIfNoSpecifiedTests=false
+          -Dquarkus.quinoa.enabled=false -Dquarkus.test.profile=test,ceph
+          -Dsmallrye.config.source.file.locations="$ZUGANG"
+
+      - name: InfomaniakAblageSmokeIT gegen Ceph
+        if: ${{ !cancelled() }}
+        working-directory: backend
+        run: >-
+          mvn -B -ntp test -Dtest=InfomaniakAblageSmokeIT -Dsurefire.failIfNoSpecifiedTests=false
+          -Dquarkus.quinoa.enabled=false -Darchiv.smoke.zugang="$ZUGANG"
+          -Darchiv.smoke.endpunkt=http://127.0.0.1:7480 -Darchiv.smoke.region=us-east-1
+
+      - name: Ceph-Log bei Fehler
+        if: failure()
+        run: docker logs --tail 200 archiv-ceph-rgw 2>&1 | cut -c1-300 || true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: ceph-surefire-reports
+          path: backend/target/surefire-reports/
+          retention-days: 7
+
+      - name: Ceph-Container entfernen
+        if: always()
+        run: |
+          docker rm -f archiv-ceph-rgw > /dev/null 2>&1 || true
+          rm -rf "$ZUGANG"

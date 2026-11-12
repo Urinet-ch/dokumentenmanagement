@@ -170,8 +170,8 @@ Vorgehen, **nur mit dem synthetischen Text unten, nie mit einem Beleg**:
 ## Smoke-Test Ablage gegen Infomaniak
 
 Die Tests der Ablage (Aufgabe 2.3) laufen gegen MinIO. `InfomaniakAblageSmokeIT` prüft dieselben Wege einmal mit dem
-Java SDK gegen den Object Storage von Infomaniak (Spike 0.2, design.md «Ablage», Open Points). **Nur von Hand durch
-Fabian, vor Aufgabe 2.6, nie in der CI.** Ohne die Property `archiv.smoke.zugang` wird der Test übersprungen; als
+Java SDK gegen den Object Storage von Infomaniak (Spike 0.2, design.md «Ablage», Open Points). **Gegen Infomaniak nur
+von Hand durch Fabian, vor Aufgabe 2.6, nie in der CI**; die CI startet ihn nur gegen ein lokales Ceph RGW (unten). Ohne die Property `archiv.smoke.zugang` wird der Test übersprungen; als
 `*IT` führt ihn `mvn verify` ohnehin nicht aus.
 
 Was der Test tut:
@@ -211,3 +211,29 @@ lokales MinIO (so am 10.11.2026 durchgelaufen); als Nachweis zählt nur der Lauf
    Infomaniak», festhalten. Weicht ein Fehlercode ab (z. B. `GetObjectRetention` ohne Sperre), ist das ein Befund für
    die Ablage, nicht für den Test.
 4. Aufräumen: `rm -r ~/.config/urinet-archiv/s3-smoke`, falls der Schlüssel nicht weiter gebraucht wird.
+
+## Ablage-Tests gegen Ceph RGW
+
+Infomaniak betreibt Ceph RGW; MinIO aus den Dev Services verdeckt Unterschiede (z. B. fehlende Versions-ID bei
+`CopyObject`, PR #85). Darum laufen `S3AblageTest`, die Ablage-Szenarien (`AblageSzenarienIT`, nur
+`features/ablage`) und `InfomaniakAblageSmokeIT` zusätzlich gegen einen Einzelcontainer mit Ceph RGW (1 MON, 1 OSD mit
+memstore, radosgw auf `127.0.0.1:7480`): in der CI über den Workflow `ceph.yml` (nächtlich, von Hand und bei Änderungen
+an der Ceph-Einrichtung, nicht blockierend), die Standard-CI bleibt bei MinIO. Das Profil `ceph` stellt nur den
+Endpunkt und den Zugang des S3-Clients um; der Zugang wird zufällig erzeugt und liegt nur als Dateien (Rechte 600) vor.
+
+Lokal im Ordner `backend/` (Docker nötig; Ceph braucht rund 15–60 s bis zur Bereitschaft):
+```bash
+Z=$(pwd)/target/ceph-zugang
+src/test/ceph/ceph-starten.sh "$Z"
+mvn -ntp test -Dtest='S3AblageTest,AblageSzenarienIT' -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dquarkus.quinoa.enabled=false -Dquarkus.test.profile=test,ceph -Dsmallrye.config.source.file.locations="$Z"
+mvn -ntp test -Dtest=InfomaniakAblageSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Dquarkus.quinoa.enabled=false \
+  -Darchiv.smoke.zugang="$Z" -Darchiv.smoke.endpunkt=http://127.0.0.1:7480 -Darchiv.smoke.region=us-east-1
+docker rm -f archiv-ceph-rgw
+```
+Ohne `-Dquarkus.test.profile=test,ceph` laufen dieselben Tests gegen MinIO. Abweichungen zwischen den Servern, die die
+Tests schon abdecken: `GetObjectRetention` ohne Sperre (MinIO 400 `NoSuchObjectLockConfiguration`, Ceph 404
+`ObjectLockConfigurationNotFoundError`), `CopyObject` ohne Versions-ID bei Ceph, und die Deny-Policy auf den Bypass, die
+MinIO für den Root-Zugang nicht anwendet (Test-Buckets tragen darum keine Policy). Versionen in COMPLIANCE lassen sich
+beim Aufräumen nicht löschen; `TestBucket` meldet das als Warnung mit Bucket und Fehlercodes, der Bucket verschwindet
+mit dem Container.

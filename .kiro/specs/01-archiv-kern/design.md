@@ -1277,7 +1277,11 @@ Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 
 von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird
 `cgr.dev/chainguard/minio` (aus dem Fork `chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
 MinIO verdeckt Eigenheiten von Ceph RGW (Fehlercodes, Deny-Policy gilt nicht für den Root-Zugang, Versions-ID bei
-`CopyObject`); die prüft nur `InfomaniakAblageSmokeIT`. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
+`CopyObject`); die prüft gegen Infomaniak nur `InfomaniakAblageSmokeIT` von Hand. Zusätzlich laufen `S3AblageTest`, die
+Ablage-Szenarien und `InfomaniakAblageSmokeIT` nicht blockierend gegen einen Einzelcontainer mit Ceph RGW (Workflow
+`ceph.yml`, nächtlich und von Hand, Profil `ceph`; Anleitung in `backend/README.md`); die Standard-CI bleibt bei MinIO.
+Keine Testerwartung musste dafür geändert werden: Sie lassen die Fehlercodes beider Server zu oder prüfen nur Status und
+Wirkung. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
 haben je einen Dev-Stub unter `adapter/out/stub/`; `adapter/out/<Name>Auswahl` wählt zur Laufzeit nach
 `archiv.<port>.stub` (nur in `dev` an). Ohne Stub und ohne echten Adapter bricht die Auswahl ab; die Methoden und
 Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die Datenbank nicht erreichbar ist
