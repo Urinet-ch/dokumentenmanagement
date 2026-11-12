@@ -12,14 +12,16 @@ Verhalten:
   `archiv-ausstehend/` abgelegt und beim nächsten Aufruf vor dem neuen PDF erneut gesendet (Req 11.5).
 - 409 (Belegnummer vergeben, Frist abgelaufen): Das PDF wird nach `archiv-konflikt/` verschoben und nicht erneut
   gesendet (Req 11.9).
-- andere Fehler (400, 401, 403, 413, 415, 422): `ArchivFehler` mit Fehlercode und Text des Archivs; das PDF bleibt,
-  wo es ist.
+- andere Fehler (400, 401, 403, 413, 415, 422): `ArchivFehler` mit Fehlercode (`fehlercode` der Problem Details) und
+  Text des Archivs; das PDF bleibt, wo es ist.
+- Weiterleitungen (3xx) folgt der Client nicht, damit das Token nie an eine andere Adresse geht: `ArchivFehler`.
 
 Beide Ordner liegen im Ordner des PDFs, sofern `ordner` nichts anderes sagt.
 
 Token (tech.md Regel 7): API-Token vom Scope `generator` aus einer Datei mit Rechten 600, Pfad aus
 ARCHIV_TOKEN_DATEI, sonst ~/.config/urinet-archiv/token; nie das Token selbst aus einer Umgebungsvariable.
-Adresse des Archivs: Parameter `url`, sonst ARCHIV_URL, sonst https://archiv.apps.urinet.ch.
+Adresse des Archivs: Parameter `url`, sonst ARCHIV_URL, sonst https://archiv.apps.urinet.ch. Nur `https://`; `http://`
+nur für localhost, 127.0.0.1 und ::1 (Tests), damit das Token nicht im Klartext übers Netz geht.
 
 Nur Python-Standardbibliothek, damit der Client ohne Installation in jedes Generator-Skript passt.
 
@@ -37,6 +39,7 @@ import socket
 import stat
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass
@@ -48,6 +51,7 @@ PFAD = "/api/v1/dokumente/generator"
 AUSSTEHEND = "archiv-ausstehend"
 KONFLIKT = "archiv-konflikt"
 ZEITGRENZE = 120
+LOKALE_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 ANGENOMMEN = "ANGENOMMEN"
 VORHANDEN = "VORHANDEN"
@@ -116,7 +120,21 @@ def token_lesen() -> str:
 
 
 def _adresse(url: str | None) -> str:
-    return (url or os.environ.get("ARCHIV_URL") or STANDARD_URL).rstrip("/")
+    adresse = (url or os.environ.get("ARCHIV_URL") or STANDARD_URL).rstrip("/")
+    teile = urllib.parse.urlsplit(adresse)
+    if not teile.hostname or not (teile.scheme == "https"
+                                  or teile.scheme == "http" and teile.hostname in LOKALE_HOSTS):
+        raise ArchivFehler(f"Die Adresse {adresse} ist nicht erlaubt. Bitte https:// verwenden "
+                           "(http:// nur für localhost).")
+    return adresse
+
+
+class _KeineWeiterleitung(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *argumente, **benannt):
+        return None
+
+
+_OEFFNER = urllib.request.build_opener(_KeineWeiterleitung)
 
 
 def _nachsenden(adresse: str, token: str, basis: Path) -> bool:
@@ -137,7 +155,7 @@ def _nachsenden(adresse: str, token: str, basis: Path) -> bool:
             print(f"archiv_client: {pdf.name} bleibt ausstehend: {fehler}", file=sys.stderr)
             continue
         if ergebnis.zustand in (ANGENOMMEN, VORHANDEN):
-            pdf.unlink()
+            pdf.unlink(missing_ok=True)
             begleit.unlink(missing_ok=True)
         elif ergebnis.zustand == KONFLIKT_ZUSTAND:
             begleit.unlink(missing_ok=True)
@@ -154,7 +172,7 @@ def _behandeln(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]
         ziel = _verschieben(pdf, basis / KONFLIKT, metadaten)
         print(f"archiv_client: {meldung} Das PDF liegt jetzt unter {ziel}.", file=sys.stderr)
         return Ergebnis(KONFLIKT_ZUSTAND, pfad=ziel, meldung=meldung)
-    raise ArchivFehler(meldung, status=status, code=antwort.get("code"), felder=antwort.get("felder"))
+    raise ArchivFehler(meldung, status=status, code=antwort.get("fehlercode"), felder=antwort.get("felder"))
 
 
 def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -> tuple[int, dict]:
@@ -177,10 +195,13 @@ def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -
         "Accept": "application/json, application/problem+json",
     })
     try:
-        with urllib.request.urlopen(anfrage, timeout=ZEITGRENZE) as antwort:
+        with _OEFFNER.open(anfrage, timeout=ZEITGRENZE) as antwort:
             return antwort.status, _json(antwort.read())
     except urllib.error.HTTPError as fehler:
         inhalt = _json(fehler.read())
+        if 300 <= fehler.code < 400:
+            raise ArchivFehler(f"Das Archiv leitet weiter (HTTP {fehler.code}); der Client folgt keiner Weiterleitung. "
+                               "Bitte die Adresse (ARCHIV_URL) prüfen.", status=fehler.code) from None
         if fehler.code >= 500:
             raise _NichtErreichbar(f"Das Archiv antwortet mit HTTP {fehler.code}.") from None
         return fehler.code, inhalt
@@ -198,8 +219,8 @@ def _json(inhalt: bytes) -> dict:
 
 def _meldung(status: int, antwort: dict) -> str:
     teile = [f"HTTP {status}"]
-    if antwort.get("code"):
-        teile.append(antwort["code"])
+    if antwort.get("fehlercode"):
+        teile.append(antwort["fehlercode"])
     text = antwort.get("detail") or antwort.get("title") or ""
     if antwort.get("felder"):
         text = f"{text} Felder: {', '.join(antwort['felder'])}".strip()

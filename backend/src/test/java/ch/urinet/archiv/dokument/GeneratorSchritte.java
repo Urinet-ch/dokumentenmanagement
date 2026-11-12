@@ -62,6 +62,9 @@ public class GeneratorSchritte {
     /** Der Einzeiler, mit dem ein Skript ablegt (Req 11.4); gibt Zustand und ID aus. */
     private static final String EINZEILER = "import json, sys, archiv_client as a; "
             + "e = a.archivieren(sys.argv[1], json.loads(sys.argv[2])); print(e.zustand, e.id or '')";
+    private static final String MIT_FEHLER = "import json, sys, archiv_client as a\n"
+            + "try:\n    a.archivieren(sys.argv[1], json.loads(sys.argv[2]))\n"
+            + "except a.ArchivFehler as f:\n    print('FEHLER', f.status, f.code)\n";
 
     private record Ort(String mandant, UUID id) {
     }
@@ -258,7 +261,12 @@ public class GeneratorSchritte {
 
     @Wenn("das Skript die PDF «{word}» mit dem Python-Client und diesen Metadaten ablegt:")
     public void client(String pdf, String metadaten) throws Exception {
-        clientAufrufen(pdf, metadaten, "http://localhost:" + RestAssured.port);
+        clientAufrufen(pdf, metadaten, "http://localhost:" + RestAssured.port, EINZEILER);
+    }
+
+    @Wenn("das Skript die PDF «{word}» mit dem Python-Client und diesen unvollständigen Metadaten ablegt:")
+    public void clientMitFehler(String pdf, String metadaten) throws Exception {
+        clientAufrufen(pdf, metadaten, "http://localhost:" + RestAssured.port, MIT_FEHLER);
     }
 
     @Wenn("das Skript bei nicht erreichbarem Archiv die PDF «{word}» mit dem Python-Client und diesen Metadaten ablegt:")
@@ -267,12 +275,17 @@ public class GeneratorSchritte {
         try (ServerSocket frei = new ServerSocket(0)) {
             port = frei.getLocalPort();
         }
-        clientAufrufen(pdf, metadaten, "http://127.0.0.1:" + port);
+        clientAufrufen(pdf, metadaten, "http://127.0.0.1:" + port, EINZEILER);
     }
 
     @Dann("meldet der Python-Client «{word}»")
     public void clientMeldet(String zustand) {
         assertThat(clientZustand).isEqualTo(zustand);
+    }
+
+    @Dann("meldet der Python-Client den Fehler {int} «{word}»")
+    public void clientFehler(int status, String fehlercode) {
+        assertThat(clientZustand + " " + clientId).isEqualTo("FEHLER " + status + " " + fehlercode);
     }
 
     @Dann("meldet der Python-Client «{word}» für das Dokument «{word}»")
@@ -301,7 +314,7 @@ public class GeneratorSchritte {
         assertThat(skript.resolve("archiv-ausstehend")).doesNotExist();
     }
 
-    private void clientAufrufen(String pdf, String metadaten, String url) throws Exception {
+    private void clientAufrufen(String pdf, String metadaten, String url, String python) throws Exception {
         if (skript == null) {
             skript = Files.createTempDirectory("generator-skript");
         }
@@ -314,7 +327,7 @@ public class GeneratorSchritte {
         Files.write(datei, pdf(pdf));
         clientPdfs.add(pdf);
         Path fehler = skript.resolve(".fehler");
-        ProcessBuilder aufruf = new ProcessBuilder("python3", "-c", EINZEILER, datei.toString(), metadaten)
+        ProcessBuilder aufruf = new ProcessBuilder("python3", "-c", python, datei.toString(), metadaten)
                 .redirectError(fehler.toFile());
         Map<String, String> umgebung = aufruf.environment();
         umgebung.put("PYTHONPATH", TOOLS.toString());

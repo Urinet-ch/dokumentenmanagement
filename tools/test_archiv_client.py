@@ -27,6 +27,13 @@ TOKEN = "urn_probe_token"
 class _Archiv(BaseHTTPRequestHandler):
     antworten: list[tuple[int, dict]] = []
     empfangen: list[dict] = []
+    weitergeleitet: list[dict] = []
+
+    def do_GET(self):
+        self.weitergeleitet.append({"pfad": self.path, "token": self.headers["Authorization"]})
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def do_POST(self):
         laenge = int(self.headers["Content-Length"])
@@ -44,6 +51,8 @@ class _Archiv(BaseHTTPRequestHandler):
         status, inhalt = self.antworten.pop(0)
         daten = json.dumps(inhalt).encode("utf-8")
         self.send_response(status)
+        if "Location" in inhalt:
+            self.send_header("Location", inhalt["Location"])
         self.send_header("Content-Type", "application/json" if status < 400 else "application/problem+json")
         self.send_header("Content-Length", str(len(daten)))
         self.end_headers()
@@ -65,6 +74,7 @@ class ArchivClientTest(unittest.TestCase):
         os.environ.pop("ARCHIV_URL", None)
         _Archiv.antworten = []
         _Archiv.empfangen = []
+        _Archiv.weitergeleitet = []
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _Archiv)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -146,7 +156,7 @@ class ArchivClientTest(unittest.TestCase):
         self.assertEqual([], list(ausstehend.iterdir()))
 
     def test_req_11_5_serverfehler_gilt_als_nicht_erreichbar(self):
-        _Archiv.antworten = [(503, {"code": "ABLAGE_NICHT_ERREICHBAR"})]
+        _Archiv.antworten = [(503, {"fehlercode": "ABLAGE_NICHT_ERREICHBAR"})]
 
         ergebnis = archiv_client.archivieren(self.pdf("r.pdf"), self.metadaten("2026-901"), url=self.url)
 
@@ -164,13 +174,14 @@ class ArchivClientTest(unittest.TestCase):
                          sorted(p.name for p in (self.ausgabe / "archiv-ausstehend").iterdir()))
 
     def test_req_11_9_bei_409_nach_archiv_konflikt_verschieben_und_nicht_erneut_senden(self):
-        _Archiv.antworten = [(409, {"code": "BELEGNUMMER_VERGEBEN", "detail": "Die Belegnummer ist vergeben."})]
+        _Archiv.antworten = [(409, {"fehlercode": "BELEGNUMMER_VERGEBEN", "detail": "Die Belegnummer ist vergeben."})]
         pdf = self.pdf("rechnung-2026-901.pdf")
 
         ergebnis = archiv_client.archivieren(pdf, self.metadaten("2026-901"), url=self.url)
 
         konflikt = self.ausgabe / "archiv-konflikt" / "rechnung-2026-901.pdf"
         self.assertEqual(("KONFLIKT", konflikt), (ergebnis.zustand, ergebnis.pfad))
+        self.assertIn("BELEGNUMMER_VERGEBEN", ergebnis.meldung)
         self.assertFalse(pdf.exists())
         self.assertTrue(konflikt.is_file())
 
@@ -182,7 +193,7 @@ class ArchivClientTest(unittest.TestCase):
 
     def test_req_11_9_ausstehendes_pdf_mit_409_wandert_nach_archiv_konflikt(self):
         archiv_client.archivieren(self.pdf("a.pdf"), self.metadaten("2026-901"), url=self.unerreichbar())
-        _Archiv.antworten = [(409, {"code": "BELEGNUMMER_VERGEBEN"}), (202, {"id": "d-2", "status": "NEU"})]
+        _Archiv.antworten = [(409, {"fehlercode": "BELEGNUMMER_VERGEBEN"}), (202, {"id": "d-2", "status": "NEU"})]
 
         archiv_client.archivieren(self.pdf("b.pdf"), self.metadaten("2026-902"), url=self.url)
 
@@ -190,7 +201,7 @@ class ArchivClientTest(unittest.TestCase):
         self.assertEqual(["a.json", "a.pdf"], sorted(p.name for p in (self.ausgabe / "archiv-konflikt").iterdir()))
 
     def test_req_11_6_abgelehnte_metadaten_ergeben_einen_fehler_mit_feldern(self):
-        _Archiv.antworten = [(422, {"code": "PFLICHTFELD_FEHLT", "felder": ["betrag"]})]
+        _Archiv.antworten = [(422, {"fehlercode": "PFLICHTFELD_FEHLT", "felder": ["betrag"]})]
         pdf = self.pdf("r.pdf")
 
         with self.assertRaises(archiv_client.ArchivFehler) as fehler:
@@ -198,6 +209,27 @@ class ArchivClientTest(unittest.TestCase):
 
         self.assertEqual((422, "PFLICHTFELD_FEHLT", ["betrag"]),
                          (fehler.exception.status, fehler.exception.code, fehler.exception.felder))
+        self.assertIn("PFLICHTFELD_FEHLT", str(fehler.exception))
+        self.assertTrue(pdf.is_file())
+        self.assertFalse((self.ausgabe / "archiv-ausstehend").exists())
+
+    def test_http_nur_fuer_localhost_sonst_wird_nichts_gesendet(self):
+        for adresse in ("http://archiv.example.ch", "ftp://127.0.0.1", "archiv.apps.urinet.ch"):
+            with self.subTest(adresse=adresse), self.assertRaisesRegex(archiv_client.ArchivFehler, "https://"):
+                archiv_client.archivieren(self.pdf("r.pdf"), self.metadaten("2026-901"), url=adresse)
+
+        self.assertFalse((self.ausgabe / "archiv-ausstehend").exists())
+        self.assertEqual("https://archiv.apps.urinet.ch", archiv_client._adresse(None))
+
+    def test_weiterleitungen_folgt_der_client_nicht(self):
+        _Archiv.antworten = [(302, {"Location": self.url + "/umgeleitet"})]
+        pdf = self.pdf("r.pdf")
+
+        with self.assertRaises(archiv_client.ArchivFehler) as fehler:
+            archiv_client.archivieren(pdf, self.metadaten("2026-901"), url=self.url)
+
+        self.assertEqual(302, fehler.exception.status)
+        self.assertEqual([], _Archiv.weitergeleitet)
         self.assertTrue(pdf.is_file())
         self.assertFalse((self.ausgabe / "archiv-ausstehend").exists())
 

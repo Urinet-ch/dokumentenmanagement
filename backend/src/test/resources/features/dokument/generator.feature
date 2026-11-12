@@ -36,13 +36,17 @@ Funktionalität: Generator-Schnittstelle für Skripte
     Dann ist das Generator-Dokument «R1» archiviert, ohne KI-Vorschlag
 
   @req-11.1
-  Szenario: Ein angemeldeter Benutzer erreicht den Generator nicht
+  Szenario: Ein angemeldeter Benutzer erreicht den Generator nicht, die Verweigerung wird protokolliert
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
     Wenn «inhaber-urinet» die PDF «B1» mit diesen Metadaten an den Generator sendet:
       """
       { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "Probe" }
       """
     Dann antwortet der Generator mit Status 403 und Fehlercode «NICHT_ERLAUBT»
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «B1»
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer       | rolle   | aktion     | dokument | ip | grund | fehlercode    |
+      | inhaber-urinet | INHABER | VERWEIGERT |          |    | A1    | NICHT_ERLAUBT |
 
   @req-11.3
   Szenario: Eine eigene Belegnummer mit anderer PDF ergibt 409 und überschreibt nichts
@@ -106,6 +110,20 @@ Funktionalität: Generator-Schnittstelle für Skripte
       """
     Dann antwortet der Generator mit Status 422 und Fehlercode «PARTNER_UNBEKANNT»
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «P1»
+
+  @req-11.7
+  Szenario: Eine crmId aus einem anderen Mandanten gilt als unbekannt, nichts wird angelegt
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Und im Mandanten «vhf-gsk» gibt es den CRM-Kontakt «Fremde Probe AG» mit der crmId «K-FREMD-4712»
+    Wenn der Generator die PDF «P2» mit diesen Metadaten sendet:
+      """
+      { "art": "AUSGANGSRECHNUNG", "titel": "Probe-Rechnung", "datum": "2026-03-10",
+        "partner": {"crmId": "K-FREMD-4712"},
+        "finanz": {"belegnummer": "2026-906", "richtung": "EINNAHME", "betrag": "50.00", "waehrung": "CHF"} }
+      """
+    Dann antwortet der Generator mit Status 422 und Fehlercode «PARTNER_UNBEKANNT»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «P2»
+    Und gibt es im Mandanten «vhf-gsk» kein Dokument zur PDF «P2»
 
   @req-11.10
   Szenario: Bei Standard PERSONAL sind Vertraulichkeit und Person Pflicht, sonst gilt der Standard der Art
@@ -237,3 +255,12 @@ Funktionalität: Generator-Schnittstelle für Skripte
     Dann meldet der Python-Client «ANGENOMMEN» für das Dokument «C3»
     Und liegt die PDF «C2» im Ordner «archiv-konflikt» des Skripts und nicht mehr neben dem Skript
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «C2»
+
+  @req-11.6
+  Szenario: Lehnt das Archiv die Metadaten ab, meldet der Python-Client Status und Fehlercode
+    Wenn das Skript die PDF «C1» mit dem Python-Client und diesen unvollständigen Metadaten ablegt:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe ohne Projekt" }
+      """
+    Dann meldet der Python-Client den Fehler 422 «PFLICHTFELD_FEHLT»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «C1»

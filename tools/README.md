@@ -26,7 +26,8 @@ Archiv verarbeitet und archiviert es ohne KI-Vorschlag. Nur Python-Standardbibli
    ```
 3. `tools/archiv_client.py` neben das Generator-Skript kopieren oder den Ordner `tools/` in `sys.path` aufnehmen.
    Die Adresse des Archivs ist `https://archiv.apps.urinet.ch`; zum Testen über `ARCHIV_URL` oder den Parameter `url`
-   ändern.
+   ändern. Erlaubt ist nur `https://`, `http://` nur für `localhost`, `127.0.0.1` und `::1`. Weiterleitungen (3xx)
+   folgt der Client nicht, damit das Token an keine andere Adresse geht.
 
 ### Einbau in `rechnung_gen.py`
 
@@ -71,7 +72,9 @@ des betroffenen Mitarbeiters) Pflicht. Zusatzfelder der Art stehen unter `zusatz
 | 200 | dieselbe Datei liegt schon im Archiv | `VORHANDEN` |
 | nicht erreichbar, Zeitüberschreitung, 5xx | Kopie von PDF und Metadaten nach `archiv-ausstehend/`; der nächste Aufruf sendet sie zuerst | `AUSSTEHEND` |
 | 409 (Belegnummer vergeben, Frist abgelaufen) | PDF und Metadaten nach `archiv-konflikt/`, kein erneuter Versuch; von Hand klären | `KONFLIKT` |
-| andere 4xx (z. B. 422 Pflichtfeld fehlt) | Ausnahme `ArchivFehler` mit `status`, `code`, `felder`; das PDF bleibt liegen | – |
+| andere 4xx (z. B. 422 Pflichtfeld fehlt), 3xx | Ausnahme `ArchivFehler` mit `status`, `code` (Feld `fehlercode` der Problem Details, z. B. `PFLICHTFELD_FEHLT`), `felder`; das PDF bleibt liegen | – |
+
+Grenzen: PDF bis 50 MB, Metadaten (JSON-Text) bis 4 KB; darüber antwortet das Archiv mit 413 `DATEI_ZU_GROSS`.
 
 `archiv-ausstehend/` und `archiv-konflikt/` liegen im Ordner des PDFs (oder im Parameter `ordner`). Ausstehende
 PDFs lassen sich auch ohne neues PDF senden: `python3 tools/archiv_client.py --nachsenden <ordner>`.
