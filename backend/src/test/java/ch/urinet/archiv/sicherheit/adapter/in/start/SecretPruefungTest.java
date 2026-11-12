@@ -39,7 +39,7 @@ class SecretPruefungTest {
 
     @Test
     void dateiFehlt() throws IOException {
-        dateien("s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_db_owner");
+        dateien("s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_db_owner", "archiv_manifest_key");
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_OWNER, String.class))
                 .hasMessageContaining("Secret-Datei fehlt, ist leer oder wird übersteuert: archiv_db_app.")
                 .hasMessageContaining(verzeichnis.toString());
