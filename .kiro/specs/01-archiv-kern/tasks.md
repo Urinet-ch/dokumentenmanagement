@@ -436,10 +436,18 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 1.9, 2.4, 2.6, 4.5, 4.9 (bei vorgezogenem Wechsel nur der Entscheid K5 aus 4.9)_
 
 ## Optionen
-Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04).
+Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04, O.7–O.8 in Spec 01).
 
 - [ ]* O.7 Übersicht und Ablauf der API-Tokens vor Stufe B [Backend] [Frontend]
   - Herkunft: Review von PR #37 (Aufgabe 1.5); Grundlage: Tokens laufen nicht ab, sie gelten bis zum Widerruf (entschieden von Fabian am 10.11.2026)
   - ungenutzte Tokens nach `zuletzt` in der Token-Verwaltung anzeigen
   - optionales `gueltig_bis` je Token, vor dem Wechsel auf Stufe B (5.11); ohne Wert gilt das Token weiter bis zum Widerruf
   - _Anforderungen: 2.5_
+
+- [ ]* O.8 Anmeldung mit Google [Infra] [Backend] [Fabian]
+  - Herkunft: Auftrag Fabian vom 12.11.2026; Entscheide [Fabian]: Stufe (2.25), Verknüpfung durch Benutzer oder Admin (2.27), Verzicht auf TOTP (2.28, Vorschlag: nein), Aufbewahrung der Keycloak-Ereignisse
+  - Google-OAuth-Client (Redirect-URI `https://archiv-auth.apps.urinet.ch/realms/urinet-archiv/broker/google/endpoint`) anlegen und Geheimnis als GitHub-Secret `GOOGLE_CLIENT_SECRET` setzen [Fabian]
+  - Identity Provider, Flows und Ereignisse im Realm-Export, `start.sh` setzt den Platzhalter, Pflichtprüfung des Secrets im Deploy-Workflow, `RealmExportTest` und `RealmExportKeycloakTest` angepasst; bei Stufe A einmalige Einrichtung im bestehenden Realm per `kcadm.sh` im Wegwerf-Container
+  - Szenarien gegen einen `oidc`-Test-IdP: unbekanntes Konto abgelehnt, E-Mail allein verknüpft nicht, verknüpftes Konto angemeldet mit TOTP, Rollen und `mandant` nur aus Keycloak, Lösen der Verknüpfung im Ereignisprotokoll und Sitzungen beendet
+  - ab Stufe B: Google als Empfänger der Anmeldedaten im Verzeichnis der Bearbeitungen und im Datenschutzhinweis [Fabian]
+  - _Anforderungen: 2.25–2.29_
