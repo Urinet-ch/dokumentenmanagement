@@ -130,6 +130,42 @@ Funktionalität: CSV-Import aus 21.CRM – Vorschau und Abgleich (Aufgabe 4.2)
       | nr | ergebnis | meldung         | kontakt | kandidaten |
       | 2  | FEHLER   | Betrag ungültig |         |            |
 
+  @req-13.3 @req-13.5
+  Szenario: Der Filter je Ergebnis zeigt nur diese Zeilen mit ihren Feldern und den Kandidaten (Aufgabe 4.4)
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Name;PLZ;E-Mail;Ort
+      Neue Werkstatt GmbH;6430;werkstatt@neu.test;Schwyz
+      Muster Garage;6460;;Altdorf
+      ;6000;leer@name.test;
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» die Zeilen mit dem Ergebnis «DUBLETTE» abfragt
+    Dann enthält die Seite 0 von 1 Zeilen die Zeilen 3 bis 3
+    Und hat die Zeile 3 die Felder «name=Muster Garage, plz=6460, ort=Altdorf»
+    Und nennt die Seite die Kontakte «Muster Garage AG 6460, Muster Garage GmbH 6460»
+    Wenn «inhaber-urinet» die Zeilen mit dem Ergebnis «NEU» abfragt
+    Dann enthält die Seite 0 von 1 Zeilen die Zeilen 2 bis 2
+    Und nennt die Seite die Kontakte «»
+    Wenn «inhaber-urinet» die Zeilen mit dem Ergebnis «OFFEN» abfragt
+    Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+
+  @req-13.2
+  Szenario: Vor der Zuordnung liefert der Lauf Spalten und Vorschlag für den Dialog nach einem Neuladen (Aufgabe 4.4)
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Name;PLZ
+      Firma A;6000
+      """
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zeigt der CSV-Import den Zuordnungsdialog mit 2 Spalten ohne Profil und den Feldern:
+      | name | 0 |
+      | plz  | 1 |
+    Wenn «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann hat die Antwort weder Spalten noch Vorschlag
+
   @req-13.3
   Szenariogrundriss: Ein unbekannter oder ungültiger Lauf ist nicht gefunden
     Wenn «inhaber-urinet» den Lauf «<lauf>» abfragt

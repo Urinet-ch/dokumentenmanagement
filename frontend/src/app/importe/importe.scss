@@ -1,0 +1,102 @@
+:host {
+  display: block;
+  max-width: 64rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+}
+
+.hochladen {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  padding: 1rem;
+}
+
+.feld {
+  display: grid;
+  gap: 0.25rem;
+}
+
+select {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem;
+  max-width: 100%;
+}
+
+.datei {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dateiname {
+  overflow-wrap: anywhere;
+}
+
+.hinweis {
+  color: var(--urinet-gedaempft);
+  margin: 0;
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
+
+mat-progress-bar {
+  width: 100%;
+}
+
+.laeufe {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.lauf {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+
+  a {
+    overflow-wrap: anywhere;
+  }
+}
+
+.angaben {
+  color: var(--urinet-gedaempft);
+}
+
+.marke {
+  justify-self: start;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 1rem;
+  padding: 0 0.5rem;
+
+  &[data-status='ZUORDNUNG_NOETIG'],
+  &[data-status='VORSCHAU'] {
+    border-color: var(--urinet-gelb);
+  }
+  &[data-status='UEBERNOMMEN'] {
+    border-color: var(--urinet-erfolg);
+  }
+  &[data-status='ABGEBROCHEN'] {
+    border-color: var(--urinet-fehler);
+  }
+}
+
+.blaettern {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

@@ -379,24 +379,34 @@ export class ImporteService extends BaseService {
 
     /**
      * Import-Lauf mit Vorschau lesen
-     * Lauf mit den Zählern der Vorschau (neu, geändert, unverändert, mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3). seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist (Status VORSCHAU).
+     * Lauf mit den Zählern der Vorschau (neu, geändert, unverändert, mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3), mit ergebnis nur Zeilen mit diesem Ergebnis. seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist (Status VORSCHAU). Bei Status ZUORDNUNG_NOETIG kommen Spalten und Vorschlag wie beim Upload mit (Zuordnungsdialog nach einem Neuladen).
      * @endpoint get /api/v1/importe/{id}
      * @param id 
+     * @param ergebnis 
      * @param groesse 
      * @param seite 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1ImporteIdGet(id: string, groesse?: number, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ImportLaufMitZeilen>;
-    public apiV1ImporteIdGet(id: string, groesse?: number, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ImportLaufMitZeilen>>;
-    public apiV1ImporteIdGet(id: string, groesse?: number, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ImportLaufMitZeilen>>;
-    public apiV1ImporteIdGet(id: string, groesse?: number, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1ImporteIdGet(id: string, ergebnis?: 'NEU' | 'GEAENDERT' | 'UNVERAENDERT' | 'DUBLETTE' | 'FEHLER' | 'UEBERSPRUNGEN', groesse?: number, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ImportLaufMitZeilen>;
+    public apiV1ImporteIdGet(id: string, ergebnis?: 'NEU' | 'GEAENDERT' | 'UNVERAENDERT' | 'DUBLETTE' | 'FEHLER' | 'UEBERSPRUNGEN', groesse?: number, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ImportLaufMitZeilen>>;
+    public apiV1ImporteIdGet(id: string, ergebnis?: 'NEU' | 'GEAENDERT' | 'UNVERAENDERT' | 'DUBLETTE' | 'FEHLER' | 'UEBERSPRUNGEN', groesse?: number, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ImportLaufMitZeilen>>;
+    public apiV1ImporteIdGet(id: string, ergebnis?: 'NEU' | 'GEAENDERT' | 'UNVERAENDERT' | 'DUBLETTE' | 'FEHLER' | 'UEBERSPRUNGEN', groesse?: number, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiV1ImporteIdGet.');
         }
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'ergebnis',
+            <any>ergebnis,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         localVarQueryParameters = this.addToHttpParams(
             localVarQueryParameters,

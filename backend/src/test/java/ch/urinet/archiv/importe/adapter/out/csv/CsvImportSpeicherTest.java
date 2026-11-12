@@ -404,6 +404,11 @@ class CsvImportSpeicherTest {
         }
 
         @Override
+        public List<Kontakt> finden(java.util.Collection<UUID> ids) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Kontakt anlegen(KontaktAngaben angaben, String nameNormalisiert, String quelle) {
             throw new UnsupportedOperationException();
         }
@@ -622,7 +627,8 @@ class CsvImportSpeicherTest {
         }
 
         @Override
-        public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+        public List<ImportZeile> zeilenSeite(UUID laufId, ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis ergebnis, int seite,
+                                             int groesse) {
             return List.of();
         }
 

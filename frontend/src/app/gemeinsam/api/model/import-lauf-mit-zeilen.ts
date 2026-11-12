@@ -8,6 +8,9 @@
  * Do not edit the class manually.
  */
 import { ImportLauf } from './import-lauf';
+import { ImportKontakt } from './import-kontakt';
+import { ImportZuordnung } from './import-zuordnung';
+import { ImportSpalte } from './import-spalte';
 import { ImportZeile } from './import-zeile';
 
 
@@ -15,10 +18,22 @@ export interface ImportLaufMitZeilen {
     lauf?: ImportLauf;
     eintraege?: Array<ImportZeile>;
     /**
-     * Anzahl Zeilen des Laufs
+     * Anzahl Zeilen des Laufs; mit Filter nur die mit diesem Ergebnis
      */
     gesamt?: number;
     seite?: number;
     groesse?: number;
+    /**
+     * Kontakt-ID → Kurzangaben für kontaktId und kandidaten der Zeilen dieser Seite
+     */
+    kontakte?: { [key: string]: ImportKontakt; };
+    /**
+     * Spalten der Kopfzeile; nur bei Status ZUORDNUNG_NOETIG
+     */
+    spalten?: Array<ImportSpalte> | null;
+    /**
+     * nur bei Status ZUORDNUNG_NOETIG
+     */
+    vorschlagZuordnung?: ImportZuordnung | null;
 }
 

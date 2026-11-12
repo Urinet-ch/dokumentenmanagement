@@ -3,12 +3,16 @@ package ch.urinet.archiv.importe.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.importe.application.CsvImport;
+import ch.urinet.archiv.importe.application.ImportKontakte;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportLauf;
 import ch.urinet.archiv.importe.domain.ImportZeile;
 import ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis;
+import ch.urinet.archiv.importe.domain.LaufStatus;
 import ch.urinet.archiv.importe.domain.Zuordnung;
+import ch.urinet.archiv.importe.domain.Zuordnungsvorschlag;
+import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -37,8 +41,11 @@ import org.jboss.resteasy.reactive.multipart.FileUpload;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -52,11 +59,14 @@ import java.util.UUID;
 public class ImportResource {
 
     private final CsvImport csvImport;
+    private final ImportKontakte kontakte;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
 
-    public ImportResource(CsvImport csvImport, MandantAufloesung aufloesung, SecurityIdentity identitaet) {
+    public ImportResource(CsvImport csvImport, ImportKontakte kontakte, MandantAufloesung aufloesung,
+                          SecurityIdentity identitaet) {
         this.csvImport = csvImport;
+        this.kontakte = kontakte;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
     }
@@ -108,17 +118,39 @@ public class ImportResource {
             @Schema(nullable = true, description = "getroffener Kontakt bei GEAENDERT und UNVERAENDERT") UUID kontaktId,
             @Schema(description = "Kandidaten einer möglichen Dublette") List<UUID> kandidaten,
             @Schema(nullable = true, description = "Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern")
-            List<String> werte) {
+            List<String> werte,
+            @Schema(nullable = true, description = "Feld → Wert nach der Zuordnung des Laufs, wie ihn die Übernahme "
+                    + "liest (Hilfsfelder aufgelöst, leere Werte fehlen); fehlt ohne Zuordnung oder ohne Rohwerte")
+            Map<String, String> felder) {
 
-        static ZeileDto aus(ImportZeile zeile) {
+        static ZeileDto aus(ImportZeile zeile, ImportLauf lauf) {
+            Map<String, String> felder = lauf.zuordnung() == null || zeile.werte() == null ? null
+                    : lauf.zuordnung().werte(lauf.art(), zeile.werte());
             return new ZeileDto(zeile.nr(), zeile.ergebnis() == Ergebnis.OFFEN ? null : zeile.ergebnis().name(),
-                    zeile.meldung(), zeile.kontaktId(), zeile.kandidaten(), zeile.werte());
+                    zeile.meldung(), zeile.kontaktId(), zeile.kandidaten(), zeile.werte(), felder);
+        }
+    }
+
+    @Schema(name = "ImportKontakt", description = "Kurzangaben eines vorhandenen Kontakts (Treffer oder Kandidat)")
+    public record KontaktKurzDto(@Schema(nullable = true) String crmId,
+            @Schema(enumeration = {"PERSON", "ORGANISATION"}) String typ, String name,
+            @Schema(nullable = true) String vorname, @Schema(nullable = true) String plz,
+            @Schema(nullable = true) String ort, @Schema(nullable = true) String email) {
+
+        static KontaktKurzDto aus(Kontakt k) {
+            return new KontaktKurzDto(k.crmId(), k.typ().name(), k.name(), k.vorname(), k.plz(), k.ort(), k.email());
         }
     }
 
     @Schema(name = "ImportLaufMitZeilen")
     public record LaufSeiteDto(LaufDto lauf, List<ZeileDto> eintraege,
-            @Schema(description = "Anzahl Zeilen des Laufs") long gesamt, int seite, int groesse) {
+            @Schema(description = "Anzahl Zeilen des Laufs; mit Filter nur die mit diesem Ergebnis") long gesamt,
+            int seite, int groesse,
+            @Schema(description = "Kontakt-ID → Kurzangaben für kontaktId und kandidaten der Zeilen dieser Seite")
+            Map<UUID, KontaktKurzDto> kontakte,
+            @Schema(nullable = true, description = "Spalten der Kopfzeile; nur bei Status ZUORDNUNG_NOETIG")
+            List<SpalteDto> spalten,
+            @Schema(nullable = true, description = "nur bei Status ZUORDNUNG_NOETIG") ZuordnungDto vorschlagZuordnung) {
     }
 
     @Schema(name = "ImportSpalte")
@@ -194,11 +226,7 @@ public class ImportResource {
         CsvImport.Hochgeladen ergebnis = csvImport.hochladen(importArt, voll, datei.fileName(), datei.uploadedFile(),
                 benutzer());
         ImportLauf lauf = ergebnis.lauf();
-        List<SpalteDto> spalten = new ArrayList<>();
-        for (int i = 0; i < lauf.kopf().spalten(); i++) {
-            spalten.add(new SpalteDto(i, lauf.kopf().namen().get(i)));
-        }
-        HochgeladenDto antwort = new HochgeladenDto(LaufDto.aus(lauf), spalten,
+        HochgeladenDto antwort = new HochgeladenDto(LaufDto.aus(lauf), spalten(lauf),
                 ergebnis.vorschlag().map(ZuordnungDto::aus).orElse(null));
         return Response.status(ergebnis.vorschlag().isPresent() ? Response.Status.OK : Response.Status.ACCEPTED)
                 .entity(antwort).build();
@@ -251,13 +279,18 @@ public class ImportResource {
     @RolesAllowed("inhaber")
     @Operation(summary = "Import-Lauf mit Vorschau lesen",
             description = "Lauf mit den Zählern der Vorschau (neu, geändert, unverändert, mögliche Dublette, "
-                    + "fehlerhaft) und einer Seite seiner Zeilen (Req 13.3). seite ab 0, groesse 1–100. Die Zähler "
-                    + "der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist (Status VORSCHAU).")
+                    + "fehlerhaft) und einer Seite seiner Zeilen (Req 13.3), mit ergebnis nur Zeilen mit diesem "
+                    + "Ergebnis. seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag "
+                    + "CSV_VORSCHAU fertig ist (Status VORSCHAU). Bei Status ZUORDNUNG_NOETIG kommen Spalten und "
+                    + "Vorschlag wie beim Upload mit (Zuordnungsdialog nach einem Neuladen).")
     @APIResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = LaufSeiteDto.class)))
+    @APIResponse(responseCode = "400", description = "ANFRAGE_UNGUELTIG: seite, groesse oder ergebnis ungültig")
     @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten")
     public LaufSeiteDto lauf(@PathParam("id") String id, @QueryParam("seite") @DefaultValue("0") int seite,
-                             @QueryParam("groesse") @DefaultValue("50") int groesse) {
+                             @QueryParam("groesse") @DefaultValue("50") int groesse,
+                             @QueryParam("ergebnis") @Schema(enumeration = {"NEU", "GEAENDERT", "UNVERAENDERT",
+                                     "DUBLETTE", "FEHLER", "UEBERSPRUNGEN"}) String ergebnis) {
         aufloesung.pruefen();
         UUID laufId;
         try {
@@ -265,9 +298,42 @@ public class ImportResource {
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
-        CsvImport.LaufSeite ergebnis = csvImport.lauf(laufId, seite, groesse);
-        return new LaufSeiteDto(LaufDto.aus(ergebnis.lauf()),
-                ergebnis.zeilen().stream().map(ZeileDto::aus).toList(), ergebnis.lauf().zeilen(), seite, groesse);
+        CsvImport.LaufSeite seiteMitZeilen = csvImport.lauf(laufId, ergebnisFilter(ergebnis), seite, groesse);
+        ImportLauf lauf = seiteMitZeilen.lauf();
+        Set<UUID> verweise = new LinkedHashSet<>();
+        for (ImportZeile zeile : seiteMitZeilen.zeilen()) {
+            if (zeile.kontaktId() != null) {
+                verweise.add(zeile.kontaktId());
+            }
+            verweise.addAll(zeile.kandidaten());
+        }
+        Map<UUID, KontaktKurzDto> kurz = new LinkedHashMap<>();
+        kontakte.zu(verweise).forEach((kontaktId, kontakt) -> kurz.put(kontaktId, KontaktKurzDto.aus(kontakt)));
+        boolean zuordnen = lauf.status() == LaufStatus.ZUORDNUNG_NOETIG;
+        return new LaufSeiteDto(LaufDto.aus(lauf),
+                seiteMitZeilen.zeilen().stream().map(z -> ZeileDto.aus(z, lauf)).toList(), seiteMitZeilen.gesamt(),
+                seite, groesse, kurz, zuordnen ? spalten(lauf) : null,
+                zuordnen ? ZuordnungDto.aus(Zuordnungsvorschlag.fuer(lauf.art(), lauf.kopf())) : null);
+    }
+
+    private static Ergebnis ergebnisFilter(String ergebnis) {
+        if (ergebnis == null || ergebnis.isEmpty()) {
+            return null;
+        }
+        for (Ergebnis e : Ergebnis.values()) {
+            if (e != Ergebnis.OFFEN && e.name().equals(ergebnis)) {
+                return e;
+            }
+        }
+        throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+    }
+
+    private static List<SpalteDto> spalten(ImportLauf lauf) {
+        List<SpalteDto> spalten = new ArrayList<>();
+        for (int i = 0; i < lauf.kopf().spalten(); i++) {
+            spalten.add(new SpalteDto(i, lauf.kopf().namen().get(i)));
+        }
+        return spalten;
     }
 
     @POST

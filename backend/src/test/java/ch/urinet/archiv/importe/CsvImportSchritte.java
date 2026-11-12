@@ -181,6 +181,44 @@ public class CsvImportSchritte {
     public void seiteAbfragen(String benutzer, int seite, int groesse) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
                 .queryParam("groesse", groesse).when().get(UPLOAD.replace("/crm", "/") + laufId);
+        if (antwort.statusCode() == 200) {
+            vorschlag = antwort.path("vorschlagZuordnung");
+        }
+    }
+
+    @Wenn("«{word}» die Zeilen mit dem Ergebnis «{word}» abfragt")
+    public void gefiltertAbfragen(String benutzer, String ergebnis) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("ergebnis", ergebnis)
+                .when().get(UPLOAD.replace("/crm", "/") + laufId);
+    }
+
+    @Dann("hat die Zeile {int} die Felder «{}»")
+    public void zeileFelder(int nr, String felder) {
+        Map<String, String> erwartet = new LinkedHashMap<>();
+        for (String paar : felder.split(", ")) {
+            String[] teile = paar.split("=", 2);
+            erwartet.put(teile[0], teile[1]);
+        }
+        List<Map<String, Object>> zeilen = antwort.path("eintraege");
+        Map<String, Object> zeile = zeilen.stream().filter(z -> Integer.valueOf(nr).equals(z.get("nr"))).findFirst()
+                .orElseThrow();
+        assertThat(zeile.get("felder")).isEqualTo(erwartet);
+    }
+
+    @Dann("nennt die Seite die Kontakte «{}»")
+    public void seiteKontakte(String erwartet) {
+        Map<String, Map<String, Object>> angaben = antwort.path("kontakte");
+        assertThat(angaben.keySet()).allSatisfy(id -> assertThat(kontakte).containsValue(UUID.fromString(id)));
+        String ist = angaben.values().stream().map(k -> k.get("name") + " " + k.get("plz")).sorted()
+                .collect(java.util.stream.Collectors.joining(", "));
+        assertThat(ist).isEqualTo(erwartet);
+    }
+
+    @Dann("hat die Antwort weder Spalten noch Vorschlag")
+    public void ohneDialog() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Object>path("spalten")).isNull();
+        assertThat(antwort.<Object>path("vorschlagZuordnung")).isNull();
     }
 
     @Dann("zeigt die Vorschau {int} neu, {int} geändert, {int} unverändert, {int} mögliche Dubletten, {int} fehlerhaft "

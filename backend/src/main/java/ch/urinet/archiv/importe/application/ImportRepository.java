@@ -5,6 +5,7 @@ import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportLauf;
 import ch.urinet.archiv.importe.domain.ImportZeile;
+import ch.urinet.archiv.importe.domain.ZeilenPruefung;
 
 import java.util.Collection;
 import java.util.List;
@@ -74,8 +75,11 @@ public interface ImportRepository {
     /** Zeilen des Laufs je Ergebnis. */
     ImportLauf.Zaehler zaehlen(UUID laufId);
 
-    /** Eine Seite der Zeilen (aufsteigend nach {@code nr}), für {@code GET /importe/{id}}. */
-    List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse);
+    /**
+     * Eine Seite der Zeilen (aufsteigend nach {@code nr}), für {@code GET /importe/{id}}; mit {@code ergebnis} nur
+     * Zeilen mit diesem Ergebnis, ohne ({@code null}) alle.
+     */
+    List<ImportZeile> zeilenSeite(UUID laufId, ZeilenPruefung.Ergebnis ergebnis, int seite, int groesse);
 
     /** Zeilen des Laufs mit diesen Nummern (unbekannte Nummern fehlen), aufsteigend nach {@code nr}. */
     List<ImportZeile> zeilenMitNr(UUID laufId, Collection<Integer> nrs);

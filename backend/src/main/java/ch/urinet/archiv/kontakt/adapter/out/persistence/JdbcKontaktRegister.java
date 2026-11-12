@@ -109,6 +109,26 @@ public class JdbcKontaktRegister implements KontaktRegister {
     }
 
     @Override
+    public List<Kontakt> finden(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select " + SPALTEN + " from " + tabelle() + " where id = any(?)")) {
+            abfrage.setArray(1, verbindung.createArrayOf("uuid", ids.toArray()));
+            List<Kontakt> kontakte = new ArrayList<>();
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    kontakte.add(kontakt(zeile));
+                }
+            }
+            return kontakte;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakte nicht lesbar", e);
+        }
+    }
+
+    @Override
     public Kontakt anlegen(KontaktAngaben angaben, String nameNormalisiert, String quelle) {
         String sql = "insert into " + tabelle() + " (id, typ, name, vorname, strasse, plz, ort, email, telefon, uid, "
                 + "iban, kategorie, name_normalisiert, quelle) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "

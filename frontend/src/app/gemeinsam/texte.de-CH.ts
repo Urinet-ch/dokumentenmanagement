@@ -272,4 +272,170 @@ export const TEXTE = {
     fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und laden Sie die Seite neu.',
     fehlerAllgemein: 'Das Dokument konnte nicht geladen werden. Bitte versuchen Sie es erneut.',
   },
+  importe: {
+    titel: 'CSV-Import aus 21.CRM',
+    einleitung:
+      'Kontakte oder Verkaufschancen als CSV-Datei (Semikolon oder Komma, UTF-8 oder Windows-1252) bis 5 MiB einlesen. ' +
+      'Das Archiv zeigt zuerst eine Vorschau und übernimmt erst, wenn Sie es bestätigen.',
+    hochladenTitel: 'Datei hochladen',
+    art: 'Importart',
+    arten: { kontakt: 'Kontakte', verkaufschance: 'Verkaufschancen' } as Record<string, string>,
+    vollexport: 'Vollexport (alle Kontakte aus 21.CRM)',
+    vollexportHinweis:
+      'Nur bei einem Vollexport kennzeichnet das Archiv Kontakte mit Kontakt-ID aus 21.CRM, die in der Datei fehlen, ' +
+      'als «nicht mehr im CRM-Export». Gelöscht wird nie ein Kontakt.',
+    vollexportMarke: 'Vollexport',
+    dateiwahl: 'CSV-Datei wählen',
+    keineDatei: 'Noch keine Datei gewählt.',
+    grenze: 'Höchstens 5 MiB pro Datei.',
+    zuGross: (groesse: string) =>
+      `Die Datei ist ${groesse} gross und damit grösser als 5 MiB. Bitte in 21.CRM kleiner exportieren (z. B. nach Kategorie).`,
+    hochladen: 'Hochladen',
+    fortschritt: 'Fortschritt des Uploads',
+    fortschrittProzent: (prozent: number) => `${prozent} % übertragen`,
+    laeufe: 'Bisherige Importe',
+    keineLaeufe: 'Noch keine Importe.',
+    ohneDateiname: 'ohne Dateiname',
+    laufZeile: (zeilen: string, erstellt: string) => `${zeilen} Datenzeilen · hochgeladen ${erstellt}`,
+    status: {
+      VORSCHAU_AUSSTEHEND: 'Vorschau wird berechnet',
+      ZUORDNUNG_NOETIG: 'Zuordnung nötig',
+      VORSCHAU: 'Vorschau bereit',
+      UEBERNOMMEN: 'Übernommen',
+      ABGEBROCHEN: 'Abgebrochen',
+    } as Record<string, string>,
+    zurueck: 'Zurück',
+    weiter: 'Weiter',
+    seiteVon: (von: string, bis: string, gesamt: string) => `${von}–${bis} von ${gesamt}`,
+    zurListe: 'Zur Liste der Importe',
+    laden: 'Wird geladen …',
+    // Zuordnungsdialog (Req 13.2)
+    zuordnungTitel: 'Spalten zuordnen',
+    zuordnungEinleitung:
+      'Die Kopfzeile ist neu oder weicht von der gespeicherten Zuordnung ab. Ordnen Sie jeder Spalte ein Feld zu ' +
+      '(jedes Feld höchstens einmal). Die Zuordnung gilt danach für weitere Dateien dieser Importart.',
+    profil: 'Profil «21.CRM» verwenden',
+    profilHinweis: 'Das Profil ordnet die Spalten des 21.CRM-Exports zu. Entfernen Sie ein Feld, gilt das Profil nicht mehr.',
+    spalte: (nr: number, name: string) => `Spalte ${nr}: «${name}»`,
+    beispiel: (wert: string) => `Beispiel: ${wert}`,
+    nichtZuordnen: '– nicht zuordnen –',
+    pflichtKontakt: 'Ordnen Sie «Name» oder «Organisation» einer Spalte zu.',
+    pflichtVerkaufschance: 'Ordnen Sie «Titel» einer Spalte zu.',
+    zugeordnet: (anzahl: number) => (anzahl === 1 ? '1 Feld zugeordnet' : `${anzahl} Felder zugeordnet`),
+    zuordnungBestaetigen: 'Zuordnung bestätigen',
+    // Vorschau (Req 13.3, 13.5)
+    ausstehend: 'Das Archiv gleicht die Zeilen ab. Die Vorschau erscheint hier automatisch.',
+    // Ansage am Ende von Vorschau und Übernahme (WCAG 4.1.3)
+    vorschauBereit: (z: Record<'zeilen' | 'neu' | 'geaendert' | 'unveraendert' | 'dubletten' | 'fehler' | 'uebersprungen', string>) =>
+      `Vorschau bereit: ${z.zeilen} Zeilen – ${z.neu} neu, ${z.geaendert} geändert, ${z.unveraendert} unverändert, ` +
+      `${z.dubletten} mögliche Dubletten, ${z.fehler} fehlerhaft, ${z.uebersprungen} übersprungen.`,
+    uebernommenAnsage: (bilanz: string) => `Übernommen: ${bilanz}.`,
+    zuordnungAnsage: 'Zuordnung nötig: Bitte ordnen Sie die Spalten zu.',
+    // Abfrage ohne Ende (Vorschau oder Übernahme endgültig gescheitert)
+    zuLangeVorschau:
+      'Die Vorschau dauert ungewöhnlich lange, vermutlich ist sie gescheitert. Prüfen Sie den Stand später erneut ' +
+      'oder laden Sie die Datei noch einmal hoch.',
+    zuLangeUebernahme:
+      'Die Übernahme dauert ungewöhnlich lange, vermutlich ist sie gescheitert. Solange der Status nicht «Übernommen» ' +
+      'zeigt, ist nichts übernommen. Prüfen Sie den Stand erneut oder lösen Sie die Übernahme noch einmal aus.',
+    erneutPruefen: 'Stand erneut prüfen',
+    abfrageGestoert: 'Die Verbindung zum Archiv ist unterbrochen. Die Seite fragt den Stand weiter ab.',
+    vorschauTitel: 'Vorschau',
+    vorschauEinleitung: 'Noch ist nichts übernommen. Prüfen Sie die Zeilen und übernehmen Sie danach den Import.',
+    zaehler: {
+      alle: 'Alle',
+      NEU: 'neu',
+      GEAENDERT: 'geändert',
+      UNVERAENDERT: 'unverändert',
+      DUBLETTE: 'mögliche Dublette',
+      FEHLER: 'fehlerhaft',
+      UEBERSPRUNGEN: 'übersprungen',
+    } as Record<string, string>,
+    filter: 'Zeilen filtern',
+    keineZeilen: 'Keine Zeilen mit diesem Ergebnis.',
+    zeile: (nr: number) => `Zeile ${nr}`,
+    trifft: 'Trifft Kontakt',
+    kandidaten: 'Mögliche Kontakte',
+    rohwerte: 'Werte der Zeile',
+    werteVerworfen: 'Werte nicht angezeigt (Feld zu lang).',
+    feld: {
+      crm_id: 'Kontakt-ID (21.CRM)',
+      typ: 'Typ (Organisation ja/nein)',
+      name: 'Name',
+      organisation: 'Organisation',
+      vorname: 'Vorname',
+      strasse: 'Strasse',
+      plz: 'PLZ',
+      ort: 'Ort',
+      email: 'E-Mail',
+      telefon: 'Telefon',
+      uid: 'UID',
+      iban: 'IBAN',
+      kategorie: 'Kategorie',
+      geloescht: 'Ist gelöscht',
+      standard_email: 'Standard-E-Mail (Index)',
+      email_geschaeft: 'E-Mail Geschäft',
+      email_geschaeft_2: 'E-Mail Geschäft 2',
+      email_privat: 'E-Mail privat',
+      email_zentrale: 'E-Mail Zentrale',
+      standard_telefon: 'Standard-Telefon (Index)',
+      telefon_geschaeft: 'Telefon Geschäft',
+      telefon_zentrale: 'Telefon Zentrale',
+      mobil_geschaeft: 'Mobil Geschäft',
+      kontakt_crm_id: 'Kontakt-ID des Kontakts (21.CRM)',
+      titel: 'Titel',
+      phase: 'Phase',
+      betrag: 'Betrag',
+      datum: 'Datum',
+    } as Record<string, string>,
+    // Dubletten (Req 13.5, 13.6)
+    entscheid: 'Entscheid',
+    entscheidFuer: (nr: number) => `Entscheid für Zeile ${nr}`,
+    entscheidOffen: '– noch offen (wird ausgelassen) –',
+    entscheidNeu: 'Als neuen Kontakt anlegen',
+    entscheidUeberspringen: 'Überspringen',
+    entscheidZusammenfuehren: (kontakt: string) => `Zusammenführen mit ${kontakt}`,
+    dublettenHinweis:
+      'Mögliche Dubletten übernimmt das Archiv nur nach Ihrem Entscheid. Ohne Entscheid wird die Zeile ausgelassen.',
+    dublettenVerkaufschance: 'Doppelte Verkaufschancen in der Datei werden ausgelassen.',
+    entschieden: (entschieden: string, gesamt: string) => `${entschieden} von ${gesamt} möglichen Dubletten entschieden`,
+    // Übernahme (Req 13.6, 13.7)
+    uebernehmen: 'Übernehmen …',
+    erneutUebernehmen: 'Erneut übernehmen …',
+    uebernehmenTitel: 'Import übernehmen?',
+    uebernehmenText: (neu: string, geaendert: string) =>
+      `Das Archiv legt ${neu} Einträge neu an und aktualisiert ${geaendert} bestehende. Werte aus der Datei gewinnen, leere Zellen überschreiben nichts.`,
+    uebernehmenEntscheide: (neu: string, zusammen: string, ueberspringen: string) =>
+      `Nach Ihren Entscheiden zu möglichen Dubletten legt das Archiv dazu ${neu} neu an, führt ${zusammen} mit ` +
+      `bestehenden Kontakten zusammen und überspringt ${ueberspringen}.`,
+    uebernehmenDubletten: (offen: string) =>
+      `${offen} mögliche Dubletten ohne Entscheid werden ausgelassen.`,
+    vollexportAktiv:
+      'Vollexport: Kontakte mit Kontakt-ID aus 21.CRM, die in dieser Datei fehlen oder dort gelöscht sind, werden als ' +
+      '«nicht mehr im CRM-Export» gekennzeichnet – aber nur, wenn die Spalte «Kontakt-ID (21.CRM)» zugeordnet ist und ' +
+      'Werte hat. Gelöscht wird nichts.',
+    keinVollexport: 'Kein Vollexport: Kontakte, die in dieser Datei fehlen, bleiben unverändert.',
+    jetztUebernehmen: 'Jetzt übernehmen',
+    abbrechen: 'Abbrechen',
+    uebernahmeLaeuft: 'Die Übernahme läuft. Das Ergebnis erscheint hier automatisch.',
+    uebernommenTitel: 'Übernommen',
+    bilanz: {
+      angelegt: 'angelegt',
+      aktualisiert: 'aktualisiert',
+      ausgelassen: 'ausgelassen',
+      gekennzeichnet: 'als «nicht mehr im CRM-Export» gekennzeichnet',
+    } as Record<string, string>,
+    uebernommenAm: (zeit: string) => `Übernommen am ${zeit}.`,
+    abgebrochen: 'Dieser Import wurde abgebrochen. Bitte laden Sie die Datei erneut hoch.',
+    fehlercode: {
+      DATEI_ZU_GROSS: 'Die Datei ist grösser als 5 MiB. Bitte in 21.CRM kleiner exportieren.',
+      CSV_LEER: 'Die Datei enthält keine Datenzeilen. Bitte exportieren Sie sie erneut aus 21.CRM.',
+      STATUS_KONFLIKT: 'Der Import hat sich inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand.',
+      NICHT_GEFUNDEN: 'Diesen Import gibt es nicht. Bitte wählen Sie ihn in der Liste der Importe.',
+      NICHT_ERLAUBT: 'Für Importe fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
+    } as Record<string, string>,
+    fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+  },
 } as const;

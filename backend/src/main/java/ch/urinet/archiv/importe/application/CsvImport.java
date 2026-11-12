@@ -213,22 +213,39 @@ public class CsvImport {
         }
     }
 
-    /** Ein Lauf mit einer Seite seiner Zeilen ({@code GET /importe/{id}}, Req 13.3). */
-    public record LaufSeite(ImportLauf lauf, List<ImportZeile> zeilen) {
+    /**
+     * Ein Lauf mit einer Seite seiner Zeilen ({@code GET /importe/{id}}, Req 13.3); {@code gesamt} zählt die Zeilen des
+     * Laufs, mit Filter nur die mit diesem Ergebnis.
+     */
+    public record LaufSeite(ImportLauf lauf, List<ImportZeile> zeilen, long gesamt) {
     }
 
     /**
-     * Lauf mit Zählern und einer Seite seiner Zeilen, aufsteigend nach Zeilennummer. Nur Läufe des eigenen Mandanten;
-     * sonst {@code NICHT_GEFUNDEN}. {@code seite} ab 0, {@code groesse} 1 bis {@value #SEITE_MAX}, sonst
-     * {@code ANFRAGE_UNGUELTIG}.
+     * Lauf mit Zählern und einer Seite seiner Zeilen, aufsteigend nach Zeilennummer; mit {@code ergebnis} nur Zeilen
+     * mit diesem Ergebnis (Filter je Ergebnis der Vorschau, Aufgabe 4.4). Nur Läufe des eigenen Mandanten; sonst
+     * {@code NICHT_GEFUNDEN}. {@code seite} ab 0, {@code groesse} 1 bis {@value #SEITE_MAX}, {@code ergebnis} nicht
+     * {@code OFFEN}, sonst {@code ANFRAGE_UNGUELTIG}.
      */
     @Transactional
-    public LaufSeite lauf(UUID laufId, int seite, int groesse) {
-        if (seite < 0 || groesse < 1 || groesse > SEITE_MAX) {
+    public LaufSeite lauf(UUID laufId, Ergebnis ergebnis, int seite, int groesse) {
+        if (seite < 0 || groesse < 1 || groesse > SEITE_MAX || ergebnis == Ergebnis.OFFEN) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         ImportLauf lauf = repository.lauf(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
-        return new LaufSeite(lauf, repository.zeilenSeite(laufId, seite, groesse));
+        long gesamt = ergebnis == null ? lauf.zeilen() : anzahl(repository.zaehlen(laufId), ergebnis);
+        return new LaufSeite(lauf, repository.zeilenSeite(laufId, ergebnis, seite, groesse), gesamt);
+    }
+
+    private static int anzahl(ImportLauf.Zaehler zaehler, Ergebnis ergebnis) {
+        return switch (ergebnis) {
+            case NEU -> zaehler.neu();
+            case GEAENDERT -> zaehler.geaendert();
+            case UNVERAENDERT -> zaehler.unveraendert();
+            case DUBLETTE -> zaehler.dubletten();
+            case FEHLER -> zaehler.fehler();
+            case UEBERSPRUNGEN -> zaehler.uebersprungen();
+            case OFFEN -> throw new IllegalArgumentException("OFFEN");
+        };
     }
 
     @Transactional
