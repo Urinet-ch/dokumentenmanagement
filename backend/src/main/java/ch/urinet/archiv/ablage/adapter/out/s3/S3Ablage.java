@@ -30,6 +30,8 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
@@ -381,14 +383,14 @@ public class S3Ablage implements AblagePort {
     private AbgelegteDatei kopieren(String bucket, ZuArchivieren datei) {
         String quelle = datei.schluessel().pfad(Ablageort.EINGANG);
         String ziel = datei.schluessel().pfad(Ablageort.ARCHIV);
-        String versionId;
+        CopyObjectResponse antwort;
         try {
-            versionId = s3.copyObject(b -> b.sourceBucket(bucket).sourceKey(quelle)
-                    .sourceVersionId(datei.eingangVersionId()).destinationBucket(bucket).destinationKey(ziel))
-                    .versionId();
+            antwort = s3.copyObject(b -> b.sourceBucket(bucket).sourceKey(quelle)
+                    .sourceVersionId(datei.eingangVersionId()).destinationBucket(bucket).destinationKey(ziel));
         } catch (S3Exception e) {
             throw quelleFehlt(e, quelle, datei.eingangVersionId(), ziel);
         }
+        String versionId = ohneVersion(antwort.versionId()) ? versionDerKopie(bucket, ziel, antwort) : antwort.versionId();
         pruefeVersion(versionId, bucket);
         Lesung lesung = lesen(bucket, ziel, versionId);
         if (!lesung.sha256().equals(datei.sha256())) {
@@ -618,8 +620,28 @@ public class S3Ablage implements AblagePort {
         return mandant.bucket(einstellungen.bucketPraefix());
     }
 
+    /**
+     * Ceph RGW 20.x lässt {@code x-amz-version-id} in der Antwort von CopyObject weg
+     * (tracker.ceph.com/issues/77796). Die Kopie ist dann die aktuelle Version des Ziels, aber nur, wenn deren ETag
+     * zum Ergebnis der Kopie passt; sonst hat inzwischen jemand anderes geschrieben, und die Archivierung bricht ab,
+     * ohne etwas zu löschen. Die SHA-256 prüft der Aufrufer danach wie immer über die Versions-ID.
+     */
+    private String versionDerKopie(String bucket, String ziel, CopyObjectResponse antwort) {
+        String etag = antwort.copyObjectResult() == null ? null : antwort.copyObjectResult().eTag();
+        HeadObjectResponse kopf = s3.headObject(b -> b.bucket(bucket).key(ziel));
+        if (etag == null || !etag.equals(kopf.eTag())) {
+            throw new IllegalStateException("Versions-ID der Archiv-Kopie nicht bestimmbar: " + ziel);
+        }
+        LOG.debugf("CopyObject ohne Versions-ID, Version über HeadObject bestimmt: %s", ziel);
+        return kopf.versionId();
+    }
+
+    private static boolean ohneVersion(String versionId) {
+        return versionId == null || versionId.isBlank() || "null".equals(versionId);
+    }
+
     private static void pruefeVersion(String versionId, String bucket) {
-        if (versionId == null || versionId.isBlank() || "null".equals(versionId)) {
+        if (ohneVersion(versionId)) {
             throw new IllegalStateException("Bucket " + bucket + " ohne Versionierung");
         }
     }

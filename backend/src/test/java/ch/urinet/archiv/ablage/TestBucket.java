@@ -4,12 +4,14 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import org.eclipse.microprofile.config.ConfigProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -39,6 +41,11 @@ final class TestBucket {
 
     /** S3-Client ohne Interceptor mit dem Zugang von MinIO, nur für Tests. */
     static S3Client verwaltung() {
+        return client();
+    }
+
+    /** S3-Client mit dem Zugang von MinIO und den angegebenen Interceptors, nur für Tests. */
+    static S3Client client(ExecutionInterceptor... interceptors) {
         var config = ConfigProvider.getConfig();
         return S3Client.builder()
                 .endpointOverride(URI.create(config.getValue("quarkus.s3.endpoint-override", String.class)))
@@ -48,6 +55,7 @@ final class TestBucket {
                         config.getValue("quarkus.s3.aws.credentials.static-provider.access-key-id", String.class),
                         config.getValue("quarkus.s3.aws.credentials.static-provider.secret-access-key", String.class))))
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
+                .overrideConfiguration(o -> Arrays.stream(interceptors).forEach(o::addExecutionInterceptor))
                 .build();
     }
 

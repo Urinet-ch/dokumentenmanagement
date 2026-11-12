@@ -336,7 +336,9 @@ stateDiagram-v2
 ### Ablage (`ablage`)
 - `AblageService` (application) nutzt den Driven Port `AblagePort` mit dem Adapter `S3Ablage` (`adapter/out/s3`, App-Schlüssel aus `s3_app_zugang_id` und `s3_app_zugang_geheimnis`; setzt nie `x-amz-bypass-governance-retention` und verkürzt keine Sperre, Req 6.5) und einem Dev-Stub im Dateisystem. Operationen: `ablegenEingang(mandant, docId, rolle, nr, stream)`, `archivieren(…)`, `loeschenEingang(…)` (alle Versionen), `sperreSetzen(…)`, `sperreVerlaengern(…)`, `vorsignierteUrl(schluessel, versionId, 5 min)`.
 - `archivieren` (Auftrag `ARCHIVIEREN`, Req 6.3), je Datei (Originale, Arbeitsfassungen, PDF/A):
-  1. CopyObject `eingang/…` → `archiv/…`, Versions-ID der Kopie speichern.
+  1. CopyObject `eingang/…` → `archiv/…`, Versions-ID der Kopie speichern. Fehlt sie in der Antwort (Ceph RGW 20.x,
+     tracker.ceph.com/issues/77796), gilt die aktuelle Version des Ziels laut HeadObject, nur wenn ihr ETag zum
+     Ergebnis der Kopie passt; sonst Abbruch ohne Löschen, neuer Versuch über den Auftrag.
   2. SHA-256 vergleichen: `x-amz-checksum-sha256`, falls Infomaniak ihn liefert (Spike Object Storage, Aufgabe 0.2, Req 0.4), sonst die Kopie über ihre Versions-ID erneut lesen und hashen.
   3. Nur bei `gesetzliche_pflicht`: `PutObjectRetention(mode=GOVERNANCE, retainUntil)` und Kontrolle per `GetObjectRetention`.
   4. Erst wenn alle Dateien kopiert, geprüft und gesperrt sind: `dokument.archiviert = now()`, `sperre_bis`, Status `ARCHIVIERT` und in derselben Transaktion `DokumentEreignisse.archiviert(id, art)` (siehe «Dokument»); danach die `eingang/`-Objekte mit allen Versionen löschen (der Bucket ist versioniert, ein einfaches Löschen liesse Altversionen liegen).
@@ -1222,8 +1224,10 @@ Entwicklungsumgebung (Aufgabe 1.2): In `dev` und in Tests starten PostgreSQL 17 
 (`pgvector/pgvector:0.8.7-pg17-trixie`) und Keycloak (`quay.io/keycloak/keycloak:26.8.2`, Realm aus
 `deploy/keycloak/realm-test.json`) als Dev Services der Extensions, MinIO und Mailpit als Compose Dev Services aus
 `backend/compose-devservices.yml` (statt Testcontainers, weil Compose dev und Tests mit einer Datei abdeckt; entschieden
-von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub; verwendet wird `cgr.dev/chainguard/minio` mit festem
-Digest. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
+von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hub (Upstream seit 24.04.2026 archiviert); verwendet wird
+`cgr.dev/chainguard/minio` (aus dem Fork `chainguard-forks/minio`) mit festem Digest, Ausweiche `docker.io/pgsty/silo`.
+MinIO verdeckt Eigenheiten von Ceph RGW (Fehlercodes, Deny-Policy gilt nicht für den Root-Zugang, Versions-ID bei
+`CopyObject`); die prüft nur `InfomaniakAblageSmokeIT`. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
 haben je einen Dev-Stub unter `adapter/out/stub/`; `adapter/out/<Name>Auswahl` wählt zur Laufzeit nach
 `archiv.<port>.stub` (nur in `dev` an). Ohne Stub und ohne echten Adapter bricht die Auswahl ab; die Methoden und
 Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die Datenbank nicht erreichbar ist
@@ -1263,7 +1267,7 @@ Umsetzung der Architekturregeln (Aufgabe 1.6, `ArchitekturTest`, Req 16.13):
 
 ## Open Points
 - ~~Object Lock pro Objekt, Schlüssel ohne Bypass-Recht, COMPLIANCE bei Infomaniak~~ geklärt im Spike Object Storage (Aufgabe 0.2, `docs/spikes/s3-object-lock.md`, Live-Tests 08.11.2026): Sperre pro Objekt mit Versionierung, GOVERNANCE und COMPLIANCE funktionieren, Objekte ohne Retention (`eingang/`) bleiben löschbar; der Rückfall mit getrennten Buckets entfällt damit. Einen Schlüssel ohne Bypass-Recht gibt es im selben Projekt nicht (jeder Schlüssel kann eine schützende Bucket Policy löschen), darum gilt Option B (entschieden 09.11.2026; ADR-007, Nachtrag 09.11.2026): GOVERNANCE für Dokumente unter `archiv/`, COMPLIANCE für `manifest/` (Req 6.11). `x-amz-checksum-sha256` wurde nicht geprüft (Antwort beim Upload mit `ChecksumCRC64NVME`); bis zum Nachweis mit dem Java SDK in Aufgabe 2.3 gilt der Rückfall aus «Ablage» (Kopie über die Versions-ID neu lesen). Aufgabe 2.3 liest die Kopie immer neu (10.11.2026). Ob Ceph bei CopyObject eine SHA-256 liefert, wurde nicht gegen Infomaniak geprüft; die Optimierung bleibt offen und ist für die Korrektheit nicht nötig.
-- Ablage mit dem Java SDK gegen Infomaniak (Aufgabe 2.3, Teilnachweis): Geprüft ist die Ablage nur gegen MinIO. Nicht live geprüft sind die Fehlercodes von Ceph (`GetObjectRetention` ohne Sperre, fehlende Version), Sperren, vorsignierte URL und neuer Versuch mit dem App-Code. Fabian führt vor Aufgabe 2.6 den manuellen Smoke-Test `InfomaniakAblageSmokeIT` gegen einen Wegwerf-Bucket aus (Anleitung in `backend/README.md`; Schlüssel nur bei Fabian, nie in der CI) und hält das Ergebnis hier fest.
+- ~~Ablage mit dem Java SDK gegen Infomaniak (Aufgabe 2.3, Teilnachweis)~~ geprüft von Fabian am 12.11.2026 mit `InfomaniakAblageSmokeIT` (Wegwerf-Bucket, `s3.gva2.infomaniak.cloud`), alle Schritte grün: `GetObjectRetention` ohne Sperre 404 `ObjectLockConfigurationNotFoundError`, fehlende Version 404 `NoSuchKey`, Löschen und Verkürzen ohne Bypass 403 `AccessDenied`, nur Verlängern, vorsignierte URL GET 200 / PUT 403, neuer Versuch ohne Quelle bricht ab, Manifest in COMPLIANCE, Bypass-Header lokal abgelehnt. **Befund:** CopyObject liefert bei Infomaniak keine Versions-ID (wie Ceph RGW 20.x, tracker.ceph.com/issues/77796); `S3Ablage` bestimmt sie seither über HeadObject mit passendem ETag (siehe «Ablage», Schritt 1). Vorher wäre jedes Archivieren abgebrochen.
 - ~~Strukturierte Antworten bei Infomaniak~~ geklärt im Spike AI Services (Aufgabe 0.3): JSON-Schema funktioniert, JSON-Modus wird abgelehnt (`docs/spikes/infomaniak-ai.md`).
 - [offen: VPS-Grösse K5 – Entscheid vor Welle 5] (Stufe B; früher, falls 1.10 abbricht oder 16.18 später eintritt); danach Messbedingungen für Req 3.2, 5.5, 14.3 und die Zeitgrenzen der Aufträge prüfen.
 - Speicherbudget der Stufe A (900 MiB, 0.75 CPU; geändert 10.11.2026, Entscheid Fabian, bisher 700 MiB) ist ein Richtwert; Messung und Ergebnis in Aufgabe 1.10.

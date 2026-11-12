@@ -4,7 +4,9 @@
 name: urinet-archiv-dev
 services:
   minio:
-    # MinIO veröffentlicht keine Images mehr auf Docker Hub; Chainguard baut sie aus dem Quellcode
+    # Upstream minio/minio ist seit 24.04.2026 archiviert; Chainguard baut aus dem Fork chainguard-forks/minio (Pflege
+    # «best-effort»). Free Tier nur :latest, darum per Digest gepinnt; Dependabot (docker-compose) zieht ihn nach.
+    # Ausweiche, falls das Image entfällt: docker.io/pgsty/silo (Drop-in, nur gepinnt und mit voller Suite).
     image: cgr.dev/chainguard/minio:latest@sha256:db3f583fa49121942168bd6383a773b2cde3384c9a99bf7193560b9a0f3a28fd
     command: ["server", "/tmp/daten"]
     environment:

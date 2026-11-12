@@ -177,7 +177,9 @@ Fabian, vor Aufgabe 2.6, nie in der CI.** Ohne die Property `archiv.smoke.zugang
 Was der Test tut:
 - legt einen eigenen Wegwerf-Bucket `urinet-archiv-smoke-<zufall>` mit Object Lock und Versionierung an (bestehende
   Buckets fasst er nicht an) und arbeitet nur mit synthetischen Inhalten;
-- prüft Eingang, `GetObjectRetention` ohne Sperre und für eine fehlende Version (gibt die Fehlercodes aus), Archivieren
+- prüft Eingang, `GetObjectRetention` ohne Sperre und für eine fehlende Version (gibt die Fehlercodes aus), ob
+  `CopyObject` mit Quellversion eine Versions-ID liefert (Ceph RGW 20.x lässt sie weg, Tracker 77796; dann nimmt
+  `S3Ablage` die Version über HeadObject), Archivieren
   mit und ohne Pflicht, Löschen und Verkürzen ohne Bypass-Header, nur Verlängern, vorsignierte URL (GET 200, PUT 403),
   neuer Versuch ohne Quelle (bricht ab, Kopie bleibt), Manifest in COMPLIANCE und dass der Bypass-Header den Rechner
   nicht verlässt;

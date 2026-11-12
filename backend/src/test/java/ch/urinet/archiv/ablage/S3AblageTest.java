@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ablage;
 
 import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
+import ch.urinet.archiv.ablage.adapter.out.s3.BypassVerbot;
 import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
 import ch.urinet.archiv.ablage.application.AblageService;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
@@ -447,6 +448,47 @@ class S3AblageTest {
         assertThatThrownBy(() -> lang.ablegenManifest(mandant, datum, ManifestTeil.SIG, manifest, Optional.empty()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("manifest/")).versions()).hasSize(2);
+    }
+
+    /** Ceph RGW 20.x: CopyObject ohne Versions-ID; die Version kommt dann über HeadObject mit passendem ETag. */
+    @Test
+    void kopieOhneVersionsIdInDerAntwortWieBeiCephRgw() {
+        try (S3Client ceph = TestBucket.client(new BypassVerbot(), new KeinBypassInterceptor(),
+                new OhneKopieVersion(false))) {
+            var ablage = new S3Ablage(ceph, S3Ablage.presigner(ceph, true), new AblageEinstellungen(TestBucket.PRAEFIX,
+                    Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)),
+                    Duration.ofMinutes(5), ZWISCHENABLAGE), Clock.systemUTC());
+            ZuArchivieren zu = eingang(ablage, DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"),
+                    inhalt("Kopie ohne Versions-ID"));
+
+            AbgelegteDatei kopie = ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.unbefristet()).dateien()
+                    .getFirst();
+
+            var versionen = verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("archiv/")).versions();
+            assertThat(versionen).hasSize(1);
+            assertThat(kopie.versionId()).isEqualTo(versionen.getFirst().versionId());
+            assertThat(kopie.sha256()).isEqualTo(zu.sha256());
+            assertThat(retention(kopie.schluessel(), kopie.versionId())).get()
+                    .extracting(ObjectLockRetention::mode).isEqualTo(ObjectLockRetentionMode.GOVERNANCE);
+        }
+    }
+
+    /** Passt das ETag der aktuellen Version nicht zur Kopie, bricht die Archivierung ab und löscht nichts. */
+    @Test
+    void kopieOhneVersionsIdUndFremdemEtagBrichtAbOhneZuLoeschen() {
+        try (S3Client ceph = TestBucket.client(new BypassVerbot(), new KeinBypassInterceptor(),
+                new OhneKopieVersion(true))) {
+            var ablage = new S3Ablage(ceph, S3Ablage.presigner(ceph, true), new AblageEinstellungen(TestBucket.PRAEFIX,
+                    Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)),
+                    Duration.ofMinutes(5), ZWISCHENABLAGE), Clock.systemUTC());
+            ZuArchivieren zu = eingang(ablage, DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf"),
+                    inhalt("Kopie mit fremdem ETag"));
+
+            assertThatThrownBy(() -> ablage.archivieren(mandant, List.of(zu), Sperrvorgabe.unbefristet()))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("nicht bestimmbar");
+            assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("archiv/")).versions()).hasSize(1);
+            assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("eingang/")).versions()).hasSize(1);
+        }
     }
 
     @Test

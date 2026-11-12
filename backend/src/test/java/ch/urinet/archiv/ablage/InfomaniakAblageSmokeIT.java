@@ -102,6 +102,14 @@ class InfomaniakAblageSmokeIT {
         melden("GetObjectRetention ohne Sperre", ohneSperre.statusCode() + " " + code(ohneSperre));
         assertThat(code(ohneSperre)).isIn(KEINE_SPERRE);
 
+        // 1a. Liefert CopyObject mit Quellversion eine Versions-ID? Ceph RGW 20.x lässt den Header x-amz-version-id weg
+        // (tracker.ceph.com/issues/77796), MinIO nicht; S3Ablage.kopieren bestimmt sie dann über HeadObject (Schritt 2, 4).
+        String probeKey = "smoke/kopie-" + UUID.randomUUID();
+        String probeVersion = s3.copyObject(b -> b.sourceBucket(bucket).sourceKey(eingangKey)
+                .sourceVersionId(zu.eingangVersionId()).destinationBucket(bucket).destinationKey(probeKey)).versionId();
+        boolean mitVersion = probeVersion != null && !probeVersion.isBlank() && !"null".equals(probeVersion);
+        melden("CopyObject Versions-ID", mitVersion ? "vorhanden" : "fehlt, Ausweg über HeadObject");
+
         // 2. Archivieren ohne Pflicht: keine Sperre, S3Ablage erkennt «keine Sperre»
         var ohnePflicht = eingang(ablage, mandant, DateiSchluessel.original(jahr, UUID.randomUUID(), 1, "pdf"),
                 "Smoke-Test ohne Pflicht");
