@@ -49,7 +49,9 @@ import java.util.regex.Pattern;
  * Schutz gegen SSRF und übergrosse Eingaben: Schemas haben höchstens {@value #MAX_SCHEMA_BYTES} Byte und
  * {@value #MAX_TIEFE} Ebenen; {@code $id}, {@code $vocabulary} und Verweise, die nicht mit {@code #} beginnen, sind
  * ungültig; {@code $schema} ist nur der Dialekt 2020-12. Die Bibliothek lädt zudem keine entfernten Ressourcen; das
- * Meta-Schema kommt aus dem JAR. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7).
+ * Meta-Schema kommt aus dem JAR. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7). Die Bibliothek (ab 3.0)
+ * arbeitet mit Jackson 3; gelesen und vorgeprüft wird weiter mit dem Jackson 2 von Quarkus ({@code StrengesJson}), und
+ * {@link Jackson3Baum} überträgt den geprüften Baum mit gleichen Knoten- und Zahlentypen.
  * <p>
  * Schutz gegen Rechenzeit (Review PR #40): Ein Aufruf von {@link #schemaPruefen} oder {@link #wertePruefen} hat
  * zusammen höchstens {@code archiv.dokumentart.muster-zeitgrenze}, ein Aufruf von {@link #seedSchemaPruefen} (Seed
@@ -249,7 +251,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         Schema schema = geprueft(schemaJson).kompiliert();
         boolean gueltig;
         try {
-            gueltig = schema.validate(werte).isEmpty();
+            gueltig = schema.validate(Jackson3Baum.wert(werte)).isEmpty();
         } catch (RuntimeException | StackOverflowError e) {
             throw ungueltig();
         }
@@ -272,9 +274,11 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
         schluesselPruefen(schema);
         zyklenPruefen(schema);
+        tools.jackson.databind.JsonNode baum;
         boolean metaGueltig;
         try {
-            metaGueltig = metaSchema.validate(schema).isEmpty();
+            baum = Jackson3Baum.von(schema);
+            metaGueltig = metaSchema.validate(baum).isEmpty();
         } catch (RuntimeException | StackOverflowError e) {
             throw ungueltig();
         }
@@ -283,12 +287,12 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
         Set<String> felder = new LinkedHashSet<>();
         schema.path("properties").fieldNames().forEachRemaining(felder::add);
-        Geprueft ergebnis = new Geprueft(kompilieren(schema), Set.copyOf(felder));
+        Geprueft ergebnis = new Geprueft(kompilieren(baum), Set.copyOf(felder));
         cache.put(schemaJson, ergebnis);
         return ergebnis;
     }
 
-    private Schema kompilieren(JsonNode schema) {
+    private Schema kompilieren(tools.jackson.databind.JsonNode schema) {
         try {
             Schema kompiliert = registry.getSchema(schema);
             kompiliert.initializeValidators();
@@ -363,6 +367,11 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         };
     }
 
+    /** Registry wie in der Anwendung, damit ein Test das Nachladen ohne die eigene Vorprüfung nachweisen kann. */
+    SchemaRegistry registry() {
+        return registry;
+    }
+
     /** Bricht ab, wenn die Frist des laufenden Aufrufs abgelaufen ist; ausserhalb eines Aufrufs gilt keine Frist. */
     private void fristPruefen() {
         Frist f = frist.get();
@@ -385,8 +394,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
 
         @Override
-        public KeywordValidator newValidator(SchemaLocation ort, JsonNode knoten, Schema schema, SchemaContext kontext)
-                throws Exception {
+        public KeywordValidator newValidator(SchemaLocation ort, tools.jackson.databind.JsonNode knoten, Schema schema,
+                SchemaContext kontext) throws Exception {
             KeywordValidator validator = keyword.newValidator(ort, knoten, schema, kontext);
             return validator == null ? null : new FristValidator(validator);
         }
@@ -400,13 +409,15 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
 
         @Override
-        public void validate(ExecutionContext kontext, JsonNode knoten, JsonNode wurzel, NodePath ort) {
+        public void validate(ExecutionContext kontext, tools.jackson.databind.JsonNode knoten,
+                tools.jackson.databind.JsonNode wurzel, NodePath ort) {
             fristPruefen();
             validator.validate(kontext, knoten, wurzel, ort);
         }
 
         @Override
-        public void walk(ExecutionContext kontext, JsonNode knoten, JsonNode wurzel, NodePath ort, boolean pruefen) {
+        public void walk(ExecutionContext kontext, tools.jackson.databind.JsonNode knoten,
+                tools.jackson.databind.JsonNode wurzel, NodePath ort, boolean pruefen) {
             fristPruefen();
             validator.walk(kontext, knoten, wurzel, ort, pruefen);
         }
@@ -589,8 +600,10 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     /**
-     * Abbruch nach der Frist. Als {@link SchemaException}, weil die Bibliothek diese ohne Log weiterreicht; andere
-     * Ausnahmen loggt sie mit Muster und Ort.
+     * Abbruch nach der Frist. Als {@link SchemaException}, weil die Bibliothek diese beim Suchen ohne Log weiterreicht;
+     * andere Ausnahmen loggt sie mit Muster und Ort. Beim Kompilieren des Musters loggt die Bibliothek
+     * ({@code PatternValidator}) jede Ausnahme, auch diese, mit dem Muster auf Stufe error; das Muster ist
+     * Schema-Inhalt, keine Dokument- oder Personendaten.
      */
     static final class FristAbgelaufen extends SchemaException {
         private static final long serialVersionUID = 1L;
