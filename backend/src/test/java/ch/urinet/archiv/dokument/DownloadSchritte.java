@@ -148,6 +148,12 @@ public class DownloadSchritte {
                 .accept("application/json").when().get("/api/v1/dokumente/" + dokumente.get(name).id() + "/datei");
     }
 
+    @Wenn("«{word}» die Datei von «{word}» mit Accept «{}» öffnet")
+    public void mitAccept(String benutzer, String name, String accept) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).redirects().follow(false)
+                .header("Accept", accept).when().get("/api/v1/dokumente/" + dokumente.get(name).id() + "/datei");
+    }
+
     @Dann("liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird")
     public void json() {
         assertThat(antwort.statusCode()).isEqualTo(200);

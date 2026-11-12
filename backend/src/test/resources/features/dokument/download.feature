@@ -46,6 +46,19 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
     Dann antwortet das Archiv mit 404 «NICHT_GEFUNDEN» ohne Adresse
     Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «mitarbeiter-urinet» für «D_INTERN»
 
+  @req-14.6
+  Szenariogrundriss: Nur ein annehmbares, ausdrücklich genanntes JSON schaltet von der Umleitung auf JSON um
+    Wenn «inhaber-urinet» die Datei von «D_NORMAL» mit Accept «<accept>» öffnet
+    Dann <antwort>
+    Und die Adresse liefert «PDF/A D_NORMAL»
+
+    Beispiele:
+      | accept                                                                | antwort                                                                                         |
+      | application/json, text/plain, */*                                     | liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird |
+      | text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8       | leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird   |
+      | application/json;q=0, */*                                             | leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird   |
+      | application/json;q=0.5                                                | liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird |
+
   @req-14.6 @req-14.5
   Szenario: Unsichtbare, fremde, verworfene und fehlende Dateien ergeben 404, falsche Angaben 400
     Dann antwortet der Download so:

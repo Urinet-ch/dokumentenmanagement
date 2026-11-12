@@ -457,12 +457,25 @@ public class DokumentResource {
 
     /**
      * Nur ein ausdrücklich genanntes application/json schaltet auf JSON um; ohne Accept-Kopf oder mit Platzhaltern
-     * (curl, Python-Client, Browser-Navigation) bleibt die Weiterleitung.
+     * (curl, Python-Client, Browser-Navigation) bleibt die Weiterleitung. {@code q=0} heisst «nicht annehmbar»
+     * (RFC 9110, 12.4.2), ein ungültiger q-Wert zählt ebenso.
      */
     static boolean alsJson(HttpHeaders kopf) {
         return kopf.getAcceptableMediaTypes().stream()
                 .anyMatch(t -> !t.isWildcardType() && !t.isWildcardSubtype()
-                        && t.isCompatible(MediaType.APPLICATION_JSON_TYPE));
+                        && t.isCompatible(MediaType.APPLICATION_JSON_TYPE) && qWert(t) > 0);
+    }
+
+    private static double qWert(MediaType typ) {
+        String q = typ.getParameters().get("q");
+        if (q == null) {
+            return 1;
+        }
+        try {
+            return Double.parseDouble(q.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private static DateiRolle rolle(String variante) {
