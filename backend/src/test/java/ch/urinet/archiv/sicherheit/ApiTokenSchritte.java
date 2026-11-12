@@ -42,14 +42,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Schritte zu Req 2.5 und 2.20 über die Verwaltung {@code /api/v1/api-tokens}, den Upload {@code POST /api/v1/dokumente}
- * (Scope {@code import}, Aufgabe 2.4; je Anfrage eine frische synthetische PDF) und den Probe-Endpunkt
- * {@code /api/v1/dokumente/generator} unter src/test ({@code ProbeTokenResource}). Tokens entstehen zur Laufzeit; jedes
+ * (Scope {@code import}, Aufgabe 2.4) und den Generator {@code POST /api/v1/dokumente/generator} (Scope
+ * {@code generator}, Aufgabe 4.7; Metadaten mit der Art aus dem Query-Parameter {@code art}, Standard
+ * {@code PROJEKTDOKUMENT}); je Anfrage eine frische synthetische PDF. Tokens entstehen zur Laufzeit; jedes
  * angelegte Token und jedes hochgeladene Dokument wird nach dem Szenario gelöscht.
  */
 public class ApiTokenSchritte {
 
     private static final String VERWALTUNG = "/api/v1/api-tokens";
     private static final String UPLOAD = "/api/v1/dokumente";
+    private static final String GENERATOR = "/api/v1/dokumente/generator";
 
     @Inject
     ApiTokenVerwaltung verwaltung;
@@ -111,9 +113,9 @@ public class ApiTokenSchritte {
     @Wenn("das Token «{word}» an «{}» sendet")
     public void senden(String name, String pfad) {
         antwort = posten(mitToken(tokens.get(name)), pfad);
-        if (UPLOAD.equals(pfad) && antwort.statusCode() == 202) {
+        if (antwort.statusCode() == 202 && (UPLOAD.equals(pfad) || pfad.startsWith(GENERATOR))) {
             hochgeladen.computeIfAbsent(tokenMandant.get(name), m -> new ArrayList<>())
-                    .add(UUID.fromString(antwort.path("[0].id")));
+                    .add(UUID.fromString(antwort.path(UPLOAD.equals(pfad) ? "[0].id" : "id")));
         }
     }
 
@@ -337,10 +339,19 @@ public class ApiTokenSchritte {
         }
     }
 
-    /** Der Upload bekommt eine frische synthetische PDF (multipart), die anderen Pfade eine leere Anfrage. */
+    /**
+     * Upload und Generator bekommen eine frische synthetische PDF (multipart), der Generator dazu Metadaten mit der Art
+     * aus {@code ?art=} (sonst {@code PROJEKTDOKUMENT}); die anderen Pfade eine leere Anfrage.
+     */
     private static Response posten(RequestSpecification anfrage, String pfad) {
         if (UPLOAD.equals(pfad)) {
             return anfrage.multiPart("dateien", "probe.pdf", Testdateien.pdf(), "application/pdf").when().post(pfad);
+        }
+        if (pfad.startsWith(GENERATOR)) {
+            String art = pfad.contains("?art=") ? pfad.substring(pfad.indexOf("?art=") + 5) : "PROJEKTDOKUMENT";
+            return anfrage.multiPart("datei", "probe.pdf", Testdateien.pdf(), "application/pdf")
+                    .multiPart("metadaten", "{\"art\":\"" + art + "\",\"titel\":\"Probe\",\"projekt\":\"Probe\"}")
+                    .when().post(GENERATOR);
         }
         return anfrage.when().post(pfad);
     }

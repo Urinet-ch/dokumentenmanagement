@@ -40,7 +40,9 @@ import java.util.UUID;
  * Handler für {@code VERARBEITEN} (Aufgabe 2.6, Req 5.1–5.4, 5.8–5.10; design.md «Verarbeitung»): Status
  * {@code VERARBEITUNG}, Quellen aus {@code eingang/} laden und gegen ihre SHA-256 prüfen, {@link OcrPort} (HEIC → JPEG,
  * Bilder → PDF, OCRmyPDF, {@code pdftotext}, Vorschau), PDF/A unter {@code eingang/<jahr>/<docId>/pdfa.pdf} und
- * Vorschaubilder unter {@code vorschau/<docId>/} ablegen, Ergebnis speichern und {@code KI_VORSCHLAG} einreihen.
+ * Vorschaubilder unter {@code vorschau/<docId>/} ablegen, Ergebnis speichern und {@code KI_VORSCHLAG} einreihen;
+ * Generator-Dokumente ({@code quelle = GENERATOR}, Nutzlast {@code ohneKi}) ohne KI weiter nach {@code ARCHIVIERUNG}
+ * und {@code ARCHIVIEREN} (Aufgabe 4.7, Req 11.2).
  * <p>
  * Idempotent: Hat ein früherer Lauf das Ergebnis gespeichert oder ist das Dokument nicht mehr {@code NEU} oder
  * {@code VERARBEITUNG}, endet der Lauf ohne Änderung. Abgeleitete Dateien eines abgebrochenen Laufs löscht der nächste
@@ -56,6 +58,7 @@ public class VerarbeitenHandler implements AuftragHandler {
     /** Schlüssel der Nutzlast; weitere Schlüssel ausser {@code ohneKi} gibt es nicht. */
     public static final String DOKUMENT_ID = "dokumentId";
     static final String OHNE_KI = "ohneKi";
+    static final String QUELLE_GENERATOR = "GENERATOR";
 
     private static final Logger LOG = Logger.getLogger(VerarbeitenHandler.class);
     private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
@@ -81,14 +84,13 @@ public class VerarbeitenHandler implements AuftragHandler {
     @Override
     public void ausfuehren(Auftrag auftrag) throws Exception {
         UUID id = dokumentId(auftrag);
-        if (auftrag.nutzlast().schalter(OHNE_KI).orElse(false)) {
-            // Generator-Dokumente gehen nach der Verarbeitung in ARCHIVIERUNG (design.md «Generator», Aufgabe 4.7)
-            throw new IllegalStateException("Verarbeitung ohne KI folgt mit Aufgabe 4.7");
-        }
         Verarbeitungsstand stand = speichern.laden(id)
                 .orElseThrow(() -> new IllegalStateException("Dokument fehlt im Mandanten: " + id));
-        if ("GENERATOR".equals(stand.quelle())) {
-            throw new IllegalStateException("Verarbeitung von Generator-Dokumenten folgt mit Aufgabe 4.7");
+        // Generator-Dokumente sind bestätigt und gehen ohne KI in ARCHIVIERUNG (Req 11.2), auch nach «Wiederholen»,
+        // dessen Auftrag den Schalter nicht trägt; ohne KI gibt es nur für sie
+        boolean generator = QUELLE_GENERATOR.equals(stand.quelle());
+        if (auftrag.nutzlast().schalter(OHNE_KI).orElse(false) && !generator) {
+            throw new IllegalStateException("Verarbeitung ohne KI nur für Generator-Dokumente: " + id);
         }
         if (!zuVerarbeiten(stand)) {
             LOG.infof("Verarbeitung übersprungen: Dokument %s ist %s", id, stand.status());
@@ -116,7 +118,7 @@ public class VerarbeitenHandler implements AuftragHandler {
             }
             Abgelegt abgelegt = ocr.verarbeiten(new OcrEingabe(eingabe), e -> ablegen(mandant, jahr, id, e));
             unterbrochen();
-            if (!speichern.ergebnisSpeichern(auftrag, id, abgelegt.ergebnis())) {
+            if (!speichern.ergebnisSpeichern(auftrag, id, abgelegt.ergebnis(), generator)) {
                 LOG.warnf("Ergebnis nicht gespeichert: Dokument %s ist nicht mehr in VERARBEITUNG", id);
                 return;
             }

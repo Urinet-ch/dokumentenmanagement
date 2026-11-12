@@ -21,6 +21,9 @@ public interface KontaktRegister {
 
     Optional<Kontakt> finden(UUID id);
 
+    /** Kontakt mit der ID aus 21.CRM ({@code crm_id} ist eindeutig), für die Generator-Metadaten (Req 11.7). */
+    Optional<Kontakt> mitCrmId(String crmId);
+
     /** {@code angaben} sind bereinigt. */
     Kontakt anlegen(KontaktAngaben angaben, String nameNormalisiert, String quelle);
 

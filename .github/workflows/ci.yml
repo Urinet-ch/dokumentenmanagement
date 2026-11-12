@@ -93,6 +93,8 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - working-directory: frontend
         run: npx ng test --watch=false
+      - name: Generator-Client (tools/archiv_client.py, unittest)
+        run: python3 -m unittest tools/test_archiv_client.py
 
   browser:
     name: Browser-Szenarien (Cucumber.js, Playwright)

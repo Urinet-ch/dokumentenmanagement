@@ -18,6 +18,11 @@ model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/eingangskorb-seite.ts
+model/generator-antwort.ts
+model/generator-finanz.ts
+model/generator-metadaten.ts
+model/generator-partner.ts
+model/generator-vertrag.ts
 model/import-hochgeladen.ts
 model/import-lauf.ts
 model/import-spalte.ts

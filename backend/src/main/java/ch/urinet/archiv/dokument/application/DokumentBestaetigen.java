@@ -93,7 +93,7 @@ public class DokumentBestaetigen {
         if (b.art() == null) {
             throw new PflichtfelderFehlen(List.of("art"));
         }
-        Dokumentart art = art(b.art());
+        Dokumentart art = art(arten, b.art());
         pflichtfelderPruefen(art, b, stand);
         if (stand.pdfaFehlt() && !b.ohnePdfa()) {
             throw new PflichtfelderFehlen(List.of("ohnePdfa"));
@@ -150,7 +150,7 @@ public class DokumentBestaetigen {
     }
 
     /** Unbekannte oder inaktive Art: 400, weil die Oberfläche nur aktive Arten anbietet. */
-    private Dokumentart art(String code) {
+    static Dokumentart art(DokumentartVerwaltung arten, String code) {
         Dokumentart art;
         try {
             art = arten.finden(code);
@@ -168,20 +168,26 @@ public class DokumentBestaetigen {
 
     /** Req 8.3: alle fehlenden Pflichtfelder der Art, in der Reihenfolge der Art; nur Namen, nie Werte. */
     static void pflichtfelderPruefen(Dokumentart art, Bestaetigung b, Stand stand) {
-        List<String> fehlen = new ArrayList<>();
-        for (String feld : art.pflichtfelder()) {
-            if (!vorhanden(feld, b, stand)) {
-                fehlen.add(feld);
-            }
-        }
+        List<String> fehlen = fehlendePflichtfelder(art, b, stand.zusatzFelder());
         if (!fehlen.isEmpty()) {
             throw new PflichtfelderFehlen(fehlen);
         }
     }
 
-    private static boolean vorhanden(String feld, Bestaetigung b, Stand stand) {
+    /** Fehlende Pflichtfelder der Art in ihrer Reihenfolge; {@code zusatzFelder} sind die Schlüssel mit Wert. */
+    static List<String> fehlendePflichtfelder(Dokumentart art, Bestaetigung b, Set<String> zusatzFelder) {
+        List<String> fehlen = new ArrayList<>();
+        for (String feld : art.pflichtfelder()) {
+            if (!vorhanden(feld, b, zusatzFelder)) {
+                fehlen.add(feld);
+            }
+        }
+        return fehlen;
+    }
+
+    private static boolean vorhanden(String feld, Bestaetigung b, Set<String> zusatzFelder) {
         if (feld.startsWith(Dokumentart.ZUSATZ)) {
-            return stand.zusatzFelder().contains(feld.substring(Dokumentart.ZUSATZ.length()));
+            return zusatzFelder.contains(feld.substring(Dokumentart.ZUSATZ.length()));
         }
         Object wert = switch (feld) {
             case "titel" -> b.titel();
@@ -209,7 +215,7 @@ public class DokumentBestaetigen {
     }
 
     /** Werte mit festem Wertebereich; ein ungültiger Wert ist eine falsche Anfrage (400). */
-    private static void werte(Bestaetigung b) {
+    static void werte(Bestaetigung b) {
         if (b.vertraulichkeit() != null && Vertraulichkeit.aus(b.vertraulichkeit()).isEmpty()
                 || b.richtung() != null && !RICHTUNGEN.contains(b.richtung())
                 || b.waehrung() != null && !WAEHRUNG.matcher(b.waehrung()).matches()

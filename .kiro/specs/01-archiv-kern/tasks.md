@@ -214,6 +214,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Teil a erledigt (PR #46, ohne Abhängigkeit zu 2.2): Werkzeuge im gemeinsamen Image `Dockerfile.jvm` (uid 10001); `OcrPort` mit `OcrMyPdfAdapter` (HEIC→JPEG, Bilder→PDF, Arbeitsfassungen, OCRmyPDF mit `--skip-text`, signierte PDFs, `pdfa_fehlt`, `pdftotext`, Vorschaubilder; Zeitgrenze mit `destroyForcibly`, ohne Shell, ein Laufverzeichnis je Lauf) und Dev-Stub; `folgtMit` in `OcrAuswahl` entfernt; Startprüfung `OcrPruefung`; Tests mit veraPDF auf synthetischen Dateien; Lastskript `tools/last/verarbeitung_foto.py`. Offen für Teil b (nach 2.2): `VerarbeitenHandler` mit Status `VERARBEITUNG`, Speichern von PDF/A, Volltext und Vorschau, Anspruch sichern, Folgeauftrag `KI_VORSCHLAG`, `FEHLER` nach 3 Fehlversuchen, Handler `ARCHIVIEREN`; Cucumber-Szenarien `@req-5.x`
   - Teil b erledigt (PR #54): `VerarbeitenHandler` mit Status `VERARBEITUNG`, Quellen aus `eingang/` mit SHA-256-Prüfung, PDF/A unter `eingang/<jahr>/<docId>/pdfa.pdf`, Vorschau unter `vorschau/<docId>/`, Volltext, Seiten und `pdfa_fehlt` in `dokument`, Anspruch sichern vor jedem Schreiben, Folgeauftrag `KI_VORSCHLAG` in derselben Transaktion, `FEHLER` mit Fehlertext nach 3 Fehlversuchen; Szenarien `features/verarbeitung/verarbeiten.feature` (`@req-5.1`–`5.4`, `5.8`–`5.10`), JUnit-Tests zu Anspruch, Mandant, Idempotenz und Zeitüberschreitung (design.md «Umsetzung (Aufgabe 2.6, Teil b)»). Offen bleiben: Handler `ARCHIVIEREN` (mit 3.4), Verarbeitung von Generator-Dokumenten und `ohneKi` (mit 4.7), Swiss QR Code (mit 3.2), Nachweis 5.5 auf Stufe B (5.11). Die Checkbox bleibt offen, bis `ARCHIVIEREN` steht.
   - Handler `ARCHIVIEREN` erledigt mit 3.4 (PR #57, `ArchivierenHandler`: nur bei Status `ARCHIVIERUNG`, bei `ARCHIVIERT` nur Aufräumen von `eingang/`; ein Auftrag je Dokument, weil `wiederholen` nur aus `ARCHIVIERUNG_FEHLER` neu einreiht). Die Checkbox bleibt offen für Generator und `ohneKi` (4.7), Swiss QR Code (3.2) und den Nachweis 5.5 (5.11).
+  - Generator und `ohneKi` erledigt mit 4.7 (`VerarbeitungSpeichern.ergebnisSpeichern(…, ohneKi)`: Dokumente mit `quelle = GENERATOR` gehen ohne `KI_VORSCHLAG` nach `ARCHIVIERUNG`, design.md «Umsetzung (Aufgabe 4.7)»). Die Checkbox bleibt offen für Swiss QR Code (3.2) und den Nachweis 5.5 (5.11).
 
 - [x] 2.7 Frontend-Grundgerüst und Upload [Frontend]
   - Layout mobil/Desktop im UriNet-Branding, Login per OIDC (PKCE) gegen Keycloak, Navigation mit Eingangskorb-Zähler, Menüpunkte nach Rechtematrix
@@ -331,13 +332,14 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
   - _Anforderungen: 10.1, 14.1, 14.2, 14.4, 14.7_
 
-- [ ] 4.7 Generator-Endpunkt und Python-Client [Backend]
+- [x] 4.7 Generator-Endpunkt und Python-Client [Backend]
   - `POST /api/v1/dokumente/generator` (Scope `generator`): Pflichtfelder der Art (422 `PFLICHTFELD_FEHLT`), unbekannte `crmId` (422); `vertraulichkeit` und `personBenutzer` Pflicht bei Standard `PERSONAL`, sonst Standard der Art
   - Verarbeitung ohne KI (Prüfsumme, Dublettenprüfung, PDF/A, Volltext, Vorschau), `aufbewahren_bis`, Archivierung über `ARCHIVIERUNG` nach `ARCHIVIERT`; Antwort 201 oder 202 gemäss design.md
   - gleiche SHA-256 wie ein vorhandenes Dokument → 200 mit vorhandener ID; Belegnummer einer eigenen Art mit abweichender SHA-256 → 409
   - Verwerfen eines Generator-Dokuments (aus `FEHLER` oder `EINGANGSKORB`) gibt die Reservation in `belegnummer_eigen` in derselben Transaktion frei; Integrationstest: verwerfen, korrigiert neu senden → 202
   - `tools/archiv_client.py` (requests, Token aus Datei mit Rechten 600: `~/.config/urinet-archiv/token` oder Pfad aus `ARCHIV_TOKEN_DATEI`, nie im Code oder als Umgebungsvariable); bei Ausfall Ordner `archiv-ausstehend/`, bei 409 nach `archiv-konflikt/` ohne erneutes Senden; Einbau-Beispiel für `rechnung_gen.py` und `urinet_pdf.py` in `tools/README.md`
   - _Anforderungen: 11.1–11.11_
+  - Erledigt: `DokumentGeneratorResource`/`DokumentGenerator`, Worker-Pfad ohne KI, `tools/archiv_client.py` (nur Standardbibliothek statt `requests`) mit `tools/test_archiv_client.py` und `tools/README.md`; Szenarien `features/dokument/generator.feature` (`@req-11.1`–`11.11`; für `11.4`, `11.5` und `11.9` ruft das Szenario den echten Client per `python3` gegen den Testserver auf); `ProbeTokenResource` entfernt (design.md «Umsetzung (Aufgabe 4.7)»)
 
 - [x] 4.8 Drive-Import-Werkzeug [Backend]
   - `tools/drive_import` (Java, Picocli), Anmeldung mit API-Token vom Scope `import` (Token aus Datei wie in 4.7, nie als Umgebungsvariable): rekursiv, Trockenlauf, Ordnerpfad als `hinweis`; Pfad-Muster → Hinweise an die KI (Kunde, Art)

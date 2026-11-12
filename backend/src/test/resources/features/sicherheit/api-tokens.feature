@@ -4,10 +4,10 @@ Funktionalität: API-Tokens für Skripte
   Generator-Client und Drive-Import melden sich mit einem API-Token `ua_<id>_<geheimnis>` an. Das Token ist an einen
   Mandanten und einen Scope gebunden, wird nur als Argon2id-Hash gespeichert und ist widerrufbar (Req 2.5).
   Anlegen, Anzeigen und Widerrufen ist Aktion A14 und nur dem «inhaber» erlaubt (Req 2.20).
-  Der Scope import erreicht den Upload «/api/v1/dokumente» (A1, Aufgabe 2.4; jede Anfrage sendet eine frische
-  synthetische PDF). Bis der Generator-Endpunkt kommt, steht für den Scope generator eine Probe unter src/test:
-  «/api/v1/dokumente/generator» (A1); ihr Query-Parameter «art» prüft, dass die Dokumentart im Schema des
-  Token-Mandanten liegt.
+  Der Scope import erreicht den Upload «/api/v1/dokumente» (A1, Aufgabe 2.4), der Scope generator den Generator
+  «/api/v1/dokumente/generator» (A1, Aufgabe 4.7); jede Anfrage sendet eine frische synthetische PDF. Der Schritt
+  übernimmt «?art=» in die Metadaten des Generators (sonst PROJEKTDOKUMENT); eine Art aus dem Schema eines anderen
+  Mandanten ist unbekannt (400).
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -19,7 +19,7 @@ Funktionalität: API-Tokens für Skripte
     Und für «urinet» gibt es das Token «generator» mit Scope «generator»
     Wenn das Token «import» an «/api/v1/dokumente» sendet
     Dann liegt das zuletzt hochgeladene Dokument des Tokens «import» im Mandanten «urinet» mit Quelle «DRIVE»
-    Wenn das Token «generator» an «/api/v1/dokumente/generator?art=AUSGANGSRECHNUNG» sendet
+    Wenn das Token «generator» an «/api/v1/dokumente/generator?art=PROJEKTDOKUMENT» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
     Und kein Logeintrag enthält das Geheimnis eines Tokens
 
@@ -58,8 +58,8 @@ Funktionalität: API-Tokens für Skripte
     Dann liegt das zuletzt hochgeladene Dokument des Tokens «vhf» im Mandanten «vhf-gsk» mit Quelle «DRIVE»
     Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=PROBE_VHF_BULLETIN» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
-    Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=AUSGANGSRECHNUNG» sendet
-    Dann antwortet das Archiv auf die Token-Anfrage mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn das Token «vhf-generator» an «/api/v1/dokumente/generator?art=PROJEKTDOKUMENT» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und das Zugriffsprotokoll von «urinet» hat seit dem gemerkten Stand keinen Eintrag eines Tokens
 
   @req-2.5

@@ -9,6 +9,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
+import ch.urinet.archiv.verarbeitung.application.ArchivierenHandler;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.VerarbeitenHandler;
@@ -40,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Pflichten des {@link VerarbeitenHandler} aus design.md «Pflichten der Handler» (Aufgabe 2.6, Teil b): idempotent,
- * Anspruch gesichert, Mandant aus dem Auftrag, Reste abgebrochener Läufe bereinigt, Generator-Dokumente erst mit 4.7.
+ * Anspruch gesichert, Mandant aus dem Auftrag, Reste abgebrochener Läufe bereinigt;
+ * Generator-Dokumente ohne KI weiter zur Archivierung (Aufgabe 4.7, Req 11.2).
  */
 @QuarkusTest
 class VerarbeitenHandlerTest {
@@ -120,7 +122,7 @@ class VerarbeitenHandlerTest {
             speichern.anspruchPruefen(fremd);
             return null;
         })).hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
-        assertThatThrownBy(() -> imMandanten(URINET, () -> speichern.ergebnisSpeichern(fremd, id, ergebnis)))
+        assertThatThrownBy(() -> imMandanten(URINET, () -> speichern.ergebnisSpeichern(fremd, id, ergebnis, false)))
                 .hasRootCauseInstanceOf(AuftragService.AnspruchVerloren.class);
 
         assertThat(hilfe.dokument(URINET, id)).isEqualTo(vorher);
@@ -145,22 +147,42 @@ class VerarbeitenHandlerTest {
     }
 
     @Test
-    void generatorDokumenteUndOhneKiFolgenMitAufgabe47() throws Exception {
+    void generatorDokumenteGehenOhneKiZurArchivierungUndOhneKiGiltNurFuerSie() throws Exception {
         UUID generator = hilfe.anlegen(URINET, "GENERATOR", foto("Generator"));
-        UUID ohneKi = hilfe.anlegen(URINET, "UPLOAD", foto("ohne KI"));
-        long a = hilfe.einreihen(URINET, generator);
+        UUID upload = hilfe.anlegen(URINET, "UPLOAD", foto("ohne KI"));
+        long a = auftraege.rohEinreihen(URINET, VerarbeitenHandler.TYP,
+                "{\"dokumentId\":\"" + generator + "\",\"ohneKi\":true}");
         long b = auftraege.rohEinreihen(URINET, VerarbeitenHandler.TYP,
-                "{\"dokumentId\":\"" + ohneKi + "\",\"ohneKi\":true}");
+                "{\"dokumentId\":\"" + upload + "\",\"ohneKi\":true}");
 
         hilfe.abarbeiten();
 
-        for (long auftrag : List.of(a, b)) {
-            assertThat(auftraege.zeile(auftrag).status()).isEqualTo("OFFEN");
-            assertThat(auftraege.zeile(auftrag).versuche()).isEqualTo(1);
-        }
-        for (UUID id : List.of(generator, ohneKi)) {
-            assertThat(hilfe.dokument(URINET, id)).containsEntry("status", "NEU").containsEntry("s3_pdfa", null);
-        }
+        assertThat(auftraege.zeile(a).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.dokument(URINET, generator).get("s3_pdfa")).isNotNull();
+        assertThat(hilfe.auftraege("KI_VORSCHLAG", generator)).isEmpty();
+        assertThat(hilfe.auftraege(ArchivierenHandler.TYP.wert(), generator)).hasSize(1);
+        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(generator);
+
+        assertThat(auftraege.zeile(b).status()).isEqualTo("OFFEN");
+        assertThat(auftraege.zeile(b).versuche()).isEqualTo(1);
+        assertThat(hilfe.dokument(URINET, upload)).containsEntry("status", "NEU").containsEntry("s3_pdfa", null);
+    }
+
+    @Test
+    void einGeneratorDokumentOhnePdfaGehtInDenEingangskorbOhneArchivierung() throws Exception {
+        UUID id = hilfe.anlegen(URINET, "GENERATOR", List.of(new Quelle(DateiRolle.ORIGINAL, 1, "pdf",
+                "application/pdf", OcrTestdateien.verschluesseltesPdf())));
+        long auftrag = auftraege.rohEinreihen(URINET, VerarbeitenHandler.TYP,
+                "{\"dokumentId\":\"" + id + "\",\"ohneKi\":true}");
+
+        hilfe.abarbeiten();
+
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.dokument(URINET, id)).containsEntry("status", "EINGANGSKORB")
+                .containsEntry("pdfa_fehlt", true).containsEntry("s3_pdfa", null);
+        assertThat(hilfe.auftraege(ArchivierenHandler.TYP.wert(), id)).isEmpty();
+        assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).isEmpty();
+        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(id);
     }
 
     @Test

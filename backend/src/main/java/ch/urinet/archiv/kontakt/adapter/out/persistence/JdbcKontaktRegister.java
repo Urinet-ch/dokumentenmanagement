@@ -90,6 +90,19 @@ public class JdbcKontaktRegister implements KontaktRegister {
     }
 
     @Override
+    public Optional<Kontakt> mitCrmId(String crmId) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select " + SPALTEN + " from " + tabelle() + " where crm_id = ?")) {
+            abfrage.setString(1, crmId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next() ? Optional.of(kontakt(zeile)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakt nicht lesbar", e);
+        }
+    }
+
+    @Override
     public Kontakt anlegen(KontaktAngaben angaben, String nameNormalisiert, String quelle) {
         String sql = "insert into " + tabelle() + " (id, typ, name, vorname, strasse, plz, ort, email, telefon, uid, "
                 + "iban, kategorie, name_normalisiert, quelle) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
