@@ -205,7 +205,7 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | POST | `/dokumente/generator` | PDF + `metadaten` (JSON) → 202, 200 (gleiche SHA-256), 409 `BELEGNUMMER_VERGEBEN`, 422 | Token `generator` |
 | GET | `/dokumente` | Suche/Liste mit Filtern (Req 14), nur sichtbare | A2–A4 |
 | GET | `/dokumente/{id}` | Metadaten, Status, Versionen, Warnungen; `ETag`; 404 | A2–A4 |
-| GET | `/dokumente/{id}/datei?variante=pdfa\|original\|arbeitsfassung&nr=` | 302 auf vorsignierte URL der gespeicherten Versions-ID (5 Min.) | A2–A4 |
+| GET | `/dokumente/{id}/datei?variante=pdfa\|original\|arbeitsfassung&nr=` | 302 auf vorsignierte URL der gespeicherten Versions-ID (5 Min.); mit `Accept: application/json` 200 `{url, gueltigBis}` (Aufgabe 4.6) | A2–A4 |
 | GET | `/dokumente/{id}/vorschau?seite=1` | PNG-Vorschau (im Worker erzeugt) | A2–A4 |
 | PATCH | `/dokumente/{id}` | Metadaten ändern; bei `ARCHIVIERT` `grund` Pflicht; 412, 428, 422 `ZUSATZ_UNGUELTIG` | A6 (Vertraulichkeit A8) |
 | POST | `/dokumente/{id}/bestaetigen` | bestätigte Metadaten inkl. Vertraulichkeit → 202, Status `ARCHIVIERUNG`; 409 `STATUS_KONFLIKT` (nicht `EINGANGSKORB`), `BELEGNUMMER_VERGEBEN`, `FRIST_ABGELAUFEN`; 422 `PFLICHTFELD_FEHLT`; 412, 428 | A7 (+A8) |
@@ -930,6 +930,38 @@ Drive-Import (Req 12):
     (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler.
+- Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026, teilweise):
+  - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
+    schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
+    Darum liefert derselbe Endpunkt mit `Accept: application/json` 200 `{url, gueltigBis}` (`DownloadAdresseDto`,
+    `Cache-Control: no-store`) mit gleicher Sichtregel, gleichen Fehlern und gleichem Protokoll `HERUNTERLADEN`; ohne
+    diesen `Accept` bleibt es beim 302 (Req 14.6, Szenario in `features/dokument/download.feature`).
+  - `/suche` (A2) hinter dem Port `SuchePort` (Adapter `HttpSucheService` über den generierten Client): Suchfeld,
+    Filterleiste mit Art, Partner, Belegdatum von–bis, Betrag von–bis, Richtung, Status, Tags, Geschäftsjahr und
+    Belegnummer (exakt), Sortierung nur mit Suchbegriff; Trefferliste mit Titel, Art, Datum, Partner, Belegnummer,
+    Betrag, Auszug und Blättern. Den Auszug setzt die PWA aus den Teilen `{text, treffer}` als Text zusammen, Treffer
+    als `<mark>` (kein `innerHTML`, Req 14.4).
+  - Grenzen der API prüft schon die PWA (`suchfilter.ts`: Länge Suchbegriff, Tags, Belegnummer, Datum von ≤ bis,
+    Betrag als `NUMERIC(12,2)` mit `'` und `,` als Eingabe, Geschäftsjahr vierstellig) und sendet erst dann; die API
+    prüft trotzdem. Beträge gehen als Text, nie als Gleitkommazahl.
+  - Partnerfilter: mit A6 (Kontakte lesen) Vorschläge über `GET /kontakte?q=`; ohne A6 wählt man den Partner über
+    «Nach Partner filtern» bei einem Treffer, weil `GET /kontakte` A6 verlangt.
+  - Beim Öffnen sucht die Seite einmal ohne Filter (neueste Dokumente). Suchbegriff, Filter und Treffer liegen nur im
+    Arbeitsspeicher (`SucheZustand`, je Mandant und Benutzer), damit «Zurück zur Suche» die Treffer wieder zeigt; sie
+    kommen weder in die Adresse noch in Local oder Session Storage.
+  - Mobil (< 960 px) ist die Filterleiste eingeklappt (Knopf mit `aria-expanded`), die Seite scrollt nicht waagrecht.
+  - `/dokument/:id` (A2) hinter `DokumentPort`: Metadaten aus `GET /dokumente/{id}` (Art mit Namen aus
+    `GET /dokumentarten`, Zusatzfelder ohne leere Werte), Vorschau der PDF/A-Fassung per `<object type="application/pdf">`
+    auf die vorsignierte Adresse, Knopf «PDF/A herunterladen» (neuer Tab, `noopener noreferrer`). Die PWA übernimmt nur
+    `http`/`https`-Adressen; läuft die Adresse in weniger als 15 s ab, holt der Knopf eine neue. Ohne PDF/A-Fassung
+    (404) bietet die Ansicht das Original zum Herunterladen an.
+  - Offen aus 4.6: Metadaten bearbeiten mit Grund (A6, Req 10.1) braucht den Endpunkt aus 3.5; die Versionsliste
+    braucht einen Endpunkt, den keine Aufgabe von Welle 4 liefert; die Vorschau als Bild der ersten Seite kommt mit
+    der Vorschau-Erzeugung (PR #68).
+  - Tests: Unit-Tests (Vitest) für Filter, Adapter, Suche und Dokumentansicht; Browser-Szenarien
+    `features/suche/suche-pwa.feature` (`@req-14.1`, `@req-14.2`, `@req-14.4`, `@req-14.6`, `@req-14.7`) gegen eine
+    API-Attrappe mit synthetischen Dokumenten (`frontend/e2e/hilfen/suche-attrappe.mjs`, darum `@attrappe`); den
+    Vertrag der echten API belegen `volltextsuche.feature` und `download.feature`.
 
 ## Data Models
 
