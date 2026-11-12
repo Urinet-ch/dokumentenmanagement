@@ -40,15 +40,16 @@
      (Req 16.19, ADR-008).
    - Die Stufenwerte liegen versioniert unter `deploy/infomaniak/`.
 5. **Stufe B** auf einer eigenen, grösseren Infomaniak-VPS nur für das Archiv:
-   - Grösse: [offen: VPS-Grösse K5 – Entscheid vor Welle 5].
+   - Grösse (K5): VPS Lite 4 vCPU, 4 GB RAM, 80 GB, an Ort aufrüstbar auf 4/8/160 (Nachtrag 12.11.2026).
    - `archiv-api` und `archiv-worker` laufen getrennt. Hier gelten die Leistungsziele und laufen
      die Lasttests.
 6. **Wechsel (Aufgabe 5.11, Req 16.17):**
    - Zeitpunkt: spätestens vor echten Belegen, also vor 5.4 und 5.8. Früher, falls 1.10 abbricht
      oder 16.18 eintritt.
-   - Umfang: neue VPS nach dem Muster, Deploy-Ziel umstellen (Host und Zugang nur als
-     GitHub-Secrets), DNS beider Domains umstellen, Stufe B leer starten, Archiv-Dienste auf
-     Stufe A entfernen, Leistung messen.
+   - Umfang: neue VPS nach dem Muster, Leistung auf der neuen VPS messen (vor dem Umstellen,
+     Req 16.26), Deploy-Ziel umstellen (Host und Zugang nur als GitHub-Secrets), DNS beider
+     Domains umstellen, Stufe B leer starten, Archiv-Dienste auf Stufe A entfernen (Reihenfolge
+     nachgeführt 12.11.2026, bisher «… Archiv-Dienste auf Stufe A entfernen, Leistung messen»).
    - Test-Buckets: entschieden von Fabian am 09.11.2026, siehe Nachtrag.
 7. **Keycloak bleibt (P5)**, weil der externe Treuhänder und Mandant 2 eigene Zugänge brauchen. Es
    läuft auf der VPS der jeweiligen Stufe und wird nach ADR-008 gesichert.
@@ -79,7 +80,8 @@
   `docs/spikes/stufe-a-speicher.md`, nur Zahlen); nach jedem Deploy Speicherabbrüche und Health
   der anderen Apps prüfen (Req 16.18).
 - **Tests:** Lasttests (2.4, 2.6, 4.5) nur auf Stufe B (5.11), auf Stufe A nur Funktion.
-- **Betrieb:** Die Restore-Probe zählt zum Speicherbudget. Monitoring auf Stufe B (5.9); die
+- **Betrieb:** Die Restore-Probe zählt zum Speicherbudget; auf Stufe B läuft sie auf derselben
+  VPS nachts mit angehaltenem Worker (Nachtrag 12.11.2026). Monitoring auf Stufe B (5.9); die
   Übernahme der Belege 2026 (5.8) setzt den abgeschlossenen Wechsel voraus.
 
 ## Nachtrag 09.11.2026 (Buckets der Stufe A)
@@ -98,8 +100,36 @@ rund 1'140 MB frei. Das Abbruchkriterium aus Req 16.18 bleibt: Ein Speicherabbru
 App beendet den Deploy, das Archiv wird auf Stufe A gestoppt und Stufe B (5.11) vorgezogen. Punkt 4 «Budget» oben gilt
 mit dem neuen Wert; nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.9, 1.10) und im Deploy-Workflow.
 
+## Nachtrag 12.11.2026 (K5: Grösse der VPS für Stufe B)
+Vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #PRNR (Aufgabe 4.9, Entscheid 4.9-E7; Spec 01, Req 16.1, 16.16–16.18, 16.26):
+- **Grösse:** eigene Infomaniak VPS Lite mit 4 vCPU, 4 GB RAM und 80 GB Disk nur für das Archiv, CHF 9.00/Mt. bei
+  Jahresbindung (CHF 108 im Voraus, Stand 12.11.2026). Bestellt wird erst zu Beginn von Aufgabe 5.11; vorher laufen die
+  Lastskripte einige Stunden auf einer stundenweise abgerechneten Infomaniak-Public-Cloud-Instanz ähnlicher Grösse.
+- **Aufrüsten:** Verfehlt die Messung die Ziele, wird die VPS an Ort auf 4 vCPU / 8 GB / 160 GB aufgerüstet
+  (CHF 18.00/Mt.; nicht umkehrbar, darum erst nach der Messung). Wechsel auf VPS Cloud (an Ort aufrüstbar, SLA, Snapshot),
+  wenn auch 4/8 ein Ziel verfehlt, die Vektoren aus Spec 02/04 mehr Speicher brauchen, Spec 03 (öffentliche Schnittstelle,
+  zweiter Mandant) die Last erhöht oder Fabian SLA, Snapshots oder Support will.
+- **Speicherbudget Stufe B:** Startwerte je Dienst für 4 GB in design.md «Stufen der Plattform» (Summe `mem_limit`
+  höchstens 3'200 MiB, `cpus` höchstens 4.5), mit Reserve für Betriebssystem, Traefik und Monitoring, bezogen auf das
+  gemessene `MemTotal`; die Restore-Probe läuft nachts mit angehaltenem Worker in dessen Anteil (ADR-008, Nachtrag
+  12.11.2026). Der Worker läuft vorerst mit Parallelität 1 (ADR-003). Das Budget gilt je Plattform (Zielhost), nicht je
+  `archiv.stufe`; `pruefe-speicherbudget.py` wird in Aufgabe 5.11 entsprechend erweitert.
+- **Messung:** auf der neuen VPS vor dem Umstellen, mit den Diensten und dem Budget der Stufe B, aber `archiv.stufe=A`
+  und einem eigenen Mess-Mandanten (Bucket `urinet-archiv-a-last`), nur synthetisch, nicht im produktiven Mandanten und
+  nicht in Test-Buckets der laufenden Stufe A; Messpunkt Server; Eingaben in Req 3.2, 5.5 und 14.3. Bei vorgezogenem
+  Wechsel als eigenes Compose-Projekt auf derselben VPS, solange dort noch keine echten Belege liegen (Aufgabe 5.11).
+- **Abbruchkriterium Stufe A:** Speicherabbrüche durch manuelle Eingriffe (z. B. eine zweite JVM per `docker exec` wie
+  am 12.11.2026) lösen Req 16.18 nicht aus. «Stufe A» meint dort die Plattform; die Messkonfiguration auf der neuen VPS
+  fällt nicht darunter.
+- **Betrachtete Alternativen:** VPS Lite 4/8/160 sofort (doppelter Preis auf Verdacht, Aufrüsten bleibt möglich);
+  bestehende VPS an Ort aufrüsten (echte Belege auf demselben Host wie andere Apps, widerspricht Punkt 5 und Req 16.15);
+  VPS Lite 2/4/60 (nur 2 Kerne für API und OCR); eigene Probe-VPS (Mehrkosten, ADR-008); Stufe B ohne Aufrüstung auf der
+  bestehenden VPS (Speicher reicht nicht); Stufe B aufschieben (keine echten Belege, Ziel von Phase 1 fällt weg).
+- Restrisiko VPS Lite: keine SLA, keine Snapshots, ausgehend kein Port 25; Infomaniak empfiehlt sie für Projekte, die
+  noch nicht geschäftskritisch sind. Vertretbar, weil Object Lock, Zweitkopie und Restore-Probe die Daten tragen.
+
 ## Verweise
-- Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19; P1 (geändert 08.11.2026), P5, P15, K5
+- Req 3.2, 5.5, 14.3, 16.1, 16.4, 16.7, 16.9–16.11, 16.15–16.19, 16.26; P1 (geändert 08.11.2026), P5, P15, K5
 - `tech.md` «Plattform und Betrieb»; design.md «Betrieb auf der VPS», «Stufen der Plattform»
 - Aufgaben 0.7, 1.9, 1.10, 4.9, 5.8, 5.9, 5.11
 - ADR-002, ADR-004, ADR-007, ADR-008, ADR-009

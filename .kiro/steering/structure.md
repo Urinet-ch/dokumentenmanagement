@@ -56,7 +56,8 @@ dokumentenmanagement/
 │   ├── infomaniak/compose.yml   Produktion: Dienste mit Traefik-Labels, Secrets als Dateien
 │   ├── keycloak/realm-export.json
 │   ├── keycloak/realm-test.json   nur dev und Tests: Export plus Testbenutzer und Client archiv-test
-│   └── backup/              Verschlüsselung und Export für die zentrale Sicherung
+│   ├── backup/              Verschlüsselung und Export für die zentrale Sicherung
+│   └── probe/compose.yml    Restore-Probe: Projekt archiv-probe auf der Stufe-B-VPS, archiv.stufe=P (nur hier zulässig), Netz internal, ohne Traefik-Labels (Spec 01, Req 16.23, 16.24)
 ├── .github/workflows/       CI, Deploy (SSH-Bundle, Health-Prüfung)
 └── docs/
     ├── umsetzungsplan.md
