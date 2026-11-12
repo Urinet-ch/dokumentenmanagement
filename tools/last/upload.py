@@ -5,7 +5,8 @@ Lädt synthetische PDFs parallel an POST /api/v1/dokumente hoch und gibt p50, p9
 Gemessen wird ab vollständig gesendeter Anfrage bis zum Eintreffen der Antwort (nahe am Messpunkt «Server, ab
 vollständig empfangener Anfrage»; die Netzlaufzeit ist enthalten). Der Nachweis erfolgt erst auf Stufe B in Aufgabe
 5.11; Eingabe, Last und Hardware sind dort festzulegen ([offen: Messbedingungen nach VPS-Grösse K5]). Darum sind
-Anzahl, Parallelität und Grösse Pflichtparameter ohne Standardwerte.
+Anzahl, Parallelität und Grösse Pflichtparameter ohne Standardwerte. `--aufwaermen` schickt vorher Uploads mit
+derselben Parallelität und Grösse, die nicht zählen (sie legen ebenfalls Dokumente an).
 
 Nur synthetische Dateien, nie echte Belege. Jede Datei ist eindeutig, es entstehen keine Dubletten; die angelegten
 Dokumente bleiben im Eingangskorb des Mandanten (nur Stufe A oder eine Testumgebung).
@@ -104,14 +105,20 @@ def main() -> int:
     parser.add_argument("--anzahl", type=int, required=True, help="Anzahl Uploads (je eine Datei)")
     parser.add_argument("--parallel", type=int, required=True, help="gleichzeitige Uploads")
     parser.add_argument("--groesse", type=int, required=True, help="Grösse je PDF in Bytes")
+    parser.add_argument("--aufwaermen", type=int, default=0, help="Uploads vorweg, die nicht zählen")
     parser.add_argument("--grenze", type=float, default=2.0, help="Grenze für p95 in Sekunden (Req 3.2: 2)")
     parser.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
     args = parser.parse_args()
     if args.anzahl < 1 or args.parallel < 1 or args.groesse < 1:
         parser.error("--anzahl, --parallel und --groesse müssen grösser als 0 sein")
+    if args.aufwaermen < 0:
+        parser.error("--aufwaermen muss mindestens 0 sein")
 
     token = token_lesen()
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
+        # Aufwärmen mit eigenen Nummern, Ergebnis verworfen
+        vorweg = range(args.anzahl, args.anzahl + args.aufwaermen)
+        list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), vorweg))
         ergebnisse = list(pool.map(lambda n: hochladen(args.url, token, args.groesse, n), range(args.anzahl)))
 
     zeiten = [dauer for status, dauer in ergebnisse if status == 202]
@@ -123,6 +130,7 @@ def main() -> int:
         "anzahl": args.anzahl,
         "parallel": args.parallel,
         "groesse": args.groesse,
+        "aufwaermen": args.aufwaermen,
         "angenommen": len(zeiten),
         "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},
         "p50_s": round(statistics.median(zeiten), 3) if zeiten else None,
