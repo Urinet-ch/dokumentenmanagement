@@ -139,7 +139,7 @@ public class DokumentGeneratorResource {
     @APIResponse(responseCode = "403", description = "Kein API-Token vom Scope generator")
     @APIResponse(responseCode = "409", description = "BELEGNUMMER_VERGEBEN (Req 11.3) oder FRIST_ABGELAUFEN "
             + "(Req 9.8); nichts angelegt, nicht erneut senden (Req 11.9)")
-    @APIResponse(responseCode = "413", description = "Datei über 50 MB")
+    @APIResponse(responseCode = "413", description = "Datei über 50 MB oder Metadaten über 4 KB")
     @APIResponse(responseCode = "415", description = "Keine PDF")
     @APIResponse(responseCode = "422", description = "PFLICHTFELD_FEHLT mit Liste (Req 11.6, 11.10), "
             + "PARTNER_UNBEKANNT (Req 11.7), ZUSATZ_UNGUELTIG oder Datei leer bzw. beschädigt")

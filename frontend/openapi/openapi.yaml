@@ -1415,7 +1415,7 @@ paths:
           description: "BELEGNUMMER_VERGEBEN (Req 11.3) oder FRIST_ABGELAUFEN (Req\
             \ 9.8); nichts angelegt, nicht erneut senden (Req 11.9)"
         "413":
-          description: Datei über 50 MB
+          description: Datei über 50 MB oder Metadaten über 4 KB
         "415":
           description: Keine PDF
         "422":

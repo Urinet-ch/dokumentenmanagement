@@ -169,6 +169,23 @@ class VerarbeitenHandlerTest {
     }
 
     @Test
+    void einGeneratorDokumentOhnePdfaGehtInDenEingangskorbOhneArchivierung() throws Exception {
+        UUID id = hilfe.anlegen(URINET, "GENERATOR", List.of(new Quelle(DateiRolle.ORIGINAL, 1, "pdf",
+                "application/pdf", OcrTestdateien.verschluesseltesPdf())));
+        long auftrag = auftraege.rohEinreihen(URINET, VerarbeitenHandler.TYP,
+                "{\"dokumentId\":\"" + id + "\",\"ohneKi\":true}");
+
+        hilfe.abarbeiten();
+
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
+        assertThat(hilfe.dokument(URINET, id)).containsEntry("status", "EINGANGSKORB")
+                .containsEntry("pdfa_fehlt", true).containsEntry("s3_pdfa", null);
+        assertThat(hilfe.auftraege(ArchivierenHandler.TYP.wert(), id)).isEmpty();
+        assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).isEmpty();
+        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(id);
+    }
+
+    @Test
     void einDokumentImEingangskorbBleibtUnveraendert() throws Exception {
         UUID id = hilfe.anlegen(URINET, "SCAN", "EINGANGSKORB", foto("schon im Eingangskorb"));
         Map<String, Object> vorher = hilfe.dokument(URINET, id);
