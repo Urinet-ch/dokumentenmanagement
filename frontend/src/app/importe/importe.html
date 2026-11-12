@@ -1,0 +1,86 @@
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+
+<section class="karte hochladen" aria-labelledby="hochladen-titel">
+  <h2 id="hochladen-titel">{{ texte.hochladenTitel }}</h2>
+  <label class="feld">
+    <span>{{ texte.art }}</span>
+    <select [value]="art()" [disabled]="laeuft()" (change)="artWaehlen($any($event.target).value)" data-test="art">
+      <option value="kontakt">{{ texte.arten['kontakt'] }}</option>
+      <option value="verkaufschance">{{ texte.arten['verkaufschance'] }}</option>
+    </select>
+  </label>
+  @if (art() === 'kontakt') {
+    <mat-checkbox
+      [checked]="vollexport()"
+      [disabled]="laeuft()"
+      (change)="vollexport.set($event.checked)"
+      aria-describedby="vollexport-hinweis"
+      data-test="vollexport"
+    >
+      {{ texte.vollexport }}
+    </mat-checkbox>
+    <p id="vollexport-hinweis" class="hinweis">{{ texte.vollexportHinweis }}</p>
+  }
+  <div class="datei">
+    <button mat-stroked-button type="button" (click)="dateiwahl.click()" [disabled]="laeuft()">
+      {{ texte.dateiwahl }}
+    </button>
+    <input
+      #dateiwahl
+      hidden
+      type="file"
+      accept=".csv,text/csv"
+      [attr.aria-label]="texte.dateiwahl"
+      (change)="gewaehlt(dateiwahl)"
+    />
+    <span class="dateiname" data-test="dateiname">{{ datei()?.name ?? texte.keineDatei }}</span>
+  </div>
+  <p class="hinweis">{{ texte.grenze }}</p>
+  <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || !datei()">
+    {{ texte.hochladen }}
+  </button>
+  @if (laeuft()) {
+    <mat-progress-bar mode="determinate" [value]="prozent()" [attr.aria-label]="texte.fortschritt" />
+  }
+  <p class="status" role="status" aria-live="polite">
+    @if (laeuft()) {
+      {{ texte.fortschrittProzent(prozent()) }}
+    }
+  </p>
+  @if (fehler()) {
+    <p class="fehler" role="alert">{{ fehler() }}</p>
+  }
+</section>
+
+<section aria-labelledby="laeufe-titel">
+  <h2 id="laeufe-titel">{{ texte.laeufe }}</h2>
+  @if (listeFehler()) {
+    <p class="fehler" role="alert">{{ listeFehler() }}</p>
+  } @else if (laeufe() === null) {
+    <p>{{ texte.laden }}</p>
+  } @else if (laeufe()!.length === 0) {
+    <p>{{ texte.keineLaeufe }}</p>
+  } @else {
+    <ul class="laeufe">
+      @for (lauf of laeufe(); track lauf.id) {
+        <li class="karte lauf" data-test="lauf">
+          <a [routerLink]="['/importe', lauf.id]">{{ lauf.dateiname || texte.ohneDateiname }}</a>
+          <span class="marke" [attr.data-status]="lauf.status">{{ texte.status[lauf.status ?? ''] }}</span>
+          <span class="angaben">
+            {{ texte.arten[lauf.art ?? ''] }}
+            @if (lauf.vollexport) {
+              · {{ texte.vollexportMarke }}
+            }
+            · {{ texte.laufZeile(zahl(lauf.zeilen), zeit(lauf.erstellt)) }}
+          </span>
+        </li>
+      }
+    </ul>
+    <nav class="blaettern" [attr.aria-label]="texte.laeufe">
+      <button mat-button type="button" [disabled]="seite() === 0" (click)="laden(seite() - 1)">{{ texte.zurueck }}</button>
+      <span>{{ texte.seiteVon(bereich().von, bereich().bis, bereich().gesamt) }}</span>
+      <button mat-button type="button" [disabled]="!hatWeitere()" (click)="laden(seite() + 1)">{{ texte.weiter }}</button>
+    </nav>
+  }
+</section>

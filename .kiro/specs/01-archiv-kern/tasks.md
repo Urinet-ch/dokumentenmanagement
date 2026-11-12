@@ -318,7 +318,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Verkaufschancen-Import (Importart `verkaufschance`) über die Kontakt-ID aus 21.CRM zuordnen (Profil «21.CRM»: `ACCOUNTGUID` → `kontakt.crm_id`, `GGUID` → `verkaufschance.crm_id`, design.md), bestehende über `crm_id` aktualisieren
   - _Anforderungen: 13.6, 13.7, 13.8, 13.9_
 
-- [ ] 4.4 Import-Oberfläche [Frontend]
+- [x] 4.4 Import-Oberfläche [Frontend]
   - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag; erkanntes Profil «21.CRM» vorausgewählt), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
   - _Anforderungen: 13.2, 13.3, 13.5, 13.6, 13.7_
 

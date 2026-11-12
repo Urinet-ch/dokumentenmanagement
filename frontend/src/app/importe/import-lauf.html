@@ -1,0 +1,226 @@
+<p><a routerLink="/importe">{{ texte.zurListe }}</a></p>
+@let l = lauf();
+<h1>{{ l?.dateiname || texte.titel }}</h1>
+
+@if (l) {
+  <p class="angaben">
+    {{ texte.arten[l.art ?? ''] }}
+    @if (l.vollexport) {
+      · {{ texte.vollexportMarke }}
+    }
+    · {{ texte.laufZeile(zahl(l.zeilen), zeit(l.erstellt)) }}
+  </p>
+  <h2 id="status-titel" class="status-titel" tabindex="-1" #statusTitel data-test="status">
+    {{ texte.status[l.status ?? ''] }}
+  </h2>
+}
+
+@if (fehler()) {
+  <p class="fehler" role="alert">{{ fehler() }}</p>
+}
+
+<div role="status" aria-live="polite" class="laufhinweis">
+  @if (status() === 'VORSCHAU_AUSSTEHEND') {
+    <p>{{ texte.ausstehend }}</p>
+  } @else if (uebernahmeLaeuft()) {
+    <p>{{ texte.uebernahmeLaeuft }}</p>
+  }
+</div>
+
+@if (!antwort() && !fehler()) {
+  <p>{{ texte.laden }}</p>
+}
+
+@if (status() === 'ZUORDNUNG_NOETIG') {
+  <section class="karte zuordnung" aria-labelledby="zuordnung-titel" data-test="zuordnung">
+    <h2 id="zuordnung-titel">{{ texte.zuordnungTitel }}</h2>
+    <p>{{ texte.zuordnungEinleitung }}</p>
+    @if (profilMoeglich()) {
+      <mat-checkbox
+        [checked]="profilAktiv()"
+        (change)="profilWaehlen($event.checked)"
+        aria-describedby="profil-hinweis"
+        data-test="profil"
+      >
+        {{ texte.profil }}
+      </mat-checkbox>
+      <p id="profil-hinweis" class="hinweis">{{ texte.profilHinweis }}</p>
+    }
+    <ol class="spalten">
+      @for (spalte of spalten(); track spalte.position) {
+        @let position = spalte.position ?? 0;
+        <li>
+          <label class="feld">
+            <span>{{ texte.spalte(position + 1, spalte.name ?? '') }}</span>
+            <select [value]="feldDerSpalte(position)" (change)="zuordnenSpalte(position, $any($event.target).value)">
+              <option value="">{{ texte.nichtZuordnen }}</option>
+              @for (feld of zielFelder(); track feld) {
+                <option [value]="feld" [selected]="feld === feldDerSpalte(position)">{{ feldText(feld) }}</option>
+              }
+            </select>
+          </label>
+          @if (beispiel(position)) {
+            <span class="hinweis">{{ texte.beispiel(beispiel(position)) }}</span>
+          }
+        </li>
+      }
+    </ol>
+    <p class="hinweis">{{ texte.zugeordnet(anzahlZugeordnet()) }}</p>
+    @if (!pflichtOk()) {
+      <p class="fehler" data-test="pflicht">
+        {{ art() === 'kontakt' ? texte.pflichtKontakt : texte.pflichtVerkaufschance }}
+      </p>
+    }
+    <button mat-flat-button type="button" [disabled]="!pflichtOk() || sendet()" (click)="zuordnungBestaetigen()">
+      {{ texte.zuordnungBestaetigen }}
+    </button>
+  </section>
+}
+
+@if (status() === 'UEBERNOMMEN' && l) {
+  <section class="karte bilanz" aria-labelledby="bilanz-titel" data-test="bilanz">
+    <h2 id="bilanz-titel">{{ texte.uebernommenTitel }}</h2>
+    <ul>
+      @for (posten of bilanz(); track posten.schluessel) {
+        <li>{{ zahl(posten.anzahl) }} {{ texte.bilanz[posten.schluessel] }}</li>
+      }
+    </ul>
+    <p class="hinweis">{{ texte.uebernommenAm(zeit(l.uebernommen)) }}</p>
+  </section>
+}
+
+@if (status() === 'ABGEBROCHEN') {
+  <p class="fehler" role="alert">{{ texte.abgebrochen }}</p>
+}
+
+@if ((status() === 'VORSCHAU' || status() === 'UEBERNOMMEN') && l) {
+  <section aria-labelledby="vorschau-titel">
+    <h2 id="vorschau-titel">{{ texte.vorschauTitel }}</h2>
+    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+      <p>{{ texte.vorschauEinleitung }}</p>
+    }
+    <div class="zaehler" role="group" [attr.aria-label]="texte.filter">
+      @for (z of zaehler(); track z.ergebnis) {
+        <button
+          type="button"
+          class="chip"
+          [attr.data-ergebnis]="z.ergebnis ?? 'ALLE'"
+          [attr.aria-pressed]="filter() === z.ergebnis"
+          (click)="filtern(z.ergebnis)"
+        >
+          <span class="anzahl">{{ zahl(z.anzahl) }}</span> {{ texte.zaehler[z.ergebnis ?? 'alle'] }}
+        </button>
+      }
+    </div>
+
+    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft() && (l.dubletten ?? 0) > 0) {
+      <p class="hinweis" data-test="dubletten-hinweis">
+        @if (art() === 'kontakt') {
+          {{ texte.dublettenHinweis }}
+          {{ texte.entschieden(zahl(entscheide().size), zahl(l.dubletten)) }}
+        } @else {
+          {{ texte.dublettenVerkaufschance }}
+        }
+      </p>
+    }
+
+    @if (zeilen().length === 0) {
+      <p>{{ texte.keineZeilen }}</p>
+    } @else {
+      <ol class="zeilen">
+        @for (zeile of zeilen(); track zeile.nr) {
+          <li class="karte zeile" [attr.data-ergebnis]="zeile.ergebnis" data-test="zeile">
+            <div class="zeile-kopf">
+              <span class="nr">{{ texte.zeile(zeile.nr ?? 0) }}</span>
+              <span class="marke" [attr.data-ergebnis]="zeile.ergebnis">{{ texte.zaehler[zeile.ergebnis ?? ''] }}</span>
+            </div>
+            @if (zeile.meldung) {
+              <p class="meldung">{{ zeile.meldung }}</p>
+            }
+            @let felder = felderListe(zeile);
+            @if (felder.length > 0) {
+              <dl class="felder">
+                @for (f of felder; track f.feld) {
+                  <div>
+                    <dt>{{ f.feld }}</dt>
+                    <dd>{{ f.wert }}</dd>
+                  </div>
+                }
+              </dl>
+            } @else if (zeile.werte?.length) {
+              <p class="werte"><span class="hinweis">{{ texte.rohwerte }}:</span> {{ zeile.werte!.join(' · ') }}</p>
+            }
+            @if (zeile.kontaktId) {
+              <p class="kontakt"><span class="hinweis">{{ texte.trifft }}:</span> {{ kontaktText(zeile.kontaktId) }}</p>
+            }
+            @if (zeile.kandidaten?.length) {
+              <div class="kandidaten">
+                <span class="hinweis">{{ texte.kandidaten }}:</span>
+                <ul>
+                  @for (kandidat of zeile.kandidaten; track kandidat) {
+                    <li>{{ kontaktText(kandidat) }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (zeile.ergebnis === 'DUBLETTE' && art() === 'kontakt' && status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+              <label class="feld entscheid">
+                <span>{{ texte.entscheid }}</span>
+                <select
+                  [attr.aria-label]="texte.entscheidFuer(zeile.nr ?? 0)"
+                  [value]="entscheidWert(zeile.nr)"
+                  (change)="entscheiden(zeile.nr, $any($event.target).value)"
+                  data-test="entscheid"
+                >
+                  <option value="" [selected]="entscheidWert(zeile.nr) === ''">{{ texte.entscheidOffen }}</option>
+                  <option value="NEU" [selected]="entscheidWert(zeile.nr) === 'NEU'">{{ texte.entscheidNeu }}</option>
+                  <option value="UEBERSPRINGEN" [selected]="entscheidWert(zeile.nr) === 'UEBERSPRINGEN'">
+                    {{ texte.entscheidUeberspringen }}
+                  </option>
+                  @for (kandidat of zeile.kandidaten ?? []; track kandidat) {
+                    <option
+                      [value]="'ZUSAMMENFUEHREN:' + kandidat"
+                      [selected]="entscheidWert(zeile.nr) === 'ZUSAMMENFUEHREN:' + kandidat"
+                    >
+                      {{ texte.entscheidZusammenfuehren(kontaktText(kandidat)) }}
+                    </option>
+                  }
+                </select>
+              </label>
+            }
+          </li>
+        }
+      </ol>
+      <nav class="blaettern" [attr.aria-label]="texte.vorschauTitel">
+        <button mat-button type="button" [disabled]="seite() === 0" (click)="blaettern(-1)">{{ texte.zurueck }}</button>
+        <span>{{ texte.seiteVon(bereich().von, bereich().bis, bereich().gesamt) }}</span>
+        <button mat-button type="button" [disabled]="!hatWeitere()" (click)="blaettern(1)">{{ texte.weiter }}</button>
+      </nav>
+    }
+
+    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+      @if (!bestaetigen()) {
+        <button mat-flat-button type="button" (click)="uebernehmenFragen()">{{ texte.uebernehmen }}</button>
+      } @else {
+        <section class="karte bestaetigen" role="group" aria-labelledby="bestaetigen-titel" data-test="bestaetigen">
+          <h3 id="bestaetigen-titel" tabindex="-1" #bestaetigenTitel>{{ texte.uebernehmenTitel }}</h3>
+          <p>{{ texte.uebernehmenText(zahl(l.neu), zahl(l.geaendert)) }}</p>
+          @if (art() === 'kontakt' && dublettenOffen() > 0) {
+            <p>{{ texte.uebernehmenDubletten(zahl(dublettenOffen())) }}</p>
+          }
+          @if (art() === 'kontakt') {
+            <p data-test="vollexport-folge">{{ l.vollexport ? texte.vollexportAktiv : texte.keinVollexport }}</p>
+          }
+          <div class="knoepfe">
+            <button mat-flat-button type="button" [disabled]="sendet()" (click)="uebernehmen()">
+              {{ texte.jetztUebernehmen }}
+            </button>
+            <button mat-button type="button" [disabled]="sendet()" (click)="bestaetigen.set(false)">
+              {{ texte.abbrechen }}
+            </button>
+          </div>
+        </section>
+      }
+    }
+  </section>
+}
