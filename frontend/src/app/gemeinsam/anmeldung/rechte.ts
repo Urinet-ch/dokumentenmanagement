@@ -5,13 +5,18 @@ export type Rolle = 'inhaber' | 'geschaeftsstelle' | 'mitarbeiter' | 'treuhaende
 // Rangfolge nach Req 2.2: Bei mehreren Archiv-Rollen gilt nur die stärkste, die Rechte werden nicht vereinigt.
 const RANGFOLGE: readonly Rolle[] = ['inhaber', 'geschaeftsstelle', 'mitarbeiter', 'treuhaender'];
 
-export type Aktion = 'A1' | 'A2' | 'A5' | 'A11' | 'A12' | 'A13' | 'A14';
+export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A11' | 'A12' | 'A13' | 'A14';
 
 // Rollen, für die die Aktion nicht 403 ist (A2: alle Rollen; Einschränkungen nach Vertraulichkeit macht das Backend).
 const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
   A1: ['inhaber', 'mitarbeiter', 'geschaeftsstelle'],
   A2: ['inhaber', 'mitarbeiter', 'treuhaender', 'geschaeftsstelle'],
   A5: ['inhaber', 'mitarbeiter', 'geschaeftsstelle'],
+  A6: ['inhaber', 'geschaeftsstelle'],
+  A7: ['inhaber', 'geschaeftsstelle'],
+  A8: ['inhaber', 'geschaeftsstelle'],
+  A9: ['inhaber', 'geschaeftsstelle'],
+  A10: ['inhaber', 'geschaeftsstelle'],
   A11: ['inhaber'],
   A12: ['inhaber'],
   A13: ['inhaber'],

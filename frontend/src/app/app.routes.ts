@@ -25,7 +25,12 @@ export const routes: Routes = [
     providers: [{ provide: UploadPort, useClass: HttpUploadService }],
     title: titel(TEXTE.menue.erfassen),
   },
-  folgt('eingangskorb', TEXTE.menue.eingangskorb, 'A5'),
+  {
+    path: 'eingangskorb',
+    loadComponent: () => import('./eingangskorb/eingangskorb').then((m) => m.Eingangskorb),
+    canActivate: [rechtGuard('A5')],
+    title: titel(TEXTE.menue.eingangskorb),
+  },
   folgt('suche', TEXTE.menue.suche, 'A2'),
   folgt('dokument/:id', 'Dokument', 'A2'),
   folgt('importe', TEXTE.menue.importe, 'A12'),

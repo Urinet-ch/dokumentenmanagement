@@ -1,0 +1,36 @@
+<h1 tabindex="-1" #ueberschrift>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+
+<p class="meldung" role="status" data-test="meldung">{{ meldung() }}</p>
+
+@if (fehlerLaden()) {
+  <div class="fehler" role="alert">
+    <p>{{ texte.fehlerLaden }}</p>
+    <button mat-stroked-button type="button" (click)="laden()">{{ texte.neuLaden }}</button>
+  </div>
+}
+
+@if (laedt() && eintraege().length === 0) {
+  <p aria-busy="true">{{ texte.laedt }}</p>
+} @else if (!fehlerLaden() && eintraege().length === 0) {
+  <p data-test="leer">{{ texte.leer }}</p>
+} @else if (eintraege().length > 0) {
+  <p class="anzahl" data-test="anzahl">{{ texte.anzahl(eintraege().length, gesamt()) }}</p>
+  <ol class="liste" [attr.aria-label]="texte.titel">
+    @for (dokument of eintraege(); track dokument.id) {
+      <li>
+        <app-eingangskorb-karte
+          [dokument]="dokument"
+          [arten]="arten()"
+          (erledigt)="neuLaden($event)"
+          (veraltet)="neuLaden($event)"
+        />
+      </li>
+    }
+  </ol>
+  @if (eintraege().length < gesamt()) {
+    <button mat-stroked-button type="button" [disabled]="laedt()" (click)="laden(true)">
+      {{ texte.mehr }}
+    </button>
+  }
+}
