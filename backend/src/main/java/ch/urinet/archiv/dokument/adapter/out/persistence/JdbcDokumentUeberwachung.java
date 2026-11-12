@@ -32,10 +32,10 @@ public class JdbcDokumentUeberwachung implements DokumentUeberwachung {
     }
 
     @Override
-    public List<Befund> seitMindestens(MandantCode mandant, Duration grenze) {
+    public List<Befund> laengerAls(MandantCode mandant, Duration grenze) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement suchen =
                 verbindung.prepareStatement("select id, status from " + mandant.schema() + ".dokument "
-                        + "where status = any(?::text[]) and status_seit <= clock_timestamp() - ? * interval '1 ms' "
+                        + "where status = any(?::text[]) and status_seit < clock_timestamp() - ? * interval '1 ms' "
                         + "order by status_seit, id")) {
             suchen.setArray(1, verbindung.createArrayOf("text", UEBERWACHTE_STATUS.toArray()));
             suchen.setLong(2, grenze.toMillis());

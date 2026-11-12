@@ -10,16 +10,20 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
  * Überwachung (Req 16.5, design.md «Überwachung»): je aktiven Mandanten Dokumente, die länger als
  * {@code archiv.ueberwachung.grenze} in {@code VERARBEITUNG}, {@code FEHLER} oder {@code ARCHIVIERUNG_FEHLER} stehen,
  * und fehlende Manifeste; einmal für den Betrieb der Stand der Sicherung. Je Befund geht genau eine Mail an den Inhaber,
- * nur mit IDs und Status (Req 16.7). Scheitert der Versand, versucht es der nächste Lauf wieder. Ein Fehler bei einem
- * Mandanten hält die anderen nicht auf.
+ * nur mit IDs und Status (Req 16.7). Scheitert der Versand, versucht es der nächste Lauf wieder; scheitert danach auch
+ * das Freigeben, wiederholt es jeder weitere Lauf, bis es gelingt (Review PR #91). Ein Fehler bei einem Mandanten hält
+ * die anderen nicht auf.
  */
 @ApplicationScoped
 public class Ueberwachung {
@@ -34,15 +38,18 @@ public class Ueberwachung {
     private final InhaberBenachrichtigung benachrichtigung;
     private final Duration grenze;
     private final MandantCode betrieb;
+    /** Ansprüche ohne zugestellte Mail, deren Freigabe gescheitert ist; der nächste Lauf gibt sie zuerst frei. */
+    private final Set<Freigabe> offeneFreigaben = ConcurrentHashMap.newKeySet();
+
+    private record Freigabe(MandantCode mandant, Befund befund, Instant anspruch) {
+    }
 
     public Ueberwachung(MandantRegister register, DokumentUeberwachung dokumente, ManifestUeberwachung manifeste,
                         SicherungUeberwachung sicherung, AlarmSpeicher alarme,
                         InhaberBenachrichtigung benachrichtigung,
                         @ConfigProperty(name = "archiv.ueberwachung.grenze") Duration grenze,
                         @ConfigProperty(name = "archiv.ueberwachung.betrieb-mandant") String betrieb) {
-        if (grenze.isNegative() || grenze.isZero()) {
-            throw new IllegalArgumentException("archiv.ueberwachung.grenze muss positiv sein");
-        }
+        this.betrieb = pruefeEinstellungen(grenze, betrieb);
         this.register = register;
         this.dokumente = dokumente;
         this.manifeste = manifeste;
@@ -50,15 +57,30 @@ public class Ueberwachung {
         this.alarme = alarme;
         this.benachrichtigung = benachrichtigung;
         this.grenze = grenze;
-        this.betrieb = new MandantCode(betrieb);
+    }
+
+    /**
+     * Prüft die Einstellungen der Überwachung (auch beim Start, {@code UeberwachungPruefung}) und liefert den
+     * Betriebs-Mandanten.
+     */
+    public static MandantCode pruefeEinstellungen(Duration grenze, String betrieb) {
+        if (grenze == null || grenze.isNegative() || grenze.isZero()) {
+            throw new IllegalArgumentException("archiv.ueberwachung.grenze muss grösser als 0 sein");
+        }
+        try {
+            return new MandantCode(betrieb);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("archiv.ueberwachung.betrieb-mandant ist kein gültiger Mandant-Code", e);
+        }
     }
 
     /** Ein Lauf über alle aktiven Mandanten; liefert die Anzahl zugestellter Mails. */
     public int pruefen() {
         List<MandantCode> mandanten = register.aktive().stream().map(Mandant::code).toList();
+        offeneFreigabenNachholen();
         int gemeldet = 0;
         for (MandantCode mandant : mandanten) {
-            gemeldet += quelle(mandant, Befund.Quelle.DOKUMENT, () -> Optional.of(dokumente.seitMindestens(mandant,
+            gemeldet += quelle(mandant, Befund.Quelle.DOKUMENT, () -> Optional.of(dokumente.laengerAls(mandant,
                     grenze)));
             gemeldet += quelle(mandant, Befund.Quelle.MANIFEST, () -> manifeste.befunde(mandant));
         }
@@ -80,11 +102,12 @@ public class Ueberwachung {
             alarme.abgleichen(mandant, quelle, befunde.get());
             int gemeldet = 0;
             for (Befund befund : befunde.get()) {
-                if (alarme.beanspruchen(mandant, befund)) {
+                Optional<Instant> anspruch = alarme.beanspruchen(mandant, befund);
+                if (anspruch.isPresent()) {
                     if (benachrichtigung.alarm(mandant, befund)) {
                         gemeldet++;
                     } else {
-                        alarme.freigeben(mandant, befund);
+                        freigeben(new Freigabe(mandant, befund, anspruch.get()));
                     }
                 }
             }
@@ -94,6 +117,23 @@ public class Ueberwachung {
             LOG.warnf("Überwachung von %s für Mandant %s fehlgeschlagen, ursache=%s", quelle, mandant.wert(),
                     Ursachen.kette(e));
             return 0;
+        }
+    }
+
+    private void offeneFreigabenNachholen() {
+        List.copyOf(offeneFreigaben).forEach(f -> {
+            offeneFreigaben.remove(f);
+            freigeben(f);
+        });
+    }
+
+    private void freigeben(Freigabe freigabe) {
+        try {
+            alarme.freigeben(freigabe.mandant(), freigabe.befund(), freigabe.anspruch());
+        } catch (RuntimeException e) {
+            offeneFreigaben.add(freigabe);
+            LOG.warnf("Alarm %s für Mandant %s nicht freigegeben, nächster Lauf wiederholt, ursache=%s",
+                    freigabe.befund().quelle(), freigabe.mandant().wert(), Ursachen.kette(e));
         }
     }
 }

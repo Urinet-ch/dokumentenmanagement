@@ -13,8 +13,8 @@ public interface DokumentUeberwachung {
     /** Status, die nach Req 16.5 nicht länger als die Grenze dauern dürfen. */
     List<String> UEBERWACHTE_STATUS = List.of("VERARBEITUNG", "FEHLER", "ARCHIVIERUNG_FEHLER");
 
-    /** Dokumente, die seit mindestens {@code grenze} in einem der {@link #UEBERWACHTE_STATUS} stehen. */
-    List<Befund> seitMindestens(MandantCode mandant, Duration grenze);
+    /** Dokumente, die länger als {@code grenze} (strikt) in einem der {@link #UEBERWACHTE_STATUS} stehen. */
+    List<Befund> laengerAls(MandantCode mandant, Duration grenze);
 
     /** Anzahl Dokumente je Status ausser den Endzuständen {@code ARCHIVIERT} und {@code VERWORFEN}. */
     Map<String, Long> anzahlJeStatus(MandantCode mandant);

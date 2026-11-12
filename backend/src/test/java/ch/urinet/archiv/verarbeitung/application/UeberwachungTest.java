@@ -8,6 +8,7 @@ import ch.urinet.archiv.verarbeitung.domain.Befund;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,7 +22,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Ablauf der Überwachung (Req 16.5) ohne Datenbank und Mail: Wiederholung, Betriebs-Mandant, fehlende Anbindung. */
+/**
+ * Ablauf der Überwachung (Req 16.5) ohne Datenbank und Mail: Wiederholung (auch nach gescheitertem Freigeben),
+ * Betriebs-Mandant, fehlende Anbindung, Einstellungen.
+ */
 class UeberwachungTest {
 
     private static final MandantCode URINET = new MandantCode("urinet");
@@ -38,6 +42,20 @@ class UeberwachungTest {
         Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty());
 
         assertThat(ueberwachung.pruefen()).isZero();
+        post.zustellen = true;
+        assertThat(ueberwachung.pruefen()).isEqualTo(1);
+        assertThat(ueberwachung.pruefen()).isZero();
+        assertThat(post.versuche).containsExactly(HAENGT, HAENGT);
+    }
+
+    @Test
+    void scheitertAuchDasFreigebenSendetDerNaechsteLauf() {
+        post.zustellen = false;
+        speicher.freigebenScheitert = 1;
+        Ueberwachung ueberwachung = ueberwachung(List.of(URINET), Optional.empty());
+
+        assertThat(ueberwachung.pruefen()).isZero();
+        assertThat(speicher.gemeldet).as("Anspruch bleibt nach gescheitertem Freigeben").isNotEmpty();
         post.zustellen = true;
         assertThat(ueberwachung.pruefen()).isEqualTo(1);
         assertThat(ueberwachung.pruefen()).isZero();
@@ -67,7 +85,7 @@ class UeberwachungTest {
     void einFehlerBeiEinemMandantenHaeltDieAnderenNichtAuf() {
         Ueberwachung ueberwachung = new Ueberwachung(register(List.of(VHF, URINET)), new DokumentUeberwachung() {
             @Override
-            public List<Befund> seitMindestens(MandantCode mandant, Duration grenze) {
+            public List<Befund> laengerAls(MandantCode mandant, Duration grenze) {
                 if (mandant.equals(VHF)) {
                     throw new IllegalStateException("Schema fehlt");
                 }
@@ -87,12 +105,22 @@ class UeberwachungTest {
     void grenzeMussPositivSein() {
         assertThatThrownBy(() -> new Ueberwachung(register(List.of()), null, null, null, speicher, post,
                 Duration.ZERO, "urinet")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Ueberwachung.pruefeEinstellungen(Duration.ofSeconds(-1), "urinet"))
+                .hasMessageContaining("archiv.ueberwachung.grenze");
+    }
+
+    @Test
+    void betriebsMandantMussGueltigSein() {
+        assertThatThrownBy(() -> Ueberwachung.pruefeEinstellungen(Duration.ofHours(1), "Urinet AG"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("archiv.ueberwachung.betrieb-mandant");
+        assertThat(Ueberwachung.pruefeEinstellungen(Duration.ofHours(1), "vhf-gsk")).isEqualTo(VHF);
     }
 
     private Ueberwachung ueberwachung(List<MandantCode> mandanten, Optional<List<Befund>> sicherung) {
         DokumentUeberwachung dokumente = new DokumentUeberwachung() {
             @Override
-            public List<Befund> seitMindestens(MandantCode mandant, Duration grenze) {
+            public List<Befund> laengerAls(MandantCode mandant, Duration grenze) {
                 return mandant.equals(URINET) ? List.of(HAENGT) : List.of();
             }
 
@@ -129,7 +157,9 @@ class UeberwachungTest {
     private static final class Speicher implements AlarmSpeicher {
 
         private final Set<String> offen = new HashSet<>();
-        private final Set<String> gemeldet = new HashSet<>();
+        private final Map<String, Instant> gemeldet = new HashMap<>();
+        private int freigebenScheitert;
+        private long uhr;
         private final List<Befund.Quelle> abgeglichen = new ArrayList<>();
 
         @Override
@@ -139,14 +169,23 @@ class UeberwachungTest {
         }
 
         @Override
-        public boolean beanspruchen(MandantCode mandant, Befund befund) {
+        public Optional<Instant> beanspruchen(MandantCode mandant, Befund befund) {
             String schluessel = mandant.wert() + "/" + befund.schluessel();
-            return offen.contains(schluessel) && gemeldet.add(schluessel);
+            if (!offen.contains(schluessel) || gemeldet.containsKey(schluessel)) {
+                return Optional.empty();
+            }
+            Instant anspruch = Instant.EPOCH.plusMillis(++uhr);
+            gemeldet.put(schluessel, anspruch);
+            return Optional.of(anspruch);
         }
 
         @Override
-        public void freigeben(MandantCode mandant, Befund befund) {
-            gemeldet.remove(mandant.wert() + "/" + befund.schluessel());
+        public void freigeben(MandantCode mandant, Befund befund, Instant anspruch) {
+            if (freigebenScheitert > 0) {
+                freigebenScheitert--;
+                throw new IllegalStateException("Verbindung nicht erhalten");
+            }
+            gemeldet.remove(mandant.wert() + "/" + befund.schluessel(), anspruch);
         }
     }
 

@@ -9,8 +9,13 @@ import jakarta.enterprise.inject.Instance;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
+import java.util.Optional;
 
 /**
  * Tabelle {@code alarm} im Schema {@code m_<code>} per JDBC, Schema immer qualifiziert (läuft im Scheduler ohne
@@ -49,24 +54,30 @@ public class JdbcAlarmSpeicher implements AlarmSpeicher {
     }
 
     @Override
-    public boolean beanspruchen(MandantCode mandant, Befund befund) {
-        return aendern(mandant, "gemeldet = clock_timestamp()", "gemeldet is null and erledigt is null", befund,
-                "Alarm nicht beansprucht") == 1;
+    public Optional<Instant> beanspruchen(MandantCode mandant, Befund befund) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update " + mandant.schema() + ".alarm set gemeldet = clock_timestamp() "
+                        + "where schluessel = ? and gemeldet is null and erledigt is null returning gemeldet")) {
+            aendern.setString(1, befund.schluessel());
+            try (ResultSet zeile = aendern.executeQuery()) {
+                return zeile.next() ? Optional.of(zeile.getObject(1, OffsetDateTime.class).toInstant())
+                        : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw JdbcAuftragSchlange.fehler("Alarm nicht beansprucht", e);
+        }
     }
 
     @Override
-    public void freigeben(MandantCode mandant, Befund befund) {
-        aendern(mandant, "gemeldet = null", "erledigt is null", befund, "Alarm nicht freigegeben");
-    }
-
-    private int aendern(MandantCode mandant, String setzen, String bedingung, Befund befund, String was) {
+    public void freigeben(MandantCode mandant, Befund befund, Instant anspruch) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
-                verbindung.prepareStatement("update " + mandant.schema() + ".alarm set " + setzen
-                        + " where schluessel = ? and " + bedingung)) {
+                verbindung.prepareStatement("update " + mandant.schema() + ".alarm set gemeldet = null "
+                        + "where schluessel = ? and gemeldet = ?")) {
             aendern.setString(1, befund.schluessel());
-            return aendern.executeUpdate();
+            aendern.setObject(2, anspruch.atOffset(ZoneOffset.UTC));
+            aendern.executeUpdate();
         } catch (SQLException e) {
-            throw JdbcAuftragSchlange.fehler(was, e);
+            throw JdbcAuftragSchlange.fehler("Alarm nicht freigegeben", e);
         }
     }
 }
