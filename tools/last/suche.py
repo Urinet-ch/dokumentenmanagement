@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Lastskript für die Volltextsuche (Spec 01, Req 14.3, Aufgabe 4.5).
+
+Schickt Suchanfragen parallel an GET /api/v1/dokumente und gibt p50, p95 und Maximum der Antwortzeit aus. Gemessen
+wird ab gesendeter Anfrage bis zur vollständig gelesenen Antwort (die Netzlaufzeit ist enthalten). Req 14.3 verlangt
+p95 innert 1 Sekunde bei bis zu 50'000 Dokumenten pro Mandant; der Nachweis erfolgt erst auf Stufe B in Aufgabe
+5.11, Last und Hardware sind dort festzulegen ([offen: Messbedingungen nach VPS-Grösse K5]). Darum sind Anzahl und
+Parallelität Pflichtparameter ohne Standardwerte.
+
+Das Skript liest nur. Der Mandant muss vorher mit synthetischen Dokumenten gefüllt sein (für Req 14.3: 50'000); die
+Zahl der für das Token sichtbaren Dokumente steht in der Ausgabe. Die Suchbegriffe stammen aus einer festen Liste
+synthetischer Wörter oder aus einer Datei (ein Begriff je Zeile); nie echte Belegdaten verwenden. Die Ausgabe nennt
+keine Suchbegriffe.
+
+Token (Regel 7): ein Access-Token (OIDC) mit Recht A2 aus einer Datei mit Rechten 600, Pfad aus ARCHIV_TOKEN_DATEI,
+sonst ~/.config/urinet-archiv/token; nie das Token selbst aus einer Umgebungsvariable.
+
+Beispiel:
+    python3 tools/last/suche.py --url https://archiv.apps.urinet.ch --anzahl 500 --parallel 4
+"""
+
+from __future__ import annotations
+
+import argparse
+import http.client
+import json
+import math
+import os
+import random
+import stat
+import statistics
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from urllib.parse import urlencode, urlsplit
+
+WOERTER = [
+    "Rechnung", "Lieferung", "Trikots", "Clubhaus", "Beleuchtung", "Wartung", "Netzwerk", "Server", "Drucker",
+    "Offerte", "Vertrag", "Versicherung", "Lohn", "Spesen", "Miete", "Reparatur", "Installation", "Schulung",
+    "Beratung", "Material", "Kabel", "Lizenz", "Abonnement", "Mahnung", "Gutschrift", "Projekt", "Webseite", "Hosting",
+]
+ARTEN = ["AUSGANGSRECHNUNG", "LIEFERANTENBELEG", "OFFERTE", "QUITTUNG", "VERTRAG", "KORRESPONDENZ"]
+
+
+def token_lesen() -> str:
+    pfad = Path(os.environ.get("ARCHIV_TOKEN_DATEI") or Path.home() / ".config" / "urinet-archiv" / "token")
+    if not pfad.is_file():
+        sys.exit(f"Keine Token-Datei unter {pfad}. Bitte das Token dort ablegen (Rechte 600).")
+    if stat.S_IMODE(pfad.stat().st_mode) & 0o077:
+        sys.exit(f"Die Token-Datei {pfad} ist für andere lesbar. Bitte mit «chmod 600 {pfad}» schützen.")
+    token = pfad.read_text(encoding="utf-8").strip()
+    if not token:
+        sys.exit(f"Die Token-Datei {pfad} ist leer.")
+    return token
+
+
+def begriffe_lesen(datei: str | None) -> list[str]:
+    if datei is None:
+        return WOERTER
+    zeilen = [z.strip() for z in Path(datei).read_text(encoding="utf-8").splitlines()]
+    begriffe = [z for z in zeilen if z and not z.startswith("#")]
+    if not begriffe:
+        sys.exit(f"Die Datei {datei} enthält keine Suchbegriffe.")
+    return begriffe
+
+
+def parameter(nummer: int, begriffe: list[str], zufall: random.Random) -> dict[str, str]:
+    """Mischung aus Suchbegriff allein, zwei Begriffen, Wortfolge mit Ausschluss, Begriff mit Filtern und nur Filtern."""
+    begriff = zufall.choice(begriffe)
+    art = nummer % 5
+    if art == 0:
+        return {"q": begriff}
+    if art == 1:
+        return {"q": f"{begriff} {zufall.choice(begriffe)}"}
+    if art == 2:
+        return {"q": f'"{begriff} {zufall.choice(begriffe)}" -{zufall.choice(begriffe)}'}
+    if art == 3:
+        return {"q": begriff, "art": zufall.choice(ARTEN), "datumVon": "2024-01-01", "richtung": "EINNAHME"}
+    return {"art": zufall.choice(ARTEN), "geschaeftsjahr": str(zufall.choice([2023, 2024, 2025, 2026]))}
+
+
+def suchen(url: str, token: str, werte: dict[str, str]) -> tuple[int, float, int | None]:
+    teile = urlsplit(url)
+    klasse = http.client.HTTPSConnection if teile.scheme == "https" else http.client.HTTPConnection
+    verbindung = klasse(teile.netloc, timeout=60)
+    try:
+        pfad = teile.path.rstrip("/") + "/api/v1/dokumente?" + urlencode(werte)
+        start = time.perf_counter()
+        verbindung.request("GET", pfad, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+        antwort = verbindung.getresponse()
+        koerper = antwort.read()
+        dauer = time.perf_counter() - start
+        gesamt = json.loads(koerper).get("gesamt") if antwort.status == 200 else None
+        return antwort.status, dauer, gesamt
+    except (OSError, ValueError):
+        return 0, 0.0, None
+    finally:
+        verbindung.close()
+
+
+def perzentil(werte: list[float], p: float) -> float:
+    """Nearest-Rank-Perzentil."""
+    geordnet = sorted(werte)
+    return geordnet[max(0, math.ceil(p / 100 * len(geordnet)) - 1)]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Lastskript Volltextsuche (Req 14.3), Nachweis in Aufgabe 5.11")
+    parser.add_argument("--url", required=True, help="Basis-URL des Archivs, z. B. https://archiv.apps.urinet.ch")
+    parser.add_argument("--anzahl", type=int, required=True, help="Anzahl Suchanfragen")
+    parser.add_argument("--parallel", type=int, required=True, help="gleichzeitige Suchanfragen")
+    parser.add_argument("--begriffe", help="Datei mit synthetischen Suchbegriffen, einer je Zeile")
+    parser.add_argument("--grenze", type=float, default=1.0, help="Grenze für p95 in Sekunden (Req 14.3: 1)")
+    parser.add_argument("--seed", type=int, default=143, help="Startwert für die Auswahl der Anfragen")
+    parser.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    args = parser.parse_args()
+    if args.anzahl < 1 or args.parallel < 1:
+        parser.error("--anzahl und --parallel müssen grösser als 0 sein")
+
+    token = token_lesen()
+    begriffe = begriffe_lesen(args.begriffe)
+    status, _, sichtbar = suchen(args.url, token, {"groesse": "1"})
+    if status != 200:
+        sys.exit(f"Die Suche antwortet mit Status {status}. Bitte URL und Token (Recht A2) prüfen.")
+    zufall = random.Random(args.seed)
+    anfragen = [parameter(n, begriffe, zufall) for n in range(args.anzahl)]
+    with ThreadPoolExecutor(max_workers=args.parallel) as pool:
+        ergebnisse = list(pool.map(lambda w: suchen(args.url, token, w), anfragen))
+
+    zeiten = [dauer for status, dauer, _ in ergebnisse if status == 200]
+    fehler: dict[int, int] = {}
+    for status, _, _ in ergebnisse:
+        if status != 200:
+            fehler[status] = fehler.get(status, 0) + 1
+    bericht = {
+        "anzahl": args.anzahl,
+        "parallel": args.parallel,
+        "sichtbare_dokumente": sichtbar,
+        "beantwortet": len(zeiten),
+        "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},
+        "p50_s": round(statistics.median(zeiten), 3) if zeiten else None,
+        "p95_s": round(perzentil(zeiten, 95), 3) if zeiten else None,
+        "max_s": round(max(zeiten), 3) if zeiten else None,
+        "grenze_s": args.grenze,
+    }
+    bericht["bestanden"] = not fehler and bericht["p95_s"] is not None and bericht["p95_s"] <= args.grenze
+    if args.json:
+        print(json.dumps(bericht, ensure_ascii=False))
+    else:
+        print(f"Suchen: {args.anzahl} (parallel {args.parallel}), sichtbare Dokumente: {sichtbar}, "
+              f"beantwortet: {len(zeiten)}")
+        if fehler:
+            # Status 0: keine Antwort (Verbindung abgebrochen oder Zeitüberschreitung)
+            print("Fehler nach Status: " + ", ".join(f"{s}: {z}" for s, z in sorted(fehler.items())))
+        if zeiten:
+            print(f"p50 {bericht['p50_s']} s, p95 {bericht['p95_s']} s, max {bericht['max_s']} s "
+                  f"(Grenze p95 {args.grenze} s)")
+        print("bestanden" if bericht["bestanden"] else "nicht bestanden")
+    return 0 if bericht["bestanden"] else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

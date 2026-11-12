@@ -2,6 +2,7 @@ package ch.urinet.archiv.ablage;
 
 import org.eclipse.microprofile.config.ConfigProvider;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
@@ -43,6 +44,13 @@ public final class TestAblage {
                 seite.deleteMarkers().stream().filter(m -> schluessel.test(m.key())).forEach(m -> s3.deleteObject(
                         b -> b.bucket(bucket(mandant)).key(m.key()).versionId(m.versionId())));
             }
+        }
+    }
+
+    /** Legt unter dem Schlüssel eine neue Version ab; die bisherigen Versionen bleiben erhalten. */
+    public static void neueVersion(String mandant, String schluessel, String inhalt) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            s3.putObject(b -> b.bucket(bucket(mandant)).key(schluessel), RequestBody.fromString(inhalt));
         }
     }
 

@@ -21,6 +21,8 @@ import { Dokument } from '../model/dokument';
 // @ts-ignore
 import { EingangskorbSeite } from '../model/eingangskorb-seite';
 // @ts-ignore
+import { Suchergebnis } from '../model/suchergebnis';
+// @ts-ignore
 import { UploadErgebnis } from '../model/upload-ergebnis';
 
 // @ts-ignore
@@ -37,6 +39,297 @@ export class DokumenteService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
+    }
+
+    /**
+     * Dokumente suchen
+     * Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.
+     * @endpoint get /api/v1/dokumente
+     * @param art Code der Dokumentart
+     * @param belegnummer exakte Belegnummer
+     * @param betragBis Dezimalzahl mit Punkt, ohne Währungsumrechnung
+     * @param betragVon Dezimalzahl mit Punkt, ohne Währungsumrechnung
+     * @param datumBis Belegdatum bis
+     * @param datumVon Belegdatum ab
+     * @param geschaeftsjahr 
+     * @param groesse 1–100
+     * @param partner ID des Partners
+     * @param q Suchbegriff (Websuche-Syntax: \&quot;Wortfolge\&quot;, -ohne, or), höchstens 200 Zeichen
+     * @param richtung 
+     * @param seite ab 0
+     * @param sortierung Standard RELEVANZ mit q, sonst DATUM
+     * @param status 
+     * @param tag Tag; mehrfach möglich (höchstens 10), alle müssen stehen
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1DokumenteGet(art?: string, belegnummer?: string, betragBis?: string, betragVon?: string, datumBis?: string, datumVon?: string, geschaeftsjahr?: number, groesse?: number, partner?: string, q?: string, richtung?: 'EINNAHME' | 'AUSGABE', seite?: number, sortierung?: 'RELEVANZ' | 'DATUM', status?: 'NEU' | 'VERARBEITUNG' | 'EINGANGSKORB' | 'ARCHIVIERUNG' | 'ARCHIVIERUNG_FEHLER' | 'ARCHIVIERT' | 'FEHLER' | 'VERWORFEN', tag?: Array<string>, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Suchergebnis>;
+    public apiV1DokumenteGet(art?: string, belegnummer?: string, betragBis?: string, betragVon?: string, datumBis?: string, datumVon?: string, geschaeftsjahr?: number, groesse?: number, partner?: string, q?: string, richtung?: 'EINNAHME' | 'AUSGABE', seite?: number, sortierung?: 'RELEVANZ' | 'DATUM', status?: 'NEU' | 'VERARBEITUNG' | 'EINGANGSKORB' | 'ARCHIVIERUNG' | 'ARCHIVIERUNG_FEHLER' | 'ARCHIVIERT' | 'FEHLER' | 'VERWORFEN', tag?: Array<string>, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Suchergebnis>>;
+    public apiV1DokumenteGet(art?: string, belegnummer?: string, betragBis?: string, betragVon?: string, datumBis?: string, datumVon?: string, geschaeftsjahr?: number, groesse?: number, partner?: string, q?: string, richtung?: 'EINNAHME' | 'AUSGABE', seite?: number, sortierung?: 'RELEVANZ' | 'DATUM', status?: 'NEU' | 'VERARBEITUNG' | 'EINGANGSKORB' | 'ARCHIVIERUNG' | 'ARCHIVIERUNG_FEHLER' | 'ARCHIVIERT' | 'FEHLER' | 'VERWORFEN', tag?: Array<string>, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Suchergebnis>>;
+    public apiV1DokumenteGet(art?: string, belegnummer?: string, betragBis?: string, betragVon?: string, datumBis?: string, datumVon?: string, geschaeftsjahr?: number, groesse?: number, partner?: string, q?: string, richtung?: 'EINNAHME' | 'AUSGABE', seite?: number, sortierung?: 'RELEVANZ' | 'DATUM', status?: 'NEU' | 'VERARBEITUNG' | 'EINGANGSKORB' | 'ARCHIVIERUNG' | 'ARCHIVIERUNG_FEHLER' | 'ARCHIVIERT' | 'FEHLER' | 'VERWORFEN', tag?: Array<string>, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'art',
+            <any>art,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'belegnummer',
+            <any>belegnummer,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'betragBis',
+            <any>betragBis,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'betragVon',
+            <any>betragVon,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'datumBis',
+            <any>datumBis,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'datumVon',
+            <any>datumVon,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'geschaeftsjahr',
+            <any>geschaeftsjahr,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'groesse',
+            <any>groesse,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'partner',
+            <any>partner,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'q',
+            <any>q,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'richtung',
+            <any>richtung,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'seite',
+            <any>seite,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'sortierung',
+            <any>sortierung,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'status',
+            <any>status,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'tag',
+            <any>tag,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/dokumente`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Suchergebnis>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Datei eines Dokuments herunterladen
+     * Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.
+     * @endpoint get /api/v1/dokumente/{id}/datei
+     * @param id 
+     * @param nr Nummer der Datei (nur original und arbeitsfassung)
+     * @param variante 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling apiV1DokumenteIdDateiGet.');
+        }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'nr',
+            <any>nr,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'variante',
+            <any>variante,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/dokumente/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/datei`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<any>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
     }
 
     /**

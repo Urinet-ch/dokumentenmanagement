@@ -67,6 +67,19 @@
           }
         }
       },
+      "AuszugTeil" : {
+        "description" : "Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req 14.4)",
+        "type" : "object",
+        "required" : [ "text", "treffer" ],
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "treffer" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Dokument" : {
         "description" : "Metadaten eines sichtbaren Dokuments",
         "type" : "object",
@@ -422,6 +435,109 @@
         "type" : "string",
         "format" : "date",
         "examples" : [ "2022-03-10" ]
+      },
+      "Suchergebnis" : {
+        "type" : "object",
+        "required" : [ "treffer", "gesamt", "seite", "groesse" ],
+        "properties" : {
+          "treffer" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Suchtreffer"
+            }
+          },
+          "gesamt" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Zahl aller sichtbaren Treffer"
+          },
+          "seite" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "groesse" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "Suchtreffer" : {
+        "type" : "object",
+        "description" : "Sichtbares Dokument in der Trefferliste",
+        "required" : [ "id", "eingang", "status", "vertraulichkeit", "tags", "auszug" ],
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "art" : {
+            "type" : [ "string", "null" ]
+          },
+          "titel" : {
+            "type" : [ "string", "null" ]
+          },
+          "datum" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "eingang" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "NEU", "VERARBEITUNG", "EINGANGSKORB", "ARCHIVIERUNG", "ARCHIVIERUNG_FEHLER", "ARCHIVIERT", "FEHLER", "VERWORFEN" ]
+          },
+          "vertraulichkeit" : {
+            "type" : "string",
+            "description" : "Ohne bestätigte Art gilt PERSONAL (Req 2.21)",
+            "enum" : [ "NORMAL", "INTERN", "PERSONAL" ]
+          },
+          "tags" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "geschaeftsjahr" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "partnerId" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "partnerName" : {
+            "type" : [ "string", "null" ]
+          },
+          "belegnummer" : {
+            "type" : [ "string", "null" ]
+          },
+          "betrag" : {
+            "type" : [ "number", "null" ],
+            "description" : "Betrag; Währung in waehrung"
+          },
+          "waehrung" : {
+            "type" : [ "string", "null" ]
+          },
+          "richtung" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "EINNAHME", "AUSGABE" ]
+          },
+          "auszug" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AuszugTeil"
+            },
+            "description" : "Textstelle mit Treffern; leer ohne Suchbegriff"
+          }
+        }
       },
       "UUID" : {
         "type" : "string",
@@ -820,6 +936,149 @@
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "mitarbeiter", "geschaeftsstelle", "api-token:import" ]
         } ]
+      },
+      "get" : {
+        "summary" : "Dokumente suchen",
+        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "description" : "Code der Dokumentart",
+          "name" : "art",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "exakte Belegnummer",
+          "name" : "belegnummer",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Dezimalzahl mit Punkt, ohne Währungsumrechnung",
+          "name" : "betragBis",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Dezimalzahl mit Punkt, ohne Währungsumrechnung",
+          "name" : "betragVon",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Belegdatum bis",
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "name" : "datumBis",
+          "in" : "query"
+        }, {
+          "description" : "Belegdatum ab",
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "name" : "datumVon",
+          "in" : "query"
+        }, {
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : "geschaeftsjahr",
+          "in" : "query"
+        }, {
+          "description" : "1–100",
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer",
+            "default" : 20
+          },
+          "name" : "groesse",
+          "in" : "query"
+        }, {
+          "description" : "ID des Partners",
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : "partner",
+          "in" : "query"
+        }, {
+          "description" : "Suchbegriff (Websuche-Syntax: \"Wortfolge\", -ohne, or), höchstens 200 Zeichen",
+          "name" : "q",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "EINNAHME", "AUSGABE" ]
+          },
+          "name" : "richtung",
+          "in" : "query"
+        }, {
+          "description" : "ab 0",
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer",
+            "default" : 0
+          },
+          "name" : "seite",
+          "in" : "query"
+        }, {
+          "description" : "Standard RELEVANZ mit q, sonst DATUM",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "RELEVANZ", "DATUM" ]
+          },
+          "name" : "sortierung",
+          "in" : "query"
+        }, {
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "NEU", "VERARBEITUNG", "EINGANGSKORB", "ARCHIVIERUNG", "ARCHIVIERUNG_FEHLER", "ARCHIVIERT", "FEHLER", "VERWORFEN" ]
+          },
+          "name" : "status",
+          "in" : "query"
+        }, {
+          "description" : "Tag; mehrfach möglich (höchstens 10), alle müssen stehen",
+          "name" : "tag",
+          "in" : "query",
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Suchergebnis"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
       }
     },
     "/api/v1/dokumente/{id}" : {
@@ -848,6 +1107,58 @@
                 "schema" : {
                   "$ref" : "#/components/schemas/Dokument"
                 }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumente/{id}/datei" : {
+      "get" : {
+        "summary" : "Datei eines Dokuments herunterladen",
+        "description" : "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.",
+        "tags" : [ "Dokumente" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        }, {
+          "description" : "Nummer der Datei (nur original und arbeitsfassung)",
+          "schema" : {
+            "maximum" : 9999,
+            "minimum" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : "nr",
+          "in" : "query"
+        }, {
+          "schema" : {
+            "type" : "string",
+            "default" : "pdfa",
+            "enum" : [ "pdfa", "original", "arbeitsfassung" ]
+          },
+          "name" : "variante",
+          "in" : "query"
+        } ],
+        "responses" : {
+          "302" : {
+            "description" : "Weiterleitung auf die vorsignierte URL",
+            "headers" : {
+              "Location" : {
+                "description" : "vorsignierte URL, nur für GET"
               }
             }
           },

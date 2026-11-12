@@ -11,6 +11,7 @@ index.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
+model/auszug-teil.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
@@ -18,6 +19,8 @@ model/eingangskorb-seite.ts
 model/kontakt-angaben.ts
 model/kontakt.ts
 model/models.ts
+model/suchergebnis.ts
+model/suchtreffer.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts
 param.ts

@@ -317,11 +317,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag; erkanntes Profil «21.CRM» vorausgewählt), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
   - _Anforderungen: 13.2, 13.3, 13.5, 13.6, 13.7_
 
-- [ ] 4.5 Volltextsuche [Backend]
+- [x] 4.5 Volltextsuche [Backend]
   - `GET /api/v1/dokumente` mit `websearch_to_tsquery` (inkl. Tags), Filtern (Art, Partner, Zeitraum, Betrag, Richtung, Tags, Status, Geschäftsjahr, Belegnummer exakt), Sortierung, `ts_headline`; Vertraulichkeit nach 2.3 und Mandant
   - Lasttest mit 50'000 synthetischen Dokumenten: p95 ≤ 1 s; Lastskript hier bereitstellen, Nachweis erst auf Stufe B in 5.11 (Messbedingungen aus 4.9, 16.16), in Stufe A nur Funktion
   - `GET /api/v1/dokumente/{id}/datei` mit vorsignierter URL (5 Min.) für die gespeicherte Versions-ID, mit Protokoll
   - _Anforderungen: 14.1–14.7_
+  - Erledigt (PR #56): Suche und Download wie design.md «Suche», «Umsetzung (Aufgabe 4.5)»; Lastskript `tools/last/suche.py`. 14.3 lokal nur als Grössenordnung (10'000 Dokumente), der Nachweis folgt in 5.11
 
 - [ ] 4.6 Suche und Dokumentansicht [Frontend]
   - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Richtung, Status, Tags, Geschäftsjahr, Belegnummer), Trefferliste mit Auszug
