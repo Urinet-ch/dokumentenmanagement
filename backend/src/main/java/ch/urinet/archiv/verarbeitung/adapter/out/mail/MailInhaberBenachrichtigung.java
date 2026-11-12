@@ -9,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.Config;
 import org.jboss.logging.Logger;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,17 +35,25 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
 
     @Override
     public void archivierungGescheitert(MandantCode mandant, UUID dokumentId, UUID fehlerId) {
+        senden(mandant, betreff(dokumentId), text(dokumentId, fehlerId), "Dokument " + dokumentId, fehlerId);
+    }
+
+    @Override
+    public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
+        senden(mandant, betreffManifest(mandant, datum), textManifest(datum, fehlerId), "Manifest " + datum, fehlerId);
+    }
+
+    private void senden(MandantCode mandant, String betreff, String text, String bezug, UUID fehlerId) {
         Optional<String> empfaenger = empfaenger(mandant);
         if (empfaenger.isEmpty()) {
-            LOG.warnf("Archivierung von Dokument %s gescheitert (fehler-id=%s); kein Empfänger für die "
-                    + "Benachrichtigung konfiguriert", dokumentId, fehlerId);
+            LOG.warnf("%s: Benachrichtigung nötig (fehler-id=%s); kein Empfänger konfiguriert", bezug, fehlerId);
             return;
         }
         try {
-            mailer.send(Mail.withText(empfaenger.get(), betreff(dokumentId), text(dokumentId, fehlerId)));
-            LOG.infof("Inhaber über gescheiterte Archivierung von Dokument %s benachrichtigt", dokumentId);
+            mailer.send(Mail.withText(empfaenger.get(), betreff, text));
+            LOG.infof("Inhaber benachrichtigt: %s", bezug);
         } catch (RuntimeException e) {
-            LOG.warnf("Benachrichtigung zu Dokument %s nicht versandt (%s)", dokumentId, e.getClass().getName());
+            LOG.warnf("Benachrichtigung zu %s nicht versandt (%s)", bezug, e.getClass().getName());
         }
     }
 
@@ -160,6 +169,18 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
                     + "Sperren und Löschmarken nicht geprüft.";
             case ABGESCHLOSSEN -> "Der Lauf war schon vollständig geprüft.";
         };
+    }
+
+    static String betreffManifest(MandantCode mandant, LocalDate datum) {
+        return "UriNet Archiv: Manifest " + datum + " für " + mandant.wert() + " fehlt";
+    }
+
+    static String textManifest(LocalDate datum, UUID fehlerId) {
+        return "Für den " + datum + " liegt nach dem letzten Versuch kein gültiges Manifest mit Zeitstempel vor. "
+                + "Der nächste tägliche Lauf um 03:30 holt es nach; bis dahin fehlt der Nachweis für diesen und alle "
+                + "folgenden Tage.\n\n"
+                + "Erreichbarkeit der Zeitstempeldienste und des Object Storage prüfen. Im Log nach der Fehler-ID "
+                + fehlerId + " suchen.\n";
     }
 
     static String betreff(UUID dokumentId) {

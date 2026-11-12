@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
@@ -32,6 +33,10 @@ import java.util.UUID;
  * löscht eine Datei unter {@code archiv/} oder {@code manifest/} (Req 6.5).
  */
 public interface AblagePort {
+
+    /** Obergrenze eines Manifest-Teils beim Lesen (8 MiB). */
+    int MANIFEST_MAX_GROESSE = 8 * 1024 * 1024;
+
 
     /** Legt eine Datei unter {@code eingang/} ohne Sperre ab (Req 6.2) und liefert Versions-ID und SHA-256. */
     AbgelegteDatei ablegenEingang(MandantCode mandant, DateiSchluessel schluessel, InputStream inhalt, long laenge);
@@ -81,6 +86,12 @@ public interface AblagePort {
      */
     AbgelegteDatei ablegenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil, byte[] inhalt,
                                    Optional<LocalDate> spaetestesAufbewahrenBis);
+
+    /**
+     * Liest die neueste Version eines Manifest-Teils (Aufgabe 5.2: Wiederholung und Prüfwerkzeug); leer, wenn er fehlt.
+     * Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18).
+     */
+    Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil);
 
     /**
      * Lädt genau diese Version einer Datei aus {@code eingang/} nach {@code ziel} (darf noch nicht bestehen) und prüft

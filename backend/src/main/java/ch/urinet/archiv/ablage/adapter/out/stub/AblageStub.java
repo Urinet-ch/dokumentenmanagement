@@ -7,6 +7,7 @@ import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
+import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
@@ -166,6 +167,20 @@ public class AblageStub implements AblagePort {
         }
         Instant bis = Sperrfrist.manifest(spaetestesAufbewahrenBis, Instant.now(), Optional.empty());
         return datei(key, speichern(mandant, key, inhalt, bis));
+    }
+
+    @Override
+    public synchronized Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil) {
+        String key = teil.pfad(datum);
+        List<Version> vorhanden = liste(mandant, key);
+        if (vorhanden.isEmpty()) {
+            return Optional.empty();
+        }
+        Version v = vorhanden.getLast();
+        if (v.groesse() > MANIFEST_MAX_GROESSE) {
+            throw new IllegalStateException("Manifest-Teil zu gross: " + key);
+        }
+        return Optional.of(new ManifestDatei(lesen(v), datei(key, v)));
     }
 
     @Override

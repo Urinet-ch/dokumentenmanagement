@@ -119,6 +119,11 @@
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
         </dependency>
+        <!-- RFC-3161-Zeitstempel, OCSP und CRL des Tages-Manifests (Aufgabe 5.2); Version aus dem Quarkus-BOM -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+        </dependency>
         <!-- JSON Schema Draft 2020-12 für zusatz_schema (Aufgabe 2.1, Req 9.5) -->
         <dependency>
             <groupId>com.networknt</groupId>
@@ -220,7 +225,8 @@
             <version>${assertj.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- KI-Aufrufe in Tests nur gegen WireMock (Aufgabe 3.2, tech.md «Tests und Qualität»; nicht im Quarkus-BOM) -->
+        <!-- KI-Aufrufe in Tests nur gegen WireMock (Aufgabe 3.2, tech.md «Tests und Qualität»; nicht im Quarkus-BOM);
+             ebenso die Stubs der Zeitstempeldienste (Aufgabe 5.2), nie echte TSA-Aufrufe aus Tests -->
         <dependency>
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock-standalone</artifactId>
@@ -232,11 +238,6 @@
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
             <version>${pdfbox.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk18on</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

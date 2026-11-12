@@ -9,6 +9,7 @@ import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
+import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
@@ -293,6 +294,29 @@ public class S3Ablage implements AblagePort {
         }
         LOG.debugf("Manifest abgelegt: %s (Version %s, %s)", key, versionId, modus);
         return new AbgelegteDatei(key, versionId, sha256, inhalt.length, Optional.of(ist.get().retainUntilDate()));
+    }
+
+    @Override
+    public Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil) {
+        String bucket = bucket(mandant);
+        String key = teil.pfad(datum);
+        List<ObjectVersion> vorhanden = versionen(bucket, key);
+        if (vorhanden.isEmpty()) {
+            return Optional.empty();
+        }
+        String versionId = vorhanden.getFirst().versionId();
+        byte[] inhalt;
+        try (InputStream ein = s3.getObject(b -> b.bucket(bucket).key(key).versionId(versionId))) {
+            inhalt = ein.readNBytes(MANIFEST_MAX_GROESSE + 1);
+        } catch (IOException e) {
+            throw SdkClientException.create("Lesen fehlgeschlagen: " + key, e);
+        }
+        if (inhalt.length > MANIFEST_MAX_GROESSE) {
+            throw new IllegalStateException("Manifest-Teil zu gross: " + key);
+        }
+        Optional<Instant> sperre = retention(bucket, key, versionId).map(ObjectLockRetention::retainUntilDate);
+        return Optional.of(new ManifestDatei(inhalt, new AbgelegteDatei(key, versionId, Pruefsumme.von(inhalt),
+                inhalt.length, sperre)));
     }
 
     /**

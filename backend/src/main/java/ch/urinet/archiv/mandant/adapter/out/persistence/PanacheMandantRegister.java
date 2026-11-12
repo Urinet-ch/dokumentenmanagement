@@ -8,7 +8,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /** Register in {@code public.mandant}; auch beim Start und im Admin-Kommando, darum mit eigenem Request-Kontext (Tenant-Resolver). */
 @ApplicationScoped
@@ -41,5 +43,12 @@ public class PanacheMandantRegister implements MandantRegister {
                 .map(e -> new Mandant(new MandantCode(e.code), e.name, e.schemaName, e.bucket,
                         new Geschaeftsjahresende(e.geschaeftsjahrEnde), e.aktiv))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public Optional<Instant> erstellt(MandantCode code) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        return eintrag == null ? Optional.empty() : Optional.of(eintrag.erstellt.toInstant());
     }
 }
