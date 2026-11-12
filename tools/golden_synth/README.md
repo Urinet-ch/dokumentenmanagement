@@ -39,7 +39,7 @@ cd tools/golden_synth && .venv/bin/python -m pytest -q
 | 01–10 | `QUITTUNG` | `QUITTUNG`: Kassenbons 80 mm, Online-Shop (A4), handschriftliche Quittung |
 | 11–20 | `LIEFERANTENRECHNUNG` | `LIEFERANTENBELEG`: 7 Layouts, 9 mit QR-Rechnung (2 QR-IBAN + QR-Referenz, 1 ohne Betrag), EUR, Gutschrift, zweiseitig |
 | 21–30 | `EIGENE_RECHNUNG_OFFERTE` | 6 `AUSGANGSRECHNUNG` (`2026-0xx`, QR), 4 `OFFERTE` (`O-2026-0xx`, «gültig bis») |
-| 31–40 | `BEHOERDE_VERSICHERUNG` | `BEHOERDE`, `VERSICHERUNG`: Akonto, Steuer, Verfügung, UVG, Policen, Mahnung, Brief, Frist, Rückerstattung |
+| 31–40 | `BEHOERDE_VERSICHERUNG` | `BEHOERDE`, `VERSICHERUNG` (nur Policen), `LIEFERANTENBELEG` (UVG-Prämienrechnung, Mahnung mit Mahngebühr): Akonto, Steuer, Verfügung, UVG, Policen, Mahnung, Brief, Frist, Rückerstattung |
 | 41–50 | `HANDY_FOTO` | gemischt; JPEG, 2 als HEIC (falls `pillow-heif` installiert, sonst JPEG) |
 
 Die Randfälle stehen je Beleg in `randfaelle` (z. B. `datum_franzoesisch`, `rundung_5rp`,

@@ -753,7 +753,7 @@ def b34(k: Kontext) -> Beleg:
                                  [0.4, 0.22, 0.15, 0.23], [False, True, True, True]),
                  summen=[("Total Prämie CHF", fb(total), True)],
                  absaetze_nach=[f"Zahlbar bis {fd(faellig, 'ddmmyyyy')}."], qr=qr)
-    return Beleg(34, "BEHOERDE_VERSICHERUNG", "uvg_praemie", "VERSICHERUNG", k.firma("foehnwind").name, tag, total, "CHF",
+    return Beleg(34, "BEHOERDE_VERSICHERUNG", "uvg_praemie", "LIEFERANTENBELEG", k.firma("foehnwind").name, tag, total, "CHF",
                  nummer, "AUSGABE", faellig, ["mehrere_betraege", "faelligkeit_datum", "qr", "datum_ddmmyyyy"],
                  lambda: render.a4(dok, render.STILE["B"]), qr=qr)
 
@@ -813,7 +813,7 @@ def b37(k: Kontext) -> Beleg:
                          ("Total offen CHF", fb(total), True)],
                  absaetze_nach=[f"Zahlbar bis {fd(faellig, 'ddmmyyyy')}. Ohne Zahlung ruht der Versicherungsschutz."],
                  qr=qr)
-    return Beleg(37, "BEHOERDE_VERSICHERUNG", "mahnung", "VERSICHERUNG", k.firma("foehnwind").name, tag, total, "CHF",
+    return Beleg(37, "BEHOERDE_VERSICHERUNG", "mahnung", "LIEFERANTENBELEG", k.firma("foehnwind").name, tag, total, "CHF",
                  nummer, "AUSGABE", faellig, ["mahnung", "mehrere_betraege", "tausender_apostroph", "faelligkeit_datum",
                                               "qr", "datum_ddmmyyyy"],
                  lambda: render.a4(dok, render.STILE["B"]), qr=qr)
@@ -992,7 +992,7 @@ def f49(k: Kontext) -> Beleg:
     dok = _brief(k, "hagelwolke", "F", fd(tag, "ddmmyyyy"), "Prämienrechnung Sachversicherung Inventar",
                  meta=[("Rechnungs-Nr.", nummer)], summen=[("Jahresprämie CHF", fb(praemie), True)],
                  absaetze_nach=[f"Zahlbar bis {fd(faellig, 'ddmmyyyy')}."], qr=qr)
-    b = Beleg(49, "", "", "VERSICHERUNG", k.firma("hagelwolke").name, tag, praemie, "CHF", nummer, "AUSGABE", faellig,
+    b = Beleg(49, "", "", "LIEFERANTENBELEG", k.firma("hagelwolke").name, tag, praemie, "CHF", nummer, "AUSGABE", faellig,
               ["qr", "faelligkeit_datum", "datum_ddmmyyyy"], lambda: render.a4(dok, render.STILE["F"]), qr=qr)
     return _als_foto(b, 49, "versicherung_licht", FotoParameter(winkel=25), ["perspektive", "ungleiches_licht"])
 
