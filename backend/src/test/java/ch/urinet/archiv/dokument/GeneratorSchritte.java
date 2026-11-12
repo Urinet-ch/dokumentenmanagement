@@ -13,12 +13,19 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -31,20 +38,30 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Schritte zu Aufgabe 4.7 (Req 11.1–11.3, 11.6–11.8, 11.10, 11.11): {@code POST /api/v1/dokumente/generator} mit
- * einem API-Token vom Scope {@code generator}, Verarbeitung und Archivierung über den Worker. Jede PDF ist eine frische
- * synthetische Text-PDF (Req 16.15); dieselbe Bezeichnung im Szenario heisst dieselben Bytes.
+ * Schritte zu Aufgabe 4.7 (Req 11.1–11.11): {@code POST /api/v1/dokumente/generator} mit einem API-Token vom Scope
+ * {@code generator}, Verarbeitung und Archivierung über den Worker; für Req 11.4, 11.5 und 11.9 ruft ein Python-Prozess
+ * den echten Client {@code tools/archiv_client.py} gegen den Testserver auf. Jede PDF ist eine frische synthetische
+ * Text-PDF (Req 16.15); dieselbe Bezeichnung im Szenario heisst dieselben Bytes.
  */
 public class GeneratorSchritte {
 
     private static final String PFAD = "/api/v1/dokumente/generator";
     private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
+    private static final Path TOOLS = Path.of("..", "tools").toAbsolutePath().normalize();
+    /** Der Einzeiler, mit dem ein Skript ablegt (Req 11.4); gibt Zustand und ID aus. */
+    private static final String EINZEILER = "import json, sys, archiv_client as a; "
+            + "e = a.archivieren(sys.argv[1], json.loads(sys.argv[2])); print(e.zustand, e.id or '')";
 
     private record Ort(String mandant, UUID id) {
     }
@@ -66,11 +83,27 @@ public class GeneratorSchritte {
     private final Map<String, String> tokenJeMandant = new HashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
     private final List<Ort> kontakte = new ArrayList<>();
+    private final Set<String> clientPdfs = new LinkedHashSet<>();
     private String mandant;
     private Response antwort;
+    private Path skript;
+    private String clientZustand;
+    private String clientId;
 
     @After
     public void aufraeumen() throws Exception {
+        for (String pdf : clientPdfs) {
+            for (String id : dokumenteZurPdf(mandant, pdf)) {
+                dokumente.putIfAbsent("client " + id, new Ort(mandant, UUID.fromString(id)));
+            }
+        }
+        if (skript != null) {
+            try (Stream<Path> pfade = Files.walk(skript)) {
+                for (Path pfad : pfade.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.delete(pfad);
+                }
+            }
+        }
         Map<String, List<UUID>> jeMandant = new HashMap<>();
         for (Ort ort : dokumente.values()) {
             ausfuehren("delete from public.auftrag where nutzlast ->> 'dokumentId' = ?", ort.id().toString());
@@ -223,9 +256,89 @@ public class GeneratorSchritte {
         assertThat(zeile(ort(name), "status").get("status")).isEqualTo(status);
     }
 
-    private Response senden(RequestSpecification anfrage, String pdf, String metadaten) {
-        byte[] inhalt = pdfs.computeIfAbsent(pdf, n -> OcrTestdateien.textPdf("Synthetischer Generator-Beleg " + n,
+    @Wenn("das Skript die PDF «{word}» mit dem Python-Client und diesen Metadaten ablegt:")
+    public void client(String pdf, String metadaten) throws Exception {
+        clientAufrufen(pdf, metadaten, "http://localhost:" + RestAssured.port);
+    }
+
+    @Wenn("das Skript bei nicht erreichbarem Archiv die PDF «{word}» mit dem Python-Client und diesen Metadaten ablegt:")
+    public void clientOhneArchiv(String pdf, String metadaten) throws Exception {
+        int port;
+        try (ServerSocket frei = new ServerSocket(0)) {
+            port = frei.getLocalPort();
+        }
+        clientAufrufen(pdf, metadaten, "http://127.0.0.1:" + port);
+    }
+
+    @Dann("meldet der Python-Client «{word}»")
+    public void clientMeldet(String zustand) {
+        assertThat(clientZustand).isEqualTo(zustand);
+    }
+
+    @Dann("meldet der Python-Client «{word}» für das Dokument «{word}»")
+    public void clientMeldetDokument(String zustand, String name) {
+        clientMeldet(zustand);
+        dokumente.put(name, new Ort(mandant, UUID.fromString(clientId)));
+    }
+
+    @Dann("liegt die PDF «{word}» im Ordner «archiv-ausstehend» des Skripts")
+    public void ausstehend(String pdf) throws IOException {
+        assertThat(Files.readAllBytes(skript.resolve("archiv-ausstehend").resolve(pdf + ".pdf"))).isEqualTo(pdfs.get(pdf));
+        assertThat(skript.resolve("archiv-ausstehend").resolve(pdf + ".json")).isRegularFile();
+    }
+
+    @Dann("liegt im Ordner «archiv-ausstehend» des Skripts keine PDF mehr")
+    public void nichtsAusstehend() throws IOException {
+        try (Stream<Path> pfade = Files.list(skript.resolve("archiv-ausstehend"))) {
+            assertThat(pfade.toList()).isEmpty();
+        }
+    }
+
+    @Dann("liegt die PDF «{word}» im Ordner «archiv-konflikt» des Skripts und nicht mehr neben dem Skript")
+    public void konflikt(String pdf) throws IOException {
+        assertThat(Files.readAllBytes(skript.resolve("archiv-konflikt").resolve(pdf + ".pdf"))).isEqualTo(pdfs.get(pdf));
+        assertThat(skript.resolve(pdf + ".pdf")).doesNotExist();
+        assertThat(skript.resolve("archiv-ausstehend")).doesNotExist();
+    }
+
+    private void clientAufrufen(String pdf, String metadaten, String url) throws Exception {
+        if (skript == null) {
+            skript = Files.createTempDirectory("generator-skript");
+        }
+        Path tokenDatei = skript.resolve(".token");
+        if (!Files.exists(tokenDatei)) {
+            Files.createFile(tokenDatei, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            Files.writeString(tokenDatei, tokenJeMandant.get(mandant));
+        }
+        Path datei = skript.resolve(pdf + ".pdf");
+        Files.write(datei, pdf(pdf));
+        clientPdfs.add(pdf);
+        Path fehler = skript.resolve(".fehler");
+        ProcessBuilder aufruf = new ProcessBuilder("python3", "-c", EINZEILER, datei.toString(), metadaten)
+                .redirectError(fehler.toFile());
+        Map<String, String> umgebung = aufruf.environment();
+        umgebung.put("PYTHONPATH", TOOLS.toString());
+        umgebung.put("PYTHONDONTWRITEBYTECODE", "1");
+        umgebung.put("ARCHIV_URL", url);
+        umgebung.put("ARCHIV_TOKEN_DATEI", tokenDatei.toString());
+        umgebung.put("NO_PROXY", "localhost,127.0.0.1");
+        umgebung.put("no_proxy", "localhost,127.0.0.1");
+        Process prozess = aufruf.start();
+        String ausgabe = new String(prozess.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+        assertThat(prozess.waitFor(60, TimeUnit.SECONDS)).as("Python-Client beendet").isTrue();
+        assertThat(prozess.exitValue()).as("Exit-Code des Python-Clients: " + Files.readString(fehler)).isZero();
+        String[] teile = ausgabe.split(" ", 2);
+        clientZustand = teile[0];
+        clientId = teile.length > 1 ? teile[1].strip() : "";
+    }
+
+    private byte[] pdf(String pdf) {
+        return pdfs.computeIfAbsent(pdf, n -> OcrTestdateien.textPdf("Synthetischer Generator-Beleg " + n,
                 "Kennung " + UUID.randomUUID()));
+    }
+
+    private Response senden(RequestSpecification anfrage, String pdf, String metadaten) {
+        byte[] inhalt = pdf(pdf);
         return anfrage.multiPart("datei", pdf + ".pdf", inhalt, "application/pdf")
                 .multiPart("metadaten", metadaten).when().post(PFAD);
     }

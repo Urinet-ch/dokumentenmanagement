@@ -184,3 +184,56 @@ Funktionalität: Generator-Schnittstelle für Skripte
       """
     Dann antwortet der Generator mit Status 409 und Fehlercode «FRIST_ABGELAUFEN»
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «A1»
+
+  @req-11.4
+  Szenario: Ein Skript legt eine PDF mit einem Aufruf des Python-Clients ab
+    Wenn das Skript die PDF «C1» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe aus dem Skript", "projekt": "Probe" }
+      """
+    Dann meldet der Python-Client «ANGENOMMEN» für das Dokument «C1»
+    Und hat das Generator-Dokument «C1» diese Werte:
+      | quelle | GENERATOR            |
+      | titel  | Probe aus dem Skript |
+
+  @req-11.5
+  Szenario: Ist das Archiv nicht erreichbar, stellt der Client die PDF zurück und sendet sie beim nächsten Aufruf
+    Wenn das Skript bei nicht erreichbarem Archiv die PDF «C1» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe zurückgestellt", "projekt": "Probe" }
+      """
+    Dann meldet der Python-Client «AUSSTEHEND»
+    Und liegt die PDF «C1» im Ordner «archiv-ausstehend» des Skripts
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «C1»
+    Wenn das Skript die PDF «C2» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe danach", "projekt": "Probe" }
+      """
+    Dann meldet der Python-Client «ANGENOMMEN» für das Dokument «C2»
+    Und liegt im Ordner «archiv-ausstehend» des Skripts keine PDF mehr
+    Und gibt es im Mandanten «urinet» genau ein Dokument zur PDF «C1»
+
+  @req-11.9
+  Szenario: Bei 409 verschiebt der Client die PDF nach archiv-konflikt und sendet sie nicht erneut
+    Wenn das Skript die PDF «C1» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "AUSGANGSRECHNUNG", "titel": "Probe-Rechnung", "datum": "2026-03-10",
+        "partner": {"crmId": "K-PROBE-4711"},
+        "finanz": {"belegnummer": "2026-905", "richtung": "EINNAHME", "betrag": "100.00", "waehrung": "CHF"} }
+      """
+    Dann meldet der Python-Client «ANGENOMMEN» für das Dokument «C1»
+    Wenn das Skript die PDF «C2» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "AUSGANGSRECHNUNG", "titel": "Andere Probe-Rechnung", "datum": "2026-03-11",
+        "partner": {"crmId": "K-PROBE-4711"},
+        "finanz": {"belegnummer": "2026-905", "richtung": "EINNAHME", "betrag": "200.00", "waehrung": "CHF"} }
+      """
+    Dann meldet der Python-Client «KONFLIKT»
+    Und liegt die PDF «C2» im Ordner «archiv-konflikt» des Skripts und nicht mehr neben dem Skript
+    Wenn das Skript die PDF «C3» mit dem Python-Client und diesen Metadaten ablegt:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe danach", "projekt": "Probe" }
+      """
+    Dann meldet der Python-Client «ANGENOMMEN» für das Dokument «C3»
+    Und liegt die PDF «C2» im Ordner «archiv-konflikt» des Skripts und nicht mehr neben dem Skript
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «C2»
