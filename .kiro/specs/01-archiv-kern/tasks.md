@@ -274,12 +274,13 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6, 6.7, 6.8, 6.13, 8.2, 8.3, 8.5, 8.8, 8.9, 8.10, 9.8_
   - erledigt (PR #57): `DokumentBestaetigen`, `DokumentVerwerfen`, `DokumentWiederholen`, `ArchivierenHandler` mit Mail an den Inhaber (nur IDs); Szenarien `features/dokument/bestaetigen.feature`, `verwerfen.feature`, `wiederholen.feature`, `features/verarbeitung/archivieren.feature`; JUnit `DokumentBestaetigenTest`, `ArchivierenHandlerTest` (design.md «Umsetzung (Aufgabe 3.4, 11.11.2026)»). Offen: Empfänger und SMTP der Benachrichtigung in `prod`; `SPERRE_KONFLIKT` und Änderungen nach `ARCHIVIERT` folgen mit 3.5
 
-- [ ] 3.5 Metadaten ändern und Versionen [Backend]
+- [x] 3.5 Metadaten ändern und Versionen [Backend]
   - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`
   - Vertraulichkeit und `person_benutzer` nur mit Recht A8
   - Änderung von Belegdatum, Art, Geschäftsjahr oder `gueltig_bis` → `aufbewahren_bis` neu berechnen, Sperre nur verlängern (`sperreVerlaengern`), Konflikt protokollieren
   - Die Szenarien zu 9.5 und 10.1 vom Probe-Endpunkt `PATCH /probe/dokumente/{id}/zusatz` (Teilnachweis aus 2.2) auf `PATCH /api/v1/dokumente/{id}` umhängen; erst damit sind 9.5 und 10.1 voll nachgewiesen (Review PR #45)
   - _Anforderungen: 2.12, 2.14, 2.23, 9.7, 10.1, 10.4, 10.6_
+  - erledigt (PR #67): `PATCH /api/v1/dokumente/{id}` mit `DokumentAendern` (Fassung, Grund, Frist und Sperre, `SPERRE_KONFLIKT`); Probe-Endpunkt und `DokumentZusatzSpeichern` entfernt, 9.5 und 10.1 über den echten Endpunkt; Szenarien `features/dokument/aendern.feature`, `datenmodell.feature`; JUnit `DokumentAendernTest` (design.md «Umsetzung (Aufgabe 3.5, 12.11.2026)»)
 
 - [ ] 3.6 Eingangskorb-Oberfläche [Frontend]
   - Liste nach Recht A5 (`mitarbeiter` nur selbst erfasste) mit Vorschaubild, Vorschlägen, «bitte prüfen»-Markierung, Partnerauswahl mit Suche, Bestätigen in ≤ 2 Tipps, Verwerfen mit Rückfrage und Grund

@@ -1,9 +1,8 @@
 # language: de
 @spec-01
 Funktionalität: Datenmodell Dokument – Versionen, Zusatzfelder und Indizes (Aufgabe 2.2)
-  Bis «PATCH /api/v1/dokumente/{id}» mit Aufgabe 3.5 kommt, ändert der Probe-Endpunkt
-  «PATCH /api/v1/probe/dokumente/{id}/zusatz» (A6, If-Match) die Zusatzfelder über den Anwendungsfall
-  «DokumentZusatzSpeichern». Indizes und Trigger prüfen die Szenarien direkt in der Datenbank.
+  Die Zusatzfelder ändert «PATCH /api/v1/dokumente/{id}» (A6, If-Match, seit Aufgabe 3.5; vorher ein
+  Probe-Endpunkt). Indizes und Trigger prüfen die Szenarien direkt in der Datenbank.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
