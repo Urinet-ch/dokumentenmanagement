@@ -31,7 +31,9 @@ import java.util.UUID;
  * ({@code pg_advisory_lock_shared}). Sitzungen mit dieser Sperre zählen bei der Prüfung auf offene Sitzungen nicht mit:
  * Sie folgen diesem Verfahren und halten die Tabellensperre nie ohne die Sitzungssperre, die gerade der Prüfende hält.
  * Sonst blockierten sich mehrere Starts, die gleichzeitig auf eine verwaiste Sperre warten, gegenseitig (Review PR #74,
- * S1). Sitzungen ohne Teilnehmersperre (ältere Releases, Handarbeit) zählen weiter.
+ * S1). Sitzungen ohne Teilnehmersperre (ältere Releases, Handarbeit) zählen weiter, ebenso Teilnehmer, die gerade eine
+ * Sitzungssperre im Namensraum {@value #NAMENSRAUM} halten, gleich unter welchem zweiten Schlüssel (Review PR #74, S2):
+ * Wartende lösen ihre Sitzungssperre nach jedem Fehlversuch, eine laufende Migration hält sie bis zum Ende.
  * <p>
  * Registriert über {@code META-INF/services/liquibase.lockservice.LockService}; gilt für {@code db/public} (Quarkus)
  * und für jedes Mandanten-Schema ({@link LiquibaseMandantDatenbank}).
@@ -234,14 +236,21 @@ public class LiquibaseSitzungssperre extends StandardLockService {
         }
     }
 
-    /** Offene Sitzungen derselben Rolle ohne Teilnehmersperre, also möglicherweise eine Migration nach altem Verfahren. */
+    /**
+     * Offene Sitzungen derselben Rolle, die eine Migration sein können: ohne Teilnehmersperre (altes Verfahren) oder mit
+     * einer Sitzungssperre im Namensraum, gleich welchem zweiten Schlüssel (Review PR #74, S2: weicht die Schlüsselbildung
+     * zwischen zwei Releases ab, bleibt eine aktive Migration so trotzdem geschützt).
+     */
     private static int andereSitzungen(Connection verbindung) throws SQLException {
         try (PreparedStatement abfrage = verbindung.prepareStatement("select count(*) from pg_stat_activity a"
                 + " where a.datname = current_database() and a.usename = session_user and a.pid <> pg_backend_pid()"
-                + " and not exists (select 1 from pg_locks l where l.pid = a.pid and l.locktype = 'advisory'"
+                + " and not (exists (select 1 from pg_locks l where l.pid = a.pid and l.locktype = 'advisory'"
                 + " and l.granted and l.mode = 'ShareLock' and l.classid::int8 = ? and l.objid::int8 = 0"
-                + " and l.objsubid = 2)")) {
+                + " and l.objsubid = 2)"
+                + " and not exists (select 1 from pg_locks x where x.pid = a.pid and x.locktype = 'advisory'"
+                + " and x.granted and x.mode = 'ExclusiveLock' and x.classid::int8 = ? and x.objsubid = 2))")) {
             abfrage.setLong(1, TEILNEHMER);
+            abfrage.setLong(2, NAMENSRAUM);
             try (ResultSet zeile = abfrage.executeQuery()) {
                 zeile.next();
                 return zeile.getInt(1);

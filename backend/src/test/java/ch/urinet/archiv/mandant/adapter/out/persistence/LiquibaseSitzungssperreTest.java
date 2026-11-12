@@ -166,6 +166,31 @@ class LiquibaseSitzungssperreTest {
         }
     }
 
+    /**
+     * Review PR #74, S2: Ein Teilnehmer, der eine Sitzungssperre unter einem anderen zweiten Schlüssel hält (z. B. ein
+     * Release mit anderer Schlüsselbildung), kann gerade migrieren; seine Sperre bleibt stehen.
+     */
+    @Test
+    void teilnehmerMitSitzungssperreUnterAnderemSchluesselZaehltMit() throws Exception {
+        verwaisteSperreSetzen();
+        try (Connection start = alsRolle()) {
+            LockService dienst = sperre(start);
+            try (Connection aktiv = alsRolle(); Statement befehl = aktiv.createStatement()) {
+                befehl.execute("select pg_advisory_lock_shared(" + LiquibaseSitzungssperre.TEILNEHMER + ", 0)");
+                befehl.execute("select pg_advisory_lock(" + LiquibaseSitzungssperre.NAMENSRAUM + ", hashtext('anders'))");
+                befehl.execute("update " + TABELLE + " set lockedby = 'anderer-schluessel' where id = 1");
+
+                assertThat(dienst.acquireLock()).isFalse();
+                assertThat(gesperrtVon()).isEqualTo("anderer-schluessel");
+            }
+            warteBisSitzungen(1);
+
+            assertThat(dienst.acquireLock()).isTrue();
+            dienst.releaseLock();
+            assertThat(gesperrtVon()).isNull();
+        }
+    }
+
     private static void verwaisteSperreSetzen() throws Exception {
         try (Connection einrichten = alsRolle()) {
             LockService dienst = sperre(einrichten);

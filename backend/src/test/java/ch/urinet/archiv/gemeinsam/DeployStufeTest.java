@@ -38,7 +38,7 @@ class DeployStufeTest {
 
     private static final Path COMPOSE = GemeinsamSchritte.REPO.resolve("deploy/infomaniak/compose.yml");
 
-    /** Alle Dienste mit dem Image der API, damit z. B. ein eigener Worker-Dienst (Stufe B) nicht durchrutscht. */
+    /** Alle Dienste des Archivs (siehe {@link #archivDienste()}), damit ein eigener Worker-Dienst nicht durchrutscht. */
     @Test
     void umgebungDerApiPasstZurStufe() throws IOException {
         Map<String, Map<String, String>> dienste = archivDienste();
@@ -101,7 +101,11 @@ class DeployStufeTest {
         return archivDienste().get("api");
     }
 
-    /** Umgebung je Dienst, der dasselbe Image wie {@code api} verwendet. */
+    /**
+     * Umgebung je Dienst des Archivs: dasselbe Image wie {@code api}, Image {@code archiv-worker:…} oder
+     * {@code ARCHIV_ROLLE} in der Umgebung (Review PR #74, K6: ein eigener Worker-Dienst auf Stufe B hat ein eigenes
+     * Image).
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Map<String, String>> archivDienste() throws IOException {
         Map<String, Object> compose = new Yaml(new SafeConstructor(new LoaderOptions()))
@@ -110,10 +114,14 @@ class DeployStufeTest {
         Object image = dienste.get("api").get("image");
         Map<String, Map<String, String>> ergebnis = new TreeMap<>();
         dienste.forEach((name, dienst) -> {
-            if (!image.equals(dienst.get("image"))) {
+            Object environment = dienst.get("environment");
+            boolean mitRolle = environment instanceof Map<?, ?> abbildung && abbildung.containsKey("ARCHIV_ROLLE")
+                    || environment instanceof List<?> liste && liste.stream()
+                            .anyMatch(eintrag -> String.valueOf(eintrag).startsWith("ARCHIV_ROLLE="));
+            if (!image.equals(dienst.get("image")) && !String.valueOf(dienst.get("image")).startsWith("archiv-worker")
+                    && !mitRolle) {
                 return;
             }
-            Object environment = dienst.get("environment");
             assertThat(environment).as("environment des Dienstes %s in compose.yml als Abbildung (NAME: wert), nicht"
                     + " als Liste", name).isInstanceOf(Map.class);
             Map<String, String> umgebung = new HashMap<>();
