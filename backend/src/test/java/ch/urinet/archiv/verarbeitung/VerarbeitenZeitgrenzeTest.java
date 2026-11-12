@@ -109,10 +109,10 @@ class VerarbeitenZeitgrenzeTest {
         assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
         dokument = hilfe.dokument("urinet", id);
         String pdfa = VerarbeitungTestHilfe.pdfaSchluessel(id);
-        assertThat(dokument).containsEntry("status", "VERARBEITUNG").containsEntry("seiten", 1);
+        assertThat(dokument).containsEntry("status", "EINGANGSKORB").containsEntry("seiten", 1);
         assertThat(hilfe.versionen("urinet", pdfa)).containsExactly(pdfa + "@" + dokument.get("s3_version_pdfa"));
         assertThat(hilfe.versionen("urinet", VerarbeitungTestHilfe.vorschauOrdner(id))).hasSize(1);
-        assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).hasSize(1);
+        assertThat(hilfe.auftragStatus("KI_VORSCHLAG", id)).containsExactly("FERTIG");
     }
 
     /** Laufende Werkzeug-Container des Adapters ({@code archiv-ocr-<uuid>}) mit vollem Befehl. */

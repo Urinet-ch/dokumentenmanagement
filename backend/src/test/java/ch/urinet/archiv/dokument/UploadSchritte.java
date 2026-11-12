@@ -332,12 +332,12 @@ public class UploadSchritte {
         }
     }
 
-    @Dann("steht jedes neue Dokument im Status «VERARBEITUNG» mit PDF\\/A und Volltext")
+    @Dann("steht jedes neue Dokument im Status «EINGANGSKORB» mit PDF\\/A und Volltext")
     public void inVerarbeitung() throws SQLException {
         for (UUID id : neueIds()) {
             Map<String, String> zeile = abfragen("select status, s3_pdfa, sha256_pdfa, volltext from " + schema()
                     + ".dokument where id = ?::uuid", id.toString()).getFirst();
-            assertThat(zeile).containsEntry("status", "VERARBEITUNG");
+            assertThat(zeile).containsEntry("status", "EINGANGSKORB");
             assertThat(zeile.get("s3_pdfa")).startsWith("eingang/").endsWith("/" + id + "/pdfa.pdf");
             assertThat(zeile.get("sha256_pdfa")).isNotBlank();
             assertThat(zeile.get("volltext")).contains("Testrechnung Upload");

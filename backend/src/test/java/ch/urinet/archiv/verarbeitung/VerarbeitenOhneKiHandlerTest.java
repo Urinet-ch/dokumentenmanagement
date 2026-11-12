@@ -2,6 +2,7 @@ package ch.urinet.archiv.verarbeitung;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
+import ch.urinet.archiv.verarbeitung.application.KiVorschlagHandler;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -18,8 +19,8 @@ import static ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien.seite
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Stand bis Aufgabe 3.2: Ohne Handler für {@code KI_VORSCHLAG} geht das Dokument nach der Verarbeitung direkt in den
- * Eingangskorb, und es entsteht kein Auftrag, den niemand bearbeitet.
+ * Ohne Handler für {@code KI_VORSCHLAG} (ausgeschlossen) geht das Dokument nach der Verarbeitung direkt in den
+ * Eingangskorb, und es entsteht kein Auftrag, den niemand bearbeitet (VerarbeitungSpeichern, Rückfall).
  */
 @QuarkusTest
 @TestProfile(VerarbeitenOhneKiHandlerTest.OhneKiHandler.class)
@@ -28,7 +29,7 @@ class VerarbeitenOhneKiHandlerTest {
     public static class OhneKiHandler implements QuarkusTestProfile {
         @Override
         public Map<String, String> getConfigOverrides() {
-            return Map.of("quarkus.arc.exclude-types", TestHandler.KiVorschlag.class.getName());
+            return Map.of("quarkus.arc.exclude-types", KiVorschlagHandler.class.getName());
         }
     }
 

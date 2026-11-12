@@ -99,6 +99,31 @@ class KiBasisUrlPruefungTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("Host api.openai.com,");
     }
 
+    // Aufgabe 3.2: benannte LangChain4j-Clients (quarkus.langchain4j.openai.<name>.*), auch mit Stub
+
+    @Test
+    void benannterClientOhneBasisUrlBrichtAbAuchMitStub() {
+        SmallRyeConfig config = konfiguration("dev", Map.of());
+        // ohne eigene base-url gilt für den benannten Client der Standard von LangChain4j
+        assertThatThrownBy(() -> KiBasisUrlPruefung.pruefeClients(config.getProfiles(), config, INFOMANIAK_URL,
+                Map.of("zweiter", "https://api.openai.com/v1/")))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Host api.openai.com,");
+    }
+
+    @Test
+    void benannterClientMitInfomaniakGelingt() {
+        SmallRyeConfig config = konfiguration("prod", Map.of());
+        assertThatCode(() -> KiBasisUrlPruefung.pruefeClients(config.getProfiles(), config, INFOMANIAK_URL,
+                Map.of("zweiter", INFOMANIAK_URL))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void standardClientMitFremderUrlBrichtAb() {
+        SmallRyeConfig config = konfiguration("prod", Map.of());
+        assertThatThrownBy(() -> KiBasisUrlPruefung.pruefeClients(config.getProfiles(), config,
+                "https://api.openai.com/v1/", Map.of())).isInstanceOf(IllegalStateException.class);
+    }
+
     @Test
     void leereUrlOhneStubBrichtAb() {
         assertThatThrownBy(() -> KiBasisUrlPruefung.pruefe(PROD, "", false, OHNE_WIREMOCK))

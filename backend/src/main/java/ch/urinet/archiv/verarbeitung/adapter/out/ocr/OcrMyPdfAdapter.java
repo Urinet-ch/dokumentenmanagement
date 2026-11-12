@@ -47,6 +47,7 @@ public class OcrMyPdfAdapter implements OcrPort {
     static final int OCRMYPDF_PDFA_GESCHEITERT = 10;
 
     private static final Pattern VORSCHAU = Pattern.compile("vorschau-(\\d+)\\.png");
+    private static final Pattern SEITE = Pattern.compile("seite-(\\d+)\\.png");
 
     private final OcrEinstellungen einstellungen;
     private final Werkzeugstarter starter;
@@ -76,6 +77,25 @@ public class OcrMyPdfAdapter implements OcrPort {
             return verwertung.verwerten(ergebnis);
         } catch (IOException e) {
             throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Ein- oder Ausgabe der Verarbeitung "
+                    + "gescheitert", e);
+        } finally {
+            loeschen(lauf);
+        }
+    }
+
+    @Override
+    public <T> T seitenbilder(Path pdf, int maxSeiten, Seitenverwertung<T> verwertung) throws InterruptedException {
+        if (maxSeiten < 1) {
+            throw new IllegalArgumentException("maxSeiten muss mindestens 1 sein");
+        }
+        Instant frist = uhr.instant().plus(einstellungen.zeitgrenze());
+        Path lauf = laufverzeichnisAnlegen();
+        try {
+            List<Path> seiten = new Lauf(lauf, frist).seitenbilder(pdf, maxSeiten);
+            pruefeUnterbrechung();
+            return verwertung.verwerten(seiten);
+        } catch (IOException e) {
+            throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Ein- oder Ausgabe beim Rendern "
                     + "gescheitert", e);
         } finally {
             loeschen(lauf);
@@ -250,6 +270,15 @@ public class OcrMyPdfAdapter implements OcrPort {
                 return List.of();
             }
             return nummeriert(VORSCHAU).stream().map(Path::of).toList();
+        }
+
+        /** Seiten mit 300 dpi wie im Golden-Lauf ({@code SwissQrLeser}); das PDF wird zuerst ins Laufverzeichnis kopiert. */
+        List<Path> seitenbilder(Path pdf, int maxSeiten) throws IOException, InterruptedException {
+            Path kopie = datei("seiten.pdf");
+            Files.copy(pdf, kopie);
+            erfolgreich(Befehl.von("pdftoppm", "-q", "-r", "300", "-l", Integer.toString(maxSeiten), "-png",
+                    kopie.toString(), datei("seite").toString()));
+            return nummeriert(SEITE).stream().map(Path::of).toList();
         }
 
         /** Dateien im Laufverzeichnis nach der Nummer der ersten Gruppe sortiert (pdftoppm füllt mit Nullen auf). */

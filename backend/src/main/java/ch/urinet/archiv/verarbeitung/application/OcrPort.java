@@ -4,6 +4,8 @@ import ch.urinet.archiv.verarbeitung.domain.OcrEingabe;
 import ch.urinet.archiv.verarbeitung.domain.OcrErgebnis;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Driven Port der Verarbeitung (design.md «Verarbeitung», Req 5.1–5.3, 5.8–5.10; ADR-011, Req 16.13): HEIC → JPEG,
@@ -25,6 +27,22 @@ public interface OcrPort {
      *                                                                 dann beendet
      */
     <T> T verarbeiten(OcrEingabe eingabe, Verwertung<T> verwertung) throws InterruptedException;
+
+    /**
+     * Rendert die ersten {@code maxSeiten} Seiten eines PDF mit 300 dpi als PNG ({@code pdftoppm}) für den Swiss QR Code
+     * und den Bildweg der KI (Aufgabe 3.2; Req 7.1, 7.11) und übergibt sie in Seitenreihenfolge an {@code verwertung},
+     * solange die Dateien bestehen. Das PDF bleibt unverändert.
+     *
+     * @throws ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen bei Zeitüberschreitung, Werkzeug- oder E/A-Fehler
+     * @throws InterruptedException                                    nach einer Unterbrechung
+     */
+    <T> T seitenbilder(Path pdf, int maxSeiten, Seitenverwertung<T> verwertung) throws InterruptedException;
+
+    /** Verwertet die gerenderten Seiten; läuft vor dem Löschen des Verzeichnisses. */
+    @FunctionalInterface
+    interface Seitenverwertung<T> {
+        T verwerten(List<Path> seiten) throws IOException, InterruptedException;
+    }
 
     /** Verwertet das Ergebnis, z. B. lädt PDF/A und Vorschaubilder hoch; läuft vor dem Löschen des Verzeichnisses. */
     @FunctionalInterface

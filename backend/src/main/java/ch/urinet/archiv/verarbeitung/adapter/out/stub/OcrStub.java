@@ -46,6 +46,16 @@ public class OcrStub implements OcrPort {
         }
     }
 
+    /** Ohne pdftoppm keine Seiten: kein Swiss QR Code und kein Bildweg im Profil dev. */
+    @Override
+    public <T> T seitenbilder(Path pdf, int maxSeiten, Seitenverwertung<T> verwertung) throws InterruptedException {
+        try {
+            return verwertung.verwerten(List.of());
+        } catch (IOException e) {
+            throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Dev-Stub: Seiten nicht verwertbar", e);
+        }
+    }
+
     /** Kleinstes gültiges PDF mit einer leeren A4-Seite; Verweistabelle mit berechneten Byte-Positionen. */
     static byte[] leeresPdf() {
         List<String> objekte = List.of("<< /Type /Catalog /Pages 2 0 R >>",

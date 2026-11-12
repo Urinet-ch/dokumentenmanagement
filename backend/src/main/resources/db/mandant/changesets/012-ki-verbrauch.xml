@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Verbrauch der KI je Aufruf (Aufgabe 3.2; design.md «Datenmodell» und «KI»): eine Zeile je Aufruf des
+         Sprachmodells, auch bei ungültiger Antwort oder Ausfall. zweck: ERFASSUNG (Spec 01); Spec 04 ergänzt
+         WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING. Nur Tokens und Modell, nie Inhalte. Nummer 012, weil 010 und 011
+         in offenen PRs vergeben sind; nur eine neue Tabelle, rückwärtskompatibel (tech.md Regel 11). -->
+    <changeSet id="012-ki-verbrauch" author="archiv">
+        <createTable tableName="ki_verbrauch">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="ki_verbrauch_pk"/>
+            </column>
+            <column name="zweck" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="modell" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tokens_ein" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tokens_aus" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="zeit" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table ki_verbrauch add constraint ki_verbrauch_tokens_ck check (tokens_ein &gt;= 0 and tokens_aus &gt;= 0);
+            create index ki_verbrauch_zeit_ix on ki_verbrauch (zeit);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

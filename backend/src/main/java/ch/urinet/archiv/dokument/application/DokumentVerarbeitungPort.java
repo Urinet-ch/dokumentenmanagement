@@ -3,8 +3,10 @@ package ch.urinet.archiv.dokument.application;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +39,42 @@ public interface DokumentVerarbeitungPort {
 
     /** {@code NEU}/{@code VERARBEITUNG} → {@code FEHLER} mit Fehlertext; {@code false}, wenn nichts geändert wurde. */
     boolean fehlerSetzen(UUID id, String fehlertext);
+
+    /** Stand für den KI-Vorschlag (Aufgabe 3.2, Req 7.1); leer, wenn das Dokument fehlt. */
+    Optional<KiStand> kiStandLaden(UUID id);
+
+    /**
+     * Speichert den KI-Vorschlag ({@code ki_vorschlag}, {@code ki_sicherheit} als JSON-Objekte), verknüpft bei
+     * {@code partnerId} den Kontakt (nur, wenn noch keiner verknüpft ist) und setzt {@code EINGANGSKORB} (Req 7.1, 7.4). Nur bei {@code VERARBEITUNG} oder
+     * {@code EINGANGSKORB}, solange nicht bestätigt, ohne Vorschlag und mit {@code version = erwarteteVersion}; ändert
+     * sonst nichts, setzt also einen Status nie zurück und überschreibt keine Änderung des Benutzers.
+     *
+     * @return {@code false}, wenn die Bedingung nicht hält (nichts geschrieben)
+     */
+    boolean vorschlagSpeichern(UUID id, int erwarteteVersion, Map<String, Object> vorschlag,
+                               Map<String, BigDecimal> sicherheit, UUID partnerId, String partnerName);
+
+    /**
+     * Req 7.1, 7.3: ohne Vorschlag {@code VERARBEITUNG} → {@code EINGANGSKORB}; {@code false}, wenn das Dokument nicht
+     * mehr in {@code VERARBEITUNG} ist (nichts geändert).
+     */
+    boolean ohneVorschlagWeiter(UUID id);
+
+    /**
+     * Stand eines Dokuments für den KI-Vorschlag.
+     *
+     * @param pdfa PDF/A der Ablage; leer bei {@code pdfa_fehlt}
+     * @param mime Medientyp des Originals (Nr. 1), für den Bildweg (Req 7.1)
+     */
+    record KiStand(UUID id, DokumentStatus status, boolean bestaetigt, int version, boolean pdfaFehlt,
+                   boolean vorschlagVorhanden, String volltext, Instant eingang, Optional<Datei> pdfa, String mime) {
+        public KiStand {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(eingang, "eingang");
+            Objects.requireNonNull(pdfa, "pdfa");
+        }
+    }
 
     /**
      * Stand eines Dokuments für die Verarbeitung.

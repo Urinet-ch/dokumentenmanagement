@@ -245,7 +245,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Eigener Folgeauftrag vor 3.2 (`tools/golden_synth`): Prämienrechnungen von Versicherern (auch UVG, Krankentaggeld, BVG) und Mahnungen mit Mahngebühr oder Verzugszins = `LIEFERANTENBELEG`, Mahnungen ohne Gebühr = `KORRESPONDENZ` (F4/F6, entschieden von Fabian am 10.11.2026; P40-2, entschieden von Fabian am 11.11.2026); in PR #40 nicht geändert; Nummer 3.8, weil bestehende Nummern bleiben, steht aber vor 3.2
   - _Anforderungen: 0.9, 0.10_
 
-- [ ] 3.2 Metadaten-Extraktor [Backend]
+- [x] 3.2 Metadaten-Extraktor [Backend]
   - Port `KiPort` mit Adapter (LangChain4j) und Dev-Stub; `MetadatenExtraktor` mit Prompt aus Welle 0, Schema-Validierung + eine Nachfrage, Sicherheiten je Feld, Modell (`archiv.ki.erfassung-modell`), Aufrufparameter und Schwelle aus Gate 0 (design.md «KI»), `ki_verbrauch`
   - Swiss QR Code vor dem KI-Aufruf deterministisch auslesen, seine Werte vor den KI-Werten verwenden
   - Vorschlag inkl. Vertraulichkeit (vorbelegt mit dem Standard der Art); das Belegnummer-Muster setzt die Art nur, wenn der Mandant Aussteller ist (Testfall Lieferantenrechnung `2026-123`)

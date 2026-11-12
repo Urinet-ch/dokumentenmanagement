@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.adapter.out;
 
+import io.quarkiverse.langchain4j.openai.runtime.config.LangChain4jOpenAiConfig;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.config.SmallRyeConfig;
@@ -13,6 +14,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
 
@@ -20,6 +22,9 @@ import java.util.Set;
  * Startprüfung der KI-Endpunkte (Req 16.21, 16.22; design.md «KI», Profil {@code lokal}; ADR-012): zulässig ist nur
  * HTTPS auf {@code api.infomaniak.com}, im Profil {@code lokal} zusätzlich HTTP auf {@code localhost}/{@code 127.0.0.1},
  * im Profil {@code test} nur mit dem Port der WireMock-Testressource (nie 1234). Die Meldung nennt nur Host und Profil.
+ * Geprüft werden die eigenen Schlüssel, der Standard-Client von Quarkus LangChain4j und jeder benannte Client
+ * ({@code quarkus.langchain4j.openai.<name>.*}); ein benannter Client ohne {@code base-url} fiele auf den Standard von
+ * LangChain4j ({@code api.openai.com}) zurück und bricht darum ab, auch mit Stub.
  * Zusätzlich prüft die Klasse die aktiven Profile: {@code lokal} zusammen mit {@code prod} bricht ab (Req 16.22), ebenso
  * das reine Testprofil {@code ceph} der Ablage zusammen mit {@code prod} (design.md «Startprüfung
  * {@code KiBasisUrlPruefung}» und «Teststrategie», Ceph RGW).
@@ -41,9 +46,39 @@ public class KiBasisUrlPruefung {
     record Schluessel(String url, String stub) {
     }
 
-    void beimStart(@Observes StartupEvent ereignis) {
+    void beimStart(@Observes StartupEvent ereignis, LangChain4jOpenAiConfig openai) {
         SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
-        pruefe(wirksameProfile(config.getProfiles(), LaunchMode.current()), config);
+        List<String> profile = wirksameProfile(config.getProfiles(), LaunchMode.current());
+        pruefe(profile, config);
+        pruefeClients(profile, config, openai.defaultConfig().baseUrl(), clients(openai));
+    }
+
+    private static Map<String, String> clients(LangChain4jOpenAiConfig openai) {
+        Map<String, String> clients = new java.util.TreeMap<>();
+        openai.namedConfig().forEach((name, client) -> clients.put(name, client.baseUrl()));
+        return clients;
+    }
+
+    /**
+     * Prüft die wirksame Basis-URL des Standard-Clients (bei aktivem Stub nur, wenn sie gesetzt ist) und jedes benannten
+     * Clients (immer, Stub entschuldigt ihn nicht).
+     *
+     * @param standardUrl wirksame Basis-URL des Standard-Clients (mit dem Standardwert von LangChain4j)
+     * @param benannte    Name → wirksame Basis-URL je benanntem Client
+     */
+    public static void pruefeClients(List<String> profile, Config config, String standardUrl,
+                                     Map<String, String> benannte) {
+        OptionalInt wiremockPort = wiremockPort(config);
+        boolean stub = config.getOptionalValue("archiv.ki.stub", Boolean.class).orElse(false);
+        if (!stub || config.getOptionalValue("quarkus.langchain4j.openai.base-url", String.class).isPresent()) {
+            pruefe(profile, standardUrl, false, wiremockPort);
+        }
+        benannte.values().forEach(url -> pruefe(profile, url, false, wiremockPort));
+    }
+
+    private static OptionalInt wiremockPort(Config config) {
+        return config.getOptionalValue(WIREMOCK_PORT, Integer.class)
+                .map(OptionalInt::of).orElseGet(OptionalInt::empty);
     }
 
     /** Ein gepacktes Artefakt (LaunchMode NORMAL) gilt immer als {@code prod}, auch mit {@code -Dquarkus.profile=lokal}. */
@@ -58,8 +93,7 @@ public class KiBasisUrlPruefung {
     /** Prüft alle KI-URL-Schlüssel der Konfiguration; bricht beim ersten abgelehnten Wert ab. */
     public static void pruefe(List<String> profile, Config config) {
         pruefeProfile(profile);
-        OptionalInt wiremockPort = config.getOptionalValue(WIREMOCK_PORT, Integer.class)
-                .map(OptionalInt::of).orElseGet(OptionalInt::empty);
+        OptionalInt wiremockPort = wiremockPort(config);
         for (Schluessel schluessel : SCHLUESSEL) {
             String url = config.getOptionalValue(schluessel.url(), String.class).orElse(null);
             boolean stub = config.getOptionalValue(schluessel.stub(), Boolean.class).orElse(false);

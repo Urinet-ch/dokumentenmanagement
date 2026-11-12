@@ -91,7 +91,7 @@ class VerarbeitenHandlerTest {
 
         Map<String, Object> dokument = hilfe.dokument(URINET, id);
         String pdfa = VerarbeitungTestHilfe.pdfaSchluessel(id);
-        assertThat(dokument).containsEntry("status", "VERARBEITUNG").containsEntry("seiten", 1);
+        assertThat(dokument).containsEntry("status", "EINGANGSKORB").containsEntry("seiten", 1);
         assertThat(hilfe.versionen(URINET, pdfa)).containsExactly(pdfa + "@" + dokument.get("s3_version_pdfa"));
         assertThat(hilfe.objektversionen(URINET, VerarbeitungTestHilfe.vorschauOrdner(id)))
                 .extracting(ObjectVersion::key).containsExactly(VerarbeitungTestHilfe.vorschauOrdner(id) + "1.png");
@@ -103,8 +103,7 @@ class VerarbeitenHandlerTest {
         assertThat(auftraege.zeile(zweiter).status()).isEqualTo("FERTIG");
         assertThat(hilfe.dokument(URINET, id)).isEqualTo(dokument);
         assertThat(hilfe.versionen(URINET, pdfa)).containsExactly(pdfa + "@" + dokument.get("s3_version_pdfa"));
-        assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).hasSize(1);
-        assertThat(TestHandler.KI_DOKUMENTE).containsOnlyOnce(id);
+        assertThat(hilfe.auftragStatus("KI_VORSCHLAG", id)).containsExactly("FERTIG");
     }
 
     @Test
@@ -161,7 +160,6 @@ class VerarbeitenHandlerTest {
         assertThat(hilfe.dokument(URINET, generator).get("s3_pdfa")).isNotNull();
         assertThat(hilfe.auftraege("KI_VORSCHLAG", generator)).isEmpty();
         assertThat(hilfe.auftraege(ArchivierenHandler.TYP.wert(), generator)).hasSize(1);
-        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(generator);
 
         assertThat(auftraege.zeile(b).status()).isEqualTo("OFFEN");
         assertThat(auftraege.zeile(b).versuche()).isEqualTo(1);
@@ -182,7 +180,6 @@ class VerarbeitenHandlerTest {
                 .containsEntry("pdfa_fehlt", true).containsEntry("s3_pdfa", null);
         assertThat(hilfe.auftraege(ArchivierenHandler.TYP.wert(), id)).isEmpty();
         assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).isEmpty();
-        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(id);
     }
 
     @Test
