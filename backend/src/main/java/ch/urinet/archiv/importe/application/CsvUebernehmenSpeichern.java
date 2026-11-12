@@ -35,6 +35,7 @@ import java.util.UUID;
  * alle Zeilen blockweise und setzt am Ende Status, Zeit und Zähler (Protokoll, Req 13.8) – alles oder nichts. Den
  * Anspruch auf den Auftrag sichert sie erst unmittelbar vor dem Abschluss, damit die Zeile des Auftrags nicht während
  * der ganzen Übernahme gesperrt ist (das Lebenszeichen schreibt sie weiter); ist er verloren, rollt alles zurück.
+ * Jede Anweisung und jedes Warten auf eine Sperre ist einzeln begrenzt ({@link ImportRepository#zeitgrenzenSetzen()}).
  * Eigene Klasse, weil {@code @Transactional} nur über den Proxy wirkt. Geloggt werden nur IDs und Zahlen.
  */
 @ApplicationScoped
@@ -59,6 +60,7 @@ public class CsvUebernehmenSpeichern {
      */
     @Transactional(value = Transactional.TxType.REQUIRES_NEW, rollbackOn = Exception.class)
     public Optional<ImportLauf.Bilanz> uebernehmen(Auftrag auftrag, UUID laufId) throws InterruptedException {
+        repository.zeitgrenzenSetzen();
         Optional<ImportLauf> gefunden = repository.laufSperren(laufId)
                 .filter(l -> l.status() == LaufStatus.VORSCHAU && l.zuordnung() != null);
         if (gefunden.isEmpty()) {

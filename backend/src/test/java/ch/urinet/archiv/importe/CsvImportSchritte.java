@@ -31,6 +31,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -41,6 +42,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
@@ -74,9 +78,13 @@ public class CsvImportSchritte {
     private boolean benutzt;
     private int erwarteteZeilen;
     private final Map<String, UUID> kontakte = new LinkedHashMap<>();
+    private Duration dauer;
+    private CountDownLatch freigeben;
+    private CompletableFuture<Void> sperre;
 
     @After
-    public void aufraeumen() throws SQLException {
+    public void aufraeumen() throws Exception {
+        sperreFreigeben();
         if (mitschnitt != null) {
             mitschnitt.close();
             mitschnitt = null;
@@ -412,8 +420,10 @@ public class CsvImportSchritte {
 
     private void zuordnen(String benutzer, String art, Map<String, ?> body) {
         benutzt = true;
+        long start = System.nanoTime();
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("art", art)
                 .contentType("application/json").body(body).when().put(ZUORDNUNG);
+        dauer = Duration.ofNanos(System.nanoTime() - start);
     }
 
     @Wenn("«{word}» die gespeicherte Kontakt-Zuordnung abfragt")
@@ -586,9 +596,11 @@ public class CsvImportSchritte {
 
     private void uebernehmen(String benutzer, String id, Map<String, String> entscheide) {
         benutzt = true;
+        long start = System.nanoTime();
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
                 .body(Map.of("dublettenEntscheide", entscheide)).when()
                 .post(UPLOAD.replace("/crm", "/") + id + "/uebernehmen");
+        dauer = Duration.ofNanos(System.nanoTime() - start);
     }
 
     @Dann("nimmt der CSV-Import die Übernahme mit Status 202 an")
@@ -610,6 +622,98 @@ public class CsvImportSchritte {
         assertThat(List.of(antwort.<Integer>path("lauf.angelegt"), antwort.<Integer>path("lauf.aktualisiert"),
                 antwort.<Integer>path("lauf.ausgelassen"), antwort.<Integer>path("lauf.gekennzeichnet")))
                 .containsExactly(angelegt, aktualisiert, ausgelassen, gekennzeichnet);
+    }
+
+    @Wenn("eine andere Transaktion den Lauf sperrt, wie es die laufende Übernahme tut")
+    public void laufSperren() throws Exception {
+        sperren("select 1 from " + new MandantCode("urinet").schema() + ".import_lauf where id = ? for update",
+                UUID.fromString(laufId));
+    }
+
+    @Wenn("eine andere Transaktion den Kontakt {word} im Mandanten «urinet» sperrt")
+    public void kontaktSperren(String kontakt) throws Exception {
+        sperren("select 1 from " + new MandantCode("urinet").schema() + ".kontakt where id = ? for update",
+                Objects.requireNonNull(kontakte.get(kontakt), kontakt));
+    }
+
+    @Wenn("die andere Transaktion ihre Sperre freigibt")
+    public void sperreFreigeben() throws Exception {
+        if (sperre != null) {
+            freigeben.countDown();
+            sperre.get(10, TimeUnit.SECONDS);
+            sperre = null;
+        }
+    }
+
+    /**
+     * Hält eine Zeilensperre in einer eigenen Transaktion auf einem eigenen Thread, bis {@link #sperreFreigeben()} sie
+     * freigibt – spätestens nach 15 s, damit ein Lauf ohne Zeitgrenze den Test nicht endlos aufhält.
+     */
+    private void sperren(String sql, UUID id) throws Exception {
+        benutzt = true;
+        AgroalDataSource quelle = datenbank.get();
+        CountDownLatch gesperrt = new CountDownLatch(1);
+        freigeben = new CountDownLatch(1);
+        sperre = CompletableFuture.runAsync(() -> {
+            try (Connection verbindung = quelle.getConnection()) {
+                verbindung.setAutoCommit(false);
+                try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+                    abfrage.setObject(1, id);
+                    abfrage.executeQuery().close();
+                    gesperrt.countDown();
+                    freigeben.await(15, TimeUnit.SECONDS);
+                } finally {
+                    verbindung.rollback();
+                    verbindung.setAutoCommit(true);
+                }
+            } catch (SQLException e) {
+                throw new IllegalStateException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        });
+        assertThat(gesperrt.await(10, TimeUnit.SECONDS)).as("Sperre gesetzt").isTrue();
+    }
+
+    @Dann("lehnt der CSV-Import nach höchstens {int} Sekunden mit Status {int} und Fehlercode «{word}» ab")
+    public void schnellAbgelehnt(int sekunden, int status, String fehlercode) {
+        abgelehnt(status, fehlercode);
+        assertThat(dauer).isLessThan(Duration.ofSeconds(sekunden));
+    }
+
+    @Dann("ist der Auftrag «CSV_UEBERNEHMEN» des Laufs nach {int} Fehlversuch wieder offen")
+    public void uebernahmeFehlversuch(int versuche) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select status, versuche, fehler from public.auftrag "
+                        + "where typ = 'CSV_UEBERNEHMEN' and nutzlast ->> 'laufId' = ?")) {
+            abfrage.setString(1, laufId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getString("status")).isEqualTo("OFFEN");
+                assertThat(zeile.getInt("versuche")).isEqualTo(versuche);
+                assertThat(zeile.getString("fehler")).matches("fehlgeschlagen fehler-id=[0-9a-f-]{36}");
+                assertThat(zeile.next()).isFalse();
+            }
+        }
+    }
+
+    @Wenn("der Auftrag «CSV_UEBERNEHMEN» des Laufs wieder fällig ist")
+    public void uebernahmeFaellig() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update public.auftrag set nicht_vor = now() "
+                        + "where typ = 'CSV_UEBERNEHMEN' and nutzlast ->> 'laufId' = ?")) {
+            aendern.setString(1, laufId);
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Dann("steht der Lauf weiter in der Vorschau, ohne Übernahme")
+    public void nichtUebernommen() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("lauf.status")).isEqualTo("VORSCHAU");
+        assertThat(antwort.<Object>path("lauf.uebernommen")).isNull();
+        assertThat(antwort.<Object>path("lauf.angelegt")).isNull();
     }
 
     /** Spalte {@code kontakt}: Kontakt aus dem Hintergrund, sonst die {@code crm_id} eines neuen Kontakts. */

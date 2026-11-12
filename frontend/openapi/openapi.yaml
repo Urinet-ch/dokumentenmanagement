@@ -2321,6 +2321,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImportLauf"
+        "409":
+          description: "STATUS_KONFLIKT: Lauf nicht mehr zuzuordnen oder gesperrt,\
+            \ weil seine Übernahme gerade läuft"
         "422":
           description: "CSV_UNGUELTIG: keine Spalte für Name bzw. Titel"
         "401":
@@ -2408,11 +2411,13 @@ paths:
                 $ref: "#/components/schemas/ImportLauf"
         "400":
           description: "ANFRAGE_UNGUELTIG: Entscheid ungültig, für eine Zeile ohne\
-            \ Dublette, mit einem Kontakt ausserhalb der Kandidaten oder bei Verkaufschancen"
+            \ Dublette, mit einem Kontakt ausserhalb der Kandidaten, zweimal für dieselbe\
+            \ Zeile oder bei Verkaufschancen"
         "404":
           description: "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten"
         "409":
-          description: "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU"
+          description: "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU oder gesperrt,\
+            \ weil seine Übernahme gerade läuft"
         "401":
           description: Not Authorized
         "403":

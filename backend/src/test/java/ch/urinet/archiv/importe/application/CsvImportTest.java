@@ -200,6 +200,15 @@ class CsvImportTest {
         }
 
         @Override
+        public Optional<ImportLauf> laufSperrenOderKonflikt(UUID id) {
+            return laufSperren(id);
+        }
+
+        @Override
+        public void zeitgrenzenSetzen() {
+        }
+
+        @Override
         public Optional<ImportLauf> laufSperren(UUID id) {
             return Optional.empty();
         }

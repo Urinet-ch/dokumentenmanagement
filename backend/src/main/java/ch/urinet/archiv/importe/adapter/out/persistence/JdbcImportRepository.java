@@ -1,5 +1,7 @@
 package ch.urinet.archiv.importe.adapter.out.persistence;
 
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.importe.application.ImportRepository;
 import ch.urinet.archiv.importe.domain.DublettenEntscheid;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
@@ -21,6 +23,7 @@ import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.sql.Array;
 import java.sql.Connection;
@@ -29,6 +32,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -53,13 +57,26 @@ public class JdbcImportRepository implements ImportRepository {
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ZEILE = "nr, daten, ergebnis, meldung, kontakt_id, kandidaten";
+    private static final String EINSTELLEN = "select set_config(?, ?, true)";
+    /** lock_not_available: {@code lock_timeout} abgelaufen. */
+    private static final String SPERRE_BELEGT = "55P03";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final String anweisungZeitgrenze;
+    private final String sperreWartezeit;
 
-    public JdbcImportRepository(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung) {
+    public JdbcImportRepository(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                                @ConfigProperty(name = "archiv.import.anweisung-zeitgrenze") Duration anweisung,
+                                @ConfigProperty(name = "archiv.import.sperre-wartezeit") Duration sperre) {
+        if (anweisung.toMillis() < 1 || sperre.toMillis() < 1) {
+            throw new IllegalArgumentException(
+                    "archiv.import.anweisung-zeitgrenze und archiv.import.sperre-wartezeit müssen mindestens 1 ms sein");
+        }
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.anweisungZeitgrenze = anweisung.toMillis() + "ms";
+        this.sperreWartezeit = sperre.toMillis() + "ms";
     }
 
     @Override
@@ -138,6 +155,50 @@ public class JdbcImportRepository implements ImportRepository {
     @Override
     public Optional<ImportLauf> laufSperren(UUID id) {
         return lauf(id, true);
+    }
+
+    @Override
+    public Optional<ImportLauf> laufSperrenOderKonflikt(UUID id) {
+        schema();
+        try (Connection verbindung = datenquelle.get().getConnection()) {
+            String vorher;
+            try (PreparedStatement abfrage = verbindung.prepareStatement("select current_setting('lock_timeout')");
+                 ResultSet ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                vorher = ergebnis.getString(1);
+            }
+            einstellen(verbindung, "lock_timeout", sperreWartezeit);
+            Optional<ImportLauf> lauf = lauf(id, true);
+            einstellen(verbindung, "lock_timeout", vorher);
+            return lauf;
+        } catch (IllegalStateException e) {
+            if (e.getCause() instanceof SQLException s && SPERRE_BELEGT.equals(s.getSQLState())) {
+                throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+            }
+            throw e;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Lauf nicht gesperrt", e);
+        }
+    }
+
+    @Override
+    public void zeitgrenzenSetzen() {
+        schema();
+        try (Connection verbindung = datenquelle.get().getConnection()) {
+            einstellen(verbindung, "statement_timeout", anweisungZeitgrenze);
+            einstellen(verbindung, "lock_timeout", sperreWartezeit);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Zeitgrenzen nicht gesetzt", e);
+        }
+    }
+
+    /** Nur für die laufende Transaktion ({@code is_local}); die Verbindung gehört ihr. */
+    private static void einstellen(Connection verbindung, String name, String wert) throws SQLException {
+        try (PreparedStatement einstellen = verbindung.prepareStatement(EINSTELLEN)) {
+            einstellen.setString(1, name);
+            einstellen.setString(2, wert);
+            einstellen.executeQuery().close();
+        }
     }
 
     private Optional<ImportLauf> lauf(UUID id, boolean sperren) {
@@ -304,8 +365,10 @@ public class JdbcImportRepository implements ImportRepository {
 
     @Override
     public void uebernahmeAbschliessen(UUID laufId, ImportLauf.Bilanz bilanz) {
-        String sql = "update " + schema() + ".import_lauf set status = 'UEBERNOMMEN', uebernommen = now(), "
-                + "angelegt = ?, aktualisiert = ?, ausgelassen = ?, gekennzeichnet = ? where id = ?";
+        // clock_timestamp(): Ende der Übernahme; now() wäre der Beginn der (langen) Transaktion
+        String sql = "update " + schema() + ".import_lauf set status = 'UEBERNOMMEN', "
+                + "uebernommen = clock_timestamp(), angelegt = ?, aktualisiert = ?, ausgelassen = ?, gekennzeichnet = ? "
+                + "where id = ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
             aendern.setInt(1, bilanz.angelegt());

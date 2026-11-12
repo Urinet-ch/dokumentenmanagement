@@ -497,6 +497,15 @@ class CsvImportSpeicherTest {
         }
 
         @Override
+        public Optional<ImportLauf> laufSperrenOderKonflikt(UUID id) {
+            return laufSperren(id);
+        }
+
+        @Override
+        public void zeitgrenzenSetzen() {
+        }
+
+        @Override
         public Optional<ImportLauf> laufSperren(UUID id) {
             try {
                 ArrayNode namen = (ArrayNode) json.readTree(kopf);

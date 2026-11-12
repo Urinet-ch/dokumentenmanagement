@@ -31,6 +31,20 @@ public interface ImportRepository {
     /** Wie {@link #lauf(UUID)}, sperrt den Lauf aber bis zum Ende der Transaktion (gleichzeitige Zuordnungen). */
     Optional<ImportLauf> laufSperren(UUID id);
 
+    /**
+     * Wie {@link #laufSperren(UUID)} für Anfragen über REST, wartet aber höchstens {@code archiv.import.sperre-wartezeit}
+     * auf die Sperre. Hält eine andere Transaktion den Lauf länger (z. B. die laufende Übernahme), {@code FachFehler}
+     * {@code STATUS_KONFLIKT}, statt die Anfrage minutenlang warten zu lassen.
+     */
+    Optional<ImportLauf> laufSperrenOderKonflikt(UUID id);
+
+    /**
+     * Begrenzt für den Rest der laufenden Transaktion jede Anweisung ({@code archiv.import.anweisung-zeitgrenze}) und
+     * jedes Warten auf eine Sperre ({@code archiv.import.sperre-wartezeit}); beide liegen unter der Zeitgrenze der
+     * Transaktion, weil diese eine blockierte Anweisung nicht beendet (design.md «Pflichten der Handler» (1)).
+     */
+    void zeitgrenzenSetzen();
+
     /** Grösste Anzahl Werte einer gespeicherten Zeile des Laufs; 0, wenn keine Zeile Werte hat. */
     int breite(UUID laufId);
 

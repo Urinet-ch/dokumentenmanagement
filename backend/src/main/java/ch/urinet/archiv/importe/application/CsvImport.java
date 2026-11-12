@@ -239,14 +239,15 @@ public class CsvImport {
     /**
      * Bestätigt die Zuordnung eines Laufs, speichert sie für Mandant und Importart (Req 13.2) und prüft seine Zeilen
      * blockweise neu. Mit {@code profil} rechnet das Archiv die Positionen aus der Kopfzeile des Laufs; {@code felder}
-     * übersteuern einzelne Felder. Fehler: Lauf unbekannt → {@code NICHT_GEFUNDEN}; anderer Status →
-     * {@code STATUS_KONFLIKT}; Importart, Profil, Feld oder Position ungültig → {@code ANFRAGE_UNGUELTIG}; Profil passt
+     * übersteuern einzelne Felder. Fehler: Lauf unbekannt → {@code NICHT_GEFUNDEN}; anderer Status oder Lauf länger
+     * gesperrt als {@code archiv.import.sperre-wartezeit} → {@code STATUS_KONFLIKT}; Importart, Profil, Feld oder Position ungültig → {@code ANFRAGE_UNGUELTIG}; Profil passt
      * nicht zur Datei oder keine Spalte für {@code name} bzw. {@code titel} → {@code CSV_UNGUELTIG} (Req 13.10), nichts
      * wird gespeichert.
      */
     @Transactional
     public ImportLauf zuordnen(ImportArt art, UUID laufId, String profil, Map<String, Integer> felder) {
-        ImportLauf lauf = repository.laufSperren(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        ImportLauf lauf = repository.laufSperrenOderKonflikt(laufId)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (lauf.art() != art) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -301,12 +302,13 @@ public class CsvImport {
      * des Auftrags in {@code VORSCHAU}. Ein Entscheid gilt nur für eine Zeile mit Ergebnis {@code DUBLETTE},
      * {@code ZUSAMMENFUEHREN} nur mit einem ihrer Kandidaten; Dubletten ohne Entscheid werden übersprungen. Ein erneuter
      * Aufruf, solange der Lauf in {@code VORSCHAU} steht, ersetzt die Entscheide. Fehler: Lauf unbekannt →
-     * {@code NICHT_GEFUNDEN}; anderer Status → {@code STATUS_KONFLIKT}; Entscheid ungültig, für eine andere Zeile oder
-     * bei Verkaufschancen → {@code ANFRAGE_UNGUELTIG}.
+     * {@code NICHT_GEFUNDEN}; anderer Status oder Lauf gesperrt (Übernahme läuft) → {@code STATUS_KONFLIKT}; Entscheid
+     * ungültig, für eine andere Zeile oder bei Verkaufschancen → {@code ANFRAGE_UNGUELTIG}.
      */
     @Transactional
     public ImportLauf uebernehmen(UUID laufId, Map<Integer, String> entscheide, String benutzer) {
-        ImportLauf lauf = repository.laufSperren(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        ImportLauf lauf = repository.laufSperrenOderKonflikt(laufId)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (lauf.status() != LaufStatus.VORSCHAU) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }

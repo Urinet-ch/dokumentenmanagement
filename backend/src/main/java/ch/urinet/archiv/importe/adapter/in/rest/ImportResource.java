@@ -227,6 +227,8 @@ public class ImportResource {
             description = "Speichert die Zuordnung für Mandant und Importart und prüft die Zeilen des Laufs neu.")
     @APIResponse(responseCode = "200", description = "Gespeichert, Lauf VORSCHAU_AUSSTEHEND", content = @Content(
             mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = LaufDto.class)))
+    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: Lauf nicht mehr zuzuordnen oder gesperrt, "
+            + "weil seine Übernahme gerade läuft")
     @APIResponse(responseCode = "422", description = "CSV_UNGUELTIG: keine Spalte für Name bzw. Titel")
     public LaufDto zuordnen(@QueryParam("art") String art, ZuordnenDto zuordnung) {
         aufloesung.pruefen();
@@ -284,15 +286,22 @@ public class ImportResource {
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = LaufDto.class)))
     @APIResponse(responseCode = "400", description = "ANFRAGE_UNGUELTIG: Entscheid ungültig, für eine Zeile ohne "
-            + "Dublette, mit einem Kontakt ausserhalb der Kandidaten oder bei Verkaufschancen")
+            + "Dublette, mit einem Kontakt ausserhalb der Kandidaten, zweimal für dieselbe Zeile oder bei "
+            + "Verkaufschancen")
     @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten")
-    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU")
+    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU oder gesperrt, "
+            + "weil seine Übernahme gerade läuft")
     public Response uebernehmen(@PathParam("id") String id, UebernehmenDto anfrage) {
         aufloesung.pruefen();
         UUID laufId = laufId(id);
         Map<Integer, String> entscheide = new HashMap<>();
         if (anfrage != null && anfrage.dublettenEntscheide() != null) {
-            anfrage.dublettenEntscheide().forEach((zeile, entscheid) -> entscheide.put(zeile(zeile), entscheid));
+            // «5» und «05» sind dieselbe Zeile; zwei Entscheide dafür sind ungültig, nicht der zweite gewinnt
+            anfrage.dublettenEntscheide().forEach((zeile, entscheid) -> {
+                if (entscheide.putIfAbsent(zeile(zeile), entscheid) != null) {
+                    throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+                }
+            });
         }
         return Response.accepted(LaufDto.aus(csvImport.uebernehmen(laufId, entscheide, benutzer()))).build();
     }

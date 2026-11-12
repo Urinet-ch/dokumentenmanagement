@@ -98,6 +98,11 @@ Funktionalität: CSV-Import aus 21.CRM – Übernahme und Protokoll (Aufgabe 4.3
     Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
     Wenn «inhaber-urinet» den Lauf mit diesen Dubletten-Entscheiden übernimmt:
       | zeile | entscheid |
+      | 2     | NEU       |
+      | 02    | NEU       |
+    Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+    Wenn «inhaber-urinet» den Lauf mit diesen Dubletten-Entscheiden übernimmt:
+      | zeile | entscheid |
       | 3     | NEU       |
     Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
     Wenn «inhaber-vhf-gsk» den Lauf übernimmt
@@ -113,6 +118,48 @@ Funktionalität: CSV-Import aus 21.CRM – Übernahme und Protokoll (Aufgabe 4.3
     Und «inhaber-urinet» den Lauf übernimmt
     Dann lehnt der CSV-Import mit Status 409 und Fehlercode «STATUS_KONFLIKT» ab
     Und gibt es im Mandanten «urinet» 1 Kontakte mit dem Namen «Neue Firma» aus dem CSV-Import
+
+  @req-13.6
+  Szenario: Während die Übernahme den Lauf sperrt, antworten Übernahme und Zuordnung sofort mit 409, statt zu warten
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Name;PLZ
+      Neue Firma;6430
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und eine andere Transaktion den Lauf sperrt, wie es die laufende Übernahme tut
+    Und «inhaber-urinet» den Lauf übernimmt
+    Dann lehnt der CSV-Import nach höchstens 5 Sekunden mit Status 409 und Fehlercode «STATUS_KONFLIKT» ab
+    Wenn «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Dann lehnt der CSV-Import nach höchstens 5 Sekunden mit Status 409 und Fehlercode «STATUS_KONFLIKT» ab
+    Und sind für den Lauf 0 Aufträge «CSV_UEBERNEHMEN» eingereiht
+    Wenn die andere Transaktion ihre Sperre freigibt
+    Und «inhaber-urinet» den Lauf übernimmt
+    Dann nimmt der CSV-Import die Übernahme mit Status 202 an
+
+  @req-13.6
+  Szenario: Wartet die Übernahme zu lange auf einen gesperrten Kontakt, scheitert der Versuch und ändert nichts
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      ID;Name;PLZ
+      CRM-T01;Probe Holz AG;6001
+      CRM-T21;Neue Firma;6430
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf übernimmt
+    Und eine andere Transaktion den Kontakt K1 im Mandanten «urinet» sperrt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Dann ist der Auftrag «CSV_UEBERNEHMEN» des Laufs nach 1 Fehlversuch wieder offen
+    Wenn «inhaber-urinet» den Lauf abfragt
+    Dann steht der Lauf weiter in der Vorschau, ohne Übernahme
+    Und gibt es im Mandanten «urinet» 0 Kontakte mit dem Namen «Neue Firma» aus dem CSV-Import
+    Wenn die andere Transaktion ihre Sperre freigibt
+    Und der Auftrag «CSV_UEBERNEHMEN» des Laufs wieder fällig ist
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann ist der Lauf von «inhaber-urinet» übernommen mit 1 angelegt, 1 aktualisiert, 0 ausgelassen und 0 gekennzeichnet
 
   @req-13.6 @req-13.8
   Szenariogrundriss: Ohne Rolle «inhaber» antwortet die Übernahme mit 403
