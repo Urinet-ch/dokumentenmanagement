@@ -88,6 +88,13 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
     ).toBe(false);
   });
 
+  it('hängt beim Nachladen keine Dokumente doppelt an (Review PR #68, K2)', async () => {
+    await seite(0, [dokument('a', 'Neu'), dokument('b', 'Älter')], 4);
+    [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === T.mehr)!.click();
+    await seite(1, [dokument('b', 'Älter'), dokument('c', 'Am ältesten')], 4);
+    expect(titel()).toEqual(['Neu', 'Älter', 'Am ältesten']);
+  });
+
   it('zeigt einen leeren Eingangskorb', async () => {
     await seite(0, [], 0);
     expect(element.querySelector('[data-test=leer]')?.textContent).toContain(T.leer);

@@ -884,15 +884,20 @@ Drive-Import (Req 12):
     und unsignierte Tokens ausstellt; der Service Worker ist dabei blockiert.
 - Umsetzung (Aufgabe 3.6, Eingangskorb-Oberfläche):
   - Backend, additiv: Das DTO `Dokument` trägt zusätzlich `fehler`, `pdfaFehlt`, `seiten`, `partnerId`, `partnerName`,
-    `projekt`, `personBenutzer`, `vorschlag` und `unsicher`. `vorschlag` (Metadaten-Vorschlag der KI) und `unsicher`
+    `projekt`, `personBenutzer`, `finanz`, `vertrag`, `vorschlag` und `unsicher`. `finanz` und `vertrag` sind die
+    gespeicherten Angaben aus `dokument_finanz` bzw. `dokument_vertrag` (Schemas `DokumentFinanz`, `DokumentVertrag`,
+    `null` ohne Zeile), damit die Karte sie beim Bestätigen nicht verliert (Muss-Befund Review PR #68). `vorschlag` (Metadaten-Vorschlag der KI) und `unsicher`
     (Felder unter `archiv.ki.schwelle`, Standard 0.8, Req 7.6) gibt es nur in den Status des Eingangskorbs, sonst
     `null` bzw. leer. Ein vorgeschlagenes Feld ohne Sicherheit gilt als unsicher (`KiSicherheit`, Domain).
   - Vorschaubild `GET /dokumente/{id}/vorschau?seite=n` (`DokumentVorschauResource`, image/png, Seite ab 1): Sichtbarkeit
-    wie beim Lesen (A2–A4, 404 vor 403), Seite über `seiten` oder ohne Bild 404 `NICHT_GEFUNDEN`, Seite unter 1 400;
+    wie beim Lesen (A2–A4, 404 vor 403), Seite über `seiten` oder ohne Bild 404 `NICHT_GEFUNDEN`, Seite unter 1 oder keine
+    Zahl 400 `ANFRAGE_UNGUELTIG` (der Parameter wird als Text angenommen und selbst gelesen, weil JAX-RS bei einem
+    ungültigen Query-Parameter 404 liefert);
     `Cache-Control: private, no-store`; gestreamt (`AblagePort.lesenVorschau` liefert einen `InputStream`, nie ganz im
     Heap); jedes Bild schreibt einen Eintrag `ANZEIGEN`. Die PWA lädt das Bild mit Token als Blob (Object-URL, beim
     Entfernen der Karte freigegeben), weil ein `<img src>` kein Bearer-Token sendet.
-  - Seite `/eingangskorb` (Recht A5, lazy geladen): je 20 Einträge, «Weitere laden»; Karte je Dokument mit Vorschau,
+  - Seite `/eingangskorb` (Recht A5, lazy geladen): je 20 Einträge, «Weitere laden» (nach `id` entdoppelt, falls sich
+    die Liste zwischen zwei Seiten verschoben hat); Karte je Dokument mit Vorschau,
     Angaben (Dokument vor Vorschlag: Was am Dokument steht, gilt; der Vorschlag füllt Lücken), «bitte prüfen» nur bei
     Feldern aus dem Vorschlag, die `unsicher` nennt, Hinweis auf einen erkannten, noch keinem Kontakt zugeordneten
     Partner und Hinweise `pdfaFehlt`, «Frist abgelaufen», `BELEGNUMMER_BEKANNT` mit Link auf `/dokument/<id>`.
@@ -902,14 +907,25 @@ Drive-Import (Req 12):
     Req 2.22); «Verwerfen» (A9, `EINGANGSKORB` und `FEHLER`) mit Rückfrage und Pflichtgrund in der Karte; «Erneut
     verarbeiten» bzw. «Archivierung wiederholen» (A10). Ohne Aktion steht ein Hinweis.
   - Der Body der Bestätigung ersetzt die Grundfelder ganz (3.4): Projekt, `personBenutzer` und Geschäftsjahr des
-    Dokuments gehen unverändert mit; `vertraulichkeit` nur, wenn gewählt oder vorgeschlagen.
+    Dokuments gehen unverändert mit; `vertraulichkeit` nur, wenn gewählt oder vorgeschlagen. Finanz- und Vertragsfelder
+    nimmt die Karte vom Dokument, der Vorschlag füllt nur Lücken; Felder ohne Eingabe in der Karte (`konto`,
+    `kuendigungsfrist`, `naechsteFrist`) gehen ebenso mit, sonst löschte das Bestätigen sie.
+  - Wechselt der Benutzer im Formular die Art, folgt die Vertraulichkeit: zurück auf die vorgeschlagene Art gilt wieder
+    der Vorschlag, sonst leer (Standard der neuen Art); hat er die Vertraulichkeit selbst gewählt, bleibt sie.
+  - Bekannte Grenze Zusatzfelder: Der Body der Bestätigung (3.4) nimmt kein `zusatz` an, die Karte kann Zusatzfelder
+    darum nicht erfassen. Fehlt einer Art mit A7 ein Pflichtfeld `zusatz.*` am Dokument, zeigt die Karte einen Hinweis
+    mit den fehlenden Feldern, und bei 422 mit `zusatz.*` sagt die Meldung, dass das Dokument im Eingangskorb bleibt
+    (verwerfen bleibt möglich). Ergänzen lassen sich Zusatzfelder erst mit `PATCH /dokumente/{id}` (3.5) bzw. in der
+    Dokumentansicht (4.6) (Soll-Befund Review PR #68).
   - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
     `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
     `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
     Nach jeder Aktion lädt die Seite neu, frischt den Zähler auf, meldet das Ergebnis in `role=status` und setzt den
     Fokus auf die Überschrift.
   - Zähler (Req 8.6): `HttpEingangskorbZaehler` liest `GET /eingangskorb?groesse=1&seite=0` (`gesamt`) nur mit A5, nach
-    der Anmeldung und nach jeder Aktion; bei einem Fehler keine Anzeige.
+    der Anmeldung, nach jeder Aktion und bei einer Navigation, wenn das letzte Zählen mindestens 30 s zurückliegt
+    (Uploads kommen erst nach der Verarbeitung im Worker in den Eingangskorb, ein Zählen direkt nach dem Upload brächte
+    nichts); bei einem Fehler keine Anzeige.
   - Browser-Szenarien (`features/dokument/eingangskorb-pwa.feature`, Viewport 375 px) laufen gegen eine Attrappe der API
     (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe

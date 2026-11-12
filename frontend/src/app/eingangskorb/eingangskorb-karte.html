@@ -53,6 +53,11 @@
   @if (d.fristAbgelaufen) {
     <p class="warnung" data-test="hinweis-frist">{{ texte.hinweisFrist }}</p>
   }
+  @if (darfBestaetigen() && zusatzFehlt().length > 0) {
+    <p class="warnung" data-test="hinweis-zusatz">
+      {{ texte.hinweisZusatz(zusatzNamen()) }} {{ texte.zusatzNichtImKorb }}
+    </p>
+  }
   @for (warnung of belegnummerWarnungen(); track $index) {
     <p class="warnung" data-test="warnung-belegnummer">
       {{ texte.warnungBelegnummer }}

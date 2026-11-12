@@ -97,6 +97,8 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly vorschauUrl = signal<string | null>(null);
   protected readonly treffer = signal<readonly Kontakt[] | null>(null);
   private zusatz: Zusatz = {};
+  /** Hat der Benutzer die Vertraulichkeit im Formular selbst gewählt? Sonst folgt sie der Art (Req 2.22). */
+  private vertraulichkeitGewaehlt = false;
   private zurueck: Modus = 'ansicht';
   private readonly suche = new Subject<string>();
 
@@ -134,6 +136,19 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         art.pflichtfelder.includes('gueltig_ab') ||
         art.pflichtfelder.includes('gueltig_bis'))
     );
+  });
+  /**
+   * Pflicht-Zusatzfelder der Art, die am Dokument fehlen. Der Eingangskorb hat dafür kein Eingabefeld, und der Body der
+   * Bestätigung nimmt keine Zusatzfelder an (design.md «Umsetzung 3.6», bekannte Grenze).
+   */
+  protected readonly zusatzFehlt = computed(() => {
+    const vorhanden = (this.dokument().zusatz ?? {}) as Record<string, unknown>;
+    return (this.art()?.pflichtfelder ?? [])
+      .filter((f) => f.startsWith('zusatz.'))
+      .filter((f) => {
+        const wert = vorhanden[f.substring('zusatz.'.length)];
+        return wert === undefined || wert === null || wert === '';
+      });
   });
   protected readonly erkannterPartner = computed(() =>
     this.entwurf().partnerId ? null : erkannterPartner(this.dokument()),
@@ -211,6 +226,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     return feld === 'partnerName' ? this.texte.feld['partner'] : this.texte.feld[feld];
   }
 
+  protected zusatzNamen(): string {
+    return this.zusatzFehlt().map(feldName).join(', ');
+  }
+
   protected bittePruefen(feld: EntwurfFeld): boolean {
     return bittePruefen(this.dokument(), feld);
   }
@@ -231,7 +250,18 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   protected setze(feld: EntwurfFeld, wert: string): void {
-    this.entwurf.update((e) => ({ ...e, [feld]: wert }));
+    if (feld === 'vertraulichkeit') {
+      this.vertraulichkeitGewaehlt = true;
+    }
+    this.entwurf.update((e) => {
+      const neu = { ...e, [feld]: wert };
+      if (feld === 'art' && !this.vertraulichkeitGewaehlt) {
+        // Der Vorschlag zur Vertraulichkeit gilt nur für die vorgeschlagene Art; sonst greift der Standard der Art.
+        const start = entwurfAus(this.dokument());
+        neu.vertraulichkeit = wert === start.art ? start.vertraulichkeit : '';
+      }
+      return neu;
+    });
   }
 
   protected wert(ereignis: Event): string {
@@ -269,6 +299,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected schliessen(): void {
     if (this.modus() === 'formular') {
       this.entwurf.set(entwurfAus(this.dokument()));
+      this.vertraulichkeitGewaehlt = false;
     }
     const ziel =
       this.modus() === 'rueckfragePdfa' || this.modus() === 'rueckfrageFrist'
@@ -362,7 +393,13 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         this.rueckfrage('rueckfragePdfa', zusatz);
       } else {
         const namen = felder.map(feldName).join(', ');
-        this.imFormular(this.texte.fehlerPflichtfelder(namen), felder.map(camel));
+        const meldung = this.texte.fehlerPflichtfelder(namen);
+        this.imFormular(
+          felder.some((f) => f.startsWith('zusatz.'))
+            ? `${meldung} ${this.texte.zusatzNichtImKorb}`
+            : meldung,
+          felder.map(camel),
+        );
       }
       return;
     }

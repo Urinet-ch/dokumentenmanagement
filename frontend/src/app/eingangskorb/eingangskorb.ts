@@ -65,9 +65,14 @@ export class Eingangskorb implements OnInit {
       .subscribe({
         next: (antwort) => {
           this.seite = seite;
-          this.eintraege.update((alt) =>
-            weitere ? [...alt, ...antwort.eintraege] : antwort.eintraege,
-          );
+          // Ändert sich die Liste zwischen zwei Seiten, liefert der Offset Dokumente doppelt (NG0955).
+          this.eintraege.update((alt) => {
+            if (!weitere) {
+              return antwort.eintraege;
+            }
+            const bekannt = new Set(alt.map((d) => d.id));
+            return [...alt, ...antwort.eintraege.filter((d) => !bekannt.has(d.id))];
+          });
           this.gesamt.set(antwort.gesamt);
           this.laedt.set(false);
         },

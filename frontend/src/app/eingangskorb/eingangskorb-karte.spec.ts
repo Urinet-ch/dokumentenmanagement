@@ -38,6 +38,16 @@ const ARTEN: Dokumentart[] = [
     gesetzlichePflicht: true,
     aktiv: true,
   },
+  {
+    code: 'LOHNABRECHNUNG',
+    name: 'Lohnabrechnung',
+    gruppen: [],
+    pflichtfelder: ['datum', 'zusatz.periode'],
+    zusatzSchema: {},
+    vertraulichkeit: 'PERSONAL',
+    gesetzlichePflicht: true,
+    aktiv: true,
+  },
 ];
 
 describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
@@ -281,5 +291,92 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     await klicken(T.bestaetigen);
     const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
     expect(anfrage.body).toEqual(expect.objectContaining({ vertraulichkeit: 'INTERN' }));
+  });
+  it('behält gespeicherte Finanz- und Vertragsangaben beim Bestätigen (Review PR #68, M1)', async () => {
+    await zeigen(
+      dokument({
+        art: 'LIEFERANTENRECHNUNG',
+        finanz: {
+          belegnummer: 'F-1',
+          richtung: 'AUSGABE',
+          betrag: 99.9,
+          waehrung: 'EUR',
+          faelligkeit: '2026-12-01',
+          qrReferenz: 'QR-1',
+          konto: '4000-TEST',
+        },
+        vertrag: {
+          gueltigAb: '2026-01-01',
+          gueltigBis: '2027-12-31',
+          kuendigungsfrist: '3 Monate',
+          naechsteFrist: '2027-09-30',
+        },
+        vorschlag: { betrag: 1234.5, waehrung: 'CHF', belegnummer: 'X-9' },
+        unsicher: ['betrag'],
+      }),
+    );
+    expect(element.textContent).toContain('EUR 99.90');
+    expect(element.querySelectorAll('[data-test=bitte-pruefen]').length).toBe(0);
+    await klicken(T.bestaetigen);
+    const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
+    expect(anfrage.body).toEqual(
+      expect.objectContaining({
+        belegnummer: 'F-1',
+        richtung: 'AUSGABE',
+        betrag: 99.9,
+        waehrung: 'EUR',
+        faelligkeit: '2026-12-01',
+        qrReferenz: 'QR-1',
+        konto: '4000-TEST',
+        gueltigAb: '2026-01-01',
+        gueltigBis: '2027-12-31',
+        kuendigungsfrist: '3 Monate',
+        naechsteFrist: '2027-09-30',
+      }),
+    );
+  });
+
+  it('nennt fehlende Pflicht-Zusatzfelder und dass der Eingangskorb sie nicht erfasst (Review PR #68, S1)', async () => {
+    await zeigen(dokument({ art: 'LOHNABRECHNUNG' }));
+    const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
+    expect(hinweis?.textContent).toContain(T.hinweisZusatz(T.zusatzFeld('periode')));
+    expect(hinweis?.textContent).toContain(T.zusatzNichtImKorb);
+    await klicken(T.bestaetigen);
+    await antworten(
+      '/api/v1/dokumente/d1/bestaetigen',
+      { fehlercode: 'PFLICHTFELD_FEHLT', felder: ['zusatz.periode'] },
+      422,
+      'Unprocessable Entity',
+    );
+    expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(
+      `${T.fehlerPflichtfelder(T.zusatzFeld('periode'))} ${T.zusatzNichtImKorb}`,
+    );
+  });
+
+  it('zeigt keinen Zusatz-Hinweis, wenn das Zusatzfeld am Dokument steht', async () => {
+    await zeigen(dokument({ art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10' } }));
+    expect(element.querySelector('[data-test=hinweis-zusatz]')).toBeNull();
+  });
+
+  it('leert die vorgeschlagene Vertraulichkeit beim Wechsel der Art, ausser der Benutzer hat sie gewählt (Review PR #68, K3)', async () => {
+    await zeigen(
+      dokument({ vorschlag: { art: 'LIEFERANTENRECHNUNG', vertraulichkeit: 'INTERN' } }),
+    );
+    await klicken(T.aendern);
+    const art = element.querySelector<HTMLSelectElement>('#d1-art')!;
+    const vertraulichkeit = () => element.querySelector<HTMLSelectElement>('#d1-vertraulichkeit')!;
+    const waehlen = async (select: HTMLSelectElement, wert: string) => {
+      select.value = wert;
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    };
+    expect(vertraulichkeit().value).toBe('INTERN');
+    await waehlen(art, 'LOHNABRECHNUNG');
+    expect(vertraulichkeit().value).toBe('');
+    await waehlen(art, 'LIEFERANTENRECHNUNG');
+    expect(vertraulichkeit().value).toBe('INTERN');
+    await waehlen(vertraulichkeit(), 'NORMAL');
+    await waehlen(art, 'LOHNABRECHNUNG');
+    expect(vertraulichkeit().value).toBe('NORMAL');
   });
 });

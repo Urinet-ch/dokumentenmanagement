@@ -48,6 +48,24 @@ function vorschlag(dokument: Dokument): Vorschlag {
   return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Vorschlag) : {};
 }
 
+/** Werte, die schon am Dokument stehen (Grundfelder, gespeicherte Finanz- und Vertragsangaben). */
+function amDokument(dokument: Dokument): Record<string, unknown> {
+  return {
+    art: dokument.art,
+    titel: dokument.titel,
+    datum: dokument.datum,
+    partnerName: dokument.partnerName,
+    projekt: dokument.projekt,
+    ...(dokument.finanz ?? {}),
+    ...(dokument.vertrag ?? {}),
+  };
+}
+
+/** Wert am Dokument, sonst aus dem Vorschlag. */
+function wert(dokument: Dokument, feld: string): string {
+  return text(amDokument(dokument)[feld]) || text(vorschlag(dokument)[feld]);
+}
+
 /**
  * Entwurf aus dem Dokument und dem Vorschlag der KI: Was am Dokument schon steht, gilt; der Vorschlag füllt nur Lücken.
  * Die Vertraulichkeit bleibt leer («Standard der Art», Req 2.22), ausser der Vorschlag nennt eine; das Dokument zeigt
@@ -65,14 +83,14 @@ export function entwurfAus(dokument: Dokument): Entwurf {
     partnerId: dokument.partnerId ?? '',
     partnerName: dokument.partnerName ?? '',
     projekt: dokument.projekt ?? '',
-    belegnummer: text(v['belegnummer']),
-    richtung: text(v['richtung']),
-    betrag: text(v['betrag']),
-    waehrung: text(v['waehrung']),
-    faelligkeit: text(v['faelligkeit']),
-    qrReferenz: text(v['qrReferenz']),
-    gueltigAb: '',
-    gueltigBis: '',
+    belegnummer: wert(dokument, 'belegnummer'),
+    richtung: wert(dokument, 'richtung'),
+    betrag: wert(dokument, 'betrag'),
+    waehrung: wert(dokument, 'waehrung'),
+    faelligkeit: wert(dokument, 'faelligkeit'),
+    qrReferenz: wert(dokument, 'qrReferenz'),
+    gueltigAb: wert(dokument, 'gueltigAb'),
+    gueltigBis: wert(dokument, 'gueltigBis'),
     vertraulichkeit: text(v['vertraulichkeit']),
     tags: dokument.tags.length > 0 ? dokument.tags : tagsVorschlag,
   };
@@ -89,14 +107,7 @@ export function erkannterPartner(dokument: Dokument): string | null {
 
 /** Kam der Wert des Felds aus dem Vorschlag (und nicht vom Dokument)? */
 export function ausVorschlag(dokument: Dokument, feld: EntwurfFeld): boolean {
-  const amDokument: Partial<Record<EntwurfFeld, unknown>> = {
-    art: dokument.art,
-    titel: dokument.titel,
-    datum: dokument.datum,
-    partnerName: dokument.partnerName,
-    projekt: dokument.projekt,
-  };
-  return !amDokument[feld] && text(vorschlag(dokument)[feld]) !== '';
+  return text(amDokument(dokument)[feld]) === '' && text(vorschlag(dokument)[feld]) !== '';
 }
 
 /** «bitte prüfen» (Req 7.6): Das Archiv nennt das Feld in `unsicher`, und sein Wert kam aus dem Vorschlag. */
@@ -117,9 +128,9 @@ function betragLesen(betrag: string): number | null {
 const leerZuNull = (wert: string) => (wert.trim() === '' ? null : wert.trim());
 
 /**
- * Body für `POST /dokumente/{id}/bestaetigen`. Der Body ersetzt die Grundfelder ganz (design.md «Umsetzung 3.4»):
- * Projekt, zugeordnete Person und Geschäftsjahr des Dokuments gehen darum unverändert mit, wenn der Entwurf sie nicht
- * ändert.
+ * Body für `POST /dokumente/{id}/bestaetigen`. Der Body ersetzt die Grundfelder sowie die Finanz- und Vertragsangaben
+ * ganz (design.md «Umsetzung 3.4»): Projekt, zugeordnete Person, Geschäftsjahr, Konto, Kündigungsfrist und nächste
+ * Frist, die das Formular nicht zeigt, gehen darum unverändert vom Dokument (sonst aus dem Vorschlag) mit.
  */
 export function bestaetigungAus(
   entwurf: Entwurf,
@@ -145,8 +156,11 @@ export function bestaetigungAus(
     waehrung: leerZuNull(entwurf.waehrung)?.toUpperCase() ?? null,
     faelligkeit: leerZuNull(entwurf.faelligkeit),
     qrReferenz: leerZuNull(entwurf.qrReferenz),
+    konto: leerZuNull(wert(dokument, 'konto')),
     gueltigAb: leerZuNull(entwurf.gueltigAb),
     gueltigBis: leerZuNull(entwurf.gueltigBis),
+    kuendigungsfrist: leerZuNull(wert(dokument, 'kuendigungsfrist')),
+    naechsteFrist: leerZuNull(wert(dokument, 'naechsteFrist')),
     ...(zusatz.ohnePdfa ? { ohnePdfa: true } : {}),
     ...(zusatz.fristAbgelaufenAkzeptiert ? { fristAbgelaufenAkzeptiert: true } : {}),
   };
