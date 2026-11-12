@@ -114,3 +114,17 @@ def test_mandant_kennungen_passen_zu_eigenen_belegen(daten):
     assert eigene and all(e["qr"]["konto"] in m["ibans"] for e in eigene)
     fremde = [e for e in daten["belege"] if e["qr"] and e["art"] != "AUSGANGSRECHNUNG"]
     assert not any(e["qr"]["konto"] in m["ibans"] for e in fremde)
+
+
+def test_praemien_und_mahnungen_nach_f4_f6(belege):
+    # F4/P40-2: Prämienrechnungen von Versicherern = LIEFERANTENBELEG, VERSICHERUNG nur für Policen;
+    # F6: Mahnungen mit Mahngebühr oder Verzugszins = LIEFERANTENBELEG, ohne Gebühr = KORRESPONDENZ.
+    for b in belege:
+        if "police" in b.randfaelle:
+            assert b.art == "VERSICHERUNG", b.nr
+        elif b.art == "VERSICHERUNG":
+            pytest.fail(f"Beleg {b.nr}: VERSICHERUNG ohne Police")
+        if "mahnung" in b.randfaelle:
+            assert b.art in ("LIEFERANTENBELEG", "KORRESPONDENZ"), b.nr
+    assert {b.nr for b in belege if b.stichwort in ("uvg_praemie", "mahnung")} == {34, 37}
+    assert all(b.art == "LIEFERANTENBELEG" for b in belege if b.nr in (34, 37, 49))
