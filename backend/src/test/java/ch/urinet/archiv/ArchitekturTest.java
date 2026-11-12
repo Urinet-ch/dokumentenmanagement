@@ -234,6 +234,36 @@ class ArchitekturTest {
             .haveFullyQualifiedName(WURZEL + ".verarbeitung.adapter.out.persistence.JdbcAuftragSchlange")
             .because("der JDBC-Weg zu public.auftrag liegt nur im Adapter der Verarbeitung (Aufgabe 2.5)");
 
+    /**
+     * Die Seed-Frist ({@code archiv.dokumentart.seed-zeitgrenze}, 2 s) gilt nur für den Seed beim Anlegen eines
+     * Mandanten (Admin-Kommando, Quelle im Repo), nie für eine Eingabe über die API (Review PR #81, S3): Nur
+     * {@code MandantProvisionierung} ruft {@code SeedPruefung.pruefen}, nur {@code SeedPruefung} ruft
+     * {@code DokumentartPruefung.seedPruefen}, und nur diese Methode ruft {@code ZusatzSchemaPruefer.seedSchemaPruefen}.
+     * Auslegung: Eine Konfigurationsdatei über die API (Spec 05, Req 6) ist keine Seed-Quelle; wer den Seed-Weg dafür
+     * nutzen will, muss diese Regel bewusst ändern.
+     */
+    @ArchTest
+    static final ArchRule seedFristNurImSeed = noClasses().should().accessTargetWhere(DescribedPredicate.describe(
+                    "den Seed-Weg ausserhalb des Seeds", zugriff -> seedZugriffVerboten(
+                            zugriff.getOrigin().getOwner().getName(), zugriff.getOrigin().getName(),
+                            zugriff.getTarget().getOwner(), zugriff.getTarget().getName())))
+            .because("die Seed-Frist gilt nur für den Seed eines Mandanten (Spec 01 design.md «Umsetzung 2.1»)");
+
+    private static boolean seedZugriffVerboten(String herkunft, String herkunftMethode, JavaClass ziel, String methode) {
+        String pruefung = WURZEL + ".dokumentart.application.DokumentartPruefung";
+        String seed = WURZEL + ".mandant.application.SeedPruefung";
+        if (methode.equals("seedSchemaPruefen") && ziel.isAssignableTo(WURZEL + ".dokumentart.application.ZusatzSchemaPruefer")) {
+            return !(herkunft.equals(pruefung) && herkunftMethode.equals("seedPruefen"));
+        }
+        if (methode.equals("seedPruefen") && ziel.isAssignableTo(pruefung)) {
+            return !herkunft.equals(seed);
+        }
+        if (methode.equals("pruefen") && ziel.isAssignableTo(seed)) {
+            return !herkunft.equals(WURZEL + ".mandant.application.MandantProvisionierung");
+        }
+        return false;
+    }
+
     private static DescribedPredicate<JavaClass> implementierenPortAusApplication() {
         return DescribedPredicate.describe("einen Port aus application implementieren", klasse -> !klasse.isInterface()
                 && klasse.getAllRawInterfaces().stream()

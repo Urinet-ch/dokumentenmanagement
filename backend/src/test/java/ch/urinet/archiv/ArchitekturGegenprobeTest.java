@@ -52,6 +52,19 @@ class ArchitekturGegenprobeTest {
                 .noneMatch(zeile -> zeile.contains("GanzeDateiGegenprobeStub"));
     }
 
+    @Test
+    void seedFristAusserhalbDesSeedsVerstoesst() {
+        JavaClasses klassen = new ClassFileImporter().importClasses(SeedFristImApiWeg.class);
+
+        var ergebnis = ArchitekturTest.seedFristNurImSeed.evaluate(klassen);
+
+        assertThat(ergebnis.getFailureReport().getDetails())
+                .anyMatch(zeile -> zeile.contains("seedSchemaPruefen"))
+                .anyMatch(zeile -> zeile.contains("DokumentartPruefung.seedPruefen"))
+                .anyMatch(zeile -> zeile.contains("SeedPruefung.pruefen"))
+                .hasSize(3);
+    }
+
     static final class WurzelKlasse {
     }
 
@@ -64,6 +77,17 @@ class ArchitekturGegenprobeTest {
     static final class BypassAlsReferenz {
         java.util.function.Function<Boolean, Object> sperre(Attrappe attrappe) {
             return attrappe::bypassGovernanceRetention;
+        }
+    }
+
+    /** Ein API-Weg, der die Seed-Frist nutzt (Mutation M2 aus Review PR #81). */
+    static final class SeedFristImApiWeg {
+        void pruefen(ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer pruefer,
+                     ch.urinet.archiv.dokumentart.application.DokumentartPruefung pruefung,
+                     ch.urinet.archiv.mandant.application.SeedPruefung seed) {
+            pruefer.seedSchemaPruefen("{}");
+            pruefung.seedPruefen(null);
+            seed.pruefen(null, null);
         }
     }
 

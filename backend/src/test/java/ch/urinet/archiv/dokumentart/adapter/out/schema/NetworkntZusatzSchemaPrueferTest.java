@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokumentart.adapter.out.schema;
 
+import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPruefer.Uhren;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import org.junit.jupiter.api.Test;
@@ -8,8 +9,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
@@ -48,7 +51,7 @@ class NetworkntZusatzSchemaPrueferTest {
     private static final Duration DROSSELUNG = Duration.ofMillis(80);
 
     private final TestUhr uhr = new TestUhr();
-    private final NetworkntZusatzSchemaPruefer pruefer = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> uhr);
+    private final NetworkntZusatzSchemaPruefer pruefer = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(uhr));
 
     @Test
     void gueltigesSchemaLiefertFeldnamen() {
@@ -174,7 +177,7 @@ class NetworkntZusatzSchemaPrueferTest {
      */
     @Test
     void gedrosselteCpuZaehltMitDerWanduhrAlsRechenzeit() {
-        var wanduhr = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> gedrosselt(System::nanoTime));
+        var wanduhr = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(gedrosselt(System::nanoTime)));
         assertUngueltig(() -> wanduhr.schemaPruefen(OFFERTE));
     }
 
@@ -187,10 +190,10 @@ class NetworkntZusatzSchemaPrueferTest {
     void gedrosselteCpuZaehltMitDerUhrDerAnwendungNicht() {
         assumeTrue(ManagementFactory.getThreadMXBean().isCurrentThreadCpuTimeSupported(), "CPU-Zeit des Threads");
         var anwendung = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE,
-                () -> gedrosselt(NetworkntZusatzSchemaPruefer.uhrDesThreads()));
+                () -> gedrosselt(NetworkntZusatzSchemaPruefer.uhrenDesThreads()));
         assertThat(anwendung.seedSchemaPruefen(OFFERTE)).containsExactly("angebot_gueltig_bis");
         var api = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE,
-                () -> gedrosselt(NetworkntZusatzSchemaPruefer.uhrDesThreads()));
+                () -> gedrosselt(NetworkntZusatzSchemaPruefer.uhrenDesThreads()));
         assertThat(api.schemaPruefen(OFFERTE)).containsExactly("angebot_gueltig_bis");
         assertThatCode(() -> api.wertePruefen(OFFERTE, "{\"angebot_gueltig_bis\":\"2026-12-31\"}"))
                 .doesNotThrowAnyException();
@@ -201,11 +204,72 @@ class NetworkntZusatzSchemaPrueferTest {
     @Test
     void uhrDerAnwendungMisstCpuZeitSonstWanduhr() throws Exception {
         assumeTrue(ManagementFactory.getThreadMXBean().isCurrentThreadCpuTimeSupported(), "CPU-Zeit des Threads");
-        assertThat(wartezeitGemessen(NetworkntZusatzSchemaPruefer.uhrDesThreads())).isLessThan(DROSSELUNG.toNanos() / 2);
+        assertThat(wartezeitGemessen(NetworkntZusatzSchemaPruefer.uhrenDesThreads().rechen())).isLessThan(DROSSELUNG.toNanos() / 2);
         AtomicReference<Long> virtuell = new AtomicReference<>();
-        Thread.ofVirtual().start(() -> virtuell.set(wartezeitGemessen(NetworkntZusatzSchemaPruefer.uhrDesThreads())))
+        Thread.ofVirtual().start(() -> virtuell.set(wartezeitGemessen(NetworkntZusatzSchemaPruefer.uhrenDesThreads().rechen())))
                 .join();
         assertThat(virtuell.get()).isGreaterThanOrEqualTo(DROSSELUNG.toNanos());
+    }
+
+    /**
+     * Der öffentliche Konstruktor (Anwendung) misst die Rechenzeit (Review PR #81, S2): Der prüfende Thread wartet
+     * {@link #DROSSELUNG} an der Sperre des Caches, nachdem die Frist begonnen hat, und rechnet dabei nicht. Mit der
+     * Wanduhr wäre die Frist danach abgelaufen und das gültige Schema {@code ZUSATZ_UNGUELTIG}.
+     */
+    @Test
+    void anwendungZaehltWartezeitNichtAlsRechenzeit() throws Exception {
+        assumeTrue(ManagementFactory.getThreadMXBean().isCurrentThreadCpuTimeSupported(), "CPU-Zeit des Threads");
+        var anwendung = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE);
+        AtomicReference<Object> ergebnis = new AtomicReference<>();
+        Thread pruefend;
+        synchronized (anwendung.cache) {
+            pruefend = Thread.ofPlatform().start(() -> {
+                try {
+                    ergebnis.set(anwendung.schemaPruefen(OFFERTE));
+                } catch (RuntimeException e) {
+                    ergebnis.set(e);
+                }
+            });
+            long bis = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (!wartetAufSperre(pruefend, anwendung.cache)) {
+                assertThat(System.nanoTime() - bis).as("Thread wartet an der Sperre des Caches").isNegative();
+                Thread.onSpinWait();
+            }
+            schlafen();
+        }
+        pruefend.join(Duration.ofSeconds(10));
+        assertThat(ergebnis.get()).isEqualTo(Set.of("angebot_gueltig_bis"));
+    }
+
+    private static boolean wartetAufSperre(Thread thread, Object sperre) {
+        ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(thread.threadId());
+        return info != null && info.getThreadState() == Thread.State.BLOCKED && info.getLockInfo() != null
+                && info.getLockInfo().getIdentityHashCode() == System.identityHashCode(sperre);
+    }
+
+    /**
+     * Die Rechenzeit ist unter Linux ein Systemaufruf (rund 0.6 µs unter {@code --cpus 0.3}); vor jedem Schlüsselwort
+     * gelesen, frass sie bei einem gültigen Wert von 64 KiB den Grossteil der 50 ms (Review PR #81, S1). Die Frist
+     * liest sie erst, wenn die Wanduhr den Rest der Frist überschritten hat. Hier läuft die Wanduhr 10 µs je Ablesen,
+     * die Rechenzeit 5 % davon (gedrosselt): Der Wert ist gültig, und die Rechenzeit wird nur selten gelesen.
+     */
+    @Test
+    void grosserGueltigerWertLiestDieRechenzeitSelten() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"l\":{\"type\":\"array\","
+                + "\"items\":{\"type\":\"integer\",\"minimum\":0}}}}";
+        int anzahl = (NetworkntZusatzSchemaPruefer.MAX_WERTE_BYTES - 16) / 2;
+        String werte = "{\"l\":[" + String.join(",", Collections.nCopies(anzahl, "1")) + "]}";
+        AtomicLong wand = new AtomicLong();
+        AtomicLong rechen = new AtomicLong();
+        Uhren uhren = new Uhren(() -> wand.incrementAndGet() * 10_000, () -> {
+            rechen.incrementAndGet();
+            return wand.get() * 500;
+        });
+        var gedrosselt = new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> uhren);
+
+        assertThatCode(() -> gedrosselt.wertePruefen(schema, werte)).doesNotThrowAnyException();
+        assertThat(wand.get() * 10_000).as("Wanduhr über der Frist").isGreaterThan(GRENZE.toNanos());
+        assertThat(rechen.get()).as("Ablesen der Rechenzeit").isBetween(2L, 100L);
     }
 
     /**
@@ -220,15 +284,20 @@ class NetworkntZusatzSchemaPrueferTest {
 
         var api = new TestUhr();
         api.schritt(schritt);
-        assertUngueltig(() -> new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> api).schemaPruefen(OFFERTE));
+        assertUngueltig(() -> new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(api)).schemaPruefen(OFFERTE));
         var seed = new TestUhr();
         seed.schritt(schritt);
-        assertThat(new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> seed).seedSchemaPruefen(OFFERTE))
+        assertThat(new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(seed)).seedSchemaPruefen(OFFERTE))
                 .containsExactly("angebot_gueltig_bis");
         var langsam = new TestUhr();
         langsam.schritt(SEED_GRENZE);
-        assertUngueltig(() -> new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> langsam)
+        assertUngueltig(() -> new NetworkntZusatzSchemaPruefer(GRENZE, SEED_GRENZE, () -> Uhren.eine(langsam))
                 .seedSchemaPruefen(OFFERTE));
+    }
+
+    /** Wie {@link #gedrosselt(LongSupplier)}; die Wartezeit fällt beim zweiten Ablesen der Wanduhr an. */
+    private static Uhren gedrosselt(Uhren uhren) {
+        return new Uhren(gedrosselt(uhren.wand()), uhren.rechen());
     }
 
     /** Uhr, deren Thread beim zweiten Ablesen {@link #DROSSELUNG} lang nicht rechnet (wie unter CFS-Drosselung). */

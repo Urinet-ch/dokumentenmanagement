@@ -57,7 +57,10 @@ import java.util.regex.Pattern;
  * {@code ZUSATZ_UNGUELTIG}. Gemessen wird die CPU-Zeit des prüfenden Threads, nicht die Wanduhr: Unter gedrosselter CPU
  * ({@code cpus} in Compose, CFS-Quote) wartet der Thread oft länger als die Frist, ohne zu rechnen, und die Wanduhr
  * lehnte dann gültige Schemas ab (Stufe A, 12.11.2026). Kann die JVM die CPU-Zeit des Threads nicht messen (virtueller
- * Thread, abgeschaltet), gilt für diesen Aufruf die Wanduhr.
+ * Thread, abgeschaltet), gilt für diesen Aufruf die Wanduhr. Weil das Ablesen der CPU-Zeit unter Linux ein
+ * Systemaufruf ist und selbst gegen die Frist zählt, liest die Frist zuerst die Wanduhr und die CPU-Zeit erst, wenn die
+ * Wanduhr den Rest der Frist überschritten hat (CPU-Zeit ≤ Wanduhr, Review PR #81). Die Wanduhr eines Aufrufs ist
+ * bewusst nicht begrenzt: Die Prüfung blockiert nicht, Wartezeit wird also nicht zu Rechenzeit.
  * Die Frist prüft jedes Schlüsselwort des Dialekts ausser {@code format} vor seiner Prüfung (auch {@code $ref}, gegen
  * Verweis-Graphen mit exponentiell vielen Pfaden), jeder reguläre Ausdruck vor dem Kompilieren (auch Werte mit
  * {@code format: regex} und Muster, die das Meta-Schema über {@code format: regex} prüft), jede Musterprüfung vor dem
@@ -113,11 +116,12 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
     private final long zeitgrenzeNanos;
     private final long seedZeitgrenzeNanos;
-    private final Supplier<LongSupplier> uhrwahl;
+    private final Supplier<Uhren> uhrwahl;
     private final ThreadLocal<Frist> frist = new ThreadLocal<>();
     private final SchemaRegistry registry;
     private final Schema metaSchema;
-    private final Map<String, Geprueft> cache = Collections.synchronizedMap(
+    /** Paketsichtbar nur für den Test, der den prüfenden Thread an dieser Sperre warten lässt. */
+    final Map<String, Geprueft> cache = Collections.synchronizedMap(
             new LinkedHashMap<>(CACHE_GROESSE, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, Geprueft> eldest) {
@@ -129,14 +133,14 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     public NetworkntZusatzSchemaPruefer(
             @ConfigProperty(name = "archiv.dokumentart.muster-zeitgrenze") Duration zeitgrenze,
             @ConfigProperty(name = "archiv.dokumentart.seed-zeitgrenze") Duration seedZeitgrenze) {
-        this(zeitgrenze, seedZeitgrenze, NetworkntZusatzSchemaPruefer::uhrDesThreads);
+        this(zeitgrenze, seedZeitgrenze, ANWENDUNG);
     }
 
     /**
      * Mit eigener Uhrwahl, damit Tests die Frist ohne echte Uhr prüfen: {@code uhrwahl} liefert beim Beginn eines
-     * Aufrufs die Uhr in Nanosekunden, die für diesen ganzen Aufruf gilt.
+     * Aufrufs die Uhren, die für diesen ganzen Aufruf gelten.
      */
-    NetworkntZusatzSchemaPruefer(Duration zeitgrenze, Duration seedZeitgrenze, Supplier<LongSupplier> uhrwahl) {
+    NetworkntZusatzSchemaPruefer(Duration zeitgrenze, Duration seedZeitgrenze, Supplier<Uhren> uhrwahl) {
         this.zeitgrenzeNanos = positiv(zeitgrenze, "archiv.dokumentart.muster-zeitgrenze");
         this.seedZeitgrenzeNanos = positiv(seedZeitgrenze, "archiv.dokumentart.seed-zeitgrenze");
         this.uhrwahl = uhrwahl;
@@ -167,20 +171,35 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     /**
-     * Uhr eines Aufrufs in der Anwendung: CPU-Zeit des aktuellen Threads, sonst die Wanduhr. Die Wahl gilt für den
-     * ganzen Aufruf, damit Frist und Ablesen nie verschiedene Uhren mischen.
+     * Uhren eines Aufrufs: {@code wand} ist günstig abzulesen, {@code rechen} misst die Frist. Für einen Thread gilt
+     * Rechenzeit ≤ Wanduhr; darum liest die {@link Frist} die (unter Linux teure) Rechenzeit erst, wenn die Wanduhr
+     * die verbleibende Frist überschritten hat. Sind beide dieselbe Uhr, liest die Frist sie einmal je Prüfung.
      */
-    static LongSupplier uhrDesThreads() {
+    record Uhren(LongSupplier wand, LongSupplier rechen) {
+        static Uhren eine(LongSupplier uhr) {
+            return new Uhren(uhr, uhr);
+        }
+    }
+
+    private static final LongSupplier WANDUHR = System::nanoTime;
+    /** Uhrwahl der Anwendung (öffentlicher Konstruktor); als Konstante, damit ein Test sie dort nachweisen kann. */
+    static final Supplier<Uhren> ANWENDUNG = NetworkntZusatzSchemaPruefer::uhrenDesThreads;
+
+    /**
+     * Uhren eines Aufrufs in der Anwendung: Rechenzeit ist die CPU-Zeit des aktuellen Threads, sonst die Wanduhr. Die
+     * Wahl gilt für den ganzen Aufruf, damit Frist und Ablesen nie verschiedene Uhren mischen.
+     */
+    static Uhren uhrenDesThreads() {
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();
         try {
             if (!Thread.currentThread().isVirtual() && threads.isCurrentThreadCpuTimeSupported()
                     && threads.isThreadCpuTimeEnabled() && threads.getCurrentThreadCpuTime() >= 0) {
-                return threads::getCurrentThreadCpuTime;
+                return new Uhren(WANDUHR, threads::getCurrentThreadCpuTime);
             }
         } catch (UnsupportedOperationException e) {
             // Wanduhr
         }
-        return System::nanoTime;
+        return Uhren.eine(WANDUHR);
     }
 
     /**
@@ -201,7 +220,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         cache.clear();
     }
 
-    private record Geprueft(Schema kompiliert, Set<String> felder) {
+    record Geprueft(Schema kompiliert, Set<String> felder) {
     }
 
     @Override
@@ -279,16 +298,39 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
     }
 
-    /** Uhr und Ende der Frist eines Aufrufs. */
-    private record Frist(LongSupplier uhr, long bis) {
-        static Frist ab(LongSupplier uhr, long nanos) {
-            return new Frist(uhr, uhr.getAsLong() + nanos);
+    /**
+     * Frist eines Aufrufs nach der Rechenzeit (Review PR #81, S1): Die Wanduhr ist eine obere Schranke der Rechenzeit
+     * des Threads. Solange sie die Stelle {@code naechste} nicht überschritten hat, kann auch die Rechenzeit die Frist
+     * nicht überschritten haben, und die Rechenzeit bleibt ungelesen. Sonst liest die Frist die Rechenzeit und rückt
+     * {@code naechste} um den Rest der Frist vor. Gehört einem Thread (ThreadLocal bzw. eine Musterprüfung).
+     */
+    private static final class Frist {
+        private final Uhren uhren;
+        private final long rechenBis;
+        private long naechste;
+
+        private Frist(Uhren uhren, long nanos) {
+            this.uhren = uhren;
+            long wand = uhren.wand().getAsLong();
+            long rechen = uhren.wand() == uhren.rechen() ? wand : uhren.rechen().getAsLong();
+            this.rechenBis = rechen + nanos;
+            this.naechste = wand + nanos;
+        }
+
+        static Frist ab(Uhren uhren, long nanos) {
+            return new Frist(uhren, nanos);
         }
 
         void pruefen() {
-            if (uhr.getAsLong() - bis > 0) {
+            long wand = uhren.wand().getAsLong();
+            if (wand - naechste <= 0) {
+                return;
+            }
+            long rest = rechenBis - (uhren.wand() == uhren.rechen() ? wand : uhren.rechen().getAsLong());
+            if (rest < 0) {
                 throw new FristAbgelaufen();
             }
+            naechste = wand + rest;
         }
     }
 
