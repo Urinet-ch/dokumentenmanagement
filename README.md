@@ -80,33 +80,96 @@ cd backend && mvn quarkus:dev
 ```bash
 java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
 ```
-- Im laufenden Container per `exec`; das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber
-  die Secret-Dateien `archiv_db_app`, `archiv_db_owner`, `s3_app_zugang_id` und `s3_app_zugang_geheimnis` unter
-  `/run/secrets/`; fehlt eine oder ist sie leer, bricht der Start ab. Seed: `seed/<code>/dokumentarten.json`.
+- Das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber die Secret-Dateien `archiv_db_app`,
+  `archiv_db_owner`, `s3_app_zugang_id` und `s3_app_zugang_geheimnis` unter `/run/secrets/`; fehlt eine oder ist sie
+  leer, bricht der Start ab. Seed: `seed/<code>/dokumentarten.json`.
 - Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
   vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).
+
+### Admin-Kommandos auf der VPS
+Nie per `docker exec` im laufenden API- oder Keycloak-Container: Eine zweite JVM sprengt dessen `mem_limit`
+(Keycloak wurde so zweimal beendet, Erkenntnis 12.11.2026). Admin-Kommandos laufen in einem Wegwerf-Container mit den
+Einstellungen der API (Image, Secrets, `JAVA_OPTS_APPEND`, `mem_limit`), ohne abhängige Dienste zu starten und ohne
+Anmeldung bei Traefik (`traefik.enable=false`):
+```bash
+sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
+  run --rm --no-deps -T -l traefik.enable=false api \
+  sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar <kommando>'
+```
+- `<kommando>` z. B. `mandant anlegen urinet --name "Urinet Aschwanden"`; der Exit-Code des Kommandos ist der von
+  `docker compose run`.
+- Der Wegwerf-Container belegt für einige Sekunden ein zweites `mem_limit` der API; nicht während einer Messung des
+  Speicherbudgets (Aufgabe 1.10) starten.
 
 ## API-Token für Skripte (Generator-Client, Drive-Import)
 Ein API-Token `ua_<id>_<geheimnis>` gilt für genau einen Mandanten und einen Scope (`generator` oder `import`) und
 erreicht nur die Endpunkte dieses Scopes (Req 2.5). Das Archiv speichert nur den Argon2id-Hash; das Token wird nur beim
 Anlegen ein einziges Mal angezeigt. Anlegen, Auflisten und Widerrufen darf nur der `inhaber` (A14, Req 2.20): in der
-Verwaltung (`/api/v1/api-tokens`) oder per Kommando (im Container per `exec`, wie `mandant anlegen`; stdout in eine
-neue Datei mit Rechten 600 umleiten und erst bei Erfolg an ihren Platz schieben, damit ein Fehlschlag kein gültiges
-Token überschreibt):
+Verwaltung (`/api/v1/api-tokens`) oder per Kommando (auf der VPS im Wegwerf-Container wie `mandant anlegen`, siehe
+«Admin-Kommandos auf der VPS»; stdout in eine neue Datei mit Rechten 600 umleiten und erst bei Erfolg an ihren Platz
+schieben, damit ein Fehlschlag kein gültiges Token überschreibt):
 ```bash
 mkdir -p ~/.config/urinet-archiv
 (umask 077; java -jar quarkus-run.jar token erstellen <mandant> <name> <generator|import> > token.neu) \
   && mv token.neu ~/.config/urinet-archiv/token
+```
+Auf der VPS (das Token entsteht dort in `token.neu` und geht danach wie unten beschrieben an den Client):
+```bash
+(umask 077; sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/compose.yml \
+  run --rm --no-deps -T -l traefik.enable=false api \
+  sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar token erstellen <mandant> <name> <generator|import>' \
+  > token.neu)
 ```
 - Das Token steht nur auf stdout; die Zeile mit ID, Mandant und Scope und das Log gehen auf stderr. Exit-Codes wie bei
   `mandant anlegen` (0 angelegt, 1 fachlicher Fehler, 2 falscher Aufruf, 3 technischer Fehler); nach einem Fehler
   `token.neu` löschen.
 - Entsteht das Token nicht auf dem Client-Rechner (Kommando auf dem Server, Anzeige in der Verwaltung), kommt es nur
   über einen sicheren Kanal dorthin (z. B. Passwort-Manager oder `scp`), nie per E-Mail, Chat oder Ticket; auf dem
-  Client wie oben mit `umask 077` in `token.neu` schreiben und verschieben.
+  Client wie oben mit `umask 077` in `token.neu` schreiben und verschieben; `token.neu` auf dem Server danach löschen.
 - Lokale Clients lesen das Token aus `~/.config/urinet-archiv/token` (Rechte 600) oder aus der Datei, deren Pfad
   `ARCHIV_TOKEN_DATEI` nennt – **nie** das Token selbst aus einer Umgebungsvariable (tech.md Regel 7), nie im Repo.
 - Ein verlorenes oder offengelegtes Token sofort widerrufen (`DELETE /api/v1/api-tokens/{tokenId}`) und neu anlegen.
+
+## Benutzer in Keycloak anlegen
+Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image
+an, nie per `docker exec` im laufenden `kc` (siehe «Admin-Kommandos auf der VPS»). Der Container hängt nur im internen
+Netz `archiv_intern`, erreicht Keycloak unter `http://kc:8080` (die Admin-Konsole bleibt nicht öffentlich) und liest
+das Admin-Passwort aus der Secret-Datei. Platzhalter im Kopf des Skripts ersetzen:
+```bash
+sudo docker run --rm -i --network archiv_intern -m 256m --cpus 0.5 --cap-drop ALL \
+  --security-opt no-new-privileges -e KC_OPTS="-Xmx96m -XX:+UseSerialGC" \
+  -v /srv/apps/archiv/secrets/keycloak_admin:/run/secrets/keycloak_admin:ro \
+  --entrypoint bash archiv:kc-current <<'EOF'
+set -euo pipefail
+BENUTZER=<benutzer>; MANDANT=<urinet|vhf-gsk>; ROLLE=<inhaber|mitarbeiter|treuhaender|geschaeftsstelle>
+EMAIL=<e-mail>; VORNAME=<vorname>; NACHNAME=<nachname>
+kcadm=/opt/keycloak/bin/kcadm.sh
+$kcadm config credentials --server http://kc:8080 --realm master --user archiv-admin \
+  --password "$(cat /run/secrets/keycloak_admin)"
+$kcadm create users -r urinet-archiv -s username="$BENUTZER" -s enabled=true \
+  -s email="$EMAIL" -s firstName="$VORNAME" -s lastName="$NACHNAME" \
+  -s "attributes.mandant=[\"$MANDANT\"]" -s 'requiredActions=["CONFIGURE_TOTP","UPDATE_PASSWORD"]'
+$kcadm add-roles -r urinet-archiv --uusername "$BENUTZER" --rolename "$ROLLE"
+PASSWORT=$(head -c 18 /dev/urandom | base64 | tr -d '/+=')
+$kcadm set-password -r urinet-archiv --username "$BENUTZER" --new-password "$PASSWORT" --temporary
+echo "Temporäres Passwort für $BENUTZER: $PASSWORT"
+$kcadm get users -r urinet-archiv -q username="$BENUTZER" -q exact=true -q briefRepresentation=false \
+  --fields 'username,attributes(*),requiredActions'
+$kcadm get-roles -r urinet-archiv --uusername "$BENUTZER" --fields name
+EOF
+```
+- **Mandant:** Das Attribut `mandant` wird zum Token-Claim `mandant` (tech.md Regel 1); es ist Pflicht im
+  Benutzerprofil, ohne Attribut weist Keycloak den Benutzer ab (`error-user-attribute-required`). Den Mandanten vorher
+  im Archiv anlegen («Mandant anlegen»).
+- **Rolle:** genau eine Realm-Rolle nach der Rechtematrix (Spec 01, Requirement 2); `geschaeftsstelle` nur im Mandanten
+  `vhf-gsk`.
+- **Temporäres Passwort:** zufällig erzeugt, erscheint nur einmal im Terminal; nur über einen sicheren Kanal
+  (Passwort-Manager) übergeben, nie per E-Mail, Chat oder Ticket. Bei der ersten Anmeldung setzt der Benutzer ein
+  eigenes Passwort (`UPDATE_PASSWORD`).
+- **TOTP-Pflicht:** `CONFIGURE_TOTP` verlangt die Einrichtung bei der ersten Anmeldung; der Browser-Flow
+  `browser-totp-pflicht` fordert TOTP danach bei jeder Anmeldung.
+- `kcadm.sh` liest die JVM-Optionen aus `KC_OPTS`, nicht aus `JAVA_OPTS`. Attribute zeigt die Benutzerliste nur mit
+  `briefRepresentation=false` und dem Feldfilter `attributes(*)`.
 
 ## Leitplanken
 Die Leitplanken stammen aus der Harness-Vorlage der Skill-Werkstatt (`~/git/ai-entwicklung/vorlagen/harness`) und
