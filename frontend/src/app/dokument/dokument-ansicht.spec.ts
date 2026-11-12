@@ -22,6 +22,7 @@ const DOKUMENT: Dokument = {
   fristAbgelaufen: false,
   zusatz: { belegnummer: '2026-003', ohneWert: null },
   version: 1,
+  warnungen: [],
 };
 
 class DokumentAttrappe extends DokumentPort {

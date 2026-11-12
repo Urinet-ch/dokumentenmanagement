@@ -94,6 +94,7 @@ function dokument(d) {
     fristAbgelaufen: false,
     zusatz: { belegnummer: d.belegnummer },
     version: 2,
+    warnungen: [],
   };
 }
 
