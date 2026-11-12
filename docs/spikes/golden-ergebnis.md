@@ -327,7 +327,7 @@ unverändert). Läufe nur auf dem Abstimmungsteil (30 Belege), Modell `google/ge
   Beschreibungen der Dokumentarten erreichen den Spike-Prompt nicht. v6 übernimmt F4/F6 und P40-2 in die Regel.
 - Ursache 38: Das Modell setzte bei Briefen ohne Belegnummer in 3 von 5 früheren Läufen `0` mit Sicherheit 1.0 (Läufe vom
   09.11. und 12.11.). Prototyp-Regel E3: eine Belegnummer nur aus Nullen wird leer.
-- Gate-Lauf auf dem Prüfteil: offen, startet nur Fabian (README «Lauf nach Aufgabe 3.8»).
+- Gate-Lauf 2026-11-12-224842 (Fabian) auf dem Merge-Commit `5b6d727` von PR #90, Prompt `v6-7a39224f2f5e`, Nachbearbeitung `nb-2026-11-12`, Modell `google/gemma-4-31B-it`, Schwelle 0.8: Prüfteil **19/20** Belege mit Art, Datum, Partner und Betrag richtig (Req 0.3), 95/100 Felder, **0 falsche Felder ab 0.8** (kleinste Schwelle mit höchstens 1 Fehler: 0.00, Req 0.9) – **bestanden**. Der eine Fehlschlag ist ein Beleg ohne Vorschlag: Aufruf ohne Modellantwort (Timeout oder HTTP-Fehler, Tokens unbekannt), kein falscher Vorschlag; mittlere KI-Zeit 12.4 s je Beleg statt rund 4 s in den Abstimmungsläufen. Kosten ca. CHF 0.007.
 
 ## Realitätsprüfung (echte Belege, 09.11.2026)
 

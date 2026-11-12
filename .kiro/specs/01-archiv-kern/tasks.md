@@ -239,7 +239,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `PartnerAbgleich` (E-Mail, UID, IBAN, Ähnlichkeit ≥ 0.6, «unsicher» bei Abstand < 0.1) mit Tests
   - _Anforderungen: 2.18, 7.4_
 
-- [ ] 3.8 Golden-Generator nach F4/F6 anpassen, neuer Golden-Lauf durch Fabian (Entscheid 11.11.2026)
+- [x] 3.8 Golden-Generator nach F4/F6 anpassen, neuer Golden-Lauf durch Fabian (Entscheid 11.11.2026)
+  - Erledigt (PR #82, #90): Generator nach F4/F6, Prompt v6 und Prototyp-Regel E3. Gate-Lauf 2026-11-12-224842 (Fabian) auf dem Merge-Commit `5b6d727` von PR #90, Prompt `v6-7a39224f2f5e`, Nachbearbeitung `nb-2026-11-12`, Modell `google/gemma-4-31B-it`, Schwelle 0.8: Prüfteil 19/20 Belege mit Art, Datum, Partner und Betrag richtig (Req 0.3), 95/100 Felder, 0 falsche Felder ab 0.8 (kleinste Schwelle mit höchstens 1 Fehler: 0.00, Req 0.9) – bestanden. Der eine Fehlschlag ist ein Beleg ohne Vorschlag: Aufruf ohne Modellantwort (Timeout oder HTTP-Fehler, Tokens unbekannt), kein falscher Vorschlag; mittlere KI-Zeit 12.4 s je Beleg statt rund 4 s in den Abstimmungsläufen. Kosten ca. CHF 0.007.
+  - Folge für 3.2: Art-Regel aus Prompt v6, Regel E3 und fehlende Modellantwort (Zeitüberschreitung, HTTP-Fehler) wie eine ungültige Antwort behandeln: Dokument ohne Vorschlag in den Eingangskorb (Req 7.3).
   - Eigener Folgeauftrag vor 3.2 (`tools/golden_synth`): Prämienrechnungen von Versicherern (auch UVG, Krankentaggeld, BVG) und Mahnungen mit Mahngebühr oder Verzugszins = `LIEFERANTENBELEG`, Mahnungen ohne Gebühr = `KORRESPONDENZ` (F4/F6, entschieden von Fabian am 10.11.2026; P40-2, entschieden von Fabian am 11.11.2026); in PR #40 nicht geändert; Nummer 3.8, weil bestehende Nummern bleiben, steht aber vor 3.2
   - _Anforderungen: 0.9, 0.10_
 
