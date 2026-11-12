@@ -4,10 +4,12 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantVerzeichnis;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnisPflege;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
 import java.security.SecureRandom;
@@ -31,14 +33,16 @@ public class ApiTokenVerwaltung {
     private final GeheimnisHasher hasher;
     private final MandantVerzeichnis verzeichnis;
     private final HashSperre sperre;
+    private final BenutzerVerzeichnisPflege benutzerVerzeichnis;
     private final SecureRandom zufall = new SecureRandom();
 
     public ApiTokenVerwaltung(ApiClientRegister register, GeheimnisHasher hasher, MandantVerzeichnis verzeichnis,
-                              HashSperre sperre) {
+                              HashSperre sperre, BenutzerVerzeichnisPflege benutzerVerzeichnis) {
         this.register = register;
         this.hasher = hasher;
         this.verzeichnis = verzeichnis;
         this.sperre = sperre;
+        this.benutzerVerzeichnis = benutzerVerzeichnis;
     }
 
     /** Das neue Token mit seinem Eintrag; {@code token} ist die einzige Stelle, an der das Geheimnis vorkommt. */
@@ -74,11 +78,20 @@ public class ApiTokenVerwaltung {
         return register.liste(mandant.wert());
     }
 
-    /** Widerruf im eigenen Mandanten; eine fremde oder unbekannte ID ergibt {@code NICHT_GEFUNDEN}. */
-    public void widerrufen(MandantCode mandant, String id) {
+    /**
+     * Widerruf im eigenen Mandanten; eine fremde oder unbekannte ID ergibt {@code NICHT_GEFUNDEN}. In derselben
+     * Transaktion beendet eine neue Zeile im Benutzerverzeichnis die Kennung {@code token:<id>} (Req 10.10); die Zeile
+     * in {@code public.api_client} bleibt.
+     */
+    @Transactional
+    public void widerrufen(MandantCode mandant, String id, Optional<String> erfasstVon) {
         if (!ApiToken.gueltigeId(id) || !register.widerrufen(mandant.wert(), id)) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
+        ApiClient client = register.finden(id).map(ApiClientRegister.Zugang::client)
+                .orElseThrow(() -> new IllegalStateException("API-Token nach dem Widerruf nicht lesbar"));
+        benutzerVerzeichnis.tokenWiderrufen(mandant, ApiToken.principal(id), client.name(), client.erstellt(),
+                erfasstVon);
         LOG.infof("API-Token widerrufen: id=%s mandant=%s", id, mandant.wert());
     }
 

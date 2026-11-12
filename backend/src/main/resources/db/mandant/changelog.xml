@@ -14,5 +14,6 @@
     <include file="changesets/007-import.xml" relativeToChangelogFile="true"/>
     <include file="changesets/008-import-abgleich.xml" relativeToChangelogFile="true"/>
     <include file="changesets/009-import-uebernahme.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/010-benutzer-verzeichnis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/011-prueflauf.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

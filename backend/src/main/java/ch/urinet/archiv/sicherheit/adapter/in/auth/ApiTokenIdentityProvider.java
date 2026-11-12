@@ -44,6 +44,7 @@ public class ApiTokenIdentityProvider implements IdentityProvider<ApiTokenAnfrag
                 .addRole(client.scope().rolle())
                 .addAttribute(TokenIdentitaet.MANDANT, client.mandant())
                 .addAttribute(TokenIdentitaet.SCOPE, client.scope())
+                .addAttribute(TokenIdentitaet.NAME, client.name())
                 .build();
     }
 }

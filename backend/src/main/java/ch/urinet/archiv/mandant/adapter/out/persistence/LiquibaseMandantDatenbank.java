@@ -36,10 +36,10 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final Pattern ROLLE = Pattern.compile("^[a-z_][a-z0-9_]*$");
     /**
-     * Tabellen, in die die App-Rolle nur einfügt und aus denen sie nur liest (Req 10.3). Zusätzlich verhindert je ein
-     * Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
+     * Tabellen, in die die App-Rolle nur einfügt und aus denen sie nur liest (Req 10.3, 10.10). Zusätzlich verhindert je
+     * ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
      */
-    static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version");
+    static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;
