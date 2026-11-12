@@ -225,6 +225,11 @@ class CsvVorschauHandlerTest {
         }
 
         @Override
+        public Optional<Kontakt> mitCrmId(String crmId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Kontakt anlegen(KontaktAngaben angaben,
                                                                String nameNormalisiert, String quelle) {
             throw new UnsupportedOperationException();
