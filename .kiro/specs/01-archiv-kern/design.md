@@ -873,7 +873,8 @@ Drive-Import (Req 12):
     sonst wird der Rückruf abgelehnt.
   - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A13); ohne Mandant oder ohne
     Archiv-Rolle kein Menü. Die Oberfläche blendet nur aus, die API prüft.
-  - Eingangskorb-Zähler hinter einem Port (`EingangskorbZaehler`); bis 3.6 ohne Endpunkt und ohne Anzeige.
+  - Eingangskorb-Zähler hinter einem Port (`EingangskorbZaehler`); bis 3.6 ohne Endpunkt und ohne Anzeige (seit 3.6
+    `HttpEingangskorbZaehler`, siehe «Umsetzung (Aufgabe 3.6)»).
   - Upload hinter dem Port `UploadPort` mit HTTP-Adapter (Multipart, das Feld `dateien[]` aus «Upload» als wiederholter
     Teil `dateien` je Datei in der Reihenfolge der Liste, `zusammenfassen=true` ab zwei Bildern); den genauen Feldnamen
     und den generierten Client legt 2.4 fest. Die Ergebnisse ordnet die PWA über den Index der Datei zu, über den
@@ -881,6 +882,38 @@ Drive-Import (Req 12):
   - Keycloak im Dev-Modus auf festem Port 8180 (`%dev.quarkus.keycloak.devservices.port`).
   - Browser-Szenarien laufen gegen eine Keycloak-Attrappe in Playwright (`frontend/e2e/hilfen/`), die PKCE S256 prüft
     und unsignierte Tokens ausstellt; der Service Worker ist dabei blockiert.
+- Umsetzung (Aufgabe 3.6, Eingangskorb-Oberfläche):
+  - Backend, additiv: Das DTO `Dokument` trägt zusätzlich `fehler`, `pdfaFehlt`, `seiten`, `partnerId`, `partnerName`,
+    `projekt`, `personBenutzer`, `vorschlag` und `unsicher`. `vorschlag` (Metadaten-Vorschlag der KI) und `unsicher`
+    (Felder unter `archiv.ki.schwelle`, Standard 0.8, Req 7.6) gibt es nur in den Status des Eingangskorbs, sonst
+    `null` bzw. leer. Ein vorgeschlagenes Feld ohne Sicherheit gilt als unsicher (`KiSicherheit`, Domain).
+  - Vorschaubild `GET /dokumente/{id}/vorschau?seite=n` (`DokumentVorschauResource`, image/png, Seite ab 1): Sichtbarkeit
+    wie beim Lesen (A2–A4, 404 vor 403), Seite über `seiten` oder ohne Bild 404 `NICHT_GEFUNDEN`, Seite unter 1 400;
+    `Cache-Control: private, no-store`; gestreamt (`AblagePort.lesenVorschau` liefert einen `InputStream`, nie ganz im
+    Heap); jedes Bild schreibt einen Eintrag `ANZEIGEN`. Die PWA lädt das Bild mit Token als Blob (Object-URL, beim
+    Entfernen der Karte freigegeben), weil ein `<img src>` kein Bearer-Token sendet.
+  - Seite `/eingangskorb` (Recht A5, lazy geladen): je 20 Einträge, «Weitere laden»; Karte je Dokument mit Vorschau,
+    Angaben (Dokument vor Vorschlag: Was am Dokument steht, gilt; der Vorschlag füllt Lücken), «bitte prüfen» nur bei
+    Feldern aus dem Vorschlag, die `unsicher` nennt, Hinweis auf einen erkannten, noch keinem Kontakt zugeordneten
+    Partner und Hinweise `pdfaFehlt`, «Frist abgelaufen», `BELEGNUMMER_BEKANNT` mit Link auf `/dokument/<id>`.
+  - Aktionen nur nach Rechtematrix: «Bestätigen» (A7) sendet den Vorschlag unverändert, also ein Tipp für ein korrekt
+    vorgeschlagenes Dokument (Req 8.4); «Angaben ändern» (A6 und A7) öffnet das Formular in der Karte mit Partnersuche
+    (`GET /kontakte?q=`, ab 2 Zeichen, 300 ms Verzögerung) und Vertraulichkeit nur mit A8 (leer = Standard der Art,
+    Req 2.22); «Verwerfen» (A9, `EINGANGSKORB` und `FEHLER`) mit Rückfrage und Pflichtgrund in der Karte; «Erneut
+    verarbeiten» bzw. «Archivierung wiederholen» (A10). Ohne Aktion steht ein Hinweis.
+  - Der Body der Bestätigung ersetzt die Grundfelder ganz (3.4): Projekt, `personBenutzer` und Geschäftsjahr des
+    Dokuments gehen unverändert mit; `vertraulichkeit` nur, wenn gewählt oder vorgeschlagen.
+  - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
+    `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
+    `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
+    Nach jeder Aktion lädt die Seite neu, frischt den Zähler auf, meldet das Ergebnis in `role=status` und setzt den
+    Fokus auf die Überschrift.
+  - Zähler (Req 8.6): `HttpEingangskorbZaehler` liest `GET /eingangskorb?groesse=1&seite=0` (`gesamt`) nur mit A5, nach
+    der Anmeldung und nach jeder Aktion; bei einem Fehler keine Anzeige.
+  - Browser-Szenarien (`features/dokument/eingangskorb-pwa.feature`, Viewport 375 px) laufen gegen eine Attrappe der API
+    (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
+    selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
+    beantwortet in jedem Browser-Szenario auch den Zähler.
 
 ## Data Models
 
