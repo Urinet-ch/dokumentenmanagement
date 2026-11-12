@@ -1,4 +1,6 @@
 import { Route, Routes } from '@angular/router';
+import { DokumentPort } from './dokument/dokument-port';
+import { HttpDokumentService } from './dokument/http-dokument.service';
 import { HttpUploadService } from './erfassen/http-upload.service';
 import { UploadPort } from './erfassen/upload-port';
 import { Folgt } from './folgt/folgt';
@@ -7,6 +9,8 @@ import { Aktion } from './gemeinsam/anmeldung/rechte';
 import { TEXTE } from './gemeinsam/texte.de-CH';
 import { Rueckruf } from './start/rueckruf';
 import { Start } from './start/start';
+import { HttpSucheService } from './suche/http-suche.service';
+import { SuchePort } from './suche/suche-port';
 
 const titel = (seite: string) => `${seite} · ${TEXTE.appTitel}`;
 
@@ -31,8 +35,20 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A5')],
     title: titel(TEXTE.menue.eingangskorb),
   },
-  folgt('suche', TEXTE.menue.suche, 'A2'),
-  folgt('dokument/:id', 'Dokument', 'A2'),
+  {
+    path: 'suche',
+    loadComponent: () => import('./suche/suche').then((m) => m.Suche),
+    canActivate: [rechtGuard('A2')],
+    providers: [{ provide: SuchePort, useClass: HttpSucheService }],
+    title: titel(TEXTE.menue.suche),
+  },
+  {
+    path: 'dokument/:id',
+    loadComponent: () => import('./dokument/dokument-ansicht').then((m) => m.DokumentAnsicht),
+    canActivate: [rechtGuard('A2')],
+    providers: [{ provide: DokumentPort, useClass: HttpDokumentService }],
+    title: titel(TEXTE.dokument.titel),
+  },
   folgt('importe', TEXTE.menue.importe, 'A12'),
   folgt('importe/:id', TEXTE.menue.importe, 'A12'),
   folgt('verwaltung/dokumentarten', TEXTE.menue.dokumentarten, 'A11'),

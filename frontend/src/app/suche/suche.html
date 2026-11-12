@@ -1,0 +1,284 @@
+<h1>{{ texte.titel }}</h1>
+
+<form class="suche" role="search" (submit)="absenden($event)" novalidate>
+  <div class="suchzeile">
+    <label class="feld begriff">
+      <span>{{ texte.begriff }}</span>
+      <input
+        type="search"
+        name="q"
+        maxlength="200"
+        autocomplete="off"
+        enterkeyhint="search"
+        [value]="filter().q"
+        (input)="setzen('q', wert($event))"
+        aria-describedby="begriff-hinweis"
+      />
+      <small id="begriff-hinweis">{{ texte.begriffHinweis }}</small>
+    </label>
+    <button mat-flat-button type="submit" [disabled]="laeuft()">{{ texte.suchen }}</button>
+  </div>
+
+  <button
+    mat-button
+    type="button"
+    class="filter-schalter"
+    [attr.aria-expanded]="filterOffen()"
+    aria-controls="filterleiste"
+    (click)="filterUmschalten()"
+  >
+    {{ texte.filterAnzahl(anzahlFilter()) }} {{ filterOffen() ? '▲' : '▼' }}
+  </button>
+
+  <fieldset id="filterleiste" class="filterleiste karte" [hidden]="!filterOffen()">
+    <legend class="nur-screenreader">{{ texte.filter }}</legend>
+
+    <label class="feld">
+      <span>{{ texte.art }}</span>
+      <select name="art" (change)="setzen('art', wert($event))">
+        <option value="" [selected]="filter().art === ''">{{ texte.alle }}</option>
+        @for (a of arten(); track a.code) {
+          <option [value]="a.code" [selected]="a.code === filter().art">{{ a.name }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="feld partner">
+      <span id="partner-label">{{ texte.partner }}</span>
+      @if (filter().partnerId) {
+        <span class="gewaehlt" data-test="partnerfilter">
+          {{ filter().partnerName || filter().partnerId }}
+          <button
+            mat-button
+            type="button"
+            [attr.aria-label]="texte.partnerEntfernen(filter().partnerName || filter().partnerId)"
+            (click)="partnerEntfernen()"
+          >
+            ✕
+          </button>
+        </span>
+      } @else if (darfKontakte()) {
+        <input
+          type="search"
+          name="partner"
+          autocomplete="off"
+          maxlength="200"
+          aria-labelledby="partner-label"
+          [attr.placeholder]="texte.partnerSuchen"
+          [value]="partnerEingabe()"
+          (input)="partnerTippen(wert($event))"
+          (keydown.enter)="$event.preventDefault()"
+        />
+        @if (partnerVorschlaege(); as vorschlaege) {
+          <ul class="vorschlaege" [attr.aria-label]="texte.partnerVorschlaege">
+            @for (k of vorschlaege; track k.id) {
+              <li>
+                <button mat-button type="button" (click)="partnerWaehlen(k.id, k.name)">{{ kontaktName(k) }}</button>
+              </li>
+            } @empty {
+              <li class="leer">{{ texte.partnerKeine }}</li>
+            }
+          </ul>
+        }
+      } @else {
+        <small>{{ texte.partnerHinweis }}</small>
+      }
+    </div>
+
+    <label class="feld">
+      <span>{{ texte.datumVon }}</span>
+      <input type="date" name="datumVon" [value]="filter().datumVon" (change)="setzen('datumVon', wert($event))" />
+    </label>
+    <label class="feld">
+      <span>{{ texte.datumBis }}</span>
+      <input type="date" name="datumBis" [value]="filter().datumBis" (change)="setzen('datumBis', wert($event))" />
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.betragVon }}</span>
+      <input
+        type="text"
+        inputmode="decimal"
+        name="betragVon"
+        autocomplete="off"
+        [value]="filter().betragVon"
+        (input)="setzen('betragVon', wert($event))"
+      />
+    </label>
+    <label class="feld">
+      <span>{{ texte.betragBis }}</span>
+      <input
+        type="text"
+        inputmode="decimal"
+        name="betragBis"
+        autocomplete="off"
+        [value]="filter().betragBis"
+        (input)="setzen('betragBis', wert($event))"
+      />
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.richtung }}</span>
+      <select name="richtung" (change)="setzen('richtung', $any(wert($event)))">
+        <option value="" [selected]="filter().richtung === ''">{{ texte.alle }}</option>
+        <option value="EINNAHME" [selected]="filter().richtung === 'EINNAHME'">{{ texte.richtungen['EINNAHME'] }}</option>
+        <option value="AUSGABE" [selected]="filter().richtung === 'AUSGABE'">{{ texte.richtungen['AUSGABE'] }}</option>
+      </select>
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.status }}</span>
+      <select name="status" (change)="setzen('status', $any(wert($event)))">
+        <option value="" [selected]="filter().status === ''">{{ texte.statusStandard }}</option>
+        @for (s of stati; track s) {
+          <option [value]="s" [selected]="filter().status === s">{{ texte.stati[s] }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.tags }}</span>
+      <input
+        type="text"
+        name="tags"
+        autocomplete="off"
+        aria-describedby="tags-hinweis"
+        [value]="filter().tags"
+        (input)="setzen('tags', wert($event))"
+      />
+      <small id="tags-hinweis">{{ texte.tagsHinweis }}</small>
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.geschaeftsjahr }}</span>
+      <input
+        type="text"
+        inputmode="numeric"
+        name="geschaeftsjahr"
+        maxlength="4"
+        autocomplete="off"
+        [value]="filter().geschaeftsjahr"
+        (input)="setzen('geschaeftsjahr', wert($event))"
+      />
+    </label>
+
+    <label class="feld">
+      <span>{{ texte.belegnummer }}</span>
+      <input
+        type="text"
+        name="belegnummer"
+        maxlength="50"
+        autocomplete="off"
+        aria-describedby="belegnummer-hinweis"
+        [value]="filter().belegnummer"
+        (input)="setzen('belegnummer', wert($event))"
+      />
+      <small id="belegnummer-hinweis">{{ texte.belegnummerHinweis }}</small>
+    </label>
+
+    @if (filter().q.trim()) {
+      <label class="feld">
+        <span>{{ texte.sortierung }}</span>
+        <select name="sortierung" (change)="setzen('sortierung', $any(wert($event)))">
+          <option value="RELEVANZ" [selected]="filter().sortierung === 'RELEVANZ'">{{ texte.sortierungen['RELEVANZ'] }}</option>
+          <option value="DATUM" [selected]="filter().sortierung === 'DATUM'">{{ texte.sortierungen['DATUM'] }}</option>
+        </select>
+      </label>
+    }
+
+    <div class="filter-aktionen">
+      <button mat-flat-button type="submit" [disabled]="laeuft()">{{ texte.suchen }}</button>
+      <button mat-button type="button" (click)="zuruecksetzen()" [disabled]="laeuft()">{{ texte.zuruecksetzen }}</button>
+    </div>
+  </fieldset>
+
+  <div role="alert" class="meldungen">
+    @for (p of pruefFehler(); track p) {
+      <p class="fehler" data-test="pruefung">{{ texte.pruefung[p] }}</p>
+    }
+    @if (fehler(); as text) {
+      <p class="fehler" data-test="fehler">{{ text }}</p>
+    }
+  </div>
+</form>
+
+<section class="treffer" aria-labelledby="treffer-titel" [attr.aria-busy]="laeuft()">
+  <h2 id="treffer-titel" tabindex="-1" #trefferUeberschrift>
+    {{ texte.treffer }}
+    @if (ergebnis(); as e) {
+      <span class="anzahl" data-test="anzahl">· {{ texte.anzahl(e.gesamt) }}</span>
+    }
+  </h2>
+  @if (laeuft()) {
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laeuft" />
+  }
+  <p class="nur-screenreader" aria-live="polite">
+    {{ laeuft() ? texte.laeuft : ergebnis() ? texte.anzahl(ergebnis()!.gesamt) : '' }}
+  </p>
+
+  @if (ergebnis(); as e) {
+    @if (e.treffer.length === 0) {
+      <p data-test="keine-treffer">{{ texte.keineTreffer }}</p>
+    } @else {
+      <ol class="liste">
+        @for (t of e.treffer; track t.id) {
+          <li class="karte eintrag" data-test="treffer">
+            <a class="titel" [routerLink]="['/dokument', t.id]">{{ titel(t) }}</a>
+            <p class="angaben">
+              <span>{{ artName()(t.art) }}</span>
+              @if (t.datum) {
+                <span>{{ datum(t.datum) }}</span>
+              }
+              @if (t.partnerName) {
+                <span>{{ t.partnerName }}</span>
+              }
+              @if (t.belegnummer) {
+                <span data-test="belegnummer">{{ t.belegnummer }}</span>
+              }
+              @if (t.betrag !== null && t.betrag !== undefined) {
+                <span class="betrag">{{ betrag(t.betrag, t.waehrung) }}</span>
+              }
+              @if (t.status !== 'ARCHIVIERT') {
+                <span class="status">{{ texte.stati[t.status] }}</span>
+              }
+            </p>
+            @if (t.auszug.length > 0) {
+              <p class="auszug" data-test="auszug">
+                @for (teil of t.auszug; track $index) {@if (teil.treffer) {<mark>{{ teil.text }}</mark>} @else {<span>{{ teil.text }}</span>}}
+              </p>
+            }
+            @if (t.tags.length > 0) {
+              <ul class="tags" [attr.aria-label]="texte.tags">
+                @for (tag of t.tags; track tag) {
+                  <li>{{ tag }}</li>
+                }
+              </ul>
+            }
+            @if (t.partnerId && t.partnerId !== filter().partnerId) {
+              <button
+                mat-button
+                type="button"
+                class="nach-partner"
+                [attr.aria-label]="texte.nachPartnerLabel(t.partnerName || '')"
+                (click)="partnerWaehlen(t.partnerId, t.partnerName)"
+              >
+                {{ texte.nachPartner }}
+              </button>
+            }
+          </li>
+        }
+      </ol>
+      @if (seiten() > 1) {
+        <nav class="blaettern" [attr.aria-label]="texte.seite(e.seite + 1, seiten())">
+          <button mat-button type="button" [disabled]="laeuft() || e.seite === 0" (click)="blaettern(-1)">
+            {{ texte.vorherige }}
+          </button>
+          <span>{{ texte.seite(e.seite + 1, seiten()) }}</span>
+          <button mat-button type="button" [disabled]="laeuft() || e.seite + 1 >= seiten()" (click)="blaettern(1)">
+            {{ texte.naechste }}
+          </button>
+        </nav>
+      }
+    }
+  }
+</section>
