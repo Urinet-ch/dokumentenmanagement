@@ -38,8 +38,8 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class JdbcKontaktRegister implements KontaktRegister {
 
-    private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
-    private static final String SPALTEN = "id, crm_id, typ, name, vorname, strasse, plz, ort, email, telefon, uid, iban, "
+    static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
+    static final String SPALTEN = "id, crm_id, typ, name, vorname, strasse, plz, ort, email, telefon, uid, iban, "
             + "kategorie, quelle, nicht_im_export, erstellt, geaendert, version";
     /** Obergrenze je Abfrage des Abgleichs, nur für die laufende Transaktion. */
     private static final String ZEITGRENZE = "select set_config('statement_timeout', '30s', true)";
@@ -264,7 +264,7 @@ public class JdbcKontaktRegister implements KontaktRegister {
         }
     }
 
-    private static void transaktionPruefen() {
+    static void transaktionPruefen() {
         if (!QuarkusTransaction.isActive()) {
             throw new IllegalStateException("Abgleich nur in einer Transaktion");
         }
@@ -286,7 +286,7 @@ public class JdbcKontaktRegister implements KontaktRegister {
         }
     }
 
-    private static int felder(PreparedStatement anweisung, int start, KontaktAngaben a, String nameNormalisiert)
+    static int felder(PreparedStatement anweisung, int start, KontaktAngaben a, String nameNormalisiert)
             throws SQLException {
         int i = start;
         anweisung.setString(i++, a.typ().name());
@@ -312,7 +312,7 @@ public class JdbcKontaktRegister implements KontaktRegister {
         return schema + ".kontakt";
     }
 
-    private static Kontakt kontakt(ResultSet zeile) throws SQLException {
+    static Kontakt kontakt(ResultSet zeile) throws SQLException {
         return new Kontakt(zeile.getObject("id", UUID.class), zeile.getString("crm_id"),
                 KontaktTyp.valueOf(zeile.getString("typ")), zeile.getString("name"), zeile.getString("vorname"),
                 zeile.getString("strasse"), zeile.getString("plz"), zeile.getString("ort"), zeile.getString("email"),

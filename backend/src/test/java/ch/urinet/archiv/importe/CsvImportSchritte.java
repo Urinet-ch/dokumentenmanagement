@@ -13,10 +13,12 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.quarkus.runtime.configuration.MemorySize;
+import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,12 +32,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -43,8 +47,9 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Schritte zu Aufgabe 4.1 (Req 2.18, 13.1, 13.2, 13.10, 13.11): Upload über {@code POST /api/v1/importe/crm},
- * Zuordnung über {@code GET}/{@code PUT /api/v1/importe/crm/zuordnung}. Die Beispieldateien stammen aus Aufgabe 0.4;
+ * Schritte zu den Aufgaben 4.1 bis 4.3 (Req 2.18, 13.1–13.11): Upload über {@code POST /api/v1/importe/crm},
+ * Zuordnung über {@code GET}/{@code PUT /api/v1/importe/crm/zuordnung}, Vorschau über {@code GET /api/v1/importe/{id}},
+ * Übernahme über {@code POST /api/v1/importe/{id}/uebernehmen} und Protokoll über {@code GET /api/v1/importe}. Die Beispieldateien stammen aus Aufgabe 0.4;
  * ihre Werte werden nur verglichen, nie ausgegeben.
  */
 public class CsvImportSchritte {
@@ -57,6 +62,9 @@ public class CsvImportSchritte {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    S3Client s3;
 
     private Response antwort;
     private String laufId;
@@ -78,7 +86,7 @@ public class CsvImportSchritte {
         }
         try (Connection verbindung = datenbank.get().getConnection()) {
             for (String schema : SCHEMAS) {
-                for (String tabelle : List.of("import_zeile", "import_lauf", "import_zuordnung")) {
+                for (String tabelle : List.of("import_zeile", "import_lauf", "import_zuordnung", "verkaufschance")) {
                     try (PreparedStatement loeschen = verbindung.prepareStatement(
                             "delete from " + schema + "." + tabelle)) {
                         loeschen.executeUpdate();
@@ -89,9 +97,13 @@ public class CsvImportSchritte {
                     loeschen.setArray(1, verbindung.createArrayOf("uuid", kontakte.values().toArray()));
                     loeschen.executeUpdate();
                 }
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from " + schema + ".kontakt where quelle = 'CSV_IMPORT'")) {
+                    loeschen.executeUpdate();
+                }
             }
             try (PreparedStatement loeschen = verbindung.prepareStatement(
-                    "delete from public.auftrag where typ = 'CSV_VORSCHAU'")) {
+                    "delete from public.auftrag where typ in ('CSV_VORSCHAU', 'CSV_UEBERNEHMEN')")) {
                 loeschen.executeUpdate();
             }
         }
@@ -103,8 +115,8 @@ public class CsvImportSchritte {
         benutzt = true;
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement einfuegen =
                 verbindung.prepareStatement("insert into " + new MandantCode(mandant).schema() + ".kontakt (id, crm_id, "
-                        + "typ, name, vorname, name_normalisiert, plz, email, quelle) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'MANUELL')")) {
+                        + "typ, name, vorname, name_normalisiert, plz, email, quelle, nicht_im_export) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'MANUELL', ?)")) {
             for (Map<String, String> zeile : tabelle.asMaps()) {
                 UUID id = UUID.randomUUID();
                 boolean person = "PERSON".equals(zeile.get("typ"));
@@ -117,6 +129,7 @@ public class CsvImportSchritte {
                         : Normalisierer.name(zeile.get("name")));
                 einfuegen.setString(7, zeile.get("plz"));
                 einfuegen.setString(8, zeile.get("email"));
+                einfuegen.setBoolean(9, Boolean.parseBoolean(zeile.get("nicht_im_export")));
                 einfuegen.executeUpdate();
                 kontakte.put(zeile.get("kontakt"), id);
             }
@@ -534,6 +547,180 @@ public class CsvImportSchritte {
     public void mitWertHochladen(String benutzer, String wert, String dateiname) {
         hochladen(benutzer, "kontakt", "true", dateiname,
                 ("Name;PLZ;Notiz\n" + wert + ";" + wert + ";" + wert + "\nB;6000\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Wenn("«{word}» diese Kontakt-CSV als Vollexport hochlädt:")
+    public void vollexportHochladen(String benutzer, String text) {
+        hochladen(benutzer, "kontakt", "true", "kontakte.csv", text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Wenn("«{word}» diese Verkaufschancen-CSV hochlädt:")
+    public void verkaufschancenTextHochladen(String benutzer, String text) {
+        hochladen(benutzer, "verkaufschance", "false", "verkaufschancen.csv", text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Wenn("«{word}» den Lauf übernimmt")
+    public void uebernehmen(String benutzer) {
+        uebernehmen(benutzer, laufId, Map.of());
+    }
+
+    @Wenn("«{word}» den Lauf «{}» übernimmt")
+    public void andererLaufUebernehmen(String benutzer, String id) {
+        uebernehmen(benutzer, id, Map.of());
+    }
+
+    /** {@code ZUSAMMENFUEHREN:K2} wird zur ID des Kontakts K2 aus dem Hintergrund. */
+    @Wenn("«{word}» den Lauf mit diesen Dubletten-Entscheiden übernimmt:")
+    public void mitEntscheidenUebernehmen(String benutzer, DataTable tabelle) {
+        Map<String, String> entscheide = new LinkedHashMap<>();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            String entscheid = zeile.get("entscheid");
+            if (entscheid.startsWith("ZUSAMMENFUEHREN:")) {
+                String kontakt = entscheid.substring("ZUSAMMENFUEHREN:".length());
+                entscheid = "ZUSAMMENFUEHREN:" + Objects.requireNonNull(kontakte.get(kontakt), kontakt);
+            }
+            entscheide.put(zeile.get("zeile"), entscheid);
+        }
+        uebernehmen(benutzer, laufId, entscheide);
+    }
+
+    private void uebernehmen(String benutzer, String id, Map<String, String> entscheide) {
+        benutzt = true;
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
+                .body(Map.of("dublettenEntscheide", entscheide)).when()
+                .post(UPLOAD.replace("/crm", "/") + id + "/uebernehmen");
+    }
+
+    @Dann("nimmt der CSV-Import die Übernahme mit Status 202 an")
+    public void uebernahmeAngenommen() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(202);
+        assertThat(antwort.<String>path("id")).isEqualTo(laufId);
+        assertThat(antwort.<String>path("status")).isEqualTo("VORSCHAU");
+        assertThat(antwort.<String>path("uebernommenVon")).isNotBlank();
+        assertThat(antwort.<Object>path("uebernommen")).isNull();
+    }
+
+    @Dann("ist der Lauf von «{word}» übernommen mit {int} angelegt, {int} aktualisiert, {int} ausgelassen und {int} "
+            + "gekennzeichnet")
+    public void uebernommen(String benutzer, int angelegt, int aktualisiert, int ausgelassen, int gekennzeichnet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("lauf.status")).isEqualTo("UEBERNOMMEN");
+        assertThat(antwort.<String>path("lauf.uebernommenVon")).isEqualTo(subjekt(benutzer));
+        assertThat(antwort.<String>path("lauf.uebernommen")).isNotBlank();
+        assertThat(List.of(antwort.<Integer>path("lauf.angelegt"), antwort.<Integer>path("lauf.aktualisiert"),
+                antwort.<Integer>path("lauf.ausgelassen"), antwort.<Integer>path("lauf.gekennzeichnet")))
+                .containsExactly(angelegt, aktualisiert, ausgelassen, gekennzeichnet);
+    }
+
+    /** Spalte {@code kontakt}: Kontakt aus dem Hintergrund, sonst die {@code crm_id} eines neuen Kontakts. */
+    @Dann("hat der Mandant «{word}» diese Kontakte:")
+    public void kontaktePruefen(String mandant, DataTable erwartet) throws SQLException {
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (Map<String, String> soll : erwartet.asMaps()) {
+                String kennung = soll.get("kontakt");
+                UUID id = kontakte.get(kennung);
+                try (PreparedStatement abfrage = verbindung.prepareStatement("select crm_id, name, plz, ort, email, "
+                        + "quelle, nicht_im_export from " + schema + ".kontakt where "
+                        + (id == null ? "crm_id = ?" : "id = ?"))) {
+                    abfrage.setObject(1, id == null ? kennung : id);
+                    try (ResultSet zeile = abfrage.executeQuery()) {
+                        assertThat(zeile.next()).as("Kontakt %s", kennung).isTrue();
+                        List<String> ist = new ArrayList<>();
+                        for (String spalte : List.of("crm_id", "name", "plz", "ort", "email", "quelle")) {
+                            ist.add(nullAlsLeer(zeile.getString(spalte)));
+                        }
+                        ist.add(String.valueOf(zeile.getBoolean("nicht_im_export")));
+                        assertThat(ist).as("Kontakt %s", kennung).containsExactly(nullAlsLeer(soll.get("crm_id")),
+                                nullAlsLeer(soll.get("name")), nullAlsLeer(soll.get("plz")),
+                                nullAlsLeer(soll.get("ort")), nullAlsLeer(soll.get("email")), soll.get("quelle"),
+                                soll.get("nicht_im_export"));
+                    }
+                }
+            }
+        }
+    }
+
+    @Dann("gibt es im Mandanten «{word}» {int} Kontakte mit dem Namen «{}» aus dem CSV-Import")
+    public void anzahlKontakte(String mandant, int anzahl, String name) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select count(*) from " + new MandantCode(mandant).schema()
+                        + ".kontakt where name = ? and quelle = 'CSV_IMPORT'")) {
+            abfrage.setString(1, name);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getInt(1)).isEqualTo(anzahl);
+            }
+        }
+    }
+
+    @Dann("hat der Mandant «{word}» diese Verkaufschancen:")
+    public void verkaufschancenPruefen(String mandant, DataTable erwartet) throws SQLException {
+        Map<UUID, String> kennung = new HashMap<>();
+        kontakte.forEach((name, id) -> kennung.put(id, name));
+        List<List<String>> ist = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select crm_id, kontakt_id, titel, phase, betrag, waehrung, datum, "
+                        + "import_lauf from " + new MandantCode(mandant).schema() + ".verkaufschance order by crm_id");
+             ResultSet zeile = abfrage.executeQuery()) {
+            while (zeile.next()) {
+                assertThat(zeile.getString("waehrung")).isEqualTo("CHF");
+                assertThat(zeile.getObject("import_lauf", UUID.class)).isNotNull();
+                ist.add(List.of(zeile.getString("crm_id"),
+                        kennung.getOrDefault(zeile.getObject("kontakt_id", UUID.class), "?"),
+                        nullAlsLeer(zeile.getString("titel")), nullAlsLeer(zeile.getString("phase")),
+                        zeile.getBigDecimal("betrag") == null ? "" : zeile.getBigDecimal("betrag").toPlainString(),
+                        zeile.getDate("datum") == null ? "" : zeile.getDate("datum").toLocalDate().toString()));
+            }
+        }
+        List<List<String>> soll = erwartet.asMaps().stream().map(z -> List.of(z.get("crm_id"), z.get("kontakt"),
+                nullAlsLeer(z.get("titel")), nullAlsLeer(z.get("phase")), nullAlsLeer(z.get("betrag")),
+                nullAlsLeer(z.get("datum")))).toList();
+        assertThat(ist).containsExactlyElementsOf(soll);
+    }
+
+    @Wenn("«{word}» die Import-Läufe abfragt")
+    public void laeufeAbfragen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(UPLOAD.replace("/crm", ""));
+    }
+
+    @Dann("listet der CSV-Import den Lauf mit Dateiname «{word}», Prüfsumme, Benutzer «{word}» und Zeit")
+    public void laufGelistet(String dateiname, String benutzer) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Integer>path("gesamt")).isEqualTo(1);
+        assertThat(antwort.<String>path("eintraege[0].id")).isEqualTo(laufId);
+        assertThat(antwort.<String>path("eintraege[0].dateiname")).isEqualTo(dateiname);
+        assertThat(antwort.<String>path("eintraege[0].sha256")).isEqualTo(sha256(hochgeladen));
+        assertThat(antwort.<String>path("eintraege[0].status")).isEqualTo("UEBERNOMMEN");
+        assertThat(antwort.<String>path("eintraege[0].uebernommenVon")).isEqualTo(subjekt(benutzer));
+        assertThat(antwort.<String>path("eintraege[0].erstellt")).isNotBlank();
+        assertThat(antwort.<String>path("eintraege[0].uebernommen")).isNotBlank();
+        assertThat(antwort.<Integer>path("eintraege[0].zeilen")).isEqualTo(2);
+        assertThat(antwort.<Integer>path("eintraege[0].ausgelassen")).isNotNull();
+    }
+
+    @Dann("listet der CSV-Import {int} Läufe")
+    public void anzahlLaeufe(int anzahl) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Integer>path("gesamt")).isEqualTo(anzahl);
+        assertThat(antwort.<List<Object>>path("eintraege")).hasSize(anzahl);
+    }
+
+    @Dann("liegt die Originaldatei des Laufs unter «importe\\/<laufId>.csv» mit der Prüfsumme der hochgeladenen Datei")
+    public void originaldatei() {
+        assertThat(laufId).isNotNull();
+        String bucket = new MandantCode("urinet").bucket(
+                ConfigProvider.getConfig().getValue("archiv.ablage.bucket-praefix", String.class));
+        byte[] gespeichert = s3.getObjectAsBytes(b -> b.bucket(bucket).key("importe/" + laufId + ".csv"))
+                .asByteArray();
+        assertThat(sha256(gespeichert)).isEqualTo(sha256(hochgeladen));
+    }
+
+    /** {@code sub} aus dem Token: Das Archiv protokolliert den Benutzer über seine Keycloak-ID. */
+    private static String subjekt(String benutzer) {
+        String nutzlast = Testanmeldung.token(benutzer).split("\\.")[1];
+        return JsonPath.from(new String(Base64.getUrlDecoder().decode(nutzlast), StandardCharsets.UTF_8))
+                .getString("sub");
     }
 
     private static String nullAlsLeer(String wert) {

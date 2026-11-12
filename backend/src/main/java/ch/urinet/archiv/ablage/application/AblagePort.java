@@ -97,6 +97,12 @@ public interface AblagePort {
     Optional<InputStream> lesenVorschau(MandantCode mandant, UUID docId, int seite);
 
     /**
+     * Legt die Originaldatei eines CSV-Imports unter {@code importe/<laufId>.csv} ohne Sperre ab (Req 13.8,
+     * Aufgabe 4.3); die SHA-256 der abgelegten Datei steht in {@link AbgelegteDatei#sha256()}.
+     */
+    AbgelegteDatei ablegenImport(MandantCode mandant, UUID laufId, Path datei);
+
+    /**
      * Löscht alle Versionen und Löschmarken der abgeleiteten Dateien eines Dokuments, also von
      * {@code eingang/<jahr>/<docId>/pdfa.pdf} und unter {@code vorschau/<docId>/}, ausser den Versionen in
      * {@code behalten} (Schlüssel und Versions-ID). Originale und Arbeitsfassungen berührt der Aufruf nie. So bleiben

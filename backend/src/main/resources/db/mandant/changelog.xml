@@ -13,4 +13,5 @@
     <include file="changesets/006-kontakt.xml" relativeToChangelogFile="true"/>
     <include file="changesets/007-import.xml" relativeToChangelogFile="true"/>
     <include file="changesets/008-import-abgleich.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/009-import-uebernahme.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -1,6 +1,5 @@
 package ch.urinet.archiv.importe.application;
 
-import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportLauf;
 import ch.urinet.archiv.importe.domain.LaufStatus;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
@@ -13,9 +12,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Auftrag {@code CSV_VORSCHAU} (Aufgabe 4.2; Req 13.3, 13.4, 13.5): gleicht die Zeilen eines Kontakt-Laufs im Status
- * {@code VORSCHAU_AUSSTEHEND} blockweise mit den bestehenden Kontakten ab ({@link CsvVorschauSpeichern#abgleichen}),
- * schreibt Ergebnis, Kontakt und Kandidaten je Zeile und setzt am Ende die Zähler und den Status {@code VORSCHAU}.
+ * Auftrag {@code CSV_VORSCHAU} (Aufgabe 4.2; Req 13.3, 13.4, 13.5): gleicht die Zeilen eines Laufs im Status
+ * {@code VORSCHAU_AUSSTEHEND} blockweise mit den bestehenden Kontakten bzw. Verkaufschancen (Aufgabe 4.3,
+ * Req 13.9) ab ({@link CsvVorschauSpeichern#abgleichen}), schreibt Ergebnis, Kontakt und Kandidaten je Zeile und setzt
+ * am Ende die Zähler und den Status {@code VORSCHAU}.
  * Übernommen wird nichts. Jeder Block ist eine eigene kurze Transaktion; ändern sich Status oder Zuordnung des Laufs
  * unterwegs (neue Zuordnung), bricht der Auftrag ohne weitere Schreibvorgänge ab, der neue Auftrag rechnet von vorn.
  * Ein Wiederholungsversuch rechnet ebenfalls von vorn. Bleiben bei unverändertem Lauf Zeilen offen, scheitert der
@@ -56,7 +56,7 @@ public class CsvVorschauHandler implements AuftragHandler {
         int nachNr = 0;
         int bloecke = 0;
         CsvVorschauSpeichern.Block block;
-        while (!(block = speichern.abgleichen(laufId, lauf.zuordnung(), nachNr, stapel)).leer()) {
+        while (!(block = speichern.abgleichen(laufId, lauf.art(), lauf.zuordnung(), nachNr, stapel)).leer()) {
             unterbrochen();
             if (!speichern.schreiben(auftrag, lauf, block.zeilen())) {
                 LOG.infof("CSV-Vorschau abgebrochen: lauf=%s Status oder Zuordnung geändert", laufId);
@@ -78,8 +78,7 @@ public class CsvVorschauHandler implements AuftragHandler {
     }
 
     static boolean offen(ImportLauf lauf) {
-        return lauf.art() == ImportArt.KONTAKT && lauf.status() == LaufStatus.VORSCHAU_AUSSTEHEND
-                && lauf.zuordnung() != null;
+        return lauf.status() == LaufStatus.VORSCHAU_AUSSTEHEND && lauf.zuordnung() != null;
     }
 
     private static void unterbrochen() throws InterruptedException {

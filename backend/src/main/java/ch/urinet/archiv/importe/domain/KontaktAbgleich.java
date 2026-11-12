@@ -162,7 +162,7 @@ public final class KontaktAbgleich {
         return teile.stream().mapToLong(KontaktAbgleich::fingerabdruck).toArray();
     }
 
-    private static long fingerabdruck(String text) {
+    static long fingerabdruck(String text) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
             return ByteBuffer.wrap(hash, 0, Long.BYTES).getLong();

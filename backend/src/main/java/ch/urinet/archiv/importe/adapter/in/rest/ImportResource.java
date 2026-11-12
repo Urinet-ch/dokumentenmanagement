@@ -36,13 +36,15 @@ import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * CSV-Import der CRM-Daten, Erkennung und Spaltenzuordnung (A12, nur {@code inhaber}; Req 2.18, 13.1, 13.2, 13.10,
- * 13.11). Der Mandant kommt nur aus der Anmeldung. Vorschau und Übernahme folgen in den Aufgaben 4.2 und 4.3.
+ * 13.11), Vorschau (Aufgabe 4.2; Req 13.3–13.5) sowie Übernahme und Protokoll (Aufgabe 4.3; Req 13.6–13.9). Der
+ * Mandant kommt nur aus der Anmeldung.
  */
 @Path("/importe")
 @Tag(name = "Importe")
@@ -73,15 +75,28 @@ public class ImportResource {
             @Schema(nullable = true, description = "Vorschau: neue Kontakte; erst ab Status VORSCHAU") Integer neu,
             @Schema(nullable = true, description = "Vorschau: geänderte Kontakte") Integer geaendert,
             @Schema(nullable = true, description = "Vorschau: unveränderte Kontakte") Integer unveraendert,
-            @Schema(nullable = true, description = "Vorschau: mögliche Dubletten") Integer dubletten) {
+            @Schema(nullable = true, description = "Vorschau: mögliche Dubletten") Integer dubletten,
+            @Schema(nullable = true, description = "Benutzer, der die Übernahme ausgelöst hat") String uebernommenVon,
+            @Schema(nullable = true, description = "Ende der Übernahme; erst ab Status UEBERNOMMEN") Instant uebernommen,
+            @Schema(nullable = true, description = "Übernahme: angelegte Kontakte bzw. Verkaufschancen") Integer angelegt,
+            @Schema(nullable = true, description = "Übernahme: aktualisierte Kontakte bzw. Verkaufschancen")
+            Integer aktualisiert,
+            @Schema(nullable = true, description = "Übernahme: ausgelassene Zeilen (fehlerhaft, gelöscht, Dublette "
+                    + "ohne Entscheid oder übersprungen, Kontakt fehlt)") Integer ausgelassen,
+            @Schema(nullable = true, description = "Übernahme (nur Vollexport): neu als «nicht mehr im CRM-Export» "
+                    + "gekennzeichnete Kontakte") Integer gekennzeichnet) {
 
         static LaufDto aus(ImportLauf lauf) {
             ImportLauf.Zaehler v = lauf.vorschau();
+            ImportLauf.Uebernahme u = lauf.uebernahme();
+            ImportLauf.Bilanz b = u == null ? null : u.bilanz();
             return new LaufDto(lauf.id(), lauf.art().code(), lauf.vollexport(), lauf.dateiname(), lauf.sha256(),
                     lauf.zeichensatz(), String.valueOf(lauf.trennzeichen()), lauf.zeilen(), lauf.fehler(),
                     lauf.uebersprungen(), lauf.status().name(), lauf.erstellt(), v == null ? null : v.neu(),
                     v == null ? null : v.geaendert(), v == null ? null : v.unveraendert(),
-                    v == null ? null : v.dubletten());
+                    v == null ? null : v.dubletten(), u == null ? null : u.von(), u == null ? null : u.zeit(),
+                    b == null ? null : b.angelegt(), b == null ? null : b.aktualisiert(),
+                    b == null ? null : b.ausgelassen(), b == null ? null : b.gekennzeichnet());
         }
     }
 
@@ -139,6 +154,18 @@ public class ImportResource {
             String profil,
             @Schema(nullable = true, description = "Feld → Spaltenposition (ab 0); übersteuert das Profil")
             Map<String, Integer> felder) {
+    }
+
+    @Schema(name = "ImportUebernehmen")
+    public record UebernehmenDto(
+            @Schema(nullable = true, description = "Zeile → NEU, ZUSAMMENFUEHREN:<kontaktId> oder UEBERSPRINGEN; nur für "
+                    + "Zeilen mit Ergebnis DUBLETTE, ZUSAMMENFUEHREN nur mit einem ihrer Kandidaten. Dubletten ohne "
+                    + "Entscheid werden übersprungen.") Map<String, String> dublettenEntscheide) {
+    }
+
+    @Schema(name = "ImportLaeufe")
+    public record LaeufeDto(List<LaufDto> eintraege, @Schema(description = "Anzahl Läufe des Mandanten") long gesamt,
+            int seite, int groesse) {
     }
 
     @POST
@@ -239,6 +266,67 @@ public class ImportResource {
         CsvImport.LaufSeite ergebnis = csvImport.lauf(laufId, seite, groesse);
         return new LaufSeiteDto(LaufDto.aus(ergebnis.lauf()),
                 ergebnis.zeilen().stream().map(ZeileDto::aus).toList(), ergebnis.lauf().zeilen(), seite, groesse);
+    }
+
+    @POST
+    @Path("/{id}/uebernehmen")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A12)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Lauf übernehmen",
+            description = "Reiht die Übernahme eines Laufs im Status VORSCHAU ein (Auftrag CSV_UEBERNEHMEN, eine "
+                    + "Transaktion; Req 13.6–13.9). Neue Kontakte bzw. Verkaufschancen werden angelegt, geänderte "
+                    + "aktualisiert (die CSV gewinnt, leere Zellen überschreiben nichts), mögliche Dubletten nur nach "
+                    + "Entscheid. Gelöscht wird nie; beim Vollexport werden Kontakte mit CRM-ID, die fehlen, als "
+                    + "«nicht mehr im CRM-Export» gekennzeichnet. Ein erneuter Aufruf vor dem Ende ersetzt die "
+                    + "Entscheide.")
+    @APIResponse(responseCode = "202", description = "Übernahme eingereiht; Status bleibt VORSCHAU bis zum Ende",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = LaufDto.class)))
+    @APIResponse(responseCode = "400", description = "ANFRAGE_UNGUELTIG: Entscheid ungültig, für eine Zeile ohne "
+            + "Dublette, mit einem Kontakt ausserhalb der Kandidaten oder bei Verkaufschancen")
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten")
+    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU")
+    public Response uebernehmen(@PathParam("id") String id, UebernehmenDto anfrage) {
+        aufloesung.pruefen();
+        UUID laufId = laufId(id);
+        Map<Integer, String> entscheide = new HashMap<>();
+        if (anfrage != null && anfrage.dublettenEntscheide() != null) {
+            anfrage.dublettenEntscheide().forEach((zeile, entscheid) -> entscheide.put(zeile(zeile), entscheid));
+        }
+        return Response.accepted(LaufDto.aus(csvImport.uebernehmen(laufId, entscheide, benutzer()))).build();
+    }
+
+    @GET
+    @ErfordertAktion(Aktion.A12)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Import-Läufe mit Protokoll lesen",
+            description = "Läufe des Mandanten, die neuesten zuerst, mit Dateiname, Prüfsumme, Zeit, Benutzer der "
+                    + "Übernahme und Zählern (Req 13.8). seite ab 0, groesse 1–100.")
+    @APIResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = LaeufeDto.class)))
+    public LaeufeDto laeufe(@QueryParam("seite") @DefaultValue("0") int seite,
+                            @QueryParam("groesse") @DefaultValue("50") int groesse) {
+        aufloesung.pruefen();
+        CsvImport.Laeufe ergebnis = csvImport.laeufe(seite, groesse);
+        return new LaeufeDto(ergebnis.laeufe().stream().map(LaufDto::aus).toList(), ergebnis.gesamt(), seite,
+                groesse);
+    }
+
+    private static UUID laufId(String id) {
+        try {
+            return UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+    }
+
+    private static int zeile(String zeile) {
+        try {
+            return Integer.parseInt(zeile);
+        } catch (NumberFormatException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
     }
 
     private static ImportArt art(String art) {

@@ -1,5 +1,6 @@
 package ch.urinet.archiv.importe.application;
 
+import ch.urinet.archiv.importe.domain.DublettenEntscheid;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportFeld;
@@ -48,7 +49,7 @@ class CsvVorschauHandlerTest {
             LaufStatus.VORSCHAU_AUSSTEHEND, "inhaber", Instant.now()).mit(ZUORDNUNG);
     private final Speicher repository = new Speicher(lauf);
     private final CsvVorschauHandler handler = new CsvVorschauHandler(new CsvVorschauSpeichern(repository,
-            new LeeresRegister(), new AuftragService(schlange(), null, null, null), new BigDecimal("0.6")));
+            new LeeresRegister(), null, new AuftragService(schlange(), null, null, null), new BigDecimal("0.6")));
     private final Auftrag auftrag = new Auftrag(1, new MandantCode("urinet"), CsvVorschauHandler.TYP,
             new Nutzlast(Map.of(CsvVorschauHandler.LAUF_ID, lauf.id())), 0);
 
@@ -187,6 +188,38 @@ class CsvVorschauHandlerTest {
         @Override
         public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ImportZeile> zeilenMitNr(UUID laufId, java.util.Collection<Integer> nrs) {
+            return List.of();
+        }
+
+        @Override
+        public void entscheideSpeichern(UUID laufId, Map<Integer, DublettenEntscheid> entscheide) {
+        }
+
+        @Override
+        public Map<Integer, DublettenEntscheid> entscheide(UUID laufId) {
+            return Map.of();
+        }
+
+        @Override
+        public void uebernahmeVormerken(UUID laufId, String benutzer) {
+        }
+
+        @Override
+        public void uebernahmeAbschliessen(UUID laufId, ImportLauf.Bilanz bilanz) {
+        }
+
+        @Override
+        public List<ImportLauf> laeufe(int seite, int groesse) {
+            return List.of();
+        }
+
+        @Override
+        public long anzahlLaeufe() {
+            return 0;
         }
 
         @Override

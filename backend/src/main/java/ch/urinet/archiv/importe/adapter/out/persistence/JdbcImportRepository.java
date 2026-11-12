@@ -1,6 +1,7 @@
 package ch.urinet.archiv.importe.adapter.out.persistence;
 
 import ch.urinet.archiv.importe.application.ImportRepository;
+import ch.urinet.archiv.importe.domain.DublettenEntscheid;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
 import ch.urinet.archiv.importe.domain.ImportLauf;
@@ -30,6 +31,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -139,41 +141,181 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     private Optional<ImportLauf> lauf(UUID id, boolean sperren) {
-        String schema = schema();
-        String sql = "select l.id, l.art, l.vollexport, l.dateiname, l.sha256, l.zeichensatz, l.trennzeichen, "
-                + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, l.zuordnung::text, "
-                + "l.neu, l.geaendert, l.unveraendert, l.dubletten, "
-                + "(select count(*) from " + schema + ".import_zeile z where z.lauf_id = l.id "
-                + "and z.ergebnis = 'UEBERSPRUNGEN') as uebersprungen "
-                + "from " + schema + ".import_lauf l where l.id = ?" + (sperren ? " for update of l" : "");
+        String sql = laufAbfrage(schema()) + " where l.id = ?" + (sperren ? " for update of l" : "");
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setObject(1, id, Types.OTHER);
             try (ResultSet ergebnis = abfrage.executeQuery()) {
-                if (!ergebnis.next()) {
-                    return Optional.empty();
-                }
-                ImportArt art = ImportArt.aus(ergebnis.getString("art"))
-                        .orElseThrow(() -> new IllegalStateException("unbekannte Importart in import_lauf"));
-                String zuordnung = ergebnis.getString("zuordnung");
-                Integer neu = ergebnis.getObject("neu", Integer.class);
-                int fehler = ergebnis.getInt("fehler");
-                int uebersprungen = ergebnis.getInt("uebersprungen");
-                ImportLauf.Zaehler vorschau = neu == null ? null : new ImportLauf.Zaehler(neu,
-                        ergebnis.getInt("geaendert"), ergebnis.getInt("unveraendert"), ergebnis.getInt("dubletten"),
-                        fehler, uebersprungen);
-                return Optional.of(new ImportLauf(ergebnis.getObject("id", UUID.class), art,
-                        ergebnis.getBoolean("vollexport"), ergebnis.getString("dateiname"),
-                        ergebnis.getString("sha256"), ergebnis.getString("zeichensatz"),
-                        ergebnis.getString("trennzeichen").charAt(0),
-                        new Kopfzeile(JSON.readValue(ergebnis.getString("kopfzeile"), new TypeReference<>() {
-                        })), ergebnis.getInt("zeilen"), fehler, uebersprungen,
-                        LaufStatus.valueOf(ergebnis.getString("status")), ergebnis.getString("benutzer"),
-                        ergebnis.getTimestamp("erstellt").toInstant(),
-                        zuordnung == null ? null : zuordnungAus(JSON.readTree(zuordnung)), vorschau));
+                return ergebnis.next() ? Optional.of(lauf(ergebnis)) : Optional.empty();
             }
         } catch (SQLException | JsonProcessingException e) {
             throw new IllegalStateException("Import-Lauf nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public List<ImportLauf> laeufe(int seite, int groesse) {
+        String sql = laufAbfrage(schema()) + " order by l.erstellt desc, l.id limit ? offset ?";
+        List<ImportLauf> laeufe = new ArrayList<>();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setInt(1, groesse);
+            abfrage.setLong(2, (long) seite * groesse);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                while (ergebnis.next()) {
+                    laeufe.add(lauf(ergebnis));
+                }
+            }
+        } catch (SQLException | JsonProcessingException e) {
+            throw new IllegalStateException("Import-Läufe nicht gelesen", e);
+        }
+        return laeufe;
+    }
+
+    @Override
+    public long anzahlLaeufe() {
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select count(*) from " + schema()
+                     + ".import_lauf");
+             ResultSet ergebnis = abfrage.executeQuery()) {
+            ergebnis.next();
+            return ergebnis.getLong(1);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Import-Läufe nicht gezählt", e);
+        }
+    }
+
+    private static String laufAbfrage(String schema) {
+        return "select l.id, l.art, l.vollexport, l.dateiname, l.sha256, l.zeichensatz, l.trennzeichen, "
+                + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, l.zuordnung::text, "
+                + "l.neu, l.geaendert, l.unveraendert, l.dubletten, l.uebernommen, l.uebernommen_von, l.angelegt, "
+                + "l.aktualisiert, l.ausgelassen, l.gekennzeichnet, "
+                + "(select count(*) from " + schema + ".import_zeile z where z.lauf_id = l.id "
+                + "and z.ergebnis = 'UEBERSPRUNGEN') as uebersprungen "
+                + "from " + schema + ".import_lauf l";
+    }
+
+    private static ImportLauf lauf(ResultSet ergebnis) throws SQLException, JsonProcessingException {
+        ImportArt art = ImportArt.aus(ergebnis.getString("art"))
+                .orElseThrow(() -> new IllegalStateException("unbekannte Importart in import_lauf"));
+        String zuordnung = ergebnis.getString("zuordnung");
+        Integer neu = ergebnis.getObject("neu", Integer.class);
+        int fehler = ergebnis.getInt("fehler");
+        int uebersprungen = ergebnis.getInt("uebersprungen");
+        ImportLauf.Zaehler vorschau = neu == null ? null : new ImportLauf.Zaehler(neu,
+                ergebnis.getInt("geaendert"), ergebnis.getInt("unveraendert"), ergebnis.getInt("dubletten"),
+                fehler, uebersprungen);
+        String von = ergebnis.getString("uebernommen_von");
+        Timestamp zeit = ergebnis.getTimestamp("uebernommen");
+        Integer angelegt = ergebnis.getObject("angelegt", Integer.class);
+        ImportLauf.Uebernahme uebernahme = von == null && zeit == null ? null : new ImportLauf.Uebernahme(von,
+                zeit == null ? null : zeit.toInstant(), angelegt == null ? null : new ImportLauf.Bilanz(angelegt,
+                ergebnis.getInt("aktualisiert"), ergebnis.getInt("ausgelassen"), ergebnis.getInt("gekennzeichnet")));
+        return new ImportLauf(ergebnis.getObject("id", UUID.class), art,
+                ergebnis.getBoolean("vollexport"), ergebnis.getString("dateiname"),
+                ergebnis.getString("sha256"), ergebnis.getString("zeichensatz"),
+                ergebnis.getString("trennzeichen").charAt(0),
+                new Kopfzeile(JSON.readValue(ergebnis.getString("kopfzeile"), new TypeReference<>() {
+                })), ergebnis.getInt("zeilen"), fehler, uebersprungen,
+                LaufStatus.valueOf(ergebnis.getString("status")), ergebnis.getString("benutzer"),
+                ergebnis.getTimestamp("erstellt").toInstant(),
+                zuordnung == null ? null : zuordnungAus(JSON.readTree(zuordnung)), vorschau, uebernahme);
+    }
+
+    @Override
+    public List<ImportZeile> zeilenMitNr(UUID laufId, Collection<Integer> nrs) {
+        List<ImportZeile> zeilen = new ArrayList<>();
+        if (nrs.isEmpty()) {
+            return zeilen;
+        }
+        String sql = "select nr, null::text as daten, ergebnis, meldung, kontakt_id, kandidaten from " + schema()
+                + ".import_zeile where lauf_id = ? and nr = any(?) order by nr";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, laufId, Types.OTHER);
+            abfrage.setArray(2, verbindung.createArrayOf("integer", nrs.toArray()));
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                while (ergebnis.next()) {
+                    zeilen.add(zeile(ergebnis));
+                }
+            }
+        } catch (SQLException | JsonProcessingException e) {
+            throw new IllegalStateException("Import-Zeilen nicht gelesen", e);
+        }
+        return zeilen;
+    }
+
+    @Override
+    public void entscheideSpeichern(UUID laufId, Map<Integer, DublettenEntscheid> entscheide) {
+        String schema = schema();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement loeschen = verbindung.prepareStatement("update " + schema + ".import_zeile "
+                     + "set entscheid = null, entscheid_kontakt = null where lauf_id = ? and entscheid is not null");
+             PreparedStatement setzen = verbindung.prepareStatement("update " + schema + ".import_zeile "
+                     + "set entscheid = ?, entscheid_kontakt = ? where lauf_id = ? and nr = ?")) {
+            loeschen.setObject(1, laufId, Types.OTHER);
+            loeschen.executeUpdate();
+            for (Map.Entry<Integer, DublettenEntscheid> eintrag : entscheide.entrySet()) {
+                setzen.setString(1, eintrag.getValue().art().name());
+                setzen.setObject(2, eintrag.getValue().kontaktId(), Types.OTHER);
+                setzen.setObject(3, laufId, Types.OTHER);
+                setzen.setInt(4, eintrag.getKey());
+                setzen.addBatch();
+            }
+            setzen.executeBatch();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Dubletten-Entscheide nicht gespeichert", e);
+        }
+    }
+
+    @Override
+    public Map<Integer, DublettenEntscheid> entscheide(UUID laufId) {
+        String sql = "select nr, entscheid, entscheid_kontakt from " + schema()
+                + ".import_zeile where lauf_id = ? and entscheid is not null";
+        Map<Integer, DublettenEntscheid> entscheide = new HashMap<>();
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setObject(1, laufId, Types.OTHER);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                while (ergebnis.next()) {
+                    entscheide.put(ergebnis.getInt("nr"), new DublettenEntscheid(
+                            DublettenEntscheid.Art.valueOf(ergebnis.getString("entscheid")),
+                            ergebnis.getObject("entscheid_kontakt", UUID.class)));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Dubletten-Entscheide nicht gelesen", e);
+        }
+        return entscheide;
+    }
+
+    @Override
+    public void uebernahmeVormerken(UUID laufId, String benutzer) {
+        String sql = "update " + schema() + ".import_lauf set uebernommen_von = ? where id = ?";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            aendern.setString(1, benutzer);
+            aendern.setObject(2, laufId, Types.OTHER);
+            aendern.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Übernahme nicht vorgemerkt", e);
+        }
+    }
+
+    @Override
+    public void uebernahmeAbschliessen(UUID laufId, ImportLauf.Bilanz bilanz) {
+        String sql = "update " + schema() + ".import_lauf set status = 'UEBERNOMMEN', uebernommen = now(), "
+                + "angelegt = ?, aktualisiert = ?, ausgelassen = ?, gekennzeichnet = ? where id = ?";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement(sql)) {
+            aendern.setInt(1, bilanz.angelegt());
+            aendern.setInt(2, bilanz.aktualisiert());
+            aendern.setInt(3, bilanz.ausgelassen());
+            aendern.setInt(4, bilanz.gekennzeichnet());
+            aendern.setObject(5, laufId, Types.OTHER);
+            aendern.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Übernahme nicht abgeschlossen", e);
         }
     }
 

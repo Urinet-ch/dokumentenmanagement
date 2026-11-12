@@ -13,6 +13,7 @@ import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
+import ch.urinet.archiv.ablage.domain.Importdatei;
 import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -546,6 +547,22 @@ public class S3Ablage implements AblagePort {
             }
             throw e;
         }
+    }
+
+    @Override
+    public AbgelegteDatei ablegenImport(MandantCode mandant, UUID laufId, Path datei) {
+        String bucket = bucket(mandant);
+        String key = Importdatei.schluessel(laufId);
+        String sha256 = pruefsumme(datei, key);
+        long groesse;
+        try {
+            groesse = Files.size(datei);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Importdatei nicht lesbar: " + key, e);
+        }
+        String versionId = hochladen(bucket, key, datei);
+        LOG.debugf("Importdatei abgelegt: %s (Version %s)", key, versionId);
+        return new AbgelegteDatei(key, versionId, sha256, groesse, Optional.empty());
     }
 
     @Override

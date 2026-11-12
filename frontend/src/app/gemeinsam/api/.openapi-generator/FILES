@@ -27,9 +27,11 @@ model/generator-metadaten.ts
 model/generator-partner.ts
 model/generator-vertrag.ts
 model/import-hochgeladen.ts
+model/import-laeufe.ts
 model/import-lauf-mit-zeilen.ts
 model/import-lauf.ts
 model/import-spalte.ts
+model/import-uebernehmen.ts
 model/import-zeile.ts
 model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
