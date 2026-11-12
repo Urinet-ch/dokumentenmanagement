@@ -201,6 +201,12 @@ class UeberwachungTest {
         }
 
         @Override
+        public void prueflaufAbweichungen(MandantCode mandant, UUID laufId, PrueflaufRegister.Zaehler zaehler,
+                                          List<PrueflaufRegister.Abweichung> erste) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public boolean alarm(MandantCode mandant, Befund befund) {
             versuche.add(befund);
             if (zustellen) {

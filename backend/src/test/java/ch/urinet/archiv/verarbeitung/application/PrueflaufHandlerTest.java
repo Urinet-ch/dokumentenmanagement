@@ -481,6 +481,11 @@ class PrueflaufHandlerTest {
             public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
                 throw new UnsupportedOperationException();
             }
+
+            @Override
+            public boolean alarm(MandantCode mandant, ch.urinet.archiv.verarbeitung.domain.Befund befund) {
+                throw new UnsupportedOperationException();
+            }
         };
         Optional<Duration> frist = Optional.of(EIN_TAG);
         return new PrueflaufHandler(speicher, ablage, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC), stufe,
