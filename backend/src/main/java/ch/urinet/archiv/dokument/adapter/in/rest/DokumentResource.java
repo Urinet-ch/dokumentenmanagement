@@ -43,6 +43,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
@@ -417,11 +418,16 @@ public class DokumentResource {
     @Protokolliert(aktion = ProtokollAktion.HERUNTERLADEN)
     @Operation(summary = "Datei eines Dokuments herunterladen",
             description = "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens "
-                    + "5 Minuten gültig (Req 14.6). variante pdfa (Standard, ohne nr), original oder arbeitsfassung "
-                    + "(nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.")
+                    + "5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» "
+                    + "(PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. "
+                    + "variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). "
+                    + "Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.")
+    @APIResponse(responseCode = "200", description = "Vorsignierte URL als JSON (nur mit Accept: application/json)",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = DownloadAdresseDto.class)))
     @APIResponse(responseCode = "302", description = "Weiterleitung auf die vorsignierte URL",
             headers = @Header(name = "Location", description = "vorsignierte URL, nur für GET"))
-    public Response datei(@PathParam("id") UUID id,
+    public Response datei(@PathParam("id") UUID id, @Context HttpHeaders kopf,
                           @QueryParam("variante") @Parameter(schema = @Schema(type = SchemaType.STRING,
                                   enumeration = {"pdfa", "original", "arbeitsfassung"}, defaultValue = "pdfa"))
                           String variante,
@@ -432,8 +438,31 @@ public class DokumentResource {
         DateiRolle rolle = rolle(variante);
         int nummer = nummer(rolle, nr);
         VorsignierteUrl url = datei.herunterladen(benutzer(identitaet), mandant, id, rolle, nummer);
-        return Response.status(Response.Status.FOUND).location(url.url())
-                .header(HttpHeaders.CACHE_CONTROL, "no-store").build();
+        Response.ResponseBuilder antwort = alsJson(kopf)
+                ? Response.ok(new DownloadAdresseDto(url.url().toString(), url.gueltigBis()))
+                : Response.status(Response.Status.FOUND).location(url.url());
+        return antwort.header(HttpHeaders.CACHE_CONTROL, "no-store").build();
+    }
+
+    @Schema(name = "DownloadAdresse", description = "Vorsignierte URL für genau eine Versions-ID (Req 14.6)")
+    public record DownloadAdresseDto(
+            @Schema(required = true, description = "nur für GET, bis gueltigBis ein Zugangsschlüssel") String url,
+            @Schema(required = true) Instant gueltigBis) {
+
+        @Override
+        public String toString() {
+            return "DownloadAdresseDto[url=***, gueltigBis=" + gueltigBis + "]";
+        }
+    }
+
+    /**
+     * Nur ein ausdrücklich genanntes application/json schaltet auf JSON um; ohne Accept-Kopf oder mit Platzhaltern
+     * (curl, Python-Client, Browser-Navigation) bleibt die Weiterleitung.
+     */
+    static boolean alsJson(HttpHeaders kopf) {
+        return kopf.getAcceptableMediaTypes().stream()
+                .anyMatch(t -> !t.isWildcardType() && !t.isWildcardSubtype()
+                        && t.isCompatible(MediaType.APPLICATION_JSON_TYPE));
     }
 
     private static DateiRolle rolle(String variante) {

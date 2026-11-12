@@ -654,6 +654,21 @@
           }
         }
       },
+      "DownloadAdresse" : {
+        "description" : "Vorsignierte URL für genau eine Versions-ID (Req 14.6)",
+        "type" : "object",
+        "required" : [ "url", "gueltigBis" ],
+        "properties" : {
+          "url" : {
+            "type" : "string",
+            "description" : "nur für GET, bis gueltigBis ein Zugangsschlüssel"
+          },
+          "gueltigBis" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          }
+        }
+      },
       "EingangskorbSeite" : {
         "type" : "object",
         "required" : [ "eintraege", "gesamt", "seite", "groesse" ],
@@ -2108,7 +2123,7 @@
     "/api/v1/dokumente/{id}/datei" : {
       "get" : {
         "summary" : "Datei eines Dokuments herunterladen",
-        "description" : "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.",
+        "description" : "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "name" : "id",
@@ -2137,6 +2152,16 @@
           "in" : "query"
         } ],
         "responses" : {
+          "200" : {
+            "description" : "Vorsignierte URL als JSON (nur mit Accept: application/json)",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DownloadAdresse"
+                }
+              }
+            }
+          },
           "302" : {
             "description" : "Weiterleitung auf die vorsignierte URL",
             "headers" : {

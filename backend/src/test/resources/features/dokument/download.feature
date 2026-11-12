@@ -4,7 +4,8 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
   «GET /api/v1/dokumente/{id}/datei» leitet auf eine vorsignierte Adresse für genau die gespeicherte Versions-ID um
   (höchstens 5 Minuten gültig) und protokolliert den Zugriff als HERUNTERLADEN. Standard ist die PDF/A-Fassung;
   Original und Arbeitsfassung gibt es mit «variante» und «nr». Wer das Dokument nicht sehen darf, erhält 404 wie beim
-  Direktzugriff (Req 1.4, 2.3). Die Dateien liegen synthetisch in MinIO.
+  Direktzugriff (Req 1.4, 2.3). Verlangt die Anfrage ausdrücklich JSON (PWA), kommt die Adresse als JSON statt als
+  Umleitung. Die Dateien liegen synthetisch in MinIO.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -34,6 +35,16 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
     Wenn «treuhaender-urinet» die Datei von «D_NORMAL» mit «variante=arbeitsfassung» öffnet
     Dann leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird
     Und die Adresse liefert «Arbeitsfassung D_NORMAL»
+
+  @req-14.6
+  Szenario: Mit «Accept: application/json» kommt dieselbe Adresse als JSON statt als Umleitung (PWA, Aufgabe 4.6)
+    Wenn «treuhaender-urinet» die Download-Adresse von «D_NORMAL» als JSON anfragt
+    Dann liefert das Archiv die höchstens 5 Minuten gültige Adresse als JSON, die nicht zwischengespeichert wird
+    Und die Adresse liefert «PDF/A D_NORMAL»
+    Und das Zugriffsprotokoll von «urinet» enthält HERUNTERLADEN von «treuhaender-urinet» für «D_NORMAL»
+    Wenn «mitarbeiter-urinet» die Download-Adresse von «D_INTERN» als JSON anfragt
+    Dann antwortet das Archiv mit 404 «NICHT_GEFUNDEN» ohne Adresse
+    Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «mitarbeiter-urinet» für «D_INTERN»
 
   @req-14.6 @req-14.5
   Szenario: Unsichtbare, fremde, verworfene und fehlende Dateien ergeben 404, falsche Angaben 400

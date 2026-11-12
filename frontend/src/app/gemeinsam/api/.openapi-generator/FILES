@@ -20,6 +20,7 @@ model/dokument-vertrag.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
+model/download-adresse.ts
 model/eingangskorb-seite.ts
 model/generator-antwort.ts
 model/generator-finanz.ts
