@@ -356,74 +356,6 @@
           }
         }
       },
-      "DokumentFinanz" : {
-        "type" : "object",
-        "description" : "Gespeicherte Finanzangaben; die Bestätigung ersetzt sie ganz",
-        "properties" : {
-          "belegnummer" : {
-            "type" : [ "string", "null" ]
-          },
-          "richtung" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "EINNAHME", "AUSGABE" ]
-          },
-          "betrag" : {
-            "type" : [ "number", "null" ]
-          },
-          "waehrung" : {
-            "type" : "string",
-            "description" : "ISO 4217"
-          },
-          "faelligkeit" : {
-            "type" : [ "string", "null" ],
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/LocalDate"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "qrReferenz" : {
-            "type" : [ "string", "null" ]
-          },
-          "konto" : {
-            "type" : [ "string", "null" ]
-          }
-        },
-        "required" : [ "waehrung" ]
-      },
-      "DokumentVertrag" : {
-        "type" : "object",
-        "description" : "Gespeicherte Vertragsangaben; die Bestätigung ersetzt sie ganz",
-        "properties" : {
-          "gueltigAb" : {
-            "type" : [ "string", "null" ],
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/LocalDate"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "gueltigBis" : {
-            "type" : [ "string", "null" ],
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/LocalDate"
-            }, {
-              "type" : "null"
-            } ]
-          },
-          "kuendigungsfrist" : {
-            "type" : [ "string", "null" ]
-          },
-          "naechsteFrist" : {
-            "type" : [ "string", "null" ],
-            "anyOf" : [ {
-              "$ref" : "#/components/schemas/LocalDate"
-            }, {
-              "type" : "null"
-            } ]
-          }
-        }
-      },
       "DokumentAenderung" : {
         "description" : "Änderung der Metadaten (A6, Aufgabe 3.5). Nur die angegebenen Felder ändern sich; null oder ein leerer Text leert ein Feld (tags: null → keine Tags). Unbekannte Felder → 400. Finanz- und Vertragsfelder nur, wenn die Art die Gruppe hat.",
         "type" : "object",
@@ -542,6 +474,74 @@
             "type" : [ "string", "null" ],
             "maxLength" : 1000,
             "description" : "Grund der Änderung; bei ARCHIVIERT Pflicht (Req 10.1)"
+          }
+        }
+      },
+      "DokumentFinanz" : {
+        "type" : "object",
+        "description" : "Gespeicherte Finanzangaben; die Bestätigung ersetzt sie ganz",
+        "properties" : {
+          "belegnummer" : {
+            "type" : [ "string", "null" ]
+          },
+          "richtung" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "EINNAHME", "AUSGABE" ]
+          },
+          "betrag" : {
+            "type" : [ "number", "null" ]
+          },
+          "waehrung" : {
+            "type" : "string",
+            "description" : "ISO 4217"
+          },
+          "faelligkeit" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "qrReferenz" : {
+            "type" : [ "string", "null" ]
+          },
+          "konto" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "waehrung" ]
+      },
+      "DokumentVertrag" : {
+        "type" : "object",
+        "description" : "Gespeicherte Vertragsangaben; die Bestätigung ersetzt sie ganz",
+        "properties" : {
+          "gueltigAb" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "kuendigungsfrist" : {
+            "type" : [ "string", "null" ]
+          },
+          "naechsteFrist" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       },

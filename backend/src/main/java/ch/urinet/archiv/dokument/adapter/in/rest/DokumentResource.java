@@ -324,7 +324,7 @@ public class DokumentResource {
         int version = version(ifMatch);
         aendern.aendern(benutzer, id, version, () -> aenderung(knoten(inhalt)));
         Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument)))
+        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
