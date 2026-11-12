@@ -15,7 +15,8 @@
 1. **Ein Bucket je Mandant** mit `ObjectLockEnabledForBucket=true` und Versionierung, **ohne Standard-Aufbewahrung**; gesperrt wird nur pro Objekt.
 2. **Präfixe:** `eingang/` (ohne Sperre, bis zur Archivierung), `archiv/` (archivierte Dateien), `vorschau/` (ohne Sperre, regenerierbar), `importe/`, `manifest/` (Sperre nach ADR-007 und Req 15.4). Schlüssel nach design.md, Abschnitt «Ablage».
 3. **Archivieren** (Auftrag `ARCHIVIEREN`, Req 6.3), je Datei (Originale, Arbeitsfassungen, PDF/A):
-   CopyObject `eingang/…` → `archiv/…` und Versions-ID speichern → SHA-256 vergleichen (`x-amz-checksum-sha256`, sonst Kopie über die Versions-ID neu lesen) → nur bei `gesetzliche_pflicht` Sperre setzen und per `GetObjectRetention` kontrollieren (Modus nach ADR-007).
+   CopyObject `eingang/…` → `archiv/…` und Versions-ID speichern (fehlt sie in der Antwort wie bei Ceph RGW 20.x: aktuelle
+   Version des Ziels per HeadObject, nur bei passendem ETag) → SHA-256 vergleichen (`x-amz-checksum-sha256`, sonst Kopie über die Versions-ID neu lesen) → nur bei `gesetzliche_pflicht` Sperre setzen und per `GetObjectRetention` kontrollieren (Modus nach ADR-007).
    Erst wenn alle Dateien kopiert, geprüft und gegebenenfalls gesperrt sind: Status `ARCHIVIERT`; danach die `eingang/`-Objekte mit **allen Versionen** löschen.
 4. **Ablaufdatum der Sperre** (`retainUntil`), in dieser Reihenfolge: Art ohne `gesetzliche_pflicht` → keine Sperre; «Frist abgelaufen» → keine Sperre (Req 9.8); unbefristet → heute + 10 Jahre, der Prüflauf verlängert (Req 6.9, 15.9); sonst Ende des Tages `aufbewahren_bis` (Europe/Zurich, als UTC).
 5. **Arten ohne gesetzliche Pflicht** liegen ebenfalls unter `archiv/`, ohne Sperre; Prüfsummen, Manifest und das Verbot von Überschreiben und Löschen über die Schnittstellen gelten trotzdem (Req 6.5, 6.12).
