@@ -542,6 +542,12 @@ public class BestaetigenSchritte {
         }
     }
 
+    @Dann("hat das Dokument «{word}» im Zusatzfeld «{word}» die Zahl {word}")
+    public void zusatzZahl(String name, String feld, String zahl) throws SQLException {
+        Ort ort = ort(name);
+        Testdokumente.zusatzZahlPruefen(datenbank.get(), ort.mandant(), ort.id(), feld, zahl);
+    }
+
     @Dann("hat das Dokument «{word}» die Belegnummer «{word}» mit Betrag {word} {word}")
     public void finanz(String name, String belegnummer, String betrag, String waehrung) throws SQLException {
         Ort ort = ort(name);

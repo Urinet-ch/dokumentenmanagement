@@ -613,7 +613,7 @@ public class DokumentResource {
                 d.tags(), text(d.vertraulichkeit()), text(d.personBenutzer()), d.geschaeftsjahr(),
                 text(d.belegnummer()), text(d.richtung()), d.betrag(), text(d.waehrung()), d.faelligkeit(),
                 text(d.qrReferenz()), text(d.konto()), d.gueltigAb(), d.gueltigBis(), text(d.kuendigungsfrist()),
-                d.naechsteFrist(), zusatz == null ? null : zusatz.toString(), zusatzFelder, grund);
+                d.naechsteFrist(), ZusatzJson.text(zusatz), zusatzFelder, grund);
     }
 
     /** Ein leerer Text leert das Feld wie {@code null}. */

@@ -192,6 +192,28 @@ Funktionalität: Generator-Schnittstelle für Skripte
       | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "tittel": "x" } | unbekanntes Feld    |
       | { "art": "GIBT_ES_NICHT", "titel": "Probe" }                               | unbekannte Art      |
       | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "zusatz": [] } | zusatz kein Objekt  |
+      | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "zusatz": {"x": NaN} } | zusatz mit NaN |
+
+  @req-9.5
+  Szenario: Eine nicht endliche Zahl in den Zusatzfeldern ergibt 422, eine grosse endliche Zahl gilt
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_ZAHL", "name": "Probe Zahl", "zusatzSchema": {"type": "object"}, "vertraulichkeit": "NORMAL",
+       "aufbewahrungJahre": null, "gesetzlichePflicht": false}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Wenn der Generator die PDF «Z1» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_ZAHL", "titel": "Probe", "zusatz": {"x": 1e400} }
+      """
+    Dann antwortet der Generator mit Status 422 und Fehlercode «ZUSATZ_UNGUELTIG»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «Z1»
+    Wenn der Generator die PDF «Z1» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_ZAHL", "titel": "Probe", "zusatz": {"x": 1e300} }
+      """
+    Dann antwortet der Generator mit 202 und dem neuen Dokument «Z1»
+    Und hat das Generator-Dokument «Z1» im Zusatzfeld «x» die Zahl 1e300
 
   @req-11.2
   Szenario: Eine abgelaufene Aufbewahrungsfrist ergibt 409, nichts wird angelegt

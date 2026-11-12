@@ -52,6 +52,9 @@ public class DokumentartVerwaltungSchritte {
         }
         try (Connection verbindung = datenbank.get().getConnection()) {
             for (String mandant : MANDANTEN) {
+                // Dokumente anderer Schritte mit einer Probe-Art zuerst (dokument_art_fk), egal in welcher Reihenfolge
+                // die @After-Hooks laufen
+                Testdokumente.loeschenMitArt(datenbank.get(), mandant, PRAEFIX);
                 try (PreparedStatement loeschen = verbindung.prepareStatement("delete from "
                         + new MandantCode(mandant).schema() + ".dokumentart where code like ?")) {
                     loeschen.setString(1, PRAEFIX + "%");

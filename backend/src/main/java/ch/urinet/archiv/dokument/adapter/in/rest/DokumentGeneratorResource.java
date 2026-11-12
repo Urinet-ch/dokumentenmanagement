@@ -67,8 +67,10 @@ public class DokumentGeneratorResource {
         this.generator = generator;
         this.identitaet = identitaet;
         this.berechtigung = berechtigung;
-        // ein Tippfehler im Feldnamen soll nicht still verloren gehen
+        // ein Tippfehler im Feldnamen soll nicht still verloren gehen; Kommazahlen als BigDecimal wie bei PATCH, damit
+        // 1e400 im Zusatz als Zahl beim Prüfer ankommt und nicht als "Infinity" (ZusatzJson)
         this.leser = mapper.readerFor(GeneratorMetadatenDto.class)
+                .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
                 .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     }
@@ -187,7 +189,7 @@ public class DokumentGeneratorResource {
                 v.kuendigungsfrist(), v.naechsteFrist(), false, false);
         JsonNode zusatz = m.zusatz() == null || m.zusatz().isNull() ? null : m.zusatz();
         return new DokumentGenerator.Anfrage(angaben, m.partner() == null ? null : m.partner().crmId(),
-                zusatz == null ? null : zusatz.toString(), zusatzFelder(zusatz));
+                ZusatzJson.text(zusatz), zusatzFelder(zusatz));
     }
 
     /** Schlüssel mit Wert, wie {@code DokumentStatusPort.Stand#zusatzFelder}: ohne null, "", [] und {}. */

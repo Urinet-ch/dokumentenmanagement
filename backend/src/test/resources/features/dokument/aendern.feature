@@ -341,6 +341,7 @@ Funktionalität: Metadaten ändern und Versionen
       | Vertraulichkeit leer       | {"titel": "Neu", "vertraulichkeit": null}  |
       | Art unbekannt              | {"titel": "Neu", "art": "GIBT_ES_NICHT"}   |
       | Zusatz kein Objekt         | {"titel": "Neu", "zusatz": [1]}            |
+      | Zusatz mit NaN             | {"titel": "Neu", "zusatz": {"x": NaN}}     |
 
   @req-3.14 @req-3.11
   Szenariogrundriss: Ein Feld «dateiname» in der Änderung antwortet mit 400 und ändert nichts: <fall>
@@ -370,3 +371,21 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» diese Werte:
       | titel     | Neu                    |
       | dateiname | Scan_Rechnung-2026.pdf |
+
+  @req-9.5
+  Szenario: Eine nicht endliche Zahl in den Zusatzfeldern ergibt 422, eine grosse endliche Zahl gilt
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_ZAHL", "name": "Probe Zahl", "zusatzSchema": {"type": "object"}, "vertraulichkeit": "NORMAL",
+       "aufbewahrungJahre": null, "gesetzlichePflicht": false}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_ZAHL", "zusatz": {"x": 1e400}}' ändert
+    Dann meldet das Archiv Status 422 mit Fehlercode «ZUSATZ_UNGUELTIG»
+    Und hat das Dokument «K» diese Werte:
+      | art    | null |
+      | zusatz | null |
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_ZAHL", "zusatz": {"x": 1e300}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 1e300

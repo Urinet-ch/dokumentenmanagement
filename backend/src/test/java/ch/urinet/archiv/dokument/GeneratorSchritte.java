@@ -270,6 +270,12 @@ public class GeneratorSchritte {
                 + "and aktion = ?", principal, aktion)).containsExactly(String.valueOf(anzahl));
     }
 
+    @Dann("hat das Generator-Dokument «{word}» im Zusatzfeld «{word}» die Zahl {word}")
+    public void zusatzZahl(String name, String feld, String zahl) throws SQLException {
+        Ort ort = ort(name);
+        Testdokumente.zusatzZahlPruefen(datenbank.get(), ort.mandant(), ort.id(), feld, zahl);
+    }
+
     @Dann("ist für das Generator-Dokument «{word}» ein Auftrag «VERARBEITEN» ohne KI eingereiht")
     public void ohneKiEingereiht(String name) throws SQLException {
         assertThat(abfragen("select nutzlast ->> 'ohneKi' as ohne_ki from public.auftrag where typ = 'VERARBEITEN' "

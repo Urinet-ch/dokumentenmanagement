@@ -5,14 +5,18 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Testdokumente per JDBC, bis Erfassung (Welle 3) und Bestätigung echte Dokumente anlegen. Die Probe-Dokumente
@@ -79,6 +83,41 @@ public final class Testdokumente {
                 verbindung.setAutoCommit(true);
             }
         }
+    }
+
+    /** Das Zusatzfeld ist in {@code dokument.zusatz} als JSON-Zahl gespeichert, nicht als Text, und hat den Wert. */
+    public static void zusatzZahlPruefen(DataSource datenquelle, String mandant, UUID id, String feld, String zahl)
+            throws SQLException {
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select jsonb_typeof(zusatz -> ?) as typ, "
+                     + "(zusatz ->> ?)::numeric = ?::numeric as gleich from " + new MandantCode(mandant).schema()
+                     + ".dokument where id = ?")) {
+            abfrage.setString(1, feld);
+            abfrage.setString(2, feld);
+            abfrage.setString(3, zahl);
+            abfrage.setObject(4, id);
+            try (ResultSet z = abfrage.executeQuery()) {
+                assertThat(z.next()).as("Dokument " + id).isTrue();
+                assertThat(z.getString("typ")).as("Typ von zusatz." + feld).isEqualTo("number");
+                assertThat(z.getBoolean("gleich")).as("Wert von zusatz." + feld).isTrue();
+            }
+        }
+    }
+
+    /** Entfernt alle Dokumente eines Mandanten, deren Art mit {@code praefix} beginnt (Probe-Arten der Szenarien). */
+    public static void loeschenMitArt(DataSource datenquelle, String mandant, String praefix) throws SQLException {
+        List<UUID> ids = new ArrayList<>();
+        try (Connection verbindung = datenquelle.getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select id from "
+                     + new MandantCode(mandant).schema() + ".dokument where art like ?")) {
+            abfrage.setString(1, praefix + "%");
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    ids.add(z.getObject(1, UUID.class));
+                }
+            }
+        }
+        loeschen(datenquelle, mandant, ids);
     }
 
     private static void einfuegen(DataSource datenquelle, UUID id, Angaben angaben, boolean fallsFehlt)
