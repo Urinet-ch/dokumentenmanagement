@@ -339,7 +339,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Verwerfen eines Generator-Dokuments (aus `FEHLER` oder `EINGANGSKORB`) gibt die Reservation in `belegnummer_eigen` in derselben Transaktion frei; Integrationstest: verwerfen, korrigiert neu senden → 202
   - `tools/archiv_client.py` (requests, Token aus Datei mit Rechten 600: `~/.config/urinet-archiv/token` oder Pfad aus `ARCHIV_TOKEN_DATEI`, nie im Code oder als Umgebungsvariable); bei Ausfall Ordner `archiv-ausstehend/`, bei 409 nach `archiv-konflikt/` ohne erneutes Senden; Einbau-Beispiel für `rechnung_gen.py` und `urinet_pdf.py` in `tools/README.md`
   - _Anforderungen: 11.1–11.11_
-  - Erledigt: `DokumentGeneratorResource`/`DokumentGenerator`, Worker-Pfad ohne KI, `tools/archiv_client.py` (nur Standardbibliothek statt `requests`) mit `tools/test_archiv_client.py` und `tools/README.md`; Szenarien `features/dokument/generator.feature` (`@req-11.1`–`11.3`, `11.6`–`11.8`, `11.10`, `11.11`); `ProbeTokenResource` entfernt (design.md «Umsetzung (Aufgabe 4.7)»)
+  - Erledigt: `DokumentGeneratorResource`/`DokumentGenerator`, Worker-Pfad ohne KI, `tools/archiv_client.py` (nur Standardbibliothek statt `requests`) mit `tools/test_archiv_client.py` und `tools/README.md`; Szenarien `features/dokument/generator.feature` (`@req-11.1`–`11.11`; für `11.4`, `11.5` und `11.9` ruft das Szenario den echten Client per `python3` gegen den Testserver auf); `ProbeTokenResource` entfernt (design.md «Umsetzung (Aufgabe 4.7)»)
 
 - [x] 4.8 Drive-Import-Werkzeug [Backend]
   - `tools/drive_import` (Java, Picocli), Anmeldung mit API-Token vom Scope `import` (Token aus Datei wie in 4.7, nie als Umgebungsvariable): rekursiv, Trockenlauf, Ordnerpfad als `hinweis`; Pfad-Muster → Hinweise an die KI (Kunde, Art)
