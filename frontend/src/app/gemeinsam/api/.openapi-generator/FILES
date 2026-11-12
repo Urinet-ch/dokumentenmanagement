@@ -12,6 +12,7 @@ model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
 model/auszug-teil.ts
+model/bestaetigung.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts
 model/dokumentart.ts
@@ -23,6 +24,8 @@ model/suchergebnis.ts
 model/suchtreffer.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts
+model/verwerfen.ts
+model/warnung.ts
 param.ts
 provide-api.ts
 query.params.ts

@@ -1,13 +1,18 @@
 package ch.urinet.archiv.dokument.application;
 
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -21,9 +26,16 @@ public class DokumentLesen {
     static final int GROESSE_MAX = 100;
 
     private final DokumentRepository repository;
+    private final DokumentStatusPort status;
+    private final MandantAufloesung aufloesung;
+    private final MandantEinstellungen einstellungen;
 
-    public DokumentLesen(DokumentRepository repository) {
+    public DokumentLesen(DokumentRepository repository, DokumentStatusPort status, MandantAufloesung aufloesung,
+                         MandantEinstellungen einstellungen) {
         this.repository = repository;
+        this.status = status;
+        this.aufloesung = aufloesung;
+        this.einstellungen = einstellungen;
     }
 
     public Dokument lesen(Benutzer benutzer, UUID id) {
@@ -37,5 +49,23 @@ public class DokumentLesen {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         return repository.eingangskorb(Sichtregel.fuer(benutzer), seite, groesse);
+    }
+
+    /**
+     * Warnungen eines Dokuments im Eingangskorb (Req 8.10, design.md «Statusmodell»): {@code BELEGNUMMER_BEKANNT}, wenn
+     * ein anderes, nicht verworfenes Dokument gleiche Art, Belegnummer und Partner hat und die Art keine eigene Art
+     * des Mandanten ist (dort verhindert Req 8.9 die Bestätigung). Ausserhalb des Eingangskorbs keine Warnungen.
+     */
+    public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument) {
+        if (!DokumentStatus.EINGANGSKORB_STATUS.contains(dokument.status()) || dokument.art() == null
+                || einstellungen.lesen(aufloesung.pruefen()).eigeneArten().contains(dokument.art())) {
+            return List.of();
+        }
+        Optional<UUID> vorhanden = status.gleicherBeleg(dokument.id());
+        if (vorhanden.isEmpty()) {
+            return List.of();
+        }
+        UUID sichtbar = repository.sichtbar(vorhanden.get(), Sichtregel.fuer(benutzer)) ? vorhanden.get() : null;
+        return List.of(new Warnung(Warnung.BELEGNUMMER_BEKANNT, sichtbar));
     }
 }
