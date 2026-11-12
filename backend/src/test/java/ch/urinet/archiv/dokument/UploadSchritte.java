@@ -84,8 +84,13 @@ public class UploadSchritte {
     private record Datei(String name, byte[] inhalt, byte[] arbeitsfassung) {
     }
 
-    /** Zählstand eines Mandanten vor dem Upload für «nichts gespeichert». */
-    private record Stand(long dokumente, long dateien, long auftraege, List<String> eingang) {
+    /**
+     * Zählstand eines Mandanten vor dem Upload für «nichts gespeichert»; dazu je Prüfsumme der gesendeten Bytes die
+     * vorhandenen Zeilen in {@code dokument_datei}. Die Zeilen statt eines Zeitvergleichs: {@code empfangen} setzt die
+     * JVM, die Datenbank im Container hat eine eigene Uhr, die nachgehen kann.
+     */
+    private record Stand(long dokumente, long dateien, long auftraege, List<String> eingang,
+                         Map<String, List<String>> zeilenJeSha) {
     }
 
     @Inject
@@ -101,8 +106,6 @@ public class UploadSchritte {
     private List<Datei> gesendet = List.of();
     private String mandant;
     private Stand vorher;
-    /** Zeit der Datenbank vor dem Senden; neue Dateien tragen einen Empfangszeitpunkt danach. */
-    private String gesendetAb;
     private Set<Path> tempVorher = Set.of();
     private Set<Path> arbeitVorher = Set.of();
     private List<Response> parallel = List.of();
@@ -183,9 +186,10 @@ public class UploadSchritte {
         ApiTokenVerwaltung.Erstellt erstellt = tokens.erstellen(mandantCode, "Probe Upload", "import");
         String token = erstellt.token().text();
         tokenIds.add(ApiToken.lesen(token).orElseThrow().id());
-        stand(mandantCode);
-        antwort = multipart(given().header("Authorization", "Bearer " + token),
-                List.of(new Datei(name, inhalte.get(name), null)), false, null).when().post(PFAD);
+        List<Datei> dateien = List.of(new Datei(name, inhalte.get(name), null));
+        stand(mandantCode, dateien);
+        gesendet = dateien;
+        antwort = multipart(given().header("Authorization", "Bearer " + token), dateien, false, null).when().post(PFAD);
         merken(mandantCode);
     }
 
@@ -262,16 +266,13 @@ public class UploadSchritte {
 
     @Dann("ist im Mandanten «{word}» nichts gespeichert")
     public void nichtsGespeichert(String mandantCode) throws SQLException {
-        Stand nachher = zaehlen(mandantCode);
+        Stand nachher = zaehlen(mandantCode, gesendet);
         assertThat(nachher.dokumente()).as("Dokumente").isEqualTo(vorher.dokumente());
         assertThat(nachher.dateien()).as("Dateien").isEqualTo(vorher.dateien());
         assertThat(nachher.auftraege()).as("Aufträge VERARBEITEN").isEqualTo(vorher.auftraege());
         assertThat(nachher.eingang()).as("Versionen unter eingang/").containsExactlyInAnyOrderElementsOf(vorher.eingang());
-        for (Datei datei : gesendet) {
-            assertThat(abfragen("select 1 from " + new MandantCode(mandantCode).schema()
-                    + ".dokument_datei where sha256 = ? and empfangen >= ?::timestamptz", sha256(datei.inhalt()),
-                    gesendetAb)).as(datei.name()).isEmpty();
-        }
+        assertThat(nachher.zeilenJeSha()).as("Zeilen in dokument_datei je gesendeter Prüfsumme")
+                .isEqualTo(vorher.zeilenJeSha());
     }
 
     @Dann("steht jedes neue Dokument im Status «NEU» als «PERSONAL» mit Quelle «{word}» und Erfasser «{word}»")
@@ -451,13 +452,13 @@ public class UploadSchritte {
     @Wenn("«{word}» gleichzeitig in {int} Anfragen je eine Datei von {int} MB hochlädt")
     public void gleichzeitigHochladen(String benutzer, int anzahl, int megabyte) throws Exception {
         String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
-        stand(mandantCode);
         String token = Testanmeldung.token(benutzer);
         List<List<Datei>> anfragen = new ArrayList<>();
         for (int i = 1; i <= anzahl; i++) {
             anfragen.add(List.of(new Datei("parallel-" + i + ".pdf", inhalt("parallel-" + i + ".pdf",
                     "pdf:" + megabyte), null)));
         }
+        stand(mandantCode, anfragen.stream().flatMap(List::stream).toList());
         arbeitVorher = arbeitsDateien();
         beobachtet.clear();
         CyclicBarrier start = new CyclicBarrier(anzahl);
@@ -541,7 +542,7 @@ public class UploadSchritte {
 
     private void senden(String benutzer, List<Datei> dateien, boolean zusammenfassen, String hinweis) {
         String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
-        stand(mandantCode);
+        stand(mandantCode, dateien);
         gesendet = dateien;
         tempVorher = tempDateien();
         rohAntwort = null;
@@ -550,11 +551,10 @@ public class UploadSchritte {
         merken(mandantCode);
     }
 
-    private void stand(String mandantCode) {
+    private void stand(String mandantCode, List<Datei> dateien) {
         mandant = mandantCode;
         try {
-            vorher = zaehlen(mandantCode);
-            gesendetAb = abfragen("select now()::text as jetzt").getFirst().get("jetzt");
+            vorher = zaehlen(mandantCode, dateien);
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
@@ -680,13 +680,22 @@ public class UploadSchritte {
         return inhalt;
     }
 
-    private Stand zaehlen(String mandantCode) throws SQLException {
+    private Stand zaehlen(String mandantCode, List<Datei> dateien) throws SQLException {
         String schema = new MandantCode(mandantCode).schema();
+        Map<String, List<String>> zeilenJeSha = new LinkedHashMap<>();
+        for (Datei datei : dateien) {
+            for (byte[] bytes : Stream.of(datei.inhalt(), datei.arbeitsfassung()).filter(b -> b != null).toList()) {
+                String sha = sha256(bytes);
+                zeilenJeSha.put(sha, abfragen("select dokument_id || '/' || rolle || '/' || nr as zeile from " + schema
+                        + ".dokument_datei where sha256 = ? order by 1", sha).stream().map(z -> z.get("zeile"))
+                        .toList());
+            }
+        }
         return new Stand(zahl("select count(*) from " + schema + ".dokument"),
                 zahl("select count(*) from " + schema + ".dokument_datei"),
                 zahl("select count(*) from public.auftrag where typ = 'VERARBEITEN' and mandant = '" + mandantCode
                         + "'"),
-                TestAblage.versionen(mandantCode, "eingang/"));
+                TestAblage.versionen(mandantCode, "eingang/"), zeilenJeSha);
     }
 
     private String schema() {
