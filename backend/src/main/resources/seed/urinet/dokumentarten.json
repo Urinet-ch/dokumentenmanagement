@@ -4,7 +4,7 @@
     {
       "code": "AUSGANGSRECHNUNG",
       "name": "Ausgangsrechnung",
-      "beschreibung": "Rechnung oder Gutschrift von Urinet an einen Kunden, Belegnummer wie 2026-003 (Altbestand R0001). Massgebend ist der Aussteller Urinet, nicht das Nummernformat. Rechnungen an Urinet = LIEFERANTENBELEG, Mahnungen = KORRESPONDENZ.",
+      "beschreibung": "Rechnung oder Gutschrift von Urinet an einen Kunden, Belegnummer wie 2026-003 (Altbestand R0001). Massgebend ist der Aussteller Urinet, nicht das Nummernformat. Rechnungen an Urinet = LIEFERANTENBELEG, Mahnungen an Urinet mit Mahngebühr oder Verzugszins = LIEFERANTENBELEG, ohne Gebühr = KORRESPONDENZ.",
       "gruppen": ["finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "belegnummer", "richtung", "betrag", "waehrung"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
@@ -93,7 +93,7 @@
     {
       "code": "VERSICHERUNG",
       "name": "Versicherung",
-      "beschreibung": "Police, Nachtrag oder Kündigung eines Versicherungsvertrags (durch Urinet oder den Versicherer), darunter SUVA und andere UVG-Versicherer, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. Prämienrechnungen = LIEFERANTENBELEG; AHV, IV, EO, ALV und FAK der Ausgleichskasse = BEHOERDE.",
+      "beschreibung": "Police, Nachtrag oder Kündigung eines Versicherungsvertrags (durch Urinet oder den Versicherer), darunter SUVA und andere UVG-Versicherer, Krankentaggeld, Pensionskasse (BVG) und Sachversicherungen. Prämienrechnungen und Mahnungen zu Prämien mit Mahngebühr oder Verzugszins = LIEFERANTENBELEG; AHV, IV, EO, ALV und FAK der Ausgleichskasse = BEHOERDE.",
       "gruppen": ["vertrag", "finanz"],
       "pflichtfelder": ["titel", "datum", "partner", "gueltig_ab"],
       "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},

@@ -41,8 +41,9 @@ class PromptV5Test {
         String system = Prompt.system(MANDANT, liste());
         assertThat(system).contains("Mandant (eigene Firma): " + MANDANT).doesNotContain("{").doesNotContain("}")
                 .contains("Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. "
-                        + "cassa di compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; UVG- und "
-                        + "Krankentaggeld-Versicherer sind VERSICHERUNG.");
+                        + "cassa di compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; Policen von UVG-, "
+                        + "Krankentaggeld- und BVG-Versicherern sind VERSICHERUNG, ihre Prämienrechnungen LIEFERANTENBELEG.")
+                .contains("Mahnungen mit Mahngebühr oder Verzugszins sind LIEFERANTENBELEG");
     }
 
     @Test

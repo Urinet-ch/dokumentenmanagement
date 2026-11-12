@@ -27,11 +27,12 @@ public final class Prompt {
             Adressfeld oder ist der Zahlungsempfänger im Swiss QR Code ein anderer, ist es ein fremder Beleg, auch wenn \
             die Nummer wie eine eigene aussieht. Belege von Dritten sind nie eine solche Art: Kassenbons und Quittungen sind QUITTUNG, \
             Rechnungen und Gutschriften von Lieferanten LIEFERANTENBELEG, Schreiben, Verfügungen und Rechnungen von \
-            Ämtern und Steuerverwaltungen BEHOERDE, Policen, Prämienrechnungen und Mahnungen von Versicherungen \
-            VERSICHERUNG.
+            Ämtern und Steuerverwaltungen BEHOERDE, Policen, Nachträge und Kündigungen von Versicherungen VERSICHERUNG. \
+            Prämienrechnungen von Versicherern und Mahnungen mit Mahngebühr oder Verzugszins sind LIEFERANTENBELEG, \
+            auch wenn sie eine Prämie betreffen; Mahnungen ohne Gebühr und ohne Zins sind KORRESPONDENZ.
             - Sozialversicherungen (AHV-Ausgleichskassen, IV, EO, FAK; frz. caisse de compensation, ital. cassa di \
-            compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; UVG- und Krankentaggeld-Versicherer \
-            sind VERSICHERUNG.
+            compensazione) sind BEHOERDE, auch bei Rückerstattungen und Gutschriften; Policen von UVG-, Krankentaggeld- und \
+            BVG-Versicherern sind VERSICHERUNG, ihre Prämienrechnungen LIEFERANTENBELEG.
             - partnerName: die Gegenpartei aus Sicht des Mandanten (bei fremden Belegen der Aussteller, bei eigenen \
             Belegen der Empfänger, bei Quittungen wer das Geld erhalten hat), nie der Mandant selbst und nie eine \
             Zahlungsart; so geschrieben wie auf dem Beleg.
