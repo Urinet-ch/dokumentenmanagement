@@ -27,10 +27,9 @@ steht der Bezug in der Klammer. Schreibweise der Akzeptanzkriterien, Nachweis (C
 Problem Details und `[offen]`-Marker wie in Spec 01. Die Szenarien liegen unter `features/konfiguration/` mit dem
 Tag `@spec-05`. «Spec 0n, x.y» bezeichnet ein Akzeptanzkriterium, «Spec 0n, Aufgabe x.y» eine Aufgabe.
 
-Einordnung: [offen: Einordnung der Wellen 17 und 18 im Umsetzungsplan – Entscheid Fabian in Aufgabe 17.1;
-Vorschlag: nach Gate Phase 1 und spätestens vor Welle 10 (Spec 03), damit `vhf-gsk` direkt mit seiner eigenen
-Konfiguration startet und keine Datenmigration der Felder aus Spec 03 nötig wird; vor Welle 6 (Spec 02), wenn
-`vollstaendigkeit` und die Finanzwerkzeuge gleich auf den Regeln dieser Spec aufbauen sollen].
+Einordnung: Die Wellen 17 und 18 folgen nach Gate Phase 1 und spätestens vor Welle 10 (Spec 03), damit `vhf-gsk`
+direkt mit seiner eigenen Konfiguration startet und keine Datenmigration der Felder aus Spec 03 nötig wird
+(entschieden von Fabian am 11.11.2026).
 
 ## Glossary
 - **Konfiguration** – die fachliche Ordnung eines Mandanten: Dokumentarten, Klassifikationen, Regeln, KI-Texte

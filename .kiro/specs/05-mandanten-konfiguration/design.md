@@ -342,9 +342,9 @@ Code kommen: Fehlercodes und A11 (siehe oben) sowie die Stammdaten-Tabelle (Aufg
   als `^(?<jahr>\d{4})-(?<nr>\d{3})$`), Modul
   `konfiguration/`, `seed/<code>/konfiguration.json`, `features/konfiguration/`; tech.md Spec-Tags `@spec-01` bis
   `@spec-05`; product.md ohne Änderung.
-- **docs/umsetzungsplan.md:** Zeile für Spec 05 (Wellen 17–18) und die Einordnung nach dem Entscheid.
+- **docs/umsetzungsplan.md:** Zeile für Spec 05 (Wellen 17–18, nach Gate Phase 1, spätestens vor Welle 10;
+  im PR dieser Spec nachgetragen).
 
 ## Open Points
-- Einordnung der Wellen 17 und 18 (requirements.md, Introduction).
 - Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9).
 - Rechte der Geschäftsstelle für A11 bleiben der Entscheid aus Spec 03, 3.5.
