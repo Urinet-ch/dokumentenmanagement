@@ -401,7 +401,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 4.9_
   - Erledigt: Changeset `010-benutzer-verzeichnis` (nur Einfügen, Indizes für die Filter), `BenutzerVerzeichnisPflege` im Schreibweg von `JdbcZugriffProtokoll` und beim Widerruf eines Tokens, `ProtokollResource` (`GET /protokoll`, `GET /protokoll/benutzer`, `POST /protokoll/benutzer/{benutzer}/austritt`, A13), Seite `/verwaltung/protokoll`; Szenarien `features/protokoll/protokoll-einsicht.feature` (`@req-2.19`, `@req-10.5`, `@req-10.10`), bestehende Szenarien für `10.2`, `10.3`, `10.7`, `10.8`; `10.9` per JUnit (`KeinLoeschpfadTest`, `MandantEigentuemerTest`); Teilnachweis «Dokument» für 10.9 folgt mit 5.7 (design.md «Umsetzung (Aufgabe 5.1)»)
 
-- [ ] 5.2 Tages-Manifest [Backend]
+- [x] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
   - Protokollzeilen so hashen, dass ein späterer Löschweg (9.9) einzelne Zeilen entfernen kann, ohne den Nachweis der übrigen zu zerstören: SHA-256 je Zeile (bevorzugt, weil sich die Frist eines Dokuments nach 9.7 ändern kann) oder je Fristklasse nach 10.9; Wahl im PR (design.md «Manifest»)
   - Feld `sicherung`: SHA-256 der Exporte von `archiv-sicherung` seit dem vorigen Manifest, damit eine Wiederherstellung nach Verlust der VPS nur belegte Snapshots einspielt (design.md «Manifest»); bleibt leer, bis 5.5 die Liste anbindet
