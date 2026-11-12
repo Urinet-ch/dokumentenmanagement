@@ -2,7 +2,10 @@ package ch.urinet.archiv.verarbeitung;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.mandant.application.MandantBucket;
+import ch.urinet.archiv.mandant.application.MandantRegister;
+import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.adapter.in.job.PrueflaufZeitplan;
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufStarten;
 import io.agroal.api.AgroalDataSource;
@@ -17,16 +20,20 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
+import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
+import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -54,6 +61,7 @@ public class PrueflaufSchritte {
     private static final String ERSTELLER = "test-prueflauf";
     private static final DateTimeFormatter DATUM = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final int MAIL_HOECHSTENS = 50;
+    private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
 
     /** Archiviertes Testdokument: Schlüssel und Versions-ID des Originals, Sperre beim Anlegen. */
     private record Archiviert(UUID id, String titel, String schluessel, String version, Instant sperre) {
@@ -88,6 +96,9 @@ public class PrueflaufSchritte {
     private final List<UUID> laeufe = new ArrayList<>();
     private Instant laufStart;
     private Optional<UUID> zweiterStart;
+    private String manifestSchluessel;
+    private String manifestVersion;
+    private Instant manifestSperre;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -161,6 +172,63 @@ public class PrueflaufSchritte {
         laeufe.add(erster);
         zweiterStart = starten(Optional.of(YearMonth.parse(monat)));
         zweiterStart.ifPresent(laeufe::add);
+    }
+
+    @Wenn("der Takt des Zeitplans am {word} um 04:00 auslöst")
+    public void takt(String datum) throws Exception {
+        Clock uhr = Clock.fixed(LocalDate.parse(datum, DATUM).atTime(4, 0).atZone(ZUERICH).toInstant(), ZUERICH);
+        MandantRegister nurUrinet = new MandantRegister() {
+            @Override
+            public boolean existiert(MandantCode code) {
+                return MANDANT.equals(code.wert());
+            }
+
+            @Override
+            public void eintragen(Mandant mandant) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<Mandant> aktive() {
+                MandantCode code = new MandantCode(MANDANT);
+                return List.of(new Mandant(code, MANDANT, code.schema(), bucket(), null, true));
+            }
+        };
+        PrueflaufZeitplan zeitplan = new PrueflaufZeitplan(nurUrinet, starten, "api,worker", uhr);
+        List<UUID> vorher = laeufeIm("2999-01");
+        threads.submit(zeitplan::starten).get(30, TimeUnit.SECONDS);
+        List<UUID> neu = laeufeIm("2999-01").stream().filter(id -> !vorher.contains(id)).toList();
+        if (laeufe.isEmpty()) {
+            assertThat(neu).as("der erste Takt holt den Lauf des Monats nach").hasSize(1);
+        } else {
+            zweiterStart = neu.stream().findFirst();
+        }
+        laeufe.addAll(neu);
+    }
+
+    @Angenommen("im Mandanten «urinet» liegt ein Manifest im Modus COMPLIANCE, gesperrt für {int} Stunden")
+    public void manifest(int stunden) {
+        manifestSchluessel = "manifest/prueflauf-probe/" + UUID.randomUUID() + ".json";
+        manifestSperre = Instant.now().plus(Duration.ofHours(stunden)).truncatedTo(ChronoUnit.SECONDS);
+        manifestVersion = s3.putObject(b -> b.bucket(bucket()).key(manifestSchluessel)
+                        .objectLockMode(ObjectLockMode.COMPLIANCE).objectLockRetainUntilDate(manifestSperre),
+                RequestBody.fromBytes(VerarbeitungTestHilfe.zufall(64))).versionId();
+    }
+
+    @Dann("meldet der Prüflauf für das Manifest nichts")
+    public void manifestOhneMeldung() throws SQLException {
+        assertThat(abfragen("select art from " + schema() + ".prueflauf_abweichung where lauf_id = '"
+                + laeufe.getLast() + "' and s3_schluessel = '" + manifestSchluessel + "'", String.class)).isEmpty();
+    }
+
+    @Dann("ist die Sperre des Manifests im Modus COMPLIANCE verlängert, höchstens bis jetzt plus {int} Tag")
+    public void manifestVerlaengert(int tage) {
+        ObjectLockRetention sperre = s3.getObjectRetention(b -> b.bucket(bucket()).key(manifestSchluessel)
+                .versionId(manifestVersion)).retention();
+        assertThat(sperre.mode()).isEqualTo(ObjectLockRetentionMode.COMPLIANCE);
+        assertThat(sperre.retainUntilDate()).isAfter(manifestSperre)
+                .isBeforeOrEqualTo(Instant.now().plus(Duration.ofDays(tage)).plusSeconds(1))
+                .isAfterOrEqualTo(laufStart.plus(Duration.ofDays(tage)).minusSeconds(1));
     }
 
     @Dann("ist der Prüflauf abgeschlossen")
@@ -279,6 +347,10 @@ public class PrueflaufSchritte {
     private Instant sperre(Archiviert d) {
         return s3.getObjectRetention(b -> b.bucket(bucket()).key(d.schluessel()).versionId(d.version()))
                 .retention().retainUntilDate();
+    }
+
+    private List<UUID> laeufeIm(String monat) throws SQLException {
+        return abfragen("select id from " + schema() + ".prueflauf where monat = '" + monat + "'", UUID.class);
     }
 
     private void aufraeumenLaeufe() throws SQLException {

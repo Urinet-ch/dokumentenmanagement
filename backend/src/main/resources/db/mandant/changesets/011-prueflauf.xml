@@ -39,7 +39,8 @@
                 id bigserial constraint prueflauf_abweichung_pk primary key,
                 lauf_id uuid not null constraint prueflauf_abweichung_lauf_fk references prueflauf (id),
                 art text not null constraint prueflauf_abweichung_art_ck
-                    check (art in ('PRUEFSUMME', 'VERSION_FEHLT', 'FREMDE_VERSION', 'LOESCHMARKE', 'SPERRE_FEHLT')),
+                    check (art in ('PRUEFSUMME', 'VERSION_FEHLT', 'FREMDE_VERSION', 'LOESCHMARKE', 'SPERRE_FEHLT',
+                                    'PRUEFFEHLER')),
                 dokument_id uuid,
                 s3_schluessel text not null,
                 s3_version text,

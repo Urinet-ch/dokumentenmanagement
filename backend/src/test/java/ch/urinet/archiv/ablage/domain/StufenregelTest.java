@@ -73,7 +73,9 @@ class StufenregelTest {
     void stufePVerlangtPraefixComplianceUndKurzeFristen() {
         var wieP = new Stufenregel.Ablageeinstellungen(Sperrmodus.COMPLIANCE, Optional.of(Duration.ofDays(1)),
                 Optional.of(Duration.ofHours(1)), Stufenregel.PRAEFIX_STUFE_P);
-        assertThat(Stufe.aus(Optional.of("p"))).isEqualTo(Stufe.P);
+        // als Startwert lehnt Stufe.aus P bis Aufgabe 5.5 ab (Leitplanke wie vorher)
+        assertThatThrownBy(() -> Stufe.aus(Optional.of("p"))).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("5.5");
         assertThat(Stufenregel.verstoesse(Stufe.P, wieP)).isEmpty();
         var ohneFristen = new Stufenregel.Ablageeinstellungen(Sperrmodus.GOVERNANCE, Optional.empty(),
                 Optional.of(Duration.ofDays(2)), Stufenregel.PRAEFIX_STUFE_A);

@@ -48,6 +48,7 @@ class PrueflaufHandlerTest {
 
     private final List<String> verlaengert = new ArrayList<>();
     private final List<UUID> mails = new ArrayList<>();
+    private String unlesbar;
 
     @Test
     void stufePVerlaengertNieUndZaehltNur() throws Exception {
@@ -70,6 +71,32 @@ class PrueflaufHandlerTest {
         assertThat(verlaengert).containsExactly(SCHLUESSEL + "@" + JETZT.plus(EIN_TAG),
                 MANIFEST + "@" + JETZT.plus(EIN_TAG));
         assertThat(speicher.lauf.zaehler()).isEqualTo(new Zaehler(1, 2, 1, 2, 0, 1));
+        assertThat(mails).containsExactly(speicher.lauf.id());
+    }
+
+    @Test
+    void massgeblichIstDieKonfigurierteStufeNichtDieDesLaufs() throws Exception {
+        // Lauf aus der Sicherung der Produktion (B), wiederhergestellt in der Restore-Probe (P)
+        Speicher speicher = new Speicher(Stufe.B);
+        lauf(handler(speicher, Stufe.P), speicher);
+
+        assertThat(verlaengert).isEmpty();
+        assertThat(speicher.lauf.zaehler().nurGezaehlt()).isEqualTo(2);
+        assertThat(mails).isEmpty();
+    }
+
+    @Test
+    void fehlerBeiEinerDateiWirdGemeldetUndDerLaufGehtWeiter() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        unlesbar = SCHLUESSEL;
+        lauf(handler(speicher), speicher);
+
+        assertThat(speicher.lauf.stand().phase()).isEqualTo(Phase.ABGESCHLOSSEN);
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.PRUEFFEHLER, Art.FREMDE_VERSION);
+        assertThat(speicher.abweichungen.getFirst().dokumentId()).contains(DOKUMENT);
+        // das Manifest nach der unlesbaren Datei wird weiter gepflegt
+        assertThat(verlaengert).containsExactly(MANIFEST + "@" + JETZT.plus(EIN_TAG));
         assertThat(mails).containsExactly(speicher.lauf.id());
     }
 
@@ -99,10 +126,19 @@ class PrueflaufHandlerTest {
     }
 
     private PrueflaufHandler handler(Speicher speicher) {
+        return handler(speicher, speicher.lauf.stufe());
+    }
+
+    private PrueflaufHandler handler(Speicher speicher, Stufe stufe) {
         Instant baldAbgelaufen = JETZT.plus(Duration.ofHours(2));
         AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{AblagePort.class}, (proxy, methode, argumente) -> switch (methode.getName()) {
-                    case "pruefen" -> Optional.of(new Dateipruefung(SHA, 10, Optional.of(baldAbgelaufen)));
+                    case "pruefen" -> {
+                        if (argumente[1].equals(unlesbar)) {
+                            throw new IllegalStateException("S3 503");
+                        }
+                        yield Optional.of(new Dateipruefung(SHA, 10, Optional.of(baldAbgelaufen)));
+                    }
                     case "versionen" -> argumente[1].equals("archiv/")
                             ? new Versionsseite(List.of(new Objektversion(SCHLUESSEL, "v1", false),
                             new Objektversion(SCHLUESSEL, "v0", false)), Optional.empty())
@@ -127,8 +163,8 @@ class PrueflaufHandlerTest {
             }
         };
         Optional<Duration> frist = Optional.of(EIN_TAG);
-        return new PrueflaufHandler(speicher, ablage, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC), frist,
-                frist, 100, 500);
+        return new PrueflaufHandler(speicher, ablage, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC), stufe,
+                frist, frist, 100, 500);
     }
 
     private static Auftrag auftrag(UUID lauf, int teil) {

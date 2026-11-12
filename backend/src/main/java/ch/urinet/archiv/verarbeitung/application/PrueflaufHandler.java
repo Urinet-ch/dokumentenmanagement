@@ -13,6 +13,7 @@ import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Bekannt;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Datei;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Pruefdokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Abweichung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Art;
@@ -48,9 +49,14 @@ import java.util.UUID;
  *     in der Datenbank sind Abweichungen.</li>
  *     <li>{@code MANIFEST_VERSIONEN}: Manifeste lesen und ihre Sperren wie oben pflegen; Löschmarken melden.</li>
  * </ol>
+ * Massgeblich ist die Stufe der laufenden Konfiguration ({@code archiv.stufe}), nicht die beim Anlegen im Lauf
+ * gespeicherte: Ein Lauf aus der Sicherung der Produktion (B) verlängert in der Restore-Probe (P) nichts.
  * In Stufe P wird keine Sperre verlängert, nur gezählt (Req 16.24), und keine E-Mail versandt. Eine fehlende verlangte
  * Sperre ist nur in Stufe B eine Abweichung; in den Stufen A und P laufen Sperren nach einem Tag ab (Req 6.11). Am Ende
  * Bericht im Log und in {@code prueflauf}; bei Abweichungen E-Mail an den Inhaber, nur mit IDs (Req 16.7).
+ * <p>
+ * Ein Fehler beim Prüfen einer einzelnen Datei oder Manifest-Version (S3, Lesen, Verlängern) hält der Lauf als
+ * {@code PRUEFFEHLER} fest und prüft weiter, damit eine dauerhaft unlesbare Datei nicht den ganzen Lauf blockiert.
  * <p>
  * Idempotent: Ein Teil, den der Lauf schon festgehalten hat, endet ohne Wirkung; Verlängerungen sind ohnehin
  * wiederholbar (nie verkürzt).
@@ -71,6 +77,7 @@ public class PrueflaufHandler implements AuftragHandler {
     private final AblagePort ablage;
     private final InhaberBenachrichtigung benachrichtigung;
     private final Clock uhr;
+    private final Stufe stufe;
     private final Optional<Duration> archivHoechstfrist;
     private final Optional<Duration> manifestHoechstfrist;
     private final int dokumenteJeTeil;
@@ -78,6 +85,7 @@ public class PrueflaufHandler implements AuftragHandler {
 
     @Inject
     public PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
+                            @ConfigProperty(name = "archiv.stufe") Optional<String> stufe,
                             @ConfigProperty(name = "archiv.ablage.max-sperrfrist") Optional<Duration> archivHoechstfrist,
                             @ConfigProperty(name = "archiv.ablage.manifest-max-sperrfrist")
                             Optional<Duration> manifestHoechstfrist,
@@ -85,12 +93,13 @@ public class PrueflaufHandler implements AuftragHandler {
                             int dokumenteJeTeil,
                             @ConfigProperty(name = "archiv.prueflauf.versionen-je-teil", defaultValue = "500")
                             int versionenJeTeil) {
-        this(speichern, ablage, benachrichtigung, Clock.systemUTC(), archivHoechstfrist, manifestHoechstfrist,
-                dokumenteJeTeil, versionenJeTeil);
+        this(speichern, ablage, benachrichtigung, Clock.systemUTC(), Stufe.aus(stufe), archivHoechstfrist,
+                manifestHoechstfrist, dokumenteJeTeil, versionenJeTeil);
     }
 
     PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
-                     Clock uhr, Optional<Duration> archivHoechstfrist, Optional<Duration> manifestHoechstfrist,
+                     Clock uhr, Stufe stufe, Optional<Duration> archivHoechstfrist,
+                     Optional<Duration> manifestHoechstfrist,
                      int dokumenteJeTeil, int versionenJeTeil) {
         if (dokumenteJeTeil < 1 || versionenJeTeil < 1 || versionenJeTeil > 1000) {
             throw new IllegalStateException("archiv.prueflauf.dokumente-je-teil muss ≥ 1, "
@@ -100,6 +109,7 @@ public class PrueflaufHandler implements AuftragHandler {
         this.ablage = ablage;
         this.benachrichtigung = benachrichtigung;
         this.uhr = uhr;
+        this.stufe = stufe;
         this.archivHoechstfrist = archivHoechstfrist;
         this.manifestHoechstfrist = manifestHoechstfrist;
         this.dokumenteJeTeil = dokumenteJeTeil;
@@ -125,6 +135,10 @@ public class PrueflaufHandler implements AuftragHandler {
         if (lauf.teil() != teil - 1) {
             throw new IllegalStateException("Prüflauf " + id + " steht auf Teil " + lauf.teil() + ", nicht " + (teil - 1));
         }
+        if (lauf.stufe() != stufe) {
+            LOG.warnf("Prüflauf %s angelegt in Stufe %s, läuft in Stufe %s: massgeblich ist %s", id, lauf.stufe(),
+                    stufe, stufe);
+        }
         Ergebnis ergebnis = switch (lauf.stand().phase()) {
             case DATEIEN -> dateien(auftrag.mandant(), lauf);
             case ARCHIV_VERSIONEN -> archivVersionen(auftrag.mandant(), lauf);
@@ -137,7 +151,7 @@ public class PrueflaufHandler implements AuftragHandler {
             return;
         }
         if (ergebnis.weiter().phase() == Phase.ABGESCHLOSSEN) {
-            abschliessen(auftrag.mandant(), id, lauf.stufe(), lauf.zaehler().plus(ergebnis.zaehler()));
+            abschliessen(auftrag.mandant(), id, lauf.zaehler().plus(ergebnis.zaehler()));
         }
     }
 
@@ -148,7 +162,11 @@ public class PrueflaufHandler implements AuftragHandler {
             for (Datei datei : dokument.dateien()) {
                 unterbrochen();
                 s.dateien++;
-                pruefeDatei(mandant, lauf.stufe(), dokument, datei, s);
+                try {
+                    pruefeDatei(mandant, dokument, datei, s);
+                } catch (RuntimeException e) {
+                    prueffehler(e, Optional.of(dokument.id()), datei.schluessel(), datei.versionId(), s);
+                }
             }
         }
         Fortsetzung weiter = seite.size() < dokumenteJeTeil
@@ -157,7 +175,7 @@ public class PrueflaufHandler implements AuftragHandler {
         return s.ergebnis(weiter);
     }
 
-    private void pruefeDatei(MandantCode mandant, Stufe stufe, Pruefdokument dokument, Datei datei, Sammler s) {
+    private void pruefeDatei(MandantCode mandant, Pruefdokument dokument, Datei datei, Sammler s) {
         if (datei.versionId().isEmpty()) {
             s.abweichung(Art.VERSION_FEHLT, Optional.of(dokument.id()), datei.schluessel(), Optional.empty());
             return;
@@ -179,7 +197,7 @@ public class PrueflaufHandler implements AuftragHandler {
             s.abweichung(Art.SPERRE_FEHLT, Optional.of(dokument.id()), datei.schluessel(), datei.versionId());
         }
         if (unbefristet(vorgabe)) {
-            pflegen(mandant, stufe, datei.schluessel(), version, bisher, archivHoechstfrist, s);
+            pflegen(mandant, datei.schluessel(), version, bisher, archivHoechstfrist, s);
         }
     }
 
@@ -225,16 +243,11 @@ public class PrueflaufHandler implements AuftragHandler {
                 continue;
             }
             s.manifeste++;
-            Optional<Dateipruefung> pruefung = ablage.pruefen(mandant, v.schluessel(), v.versionId());
-            if (pruefung.isEmpty()) {
-                s.abweichung(Art.VERSION_FEHLT, Optional.empty(), v.schluessel(), Optional.of(v.versionId()));
-                continue;
+            try {
+                pruefeManifest(mandant, v, jetzt, s);
+            } catch (RuntimeException e) {
+                prueffehler(e, Optional.empty(), v.schluessel(), Optional.of(v.versionId()), s);
             }
-            Optional<Instant> bisher = pruefung.get().sperreBis();
-            if (lauf.stufe() == Stufe.B && bisher.filter(bis -> bis.isAfter(jetzt)).isEmpty()) {
-                s.abweichung(Art.SPERRE_FEHLT, Optional.empty(), v.schluessel(), Optional.of(v.versionId()));
-            }
-            pflegen(mandant, lauf.stufe(), v.schluessel(), v.versionId(), bisher, manifestHoechstfrist, s);
         }
         Fortsetzung weiter = seite.weiter().isEmpty()
                 ? Fortsetzung.beginn(Phase.ABGESCHLOSSEN)
@@ -242,7 +255,31 @@ public class PrueflaufHandler implements AuftragHandler {
         return s.ergebnis(weiter);
     }
 
-    private void pflegen(MandantCode mandant, Stufe stufe, String schluessel, String version,
+    private void pruefeManifest(MandantCode mandant, Objektversion v, Instant jetzt, Sammler s) {
+        Optional<Dateipruefung> pruefung = ablage.pruefen(mandant, v.schluessel(), v.versionId());
+        if (pruefung.isEmpty()) {
+            s.abweichung(Art.VERSION_FEHLT, Optional.empty(), v.schluessel(), Optional.of(v.versionId()));
+            return;
+        }
+        Optional<Instant> bisher = pruefung.get().sperreBis();
+        if (stufe == Stufe.B && bisher.filter(bis -> bis.isAfter(jetzt)).isEmpty()) {
+            s.abweichung(Art.SPERRE_FEHLT, Optional.empty(), v.schluessel(), Optional.of(v.versionId()));
+        }
+        pflegen(mandant, v.schluessel(), v.versionId(), bisher, manifestHoechstfrist, s);
+    }
+
+    /** Fehler bei einer Datei: festhalten und weiterprüfen; eine Unterbrechung reicht er weiter. */
+    private static void prueffehler(RuntimeException e, Optional<UUID> dokument, String schluessel,
+                                    Optional<String> version, Sammler s) {
+        if (Thread.currentThread().isInterrupted()) {
+            throw e;
+        }
+        // nur Schlüssel und Klassennamen, keine Inhalte (Req 16.7)
+        LOG.warnf("Prüflauf: %s nicht geprüft, ursache=%s", schluessel, Ursachen.kette(e));
+        s.abweichung(Art.PRUEFFEHLER, dokument, schluessel, version);
+    }
+
+    private void pflegen(MandantCode mandant, String schluessel, String version,
                          Optional<Instant> bisher, Optional<Duration> hoechstfrist, Sammler s) {
         Sperrpflege pflege = Sperrpflege.entscheiden(stufe, bisher, uhr.instant(), hoechstfrist);
         switch (pflege.art()) {
@@ -260,7 +297,7 @@ public class PrueflaufHandler implements AuftragHandler {
         }
     }
 
-    private void abschliessen(MandantCode mandant, UUID id, Stufe stufe, Zaehler zaehler) {
+    private void abschliessen(MandantCode mandant, UUID id, Zaehler zaehler) {
         LOG.infof("Prüflauf %s abgeschlossen (Stufe %s): dateien=%d versionen=%d manifeste=%d verlaengert=%d "
                         + "nur_gezaehlt=%d abweichungen=%d", id, stufe, zaehler.dateien(), zaehler.versionen(),
                 zaehler.manifeste(), zaehler.verlaengert(), zaehler.nurGezaehlt(), zaehler.abweichungen());

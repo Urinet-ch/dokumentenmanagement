@@ -40,7 +40,9 @@ public interface PrueflaufRegister {
         /** Löschmarke unter {@code archiv/} oder {@code manifest/} (Req 15.10). */
         LOESCHMARKE,
         /** Nur Stufe B: verlangte Sperre fehlt oder ist abgelaufen (Req 6.9, 15.4). */
-        SPERRE_FEHLT
+        SPERRE_FEHLT,
+        /** Datei oder Manifest-Version nicht prüfbar oder Sperre nicht verlängert (S3- oder Lesefehler); weitergeprüft. */
+        PRUEFFEHLER
     }
 
     record Lauf(UUID id, Stufe stufe, int teil, Fortsetzung stand, Zaehler zaehler) {

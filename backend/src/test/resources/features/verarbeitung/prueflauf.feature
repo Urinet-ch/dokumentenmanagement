@@ -34,7 +34,21 @@ Funktionalität: Monatlicher Prüflauf (PRUEFLAUF)
     Und ist die Sperre des Originals von «U» verlängert, höchstens bis jetzt plus 1 Tag
     Und ist die Sperre des Originals von «F» unverändert
 
+  @req-15.9
+  Szenario: Der Prüflauf verlängert die Sperre eines Manifests im Modus COMPLIANCE, gekappt auf die Höchstfrist
+    Angenommen im Mandanten «urinet» liegt ein Manifest im Modus COMPLIANCE, gesperrt für 2 Stunden
+    Wenn der Prüflauf für «urinet» läuft
+    Dann ist der Prüflauf abgeschlossen
+    Und meldet der Prüflauf für das Manifest nichts
+    Und ist die Sperre des Manifests im Modus COMPLIANCE verlängert, höchstens bis jetzt plus 1 Tag
+
   @req-15.5
   Szenario: Der Zeitplan startet je Monat höchstens einen Lauf
     Wenn der Prüflauf für «urinet» und den Monat «2999-01» zweimal gestartet wird
+    Dann hat nur der erste Start einen Lauf angelegt
+
+  @req-15.5
+  Szenario: Der tägliche Takt holt einen verpassten Monatslauf nach und startet keinen zweiten
+    Wenn der Takt des Zeitplans am 02.01.2999 um 04:00 auslöst
+    Und der Takt des Zeitplans am 03.01.2999 um 04:00 auslöst
     Dann hat nur der erste Start einen Lauf angelegt
