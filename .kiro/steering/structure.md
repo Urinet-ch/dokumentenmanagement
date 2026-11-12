@@ -15,7 +15,8 @@ dokumentenmanagement/
 │       ├── 01-archiv-kern/  requirements.md, design.md, tasks.md
 │       ├── 02-abgleich-chat/
 │       ├── 03-zweiter-mandant/
-│       └── 04-wissensbasis/
+│       ├── 04-wissensbasis/
+│       └── 05-mandanten-konfiguration/
 ├── backend/                 Quarkus (API + Worker), liefert die PWA über Quinoa aus
 │   ├── compose-devservices.yml   MinIO und Mailpit als Compose Dev Services (dev und Tests)
 │   └── src/main/java/ch/urinet/archiv/
@@ -33,13 +34,15 @@ dokumentenmanagement/
 │       ├── export/          Jahresexport (Spec 02)
 │       ├── integration/     abaninja/, mail/, wordpress/ (Spec 02/03)
 │       ├── wissen/          Wissensbasis: Seiten, Ingest, Freigabe, Lint, OKF-Export (Spec 04)
+│       ├── konfiguration/   Konfiguration je Mandant: Versionen, Klassifikationen, Regeln, KI-Texte, Konfigurationsdatei (Spec 05)
 │       └── gemeinsam/       Fehler (Problem Details), Zeit, Geld
 │   └── src/main/resources/
 │       ├── db/public/       Liquibase: Mandantenregister, Aufträge, API-Clients
 │       ├── db/mandant/      Liquibase: Schema je Mandant
-│       ├── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten
+│       ├── seed/urinet/dokumentarten.json   Stammdaten der Dokumentarten (bis Spec 05, Aufgabe 17.7)
+│       ├── seed/<code>/konfiguration.json   Konfiguration je Mandant (Spec 05, ersetzt seed/<code>/dokumentarten.json)
 │       └── seed/_alle/dokumentarten-wissen.json   Art WISSENSQUELLE für jeden Mandanten (Spec 04)
-│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/
+│   └── src/test/resources/features/<fachbereich>/   Cucumber-Features (@req-<x.y>, je Datei genau ein @spec-NN); Spec 04 unter features/wissen/, Spec 05 unter features/konfiguration/
 ├── frontend/                Angular PWA (Build über Quinoa)
 │   └── src/app/
 │       ├── erfassen/  eingangskorb/  suche/  dokument/  importe/  chat/  verwaltung/  wissen/ (Spec 04)
@@ -96,3 +99,7 @@ ArchUnit prüft: `domain` hängt von nichts ab, `application` nur von `domain`, 
 | Lieferantenbeleg (AbaNinja) | `^F\d{4}$` | `F0003` |
 
 Die Muster ändern die Art nur, wenn Urinet der Aussteller ist (eine Lieferantenrechnung `2026-123` bleibt Lieferantenrechnung).
+Spec 05 ergänzt (Spec 05, Req 2.3): Die Tabelle nennt die Werte des Mandanten `urinet`; gepflegt werden sie in seiner
+Konfiguration als `belegnummer_muster` der Arten, «Aussteller» heisst dort `selbst_ausgestellt` mit `kennungen`. Die
+Ausgangsrechnung steht dort als `^(?<jahr>\d{4})-(?<nr>\d{3})$` (gleiche Treffer, mit benannten Gruppen für die Regel
+`FOLGE`).

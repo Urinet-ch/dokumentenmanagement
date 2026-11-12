@@ -50,12 +50,12 @@ damit ich «Unfallversicherung» finde, auch wenn auf der Police «UVG» steht.
 damit ich nicht selbst suchen und rechnen muss.
 
 #### Acceptance Criteria
-1. Das Archiv SOLL einen Chat-Agenten anbieten, der ausschliesslich diese Werkzeuge aufrufen darf: `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`. Spec 04, 8.1 ergänzt die Liste um die nur lesenden Werkzeuge `wissen_index` und `wissen_seite_zeigen`; sonst bleibt sie abschliessend (umgesetzt in Spec 04, Aufgabe 15.2).
+1. Das Archiv SOLL einen Chat-Agenten anbieten, der ausschliesslich diese Werkzeuge aufrufen darf: `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`. Spec 04, 8.1 ergänzt die Liste um die nur lesenden Werkzeuge `wissen_index` und `wissen_seite_zeigen`; sonst bleibt sie abschliessend (umgesetzt in Spec 04, Aufgabe 15.2). Spec 05, 5.4 und 8.8 ergänzen dieses Kriterium: `vollstaendigkeit` beruht auf dem Lückenbericht nach den Regeln `FOLGE` und `ERWARTET` des Mandanten; `kennzahl` und `offene_posten` bietet das Archiv dem Agenten nur an, wenn der Mandant Finanzfunktionen hat (`Funktionen.finanzVerfuegbar()`; Lückenbericht und Funktionen umgesetzt in Spec 05, Aufgaben 17.6 und 18.2).
 2. WENN eine Frage Summen, Anzahlen oder Zeiträume betrifft, DANN SOLL der Agent das Werkzeug `kennzahl` verwenden; das Ergebnis SOLL aus einer vordefinierten SQL-Abfrage stammen und unverändert in die Antwort übernommen werden.
-3. Das Werkzeug `kennzahl` SOLL Einnahmen oder Ausgaben für einen Zeitraum liefern, gruppiert nach Jahr, Monat, Partner oder Dokumentart, wahlweise nach Belegdatum oder Zahlungsdatum.
-4. WO der Zahlstatus unbekannt ist (keine AbaNinja-Verbindung), SOLL `offene_posten` die Rechnungen mit Fälligkeit liefern und ausdrücklich angeben, dass der Zahlstatus nicht bekannt ist.
+3. Das Werkzeug `kennzahl` SOLL Einnahmen oder Ausgaben für einen Zeitraum liefern, gruppiert nach Jahr, Monat, Partner oder Dokumentart, wahlweise nach Belegdatum oder Zahlungsdatum. Spec 05, 8.8 ergänzt dieses Kriterium: Ohne Finanzfunktionen des Mandanten (`Funktionen.finanzVerfuegbar()`) bietet das Archiv `kennzahl` dem Agenten nicht an (umgesetzt in Spec 05, Aufgabe 18.2).
+4. WO der Zahlstatus unbekannt ist (keine AbaNinja-Verbindung), SOLL `offene_posten` die Rechnungen mit Fälligkeit liefern und ausdrücklich angeben, dass der Zahlstatus nicht bekannt ist. Spec 05, 8.8 ergänzt dieses Kriterium: Ohne Finanzfunktionen des Mandanten (`Funktionen.finanzVerfuegbar()`) bietet das Archiv `offene_posten` dem Agenten nicht an (umgesetzt in Spec 05, Aufgabe 18.2).
 5. Das Werkzeug `fristen` SOLL Vertragsfristen (`naechste_frist`, `gueltig_bis`), Fälligkeiten und Gültigkeitsdaten von Offerten für einen Zeitraum liefern.
-6. Das Werkzeug `vollstaendigkeit` SOLL für ein Geschäftsjahr Lücken melden: fehlende Nummern in den Belegnummern-Folgen, fehlende monatliche Lohnabrechnungen und Kontoauszüge seit Beginn, und – mit AbaNinja – Lieferantenbelege ohne Archivdokument.
+6. Das Werkzeug `vollstaendigkeit` SOLL für ein Geschäftsjahr Lücken melden: fehlende Nummern in den Belegnummern-Folgen, fehlende monatliche Lohnabrechnungen und Kontoauszüge seit Beginn, und – mit AbaNinja – Lieferantenbelege ohne Archivdokument. Spec 05, 5.4 ergänzt dieses Kriterium: Die Lücken in Nummernfolgen und die fehlenden Monate liefert der Lückenbericht nach den Regeln `FOLGE` und `ERWARTET` der Konfiguration des Mandanten statt fester Muster (für `urinet` aus dem Seed: Ausgangsrechnungen, Lohnabrechnungen, Kontoauszüge; Spec 05 design.md, «Regeltypen»; Lückenbericht umgesetzt in Spec 05, Aufgabe 17.6).
 7. Der Agent SOLL in Deutsch (Schweiz) antworten, Beträge als `CHF 1'234.50` formatieren und die Datenbasis nennen (z. B. «nach Rechnungsdatum, 3 Rechnungen»).
 8. Der Agent SOLL innert 10 Sekunden (p95, Messpunkt Server; Messbedingungen wie Spec 01, Requirement 3.2) mit der ersten Textausgabe beginnen und die Antwort fortlaufend streamen.
 
@@ -65,7 +65,7 @@ damit ich der Zahl auch vor dem Treuhänder trauen kann.
 
 #### Acceptance Criteria
 1. Jede Antwort SOLL eine Liste der verwendeten Quellen enthalten (Dokumenttitel mit Link oder «Datenstand: <Zeitpunkt>, <n> Belege»). Spec 04, 8.5 ergänzt die Quellenform «Wissensseite (Titel, Link, Stand) mit Quelldokumenten» (umgesetzt in Spec 04, Aufgabe 15.2).
-2. FALLS kein Werkzeug ein passendes Ergebnis liefert, DANN SOLL der Agent sagen, dass er keinen Beleg gefunden hat, und keine Vermutung als Tatsache formulieren.
+2. FALLS kein Werkzeug ein passendes Ergebnis liefert, DANN SOLL der Agent sagen, dass er keinen Beleg gefunden hat, und keine Vermutung als Tatsache formulieren. Spec 05, 5.4 ergänzt dieses Kriterium: Das Werkzeug `vollstaendigkeit` bietet das Archiv nur Rollen an, die A3 und A4 uneingeschränkt sehen (`inhaber`, `treuhaender`, `geschaeftsstelle`); für andere Rollen fehlt es in der Liste der Werkzeuge, statt gefilterte Lücken zu liefern, die falsche Lücken zeigen könnten.
 3. WENN der Benutzer auf eine Quelle tippt, DANN SOLL die App das Dokument öffnen (mit Protokolleintrag).
 
 ### Requirement 5: Schutzregeln des Chats
@@ -74,7 +74,7 @@ damit Vertraulichkeit und Mandantentrennung auch im Chat gelten.
 
 #### Acceptance Criteria
 1. Die Werkzeuge SOLLEN Mandant und Benutzer ausschliesslich aus dem Anfragekontext beziehen; keine Werkzeug-Parameter für Mandant oder Benutzer.
-2. Die Werkzeuge SOLLEN die Vertraulichkeitsregeln (Spec 01, Requirement 2.3, 2.21 und Rechtematrix 2.6, Zeilen A2 bis A4) anwenden, auch in Summen, Anzahlen und Lücken von `kennzahl`, `offene_posten`, `fristen` und `vollstaendigkeit`.
+2. Die Werkzeuge SOLLEN die Vertraulichkeitsregeln (Spec 01, Requirement 2.3, 2.21 und Rechtematrix 2.6, Zeilen A2 bis A4) anwenden, auch in Summen, Anzahlen und Lücken von `kennzahl`, `offene_posten`, `fristen` und `vollstaendigkeit`. Spec 05, 5.4 ergänzt dieses Kriterium: `vollstaendigkeit` erhalten nur Rollen, die A3 und A4 uneingeschränkt sehen; für andere Rollen fehlt das Werkzeug in der Liste, statt gefilterte Lücken zu liefern, die falsche Lücken zeigen könnten.
 3. Das Archiv SOLL Dokumentinhalte, die an das Sprachmodell gehen, als Daten kennzeichnen; Anweisungen in Dokumenten SOLLEN keine Werkzeuge mit Nebenwirkungen auslösen können (alle Werkzeuge sind nur lesend).
 4. Das Archiv SOLL jedes Gespräch mit Fragen, Werkzeugaufrufen, Quellen und Tokens speichern und nach 12 Monaten löschen.
 5. FALLS ein Benutzer mehr als 100 Fragen pro Stunde stellt, DANN SOLL das Archiv weitere Fragen bis zum Ablauf der Stunde ablehnen.
@@ -93,7 +93,7 @@ damit ich unterwegs schnell nachschauen kann.
 damit der Abschluss ohne Zusammensuchen möglich ist.
 
 #### Acceptance Criteria
-1. WENN ein Benutzer mit Rolle `inhaber` oder `treuhaender` einen Export für ein Geschäftsjahr anfordert, DANN SOLL das Archiv als Auftrag ein ZIP erstellen mit den PDF/A-Fassungen aller Dokumente des Geschäftsjahres im Status `ARCHIVIERT` (bei Vermerk `pdfa_fehlt` nach Spec 01, 5.9 mit dem Original), `belegliste.csv` (ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname), `pruefsummen.sha256` und den Manifesten des Jahres. Spec 04, 1.6 ergänzt: Dokumente der Art `WISSENSQUELLE` SOLLEN nicht in den Jahresexport und nicht in `belegliste.csv` gelangen, weil sie keine Belege sind (umgesetzt in Spec 04, Aufgabe 13.2).
+1. WENN ein Benutzer mit Rolle `inhaber` oder `treuhaender` einen Export für ein Geschäftsjahr anfordert, DANN SOLL das Archiv als Auftrag ein ZIP erstellen mit den PDF/A-Fassungen aller Dokumente des Geschäftsjahres im Status `ARCHIVIERT` (bei Vermerk `pdfa_fehlt` nach Spec 01, 5.9 mit dem Original), `belegliste.csv` (ID, Art, Datum, Partner, Belegnummer, Richtung, Betrag, Währung, SHA-256, Dateiname), `pruefsummen.sha256` und den Manifesten des Jahres. Spec 04, 1.6 ergänzt: Dokumente der Art `WISSENSQUELLE` SOLLEN nicht in den Jahresexport und nicht in `belegliste.csv` gelangen, weil sie keine Belege sind (umgesetzt in Spec 04, Aufgabe 13.2). Spec 05, 8.8 ergänzt dieses Requirement: Hat der Mandant keine Finanzfunktionen (`Funktionen.finanzVerfuegbar()`), beantwortet das Archiv den Jahresexport für Rollen mit Exportrecht mit HTTP 404; für die übrigen Rollen bleibt es bei HTTP 403 nach 7.5 (umgesetzt in Spec 05, Aufgabe 18.2).
 2. WENN der Export fertig ist, DANN SOLL das Archiv einen Download-Link (24 Stunden gültig) anzeigen und per E-Mail melden.
 3. Das Archiv SOLL jeden Export mit Benutzer, Zeit und Prüfsumme des ZIP protokollieren.
 4. Dateinamen im ZIP SOLLEN dem Muster `<datum>_<art>_<belegnummer|id>_<partner>.pdf` folgen (nur ASCII, ohne Leerzeichen).
