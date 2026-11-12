@@ -11,10 +11,12 @@ public record MandantCode(String wert) {
     private static final int MAX_LAENGE = 40;
     // reserviert: Auf Stufe B ergäbe «a-<x>» den Bucket der Stufe A von Mandant <x> (Präfix urinet-archiv-a-, Req 6.11)
     private static final String RESERVIERT_STUFE_A = "a-";
+    // ebenso «p-<x>» für den Bucket der Restore-Probe (Präfix urinet-archiv-p-, Req 16.24)
+    private static final String RESERVIERT_STUFE_P = "p-";
 
     public MandantCode {
         if (wert == null || wert.length() > MAX_LAENGE || !CODE.matcher(wert).matches()
-                || wert.startsWith(RESERVIERT_STUFE_A)) {
+                || wert.startsWith(RESERVIERT_STUFE_A) || wert.startsWith(RESERVIERT_STUFE_P)) {
             throw new IllegalArgumentException("Ungültiger Mandant-Code: " + wert);
         }
     }

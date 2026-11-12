@@ -3,9 +3,11 @@ package ch.urinet.archiv.ablage.application;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
+import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
+import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
@@ -16,6 +18,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -122,4 +125,23 @@ public interface AblagePort {
      */
     int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten,
                               Runnable vorDemLoeschen);
+
+    /**
+     * Prüflauf (Req 15.5): liest genau diese Version unter {@code archiv/} oder {@code manifest/} stromweise und
+     * liefert SHA-256, Grösse und {@code retainUntil}. Leer, wenn die Version fehlt oder eine Löschmarke ist.
+     */
+    Optional<Dateipruefung> pruefen(MandantCode mandant, String schluessel, String versionId);
+
+    /**
+     * Prüflauf (Req 15.10): eine Seite aller Versionen und Löschmarken unter {@code praefix} ({@code archiv/} oder
+     * {@code manifest/}), höchstens {@code anzahl}, fortgesetzt nach {@code ab}.
+     */
+    Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab, int anzahl);
+
+    /**
+     * Prüflauf (Req 15.9): verlängert die aktive Sperre dieser Version unter {@code archiv/} oder {@code manifest/} bis
+     * {@code bis}, im bisherigen Modus und gekappt auf die Höchstfrist des Bereichs. Ohne aktive Sperre setzt der
+     * Aufruf keine neue ({@code KEINE_SPERRE}); eine längere Sperre bleibt ({@code UNVERAENDERT}), nie verkürzt.
+     */
+    SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId, Instant bis);
 }

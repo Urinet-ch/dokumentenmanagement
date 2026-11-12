@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Monatlicher Prüflauf (Aufgabe 5.3; Req 15.5, 15.9, 15.10, 16.24). Nur neue Tabellen, rückwärtskompatibel
+         (tech.md Regel 11):
+         - prueflauf: ein Lauf je Mandant, abgearbeitet in Teilaufträgen PRUEFLAUF. teil ist der zuletzt
+           abgeschlossene Teilauftrag (Idempotenz); phase und die Fortsetzungsmarken (nach_dokument, marke_*) sagen,
+           wo der nächste Teil weitermacht. monat (JJJJ-MM) nur beim geplanten Lauf, eindeutig, damit der Zeitplan
+           je Monat höchstens einen Lauf startet.
+         - prueflauf_abweichung: nur IDs, S3-Schlüssel und Versions-ID, nie Inhalte (Req 16.7).
+         - Indizes auf die S3-Schlüssel, damit der Abgleich der Versionsliste mit der Datenbank nicht jede Seite
+           über die ganze Tabelle sucht. -->
+    <changeSet id="011-prueflauf" author="archiv">
+        <sql>
+            create table prueflauf (
+                id uuid not null constraint prueflauf_pk primary key,
+                monat text constraint prueflauf_monat_uk unique,
+                stufe text not null constraint prueflauf_stufe_ck check (stufe in ('A', 'B', 'P')),
+                gestartet timestamptz not null default clock_timestamp(),
+                beendet timestamptz,
+                teil int not null default 0,
+                phase text not null default 'DATEIEN' constraint prueflauf_phase_ck
+                    check (phase in ('DATEIEN', 'ARCHIV_VERSIONEN', 'MANIFEST_VERSIONEN', 'ABGESCHLOSSEN')),
+                nach_dokument uuid,
+                marke_schluessel text,
+                marke_version text,
+                dateien int not null default 0,
+                versionen int not null default 0,
+                manifeste int not null default 0,
+                verlaengert int not null default 0,
+                nur_gezaehlt int not null default 0,
+                abweichungen int not null default 0,
+                constraint prueflauf_beendet_ck check ((phase = 'ABGESCHLOSSEN') = (beendet is not null))
+            );
+            create table prueflauf_abweichung (
+                id bigserial constraint prueflauf_abweichung_pk primary key,
+                lauf_id uuid not null constraint prueflauf_abweichung_lauf_fk references prueflauf (id),
+                art text not null constraint prueflauf_abweichung_art_ck
+                    check (art in ('PRUEFSUMME', 'VERSION_FEHLT', 'FREMDE_VERSION', 'LOESCHMARKE', 'SPERRE_FEHLT',
+                                    'PRUEFFEHLER')),
+                dokument_id uuid,
+                s3_schluessel text not null,
+                s3_version text,
+                festgestellt timestamptz not null default clock_timestamp()
+            );
+            create index prueflauf_abweichung_lauf_ix on prueflauf_abweichung (lauf_id);
+            create index dokument_datei_s3_schluessel_ix on dokument_datei (s3_schluessel);
+            create index dokument_s3_pdfa_ix on dokument (s3_pdfa) where s3_pdfa is not null;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

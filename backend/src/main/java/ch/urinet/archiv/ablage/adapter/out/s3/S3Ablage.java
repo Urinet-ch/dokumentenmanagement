@@ -7,11 +7,14 @@ import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
+import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.Importdatei;
 import ch.urinet.archiv.ablage.domain.Vorschau;
@@ -32,6 +35,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
@@ -49,6 +53,7 @@ import java.nio.file.Path;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -84,6 +89,8 @@ public class S3Ablage implements AblagePort {
     public static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
             "ObjectLockConfigurationNotFoundError");
     private static final Set<String> FEHLT = Set.of("NoSuchKey", "NoSuchVersion");
+    private static final String MANIFEST = "manifest/";
+    private static final Set<String> PRUEFBEREICHE = Set.of(ARCHIV, MANIFEST);
 
     private final S3Client s3;
     private final S3Presigner presigner;
@@ -592,6 +599,85 @@ public class S3Ablage implements AblagePort {
         int anzahl = loeschen.size();
         LOG.debugf("Abgeleitete Dateien bereinigt: %s (%d Versionen)", docId, anzahl);
         return anzahl;
+    }
+
+    @Override
+    public Optional<Dateipruefung> pruefen(MandantCode mandant, String schluessel, String versionId) {
+        bereichPruefen(schluessel, versionId);
+        String bucket = bucket(mandant);
+        Lesung lesung;
+        try {
+            lesung = lesen(bucket, schluessel, versionId);
+        } catch (S3Exception e) {
+            // eine Löschmarke liefert bei GET mit Versions-ID 405 (MethodNotAllowed)
+            if (FEHLT.contains(fehlercode(e)) || e.statusCode() == 405) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+        Optional<Instant> sperre = retention(bucket, schluessel, versionId).map(ObjectLockRetention::retainUntilDate);
+        return Optional.of(new Dateipruefung(lesung.sha256(), lesung.groesse(), sperre));
+    }
+
+    @Override
+    public Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab,
+                                   int anzahl) {
+        if (!PRUEFBEREICHE.contains(praefix)) {
+            throw new IllegalArgumentException("Versionsliste nur unter archiv/ oder manifest/: " + praefix);
+        }
+        if (anzahl < 1 || anzahl > 1000) {
+            throw new IllegalArgumentException("anzahl zwischen 1 und 1000");
+        }
+        String bucket = bucket(mandant);
+        ListObjectVersionsResponse antwort = s3.listObjectVersions(b -> {
+            b.bucket(bucket).prefix(praefix).maxKeys(anzahl);
+            ab.ifPresent(m -> b.keyMarker(m.schluessel()).versionIdMarker(m.versionId()));
+        });
+        List<Objektversion> versionen = new ArrayList<>();
+        antwort.versions().forEach(v -> versionen.add(new Objektversion(v.key(), v.versionId(), false)));
+        antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true)));
+        versionen.sort(Comparator.comparing(Objektversion::schluessel));
+        Optional<Versionsseite.Marke> weiter = Boolean.TRUE.equals(antwort.isTruncated())
+                && antwort.nextKeyMarker() != null
+                ? Optional.of(new Versionsseite.Marke(antwort.nextKeyMarker(),
+                        Objects.requireNonNullElse(antwort.nextVersionIdMarker(), "")))
+                : Optional.empty();
+        return new Versionsseite(versionen, weiter);
+    }
+
+    @Override
+    public SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId,
+                                               Instant bis) {
+        bereichPruefen(schluessel, versionId);
+        String bucket = bucket(mandant);
+        Instant jetzt = uhr.instant();
+        Optional<Duration> hoechstfrist = schluessel.startsWith(ARCHIV)
+                ? einstellungen.archivHoechstfrist() : einstellungen.manifestHoechstfrist();
+        Instant gekappt = hoechstfrist.map(jetzt::plus).filter(grenze -> grenze.isBefore(bis)).orElse(bis)
+                .truncatedTo(ChronoUnit.SECONDS);
+        Optional<ObjectLockRetention> ist = retention(bucket, schluessel, versionId)
+                .filter(r -> r.retainUntilDate().isAfter(jetzt));
+        AbgelegteDatei datei = new AbgelegteDatei(schluessel, versionId, null, 0, Optional.empty());
+        if (ist.isEmpty()) {
+            return aenderung(datei, SperrAenderung.Ergebnis.KEINE_SPERRE, Optional.empty());
+        }
+        Instant istBis = ist.get().retainUntilDate();
+        if (!gekappt.isAfter(istBis)) {
+            return aenderung(datei, SperrAenderung.Ergebnis.UNVERAENDERT, Optional.of(istBis));
+        }
+        setzen(bucket, datei, ist.get().mode(), gekappt);
+        Optional<ObjectLockRetention> kontrolle = retention(bucket, schluessel, versionId);
+        if (kontrolle.isEmpty() || kontrolle.get().mode() != ist.get().mode()
+                || kontrolle.get().retainUntilDate().isBefore(gekappt)) {
+            throw new IllegalStateException("Sperre nicht verlängert: " + schluessel);
+        }
+        return aenderung(datei, SperrAenderung.Ergebnis.VERLAENGERT, Optional.of(kontrolle.get().retainUntilDate()));
+    }
+
+    private static void bereichPruefen(String schluessel, String versionId) {
+        if (schluessel == null || PRUEFBEREICHE.stream().noneMatch(schluessel::startsWith) || ohneVersion(versionId)) {
+            throw new IllegalArgumentException("Nur Versionen unter archiv/ oder manifest/: " + schluessel);
+        }
     }
 
     private static String pruefsumme(Path datei, String key) {

@@ -17,6 +17,8 @@ public final class Sperrfrist {
 
     public static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
     public static final int UNBEFRISTET_JAHRE = 10;
+    /** Req 15.9: Sperren mit weniger Restlaufzeit verlängert der Prüflauf. */
+    public static final int VERLAENGERN_UNTER_MONATEN = 12;
 
     private Sperrfrist() {
     }
@@ -38,6 +40,24 @@ public final class Sperrfrist {
         Instant bis = spaetestesAufbewahrenBis.map(Sperrfrist::tagesende).orElseGet(() -> zehnJahre(jetzt));
         return begrenzt(bis, jetzt, hoechstfrist)
                 .orElseThrow(() -> new IllegalArgumentException("Sperrfrist des Manifests liegt nicht in der Zukunft"));
+    }
+
+    /**
+     * Verlängerung im Prüflauf (Req 15.9): Eine aktive Sperre, die in weniger als
+     * {@value #VERLAENGERN_UNTER_MONATEN} Monaten abläuft, gilt danach bis {@code bisher} + 10 Jahre (Req 6.9), gekappt
+     * auf die Höchstfrist ab {@code jetzt} (Stufe A, Req 6.11). Leer, wenn die Sperre schon abgelaufen ist, noch
+     * lange genug läuft oder die gekappte Frist nicht über {@code bisher} hinausgeht (nie verkürzen).
+     */
+    public static Optional<Instant> verlaengert(Instant bisher, Instant jetzt, Optional<Duration> hoechstfrist) {
+        if (!bisher.isAfter(jetzt)) {
+            return Optional.empty();
+        }
+        Instant grenze = jetzt.atZone(ZUERICH).plusMonths(VERLAENGERN_UNTER_MONATEN).toInstant();
+        if (!bisher.isBefore(grenze)) {
+            return Optional.empty();
+        }
+        Instant ziel = bisher.atZone(ZUERICH).plusYears(UNBEFRISTET_JAHRE).toInstant();
+        return begrenzt(ziel, jetzt, hoechstfrist).filter(bis -> bis.isAfter(bisher));
     }
 
     /** Ende des Tages in Europe/Zurich (Beginn des Folgetags), als Instant. */
