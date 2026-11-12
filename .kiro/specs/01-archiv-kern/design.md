@@ -944,8 +944,8 @@ Drive-Import (Req 12):
   - Grenzen der API prüft schon die PWA (`suchfilter.ts`: Länge Suchbegriff, Tags, Belegnummer, Datum von ≤ bis,
     Betrag als `NUMERIC(12,2)` mit `'` und `,` als Eingabe, Geschäftsjahr vierstellig) und sendet erst dann; die API
     prüft trotzdem. Beträge gehen als Text, nie als Gleitkommazahl.
-  - Partnerfilter: mit A6 (Kontakte lesen) Vorschläge über `GET /kontakte?q=`; ohne A6 wählt man den Partner über
-    «Nach Partner filtern» bei einem Treffer, weil `GET /kontakte` A6 verlangt.
+  - Partnerfilter: mit A6 Vorschläge über `GET /kontakte?q=` (der Endpunkt verlangt A6, Partnerauswahl beim Ändern der
+    Metadaten); ohne A6 wählt man den Partner über «Nach Partner filtern» bei einem Treffer.
   - Beim Öffnen sucht die Seite einmal ohne Filter (neueste Dokumente). Suchbegriff, Filter und Treffer liegen nur im
     Arbeitsspeicher (`SucheZustand`, je Mandant und Benutzer), damit «Zurück zur Suche» die Treffer wieder zeigt; sie
     kommen weder in die Adresse noch in Local oder Session Storage.
