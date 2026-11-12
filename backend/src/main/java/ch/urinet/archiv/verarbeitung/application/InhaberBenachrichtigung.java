@@ -1,14 +1,15 @@
 package ch.urinet.archiv.verarbeitung.application;
 
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.domain.Befund;
 
 import java.util.List;
 import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Driven Port: benachrichtigt den Inhaber eines Mandanten (Req 6.4). Die Nachricht nennt nur IDs, nie Inhalte, Beträge
- * oder Personendaten (Req 16.7). Ein Fehler beim Versand darf den Aufrufer nicht scheitern lassen.
+ * Driven Port: benachrichtigt den Inhaber eines Mandanten (Req 6.4, 16.5). Die Nachricht nennt nur IDs und Status, nie
+ * Inhalte, Beträge oder Personendaten (Req 16.7). Ein Fehler beim Versand darf den Aufrufer nicht scheitern lassen.
  */
 public interface InhaberBenachrichtigung {
 
@@ -36,4 +37,7 @@ public interface InhaberBenachrichtigung {
 
     /** Für {@code datum} liegt nach dem letzten Versuch kein gültiges Manifest vor (Req 15.8, Aufgabe 5.2). */
     void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId);
+
+    /** Alarm der Überwachung (Req 16.5); {@code true} nur, wenn die Mail zugestellt wurde. */
+    boolean alarm(MandantCode mandant, Befund befund);
 }

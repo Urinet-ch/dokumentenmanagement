@@ -456,6 +456,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
   - Health: öffentlich nur ein schlanker Pfad über Traefik; Detail-Health und Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb, Korrekturquote je Feld) nur intern
   - E-Mail an den Inhaber bei einem Dokument > 1 h in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER`, bei fehlgeschlagener Sicherung und fehlendem Manifest; Inhalte nur IDs
+  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; offen: Korrekturquote (mit 3.3), Anbindung Manifest (5.2) und Sicherung (5.5), SMTP-Zugang in prod, Teil Infra
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 

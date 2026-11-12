@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.adapter.out.mail;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.InhaberBenachrichtigung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister;
+import ch.urinet.archiv.verarbeitung.domain.Befund;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.Mailer;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -181,6 +182,47 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
                 + "folgenden Tage.\n\n"
                 + "Erreichbarkeit der Zeitstempeldienste und des Object Storage prüfen. Im Log nach der Fehler-ID "
                 + fehlerId + " suchen.\n";
+    }
+
+    @Override
+    public boolean alarm(MandantCode mandant, Befund befund) {
+        Optional<String> empfaenger = empfaenger(mandant);
+        if (empfaenger.isEmpty()) {
+            LOG.warnf("Alarm %s (Mandant %s) nicht versandt: kein Empfänger konfiguriert", befund.schluessel(),
+                    mandant.wert());
+            return false;
+        }
+        try {
+            mailer.send(Mail.withText(empfaenger.get(), betreff(befund), text(mandant, befund)));
+            LOG.infof("Alarm %s (Mandant %s) an den Inhaber versandt", befund.schluessel(), mandant.wert());
+            return true;
+        } catch (RuntimeException e) {
+            LOG.warnf("Alarm %s (Mandant %s) nicht versandt (%s)", befund.schluessel(), mandant.wert(),
+                    e.getClass().getName());
+            return false;
+        }
+    }
+
+    static String betreff(Befund befund) {
+        return switch (befund.quelle()) {
+            case DOKUMENT -> "UriNet Archiv: Dokument " + befund.gegenstand() + " hängt in " + befund.status();
+            case MANIFEST -> "UriNet Archiv: Manifest " + befund.gegenstand() + " " + befund.status();
+            case SICHERUNG -> "UriNet Archiv: Sicherung " + befund.gegenstand() + " " + befund.status();
+        };
+    }
+
+    static String text(MandantCode mandant, Befund befund) {
+        String was = switch (befund.quelle()) {
+            case DOKUMENT -> "Das Dokument " + befund.gegenstand() + " steht länger als erlaubt (Standard 1 Stunde) im "
+                    + "Status " + befund.status() + ".\n\nIm Eingangskorb prüfen und «Wiederholen» wählen; steht es in "
+                    + "VERARBEITUNG, im Log nach der Dokument-ID suchen.";
+            case MANIFEST -> "Das Tages-Manifest " + befund.gegenstand() + " hat den Befund " + befund.status()
+                    + ".\n\nIm Log nach dem Datum suchen und den Auftrag MANIFEST prüfen.";
+            case SICHERUNG -> "Die Sicherung " + befund.gegenstand() + " hat den Befund " + befund.status()
+                    + ".\n\nDen Sicherungs-Export auf dem Server und den Sicherungs-Workflow prüfen.";
+        };
+        return "Mandant: " + mandant.wert() + "\n" + was + "\n\nZu diesem Befund kommt keine weitere Mail, bis er "
+                + "behoben ist.\n";
     }
 
     static String betreff(UUID dokumentId) {

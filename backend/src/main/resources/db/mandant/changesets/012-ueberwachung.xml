@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Überwachung (Aufgabe 5.6; Req 16.5, design.md «Überwachung»). Nur Ergänzungen, rückwärtskompatibel (tech.md
+         Regel 11):
+         - dokument.status_seit: seit wann das Dokument im aktuellen Status steht. Ein Trigger setzt den Wert bei jedem
+           Statuswechsel, auch wenn das Vorgänger-Release schreibt; geaendert taugt dafür nicht, weil es auch
+           Metadaten-Änderungen nachführt. Bestehende Zeilen übernehmen geaendert (frühestens so lange im Status).
+         - alarm: je Befund eine Zeile (Schlüssel nur aus IDs und Status, Req 16.7); gemeldet ist null, solange keine
+           Mail zugestellt ist, erledigt ist gesetzt, sobald der Befund verschwunden ist. -->
+    <changeSet id="012-ueberwachung" author="archiv">
+        <addColumn tableName="dokument">
+            <column name="status_seit" type="timestamptz"/>
+        </addColumn>
+        <sql splitStatements="false">
+            create function dokument_status_seit() returns trigger language plpgsql as $$
+            begin
+                if tg_op = 'INSERT' then
+                    new.status_seit := coalesce(new.status_seit, clock_timestamp());
+                elsif new.status is distinct from old.status then
+                    new.status_seit := clock_timestamp();
+                end if;
+                return new;
+            end
+            $$;
+        </sql>
+        <sql>
+            create trigger dokument_status_seit before insert or update of status on dokument
+                for each row execute function dokument_status_seit();
+            update dokument set status_seit = geaendert where status_seit is null;
+            create index dokument_status_seit_idx on dokument (status_seit)
+                where status in ('VERARBEITUNG', 'FEHLER', 'ARCHIVIERUNG_FEHLER');
+            create table alarm (
+                schluessel text primary key,
+                erstmals timestamptz not null default clock_timestamp(),
+                gemeldet timestamptz,
+                erledigt timestamptz,
+                constraint alarm_schluessel_ck check (schluessel ~ '^[a-z]+:[A-Za-z0-9-]+:[A-Z_]+$')
+            );
+        </sql>
+    </changeSet>
+</databaseChangeLog>
