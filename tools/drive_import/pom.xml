@@ -20,7 +20,7 @@
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
-        <shade-plugin.version>3.6.0</shade-plugin.version>
+        <shade-plugin.version>3.6.2</shade-plugin.version>
     </properties>
 
     <dependencyManagement>
