@@ -337,7 +337,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `tools/archiv_client.py` (requests, Token aus Datei mit Rechten 600: `~/.config/urinet-archiv/token` oder Pfad aus `ARCHIV_TOKEN_DATEI`, nie im Code oder als Umgebungsvariable); bei Ausfall Ordner `archiv-ausstehend/`, bei 409 nach `archiv-konflikt/` ohne erneutes Senden; Einbau-Beispiel für `rechnung_gen.py` und `urinet_pdf.py` in `tools/README.md`
   - _Anforderungen: 11.1–11.11_
 
-- [ ] 4.8 Drive-Import-Werkzeug [Backend]
+- [x] 4.8 Drive-Import-Werkzeug [Backend]
   - `tools/drive_import` (Java, Picocli), Anmeldung mit API-Token vom Scope `import` (Token aus Datei wie in 4.7, nie als Umgebungsvariable): rekursiv, Trockenlauf, Ordnerpfad als `hinweis`; Pfad-Muster → Hinweise an die KI (Kunde, Art)
   - `DUBLETTE` gilt als übertragen («schon vorhanden»); `.gdoc/.gsheet` in der Liste «bitte als PDF exportieren»; Office-, `.eml`- und ZIP-Dateien sowie vom Archiv abgelehnte Dateien unter «nicht übernommen» mit Pfad und Grund
   - Schlussbericht: gefunden = übertragen + schon vorhanden + übersprungen + abgelehnt
