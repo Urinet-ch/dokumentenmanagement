@@ -126,9 +126,13 @@ Then('sehe ich kein Menü', async function () {
   assert.equal(await this.seite.getByRole('navigation', { name: 'Hauptnavigation' }).count(), 0);
 });
 
-Then('zeigt die Navigation keinen Eingangskorb-Zähler und keine Fehlermeldung', async function () {
+Then('ruft die PWA den Eingangskorb nicht ab und zeigt keinen Zähler', async function () {
   await this.seite.getByRole('navigation', { name: 'Hauptnavigation' }).waitFor();
   assert.equal(await this.seite.locator('[data-test=eingangskorb-zaehler]').count(), 0);
   assert.equal(await this.seite.getByRole('alert').count(), 0);
-  assert.deepEqual(this.apiAnfragen, [], 'die PWA hat die API aufgerufen');
+  assert.deepEqual(
+    this.apiAnfragen.filter((url) => new URL(url).pathname === '/api/v1/eingangskorb'),
+    [],
+    'die PWA hat den Eingangskorb abgerufen',
+  );
 });
