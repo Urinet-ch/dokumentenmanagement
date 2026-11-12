@@ -56,7 +56,7 @@ Funktionalität: Metadaten ändern und Versionen
     Und hält die letzte Fassung von «Q» den Titel "Quittung" mit dem Grund "Titel präzisiert" von «inhaber-urinet» fest
 
   @req-10.1
-  Szenario: Archiviert darf kein Pflichtfeld der Art neu fehlen
+  Szenario: Archiviert darf kein Pflichtfeld der Art und nicht das Geschäftsjahr neu fehlen
     Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und «inhaber-urinet» das Dokument «Q» so bestätigt:
       | art      | QUITTUNG   |
@@ -72,6 +72,13 @@ Funktionalität: Metadaten ändern und Versionen
     Dann meldet das Archiv Status 422 mit Fehlercode «PFLICHTFELD_FEHLT»
     Und nennt die Antwort die fehlenden Felder "betrag"
     Und hat das Dokument «Q» die Belegnummer «null» mit Betrag 12.00 CHF
+    Und hat das Dokument «Q» 0 Fassungen mit Grund
+    Wenn «inhaber-urinet» das Dokument «Q» so ändert:
+      | geschaeftsjahr |          |
+      | grund          | Versehen |
+    Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
+    Und hat das Dokument «Q» diese Werte:
+      | geschaeftsjahr | 2026 |
     Und hat das Dokument «Q» 0 Fassungen mit Grund
 
   @req-9.7
@@ -120,7 +127,54 @@ Funktionalität: Metadaten ändern und Versionen
     Und sind die Sperren der Dateien von «Q» unverändert
     Und hält das Zugriffsprotokoll für «Q» «SPERRE_KONFLIKT» von «inhaber-urinet» mit der Frist bisher «2036-12-31» und neu «2035-12-31» fest
 
-  @req-2.12
+  @req-9.7
+  Szenario: Eine Art ohne gesetzliche Pflicht und ohne Sperre übernimmt eine frühere Frist ohne Konflikt
+    Angenommen im Mandanten «urinet» gibt es den Kontakt «Partner_Probe»
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und «inhaber-urinet» das Dokument «K» so bestätigt:
+      | art     | KORRESPONDENZ |
+      | titel   | Anfrage Probe |
+      | datum   | 2026-03-10    |
+      | partner | Partner_Probe |
+    Und der Worker die Archivierung ausführt
+    Wenn «inhaber-urinet» das Dokument «K» so ändert:
+      | datum          | 2025-03-10           |
+      | geschaeftsjahr | 2025                 |
+      | grund          | Datum falsch erfasst |
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» diese Werte:
+      | datum           | 2025-03-10 |
+      | aufbewahren_bis | 2035-12-31 |
+    Und liegen die Dateien von «K» unter archiv/ ohne Sperre
+    Und hält das Zugriffsprotokoll für «K» kein «SPERRE_KONFLIKT» fest
+
+  @req-9.7
+  Szenario: Ein Wechsel auf eine Art ohne Pflicht verkürzt bei Sperre nichts und wird als Konflikt protokolliert
+    Angenommen im Mandanten «urinet» gibt es den Kontakt «Partner_Probe»
+    Und im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und «inhaber-urinet» das Dokument «Q» so bestätigt:
+      | art      | QUITTUNG   |
+      | titel    | Quittung   |
+      | datum    | 2026-03-10 |
+      | richtung | AUSGABE    |
+      | betrag   | 12.00      |
+      | waehrung | CHF        |
+    Und der Worker die Archivierung ausführt
+    Und die Sperren der Dateien von «Q» sind gemerkt
+    Wenn «inhaber-urinet» das Dokument «Q» so ändert:
+      | art            | KORRESPONDENZ        |
+      | partner        | Partner_Probe        |
+      | datum          | 2025-03-10           |
+      | geschaeftsjahr | 2025                 |
+      | grund          | Art falsch erfasst   |
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «Q» diese Werte:
+      | art             | KORRESPONDENZ |
+      | aufbewahren_bis | 2036-12-31    |
+    Und sind die Sperren der Dateien von «Q» unverändert
+    Und hält das Zugriffsprotokoll für «Q» «SPERRE_KONFLIKT» von «inhaber-urinet» mit der Frist bisher «2036-12-31» und neu «2035-12-31» fest
+
+  @req-2.12 @req-10.7
   Szenario: mitarbeiter und treuhaender dürfen nicht ändern
     Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «mitarbeiter-urinet»
     Und das Dokument «K» ist für alle Rollen sichtbar
@@ -133,6 +187,8 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» diese Werte:
       | titel | null |
     Und steht im Zugriffsprotokoll für «K» 0 Mal «AENDERN» von «mitarbeiter-urinet»
+    Und steht im Zugriffsprotokoll für «K» 1 Mal «VERWEIGERT» von «mitarbeiter-urinet»
+    Und steht im Zugriffsprotokoll für «K» 1 Mal «VERWEIGERT» von «treuhaender-urinet»
 
   @req-2.14 @req-2.23
   Szenario: Vertraulichkeit und betroffene Person ändert nur, wer A8 hat
@@ -150,6 +206,29 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» diese Werte:
       | vertraulichkeit | PERSONAL |
       | person_benutzer | ma-probe |
+
+  @req-2.3 @req-2.6 @req-10.7
+  Szenario: Ein für den Mitarbeiter unsichtbares Dokument ist nicht auffindbar (404 vor 403)
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «mitarbeiter-urinet» das Dokument «K» so ändert:
+      | titel | Neu |
+    Dann meldet das Archiv Status 404 mit Fehlercode «NICHT_GEFUNDEN»
+    Und hat das Dokument «K» diese Werte:
+      | titel | null |
+    Und steht im Zugriffsprotokoll für «K» 1 Mal «VERWEIGERT» von «mitarbeiter-urinet»
+
+  @req-2.6 @req-2.23
+  Szenario: Die Geschäftsstelle ändert Metadaten und Vertraulichkeit im eigenen Mandanten
+    Angenommen im Mandanten «vhf-gsk» liegt das Dokument «B» im Status «EINGANGSKORB», erfasst von «geschaeftsstelle-vhf-gsk»
+    Wenn «geschaeftsstelle-vhf-gsk» das Dokument «B» so ändert:
+      | titel           | Bulletin Probe |
+      | tags            |                |
+      | vertraulichkeit | INTERN         |
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «B» diese Werte:
+      | titel           | Bulletin Probe |
+      | vertraulichkeit | INTERN         |
+    Und steht im Zugriffsprotokoll für «B» 1 Mal «AENDERN» von «geschaeftsstelle-vhf-gsk»
 
   Szenario: Ein Dokument eines anderen Mandanten ist nicht auffindbar
     Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
@@ -169,10 +248,24 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» diese Werte:
       | titel | null |
 
+  @req-10.4 @req-10.6
+  Szenario: Auch ein ungültiger Körper scheitert zuerst an If-Match und am Status
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» ohne If-Match mit dem Körper '{}' ändert
+    Dann meldet das Archiv Status 428 mit Fehlercode «VERSION_FEHLT»
+    Wenn «inhaber-urinet» das Dokument «K» ohne If-Match mit dem Körper '{"titel": ' ändert
+    Dann meldet das Archiv Status 428 mit Fehlercode «VERSION_FEHLT»
+    Wenn «inhaber-urinet» das Dokument «K» mit einer veralteten Version und dem Körper '{"titel": "Neu", "status": "ARCHIVIERT"}' ändert
+    Dann meldet das Archiv Status 412 mit Fehlercode «VERSION_KONFLIKT»
+    Und hat das Dokument «K» diese Werte:
+      | titel | null |
+
   Szenario: Während der Archivierung lässt sich nichts ändern
     Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «ARCHIVIERUNG», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» das Dokument «K» so ändert:
       | titel | Neu |
+    Dann meldet das Archiv Status 409 mit Fehlercode «STATUS_KONFLIKT»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{}' ändert
     Dann meldet das Archiv Status 409 mit Fehlercode «STATUS_KONFLIKT»
 
   Szenariogrundriss: Eine ungültige Änderung antwortet mit 400: <fall>

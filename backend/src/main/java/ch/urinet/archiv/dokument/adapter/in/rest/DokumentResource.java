@@ -265,12 +265,11 @@ public class DokumentResource {
                             String inhalt) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer(identitaet);
-        JsonNode knoten = knoten(inhalt);
-        if (Aenderung.NUR_A8.stream().anyMatch(knoten::has)) {
+        if (betrifftA8(inhalt)) {
             berechtigung.dokumentAktion(benutzer, Aktion.A8, id);
         }
         int version = version(ifMatch);
-        aendern.aendern(benutzer, id, version, aenderung(knoten));
+        aendern.aendern(benutzer, id, version, () -> aenderung(knoten(inhalt)));
         Dokument dokument = lesen.lesen(benutzer, id);
         return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
@@ -422,6 +421,22 @@ public class DokumentResource {
     }
 
     /** Ein JSON-Objekt mit mindestens einem bekannten Feld; sonst 400. */
+    /**
+     * A8 gehört als Recht vor {@code If-Match} (design.md «Berechtigung», 403 vor 428/412). Ein unlesbarer Körper
+     * braucht kein A8; er scheitert erst im Anwendungsfall nach 404, 428/412 und 409 mit 400 (Review PR #67, S1).
+     */
+    private boolean betrifftA8(String inhalt) {
+        if (inhalt == null || inhalt.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode k = leser().readTree(inhalt);
+            return k != null && k.isObject() && Aenderung.NUR_A8.stream().anyMatch(k::has);
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
     private JsonNode knoten(String inhalt) {
         JsonNode knoten;
         try {

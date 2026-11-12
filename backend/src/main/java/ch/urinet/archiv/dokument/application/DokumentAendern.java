@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -89,8 +90,13 @@ public class DokumentAendern {
         this.einstellungen = einstellungen;
     }
 
-    /** @return die neue Version des Dokuments (für das ETag) */
-    public int aendern(Benutzer benutzer, UUID id, int erwarteteVersion, Aenderung a) {
+    /**
+     * Die Angaben werden erst nach Sichtbarkeit, Version und Status gelesen: ein ungültiger Körper (400) überholt so
+     * weder 412 noch 409 (design.md «Umsetzung (Aufgabe 3.5)», Reihenfolge).
+     *
+     * @return die neue Version des Dokuments (für das ETag)
+     */
+    public int aendern(Benutzer benutzer, UUID id, int erwarteteVersion, Supplier<Aenderung> angaben) {
         Dokument dokument = repository.finden(id, Sichtregel.fuer(benutzer))
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (dokument.version() != erwarteteVersion) {
@@ -103,6 +109,7 @@ public class DokumentAendern {
         if (!AENDERBAR.contains(alt.status())) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
+        Aenderung a = angaben.get();
         boolean archiviert = alt.status() == DokumentStatus.ARCHIVIERT;
         String grund = a.grund() == null || a.grund().isBlank() ? null : a.grund().strip();
         if (archiviert && grund == null) {
@@ -169,6 +176,7 @@ public class DokumentAendern {
                 && (a.vertraulichkeit() == null || Vertraulichkeit.aus(a.vertraulichkeit()).isEmpty())
                 || a.hat(Aenderung.WAEHRUNG) && (a.waehrung() == null || !WAEHRUNG.matcher(a.waehrung()).matches())
                 || archiviert && a.hat(Aenderung.ART) && a.art() == null
+                || archiviert && a.hat(Aenderung.GESCHAEFTSJAHR) && a.geschaeftsjahr() == null
                 || a.richtung() != null && !RICHTUNGEN.contains(a.richtung())
                 || a.geschaeftsjahr() != null
                 && (a.geschaeftsjahr() < GESCHAEFTSJAHR_MIN || a.geschaeftsjahr() > GESCHAEFTSJAHR_MAX)

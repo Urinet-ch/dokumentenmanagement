@@ -266,6 +266,18 @@ public class BestaetigenSchritte {
                 .when().patch("/api/v1/dokumente/" + ort(name).id());
     }
 
+    @Wenn("«{word}» das Dokument «{word}» ohne If-Match mit dem Körper {string} ändert")
+    public void aendernRohOhneIfMatch(String benutzer, String name, String koerper) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON).body(koerper)
+                .when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» mit einer veralteten Version und dem Körper {string} ändert")
+    public void aendernRohVeraltet(String benutzer, String name, String koerper) throws SQLException {
+        antwort = mitVeralteterVersion(benutzer, name).contentType(ContentType.JSON).body(koerper)
+                .when().patch("/api/v1/dokumente/" + ort(name).id());
+    }
+
     @Wenn("«{word}» das Dokument «{word}» mit dem Körper {string} ändert")
     public void aendernRoh(String benutzer, String name, String koerper) throws SQLException {
         antwort = mitVersion(benutzer, name).contentType(ContentType.JSON).body(koerper)
