@@ -726,6 +726,68 @@ export class DokumenteService extends BaseService {
     }
 
     /**
+     * Vorschaubild einer Seite lesen
+     * PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 oder keine Zahl → 400.
+     * @endpoint get /api/v1/dokumente/{id}/vorschau
+     * @param id 
+     * @param seite 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1DokumenteIdVorschauGet(id: string, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'image/png', context?: HttpContext, transferCache?: boolean}): Observable<Blob>;
+    public apiV1DokumenteIdVorschauGet(id: string, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'image/png', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Blob>>;
+    public apiV1DokumenteIdVorschauGet(id: string, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'image/png', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Blob>>;
+    public apiV1DokumenteIdVorschauGet(id: string, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'image/png', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling apiV1DokumenteIdVorschauGet.');
+        }
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'seite',
+            <any>seite,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'image/png'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let localVarPath = `/api/v1/dokumente/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/vorschau`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: "blob",
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Verarbeitung oder Archivierung wiederholen
      * FEHLER → NEU (neue Verarbeitung), ARCHIVIERUNG_FEHLER → ARCHIVIERUNG (neue Archivierung, Metadaten unverändert); sonst 409 STATUS_KONFLIKT (Req 6.8, 6.13).
      * @endpoint post /api/v1/dokumente/{id}/wiederholen

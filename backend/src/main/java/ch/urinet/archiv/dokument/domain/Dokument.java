@@ -9,12 +9,17 @@ import java.util.UUID;
 /**
  * Metadaten eines Dokuments, wie sie ein Benutzer lesen darf, der es sieht (Req 2.3). {@code vertraulichkeit} ist die
  * gespeicherte Vertraulichkeit; ohne bestätigte Art wirkt {@code PERSONAL} ({@link #wirksameVertraulichkeit()},
- * Req 2.21). {@code zusatz} sind die freien Zusatzfelder als JSON-Objekt (Req 9.5).
+ * Req 2.21). {@code zusatz} sind die freien Zusatzfelder als JSON-Objekt (Req 9.5). Für den Eingangskorb (Req 8.1,
+ * 8.7) kommen Fehlertext, PDF/A-Kennzeichen, Seitenzahl, Partner sowie Vorschlag und Sicherheiten der KI als JSON
+ * hinzu (Aufgabe 3.6). {@code finanz} und {@code vertrag} sind die gespeicherten Angaben der Gruppen, {@code null} ohne
+ * Zeile; die Bestätigung ersetzt sie ganz, darum muss die Oberfläche sie kennen.
  */
 public record Dokument(UUID id, String art, String titel, LocalDate datum, Instant eingang, String quelle,
                        List<String> tags, String vertraulichkeit, String personBenutzer, String erstelltVon,
                        DokumentStatus status, Instant bestaetigt, Integer geschaeftsjahr, LocalDate aufbewahrenBis,
-                       LocalDate sperreBis, boolean fristAbgelaufen, String zusatz, int version) {
+                       LocalDate sperreBis, boolean fristAbgelaufen, String zusatz, int version, String fehler,
+                       boolean pdfaFehlt, Integer seiten, UUID partnerId, String partnerName, String kiVorschlag,
+                       String kiSicherheit, String projekt, DokumentFinanz finanz, DokumentVertrag vertrag) {
 
     public static final String PERSONAL = "PERSONAL";
 

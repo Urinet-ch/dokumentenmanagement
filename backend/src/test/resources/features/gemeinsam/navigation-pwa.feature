@@ -24,9 +24,16 @@ Funktionalität: Navigation der PWA nach Rolle
     Dann sehe ich kein Menü
     Und sehe ich die Meldung «Ihrem Benutzer ist kein Mandant oder keine Rolle im Archiv zugeordnet. Bitte wenden Sie sich an den Inhaber.»
 
-  # Teilnachweis bis Aufgabe 3.6: Die Anzeige der Anzahl belegt der Unit-Test app.spec.ts mit einer Attrappe des
-  # Zählers. Den Endpunkt GET /eingangskorb schliesst 3.6 an; bis dahin zeigt die Navigation nichts und meldet keinen Fehler.
+  # Der Zähler zählt über GET /api/v1/eingangskorb (Feld gesamt), hier mit der Attrappe der API
+  # (frontend/e2e/hilfen/archiv-attrappe.mjs); dass das Archiv nur Sichtbares zählt, belegen die Java-Szenarien.
   @req-8.6
-  Szenario: Ohne Zähler-Endpunkt zeigt die Navigation keinen Zähler und keine Fehlermeldung
-    Angenommen ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet
-    Dann zeigt die Navigation keinen Eingangskorb-Zähler und keine Fehlermeldung
+  Szenario: Die Navigation zeigt die Anzahl Dokumente im Eingangskorb
+    Angenommen der Eingangskorb enthält 3 Dokumente
+    Und ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet
+    Dann zeigt die Navigation den Eingangskorb-Zähler «3»
+
+  @req-2.11
+  Szenario: Ohne Recht auf den Eingangskorb fragt die PWA keinen Zähler ab
+    Angenommen der Eingangskorb enthält 3 Dokumente
+    Und ich bin als «treuhaender» im Mandanten «urinet» angemeldet
+    Dann ruft die PWA den Eingangskorb nicht ab und zeigt keinen Zähler

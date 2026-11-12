@@ -535,6 +535,20 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
+    public Optional<InputStream> lesenVorschau(MandantCode mandant, UUID docId, int seite) {
+        String bucket = bucket(mandant);
+        String key = Vorschau.schluessel(docId, seite);
+        try {
+            return Optional.of(s3.getObject(b -> b.bucket(bucket).key(key)));
+        } catch (S3Exception e) {
+            if (FEHLT.contains(fehlercode(e))) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public int abgeleiteteBereinigen(MandantCode mandant, int jahr, UUID docId, Collection<AbgelegteDatei> behalten,
                                      Runnable vorDemLoeschen) {
         String bucket = bucket(mandant);

@@ -5,7 +5,7 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { routes } from './app.routes';
 import { provideApi } from './gemeinsam/api';
 import { anmeldungInterceptor } from './gemeinsam/anmeldung/anmeldung.interceptor';
-import { EingangskorbZaehler, OhneEingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
+import { EingangskorbZaehler, HttpEingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -14,7 +14,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([anmeldungInterceptor])),
     // Relative Pfade, damit der Interceptor das Token nur an die eigene API hängt
     provideApi(''),
-    { provide: EingangskorbZaehler, useClass: OhneEingangskorbZaehler },
+    { provide: EingangskorbZaehler, useClass: HttpEingangskorbZaehler },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

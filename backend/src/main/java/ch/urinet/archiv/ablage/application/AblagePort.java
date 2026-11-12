@@ -90,6 +90,13 @@ public interface AblagePort {
     AbgelegteDatei ablegenVorschau(MandantCode mandant, UUID docId, int seite, Path datei);
 
     /**
+     * Liest das Vorschaubild einer Seite (neueste Version unter {@code vorschau/<docId>/<seite>.png}, Aufgabe 3.6);
+     * fehlt es, leer. Die Vorschau ist regenerierbar und darum ohne Prüfsumme in der Datenbank. Der Aufrufer schliesst
+     * den Datenstrom.
+     */
+    Optional<InputStream> lesenVorschau(MandantCode mandant, UUID docId, int seite);
+
+    /**
      * Löscht alle Versionen und Löschmarken der abgeleiteten Dateien eines Dokuments, also von
      * {@code eingang/<jahr>/<docId>/pdfa.pdf} und unter {@code vorschau/<docId>/}, ausser den Versionen in
      * {@code behalten} (Schlüssel und Versions-ID). Originale und Arbeitsfassungen berührt der Aufruf nie. So bleiben

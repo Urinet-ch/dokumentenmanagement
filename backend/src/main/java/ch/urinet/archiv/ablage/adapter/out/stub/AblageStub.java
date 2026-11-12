@@ -18,6 +18,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -186,6 +187,12 @@ public class AblageStub implements AblagePort {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public synchronized Optional<InputStream> lesenVorschau(MandantCode mandant, UUID docId, int seite) {
+        List<Version> liste = liste(mandant, Vorschau.schluessel(docId, seite));
+        return liste.isEmpty() ? Optional.empty() : Optional.of(new ByteArrayInputStream(lesen(liste.getLast())));
     }
 
     @Override

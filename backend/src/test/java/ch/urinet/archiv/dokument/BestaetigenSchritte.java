@@ -31,6 +31,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -41,6 +43,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -95,6 +98,7 @@ public class BestaetigenSchritte {
     private final Map<String, Ort> kontakte = new LinkedHashMap<>();
     private final Map<UUID, String> echtePruefsumme = new HashMap<>();
     private final Map<String, Instant> gemerkteSperren = new HashMap<>();
+    private final Map<UUID, byte[]> vorschauen = new HashMap<>();
     private Response antwort;
 
     @After
@@ -110,6 +114,12 @@ public class BestaetigenSchritte {
         for (Map.Entry<String, List<UUID>> eintrag : jeMandant.entrySet()) {
             Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), eintrag.getValue());
         }
+        for (Ort ort : dokumente.values()) {
+            if (vorschauen.containsKey(ort.id())) {
+                ablage.abgeleiteteBereinigen(new MandantCode(ort.mandant()), VerarbeitungTestHilfe.JAHR, ort.id(),
+                        List.of());
+            }
+        }
         for (Ort kontakt : kontakte.values()) {
             auftraege.ausfuehren("delete from " + schema(kontakt.mandant()) + ".kontakt where id = '" + kontakt.id()
                     + "'");
@@ -118,6 +128,7 @@ public class BestaetigenSchritte {
         kontakte.clear();
         echtePruefsumme.clear();
         gemerkteSperren.clear();
+        vorschauen.clear();
     }
 
     @Angenommen("die Archivierung ist bereit")
@@ -177,6 +188,50 @@ public class BestaetigenSchritte {
         Ort ort = ort(name);
         ausfuehren("insert into " + schema(ort.mandant()) + ".belegnummer_eigen (art, belegnummer, dokument_id) "
                 + "values (?, ?, ?)", art, belegnummer, ort.id());
+    }
+
+    @Angenommen("das Dokument «{word}» hat den KI-Vorschlag {string} mit den Sicherheiten {string}")
+    public void vorschlag(String name, String vorschlag, String sicherheit) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set ki_vorschlag = cast(? as jsonb), "
+                + "ki_sicherheit = cast(? as jsonb) where id = ?", vorschlag, sicherheit, ort.id());
+    }
+
+    @Angenommen("das Dokument «{word}» hat den Fehlertext {string}")
+    public void fehlertext(String name, String fehler) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set fehler = ? where id = ?", fehler, ort.id());
+    }
+
+    /** Zeile in {@code dokument_finanz} bzw. {@code dokument_vertrag}; Spaltennamen wie in der Tabelle. */
+    @Angenommen("das Dokument «{word}» hat in {word} gespeichert:")
+    public void gespeichert(String name, String tabelle, Map<String, String> werte) throws SQLException {
+        assertThat(tabelle).isIn("dokument_finanz", "dokument_vertrag");
+        Ort ort = ort(name);
+        List<String> spalten = new ArrayList<>(List.of("dokument_id"));
+        List<Object> parameter = new ArrayList<>(List.of(ort.id()));
+        werte.forEach((spalte, wert) -> {
+            spalten.add(spalte);
+            parameter.add(spalte.equals("betrag") ? new BigDecimal(wert)
+                    : wert.matches("\\d{4}-\\d{2}-\\d{2}") ? Date.valueOf(LocalDate.parse(wert)) : wert);
+        });
+        ausfuehren("insert into " + schema(ort.mandant()) + "." + tabelle + " (" + String.join(", ", spalten)
+                + ") values (" + String.join(", ", Collections.nCopies(spalten.size(), "?")) + ")",
+                parameter.toArray());
+    }
+
+    @Angenommen("für das Dokument «{word}» liegt ein Vorschaubild der Seite {int}")
+    public void vorschaubild(String name, int seite) throws Exception {
+        Ort ort = ort(name);
+        byte[] bild = ("\u0089PNG synthetisch " + UUID.randomUUID()).getBytes(StandardCharsets.ISO_8859_1);
+        Path datei = Files.createTempFile("vorschau-", ".png");
+        try {
+            Files.write(datei, bild);
+            ablage.ablegenVorschau(new MandantCode(ort.mandant()), ort.id(), seite, datei);
+        } finally {
+            Files.deleteIfExists(datei);
+        }
+        vorschauen.put(ort.id(), bild);
     }
 
     @Angenommen("die gespeicherte Prüfsumme des Originals von «{word}» ist verfälscht")
@@ -384,6 +439,31 @@ public class BestaetigenSchritte {
                 .when().get("/api/v1/eingangskorb");
     }
 
+    @Wenn("«{word}» die Vorschau der Seite {int} von «{word}» abruft")
+    public void vorschau(String benutzer, int seite, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
+                .when().get("/api/v1/dokumente/" + ort(name).id() + "/vorschau");
+    }
+
+    @Wenn("«{word}» die Vorschau der Seite {string} von «{word}» abruft")
+    public void vorschauText(String benutzer, String seite, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
+                .when().get("/api/v1/dokumente/" + ort(name).id() + "/vorschau");
+    }
+
+    /** Pfade wie {@code finanz.konto} im Dokument der Antwort; ohne Eintrag im Eingangskorb das Dokument selbst. */
+    @Dann("liefert das Archiv beim Dokument «{word}» diese Angaben:")
+    public void angaben(String name, Map<String, String> erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String basis = antwort.jsonPath().get("eintraege") != null
+                ? "eintraege.find { it.id == '" + ort(name).id() + "' }." : "";
+        if (basis.isEmpty()) {
+            assertThat(antwort.<String>path("id")).isEqualTo(ort(name).id().toString());
+        }
+        erwartet.forEach((pfad, wert) -> assertThat(String.valueOf(antwort.jsonPath().getString(basis + pfad)))
+                .as(pfad).isEqualTo(wert == null ? "null" : wert));
+    }
+
     @Dann("meldet das Archiv Status {int}")
     public void status(int status) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);
@@ -577,6 +657,57 @@ public class BestaetigenSchritte {
         assertThat(antwort.jsonPath().<String>getList(pfad + ".code")).containsExactly(code);
         assertThat(antwort.jsonPath().<String>getList(pfad + ".vorhandenId"))
                 .containsExactly(ort(vorhanden).id().toString());
+    }
+
+    @Dann("liefert das Archiv das Vorschaubild von «{word}» als PNG, nicht im Cache gespeichert")
+    public void vorschaubildGeliefert(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.contentType()).startsWith("image/png");
+        assertThat(antwort.header("Cache-Control")).contains("private").contains("no-store");
+        assertThat(antwort.asByteArray()).isEqualTo(vorschauen.get(ort(name).id()));
+    }
+
+    @Dann("enthält das Zugriffsprotokoll für «{word}» einen Eintrag «{word}» von «{word}»")
+    public void protokolliert(String name, String aktion, String benutzer) throws SQLException {
+        Ort ort = ort(name);
+        Object anzahl = zeile("select count(*) as anzahl from " + schema(ort.mandant()) + ".zugriff_protokoll "
+                + "where dokument_id = ? and aktion = ? and benutzer = ?", ort.id(), aktion,
+                Testanmeldung.sub(benutzer)).get("anzahl");
+        assertThat(((Number) anzahl).longValue()).isPositive();
+    }
+
+    @Dann("zeigt der Eingangskorb beim Dokument «{word}» den Vorschlag der Art «{word}» und «bitte prüfen» bei {string}")
+    public void vorschlagImEingangskorb(String name, String art, String unsicher) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String pfad = "eintraege.find { it.id == '" + ort(name).id() + "' }";
+        assertThat(antwort.<String>path(pfad + ".vorschlag.art")).isEqualTo(art);
+        assertThat(antwort.jsonPath().<String>getList(pfad + ".unsicher"))
+                .containsExactlyElementsOf(Arrays.asList(unsicher.split(",\\s*")));
+    }
+
+    @Dann("zeigt das Dokument «{word}» den Vorschlag der Art «{word}» und «bitte prüfen» bei {string}")
+    public void vorschlagImDokument(String name, String art, String unsicher) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("id")).isEqualTo(ort(name).id().toString());
+        assertThat(antwort.<String>path("vorschlag.art")).isEqualTo(art);
+        assertThat(antwort.jsonPath().<String>getList("unsicher"))
+                .containsExactlyElementsOf(Arrays.asList(unsicher.split(",\\s*")));
+    }
+
+    @Dann("zeigt das Dokument «{word}» weder Vorschlag noch «bitte prüfen»")
+    public void ohneVorschlag(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("id")).isEqualTo(ort(name).id().toString());
+        assertThat(antwort.<Object>path("vorschlag")).isNull();
+        assertThat(antwort.jsonPath().<String>getList("unsicher")).isEmpty();
+    }
+
+    @Dann("zeigt der Eingangskorb beim Dokument «{word}» den Fehlertext {string}, ohne PDF\\/A {word}")
+    public void fehlerImEingangskorb(String name, String fehler, String ohnePdfa) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String pfad = "eintraege.find { it.id == '" + ort(name).id() + "' }";
+        assertThat(antwort.<String>path(pfad + ".fehler")).isEqualTo(fehler);
+        assertThat(antwort.<Boolean>path(pfad + ".pdfaFehlt")).isEqualTo("ja".equals(ohnePdfa));
     }
 
     private UUID mitOriginal(String mandant, String name, String status, String erfasser) throws Exception {
