@@ -36,7 +36,8 @@ services:
       MALLOC_ARENA_MAX: "2"
       # Stufe A (Req 6.11, entschieden von Fabian am 09.11.2026): ohne archiv.stufe gilt B, und der Start bricht mit dem
       # Präfix der Stufe A ab. Sperren unter archiv/ und manifest/ höchstens 1 Tag, damit die Test-Buckets beim Wechsel
-      # auf Stufe B (Aufgabe 5.11) ohne Bypass-Header löschbar sind; manifest/ bleibt COMPLIANCE.
+      # auf Stufe B (Aufgabe 5.11) ohne Bypass-Header löschbar sind; manifest/ bleibt COMPLIANCE. DeployStufeTest prüft
+      # diese Werte in der CI gegen die Startprüfung.
       ARCHIV_STUFE: A
       ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
       ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D

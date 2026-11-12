@@ -211,10 +211,19 @@ jobs:
           cat stand.txt
           # nur die Zählung, keine Log-Inhalte
           oidc=$(grep -c 'fehlercode=OIDC_NICHT_BEREIT' status.txt || true)
+          # Liquibase wartet auf die Sperre (erster Deploy 12.11.2026); LIQUIBASE_SPERRE_BELEGT: eine andere Sitzung
+          # der Migrationsrolle ist offen, die Sperre wird darum nicht freigegeben (design.md «Betrieb auf der VPS»)
+          sperre=$(grep -c 'Waiting for changelog lock' status.txt || true)
+          belegt=$(grep -c 'fehlercode=LIQUIBASE_SPERRE_BELEGT' status.txt || true)
           rm -f status.txt stand.txt
           echo "OIDC_NICHT_BEREIT im Log: $oidc"
+          echo "Waiting for changelog lock im Log: $sperre"
+          echo "LIQUIBASE_SPERRE_BELEGT im Log: $belegt"
           if [ "$oidc" -ne 0 ]; then
             echo "::error::Die API meldet Keycloak nicht bereit (OIDC_NICHT_BEREIT): Realm, Adresse (quarkus.oidc.auth-server-url) und Erreichbarkeit von archiv-auth prüfen."
+          fi
+          if [ "$sperre" -ne 0 ] || [ "$belegt" -ne 0 ]; then
+            echo "::error::Die API wartet auf die Liquibase-Sperre: Läuft eine Migration (zweite API, Admin-Kommando), abwarten; sonst die offene Sitzung der Rolle archiv_owner beenden, der nächste Start gibt die verwaiste Sperre selbst frei. Die Sperre nie von Hand löschen (Anleitung design.md «Betrieb auf der VPS»)."
           fi
           echo "::error::api, db und kc sind nach 10 Minuten nicht alle healthy."
           exit 1
