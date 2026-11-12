@@ -26,8 +26,8 @@
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
         <build-helper-plugin.version>3.7.0</build-helper-plugin.version>
-        <!-- 2.0.x ist die letzte Linie auf Jackson 2 (Quarkus 3.40); 3.x braucht Jackson 3 (tools.jackson) -->
-        <json-schema-validator.version>2.0.8</json-schema-validator.version>
+        <!-- 3.x braucht Jackson 3 (tools.jackson) neben dem Jackson 2 von Quarkus; nur der Schema-Prüfer nutzt es (Jackson3Baum) -->
+        <json-schema-validator.version>3.0.9</json-schema-validator.version>
         <tika.version>4.2.0</tika.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <icu4j.version>79.1</icu4j.version>

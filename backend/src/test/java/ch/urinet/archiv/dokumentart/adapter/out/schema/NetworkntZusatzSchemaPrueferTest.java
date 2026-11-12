@@ -45,6 +45,11 @@ class NetworkntZusatzSchemaPrueferTest {
             {"type":"object","properties":{"angebot_gueltig_bis":{"type":"string","format":"date"}},
              "additionalProperties":false}""";
 
+    /** Verhalten ab json-schema-validator 3.x: {@code date-time} und {@code time} nach RFC 3339, Zahlen nach Wert. */
+    private static final String SCHEMA_3X = """
+            {"type":"object","properties":{"t":{"type":"string","format":"date-time"},
+             "z":{"type":"string","format":"time"},"l":{"type":"array","uniqueItems":true},"n":{"type":"number"}}}""";
+
     private static final Duration GRENZE = Duration.ofMillis(50);
     private static final Duration SEED_GRENZE = Duration.ofSeconds(2);
     /** Wie lange ein gedrosselter Thread in einer CFS-Periode (100 ms) höchstens wartet, ohne zu rechnen. */
@@ -130,6 +135,25 @@ class NetworkntZusatzSchemaPrueferTest {
     void werteUeberDerGrenzeSindUngueltig() {
         String gross = "{\"periode\":\"" + "x".repeat(NetworkntZusatzSchemaPruefer.MAX_WERTE_BYTES) + "\"}";
         assertUngueltig(() -> pruefer.wertePruefen("{\"type\":\"object\"}", gross));
+    }
+
+    @Test
+    void werteNachRfc3339UndZahlenNachWertSindGueltig() {
+        assertThatCode(() -> pruefer.wertePruefen(SCHEMA_3X,
+                "{\"t\":\"2026-11-12T12:00:00-00:00\",\"z\":\"12:00:00.5+01:00\",\"l\":[1,2],\"n\":0.1}"))
+                .doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"t\":\"2026-11-12 12:00:00Z\"}",
+            "{\"t\":\"2016-12-31T23:59:60\"}",
+            "{\"z\":\"12:00:00.Z\"}",
+            "{\"l\":[1,1.0]}",
+            "{\"n\":1e400}"
+    })
+    void werteAusserhalbVonRfc3339OderUnendlichSindUngueltig(String werte) {
+        assertUngueltig(() -> pruefer.wertePruefen(SCHEMA_3X, werte));
     }
 
     @Test
