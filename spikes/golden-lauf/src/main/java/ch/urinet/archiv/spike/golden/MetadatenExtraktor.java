@@ -15,7 +15,7 @@ import io.quarkiverse.langchain4j.RegisterAiService.NoChatMemoryProviderSupplier
 @RegisterAiService(chatLanguageModelSupplier = KiModell.class, chatMemoryProviderSupplier = NoChatMemoryProviderSupplier.class)
 public interface MetadatenExtraktor {
 
-    String PROMPT_VERSION = "v5";
+    String PROMPT_VERSION = "v6";
 
     @SystemMessage("{systemPrompt}")
     @UserMessage(Prompt.BENUTZER)

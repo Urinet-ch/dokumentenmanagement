@@ -94,6 +94,16 @@ Nachbearbeitung (`Nachbearbeitung.FASSUNG`, bei jeder Regeländerung hochgezähl
 5. Kennzahlen des Prüfteils in golden-ergebnis.md eintragen. Bestanden bei mindestens 18/20 Belegen mit Art, Datum,
    Partner, Betrag richtig und erfüllter Req 0.9 (Req 0.3); «keine ≤ 1.0» im Prüfteil heisst nicht bestanden.
 
+### Lauf nach Aufgabe 3.8 (Golden-Generator nach F4/F6, vorgeschlagen 12.11.2026)
+Erwartungen nach F4/F6 (PR #82): Prämienrechnungen und Mahnungen mit Gebühr = `LIEFERANTENBELEG`. Der Prompt v5 legte
+in der Art-Regel noch «Prämienrechnungen und Mahnungen von Versicherungen VERSICHERUNG» fest; Prompt v6 setzt F4/F6 und
+P40-2 um, die Prototyp-Regel E3 leert eine Belegnummer nur aus Nullen. Abgestimmt nur auf dem Abstimmungsteil.
+1. Commit = Merge-Commit von PR #90, ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
+2. Golden-Daten vorher mit dem Generator ab PR #82 neu erzeugen (`tools/golden_synth/README.md`, Seed 20261108).
+3. Aufruf wie oben mit `--gate`. Eingefroren: Prompt `v6-7a39224f2f5e`, Modell `google/gemma-4-31B-it`, Nachbearbeitung
+   `nb-2026-11-12`, Eingangsdatum `2026-11-10`, Schwelle 0.8. Weicht einer ab, gilt der Lauf nicht.
+4. Bestanden wie oben (≥ 18/20, Req 0.9). Kennzahlen in `docs/spikes/golden-ergebnis.md`, «Lauf nach Aufgabe 3.8».
+
 ## Ausgabe
 
 - Konsole: nur Beleg-ID (synthetisch Dateiname, echt die ersten 8 Zeichen des SHA-256 des Dateinamens), Feld, richtig/falsch.

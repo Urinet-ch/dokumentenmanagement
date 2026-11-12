@@ -311,6 +311,24 @@ war das einzige falsche Feld eine Belegnummer mit hoher Sicherheit; der eine erl
 Befund für Welle 3 (KI-Vorschläge im Produkt): Die Belegnummer ist in Abstimmungs- und Prüfteil die einzige Fehlerquelle
 mit hoher Sicherheit; in Aufgabe 3.2 gezielt prüfen, ohne den eingefrorenen Stand des Prototyps zu ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
 
+## Lauf nach Aufgabe 3.8 (12.11.2026, PR #90)
+Golden-Daten neu erzeugt mit dem Generator nach F4/F6 (PR #82; nur die erwartete Art von 34, 37 und 49 geändert, Aufteilung
+unverändert). Läufe nur auf dem Abstimmungsteil (30 Belege), Modell `google/gemma-4-31B-it`, Schwelle 0.8:
+
+| Lauf | Prompt | Nachbearbeitung | Felder | Req 0.3 | falsch ab 0.8 | Fehlschläge |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-12-220048 (Fabian) | `v5-fb5c021d33fc` | `nb-2026-11-09` | 148/150 | 29/30 | 2 | 37 Art (`VERSICHERUNG`), 38 Belegnummer `0` |
+| 2026-11-12-220741 | `v5-fb5c021d33fc` | `nb-2026-11-12` (E3) | 149/150 | 29/30 | 1 | 37 Art |
+| 2026-11-12-221031 | `v6-7a39224f2f5e` | `nb-2026-11-12` | 150/150 | 30/30 | 0 | keine |
+| 2026-11-12-221218 | `v6-7a39224f2f5e` | `nb-2026-11-12` | 150/150 | 30/30 | 0 | keine |
+| 2026-11-12-221413 | `v6-7a39224f2f5e` | `nb-2026-11-12` | 150/150 | 30/30 | 0 | keine |
+
+- Ursache 37: Die Art-Regel im Prompt v5 nannte «Prämienrechnungen und Mahnungen von Versicherungen VERSICHERUNG»; die
+  Beschreibungen der Dokumentarten erreichen den Spike-Prompt nicht. v6 übernimmt F4/F6 und P40-2 in die Regel.
+- Ursache 38: Das Modell setzte bei Briefen ohne Belegnummer in 3 von 5 früheren Läufen `0` mit Sicherheit 1.0 (Läufe vom
+  09.11. und 12.11.). Prototyp-Regel E3: eine Belegnummer nur aus Nullen wird leer.
+- Gate-Lauf auf dem Prüfteil: offen, startet nur Fabian (README «Lauf nach Aufgabe 3.8»).
+
 ## Realitätsprüfung (echte Belege, 09.11.2026)
 
 Lauf `2026-11-09-191327-realitaet`, gestartet von Fabian auf demselben Stand wie der Gate-Lauf (Prompt

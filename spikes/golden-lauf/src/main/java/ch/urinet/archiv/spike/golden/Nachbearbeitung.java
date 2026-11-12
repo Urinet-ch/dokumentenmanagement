@@ -28,7 +28,7 @@ public final class Nachbearbeitung {
     }
 
     /** Fassung der Regeln, Teil der Laufidentität; bei jeder Regeländerung hochzählen. */
-    public static final String FASSUNG = "nb-2026-11-09";
+    public static final String FASSUNG = "nb-2026-11-12";
     static final String GRUND_QR = "QR";
     static final String GRUND_E2 = "E2";
 
@@ -82,7 +82,9 @@ public final class Nachbearbeitung {
         String waehrung = v.waehrung();
         String partner = v.partnerName();
         String partnerIban = v.partnerIban();
-        String belegnummer = leer(v.belegnummer()) ? null : v.belegnummer().strip();
+        // Prototyp-Regel E3 (12.11.2026): eine Belegnummer nur aus Nullen («0», «000») ist keine Belegnummer
+        String belegnummer = leer(v.belegnummer()) || v.belegnummer().strip().matches("0+") ? null
+                : v.belegnummer().strip();
 
         boolean qrVomMandant = qr.isPresent() && enthaeltIban(mandant, qr.get().iban());
         if (qr.isPresent()) {

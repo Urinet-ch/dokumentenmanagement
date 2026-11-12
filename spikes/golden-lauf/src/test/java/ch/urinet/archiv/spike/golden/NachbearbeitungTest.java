@@ -236,6 +236,20 @@ class NachbearbeitungTest {
         assertThat(andererBetrag.betrag()).isEqualByComparingTo("12.50");
     }
 
+    @Test
+    void e3BelegnummerNurAusNullenWirdLeer() throws IOException {
+        for (String nullen : List.of("0", "000", " 0 ")) {
+            var e = Nachbearbeitung.bearbeite(vorschlag("BEHOERDE", nullen, "2026-02-08"), Optional.empty(), "", MANDANT,
+                    arten(), EIGENE, EINGANG);
+            assertThat(e.belegnummer()).isNull();
+        }
+        for (String nummer : List.of("0815", "10", "M-2026-0")) {
+            var e = Nachbearbeitung.bearbeite(vorschlag("BEHOERDE", nummer, "2026-02-08"), Optional.empty(), "", MANDANT,
+                    arten(), EIGENE, EINGANG);
+            assertThat(e.belegnummer()).isEqualTo(nummer);
+        }
+    }
+
     static Nachbearbeitung.Ergebnis e2(String art, Optional<QrDaten> qr, String iban, String faelligkeit, String nummer,
                                        String text) throws IOException {
         return Nachbearbeitung.bearbeite(vorschlag(art, nummer, "2026-03-01", Vertraulichkeit.NORMAL, BigDecimal.TEN,
