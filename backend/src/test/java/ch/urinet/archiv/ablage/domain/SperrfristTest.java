@@ -62,4 +62,37 @@ class SperrfristTest {
         assertThatThrownBy(() -> Sperrfrist.manifest(Optional.of(LocalDate.of(2020, 1, 1)), JETZT, Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void verlaengertNurAktiveSperreMitWenigerAlsZwoelfMonatenRest() {
+        assertThat(Sperrfrist.verlaengert(JETZT.minusSeconds(1), JETZT, Optional.empty())).isEmpty();
+        assertThat(Sperrfrist.verlaengert(JETZT, JETZT, Optional.empty())).isEmpty();
+        // genau 12 Monate in Zürich: reicht
+        assertThat(Sperrfrist.verlaengert(Instant.parse("2027-11-10T09:15:30.250Z"), JETZT, Optional.empty()))
+                .isEmpty();
+        assertThat(Sperrfrist.verlaengert(Instant.parse("2027-11-10T09:15:30Z"), JETZT, Optional.empty()))
+                .contains(Instant.parse("2037-11-10T09:15:30Z"));
+    }
+
+    @Test
+    void verlaengertUmZehnJahreAbBisherigerSperre() {
+        assertThat(Sperrfrist.verlaengert(Instant.parse("2027-03-01T00:00:00Z"), JETZT, Optional.empty()))
+                .contains(Instant.parse("2037-03-01T00:00:00Z"));
+    }
+
+    @Test
+    void verlaengerungInStufeAHoechstensEinTagAbJetzt() {
+        Optional<Duration> einTag = Optional.of(Duration.ofDays(1));
+        Instant bisher = JETZT.plus(Duration.ofHours(2));
+        Optional<Instant> bis = Sperrfrist.verlaengert(bisher, JETZT, einTag);
+        assertThat(bis).contains(Instant.parse("2026-11-11T09:15:31Z"));
+        assertThat(bis.get()).isBefore(JETZT.plus(Duration.ofDays(1)).plusSeconds(1));
+    }
+
+    @Test
+    void verlaengerungVerkuerztNie() {
+        // steht schon an der Höchstfrist: keine Änderung statt einer kürzeren Sperre
+        Instant bisher = JETZT.plus(Duration.ofDays(1)).plusSeconds(5);
+        assertThat(Sperrfrist.verlaengert(bisher, JETZT, Optional.of(Duration.ofDays(1)))).isEmpty();
+    }
 }

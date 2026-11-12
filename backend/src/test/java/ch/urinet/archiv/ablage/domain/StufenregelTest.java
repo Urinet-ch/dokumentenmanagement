@@ -68,4 +68,25 @@ class StufenregelTest {
         assertThat(Stufenregel.warnungen(Stufe.A, zuLang)).containsExactly("archiv.ablage.max-sperrfrist");
         assertThat(Stufenregel.warnungen(Stufe.B, ohneFrist)).isEmpty();
     }
+
+    @Test
+    void stufePVerlangtPraefixComplianceUndKurzeFristen() {
+        var wieP = new Stufenregel.Ablageeinstellungen(Sperrmodus.COMPLIANCE, Optional.of(Duration.ofDays(1)),
+                Optional.of(Duration.ofHours(1)), Stufenregel.PRAEFIX_STUFE_P);
+        assertThat(Stufe.aus(Optional.of("p"))).isEqualTo(Stufe.P);
+        assertThat(Stufenregel.verstoesse(Stufe.P, wieP)).isEmpty();
+        var ohneFristen = new Stufenregel.Ablageeinstellungen(Sperrmodus.GOVERNANCE, Optional.empty(),
+                Optional.of(Duration.ofDays(2)), Stufenregel.PRAEFIX_STUFE_A);
+        assertThat(Stufenregel.verstoesse(Stufe.P, ohneFristen)).containsExactly("archiv.ablage.manifest-sperrmodus",
+                "archiv.ablage.manifest-max-sperrfrist", "archiv.ablage.max-sperrfrist", "archiv.ablage.bucket-praefix");
+        assertThatThrownBy(() -> Stufenregel.pruefe(Stufe.P, ohneFristen)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Ablage Stufe P");
+    }
+
+    @Test
+    void stufeBLehntDenPraefixDerProbeAb() {
+        var mitPraefixP = new Stufenregel.Ablageeinstellungen(Sperrmodus.COMPLIANCE, Optional.empty(),
+                Optional.empty(), Stufenregel.PRAEFIX_STUFE_P);
+        assertThat(Stufenregel.verstoesse(Stufe.B, mitPraefixP)).containsExactly("archiv.ablage.bucket-praefix");
+    }
 }

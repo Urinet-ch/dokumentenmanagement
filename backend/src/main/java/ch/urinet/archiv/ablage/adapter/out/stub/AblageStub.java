@@ -6,11 +6,14 @@ import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
+import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.Importdatei;
 import ch.urinet.archiv.ablage.domain.Vorschau;
@@ -234,6 +237,58 @@ public class AblageStub implements AblagePort {
             }
         }
         return anzahl;
+    }
+
+    @Override
+    public synchronized Optional<Dateipruefung> pruefen(MandantCode mandant, String schluessel, String versionId) {
+        return liste(mandant, schluessel).stream().filter(v -> v.versionId().equals(versionId)).findFirst()
+                .filter(v -> Files.exists(v.datei()))
+                .map(v -> {
+                    byte[] daten = lesen(v);
+                    return new Dateipruefung(Pruefsumme.von(daten), daten.length, Optional.ofNullable(v.sperreBis()));
+                });
+    }
+
+    @Override
+    public synchronized Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab,
+                                                int anzahl) {
+        String vorsatz = mandant.wert() + "/";
+        List<Objektversion> alle = new ArrayList<>();
+        versionen.keySet().stream().filter(k -> k.startsWith(vorsatz + praefix)).sorted().forEach(k ->
+                versionen.get(k).forEach(v -> alle.add(new Objektversion(k.substring(vorsatz.length()), v.versionId(),
+                        false))));
+        int start = ab.map(m -> {
+            for (int i = 0; i < alle.size(); i++) {
+                Objektversion o = alle.get(i);
+                if (o.schluessel().equals(m.schluessel()) && o.versionId().equals(m.versionId())) {
+                    return i + 1;
+                }
+            }
+            return alle.size();
+        }).orElse(0);
+        int ende = Math.min(alle.size(), start + anzahl);
+        List<Objektversion> seite = alle.subList(start, ende);
+        Optional<Versionsseite.Marke> weiter = ende < alle.size() && !seite.isEmpty()
+                ? Optional.of(new Versionsseite.Marke(seite.getLast().schluessel(), seite.getLast().versionId()))
+                : Optional.empty();
+        return new Versionsseite(seite, weiter);
+    }
+
+    @Override
+    public synchronized SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId,
+                                                            Instant bis) {
+        Instant jetzt = Instant.now();
+        Version v = liste(mandant, schluessel).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + schluessel));
+        if (!v.gesperrt(jetzt)) {
+            return new SperrAenderung(schluessel, versionId, SperrAenderung.Ergebnis.KEINE_SPERRE, Optional.empty());
+        }
+        if (!bis.isAfter(v.sperreBis())) {
+            return new SperrAenderung(schluessel, versionId, SperrAenderung.Ergebnis.UNVERAENDERT,
+                    Optional.of(v.sperreBis()));
+        }
+        ersetzen(mandant, schluessel, v, bis);
+        return new SperrAenderung(schluessel, versionId, SperrAenderung.Ergebnis.VERLAENGERT, Optional.of(bis));
     }
 
     private Version speichern(MandantCode mandant, String key, byte[] daten, Instant sperreBis) {

@@ -387,11 +387,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 6.11, 15.1–15.4, 15.6, 15.7, 15.8, 15.11, 15.12, 16.7, 16.9_
   - _Abhängig von: 4.9_
 
-- [ ] 5.3 Monatlicher Prüflauf [Backend]
+- [x] 5.3 Monatlicher Prüflauf [Backend]
   - Auftrag `PRUEFLAUF`: alle Dateien über die gespeicherte Versions-ID stromweise hashen, mit Datenbank und Manifest vergleichen (massgeblich SHA-256); fremde Versionen und Löschmarken unter `archiv/` als Abweichung
   - Sperren unbefristeter Dokumente und von Manifesten, die in weniger als 12 Monaten ablaufen, um 10 Jahre verlängern, mit derselben Kappung wie `Sperrfrist` (Höchstfrist der Stufe A): dafür einen öffentlichen Einstieg schaffen, z. B. `Sperrfrist.verlaengert(bisher, jetzt, hoechstfrist)` (heute ist `begrenzt` privat, und `retainUntil`/`manifest` verlängern keine bestehende Sperre); in Stufe P nicht verlängern, nur zählen (Req 16.24); Test: in Stufe A setzt der Prüflauf keine Sperre über 1 Tag, in Stufe P keine (4.9-E5)
   - Bericht und E-Mail an den Inhaber bei Abweichung (nur IDs)
   - _Anforderungen: 6.9, 15.5, 15.9, 15.10, 16.24_
+  - Erledigt ohne den Vergleich mit dem Manifest-Inhalt: Er folgt mit 5.2, sobald es Tages-Manifeste gibt (design.md, «Prüflauf», Umsetzung 5.3)
 
 - [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
   - Produktion auf Stufe B (VPS aus 5.11) mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP
