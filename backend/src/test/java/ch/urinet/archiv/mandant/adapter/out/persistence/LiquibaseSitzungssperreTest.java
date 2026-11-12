@@ -116,6 +116,69 @@ class LiquibaseSitzungssperreTest {
         }
     }
 
+    /** Review PR #74, S1: Zwei Starts warten gleichzeitig auf eine verwaiste Sperre; einer gibt sie frei, nie beide. */
+    @Test
+    void gleichzeitigWartendeStartsBlockierenSichNicht() throws Exception {
+        verwaisteSperreSetzen();
+        try (Connection a = alsRolle(); Connection b = alsRolle()) {
+            LockService startA = sperre(a);
+            LockService startB = sperre(b);
+            // B sieht die Sitzung von A, die noch nicht wartet: könnte eine Migration nach altem Verfahren sein
+            assertThat(startB.acquireLock()).isFalse();
+            assertThat(gesperrtVon()).isEqualTo("kuenstlich");
+
+            // A sieht nur noch B, und B wartet als Teilnehmer
+            assertThat(startA.acquireLock()).isTrue();
+            String gesperrt = gesperrtVon();
+            assertThat(gesperrt).isNotNull().isNotEqualTo("kuenstlich");
+            assertThat(startB.acquireLock()).isFalse();
+            assertThat(gesperrtVon()).isEqualTo(gesperrt);
+
+            startA.releaseLock();
+            assertThat(startB.acquireLock()).isTrue();
+            startB.releaseLock();
+            assertThat(gesperrtVon()).isNull();
+        }
+    }
+
+    /**
+     * Review PR #74, K2: Eine Migration nach diesem Verfahren unter einer anderen Rolle zählt bei den offenen Sitzungen
+     * nicht mit; vor dem Bruch ihrer Sperre schützt allein die Sitzungssperre.
+     */
+    @Test
+    void sitzungssperreSchuetztMigrationEinerAnderenRolle() throws Exception {
+        try (Connection einrichten = alsRolle()) {
+            LockService dienst = sperre(einrichten);
+            assertThat(dienst.acquireLock()).isTrue();
+            dienst.releaseLock();
+        }
+        warteBisSitzungen(0);
+        try (Connection fremd = verbinden()) {
+            LockService fremdeMigration = sperre(fremd);
+            assertThat(fremdeMigration.acquireLock()).isTrue();
+            String gesperrt = gesperrtVon();
+
+            try (Connection start = alsRolle()) {
+                assertThat(sperre(start).acquireLock()).isFalse();
+            }
+            assertThat(gesperrtVon()).isEqualTo(gesperrt).isNotNull();
+            fremdeMigration.releaseLock();
+        }
+    }
+
+    private static void verwaisteSperreSetzen() throws Exception {
+        try (Connection einrichten = alsRolle()) {
+            LockService dienst = sperre(einrichten);
+            assertThat(dienst.acquireLock()).isTrue();
+            dienst.releaseLock();
+        }
+        warteBisSitzungen(0);
+        try (Connection admin = verbinden(); Statement befehl = admin.createStatement()) {
+            befehl.execute("update " + TABELLE + " set locked = true, lockgranted = now(), lockedby = 'kuenstlich'"
+                    + " where id = 1");
+        }
+    }
+
     private static LockService sperre(Connection verbindung) throws Exception {
         Database datenbank = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
         datenbank.setDefaultSchemaName(SCHEMA);

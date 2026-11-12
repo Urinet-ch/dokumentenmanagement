@@ -27,6 +27,12 @@ import java.util.UUID;
  * Liquibase wartet wie bisher, und das Log nennt einmal {@value #FEHLERCODE_BELEGT} mit Anleitung. Eine fremde aktive
  * Sperre wird nie gebrochen; zwei Migrationen laufen nie gleichzeitig.
  * <p>
+ * Ab dem ersten Versuch bis {@code releaseLock} hält jede Instanz zusätzlich eine geteilte Teilnehmersperre
+ * ({@code pg_advisory_lock_shared}). Sitzungen mit dieser Sperre zählen bei der Prüfung auf offene Sitzungen nicht mit:
+ * Sie folgen diesem Verfahren und halten die Tabellensperre nie ohne die Sitzungssperre, die gerade der Prüfende hält.
+ * Sonst blockierten sich mehrere Starts, die gleichzeitig auf eine verwaiste Sperre warten, gegenseitig (Review PR #74,
+ * S1). Sitzungen ohne Teilnehmersperre (ältere Releases, Handarbeit) zählen weiter.
+ * <p>
  * Registriert über {@code META-INF/services/liquibase.lockservice.LockService}; gilt für {@code db/public} (Quarkus)
  * und für jedes Mandanten-Schema ({@link LiquibaseMandantDatenbank}).
  */
@@ -36,10 +42,13 @@ public class LiquibaseSitzungssperre extends StandardLockService {
     public static final String FEHLERCODE_BELEGT = "LIQUIBASE_SPERRE_BELEGT";
     /** Erster Schlüssel der Sitzungssperre («LB»); der zweite ist der Hash der Sperrtabelle (je Schema eigene). */
     static final int NAMENSRAUM = 0x4C42;
+    /** Erster Schlüssel der geteilten Teilnehmersperre («LT»), zweiter Schlüssel 0; getrennt vom Namensraum oben. */
+    static final int TEILNEHMER = 0x4C54;
 
     private static final Logger LOG = Logger.getLogger(LiquibaseSitzungssperre.class);
 
     private boolean sitzungssperre;
+    private boolean teilnehmer;
     private boolean zeileGehalten;
     private boolean belegtGemeldet;
 
@@ -60,6 +69,7 @@ public class LiquibaseSitzungssperre extends StandardLockService {
         }
         boolean erhalten = false;
         try {
+            teilnehmerMelden();
             if (!sitzungssperreVersuchen()) {
                 return false;
             }
@@ -89,6 +99,7 @@ public class LiquibaseSitzungssperre extends StandardLockService {
         } finally {
             zeileGehalten = false;
             sitzungssperreLoesen();
+            teilnehmerAbmelden();
         }
     }
 
@@ -115,6 +126,39 @@ public class LiquibaseSitzungssperre extends StandardLockService {
             database.rollback();
         }
         return sitzungssperre;
+    }
+
+    private void teilnehmerMelden() throws SQLException, DatabaseException {
+        if (teilnehmer) {
+            return;
+        }
+        try (PreparedStatement abfrage = verbindung().prepareStatement("select pg_try_advisory_lock_shared(?, 0)")) {
+            abfrage.setInt(1, TEILNEHMER);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                // Exklusiv nimmt diesen Schlüssel niemand; ohne Teilnehmersperre zählt die Sitzung bei anderen mit
+                teilnehmer = zeile.next() && zeile.getBoolean(1);
+            }
+        } finally {
+            database.rollback();
+        }
+    }
+
+    private void teilnehmerAbmelden() {
+        if (!teilnehmer) {
+            return;
+        }
+        try {
+            try (PreparedStatement abfrage = verbindung().prepareStatement("select pg_advisory_unlock_shared(?, 0)")) {
+                abfrage.setInt(1, TEILNEHMER);
+                abfrage.execute();
+            } finally {
+                database.rollback();
+            }
+        } catch (SQLException | DatabaseException | RuntimeException e) {
+            LOG.warnf("Liquibase: Teilnehmersperre nicht gelöst, ursache=%s", e.getClass().getName());
+        } finally {
+            teilnehmer = false;
+        }
     }
 
     private void sitzungssperreLoesen() {
@@ -164,7 +208,9 @@ public class LiquibaseSitzungssperre extends StandardLockService {
                     LOG.errorf("Fehler %s: fehlercode=%s, Liquibase-Sperre in %s gesetzt seit %s, %d weitere Sitzung(en)"
                                     + " der Migrationsrolle offen; Liquibase wartet und bricht nach der Wartezeit ab."
                                     + " Läuft eine Migration (zweite API, Admin-Kommando), abwarten. Sonst die offene"
-                                    + " Sitzung beenden; der nächste Start gibt die verwaiste Sperre dann selbst frei."
+                                    + " Sitzung beenden (nur im Zustand idle und ohne Advisory-Sperre mit classid"
+                                    + " 0x4C42 oder 0x4C54 in pg_locks); der nächste Start gibt die verwaiste Sperre"
+                                    + " dann selbst frei."
                                     + " Die Sperre nie von Hand löschen, solange eine Sitzung offen ist.",
                             UUID.randomUUID(), FEHLERCODE_BELEGT, tabelle, gesetzt, offen);
                 }
@@ -188,12 +234,18 @@ public class LiquibaseSitzungssperre extends StandardLockService {
         }
     }
 
+    /** Offene Sitzungen derselben Rolle ohne Teilnehmersperre, also möglicherweise eine Migration nach altem Verfahren. */
     private static int andereSitzungen(Connection verbindung) throws SQLException {
-        try (PreparedStatement abfrage = verbindung.prepareStatement("select count(*) from pg_stat_activity"
-                + " where datname = current_database() and usename = session_user and pid <> pg_backend_pid()");
-             ResultSet zeile = abfrage.executeQuery()) {
-            zeile.next();
-            return zeile.getInt(1);
+        try (PreparedStatement abfrage = verbindung.prepareStatement("select count(*) from pg_stat_activity a"
+                + " where a.datname = current_database() and a.usename = session_user and a.pid <> pg_backend_pid()"
+                + " and not exists (select 1 from pg_locks l where l.pid = a.pid and l.locktype = 'advisory'"
+                + " and l.granted and l.mode = 'ShareLock' and l.classid::int8 = ? and l.objid::int8 = 0"
+                + " and l.objsubid = 2)")) {
+            abfrage.setLong(1, TEILNEHMER);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                return zeile.getInt(1);
+            }
         }
     }
 

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,9 +38,14 @@ class DeployStufeTest {
 
     private static final Path COMPOSE = GemeinsamSchritte.REPO.resolve("deploy/infomaniak/compose.yml");
 
+    /** Alle Dienste mit dem Image der API, damit z. B. ein eigener Worker-Dienst (Stufe B) nicht durchrutscht. */
     @Test
     void umgebungDerApiPasstZurStufe() throws IOException {
-        assertThat(pruefen(apiUmgebung())).isEmpty();
+        Map<String, Map<String, String>> dienste = archivDienste();
+        assertThat(dienste).containsKey("api");
+        for (var dienst : dienste.entrySet()) {
+            assertThat(pruefen(dienst.getValue())).as("Dienst %s", dienst.getKey()).isEmpty();
+        }
     }
 
     @Test
@@ -91,13 +97,30 @@ class DeployStufeTest {
         return frist.filter(f -> f.compareTo(Stufenregel.HOECHSTFRIST_STUFE_A) <= 0).isPresent();
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, String> apiUmgebung() throws IOException {
+        return archivDienste().get("api");
+    }
+
+    /** Umgebung je Dienst, der dasselbe Image wie {@code api} verwendet. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Map<String, String>> archivDienste() throws IOException {
         Map<String, Object> compose = new Yaml(new SafeConstructor(new LoaderOptions()))
                 .load(Files.readString(COMPOSE, StandardCharsets.UTF_8));
-        var api = (Map<String, Object>) ((Map<String, Object>) compose.get("services")).get("api");
-        Map<String, String> umgebung = new HashMap<>();
-        ((Map<String, Object>) api.get("environment")).forEach((name, wert) -> umgebung.put(name, String.valueOf(wert)));
-        return umgebung;
+        var dienste = (Map<String, Map<String, Object>>) compose.get("services");
+        Object image = dienste.get("api").get("image");
+        Map<String, Map<String, String>> ergebnis = new TreeMap<>();
+        dienste.forEach((name, dienst) -> {
+            if (!image.equals(dienst.get("image"))) {
+                return;
+            }
+            Object environment = dienst.get("environment");
+            assertThat(environment).as("environment des Dienstes %s in compose.yml als Abbildung (NAME: wert), nicht"
+                    + " als Liste", name).isInstanceOf(Map.class);
+            Map<String, String> umgebung = new HashMap<>();
+            ((Map<String, Object>) environment).forEach((schluessel, wert) -> umgebung.put(schluessel,
+                    String.valueOf(wert)));
+            ergebnis.put(name, umgebung);
+        });
+        return ergebnis;
     }
 }
