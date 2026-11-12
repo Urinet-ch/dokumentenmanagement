@@ -5,7 +5,7 @@ Schickt Suchanfragen parallel an GET /api/v1/dokumente und gibt p50, p95 und Max
 wird ab gesendeter Anfrage bis zur vollständig gelesenen Antwort (die Netzlaufzeit ist enthalten). Req 14.3 verlangt
 p95 innert 1 Sekunde bei bis zu 50'000 Dokumenten pro Mandant; der Nachweis erfolgt erst auf Stufe B in Aufgabe
 5.11, Last und Hardware sind dort festzulegen ([offen: Messbedingungen nach VPS-Grösse K5]). Darum sind Anzahl und
-Parallelität Pflichtparameter ohne Standardwerte.
+Parallelität Pflichtparameter ohne Standardwerte. `--aufwaermen` schickt vorher Suchen, die nicht zählen.
 
 Das Skript liest nur. Der Mandant muss vorher mit synthetischen Dokumenten gefüllt sein (für Req 14.3: 50'000); die
 Zahl der für das Token sichtbaren Dokumente steht in der Ausgabe. Die Suchbegriffe stammen aus einer festen Liste
@@ -111,12 +111,15 @@ def main() -> int:
     parser.add_argument("--anzahl", type=int, required=True, help="Anzahl Suchanfragen")
     parser.add_argument("--parallel", type=int, required=True, help="gleichzeitige Suchanfragen")
     parser.add_argument("--begriffe", help="Datei mit synthetischen Suchbegriffen, einer je Zeile")
+    parser.add_argument("--aufwaermen", type=int, default=0, help="Suchen vorweg, die nicht zählen")
     parser.add_argument("--grenze", type=float, default=1.0, help="Grenze für p95 in Sekunden (Req 14.3: 1)")
     parser.add_argument("--seed", type=int, default=143, help="Startwert für die Auswahl der Anfragen")
     parser.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
     args = parser.parse_args()
     if args.anzahl < 1 or args.parallel < 1:
         parser.error("--anzahl und --parallel müssen grösser als 0 sein")
+    if args.aufwaermen < 0:
+        parser.error("--aufwaermen muss mindestens 0 sein")
 
     token = token_lesen()
     begriffe = begriffe_lesen(args.begriffe)
@@ -124,8 +127,12 @@ def main() -> int:
     if status != 200:
         sys.exit(f"Die Suche antwortet mit Status {status}. Bitte URL und Token (Recht A2) prüfen.")
     zufall = random.Random(args.seed)
+    # Gemessene Anfragen hängen nur vom Seed ab, nicht von der Zahl der Aufwärm-Anfragen
     anfragen = [parameter(n, begriffe, zufall) for n in range(args.anzahl)]
+    zufall_vorweg = random.Random(args.seed + 1)
+    aufwaermen = [parameter(n, begriffe, zufall_vorweg) for n in range(args.aufwaermen)]
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
+        list(pool.map(lambda w: suchen(args.url, token, w), aufwaermen))
         ergebnisse = list(pool.map(lambda w: suchen(args.url, token, w), anfragen))
 
     zeiten = [dauer for status, dauer, _ in ergebnisse if status == 200]
@@ -136,6 +143,7 @@ def main() -> int:
     bericht = {
         "anzahl": args.anzahl,
         "parallel": args.parallel,
+        "aufwaermen": args.aufwaermen,
         "sichtbare_dokumente": sichtbar,
         "beantwortet": len(zeiten),
         "fehler": {str(status): zahl for status, zahl in sorted(fehler.items())},

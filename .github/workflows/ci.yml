@@ -95,6 +95,8 @@ jobs:
         run: npx ng test --watch=false
       - name: Generator-Client (tools/archiv_client.py, unittest)
         run: python3 -m unittest tools/test_archiv_client.py
+      - name: Lastskripte (tools/last, unittest)
+        run: python3 -m unittest tools/last/test_last.py
 
   browser:
     name: Browser-Szenarien (Cucumber.js, Playwright)

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Lastskript Req 5.5: einseitiges Handy-Foto, p95 bis zum Status EINGANGSKORB (Ziel <= 30 s).
+"""Lastskript Req 5.5: einseitiges Handy-Foto (JPEG oder HEIC), p95 bis zum Status EINGANGSKORB (Ziel <= 30 s).
 
 Nur Standardbibliothek. Der Nachweis gilt erst auf Stufe B (Req 16.16, Aufgabe 5.11), nur mit synthetischen
-Testfotos. Das Skript lädt das Foto nacheinander hoch (je Lauf mit eindeutigem Anhang hinter dem JPEG-Ende, damit
-keine Dublette entsteht) und fragt den Status ab, bis EINGANGSKORB oder FEHLER erreicht ist.
+Testfotos. Das Skript lädt das Foto nacheinander hoch (je Lauf mit eindeutigem Anhang, damit keine Dublette entsteht:
+bei JPEG hinter dem EOI-Marker, bei HEIC/HEIF als ISO-BMFF-Box `free` am Ende) und fragt den Status ab, bis
+EINGANGSKORB oder FEHLER erreicht ist. `--aufwaermen` schickt vorher Läufe, die nicht zählen.
 
 Messpunkt: von der Antwort 202 bis zum ersten gelesenen EINGANGSKORB. Das ist eine obere Schranke für «Start des
 Auftrags bis EINGANGSKORB»: Wartezeit in der Schlange und Abfrageintervall zählen mit. Ohne KI-Wartezeit heisst:
@@ -21,6 +22,7 @@ import json
 import math
 import os
 import stat
+import struct
 import sys
 import time
 import urllib.error
@@ -42,11 +44,33 @@ def token_lesen() -> str:
     return token
 
 
-def eindeutig(jpeg: bytes) -> bytes:
-    """Bytes hinter dem EOI-Marker ignorieren JPEG-Leser; die SHA-256 wird damit je Lauf neu."""
-    if not jpeg.startswith(b"\xff\xd8"):
-        sys.exit("Das Foto muss ein JPEG sein (synthetisches Testfoto).")
-    return jpeg + b"lastlauf-" + uuid.uuid4().hex.encode()
+# Marken der ftyp-Box (ISO/IEC 23008-12): HEVC-Bilder als HEIC, übrige Bildfolgen und Einzelbilder als HEIF
+HEIC_MARKEN = {b"heic", b"heix", b"heim", b"heis", b"hevc", b"hevx"}
+HEIF_MARKEN = {b"mif1", b"msf1"}
+
+
+def fototyp(foto: bytes) -> tuple[str, str]:
+    """Endung und Medientyp aus dem Dateikopf; nur JPEG, HEIC und HEIF."""
+    if foto.startswith(b"\xff\xd8"):
+        return "jpg", "image/jpeg"
+    if len(foto) >= 12 and foto[4:8] == b"ftyp":
+        marke = foto[8:12]
+        if marke in HEIC_MARKEN:
+            return "heic", "image/heic"
+        if marke in HEIF_MARKEN:
+            return "heif", "image/heif"
+    sys.exit("Das Foto muss ein JPEG oder HEIC/HEIF sein (synthetisches Testfoto).")
+
+
+def eindeutig(foto: bytes, endung: str) -> bytes:
+    """Macht die SHA-256 je Lauf neu, ohne das Bild zu verändern.
+
+    JPEG-Leser ignorieren Bytes hinter dem EOI-Marker; ISO-BMFF-Leser (HEIC/HEIF) überspringen eine Box vom Typ
+    `free` am Dateiende (ISO/IEC 14496-12, 8.1.2)."""
+    anhang = b"lastlauf-" + uuid.uuid4().hex.encode()
+    if endung == "jpg":
+        return foto + anhang
+    return foto + struct.pack(">I", 8 + len(anhang)) + b"free" + anhang
 
 
 def multipart(feld: str, dateiname: str, inhalt: bytes, medientyp: str) -> tuple[bytes, str]:
@@ -76,7 +100,8 @@ def anfrage(url: str, token: str, daten: bytes | None = None, medientyp: str | N
 
 
 def ein_lauf(basis: str, token: str, foto: bytes, intervall: float, grenze: float) -> float:
-    koerper, medientyp = multipart("dateien[]", "lastlauf.jpg", eindeutig(foto), "image/jpeg")
+    endung, typ = fototyp(foto)
+    koerper, medientyp = multipart("dateien[]", f"lastlauf.{endung}", eindeutig(foto, endung), typ)
     status, ergebnis = anfrage(f"{basis}/api/v1/dokumente", token, koerper, medientyp)
     start = time.monotonic()
     if status != 202 or not isinstance(ergebnis, list) or not ergebnis or "id" not in ergebnis[0]:
@@ -103,17 +128,25 @@ def p95(werte: list[float]) -> float:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--basis-url", required=True, help="z. B. https://archiv.apps.urinet.ch")
-    parser.add_argument("--foto", required=True, type=Path, help="synthetisches einseitiges JPEG")
+    parser.add_argument("--foto", required=True, type=Path, help="synthetisches einseitiges JPEG oder HEIC/HEIF")
     parser.add_argument("--anzahl", type=int, default=20)
+    parser.add_argument("--aufwaermen", type=int, default=0, help="Läufe vorweg, die nicht zählen")
     parser.add_argument("--intervall", type=float, default=0.5, help="Abfrageintervall in Sekunden")
     parser.add_argument("--grenze", type=float, default=600.0, help="Abbruch je Lauf in Sekunden")
     args = parser.parse_args()
 
+    if args.anzahl < 1 or args.aufwaermen < 0:
+        parser.error("--anzahl muss grösser als 0 sein, --aufwaermen mindestens 0")
     token = token_lesen()
     foto = args.foto.read_bytes()
+    fototyp(foto)
+    basis = args.basis_url.rstrip("/")
+    for nr in range(1, args.aufwaermen + 1):
+        dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
+        print(f"Aufwärmen {nr:3d}: {dauer:6.1f} s (zählt nicht)")
     zeiten = []
     for nr in range(1, args.anzahl + 1):
-        dauer = ein_lauf(args.basis_url.rstrip("/"), token, foto, args.intervall, args.grenze)
+        dauer = ein_lauf(basis, token, foto, args.intervall, args.grenze)
         zeiten.append(dauer)
         print(f"Lauf {nr:3d}: {dauer:6.1f} s")
     wert = p95(zeiten)

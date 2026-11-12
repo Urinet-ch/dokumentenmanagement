@@ -6,7 +6,7 @@
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
-| `last/` | Lastskripte (Stufe B, Aufgabe 5.11) |
+| `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
 
 ## Generator-Client `archiv_client.py`
 
