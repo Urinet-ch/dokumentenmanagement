@@ -101,7 +101,7 @@ App beendet den Deploy, das Archiv wird auf Stufe A gestoppt und Stufe B (5.11) 
 mit dem neuen Wert; nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.9, 1.10) und im Deploy-Workflow.
 
 ## Nachtrag 12.11.2026 (K5: Grösse der VPS für Stufe B)
-Vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #PRNR (Aufgabe 4.9, Entscheid 4.9-E7; Spec 01, Req 16.1, 16.16–16.18, 16.26):
+Vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86 (Aufgabe 4.9, Entscheid 4.9-E7; Spec 01, Req 16.1, 16.16–16.18, 16.26):
 - **Grösse:** eigene Infomaniak VPS Lite mit 4 vCPU, 4 GB RAM und 80 GB Disk nur für das Archiv, CHF 9.00/Mt. bei
   Jahresbindung (CHF 108 im Voraus, Stand 12.11.2026). Bestellt wird erst zu Beginn von Aufgabe 5.11; vorher laufen die
   Lastskripte einige Stunden auf einer stundenweise abgerechneten Infomaniak-Public-Cloud-Instanz ähnlicher Grösse.
