@@ -366,13 +366,14 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1 (Voraussetzung: Entscheide aus 4.9)
 
-- [ ] 5.1 Zugriffsprotokoll vollständig [Backend] [Frontend]
+- [x] 5.1 Zugriffsprotokoll vollständig [Backend] [Frontend]
   - `@Protokolliert` an allen Endpunkten der Liste in design.md, inkl. verweigerter Zugriffe (`VERWEIGERT`); REST `/api/v1/protokoll` (Recht A13) mit Filtern; Seite `/verwaltung/protokoll`
   - Aufbewahrungsfrist aus 4.9 (4.9-E6, Req 10.9): kein Codepfad löscht oder pseudonymisiert Einträge von `zugriff_protokoll` oder `dokument_version`, Trigger und Rechte bleiben (nur Einfügen); Nachweis hier per JUnit (kein Löschpfad, Rechte nur `INSERT` und `SELECT`); die Regel steht in `docs/verfahrensbeschreibung.md`, Abschnitt Zugriffe, die erst in 5.7 entsteht (dort der Teilnachweis «Dokument»)
   - Benutzerverzeichnis (Req 10.10): Tabelle `benutzer_verzeichnis` je Mandant, nur Einfügen (Trigger wie `zugriff_protokoll`); wann ein Eintrag entsteht (erste Aktion, geänderter Name oder Rolle, Austritt durch den Inhaber) legt der PR fest; API-Tokens bleiben nach dem Widerruf als Zeile erhalten (design.md «Sicherheit»)
   - Tests: UPDATE/DELETE auf `zugriff_protokoll`, `dokument_version` und `benutzer_verzeichnis` scheitert; ohne Protokolleintrag keine Aktion
   - _Anforderungen: 2.19, 10.2, 10.3, 10.5, 10.7, 10.8, 10.9, 10.10_
   - _Abhängig von: 4.9_
+  - Erledigt: Changeset `010-benutzer-verzeichnis` (nur Einfügen, Indizes für die Filter), `BenutzerVerzeichnisPflege` im Schreibweg von `JdbcZugriffProtokoll` und beim Widerruf eines Tokens, `ProtokollResource` (`GET /protokoll`, `GET /protokoll/benutzer`, `POST /protokoll/benutzer/{benutzer}/austritt`, A13), Seite `/verwaltung/protokoll`; Szenarien `features/protokoll/protokoll-einsicht.feature` (`@req-2.19`, `@req-10.5`, `@req-10.10`), bestehende Szenarien für `10.2`, `10.3`, `10.7`, `10.8`; `10.9` per JUnit (`KeinLoeschpfadTest`, `MandantEigentuemerTest`); Teilnachweis «Dokument» für 10.9 folgt mit 5.7 (design.md «Umsetzung (Aufgabe 5.1)»)
 
 - [ ] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
