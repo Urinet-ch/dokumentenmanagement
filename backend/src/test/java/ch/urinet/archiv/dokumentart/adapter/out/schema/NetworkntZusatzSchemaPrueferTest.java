@@ -172,14 +172,29 @@ class NetworkntZusatzSchemaPrueferTest {
         assertUngueltig(() -> pruefer.schemaPruefen("{\"type\":\"object\",\"maximum\":1e400}"));
     }
 
-    /** Review PR #83, Soll 1: nicht endliche Zahlen in Werten bleiben ungültig, auch ohne {@code type} im Schema. */
+    /**
+     * Review PR #83: nicht endliche Zahlen in Werten sind ungültig, auch ohne {@code type} im Schema. Neue, strengere
+     * Regel: 2.0.8 nahm {@code 1e400} z. B. gegen {@code minimum: 0} an.
+     */
     @ParameterizedTest
     @ValueSource(strings = {"\"minimum\":0", "\"minimum\":-1e-400", "\"multipleOf\":4.9e-324", "\"const\":1e400"})
     void unendlicheZahlIstAuchOhneTypUngueltig(String schluessel) {
         String schema = "{\"type\":\"object\",\"properties\":{\"n\":{" + schluessel + "}}}";
         assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":1e400}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":-1e400}"));
         assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":[-1e400]}"));
+        // NaN lehnt schon der strenge Leser ab, nicht erst Jackson3Baum.wert.
         assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":NaN}"));
+    }
+
+    /** Review PR #83 (Nachprüfung, Soll 3): ab 3.x strenger als 2.0.8. */
+    @Test
+    void strengereFaelleAb3xSindUngueltig() {
+        assertUngueltig(() -> pruefer.wertePruefen(
+                "{\"type\":\"object\",\"properties\":{\"s\":{\"minLength\":3000000000}}}", "{\"s\":\"x\"}"));
+        assertUngueltig(() -> pruefer.wertePruefen(
+                "{\"type\":\"object\",\"properties\":{\"n\":{\"multipleOf\":2}}}", "{\"n\":9007199254740993}"));
+        assertUngueltig(() -> pruefer.schemaPruefen("{\"type\":\"object\",\"exclusiveMaximum\":1e400}"));
     }
 
     /** Ab 3.x (Review PR #83, Soll 1, Fälle 3 und 4): grosse Ganzzahlen und Grenzen über {@code int} nach Wert. */

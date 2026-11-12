@@ -22,8 +22,9 @@ import java.util.Map;
  * (doppelte Schlüssel, Zeichen nach dem Wert) nur an einer Stelle liegt. Die Tiefe ist vorher begrenzt.
  * <p>
  * Zusatzwerte überträgt {@link #wert}: Nicht endliche Zahlen (z. B. {@code 1e400} als {@code DoubleNode(Infinity)})
- * sind dort ungültig, unabhängig vom Schema, wie mit 2.0.8 (Review PR #83, Soll 1); 3.x liesse sie gegen Schemas ohne
- * {@code type} durch.
+ * sind dort ungültig, unabhängig vom Schema (Review PR #83). Das ist strenger als 2.0.8, das sie mit {@code type: number}
+ * und ohne Schranke annahm und nur bei {@code maximum}, {@code multipleOf} und {@code const} ablehnte; 3.x allein liesse
+ * sie auch gegen {@code maximum} durch. Die Regel greift nur, wenn der Wert als JSON-Zahl beim Prüfer ankommt.
  */
 final class Jackson3Baum {
 
