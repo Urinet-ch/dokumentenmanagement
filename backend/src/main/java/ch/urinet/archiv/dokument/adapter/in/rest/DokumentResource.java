@@ -12,7 +12,9 @@ import ch.urinet.archiv.dokument.application.DokumentVerwerfen;
 import ch.urinet.archiv.dokument.application.DokumentWiederholen;
 import ch.urinet.archiv.dokument.application.Warnung;
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.dokument.domain.DokumentFinanz;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.dokument.domain.DokumentVertrag;
 import ch.urinet.archiv.dokument.domain.KiSicherheit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -197,6 +199,35 @@ public class DokumentResource {
     public record VerwerfenDto(@Schema(required = true, maxLength = 1000) String grund) {
     }
 
+    @Schema(name = "DokumentFinanz", description = "Gespeicherte Finanzangaben; die Bestätigung ersetzt sie ganz")
+    public record FinanzDto(
+            @Schema(nullable = true) String belegnummer,
+            @Schema(nullable = true, enumeration = {"EINNAHME", "AUSGABE"}) String richtung,
+            @Schema(nullable = true) BigDecimal betrag,
+            @Schema(required = true, description = "ISO 4217") String waehrung,
+            @Schema(nullable = true) LocalDate faelligkeit,
+            @Schema(nullable = true) String qrReferenz,
+            @Schema(nullable = true) String konto) {
+
+        static FinanzDto aus(DokumentFinanz f) {
+            return f == null ? null : new FinanzDto(f.belegnummer(), f.richtung(), f.betrag(), f.waehrung(),
+                    f.faelligkeit(), f.qrReferenz(), f.konto());
+        }
+    }
+
+    @Schema(name = "DokumentVertrag", description = "Gespeicherte Vertragsangaben; die Bestätigung ersetzt sie ganz")
+    public record VertragDto(
+            @Schema(nullable = true) LocalDate gueltigAb,
+            @Schema(nullable = true) LocalDate gueltigBis,
+            @Schema(nullable = true) String kuendigungsfrist,
+            @Schema(nullable = true) LocalDate naechsteFrist) {
+
+        static VertragDto aus(DokumentVertrag v) {
+            return v == null ? null : new VertragDto(v.gueltigAb(), v.gueltigBis(), v.kuendigungsfrist(),
+                    v.naechsteFrist());
+        }
+    }
+
     @Schema(name = "Dokument", description = "Metadaten eines sichtbaren Dokuments")
     public record DokumentDto(
             @Schema(required = true) UUID id,
@@ -235,7 +266,9 @@ public class DokumentResource {
             List<String> unsicher,
             @Schema(nullable = true) String projekt,
             @Schema(nullable = true, description = "Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments")
-            String personBenutzer) {
+            String personBenutzer,
+            @Schema(nullable = true) FinanzDto finanz,
+            @Schema(nullable = true) VertragDto vertrag) {
     }
 
     @GET
@@ -531,7 +564,8 @@ public class DokumentResource {
                 d.wirksameVertraulichkeit(), d.status().name(), d.bestaetigt(), d.geschaeftsjahr(), d.aufbewahrenBis(),
                 d.sperreBis(), d.fristAbgelaufen(), lesenJson(d, d.zusatz(), "zusatz", json), d.version(),
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
-                d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer());
+                d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(),
+                FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()));
     }
 
     // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst

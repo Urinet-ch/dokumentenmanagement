@@ -7,7 +7,11 @@ import ch.urinet.archiv.dokument.application.NeueDatei;
 import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.dokument.domain.DokumentFinanz;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.dokument.domain.DokumentVertrag;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
@@ -58,7 +62,7 @@ public class PanacheDokumentRepository implements DokumentRepository {
     public Optional<Dokument> finden(UUID id, Sichtregel regel) {
         VertraulichkeitFilter filter = VertraulichkeitFilter.fuer(regel).und("id = :id", Map.of("id", id));
         return DokumentEintrag.<DokumentEintrag>find(filter.bedingung(), filter.parameter()).firstResultOptional()
-                .map(PanacheDokumentRepository::dokument);
+                .map(e -> dokument(e, DokumentFinanzEintrag.findById(e.id), DokumentVertragEintrag.findById(e.id)));
     }
 
     @Override
@@ -97,9 +101,19 @@ public class PanacheDokumentRepository implements DokumentRepository {
         }
         VertraulichkeitFilter filter = VertraulichkeitFilter.fuer(regel).und(bedingung, parameter);
         long gesamt = DokumentEintrag.count(filter.bedingung(), filter.parameter());
-        List<Dokument> eintraege = DokumentEintrag.<DokumentEintrag>find(filter.bedingung(),
-                        Sort.descending("eingang", "id"), filter.parameter())
-                .page(Page.of(seite, groesse)).list().stream().map(PanacheDokumentRepository::dokument).toList();
+        List<DokumentEintrag> zeilen = DokumentEintrag.<DokumentEintrag>find(filter.bedingung(),
+                Sort.descending("eingang", "id"), filter.parameter()).page(Page.of(seite, groesse)).list();
+        List<UUID> ids = zeilen.stream().map(e -> e.id).toList();
+        Map<UUID, DokumentFinanzEintrag> finanz = new HashMap<>();
+        Map<UUID, DokumentVertragEintrag> vertrag = new HashMap<>();
+        if (!ids.isEmpty()) {
+            DokumentFinanzEintrag.<DokumentFinanzEintrag>list("dokumentId in ?1", ids)
+                    .forEach(f -> finanz.put(f.dokumentId, f));
+            DokumentVertragEintrag.<DokumentVertragEintrag>list("dokumentId in ?1", ids)
+                    .forEach(v -> vertrag.put(v.dokumentId, v));
+        }
+        List<Dokument> eintraege = zeilen.stream()
+                .map(e -> dokument(e, finanz.get(e.id), vertrag.get(e.id))).toList();
         return new Seite<>(eintraege, gesamt);
     }
 
@@ -150,11 +164,15 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 .executeUpdate();
     }
 
-    private static Dokument dokument(DokumentEintrag e) {
+    private static Dokument dokument(DokumentEintrag e, DokumentFinanzEintrag f, DokumentVertragEintrag v) {
         return new Dokument(e.id, e.art, e.titel, e.datum, e.eingang.toInstant(), e.quelle,
                 e.tags == null ? List.of() : List.of(e.tags), e.vertraulichkeit, e.personBenutzer, e.erstelltVon,
                 DokumentStatus.valueOf(e.status), e.bestaetigt == null ? null : e.bestaetigt.toInstant(),
                 e.geschaeftsjahr, e.aufbewahrenBis, e.sperreBis, e.fristAbgelaufen, e.zusatz, e.version, e.fehler,
-                e.pdfaFehlt, e.seiten, e.partnerId, e.partnerName, e.kiVorschlag, e.kiSicherheit, e.projekt);
+                e.pdfaFehlt, e.seiten, e.partnerId, e.partnerName, e.kiVorschlag, e.kiSicherheit, e.projekt,
+                f == null ? null : new DokumentFinanz(f.belegnummer, f.richtung, f.betrag, f.waehrung, f.faelligkeit,
+                        f.qrReferenz, f.konto),
+                v == null ? null : new DokumentVertrag(v.gueltigAb, v.gueltigBis, v.kuendigungsfrist,
+                        v.naechsteFrist));
     }
 }

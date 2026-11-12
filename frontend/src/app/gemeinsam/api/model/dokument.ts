@@ -7,7 +7,9 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { DokumentFinanz } from './dokument-finanz';
 import { Warnung } from './warnung';
+import { DokumentVertrag } from './dokument-vertrag';
 
 
 /**
@@ -73,6 +75,8 @@ export interface Dokument {
      * Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
      */
     personBenutzer?: string | null;
+    finanz?: DokumentFinanz | null;
+    vertrag?: DokumentVertrag | null;
 }
 export namespace Dokument {
     export const QuelleEnum = {

@@ -1,6 +1,8 @@
 package ch.urinet.archiv.dokument.adapter.in.rest;
 
 import ch.urinet.archiv.dokument.application.DokumentLesen;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
@@ -21,6 +23,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -55,17 +58,29 @@ public class DokumentVorschauResource {
     @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
     @Operation(summary = "Vorschaubild einer Seite lesen",
             description = "PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der "
-                    + "Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 → 400.")
+                    + "Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 oder keine Zahl → 400.")
     @APIResponse(responseCode = "200", description = "Vorschaubild",
             content = @Content(mediaType = PNG, schema = @Schema(type = SchemaType.STRING, format = "binary")))
-    public Response vorschau(@PathParam("id") UUID id, @QueryParam("seite") @DefaultValue("1") int seite) {
+    public Response vorschau(@PathParam("id") UUID id,
+                             @QueryParam("seite") @DefaultValue("1")
+                             @Parameter(schema = @Schema(type = SchemaType.INTEGER, format = "int32",
+                                     defaultValue = "1")) String seite) {
         aufloesung.pruefen();
-        InputStream bild = lesen.vorschau(DokumentResource.benutzer(identitaet), id, seite);
+        InputStream bild = lesen.vorschau(DokumentResource.benutzer(identitaet), id, seite(seite));
         StreamingOutput ausgabe = ziel -> {
             try (bild) {
                 bild.transferTo(ziel);
             }
         };
         return Response.ok(ausgabe, PNG).header(HttpHeaders.CACHE_CONTROL, "private, no-store").build();
+    }
+
+    /** Als Text angenommen, weil JAX-RS eine nicht umwandelbare Query-Zahl mit 404 statt 400 beantwortet. */
+    private static int seite(String text) {
+        try {
+            return Integer.parseInt(text.strip());
+        } catch (NumberFormatException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
     }
 }

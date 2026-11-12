@@ -24,6 +24,46 @@ Funktionalität: Eingangskorb – Angaben für die Oberfläche
     Wenn «inhaber-urinet» das Dokument «A» mit Warnungen liest
     Dann zeigt das Dokument «A» weder Vorschlag noch «bitte prüfen»
 
+  @req-8.1
+  Szenario: Eingangskorb und Dokument liefern die gespeicherten Finanz- und Vertragsangaben
+    # Die Bestätigung ersetzt finanz und vertrag ganz (3.4); die Oberfläche muss die gespeicherten Werte kennen, etwa bei
+    # einem Generator-Dokument ohne Vorschlag, und sendet sie unverändert mit (Review PR #68, M1).
+    Angenommen im Mandanten «urinet» liegt das Dokument «G» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und das Dokument «G» hat in dokument_finanz gespeichert:
+      | belegnummer | 2026-901        |
+      | richtung    | EINNAHME        |
+      | betrag      | 1234.5          |
+      | waehrung    | CHF             |
+      | faelligkeit | 2026-12-31      |
+      | qr_referenz | QR-TEST-1       |
+      | konto       | 1100-TEST       |
+    Und das Dokument «G» hat in dokument_vertrag gespeichert:
+      | gueltig_ab       | 2026-01-01 |
+      | gueltig_bis      | 2027-12-31 |
+      | kuendigungsfrist | 3 Monate   |
+      | naechste_frist   | 2027-09-30 |
+    Und im Mandanten «urinet» liegt das Dokument «O» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» den Eingangskorb mit Warnungen abruft
+    Dann liefert das Archiv beim Dokument «G» diese Angaben:
+      | finanz.belegnummer      | 2026-901   |
+      | finanz.richtung         | EINNAHME   |
+      | finanz.betrag           | 1234.5     |
+      | finanz.waehrung         | CHF        |
+      | finanz.faelligkeit      | 2026-12-31 |
+      | finanz.qrReferenz       | QR-TEST-1  |
+      | finanz.konto            | 1100-TEST  |
+      | vertrag.gueltigAb       | 2026-01-01 |
+      | vertrag.gueltigBis      | 2027-12-31 |
+      | vertrag.kuendigungsfrist | 3 Monate  |
+      | vertrag.naechsteFrist   | 2027-09-30 |
+    Und liefert das Archiv beim Dokument «O» diese Angaben:
+      | finanz  | null |
+      | vertrag | null |
+    Wenn «inhaber-urinet» das Dokument «G» mit Warnungen liest
+    Dann liefert das Archiv beim Dokument «G» diese Angaben:
+      | finanz.konto            | 1100-TEST  |
+      | vertrag.kuendigungsfrist | 3 Monate  |
+
   @req-8.7
   Szenario: Der Eingangskorb nennt den Fehlertext und das fehlende PDF/A
     Angenommen im Mandanten «urinet» liegt das Dokument «F» im Status «FEHLER», erfasst von «inhaber-urinet»
@@ -48,6 +88,8 @@ Funktionalität: Eingangskorb – Angaben für die Oberfläche
     Wenn «inhaber-urinet» die Vorschau der Seite 2 von «V» abruft
     Dann meldet das Archiv Status 404 mit Fehlercode «NICHT_GEFUNDEN»
     Wenn «inhaber-urinet» die Vorschau der Seite 0 von «V» abruft
+    Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» die Vorschau der Seite "abc" von «V» abruft
     Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
 
   @req-2.3 @req-1.4

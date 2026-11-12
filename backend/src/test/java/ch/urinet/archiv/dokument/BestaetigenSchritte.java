@@ -43,6 +43,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -200,6 +201,23 @@ public class BestaetigenSchritte {
     public void fehlertext(String name, String fehler) throws SQLException {
         Ort ort = ort(name);
         ausfuehren("update " + schema(ort.mandant()) + ".dokument set fehler = ? where id = ?", fehler, ort.id());
+    }
+
+    /** Zeile in {@code dokument_finanz} bzw. {@code dokument_vertrag}; Spaltennamen wie in der Tabelle. */
+    @Angenommen("das Dokument «{word}» hat in {word} gespeichert:")
+    public void gespeichert(String name, String tabelle, Map<String, String> werte) throws SQLException {
+        assertThat(tabelle).isIn("dokument_finanz", "dokument_vertrag");
+        Ort ort = ort(name);
+        List<String> spalten = new ArrayList<>(List.of("dokument_id"));
+        List<Object> parameter = new ArrayList<>(List.of(ort.id()));
+        werte.forEach((spalte, wert) -> {
+            spalten.add(spalte);
+            parameter.add(spalte.equals("betrag") ? new BigDecimal(wert)
+                    : wert.matches("\\d{4}-\\d{2}-\\d{2}") ? Date.valueOf(LocalDate.parse(wert)) : wert);
+        });
+        ausfuehren("insert into " + schema(ort.mandant()) + "." + tabelle + " (" + String.join(", ", spalten)
+                + ") values (" + String.join(", ", Collections.nCopies(spalten.size(), "?")) + ")",
+                parameter.toArray());
     }
 
     @Angenommen("für das Dokument «{word}» liegt ein Vorschaubild der Seite {int}")
@@ -425,6 +443,25 @@ public class BestaetigenSchritte {
     public void vorschau(String benutzer, int seite, String name) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
                 .when().get("/api/v1/dokumente/" + ort(name).id() + "/vorschau");
+    }
+
+    @Wenn("«{word}» die Vorschau der Seite {string} von «{word}» abruft")
+    public void vorschauText(String benutzer, String seite, String name) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
+                .when().get("/api/v1/dokumente/" + ort(name).id() + "/vorschau");
+    }
+
+    /** Pfade wie {@code finanz.konto} im Dokument der Antwort; ohne Eintrag im Eingangskorb das Dokument selbst. */
+    @Dann("liefert das Archiv beim Dokument «{word}» diese Angaben:")
+    public void angaben(String name, Map<String, String> erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String basis = antwort.jsonPath().get("eintraege") != null
+                ? "eintraege.find { it.id == '" + ort(name).id() + "' }." : "";
+        if (basis.isEmpty()) {
+            assertThat(antwort.<String>path("id")).isEqualTo(ort(name).id().toString());
+        }
+        erwartet.forEach((pfad, wert) -> assertThat(String.valueOf(antwort.jsonPath().getString(basis + pfad)))
+                .as(pfad).isEqualTo(wert == null ? "null" : wert));
     }
 
     @Dann("meldet das Archiv Status {int}")

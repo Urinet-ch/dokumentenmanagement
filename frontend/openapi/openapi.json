@@ -339,6 +339,88 @@
           "personBenutzer" : {
             "type" : [ "string", "null" ],
             "description" : "Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments"
+          },
+          "finanz" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DokumentFinanz"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "vertrag" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/DokumentVertrag"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        }
+      },
+      "DokumentFinanz" : {
+        "type" : "object",
+        "description" : "Gespeicherte Finanzangaben; die Bestätigung ersetzt sie ganz",
+        "properties" : {
+          "belegnummer" : {
+            "type" : [ "string", "null" ]
+          },
+          "richtung" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "EINNAHME", "AUSGABE" ]
+          },
+          "betrag" : {
+            "type" : [ "number", "null" ]
+          },
+          "waehrung" : {
+            "type" : "string",
+            "description" : "ISO 4217"
+          },
+          "faelligkeit" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "qrReferenz" : {
+            "type" : [ "string", "null" ]
+          },
+          "konto" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "waehrung" ]
+      },
+      "DokumentVertrag" : {
+        "type" : "object",
+        "description" : "Gespeicherte Vertragsangaben; die Bestätigung ersetzt sie ganz",
+        "properties" : {
+          "gueltigAb" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "kuendigungsfrist" : {
+            "type" : [ "string", "null" ]
+          },
+          "naechsteFrist" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       },
@@ -2133,7 +2215,7 @@
     "/api/v1/dokumente/{id}/vorschau" : {
       "get" : {
         "summary" : "Vorschaubild einer Seite lesen",
-        "description" : "PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 → 400.",
+        "description" : "PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 oder keine Zahl → 400.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "name" : "id",
@@ -2143,13 +2225,13 @@
             "$ref" : "#/components/schemas/UUID"
           }
         }, {
-          "name" : "seite",
-          "in" : "query",
           "schema" : {
-            "type" : "integer",
             "format" : "int32",
+            "type" : "integer",
             "default" : 1
-          }
+          },
+          "name" : "seite",
+          "in" : "query"
         } ],
         "responses" : {
           "200" : {

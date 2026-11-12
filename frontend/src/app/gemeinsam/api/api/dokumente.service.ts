@@ -727,7 +727,7 @@ export class DokumenteService extends BaseService {
 
     /**
      * Vorschaubild einer Seite lesen
-     * PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 → 400.
+     * PNG der Seite (ab 1, Standard 1). Unsichtbares oder fremdes Dokument, Seite über der Seitenzahl oder noch ohne Vorschau → 404 NICHT_GEFUNDEN; Seite unter 1 oder keine Zahl → 400.
      * @endpoint get /api/v1/dokumente/{id}/vorschau
      * @param id 
      * @param seite 
