@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ImportLaufMitZeilen, ImporteService } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { ABFRAGE_MS, ImportLaufSeite } from './import-lauf';
+import { ABFRAGE_MS, ABFRAGE_STOERUNG_MS, ImportLaufSeite, WARTEN_MAX_MS } from './import-lauf';
 
 const ZUORDNUNG: ImportLaufMitZeilen = {
   lauf: { id: 'l1', art: 'kontakt', status: 'ZUORDNUNG_NOETIG', dateiname: 'kontakte.csv', zeilen: 2 },
@@ -56,12 +56,14 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
     apiV1ImporteIdUebernehmenPost: vi.fn(),
   };
 
-  async function oeffnen(...antworten: ImportLaufMitZeilen[]) {
+  async function oeffnen(...antworten: (ImportLaufMitZeilen | HttpErrorResponse)[]) {
     service.apiV1ImporteIdGet.mockReset();
+    const als = (a: ImportLaufMitZeilen | HttpErrorResponse) =>
+      a instanceof HttpErrorResponse ? throwError(() => a) : of(a);
     for (const antwort of antworten) {
-      service.apiV1ImporteIdGet.mockReturnValueOnce(of(antwort));
+      service.apiV1ImporteIdGet.mockReturnValueOnce(als(antwort));
     }
-    service.apiV1ImporteIdGet.mockReturnValue(of(antworten.at(-1)));
+    service.apiV1ImporteIdGet.mockReturnValue(als(antworten.at(-1)!));
     TestBed.configureTestingModule({
       imports: [ImportLaufSeite],
       providers: [provideRouter([]), { provide: ImporteService, useValue: service }],
@@ -171,6 +173,38 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
       });
     });
 
+    it('behält die Entscheide über Filter hinweg und nennt sie in der Bestätigung (Review PR #72, K1, K3)', async () => {
+      await oeffnen(VORSCHAU);
+      const auswahl = () => [...element.querySelectorAll<HTMLSelectElement>('[data-test=entscheid]')];
+      await waehlen(auswahl()[0], `ZUSAMMENFUEHREN:${K1}`);
+      await waehlen(auswahl()[1], 'NEU');
+      const chips = () => [...element.querySelectorAll<HTMLButtonElement>('.chip')];
+      chips()[1].click();
+      await fixture.whenStable();
+      chips()[0].click();
+      await fixture.whenStable();
+      expect(service.apiV1ImporteIdGet).toHaveBeenLastCalledWith('l1', undefined, 50, 0);
+      expect(auswahl().map((a) => a.value)).toEqual([`ZUSAMMENFUEHREN:${K1}`, 'NEU']);
+
+      knopf(TEXTE.importe.uebernehmen).click();
+      await fixture.whenStable();
+      expect(element.querySelector('[data-test=entscheide-folge]')!.textContent).toContain(
+        TEXTE.importe.uebernehmenEntscheide('1', '1', '0'),
+      );
+      knopf(TEXTE.importe.jetztUebernehmen).click();
+      expect(service.apiV1ImporteIdUebernehmenPost).toHaveBeenCalledWith('l1', {
+        dublettenEntscheide: { '2': `ZUSAMMENFUEHREN:${K1}`, '3': 'NEU' },
+      });
+    });
+
+    it('nennt Zeilen ohne angezeigte Werte (Feld zu lang)', async () => {
+      await oeffnen({
+        ...VORSCHAU,
+        eintraege: [{ nr: 5, ergebnis: 'FEHLER', meldung: 'Feld zu lang', werte: null, felder: null }],
+      });
+      expect(element.querySelector('[data-test=werte-verworfen]')!.textContent).toContain(TEXTE.importe.werteVerworfen);
+    });
+
     it('zeigt bei Verkaufschancen keine Entscheide', async () => {
       await oeffnen({ ...VORSCHAU, lauf: { ...VORSCHAU.lauf, art: 'verkaufschance', vollexport: false } });
       expect(element.querySelectorAll('[data-test=entscheid]')).toHaveLength(0);
@@ -203,16 +237,113 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
     });
   });
 
-  it('fragt den Status ab, solange die Vorschau aussteht, und hört danach auf', async () => {
-    vi.useFakeTimers();
-    await oeffnen({ lauf: { id: 'l1', art: 'kontakt', status: 'VORSCHAU_AUSSTEHEND' }, eintraege: [] }, VORSCHAU);
-    expect(element.textContent).toContain(TEXTE.importe.ausstehend);
-    expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
-    await stabil();
-    expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
-    expect(element.querySelectorAll('[data-test=zeile]')).toHaveLength(3);
-    await vi.advanceTimersByTimeAsync(ABFRAGE_MS * 3);
-    expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
+  describe('Statusabfrage', () => {
+    const AUSSTEHEND: ImportLaufMitZeilen = {
+      lauf: { id: 'l1', art: 'kontakt', status: 'VORSCHAU_AUSSTEHEND' },
+      eintraege: [],
+    };
+    const LAEUFT: ImportLaufMitZeilen = { ...VORSCHAU, lauf: { ...VORSCHAU.lauf, uebernommenVon: 'inhaber' } };
+    const ansage = () => element.querySelector('[data-test=ansage]')!.textContent!.trim();
+
+    it('fragt den Status ab, solange die Vorschau aussteht, hört danach auf und sagt das Ergebnis an', async () => {
+      vi.useFakeTimers();
+      await oeffnen(AUSSTEHEND, VORSCHAU);
+      expect(ansage()).toBe(TEXTE.importe.ausstehend);
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      await stabil();
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
+      expect(element.querySelectorAll('[data-test=zeile]')).toHaveLength(3);
+      // Review PR #72, S2: Das Ende steht in der Live-Region (WCAG 4.1.3)
+      expect(ansage()).toBe(
+        'Vorschau bereit: 4 Zeilen – 1 neu, 1 geändert, 0 unverändert, 2 mögliche Dubletten, 0 fehlerhaft, 0 übersprungen.',
+      );
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS * 3);
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('sagt das Ende der Übernahme mit der Bilanz an', async () => {
+      vi.useFakeTimers();
+      await oeffnen(LAEUFT, {
+        ...VORSCHAU,
+        lauf: { ...VORSCHAU.lauf, status: 'UEBERNOMMEN', angelegt: 1, aktualisiert: 2, ausgelassen: 1, gekennzeichnet: 0 },
+      });
+      expect(ansage()).toBe(TEXTE.importe.uebernahmeLaeuft);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      await stabil();
+      expect(ansage()).toBe(
+        'Übernommen: 1 angelegt, 2 aktualisiert, 1 ausgelassen, 0 als «nicht mehr im CRM-Export» gekennzeichnet.',
+      );
+    });
+
+    it('sagt beim blossen Öffnen einer fertigen Vorschau nichts an', async () => {
+      await oeffnen(VORSCHAU);
+      expect(ansage()).toBe('');
+    });
+
+    it('beendet die Abfrage einer hängenden Übernahme mit Hinweis und erlaubt sie erneut (Review PR #72, S1)', async () => {
+      vi.useFakeTimers();
+      await oeffnen(LAEUFT);
+      expect(element.querySelectorAll('[data-test=entscheid]')).toHaveLength(0);
+      expect(knopf(TEXTE.importe.erneutUebernehmen)).toBeUndefined();
+      vi.setSystemTime(Date.now() + WARTEN_MAX_MS);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      await stabil();
+      const aufrufe = service.apiV1ImporteIdGet.mock.calls.length;
+      expect(element.querySelector('[data-test=zu-lange] [role=alert]')!.textContent).toContain(
+        TEXTE.importe.zuLangeUebernahme,
+      );
+      expect(ansage()).toBe('');
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS * 5);
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(aufrufe);
+
+      expect(element.querySelectorAll('[data-test=entscheid]')).toHaveLength(2);
+      knopf(TEXTE.importe.erneutUebernehmen).click();
+      await stabil();
+      expect(element.querySelector('[data-test=bestaetigen]')!.textContent).toContain(
+        '2 mögliche Dubletten ohne Entscheid werden ausgelassen',
+      );
+      service.apiV1ImporteIdGet.mockReturnValue(of(LAEUFT));
+      knopf(TEXTE.importe.jetztUebernehmen).click();
+      await stabil();
+      expect(service.apiV1ImporteIdUebernehmenPost).toHaveBeenCalledWith('l1', { dublettenEntscheide: {} });
+      expect(element.querySelector('[data-test=zu-lange]')).toBeNull();
+      const nachher = service.apiV1ImporteIdGet.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(nachher + 1);
+    });
+
+    it('beendet die Abfrage einer hängenden Vorschau und prüft auf Wunsch erneut', async () => {
+      vi.useFakeTimers();
+      await oeffnen(AUSSTEHEND);
+      vi.setSystemTime(Date.now() + WARTEN_MAX_MS);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      await stabil();
+      expect(element.querySelector('[data-test=zu-lange]')!.textContent).toContain(TEXTE.importe.zuLangeVorschau);
+
+      service.apiV1ImporteIdGet.mockReturnValue(of(VORSCHAU));
+      const aufrufe = service.apiV1ImporteIdGet.mock.calls.length;
+      knopf(TEXTE.importe.erneutPruefen).click();
+      await stabil();
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(aufrufe + 1);
+      expect(element.querySelector('[data-test=zu-lange]')).toBeNull();
+      expect(element.querySelectorAll('[data-test=zeile]')).toHaveLength(3);
+    });
+
+    it('fragt nach einer vorübergehenden Störung mit längerem Abstand weiter ab (Review PR #72, K2)', async () => {
+      vi.useFakeTimers();
+      await oeffnen(AUSSTEHEND, new HttpErrorResponse({ status: 503 }), VORSCHAU);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_MS);
+      await stabil();
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
+      expect(element.querySelector('[role=alert]')!.textContent).toContain(TEXTE.importe.abfrageGestoert);
+      await vi.advanceTimersByTimeAsync(ABFRAGE_STOERUNG_MS - 1);
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      await stabil();
+      expect(service.apiV1ImporteIdGet).toHaveBeenCalledTimes(3);
+      expect(element.querySelector('[role=alert]')).toBeNull();
+      expect(element.querySelectorAll('[data-test=zeile]')).toHaveLength(3);
+    });
   });
 });

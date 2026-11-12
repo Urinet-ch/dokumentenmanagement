@@ -57,7 +57,7 @@ Funktionalität: CSV-Import in der PWA
     Wenn ich die Kontakt-Datei «kontakte.csv» mit der Kopfzeile «Organisation;Vorname;Name;PLZ;Ort;E-Mail» als Vollexport hochlade
     Und ich für Zeile 3 «Zusammenführen mit «Muster Garage GmbH»» wähle
     Und ich auf «Übernehmen …» klicke
-    Dann sehe ich die Meldung «Vollexport: Kontakte mit Kontakt-ID aus 21.CRM, die in dieser Datei fehlen oder dort gelöscht sind, werden als «nicht mehr im CRM-Export» gekennzeichnet. Gelöscht wird nichts.»
+    Dann sehe ich die Meldung «Vollexport: Kontakte mit Kontakt-ID aus 21.CRM, die in dieser Datei fehlen oder dort gelöscht sind, werden als «nicht mehr im CRM-Export» gekennzeichnet – aber nur, wenn die Spalte «Kontakt-ID (21.CRM)» zugeordnet ist und Werte hat. Gelöscht wird nichts.»
     Und hat das Archiv keine Übernahme erhalten
     Wenn ich auf «Jetzt übernehmen» klicke
     Dann hat das Archiv die Übernahme mit dem Entscheid «3» → «Muster Garage GmbH» erhalten

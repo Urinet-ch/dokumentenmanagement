@@ -322,10 +322,24 @@ export const TEXTE = {
     pflichtKontakt: 'Ordnen Sie «Name» oder «Organisation» einer Spalte zu.',
     pflichtVerkaufschance: 'Ordnen Sie «Titel» einer Spalte zu.',
     zugeordnet: (anzahl: number) => (anzahl === 1 ? '1 Feld zugeordnet' : `${anzahl} Felder zugeordnet`),
-    nurZugeordnete: 'Nur zugeordnete Spalten zeigen',
     zuordnungBestaetigen: 'Zuordnung bestätigen',
     // Vorschau (Req 13.3, 13.5)
     ausstehend: 'Das Archiv gleicht die Zeilen ab. Die Vorschau erscheint hier automatisch.',
+    // Ansage am Ende von Vorschau und Übernahme (WCAG 4.1.3)
+    vorschauBereit: (z: Record<'zeilen' | 'neu' | 'geaendert' | 'unveraendert' | 'dubletten' | 'fehler' | 'uebersprungen', string>) =>
+      `Vorschau bereit: ${z.zeilen} Zeilen – ${z.neu} neu, ${z.geaendert} geändert, ${z.unveraendert} unverändert, ` +
+      `${z.dubletten} mögliche Dubletten, ${z.fehler} fehlerhaft, ${z.uebersprungen} übersprungen.`,
+    uebernommenAnsage: (bilanz: string) => `Übernommen: ${bilanz}.`,
+    zuordnungAnsage: 'Zuordnung nötig: Bitte ordnen Sie die Spalten zu.',
+    // Abfrage ohne Ende (Vorschau oder Übernahme endgültig gescheitert)
+    zuLangeVorschau:
+      'Die Vorschau dauert ungewöhnlich lange, vermutlich ist sie gescheitert. Prüfen Sie den Stand später erneut ' +
+      'oder laden Sie die Datei noch einmal hoch.',
+    zuLangeUebernahme:
+      'Die Übernahme dauert ungewöhnlich lange, vermutlich ist sie gescheitert. Solange der Status nicht «Übernommen» ' +
+      'zeigt, ist nichts übernommen. Prüfen Sie den Stand erneut oder lösen Sie die Übernahme noch einmal aus.',
+    erneutPruefen: 'Stand erneut prüfen',
+    abfrageGestoert: 'Die Verbindung zum Archiv ist unterbrochen. Die Seite fragt den Stand weiter ab.',
     vorschauTitel: 'Vorschau',
     vorschauEinleitung: 'Noch ist nichts übernommen. Prüfen Sie die Zeilen und übernehmen Sie danach den Import.',
     zaehler: {
@@ -387,14 +401,19 @@ export const TEXTE = {
     entschieden: (entschieden: string, gesamt: string) => `${entschieden} von ${gesamt} möglichen Dubletten entschieden`,
     // Übernahme (Req 13.6, 13.7)
     uebernehmen: 'Übernehmen …',
+    erneutUebernehmen: 'Erneut übernehmen …',
     uebernehmenTitel: 'Import übernehmen?',
     uebernehmenText: (neu: string, geaendert: string) =>
       `Das Archiv legt ${neu} Einträge neu an und aktualisiert ${geaendert} bestehende. Werte aus der Datei gewinnen, leere Zellen überschreiben nichts.`,
+    uebernehmenEntscheide: (neu: string, zusammen: string, ueberspringen: string) =>
+      `Nach Ihren Entscheiden zu möglichen Dubletten legt das Archiv dazu ${neu} neu an, führt ${zusammen} mit ` +
+      `bestehenden Kontakten zusammen und überspringt ${ueberspringen}.`,
     uebernehmenDubletten: (offen: string) =>
       `${offen} mögliche Dubletten ohne Entscheid werden ausgelassen.`,
     vollexportAktiv:
       'Vollexport: Kontakte mit Kontakt-ID aus 21.CRM, die in dieser Datei fehlen oder dort gelöscht sind, werden als ' +
-      '«nicht mehr im CRM-Export» gekennzeichnet. Gelöscht wird nichts.',
+      '«nicht mehr im CRM-Export» gekennzeichnet – aber nur, wenn die Spalte «Kontakt-ID (21.CRM)» zugeordnet ist und ' +
+      'Werte hat. Gelöscht wird nichts.',
     keinVollexport: 'Kein Vollexport: Kontakte, die in dieser Datei fehlen, bleiben unverändert.',
     jetztUebernehmen: 'Jetzt übernehmen',
     abbrechen: 'Abbrechen',
@@ -410,11 +429,10 @@ export const TEXTE = {
     abgebrochen: 'Dieser Import wurde abgebrochen. Bitte laden Sie die Datei erneut hoch.',
     fehlercode: {
       DATEI_ZU_GROSS: 'Die Datei ist grösser als 5 MiB. Bitte in 21.CRM kleiner exportieren.',
-      CSV_LEER: 'Die Datei enthält keine Datenzeilen.',
-      CSV_UNGUELTIG: 'Die Datei ist keine gültige CSV-Datei.',
+      CSV_LEER: 'Die Datei enthält keine Datenzeilen. Bitte exportieren Sie sie erneut aus 21.CRM.',
       STATUS_KONFLIKT: 'Der Import hat sich inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand.',
-      NICHT_GEFUNDEN: 'Diesen Import gibt es nicht.',
-      NICHT_ERLAUBT: 'Für Importe fehlt Ihnen das Recht.',
+      NICHT_GEFUNDEN: 'Diesen Import gibt es nicht. Bitte wählen Sie ihn in der Liste der Importe.',
+      NICHT_ERLAUBT: 'Für Importe fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
     } as Record<string, string>,
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',

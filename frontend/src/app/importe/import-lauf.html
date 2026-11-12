@@ -19,13 +19,20 @@
   <p class="fehler" role="alert">{{ fehler() }}</p>
 }
 
-<div role="status" aria-live="polite" class="laufhinweis">
-  @if (status() === 'VORSCHAU_AUSSTEHEND') {
-    <p>{{ texte.ausstehend }}</p>
-  } @else if (uebernahmeLaeuft()) {
-    <p>{{ texte.uebernahmeLaeuft }}</p>
+<div role="status" aria-live="polite" class="laufhinweis" data-test="ansage">
+  @if (ansage()) {
+    <p>{{ ansage() }}</p>
   }
 </div>
+
+@if (zuLange()) {
+  <section class="karte zu-lange" data-test="zu-lange">
+    <p class="fehler" role="alert">
+      {{ status() === 'VORSCHAU_AUSSTEHEND' ? texte.zuLangeVorschau : texte.zuLangeUebernahme }}
+    </p>
+    <button mat-button type="button" (click)="erneutPruefen()">{{ texte.erneutPruefen }}</button>
+  </section>
+}
 
 @if (!antwort() && !fehler()) {
   <p>{{ texte.laden }}</p>
@@ -96,7 +103,7 @@
 @if ((status() === 'VORSCHAU' || status() === 'UEBERNOMMEN') && l) {
   <section aria-labelledby="vorschau-titel">
     <h2 id="vorschau-titel">{{ texte.vorschauTitel }}</h2>
-    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+    @if (entscheidbar()) {
       <p>{{ texte.vorschauEinleitung }}</p>
     }
     <div class="zaehler" role="group" [attr.aria-label]="texte.filter">
@@ -113,7 +120,7 @@
       }
     </div>
 
-    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft() && (l.dubletten ?? 0) > 0) {
+    @if (entscheidbar() && (l.dubletten ?? 0) > 0) {
       <p class="hinweis" data-test="dubletten-hinweis">
         @if (art() === 'kontakt') {
           {{ texte.dublettenHinweis }}
@@ -149,6 +156,8 @@
               </dl>
             } @else if (zeile.werte?.length) {
               <p class="werte"><span class="hinweis">{{ texte.rohwerte }}:</span> {{ zeile.werte!.join(' · ') }}</p>
+            } @else if (!zeile.werte) {
+              <p class="hinweis" data-test="werte-verworfen">{{ texte.werteVerworfen }}</p>
             }
             @if (zeile.kontaktId) {
               <p class="kontakt"><span class="hinweis">{{ texte.trifft }}:</span> {{ kontaktText(zeile.kontaktId) }}</p>
@@ -163,7 +172,7 @@
                 </ul>
               </div>
             }
-            @if (zeile.ergebnis === 'DUBLETTE' && art() === 'kontakt' && status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+            @if (zeile.ergebnis === 'DUBLETTE' && art() === 'kontakt' && entscheidbar()) {
               <label class="feld entscheid">
                 <span>{{ texte.entscheid }}</span>
                 <select
@@ -198,13 +207,21 @@
       </nav>
     }
 
-    @if (status() === 'VORSCHAU' && !uebernahmeLaeuft()) {
+    @if (entscheidbar()) {
       @if (!bestaetigen()) {
-        <button mat-flat-button type="button" (click)="uebernehmenFragen()">{{ texte.uebernehmen }}</button>
+        <button mat-flat-button type="button" (click)="uebernehmenFragen()">
+          {{ uebernahmeLaeuft() ? texte.erneutUebernehmen : texte.uebernehmen }}
+        </button>
       } @else {
         <section class="karte bestaetigen" role="group" aria-labelledby="bestaetigen-titel" data-test="bestaetigen">
           <h3 id="bestaetigen-titel" tabindex="-1" #bestaetigenTitel>{{ texte.uebernehmenTitel }}</h3>
           <p>{{ texte.uebernehmenText(zahl(l.neu), zahl(l.geaendert)) }}</p>
+          @if (art() === 'kontakt' && entscheide().size > 0) {
+            @let e = entscheideAnzahl();
+            <p data-test="entscheide-folge">
+              {{ texte.uebernehmenEntscheide(zahl(e.neu), zahl(e.zusammen), zahl(e.ueberspringen)) }}
+            </p>
+          }
           @if (art() === 'kontakt' && dublettenOffen() > 0) {
             <p>{{ texte.uebernehmenDubletten(zahl(dublettenOffen())) }}</p>
           }

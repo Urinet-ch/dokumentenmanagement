@@ -132,7 +132,12 @@ async function bedienen(welt, route) {
     imp.lauf.uebernommenVon = welt.keycloak.benutzer.id;
     return antwort(route, 202, imp.lauf);
   }
-  return antwort(route, 404, { status: 404, code: 'NICHT_GEFUNDEN', title: 'Nicht gefunden' });
+  return antwort(route, 404, {
+    status: 404,
+    fehlercode: 'NICHT_GEFUNDEN',
+    title: 'Nicht gefunden',
+    detail: 'Den Eintrag gibt es nicht, oder er ist für Sie nicht sichtbar. Bitte prüfen Sie den Link.',
+  });
 }
 
 // Chromium gibt den Inhalt einer Datei nicht an Playwright heraus (postDataBuffer bleibt leer); darum hält die Seite

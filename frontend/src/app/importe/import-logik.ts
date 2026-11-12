@@ -6,7 +6,10 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 export type ImportArt = 'kontakt' | 'verkaufschance';
 
-/** Grenze des Servers (`archiv.import.max-groesse`, Req 13.10); grössere Dateien lehnt schon die PWA ab. */
+/**
+ * Grenze des Servers (`archiv.import.max-groesse`, Req 13.10); grössere Dateien lehnt schon die PWA ab. Ändert sich
+ * die Konfiguration, hier und in `texte.de-CH.ts` («5 MiB») nachziehen.
+ */
 export const MAX_GROESSE = 5 * 1024 * 1024;
 
 export const PROFIL_21CRM = ImportZuordnungBestaetigen.ProfilEnum._21Crm;
@@ -98,6 +101,27 @@ export function entscheideAnfrage(entscheide: ReadonlyMap<number, Entscheid>): R
   return ergebnis;
 }
 
+/** Getroffene Entscheide je Art, für die Bestätigung der Übernahme. */
+export function entscheideZaehlen(entscheide: ReadonlyMap<number, Entscheid>): {
+  neu: number;
+  zusammen: number;
+  ueberspringen: number;
+} {
+  let neu = 0;
+  let zusammen = 0;
+  let ueberspringen = 0;
+  for (const entscheid of entscheide.values()) {
+    if (entscheid === 'NEU') {
+      neu++;
+    } else if (entscheid === 'UEBERSPRINGEN') {
+      ueberspringen++;
+    } else {
+      zusammen++;
+    }
+  }
+  return { neu, zusammen, ueberspringen };
+}
+
 /** Ganze Zahlen mit Apostroph als Tausendertrennzeichen (`1'234`). */
 export function zahl(wert: number | null | undefined): string {
   return String(wert ?? 0).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
@@ -140,7 +164,16 @@ export function fehlercode(fehler: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
-/** Meldung zu einer Fehlerantwort (Problem Details) ohne technische Einzelheiten. */
+/** Vorübergehende Störung (keine Verbindung, Proxy oder Archiv kurz nicht bereit): Die Statusabfrage versucht es weiter. */
+export function voruebergehend(fehler: unknown): boolean {
+  const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
+  return status === 0 || status === 502 || status === 503 || status === 504;
+}
+
+/**
+ * Meldung zu einer Fehlerantwort (Problem Details) ohne technische Einzelheiten. Der eigene Text zum Fehlercode geht vor
+ * `detail`, weil der Server dort einen allgemeinen Text sendet (z. B. bei `STATUS_KONFLIKT` über «das Dokument»).
+ */
 export function fehlerText(fehler: unknown): string {
   const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
   if (status === 401) {
@@ -152,6 +185,6 @@ export function fehlerText(fehler: unknown): string {
   const detail = problem(fehler)['detail'];
   const code = fehlercode(fehler);
   return (
-    (typeof detail === 'string' && detail) || (code && TEXTE.importe.fehlercode[code]) || TEXTE.importe.fehlerAllgemein
+    (code && TEXTE.importe.fehlercode[code]) || (typeof detail === 'string' && detail) || TEXTE.importe.fehlerAllgemein
   );
 }

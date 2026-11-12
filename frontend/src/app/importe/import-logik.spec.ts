@@ -76,7 +76,13 @@ describe('Import-Logik (Aufgabe 4.4)', () => {
     expect(fehlerText(problem(0, null))).toBe(TEXTE.importe.fehlerVerbindung);
     expect(fehlerText(problem(401, null))).toBe(TEXTE.importe.fehlerSitzung);
     expect(fehlerText(problem(422, { fehlercode: 'CSV_LEER' }))).toBe(TEXTE.importe.fehlercode['CSV_LEER']);
-    expect(fehlerText(problem(422, { fehlercode: 'CSV_LEER', detail: 'keine Datenzeilen' }))).toBe('keine Datenzeilen');
+    // Der eigene Text zum Fehlercode geht vor dem allgemeinen detail des Servers (Review PR #72, S3)
+    expect(fehlerText(problem(409, { fehlercode: 'STATUS_KONFLIKT', detail: 'Das Dokument steht …' }))).toBe(
+      TEXTE.importe.fehlercode['STATUS_KONFLIKT'],
+    );
+    expect(fehlerText(problem(400, { fehlercode: 'ANFRAGE_UNGUELTIG', detail: 'Bitte prüfen Sie …' }))).toBe(
+      'Bitte prüfen Sie …',
+    );
     expect(fehlerText(problem(500, 'kaputt'))).toBe(TEXTE.importe.fehlerAllgemein);
   });
 });

@@ -25,12 +25,14 @@ import {
   Felder,
   ImportArt,
   entscheideAnfrage,
+  entscheideZaehlen,
   feldDerSpalte,
   fehlerText,
   fehlercode,
   kontaktText,
   pflichtErfuellt,
   profilGilt,
+  voruebergehend,
   zahl,
   zeit,
   zuordnen,
@@ -39,6 +41,15 @@ import {
 
 /** Abstand der Statusabfrage, solange der Worker rechnet (Vorschau oder Übernahme). */
 export const ABFRAGE_MS = 2000;
+/** Abstand nach einer vorübergehenden Störung der Abfrage (keine Verbindung, 502–504). */
+export const ABFRAGE_STOERUNG_MS = 10_000;
+/**
+ * Längste Wartezeit ohne Ergebnis, danach endet die Abfrage mit einem Hinweis: über der Summe aller Versuche von
+ * `CSV_UEBERNEHMEN` (3 × 10 min Zeitgrenze + 2 und 4 min Wartezeit = 36 min; `CSV_VORSCHAU` 3 × 5 + 6 = 21 min).
+ * Ein endgültig gescheiterter Auftrag lässt den Lauf in `VORSCHAU_AUSSTEHEND` bzw. in `VORSCHAU` mit
+ * `uebernommenVon` stehen (design.md, Importe, K4).
+ */
+export const WARTEN_MAX_MS = 40 * 60 * 1000;
 const SEITE = 50;
 
 type Ergebnis = ImportZeile.ErgebnisEnum;
@@ -65,6 +76,8 @@ export class ImportLaufSeite {
   private readonly injector = inject(Injector);
   private abfrage?: ReturnType<typeof setTimeout>;
   private anfrage?: Subscription;
+  private wartetSeit: number | null = null;
+  private abfrageGestoert = false;
 
   readonly id = input.required<string>();
 
@@ -77,6 +90,10 @@ export class ImportLaufSeite {
   protected readonly filter = signal<Ergebnis | null>(null);
   protected readonly seite = signal(0);
   protected readonly sendet = signal(false);
+  /** Die Seite hat auf Vorschau oder Übernahme gewartet; erst dann wird das Ende angesagt (WCAG 4.1.3). */
+  private readonly gewartet = signal(false);
+  /** Vorschau oder Übernahme dauert länger als {@link WARTEN_MAX_MS}; die Abfrage ist beendet. */
+  protected readonly zuLange = signal(false);
 
   // Zuordnung (Req 13.2)
   protected readonly felder = signal<Felder>({});
@@ -92,6 +109,11 @@ export class ImportLaufSeite {
   protected readonly art = computed<ImportArt>(() => (this.lauf()?.art === 'verkaufschance' ? 'verkaufschance' : 'kontakt'));
   protected readonly status = computed(() => this.lauf()?.status ?? null);
   protected readonly uebernahmeLaeuft = computed(() => this.status() === 'VORSCHAU' && !!this.lauf()?.uebernommenVon);
+  private readonly wartet = computed(() => this.status() === 'VORSCHAU_AUSSTEHEND' || this.uebernahmeLaeuft());
+  /** Entscheiden und übernehmen: in der Vorschau, und erneut, wenn eine Übernahme zu lange ausbleibt. */
+  protected readonly entscheidbar = computed(
+    () => this.status() === 'VORSCHAU' && (!this.uebernahmeLaeuft() || this.zuLange()),
+  );
   protected readonly zeilen = computed<readonly ImportZeile[]>(() => this.antwort()?.eintraege ?? []);
   protected readonly kontakte = computed(() => this.antwort()?.kontakte ?? {});
 
@@ -119,12 +141,52 @@ export class ImportLaufSeite {
     };
     return [{ ergebnis: null, anzahl: lauf.zeilen ?? 0 }, ...ERGEBNISSE.map((e) => ({ ergebnis: e, anzahl: anzahl[e] }))];
   });
+  protected readonly entscheideAnzahl = computed(() => entscheideZaehlen(this.entscheide()));
   protected readonly dublettenOffen = computed(() => Math.max(0, (this.lauf()?.dubletten ?? 0) - this.entscheide().size));
   protected readonly bilanz = computed(() => {
     const lauf = this.lauf();
     return (['angelegt', 'aktualisiert', 'ausgelassen', 'gekennzeichnet'] as const)
       .filter((schluessel) => schluessel !== 'gekennzeichnet' || lauf?.vollexport)
       .map((schluessel) => ({ schluessel, anzahl: lauf?.[schluessel] ?? 0 }));
+  });
+
+  /** Inhalt der Live-Region: während des Wartens der Hinweis, danach das Ergebnis. */
+  protected readonly ansage = computed(() => {
+    const lauf = this.lauf();
+    if (!lauf || this.zuLange()) {
+      return '';
+    }
+    if (lauf.status === 'VORSCHAU_AUSSTEHEND') {
+      return this.texte.ausstehend;
+    }
+    if (this.uebernahmeLaeuft()) {
+      return this.texte.uebernahmeLaeuft;
+    }
+    if (!this.gewartet()) {
+      return '';
+    }
+    switch (lauf.status) {
+      case 'VORSCHAU':
+        return this.texte.vorschauBereit({
+          zeilen: zahl(lauf.zeilen),
+          neu: zahl(lauf.neu),
+          geaendert: zahl(lauf.geaendert),
+          unveraendert: zahl(lauf.unveraendert),
+          dubletten: zahl(lauf.dubletten),
+          fehler: zahl(lauf.fehler),
+          uebersprungen: zahl(lauf.uebersprungen),
+        });
+      case 'UEBERNOMMEN':
+        return this.texte.uebernommenAnsage(
+          this.bilanz()
+            .map((posten) => `${zahl(posten.anzahl)} ${this.texte.bilanz[posten.schluessel]}`)
+            .join(', '),
+        );
+      case 'ZUORDNUNG_NOETIG':
+        return this.texte.zuordnungAnsage;
+      default:
+        return '';
+    }
   });
 
   private readonly bestaetigenTitel = viewChild<ElementRef<HTMLElement>>('bestaetigenTitel');
@@ -140,6 +202,9 @@ export class ImportLaufSeite {
         this.seite.set(0);
         this.entscheide.set(new Map());
         this.zuordnungFuer = null;
+        this.gewartet.set(false);
+        this.zuLange.set(false);
+        this.wartetSeit = null;
         this.laden(id);
       });
     });
@@ -153,6 +218,13 @@ export class ImportLaufSeite {
 
   protected blaettern(richtung: -1 | 1): void {
     this.seite.update((seite) => Math.max(0, seite + richtung));
+    this.laden(this.id());
+  }
+
+  /** Nach {@link WARTEN_MAX_MS}: fragt erneut ab und wartet wieder höchstens so lange. */
+  protected erneutPruefen(): void {
+    this.zuLange.set(false);
+    this.wartetSeit = null;
     this.laden(this.id());
   }
 
@@ -256,6 +328,8 @@ export class ImportLaufSeite {
       next: () => {
         this.sendet.set(false);
         this.bestaetigen.set(false);
+        this.zuLange.set(false);
+        this.wartetSeit = null;
         this.filter.set(null);
         this.seite.set(0);
         this.laden(this.id());
@@ -277,11 +351,23 @@ export class ImportLaufSeite {
     const ergebnis = this.filter() ?? undefined;
     this.anfrage = this.importe.apiV1ImporteIdGet(id, ergebnis, SEITE, this.seite()).subscribe({
       next: (antwort) => {
+        if (this.abfrageGestoert) {
+          this.abfrageGestoert = false;
+          this.fehler.set(null);
+        }
         this.antwort.set(antwort);
         this.zuordnungUebernehmen(antwort);
         this.planen(id);
       },
-      error: (fehler: unknown) => this.fehler.set(fehlerText(fehler)),
+      error: (fehler: unknown) => {
+        if (this.wartet() && voruebergehend(fehler)) {
+          this.abfrageGestoert = true;
+          this.fehler.set(this.texte.abfrageGestoert);
+          this.weiterAbfragen(id, ABFRAGE_STOERUNG_MS);
+        } else {
+          this.fehler.set(fehlerText(fehler));
+        }
+      },
     });
   }
 
@@ -299,9 +385,24 @@ export class ImportLaufSeite {
   }
 
   private planen(id: string): void {
-    if (this.status() === 'VORSCHAU_AUSSTEHEND' || this.uebernahmeLaeuft()) {
-      this.abfrage = setTimeout(() => this.laden(id), ABFRAGE_MS);
+    if (!this.wartet()) {
+      this.wartetSeit = null;
+      return;
     }
+    this.gewartet.set(true);
+    this.weiterAbfragen(id, ABFRAGE_MS);
+  }
+
+  private weiterAbfragen(id: string, abstand: number): void {
+    this.wartetSeit ??= Date.now();
+    if (Date.now() - this.wartetSeit >= WARTEN_MAX_MS) {
+      this.zuLange.set(true);
+      if (this.abfrageGestoert) {
+        this.fehler.set(this.texte.fehlerVerbindung);
+      }
+      return;
+    }
+    this.abfrage = setTimeout(() => this.laden(id), abstand);
   }
 
   private anhalten(): void {
