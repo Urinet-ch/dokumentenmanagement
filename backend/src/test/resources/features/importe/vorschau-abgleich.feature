@@ -98,9 +98,58 @@ Funktionalität: CSV-Import aus 21.CRM – Vorschau und Abgleich (Aufgabe 4.2)
     Wenn «inhaber-vhf-gsk» den Lauf abfragt
     Dann lehnt der CSV-Import mit Status 404 und Fehlercode «NICHT_GEFUNDEN» ab
 
+  @req-13.3
+  Szenario: Gelöschte Zeilen bleiben in der Vorschau übersprungen
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Kontakt-Nr;Name;PLZ;Ist gelöscht
+      CRM-T01;Probe Holz AG;6000;true
+      ;Neue Werkstatt GmbH;6430;false
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» mit 2 Datenzeilen, 0 fehlerhaft und 1 übersprungen
+    Und sind für den Lauf 1 Aufträge «CSV_VORSCHAU» eingereiht
+    Wenn der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zeigt die Vorschau 1 neu, 0 geändert, 0 unverändert, 0 mögliche Dubletten, 0 fehlerhaft und 1 übersprungen
+    Und zeigt die Vorschau diese Zeilen:
+      | nr | ergebnis      | meldung         | kontakt | kandidaten |
+      | 2  | UEBERSPRUNGEN | im CRM gelöscht |         |            |
+      | 3  | NEU           |                 |         |            |
+
+  @req-13.3
+  Szenario: Für einen Verkaufschancen-Lauf reiht das Archiv keinen Kontakt-Abgleich ein
+    Wenn «inhaber-urinet» die Verkaufschancen-Kopfzeile aus 21.CRM mit einer erfundenen Zeile hochlädt
+    Und «inhaber-urinet» den Vorschlag für den Verkaufschancen-Lauf bestätigt
+    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» ohne Zähler der Vorschau
+    Und sind für den Lauf 0 Aufträge «CSV_VORSCHAU» eingereiht
+    Wenn der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» ohne Zähler der Vorschau
+
+  @req-13.3
+  Szenariogrundriss: Ein unbekannter oder ungültiger Lauf ist nicht gefunden
+    Wenn «inhaber-urinet» den Lauf «<lauf>» abfragt
+    Dann lehnt der CSV-Import mit Status 404 und Fehlercode «NICHT_GEFUNDEN» ab
+
+    Beispiele:
+      | lauf                                 |
+      | 00000000-0000-4000-8000-000000000000 |
+      | kein-lauf                            |
+
+  @req-13.3
+  Szenario: Eine negative Seite lehnt der CSV-Import ab
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      Name;PLZ
+      Firma A;6000
+      """
+    Und «inhaber-urinet» die Seite -1 mit 10 Zeilen des Laufs abfragt
+    Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+
   @req-2.18
   Szenariogrundriss: Ohne Rolle «inhaber» liefert der CSV-Import keine Vorschau
-    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+    Wenn «<hochlader>» diese Kontakt-CSV hochlädt:
       """
       Name;PLZ
       Firma A;6000
@@ -109,6 +158,7 @@ Funktionalität: CSV-Import aus 21.CRM – Vorschau und Abgleich (Aufgabe 4.2)
     Dann lehnt der CSV-Import mit Status 403 und Fehlercode «NICHT_ERLAUBT» ab
 
     Beispiele:
-      | benutzer           |
-      | mitarbeiter-urinet |
-      | treuhaender-urinet |
+      | hochlader       | benutzer                 |
+      | inhaber-urinet  | mitarbeiter-urinet       |
+      | inhaber-urinet  | treuhaender-urinet       |
+      | inhaber-vhf-gsk | geschaeftsstelle-vhf-gsk |

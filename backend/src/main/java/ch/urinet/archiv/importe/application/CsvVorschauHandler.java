@@ -18,7 +18,8 @@ import java.util.UUID;
  * schreibt Ergebnis, Kontakt und Kandidaten je Zeile und setzt am Ende die Zähler und den Status {@code VORSCHAU}.
  * Übernommen wird nichts. Jeder Block ist eine eigene kurze Transaktion; ändern sich Status oder Zuordnung des Laufs
  * unterwegs (neue Zuordnung), bricht der Auftrag ohne weitere Schreibvorgänge ab, der neue Auftrag rechnet von vorn.
- * Ein Wiederholungsversuch rechnet ebenfalls von vorn. Geloggt werden nur IDs und Zahlen.
+ * Ein Wiederholungsversuch rechnet ebenfalls von vorn. Bleiben bei unverändertem Lauf Zeilen offen, scheitert der
+ * Versuch ({@link CsvVorschauSpeichern.OffeneZeilen}). Geloggt werden nur IDs und Zahlen.
  */
 @ApplicationScoped
 public class CsvVorschauHandler implements AuftragHandler {
@@ -67,7 +68,7 @@ public class CsvVorschauHandler implements AuftragHandler {
         }
         Optional<ImportLauf> fertig = speichern.abschliessen(auftrag, lauf);
         if (fertig.isEmpty()) {
-            LOG.infof("CSV-Vorschau nicht abgeschlossen: lauf=%s Status, Zuordnung oder Zeilen geändert", laufId);
+            LOG.infof("CSV-Vorschau nicht abgeschlossen: lauf=%s Status oder Zuordnung geändert", laufId);
             return;
         }
         ImportLauf.Zaehler z = fertig.get().vorschau();

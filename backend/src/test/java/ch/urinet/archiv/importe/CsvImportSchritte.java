@@ -128,6 +128,34 @@ public class CsvImportSchritte {
         seiteAbfragen(benutzer, 0, 100);
     }
 
+    @Wenn("«{word}» den Lauf «{}» abfragt")
+    public void andererLauf(String benutzer, String id) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(UPLOAD.replace("/crm", "/") + id);
+    }
+
+    @Dann("steht der Lauf auf «{word}» ohne Zähler der Vorschau")
+    public void ohneVorschau(String status) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String pfad = antwort.<Object>path("lauf") == null ? "" : "lauf.";
+        assertThat(antwort.<String>path(pfad + "status")).isEqualTo(status);
+        assertThat(List.of("neu", "geaendert", "unveraendert", "dubletten"))
+                .allSatisfy(feld -> assertThat(antwort.<Object>path(pfad + feld)).as(feld).isNull());
+    }
+
+    @Dann("sind für den Lauf {int} Aufträge «{word}» eingereiht")
+    public void auftraege(int anzahl, String typ) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select count(*) from public.auftrag where typ = ? "
+                        + "and nutzlast ->> 'laufId' = ?")) {
+            abfrage.setString(1, typ);
+            abfrage.setString(2, laufId);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                assertThat(zeile.getInt(1)).isEqualTo(anzahl);
+            }
+        }
+    }
+
     @Wenn("«{word}» die Seite {int} mit {int} Zeilen des Laufs abfragt")
     public void seiteAbfragen(String benutzer, int seite, int groesse) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).queryParam("seite", seite)
@@ -332,6 +360,15 @@ public class CsvImportSchritte {
         body.put("profil", vorschlag.get("profil"));
         body.put("felder", vorschlag.get("felder"));
         zuordnen(benutzer, "kontakt", body);
+    }
+
+    @Wenn("«{word}» den Vorschlag für den Verkaufschancen-Lauf bestätigt")
+    public void verkaufschancenVorschlagBestaetigen(String benutzer) {
+        assertThat(vorschlag).as("Vorschlag aus dem letzten Upload").isNotNull();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("laufId", laufId);
+        body.put("felder", vorschlag.get("felder"));
+        zuordnen(benutzer, "verkaufschance", body);
     }
 
     @Wenn("«{word}» für den Lauf die Kontakt-Zuordnung bestätigt:")

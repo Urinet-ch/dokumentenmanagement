@@ -145,8 +145,10 @@ public class CsvVorschauSpeichern {
 
     /**
      * Markiert Zeilen, die in der Datei doppelt vorkommen, zählt die Ergebnisse und setzt den Lauf auf
-     * {@code VORSCHAU}. Leer ohne Änderung, wenn der Lauf nicht mehr derselbe ist oder noch offene Zeilen hat (eine
-     * neue Zuordnung hat sie zurückgesetzt; ihr eigener Auftrag rechnet sie).
+     * {@code VORSCHAU}. Leer ohne Änderung, wenn der Lauf nicht mehr derselbe ist (neue Zuordnung; ihr eigener Auftrag
+     * rechnet). Bleiben bei unverändertem Lauf Zeilen offen, wirft es {@link OffeneZeilen}: Die Transaktion rollt
+     * zurück, der Auftrag wird wiederholt und endet sonst in {@code FEHLER}, statt den Lauf still in
+     * {@code VORSCHAU_AUSSTEHEND} zu lassen.
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public Optional<ImportLauf> abschliessen(Auftrag auftrag, ImportLauf lauf) {
@@ -159,7 +161,7 @@ public class CsvVorschauSpeichern {
         ImportLauf.Zaehler z = repository.zaehlen(lauf.id());
         int bewertet = z.neu() + z.geaendert() + z.unveraendert() + z.dubletten() + z.fehler() + z.uebersprungen();
         if (bewertet != aktuell.get().zeilen()) {
-            return Optional.empty();
+            throw new OffeneZeilen(lauf.id(), aktuell.get().zeilen() - bewertet);
         }
         ImportLauf fertig = aktuell.get().mitVorschau(z);
         repository.laufAktualisieren(fertig);
@@ -188,6 +190,13 @@ public class CsvVorschauSpeichern {
         felder.put("kategorie", k.kategorie());
         felder.values().removeIf(Objects::isNull);
         return new Bestand(k.id(), treffer.nameNormalisiert(), felder);
+    }
+
+    /** Nach dem Abgleich sind Zeilen eines unveränderten Laufs offen geblieben; die Meldung nennt nur IDs und Zahlen. */
+    public static final class OffeneZeilen extends IllegalStateException {
+        OffeneZeilen(UUID laufId, int anzahl) {
+            super("CSV-Vorschau: lauf=" + laufId + " hat nach dem Abgleich " + anzahl + " nicht bewertete Zeilen");
+        }
     }
 
     /** Abgeglichene Zeilen eines Blocks und die Nummer der letzten gelesenen Zeile (auch wenn sie nicht dabei ist). */
