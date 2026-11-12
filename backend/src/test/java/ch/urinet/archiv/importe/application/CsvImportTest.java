@@ -1,5 +1,9 @@
 package ch.urinet.archiv.importe.application;
 
+import java.util.Map;
+import java.io.InputStream;
+import ch.urinet.archiv.importe.domain.DublettenEntscheid;
+import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.importe.domain.CsvTabelle;
@@ -37,7 +41,7 @@ class CsvImportTest {
     private final ZaehlenderLeser leser = new ZaehlenderLeser();
     private final MerkendesRepository repository = new MerkendesRepository();
     private final CsvImport csvImport = new CsvImport(leser, repository, new ImportEinstellungen(GRENZE, 10_000),
-            laufId -> { });
+            laufId -> { }, (laufId, datei) -> pruefsumme(datei), laufId -> { });
 
     @Test
     void dateiUeberDerGrenzeWirdOhneParserAbgelehnt() throws IOException {
@@ -196,6 +200,15 @@ class CsvImportTest {
         }
 
         @Override
+        public Optional<ImportLauf> laufSperrenOderKonflikt(UUID id) {
+            return laufSperren(id);
+        }
+
+        @Override
+        public void zeitgrenzenSetzen() {
+        }
+
+        @Override
         public Optional<ImportLauf> laufSperren(UUID id) {
             return Optional.empty();
         }
@@ -234,6 +247,38 @@ class CsvImportTest {
         }
 
         @Override
+        public List<ImportZeile> zeilenMitNr(UUID laufId, java.util.Collection<Integer> nrs) {
+            return List.of();
+        }
+
+        @Override
+        public void entscheideSpeichern(UUID laufId, Map<Integer, DublettenEntscheid> entscheide) {
+        }
+
+        @Override
+        public Map<Integer, DublettenEntscheid> entscheide(UUID laufId) {
+            return Map.of();
+        }
+
+        @Override
+        public void uebernahmeVormerken(UUID laufId, String benutzer) {
+        }
+
+        @Override
+        public void uebernahmeAbschliessen(UUID laufId, ImportLauf.Bilanz bilanz) {
+        }
+
+        @Override
+        public List<ImportLauf> laeufe(int seite, int groesse) {
+            return List.of();
+        }
+
+        @Override
+        public long anzahlLaeufe() {
+            return 0;
+        }
+
+        @Override
         public Optional<GespeicherteZuordnung> zuordnung(ImportArt art) {
             return Optional.empty();
         }
@@ -241,5 +286,15 @@ class CsvImportTest {
         @Override
         public void zuordnungSpeichern(GespeicherteZuordnung zuordnung) {
         }
+    }
+    /** SHA-256 der Datei wie die Ablage ({@code ImportAblage}). */
+    static String pruefsumme(Path datei) {
+        java.security.MessageDigest digest = Pruefsumme.sha256();
+        try (InputStream eingabe = Files.newInputStream(datei)) {
+            eingabe.transferTo(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest));
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return Pruefsumme.hex(digest);
     }
 }

@@ -47,6 +47,30 @@ export interface ImportLauf {
      * Vorschau: mögliche Dubletten
      */
     dubletten?: number | null;
+    /**
+     * Benutzer, der die Übernahme ausgelöst hat
+     */
+    uebernommenVon?: string | null;
+    /**
+     * Ende der Übernahme; erst ab Status UEBERNOMMEN
+     */
+    uebernommen?: string | null;
+    /**
+     * Übernahme: angelegte Kontakte bzw. Verkaufschancen
+     */
+    angelegt?: number | null;
+    /**
+     * Übernahme: aktualisierte Kontakte bzw. Verkaufschancen
+     */
+    aktualisiert?: number | null;
+    /**
+     * Übernahme: ausgelassene Zeilen (fehlerhaft, gelöscht, Dublette ohne Entscheid oder übersprungen, Kontakt fehlt)
+     */
+    ausgelassen?: number | null;
+    /**
+     * Übernahme (nur Vollexport): neu als «nicht mehr im CRM-Export» gekennzeichnete Kontakte
+     */
+    gekennzeichnet?: number | null;
 }
 export namespace ImportLauf {
     export const ArtEnum = {

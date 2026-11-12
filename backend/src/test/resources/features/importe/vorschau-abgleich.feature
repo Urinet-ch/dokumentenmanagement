@@ -118,14 +118,17 @@ Funktionalität: CSV-Import aus 21.CRM – Vorschau und Abgleich (Aufgabe 4.2)
       | 3  | NEU           |                 |         |            |
 
   @req-13.3
-  Szenario: Für einen Verkaufschancen-Lauf reiht das Archiv keinen Kontakt-Abgleich ein
+  Szenario: Auch ein Verkaufschancen-Lauf bekommt seine Vorschau (seit Aufgabe 4.3)
     Wenn «inhaber-urinet» die Verkaufschancen-Kopfzeile aus 21.CRM mit einer erfundenen Zeile hochlädt
     Und «inhaber-urinet» den Vorschlag für den Verkaufschancen-Lauf bestätigt
     Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» ohne Zähler der Vorschau
-    Und sind für den Lauf 0 Aufträge «CSV_VORSCHAU» eingereiht
+    Und sind für den Lauf 1 Aufträge «CSV_VORSCHAU» eingereiht
     Wenn der Worker alle fälligen Aufträge bearbeitet
     Und «inhaber-urinet» den Lauf abfragt
-    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» ohne Zähler der Vorschau
+    Dann zeigt die Vorschau 0 neu, 0 geändert, 0 unverändert, 0 mögliche Dubletten, 1 fehlerhaft und 0 übersprungen
+    Und zeigt die Vorschau diese Zeilen:
+      | nr | ergebnis | meldung         | kontakt | kandidaten |
+      | 2  | FEHLER   | Betrag ungültig |         |            |
 
   @req-13.3
   Szenariogrundriss: Ein unbekannter oder ungültiger Lauf ist nicht gefunden

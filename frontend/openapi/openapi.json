@@ -846,6 +846,30 @@
           }
         }
       },
+      "ImportLaeufe" : {
+        "type" : "object",
+        "properties" : {
+          "eintraege" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ImportLauf"
+            }
+          },
+          "gesamt" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Anzahl Läufe des Mandanten"
+          },
+          "seite" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "groesse" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "ImportLauf" : {
         "type" : "object",
         "properties" : {
@@ -914,6 +938,39 @@
             "type" : [ "integer", "null" ],
             "format" : "int32",
             "description" : "Vorschau: mögliche Dubletten"
+          },
+          "uebernommenVon" : {
+            "type" : [ "string", "null" ],
+            "description" : "Benutzer, der die Übernahme ausgelöst hat"
+          },
+          "uebernommen" : {
+            "description" : "Ende der Übernahme; erst ab Status UEBERNOMMEN",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "angelegt" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Übernahme: angelegte Kontakte bzw. Verkaufschancen"
+          },
+          "aktualisiert" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Übernahme: aktualisierte Kontakte bzw. Verkaufschancen"
+          },
+          "ausgelassen" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Übernahme: ausgelassene Zeilen (fehlerhaft, gelöscht, Dublette ohne Entscheid oder übersprungen, Kontakt fehlt)"
+          },
+          "gekennzeichnet" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Übernahme (nur Vollexport): neu als «nicht mehr im CRM-Export» gekennzeichnete Kontakte"
           }
         }
       },
@@ -954,6 +1011,18 @@
           },
           "name" : {
             "type" : "string"
+          }
+        }
+      },
+      "ImportUebernehmen" : {
+        "type" : "object",
+        "properties" : {
+          "dublettenEntscheide" : {
+            "type" : [ "object", "null" ],
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Zeile → NEU, ZUSAMMENFUEHREN:<kontaktId> oder UEBERSPRINGEN; nur für Zeilen mit Ergebnis DUBLETTE, ZUSAMMENFUEHREN nur mit einem ihrer Kandidaten. Dubletten ohne Entscheid werden übersprungen."
           }
         }
       },
@@ -2374,6 +2443,51 @@
         } ]
       }
     },
+    "/api/v1/importe" : {
+      "get" : {
+        "summary" : "Import-Läufe mit Protokoll lesen",
+        "description" : "Läufe des Mandanten, die neuesten zuerst, mit Dateiname, Prüfsumme, Zeit, Benutzer der Übernahme und Zählern (Req 13.8). seite ab 0, groesse 1–100.",
+        "tags" : [ "Importe" ],
+        "parameters" : [ {
+          "name" : "groesse",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        }, {
+          "name" : "seite",
+          "in" : "query",
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportLaeufe"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
     "/api/v1/importe/crm" : {
       "post" : {
         "summary" : "CSV aus dem CRM hochladen",
@@ -2505,6 +2619,9 @@
               }
             }
           },
+          "409" : {
+            "description" : "STATUS_KONFLIKT: Lauf nicht mehr zuzuordnen oder gesperrt, weil seine Übernahme gerade läuft"
+          },
           "422" : {
             "description" : "CSV_UNGUELTIG: keine Spalte für Name bzw. Titel"
           },
@@ -2565,6 +2682,61 @@
           },
           "404" : {
             "description" : "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/importe/{id}/uebernehmen" : {
+      "post" : {
+        "summary" : "Lauf übernehmen",
+        "description" : "Reiht die Übernahme eines Laufs im Status VORSCHAU ein (Auftrag CSV_UEBERNEHMEN, eine Transaktion; Req 13.6–13.9). Neue Kontakte bzw. Verkaufschancen werden angelegt, geänderte aktualisiert (die CSV gewinnt, leere Zellen überschreiben nichts), mögliche Dubletten nur nach Entscheid. Gelöscht wird nie; beim Vollexport werden Kontakte mit CRM-ID, die fehlen, als «nicht mehr im CRM-Export» gekennzeichnet. Ein erneuter Aufruf vor dem Ende ersetzt die Entscheide.",
+        "tags" : [ "Importe" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ImportUebernehmen"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Übernahme eingereiht; Status bleibt VORSCHAU bis zum Ende",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ImportLauf"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "ANFRAGE_UNGUELTIG: Entscheid ungültig, für eine Zeile ohne Dublette, mit einem Kontakt ausserhalb der Kandidaten, zweimal für dieselbe Zeile oder bei Verkaufschancen"
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten"
+          },
+          "409" : {
+            "description" : "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU oder gesperrt, weil seine Übernahme gerade läuft"
           },
           "401" : {
             "description" : "Not Authorized"

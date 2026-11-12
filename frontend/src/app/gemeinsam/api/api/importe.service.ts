@@ -19,9 +19,13 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { ImportHochgeladen } from '../model/import-hochgeladen';
 // @ts-ignore
+import { ImportLaeufe } from '../model/import-laeufe';
+// @ts-ignore
 import { ImportLauf } from '../model/import-lauf';
 // @ts-ignore
 import { ImportLaufMitZeilen } from '../model/import-lauf-mit-zeilen';
+// @ts-ignore
+import { ImportUebernehmen } from '../model/import-uebernehmen';
 // @ts-ignore
 import { ImportZuordnungBestaetigen } from '../model/import-zuordnung-bestaetigen';
 
@@ -295,6 +299,85 @@ export class ImporteService extends BaseService {
     }
 
     /**
+     * Import-Läufe mit Protokoll lesen
+     * Läufe des Mandanten, die neuesten zuerst, mit Dateiname, Prüfsumme, Zeit, Benutzer der Übernahme und Zählern (Req 13.8). seite ab 0, groesse 1–100.
+     * @endpoint get /api/v1/importe
+     * @param groesse 
+     * @param seite 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1ImporteGet(groesse?: number, seite?: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ImportLaeufe>;
+    public apiV1ImporteGet(groesse?: number, seite?: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ImportLaeufe>>;
+    public apiV1ImporteGet(groesse?: number, seite?: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ImportLaeufe>>;
+    public apiV1ImporteGet(groesse?: number, seite?: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'groesse',
+            <any>groesse,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'seite',
+            <any>seite,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/importe`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<ImportLaeufe>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Import-Lauf mit Vorschau lesen
      * Lauf mit den Zählern der Vorschau (neu, geändert, unverändert, mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3). seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist (Status VORSCHAU).
      * @endpoint get /api/v1/importe/{id}
@@ -367,6 +450,80 @@ export class ImporteService extends BaseService {
             {
                 context: localVarHttpContext,
                 params: localVarQueryParameters.toHttpParams(),
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Lauf übernehmen
+     * Reiht die Übernahme eines Laufs im Status VORSCHAU ein (Auftrag CSV_UEBERNEHMEN, eine Transaktion; Req 13.6–13.9). Neue Kontakte bzw. Verkaufschancen werden angelegt, geänderte aktualisiert (die CSV gewinnt, leere Zellen überschreiben nichts), mögliche Dubletten nur nach Entscheid. Gelöscht wird nie; beim Vollexport werden Kontakte mit CRM-ID, die fehlen, als «nicht mehr im CRM-Export» gekennzeichnet. Ein erneuter Aufruf vor dem Ende ersetzt die Entscheide.
+     * @endpoint post /api/v1/importe/{id}/uebernehmen
+     * @param id 
+     * @param importUebernehmen 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1ImporteIdUebernehmenPost(id: string, importUebernehmen: ImportUebernehmen, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ImportLauf>;
+    public apiV1ImporteIdUebernehmenPost(id: string, importUebernehmen: ImportUebernehmen, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ImportLauf>>;
+    public apiV1ImporteIdUebernehmenPost(id: string, importUebernehmen: ImportUebernehmen, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ImportLauf>>;
+    public apiV1ImporteIdUebernehmenPost(id: string, importUebernehmen: ImportUebernehmen, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling apiV1ImporteIdUebernehmenPost.');
+        }
+        if (importUebernehmen === null || importUebernehmen === undefined) {
+            throw new Error('Required parameter importUebernehmen was null or undefined when calling apiV1ImporteIdUebernehmenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/importe/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/uebernehmen`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<ImportLauf>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: importUebernehmen,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

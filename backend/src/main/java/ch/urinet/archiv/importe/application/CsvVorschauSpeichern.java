@@ -11,11 +11,14 @@ import ch.urinet.archiv.importe.domain.KontaktAbgleich.Bestaende;
 import ch.urinet.archiv.importe.domain.KontaktAbgleich.Bestand;
 import ch.urinet.archiv.importe.domain.KontaktAbgleich.Schluessel;
 import ch.urinet.archiv.importe.domain.LaufStatus;
+import ch.urinet.archiv.importe.domain.VerkaufschanceAbgleich;
 import ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis;
 import ch.urinet.archiv.importe.domain.Zuordnung;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.application.KontaktTreffer;
+import ch.urinet.archiv.kontakt.application.KontaktUebernahme;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.kontakt.domain.Verkaufschance;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -44,13 +47,16 @@ public class CsvVorschauSpeichern {
 
     private final ImportRepository repository;
     private final KontaktRegister kontakte;
+    private final KontaktUebernahme uebernahme;
     private final AuftragService auftraege;
     private final BigDecimal schwelle;
 
-    public CsvVorschauSpeichern(ImportRepository repository, KontaktRegister kontakte, AuftragService auftraege,
+    public CsvVorschauSpeichern(ImportRepository repository, KontaktRegister kontakte, KontaktUebernahme uebernahme,
+                                AuftragService auftraege,
                                 @ConfigProperty(name = "archiv.abgleich.aehnlichkeit") BigDecimal schwelle) {
         this.repository = repository;
         this.kontakte = kontakte;
+        this.uebernahme = uebernahme;
         this.auftraege = auftraege;
         this.schwelle = schwelle;
     }
@@ -71,10 +77,13 @@ public class CsvVorschauSpeichern {
      * Namensähnlichkeit der Zeilen ohne exakten Treffer. Schreibt nichts.
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public Block abgleichen(UUID laufId, Zuordnung zuordnung, int nachNr, int stapel) {
+    public Block abgleichen(UUID laufId, ImportArt art, Zuordnung zuordnung, int nachNr, int stapel) {
         List<ImportZeile> gelesen = repository.zeilen(laufId, nachNr, stapel, CsvImport.STAPEL_ZEICHEN);
         if (gelesen.isEmpty()) {
             return Block.LEER;
+        }
+        if (art == ImportArt.VERKAUFSCHANCE) {
+            return verkaufschancen(gelesen, zuordnung);
         }
         List<ImportZeile> offen = new ArrayList<>();
         List<Map<String, String>> werte = new ArrayList<>();
@@ -126,6 +135,46 @@ public class CsvVorschauSpeichern {
             }
             zeilen.add(new Abgeglichen(offen.get(i).mit(befund),
                     KontaktAbgleich.fingerabdruecke(schluessel.get(i), befund.kontaktId())));
+        }
+        return new Block(zeilen, gelesen.getLast().nr());
+    }
+
+    /**
+     * Abgleich eines Blocks Verkaufschancen (Aufgabe 4.3; Req 13.9): Kontakt über die Kontakt-ID aus 21.CRM, bestehende
+     * Verkaufschance über ihre {@code crm_id}; je eine Abfrage für den ganzen Block.
+     */
+    private Block verkaufschancen(List<ImportZeile> gelesen, Zuordnung zuordnung) {
+        List<ImportZeile> offen = new ArrayList<>();
+        List<VerkaufschanceAbgleich.Gelesen> werte = new ArrayList<>();
+        Set<String> kontaktIds = new LinkedHashSet<>();
+        Set<String> crmIds = new LinkedHashSet<>();
+        for (ImportZeile zeile : gelesen) {
+            if (zeile.werte() == null || !zeile.ergebnis().abzugleichen()) {
+                continue;
+            }
+            VerkaufschanceAbgleich.Gelesen g = VerkaufschanceAbgleich.lesen(
+                    zuordnung.werte(ImportArt.VERKAUFSCHANCE, zeile.werte()));
+            offen.add(zeile);
+            werte.add(g);
+            if (g.werte() != null && g.werte().kontaktCrmId() != null) {
+                kontaktIds.add(g.werte().kontaktCrmId());
+            }
+            if (g.werte() != null && g.werte().crmId() != null) {
+                crmIds.add(g.werte().crmId());
+            }
+        }
+        Map<String, UUID> kontaktZu = uebernahme.kontakteMitCrmId(kontaktIds);
+        Map<String, Verkaufschance> bestand = uebernahme.verkaufschancen(crmIds);
+        List<Abgeglichen> zeilen = new ArrayList<>(offen.size());
+        for (int i = 0; i < offen.size(); i++) {
+            VerkaufschanceAbgleich.Werte w = werte.get(i).werte();
+            UUID kontaktId = w == null || w.kontaktCrmId() == null ? null : kontaktZu.get(w.kontaktCrmId());
+            Verkaufschance alt = w == null || w.crmId() == null ? null : bestand.get(w.crmId());
+            Befund befund = VerkaufschanceAbgleich.pruefen(werte.get(i), kontaktId, alt == null ? null
+                    : new VerkaufschanceAbgleich.Bestand(alt.id(), alt.kontaktId(), alt.titel(), alt.phase(),
+                    alt.betrag(), alt.datum()));
+            zeilen.add(new Abgeglichen(offen.get(i).mit(befund), befund.ergebnis() == Ergebnis.FEHLER ? null
+                    : VerkaufschanceAbgleich.fingerabdruecke(w)));
         }
         return new Block(zeilen, gelesen.getLast().nr());
     }

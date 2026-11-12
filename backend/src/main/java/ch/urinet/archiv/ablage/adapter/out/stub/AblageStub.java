@@ -12,6 +12,7 @@ import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
+import ch.urinet.archiv.ablage.domain.Importdatei;
 import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -193,6 +194,16 @@ public class AblageStub implements AblagePort {
     public synchronized Optional<InputStream> lesenVorschau(MandantCode mandant, UUID docId, int seite) {
         List<Version> liste = liste(mandant, Vorschau.schluessel(docId, seite));
         return liste.isEmpty() ? Optional.empty() : Optional.of(new ByteArrayInputStream(lesen(liste.getLast())));
+    }
+
+    @Override
+    public synchronized AbgelegteDatei ablegenImport(MandantCode mandant, UUID laufId, Path datei) {
+        String key = Importdatei.schluessel(laufId);
+        try {
+            return datei(key, speichern(mandant, key, Files.readAllBytes(datei), null));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

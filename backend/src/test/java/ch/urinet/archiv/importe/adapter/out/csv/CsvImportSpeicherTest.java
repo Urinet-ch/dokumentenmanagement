@@ -1,5 +1,7 @@
 package ch.urinet.archiv.importe.adapter.out.csv;
 
+import ch.urinet.archiv.importe.domain.DublettenEntscheid;
+import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.importe.application.CsvImport;
 import ch.urinet.archiv.importe.application.CsvVorschauHandler;
 import ch.urinet.archiv.importe.application.CsvVorschauSpeichern;
@@ -262,7 +264,8 @@ class CsvImportSpeicherTest {
             boolean vorschau = args[2].equals("vorschau");
             try (JsonRepository repository = new JsonRepository(json, Path.of(args[1]).resolve("zeilen.jsonl"))) {
                 CsvImport csvImport = new CsvImport(new CommonsCsvLeser(), repository,
-                        new ImportEinstellungen(MAX_GROESSE, FELD_GRENZE), laufId -> { });
+                        new ImportEinstellungen(MAX_GROESSE, FELD_GRENZE), laufId -> { },
+                        (laufId, datei) -> pruefsumme(datei), laufId -> { });
                 CsvImport.Hochgeladen hochgeladen = csvImport.hochladen(ImportArt.KONTAKT, false, "messung.csv",
                         Path.of(args[0]), "inhaber");
                 String antwort = json.writeValueAsString(Map.of("kopf", hochgeladen.lauf().kopf().namen(),
@@ -303,7 +306,7 @@ class CsvImportSpeicherTest {
                         throw new UnsupportedOperationException(methode.getName());
                     });
             CsvVorschauHandler handler = new CsvVorschauHandler(new CsvVorschauSpeichern(repository,
-                    new JdbcRegister(treffer), new AuftragService(schlange, null, null, null), new BigDecimal("0.6")));
+                    new JdbcRegister(treffer), null, new AuftragService(schlange, null, null, null), new BigDecimal("0.6")));
             handler.ausfuehren(new Auftrag(1, new MandantCode("urinet"), CsvVorschauHandler.TYP,
                     new Nutzlast(Map.of(CsvVorschauHandler.LAUF_ID, zugeordnet.id())), 0));
             ImportLauf fertig = repository.lauf(zugeordnet.id()).orElseThrow();
@@ -494,6 +497,15 @@ class CsvImportSpeicherTest {
         }
 
         @Override
+        public Optional<ImportLauf> laufSperrenOderKonflikt(UUID id) {
+            return laufSperren(id);
+        }
+
+        @Override
+        public void zeitgrenzenSetzen() {
+        }
+
+        @Override
         public Optional<ImportLauf> laufSperren(UUID id) {
             try {
                 ArrayNode namen = (ArrayNode) json.readTree(kopf);
@@ -615,6 +627,38 @@ class CsvImportSpeicherTest {
         }
 
         @Override
+        public List<ImportZeile> zeilenMitNr(UUID laufId, java.util.Collection<Integer> nrs) {
+            return List.of();
+        }
+
+        @Override
+        public void entscheideSpeichern(UUID laufId, Map<Integer, DublettenEntscheid> entscheide) {
+        }
+
+        @Override
+        public Map<Integer, DublettenEntscheid> entscheide(UUID laufId) {
+            return Map.of();
+        }
+
+        @Override
+        public void uebernahmeVormerken(UUID laufId, String benutzer) {
+        }
+
+        @Override
+        public void uebernahmeAbschliessen(UUID laufId, ImportLauf.Bilanz bilanz) {
+        }
+
+        @Override
+        public List<ImportLauf> laeufe(int seite, int groesse) {
+            return List.of();
+        }
+
+        @Override
+        public long anzahlLaeufe() {
+            return 0;
+        }
+
+        @Override
         public Optional<GespeicherteZuordnung> zuordnung(ImportArt art) {
             return Optional.ofNullable(zuordnung);
         }
@@ -642,5 +686,15 @@ class CsvImportSpeicherTest {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+    /** SHA-256 der Datei wie die Ablage ({@code ImportAblage}). */
+    static String pruefsumme(Path datei) {
+        java.security.MessageDigest digest = Pruefsumme.sha256();
+        try (InputStream eingabe = Files.newInputStream(datei)) {
+            eingabe.transferTo(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest));
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        return Pruefsumme.hex(digest);
     }
 }

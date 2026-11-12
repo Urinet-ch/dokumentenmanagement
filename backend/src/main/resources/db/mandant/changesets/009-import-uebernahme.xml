@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Übernahme und Protokoll des CSV-Imports (Aufgabe 4.3; Req 13.6, 13.7, 13.8, 13.9). Nur Ergänzungen,
+         rückwärtskompatibel (tech.md Regel 11):
+         - import_zeile.entscheid / entscheid_kontakt: Auswahl des Benutzers für eine «mögliche Dublette»
+           (NEU, ZUSAMMENFUEHREN mit einem Kandidaten, UEBERSPRINGEN); null = ohne Entscheid (wird übersprungen).
+         - import_lauf.uebernommen_von: wer die Übernahme ausgelöst hat (Protokoll, Req 13.8); die Zeit steht in
+           import_lauf.uebernommen (007).
+         - Zähler der Übernahme: angelegt, aktualisiert, ausgelassen, gekennzeichnet («nicht mehr im CRM-Export»). -->
+    <changeSet id="009-import-uebernahme" author="archiv">
+        <addColumn tableName="import_zeile">
+            <column name="entscheid" type="text"/>
+            <column name="entscheid_kontakt" type="uuid"/>
+        </addColumn>
+        <addColumn tableName="import_lauf">
+            <column name="uebernommen_von" type="text"/>
+            <column name="angelegt" type="int"/>
+            <column name="aktualisiert" type="int"/>
+            <column name="ausgelassen" type="int"/>
+            <column name="gekennzeichnet" type="int"/>
+        </addColumn>
+        <sql>
+            alter table import_zeile add constraint import_zeile_entscheid_ck
+                check (entscheid is null or entscheid in ('NEU', 'ZUSAMMENFUEHREN', 'UEBERSPRINGEN'));
+            alter table import_zeile add constraint import_zeile_entscheid_kontakt_ck
+                check ((entscheid is not distinct from 'ZUSAMMENFUEHREN') = (entscheid_kontakt is not null));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

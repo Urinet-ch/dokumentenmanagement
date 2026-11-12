@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.importe.domain.CsvTabelle;
+import ch.urinet.archiv.importe.domain.DublettenEntscheid;
 import ch.urinet.archiv.importe.domain.Kopfzeile;
 import ch.urinet.archiv.importe.domain.GespeicherteZuordnung;
 import ch.urinet.archiv.importe.domain.ImportArt;
@@ -28,6 +29,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +40,10 @@ import java.util.UUID;
 /**
  * CSV-Import der CRM-Daten, Teil Erkennung und Zuordnung (Aufgabe 4.1; Req 13.1, 13.2, 13.10, 13.11): Upload lesen,
  * Lauf und Zeilen speichern, Zuordnung vorschlagen, bestätigen und speichern. Ein Lauf mit gültiger Zuordnung wartet im
- * Status {@code VORSCHAU_AUSSTEHEND}; für Kontakte reiht das Archiv in derselben Transaktion den Auftrag
- * {@code CSV_VORSCHAU} ein ({@link CsvVorschauHandler}, Aufgabe 4.2). Die Übernahme (4.3) folgt. Die Datei wird nie als
- * Ganzes gehalten: Der Leser meldet Zeile für Zeile (jede höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen, eine
+ * Status {@code VORSCHAU_AUSSTEHEND}; das Archiv reiht in derselben Transaktion den Auftrag {@code CSV_VORSCHAU} ein
+ * ({@link CsvVorschauHandler}, Aufgabe 4.2). Die Originaldatei legt es beim Upload unter {@code importe/} ab, die
+ * Übernahme löst {@link #uebernehmen} aus ({@link CsvUebernehmenHandler}, Aufgabe 4.3). Die Datei wird nie als Ganzes
+ * gehalten: Der Leser meldet Zeile für Zeile (jede höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen, eine
  * längere ist «fehlerhaft»), gespeichert und neu geprüft wird in Blöcken zu höchstens
  * {@link #STAPEL} Zeilen, {@link #STAPEL_WERTE} Werten und {@link #STAPEL_ZEICHEN} Zeichen (Entscheid Fabian 11.11.2026:
  * höchstens ~32 MiB Heap je Import, unabhängig von der Datei). Geloggt werden nur IDs, Prüfsumme, Zahlen und Status,
@@ -60,7 +63,7 @@ public class CsvImport {
      * Zeile, eine Zeile höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen.
      */
     static final int STAPEL_ZEICHEN = 1024 * 1024;
-    /** Grösste Seite von {@code GET /importe/{id}}. */
+    /** Grösste Seite von {@code GET /importe/{id}} und {@code GET /importe}. */
     public static final int SEITE_MAX = 100;
     private static final Logger LOG = Logger.getLogger(CsvImport.class);
     private static final EnumSet<LaufStatus> ZUORDENBAR = EnumSet.of(LaufStatus.ZUORDNUNG_NOETIG,
@@ -70,13 +73,17 @@ public class CsvImport {
     private final ImportRepository repository;
     private final ImportEinstellungen einstellungen;
     private final VorschauAuftraege vorschau;
+    private final ImportAblage ablage;
+    private final UebernahmeAuftraege uebernahme;
 
     public CsvImport(CsvLeser leser, ImportRepository repository, ImportEinstellungen einstellungen,
-                     VorschauAuftraege vorschau) {
+                     VorschauAuftraege vorschau, ImportAblage ablage, UebernahmeAuftraege uebernahme) {
         this.leser = leser;
         this.repository = repository;
         this.einstellungen = einstellungen;
         this.vorschau = vorschau;
+        this.ablage = ablage;
+        this.uebernahme = uebernahme;
     }
 
     /** Ergebnis des Uploads; {@code vorschlag} nur im Status {@code ZUORDNUNG_NOETIG} (Zuordnungsdialog, Req 13.2). */
@@ -89,7 +96,8 @@ public class CsvImport {
      * Sonst liest es die Datei und legt den Lauf mit seinen Zeilen an. Mit gespeicherter Zuordnung, deren Kopfzeile
      * passt, werden die Zeilen geprüft ({@code VORSCHAU_AUSSTEHEND}); sonst gilt {@code ZUORDNUNG_NOETIG} mit Vorschlag.
      * Ohne Datenzeilen {@code CSV_LEER}, ein ungültiges Format oder mehr als 10'000 Datenzeilen {@code CSV_UNGUELTIG};
-     * dann bleibt nichts gespeichert (die Transaktion wird zurückgerollt).
+     * dann bleibt nichts gespeichert (die Transaktion wird zurückgerollt). Eine angenommene Datei legt das Archiv
+     * unverändert unter {@code importe/<laufId>.csv} ab (Req 13.8).
      */
     @Transactional
     public Hochgeladen hochladen(ImportArt art, boolean vollexport, String dateiname, Path datei, String benutzer) {
@@ -111,6 +119,9 @@ public class CsvImport {
             throw fehler;
         }
         ImportLauf lauf = erfassung.lauf;
+        if (!sha256.equals(ablage.ablegen(id, datei))) {
+            throw new IllegalStateException("Prüfsumme der abgelegten Importdatei weicht ab: lauf=" + id);
+        }
         vorschauEinreihen(lauf);
         LOG.infof("CSV-Import gespeichert: lauf=%s art=%s zeichensatz=%s spalten=%d zeilen=%d fehler=%d "
                         + "uebersprungen=%d status=%s", id, art.code(), lauf.zeichensatz(), lauf.kopf().spalten(),
@@ -228,14 +239,15 @@ public class CsvImport {
     /**
      * Bestätigt die Zuordnung eines Laufs, speichert sie für Mandant und Importart (Req 13.2) und prüft seine Zeilen
      * blockweise neu. Mit {@code profil} rechnet das Archiv die Positionen aus der Kopfzeile des Laufs; {@code felder}
-     * übersteuern einzelne Felder. Fehler: Lauf unbekannt → {@code NICHT_GEFUNDEN}; anderer Status →
-     * {@code STATUS_KONFLIKT}; Importart, Profil, Feld oder Position ungültig → {@code ANFRAGE_UNGUELTIG}; Profil passt
+     * übersteuern einzelne Felder. Fehler: Lauf unbekannt → {@code NICHT_GEFUNDEN}; anderer Status oder Lauf länger
+     * gesperrt als {@code archiv.import.sperre-wartezeit} → {@code STATUS_KONFLIKT}; Importart, Profil, Feld oder Position ungültig → {@code ANFRAGE_UNGUELTIG}; Profil passt
      * nicht zur Datei oder keine Spalte für {@code name} bzw. {@code titel} → {@code CSV_UNGUELTIG} (Req 13.10), nichts
      * wird gespeichert.
      */
     @Transactional
     public ImportLauf zuordnen(ImportArt art, UUID laufId, String profil, Map<String, Integer> felder) {
-        ImportLauf lauf = repository.laufSperren(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        ImportLauf lauf = repository.laufSperrenOderKonflikt(laufId)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (lauf.art() != art) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -277,14 +289,64 @@ public class CsvImport {
         return neu;
     }
 
-    /**
-     * Reiht für einen Kontakt-Lauf mit gültiger Zuordnung den Auftrag {@code CSV_VORSCHAU} ein. Der Abgleich der
-     * Verkaufschancen über die Kontakt-ID aus 21.CRM gehört zur Übernahme (Aufgabe 4.3).
-     */
+    /** Reiht für einen Lauf mit gültiger Zuordnung den Auftrag {@code CSV_VORSCHAU} ein (Kontakte und Verkaufschancen). */
     private void vorschauEinreihen(ImportLauf lauf) {
-        if (lauf.art() == ImportArt.KONTAKT && lauf.status() == LaufStatus.VORSCHAU_AUSSTEHEND) {
+        if (lauf.status() == LaufStatus.VORSCHAU_AUSSTEHEND) {
             vorschau.einreihen(lauf.id());
         }
+    }
+
+    /**
+     * Löst die Übernahme eines Laufs im Status {@code VORSCHAU} aus (Req 13.6–13.9): speichert die
+     * Dubletten-Entscheide, hält den Benutzer fest und reiht {@code CSV_UEBERNEHMEN} ein; der Lauf bleibt bis zum Ende
+     * des Auftrags in {@code VORSCHAU}. Ein Entscheid gilt nur für eine Zeile mit Ergebnis {@code DUBLETTE},
+     * {@code ZUSAMMENFUEHREN} nur mit einem ihrer Kandidaten; Dubletten ohne Entscheid werden übersprungen. Ein erneuter
+     * Aufruf, solange der Lauf in {@code VORSCHAU} steht, ersetzt die Entscheide. Fehler: Lauf unbekannt →
+     * {@code NICHT_GEFUNDEN}; anderer Status oder Lauf gesperrt (Übernahme läuft) → {@code STATUS_KONFLIKT}; Entscheid
+     * ungültig, für eine andere Zeile oder bei Verkaufschancen → {@code ANFRAGE_UNGUELTIG}.
+     */
+    @Transactional
+    public ImportLauf uebernehmen(UUID laufId, Map<Integer, String> entscheide, String benutzer) {
+        ImportLauf lauf = repository.laufSperrenOderKonflikt(laufId)
+                .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        if (lauf.status() != LaufStatus.VORSCHAU) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
+        Map<Integer, String> roh = entscheide == null ? Map.of() : entscheide;
+        if (!roh.isEmpty() && (lauf.art() != ImportArt.KONTAKT || roh.size() > lauf.zeilen())) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        Map<Integer, DublettenEntscheid> gelesen = new HashMap<>();
+        roh.forEach((nr, text) -> gelesen.put(Objects.requireNonNullElse(nr, 0),
+                DublettenEntscheid.lesen(text).orElseThrow(() -> new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG))));
+        if (!gelesen.isEmpty()) {
+            List<ImportZeile> zeilen = repository.zeilenMitNr(laufId, gelesen.keySet());
+            if (zeilen.size() != gelesen.size()
+                    || zeilen.stream().anyMatch(z -> !gelesen.get(z.nr()).passt(z))) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+        }
+        repository.entscheideSpeichern(laufId, gelesen);
+        repository.uebernahmeVormerken(laufId, benutzer);
+        uebernahme.einreihen(laufId);
+        LOG.infof("CSV-Übernahme eingereiht: lauf=%s art=%s entscheide=%d", laufId, lauf.art().code(), gelesen.size());
+        return repository.lauf(laufId).orElseThrow();
+    }
+
+    /** Eine Seite der Läufe des Mandanten mit der Gesamtzahl ({@code GET /importe}). */
+    public record Laeufe(List<ImportLauf> laeufe, long gesamt) {
+    }
+
+    /**
+     * Läufe des eigenen Mandanten, die neuesten zuerst, mit Protokoll (Req 13.8). {@code seite} ab 0, {@code groesse}
+     * 1 bis {@value #SEITE_MAX}, sonst {@code ANFRAGE_UNGUELTIG}.
+     */
+    @Transactional
+    public Laeufe laeufe(int seite, int groesse) {
+        if (seite < 0 || groesse < 1 || groesse > SEITE_MAX) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        return new Laeufe(repository.laeufe(seite, groesse), repository.anzahlLaeufe());
     }
 
     private static Zuordnung zuordnung(ImportArt art, ImportLauf lauf, String profil, Map<String, Integer> felder) {
