@@ -38,6 +38,6 @@ export interface Suchanfrage {
 export abstract class SuchePort {
   abstract suchen(anfrage: Suchanfrage): Observable<Suchergebnis>;
   abstract dokumentarten(): Observable<Dokumentart[]>;
-  /** Nur mit Recht A6 (Kontakte lesen); andere Rollen filtern über den Partner eines Treffers. */
+  /** Nur mit Recht A6 (GET /kontakte verlangt es); andere Rollen filtern über den Partner eines Treffers. */
   abstract kontakte(q: string): Observable<Kontakt[]>;
 }
