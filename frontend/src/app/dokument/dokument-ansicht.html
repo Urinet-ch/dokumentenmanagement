@@ -114,6 +114,14 @@
               <p class="fehler" role="alert">{{ texte.fehlerDatei }}</p>
             }
           }
+          @if (geholtUrl(); as url) {
+            <p class="klein" data-test="datei-bereit">
+              {{ texte.oeffnenHinweis }}
+              <a target="_blank" rel="noopener noreferrer" [href]="url" (click)="geholtKlick($event)">{{
+                texte.jetztOeffnen
+              }}</a>
+            </p>
+          }
           @if (dateiFehler()) {
             <p class="fehler" role="alert" data-test="datei-fehler">{{ texte.fehlerDatei }}</p>
           }

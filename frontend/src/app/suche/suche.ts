@@ -20,7 +20,7 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { betrag, datum } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { SucheZustand } from './suche-zustand';
-import { SuchePort } from './suche-port';
+import { Suchanfrage, SuchePort } from './suche-port';
 import { Filterwerte, GROESSE, LEERE_FILTER, Pruefung, SEITE_MAX, aktiveFilter, pruefen } from './suchfilter';
 
 const STATI = [
@@ -165,7 +165,12 @@ export class Suche {
   }
 
   protected blaettern(richtung: -1 | 1): void {
-    this.suchen(this.zustand.seite() + richtung, true);
+    const letzte = this.zustand.gesendet();
+    if (!letzte) {
+      this.suchen(this.zustand.seite() + richtung, true);
+      return;
+    }
+    this.senden({ ...letzte, seite: Math.min(Math.max(letzte.seite + richtung, 0), SEITE_MAX) }, true);
   }
 
   protected titel(t: Suchtreffer): string {
@@ -180,12 +185,17 @@ export class Suche {
       return;
     }
     this.pruefFehler.set([]);
+    this.senden(geprueft.anfrage, fokus);
+  }
+
+  private senden(anfrage: Suchanfrage, fokus: boolean): void {
     this.fehler.set(null);
     this.laeuft.set(true);
     this.laufend?.unsubscribe();
-    this.laufend = this.port.suchen(geprueft.anfrage).subscribe({
+    this.laufend = this.port.suchen(anfrage).subscribe({
       next: (ergebnis) => {
-        this.zustand.seite.set(geprueft.anfrage.seite);
+        this.zustand.seite.set(anfrage.seite);
+        this.zustand.gesendet.set(anfrage);
         this.ergebnis.set(ergebnis);
         this.laeuft.set(false);
         if (fokus) {

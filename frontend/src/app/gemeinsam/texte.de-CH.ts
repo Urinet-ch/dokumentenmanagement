@@ -259,10 +259,13 @@ export const TEXTE = {
     vorschauLaeuft: 'Vorschau wird geladen …',
     vorschauFehlt:
       'Für dieses Dokument gibt es noch keine PDF/A-Fassung. Sie entsteht bei der Archivierung; das Original lässt sich herunterladen.',
-    vorschauErsatz: 'Ihr Browser zeigt PDF-Dateien hier nicht an.',
+    vorschauErsatz:
+      'Ihr Browser zeigt PDF-Dateien hier nicht an. Laden Sie die PDF/A-Fassung mit dem Knopf «PDF/A herunterladen» herunter.',
     pdfOeffnen: 'PDF öffnen',
     herunterladen: 'PDF/A herunterladen',
     originalHerunterladen: 'Original herunterladen',
+    oeffnenHinweis: 'Öffnet sich keine neue Seite, etwa wegen eines Popup-Blockers?',
+    jetztOeffnen: 'Datei jetzt öffnen',
     downloadHinweis: 'Der Download-Link gilt höchstens 5 Minuten und wird bei Bedarf neu angefordert.',
     fehlerDatei: 'Die Datei ist nicht verfügbar. Bitte laden Sie die Seite neu oder versuchen Sie es später erneut.',
     nichtGefunden: 'Dieses Dokument gibt es nicht oder Sie dürfen es nicht sehen.',

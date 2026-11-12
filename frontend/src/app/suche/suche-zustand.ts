@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { Suchergebnis } from '../gemeinsam/api';
+import { Suchanfrage } from './suche-port';
 import { Filterwerte, LEERE_FILTER } from './suchfilter';
 
 /**
@@ -13,6 +14,8 @@ export class SucheZustand {
   readonly filter = signal<Filterwerte>(LEERE_FILTER);
   readonly seite = signal(0);
   readonly ergebnis = signal<Suchergebnis | null>(null);
+  /** Zuletzt gesendete Anfrage; Blättern ändert nur deren Seite, nicht abgeschickte Filter bleiben aussen vor. */
+  readonly gesendet = signal<Suchanfrage | null>(null);
 
   /** Gibt den Stand nur dem Benutzer zurück, der ihn angelegt hat; sonst beginnt die Suche leer. */
   fuer(besitzer: string): void {
@@ -21,6 +24,7 @@ export class SucheZustand {
       this.filter.set(LEERE_FILTER);
       this.seite.set(0);
       this.ergebnis.set(null);
+      this.gesendet.set(null);
     }
   }
 }

@@ -64,6 +64,12 @@ export class DokumentAnsicht {
     return url ? this.bereinigen.bypassSecurityTrustResourceUrl(url) : null;
   });
   protected readonly dateiFehler = signal(false);
+  /**
+   * Zuletzt per Klick geholte Adresse: `window.open` läuft erst nach der Antwort und damit ausserhalb der Klick-Geste;
+   * blockiert der Browser das Fenster, bleibt dieser Link als zweite, eigene Geste.
+   */
+  private readonly geholt = signal<{ adresse: DownloadAdresse; variante: Variante } | null>(null);
+  protected readonly geholtUrl = computed(() => sichereAdresse(this.geholt()?.adresse.url));
 
   private readonly arten = signal<Map<string, string>>(new Map());
   protected readonly artName = computed(() => {
@@ -106,6 +112,7 @@ export class DokumentAnsicht {
     this.pdfa.set(null);
     this.vorschau.set('laedt');
     this.dateiFehler.set(false);
+    this.geholt.set(null);
     this.abos.add(
       this.port.lesen(id).subscribe({
         next: (dokument) => {
@@ -144,8 +151,20 @@ export class DokumentAnsicht {
     this.holenUndOeffnen('original');
   }
 
+  protected geholtKlick(ereignis: MouseEvent): void {
+    const geholt = this.geholt();
+    if (geholt && gueltig(geholt.adresse)) {
+      return;
+    }
+    ereignis.preventDefault();
+    if (geholt) {
+      this.holenUndOeffnen(geholt.variante);
+    }
+  }
+
   private holenUndOeffnen(variante: Variante): void {
     this.dateiFehler.set(false);
+    this.geholt.set(null);
     this.abos.add(
       this.port.adresse(this.id(), variante).subscribe({
         next: (adresse) => {
@@ -157,6 +176,7 @@ export class DokumentAnsicht {
           if (variante === 'pdfa') {
             this.pdfa.set(adresse);
           }
+          this.geholt.set({ adresse, variante });
           window.open(url, '_blank', 'noopener,noreferrer');
         },
         error: () => this.dateiFehler.set(true),

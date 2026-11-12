@@ -73,7 +73,7 @@
           <ul class="vorschlaege" [attr.aria-label]="texte.partnerVorschlaege">
             @for (k of vorschlaege; track k.id) {
               <li>
-                <button mat-button type="button" (click)="partnerWaehlen(k.id, k.name)">{{ kontaktName(k) }}</button>
+                <button mat-button type="button" (click)="partnerWaehlen(k.id, kontaktName(k))">{{ kontaktName(k) }}</button>
               </li>
             } @empty {
               <li class="leer">{{ texte.partnerKeine }}</li>

@@ -27,6 +27,7 @@ const DOKUMENT: Dokument = {
 class DokumentAttrappe extends DokumentPort {
   dokument: Observable<Dokument> = of(DOKUMENT);
   pdfa: Observable<DownloadAdresse> = of({ url: 'https://s3.example/pdfa?sig=1', gueltigBis: zukunft() });
+  original: () => DownloadAdresse = () => ({ url: 'https://s3.example/original', gueltigBis: zukunft() });
   aufrufe: Variante[] = [];
   lesen(): Observable<Dokument> {
     return this.dokument;
@@ -36,7 +37,7 @@ class DokumentAttrappe extends DokumentPort {
   }
   adresse(_id: string, variante: Variante): Observable<DownloadAdresse> {
     this.aufrufe.push(variante);
-    return variante === 'pdfa' ? this.pdfa : of({ url: 'https://s3.example/original', gueltigBis: zukunft() });
+    return variante === 'pdfa' ? this.pdfa : of(this.original());
   }
 }
 
@@ -95,6 +96,31 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     const offen = vi.spyOn(window, 'open').mockReturnValue(null);
     knopf(TEXTE.dokument.originalHerunterladen).click();
     expect(offen).toHaveBeenCalledWith('https://s3.example/original', '_blank', 'noopener,noreferrer');
+  });
+
+  it('bietet nach dem Abruf einen Link als eigene Geste an, falls der Browser das Fenster blockiert', async () => {
+    port.pdfa = throwError(() => new HttpErrorResponse({ status: 404 }));
+    await oeffnen();
+    expect(element.querySelector('[data-test=datei-bereit]')).toBeNull();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    knopf(TEXTE.dokument.originalHerunterladen).click();
+    await fixture.whenStable();
+    const link = element.querySelector<HTMLAnchorElement>('[data-test=datei-bereit] a')!;
+    expect(link.href).toBe('https://s3.example/original');
+    expect(link.rel).toBe('noopener noreferrer');
+    expect(link.target).toBe('_blank');
+    expect(port.aufrufe).toEqual(['pdfa', 'original']);
+  });
+
+  it('holt beim Klick auf den Ersatz-Link eine abgelaufene Adresse neu', async () => {
+    port.pdfa = throwError(() => new HttpErrorResponse({ status: 404 }));
+    port.original = () => ({ url: 'https://s3.example/original', gueltigBis: new Date(Date.now() - 1000).toISOString() });
+    await oeffnen();
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    knopf(TEXTE.dokument.originalHerunterladen).click();
+    await fixture.whenStable();
+    element.querySelector<HTMLAnchorElement>('[data-test=datei-bereit] a')!.click();
+    expect(port.aufrufe).toEqual(['pdfa', 'original', 'original']);
   });
 
   it('sagt bei 404 nur, dass es das Dokument nicht gibt oder es nicht sichtbar ist (Req 2.3)', async () => {

@@ -13,6 +13,7 @@ class SucheAttrappe extends SuchePort {
   anfragen: Suchanfrage[] = [];
   antworten: Subject<Suchergebnis>[] = [];
   kontaktAnfragen: string[] = [];
+  kontaktListe: Kontakt[] = [];
   suchen(anfrage: Suchanfrage): Observable<Suchergebnis> {
     this.anfragen.push(anfrage);
     const antwort = new Subject<Suchergebnis>();
@@ -24,7 +25,7 @@ class SucheAttrappe extends SuchePort {
   }
   kontakte(q: string): Observable<Kontakt[]> {
     this.kontaktAnfragen.push(q);
-    return of([]);
+    return of(this.kontaktListe);
   }
 }
 
@@ -149,6 +150,32 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
     expect(port.anfragen.at(-1)).toMatchObject({ partner: 'k1' });
     expect(element.querySelector('[data-test=partnerfilter]')!.textContent).toContain('FC Schattdorf');
     expect(port.kontaktAnfragen).toEqual([]);
+  });
+
+  it('blättert in der zuletzt gesendeten Suche, nicht in noch nicht abgeschickten Filtern', async () => {
+    eingeben('q', 'Miete');
+    await absenden();
+    await antworten({ ...ergebnis(treffer({})), gesamt: 45 });
+    eingeben('belegnummer', '2026-003');
+    eingeben('q', 'Lohn');
+    element.querySelector<HTMLButtonElement>('nav.blaettern button:last-of-type')!.click();
+    await fixture.whenStable();
+    expect(port.anfragen.at(-1)).toEqual({ seite: 1, groesse: 20, q: 'Miete', sortierung: 'RELEVANZ' });
+  });
+
+  it('zeigt den gewählten Partner mit vollem Namen und Ort wie in den Vorschlägen (A6)', async () => {
+    benutzer.set({ id: 'u2', name: 'Fabian', mandant: 'urinet', rolle: 'inhaber' });
+    fixture.destroy();
+    await oeffnen();
+    await antworten(ergebnis());
+    port.kontaktListe = [{ id: 'k7', typ: 'PERSON', vorname: 'Anna', name: 'Muster', ort: 'Altdorf' }];
+    eingeben('partner', 'Mus');
+    await new Promise((fertig) => setTimeout(fertig, 350));
+    await fixture.whenStable();
+    [...element.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes('Anna Muster'))!.click();
+    await fixture.whenStable();
+    expect(port.anfragen.at(-1)).toMatchObject({ partner: 'k7' });
+    expect(element.querySelector('[data-test=partnerfilter]')!.textContent).toContain('Anna Muster, Altdorf');
   });
 
   it('behält die letzte Suche für «Zurück», verwirft sie aber für einen anderen Benutzer', async () => {
