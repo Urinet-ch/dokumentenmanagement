@@ -439,6 +439,141 @@ components:
         groesse:
           type: integer
           format: int32
+    ImportHochgeladen:
+      type: object
+      properties:
+        lauf:
+          $ref: "#/components/schemas/ImportLauf"
+        spalten:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportSpalte"
+        vorschlagZuordnung:
+          description: nur bei Status ZUORDNUNG_NOETIG
+          type: object
+          anyOf:
+          - $ref: "#/components/schemas/ImportZuordnung"
+          - type: "null"
+    ImportLauf:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        art:
+          type: string
+          enum:
+          - kontakt
+          - verkaufschance
+        vollexport:
+          type: boolean
+        dateiname:
+          type:
+          - string
+          - "null"
+        sha256:
+          type: string
+        zeichensatz:
+          type: string
+          enum:
+          - UTF-8
+          - windows-1252
+        trennzeichen:
+          type: string
+          enum:
+          - ;
+          - ","
+        zeilen:
+          type: integer
+          format: int32
+          description: Datenzeilen ohne Kopfzeile
+        fehler:
+          type: integer
+          format: int32
+          description: "Zeilen «fehlerhaft» (Spaltenzahl, Feldgrenze, Name bzw. Titel\
+            \ fehlt)"
+        uebersprungen:
+          type: integer
+          format: int32
+          description: Zeilen «Ist gelöscht = true»
+        status:
+          type: string
+          enum:
+          - VORSCHAU_AUSSTEHEND
+          - ZUORDNUNG_NOETIG
+          - VORSCHAU
+          - UEBERNOMMEN
+          - ABGEBROCHEN
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+    ImportSpalte:
+      type: object
+      properties:
+        position:
+          type: integer
+          format: int32
+          description: Position ab 0
+        name:
+          type: string
+    ImportZuordnung:
+      type: object
+      properties:
+        profil:
+          type:
+          - string
+          - "null"
+          enum:
+          - 21.CRM
+        felder:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Feld → Spaltenposition (ab 0)
+    ImportZuordnungBestaetigen:
+      type: object
+      required:
+      - laufId
+      properties:
+        laufId:
+          type: string
+          description: "Lauf, dessen Kopfzeile zugeordnet wird"
+        profil:
+          type:
+          - string
+          - "null"
+          description: Profil (nur Importart kontakt); die Positionen rechnet das
+            Archiv aus der Kopfzeile
+          enum:
+          - 21.CRM
+        felder:
+          type:
+          - object
+          - "null"
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Feld → Spaltenposition (ab 0); übersteuert das Profil
+    ImportZuordnungGespeichert:
+      type: object
+      properties:
+        art:
+          type: string
+          enum:
+          - kontakt
+          - verkaufschance
+        profil:
+          type:
+          - string
+          - "null"
+          enum:
+          - 21.CRM
+        felder:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+        geaendert:
+          $ref: "#/components/schemas/Instant"
     Instant:
       type: string
       format: date-time
@@ -761,6 +896,7 @@ tags:
 - name: API-Tokens
 - name: Dokumentarten
 - name: Dokumente
+- name: Importe
 - name: Kontakte
 paths:
   /api/v1/api-tokens:
@@ -1379,6 +1515,112 @@ paths:
         - mitarbeiter
         - treuhaender
         - geschaeftsstelle
+  /api/v1/importe/crm:
+    post:
+      summary: CSV aus dem CRM hochladen
+      description: Erkennt Zeichensatz und Trennzeichen und speichert den Lauf. Unbekannte
+        oder abweichende Kopfzeile → 200 mit Spalten und Vorschlag (Zuordnungsdialog);
+        bekannte → 202 (VORSCHAU_AUSSTEHEND). Dateien über 5 MiB → 413 (DATEI_ZU_GROSS).
+      tags:
+      - Importe
+      parameters:
+      - name: art
+        in: query
+        schema:
+          type: string
+      - name: vollexport
+        in: query
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                datei:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        "200":
+          description: Zuordnung nötig
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportHochgeladen"
+        "202":
+          description: "Zuordnung bekannt, Vorschau ausstehend"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportHochgeladen"
+        "413":
+          description: "DATEI_ZU_GROSS: Datei über archiv.import.max-groesse (5 MiB)"
+        "422":
+          description: CSV_UNGUELTIG oder CSV_LEER
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/importe/crm/zuordnung:
+    get:
+      summary: Gespeicherte Spaltenzuordnung der Importart lesen
+      tags:
+      - Importe
+      parameters:
+      - name: art
+        in: query
+        schema:
+          type: string
+      responses:
+        "404":
+          description: Keine Zuordnung gespeichert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+    put:
+      summary: Spaltenzuordnung bestätigen und speichern
+      description: Speichert die Zuordnung für Mandant und Importart und prüft die
+        Zeilen des Laufs neu.
+      tags:
+      - Importe
+      parameters:
+      - name: art
+        in: query
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportZuordnungBestaetigen"
+        required: true
+      responses:
+        "200":
+          description: "Gespeichert, Lauf VORSCHAU_AUSSTEHEND"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportLauf"
+        "422":
+          description: "CSV_UNGUELTIG: keine Spalte für Name bzw. Titel"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
   /api/v1/kontakte:
     get:
       summary: Kontakte suchen (Partnerauswahl)

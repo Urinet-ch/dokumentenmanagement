@@ -298,7 +298,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 ## Welle 4 — CSV-Import, Suche, Generatoren, Altbestand
 
-- [ ] 4.1 CSV-Erkennung und Spaltenzuordnung [Backend]
+- [x] 4.1 CSV-Erkennung und Spaltenzuordnung [Backend]
   - Upload `/api/v1/importe/crm` (Recht A12), SHA-256, ICU4J-Zeichensatz, Trennzeichen aus Kopfzeile, Grenzen (Spalte für `name` Pflicht, bei 21.CRM `Name` oder `Organisation`; Zeile ohne Namen oder mit falscher Spaltenzahl «fehlerhaft»; ≤ 10'000 Zeilen; ohne Datenzeilen abgelehnt); Parser nach RFC 4180 (Felder in Anführungszeichen mit `;` oder Zeilenumbruch)
   - Profil «21.CRM» aus design.md (Erkennung der Kopfzeile, Name aus `Name` oder `Organisation`, E-Mail/Telefon über Index, gelöschte Zeilen übersprungen, Zuordnung nach Spaltenposition) als Vorschlag im Zuordnungsdialog und Synonymliste für andere Dateien (beide design.md, Befund in `docs/spikes/21crm-export.md`); `import_zuordnung` lesen/speichern; abweichende Kopfzeile → Zuordnungsdialog
   - Tests mit den Beispieldateien aus 0.4 (`21crm-kontakte-beispiel.csv` Windows-1252/Semikolon, `21crm-verkaufschancen-beispiel.csv` ohne Datenzeilen) plus daraus abgeleitete Varianten: UTF-8 mit BOM, Komma, Feld in Anführungszeichen mit `;` und Zeilenumbruch, Zeile mit falscher Spaltenzahl, Zeile ohne Namen, `Ist gelöscht = true`, eigene Datei nur mit Kopfzeile für Req 13.11 (die Verkaufschancen-Beispieldatei wird nach dem Nachexport gefüllt)
