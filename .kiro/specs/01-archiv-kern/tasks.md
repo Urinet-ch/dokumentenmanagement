@@ -129,7 +129,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 1.9 Deploy-Workflow und Compose für die VPS [Infra]
   - `deploy/infomaniak/compose.yml`: API (mit PWA), Worker, PostgreSQL, Keycloak; Traefik-Labels für `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Compose-Policy (Limits, `cap_drop: ALL`, `no-new-privileges`, uid ungleich 0); Secrets nur als Dateien unter `/run/secrets/`, nie `environment` oder `env_file`
   - Images von PostgreSQL und Keycloak als `<app>:…` umtaggen, Eintrag im Infra-Repo der VPS
-  - `archiv_db_owner` nur dem Dienst `archiv-api` mounten; das Admin-Kommando läuft per `exec` im API-Container
+  - `archiv_db_owner` nur dem Dienst `archiv-api` mounten; das Admin-Kommando läuft per `exec` im API-Container (geändert 12.11.2026: in einem Wegwerf-Container des Dienstes `api` mit dessen Secrets, nie per `exec`, weil eine zweite JVM das `mem_limit` sprengt; README «Admin-Kommandos auf der VPS»)
   - GitHub-Actions-Workflow: Image bauen, Bundle per SSH an den Deploy-Befehl der VPS, Health-Prüfung, bei Fehler Rollback auf das Vorgänger-Image ohne Rückbau der Datenbank
   - erster Deploy des Gerüsts auf Stufe A (VPS aus 0.7) in der Form aus tech.md (API und Worker in einem Container, Limits im Speicherbudget), nur mit Testdaten (15.3, 16.15)
   - nach jedem Deploy auf Stufe A Speicherabbrüche der VPS und Health der anderen Apps prüfen; tritt 16.18 ein, gilt das Abbruchkriterium aus 1.10
