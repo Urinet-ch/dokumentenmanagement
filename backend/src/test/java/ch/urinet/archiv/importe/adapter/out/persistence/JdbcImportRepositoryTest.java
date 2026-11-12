@@ -144,11 +144,15 @@ class JdbcImportRepositoryTest {
 
     @Test
     void jederMandantBlaettertUndZaehltNurSeineZeilen() {
-        assertThat(im(URINET, () -> repository.zeilenSeite(LAUF, 1, 2))).extracting(ImportZeile::nr)
+        assertThat(im(URINET, () -> repository.zeilenSeite(LAUF, null, 1, 2))).extracting(ImportZeile::nr)
                 .containsExactly(4, 5);
-        assertThat(im(ZWEITER, () -> repository.zeilenSeite(LAUF, 0, 100))).singleElement()
+        assertThat(im(ZWEITER, () -> repository.zeilenSeite(LAUF, null, 0, 100))).singleElement()
                 .satisfies(z -> assertThat(z.werte()).containsExactly("fremd"));
-        assertThat(im(ZWEITER, () -> repository.zeilenSeite(LAUF, 1, 2))).isEmpty();
+        assertThat(im(ZWEITER, () -> repository.zeilenSeite(LAUF, null, 1, 2))).isEmpty();
+        assertThat(im(URINET, () -> repository.zeilenSeite(LAUF, Ergebnis.FEHLER, 0, 100))).singleElement()
+                .satisfies(z -> assertThat(z.ergebnis()).isEqualTo(Ergebnis.FEHLER));
+        assertThat(im(URINET, () -> repository.zeilenSeite(LAUF, Ergebnis.NEU, 0, 100))).isEmpty();
+        assertThat(im(ZWEITER, () -> repository.zeilenSeite(LAUF, Ergebnis.FEHLER, 0, 100))).isEmpty();
 
         assertThat(im(URINET, () -> repository.zaehlen(LAUF)))
                 .isEqualTo(new ImportLauf.Zaehler(0, 0, 0, 0, 1, 0));

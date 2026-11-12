@@ -195,7 +195,8 @@ class CsvVorschauHandlerTest {
         }
 
         @Override
-        public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+        public List<ImportZeile> zeilenSeite(UUID laufId, ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis ergebnis, int seite,
+                                             int groesse) {
             throw new UnsupportedOperationException();
         }
 
@@ -268,6 +269,11 @@ class CsvVorschauHandlerTest {
 
         @Override
         public Optional<Kontakt> mitCrmId(String crmId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Kontakt> finden(java.util.Collection<UUID> ids) {
             throw new UnsupportedOperationException();
         }
 

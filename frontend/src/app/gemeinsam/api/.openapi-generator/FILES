@@ -28,6 +28,7 @@ model/generator-metadaten.ts
 model/generator-partner.ts
 model/generator-vertrag.ts
 model/import-hochgeladen.ts
+model/import-kontakt.ts
 model/import-laeufe.ts
 model/import-lauf-mit-zeilen.ts
 model/import-lauf.ts

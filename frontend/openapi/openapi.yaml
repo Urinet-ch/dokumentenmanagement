@@ -828,6 +828,37 @@ components:
           anyOf:
           - $ref: "#/components/schemas/ImportZuordnung"
           - type: "null"
+    ImportKontakt:
+      description: Kurzangaben eines vorhandenen Kontakts (Treffer oder Kandidat)
+      type: object
+      properties:
+        crmId:
+          type:
+          - string
+          - "null"
+        typ:
+          type: string
+          enum:
+          - PERSON
+          - ORGANISATION
+        name:
+          type: string
+        vorname:
+          type:
+          - string
+          - "null"
+        plz:
+          type:
+          - string
+          - "null"
+        ort:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
     ImportLaeufe:
       type: object
       properties:
@@ -971,13 +1002,34 @@ components:
         gesamt:
           type: integer
           format: int64
-          description: Anzahl Zeilen des Laufs
+          description: Anzahl Zeilen des Laufs; mit Filter nur die mit diesem Ergebnis
         seite:
           type: integer
           format: int32
         groesse:
           type: integer
           format: int32
+        kontakte:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ImportKontakt"
+          description: Kontakt-ID → Kurzangaben für kontaktId und kandidaten der Zeilen
+            dieser Seite
+        spalten:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/ImportSpalte"
+          description: Spalten der Kopfzeile; nur bei Status ZUORDNUNG_NOETIG
+        vorschlagZuordnung:
+          description: nur bei Status ZUORDNUNG_NOETIG
+          type:
+          - object
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/ImportZuordnung"
+          - type: "null"
     ImportSpalte:
       type: object
       properties:
@@ -1044,6 +1096,15 @@ components:
           items:
             type: string
           description: Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern
+        felder:
+          type:
+          - object
+          - "null"
+          additionalProperties:
+            type: string
+          description: "Feld → Wert nach der Zuordnung des Laufs, wie ihn die Übernahme\
+            \ liest (Hilfsfelder aufgelöst, leere Werte fehlen); fehlt ohne Zuordnung\
+            \ oder ohne Rohwerte"
     ImportZuordnung:
       type: object
       properties:
@@ -2360,9 +2421,11 @@ paths:
     get:
       summary: Import-Lauf mit Vorschau lesen
       description: "Lauf mit den Zählern der Vorschau (neu, geändert, unverändert,\
-        \ mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3).\
-        \ seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag\
-        \ CSV_VORSCHAU fertig ist (Status VORSCHAU)."
+        \ mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3),\
+        \ mit ergebnis nur Zeilen mit diesem Ergebnis. seite ab 0, groesse 1–100.\
+        \ Die Zähler der Vorschau fehlen, bis der Auftrag CSV_VORSCHAU fertig ist\
+        \ (Status VORSCHAU). Bei Status ZUORDNUNG_NOETIG kommen Spalten und Vorschlag\
+        \ wie beim Upload mit (Zuordnungsdialog nach einem Neuladen)."
       tags:
       - Importe
       parameters:
@@ -2371,6 +2434,17 @@ paths:
         required: true
         schema:
           type: string
+      - name: ergebnis
+        in: query
+        schema:
+          type: string
+          enum:
+          - NEU
+          - GEAENDERT
+          - UNVERAENDERT
+          - DUBLETTE
+          - FEHLER
+          - UEBERSPRUNGEN
       - name: groesse
         in: query
         schema:
@@ -2390,6 +2464,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ImportLaufMitZeilen"
+        "400":
+          description: "ANFRAGE_UNGUELTIG: seite, groesse oder ergebnis ungültig"
         "404":
           description: "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten"
         "401":

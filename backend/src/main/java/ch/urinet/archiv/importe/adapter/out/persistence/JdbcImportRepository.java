@@ -423,15 +423,20 @@ public class JdbcImportRepository implements ImportRepository {
     }
 
     @Override
-    public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+    public List<ImportZeile> zeilenSeite(UUID laufId, Ergebnis filter, int seite, int groesse) {
         String sql = "select nr, daten::text as daten, ergebnis, meldung, kontakt_id, kandidaten from " + schema()
-                + ".import_zeile where lauf_id = ? order by nr limit ? offset ?";
+                + ".import_zeile where lauf_id = ?" + (filter == null ? "" : " and ergebnis = ?")
+                + " order by nr limit ? offset ?";
         List<ImportZeile> zeilen = new ArrayList<>();
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setObject(1, laufId, Types.OTHER);
-            abfrage.setInt(2, groesse);
-            abfrage.setLong(3, (long) seite * groesse);
+            int i = 1;
+            abfrage.setObject(i++, laufId, Types.OTHER);
+            if (filter != null) {
+                abfrage.setString(i++, filter.name());
+            }
+            abfrage.setInt(i++, groesse);
+            abfrage.setLong(i, (long) seite * groesse);
             try (ResultSet ergebnis = abfrage.executeQuery()) {
                 while (ergebnis.next()) {
                     zeilen.add(zeile(ergebnis));

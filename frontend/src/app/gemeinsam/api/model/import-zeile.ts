@@ -31,6 +31,10 @@ export interface ImportZeile {
      * Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern
      */
     werte?: Array<string> | null;
+    /**
+     * Feld → Wert nach der Zuordnung des Laufs, wie ihn die Übernahme liest (Hilfsfelder aufgelöst, leere Werte fehlen); fehlt ohne Zuordnung oder ohne Rohwerte
+     */
+    felder?: { [key: string]: string; } | null;
 }
 export namespace ImportZeile {
     export const ErgebnisEnum = {

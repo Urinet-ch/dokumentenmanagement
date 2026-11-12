@@ -17,6 +17,7 @@ export * from './generator-metadaten';
 export * from './generator-partner';
 export * from './generator-vertrag';
 export * from './import-hochgeladen';
+export * from './import-kontakt';
 export * from './import-laeufe';
 export * from './import-lauf';
 export * from './import-lauf-mit-zeilen';
