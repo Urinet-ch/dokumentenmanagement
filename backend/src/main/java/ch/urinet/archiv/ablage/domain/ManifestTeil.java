@@ -11,11 +11,12 @@ import java.util.regex.Pattern;
  */
 public record ManifestTeil(String endung) {
 
-    public static final ManifestTeil JSON = new ManifestTeil("json");
-    public static final ManifestTeil SIG = new ManifestTeil("sig");
-
+    // Muster vor den Konstanten: sonst prüft der Konstruktor gegen ein noch leeres Feld
     private static final Pattern DIENST = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
     private static final Pattern ENDUNG = Pattern.compile("json|sig|[a-z0-9][a-z0-9-]{0,31}\\.(tsr|kette\\.pem|ocsp\\.der|crl\\.der)");
+
+    public static final ManifestTeil JSON = new ManifestTeil("json");
+    public static final ManifestTeil SIG = new ManifestTeil("sig");
 
     public ManifestTeil {
         Objects.requireNonNull(endung, "endung");
