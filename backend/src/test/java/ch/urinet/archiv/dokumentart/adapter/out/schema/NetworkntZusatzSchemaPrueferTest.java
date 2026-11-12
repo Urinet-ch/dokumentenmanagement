@@ -3,16 +3,27 @@ package ch.urinet.archiv.dokumentart.adapter.out.schema;
 import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPruefer.Uhren;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.Schema;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
@@ -154,6 +165,68 @@ class NetworkntZusatzSchemaPrueferTest {
     })
     void werteAusserhalbVonRfc3339OderUnendlichSindUngueltig(String werte) {
         assertUngueltig(() -> pruefer.wertePruefen(SCHEMA_3X, werte));
+    }
+
+    @Test
+    void schemaMitUnendlicherGrenzeIstUngueltig() {
+        assertUngueltig(() -> pruefer.schemaPruefen("{\"type\":\"object\",\"maximum\":1e400}"));
+    }
+
+    /** Review PR #83, Soll 1: nicht endliche Zahlen in Werten bleiben ungültig, auch ohne {@code type} im Schema. */
+    @ParameterizedTest
+    @ValueSource(strings = {"\"minimum\":0", "\"minimum\":-1e-400", "\"multipleOf\":4.9e-324", "\"const\":1e400"})
+    void unendlicheZahlIstAuchOhneTypUngueltig(String schluessel) {
+        String schema = "{\"type\":\"object\",\"properties\":{\"n\":{" + schluessel + "}}}";
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":1e400}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":[-1e400]}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":NaN}"));
+    }
+
+    /** Ab 3.x (Review PR #83, Soll 1, Fälle 3 und 4): grosse Ganzzahlen und Grenzen über {@code int} nach Wert. */
+    @Test
+    void grosseGanzzahlenGeltenNachWert() {
+        String gross = "1" + "0".repeat(900);
+        assertThatCode(() -> pruefer.wertePruefen(
+                "{\"type\":\"object\",\"properties\":{\"n\":{\"minimum\":0.1,\"multipleOf\":0.01}}}",
+                "{\"n\":" + gross + "}")).doesNotThrowAnyException();
+        assertThatCode(() -> pruefer.wertePruefen(
+                "{\"type\":\"object\",\"properties\":{\"l\":{\"type\":\"array\",\"maxItems\":" + gross + "}}}",
+                "{\"l\":[1,1.0]}")).doesNotThrowAnyException();
+    }
+
+    /**
+     * Review PR #83, Kann 1: Die Registry des Prüfers lädt auch ohne die eigene Vorprüfung nichts nach – weder über
+     * HTTP (0 Verbindungen auf einem lokalen Port) noch aus einer Datei.
+     */
+    @Test
+    void registryLaedtOhneVorpruefungNichtsNach(@TempDir Path ordner) throws Exception {
+        Path datei = Files.writeString(ordner.resolve("ziel.json"), "{\"type\":\"string\"}");
+        AtomicInteger verbindungen = new AtomicInteger();
+        try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+            Thread annehmen = Thread.ofPlatform().daemon().start(() -> {
+                while (!server.isClosed()) {
+                    try (Socket ignoriert = server.accept()) {
+                        verbindungen.incrementAndGet();
+                    } catch (IOException e) {
+                        return;
+                    }
+                }
+            });
+            ObjectMapper leser = new ObjectMapper();
+            for (String ziel : List.of("http://127.0.0.1:" + server.getLocalPort() + "/s.json", datei.toUri().toString(),
+                    "file:" + datei)) {
+                tools.jackson.databind.JsonNode schema = Jackson3Baum.von(leser.readTree(
+                        "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"" + ziel + "\"}}}"));
+                assertThatThrownBy(() -> {
+                    Schema kompiliert = pruefer.registry().getSchema(schema);
+                    kompiliert.initializeValidators();
+                    kompiliert.validate(Jackson3Baum.von(leser.readTree("{\"a\":\"x\"}")));
+                }).as(ziel).isInstanceOf(RuntimeException.class);
+            }
+            server.close();
+            annehmen.join(Duration.ofSeconds(1));
+        }
+        assertThat(verbindungen).hasValue(0);
     }
 
     @Test

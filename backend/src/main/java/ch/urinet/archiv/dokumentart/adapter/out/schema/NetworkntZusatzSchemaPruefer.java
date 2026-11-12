@@ -251,7 +251,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         Schema schema = geprueft(schemaJson).kompiliert();
         boolean gueltig;
         try {
-            gueltig = schema.validate(Jackson3Baum.von(werte)).isEmpty();
+            gueltig = schema.validate(Jackson3Baum.wert(werte)).isEmpty();
         } catch (RuntimeException | StackOverflowError e) {
             throw ungueltig();
         }
@@ -365,6 +365,11 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             f.pruefen();
             return pattern.matcher(new MitFrist(text, f)).find();
         };
+    }
+
+    /** Registry wie in der Anwendung, damit ein Test das Nachladen ohne die eigene Vorprüfung nachweisen kann. */
+    SchemaRegistry registry() {
+        return registry;
     }
 
     /** Bricht ab, wenn die Frist des laufenden Aufrufs abgelaufen ist; ausserhalb eines Aufrufs gilt keine Frist. */
@@ -595,8 +600,10 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     /**
-     * Abbruch nach der Frist. Als {@link SchemaException}, weil die Bibliothek diese ohne Log weiterreicht; andere
-     * Ausnahmen loggt sie mit Muster und Ort.
+     * Abbruch nach der Frist. Als {@link SchemaException}, weil die Bibliothek diese beim Suchen ohne Log weiterreicht;
+     * andere Ausnahmen loggt sie mit Muster und Ort. Beim Kompilieren des Musters loggt die Bibliothek
+     * ({@code PatternValidator}) jede Ausnahme, auch diese, mit dem Muster auf Stufe error; das Muster ist
+     * Schema-Inhalt, keine Dokument- oder Personendaten.
      */
     static final class FristAbgelaufen extends SchemaException {
         private static final long serialVersionUID = 1L;
