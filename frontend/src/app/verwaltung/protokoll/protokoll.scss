@@ -1,0 +1,102 @@
+:host {
+  display: block;
+  max-width: 64rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+}
+
+.filter {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+
+  h2,
+  .knoepfe {
+    grid-column: 1 / -1;
+  }
+}
+
+.feld {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+
+input,
+select {
+  font: inherit;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.hinweis,
+.angaben {
+  color: var(--urinet-gedaempft);
+  margin: 0;
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
+
+.liste {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.eintrag,
+.zeile {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  justify-items: start;
+}
+
+.kopf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.kennung,
+.details,
+a {
+  overflow-wrap: anywhere;
+}
+
+.marke {
+  border: 1px solid var(--urinet-linie);
+  border-radius: 1rem;
+  padding: 0 0.5rem;
+
+  &[data-aktion='VERWEIGERT'],
+  &[data-aktion='SPERRE_KONFLIKT'] {
+    border-color: var(--urinet-fehler);
+  }
+}
+
+.blaettern {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

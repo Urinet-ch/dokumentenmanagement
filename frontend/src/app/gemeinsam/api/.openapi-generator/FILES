@@ -6,6 +6,7 @@ api/dokumentarten.service.ts
 api/dokumente.service.ts
 api/importe.service.ts
 api/kontakte.service.ts
+api/protokoll.service.ts
 configuration.ts
 encoder.ts
 index.ts
@@ -41,11 +42,14 @@ model/import-zuordnung.ts
 model/kontakt-angaben.ts
 model/kontakt.ts
 model/models.ts
+model/protokoll-eintrag.ts
+model/protokoll-seite.ts
 model/suchergebnis.ts
 model/suchtreffer.ts
 model/upload-ergebnis.ts
 model/upload-fehler.ts
 model/verwerfen.ts
+model/verzeichnis-eintrag.ts
 model/warnung.ts
 param.ts
 provide-api.ts

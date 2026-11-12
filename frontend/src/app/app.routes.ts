@@ -62,6 +62,11 @@ export const routes: Routes = [
     title: titel(TEXTE.menue.importe),
   },
   folgt('verwaltung/dokumentarten', TEXTE.menue.dokumentarten, 'A11'),
-  folgt('verwaltung/protokoll', TEXTE.menue.protokoll, 'A13'),
+  {
+    path: 'verwaltung/protokoll',
+    loadComponent: () => import('./verwaltung/protokoll/protokoll').then((m) => m.Protokoll),
+    canActivate: [rechtGuard('A13')],
+    title: titel(TEXTE.menue.protokoll),
+  },
   { path: '**', redirectTo: '' },
 ];

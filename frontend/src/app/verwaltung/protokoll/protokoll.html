@@ -1,0 +1,155 @@
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+
+<form class="karte filter" (submit)="$event.preventDefault(); anzeigen()" [attr.aria-label]="texte.filterTitel">
+  <h2>{{ texte.filterTitel }}</h2>
+  <label class="feld">
+    <span>{{ texte.von }}</span>
+    <input type="date" [value]="filter().von" (input)="setzen('von', $any($event.target).value)" data-test="von" />
+  </label>
+  <label class="feld">
+    <span>{{ texte.bis }}</span>
+    <input type="date" [value]="filter().bis" (input)="setzen('bis', $any($event.target).value)" data-test="bis" />
+  </label>
+  <label class="feld">
+    <span>{{ texte.benutzer }}</span>
+    <input
+      type="text"
+      list="kennungen"
+      maxlength="200"
+      aria-describedby="kennung-hinweis"
+      [value]="filter().benutzer"
+      (input)="setzen('benutzer', $any($event.target).value)"
+      data-test="benutzer"
+    />
+    <datalist id="kennungen">
+      @for (zeile of kennungen(); track zeile.benutzer) {
+        <option [value]="zeile.benutzer">{{ zeile.name || zeile.benutzer }}</option>
+      }
+    </datalist>
+    <span id="kennung-hinweis" class="hinweis">{{ texte.benutzerHinweis }}</span>
+  </label>
+  <label class="feld">
+    <span>{{ texte.dokument }}</span>
+    <input
+      type="text"
+      maxlength="36"
+      [value]="filter().dokument"
+      (input)="setzen('dokument', $any($event.target).value)"
+      data-test="dokument"
+    />
+  </label>
+  <label class="feld">
+    <span>{{ texte.aktion }}</span>
+    <select [value]="filter().aktion" (change)="setzen('aktion', $any($event.target).value)" data-test="aktion">
+      <option value="">{{ texte.alleAktionen }}</option>
+      @for (aktion of aktionen; track aktion) {
+        <option [value]="aktion">{{ aktionText(aktion) }}</option>
+      }
+    </select>
+  </label>
+  <div class="knoepfe">
+    <button mat-flat-button type="submit">{{ texte.anzeigen }}</button>
+    <button mat-button type="button" (click)="zuruecksetzen()">{{ texte.zuruecksetzen }}</button>
+  </div>
+</form>
+
+<section aria-labelledby="eintraege-titel">
+  <h2 id="eintraege-titel">{{ texte.eintraege }}</h2>
+  @if (fehler()) {
+    <p class="fehler" role="alert">{{ fehler() }}</p>
+  }
+  @if (eintraege() === null) {
+    @if (!fehler()) {
+      <p>{{ texte.laden }}</p>
+    }
+  } @else if (eintraege()!.length === 0) {
+    <p role="status">{{ texte.keineEintraege }}</p>
+  } @else {
+    <ul class="liste">
+      @for (eintrag of eintraege(); track eintrag.id) {
+        <li class="karte eintrag" data-test="eintrag">
+          <span class="kopf">
+            <time [attr.datetime]="eintrag.zeit">{{ zeitpunkt(eintrag.zeit) }}</time>
+            <span class="marke" [attr.data-aktion]="eintrag.aktion">{{ aktionText(eintrag.aktion) }}</span>
+          </span>
+          <span class="wer">{{ wer(eintrag) }}</span>
+          @if (eintrag.benutzer) {
+            <span class="angaben kennung">{{ texte.kennung(eintrag.benutzer) }}</span>
+          }
+          @if (eintrag.dokumentId) {
+            <a class="angaben" [routerLink]="['/dokument', eintrag.dokumentId]">
+              {{ texte.zumDokument }} {{ eintrag.dokumentId }}
+            </a>
+          }
+          @if (eintrag.ip) {
+            <span class="angaben">{{ texte.ip(eintrag.ip) }}</span>
+          }
+          @if (eintrag.details && eintrag.details !== '{}') {
+            <span class="angaben details">{{ texte.details }}: {{ eintrag.details }}</span>
+          }
+        </li>
+      }
+    </ul>
+    <nav class="blaettern" [attr.aria-label]="texte.eintraege">
+      <button mat-button type="button" [disabled]="seite() === 0" (click)="laden(seite() - 1)">{{ texte.zurueck }}</button>
+      <span>{{ texte.seiteVon(bereich().von, bereich().bis, bereich().gesamt) }}</span>
+      <button mat-button type="button" [disabled]="!hatWeitere()" (click)="laden(seite() + 1)">{{ texte.weiter }}</button>
+    </nav>
+  }
+</section>
+
+<section aria-labelledby="verzeichnis-titel">
+  <h2 id="verzeichnis-titel">{{ texte.verzeichnisTitel }}</h2>
+  <p>{{ texte.verzeichnisEinleitung }}</p>
+  <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
+  @if (verzeichnisFehler()) {
+    <p class="fehler" role="alert">{{ verzeichnisFehler() }}</p>
+  }
+  @if (verzeichnis() === null) {
+    @if (!verzeichnisFehler()) {
+      <p>{{ texte.laden }}</p>
+    }
+  } @else if (verzeichnis()!.length === 0) {
+    <p>{{ texte.keinVerzeichnis }}</p>
+  } @else {
+    <ul class="liste">
+      @for (zeile of verzeichnis(); track zeile.id) {
+        <li class="karte zeile" data-test="verzeichnis">
+          <span class="wer">{{ person(zeile.name, zeile.rolle) }}</span>
+          <span class="angaben kennung">{{ texte.kennung(zeile.benutzer) }}</span>
+          <span class="angaben">
+            {{ texte.anlaesse[zeile.anlass] }} ·
+            {{ texte.gueltig(zeitpunkt(zeile.gueltigVon), zeile.gueltigBis ? zeitpunkt(zeile.gueltigBis) : null) }}
+            @if (zeile.erfasstVon) {
+              · {{ texte.erfasstVon(zeile.erfasstVon) }}
+            }
+          </span>
+          @if (austrittMoeglich(zeile)) {
+            @if (austrittFuer() === zeile.benutzer) {
+              <span class="frage">{{ texte.austrittFrage(zeile.name || zeile.benutzer) }}</span>
+              <span class="knoepfe">
+                <button mat-flat-button type="button" [disabled]="laeuft()" (click)="austritt(zeile)">
+                  {{ texte.austrittBestaetigen }}
+                </button>
+                <button mat-button type="button" [disabled]="laeuft()" (click)="austrittFuer.set(null)">
+                  {{ texte.abbrechen }}
+                </button>
+              </span>
+            } @else {
+              <button
+                mat-stroked-button
+                type="button"
+                class="austritt"
+                [disabled]="laeuft()"
+                (click)="meldung.set(null); austrittFuer.set(zeile.benutzer)"
+              >
+                {{ texte.austritt }}
+              </button>
+            }
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>
