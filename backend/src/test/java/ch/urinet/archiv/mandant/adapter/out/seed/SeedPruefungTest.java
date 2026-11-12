@@ -27,9 +27,10 @@ class SeedPruefungTest {
 
     private static final String UNGUELTIG = "probe-seed-ungueltig";
 
-    // Grosszügige Frist: geprüft werden die Seeds, nicht die Zeitgrenze (sonst abhängig vom Tempo des Rechners)
-    private final SeedPruefung pruefung =
-            new SeedPruefung(new DokumentartPruefung(new NetworkntZusatzSchemaPruefer(Duration.ofSeconds(10))));
+    // Fristen wie in application.properties: Die Seed-Prüfung misst CPU-Zeit mit eigener Seed-Frist, darum hängt sie
+    // nicht vom Tempo des Rechners ab (Stufe A, 12.11.2026)
+    private final SeedPruefung pruefung = new SeedPruefung(new DokumentartPruefung(
+            new NetworkntZusatzSchemaPruefer(Duration.ofMillis(50), Duration.ofSeconds(2))));
 
     @Test
     void alleSeedsSindGueltig() throws IOException {

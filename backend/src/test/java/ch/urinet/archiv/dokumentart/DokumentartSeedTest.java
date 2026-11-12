@@ -108,7 +108,7 @@ class DokumentartSeedTest {
         }
         assertThat(schema).isNotNull();
         // Grosszügige Frist: geprüft wird das Schema, nicht die Zeitgrenze (sonst abhängig vom Tempo des Rechners)
-        var pruefer = new NetworkntZusatzSchemaPruefer(Duration.ofSeconds(10));
+        var pruefer = new NetworkntZusatzSchemaPruefer(Duration.ofSeconds(10), Duration.ofSeconds(10));
         String werte = "{\"periode\":\"" + periode + "\",\"person\":\"Testperson\"}";
         if (gueltig) {
             pruefer.wertePruefen(schema, werte);

@@ -16,7 +16,8 @@ import java.util.List;
 /**
  * Prüft den Seed eines Mandanten, bevor die Provisionierung etwas anlegt (Review PR #40): Jede Vorlage muss eine
  * gültige {@link Dokumentart} ergeben (Domain-Regeln) und durch die {@link DokumentartPruefung} gehen (Zusatz-Schema,
- * Pflichtfelder). Sonst {@code SEED_UNGUELTIG}, statt dass die Art erst beim Lesen zur Laufzeit 500 ergibt.
+ * Pflichtfelder). Sonst {@code SEED_UNGUELTIG}, statt dass die Art erst beim Lesen zur Laufzeit 500 ergibt. Der Seed
+ * stammt aus dem Repo und läuft im Admin-Kommando, darum mit der Seed-Frist ({@code archiv.dokumentart.seed-zeitgrenze}).
  */
 @ApplicationScoped
 public class SeedPruefung {
@@ -30,7 +31,7 @@ public class SeedPruefung {
     public void pruefen(MandantCode mandant, List<DokumentartVorlage> vorlagen) {
         for (DokumentartVorlage vorlage : vorlagen) {
             try {
-                pruefung.pruefen(art(vorlage));
+                pruefung.seedPruefen(art(vorlage));
             } catch (FachFehler e) {
                 throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG, "Seed für Mandant " + mandant.wert()
                         + ": Dokumentart " + vorlage.code() + " ist ungültig (" + e.code().name() + ")", e);

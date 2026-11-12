@@ -12,6 +12,12 @@ public interface ZusatzSchemaPruefer {
     /** Prüft das Schema und liefert die Namen der Zusatzfelder ({@code properties} der obersten Ebene). */
     Set<String> schemaPruefen(String schemaJson);
 
+    /**
+     * Wie {@link #schemaPruefen}, aber für den Seed eines Mandanten (Admin-Kommando, Quelle im Repo) mit der eigenen,
+     * grösseren Frist {@code archiv.dokumentart.seed-zeitgrenze}.
+     */
+    Set<String> seedSchemaPruefen(String schemaJson);
+
     /** Prüft Zusatzwerte (JSON-Objekt) gegen ein gültiges Schema. */
     void wertePruefen(String schemaJson, String werteJson);
 }
