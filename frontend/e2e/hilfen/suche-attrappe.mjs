@@ -95,6 +95,8 @@ function dokument(d) {
     zusatz: { belegnummer: d.belegnummer },
     version: 2,
     warnungen: [],
+    pdfaFehlt: false,
+    unsicher: [],
   };
 }
 

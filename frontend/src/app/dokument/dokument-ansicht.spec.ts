@@ -23,6 +23,8 @@ const DOKUMENT: Dokument = {
   zusatz: { belegnummer: '2026-003', ohneWert: null },
   version: 1,
   warnungen: [],
+  pdfaFehlt: false,
+  unsicher: [],
 };
 
 class DokumentAttrappe extends DokumentPort {
