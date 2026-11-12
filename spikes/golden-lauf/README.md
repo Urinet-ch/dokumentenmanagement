@@ -98,7 +98,7 @@ Nachbearbeitung (`Nachbearbeitung.FASSUNG`, bei jeder Regeländerung hochgezähl
 Erwartungen nach F4/F6 (PR #82): Prämienrechnungen und Mahnungen mit Gebühr = `LIEFERANTENBELEG`. Der Prompt v5 legte
 in der Art-Regel noch «Prämienrechnungen und Mahnungen von Versicherungen VERSICHERUNG» fest; Prompt v6 setzt F4/F6 und
 P40-2 um, die Prototyp-Regel E3 leert eine Belegnummer nur aus Nullen. Abgestimmt nur auf dem Abstimmungsteil.
-1. Commit = Merge-Commit von PR #PRNR, ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
+1. Commit = Merge-Commit von PR #90, ohne spätere Änderungen im Spike; `cd spikes/golden-lauf && mvn package`.
 2. Golden-Daten vorher mit dem Generator ab PR #82 neu erzeugen (`tools/golden_synth/README.md`, Seed 20261108).
 3. Aufruf wie oben mit `--gate`. Eingefroren: Prompt `v6-7a39224f2f5e`, Modell `google/gemma-4-31B-it`, Nachbearbeitung
    `nb-2026-11-12`, Eingangsdatum `2026-11-10`, Schwelle 0.8. Weicht einer ab, gilt der Lauf nicht.

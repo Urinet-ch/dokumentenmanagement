@@ -311,7 +311,7 @@ war das einzige falsche Feld eine Belegnummer mit hoher Sicherheit; der eine erl
 Befund für Welle 3 (KI-Vorschläge im Produkt): Die Belegnummer ist in Abstimmungs- und Prüfteil die einzige Fehlerquelle
 mit hoher Sicherheit; in Aufgabe 3.2 gezielt prüfen, ohne den eingefrorenen Stand des Prototyps zu ändern. Abnahme durch Fabian: `docs/umsetzungsplan.md`, Abschnitt 6.
 
-## Lauf nach Aufgabe 3.8 (12.11.2026, PR #PRNR)
+## Lauf nach Aufgabe 3.8 (12.11.2026, PR #90)
 Golden-Daten neu erzeugt mit dem Generator nach F4/F6 (PR #82; nur die erwartete Art von 34, 37 und 49 geändert, Aufteilung
 unverändert). Läufe nur auf dem Abstimmungsteil (30 Belege), Modell `google/gemma-4-31B-it`, Schwelle 0.8:
 
