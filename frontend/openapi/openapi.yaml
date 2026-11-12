@@ -741,6 +741,49 @@ components:
           - ABGEBROCHEN
         erstellt:
           $ref: "#/components/schemas/Instant"
+        neu:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Vorschau: neue Kontakte; erst ab Status VORSCHAU"
+        geaendert:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Vorschau: geänderte Kontakte"
+        unveraendert:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Vorschau: unveränderte Kontakte"
+        dubletten:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Vorschau: mögliche Dubletten"
+    ImportLaufMitZeilen:
+      type: object
+      properties:
+        lauf:
+          $ref: "#/components/schemas/ImportLauf"
+        eintraege:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportZeile"
+        gesamt:
+          type: integer
+          format: int64
+          description: Anzahl Zeilen des Laufs
+        seite:
+          type: integer
+          format: int32
+        groesse:
+          type: integer
+          format: int32
     ImportSpalte:
       type: object
       properties:
@@ -750,6 +793,51 @@ components:
           description: Position ab 0
         name:
           type: string
+    ImportZeile:
+      type: object
+      properties:
+        nr:
+          type: integer
+          format: int32
+          description: Zeile in der Datei (Kopfzeile = 1)
+        ergebnis:
+          type:
+          - string
+          - "null"
+          description: "null: wartet auf Zuordnung oder Vorschau"
+          enum:
+          - NEU
+          - GEAENDERT
+          - UNVERAENDERT
+          - DUBLETTE
+          - FEHLER
+          - UEBERSPRUNGEN
+        meldung:
+          type:
+          - string
+          - "null"
+        kontaktId:
+          description: getroffener Kontakt bei GEAENDERT und UNVERAENDERT
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        kandidaten:
+          type: array
+          items:
+            type: string
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+          description: Kandidaten einer möglichen Dublette
+        werte:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern
     ImportZuordnung:
       type: object
       properties:
@@ -1975,6 +2063,49 @@ paths:
           description: Not Allowed
         "400":
           description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/importe/{id}:
+    get:
+      summary: Import-Lauf mit Vorschau lesen
+      description: "Lauf mit den Zählern der Vorschau (neu, geändert, unverändert,\
+        \ mögliche Dublette, fehlerhaft) und einer Seite seiner Zeilen (Req 13.3).\
+        \ seite ab 0, groesse 1–100. Die Zähler der Vorschau fehlen, bis der Auftrag\
+        \ CSV_VORSCHAU fertig ist (Status VORSCHAU)."
+      tags:
+      - Importe
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: groesse
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - name: seite
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportLaufMitZeilen"
+        "404":
+          description: "NICHT_GEFUNDEN: kein Lauf mit dieser ID im Mandanten"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber

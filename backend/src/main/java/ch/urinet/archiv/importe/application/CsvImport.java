@@ -37,8 +37,9 @@ import java.util.UUID;
 
 /**
  * CSV-Import der CRM-Daten, Teil Erkennung und Zuordnung (Aufgabe 4.1; Req 13.1, 13.2, 13.10, 13.11): Upload lesen,
- * Lauf und Zeilen speichern, Zuordnung vorschlagen, bestätigen und speichern. Vorschau mit Abgleich (4.2) und Übernahme
- * (4.3) folgen; ein Lauf mit gültiger Zuordnung wartet im Status {@code VORSCHAU_AUSSTEHEND}. Die Datei wird nie als
+ * Lauf und Zeilen speichern, Zuordnung vorschlagen, bestätigen und speichern. Ein Lauf mit gültiger Zuordnung wartet im
+ * Status {@code VORSCHAU_AUSSTEHEND}; für Kontakte reiht das Archiv in derselben Transaktion den Auftrag
+ * {@code CSV_VORSCHAU} ein ({@link CsvVorschauHandler}, Aufgabe 4.2). Die Übernahme (4.3) folgt. Die Datei wird nie als
  * Ganzes gehalten: Der Leser meldet Zeile für Zeile (jede höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen, eine
  * längere ist «fehlerhaft»), gespeichert und neu geprüft wird in Blöcken zu höchstens
  * {@link #STAPEL} Zeilen, {@link #STAPEL_WERTE} Werten und {@link #STAPEL_ZEICHEN} Zeichen (Entscheid Fabian 11.11.2026:
@@ -59,6 +60,8 @@ public class CsvImport {
      * Zeile, eine Zeile höchstens {@link CsvTabelle#MAX_ZEILE} JSON-Zeichen.
      */
     static final int STAPEL_ZEICHEN = 1024 * 1024;
+    /** Grösste Seite von {@code GET /importe/{id}}. */
+    public static final int SEITE_MAX = 100;
     private static final Logger LOG = Logger.getLogger(CsvImport.class);
     private static final EnumSet<LaufStatus> ZUORDENBAR = EnumSet.of(LaufStatus.ZUORDNUNG_NOETIG,
             LaufStatus.VORSCHAU_AUSSTEHEND);
@@ -66,11 +69,14 @@ public class CsvImport {
     private final CsvLeser leser;
     private final ImportRepository repository;
     private final ImportEinstellungen einstellungen;
+    private final VorschauAuftraege vorschau;
 
-    public CsvImport(CsvLeser leser, ImportRepository repository, ImportEinstellungen einstellungen) {
+    public CsvImport(CsvLeser leser, ImportRepository repository, ImportEinstellungen einstellungen,
+                     VorschauAuftraege vorschau) {
         this.leser = leser;
         this.repository = repository;
         this.einstellungen = einstellungen;
+        this.vorschau = vorschau;
     }
 
     /** Ergebnis des Uploads; {@code vorschlag} nur im Status {@code ZUORDNUNG_NOETIG} (Zuordnungsdialog, Req 13.2). */
@@ -105,6 +111,7 @@ public class CsvImport {
             throw fehler;
         }
         ImportLauf lauf = erfassung.lauf;
+        vorschauEinreihen(lauf);
         LOG.infof("CSV-Import gespeichert: lauf=%s art=%s zeichensatz=%s spalten=%d zeilen=%d fehler=%d "
                         + "uebersprungen=%d status=%s", id, art.code(), lauf.zeichensatz(), lauf.kopf().spalten(),
                 lauf.zeilen(), lauf.fehler(), lauf.uebersprungen(), lauf.status());
@@ -147,7 +154,7 @@ public class CsvImport {
             gueltig = repository.zuordnung(art).filter(z -> z.passt(kopf)).map(GespeicherteZuordnung::zuordnung);
             LaufStatus status = gueltig.isPresent() ? LaufStatus.VORSCHAU_AUSSTEHEND : LaufStatus.ZUORDNUNG_NOETIG;
             lauf = new ImportLauf(id, art, vollexport, dateiname, sha256, zeichensatz, trennzeichen, kopf, 0, 0, 0,
-                    status, benutzer, Instant.now());
+                    status, benutzer, Instant.now(), gueltig.orElse(null), null);
             repository.laufAnlegen(lauf);
         }
 
@@ -189,9 +196,28 @@ public class CsvImport {
                 speichern();
             }
             lauf = new ImportLauf(id, art, vollexport, dateiname, sha256, lauf.zeichensatz(), lauf.trennzeichen(),
-                    lauf.kopf(), zeilen, fehler, uebersprungen, lauf.status(), benutzer, lauf.erstellt());
+                    lauf.kopf(), zeilen, fehler, uebersprungen, lauf.status(), benutzer, lauf.erstellt(),
+                    lauf.zuordnung(), null);
             repository.laufAktualisieren(lauf);
         }
+    }
+
+    /** Ein Lauf mit einer Seite seiner Zeilen ({@code GET /importe/{id}}, Req 13.3). */
+    public record LaufSeite(ImportLauf lauf, List<ImportZeile> zeilen) {
+    }
+
+    /**
+     * Lauf mit Zählern und einer Seite seiner Zeilen, aufsteigend nach Zeilennummer. Nur Läufe des eigenen Mandanten;
+     * sonst {@code NICHT_GEFUNDEN}. {@code seite} ab 0, {@code groesse} 1 bis {@value #SEITE_MAX}, sonst
+     * {@code ANFRAGE_UNGUELTIG}.
+     */
+    @Transactional
+    public LaufSeite lauf(UUID laufId, int seite, int groesse) {
+        if (seite < 0 || groesse < 1 || groesse > SEITE_MAX) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        ImportLauf lauf = repository.lauf(laufId).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        return new LaufSeite(lauf, repository.zeilenSeite(laufId, seite, groesse));
     }
 
     @Transactional
@@ -242,12 +268,23 @@ public class CsvImport {
             repository.zeilenAktualisieren(laufId, geprueft);
             nachNr = block.getLast().nr();
         }
-        ImportLauf neu = lauf.mit(LaufStatus.VORSCHAU_AUSSTEHEND, fehler, uebersprungen);
+        ImportLauf neu = lauf.mit(LaufStatus.VORSCHAU_AUSSTEHEND, fehler, uebersprungen).mit(zuordnung);
         repository.laufAktualisieren(neu);
+        vorschauEinreihen(neu);
         LOG.infof("Zuordnung gespeichert: lauf=%s art=%s profil=%s felder=%s fehler=%d uebersprungen=%d", laufId,
                 art.code(), zuordnung.profilName().orElse("-"), zuordnung.felder().keySet(), neu.fehler(),
                 neu.uebersprungen());
         return neu;
+    }
+
+    /**
+     * Reiht für einen Kontakt-Lauf mit gültiger Zuordnung den Auftrag {@code CSV_VORSCHAU} ein. Der Abgleich der
+     * Verkaufschancen über die Kontakt-ID aus 21.CRM gehört zur Übernahme (Aufgabe 4.3).
+     */
+    private void vorschauEinreihen(ImportLauf lauf) {
+        if (lauf.art() == ImportArt.KONTAKT && lauf.status() == LaufStatus.VORSCHAU_AUSSTEHEND) {
+            vorschau.einreihen(lauf.id());
+        }
     }
 
     private static Zuordnung zuordnung(ImportArt art, ImportLauf lauf, String profil, Map<String, Integer> felder) {

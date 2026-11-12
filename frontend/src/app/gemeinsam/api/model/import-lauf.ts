@@ -31,6 +31,22 @@ export interface ImportLauf {
     uebersprungen?: number;
     status?: ImportLauf.StatusEnum;
     erstellt?: string;
+    /**
+     * Vorschau: neue Kontakte; erst ab Status VORSCHAU
+     */
+    neu?: number | null;
+    /**
+     * Vorschau: geänderte Kontakte
+     */
+    geaendert?: number | null;
+    /**
+     * Vorschau: unveränderte Kontakte
+     */
+    unveraendert?: number | null;
+    /**
+     * Vorschau: mögliche Dubletten
+     */
+    dubletten?: number | null;
 }
 export namespace ImportLauf {
     export const ArtEnum = {

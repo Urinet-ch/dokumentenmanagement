@@ -36,7 +36,8 @@ class CsvImportTest {
 
     private final ZaehlenderLeser leser = new ZaehlenderLeser();
     private final MerkendesRepository repository = new MerkendesRepository();
-    private final CsvImport csvImport = new CsvImport(leser, repository, new ImportEinstellungen(GRENZE, 10_000));
+    private final CsvImport csvImport = new CsvImport(leser, repository, new ImportEinstellungen(GRENZE, 10_000),
+            laufId -> { });
 
     @Test
     void dateiUeberDerGrenzeWirdOhneParserAbgelehnt() throws IOException {
@@ -211,6 +212,25 @@ class CsvImportTest {
 
         @Override
         public void zeilenAktualisieren(UUID laufId, List<ImportZeile> zeilen) {
+        }
+
+        @Override
+        public void abgleichSchreiben(UUID laufId, List<Abgeglichen> zeilen) {
+        }
+
+        @Override
+        public int doppelteMarkieren(UUID laufId, String meldung) {
+            return 0;
+        }
+
+        @Override
+        public ImportLauf.Zaehler zaehlen(UUID laufId) {
+            return new ImportLauf.Zaehler(0, 0, 0, 0, 0, 0);
+        }
+
+        @Override
+        public List<ImportZeile> zeilenSeite(UUID laufId, int seite, int groesse) {
+            return List.of();
         }
 
         @Override

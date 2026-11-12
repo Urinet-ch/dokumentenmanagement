@@ -307,7 +307,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.18, 13.1, 13.2, 13.10, 13.11_
   - _Abhängig von: 0.4_
 
-- [ ] 4.2 Vorschau und Abgleich [Backend]
+- [x] 4.2 Vorschau und Abgleich [Backend]
   - Auftrag `CSV_VORSCHAU`: Abgleich Kontakt-ID → E-Mail → normalisierter Name + PLZ (ein exakter Treffer zählt), Ergebnis je Zeile in `import_zeile`, Zähler im Lauf
   - «mögliche Dublette» bei mehreren Kandidaten, sich widersprechenden Stufen oder nur Ähnlichkeit ab der Schwelle aus design.md
   - _Anforderungen: 13.3, 13.4, 13.5_

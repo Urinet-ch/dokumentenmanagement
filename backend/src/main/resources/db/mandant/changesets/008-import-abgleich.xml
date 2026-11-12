@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Vorschau und Abgleich des CSV-Imports (Aufgabe 4.2; Req 13.3, 13.4, 13.5). Nur Ergänzungen, rückwärtskompatibel
+         (tech.md Regel 11):
+         - import_lauf.zuordnung: die Zuordnung, mit der die Zeilen des Laufs geprüft wurden. import_zuordnung gilt je
+           Mandant und Importart und kann ein späterer Lauf mit anderer Kopfzeile überschreiben; die Vorschau rechnet
+           darum mit der Zuordnung des Laufs. null bei Läufen ohne gültige Zuordnung (ZUORDNUNG_NOETIG) und bei Läufen
+           aus Aufgabe 4.1.
+         - Fremdschlüssel import_zeile.kontakt_id → kontakt(id) (angekündigt in 007-import.xml).
+         - Index auf kontakt (name_normalisiert, plz) für die Stufe «Name + PLZ» (Req 13.4).
+         - import_zeile.schluessel: 64-Bit-Fingerabdrücke (SHA-256, gekürzt) der Abgleich-Schlüssel einer Zeile
+           (crm_id, E-Mail, Name + PLZ, getroffener Kontakt). Damit erkennt die Datenbank Zeilen, die in derselben
+           Datei doppelt vorkommen, ohne die Schlüssel im Heap zu sammeln (Speicherziel ~32 MiB je Import). Keine
+           Werte im Klartext; null für Zeilen ohne Abgleich. -->
+    <changeSet id="008-import-abgleich" author="archiv">
+        <addColumn tableName="import_lauf">
+            <column name="zuordnung" type="jsonb"/>
+        </addColumn>
+        <addColumn tableName="import_zeile">
+            <column name="schluessel" type="bigint[]"/>
+        </addColumn>
+        <addForeignKeyConstraint baseTableName="import_zeile" baseColumnNames="kontakt_id"
+                                 constraintName="import_zeile_kontakt_fk" referencedTableName="kontakt"
+                                 referencedColumnNames="id"/>
+        <sql>
+            alter table import_lauf add constraint import_lauf_zuordnung_ck
+                check (zuordnung is null or jsonb_typeof(zuordnung) = 'object');
+            create index kontakt_name_plz_ix on kontakt (name_normalisiert, plz);
+        </sql>
+    </changeSet>
+</databaseChangeLog>
