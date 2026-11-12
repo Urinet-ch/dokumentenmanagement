@@ -211,9 +211,10 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | GET, PATCH | `/mandant/einstellungen` | Geschäftsjahresende, eigene Arten, Kennungen | wie A11 |
 
 Spec 05 ergänzt diese Tabelle (Spec 05 design.md, «REST-Schnittstelle»): `POST`, `PATCH` und `DELETE` auf
-`/dokumentarten` nehmen die neuen Attribute der Art an und verlangen wie `PATCH /mandant/einstellungen` `If-Match`
-mit der Konfigurationsversion; jede Antwort trägt die neue Version als `ETag` (Spec 05, Req 7.6). `GET/PATCH
-/mandant/einstellungen` verliert `eigene_arten` (Spec 05, Req 2.2). `PATCH /dokumente/{id}`,
+`/dokumentarten` nehmen die neuen Attribute der Art an und verlangen ab Spec 05 ebenso wie
+`PATCH /mandant/einstellungen` `If-Match` mit der Konfigurationsversion; jede Antwort trägt die neue Version als
+`ETag` (Spec 05, Req 7.6). `GET/PATCH /mandant/einstellungen` verliert `eigene_arten` (Spec 05, Req 2.2).
+`PATCH /dokumente/{id}`,
 `POST /dokumente/{id}/bestaetigen` und `POST /dokumente/generator` nehmen `klassifikationen` mit Code an (Spec 05,
 Req 3.5, 8.7). Die neuen Endpunkte für Klassifikationen, Regeln, KI-Texte, Konfiguration und Versionen, den
 Lückenbericht und `GET /mandant/funktionen` stehen in Spec 05 design.md, «REST-Schnittstelle» (umgesetzt in Spec 05,
