@@ -51,6 +51,13 @@ Funktionalität: E-Mail-Eingang
     Und liegt die Mail im Ordner «Archiviert» und der Posteingang ist leer
     Und im Mandanten «vhf-gsk» ist zur Mail nichts entstanden
 
+  @req-1.2
+  Szenario: Ein in den Text eingefügtes Foto einer Quittung wird ein Bild-Dokument, keine Korrespondenz
+    Angenommen im Postfach liegt eine Mail von «inhaber@example.invalid» mit dem Betreff «Quittung» und einem in den Text eingefügten Foto «IMG_0042.jpg» von 300 KiB
+    Wenn der Mail-Eingang das Postfach von «urinet» abruft
+    Dann hat das Archiv im Mandanten «urinet» zur Mail genau ein Dokument angelegt
+    Und das Dokument der Mail ist das Foto «IMG_0042.jpg» als «image/jpeg», nicht Korrespondenz
+
   @req-1.3 @req-1.6
   Szenario: Eine Mail ohne unterstützten Anhang wird Korrespondenz mit .eml und PDF/A aus dem Text im Eingangskorb
     Angenommen die Verarbeitung ist bereit

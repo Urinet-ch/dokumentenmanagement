@@ -27,11 +27,13 @@ import java.util.regex.Pattern;
  * Zerlegt eine Nachricht (MIME) in Text und Anhänge, auch in angehängten Nachrichten ({@code message/rfc822}, bis Tiefe
  * {@value #MAX_TIEFE}). Ein Anhang ist ein Teil mit Disposition {@code attachment} oder ein Teil mit Dateiname, der nicht
  * eingebettet ist. Eingebettet ist ein Teil mit Content-ID in {@code multipart/related} oder mit Disposition
- * {@code inline} (z. B. das Logo einer Signatur, ein Bild im HTML-Text); er gehört zum Text der Nachricht und ist kein
- * Anhang (Spec 02, Req 1.2, 1.3). Ein Teil ohne Dateiname und ohne {@code attachment} ist ebenfalls kein Anhang. Text ist
- * der erste {@code text/plain}-Teil, der kein Anhang ist, sonst der erste solche {@code text/html}-Teil ohne Markup.
- * Anhänge landen decodiert als Dateien im Verzeichnis der Nachricht. Ein Teil, der sich nicht lesen lässt, fällt weg;
- * die {@code .eml} bleibt vollständig.
+ * {@code inline}. Ein eingebettetes Bild zählt als Anhang, wenn es mindestens {@code eingebettetAb} Byte gross ist (ein in
+ * den Text eingefügtes Foto einer Quittung, z. B. aus Apple Mail oder Gmail); kleinere eingebettete Bilder wie das Logo
+ * einer Signatur gehören zum Text der Nachricht (Spec 02, Req 1.2, 1.3). Ein Teil ohne Dateiname und ohne
+ * {@code attachment} ist kein Anhang, ausser er ist ein solches grosses eingebettetes Bild. Text ist der erste
+ * {@code text/plain}-Teil, der kein Anhang ist, sonst der erste solche {@code text/html}-Teil ohne Markup. Anhänge landen
+ * decodiert als Dateien im Verzeichnis der Nachricht. Ein Teil, der sich nicht lesen lässt, fällt weg; die {@code .eml}
+ * bleibt vollständig.
  */
 final class MailTeile {
 
@@ -44,16 +46,19 @@ final class MailTeile {
     private static final Pattern TAG = Pattern.compile("(?s)<[^>]*>");
 
     private final Path verzeichnis;
+    private final long eingebettetAb;
     private final List<Anhang> anhaenge = new ArrayList<>();
     private String text;
     private String html;
+    private int dateien;
 
-    private MailTeile(Path verzeichnis) {
+    private MailTeile(Path verzeichnis, long eingebettetAb) {
         this.verzeichnis = verzeichnis;
+        this.eingebettetAb = eingebettetAb;
     }
 
-    static MailTeile lesen(MimeMessage nachricht, Path verzeichnis) {
-        MailTeile teile = new MailTeile(verzeichnis);
+    static MailTeile lesen(MimeMessage nachricht, Path verzeichnis, long eingebettetAb) {
+        MailTeile teile = new MailTeile(verzeichnis, eingebettetAb);
         teile.teil(nachricht, 0, false);
         return teile;
     }
@@ -104,18 +109,19 @@ final class MailTeile {
                 return;
             }
             Optional<String> name = name(teil);
-            if (!anhang(teil, name, inRelated)) {
-                if (teil.isMimeType("text/plain") && text == null) {
-                    text = inhalt(teil);
-                } else if (teil.isMimeType("text/html") && html == null) {
-                    html = inhalt(teil);
+            if (anhang(teil, name, inRelated)) {
+                anhaenge.add(new Anhang(speichern(teil), name));
+            } else if (eingebettet(teil, inRelated) && teil.isMimeType("image/*")) {
+                Path datei = speichern(teil);
+                if (Files.size(datei) >= eingebettetAb) {
+                    anhaenge.add(new Anhang(datei, name));
+                } else {
+                    Files.delete(datei);
                 }
-            } else {
-                Path datei = verzeichnis.resolve("anhang-" + (anhaenge.size() + 1));
-                try (InputStream ein = teil.getInputStream()) {
-                    Files.copy(ein, datei);
-                }
-                anhaenge.add(new Anhang(datei, name));
+            } else if (teil.isMimeType("text/plain") && text == null) {
+                text = inhalt(teil);
+            } else if (teil.isMimeType("text/html") && html == null) {
+                html = inhalt(teil);
             }
         } catch (MessagingException | IOException | RuntimeException e) {
             LOG.infof("Mail-Eingang: ein Teil der Nachricht ist nicht lesbar und fällt weg, ursache=%s",
@@ -129,9 +135,20 @@ final class MailTeile {
         if (Part.ATTACHMENT.equalsIgnoreCase(disposition)) {
             return true;
         }
-        boolean eingebettet = teil instanceof MimePart mime && mime.getContentID() != null
-                && (inRelated || Part.INLINE.equalsIgnoreCase(disposition));
-        return name.isPresent() && !eingebettet;
+        return name.isPresent() && !eingebettet(teil, inRelated);
+    }
+
+    static boolean eingebettet(Part teil, boolean inRelated) throws MessagingException {
+        return teil instanceof MimePart mime && mime.getContentID() != null
+                && (inRelated || Part.INLINE.equalsIgnoreCase(teil.getDisposition()));
+    }
+
+    private Path speichern(Part teil) throws MessagingException, IOException {
+        Path datei = verzeichnis.resolve("anhang-" + (++dateien));
+        try (InputStream ein = teil.getInputStream()) {
+            Files.copy(ein, datei);
+        }
+        return datei;
     }
 
     private static Optional<String> name(Part teil) throws MessagingException {

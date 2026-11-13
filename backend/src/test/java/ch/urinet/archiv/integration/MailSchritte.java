@@ -351,6 +351,33 @@ public class MailSchritte {
         zustellen(htmlMitLogo(von, "Nachfrage"), neueId());
     }
 
+    @Angenommen("im Postfach liegt eine Mail von «{}» mit dem Betreff «{}» und einem in den Text eingefügten Foto «{}» von {int} KiB")
+    public void mitEingefuegtemFoto(String von, String betreff, String name, int kib) throws Exception {
+        MimeMultipart inhalt = new MimeMultipart("mixed");
+        MimeBodyPart text = new MimeBodyPart();
+        text.setText("Quittung von heute.", "UTF-8");
+        inhalt.addBodyPart(text);
+        MimeBodyPart foto = new MimeBodyPart();
+        foto.setDataHandler(new DataHandler(new ByteArrayDataSource(jpeg(kib * 1024), "image/jpeg")));
+        foto.setFileName(name);
+        foto.setDisposition(jakarta.mail.Part.INLINE);
+        foto.setContentID("<" + UUID.randomUUID() + "@apple.example.invalid>");
+        inhalt.addBodyPart(foto);
+        MimeMessage nachricht = nachricht(von, betreff, null, "", List.of());
+        nachricht.setContent(inhalt);
+        zustellen(nachricht, neueId());
+    }
+
+    @Dann("das Dokument der Mail ist das Foto «{}» als «{}», nicht Korrespondenz")
+    public void istFoto(String name, String mime) throws SQLException {
+        UUID id = dokument("urinet");
+        Map<String, Object> dok = zeile("select art, dateiname from " + schema("urinet") + ".dokument where id = ?", id);
+        assertThat(dok.get("art")).isNull();
+        assertThat(dok).containsEntry("dateiname", name);
+        assertThat(zeile("select mime from " + schema("urinet") + ".dokument_datei where dokument_id = ? and nr = 1",
+                id)).containsEntry("mime", mime);
+    }
+
     @Angenommen("im Postfach liegt eine Mail von «{}» mit dem Betreff «{}» und einem abgeschnittenen PDF «{}»")
     public void mitDefektemPdf(String von, String betreff, String name) throws Exception {
         zustellen(nachricht(von, betreff, null, "Siehe Anhang.", List.of(new Teil(name, Testdateien.abgeschnitten(),
@@ -417,6 +444,23 @@ public class MailSchritte {
     public void logOhneNeuesDokument() {
         assertThat(mailEintraege().stream().map(log::nachricht))
                 .anyMatch(n -> n.startsWith("Mail ohne neues Dokument: mandant=urinet"));
+    }
+
+    /** Synthetisches JPEG der Grösse {@code groesse}: Kopf, Kommentarsegmente mit Zufall, Ende. */
+    private static byte[] jpeg(int groesse) {
+        byte[] kopf = Arrays.copyOf(Testdateien.jpeg(), 20);
+        java.io.ByteArrayOutputStream aus = new java.io.ByteArrayOutputStream();
+        aus.writeBytes(kopf);
+        java.util.Random zufall = new java.util.Random();
+        while (aus.size() < groesse - 2) {
+            int laenge = Math.min(60_000, Math.max(16, groesse - 2 - aus.size() - 4));
+            byte[] daten = new byte[laenge];
+            zufall.nextBytes(daten);
+            aus.writeBytes(new byte[]{(byte) 0xFF, (byte) 0xFE, (byte) ((laenge + 2) >> 8), (byte) (laenge + 2)});
+            aus.writeBytes(daten);
+        }
+        aus.writeBytes(new byte[]{(byte) 0xFF, (byte) 0xD9});
+        return aus.toByteArray();
     }
 
     private MimeMessage htmlMitLogo(String von, String betreff) throws Exception {

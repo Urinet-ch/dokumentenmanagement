@@ -41,7 +41,7 @@ class ImapPostfachTest {
         MutableUhr uhr = new MutableUhr(Instant.parse("2026-11-13T10:00:00Z"));
         ImapPostfach postfach = new ImapPostfach(Duration.ofSeconds(10), "Archiviert", "Quarantaene",
                 Optional.of(Path.of(System.getProperty("user.dir"), "target", "greenmail", "ca.pem")), verzeichnis,
-                60_000_000L, Duration.ofHours(1), uhr);
+                60_000_000L, Duration.ofHours(1), 100 * 1024, uhr);
         Postfach zugang = new Postfach(TestPostfach.HOST, TestPostfach.port(), test.login());
         List<String> gesehen = new ArrayList<>();
         Abruf erster = postfach.abrufen(zugang, test.passwort(), 1, n -> {

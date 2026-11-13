@@ -33,6 +33,8 @@ class MailTeileTest {
     private static final Session SITZUNG = Session.getInstance(new Properties());
     private static final byte[] PDF = "%PDF-1.4\n% Test\n%%EOF\n".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0};
+    /** wie {@code archiv.mail.eingebettet-ab} */
+    private static final long SCHWELLE = 100 * 1024;
 
     @TempDir
     Path verzeichnis;
@@ -61,13 +63,36 @@ class MailTeileTest {
     }
 
     @Test
-    void inlineMitContentIdIstAuchAusserhalbVonRelatedKeinAnhangInlineOhneContentIdSchon() throws Exception {
+    void kleinesInlineBildMitContentIdIstAuchAusserhalbVonRelatedKeinAnhangInlineOhneContentIdSchon() throws Exception {
         MimeMultipart gemischt = new MimeMultipart("mixed");
         gemischt.addBodyPart(text("Hallo", "plain"));
         gemischt.addBodyPart(datei(PNG, "image/png", "logo.png", Part.INLINE, "<logo>"));
         // so hängt z. B. Apple Mail ein PDF an: inline, mit Dateiname, ohne Content-ID
         gemischt.addBodyPart(datei(PDF, "application/pdf", "rechnung.pdf", Part.INLINE, null));
         assertThat(namen(lesen(gemischt))).containsExactly("rechnung.pdf");
+    }
+
+    @Test
+    void eingebetteteBilderAbDerSchwelleSindAnhaengeKleinereNicht() throws Exception {
+        // Logo der Signatur, 8 KiB, in multipart/related
+        MimeMultipart related = new MimeMultipart("related");
+        related.addBodyPart(text("<p>Gruss</p><img src=\"cid:logo\">", "html"));
+        related.addBodyPart(datei(bild(8 * 1024), "image/png", "image001.png", Part.INLINE, "<logo>"));
+        assertThat(lesen(related).anhaenge()).isEmpty();
+        // Foto aus Apple Mail: 300 KiB, inline mit Content-ID in multipart/mixed
+        MimeMultipart apple = new MimeMultipart("mixed");
+        apple.addBodyPart(text("Quittung", "plain"));
+        apple.addBodyPart(datei(bild(300 * 1024), "image/jpeg", "IMG_0042.jpg", Part.INLINE, "<foto@apple>"));
+        assertThat(namen(lesen(apple))).containsExactly("IMG_0042.jpg");
+        // Foto aus Gmail: in multipart/related mit cid, ohne Disposition und ohne Namen
+        MimeMultipart gmail = new MimeMultipart("related");
+        gmail.addBodyPart(text("<p>Quittung</p><img src=\"cid:ii_abc\">", "html"));
+        gmail.addBodyPart(datei(bild(300 * 1024), "image/jpeg", null, null, "<ii_abc>"));
+        MailTeile teile = lesen(gmail);
+        assertThat(teile.anhaenge()).hasSize(1);
+        assertThat(teile.anhaenge().getFirst().name()).isEmpty();
+        assertThat(Files.size(teile.anhaenge().getFirst().datei())).isEqualTo(300 * 1024);
+        assertThat(teile.text()).isEqualTo("Quittung");
     }
 
     @Test
@@ -101,16 +126,16 @@ class MailTeileTest {
             nachricht = nachricht(aussen);
             if (tiefe == 1 || tiefe == MailTeile.MAX_TIEFE) {
                 Path ziel = Files.createDirectory(verzeichnis.resolve("t" + tiefe));
-                assertThat(namen(MailTeile.lesen(neuGelesen(nachricht), ziel))).containsExactly("tief-0.pdf");
+                assertThat(namen(MailTeile.lesen(neuGelesen(nachricht), ziel, SCHWELLE))).containsExactly("tief-0.pdf");
             }
         }
         // eine Ebene über der Grenze bleibt die innerste Nachricht ungelesen: ihr PDF erscheint nicht
         Path ziel = Files.createDirectory(verzeichnis.resolve("tiefer"));
-        assertThat(namen(MailTeile.lesen(neuGelesen(nachricht), ziel))).doesNotContain("tief-0.pdf");
+        assertThat(namen(MailTeile.lesen(neuGelesen(nachricht), ziel, SCHWELLE))).doesNotContain("tief-0.pdf");
     }
 
     private MailTeile lesen(MimeMultipart inhalt) throws Exception {
-        return MailTeile.lesen(neuGelesen(nachricht(inhalt)), Files.createTempDirectory(verzeichnis, "m"));
+        return MailTeile.lesen(neuGelesen(nachricht(inhalt)), Files.createTempDirectory(verzeichnis, "m"), SCHWELLE);
     }
 
     private static List<String> namen(MailTeile teile) {
@@ -131,6 +156,12 @@ class MailTeileTest {
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
         nachricht.writeTo(aus);
         return new MimeMessage(SITZUNG, new ByteArrayInputStream(aus.toByteArray()));
+    }
+
+    private static byte[] bild(int groesse) {
+        byte[] inhalt = new byte[groesse];
+        new java.util.Random(groesse).nextBytes(inhalt);
+        return inhalt;
     }
 
     private static MimeBodyPart text(String inhalt, String art) throws Exception {
