@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { MENUE } from '../gemeinsam/navigation';
+import { ONLINE } from '../gemeinsam/online';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 @Component({
@@ -32,6 +33,9 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
         }
       }
       <button mat-flat-button type="button" (click)="anmelden()">{{ texte.anmeldung.anmelden }}</button>
+      @if (!online()) {
+        <p><a routerLink="/erfassen">{{ texte.handy.offlineErfassen }}</a></p>
+      }
     }
   `,
   styles: `
@@ -49,6 +53,8 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 export class Start {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE;
+  /** Ohne Verbindung ist keine Anmeldung möglich; «Erfassen» nimmt dann Aufnahmen in die Warteschlange (Req 4.4). */
+  protected readonly online = inject(ONLINE);
   /** Ziel nach der Anmeldung (vom Guard gesetzt). */
   readonly ziel = input<string>();
 
