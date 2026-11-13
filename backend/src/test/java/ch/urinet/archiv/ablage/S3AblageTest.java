@@ -20,6 +20,7 @@ import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +60,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * S3-Adapter der Ablage gegen MinIO (Compose Dev Services) mit dem S3-Client der Anwendung, an dem
+ * S3-Adapter der Ablage gegen MinIO (Compose Dev Services) oder Ceph RGW (Profil {@code ceph}, {@code backend/README.md})
+ * mit dem S3-Client der Anwendung, an dem
  * {@link KeinBypassInterceptor} hängt (Req 6.2–6.5, 6.9, 6.11, 6.12, 14.6). Jeder Test hat einen eigenen Bucket mit
  * Object Lock und Versionierung, ohne Bucket Policy.
  */
@@ -113,6 +115,16 @@ class S3AblageTest {
     private ZuArchivieren eingang(S3Ablage ablage, DateiSchluessel schluessel, byte[] daten) {
         AbgelegteDatei datei = ablage.ablegenEingang(mandant, schluessel, new ByteArrayInputStream(daten), daten.length);
         return new ZuArchivieren(schluessel, datei.versionId(), datei.sha256());
+    }
+
+    /**
+     * Der Server lehnt wegen der Sperre ab, je nach Server mit einem anderen Code (MinIO und Ceph RGW bzw. Infomaniak
+     * antworten verschieden, backend/README.md); ein anderer Fehler (z. B. 5xx) zählt nicht als Schutz.
+     */
+    private static void abgelehnt(ThrowingCallable aufruf) {
+        assertThatThrownBy(aufruf).isInstanceOfSatisfying(S3Exception.class, e -> assertThat(e.statusCode() + " "
+                + (e.awsErrorDetails() == null ? "?" : e.awsErrorDetails().errorCode()))
+                .isIn("400 InvalidRequest", "403 AccessDenied"));
     }
 
     private Optional<ObjectLockRetention> retention(String key, String versionId) {
@@ -171,12 +183,10 @@ class S3AblageTest {
         assertThat(sperre.retainUntilDate()).isAfter(Instant.now().plus(Duration.ofHours(23)))
                 .isBeforeOrEqualTo(Instant.now().plus(Duration.ofDays(1)).plusSeconds(1));
 
-        assertThatThrownBy(() -> s3.deleteObject(b -> b.bucket(bucket).key(kopie.schluessel())
-                .versionId(kopie.versionId()))).isInstanceOf(S3Exception.class);
-        assertThatThrownBy(() -> s3.putObjectRetention(b -> b.bucket(bucket).key(kopie.schluessel())
+        abgelehnt(() -> s3.deleteObject(b -> b.bucket(bucket).key(kopie.schluessel()).versionId(kopie.versionId())));
+        abgelehnt(() -> s3.putObjectRetention(b -> b.bucket(bucket).key(kopie.schluessel())
                 .versionId(kopie.versionId()).retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE)
-                        .retainUntilDate(Instant.now().plus(Duration.ofHours(1))))))
-                .isInstanceOf(S3Exception.class);
+                        .retainUntilDate(Instant.now().plus(Duration.ofHours(1))))));
         assertThat(retention(kopie.schluessel(), kopie.versionId()).orElseThrow().retainUntilDate())
                 .isEqualTo(sperre.retainUntilDate());
     }
@@ -415,12 +425,11 @@ class S3AblageTest {
         assertThat(datei.schluessel()).isEqualTo(ManifestTeil.JSON.pfad(datum)).startsWith("manifest/");
         ObjectLockRetention sperre = retention(datei.schluessel(), datei.versionId()).orElseThrow();
         assertThat(sperre.mode()).isEqualTo(ObjectLockRetentionMode.COMPLIANCE);
-        assertThatThrownBy(() -> verwaltung.deleteObject(b -> b.bucket(bucket).key(datei.schluessel())
-                .versionId(datei.versionId()).bypassGovernanceRetention(true))).isInstanceOf(S3Exception.class);
-        assertThatThrownBy(() -> verwaltung.putObjectRetention(b -> b.bucket(bucket).key(datei.schluessel())
+        abgelehnt(() -> verwaltung.deleteObject(b -> b.bucket(bucket).key(datei.schluessel())
+                .versionId(datei.versionId()).bypassGovernanceRetention(true)));
+        abgelehnt(() -> verwaltung.putObjectRetention(b -> b.bucket(bucket).key(datei.schluessel())
                 .versionId(datei.versionId()).bypassGovernanceRetention(true)
-                .retention(r -> r.mode(ObjectLockRetentionMode.COMPLIANCE).retainUntilDate(Instant.now().plusSeconds(5)))))
-                .isInstanceOf(S3Exception.class);
+                .retention(r -> r.mode(ObjectLockRetentionMode.COMPLIANCE).retainUntilDate(Instant.now().plusSeconds(5)))));
         assertThat(retention(datei.schluessel(), datei.versionId()).orElseThrow().retainUntilDate())
                 .isEqualTo(sperre.retainUntilDate());
 
