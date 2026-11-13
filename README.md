@@ -81,7 +81,7 @@ cd backend && mvn quarkus:dev
 java -jar quarkus-run.jar mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
 ```
 - Das Kommando startet keinen HTTP-Server und keine Start-Migration, braucht aber die Secret-Dateien `archiv_db_app`,
-  `archiv_db_owner`, `s3_app_zugang_id` und `s3_app_zugang_geheimnis` unter `/run/secrets/`; fehlt eine oder ist sie
+  `archiv_db_owner`, `s3_app_zugang_id`, `s3_app_zugang_geheimnis` und `infomaniak_ai_token` unter `/run/secrets/`; fehlt eine oder ist sie
   leer, bricht der Start ab. Seed: `seed/<code>/dokumentarten.json`.
 - Exit-Code 0 angelegt, 1 fachlicher Fehler (`MandantFehler`, z. B. `MANDANT_EXISTIERT`), 2 falscher Aufruf (geprüft
   vor dem Start, mit Aufrufhilfe), 3 technischer Fehler, auch ein abgebrochener Start (design.md, «Mandant»).

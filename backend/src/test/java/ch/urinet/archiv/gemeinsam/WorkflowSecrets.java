@@ -21,7 +21,9 @@ final class WorkflowSecrets {
     /** Workflows, die Secrets brauchen dürfen, mit den erlaubten Namen: nur der Deploy (Aufgabe 1.9). */
     static final Map<String, Set<String>> ERLAUBT = Map.of("infomaniak-deploy.yml", Set.of(
             "INFOMANIAK_SSH_KEY", "ARCHIV_DB_POSTGRES", "ARCHIV_DB_OWNER", "ARCHIV_DB_APP", "KEYCLOAK_DB",
-            "KEYCLOAK_ADMIN", "S3_APP_ZUGANG_ID", "S3_APP_ZUGANG_GEHEIMNIS"));
+            "KEYCLOAK_ADMIN", "S3_APP_ZUGANG_ID", "S3_APP_ZUGANG_GEHEIMNIS",
+            // Aufgabe 3.2: Token der Infomaniak AI Services als Secret-Datei (tech.md, Infomaniak AI Services)
+            "INFOMANIAK_AI_TOKEN"));
 
     private static final Pattern WORT = Pattern.compile("(?i)\\bsecrets\\b");
     private static final Pattern NAME = Pattern.compile("\\G\\s*\\.\\s*([A-Za-z0-9_-]+)\\b(?!\\s*[.\\[(])");

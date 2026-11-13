@@ -1,6 +1,8 @@
 package ch.urinet.archiv.ki;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
+import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
+import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
@@ -17,6 +19,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
+import io.cucumber.java.de.Wenn;
 import jakarta.inject.Inject;
 
 import java.awt.Graphics2D;
@@ -48,20 +51,28 @@ public class KiVorschlagSchritte {
     @Inject
     VerarbeitungTestHilfe hilfe;
 
+    @Inject
+    AuftragTestHilfe auftraege;
+
     private WireMock modell;
     private UUID id;
     private long verbrauchStand;
     /** Kennungen des Mandanten vor dem Szenario, wenn ein Schritt sie geändert hat. */
     private String kennungenVorher;
     private boolean kennungenGeaendert;
+    /** Kontakt aus dem Szenario, wird danach gelöscht. */
+    private UUID kontakt;
 
     @Angenommen("das Sprachmodell ist bereit")
     public void bereit() throws Exception {
-        modell = KiWireMock.client();
-        modell.resetMappings();
-        modell.resetRequests();
-        modell.resetScenarios();
+        modell = KiWireMock.zuruecksetzen();
         verbrauchStand = hilfe.kiVerbrauchStand(MANDANT);
+    }
+
+    /** Nach jedem Szenario (auch ausserhalb von KI): keine Stubs und Szenario-Zustände für die nächsten Tests. */
+    @After
+    public void sprachmodellZuruecksetzen() {
+        KiWireMock.zuruecksetzen();
     }
 
     @Angenommen("der Mandant «{word}» hat die UID «{}»")
@@ -79,6 +90,21 @@ public class KiVorschlagSchritte {
             hilfe.kennungenSetzen(MANDANT, kennungenVorher);
             kennungenGeaendert = false;
         }
+        if (kontakt != null) {
+            hilfe.kontaktLoeschen(MANDANT, kontakt);
+            kontakt = null;
+        }
+    }
+
+    @Angenommen("im Mandanten gibt es den Kontakt «{}» mit der IBAN «{word}»")
+    public void kontakt(String name, String iban) throws Exception {
+        kontakt = hilfe.kontaktAnlegen(MANDANT, name, iban);
+    }
+
+    @Angenommen("ein Beleg als verschlüsseltes PDF")
+    public void verschluesselt() throws Exception {
+        anlegen("UPLOAD", new Quelle(DateiRolle.ORIGINAL, 1, "pdf", "application/pdf",
+                OcrTestdateien.verschluesseltesPdf()));
     }
 
     @Angenommen("ein Beleg als digitales PDF mit «{}» und «{}»")
@@ -124,6 +150,45 @@ public class KiVorschlagSchritte {
         modell.register(post(urlPathEqualTo(PFAD)).willReturn(okJson(antwort("kein JSON"))));
     }
 
+    @Angenommen("das Sprachmodell antwortet immer mit «{}»")
+    public void immerInhalt(String inhalt) throws Exception {
+        modell.register(post(urlPathEqualTo(PFAD)).willReturn(okJson(antwort(inhalt))));
+    }
+
+    @Angenommen("das Sprachmodell antwortet immer ohne Nachricht")
+    public void ohneNachricht() throws Exception {
+        ObjectNode a = (ObjectNode) JSON.readTree(antwort(""));
+        ((ObjectNode) a.path("choices").get(0).path("message")).putNull("content");
+        modell.register(post(urlPathEqualTo(PFAD)).willReturn(okJson(JSON.writeValueAsString(a))));
+    }
+
+    @Wenn("der Auftrag «KI_VORSCHLAG» zweimal wieder fällig wird und der Worker ihn bearbeitet")
+    public void zweimalWiederholen() throws Exception {
+        long auftrag = hilfe.auftraege("KI_VORSCHLAG", id).getFirst();
+        for (int i = 0; i < 2; i++) {
+            auftraege.aendern(auftrag, "nicht_vor = now()");
+            hilfe.abarbeiten();
+        }
+    }
+
+    @Dann("ist der Auftrag «KI_VORSCHLAG» nach {int} Versuch(en) «{word}»")
+    public void auftragVersuche(int versuche, String status) throws Exception {
+        var zeile = auftraege.zeile(hilfe.auftraege("KI_VORSCHLAG", id).getFirst());
+        assertThat(zeile.status()).isEqualTo(status);
+        assertThat(zeile.versuche()).isEqualTo(versuche);
+    }
+
+    @Dann("das Dokument ist mit dem Kontakt verknüpft und heisst dort «{}»")
+    public void partnerVerknuepft(String name) throws Exception {
+        assertThat(hilfe.kiVorschlag(MANDANT, id)).containsEntry("partner_id", kontakt.toString())
+                .containsEntry("partner_name", name);
+    }
+
+    @Dann("der Aufruf enthält kein Seitenbild")
+    public void keinSeitenbild() {
+        assertThat(anfragen()).allSatisfy(a -> assertThat(a.getBodyAsString()).doesNotContain("data:image/"));
+    }
+
     @Angenommen("das Sprachmodell antwortet mit HTTP {int}")
     public void httpFehler(int status) {
         modell.register(post(urlPathEqualTo(PFAD)).willReturn(aResponse().withStatus(status)
@@ -139,6 +204,8 @@ public class KiVorschlagSchritte {
     public void parameter(String name) throws Exception {
         JsonNode anfrage = JSON.readTree(anfragen().getFirst().getBodyAsString());
         assertThat(anfrage.path("model").asText()).isEqualTo(name);
+        assertThat(List.of("temperature", "top_p", "presence_penalty", "frequency_penalty"))
+                .allSatisfy(feld -> assertThat(anfrage.has(feld)).as(feld).isTrue());
         assertThat(anfrage.path("temperature").decimalValue()).isEqualByComparingTo("0");
         assertThat(anfrage.path("top_p").decimalValue()).isEqualByComparingTo("1");
         assertThat(anfrage.path("presence_penalty").decimalValue()).isEqualByComparingTo("0");
@@ -148,6 +215,8 @@ public class KiVorschlagSchritte {
         assertThat(anfrage.path("response_format").path("json_schema").path("schema").path("properties").fieldNames())
                 .toIterable().contains("art", "titel", "datum", "partnerName", "belegnummer", "richtung", "betrag",
                         "waehrung", "faelligkeit", "vertraulichkeit", "tags", "sicherheit");
+        assertThat(anfrage.path("response_format").path("json_schema").path("schema"))
+                .isEqualTo(JSON.readTree(AntwortSchema.json()));
     }
 
     @Dann("der Aufruf enthält den Belegtext «{}» und die Dokumentarten des Mandanten")

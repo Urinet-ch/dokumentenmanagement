@@ -44,7 +44,7 @@ public interface KiPort {
     }
 
     /** Ergebnis eines Aufrufs; {@link Verbrauch} auch bei Fehlern, soweit das Modell Tokens meldete. */
-    sealed interface Antwort permits Gueltig, Schemafehler, Ausfall {
+    sealed interface Antwort permits Gueltig, Schemafehler, Ausfall, OhneZugang {
         Verbrauch verbrauch();
     }
 
@@ -56,8 +56,18 @@ public interface KiPort {
     record Schemafehler(String grund, Verbrauch verbrauch) implements Antwort {
     }
 
-    /** Keine Antwort (Zeitüberschreitung, Verbindung, HTTP-Fehler); {@code grund} nennt nur Klassennamen. */
+    /**
+     * Keine Antwort (Zeitüberschreitung, Verbindung, HTTP-Fehler); {@code grund} nennt nur Klassennamen. Zählt als
+     * Fehlversuch des Auftrags (Req 5.4).
+     */
     record Ausfall(String grund, Verbrauch verbrauch) implements Antwort {
+    }
+
+    /**
+     * Kein Aufruf, weil das Token fehlt (Secret-Datei {@code infomaniak_ai_token}): Es ging kein Request hinaus, es gibt
+     * keinen Verbrauch, und eine Wiederholung hilft nicht.
+     */
+    record OhneZugang(Verbrauch verbrauch) implements Antwort {
     }
 
     /** Tokens eines Aufrufs für {@code ki_verbrauch} (design.md «KI»). */

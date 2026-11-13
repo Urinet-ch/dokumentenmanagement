@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,9 +47,15 @@ public class OcrStub implements OcrPort {
         }
     }
 
+    /** Ohne pdftotext kein Text: der KI-Vorschlag nimmt dann den Volltext (im Profil dev leer). */
+    @Override
+    public String layoutText(Path pdf, Duration zeitgrenze) {
+        return "";
+    }
+
     /** Ohne pdftoppm keine Seiten: kein Swiss QR Code und kein Bildweg im Profil dev. */
     @Override
-    public <T> T seitenbilder(Path pdf, int maxSeiten, Seitenverwertung<T> verwertung) throws InterruptedException {
+    public <T> T seitenbilder(Path pdf, Render render, Seitenverwertung<T> verwertung) throws InterruptedException {
         try {
             return verwertung.verwerten(List.of());
         } catch (IOException e) {

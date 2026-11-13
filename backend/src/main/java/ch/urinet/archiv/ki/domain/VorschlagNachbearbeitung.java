@@ -39,6 +39,8 @@ public final class VorschlagNachbearbeitung {
     static final String UMSTUFUNG_ZIEL = "LIEFERANTENBELEG";
     static final String QUITTUNG = "QUITTUNG";
     static final BigDecimal UMSTUFUNG_SICHERHEIT = new BigDecimal("0.5");
+    /** {@code NUMERIC(12,2)} der Spalte {@code dokument_finanz.betrag}. */
+    static final int BETRAG_STELLEN_VOR_KOMMA = 10;
 
     private VorschlagNachbearbeitung() {
     }
@@ -71,7 +73,10 @@ public final class VorschlagNachbearbeitung {
         if (datum == null || datum.isAfter(eingang)) {
             sicherheit.put(Feld.DATUM, BigDecimal.ZERO);
         }
-        BigDecimal betrag = v.betrag() == null ? null : v.betrag().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal betrag = betrag(v.betrag());
+        if (v.betrag() != null && betrag == null) {
+            sicherheit.put(Feld.BETRAG, BigDecimal.ZERO);
+        }
         // E1: Betrag 0 des Modells heisst «kein Betrag»; ein QR-Betrag (auch 0.00) setzt ihn unten wieder (Req 7.11)
         if (betrag != null && betrag.signum() == 0) {
             betrag = null;
@@ -89,8 +94,11 @@ public final class VorschlagNachbearbeitung {
             QrDaten q = qr.get();
             waehrung = q.waehrung();
             sicherheit.put(Feld.WAEHRUNG, BigDecimal.ONE);
-            if (q.betrag() != null) {
-                betrag = q.betrag().setScale(2, RoundingMode.HALF_UP);
+            if (q.betragUngueltig()) {
+                betrag = null;
+                sicherheit.put(Feld.BETRAG, BigDecimal.ZERO);
+            } else if (betrag(q.betrag()) != null) {
+                betrag = betrag(q.betrag());
                 sicherheit.put(Feld.BETRAG, BigDecimal.ONE);
             }
             if (q.referenz() != null) {
@@ -111,7 +119,7 @@ public final class VorschlagNachbearbeitung {
         boolean musterGesetzt = false;
         if (aussteller && belegnummer != null) {
             for (Map.Entry<Pattern, String> m : MUSTER.entrySet()) {
-                if (m.getKey().matcher(belegnummer).matches()) {
+                if (m.getKey().matcher(belegnummer).matches() && aktiv(arten, m.getValue())) {
                     art = m.getValue();
                     sicherheit.put(Feld.ART, BigDecimal.ONE);
                     musterGesetzt = true;
@@ -121,7 +129,7 @@ public final class VorschlagNachbearbeitung {
         // Eigene Art ohne Kennung des Mandanten: bei fremdem QR umstufen, sonst unverändert (Req 7.12) und prüfen lassen
         String umstufung = null;
         if (!aussteller && art != null && mandant.eigeneArten().contains(art)) {
-            if (qrFremd && UMSTUFBAR.contains(art)) {
+            if (qrFremd && UMSTUFBAR.contains(art) && aktiv(arten, UMSTUFUNG_ZIEL)) {
                 art = UMSTUFUNG_ZIEL;
                 sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
                 umstufung = GRUND_QR;
@@ -135,7 +143,7 @@ public final class VorschlagNachbearbeitung {
             sicherheit.put(Feld.FAELLIGKEIT, leer(v.faelligkeit()) ? sicherheit.get(Feld.FAELLIGKEIT) : BigDecimal.ZERO);
         }
         if (!musterGesetzt && UMSTUFUNG_ZIEL.equals(artRoh) && UMSTUFUNG_ZIEL.equals(art) && qr.isEmpty()
-                && leer(partnerIban) && faelligkeit == null) {
+                && leer(partnerIban) && faelligkeit == null && aktiv(arten, QUITTUNG)) {
             art = QUITTUNG;
             sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
             umstufung = GRUND_E2;
@@ -160,6 +168,11 @@ public final class VorschlagNachbearbeitung {
         return new Vorschlag(art, leer(v.titel()) ? null : v.titel().strip(), datum, partner, v.partnerUid(),
                 partnerIban, v.partnerEmail(), belegnummer, v.richtung(), betrag, waehrung, faelligkeit, qrReferenz,
                 vertraulichkeit, v.tags(), sicherheit, aussteller, umstufung);
+    }
+
+    /** Eine Regel setzt nur eine Art, die beim Mandanten aktiv ist; sonst bleibt die bisherige Art. */
+    private static boolean aktiv(List<ArtEintrag> arten, String code) {
+        return arten.stream().anyMatch(a -> a.code().equals(code));
     }
 
     static String kompakt(String s) {
@@ -199,11 +212,35 @@ public final class VorschlagNachbearbeitung {
         return iban || uid;
     }
 
+    /**
+     * Betrag auf zwei Stellen, nur innerhalb von {@code NUMERIC(12,2)}; sonst {@code null}. Geprüft wird über Stellenzahl
+     * und Exponent, bevor {@code setScale} rechnet: {@code 1E300000000} oder {@code 1E-300000000} würden sonst riesige
+     * Zahlen erzeugen (OutOfMemoryError). Ein Betrag unter einem halben Rappen ergibt 0 (E1 macht ihn leer).
+     */
+    static BigDecimal betrag(BigDecimal d) {
+        if (d == null || d.signum() == 0) {
+            return d == null ? null : d.setScale(2, RoundingMode.HALF_UP);
+        }
+        long stellenVorKomma = (long) d.precision() - d.scale();
+        if (stellenVorKomma > BETRAG_STELLEN_VOR_KOMMA) {
+            return null;
+        }
+        if (stellenVorKomma < -2) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        BigDecimal b = d.setScale(2, RoundingMode.HALF_UP);
+        return b.precision() - b.scale() > BETRAG_STELLEN_VOR_KOMMA ? null : b;
+    }
+
+    /** Sicherheit zwischen 0 und 1, auf 4 Stellen abgeschnitten (ändert keinen Vergleich mit den Schwellen). */
     private static BigDecimal wert(BigDecimal d) {
-        if (d == null) {
+        if (d == null || d.signum() < 0 || (d.signum() > 0 && (long) d.precision() - d.scale() < -4)) {
             return BigDecimal.ZERO;
         }
-        return d.max(BigDecimal.ZERO).min(BigDecimal.ONE);
+        if (d.compareTo(BigDecimal.ONE) > 0) {
+            return BigDecimal.ONE;
+        }
+        return d.scale() > 4 ? d.setScale(4, RoundingMode.DOWN) : d;
     }
 
     private static boolean leer(String s) {

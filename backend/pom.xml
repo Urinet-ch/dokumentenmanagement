@@ -295,7 +295,33 @@
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
+                    <excludes>
+                        <exclude>**/*KnapperHeapTest.java</exclude>
+                    </excludes>
                 </configuration>
+                <executions>
+                    <!-- Aufgabe 3.2 (Review PR #93, M3): Seitenbilder und Swiss QR Code mit knappem Heap; Stufe A hat
+                         -Xmx112m, davon braucht die übrige API den grösseren Teil -->
+                    <execution>
+                        <id>speicher</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <excludes combine.self="override"/>
+                            <includes>
+                                <include>**/*KnapperHeapTest.java</include>
+                            </includes>
+                            <!-- fest, damit -Dtest=… keine anderen Tests in diesen Fork holt -->
+                            <test>*KnapperHeapTest</test>
+                            <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                            <argLine>-Xmx64m -Djava.awt.headless=true</argLine>
+                            <systemPropertyVariables>
+                                <archiv.speicher-test>true</archiv.speicher-test>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <!-- Definition of Done (tech.md): keine neuen SpotBugs-Funde der Stufe hoch -->

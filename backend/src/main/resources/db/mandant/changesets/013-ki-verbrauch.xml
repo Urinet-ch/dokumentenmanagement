@@ -8,7 +8,7 @@
          Sprachmodells, auch bei ungültiger Antwort oder Ausfall. zweck: ERFASSUNG (Spec 01); Spec 04 ergänzt
          WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING. Nur Tokens und Modell, nie Inhalte. Nummer 012, weil 010 und 011
          in offenen PRs vergeben sind; nur eine neue Tabelle, rückwärtskompatibel (tech.md Regel 11). -->
-    <changeSet id="012-ki-verbrauch" author="archiv">
+    <changeSet id="013-ki-verbrauch" author="archiv">
         <createTable tableName="ki_verbrauch">
             <column name="id" type="bigserial">
                 <constraints primaryKey="true" primaryKeyName="ki_verbrauch_pk"/>

@@ -157,7 +157,8 @@ public class VerarbeitungTestHilfe {
     /** KI-Vorschlag des Dokuments (Aufgabe 3.2): {@code ki_vorschlag} und {@code ki_sicherheit} als JSON-Text. */
     public Map<String, Object> kiVorschlag(String mandant, UUID id) throws SQLException {
         return zeile("select status, fehler, ki_vorschlag::text as ki_vorschlag, ki_sicherheit::text as ki_sicherheit, "
-                + "partner_name, bestaetigt, version from " + schema(mandant) + ".dokument where id = ?", id);
+                + "partner_id::text as partner_id, partner_name, bestaetigt, version from " + schema(mandant)
+                + ".dokument where id = ?", id);
     }
 
     /** Zeilen aus {@code ki_verbrauch} mit einer ID über {@code abId}: Zweck, Modell, Tokens ein und aus. */
@@ -183,6 +184,37 @@ public class VerarbeitungTestHilfe {
             abfrage.setString(1, mandant);
             try (ResultSet z = abfrage.executeQuery()) {
                 return z.next() ? z.getString(1) : null;
+            }
+        }
+    }
+
+    /** Legt einen Kontakt mit IBAN an (Partner-Abgleich, Req 7.4) und gibt seine ID zurück. */
+    public UUID kontaktAnlegen(String mandant, String name, String iban) throws SQLException {
+        UUID id = UUID.randomUUID();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement anlegen = verbindung.prepareStatement(
+                "insert into " + schema(mandant) + ".kontakt (id, typ, name, name_normalisiert, iban, quelle) "
+                        + "values (?, 'ORGANISATION', ?, ?, ?, 'TEST')")) {
+            anlegen.setObject(1, id);
+            anlegen.setString(2, name);
+            anlegen.setString(3, name.toLowerCase(java.util.Locale.ROOT));
+            anlegen.setString(4, iban);
+            anlegen.executeUpdate();
+        }
+        return id;
+    }
+
+    /** Löst den Kontakt von allen Dokumenten und löscht ihn (Aufräumen nach dem Szenario). */
+    public void kontaktLoeschen(String mandant, UUID id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            try (PreparedStatement loesen = verbindung.prepareStatement("update " + schema(mandant)
+                    + ".dokument set partner_id = null where partner_id = ?")) {
+                loesen.setObject(1, id);
+                loesen.executeUpdate();
+            }
+            try (PreparedStatement loeschen = verbindung.prepareStatement("delete from " + schema(mandant)
+                    + ".kontakt where id = ?")) {
+                loeschen.setObject(1, id);
+                loeschen.executeUpdate();
             }
         }
     }

@@ -170,4 +170,166 @@ class VorschlagNachbearbeitungTest {
         assertThat(v.sicherheit().get(Feld.DATUM)).isEqualByComparingTo("0");
         assertThat(v.sicherheit().values()).allSatisfy(w -> assertThat(w).isBetween(BigDecimal.ZERO, BigDecimal.ONE));
     }
+
+    static Rohvorschlag mitBetrag(String art, String belegnummer, BigDecimal betrag, String iban, String faelligkeit) {
+        Map<Feld, BigDecimal> s = new EnumMap<>(Feld.class);
+        s.put(Feld.ART, new BigDecimal("0.9"));
+        s.put(Feld.BETRAG, new BigDecimal("0.8"));
+        s.put(Feld.DATUM, new BigDecimal("0.9"));
+        return new Rohvorschlag(art, "Titel", "2026-11-01", "Lieferant GmbH", null, iban, null, belegnummer, "AUSGABE",
+                betrag, "CHF", faelligkeit, null, null, List.of(), s);
+    }
+
+    /** E1: Betrag 0 des Modells heisst «kein Betrag»; ein QR-Betrag 0.00 setzt ihn wieder. */
+    @Test
+    void e1BetragNullDesModellsWirdLeer() {
+        for (String nullBetrag : List.of("0", "0.0", "0.00")) {
+            Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", null, new BigDecimal(nullBetrag), null, "2026-12-01"),
+                    Optional.empty(), FREMDER_KOPF);
+            assertThat(v.betrag()).isNull();
+            assertThat(v.sicherheit().get(Feld.BETRAG)).isEqualByComparingTo("0.8");
+        }
+        QrDaten nullBetrag = new QrDaten(FREMDE_IBAN, new BigDecimal("0.00"), "CHF", "NON", null, "Lieferant GmbH");
+        Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.ZERO, null, null), Optional.of(nullBetrag),
+                FREMDER_KOPF);
+        assertThat(v.betrag()).isEqualByComparingTo("0.00");
+    }
+
+    /** E3: Eine Belegnummer nur aus Nullen ist keine Belegnummer. */
+    @Test
+    void e3BelegnummerNurAusNullenWirdLeer() {
+        for (String nullen : List.of("0", "000", " 0 ")) {
+            assertThat(bearbeite(roh("PROJEKTDOKUMENT", nullen, new BigDecimal("0.9"), null), Optional.empty(),
+                    FREMDER_KOPF).belegnummer()).isNull();
+        }
+        for (String nummer : List.of("0815", "10", "M-2026-0")) {
+            assertThat(bearbeite(roh("PROJEKTDOKUMENT", nummer, new BigDecimal("0.9"), null), Optional.empty(),
+                    FREMDER_KOPF).belegnummer()).isEqualTo(nummer);
+        }
+    }
+
+    /** E2: Lieferantenbeleg ohne QR, ohne IBAN und ohne Fälligkeit wird Quittung. */
+    @Test
+    void e2LieferantenbelegOhneQrIbanFaelligkeitWirdQuittung() {
+        Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, null, null), Optional.empty(), "Bon");
+
+        assertThat(v.art()).isEqualTo("QUITTUNG");
+        assertThat(v.umstufung()).isEqualTo(VorschlagNachbearbeitung.GRUND_E2);
+        assertThat(v.sicherheit().get(Feld.ART)).isEqualByComparingTo("0.5");
+        assertThat(bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, "null", "2026-13-40"),
+                Optional.empty(), "Bon").art()).isEqualTo("QUITTUNG");
+    }
+
+    @Test
+    void e2GreiftNichtJeBedingung() {
+        QrDaten qr = new QrDaten(FREMDE_IBAN, null, "CHF", "NON", null, "Lieferant GmbH");
+        for (Vorschlag v : List.of(
+                bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, null, null), Optional.of(qr), "Bon"),
+                bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, FREMDE_IBAN, null), Optional.empty(), "Bon"),
+                bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, null, "2026-12-31"), Optional.empty(),
+                        "Bon"))) {
+            assertThat(v.art()).isEqualTo("LIEFERANTENBELEG");
+            assertThat(v.umstufung()).isNull();
+        }
+    }
+
+    /** E2 greift nicht, wenn das Belegnummer-Muster des ausstellenden Mandanten die Art gesetzt hat. */
+    @Test
+    void e2GreiftNichtWennMusterDieArtGesetztHat() {
+        Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", "F2026", BigDecimal.TEN, null, null), Optional.empty(),
+                "IBAN " + IBAN);
+
+        assertThat(v.mandantIstAussteller()).isTrue();
+        assertThat(v.art()).isEqualTo("LIEFERANTENBELEG");
+        assertThat(v.sicherheit().get(Feld.ART)).isEqualByComparingTo("1");
+        assertThat(v.umstufung()).isNull();
+    }
+
+    /** Belegnummer-Muster (Req 7.5): Offerte und Altbestand nur beim eigenen Beleg. */
+    @Test
+    void musterSetzenDieArtNurBeimEigenenBeleg() {
+        assertThat(bearbeite(roh("PROJEKTDOKUMENT", "O-2026-005", new BigDecimal("0.9"), null), Optional.empty(),
+                EIGENER_KOPF).art()).isEqualTo("OFFERTE");
+        assertThat(bearbeite(roh("PROJEKTDOKUMENT", "R0001", new BigDecimal("0.9"), null), Optional.empty(),
+                EIGENER_KOPF).art()).isEqualTo("AUSGANGSRECHNUNG");
+        assertThat(bearbeite(roh("PROJEKTDOKUMENT", "O-2026-005", new BigDecimal("0.9"), null), Optional.empty(),
+                FREMDER_KOPF).art()).isEqualTo("PROJEKTDOKUMENT");
+    }
+
+    /** Eine Regel setzt keine Art, die beim Mandanten nicht aktiv ist; die Art des Modells bleibt. */
+    @Test
+    void zielArtNurWennBeimMandantenAktiv() {
+        List<ArtEintrag> ohneZiele = ARTEN.stream()
+                .filter(a -> !Set.of("QUITTUNG", "OFFERTE").contains(a.code())).toList();
+
+        Vorschlag e2 = VorschlagNachbearbeitung.bearbeite(mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, null,
+                null), Optional.empty(), "Bon", MANDANT, ohneZiele, EINGANG);
+        Vorschlag muster = VorschlagNachbearbeitung.bearbeite(roh("PROJEKTDOKUMENT", "O-2026-005",
+                new BigDecimal("0.9"), null), Optional.empty(), EIGENER_KOPF, MANDANT, ohneZiele, EINGANG);
+
+        assertThat(e2.art()).isEqualTo("LIEFERANTENBELEG");
+        assertThat(e2.umstufung()).isNull();
+        assertThat(muster.art()).isEqualTo("PROJEKTDOKUMENT");
+    }
+
+    /** R3: ein Datum nach dem Eingang ist unsicher, der gleiche Tag nicht. */
+    @Test
+    void r3GleicherTagBleibtSicher() {
+        Rohvorschlag r = mitBetrag("LIEFERANTENBELEG", null, BigDecimal.TEN, null, "2026-12-01");
+        Rohvorschlag gleicherTag = new Rohvorschlag(r.art(), r.titel(), EINGANG.toString(), r.partnerName(),
+                r.partnerUid(), r.partnerIban(), r.partnerEmail(), r.belegnummer(), r.richtung(), r.betrag(),
+                r.waehrung(), r.faelligkeit(), r.qrReferenz(), r.vertraulichkeit(), r.tags(), r.sicherheit());
+
+        assertThat(bearbeite(gleicherTag, Optional.empty(), FREMDER_KOPF).sicherheit().get(Feld.DATUM))
+                .isEqualByComparingTo("0.9");
+    }
+
+    /** Betrag des Modells ausserhalb von NUMERIC(12,2) oder mit riesigem Exponenten: leer und unsicher, ohne Ausnahme. */
+    @Test
+    void betragDesModellsAusserhalbDesBereichsWirdLeer() {
+        for (String ungueltig : List.of("1E300000000", "-1E300000000", "10000000000", "1E+10")) {
+            Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", null, new BigDecimal(ungueltig), null, "2026-12-01"),
+                    Optional.empty(), FREMDER_KOPF);
+            assertThat(v.betrag()).as(ungueltig).isNull();
+            assertThat(v.sicherheit().get(Feld.BETRAG)).as(ungueltig).isEqualByComparingTo("0");
+        }
+        Vorschlag winzig = bearbeite(mitBetrag("LIEFERANTENBELEG", null, new BigDecimal("1E-300000000"), null,
+                "2026-12-01"), Optional.empty(), FREMDER_KOPF);
+        assertThat(winzig.betrag()).isNull();
+        Vorschlag gutschrift = bearbeite(mitBetrag("LIEFERANTENBELEG", null, new BigDecimal("-9999999999.994"), null,
+                "2026-12-01"), Optional.empty(), FREMDER_KOPF);
+        assertThat(gutschrift.betrag()).isEqualByComparingTo("-9999999999.99");
+        assertThat(gutschrift.sicherheit().get(Feld.BETRAG)).isEqualByComparingTo("0.8");
+    }
+
+    /** Sicherheiten mit riesigem Exponenten werden ohne Ausnahme auf 0 bis 1 gebracht. */
+    @Test
+    void sicherheitMitRiesigemExponenten() {
+        Map<Feld, BigDecimal> s = new EnumMap<>(Feld.class);
+        s.put(Feld.TITEL, new BigDecimal("1E-300000000"));
+        s.put(Feld.RICHTUNG, new BigDecimal("1E300000000"));
+        s.put(Feld.DATUM, new BigDecimal("0.899999"));
+        Rohvorschlag r = new Rohvorschlag("PROJEKTDOKUMENT", "Titel", "2026-11-01", null, null, null, null, null,
+                null, null, null, null, null, null, null, s);
+
+        Vorschlag v = bearbeite(r, Optional.empty(), FREMDER_KOPF);
+
+        assertThat(v.sicherheit().get(Feld.TITEL)).isEqualByComparingTo("0");
+        assertThat(v.sicherheit().get(Feld.RICHTUNG)).isEqualByComparingTo("1");
+        assertThat(v.sicherheit().get(Feld.DATUM)).isEqualByComparingTo("0.8999");
+    }
+
+    /** Ein QR-Betrag ausserhalb des Formats macht den Betrag leer und unsicher, die übrigen QR-Werte gelten. */
+    @Test
+    void ungueltigerQrBetragWirdLeerUndUnsicher() {
+        QrDaten qr = QrDaten.parse(QrDatenTest.payload("1E300000000")).orElseThrow();
+
+        Vorschlag v = bearbeite(mitBetrag("LIEFERANTENBELEG", null, new BigDecimal("12.50"), null, null),
+                Optional.of(qr), FREMDER_KOPF);
+
+        assertThat(v.betrag()).isNull();
+        assertThat(v.sicherheit().get(Feld.BETRAG)).isEqualByComparingTo("0");
+        assertThat(v.partnerIban()).isEqualTo(qr.iban());
+        assertThat(v.sicherheit().get(Feld.PARTNER)).isEqualByComparingTo("1");
+    }
 }

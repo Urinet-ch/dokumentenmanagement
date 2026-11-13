@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,11 @@ import java.util.Set;
 public final class ErfassungPrompt {
 
     public static final String VERSION = "v6";
+    /**
+     * Kennung aus Gate 0 (Mandant «UriNet Aschwanden», Seed {@code urinet}); weicht die Kennung des gesendeten Prompts
+     * ab, warnt der Extraktor (Mandantenname oder Arten anders als im Gate).
+     */
+    public static final String GATE_KENNUNG = "v6-7a39224f2f5e";
     /** Kennung des Bildwegs im Gate-Lauf: Originale, die Bilder sind, gehen als Seitenbild an das Modell (Req 7.1). */
     public static final String BILDWEG = "fotos";
 
@@ -137,6 +143,12 @@ public final class ErfassungPrompt {
             sb.append("\n");
         }
         return sb.toString();
+    }
+
+    /** Arten, die das Antwortschema kennt, in dessen Reihenfolge (Reihenfolge der Seed-Tabelle im Golden-Lauf). */
+    public static List<ArtEintrag> schemaArten(List<ArtEintrag> arten, List<String> codes) {
+        return arten.stream().filter(a -> codes.contains(a.code()))
+                .sorted(Comparator.comparingInt(a -> codes.indexOf(a.code()))).toList();
     }
 
     /** Kennung der Prompt-Fassung: gerenderter System-Prompt, Vorlagen, Schema, Reihenfolge der Art-Codes, Bildweg. */

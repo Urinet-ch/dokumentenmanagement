@@ -2,9 +2,16 @@ package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadDokumentartSeed;
+import ch.urinet.archiv.mandant.domain.DokumentartVorlage;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ErfassungPromptTest {
 
     static final String GATE_KENNUNG = "v6-7a39224f2f5e";
+    /** Name des Mandanten im Gate-Lauf; das Archiv liest ihn aus {@code public.mandant.name}. */
     static final String MANDANT = "UriNet Aschwanden";
     static final Set<String> EIGENE = Set.of("AUSGANGSRECHNUNG", "OFFERTE", "LOHNABRECHNUNG");
     static final List<ArtEintrag> SEED = List.of(
@@ -40,7 +48,32 @@ class ErfassungPromptTest {
         String kennung = ErfassungPrompt.hash(system, LangChain4jKiAdapter.schema(), LangChain4jKiAdapter.codes(),
                 ErfassungPrompt.BILDWEG);
 
-        assertThat(kennung).isEqualTo(GATE_KENNUNG);
+        assertThat(kennung).isEqualTo(GATE_KENNUNG).isEqualTo(ErfassungPrompt.GATE_KENNUNG);
+    }
+
+    /**
+     * Produktpfad (Review PR #93): Arten aus dem Seed des Mandanten {@code urinet}, gefiltert und geordnet wie in
+     * {@code MetadatenExtraktion.arten()}, eigene Arten aus {@code application.properties}, Antwortschema und Codes aus
+     * dem Adapter. Weicht der Text ab, warnt das Archiv bei jedem Aufruf; hier bricht der Build.
+     */
+    @Test
+    void produktpfadMitSeedUrinetErgibtDieGateKennung() throws Exception {
+        List<ArtEintrag> aktiv = new KlassenpfadDokumentartSeed(new ObjectMapper()).lesen(new MandantCode("urinet"))
+                .stream()
+                .filter(DokumentartVorlage::aktiv)
+                .map(v -> new ArtEintrag(v.code(), v.name(), v.vertraulichkeit()))
+                .toList();
+        List<ArtEintrag> arten = ErfassungPrompt.schemaArten(aktiv, LangChain4jKiAdapter.codes());
+        Properties properties = new Properties();
+        try (var ein = getClass().getResourceAsStream("/application.properties")) {
+            properties.load(new InputStreamReader(ein, StandardCharsets.UTF_8));
+        }
+        Set<String> eigene = Set.of(properties.getProperty("archiv.mandant.urinet.eigene-arten").split(","));
+
+        String system = ErfassungPrompt.system(MANDANT, ErfassungPrompt.artListe(arten, eigene, MANDANT));
+
+        assertThat(ErfassungPrompt.hash(system, LangChain4jKiAdapter.schema(), LangChain4jKiAdapter.codes(),
+                ErfassungPrompt.BILDWEG)).isEqualTo(ErfassungPrompt.GATE_KENNUNG);
     }
 
     @Test

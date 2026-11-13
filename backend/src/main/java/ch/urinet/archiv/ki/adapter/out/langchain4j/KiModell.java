@@ -8,6 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -19,13 +20,15 @@ import java.util.function.Supplier;
  * mit {@code strict}), ohne Transport-Wiederholung ({@code maxRetries(0)}), damit je Aufruf genau ein Request rausgeht
  * (Req 7.1); {@code quarkus.langchain4j.openai.max-retries} lehnt 0 ab. Basis-URL aus {@code archiv.ki.basis-url}
  * (Startprüfung {@code KiBasisUrlPruefung}, Req 16.21), Token aus der Secret-Datei {@code infomaniak_ai_token}
- * (tech.md Regel 7). Nie Inhalte loggen (Req 16.7).
+ * (tech.md Regel 7; in prod Pflicht über {@code archiv.secrets.pflicht}). Ohne Token geht kein Request hinaus
+ * ({@link #bereit()}); nur gegen ein lokales Ziel (WireMock in {@code test}, LM Studio in {@code lokal}) gilt ein
+ * Platzhalter. Nie Inhalte loggen (Req 16.7).
  */
 @ApplicationScoped
 public class KiModell implements Supplier<ChatModel> {
 
-    /** Ohne Secret-Datei (dev, test, lokal) ein Platzhalter; Infomaniak lehnt ihn ab, der Vorschlag fällt dann aus. */
-    static final String OHNE_TOKEN = "ohne-token";
+    /** Platzhalter ohne Secret-Datei, nur für ein lokales Ziel (WireMock, LM Studio); nie an Infomaniak gesendet. */
+    static final String LOKAL_OHNE_TOKEN = "lokal-ohne-token";
 
     @ConfigProperty(name = "archiv.ki.basis-url")
     String basisUrl;
@@ -46,13 +49,37 @@ public class KiModell implements Supplier<ChatModel> {
         if (modell == null) {
             synchronized (this) {
                 if (chatModel == null) {
-                    chatModel = baue(basisUrl, token.map(String::strip).filter(t -> !t.isEmpty()).orElse(OHNE_TOKEN),
-                            this.modell, timeout, tokenZaehler);
+                    String zugang = zugang(token, basisUrl).orElseThrow(
+                            () -> new IllegalStateException("kein Token für das Sprachmodell"));
+                    chatModel = baue(basisUrl, zugang, this.modell, timeout, tokenZaehler);
                 }
                 modell = chatModel;
             }
         }
         return modell;
+    }
+
+    /** {@code true}, wenn ein Request hinausgehen darf: Token vorhanden oder lokales Ziel. */
+    public boolean bereit() {
+        return zugang(token, basisUrl).isPresent();
+    }
+
+    /** Token aus der Secret-Datei; ohne Token nur für ein lokales Ziel ein Platzhalter, sonst leer. */
+    static Optional<String> zugang(Optional<String> token, String basisUrl) {
+        Optional<String> wert = token.map(String::strip).filter(t -> !t.isEmpty());
+        if (wert.isPresent()) {
+            return wert;
+        }
+        return lokal(basisUrl) ? Optional.of(LOKAL_OHNE_TOKEN) : Optional.empty();
+    }
+
+    private static boolean lokal(String basisUrl) {
+        try {
+            String host = URI.create(basisUrl).getHost();
+            return "localhost".equals(host) || "127.0.0.1".equals(host);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return false;
+        }
     }
 
     /** Modellname für {@code ki_verbrauch}. */

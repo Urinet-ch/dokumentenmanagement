@@ -50,15 +50,56 @@ Funktionalität: KI-Vorschlag der Metadaten (KI_VORSCHLAG)
     Und das Dokument ist «EINGANGSKORB» ohne Vorschlag
     Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
 
-  @req-7.3 @req-7.8
-  Szenario: Fällt das Sprachmodell aus, geht das Dokument ohne Vorschlag in den Eingangskorb
+  @req-7.3
+  Szenario: Eine Antwort ohne Pflichtfelder des Schemas löst die Nachfrage aus
+    Angenommen ein Beleg als digitales PDF mit «Muster Buerobedarf AG» und «Rechnung 2026-127»
+    Und das Sprachmodell antwortet immer mit «{}»
+    Wenn der Worker die Aufträge bearbeitet
+    Dann wurde das Sprachmodell 2-mal aufgerufen
+    Und der zweite Aufruf nennt den Fehlerhinweis «Schemafehler»
+    Und das Dokument ist «EINGANGSKORB» ohne Vorschlag
+    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
+
+  @req-7.3
+  Szenario: Eine Antwort ohne Nachricht gilt wie eine ungültige
+    Angenommen ein Beleg als digitales PDF mit «Muster Buerobedarf AG» und «Rechnung 2026-128»
+    Und das Sprachmodell antwortet immer ohne Nachricht
+    Wenn der Worker die Aufträge bearbeitet
+    Dann wurde das Sprachmodell 2-mal aufgerufen
+    Und das Dokument ist «EINGANGSKORB» ohne Vorschlag
+    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
+
+  @req-7.3 @req-7.8 @req-5.4
+  Szenario: Fällt das Sprachmodell aus, wiederholt der Worker den Auftrag und legt das Dokument danach ohne Vorschlag in den Eingangskorb
     Angenommen ein Beleg als digitales PDF mit «Muster Buerobedarf AG» und «Rechnung 2026-126»
     Und das Sprachmodell antwortet mit HTTP 500
     Wenn der Worker die Aufträge bearbeitet
     Dann wurde das Sprachmodell 1-mal aufgerufen
+    Und ist der Auftrag «KI_VORSCHLAG» nach 1 Versuch «OFFEN»
+    Und das Dokument ist «VERARBEITUNG» ohne Vorschlag
+    Wenn der Auftrag «KI_VORSCHLAG» zweimal wieder fällig wird und der Worker ihn bearbeitet
+    Dann wurde das Sprachmodell 3-mal aufgerufen
+    Und ist der Auftrag «KI_VORSCHLAG» nach 3 Versuchen «FEHLER»
     Und das Dokument ist «EINGANGSKORB» ohne Vorschlag
-    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
-    Und «ki_verbrauch» enthält 1 Zeile «ERFASSUNG» mit 0 Tokens ein und 0 Tokens aus
+    Und «ki_verbrauch» enthält 3 Zeilen «ERFASSUNG» mit 0 Tokens ein und 0 Tokens aus
+
+  @req-7.1 @req-5.9
+  Szenario: Ein Dokument ohne PDF/A im Eingangskorb erhält einen Vorschlag nur aus dem Text
+    Angenommen ein Beleg als verschlüsseltes PDF
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «2026-129» und Vertraulichkeit «INTERN» vor
+    Wenn der Worker die Aufträge bearbeitet
+    Dann wurde das Sprachmodell 1-mal aufgerufen
+    Und der Aufruf enthält kein Seitenbild
+    Und das Dokument ist «EINGANGSKORB» mit der Art «LIEFERANTENBELEG» und der Vertraulichkeit «INTERN»
+
+  @req-7.1 @req-7.4
+  Szenario: Ein eindeutiger Kontakt zur IBAN aus dem Swiss QR Code wird als Partner verknüpft
+    Angenommen im Mandanten gibt es den Kontakt «Lieferant GmbH» mit der IBAN «CH4431999123000889012»
+    Und ein Beleg als gescanntes PDF mit «Lieferant GmbH» und einem Swiss QR Code über CHF 80.00
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «F-78» und Vertraulichkeit «INTERN» vor
+    Wenn der Worker die Aufträge bearbeitet
+    Dann das Dokument ist «EINGANGSKORB» mit der Art «LIEFERANTENBELEG» und der Vertraulichkeit «INTERN»
+    Und das Dokument ist mit dem Kontakt verknüpft und heisst dort «Lieferant GmbH»
 
   @req-7.11
   Szenario: Die Werte aus dem Swiss QR Code gehen vor den Werten der KI

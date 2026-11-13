@@ -16,7 +16,6 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,8 +25,9 @@ import java.util.UUID;
  * Metadaten-Extraktor der Erfassung (Aufgabe 3.2; Req 7.1–7.3, 7.5, 7.6, 7.11, 7.12; design.md «KI»), Ablauf wie im
  * Golden-Lauf: Swiss QR Code vor dem KI-Aufruf lesen, Prompt v6 bauen, genau ein Aufruf über {@link KiPort}, bei einer
  * Antwort ausserhalb des Schemas genau eine Nachfrage, danach {@link VorschlagNachbearbeitung}. Jeder Aufruf landet in
- * {@code ki_verbrauch}. Antwortet das Modell nicht oder zweimal ungültig, gibt es keinen Vorschlag (Req 7.3); das Log
- * nennt nur die Dokument-ID und Klassennamen, nie Inhalte (Req 16.7).
+ * {@code ki_verbrauch}. Antwortet das Modell zweimal ungültig oder fehlt das Token, gibt es keinen Vorschlag (Req 7.3);
+ * antwortet es nicht, wirft sie {@link KiAusfall} (Fehlversuch des Auftrags, Req 5.4). Das Log nennt nur die
+ * Dokument-ID, die Kennung des Prompts und Klassennamen, nie Inhalte (Req 16.7).
  */
 @ApplicationScoped
 public class MetadatenExtraktion {
@@ -53,52 +53,70 @@ public class MetadatenExtraktion {
     }
 
     /**
-     * @param volltext Volltext des Dokuments, Seiten durch Seitenvorschub getrennt
-     * @param seiten   gerenderte Seiten der PDF/A (für QR und Bildweg); leer bei {@code pdfa_fehlt}
-     * @param bildweg  Quelle ist ein Bild (Handy-Erfassung): das Seitenbild geht an das Modell (Req 7.1)
-     * @param eingang  Eingangsdatum in Europe/Zurich (Regel R3)
+     * @param text    Text für Modell, Nachbearbeitung und Kopf/Fuss-Erkennung wie im Golden-Lauf ({@code pdftotext
+     *                -layout}), Seiten durch Seitenvorschub getrennt; bei {@code pdfa_fehlt} der Volltext
+     * @param qr      Swiss QR Code aus {@link #qr(List)}; leer bei {@code pdfa_fehlt}
+     * @param bild    Seitenbild des Bildwegs aus {@link #bild(List)}: Quelle ist ein Bild (Handy-Erfassung), das Bild
+     *                geht statt des Texts an das Modell (Req 7.1); leer für den Textweg
+     * @param eingang Eingangsdatum in Europe/Zurich (Regel R3)
      */
-    public record Eingabe(UUID dokumentId, MandantCode mandant, String volltext, List<Path> seiten, boolean bildweg,
-                          LocalDate eingang) {
+    public record Eingabe(UUID dokumentId, MandantCode mandant, String text, Optional<QrDaten> qr,
+                          Optional<byte[]> bild, LocalDate eingang) {
         public Eingabe {
             Objects.requireNonNull(dokumentId, "dokumentId");
             Objects.requireNonNull(mandant, "mandant");
-            volltext = volltext == null ? "" : volltext;
-            seiten = List.copyOf(seiten);
+            text = text == null ? "" : text;
+            Objects.requireNonNull(qr, "qr");
+            Objects.requireNonNull(bild, "bild");
             Objects.requireNonNull(eingang, "eingang");
         }
     }
 
-    /** Vorschlag nach der Nachbearbeitung; leer, wenn das Modell ausfiel oder zweimal ungültig antwortete. */
+    /** Erster Swiss QR Code auf den gerenderten Seiten (Req 7.11); ohne Seiten keiner. */
+    public Optional<QrDaten> qr(List<Path> seiten) {
+        return seiten.isEmpty() ? Optional.empty() : qrLeser.lesen(seiten);
+    }
+
+    /**
+     * Seitenbild des Bildwegs wie im Golden-Lauf (Req 7.1); ohne Seiten keines (dann geht der Text an das Modell).
+     *
+     * @throws IOException wenn eine Seite nicht lesbar ist (Fehlversuch des Auftrags)
+     */
+    public Optional<byte[]> bild(List<Path> seiten) throws IOException {
+        return seiten.isEmpty() ? Optional.empty() : Optional.of(seitenbild.jpeg(seiten));
+    }
+
+    /**
+     * Vorschlag nach der Nachbearbeitung; leer, wenn das Modell zweimal ausserhalb des Schemas antwortete (Req 7.3).
+     *
+     * @throws KiAusfall wenn das Modell nicht antwortete (Timeout, HTTP-Fehler, Netz): Fehlversuch des Auftrags,
+     *                   wiederholt nach Req 5.4; ohne Token dagegen leer und ohne Request
+     */
     public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
         ErfassungMandant mandant = new ErfassungMandant(werte.name(), werte.uid(), werte.ibans(), werte.eigeneArten());
         List<ArtEintrag> arten = arten();
         String system = ErfassungPrompt.system(mandant.name(),
                 ErfassungPrompt.artListe(arten, mandant.eigeneArten(), mandant.name()));
-        Optional<QrDaten> qr = eingabe.seiten().isEmpty() ? Optional.empty() : qrLeser.lesen(eingabe.seiten());
-        Optional<byte[]> bild = Optional.empty();
-        if (eingabe.bildweg() && !eingabe.seiten().isEmpty()) {
-            try {
-                bild = Optional.of(seitenbild.jpeg(eingabe.seiten()));
-            } catch (IOException | RuntimeException e) {
-                LOG.warnf("KI-Vorschlag für Dokument %s ohne Ergebnis: Seitenbild nicht erstellt (%s)",
-                        eingabe.dokumentId(), e.getClass().getName());
-                return Optional.empty();
-            }
-        }
-        String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.volltext());
+        Optional<QrDaten> qr = eingabe.qr();
+        Optional<byte[]> bild = eingabe.bild();
+        String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty());
+        String kennung = ErfassungPrompt.hash(system, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
+        if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
+            LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "
+                    + "weichen ab)", eingabe.dokumentId(), kennung, ErfassungPrompt.GATE_KENNUNG);
+        }
         KiPort.Antwort antwort = aufrufen(anfrage);
         if (antwort instanceof KiPort.Schemafehler) {
             antwort = aufrufen(anfrage.nachfrage(NACHFRAGE_GRUND));
         }
         return switch (antwort) {
             case KiPort.Gueltig g -> {
-                Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeite(g.vorschlag(), qr, eingabe.volltext(),
+                Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeite(g.vorschlag(), qr, eingabe.text(),
                         mandant, arten, eingabe.eingang());
                 LOG.infof("KI-Vorschlag für Dokument %s (Prompt %s, Nachbearbeitung %s, QR %s, Bildweg %s)",
-                        eingabe.dokumentId(), ErfassungPrompt.VERSION, VorschlagNachbearbeitung.FASSUNG,
+                        eingabe.dokumentId(), kennung, VorschlagNachbearbeitung.FASSUNG,
                         qr.isPresent(), bild.isPresent());
                 yield Optional.of(vorschlag);
             }
@@ -107,9 +125,10 @@ public class MetadatenExtraktion {
                         eingabe.dokumentId(), s.grund());
                 yield Optional.empty();
             }
-            case KiPort.Ausfall a -> {
-                LOG.warnf("KI-Vorschlag für Dokument %s ohne Ergebnis: keine Antwort (%s)", eingabe.dokumentId(),
-                        a.grund());
+            case KiPort.Ausfall a -> throw new KiAusfall(eingabe.dokumentId(), a.grund());
+            case KiPort.OhneZugang o -> {
+                LOG.warnf("KI-Vorschlag für Dokument %s ohne Ergebnis: kein Token für das Sprachmodell",
+                        eingabe.dokumentId());
                 yield Optional.empty();
             }
         };
@@ -120,17 +139,17 @@ public class MetadatenExtraktion {
      * im Golden-Lauf; {@code ErfassungPrompt.artListe} stellt die eigenen Arten nach hinten).
      */
     List<ArtEintrag> arten() {
-        List<String> codes = ki.artCodes();
-        return dokumentarten.alle().stream()
+        return ErfassungPrompt.schemaArten(dokumentarten.alle().stream()
                 .filter(Dokumentart::aktiv)
-                .filter(a -> codes.contains(a.code()))
-                .sorted(Comparator.comparingInt(a -> codes.indexOf(a.code())))
                 .map(a -> new ArtEintrag(a.code(), a.name(), a.vertraulichkeit().name()))
-                .toList();
+                .toList(), ki.artCodes());
     }
 
     private KiPort.Antwort aufrufen(KiPort.Anfrage anfrage) {
         KiPort.Antwort antwort = ki.metadaten(anfrage);
+        if (antwort instanceof KiPort.OhneZugang) {
+            return antwort;
+        }
         try {
             verbrauch.erfassen(KiVerbrauchPort.ERFASSUNG, antwort.verbrauch());
         } catch (RuntimeException e) {

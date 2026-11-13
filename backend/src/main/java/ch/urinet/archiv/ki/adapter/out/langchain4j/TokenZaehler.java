@@ -7,31 +7,36 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Zählt die Tokens der Modellantwort, auch wenn der AI-Service sie danach nicht parsen kann (Req 7.3, 7.8), wie im
- * Golden-Lauf; je Thread, weil der Worker mehrere Aufträge parallel ausführen kann und das Modell synchron im Thread
- * des Aufrufers antwortet.
+ * Golden-Lauf, und merkt sich den Rohtext der letzten Antwort für die Schemaprüfung ({@link AntwortSchema}); je Thread,
+ * weil der Worker mehrere Aufträge parallel ausführen kann und das Modell synchron im Thread des Aufrufers antwortet.
+ * Der Adapter räumt den Stand nach jedem Aufruf ab ({@link #zuruecksetzen()}).
  */
 @ApplicationScoped
 public class TokenZaehler implements ChatModelListener {
 
-    /** Tokens eines Aufrufs; {@code antworten} 0, wenn keine Antwort kam. */
-    public record Stand(long ein, long aus, int antworten) {
+    /** Tokens eines Aufrufs; {@code antworten} 0, wenn keine Antwort kam; {@code text} Rohtext der letzten Antwort. */
+    public record Stand(long ein, long aus, int antworten, String text) {
     }
 
     private final ThreadLocal<long[]> stand = ThreadLocal.withInitial(() -> new long[3]);
+    private final ThreadLocal<String> text = new ThreadLocal<>();
 
     public void zuruecksetzen() {
         stand.remove();
+        text.remove();
     }
 
     public Stand stand() {
         long[] s = stand.get();
-        return new Stand(s[0], s[1], (int) s[2]);
+        return new Stand(s[0], s[1], (int) s[2], text.get());
     }
 
     @Override
     public void onResponse(ChatModelResponseContext kontext) {
         long[] s = stand.get();
         s[2]++;
+        text.set(kontext.chatResponse() == null || kontext.chatResponse().aiMessage() == null ? null
+                : kontext.chatResponse().aiMessage().text());
         TokenUsage t = kontext.chatResponse() == null ? null : kontext.chatResponse().tokenUsage();
         if (t != null) {
             s[0] += t.inputTokenCount() == null ? 0 : t.inputTokenCount();

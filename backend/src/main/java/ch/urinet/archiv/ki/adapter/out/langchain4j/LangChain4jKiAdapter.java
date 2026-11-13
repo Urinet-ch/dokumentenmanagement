@@ -19,9 +19,11 @@ import java.util.Map;
 
 /**
  * Adapter des {@link KiPort} mit Quarkus LangChain4j gegen Infomaniak AI Services (design.md «KI»; Req 7.1, 7.3): genau
- * ein Request je {@link #metadaten}, ohne Wiederholung ({@link KiModell}). Eine Antwort ausserhalb des Schemas ist ein
+ * ein Request je {@link #metadaten}, ohne Wiederholung ({@link KiModell}). Eine Antwort ausserhalb des Schemas (nicht
+ * lesbar, leer oder gegen das strikte Schema ungültig, {@link AntwortSchema}) ist ein
  * {@link KiPort.Schemafehler}, jeder andere Fehler ein {@link KiPort.Ausfall}; die Gründe nennen nur Klassennamen (Req
- * 16.7). Nur über {@code KiAuswahl} wählbar.
+ * 16.7). Ohne Token ({@link KiModell#bereit()}) kein Request, sondern {@link KiPort.OhneZugang}. Nur über
+ * {@code KiAuswahl} wählbar.
  */
 @ApplicationScoped
 @Typed(LangChain4jKiAdapter.class)
@@ -39,12 +41,18 @@ public class LangChain4jKiAdapter implements KiPort {
 
     @Override
     public Antwort metadaten(Anfrage anfrage) {
+        if (!modell.bereit()) {
+            return new OhneZugang(new Verbrauch(modell.modell(), 0, 0));
+        }
         zaehler.zuruecksetzen();
         try {
             Result<MetadatenVorschlag> ergebnis = aufrufen(anfrage);
             Verbrauch verbrauch = verbrauch(ergebnis.tokenUsage());
             if (ergebnis.content() == null) {
                 return new Schemafehler("leere Antwort", verbrauch);
+            }
+            if (!AntwortSchema.gueltig(zaehler.stand().text())) {
+                return new Schemafehler("Antwort ausserhalb des Schemas", verbrauch);
             }
             return new Gueltig(roh(ergebnis.content()), verbrauch);
         } catch (RuntimeException e) {
