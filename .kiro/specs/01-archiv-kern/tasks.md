@@ -266,6 +266,8 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Vorauswahl vor dem KI-Aufruf deterministisch über diese Merkmale, ohne Treffer die 5 neuesten; kein zweiter KI-Aufruf
   - Korrekturquote je Feld als Kennzahl fortschreiben
   - Szenario: Nach einer Korrektur bei Partner X enthält der nächste Beleg mit der IBAN von X das Beispiel
+  - Umgesetzt (PR #109) hinter `archiv.ki.beispiele.aktiv`: `ki_beispiel` (Changeset 016, Merkmale als Arrays, Sicht aus dem Dokument), `KorrekturLernen` beim Bestätigen, `BeispielAuswahl` und `BeispielVorauswahl` vor dem Aufruf, Zähler `archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`; siehe design.md «Umsetzung (Aufgabe 3.3)»
+  - Offen: Die Beispiele kommen nur mit `archiv.ki.beispiele.aktiv=true` in den Prompt (Standard aus, auch in prod, wegen Gate 0); Req 7.1 (Teil Korrekturbeispiele), 7.9 und 7.10 wirken in prod erst nach einem Golden-Lauf mit Beispielen und dem Einschalten [Fabian]. Die Checkbox wird erst danach abgehakt
   - _Anforderungen: 7.7, 7.9, 7.10_
   - _Abhängig von: 3.2_
 

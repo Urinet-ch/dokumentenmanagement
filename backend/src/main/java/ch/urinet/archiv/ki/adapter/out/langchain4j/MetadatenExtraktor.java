@@ -38,4 +38,24 @@ public interface MetadatenExtraktor {
     @SystemMessage("{systemPrompt}")
     @UserMessage(ErfassungPrompt.BENUTZER_K1 + ErfassungPrompt.NACHFRAGE)
     Result<MetadatenVorschlag> nachfrageBild(String systemPrompt, String qr, @ImageUrl Image bild, String fehler);
+
+    /** Mit Korrekturbeispielen (Req 7.9, nur mit {@code archiv.ki.beispiele.aktiv=true}). */
+    @SystemMessage("{systemPrompt}")
+    @UserMessage(ErfassungPrompt.BEISPIELE + ErfassungPrompt.BENUTZER)
+    Result<MetadatenVorschlag> extrahiereMitBeispielen(String systemPrompt, String beispiele, String qr, String text);
+
+    @SystemMessage("{systemPrompt}")
+    @UserMessage(ErfassungPrompt.BEISPIELE + ErfassungPrompt.BENUTZER + ErfassungPrompt.NACHFRAGE)
+    Result<MetadatenVorschlag> nachfrageMitBeispielen(String systemPrompt, String beispiele, String qr, String text,
+                                                      String fehler);
+
+    @SystemMessage("{systemPrompt}")
+    @UserMessage(ErfassungPrompt.BEISPIELE + ErfassungPrompt.BENUTZER_K1)
+    Result<MetadatenVorschlag> extrahiereBildMitBeispielen(String systemPrompt, String beispiele, String qr,
+                                                           @ImageUrl Image bild);
+
+    @SystemMessage("{systemPrompt}")
+    @UserMessage(ErfassungPrompt.BEISPIELE + ErfassungPrompt.BENUTZER_K1 + ErfassungPrompt.NACHFRAGE)
+    Result<MetadatenVorschlag> nachfrageBildMitBeispielen(String systemPrompt, String beispiele, String qr,
+                                                          @ImageUrl Image bild, String fehler);
 }

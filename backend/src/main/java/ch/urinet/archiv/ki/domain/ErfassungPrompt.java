@@ -16,7 +16,9 @@ import java.util.Set;
  * Kürzung, QR-Zeile, Liste der Dokumentarten und Kennung der Prompt-Fassung 1:1 aus
  * {@code spikes/golden-lauf} ({@code Prompt}, {@code Dokumentarten}). Jede Änderung an Text, Reihenfolge oder Schema
  * ändert die Kennung und braucht einen neuen Golden-Lauf; {@code ErfassungPromptTest} hält den Stand des Spikes fest.
- * Ohne Korrekturbeispiele, die folgen mit Aufgabe 3.3 (Req 7.9).
+ * Die Korrekturbeispiele (Aufgabe 3.3, Req 7.9) stehen in {@link #BEISPIELE} vor der Benutzernachricht; sie zählen
+ * nicht zur Kennung, gehen aber nur mit {@code archiv.ki.beispiele.aktiv=true} an das Modell (der Gate-Lauf kannte sie
+ * nicht, design.md «Umsetzung (Aufgabe 3.3)»).
  */
 public final class ErfassungPrompt {
 
@@ -84,7 +86,24 @@ public final class ErfassungPrompt {
             Der Beleg liegt als Bild bei (Foto oder gerenderte Seiten untereinander). Lies die Werte direkt aus dem Bild.
             """;
 
+    /**
+     * Korrekturbeispiele vor {@link #BENUTZER} bzw. {@link #BENUTZER_K1} (Req 7.9); {beispiele} aus
+     * {@link #beispiele(List, boolean)} mit der Einleitung je nach Auswahl. Nicht Teil von {@link #hash}: Ohne Beispiele
+     * bleibt die Nachricht die des Gate-Laufs.
+     */
+    public static final String BEISPIELE = """
+            Korrekturbeispiele: {beispiele}
+
+            """;
+    static final String EINLEITUNG_MERKMALE = "Bei früheren Belegen mit gleichen Merkmalen (IBAN, UID, E-Mail, "
+            + "Belegnummer-Muster) hat der Benutzer diese Werte bestätigt. Übernimm sie nur, wenn der Beleg dazu passt.";
+    static final String EINLEITUNG_NEUESTE = "Bei den neuesten früheren Belegen, ohne gleiche Merkmale wie dieser "
+            + "Beleg, hat der Benutzer diese Werte bestätigt. Sie zeigen nur, worauf er achtet; übernimm keinen Wert, der "
+            + "nicht aus diesem Beleg hervorgeht.";
+
     public static final int MAX_ZEICHEN = 12_000;
+    /** Höchstlänge eines Werts in {@link #beispiele(List)}. */
+    static final int MAX_WERT = 200;
 
     /**
      * Anzeigetexte nur im Prompt (v5); die Namen der Dokumentarten bleiben. %s ist der Mandantenname, eingesetzt in
@@ -119,6 +138,41 @@ public final class ErfassungPrompt {
         return "IBAN " + q.iban() + ", Betrag " + (q.betrag() == null ? "keiner" : q.betrag().toPlainString())
                 + ", Währung " + q.waehrung() + ", Referenz " + (q.referenz() == null ? "keine" : q.referenz())
                 + ", Zahlungsempfänger " + q.zahlungsempfaenger();
+    }
+
+    /**
+     * Wert für {beispiele}: die Einleitung (Auswahl nach Merkmalen oder Rückfall auf die neuesten), dann je Beispiel
+     * eine Zeile mit der bestätigten Art und nur den korrigierten Feldern in der Reihenfolge von {@link Feld},
+     * Leerraum zusammengefasst, Werte höchstens {@value #MAX_WERT} Zeichen; leer ohne Beispiele.
+     */
+    public static String beispiele(List<Beispiel> beispiele, boolean nachMerkmalen) {
+        if (beispiele.isEmpty()) {
+            return "";
+        }
+        return (nachMerkmalen ? EINLEITUNG_MERKMALE : EINLEITUNG_NEUESTE) + "\n" + zeilen(beispiele);
+    }
+
+    /** Je Beispiel eine Zeile (ohne Einleitung). */
+    static String zeilen(List<Beispiel> beispiele) {
+        List<String> zeilen = new ArrayList<>();
+        for (Beispiel b : beispiele) {
+            StringBuilder sb = new StringBuilder("- art=").append(wert(b.art()));
+            for (Feld feld : Feld.values()) {
+                if (feld != Feld.ART && b.korrektur().containsKey(feld)) {
+                    sb.append("; ").append(feld.schluessel()).append('=').append(wert(b.korrektur().get(feld)));
+                }
+            }
+            zeilen.add(sb.toString());
+        }
+        return String.join("\n", zeilen);
+    }
+
+    private static String wert(String wert) {
+        if (wert == null) {
+            return "null";
+        }
+        String w = wert.replaceAll("\\s+", " ").strip();
+        return w.length() <= MAX_WERT ? w : w.substring(0, MAX_WERT) + "…";
     }
 
     /** Fertig gerenderter System-Prompt, wie ihn das Modell erhält. */

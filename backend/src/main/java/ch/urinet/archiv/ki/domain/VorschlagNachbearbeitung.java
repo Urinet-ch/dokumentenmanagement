@@ -45,6 +45,11 @@ public final class VorschlagNachbearbeitung {
     private VorschlagNachbearbeitung() {
     }
 
+    /** Belegnummer-Muster des Mandanten in fester Reihenfolge, Merkmal der Vorauswahl (Req 7.9). */
+    public static List<Pattern> belegnummerMuster() {
+        return List.copyOf(MUSTER.keySet());
+    }
+
     private static Map<Pattern, String> muster() {
         Map<Pattern, String> m = new LinkedHashMap<>();
         m.put(Pattern.compile("^\\d{4}-\\d{3}$"), "AUSGANGSRECHNUNG");
@@ -63,6 +68,9 @@ public final class VorschlagNachbearbeitung {
                                       List<ArtEintrag> arten, LocalDate eingang) {
         Map<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
+            if (!f.mitSicherheit()) {
+                continue;
+            }
             sicherheit.put(f, wert(v.sicherheit().get(f)));
         }
 

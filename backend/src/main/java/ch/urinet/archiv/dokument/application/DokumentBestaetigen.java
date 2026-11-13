@@ -13,10 +13,13 @@ import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
+import ch.urinet.archiv.ki.application.KiBeispielPort;
+import ch.urinet.archiv.ki.application.KorrekturLernen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
@@ -38,7 +41,8 @@ import java.util.regex.Pattern;
 /**
  * Bestätigen (A7, Req 8.2, 8.3, 8.8, 8.9, 2.22, 5.9, 9.8; design.md «Statusmodell»): Pflichtfelder der Art prüfen,
  * Frist berechnen, bei eigenen Arten die Belegnummer reservieren, Status {@code ARCHIVIERUNG} und Auftrag
- * {@code ARCHIVIEREN} einreihen, alles in einer Transaktion. Recht und Sichtbarkeit prüft die REST-Schicht vorher.
+ * {@code ARCHIVIEREN} einreihen und aus der Korrektur lernen ({@link KorrekturLernen}, Req 7.7), alles in einer
+ * Transaktion. Recht und Sichtbarkeit prüft die REST-Schicht vorher.
  * <p>
  * Die Prüfungen laufen ohne Zeilensperre; erst das Schreiben sperrt das Dokument und prüft Status und Version erneut.
  * Liegt die Frist in der Vergangenheit, setzt eine eigene Transaktion das Kennzeichen «Frist abgelaufen», und die
@@ -65,10 +69,12 @@ public class DokumentBestaetigen {
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
+    private final KorrekturLernen lernen;
 
     public DokumentBestaetigen(DokumentRepository repository, DokumentStatusPort status, FristKennzeichen frist,
                                DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
-                               MandantEinstellungen einstellungen, AuftragService auftraege) {
+                               MandantEinstellungen einstellungen, AuftragService auftraege,
+                               KorrekturLernen lernen) {
         this.repository = repository;
         this.status = status;
         this.frist = frist;
@@ -77,6 +83,7 @@ public class DokumentBestaetigen {
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
+        this.lernen = lernen;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -102,7 +109,8 @@ public class DokumentBestaetigen {
         String partnerName = b.partnerId() == null ? null : kontakte.finden(b.partnerId()).map(Kontakt::name)
                 .orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
 
-        MandantEinstellungen.Werte mandant = einstellungen.lesen(aufloesung.pruefen());
+        MandantCode mandantCode = aufloesung.pruefen();
+        MandantEinstellungen.Werte mandant = einstellungen.lesen(mandantCode);
         boolean eigeneArt = mandant.eigeneArten().contains(art.code());
         boolean finanz = art.gruppen().contains("finanz");
         if (eigeneArt && finanz && b.belegnummer() != null) {
@@ -132,6 +140,7 @@ public class DokumentBestaetigen {
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
                         b.naechsteFrist())) : Optional.empty());
+        Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)
             Stand jetzt = status.stand(id, false).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
@@ -145,6 +154,9 @@ public class DokumentBestaetigen {
         } else {
             status.belegnummerFreigeben(id);
         }
+        vorher.ifPresent(v -> lernen.lernen(mandantCode, id, v, new KorrekturLernen.Ergebnis(art.code(), b.titel(),
+                b.datum(), b.partnerId(), partnerName, finanz, b.belegnummer(), b.richtung(), b.betrag(),
+                b.waehrung(), b.faelligkeit(), b.qrReferenz(), vertraulichkeit, b.tags())));
         auftraege.einreihen(ARCHIVIEREN, new Nutzlast(Map.of(NUTZLAST_DOKUMENT, id)));
         return erwarteteVersion + 1;
     }

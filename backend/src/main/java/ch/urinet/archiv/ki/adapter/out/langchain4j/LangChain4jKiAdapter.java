@@ -64,17 +64,29 @@ public class LangChain4jKiAdapter implements KiPort {
         }
     }
 
+    /** Ohne Beispiele genau die Methoden des Gate-Laufs, damit die Nachricht unverändert bleibt. */
     private Result<MetadatenVorschlag> aufrufen(Anfrage a) {
+        String b = a.beispiele();
         if (a.bildJpeg().isPresent()) {
             Image bild = Image.builder().base64Data(Base64.getEncoder().encodeToString(a.bildJpeg().get()))
                     .mimeType("image/jpeg").build();
+            if (b.isEmpty()) {
+                return a.fehler().isPresent()
+                        ? extraktor.nachfrageBild(a.systemPrompt(), a.qr(), bild, a.fehler().get())
+                        : extraktor.extrahiereBild(a.systemPrompt(), a.qr(), bild);
+            }
             return a.fehler().isPresent()
-                    ? extraktor.nachfrageBild(a.systemPrompt(), a.qr(), bild, a.fehler().get())
-                    : extraktor.extrahiereBild(a.systemPrompt(), a.qr(), bild);
+                    ? extraktor.nachfrageBildMitBeispielen(a.systemPrompt(), b, a.qr(), bild, a.fehler().get())
+                    : extraktor.extrahiereBildMitBeispielen(a.systemPrompt(), b, a.qr(), bild);
+        }
+        if (b.isEmpty()) {
+            return a.fehler().isPresent()
+                    ? extraktor.nachfrage(a.systemPrompt(), a.qr(), a.text(), a.fehler().get())
+                    : extraktor.extrahiere(a.systemPrompt(), a.qr(), a.text());
         }
         return a.fehler().isPresent()
-                ? extraktor.nachfrage(a.systemPrompt(), a.qr(), a.text(), a.fehler().get())
-                : extraktor.extrahiere(a.systemPrompt(), a.qr(), a.text());
+                ? extraktor.nachfrageMitBeispielen(a.systemPrompt(), b, a.qr(), a.text(), a.fehler().get())
+                : extraktor.extrahiereMitBeispielen(a.systemPrompt(), b, a.qr(), a.text());
     }
 
     /** Tokens aus dem Listener (auch bei nicht parsebarer Antwort), sonst aus dem Ergebnis. */

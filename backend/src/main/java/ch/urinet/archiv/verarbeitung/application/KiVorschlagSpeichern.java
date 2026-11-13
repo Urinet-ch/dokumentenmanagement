@@ -114,7 +114,7 @@ public class KiVorschlagSpeichern {
         Map<String, Object> werte = werte(v);
         Map<String, BigDecimal> sicherheit = new LinkedHashMap<>();
         for (Feld feld : Feld.values()) {
-            if (werte.containsKey(feld.schluessel())) {
+            if (feld.mitSicherheit() && werte.containsKey(feld.schluessel())) {
                 sicherheit.put(feld.schluessel(), v.sicherheit(feld));
             }
         }

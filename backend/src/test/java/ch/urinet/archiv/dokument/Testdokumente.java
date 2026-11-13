@@ -30,7 +30,7 @@ public final class Testdokumente {
             "UNBEKANNT", UUID.fromString("00000000-0000-4000-8000-0000000000ff"));
 
     private static final List<String> TABELLEN = List.of("dokument_version", "dokument_datei", "dokument_finanz",
-            "dokument_vertrag", "belegnummer_eigen", "dokument");
+            "dokument_vertrag", "belegnummer_eigen", "ki_beispiel", "dokument");
 
     /** Angaben eines Testdokuments; {@code bestaetigt = false} heisst Art unbestätigt. */
     public record Angaben(String mandant, String art, String vertraulichkeit, boolean bestaetigt, String erstelltVon,

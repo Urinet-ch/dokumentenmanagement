@@ -131,7 +131,7 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
                 + "ki_sicherheit = cast(:sicherheit as jsonb), status = 'EINGANGSKORB', version = version + 1, "
                 + "geaendert = clock_timestamp()"
                 + (partnerId == null ? "" : ", partner_name = case when partner_id is null then :partnerName "
-                        + "else partner_name end, partner_id = coalesce(partner_id, :partner)")
+                        + "else partner_name end, partner_id = coalesce(partner_id, :partner), ki_partner_id = :partner")
                 + " where id = :id and status in ('VERARBEITUNG', 'EINGANGSKORB') and bestaetigt is null "
                 + "and ki_vorschlag is null and version = :erwartet";
         var abfrage = em().createNativeQuery(sql)

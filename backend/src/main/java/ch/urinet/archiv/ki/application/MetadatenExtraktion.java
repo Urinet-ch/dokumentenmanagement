@@ -23,7 +23,8 @@ import java.util.UUID;
 
 /**
  * Metadaten-Extraktor der Erfassung (Aufgabe 3.2; Req 7.1–7.3, 7.5, 7.6, 7.11, 7.12; design.md «KI»), Ablauf wie im
- * Golden-Lauf: Swiss QR Code vor dem KI-Aufruf lesen, Prompt v6 bauen, genau ein Aufruf über {@link KiPort}, bei einer
+ * Golden-Lauf: Swiss QR Code vor dem KI-Aufruf lesen, Prompt v6 bauen (mit Korrekturbeispielen aus
+ * {@link BeispielAuswahl}, Aufgabe 3.3, Req 7.9), genau ein Aufruf über {@link KiPort}, bei einer
  * Antwort ausserhalb des Schemas genau eine Nachfrage, danach {@link VorschlagNachbearbeitung}. Jeder Aufruf landet in
  * {@code ki_verbrauch}. Antwortet das Modell zweimal ungültig oder fehlt das Token, gibt es keinen Vorschlag (Req 7.3);
  * antwortet es nicht, wirft sie {@link KiAusfall} (Fehlversuch des Auftrags, Req 5.4). Das Log nennt nur die
@@ -41,15 +42,18 @@ public class MetadatenExtraktion {
     private final KiVerbrauchPort verbrauch;
     private final DokumentartVerwaltung dokumentarten;
     private final MandantEinstellungen einstellungen;
+    private final BeispielAuswahl beispiele;
 
     public MetadatenExtraktion(KiPort ki, QrLeserPort qrLeser, SeitenbildPort seitenbild, KiVerbrauchPort verbrauch,
-                               DokumentartVerwaltung dokumentarten, MandantEinstellungen einstellungen) {
+                               DokumentartVerwaltung dokumentarten, MandantEinstellungen einstellungen,
+                               BeispielAuswahl beispiele) {
         this.ki = ki;
         this.qrLeser = qrLeser;
         this.seitenbild = seitenbild;
         this.verbrauch = verbrauch;
         this.dokumentarten = dokumentarten;
         this.einstellungen = einstellungen;
+        this.beispiele = beispiele;
     }
 
     /**
@@ -101,7 +105,10 @@ public class MetadatenExtraktion {
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
         String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
-        KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty());
+        String auswahl = beispiele.fuer(eingabe.dokumentId(), eingabe.mandant(),
+                ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
+        KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
+                auswahl);
         String kennung = ErfassungPrompt.hash(system, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
         if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
             LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "

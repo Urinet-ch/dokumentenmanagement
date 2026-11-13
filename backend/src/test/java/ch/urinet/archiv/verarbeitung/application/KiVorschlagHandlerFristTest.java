@@ -103,7 +103,7 @@ class KiVorschlagHandlerFristTest {
                 return true;
             }
         };
-        MetadatenExtraktion extraktion = new MetadatenExtraktion(null, null, null, null, null, null) {
+        MetadatenExtraktion extraktion = new MetadatenExtraktion(null, null, null, null, null, null, null) {
             @Override
             public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
                 eingaben.add(eingabe);
