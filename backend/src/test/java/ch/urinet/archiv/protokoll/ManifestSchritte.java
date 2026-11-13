@@ -348,8 +348,20 @@ public class ManifestSchritte {
 
     @Wenn("der Manifest-Lauf für «{word}» bis «{word}» bis zum letzten Versuch läuft")
     public void bisZumLetztenVersuch(String alias, String bis) throws Exception {
+        eingereiht(alias, bis);
+        eingereihterBisZumLetztenVersuch();
+    }
+
+    /** Nur einreihen, z. B. wie der Lauf beim Start nach einem Neustart (Review PR #114); der Auftrag bleibt OFFEN. */
+    @Wenn("für «{word}» wird ein Manifest-Auftrag bis «{word}» eingereiht")
+    public void eingereiht(String alias, String bis) throws SQLException {
         auftrag = auftraege.rohEinreihen(code(alias), ManifestErzeugen.TYP,
                 "{\"" + ManifestErzeugen.BIS_TAG + "\": " + LocalDate.parse(bis, DATUM).toEpochDay() + "}");
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("OFFEN");
+    }
+
+    @Wenn("der eingereihte Manifest-Auftrag bis zum letzten Versuch läuft")
+    public void eingereihterBisZumLetztenVersuch() throws Exception {
         for (int runde = 0; runde < 5; runde++) {
             auftraege.abarbeiten();
             if (!auftraege.zeile(auftrag).status().equals("OFFEN")) {
@@ -738,6 +750,21 @@ public class ManifestSchritte {
                 assertThat(r.next()).as(schluessel).isTrue();
                 assertThat(r.getBoolean(1)).as("gemeldet").isTrue();
                 assertThat(r.getBoolean(2)).as("erledigt").isTrue();
+            }
+        }
+    }
+
+    /** Gemeldet und nicht erledigt: Der Alarm bleibt bestehen, eine weitere Mail zum selben Befund gibt es nicht. */
+    @Dann("ist der Alarm zum Manifest «{word}» von «{word}» offen")
+    public void alarmOffen(String datum, String alias) throws SQLException {
+        String schluessel = "manifest:" + LocalDate.parse(datum, DATUM) + ":FEHLT";
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "select gemeldet is not null, erledigt is null from " + schema(alias) + ".alarm where schluessel = ?")) {
+            p.setString(1, schluessel);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).as(schluessel).isTrue();
+                assertThat(r.getBoolean(1)).as("gemeldet").isTrue();
+                assertThat(r.getBoolean(2)).as("nicht erledigt").isTrue();
             }
         }
     }
