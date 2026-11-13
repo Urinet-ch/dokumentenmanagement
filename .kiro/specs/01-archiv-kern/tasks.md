@@ -304,6 +304,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Offline-Warteschlange (IndexedDB) mit Zähler, automatischer Upload bei `online`; `DUBLETTE` gilt als übertragen und wird gelöscht; nur Netzwerkfehler und 5xx zählen als Fehlversuch, offline nicht; 3 Fehlversuche → manuell wiederholen; 4xx sofort fehlerhaft mit Meldung des Servers (401 → neu anmelden)
   - Nach einem Neuladen der PWA meldet man sich neu an (Tokens nur im Arbeitsspeicher, aus 2.7). `/erfassen` ist darum offline auch ohne Anmeldung zugänglich und nimmt Aufnahmen in die Warteschlange; hochgeladen wird erst nach der Anmeldung (entschieden von Fabian am 11.11.2026, PR #44)
   - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
+  - Stand Umsetzung (PR #123, 13.11.2026): Kamera, Scanner im Web Worker, Vorschau, Warteschlange und Upload sind umgesetzt, dazu Eintrag `aufgenommen` und Aufruf von `aufnahmeName` aus 4.10 (Req 4.9); Browser-Szenarien in `features/dokument/erfassen-handy-pwa.feature` (`@req-4.2` bis `@req-4.9`). Der Haken folgt erst nach dem Gerätetest [Fabian] (Req 4.1)
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_
 

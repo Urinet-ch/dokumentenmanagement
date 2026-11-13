@@ -1166,6 +1166,57 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler.
+- Umsetzung (Aufgabe 3.7, Handy-Erfassung, 13.11.2026):
+  - Seite `/erfassen/handy` (lazy geladen, `erfassenGuard`): angemeldet mit Recht A1; ohne Anmeldung nur offline
+    zugänglich (Tokens nur im Arbeitsspeicher, entschieden von Fabian am 11.11.2026), online führt der Weg über die
+    Anmeldung. Die Startseite verlinkt «Ohne Verbindung erfassen», solange das Gerät offline ist. Den Online-Zustand
+    liefert das Token `ONLINE` (Signal aus `navigator.onLine` und den Ereignissen `online`/`offline`). Die Umleitung
+    der App auf die Anmeldung spart `/erfassen` aus, damit Aufnahmen vor der Anmeldung gesichert werden (Req 4.4).
+  - Kamera: `getUserMedia` mit `facingMode: { ideal: 'environment' }`; auf Geräten mit Touch (`pointer: coarse`)
+    startet sie beim Öffnen, sonst per Knopf; ohne Kamera oder ohne Erlaubnis der Fallback
+    `<input type="file" accept="image/*" capture="environment">`. Original ist das volle Videobild als JPEG 0.95 bzw. die
+    Datei der Kamera (Req 4.7).
+  - Scanner im Web Worker (`scanner.worker.ts`, eigener Chunk mit OpenCV.js `@techstark/opencv-js` 4.12 und
+    `jscanify` 1.4.3, beide Apache-2.0 bzw. MIT): Kanten auf einer Verkleinerung (lange Kante 1'000 px) suchen, Ecken
+    prüfen (im Bild, konvex, Fläche mindestens 20 % des Bilds), sonst das ganze Bild (Req 4.3); Entzerrung auf
+    2'480 px an der langen Kante, kleinere Aufnahmen werden hochskaliert, JPEG 0.85. Die Ecken lassen sich in der
+    Vorschau verschieben (auch per Tastatur, Shift + Pfeil), die Seite lässt sich verwerfen.
+  - Erkenntnisse OpenCV.js: Das Emscripten-Modul ist ein Thenable; `await` darauf oder ein dynamisches `import()`
+    hängt. Es wird darum im Worker geladen und über `onRuntimeInitialized` abgewartet; jscanify braucht das globale
+    `cv`. Die Verweise auf `fs`/`path` in OpenCV.js sind in `angular.json` als `externalDependencies` ausgenommen,
+    `canvas`/`jsdom` (nur für Node in jscanify) werden nicht gebündelt. Weil OpenCV.js unter Vitest hängt, prüfen
+    Unit-Tests nur die Geometrie (`ecken.ts`); Worker und OpenCV.js prüfen die Browser-Szenarien.
+  - Bundle und Offline: Der Worker-Chunk (rund 10.8 MB, übertragen rund 2.5 MB) liegt in der Gruppe «app» des Service
+    Workers und wird bei der Installation vorgeladen. Beim Öffnen der Seite startet die PWA den Worker sofort
+    (`ScannerPort.vorbereiten()`), damit eine danach offline aufgenommene Seite ihn nicht erst laden muss. Die
+    Warteschlange (`idb`) wird in `App` nachgeladen; das erste Bundle bleibt bei rund 525 kB (die Budget-Warnung von
+    500 kB besteht schon auf `main`).
+  - Warteschlange (Req 4.4–4.8): ein Eintrag je Erfassung mit `aufgenommen` (Zeitpunkt der ersten Seite), Seiten
+    (Original und Arbeitsfassung), `fehlversuche`, `zustand`, `meldung` und dem Benutzer (`sub`), wenn angemeldet.
+    Hochgeladen wird nacheinander, nur online, nur mit Recht A1 und nur Einträge des angemeldeten Benutzers (ohne
+    Benutzer: jeder mit A1); Anlässe sind Start der App, Wechsel auf online, Anmeldung und neue Erfassung. Upload je
+    Erfassung als ein Dokument (`zusammenfassen=true` ab zwei Seiten), Originale als `dateien`, Arbeitsfassungen als
+    `arbeitsfassungen`; Dateiname der Originale «Aufnahme TT.MM.JJJJ HH:MM» aus `aufgenommen` (`aufnahmeName`, Req 4.9),
+    der Arbeitsfassungen «… Seite n.jpg». Bewertung (`bewerten`, reine Funktion): 202 mit `NEU` oder `DUBLETTE` →
+    löschen; ein Ergebnis `ABGELEHNT` → fehlerhaft mit der Meldung des Archivs; Netzwerkfehler oder 5xx online →
+    Fehlversuch, nächster Versuch nach 30 s × Fehlversuche, beim Wechsel auf online sofort; offline zählt nicht;
+    nach 3 Fehlversuchen fehlerhaft mit «Erneut versuchen» (setzt die Fehlversuche zurück); 4xx ausser 401 → sofort
+    fehlerhaft mit `detail` bzw. Text zum `fehlercode`; 401 → «Sitzung abgelaufen», der Eintrag bleibt und geht nach
+    der Anmeldung hoch. `navigator.storage.persist()` bittet den Browser, die Daten nicht zu räumen.
+  - Abweichung: kein Background Sync. Die Tokens liegen nur im Arbeitsspeicher der Seite, ein Service Worker könnte
+    ohne Token nicht hochladen; die Warteschlange läuft, sobald die PWA offen ist.
+  - Upload-Seite: Der Titel ist ein `h2` unter dem Seitentitel, damit «Handy-Erfassung» und «Datei hochladen» eine
+    Überschriftenfolge bilden.
+  - Browser-Szenarien (`features/dokument/erfassen-handy-pwa.feature`, `frontend/e2e/schritte/erfassen.mjs`): Chromium
+    als Handy (390 × 844, Touch) mit Fake-Kamera; sie spielt ein synthetisches Y4M-Video aus `e2e/hilfen/testbild.mjs`
+    (Blatt auf dunklem Grund, 10 Bilder pro Sekunde). Jedes Szenario trägt eine zufällige Kennung und jedes Videobild
+    seine Nummer als kaum sichtbare Felder ausserhalb des Blatts, damit das Archiv im Testmodus, dessen Daten über
+    die Szenarien bestehen bleiben, keine Aufnahme als Dublette erkennt. Was die PWA sendet, schreibt ein Init-Script
+    über `exposeFunction` mit (über Anmeldung und Neuladen hinweg); der Angular-HttpClient sendet über `fetch`, darum
+    sind `fetch` und `XMLHttpRequest` umschlossen. Den Offline-Start mit installierter PWA prüft ein Szenario mit
+    Service Worker, «installiert» heisst: alle Dateien der Gruppe «app» aus `ngsw.json` liegen im Cache. Req 4.9 prüft
+    ein Szenario in der Zeitzone Asia/Tokyo mit fester Uhr (23:59 in Zürich) und Upload nach Mitternacht; den
+    gespeicherten Dateinamen liest es über die API. Req 4.1 (Installation, echte Geräte) weist Fabian manuell nach.
 - Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
