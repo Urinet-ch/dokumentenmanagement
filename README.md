@@ -50,7 +50,9 @@ Quarkus-Start, dazu SpotBugs) und «Backend-Starttests» `start-1` und `start-2`
 «Backend-Tests vollständig» prüft aus den Surefire-Berichten, dass jede Testklasse in genau einem Job lief
 (`.github/scripts/pruefe-testaufteilung.py`). Das Artefakt für Browser-Szenarien und Docker-Image baut der Job «Build»
 ohne Tests; dort laufen auch die Liquibase-, OpenAPI- und Drive-Import-Prüfungen. Eine neue Klasse mit eigenem Start
-bekommt die Startgruppe mit der kleineren Laufzeit-Summe. Lokal deckt `mvn verify` weiterhin alles in einem Lauf ab. Die Szenario-Prüfung «Abdeckung» verlangt für jedes Kriterium unter `_Anforderungen_` einer
+bekommt die Startgruppe mit der kleineren Laufzeit-Summe. Lokal deckt `mvn verify` weiterhin alles in einem Lauf ab.
+
+Die Szenario-Prüfung «Abdeckung» verlangt für jedes Kriterium unter `_Anforderungen_` einer
 abgehakten Aufgabe ab Welle 1 ein Szenario `@req-x.y` oder einen Nachweis-Vermerk in `requirements.md`.
 
 ## Entwicklung lokal
