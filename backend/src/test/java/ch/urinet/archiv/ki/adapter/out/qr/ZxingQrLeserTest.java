@@ -19,11 +19,15 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Req 7.11: Swiss QR Code deterministisch aus den gerenderten Seiten lesen; nur synthetische Zahlteile. */
 class ZxingQrLeserTest {
+
+    private static final UUID DOKUMENT = UUID.randomUUID();
+    private static final ZxingQrLeser LESER = new ZxingQrLeser(8_750_000);
 
     /** Swiss Payments Code 2.0 mit 31 Zeilen, Testwerte. */
     static String spc(String betrag, String referenztyp, String referenz) {
@@ -54,7 +58,7 @@ class ZxingQrLeserTest {
         List<Path> seiten = List.of(seite(ordner, "s1.png", null),
                 seite(ordner, "s2.png", spc("250.50", "QRR", "210000000003139471430009017")));
 
-        Optional<QrDaten> qr = new ZxingQrLeser().lesen(seiten);
+        Optional<QrDaten> qr = LESER.lesen(DOKUMENT, seiten);
 
         assertThat(qr).hasValueSatisfying(q -> {
             assertThat(q.iban()).isEqualTo("CH4431999123000889012");
@@ -67,7 +71,7 @@ class ZxingQrLeserTest {
 
     @Test
     void ohneBetragUndReferenz(@TempDir Path ordner) throws Exception {
-        Optional<QrDaten> qr = new ZxingQrLeser().lesen(List.of(seite(ordner, "s.png", spc("", "NON", ""))));
+        Optional<QrDaten> qr = LESER.lesen(DOKUMENT, List.of(seite(ordner, "s.png", spc("", "NON", ""))));
 
         assertThat(qr).hasValueSatisfying(q -> {
             assertThat(q.betrag()).isNull();
@@ -77,14 +81,22 @@ class ZxingQrLeserTest {
 
     @Test
     void andereQrCodesZaehlenNicht(@TempDir Path ordner) throws Exception {
-        assertThat(new ZxingQrLeser().lesen(List.of(seite(ordner, "s.png", "https://example.org/beleg")))).isEmpty();
+        assertThat(LESER.lesen(DOKUMENT, List.of(seite(ordner, "s.png", "https://example.org/beleg")))).isEmpty();
     }
 
     @Test
     void unlesbareSeiteVerhindertNichts(@TempDir Path ordner) throws Exception {
         Path kaputt = Files.writeString(ordner.resolve("kaputt.png"), "kein Bild");
 
-        assertThat(new ZxingQrLeser().lesen(List.of(kaputt, seite(ordner, "s.png", spc("1.00", "NON", "")))))
+        assertThat(LESER.lesen(DOKUMENT, List.of(kaputt, seite(ordner, "s.png", spc("1.00", "NON", "")))))
                 .isPresent();
+    }
+
+    @Test
+    void seiteUeberDerPixelgrenzeWirdAusgelassen(@TempDir Path ordner) throws Exception {
+        Path seite = seite(ordner, "s.png", spc("1.00", "NON", ""));
+
+        assertThat(new ZxingQrLeser(2480L * 3508 - 1).lesen(DOKUMENT, List.of(seite))).isEmpty();
+        assertThat(new ZxingQrLeser(2480L * 3508).lesen(DOKUMENT, List.of(seite))).isPresent();
     }
 }

@@ -185,6 +185,37 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         }
     }
 
+    @Override
+    public boolean mailAbrufGestoert(MandantCode mandant, int fehlschlaege) {
+        Optional<String> empfaenger = empfaenger(mandant);
+        if (empfaenger.isEmpty()) {
+            LOG.warnf("Mail-Eingang von Mandant %s %d-mal gescheitert; kein Empfänger für die Benachrichtigung "
+                    + "konfiguriert", mandant.wert(), fehlschlaege);
+            return false;
+        }
+        try {
+            mailer.send(Mail.withText(empfaenger.get(), mailAbrufBetreff(mandant), mailAbrufText(mandant,
+                    fehlschlaege)));
+            LOG.infof("Inhaber über den gestörten Mail-Eingang von Mandant %s benachrichtigt", mandant.wert());
+            return true;
+        } catch (RuntimeException e) {
+            LOG.warnf("Benachrichtigung zum Mail-Eingang von Mandant %s nicht versandt (%s)", mandant.wert(),
+                    e.getClass().getName());
+            return false;
+        }
+    }
+
+    static String mailAbrufBetreff(MandantCode mandant) {
+        return "UriNet Archiv: Mail-Eingang für " + mandant.wert() + " gestört";
+    }
+
+    static String mailAbrufText(MandantCode mandant, int fehlschlaege) {
+        return "Das Archiv konnte das Postfach des Mail-Eingangs für den Mandanten " + mandant.wert() + " "
+                + fehlschlaege + "-mal in Folge nicht abrufen. Es versucht es weiter alle 10 Minuten; neue Mails "
+                + "bleiben bis dahin im Postfach.\n\nZugang und Erreichbarkeit des Postfachs prüfen; das Log nennt "
+                + "die Ursache unter «Mail-Eingang».\n";
+    }
+
     static String betreff(MandantCode mandant, Befund befund) {
         return switch (befund.quelle()) {
             case DOKUMENT -> "UriNet Archiv: Dokument " + befund.gegenstand() + " hängt in " + befund.status();

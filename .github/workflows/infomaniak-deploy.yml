@@ -141,6 +141,9 @@ jobs:
           S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
           INFOMANIAK_AI_TOKEN: ${{ secrets.INFOMANIAK_AI_TOKEN }}
           ARCHIV_MANIFEST_KEY: ${{ secrets.ARCHIV_MANIFEST_KEY }}
+          # Datenschlüssel für Zugangsdaten in der DB (Spec 02, Mail-Eingang); optional: ohne ihn ist die Datei leer
+          # und der Mail-Eingang ruht
+          ARCHIV_DATA_KEY: ${{ secrets.ARCHIV_DATA_KEY }}
         run: |
           umask 077
           mkdir -p bundle/secrets
@@ -159,6 +162,7 @@ jobs:
           schreibe s3_app_zugang_geheimnis "$S3_APP_ZUGANG_GEHEIMNIS"
           schreibe infomaniak_ai_token "$INFOMANIAK_AI_TOKEN"
           schreibe archiv_manifest_key "$ARCHIV_MANIFEST_KEY"
+          schreibe archiv_data_key "$ARCHIV_DATA_KEY"
           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
             python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"

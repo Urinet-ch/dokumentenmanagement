@@ -72,6 +72,13 @@ public class DokumentErfassen {
     public static final String QUELLE_SCAN = "SCAN";
     public static final String QUELLE_DRIVE = "DRIVE";
     public static final String QUELLE_GENERATOR = "GENERATOR";
+    public static final String QUELLE_EMAIL = "EMAIL";
+    /** Art einer Mail ohne unterstützten Anhang (Spec 02, Req 1.3), vorbelegt, solange der Mandant sie kennt. */
+    public static final String ART_KORRESPONDENZ = "KORRESPONDENZ";
+    /** Medientyp der Nachricht als Original ({@code <nr>-original.eml}); keine Quelle der Verarbeitung. */
+    public static final String MIME_EML = "message/rfc822";
+    /** Name der Nachricht in den Ergebnissen; nie in {@code dokument.dateiname}. */
+    public static final String NAME_EML = "nachricht.eml";
     static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
 
     private static final Logger LOG = Logger.getLogger(DokumentErfassen.class);
@@ -110,7 +117,18 @@ public class DokumentErfassen {
 
     /** Ein Ergebnis je Seite in der gesendeten Reihenfolge; Fehler der ganzen Anfrage als {@link FachFehler}. */
     public List<UploadErgebnis> erfassen(UploadAnfrage anfrage) {
-        MandantCode mandant = aufloesung.pruefen();
+        return erfassen(aufloesung.pruefen(), anfrage);
+    }
+
+    /**
+     * Wie {@link #erfassen(UploadAnfrage)}, aber ohne Anfrage im Mandanten-Kontext des Aufrufers (Mail-Eingang, Spec 02,
+     * Req 1.2, 1.6): dieselben Prüfungen, dieselbe Dublettenprüfung, derselbe Auftrag {@code VERARBEITEN}.
+     */
+    public List<UploadErgebnis> imKontextErfassen(UploadAnfrage anfrage) {
+        return erfassen(aufloesung.ausKontext(), anfrage);
+    }
+
+    private List<UploadErgebnis> erfassen(MandantCode mandant, UploadAnfrage anfrage) {
         // Regel 3: jede empfangene Datei zuerst prüfen und ihre Prüfsumme festhalten, auch wenn danach die ganze
         // Anfrage abgelehnt wird
         List<Empfangen> empfangen = anfrage.seiten().stream().map(seite -> new Empfangen(
@@ -221,6 +239,51 @@ public class DokumentErfassen {
         return id;
     }
 
+    /**
+     * Mail ohne unterstützten Anhang (Spec 02, Req 1.3, 1.6; design.md «E-Mail-Eingang», «Umsetzung 6.1»): ein Dokument
+     * mit {@code quelle = EMAIL}, der Nachricht unverändert als Original 1 ({@code .eml}, {@value #MIME_EML}) und ihrem
+     * Text als PDF als Original 2, aus dem die Verarbeitung das PDF/A erstellt. Wie beim Upload zuerst die Prüfsummen
+     * (Regel 3), dann Grösse und Inhalt; die Dublettenprüfung (Req 3.4) gilt der Nachricht. Die Art
+     * {@value #ART_KORRESPONDENZ} ist vorbelegt, das Dokument bleibt bis zur Bestätigung unbestätigt (Req 2.21) und geht
+     * mit {@code VERARBEITEN} den normalen Weg in den Eingangskorb. Läuft ohne Anfrage im Mandanten-Kontext des
+     * Aufrufers.
+     */
+    public UploadErgebnis korrespondenzErfassen(Path eml, Path textPdf, Optional<String> hinweis, String erstelltVon) {
+        MandantCode mandant = aufloesung.ausKontext();
+        // die Nachricht nur nach Grösse: Ihren Typ prüft das Archiv nicht am Inhalt, sie kommt vom Postfach-Adapter
+        Geprueft nachricht = empfangen(mandant, eml, DateiRolle.ORIGINAL);
+        Geprueft pdf = pruefen(mandant, textPdf, Set.of(Dateityp.PDF), DateiRolle.ORIGINAL);
+        if (hinweis.map(DokumentErfassen::hinweisUngueltig).orElse(false)) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        Optional<Fehlercode> fehler = nachricht.fehler().or(pdf::fehler);
+        if (fehler.isPresent()) {
+            LOG.infof("Datei abgelehnt: mandant=%s sha256=%s ergebnis=%s", mandant.wert(), nachricht.sha256(),
+                    fehler.get());
+            return new UploadErgebnis.Abgelehnt(NAME_EML, fehler.get());
+        }
+        Optional<UUID> vorhanden = repository.dubletteSperren(nachricht.sha256());
+        if (vorhanden.isPresent()) {
+            LOG.infof("Datei ist Dublette: mandant=%s sha256=%s ergebnis=DUBLETTE vorhanden=%s", mandant.wert(),
+                    nachricht.sha256(), vorhanden.get());
+            return new UploadErgebnis.Dublette(NAME_EML, Optional.empty());
+        }
+        Instant eingang = uhr.instant();
+        int jahr = eingang.atZone(ZUERICH).getYear();
+        UUID id = UUID.randomUUID();
+        repository.anlegen(new NeuesDokument(id, eingang, QUELLE_EMAIL, erstelltVon,
+                hinweis.filter(h -> !h.isBlank()), Optional.empty()));
+        transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
+        repository.artVorbelegen(id, ART_KORRESPONDENZ);
+        ablegen(mandant, DateiSchluessel.original(jahr, id, 1, "eml"), DateiRolle.ORIGINAL, eml, nachricht.sha256(),
+                MIME_EML, nachricht.groesse(), nachricht.empfangen());
+        ablegen(mandant, DateiSchluessel.original(jahr, id, 2, pdf.typ().endung()), DateiRolle.ORIGINAL, textPdf, pdf);
+        LOG.infof("Datei angenommen: mandant=%s sha256=%s ergebnis=ANGENOMMEN dokument=%s nr=1", mandant.wert(),
+                nachricht.sha256(), id);
+        auftraege.einreihen(VERARBEITEN, new Nutzlast(Map.of(NUTZLAST_DOKUMENT, id)));
+        return new UploadErgebnis.Angenommen(NAME_EML, id);
+    }
+
     /** Ohne Benutzer (API-Token) oder ohne Leserecht keine ID (Req 2.3, 3.4). */
     private Optional<UUID> sichtbar(UploadAnfrage anfrage, UUID vorhanden) {
         return anfrage.erfasser().benutzer()
@@ -239,16 +302,42 @@ public class DokumentErfassen {
 
     private void ablegen(MandantCode mandant, DateiSchluessel schluessel, DateiRolle rolle, Path datei,
                          Geprueft geprueft) {
-        repository.dateiAnlegen(new NeueDatei(schluessel.docId(), rolle, schluessel.nr(), geprueft.sha256(),
-                schluessel.pfad(Ablageort.EINGANG), geprueft.typ().mime(), geprueft.groesse(), geprueft.empfangen()));
+        ablegen(mandant, schluessel, rolle, datei, geprueft.sha256(), geprueft.typ().mime(), geprueft.groesse(),
+                geprueft.empfangen());
+    }
+
+    private void ablegen(MandantCode mandant, DateiSchluessel schluessel, DateiRolle rolle, Path datei, String sha256,
+                         String mime, long groesse, Instant empfangen) {
+        repository.dateiAnlegen(new NeueDatei(schluessel.docId(), rolle, schluessel.nr(), sha256,
+                schluessel.pfad(Ablageort.EINGANG), mime, groesse, empfangen));
         AbgelegteDatei abgelegt = ablage.ablegenEingang(mandant, schluessel, datei);
-        if (!abgelegt.sha256().equals(geprueft.sha256())) {
+        if (!abgelegt.sha256().equals(sha256)) {
             throw new IllegalStateException("Prüfsumme nach der Ablage weicht ab: " + schluessel.pfad(Ablageort.EINGANG));
         }
         repository.dateiAbgelegt(schluessel.docId(), rolle, schluessel.nr(), abgelegt.versionId());
     }
 
     private Geprueft pruefen(MandantCode mandant, Path datei, Set<Dateityp> erlaubt, DateiRolle rolle) {
+        Geprueft geprueft = empfangen(mandant, datei, rolle);
+        long groesse = geprueft.groesse();
+        if (geprueft.fehler().isPresent()) {
+            return geprueft;
+        }
+        Optional<Dateityp> typ = typerkennung.erkennen(datei).filter(erlaubt::contains);
+        if (typ.isEmpty()) {
+            return geprueft.abgelehnt(Fehlercode.DATEITYP_UNBEKANNT);
+        }
+        byte[] kopf = lesen(datei, 0, (int) Math.min(Dateipruefung.KOPF, groesse));
+        int endeLaenge = (int) Math.min(Dateipruefung.ENDE, groesse);
+        byte[] ende = lesen(datei, groesse - endeLaenge, endeLaenge);
+        if (!Dateipruefung.lesbar(typ.get(), kopf, ende, groesse)) {
+            return geprueft.abgelehnt(Fehlercode.DATEI_UNGUELTIG);
+        }
+        return new Geprueft(geprueft.sha256(), groesse, geprueft.empfangen(), typ.get(), Optional.empty());
+    }
+
+    /** Prüfsumme und Grösse, im Log festgehalten, bevor das Archiv weiter prüft (Regel 3); dazu zu gross und leer. */
+    private Geprueft empfangen(MandantCode mandant, Path datei, DateiRolle rolle) {
         MessageDigest digest = Pruefsumme.sha256();
         long groesse;
         try (InputStream ein = new DigestInputStream(Files.newInputStream(datei), digest)) {
@@ -265,17 +354,7 @@ public class DokumentErfassen {
         if (groesse == 0) {
             return geprueft.abgelehnt(Fehlercode.DATEI_UNGUELTIG);
         }
-        Optional<Dateityp> typ = typerkennung.erkennen(datei).filter(erlaubt::contains);
-        if (typ.isEmpty()) {
-            return geprueft.abgelehnt(Fehlercode.DATEITYP_UNBEKANNT);
-        }
-        byte[] kopf = lesen(datei, 0, (int) Math.min(Dateipruefung.KOPF, groesse));
-        int endeLaenge = (int) Math.min(Dateipruefung.ENDE, groesse);
-        byte[] ende = lesen(datei, groesse - endeLaenge, endeLaenge);
-        if (!Dateipruefung.lesbar(typ.get(), kopf, ende, groesse)) {
-            return geprueft.abgelehnt(Fehlercode.DATEI_UNGUELTIG);
-        }
-        return new Geprueft(geprueft.sha256(), groesse, geprueft.empfangen(), typ.get(), Optional.empty());
+        return geprueft;
     }
 
     private static byte[] lesen(Path datei, long ab, int laenge) {

@@ -1,4 +1,4 @@
-<h1>{{ texte.titel }}</h1>
+<h2>{{ texte.titel }}</h2>
 <p>{{ texte.einleitung }}</p>
 
 <section
@@ -26,9 +26,9 @@
 
 <section class="liste" aria-labelledby="liste-titel">
   @if (abgeschlossen()) {
-    <h2 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.ergebnisse }}</h2>
+    <h3 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.ergebnisse }}</h3>
   } @else {
-    <h2 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.liste }}</h2>
+    <h3 id="liste-titel" tabindex="-1" #ergebnisUeberschrift>{{ texte.liste }}</h3>
   }
   @if (zeilen().length === 0) {
     <p>{{ texte.keineDateien }}</p>

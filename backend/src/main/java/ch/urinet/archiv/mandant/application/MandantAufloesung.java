@@ -52,6 +52,19 @@ public class MandantAufloesung {
         throw new MandantVerweigert("Anmeldung ohne gültigen Mandanten");
     }
 
+    /**
+     * Für Arbeit ohne Anfrage (Mail-Eingang, Spec 02, Req 1.6): aktiver Mandant aus dem Mandanten-Kontext
+     * ({@link MandantKontext#mit}); eine Anmeldung darf es dabei nicht geben, sonst {@link MandantVerweigert}.
+     */
+    public MandantCode ausKontext() {
+        MandantCode code = kontext.aktuell().orElseThrow(() -> new MandantVerweigert("Kein Mandanten-Kontext"));
+        if (!(anmeldung.ermitteln() instanceof MandantAusAnmeldung.Anonym)) {
+            throw new MandantVerweigert("Mandanten-Kontext widerspricht der Anmeldung");
+        }
+        aktivesSchema(code);
+        return code;
+    }
+
     private String aktivesSchema(MandantCode code) {
         return verzeichnis.aktivesSchema(code)
                 .orElseThrow(() -> new MandantVerweigert("Mandant unbekannt oder inaktiv"));

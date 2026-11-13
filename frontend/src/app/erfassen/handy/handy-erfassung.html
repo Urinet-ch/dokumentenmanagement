@@ -1,0 +1,119 @@
+<h1>{{ texte.titel }}</h1>
+
+@if (!anmeldung.angemeldet()) {
+  <div class="karte hinweis">
+    <p role="alert">
+      {{ anmeldung.zustand() === 'abgelaufen' ? anmeldeTexte.abgelaufen : texte.ohneAnmeldung }}
+    </p>
+    <button mat-flat-button type="button" (click)="anmelden()">{{ anmeldeTexte.anmelden }}</button>
+  </div>
+}
+
+<p class="zaehler" role="status" data-test="wartet">{{ texte.wartet(warteschlange.wartend()) }}</p>
+
+@if (warteschlange.fehlerhaft().length > 0) {
+  <h2>{{ texte.fehlerhaft }}</h2>
+  <ul class="liste">
+    @for (eintrag of warteschlange.fehlerhaft(); track eintrag.id) {
+      <li class="karte" data-test="fehlerhaft">
+        <strong>{{ texte.erfassung(name(eintrag.aufgenommen), eintrag.seiten.length) }}</strong>
+        <p class="fehler" data-test="meldung">{{ eintrag.meldung }}</p>
+        <button mat-stroked-button type="button" (click)="warteschlange.wiederholen(eintrag.id)">
+          {{ texte.erneutVersuchen }}
+        </button>
+      </li>
+    }
+  </ul>
+}
+
+<section aria-labelledby="kamera-titel">
+  <h2 id="kamera-titel">{{ texte.kameraTitel }}</h2>
+  <p>{{ texte.einleitung }}</p>
+
+  <video #video class="kamera" playsinline muted [hidden]="kamera() !== 'an'" [attr.aria-label]="texte.kamera"></video>
+  @switch (kamera()) {
+    @case ('aus') {
+      <button mat-flat-button type="button" (click)="kameraStarten()">{{ texte.kameraOeffnen }}</button>
+    }
+    @case ('startet') {
+      <p role="status">{{ texte.kameraLaeuft }}</p>
+    }
+    @case ('an') {
+      <button mat-flat-button type="button" class="ausloeser" [disabled]="speichert()" (click)="aufnehmen()">{{ texte.aufnehmen }}</button>
+    }
+    @case ('nicht-verfuegbar') {
+      <p>{{ texte.keineKamera }}</p>
+      <button mat-stroked-button type="button" [disabled]="speichert()" (click)="foto.click()">{{ texte.fotoWaehlen }}</button>
+      <input
+        #foto
+        hidden
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        [disabled]="speichert()"
+        (change)="dateienGewaehlt($event)"
+      />
+    }
+  }
+
+  @if (inBearbeitung(); as seite) {
+    <h3>{{ texte.zuschnitt }}</h3>
+    <app-zuschnitt
+      [bild]="seite.originalUrl"
+      [breite]="seite.breite"
+      [hoehe]="seite.hoehe"
+      [ecken]="seite.ecken"
+      (uebernehmen)="zuschnittUebernehmen($event)"
+      (abbrechen)="bearbeitet.set(null)"
+    />
+  }
+
+  @if (seiten().length > 0) {
+    <h3>{{ texte.seiten }}</h3>
+    <ol class="liste seiten">
+      @for (seite of seiten(); track seite.nr; let i = $index) {
+        <li class="karte" data-test="seite" [class.mit-fehler]="seite.hinweis === 'fehler'" [attr.data-hinweis]="seite.hinweis">
+          @if (seite.vorschauUrl) {
+            <img [src]="seite.vorschauUrl" [alt]="texte.vorschau(i + 1)" />
+          }
+          <div>
+            <strong>{{ texte.seite(i + 1) }}</strong>
+            <p role="status" [class.fehler]="seite.hinweis === 'fehler'">{{ hinweisText(seite.hinweis) }}</p>
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="!seite.arbeitsfassung || seite.hinweis === 'laeuft' || speichert()"
+              [attr.aria-label]="texte.anpassen(i + 1)"
+              (click)="bearbeitet.set(seite.nr)"
+            >
+              {{ texte.zuschnitt }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              [disabled]="speichert()"
+              [attr.aria-label]="texte.verwerfen(i + 1)"
+              (click)="verwerfen(seite.nr)"
+            >
+              {{ texte.verwerfenKurz }}
+            </button>
+          </div>
+        </li>
+      }
+    </ol>
+    <button mat-flat-button type="button" [disabled]="!abschliessbar()" (click)="abschliessen()">
+      {{ texte.abschliessen }}
+    </button>
+  }
+  @if (speichert()) {
+    <p role="status">{{ texte.speichert }}</p>
+  }
+  @if (meldung(); as text) {
+    <p role="status" data-test="erfassung-meldung">{{ text }}</p>
+  }
+</section>
+
+@if (anmeldung.darf('A1')) {
+  <app-upload />
+}

@@ -47,6 +47,15 @@ public interface DokumentRepository {
     /** Legt ein Dokument im Status {@code NEU} an, Vertraulichkeit {@code PERSONAL} bis zur Bestätigung (Req 2.21). */
     void anlegen(NeuesDokument dokument);
 
+    /**
+     * Belegt die Art eines eben angelegten, unbestätigten Dokuments vor (Spec 02, Req 1.3: Mail ohne Anhang als
+     * «Korrespondenz»), nur wenn der Mandant die Art kennt; die Sichtbarkeit bleibt bis zur Bestätigung die eines
+     * unbestätigten Dokuments (Req 2.21).
+     *
+     * @return {@code true}, wenn die Art gesetzt wurde
+     */
+    boolean artVorbelegen(UUID id, String art);
+
     /** Schreibt die Zeile in {@code dokument_datei} sofort (vor der Ablage, Regel 3); die Versions-ID folgt danach. */
     void dateiAnlegen(NeueDatei datei);
 

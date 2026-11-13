@@ -48,6 +48,11 @@ public class PanacheDokumentRepository implements DokumentRepository {
             insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis, dateiname)
             values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis, :dateiname)""";
 
+    private static final String ART_VORBELEGEN = """
+            update dokument set art = :art
+            where id = :id and status = 'NEU' and bestaetigt is null and art is null
+              and exists (select 1 from dokumentart where code = :art and aktiv)""";
+
     private static final String DATEI_ANLEGEN = """
             insert into dokument_datei (dokument_id, rolle, nr, sha256, s3_schluessel, mime, groesse, empfangen)
             values (:id, :rolle, :nr, :sha, :schluessel, :mime, :groesse, :empfangen)""";
@@ -149,6 +154,14 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 .setParameter("hinweis", dokument.hinweis().orElse(null))
                 .setParameter("dateiname", dokument.dateiname().orElse(null))
                 .executeUpdate();
+    }
+
+    @Override
+    public boolean artVorbelegen(UUID id, String art) {
+        return DokumentEintrag.getEntityManager().createNativeQuery(ART_VORBELEGEN)
+                .setParameter("id", id)
+                .setParameter("art", art)
+                .executeUpdate() == 1;
     }
 
     @Override

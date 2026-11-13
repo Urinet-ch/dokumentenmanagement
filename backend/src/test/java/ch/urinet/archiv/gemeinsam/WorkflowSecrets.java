@@ -25,7 +25,9 @@ final class WorkflowSecrets {
             // Aufgabe 3.2: Token der Infomaniak AI Services als Secret-Datei (tech.md, Infomaniak AI Services)
             "INFOMANIAK_AI_TOKEN",
             // Aufgabe 5.2: privater Schlüssel des Tages-Manifests als Secret-Datei
-            "ARCHIV_MANIFEST_KEY"));
+            "ARCHIV_MANIFEST_KEY",
+            // Spec 02, Aufgabe 6.1: Datenschlüssel für Zugangsdaten in der DB (Mail-Eingang), optional
+            "ARCHIV_DATA_KEY"));
 
     private static final Pattern WORT = Pattern.compile("(?i)\\bsecrets\\b");
     private static final Pattern NAME = Pattern.compile("\\G\\s*\\.\\s*([A-Za-z0-9_-]+)\\b(?!\\s*[.\\[(])");

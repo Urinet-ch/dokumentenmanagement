@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injector, afterNextRender, computed, effect, inject, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatListModule } from '@angular/material/list';
@@ -34,10 +34,20 @@ export class App {
   protected readonly menue = computed(() => MENUE.filter((punkt) => this.anmeldung.darf(punkt.aktion)));
 
   constructor() {
-    // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»; die Seite bleibt als Ziel
+    // Die Warteschlange der Handy-Erfassung lädt ab dem Start der App hoch, nicht erst auf «Erfassen» (Req 4.5);
+    // nachgeladen, damit IndexedDB und Upload nicht im ersten Bundle liegen
+    const injector = inject(Injector);
+    afterNextRender(() =>
+      void import('./erfassen/handy/warteschlange/warteschlange.service').then((m) => injector.get(m.WarteschlangeService)),
+    );
+    // Abgelaufene Sitzung: zurück zur Startseite, dort stehen der Hinweis und «Anmelden»; die Seite bleibt als Ziel.
+    // «Erfassen» zeigt beides selbst und sichert vor der Anmeldung die aufgenommenen Seiten (Req 4.4).
     effect(() => {
       if (this.anmeldung.zustand() === 'abgelaufen') {
         const ziel = untracked(() => this.router.url);
+        if (ziel === '/erfassen' || ziel.startsWith('/erfassen?')) {
+          return;
+        }
         const queryParams = ziel.startsWith('/?') || ziel === '/' ? {} : { ziel };
         void this.router.navigate(['/'], { queryParams });
       }

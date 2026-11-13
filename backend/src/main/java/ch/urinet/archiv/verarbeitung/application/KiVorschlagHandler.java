@@ -46,7 +46,8 @@ import java.util.concurrent.TimeoutException;
  * {@code EINGANGSKORB} setzen. Antwortet das Modell zweimal ausserhalb des Schemas, geht das Dokument ohne Vorschlag in
  * den Eingangskorb (Req 7.3); antwortet es nicht ({@link KiAusfall}) oder scheitert das Rendern, ist es ein Fehlversuch
  * des Auftrags (Req 5.4). Reicht die Frist des Renderns nicht, geht es ohne QR bzw. Seitenbild weiter (kein
- * Fehlversuch). Das Log nennt nur IDs.
+ * Fehlversuch); ebenso, wenn eine Seite einen ungültigen Kopf oder zu viele Pixel hat ({@link MetadatenExtraktion#bild},
+ * Review PR #120). Das Log nennt nur IDs.
  * <p>
  * Rendern und QR-Lesen belegen viel Heap; sie laufen darum in der JVM nacheinander (eine Sperre mit einem Platz) und
  * innerhalb von {@code archiv.ki.render-zeitgrenze}, der Aufruf des Modells danach ausserhalb der Sperre.
@@ -184,11 +185,12 @@ public class KiVorschlagHandler implements AuftragHandler {
                 }
                 try {
                     qr = ocr.seitenbilder(datei,
-                            new OcrPort.Render(renderSeitenMax, false, renderPixelMax, rest(ende)), extraktion::qr);
+                            new OcrPort.Render(renderSeitenMax, false, renderPixelMax, rest(ende)),
+                            seiten -> extraktion.qr(stand.id(), seiten));
                     if (bildweg) {
                         bild = ocr.seitenbilder(datei,
                                 new OcrPort.Render(renderSeitenMax, true, renderPixelMax, rest(ende)),
-                                extraktion::bild);
+                                seiten -> extraktion.bild(stand.id(), seiten));
                     }
                 } finally {
                     sperre.release();

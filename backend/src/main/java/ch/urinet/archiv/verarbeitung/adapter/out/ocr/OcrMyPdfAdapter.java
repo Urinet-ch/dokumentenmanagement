@@ -24,11 +24,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -130,7 +132,9 @@ public class OcrMyPdfAdapter implements OcrPort {
     /**
      * Auflösung einer Seite: 300 dpi wie im Golden-Lauf, solange die Seite dann höchstens {@code pixelMax} Pixel hat
      * (A4 mit 300 dpi bleibt so unverändert), sonst die grösste ganze Zahl dpi darunter. Leer, wenn das Format nicht
-     * lesbar ist oder auch {@value #MIN_DPI} dpi die Grenze sprengen.
+     * lesbar ist oder auch {@value #MIN_DPI} dpi die Grenze sprengen. Je eine Zeile und Spalte Spielraum (Review PR
+     * #120): {@code pdfinfo} rundet das Format, {@code pdftoppm} rechnet mit dem genauen und liefert dann eine Zeile
+     * oder Spalte mehr.
      */
     static OptionalInt dpi(double breitePt, double hoehePt, long pixelMax) {
         if (!(breitePt > 0 && hoehePt > 0) || Double.isInfinite(breitePt) || Double.isInfinite(hoehePt)) {
@@ -138,19 +142,26 @@ public class OcrMyPdfAdapter implements OcrPort {
         }
         for (int dpi = RENDER_DPI; dpi >= MIN_DPI; dpi = Math.min(dpi - 1,
                 (int) Math.floor(72 * Math.sqrt(pixelMax / (breitePt * hoehePt))))) {
-            if (Math.ceil(breitePt * dpi / 72) * Math.ceil(hoehePt * dpi / 72) <= pixelMax) {
+            if ((Math.ceil(breitePt * dpi / 72) + 1) * (Math.ceil(hoehePt * dpi / 72) + 1) <= pixelMax) {
                 return OptionalInt.of(dpi);
             }
         }
         return OptionalInt.empty();
     }
 
-    /** Seitenzahl und Format je Seite aus der Ausgabe von {@code pdfinfo -f … -l …}. */
+    /**
+     * Seitenzahl und Format je Seite aus der Ausgabe von {@code pdfinfo -box -f … -l …}: je Richtung das grössere aus
+     * «Page size» (CropBox) und MediaBox, denn {@code pdftoppm} ohne {@code -cropbox} rendert die MediaBox (Review PR
+     * #120; {@code -cropbox} würde die Pixel des Gates ändern). Eine Seite ohne lesbare MediaBox fehlt (wird nicht
+     * gerendert).
+     */
     record Seiteninfo(int seiten, Map<Integer, double[]> formate) {
 
         private static final Pattern SEITEN = Pattern.compile("(?m)^Pages:\\s+(\\d+)\\s*$");
         private static final Pattern FORMAT = Pattern.compile(
                 "(?m)^Page\\s+(\\d+)\\s+size:\\s+([0-9.]+)\\s+x\\s+([0-9.]+)\\s+pts");
+        private static final Pattern MEDIABOX = Pattern.compile(
+                "(?m)^Page\\s+(\\d+)\\s+MediaBox:\\s+(-?[0-9.]+)\\s+(-?[0-9.]+)\\s+(-?[0-9.]+)\\s+(-?[0-9.]+)\\s*$");
 
         static Seiteninfo lesen(String ausgabe) {
             Matcher m = SEITEN.matcher(ausgabe);
@@ -159,13 +170,32 @@ public class OcrMyPdfAdapter implements OcrPort {
             Matcher f = FORMAT.matcher(ausgabe);
             while (f.find()) {
                 try {
-                    formate.put(Integer.parseInt(f.group(1)),
-                            new double[]{Double.parseDouble(f.group(2)), Double.parseDouble(f.group(3))});
+                    groesser(formate, Integer.parseInt(f.group(1)), Double.parseDouble(f.group(2)),
+                            Double.parseDouble(f.group(3)));
                 } catch (NumberFormatException e) {
                     // Format nicht lesbar: Seite fehlt
                 }
             }
+            Set<Integer> mitMediaBox = new HashSet<>();
+            Matcher b = MEDIABOX.matcher(ausgabe);
+            while (b.find()) {
+                try {
+                    int seite = Integer.parseInt(b.group(1));
+                    double breite = Math.abs(Double.parseDouble(b.group(4)) - Double.parseDouble(b.group(2)));
+                    double hoehe = Math.abs(Double.parseDouble(b.group(5)) - Double.parseDouble(b.group(3)));
+                    groesser(formate, seite, breite, hoehe);
+                    mitMediaBox.add(seite);
+                } catch (NumberFormatException e) {
+                    // MediaBox nicht lesbar: Seite fehlt
+                }
+            }
+            formate.keySet().retainAll(mitMediaBox);
             return new Seiteninfo(seiten, formate);
+        }
+
+        private static void groesser(Map<Integer, double[]> formate, int seite, double breite, double hoehe) {
+            formate.merge(seite, new double[]{breite, hoehe},
+                    (a, n) -> new double[]{Math.max(a[0], n[0]), Math.max(a[1], n[1])});
         }
     }
 
@@ -352,9 +382,9 @@ public class OcrMyPdfAdapter implements OcrPort {
         }
 
         /**
-         * Seiten Seite für Seite mit der Auflösung aus {@link #dpi}, farbig als PPM (Pixel wie {@code pdftoppm -r 300
-         * -png} im Golden-Lauf) oder mit {@code -gray} als TIFF mit LZW (siehe {@link #SEITE}); das PDF wird zuerst ins
-         * Laufverzeichnis kopiert.
+         * Seiten Seite für Seite mit der Auflösung aus {@link #dpi} (Format aus {@link Seiteninfo}), farbig als PPM
+         * (Pixel wie {@code pdftoppm -r 300 -png} im Golden-Lauf) oder mit {@code -gray} als TIFF mit LZW (siehe
+         * {@link #SEITE}); das PDF wird zuerst ins Laufverzeichnis kopiert.
          */
         List<Path> seitenbilder(Path pdf, Render render) throws IOException, InterruptedException {
             Path kopie = datei("seiten.pdf");
@@ -388,8 +418,8 @@ public class OcrMyPdfAdapter implements OcrPort {
         }
 
         private Seiteninfo seiteninfo(Path pdf, int von, int bis) throws InterruptedException {
-            Werkzeugstarter.Lauf lauf = starter.ausfuehren(Befehl.von("pdfinfo", "-f", Integer.toString(von), "-l",
-                    Integer.toString(bis), pdf.toString()), verzeichnis, frist);
+            Werkzeugstarter.Lauf lauf = starter.ausfuehren(Befehl.von("pdfinfo", "-box", "-f", Integer.toString(von),
+                    "-l", Integer.toString(bis), pdf.toString()), verzeichnis, frist);
             if (!lauf.erfolgreich()) {
                 throw werkzeugFehler("pdfinfo", lauf);
             }
