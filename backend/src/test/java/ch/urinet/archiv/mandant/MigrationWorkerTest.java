@@ -4,6 +4,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Der Worker migriert nie, weder {@code db/public} noch Mandanten-Schemas (design.md «Mandant»): Mit Eigentümer-Zugang,
  * den es nicht gibt, startet er trotzdem, weil er keine Verbindung als Eigentümer öffnet.
  */
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(MigrationWorkerTest.NurWorker.class)
 class MigrationWorkerTest {

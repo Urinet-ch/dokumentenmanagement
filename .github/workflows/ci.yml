@@ -20,8 +20,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  backend:
-    name: Backend (mvn verify, Quinoa-Build, Prüfungen)
+  # Die Backend-Tests laufen in drei parallelen Jobs (Entscheid Fabian 13.11.2026, vorher ein Job mit 22 min): Klassen
+  # mit eigenem Quarkus-Start (Profil, Main-Test) tragen genau eine Startgruppe @Tag("start-1") oder @Tag("start-2"),
+  # alle anderen keine (StartGruppenTest). «testzahl» prüft, dass jede Testklasse in genau einem Job lief. Das Artefakt
+  # für Browser-Szenarien und Docker baut «build» ohne Tests; lokal deckt «mvn verify» weiterhin alles in einem Lauf ab.
+  build:
+    name: Build (Quinoa, OpenAPI, Liquibase, Drive-Import)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     steps:
@@ -51,11 +55,14 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: mvn verify (Cucumber, JUnit, ArchUnit, Abdeckung @req) und Build über Quinoa
-        run: mvn -B -ntp -f backend/pom.xml verify
+      - name: Build über Quinoa (ohne Tests, die laufen in den Backend-Jobs)
+        run: mvn -B -ntp -f backend/pom.xml package -Dmaven.test.skip=true
 
-      - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
-        run: mvn -B -ntp -f tools/drive_import/pom.xml verify
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: quarkus-app
+          path: backend/target/quarkus-app/
+          retention-days: 3
 
       - name: OpenAPI und generierter Client aktuell
         working-directory: frontend
@@ -67,11 +74,78 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Drive-Import-Werkzeug (mvn verify, Unit-Tests, SpotBugs)
+        run: mvn -B -ntp -f tools/drive_import/pom.xml verify
+
+  backend:
+    name: Backend-Tests (Szenarien, JUnit, ArchUnit, SpotBugs)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          name: quarkus-app
-          path: backend/target/quarkus-app/
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # Quinoa baut die PWA im Job «build»; hier nur verify ohne die Klassen mit eigenem Start
+      - name: mvn verify (Cucumber, JUnit, ArchUnit, Abdeckung @req, SpotBugs) ohne Startgruppen
+        run: mvn -B -ntp -f backend/pom.xml verify -DexcludedGroups=start-1,start-2 -Dquarkus.quinoa=false
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: surefire-backend
+          path: backend/target/surefire-reports/TEST-*.xml
           retention-days: 3
+
+  starttests:
+    name: Backend-Starttests (${{ matrix.gruppe }})
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Gruppenliste synchron halten mit -DexcludedGroups (Job backend), den Argumenten der Testzahl-Prüfung und
+        # GRUPPEN in StartGruppenTest
+        gruppe: [start-1, start-2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: mvn test (nur Startgruppe ${{ matrix.gruppe }})
+        env:
+          GRUPPE: ${{ matrix.gruppe }}
+        run: mvn -B -ntp -f backend/pom.xml test -Dgroups="$GRUPPE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
+        with:
+          name: surefire-${{ matrix.gruppe }}
+          path: backend/target/surefire-reports/TEST-*.xml
+          retention-days: 3
+
+  testzahl:
+    name: Backend-Tests vollständig (jede Klasse genau einmal)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [backend, starttests]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: surefire-*
+          path: berichte
+      - run: |
+          python3 .github/scripts/pruefe-testaufteilung.py backend/src/test/java backend=berichte/surefire-backend \
+            start-1=berichte/surefire-start-1 start-2=berichte/surefire-start-2
 
   frontend:
     name: Frontend (ng test)
@@ -100,7 +174,8 @@ jobs:
 
   browser:
     name: Browser-Szenarien (Cucumber.js, Playwright)
-    needs: backend
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: build
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -181,7 +256,8 @@ jobs:
 
   docker:
     name: Docker-Image (nur bauen)
-    needs: backend
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: build
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

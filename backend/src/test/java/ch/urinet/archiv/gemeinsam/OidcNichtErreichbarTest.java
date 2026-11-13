@@ -14,6 +14,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
@@ -36,6 +37,7 @@ import static org.hamcrest.Matchers.containsString;
  * Neustart heilt erst eine angemeldete Anfrage den Tenant – die kommt hinter Traefik nicht, solange die API unhealthy
  * ist; darum der Wächter.
  */
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(OidcNichtErreichbarTest.OhneKeycloak.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

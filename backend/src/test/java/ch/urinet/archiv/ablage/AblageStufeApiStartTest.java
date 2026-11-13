@@ -6,6 +6,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Stufen-Prüfung der Ablage (Req 6.11, tasks.md 2.3): Ab Stufe B bricht der Start der API ab, wenn Manifeste nicht in
  * COMPLIANCE gesperrt würden. Der Dienst startet ohne Argumente; gelänge der Start, endete der Test nicht.
  */
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(AblageStufeApiStartTest.ApiStufeBGovernance.class)
 class AblageStufeApiStartTest {

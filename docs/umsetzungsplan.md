@@ -57,7 +57,7 @@ Konventionen pro Aufgabe:
 - Aufgabe gilt als erledigt, wenn die Definition of Done aus `tech.md` erfüllt ist.
 
 Prüfungen (CI und Claude-Code-Hooks):
-- **CI (GitHub Actions, Pflicht vor dem Merge):** `mvn verify` mit Cucumber, JUnit und ArchUnit; bestehende Liquibase-Changesets unverändert (nur neue Dateien unter `db/**`); OpenAPI und generierter Frontend-Client aktuell; jedes Akzeptanzkriterium hat ein Szenario mit `@req-x.y` oder einen Nachweis-Vermerk.
+- **CI (GitHub Actions, Pflicht vor dem Merge):** `mvn verify` mit Cucumber, JUnit und ArchUnit (seit 13.11.2026 auf drei parallele Jobs verteilt, jede Testklasse läuft in genau einem; Entscheid Fabian); bestehende Liquibase-Changesets unverändert (nur neue Dateien unter `db/**`); OpenAPI und generierter Frontend-Client aktuell; jedes Akzeptanzkriterium hat ein Szenario mit `@req-x.y` oder einen Nachweis-Vermerk.
 - **Claude-Code-Hooks (`.claude/settings.json` im Repo):** Es gelten die Hooks der Harness-Vorlage. Bearbeitungen unter `db/**` mit Edit oder Write fragen nach (`.claude/harness.yml`), die CI blockiert Änderungen an bestehenden Changesets (`pruefe-liquibase.sh`); keine Secret-Dateien lesen oder schreiben. Die Tests laufen in `mvn verify` und in der CI, ein Hook für Tests nach dem Bearbeiten einer Java-Datei entfällt (Entscheid Fabian 09.11.2026, Aufgabe 1.8).
 
 ## 4. Wellen, Abhängigkeiten und Aufwand

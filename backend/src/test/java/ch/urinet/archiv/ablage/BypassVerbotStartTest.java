@@ -6,6 +6,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Bypass-Verbot beim Start (Req 6.5, Review PR #43 K1): Fehlt {@code BypassVerbot} am S3-Client, bricht der Start ab,
  * bevor ein Zugriff auf die Ablage erfolgt. Gelänge der Start, endete der Test nicht.
  */
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(BypassVerbotStartTest.OhneBypassVerbot.class)
 class BypassVerbotStartTest {

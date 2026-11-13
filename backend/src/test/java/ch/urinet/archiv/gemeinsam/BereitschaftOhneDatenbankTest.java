@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -11,6 +12,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 
 /** Readiness meldet DOWN, solange die Datenbank nicht erreichbar ist (Aufgabe 1.2). */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(BereitschaftOhneDatenbankTest.OhneDatenbank.class)
 class BereitschaftOhneDatenbankTest {

@@ -8,6 +8,7 @@ import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -22,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
  * (Aufgabe 1.9, entschieden von Fabian am 11.11.2026, PR #42 P42-1): Readiness UP samt OIDC-Tenant, der Wächter
  * beendet nichts, gültige Tokens gelten.
  */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(OidcBereitschaftTest.MitKeycloak.class)
 class OidcBereitschaftTest {

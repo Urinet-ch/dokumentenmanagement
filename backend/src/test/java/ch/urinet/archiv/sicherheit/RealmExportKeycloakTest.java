@@ -9,6 +9,7 @@ import io.restassured.response.Response;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Client oder Ablauf, und die API nimmt nur Tokens mit Audience {@code archiv-api} an. Gegenprobe:
  * {@code mvn verify -Dtest=RealmExportKeycloakTest -Darchiv.realm-export=<alter Export>} muss rot werden.
  */
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(RealmExportKeycloakTest.MitExport.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

@@ -7,6 +7,7 @@ import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Fehlt in {@code prod} eine Secret-Datei ({@code archiv_db_app}), bricht der Start ab, statt mit leerem Passwort
  * weiterzulaufen (fail closed, tech.md Regel 7). Über das Admin-Kommando, weil der Dienst bei gelungenem Start nie endet.
  */
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(SecretDateiFehltTest.ProdOhneDbApp.class)
 class SecretDateiFehltTest {
