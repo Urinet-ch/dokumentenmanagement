@@ -142,6 +142,36 @@ Auf der VPS (das Token entsteht dort in `token.neu` und geht danach wie unten be
   `ARCHIV_TOKEN_DATEI` nennt – **nie** das Token selbst aus einer Umgebungsvariable (tech.md Regel 7), nie im Repo.
 - Ein verlorenes oder offengelegtes Token sofort widerrufen (`DELETE /api/v1/api-tokens/{tokenId}`) und neu anlegen.
 
+## Mail-Eingang einrichten (Spec 02, Aufgabe 6.2)
+Der Worker ruft je Mandant alle 10 Minuten ein Postfach per IMAP über TLS ab (Spec 02, Requirement 1). Host, Port,
+Benutzer und Zulassungsliste stehen in `integration_mail` des Mandanten, das Passwort nur verschlüsselt mit dem
+Datenschlüssel `archiv_data_key` (AES-256-GCM). Ohne Postfach oder Schlüssel ruht der Mail-Eingang und sagt das einmal
+im Log.
+
+1. Datenschlüssel erzeugen (32 Byte, Base64, z. B. `openssl rand -base64 32`), im Passwort-Manager ablegen und als
+   GitHub-Secret `ARCHIV_DATA_KEY` des Repos setzen (Einstellungen → Secrets and variables → Actions); der nächste
+   Deploy legt ihn als Secret-Datei `archiv_data_key` ab (tech.md Regel 7). Den Schlüssel nicht wechseln, solange ein
+   Postfach eingerichtet ist: Mit einem anderen Schlüssel lässt sich das Passwort nicht mehr entschlüsseln, das
+   Postfach muss dann neu eingerichtet werden.
+2. Nach dem Deploy das Postfach im Wegwerf-Container einrichten (wie «Admin-Kommandos auf der VPS»). Das Passwort
+   kommt als erste Zeile über die Standardeingabe, nie als Argument; IMAP-Server und Port aus den Angaben des
+   Mail-Anbieters (TLS, Standard 993), danach die zugelassenen Absender:
+   ```bash
+   read -rs MAILPASSWORT
+   printf '%s\n' "$MAILPASSWORT" | sudo docker compose --project-directory /srv/apps/archiv \
+     -f /srv/apps/archiv/compose.yml run --rm --no-deps -T -l traefik.enable=false api \
+     sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar mail einrichten <mandant> <imap-host> 993 <benutzer> <absender> [<absender> …]'
+   unset MAILPASSWORT
+   ```
+   Exit-Codes wie bei `token erstellen` (0 eingerichtet, 1 fachlicher Fehler, z. B. Mandant nicht aktiv oder
+   Datenschlüssel fehlt, 2 falscher Aufruf, 3 technischer Fehler). Erneut aufgerufen ersetzt das Kommando Postfach und
+   Zulassungsliste; `mail abschalten <mandant>` stoppt den Abruf.
+- Die Ordner `Archiviert` und `Quarantaene` legt das Archiv an, falls sie fehlen. Mails nicht zugelassener Absender
+  landen in `Quarantaene`, alle anderen nach der Erfassung in `Archiviert`; gelöscht wird keine Mail.
+- Lag eine Mail in `Quarantaene`, weil ihr Absender fehlte: Absender mit `mail einrichten` ergänzen und die Mail im
+  Mailprogramm zurück in den Posteingang schieben; der nächste Abruf erfasst sie.
+- Auf Stufe A gilt die Datenregel aus `tech.md`: nur Testmails mit synthetischen Belegen, echte Belege erst ab Stufe B.
+
 ## Benutzer in Keycloak anlegen
 Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image
 an, nie per `docker exec` im laufenden `kc` (siehe «Admin-Kommandos auf der VPS»). Der Container hängt nur im internen

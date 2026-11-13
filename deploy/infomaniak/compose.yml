@@ -62,6 +62,8 @@ services:
       - s3_app_zugang_geheimnis
       - infomaniak_ai_token
       - archiv_manifest_key
+      # Spec 02 (Mail-Eingang): leer, solange das Geheimnis ARCHIV_DATA_KEY fehlt; dann ruht der Mail-Eingang
+      - archiv_data_key
     networks:
       intern: {}
       web: {}
@@ -254,6 +256,8 @@ secrets:
     file: ./secrets/infomaniak_ai_token
   archiv_manifest_key:
     file: ./secrets/archiv_manifest_key
+  archiv_data_key:
+    file: ./secrets/archiv_data_key
   archiv_db_postgres:
     file: ./secrets/archiv_db_postgres
   archiv_db_owner_scram:

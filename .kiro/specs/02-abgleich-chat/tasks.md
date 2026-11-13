@@ -9,7 +9,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 6 — E-Mail, Embeddings, Export (parallel)
 
-- [ ] 6.1 E-Mail-Eingang [Backend]
+- [x] 6.1 E-Mail-Eingang [Backend]
   - `integration_mail`, `mail_eingang`; `MailPoller` (Angus Mail, IMAP TLS), Zulassungsliste, Ordner `Archiviert`/`Quarantaene`, Idempotenz über Message-ID
   - Mail ohne Anhang → `.eml` + PDF aus Text (PDFBox) → normale Verarbeitung bis in den Eingangskorb, Dublettenprüfung wie Upload
   - Szenarien `@req-1.x` mit GreenMail
