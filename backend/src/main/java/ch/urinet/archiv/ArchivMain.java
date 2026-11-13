@@ -4,6 +4,7 @@ import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
+import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
@@ -20,7 +21,8 @@ import java.util.function.BiConsumer;
 
 /**
  * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet} oder
- * {@code archiv token erstellen urinet Rechnungsgenerator generator}.
+ * {@code archiv token erstellen urinet Rechnungsgenerator generator} oder
+ * {@code archiv embedding nachberechnen urinet}.
  * Exit-Codes des Kommandos: 0 ok, 1 fachlicher Fehler, 2 falscher Aufruf (geprüft, bevor Quarkus startet),
  * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}).
  */
@@ -67,6 +69,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     MailKommando mail;
+
+    @Inject
+    EmbeddingKommando embedding;
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
@@ -139,9 +144,11 @@ public class ArchivMain implements QuarkusApplication {
                     : Optional.of(ManifestKommando.AUFRUF);
             case "mail" -> MailKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(MailKommando.AUFRUF);
+            case "embedding" -> EmbeddingKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(EmbeddingKommando.AUFRUF);
             default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
                     + TokenKommando.AUFRUF + System.lineSeparator() + ManifestKommando.AUFRUF
-                    + System.lineSeparator() + MailKommando.AUFRUF);
+                    + System.lineSeparator() + MailKommando.AUFRUF + System.lineSeparator() + EmbeddingKommando.AUFRUF);
         };
     }
 
@@ -165,6 +172,7 @@ public class ArchivMain implements QuarkusApplication {
             case "token" -> token.ausfuehren(rest, ergebnis, System.err);
             case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
             case "mail" -> mail.ausfuehren(rest, System.in, System.err);
+            case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
     }

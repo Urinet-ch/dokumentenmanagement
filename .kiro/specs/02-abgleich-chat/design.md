@@ -64,6 +64,14 @@ flowchart LR
 - `Chunker`: Absätze zusammenfassen bis ≈ 3'000 Zeichen, 400 Zeichen Überlappung, Titel + Art + Partner als Kopfzeile jedes Chunks.
   Spec 03 ergänzt (Spec 03, Req 5.7; 13.11.2026; umgesetzt in Spec 02, Aufgaben 6.3 und 6.4): `chunk` erhält `seite_von` und `seite_bis` (1-basiert), bestimmt aus den `\f` in `dokument.volltext` über `Seitentext.von` (Spec 04 design.md), `null` ohne Seitentrenner (z. B. bei `pdfa_fehlt`) oder wenn die Zahl der Seiten nicht `dokument.seiten` entspricht; `HybridSuche.suchen` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit. Treffer nur aus dem Volltext haben keinen Seitenbereich.
 - `EmbeddingService` (LangChain4j `EmbeddingModel`, OpenAI-kompatibel), Batch 16 Chunks, Auftrag `EMBEDDING` nach erfolgreichem `ARCHIVIEREN` (Status `ARCHIVIERT`); Nachberechnung `EMBEDDING_ALLE`.
+- Umsetzung (Aufgabe 6.3, 13.11.2026):
+  - Changesets `db/public` 009 (`create extension vector` in `public`) und `db/mandant` 021 (`chunk` mit `seite_von`/`seite_bis`, `embedding public.halfvec(3584)` leer erlaubt, Eindeutigkeit `(dokument_id, nr)`, HNSW `public.halfvec_cosine_ops`). Der Index wird beim Einfügen gepflegt; `maintenance_work_mem` bleibt auf Stufe A bei 16MB.
+  - `Chunker` (`ki/domain`): Absätze an Leerzeilen, je Abschnitt höchstens 3'000 Zeichen Inhalt ohne Kopfzeile, Überlappung bis 400 Zeichen an einer Wortgrenze, Absätze über 2'598 Zeichen an Leerraum geteilt, Kopfzeile «Titel – Art – Partner» (Name der Art, leere Teile entfallen). Ein Absatz gehört zu genau einer Seite. `Seitentext` liegt in `gemeinsam/domain`, weil Spec 03 und 04 ihn ebenfalls brauchen.
+  - `EmbeddingPort` mit Adapter (LangChain4j, ohne `dimensions`, `maxRetries(0)`) und Dev-Stub über `archiv.ki.embedding-stub`; falsche Anzahl, falsche Dimension, Werte ausserhalb von `halfvec` (±65'504) und Fehler des Modells sind ein Fehlversuch des Auftrags (Spec 01, Req 5.4) ohne Änderung an den Abschnitten. Jeder Aufruf mit Antwort ist eine Zeile in `ki_verbrauch` mit Zweck `EMBEDDING`.
+  - Ohne Vektoren (Stub, kein Token) entstehen die Abschnitte ohne Embedding; hat das Dokument schon Abschnitte mit Embedding, bleiben diese unverändert. `--nur-fehlende` holt fehlende Vektoren nach.
+  - `EMBEDDING` wird in derselben Transaktion eingereiht, die `ARCHIVIERT` festhält; ein Dokument, das nicht (mehr) archiviert ist, wird übersprungen. Die Abschnitte eines Dokuments werden in einer Transaktion ersetzt (`select … for no key update` auf das Dokument).
+  - Nachberechnung (Req 2.4) über das Kommando `archiv embedding nachberechnen <code> [--nur-fehlende]` (Betrieb, kein REST-Endpunkt, die Rechtematrix bleibt unverändert): reiht `EMBEDDING_ALLE` ein, das in Teilen zu 500 Dokumenten je archiviertem Dokument ein `EMBEDDING` einreiht (ohne Option alle, mit Option nur Dokumente ohne Abschnitt oder mit Abschnitt ohne Embedding). Zeitgrenzen: `EMBEDDING` 10 min, `EMBEDDING_ALLE` 30 min je Teil (Spec 01 design.md).
+  - Messung lokal (Image der Dev Services, `mem_limit 100m`, `cpus 0.15`, Einstellungen der Stufe A): HNSW-Index ≈ 8 KiB je Abschnitt, Tabelle mit Index ≈ 16 KiB je Abschnitt; Einfügen von 1'000 Abschnitten in rund 63 s, Speicher höchstens 43.6 MiB, kein Speicherabbruch.
 - `HybridSuche.suchen(frage, filter, k)`:
   1. Volltext: Top 50 nach `ts_rank_cd`.
   2. Vektor: Frage einbetten, Top 50 Chunks nach Kosinus, auf Dokumente verdichten (bester Chunk zählt).
@@ -150,7 +158,7 @@ flowchart LR
 
 ## Data Models (neu in `m_<code>`, Liquibase-Changelog `db/mandant`)
 ```sql
-chunk(id bigserial pk, dokument_id uuid fk, nr int, text text, embedding halfvec(3584))
+chunk(id bigserial pk, dokument_id uuid fk, nr int, text text, seite_von int, seite_bis int, embedding halfvec(3584))
   -- Dimension gemäss Spike; Index: USING hnsw (embedding halfvec_cosine_ops)
   -- nur Dokumente; Embeddings der Wissensseiten liegen in wissensseite_chunk (Spec 04), nicht hier
 mail_eingang(message_id text pk, absender text, betreff text, status text, zeit timestamptz, dokument_ids uuid[])

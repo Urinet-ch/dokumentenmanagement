@@ -515,6 +515,8 @@ Die Spalte «Beschreibung» (Aufgabe 2.1, entschieden von Fabian am 09.11.2026; 
 | `CSV_UEBERNEHMEN` | 10 min |
 | `MANIFEST` | 15 min |
 | `PRUEFLAUF` | 30 min je Teilauftrag (500 Dateien) |
+| `EMBEDDING` (Spec 02) | 10 min |
+| `EMBEDDING_ALLE` (Spec 02) | 30 min je Teilauftrag (500 Dokumente) |
 | `WISSEN_INGEST` (Spec 04) | 3 min je Teilauftrag |
 | `WISSEN_LINT` (Spec 04) | 3 min je Teilauftrag |
 | `WISSEN_EMBEDDING` (Spec 04) | 10 min |
@@ -1421,7 +1423,8 @@ ki_beispiel(id bigserial pk, partner_id uuid null, art text, eingabe_auszug text
   -- (siehe «Umsetzung (Aufgabe 3.3)»)
 ki_verbrauch(id bigserial pk, zweck text, modell text, tokens_ein int, tokens_aus int, zeit timestamptz)
   -- zweck: Spec 04 ergänzt WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING (Monatsbericht nach Zweck, Spec 03, 8.1;
-  -- Monatsbudget der Wissensbasis, Spec 04, 13.6)
+  -- Monatsbudget der Wissensbasis, Spec 04, 13.6); Spec 02, Aufgabe 6.3 ergänzt EMBEDDING (Embeddings der Abschnitte
+  -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0)
 
 import_zuordnung(art text pk, spalten jsonb, kopf_hash text, geaendert timestamptz)
 import_lauf(id uuid pk, art text, vollexport bool, dateiname text, sha256 text, zeichensatz text,

@@ -21,7 +21,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Zugangsdaten nie ins Repo; Ablage gemäss design.md (verschlüsselt in `integration_mail`, Schlüssel aus `/run/secrets/`)
   - _Anforderungen: 1.1, 1.4_
 
-- [ ] 6.3 Chunks und Embeddings [Backend]
+- [x] 6.3 Chunks und Embeddings [Backend]
   - Liquibase-Changeset (`db/mandant`) `chunk` mit `halfvec(<dim aus Spike>)` + HNSW; `Chunker`; `EmbeddingService`; Auftrag `EMBEDDING` nach Archivierung; Nachberechnung `EMBEDDING_ALLE`
   - Spec 03 ergänzt: `chunk.seite_von`/`seite_bis` aus den Seitentrennern über `Seitentext.von` (Spec 04), `null` ohne Trenner oder bei abweichender Seitenzahl (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Embedding-Port wählt Adapter oder Stub über den Schalter `archiv.ki.embedding-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)

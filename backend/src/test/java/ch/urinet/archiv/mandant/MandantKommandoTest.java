@@ -56,7 +56,8 @@ class MandantKommandoTest {
     @Test
     @Launch(value = {"unbekannt"}, exitCode = 2)
     void unbekanntesKommando(LaunchResult ergebnis) {
-        assertThat(ergebnis.getErrorOutput()).contains("Unbekanntes Kommando");
+        assertThat(ergebnis.getErrorOutput()).contains("Unbekanntes Kommando")
+                .contains("archiv embedding nachberechnen");
         assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
     }
 }
