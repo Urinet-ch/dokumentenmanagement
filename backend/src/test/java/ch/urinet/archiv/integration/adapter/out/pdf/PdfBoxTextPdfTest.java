@@ -7,9 +7,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /** PDF aus dem Text einer Mail (Spec 02, Req 1.3): Kopf und Text lesbar, fremde Zeichen als «?», lange Texte umbrochen. */
 class PdfBoxTextPdfTest {
@@ -28,6 +30,17 @@ class PdfBoxTextPdfTest {
             String text = new PDFTextStripper().getText(dokument);
             assertThat(text).contains("Von: inhaber@example.invalid", "Betreff: Grüsse ?", "Grüezi mitenand",
                     "Zweite Zeile ? €");
+        }
+    }
+
+    @Test
+    void einWortAus100000ZeichenWirdInLinearerZeitHartGetrennt() throws Exception {
+        Path pdf = verzeichnis.resolve("lang.pdf");
+        String wort = "W".repeat(100_000);
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> new PdfBoxTextPdf().erzeugen(List.of(), wort, pdf));
+        try (PDDocument dokument = Loader.loadPDF(pdf.toFile())) {
+            String text = new PDFTextStripper().getText(dokument).replaceAll("\\s", "");
+            assertThat(text).hasSize(100_000).matches("W+");
         }
     }
 

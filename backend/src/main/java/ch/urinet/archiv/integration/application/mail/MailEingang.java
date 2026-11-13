@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Abruf der Postfächer aller aktiven Mandanten (Spec 02, Req 1.1; design.md «E-Mail-Eingang», «Error Handling»).
  * Ohne eingerichtetes, aktives Postfach oder ohne Datenschlüssel ruft das Archiv für den Mandanten nichts ab und sagt
  * das einmal im Log (INFO, kein Fehler, kein Alarm), bis sich der Grund ändert. Scheitert der Abruf (Verbindung, TLS,
- * Anmeldung), zählt das Archiv die Fehlschläge in Folge; beim {@value #MELDEN_NACH}. benachrichtigt es den Inhaber,
+ * Anmeldung, ein Passwort, das nicht zum Datenschlüssel passt), zählt das Archiv die Fehlschläge in Folge; beim {@value #MELDEN_NACH}. benachrichtigt es den Inhaber,
  * einen Auftrag zum Wiederholen gibt es nicht: Der nächste Takt versucht es wieder. Das Passwort entschlüsselt das
  * Archiv erst für den Abruf; es gelangt nie ins Log (Req 16.7).
  */
@@ -93,7 +93,8 @@ public class MailEingang {
             passwort = new String(verschluesselung.entschluesseln(einstellung.get().passwortVerschluesselt(),
                     bezug(mandant)), StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
-            einmalMelden(mandant, "Passwort passt nicht zum Datenschlüssel; Postfach neu einrichten");
+            // Schlüssel gewechselt oder Chiffrat beschädigt: ein Ausfall wie eine gescheiterte Anmeldung
+            fehlschlag(mandant, "Passwort passt nicht zum Datenschlüssel, Postfach neu einrichten", e);
             return Optional.empty();
         }
         gemeldet.remove(mandant);
@@ -108,13 +109,17 @@ public class MailEingang {
             }
             return Optional.of(abruf);
         } catch (PostfachNichtErreichbar e) {
-            int folge = konfiguration.fehlschlagZaehlen(mandant);
-            LOG.warnf("Mail-Eingang: Abruf für Mandant %s gescheitert (%d in Folge), stelle=%s, ursache=%s",
-                    mandant.wert(), folge, e.getMessage(), Ursachen.kette(e.getCause()));
-            if (folge == MELDEN_NACH) {
-                benachrichtigung.mailAbrufGestoert(mandant, folge);
-            }
+            fehlschlag(mandant, e.getMessage(), e.getCause());
             return Optional.empty();
+        }
+    }
+
+    private void fehlschlag(MandantCode mandant, String stelle, Throwable ursache) {
+        int folge = konfiguration.fehlschlagZaehlen(mandant);
+        LOG.warnf("Mail-Eingang: Abruf für Mandant %s gescheitert (%d in Folge), stelle=%s, ursache=%s",
+                mandant.wert(), folge, stelle, Ursachen.kette(ursache));
+        if (folge == MELDEN_NACH) {
+            benachrichtigung.mailAbrufGestoert(mandant, folge);
         }
     }
 

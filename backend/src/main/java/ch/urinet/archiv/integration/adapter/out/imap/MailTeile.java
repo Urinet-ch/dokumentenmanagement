@@ -8,6 +8,7 @@ import jakarta.mail.Multipart;
 import jakarta.mail.Part;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimePart;
 import jakarta.mail.internet.MimeUtility;
 import org.jboss.logging.Logger;
 
@@ -23,11 +24,14 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Zerlegt eine Nachricht (MIME) in Text und Anhänge: Ein Anhang ist jeder Teil mit Dateiname oder Disposition
- * {@code attachment} und jeder Teil, der kein Text ist, auch in angehängten Nachrichten ({@code message/rfc822}, bis
- * Tiefe {@value #MAX_TIEFE}). Text ist der erste {@code text/plain}-Teil ohne Dateiname, sonst der erste
- * {@code text/html}-Teil ohne Markup. Anhänge landen decodiert als Dateien im Verzeichnis der Nachricht. Ein Teil, der
- * sich nicht lesen lässt, fällt weg; die {@code .eml} bleibt vollständig.
+ * Zerlegt eine Nachricht (MIME) in Text und Anhänge, auch in angehängten Nachrichten ({@code message/rfc822}, bis Tiefe
+ * {@value #MAX_TIEFE}). Ein Anhang ist ein Teil mit Disposition {@code attachment} oder ein Teil mit Dateiname, der nicht
+ * eingebettet ist. Eingebettet ist ein Teil mit Content-ID in {@code multipart/related} oder mit Disposition
+ * {@code inline} (z. B. das Logo einer Signatur, ein Bild im HTML-Text); er gehört zum Text der Nachricht und ist kein
+ * Anhang (Spec 02, Req 1.2, 1.3). Ein Teil ohne Dateiname und ohne {@code attachment} ist ebenfalls kein Anhang. Text ist
+ * der erste {@code text/plain}-Teil, der kein Anhang ist, sonst der erste solche {@code text/html}-Teil ohne Markup.
+ * Anhänge landen decodiert als Dateien im Verzeichnis der Nachricht. Ein Teil, der sich nicht lesen lässt, fällt weg;
+ * die {@code .eml} bleibt vollständig.
  */
 final class MailTeile {
 
@@ -50,7 +54,7 @@ final class MailTeile {
 
     static MailTeile lesen(MimeMessage nachricht, Path verzeichnis) {
         MailTeile teile = new MailTeile(verzeichnis);
-        teile.teil(nachricht, 0);
+        teile.teil(nachricht, 0, false);
         return teile;
     }
 
@@ -85,30 +89,28 @@ final class MailTeile {
         }
     }
 
-    private void teil(Part teil, int tiefe) {
+    private void teil(Part teil, int tiefe, boolean inRelated) {
         try {
             if (teil.isMimeType("multipart/*")) {
                 Multipart teile = (Multipart) teil.getContent();
+                boolean related = teil.isMimeType("multipart/related");
                 for (int i = 0; i < teile.getCount(); i++) {
-                    teil(teile.getBodyPart(i), tiefe);
+                    teil(teile.getBodyPart(i), tiefe, related);
                 }
                 return;
             }
             if (teil.isMimeType("message/rfc822") && tiefe < MAX_TIEFE && teil.getContent() instanceof Part innen) {
-                teil(innen, tiefe + 1);
+                teil(innen, tiefe + 1, false);
                 return;
             }
             Optional<String> name = name(teil);
-            boolean anhang = name.isPresent() || Part.ATTACHMENT.equalsIgnoreCase(teil.getDisposition());
-            if (!anhang && teil.isMimeType("text/plain")) {
-                if (text == null) {
+            if (!anhang(teil, name, inRelated)) {
+                if (teil.isMimeType("text/plain") && text == null) {
                     text = inhalt(teil);
-                }
-            } else if (!anhang && teil.isMimeType("text/html")) {
-                if (html == null) {
+                } else if (teil.isMimeType("text/html") && html == null) {
                     html = inhalt(teil);
                 }
-            } else if (anhang || !teil.isMimeType("text/*")) {
+            } else {
                 Path datei = verzeichnis.resolve("anhang-" + (anhaenge.size() + 1));
                 try (InputStream ein = teil.getInputStream()) {
                     Files.copy(ein, datei);
@@ -119,6 +121,17 @@ final class MailTeile {
             LOG.infof("Mail-Eingang: ein Teil der Nachricht ist nicht lesbar und fällt weg, ursache=%s",
                     Ursachen.kette(e));
         }
+    }
+
+    /** Anhang oder Teil des Textes; Regel siehe Klassenkommentar. */
+    static boolean anhang(Part teil, Optional<String> name, boolean inRelated) throws MessagingException {
+        String disposition = teil.getDisposition();
+        if (Part.ATTACHMENT.equalsIgnoreCase(disposition)) {
+            return true;
+        }
+        boolean eingebettet = teil instanceof MimePart mime && mime.getContentID() != null
+                && (inRelated || Part.INLINE.equalsIgnoreCase(disposition));
+        return name.isPresent() && !eingebettet;
     }
 
     private static Optional<String> name(Part teil) throws MessagingException {

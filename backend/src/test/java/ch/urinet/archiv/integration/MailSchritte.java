@@ -1,9 +1,11 @@
 package ch.urinet.archiv.integration;
 
 import ch.urinet.archiv.dokument.Testdateien;
+import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.integration.application.mail.MailEingang;
 import ch.urinet.archiv.integration.application.mail.MailEinrichten;
+import ch.urinet.archiv.integration.domain.mail.MailKopf;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
 import io.agroal.api.AgroalDataSource;
@@ -76,10 +78,13 @@ public class MailSchritte {
     /** Anzahl Dokumente mit Quelle EMAIL je Mandant vor dem Szenario. */
     private final Map<String, Long> vorher = new HashMap<>();
     private byte[] letztesPdf;
+    private byte[] logo;
+    private MimeMessage letzteNachricht;
     private LogMitschnitt log;
 
     @After("@spec-02")
     public void aufraeumen() {
+        S3Stoerung.aus();
         if (log != null) {
             log.close();
         }
@@ -280,7 +285,7 @@ public class MailSchritte {
     public void nichtsImMandanten(String mandant) throws SQLException {
         assertThat(emailDokumente(mandant)).isEqualTo(vorher.get(mandant));
         assertThat(wert("select count(*) from " + schema(mandant) + ".mail_eingang where message_id = ?",
-                nachrichten.getLast())).isZero();
+                gespeichert(nachrichten.getLast()))).isZero();
     }
 
     @Dann("hat das Archiv im Mandanten «{word}» zur Mail kein Dokument angelegt")
@@ -297,11 +302,15 @@ public class MailSchritte {
     public void genauEines(String mandant) throws SQLException {
         assertThat(dokumentIds(mandant, nachrichten.getLast())).hasSize(1);
         assertThat(emailDokumente(mandant)).isEqualTo(vorher.get(mandant) + 1);
+        // Stand für die nächste Mail desselben Szenarios
+        vorher.put(mandant, vorher.get(mandant) + 1);
     }
 
     @Dann("hat das Archiv im Mandanten «{word}» zur Mail genau ein Dokument der Art «{word}» mit Quelle «{word}» angelegt")
     public void korrespondenz(String mandant, String art, String quelle) throws SQLException {
         genauEines(mandant);
+        assertThat(zeile("select mime from " + schema(mandant) + ".dokument_datei where dokument_id = ? and nr = 1",
+                dokument(mandant))).containsEntry("mime", "message/rfc822");
         Map<String, Object> dok = zeile("select art, quelle, dateiname from " + schema(mandant)
                 + ".dokument where id = ?", dokument(mandant));
         assertThat(dok).containsEntry("art", art).containsEntry("quelle", quelle);
@@ -331,6 +340,112 @@ public class MailSchritte {
                 .get("bestaetigt")).isNull();
     }
 
+    @Angenommen("im Postfach liegt eine HTML-Mail von «{}» mit dem Betreff «{}» und einem eingebetteten Logo")
+    public void mailMitLogo(String von, String betreff) throws Exception {
+        logo = Testdateien.png();
+        zustellen(htmlMitLogo(von, betreff), neueId());
+    }
+
+    @Angenommen("im Postfach liegt eine zweite HTML-Mail von «{}» mit demselben eingebetteten Logo")
+    public void zweiteHtmlMitLogo(String von) throws Exception {
+        zustellen(htmlMitLogo(von, "Nachfrage"), neueId());
+    }
+
+    @Angenommen("im Postfach liegt eine Mail von «{}» mit dem Betreff «{}» und einem abgeschnittenen PDF «{}»")
+    public void mitDefektemPdf(String von, String betreff, String name) throws Exception {
+        zustellen(nachricht(von, betreff, null, "Siehe Anhang.", List.of(new Teil(name, Testdateien.abgeschnitten(),
+                "application/pdf"))), neueId());
+    }
+
+    @Angenommen("im Postfach liegt eine Mail von «{}» mit Steuerzeichen im Betreff und einer Message-ID aus {int} Zeichen")
+    public void kopfMitSteuerzeichen(String von, int laenge) throws Exception {
+        MimeMessage nachricht = nachricht(von, "Platzhalter", null, "Text", List.of());
+        nachricht.setHeader("Subject", "=?UTF-8?Q?Rechnung=00X=07Y?=");
+        String domain = "@example.invalid>";
+        zustellen(nachricht, "<" + "x".repeat(laenge - domain.length() - 1) + domain);
+    }
+
+    @Angenommen("für «{word}» ist «{}» zusätzlich zugelassen")
+    public void zusaetzlichZugelassen(String mandant, String adresse) {
+        List<String> liste = new ArrayList<>(absender.get(mandant));
+        liste.add(adresse);
+        absender.put(mandant, liste);
+        TestPostfach postfach = postfaecher.get(mandant);
+        einrichten.einrichten(mandant, TestPostfach.HOST, TestPostfach.port(), postfach.login(), postfach.passwort(),
+                liste);
+    }
+
+    @Angenommen("die Mail liegt wieder im Posteingang")
+    public void wiederImPosteingang() {
+        postfaecher.get("urinet").zustellen(letzteNachricht);
+    }
+
+    @Angenommen("der Object Storage nimmt keine Datei mehr an")
+    public void ablageFaelltAus() {
+        S3Stoerung.ab(0, S3Stoerung.Art.NETZ);
+    }
+
+    @Angenommen("der Object Storage ist wieder erreichbar")
+    public void ablageWieder() {
+        S3Stoerung.aus();
+    }
+
+    @Dann("führt «mail_eingang» von «{word}» die Mail nicht, zur Mail gibt es kein Dokument, und sie liegt noch im Posteingang")
+    public void nichtsEingetragen(String mandant) throws Exception {
+        assertThat(wert("select count(*) from " + schema(mandant) + ".mail_eingang where message_id = ?",
+                gespeichert(nachrichten.getLast()))).isZero();
+        assertThat(emailDokumente(mandant)).isEqualTo(vorher.get(mandant));
+        assertThat(postfaecher.get(mandant).ordner("INBOX")).containsExactly(nachrichten.getLast());
+    }
+
+    @Dann("«mail_eingang» von «{word}» führt die Mail als «{word}» mit diesem Dokument")
+    public void eingangMitEinemDokument(String mandant, String status) throws SQLException {
+        assertThat(status(mandant, nachrichten.getLast())).isEqualTo(status);
+        assertThat(dokumentIds(mandant, nachrichten.getLast())).hasSize(1);
+    }
+
+    @Dann("«mail_eingang» von «{word}» führt die Mail unter dem Hash ihrer Message-ID als «{word}» mit bereinigtem Betreff")
+    public void bereinigtGespeichert(String mandant, String status) throws SQLException {
+        String id = gespeichert(nachrichten.getLast());
+        assertThat(id).startsWith(MailKopf.PRAEFIX_HASH);
+        Map<String, Object> zeile = zeile("select status, betreff from " + schema(mandant)
+                + ".mail_eingang where message_id = ?", id);
+        assertThat(zeile).containsEntry("status", status).containsEntry("betreff", "Rechnung X Y");
+    }
+
+    @Dann("das Log meldet zur Mail kein neues Dokument")
+    public void logOhneNeuesDokument() {
+        assertThat(mailEintraege().stream().map(log::nachricht))
+                .anyMatch(n -> n.startsWith("Mail ohne neues Dokument: mandant=urinet"));
+    }
+
+    private MimeMessage htmlMitLogo(String von, String betreff) throws Exception {
+        MimeMessage nachricht = new MimeMessage(Session.getInstance(new Properties()));
+        nachricht.setFrom(new InternetAddress(von));
+        nachricht.setRecipients(jakarta.mail.Message.RecipientType.TO, "archiv@example.invalid");
+        nachricht.setSubject(betreff, "UTF-8");
+        nachricht.setSentDate(new Date());
+        MimeMultipart alternativ = new MimeMultipart("alternative");
+        MimeBodyPart text = new MimeBodyPart();
+        text.setText("Guten Tag, bitte um eine Offerte.", "UTF-8");
+        MimeBodyPart html = new MimeBodyPart();
+        html.setText("<p>Guten Tag, bitte um eine Offerte.</p><img src=\"cid:logo\">", "UTF-8", "html");
+        alternativ.addBodyPart(text);
+        alternativ.addBodyPart(html);
+        MimeBodyPart huelle = new MimeBodyPart();
+        huelle.setContent(alternativ);
+        MimeBodyPart bild = new MimeBodyPart();
+        bild.setDataHandler(new DataHandler(new ByteArrayDataSource(logo, "image/png")));
+        bild.setFileName("image001.png");
+        bild.setDisposition(jakarta.mail.Part.INLINE);
+        bild.setContentID("<logo>");
+        MimeMultipart related = new MimeMultipart("related");
+        related.addBodyPart(huelle);
+        related.addBodyPart(bild);
+        nachricht.setContent(related);
+        return nachricht;
+    }
+
     private void postfachEinrichten(String mandant, boolean mitOrdnern) throws Exception {
         TestPostfach postfach = TestPostfach.neu();
         if (mitOrdnern) {
@@ -348,6 +463,12 @@ public class MailSchritte {
         nachricht.setHeader("Message-ID", messageId);
         postfaecher.get("urinet").zustellen(nachricht);
         nachrichten.add(messageId);
+        letzteNachricht = nachricht;
+    }
+
+    /** So, wie das Archiv die Message-ID in {@code mail_eingang} speichert. */
+    private static String gespeichert(String messageId) {
+        return MailKopf.messageId(messageId).orElseThrow();
     }
 
     private static String neueId() {
@@ -396,7 +517,7 @@ public class MailSchritte {
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
                 verbindung.prepareStatement("select dokument_ids from " + schema(mandant)
                         + ".mail_eingang where message_id = ?")) {
-            abfrage.setString(1, messageId);
+            abfrage.setString(1, gespeichert(messageId));
             try (ResultSet zeile = abfrage.executeQuery()) {
                 if (!zeile.next()) {
                     return List.of();
@@ -409,7 +530,7 @@ public class MailSchritte {
 
     private String status(String mandant, String messageId) throws SQLException {
         return (String) zeile("select status from " + schema(mandant) + ".mail_eingang where message_id = ?",
-                messageId).get("status");
+                gespeichert(messageId)).get("status");
     }
 
     private long emailDokumente(String mandant) throws SQLException {

@@ -89,6 +89,21 @@ class MailEingangTest {
     }
 
     @Test
+    void einPasswortDasNichtZumSchluesselPasstZaehltAlsAusfallUndWirdGemeldet() {
+        einrichten.einrichten("urinet", "imap.example.invalid", 993, "archiv@example.invalid", "pw",
+                List.of("inhaber@example.invalid"));
+        MailKonfigurationPort.Einstellung e = konfiguration.einstellung.orElseThrow();
+        konfiguration.einstellung = Optional.of(new MailKonfigurationPort.Einstellung(e.postfach(),
+                "beschaedigt".getBytes(), e.zulassung(), true));
+        for (int i = 0; i < MailEingang.MELDEN_NACH; i++) {
+            assertThat(eingang.abrufen(URINET)).isEmpty();
+        }
+        assertThat(postfach.aufrufe).isZero();
+        assertThat(konfiguration.fehler).isEqualTo(MailEingang.MELDEN_NACH);
+        assertThat(post.meldungen).containsExactly("urinet:6");
+    }
+
+    @Test
     void einrichtenNurFuerAktiveMandantenMitPasswortUndAbsender() {
         assertThatThrownBy(() -> einrichten.einrichten("andere", "imap.example.invalid", 993, "a", "pw",
                 List.of("a@example.invalid"))).isInstanceOf(MailEinrichten.Fehler.class).hasMessageContaining("aktiv");

@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@link TextPdfPort} mit PDFBox (Spec 02, Aufgabe 6.1): A4, Helvetica 10 pt, Kopfzeilen fett, Zeilen am Rand
@@ -34,16 +36,19 @@ public class PdfBoxTextPdf implements TextPdfPort {
         PDType1Font normal = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         PDType1Font fett = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         float breite = PDRectangle.A4.getWidth() - 2 * RAND;
+        Breiten breitenNormal = new Breiten(normal);
+        Breiten breitenFett = new Breiten(fett);
         List<Zeile> zeilen = new ArrayList<>();
         for (String k : kopf) {
-            umbrechen(darstellbar(fett, k), fett, breite).forEach(z -> zeilen.add(new Zeile(z, true)));
+            umbrechen(darstellbar(fett, k), breitenFett, breite).forEach(z -> zeilen.add(new Zeile(z, true)));
         }
         if (!kopf.isEmpty()) {
             zeilen.add(new Zeile("", false));
         }
         String inhalt = text.length() > MAX_ZEICHEN ? text.substring(0, MAX_ZEICHEN) + "\n[…]" : text;
         for (String absatz : inhalt.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1)) {
-            umbrechen(darstellbar(normal, absatz), normal, breite).forEach(z -> zeilen.add(new Zeile(z, false)));
+            umbrechen(darstellbar(normal, absatz), breitenNormal, breite)
+                    .forEach(z -> zeilen.add(new Zeile(z, false)));
         }
         try (PDDocument dokument = new PDDocument()) {
             PDPageContentStream seite = null;
@@ -102,38 +107,76 @@ public class PdfBoxTextPdf implements TextPdfPort {
         return aus.toString();
     }
 
-    private static List<String> umbrechen(String absatz, PDType1Font schrift, float breite) {
+    /**
+     * Umbruch an Leerzeichen; ein Wort breiter als die Zeile wird hart getrennt. Die Breite wächst Zeichen für Zeichen
+     * mit, darum linear in der Länge des Absatzes, auch bei einem Wort aus 100'000 Zeichen.
+     */
+    static List<String> umbrechen(String absatz, Breiten breiten, float breite) {
         List<String> zeilen = new ArrayList<>();
         StringBuilder zeile = new StringBuilder();
+        float belegt = 0;
+        float leer = breiten.von(' ');
         for (String wort : absatz.split(" ", -1)) {
-            String versuch = zeile.isEmpty() ? wort : zeile + " " + wort;
-            if (zeile.isEmpty() || weite(schrift, versuch) <= breite) {
-                zeile.setLength(0);
-                zeile.append(versuch);
-            } else {
+            float weite = breiten.von(wort);
+            if (!zeile.isEmpty()) {
+                if (belegt + leer + weite <= breite) {
+                    zeile.append(' ').append(wort);
+                    belegt += leer + weite;
+                    continue;
+                }
                 zeilen.add(zeile.toString());
                 zeile.setLength(0);
-                zeile.append(wort);
+                belegt = 0;
             }
-            // ein Wort breiter als die Zeile wird hart getrennt
-            while (weite(schrift, zeile.toString()) > breite && zeile.length() > 1) {
-                int teil = zeile.length() - 1;
-                while (teil > 1 && weite(schrift, zeile.substring(0, teil)) > breite) {
-                    teil--;
+            if (weite <= breite) {
+                zeile.append(wort);
+                belegt = weite;
+                continue;
+            }
+            for (int i = 0; i < wort.length(); ) {
+                int c = wort.codePointAt(i);
+                i += Character.charCount(c);
+                float w = breiten.von(c);
+                if (!zeile.isEmpty() && belegt + w > breite) {
+                    zeilen.add(zeile.toString());
+                    zeile.setLength(0);
+                    belegt = 0;
                 }
-                zeilen.add(zeile.substring(0, teil));
-                zeile.delete(0, teil);
+                zeile.appendCodePoint(c);
+                belegt += w;
             }
         }
         zeilen.add(zeile.toString());
         return zeilen;
     }
 
-    private static float weite(PDType1Font schrift, String text) {
-        try {
-            return schrift.getStringWidth(text) / 1000 * GROESSE;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    /** Breite je Zeichen einer Schrift in Punkt, zwischengespeichert. */
+    static final class Breiten {
+        private final PDType1Font schrift;
+        private final Map<Integer, Float> je = new HashMap<>();
+
+        Breiten(PDType1Font schrift) {
+            this.schrift = schrift;
+        }
+
+        float von(String text) {
+            float summe = 0;
+            for (int i = 0; i < text.length(); ) {
+                int c = text.codePointAt(i);
+                i += Character.charCount(c);
+                summe += von(c);
+            }
+            return summe;
+        }
+
+        float von(int zeichen) {
+            return je.computeIfAbsent(zeichen, c -> {
+                try {
+                    return schrift.getStringWidth(Character.toString(c)) / 1000 * GROESSE;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
         }
     }
 

@@ -168,6 +168,8 @@ im Log.
    Zulassungsliste; `mail abschalten <mandant>` stoppt den Abruf.
 - Die Ordner `Archiviert` und `Quarantaene` legt das Archiv an, falls sie fehlen. Mails nicht zugelassener Absender
   landen in `Quarantaene`, alle anderen nach der Erfassung in `Archiviert`; gelöscht wird keine Mail.
+- Lag eine Mail in `Quarantaene`, weil ihr Absender fehlte: Absender mit `mail einrichten` ergänzen und die Mail im
+  Mailprogramm zurück in den Posteingang schieben; der nächste Abruf erfasst sie.
 - Auf Stufe A gilt die Datenregel aus `tech.md`: nur Testmails mit synthetischen Belegen, echte Belege erst ab Stufe B.
 
 ## Benutzer in Keycloak anlegen

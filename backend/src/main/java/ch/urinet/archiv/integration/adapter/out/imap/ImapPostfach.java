@@ -3,10 +3,12 @@ package ch.urinet.archiv.integration.adapter.out.imap;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.integration.application.mail.PostfachNichtErreichbar;
 import ch.urinet.archiv.integration.application.mail.PostfachPort;
+import ch.urinet.archiv.integration.domain.mail.MailKopf;
 import ch.urinet.archiv.integration.domain.mail.Postfach;
 import io.quarkus.runtime.configuration.MemorySize;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
+import jakarta.inject.Inject;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Flags;
 import jakarta.mail.Folder;
@@ -43,11 +45,15 @@ import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link PostfachPort} über IMAP mit TLS (Angus Mail, Store {@code imaps}; Spec 02, Req 1.1, 1.4, 1.5). Das Zertifikat
@@ -55,7 +61,10 @@ import java.util.Properties;
  * {@code archiv.mail.ca-datei} gesetzt ist, gegen die Zertifikate dieser PEM-Datei (Tests mit GreenMail). Die Ordner
  * {@code archiv.mail.ordner-archiviert} und {@code archiv.mail.ordner-quarantaene} legt das Archiv an, wenn sie fehlen
  * (bei Servern mit Präfix des persönlichen Namensraums, z. B. {@code INBOX.}, darunter). Verschoben wird mit
- * {@code MOVE} (RFC 6851), sonst mit Kopie, Löschmarke und {@code EXPUNGE} beim Schliessen.
+ * {@code MOVE} (RFC 6851), sonst mit Kopie, Löschmarke und {@code EXPUNGE} beim Schliessen. Je Abruf versucht das
+ * Archiv höchstens {@code max} Nachrichten; eine Nachricht, die scheitert, bleibt im Posteingang und wird für
+ * {@code archiv.mail.zurueckstellen} übersprungen, damit Nachrichten, die immer scheitern (zu gross, unlesbar), die
+ * übrigen nicht blockieren.
  * <p>
  * Jede Nachricht liegt während der Verarbeitung als {@code .eml} mit ihren Anhängen in einem eigenen Verzeichnis unter
  * {@code archiv.mail.arbeitsverzeichnis} (Rechte 700) und wird danach gelöscht; ganz im Heap liegt sie nie. Das Log
@@ -73,19 +82,33 @@ public class ImapPostfach implements PostfachPort {
     private final Optional<Path> caDatei;
     private final Path arbeitsverzeichnis;
     private final long maxGroesse;
+    private final Duration zurueckstellen;
+    private final Clock uhr;
+    /** Gescheiterte Nachrichten (Postfach, UIDVALIDITY, UID) → frühester nächster Versuch. */
+    private final Map<String, Instant> zurueckgestellt = new ConcurrentHashMap<>();
 
+    @Inject
     public ImapPostfach(@ConfigProperty(name = "archiv.mail.zeitgrenze") Duration zeitgrenze,
                         @ConfigProperty(name = "archiv.mail.ordner-archiviert") String archiviert,
                         @ConfigProperty(name = "archiv.mail.ordner-quarantaene") String quarantaene,
                         @ConfigProperty(name = "archiv.mail.ca-datei") Optional<Path> caDatei,
                         @ConfigProperty(name = "archiv.mail.arbeitsverzeichnis") Path arbeitsverzeichnis,
-                        @ConfigProperty(name = "archiv.mail.max-groesse") MemorySize maxGroesse) {
+                        @ConfigProperty(name = "archiv.mail.max-groesse") MemorySize maxGroesse,
+                        @ConfigProperty(name = "archiv.mail.zurueckstellen") Duration zurueckstellen) {
+        this(zeitgrenze, archiviert, quarantaene, caDatei, arbeitsverzeichnis, maxGroesse.asLongValue(), zurueckstellen,
+                Clock.systemUTC());
+    }
+
+    ImapPostfach(Duration zeitgrenze, String archiviert, String quarantaene, Optional<Path> caDatei,
+                 Path arbeitsverzeichnis, long maxGroesse, Duration zurueckstellen, Clock uhr) {
         this.zeitgrenze = zeitgrenze;
         this.archiviert = archiviert;
         this.quarantaene = quarantaene;
         this.caDatei = caDatei;
         this.arbeitsverzeichnis = arbeitsverzeichnis;
-        this.maxGroesse = maxGroesse.asLongValue();
+        this.maxGroesse = maxGroesse;
+        this.zurueckstellen = zurueckstellen;
+        this.uhr = uhr;
     }
 
     @Override
@@ -108,31 +131,49 @@ public class ImapPostfach implements PostfachPort {
             eingang.open(Folder.READ_WRITE);
             Folder zielArchiviert = ordner(store, archiviert);
             Folder zielQuarantaene = ordner(store, quarantaene);
-            int anzahl = Math.min(eingang.getMessageCount(), max);
-            if (anzahl == 0) {
+            Message[] nachrichten = eingang.getMessages();
+            if (nachrichten.length == 0) {
                 eingang.close(false);
                 return new Abruf(0, 0);
             }
-            Message[] nachrichten = eingang.getMessages(1, anzahl);
             FetchProfile profil = new FetchProfile();
             profil.add(FetchProfile.Item.SIZE);
             profil.add(UIDFolder.FetchProfileItem.UID);
             eingang.fetch(nachrichten, profil);
+            String ort = postfach.host() + "|" + postfach.port() + "|" + postfach.benutzer() + "|"
+                    + ((UIDFolder) eingang).getUIDValidity() + "|";
+            Instant jetzt = uhr.instant();
             int verarbeitet = 0;
             int gescheitert = 0;
+            int wartend = 0;
             for (Message nachricht : nachrichten) {
+                if (verarbeitet + gescheitert >= max) {
+                    break;
+                }
+                String schluessel = ort + ((UIDFolder) eingang).getUID(nachricht);
+                Instant naechster = zurueckgestellt.get(schluessel);
+                if (naechster != null && jetzt.isBefore(naechster)) {
+                    // eine Nachricht, die zuletzt scheiterte, belegt das Fenster nicht; nach der Wartezeit wieder
+                    wartend++;
+                    continue;
+                }
                 try {
                     Ziel ziel = verarbeiten(session, nachricht, verarbeiter);
                     verschieben(store, eingang, nachricht, ziel == Ziel.QUARANTAENE ? zielQuarantaene : zielArchiviert);
+                    zurueckgestellt.remove(schluessel);
                     verarbeitet++;
                 } catch (FolderClosedException | StoreClosedException e) {
                     throw new PostfachNichtErreichbar("Verbindung", e);
                 } catch (Exception e) {
-                    // bleibt im Posteingang, der nächste Abruf versucht es wieder
+                    // bleibt im Posteingang; der nächste Versuch nach archiv.mail.zurueckstellen
                     gescheitert++;
-                    LOG.warnf("Mail-Eingang: Nachricht nicht verarbeitet, bleibt im Posteingang, ursache=%s",
-                            Ursachen.kette(e));
+                    zurueckgestellt.put(schluessel, jetzt.plus(zurueckstellen));
+                    LOG.warnf("Mail-Eingang: Nachricht nicht verarbeitet, bleibt im Posteingang und wird zurückgestellt, "
+                            + "ursache=%s", Ursachen.kette(e));
                 }
+            }
+            if (wartend > 0) {
+                LOG.infof("Mail-Eingang: %d zurückgestellte Nachricht(en) im Posteingang", wartend);
             }
             eingang.close(true);
             return new Abruf(verarbeitet, gescheitert);
@@ -183,11 +224,14 @@ public class ImapPostfach implements PostfachPort {
         }
     }
 
-    /** Message-ID aus dem Kopf; ohne sie {@code sha256:<Prüfsumme der Nachricht>} (Req 1.5). */
+    /**
+     * Message-ID aus dem Kopf, bereinigt ({@link MailKopf#messageId}); ohne sie {@code sha256:<Prüfsumme der Nachricht>}
+     * (Req 1.5).
+     */
     static String messageId(MimeMessage nachricht, Path eml) throws MessagingException, IOException {
-        String id = nachricht.getMessageID();
-        if (id != null && !id.isBlank()) {
-            return id.strip();
+        Optional<String> id = MailKopf.messageId(nachricht.getMessageID());
+        if (id.isPresent()) {
+            return id.get();
         }
         MessageDigest digest;
         try {
@@ -198,7 +242,7 @@ public class ImapPostfach implements PostfachPort {
         try (InputStream ein = new DigestInputStream(Files.newInputStream(eml), digest)) {
             ein.transferTo(OutputStream.nullOutputStream());
         }
-        return "sha256:" + HexFormat.of().formatHex(digest.digest());
+        return MailKopf.PRAEFIX_HASH + HexFormat.of().formatHex(digest.digest());
     }
 
     private void verschieben(Store store, Folder eingang, Message nachricht, Folder ziel) throws MessagingException {

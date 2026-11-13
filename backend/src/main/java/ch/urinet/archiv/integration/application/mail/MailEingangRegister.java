@@ -19,5 +19,12 @@ public interface MailEingangRegister {
     boolean eintragen(MandantCode mandant, String messageId, Optional<String> absender, Optional<String> betreff,
                       MailStatus status);
 
+    /**
+     * Setzt eine Mail aus der Quarantäne auf {@code ERFASST}, wenn ihr Absender inzwischen zugelassen ist.
+     *
+     * @return {@code false}, wenn sie nicht (mehr) in der Quarantäne steht
+     */
+    boolean ausQuarantaene(MandantCode mandant, String messageId);
+
     void dokumenteSetzen(MandantCode mandant, String messageId, List<UUID> dokumente);
 }

@@ -59,6 +59,18 @@ public class JdbcMailEingangRegister implements MailEingangRegister {
     }
 
     @Override
+    public boolean ausQuarantaene(MandantCode mandant, String messageId) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update " + tabelle(mandant) + " set status = 'ERFASST', "
+                        + "zeit = clock_timestamp() where message_id = ? and status = 'QUARANTAENE'")) {
+            aendern.setString(1, messageId);
+            return aendern.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw JdbcMailKonfiguration.fehler("Mail nicht aus der Quarantäne genommen", e);
+        }
+    }
+
+    @Override
     public void dokumenteSetzen(MandantCode mandant, String messageId, List<UUID> dokumente) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
                 verbindung.prepareStatement("update " + tabelle(mandant) + " set dokument_ids = ? "
