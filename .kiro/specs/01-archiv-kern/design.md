@@ -883,7 +883,7 @@ Drive-Import (Req 12):
     `BenutzerVerzeichnisSperreTest`.
   - Name: Benutzername (`preferred_username`) des Access-Tokens; bei API-Tokens die Bezeichnung aus
     `public.api_client` (Attribut `TokenIdentitaet.NAME`). Nicht der Claim `name` (geändert mit dem Folge-PR zu #88,
-    Review PR #88, S4): Vor- und Nachnamen darf jeder Benutzer in der Kontokonsole von Keycloak selbst ändern
+    Review PR #88, S4; entschieden von Fabian, 13.11.2026): Vor- und Nachnamen darf jeder Benutzer in der Kontokonsole von Keycloak selbst ändern
     (User Profile `edit: [admin, user]`), den Benutzernamen nur der Admin (`editUsernameAllowed: false`, `RealmExportTest`);
     ein selbst gewählter Name bliebe im Verzeichnis für die ganze Frist nach Req 10.9 stehen. Folge: Einsicht und
     Verzeichnis zeigen den Benutzernamen, nicht den Anzeigenamen. Rolle der Tokens im Verzeichnis `API_TOKEN`; im
