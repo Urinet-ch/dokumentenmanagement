@@ -66,6 +66,24 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         }
     }
 
+    @Override
+    public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
+                                     UUID fehlerId) {
+        Optional<String> empfaenger = empfaenger(mandant);
+        if (empfaenger.isEmpty()) {
+            LOG.warnf("Prüflauf %s Teil %d endgültig gescheitert (fehler-id=%s); kein Empfänger für die "
+                    + "Benachrichtigung konfiguriert", laufId, teil, fehlerId);
+            return;
+        }
+        try {
+            mailer.send(Mail.withText(empfaenger.get(), abbruchBetreff(laufId),
+                    abbruchText(laufId, teil, stand, fehlerId)));
+            LOG.infof("Inhaber über den abgebrochenen Prüflauf %s benachrichtigt", laufId);
+        } catch (RuntimeException e) {
+            LOG.warnf("Benachrichtigung zum Prüflauf %s nicht versandt (%s)", laufId, e.getClass().getName());
+        }
+    }
+
     private Optional<String> empfaenger(MandantCode mandant) {
         return config.getOptionalValue(EMPFAENGER + mandant.wert(), String.class)
                 .map(String::strip).filter(s -> !s.isEmpty());
@@ -94,6 +112,22 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         }
         return text.append("\nDie betroffenen Dateien nicht ändern oder löschen und die Abweichungen klären; "
                 + "Details im Log unter der Lauf-ID.\n").toString();
+    }
+
+    static String abbruchBetreff(UUID laufId) {
+        return "UriNet Archiv: Prüflauf " + laufId + " abgebrochen";
+    }
+
+    static String abbruchText(UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand, UUID fehlerId) {
+        return "Der monatliche Prüflauf " + laufId + " ist nach mehreren Versuchen abgebrochen und wird in diesem "
+                + "Monat nicht fortgesetzt; der nächste Monatslauf beginnt von vorn.\n\n"
+                + "Teil: " + teil + '\n'
+                + "Phase: " + stand.phase() + '\n'
+                + "Nach Dokument: " + stand.nachDokument().map(UUID::toString).orElse("-") + '\n'
+                + "Marke: " + stand.marke().map(m -> m.schluessel() + ", Version " + m.versionId().orElse("-"))
+                .orElse("-") + "\n\n"
+                + "Den Object Storage prüfen und im Log nach der Fehler-ID " + fehlerId + " und der Lauf-ID suchen. "
+                + "Bis zum nächsten vollständigen Lauf sind Prüfsummen und Sperren ab dieser Stelle nicht geprüft.\n";
     }
 
     static String betreff(UUID dokumentId) {

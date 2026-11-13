@@ -19,6 +19,7 @@ import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Fortsetzung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Lauf;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Phase;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Zaehler;
+import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +67,9 @@ class PrueflaufHandlerTest {
     /** abweichende Sperre je Schlüssel; sonst läuft die Sperre in 2 Stunden ab */
     private final Map<String, Optional<Instant>> sperren = new HashMap<>();
     private final List<String> geprueft = new ArrayList<>();
+    /** abweichende Prüfsumme im Object Storage je Schlüssel; sonst {@link #SHA} */
+    private final Map<String, String> pruefsummen = new HashMap<>();
+    private final List<String> abbrueche = new ArrayList<>();
     private final List<Optional<Versionsseite.Marke>> marken = new ArrayList<>();
     private List<Objektversion> archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
             new Objektversion(SCHLUESSEL, "v0", false));
@@ -151,16 +155,16 @@ class PrueflaufHandlerTest {
     }
 
     @Test
-    void fehlerInFolgeBrechenDenTeilAbImLetztenVersuchOhneWeitereAufrufe() throws Exception {
+    void voruebergehendeFehlerInFolgeBrechenDenTeilAbImLetztenVersuchOhneWeitereAufrufe() throws Exception {
         abbruchNachFehlern = 2;
         Speicher speicher = new Speicher(Stufe.A, 4);
         speicher.dokumente.forEach(d -> fehler.put(d.dateien().getFirst().schluessel(),
-                new IllegalStateException("verweigert")));
+                new AblageGestoert(d.dateien().getFirst().schluessel(), new RuntimeException("503"))));
         PrueflaufHandler handler = handler(speicher);
 
         assertThatThrownBy(() -> handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 1)))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("2 Prüffehler in Folge");
-        assertThat(geprueft).hasSize(2);
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("vorübergehend gestört");
+        assertThat(geprueft).hasSize(1);
         assertThat(speicher.lauf.teil()).isZero();
 
         geprueft.clear();
@@ -171,6 +175,53 @@ class PrueflaufHandlerTest {
         assertThat(speicher.abweichungen).hasSize(4).extracting(Abweichung::art).containsOnly(Art.PRUEFFEHLER);
         assertThat(speicher.abweichungen).extracting(Abweichung::dokumentId)
                 .containsExactlyElementsOf(speicher.dokumente.stream().map(d -> Optional.of(d.id())).toList());
+    }
+
+    /**
+     * Dauerhafte Fehler in Folge brechen ausser im letzten Versuch den Teil ab; im letzten Versuch prüft der Lauf
+     * weiter, damit eine Folge unlesbarer Dateien keine falsche Prüfsumme danach verdeckt (Review PR #97).
+     */
+    @Test
+    void dauerhafteFehlerInFolgeVerdeckenImLetztenVersuchKeineFalschePruefsumme() throws Exception {
+        abbruchNachFehlern = 2;
+        Speicher speicher = new Speicher(Stufe.A, 4);
+        for (int i = 0; i < 3; i++) {
+            fehler.put(speicher.dokumente.get(i).dateien().getFirst().schluessel(),
+                    new IllegalStateException("verweigert"));
+        }
+        String verfaelscht = speicher.dokumente.get(3).dateien().getFirst().schluessel();
+        pruefsummen.put(verfaelscht, "b".repeat(64));
+        PrueflaufHandler handler = handler(speicher);
+
+        assertThatThrownBy(() -> handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 1)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("2 Prüffehler in Folge");
+        assertThat(geprueft).hasSize(2);
+        assertThat(speicher.lauf.teil()).isZero();
+
+        geprueft.clear();
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
+        assertThat(geprueft).hasSize(4);
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME);
+        assertThat(speicher.abweichungen.getLast().schluessel()).isEqualTo(verfaelscht);
+    }
+
+    /** Ein dauerhafter Fehler unterbricht die Folge vorübergehender Fehler. */
+    @Test
+    void dauerhafterFehlerSetztDieFolgeVoruebergehenderFehlerZurueck() throws Exception {
+        abbruchNachFehlern = 2;
+        Speicher speicher = new Speicher(Stufe.A, 4);
+        List<String> schluessel = speicher.dokumente.stream().map(d -> d.dateien().getFirst().schluessel()).toList();
+        fehler.put(schluessel.get(0), new AblageGestoert(schluessel.get(0), new RuntimeException("503")));
+        fehler.put(schluessel.get(1), new IllegalStateException("verweigert"));
+        fehler.put(schluessel.get(2), new AblageGestoert(schluessel.get(2), new RuntimeException("503")));
+        pruefsummen.put(schluessel.get(3), "b".repeat(64));
+
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
+
+        assertThat(geprueft).hasSize(4);
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME);
     }
 
     @Test
@@ -290,6 +341,40 @@ class PrueflaufHandlerTest {
         assertThat(verlaengert).hasSize(1);
     }
 
+    /** Endgültig gescheiterter Teil (Req 15.5): Mail an den Inhaber nur mit Lauf-ID, Phase und Marke (Req 16.7). */
+    @Test
+    void nachDemLetztenFehlversuchErhaeltDerInhaberEineMeldung() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        versionenJeTeil = 1;
+        PrueflaufHandler handler = handler(speicher);
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1));
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 2));
+        assertThat(speicher.lauf.stand().marke()).isPresent();
+
+        UUID fehlerId = UUID.randomUUID();
+        handler.nachLetztemFehlversuch(auftrag(speicher.lauf.id(), 3, 3), fehlerId);
+
+        assertThat(abbrueche).containsExactly(speicher.lauf.id() + " Teil 3 " + speicher.lauf.stand() + " "
+                + fehlerId);
+        assertThat(mails).isEmpty();
+    }
+
+    @Test
+    void nachDemLetztenFehlversuchKeineMeldungInStufePOderWennDerTeilFestgehaltenIst() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        handler(speicher, Stufe.P).nachLetztemFehlversuch(auftrag(speicher.lauf.id(), 1, 3), UUID.randomUUID());
+
+        PrueflaufHandler handler = handler(speicher);
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1));
+        handler.nachLetztemFehlversuch(auftrag(speicher.lauf.id(), 1, 3), UUID.randomUUID());
+        handler.nachLetztemFehlversuch(new Auftrag(9, MANDANT, PrueflaufHandler.TYP, Nutzlast.leer(), 3),
+                UUID.randomUUID());
+        lauf(handler, speicher);
+        handler.nachLetztemFehlversuch(auftrag(speicher.lauf.id(), speicher.lauf.teil() + 1, 3), UUID.randomUUID());
+
+        assertThat(abbrueche).isEmpty();
+    }
+
     @Test
     void dokumentIdNurAusArchivSchluesseln() {
         assertThat(PrueflaufHandler.dokumentId(SCHLUESSEL)).contains(DOKUMENT);
@@ -318,7 +403,7 @@ class PrueflaufHandlerTest {
                         if (fehler.containsKey(schluessel)) {
                             throw fehler.get(schluessel);
                         }
-                        yield Optional.of(new Dateipruefung(SHA, 10,
+                        yield Optional.of(new Dateipruefung(pruefsummen.getOrDefault(schluessel, SHA), 10,
                                 sperren.getOrDefault(schluessel, Optional.of(BALD_ABGELAUFEN))));
                     }
                     case "versionen" -> {
@@ -345,6 +430,12 @@ class PrueflaufHandlerTest {
             public void prueflaufAbweichungen(MandantCode mandant, UUID laufId, Zaehler zaehler,
                                               List<Abweichung> erste) {
                 mails.add(laufId);
+            }
+
+            @Override
+            public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, Fortsetzung stand,
+                                             UUID fehlerId) {
+                abbrueche.add(laufId + " Teil " + teil + " " + stand + " " + fehlerId);
             }
         };
         Optional<Duration> frist = Optional.of(EIN_TAG);
