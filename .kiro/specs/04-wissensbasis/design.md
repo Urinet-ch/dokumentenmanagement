@@ -84,7 +84,8 @@ flowchart LR
 
 - Seitenangaben: Der Volltext aus Spec 01 (`pdftotext`) trennt Seiten mit `\f`. Spec 04 setzt voraus, dass
   `dokument.volltext` diese Trenner unverändert speichert (Folgeänderung Spec 01, design.md, `VERARBEITEN`).
-  `Seitentext.von(volltext)` liefert die PDF-Seiten der PDF/A-Fassung (1-basiert); darauf beruhen Abschnitte,
+  `Seitentext.von(volltext)` (`gemeinsam/domain`, umgesetzt mit Spec 02, Aufgabe 6.3, und von dort wiederverwendet)
+  liefert die PDF-Seiten der PDF/A-Fassung (1-basiert); darauf beruhen Abschnitte,
   Seitenangaben und Auszugsprüfung. Bei `pdfa_fehlt` (Tika-Text ohne `\f`) oder wenn die Zahl der Seiten nicht
   `dokument.seiten` entspricht, gibt es keinen Ingest (Requirement 5.6).
 

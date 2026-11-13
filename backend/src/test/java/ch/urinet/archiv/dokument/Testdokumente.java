@@ -29,7 +29,7 @@ public final class Testdokumente {
             "INTERN", UUID.fromString("00000000-0000-4000-8000-000000000002"),
             "UNBEKANNT", UUID.fromString("00000000-0000-4000-8000-0000000000ff"));
 
-    private static final List<String> TABELLEN = List.of("dokument_version", "dokument_datei", "dokument_finanz",
+    private static final List<String> TABELLEN = List.of("chunk", "dokument_version", "dokument_datei", "dokument_finanz",
             "dokument_vertrag", "belegnummer_eigen", "ki_beispiel", "dokument");
 
     /** Angaben eines Testdokuments; {@code bestaetigt = false} heisst Art unbestätigt. */

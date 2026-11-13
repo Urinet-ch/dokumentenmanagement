@@ -32,11 +32,22 @@ public class ArchivierungSpeichern {
         return dokumente.laden(id);
     }
 
-    /** @return {@code false}, wenn das Dokument nicht mehr in {@code ARCHIVIERUNG} ist (nichts geschrieben) */
+    /**
+     * Hält die Archivierung fest und reiht in derselben Transaktion {@code EMBEDDING} ein (Spec 02, Req 2.1), sobald es
+     * dafür einen Handler gibt.
+     *
+     * @return {@code false}, wenn das Dokument nicht mehr in {@code ARCHIVIERUNG} ist (nichts geschrieben)
+     */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public boolean festhalten(Auftrag auftrag, UUID id, List<Archiviert> dateien, LocalDate sperreBis) {
         auftraege.anspruchSichern(auftrag);
-        return dokumente.festhalten(id, dateien, sperreBis);
+        if (!dokumente.festhalten(id, dateien, sperreBis)) {
+            return false;
+        }
+        if (auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)) {
+            auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
+        }
+        return true;
     }
 
     /** Abbruch nach Req 6.4 während des Laufs: mit Anspruch. */

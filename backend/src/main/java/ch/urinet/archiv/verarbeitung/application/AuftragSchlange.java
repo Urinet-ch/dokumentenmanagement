@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /**
@@ -83,4 +84,29 @@ public interface AuftragSchlange {
      * Anspruch nicht mehr hält. Bricht ohne laufende Transaktion ab, weil die Sperre sonst sofort wieder frei wäre.
      */
     boolean anspruchSperren(Auftrag auftrag);
+
+    /**
+     * Ob nach {@code vorgaenger} schon ein Auftrag desselben Mandanten eingereiht ist, dessen Nutzlast unter
+     * {@code schluessel} die ID von {@code vorgaenger} trägt. So reiht ein Handler, der nach seinem Commit noch einmal
+     * läuft (Abschluss gescheitert, Absturz, Herunterfahren), seine Folgeaufträge nicht ein zweites Mal ein.
+     */
+    boolean nachfolgerVorhanden(Auftrag vorgaenger, String schluessel);
+
+    /**
+     * Sperrt den Typ für den Mandanten bis zum Ende der laufenden Transaktion ({@code pg_advisory_xact_lock}), damit
+     * zwei Aufrufer nicht gleichzeitig prüfen und einreihen. Bricht ohne laufende Transaktion ab.
+     */
+    void typSperren(MandantCode mandant, AuftragTyp typ);
+
+    /**
+     * Kleinste ID der Aufträge {@code typ} des Mandanten in {@code OFFEN} oder {@code LAEUFT}; mit {@code schluessel}
+     * nur solche, deren Nutzlast den Schlüssel trägt.
+     */
+    OptionalLong offen(MandantCode mandant, AuftragTyp typ, Optional<String> schluessel);
+
+    /**
+     * Ob ein Auftrag {@code typ} des Mandanten {@code OFFEN} ist (noch nicht geholt), dessen Nutzlast unter
+     * {@code schluessel} den Text {@code wert} trägt.
+     */
+    boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert);
 }
