@@ -154,6 +154,91 @@ public class VerarbeitungTestHilfe {
                 + "version from " + schema(mandant) + ".dokument where id = ?", id);
     }
 
+    /** KI-Vorschlag des Dokuments (Aufgabe 3.2): {@code ki_vorschlag} und {@code ki_sicherheit} als JSON-Text. */
+    public Map<String, Object> kiVorschlag(String mandant, UUID id) throws SQLException {
+        return zeile("select status, fehler, ki_vorschlag::text as ki_vorschlag, ki_sicherheit::text as ki_sicherheit, "
+                + "partner_id::text as partner_id, partner_name, bestaetigt, version from " + schema(mandant)
+                + ".dokument where id = ?", id);
+    }
+
+    /** Zeilen aus {@code ki_verbrauch} mit einer ID über {@code abId}: Zweck, Modell, Tokens ein und aus. */
+    public List<List<Object>> kiVerbrauch(String mandant, long abId) throws SQLException {
+        List<List<Object>> zeilen = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select zweck, modell, tokens_ein, tokens_aus from " + schema(mandant)
+                        + ".ki_verbrauch where id > ? order by id")) {
+            abfrage.setLong(1, abId);
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    zeilen.add(List.of(z.getString(1), z.getString(2), z.getInt(3), z.getInt(4)));
+                }
+            }
+        }
+        return zeilen;
+    }
+
+    /** {@code public.mandant.kennungen} als JSON-Text ({@code null}, wenn nicht gesetzt). */
+    public String kennungen(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select kennungen::text from public.mandant where code = ?")) {
+            abfrage.setString(1, mandant);
+            try (ResultSet z = abfrage.executeQuery()) {
+                return z.next() ? z.getString(1) : null;
+            }
+        }
+    }
+
+    /** Legt einen Kontakt mit IBAN an (Partner-Abgleich, Req 7.4) und gibt seine ID zurück. */
+    public UUID kontaktAnlegen(String mandant, String name, String iban) throws SQLException {
+        UUID id = UUID.randomUUID();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement anlegen = verbindung.prepareStatement(
+                "insert into " + schema(mandant) + ".kontakt (id, typ, name, name_normalisiert, iban, quelle) "
+                        + "values (?, 'ORGANISATION', ?, ?, ?, 'TEST')")) {
+            anlegen.setObject(1, id);
+            anlegen.setString(2, name);
+            anlegen.setString(3, name.toLowerCase(java.util.Locale.ROOT));
+            anlegen.setString(4, iban);
+            anlegen.executeUpdate();
+        }
+        return id;
+    }
+
+    /** Löst den Kontakt von allen Dokumenten und löscht ihn (Aufräumen nach dem Szenario). */
+    public void kontaktLoeschen(String mandant, UUID id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            try (PreparedStatement loesen = verbindung.prepareStatement("update " + schema(mandant)
+                    + ".dokument set partner_id = null where partner_id = ?")) {
+                loesen.setObject(1, id);
+                loesen.executeUpdate();
+            }
+            try (PreparedStatement loeschen = verbindung.prepareStatement("delete from " + schema(mandant)
+                    + ".kontakt where id = ?")) {
+                loeschen.setObject(1, id);
+                loeschen.executeUpdate();
+            }
+        }
+    }
+
+    /** Setzt {@code public.mandant.kennungen} (JSON-Text oder {@code null}). */
+    public void kennungenSetzen(String mandant, String json) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement setzen = verbindung.prepareStatement(
+                "update public.mandant set kennungen = cast(? as jsonb) where code = ?")) {
+            setzen.setString(1, json);
+            setzen.setString(2, mandant);
+            setzen.executeUpdate();
+        }
+    }
+
+    /** Höchste ID in {@code ki_verbrauch} (0 ohne Zeilen). */
+    public long kiVerbrauchStand(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select coalesce(max(id), 0) from " + schema(mandant) + ".ki_verbrauch");
+             ResultSet z = abfrage.executeQuery()) {
+            z.next();
+            return z.getLong(1);
+        }
+    }
+
     /** Findet die deutsche Volltextsuche (Req 5.3) das Dokument mit diesem Wort? */
     public boolean volltextFindet(String mandant, UUID id, String wort) throws SQLException {
         return !zeile("select 1 as treffer from " + schema(mandant) + ".dokument where id = ? "
@@ -183,7 +268,32 @@ public class VerarbeitungTestHilfe {
                 + HexFormat.of().formatHex(zufall(32)) + "' where dokument_id = '" + id + "'");
     }
 
+    /**
+     * Ändert das Dokument wie ein Benutzer im Eingangskorb: {@code setzen} (fester SQL-Ausdruck aus dem Test), dazu
+     * {@code version + 1}.
+     */
+    public void dokumentAendern(String mandant, UUID id, String setzen) throws SQLException {
+        auftraege.ausfuehren("update " + schema(mandant) + ".dokument set " + setzen
+                + ", version = version + 1, geaendert = clock_timestamp() where id = '" + id + "'");
+    }
+
     /** IDs der Aufträge eines Typs für dieses Dokument. */
+    /** Status der Aufträge {@code typ} zum Dokument, nach ID sortiert. */
+    public List<String> auftragStatus(String typ, UUID id) throws SQLException {
+        List<String> status = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select status from public.auftrag where typ = ? and nutzlast ->> 'dokumentId' = ? order by id")) {
+            abfrage.setString(1, typ);
+            abfrage.setString(2, id.toString());
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    status.add(z.getString(1));
+                }
+            }
+        }
+        return status;
+    }
+
     public List<Long> auftraege(String typ, UUID id) throws SQLException {
         List<Long> ids = new ArrayList<>();
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(

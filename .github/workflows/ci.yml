@@ -158,7 +158,7 @@ jobs:
         run: |
           DATEIEN="$RUNNER_TEMP/secret-dateien"
           mkdir -p "$DATEIEN"
-          for datei in archiv_db_app archiv_db_owner s3_app_zugang_id s3_app_zugang_geheimnis; do
+          for datei in archiv_db_app archiv_db_owner s3_app_zugang_id s3_app_zugang_geheimnis infomaniak_ai_token; do
             printf 'ci-platzhalter' > "$DATEIEN/$datei"
           done
           # Log in eine Datei; bei einem Fehler die letzten 80 Zeilen (nur Platzhalter, keine echten Geheimnisse)

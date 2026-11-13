@@ -3,7 +3,8 @@
 Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Der Worker macht aus jedem neuen Dokument ein durchsuchbares PDF/A-2b mit Vorschaubildern und Volltext und reiht
   danach den KI-Vorschlag ein (Aufgabe 2.6). Die Werkzeuge laufen im Image der Stufe «werkzeuge», die Dateien liegen
-  in MinIO. Bis Aufgabe 3.2 steht für «KI_VORSCHLAG» ein Test-Handler unter src/test, der nur die Dokument-ID merkt.
+  in MinIO. Seit Aufgabe 3.2 läuft danach der echte Handler für «KI_VORSCHLAG» gegen WireMock (ohne Antwort-Stub, also
+  ohne Vorschlag) und legt das Dokument in den Eingangskorb (Req 7.3).
   Nur synthetische Testdateien (Req 16.15).
 
   Hintergrund:
@@ -13,7 +14,7 @@ Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Szenario: Ein schief fotografierter Beleg wird zu einem durchsuchbaren PDF/A-2b mit Vorschau
     Angenommen ein Dokument mit einem schiefen Foto «Rechnungen Nummer 4711»
     Wenn der Worker die Aufträge bearbeitet
-    Dann ist das Dokument «VERARBEITUNG» mit 1 Seite
+    Dann ist das Dokument «EINGANGSKORB» mit 1 Seite
     Und die PDF/A-Fassung ist gültiges PDF/A-2b und stimmt mit der gespeicherten Prüfsumme überein
     Und es liegt je Seite ein Vorschaubild
     Und der Volltext enthält «4711»
@@ -25,7 +26,7 @@ Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Szenario: Ein HEIC-Foto wird zu einem PDF/A-2b
     Angenommen ein Dokument mit einem HEIC-Foto
     Wenn der Worker die Aufträge bearbeitet
-    Dann ist das Dokument «VERARBEITUNG» mit 1 Seite
+    Dann ist das Dokument «EINGANGSKORB» mit 1 Seite
     Und die PDF/A-Fassung ist gültiges PDF/A-2b und stimmt mit der gespeicherten Prüfsumme überein
     Und der Volltext enthält «Quittung»
 
@@ -34,7 +35,7 @@ Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Szenario: Ein PDF mit Textebene erhält eine PDF/A-Fassung mit dem vorhandenen Text
     Angenommen ein Dokument mit einem digitalen PDF «Digitale Rechnung Textebene vorhanden»
     Wenn der Worker die Aufträge bearbeitet
-    Dann ist das Dokument «VERARBEITUNG» mit 1 Seite
+    Dann ist das Dokument «EINGANGSKORB» mit 1 Seite
     Und die PDF/A-Fassung ist gültiges PDF/A-2b und stimmt mit der gespeicherten Prüfsumme überein
     Und der Volltext enthält «Textebene vorhanden»
 
@@ -54,7 +55,7 @@ Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Szenario: Ein signiertes PDF erhält eine PDF/A-Fassung, das Original bleibt unverändert
     Angenommen ein Dokument mit einem signierten PDF
     Wenn der Worker die Aufträge bearbeitet
-    Dann ist das Dokument «VERARBEITUNG» mit 1 Seite
+    Dann ist das Dokument «EINGANGSKORB» mit 1 Seite
     Und die PDF/A-Fassung ist gültiges PDF/A-2b und stimmt mit der gespeicherten Prüfsumme überein
     Und die Dateien aus dem Eingang sind unverändert
 
@@ -70,7 +71,7 @@ Funktionalität: Verarbeitung eines Dokuments (VERARBEITEN)
   Szenario: Aus der Handy-Erfassung entsteht die PDF/A-Fassung aus den Arbeitsfassungen
     Angenommen ein Dokument aus der Handy-Erfassung mit 2 Seiten
     Wenn der Worker die Aufträge bearbeitet
-    Dann ist das Dokument «VERARBEITUNG» mit 2 Seiten
+    Dann ist das Dokument «EINGANGSKORB» mit 2 Seiten
     Und die PDF/A-Fassung ist gültiges PDF/A-2b und stimmt mit der gespeicherten Prüfsumme überein
     Und es liegt je Seite ein Vorschaubild
     Und der Volltext enthält «Arbeitsfassung» und nicht «Rohbild»

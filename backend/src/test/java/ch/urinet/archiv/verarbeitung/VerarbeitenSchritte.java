@@ -162,14 +162,12 @@ public class VerarbeitenSchritte {
 
     @Dann("für das Dokument lief genau ein Auftrag «KI_VORSCHLAG»")
     public void kiAuftrag() throws Exception {
-        assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).hasSize(1);
-        assertThat(TestHandler.KI_DOKUMENTE).containsOnlyOnce(id);
+        assertThat(hilfe.auftragStatus("KI_VORSCHLAG", id)).containsExactly("FERTIG");
     }
 
     @Dann("für das Dokument lief kein Auftrag «KI_VORSCHLAG»")
     public void keinKiAuftrag() throws Exception {
         assertThat(hilfe.auftraege("KI_VORSCHLAG", id)).isEmpty();
-        assertThat(TestHandler.KI_DOKUMENTE).doesNotContain(id);
     }
 
     @Dann("die Dateien aus dem Eingang sind unverändert")

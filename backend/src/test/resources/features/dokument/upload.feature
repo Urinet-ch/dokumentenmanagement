@@ -49,7 +49,7 @@ Funktionalität: Upload von Dateien
     Und ist für jedes neue Dokument genau ein Auftrag «VERARBEITEN» eingereiht
     Wenn der Worker die Aufträge bearbeitet
     Dann ist der Auftrag «VERARBEITEN» jedes neuen Dokuments «FERTIG»
-    Und steht jedes neue Dokument im Status «VERARBEITUNG» mit PDF/A und Volltext
+    Und steht jedes neue Dokument im Status «EINGANGSKORB» mit PDF/A und Volltext
     Und ist für jedes neue Dokument genau ein Auftrag «KI_VORSCHLAG» eingereiht
 
   @req-3.1 @req-3.6

@@ -4,6 +4,10 @@ import ch.urinet.archiv.verarbeitung.domain.OcrEingabe;
 import ch.urinet.archiv.verarbeitung.domain.OcrErgebnis;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Driven Port der Verarbeitung (design.md «Verarbeitung», Req 5.1–5.3, 5.8–5.10; ADR-011, Req 16.13): HEIC → JPEG,
@@ -25,6 +29,53 @@ public interface OcrPort {
      *                                                                 dann beendet
      */
     <T> T verarbeiten(OcrEingabe eingabe, Verwertung<T> verwertung) throws InterruptedException;
+
+    /**
+     * Text einer PDF für das Sprachmodell wie im Golden-Lauf: {@code pdftotext -layout -enc UTF-8}, Seiten durch
+     * Seitenvorschub getrennt (Aufgabe 3.2; Req 7.1). Der Volltext für Suche und Index bleibt der aus
+     * {@link #verarbeiten}. Das PDF bleibt unverändert.
+     *
+     * @param zeitgrenze Frist dieses Aufrufs (im KI-Auftrag {@code archiv.ki.render-zeitgrenze})
+     * @throws ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen bei Zeitüberschreitung, Werkzeug- oder E/A-Fehler
+     * @throws InterruptedException                                    nach einer Unterbrechung
+     */
+    String layoutText(Path pdf, Duration zeitgrenze) throws InterruptedException;
+
+    /**
+     * Rendert die ersten {@link Render#maxSeiten()} Seiten eines PDF und, wenn es mehr hat, zusätzlich die letzte Seite
+     * als PNG ({@code pdftoppm}) für den Swiss QR Code und den Bildweg der KI (Aufgabe 3.2; Req 7.1, 7.11) und übergibt
+     * sie in Seitenreihenfolge an {@code verwertung}, solange die Dateien bestehen. Jede Seite wird mit 300 dpi
+     * gerendert wie im Golden-Lauf, ausser sie hätte dann mehr als {@link Render#pixelMax()} Pixel: dann mit so viel
+     * weniger dpi, dass sie hineinpasst. Eine Seite ohne lesbares Format fehlt in der Liste. Das PDF bleibt unverändert.
+     *
+     * @throws ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen bei Zeitüberschreitung, Werkzeug- oder E/A-Fehler
+     * @throws InterruptedException                                    nach einer Unterbrechung
+     */
+    <T> T seitenbilder(Path pdf, Render render, Seitenverwertung<T> verwertung) throws InterruptedException;
+
+    /**
+     * @param maxSeiten  so viele Seiten von vorne (dazu die letzte)
+     * @param farbig     farbig (Bildweg) oder in Graustufen ({@code -gray}, Swiss QR Code; ein Drittel des Speichers)
+     * @param pixelMax   Grenze je Seite (Speicherbudget, design.md «Umsetzung 3.2»)
+     * @param zeitgrenze Frist des ganzen Aufrufs (im KI-Auftrag {@code archiv.ki.render-zeitgrenze})
+     */
+    record Render(int maxSeiten, boolean farbig, long pixelMax, Duration zeitgrenze) {
+        public Render {
+            if (maxSeiten < 1) {
+                throw new IllegalArgumentException("maxSeiten muss mindestens 1 sein");
+            }
+            if (pixelMax < 1) {
+                throw new IllegalArgumentException("pixelMax muss positiv sein");
+            }
+            Objects.requireNonNull(zeitgrenze, "zeitgrenze");
+        }
+    }
+
+    /** Verwertet die gerenderten Seiten; läuft vor dem Löschen des Verzeichnisses. */
+    @FunctionalInterface
+    interface Seitenverwertung<T> {
+        T verwerten(List<Path> seiten) throws IOException, InterruptedException;
+    }
 
     /** Verwertet das Ergebnis, z. B. lädt PDF/A und Vorschaubilder hoch; läuft vor dem Löschen des Verzeichnisses. */
     @FunctionalInterface

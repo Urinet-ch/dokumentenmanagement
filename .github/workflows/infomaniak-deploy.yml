@@ -79,6 +79,7 @@ jobs:
           KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
           S3_APP_ZUGANG_ID: ${{ secrets.S3_APP_ZUGANG_ID }}
           S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
+          INFOMANIAK_AI_TOKEN: ${{ secrets.INFOMANIAK_AI_TOKEN }}
         run: |
           fehlt=0
           pruefe() { if [ -z "$2" ]; then echo "::error::$1 fehlt (Secret bzw. Variable im Repo setzen)"; fehlt=1; fi; }
@@ -92,6 +93,7 @@ jobs:
           pruefe KEYCLOAK_ADMIN "$KEYCLOAK_ADMIN"
           pruefe S3_APP_ZUGANG_ID "$S3_APP_ZUGANG_ID"
           pruefe S3_APP_ZUGANG_GEHEIMNIS "$S3_APP_ZUGANG_GEHEIMNIS"
+          pruefe INFOMANIAK_AI_TOKEN "$INFOMANIAK_AI_TOKEN"
           exit "$fehlt"
 
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -133,6 +135,7 @@ jobs:
           KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
           S3_APP_ZUGANG_ID: ${{ secrets.S3_APP_ZUGANG_ID }}
           S3_APP_ZUGANG_GEHEIMNIS: ${{ secrets.S3_APP_ZUGANG_GEHEIMNIS }}
+          INFOMANIAK_AI_TOKEN: ${{ secrets.INFOMANIAK_AI_TOKEN }}
         run: |
           umask 077
           mkdir -p bundle/secrets
@@ -149,6 +152,7 @@ jobs:
           schreibe keycloak_admin "$KEYCLOAK_ADMIN"
           schreibe s3_app_zugang_id "$S3_APP_ZUGANG_ID"
           schreibe s3_app_zugang_geheimnis "$S3_APP_ZUGANG_GEHEIMNIS"
+          schreibe infomaniak_ai_token "$INFOMANIAK_AI_TOKEN"
           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
             python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"

@@ -62,9 +62,9 @@ public class VerarbeitungSpeichern {
 
     /**
      * Speichert das Ergebnis und reiht {@code KI_VORSCHLAG} in derselben Transaktion ein (kein doppelter Folgeauftrag).
-     * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9, die KI läuft trotzdem) und, solange es keinen
-     * Handler für {@code KI_VORSCHLAG} gibt (bis Aufgabe 3.2), ohne Vorschlag; sonst bleibt {@code VERARBEITUNG}, bis die
-     * KI fertig ist.
+     * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9, die KI läuft trotzdem) und ohne Handler für
+     * {@code KI_VORSCHLAG} (nur in Tests) ohne Vorschlag; sonst bleibt {@code VERARBEITUNG}, bis der
+     * {@link KiVorschlagHandler} fertig ist (Aufgabe 3.2).
      * <p>
      * {@code ohneKi} (Generator, Req 11.2): die Metadaten sind schon bestätigt, darum {@code ARCHIVIERUNG} und Auftrag
      * {@code ARCHIVIEREN} statt {@code KI_VORSCHLAG}; bei {@code pdfa_fehlt} {@code EINGANGSKORB} ohne Folgeauftrag, der

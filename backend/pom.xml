@@ -33,6 +33,9 @@
         <tika.version>4.2.0</tika.version>
         <commons-csv.version>1.14.1</commons-csv.version>
         <icu4j.version>79.1</icu4j.version>
+        <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11): dieselbe Version wie im Golden-Lauf (spikes/golden-lauf) -->
+        <zxing.version>3.5.4</zxing.version>
+        <wiremock.version>3.13.0</wiremock.version>
     </properties>
 
     <dependencyManagement>
@@ -151,6 +154,27 @@
             <artifactId>icu4j</artifactId>
             <version>${icu4j.version}</version>
         </dependency>
+        <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11); javase nur für BufferedImageLuminanceSource, ohne Kommandozeile -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxing.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>${zxing.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jcommander</groupId>
+                    <artifactId>jcommander</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.github.jai-imageio</groupId>
+                    <artifactId>jai-imageio-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>io.quarkiverse.quinoa</groupId>
             <artifactId>quarkus-quinoa</artifactId>
@@ -194,6 +218,13 @@
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- KI-Aufrufe in Tests nur gegen WireMock (Aufgabe 3.2, tech.md «Tests und Qualität»; nicht im Quarkus-BOM) -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>${wiremock.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- OCR-Adapter (Aufgabe 2.6): synthetische Test-PDFs (Textebene, verschlüsselt, signiert) und PDF/A-Prüfung -->
@@ -264,7 +295,33 @@
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
+                    <excludes>
+                        <exclude>**/*KnapperHeapTest.java</exclude>
+                    </excludes>
                 </configuration>
+                <executions>
+                    <!-- Aufgabe 3.2 (Review PR #93, M3): Seitenbilder und Swiss QR Code mit knappem Heap; Stufe A hat
+                         -Xmx112m, davon braucht die übrige API den grösseren Teil -->
+                    <execution>
+                        <id>speicher</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <excludes combine.self="override"/>
+                            <includes>
+                                <include>**/*KnapperHeapTest.java</include>
+                            </includes>
+                            <!-- fest, damit -Dtest=… keine anderen Tests in diesen Fork holt -->
+                            <test>*KnapperHeapTest</test>
+                            <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                            <argLine>-Xmx64m -Djava.awt.headless=true</argLine>
+                            <systemPropertyVariables>
+                                <archiv.speicher-test>true</archiv.speicher-test>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <!-- Definition of Done (tech.md): keine neuen SpotBugs-Funde der Stufe hoch -->

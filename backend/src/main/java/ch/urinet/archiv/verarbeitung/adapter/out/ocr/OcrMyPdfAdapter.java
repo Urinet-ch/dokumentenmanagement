@@ -19,12 +19,16 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -47,6 +51,16 @@ public class OcrMyPdfAdapter implements OcrPort {
     static final int OCRMYPDF_PDFA_GESCHEITERT = 10;
 
     private static final Pattern VORSCHAU = Pattern.compile("vorschau-(\\d+)\\.png");
+    /**
+     * Graue Seitenbilder (QR) als TIFF mit LZW: verlustfrei wie PNG (gleiche Pixel), aber ohne dessen teure Kompression
+     * (A4 mit 300 dpi: rund 0.15 s statt 6.5 s CPU je Seite; Nachtrag PR #93). Farbige Seiten (Bildweg) bleiben PNG wie
+     * im Golden-Lauf: Ein farbiges TIFF liest ImageIO nicht als {@code TYPE_3BYTE_BGR}, und das Skalieren in
+     * {@code AwtSeitenbild} bräuchte dann ein volles Int-Raster (OOM mit {@code -Xmx112m}).
+     */
+    private static final Pattern SEITE = Pattern.compile("seite-(\\d+)\\.(?:tif|png)");
+    /** Auflösung des Golden-Laufs ({@code pdftoppm -r 300}). */
+    static final int RENDER_DPI = 300;
+    static final int MIN_DPI = 10;
 
     private final OcrEinstellungen einstellungen;
     private final Werkzeugstarter starter;
@@ -79,6 +93,78 @@ public class OcrMyPdfAdapter implements OcrPort {
                     + "gescheitert", e);
         } finally {
             loeschen(lauf);
+        }
+    }
+
+    @Override
+    public String layoutText(Path pdf, Duration zeitgrenze) throws InterruptedException {
+        Instant frist = uhr.instant().plus(zeitgrenze);
+        Path lauf = laufverzeichnisAnlegen();
+        try {
+            return new Lauf(lauf, frist).layoutText(pdf);
+        } catch (IOException e) {
+            throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Ein- oder Ausgabe beim Lesen des Texts "
+                    + "gescheitert", e);
+        } finally {
+            loeschen(lauf);
+        }
+    }
+
+    @Override
+    public <T> T seitenbilder(Path pdf, Render render, Seitenverwertung<T> verwertung) throws InterruptedException {
+        Instant frist = uhr.instant().plus(render.zeitgrenze());
+        Path lauf = laufverzeichnisAnlegen();
+        try {
+            List<Path> seiten = new Lauf(lauf, frist).seitenbilder(pdf, render);
+            pruefeUnterbrechung();
+            return verwertung.verwerten(seiten);
+        } catch (IOException e) {
+            throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Ein- oder Ausgabe beim Rendern "
+                    + "gescheitert", e);
+        } finally {
+            loeschen(lauf);
+        }
+    }
+
+    /**
+     * Auflösung einer Seite: 300 dpi wie im Golden-Lauf, solange die Seite dann höchstens {@code pixelMax} Pixel hat
+     * (A4 mit 300 dpi bleibt so unverändert), sonst die grösste ganze Zahl dpi darunter. Leer, wenn das Format nicht
+     * lesbar ist oder auch {@value #MIN_DPI} dpi die Grenze sprengen.
+     */
+    static OptionalInt dpi(double breitePt, double hoehePt, long pixelMax) {
+        if (!(breitePt > 0 && hoehePt > 0) || Double.isInfinite(breitePt) || Double.isInfinite(hoehePt)) {
+            return OptionalInt.empty();
+        }
+        for (int dpi = RENDER_DPI; dpi >= MIN_DPI; dpi = Math.min(dpi - 1,
+                (int) Math.floor(72 * Math.sqrt(pixelMax / (breitePt * hoehePt))))) {
+            if (Math.ceil(breitePt * dpi / 72) * Math.ceil(hoehePt * dpi / 72) <= pixelMax) {
+                return OptionalInt.of(dpi);
+            }
+        }
+        return OptionalInt.empty();
+    }
+
+    /** Seitenzahl und Format je Seite aus der Ausgabe von {@code pdfinfo -f … -l …}. */
+    record Seiteninfo(int seiten, Map<Integer, double[]> formate) {
+
+        private static final Pattern SEITEN = Pattern.compile("(?m)^Pages:\\s+(\\d+)\\s*$");
+        private static final Pattern FORMAT = Pattern.compile(
+                "(?m)^Page\\s+(\\d+)\\s+size:\\s+([0-9.]+)\\s+x\\s+([0-9.]+)\\s+pts");
+
+        static Seiteninfo lesen(String ausgabe) {
+            Matcher m = SEITEN.matcher(ausgabe);
+            int seiten = m.find() ? Integer.parseInt(m.group(1)) : 0;
+            Map<Integer, double[]> formate = new HashMap<>();
+            Matcher f = FORMAT.matcher(ausgabe);
+            while (f.find()) {
+                try {
+                    formate.put(Integer.parseInt(f.group(1)),
+                            new double[]{Double.parseDouble(f.group(2)), Double.parseDouble(f.group(3))});
+                } catch (NumberFormatException e) {
+                    // Format nicht lesbar: Seite fehlt
+                }
+            }
+            return new Seiteninfo(seiten, formate);
         }
     }
 
@@ -250,6 +336,65 @@ public class OcrMyPdfAdapter implements OcrPort {
                 return List.of();
             }
             return nummeriert(VORSCHAU).stream().map(Path::of).toList();
+        }
+
+        /** Wie im Golden-Lauf ({@code Ocr}): {@code pdftotext -layout -enc UTF-8}; das PDF zuerst ins Laufverzeichnis. */
+        String layoutText(Path pdf) throws IOException, InterruptedException {
+            Path kopie = datei("modell.pdf");
+            Files.copy(pdf, kopie);
+            Path text = datei("layout.txt");
+            erfolgreich(Befehl.von("pdftotext", "-q", "-layout", "-enc", "UTF-8", kopie.toString(), text.toString()));
+            if (!Files.isRegularFile(text)) {
+                throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.WERKZEUG, "pdftotext lieferte keine Datei");
+            }
+            return Files.readString(text, StandardCharsets.UTF_8);
+        }
+
+        /**
+         * Seiten Seite für Seite mit der Auflösung aus {@link #dpi}, farbig wie im Golden-Lauf ({@code pdftoppm -r 300
+         * -png}) oder mit {@code -gray} als TIFF mit LZW (siehe {@link #SEITE}); das PDF wird zuerst ins
+         * Laufverzeichnis kopiert.
+         */
+        List<Path> seitenbilder(Path pdf, Render render) throws IOException, InterruptedException {
+            Path kopie = datei("seiten.pdf");
+            Files.copy(pdf, kopie);
+            Seiteninfo info = seiteninfo(kopie, 1, render.maxSeiten());
+            List<Integer> nummern = new ArrayList<>();
+            for (int i = 1; i <= Math.min(info.seiten(), render.maxSeiten()); i++) {
+                nummern.add(i);
+            }
+            Map<Integer, double[]> formate = new HashMap<>(info.formate());
+            if (info.seiten() > render.maxSeiten()) {
+                nummern.add(info.seiten());
+                formate.putAll(seiteninfo(kopie, info.seiten(), info.seiten()).formate());
+            }
+            for (int nummer : nummern) {
+                double[] format = formate.get(nummer);
+                OptionalInt dpi = format == null ? OptionalInt.empty() : dpi(format[0], format[1], render.pixelMax());
+                if (dpi.isEmpty()) {
+                    LOG.infof("Seite %d nicht gerendert: Format ausserhalb der Grenze", nummer);
+                    continue;
+                }
+                List<String> argumente = new ArrayList<>(List.of("-q", "-r", Integer.toString(dpi.getAsInt()),
+                        "-f", Integer.toString(nummer), "-l", Integer.toString(nummer)));
+                if (render.farbig()) {
+                    argumente.add("-png");
+                } else {
+                    argumente.addAll(List.of("-gray", "-tiff", "-tiffcompression", "lzw"));
+                }
+                argumente.addAll(List.of(kopie.toString(), datei("seite").toString()));
+                erfolgreich(new Befehl("pdftoppm", argumente));
+            }
+            return nummeriert(SEITE).stream().map(Path::of).toList();
+        }
+
+        private Seiteninfo seiteninfo(Path pdf, int von, int bis) throws InterruptedException {
+            Werkzeugstarter.Lauf lauf = starter.ausfuehren(Befehl.von("pdfinfo", "-f", Integer.toString(von), "-l",
+                    Integer.toString(bis), pdf.toString()), verzeichnis, frist);
+            if (!lauf.erfolgreich()) {
+                throw werkzeugFehler("pdfinfo", lauf);
+            }
+            return Seiteninfo.lesen(lauf.ausgabe());
         }
 
         /** Dateien im Laufverzeichnis nach der Nummer der ersten Gruppe sortiert (pdftoppm füllt mit Nullen auf). */

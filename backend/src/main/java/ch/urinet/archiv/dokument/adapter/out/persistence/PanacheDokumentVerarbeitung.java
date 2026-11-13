@@ -3,15 +3,19 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.hibernate.query.NativeQuery;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +30,8 @@ import java.util.UUID;
 public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
 
     static final String ZEITGRENZE = "30s";
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String OFFEN = "status in ('NEU', 'VERARBEITUNG')";
 
@@ -92,6 +98,67 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
         return em().createNativeQuery("update dokument set status = 'FEHLER', fehler = :fehler, "
                         + "version = version + 1, geaendert = clock_timestamp() where id = :id and " + OFFEN)
                 .setParameter("fehler", fehlertext).setParameter("id", id).executeUpdate() == 1;
+    }
+
+    @Override
+    public Optional<KiStand> kiStandLaden(UUID id) {
+        zeitgrenze();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em().createNativeQuery("""
+                        select status, bestaetigt is not null, version, pdfa_fehlt, ki_vorschlag is not null, volltext,
+                            eingang, s3_pdfa, s3_version_pdfa, sha256_pdfa,
+                            (select mime from dokument_datei where dokument_id = d.id and rolle = 'ORIGINAL'
+                                and status = 'AKTIV' order by nr limit 1)
+                        from dokument d where id = :id""")
+                .setParameter("id", id).getResultList();
+        if (zeilen.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] d = zeilen.getFirst();
+        Optional<Datei> pdfa = d[8] == null ? Optional.empty()
+                : Optional.of(new Datei(DateiRolle.PDFA, 1, "application/pdf", (String) d[7], (String) d[8],
+                        (String) d[9]));
+        return Optional.of(new KiStand(id, DokumentStatus.valueOf((String) d[0]), (Boolean) d[1],
+                ((Number) d[2]).intValue(), (Boolean) d[3], (Boolean) d[4], (String) d[5], zeitpunkt(d[6]), pdfa,
+                (String) d[10]));
+    }
+
+    @Override
+    public boolean vorschlagSpeichern(UUID id, int erwarteteVersion, Map<String, Object> vorschlag,
+                                      Map<String, BigDecimal> sicherheit, UUID partnerId, String partnerName) {
+        zeitgrenze();
+        String sql = "update dokument set ki_vorschlag = cast(:vorschlag as jsonb), "
+                + "ki_sicherheit = cast(:sicherheit as jsonb), status = 'EINGANGSKORB', version = version + 1, "
+                + "geaendert = clock_timestamp()"
+                + (partnerId == null ? "" : ", partner_name = case when partner_id is null then :partnerName "
+                        + "else partner_name end, partner_id = coalesce(partner_id, :partner)")
+                + " where id = :id and status in ('VERARBEITUNG', 'EINGANGSKORB') and bestaetigt is null "
+                + "and ki_vorschlag is null and version = :erwartet";
+        var abfrage = em().createNativeQuery(sql)
+                .setParameter("vorschlag", json(vorschlag))
+                .setParameter("sicherheit", json(sicherheit))
+                .setParameter("id", id)
+                .setParameter("erwartet", erwarteteVersion);
+        if (partnerId != null) {
+            abfrage.setParameter("partner", partnerId).setParameter("partnerName", partnerName);
+        }
+        return abfrage.executeUpdate() == 1;
+    }
+
+    @Override
+    public boolean ohneVorschlagWeiter(UUID id) {
+        zeitgrenze();
+        return em().createNativeQuery("update dokument set status = 'EINGANGSKORB', version = version + 1, "
+                        + "geaendert = clock_timestamp() where id = :id and status = 'VERARBEITUNG'")
+                .setParameter("id", id).executeUpdate() == 1;
+    }
+
+    private static String json(Object wert) {
+        try {
+            return JSON.writeValueAsString(wert);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("KI-Vorschlag nicht serialisierbar", e);
+        }
     }
 
     private void zeitgrenze() {

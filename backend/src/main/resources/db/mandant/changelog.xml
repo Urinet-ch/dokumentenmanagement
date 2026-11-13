@@ -16,4 +16,5 @@
     <include file="changesets/009-import-uebernahme.xml" relativeToChangelogFile="true"/>
     <include file="changesets/010-benutzer-verzeichnis.xml" relativeToChangelogFile="true"/>
     <include file="changesets/011-prueflauf.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/013-ki-verbrauch.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
