@@ -68,11 +68,12 @@ public class DokumentGeneratorResource {
         this.identitaet = identitaet;
         this.berechtigung = berechtigung;
         // ein Tippfehler im Feldnamen soll nicht still verloren gehen; Kommazahlen als BigDecimal wie bei PATCH, damit
-        // 1e400 im Zusatz als Zahl beim Prüfer ankommt und nicht als "Infinity" (ZusatzJson)
+        // der Prüfer genau die Zahl prüft, die gespeichert wird (ZusatzJson); doppelte Schlüssel im Zusatz ungültig
         this.leser = mapper.readerFor(GeneratorMetadatenDto.class)
                 .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
                 .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .with(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
     }
 
     @Schema(name = "GeneratorPartner", description = "Partner aus 21.CRM; massgeblich ist nur crmId (Req 11.7)")

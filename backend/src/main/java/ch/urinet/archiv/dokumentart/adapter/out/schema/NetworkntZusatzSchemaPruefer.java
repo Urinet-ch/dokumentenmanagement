@@ -52,7 +52,9 @@ import java.util.regex.Pattern;
  * Schema-Lader lässt nur die eingebauten Meta-Schemas 2020-12 aus dem JAR zu ({@link #META_SCHEMAS}), auch ohne die
  * eigene Vorprüfung. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7). Die Bibliothek (ab 3.0) arbeitet
  * mit Jackson 3; gelesen und vorgeprüft wird weiter mit dem Jackson 2 von Quarkus ({@code StrengesJson}), und
- * {@link Jackson3Baum} überträgt den geprüften Baum mit gleichen Knoten- und Zahlentypen.
+ * {@link Jackson3Baum} überträgt den geprüften Baum mit gleichen Knoten- und Zahlentypen. Zusatzwerte liest er genau
+ * (Kommazahlen als {@code BigDecimal}): Geprüft wird dieselbe Zahl, die {@code dokument.zusatz} speichert, und Zahlen,
+ * die dort nicht verlustfrei und lesbar liegen können, sind ungültig ({@link Jackson3Baum#darstellbar}).
  * <p>
  * Schutz gegen Rechenzeit (Review PR #40): Ein Aufruf von {@link #schemaPruefen} oder {@link #wertePruefen} hat
  * zusammen höchstens {@code archiv.dokumentart.muster-zeitgrenze}, ein Aufruf von {@link #seedSchemaPruefen} (Seed
@@ -261,7 +263,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     private void werteGegen(String schemaJson, String werteJson) {
-        JsonNode werte = lesen(werteJson, MAX_WERTE_BYTES);
+        // genau (BigDecimal), damit geprüft wird, was gespeichert wird (Review PR #95)
+        JsonNode werte = lesen(werteJson, MAX_WERTE_BYTES, true);
         if (!werte.isObject() || tiefe(werte) > MAX_TIEFE) {
             throw ungueltig();
         }
@@ -456,11 +459,15 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     private JsonNode lesen(String text, int maxBytes) {
+        return lesen(text, maxBytes, false);
+    }
+
+    private JsonNode lesen(String text, int maxBytes, boolean genau) {
         if (text == null || text.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
             throw ungueltig();
         }
         try {
-            JsonNode knoten = StrengesJson.lesen(text);
+            JsonNode knoten = genau ? StrengesJson.lesenGenau(text) : StrengesJson.lesen(text);
             if (knoten == null) {
                 throw ungueltig();
             }

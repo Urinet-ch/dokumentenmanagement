@@ -540,10 +540,14 @@ public class DokumentResource {
         throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
     }
 
-    /** Beträge als BigDecimal, nie über double (Regel 9). */
+    /**
+     * Beträge als BigDecimal, nie über double (Regel 9); streng wie der Prüfer der Zusatzwerte: doppelte Schlüssel
+     * sind ungültig, statt dass der letzte still gewinnt (Review PR #95).
+     */
     private ObjectReader leser() {
         return json.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .with(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
     }
 
     /** Ein JSON-Objekt mit mindestens einem bekannten Feld; sonst 400. */
