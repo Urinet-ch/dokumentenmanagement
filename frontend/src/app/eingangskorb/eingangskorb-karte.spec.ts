@@ -23,6 +23,7 @@ function dokument(angaben: Partial<Dokument> = {}): Dokument {
     warnungen: [],
     pdfaFehlt: false,
     unsicher: [],
+    versionen: [],
     ...angaben,
   };
 }

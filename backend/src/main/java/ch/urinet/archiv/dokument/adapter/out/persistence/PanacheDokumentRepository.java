@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.application.DateiFundstelle;
 import ch.urinet.archiv.dokument.application.DokumentRepository;
+import ch.urinet.archiv.dokument.application.Fassung;
 import ch.urinet.archiv.dokument.application.NeueDatei;
 import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
@@ -69,6 +70,12 @@ public class PanacheDokumentRepository implements DokumentRepository {
     public boolean sichtbar(UUID id, Sichtregel regel) {
         VertraulichkeitFilter filter = VertraulichkeitFilter.fuer(regel).und("id = :id", Map.of("id", id));
         return DokumentEintrag.count(filter.bedingung(), filter.parameter()) > 0;
+    }
+
+    @Override
+    public List<Fassung> fassungen(UUID id) {
+        return DokumentVersionEintrag.<DokumentVersionEintrag>find("dokumentId", Sort.descending("version", "id"), id)
+                .stream().map(v -> new Fassung(v.version, v.zeit.toInstant(), v.geaendertVon, v.grund)).toList();
     }
 
     @Override

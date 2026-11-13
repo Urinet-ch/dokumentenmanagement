@@ -1,5 +1,7 @@
 <a class="zurueck" routerLink="/suche">← {{ texte.zurueck }}</a>
 
+<p class="meldung" role="status" aria-live="polite" tabindex="-1" data-test="meldung">{{ meldung() }}</p>
+
 @switch (laden()) {
   @case ('laedt') {
     <h1>{{ texte.titel }}</h1>
@@ -27,12 +29,64 @@
       <div class="spalten">
         <section class="karte metadaten" aria-labelledby="metadaten-titel">
           <h2 id="metadaten-titel">{{ texte.metadaten }}</h2>
+          @if (bearbeiten()) {
+            <app-metadaten-formular
+              [dokument]="d"
+              [arten]="arten()"
+              (gespeichert)="gespeichert($event)"
+              (abgebrochen)="bearbeitenSchliessen()"
+              (veraltet)="veraltet($event)"
+            />
+          } @else {
+          @if (darfBearbeiten()) {
+            <div class="aktionen oben">
+              <button mat-stroked-button type="button" data-test="bearbeiten" (click)="bearbeitenOeffnen()">
+                {{ texte.bearbeiten.knopf }}
+              </button>
+            </div>
+          }
           <dl>
             <dt>{{ texte.art }}</dt>
             <dd data-test="art">{{ artName() }}</dd>
             @if (d.datum) {
               <dt>{{ texte.datum }}</dt>
               <dd data-test="datum">{{ datum(d.datum) }}</dd>
+            }
+            @if (d.partnerId || d.partnerName) {
+              <dt>{{ texte.partner }}</dt>
+              <dd data-test="partner">{{ d.partnerName || d.partnerId }}</dd>
+            }
+            @if (d.projekt) {
+              <dt>{{ texte.projekt }}</dt>
+              <dd>{{ d.projekt }}</dd>
+            }
+            @if (d.finanz; as f) {
+              @if (f.belegnummer) {
+                <dt>{{ texte.belegnummer }}</dt>
+                <dd data-test="belegnummer">{{ f.belegnummer }}</dd>
+              }
+              @if (f.richtung) {
+                <dt>{{ texte.richtung }}</dt>
+                <dd>{{ richtungen[f.richtung] || f.richtung }}</dd>
+              }
+              @if (f.betrag !== null && f.betrag !== undefined) {
+                <dt>{{ texte.betrag }}</dt>
+                <dd data-test="betrag">{{ betrag(f.betrag, f.waehrung) }}</dd>
+              }
+              @if (f.faelligkeit) {
+                <dt>{{ texte.faelligkeit }}</dt>
+                <dd>{{ datum(f.faelligkeit) }}</dd>
+              }
+            }
+            @if (d.vertrag; as v) {
+              @if (v.gueltigAb) {
+                <dt>{{ texte.gueltigAb }}</dt>
+                <dd>{{ datum(v.gueltigAb) }}</dd>
+              }
+              @if (v.gueltigBis) {
+                <dt>{{ texte.gueltigBis }}</dt>
+                <dd>{{ datum(v.gueltigBis) }}</dd>
+              }
             }
             <dt>{{ texte.eingang }}</dt>
             <dd>{{ zeitpunkt(d.eingang) }}</dd>
@@ -70,6 +124,7 @@
               }
             </dl>
           }
+          }
         </section>
 
         <section class="karte vorschau" aria-labelledby="vorschau-titel">
@@ -79,15 +134,19 @@
               <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.vorschauLaeuft" />
             }
             @case ('ok') {
-              <object
-                class="pdf"
-                type="application/pdf"
-                data-test="vorschau"
-                [attr.aria-label]="texte.vorschauTitel(titel())"
-                [data]="pdfaRessource()"
-              >
-                <p>{{ texte.vorschauErsatz }}</p>
-              </object>
+              @if (!breit() && bildUrl(); as url) {
+                <img class="bild" data-test="bild" [src]="url" [alt]="texte.bild(titel())" />
+              } @else {
+                <object
+                  class="pdf"
+                  type="application/pdf"
+                  data-test="vorschau"
+                  [attr.aria-label]="texte.vorschauTitel(titel())"
+                  [data]="pdfaRessource()"
+                >
+                  <p>{{ texte.vorschauErsatz }}</p>
+                </object>
+              }
               <div class="aktionen">
                 <a
                   mat-flat-button
@@ -103,6 +162,9 @@
               <p class="klein">{{ texte.downloadHinweis }}</p>
             }
             @case ('fehlt') {
+              @if (bildUrl(); as url) {
+                <img class="bild" data-test="bild" [src]="url" [alt]="texte.bild(titel())" />
+              }
               <p data-test="vorschau-fehlt">{{ texte.vorschauFehlt }}</p>
               <div class="aktionen">
                 <button mat-flat-button type="button" (click)="originalHerunterladen()">
@@ -111,6 +173,9 @@
               </div>
             }
             @case ('fehler') {
+              @if (bildUrl(); as url) {
+                <img class="bild" data-test="bild" [src]="url" [alt]="texte.bild(titel())" />
+              }
               <p class="fehler" role="alert">{{ texte.fehlerDatei }}</p>
             }
           }
@@ -127,6 +192,24 @@
           }
         </section>
       </div>
+
+      <section class="karte versionen" aria-labelledby="versionen-titel" data-test="versionen">
+        <h2 id="versionen-titel">{{ texte.versionen }}</h2>
+        @if (d.versionen.length === 0) {
+          <p class="klein">{{ texte.versionenLeer }}</p>
+        } @else {
+          <p class="klein">{{ texte.versionenHinweis }}</p>
+          <ol>
+            @for (v of d.versionen; track v.version) {
+              <li data-test="version">
+                <span class="version">{{ texte.version(v.version) }}</span>
+                <span>{{ zeitpunkt(v.zeit) }}, {{ texte.geaendertVon }} {{ wer(v.geaendertVon) }}</span>
+                <span class="grund">{{ v.grund || texte.ohneGrund }}</span>
+              </li>
+            }
+          </ol>
+        }
+      </section>
     }
   }
 }

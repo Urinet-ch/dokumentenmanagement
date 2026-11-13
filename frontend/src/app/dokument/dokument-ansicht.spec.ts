@@ -2,7 +2,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
-import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
+import { signal } from '@angular/core';
+import { Dokument, DokumentAenderung, Dokumentart, DownloadAdresse, Kontakt } from '../gemeinsam/api';
+import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentAnsicht, sichereAdresse } from './dokument-ansicht';
 import { DokumentPort, Variante } from './dokument-port';
@@ -25,6 +28,18 @@ const DOKUMENT: Dokument = {
   warnungen: [],
   pdfaFehlt: false,
   unsicher: [],
+  versionen: [],
+};
+
+const ART: Dokumentart = {
+  code: 'AUSGANGSRECHNUNG',
+  name: 'Ausgangsrechnung',
+  gruppen: ['finanz'],
+  pflichtfelder: ['titel', 'datum'],
+  zusatzSchema: {},
+  vertraulichkeit: 'NORMAL',
+  gesetzlichePflicht: true,
+  aktiv: true,
 };
 
 class DokumentAttrappe extends DokumentPort {
@@ -32,11 +47,28 @@ class DokumentAttrappe extends DokumentPort {
   pdfa: Observable<DownloadAdresse> = of({ url: 'https://s3.example/pdfa?sig=1', gueltigBis: zukunft() });
   original: () => DownloadAdresse = () => ({ url: 'https://s3.example/original', gueltigBis: zukunft() });
   aufrufe: Variante[] = [];
+  gelesen = 0;
+  bilder: number[] = [];
+  bild: Observable<Blob> = of(new Blob(['png'], { type: 'image/png' }));
+  geaendert: Observable<Dokument> = of(DOKUMENT);
+  aenderungen: { version: number; aenderung: DokumentAenderung }[] = [];
   lesen(): Observable<Dokument> {
+    this.gelesen++;
     return this.dokument;
   }
   dokumentarten(): Observable<Dokumentart[]> {
-    return of([{ code: 'AUSGANGSRECHNUNG', name: 'Ausgangsrechnung' } as Dokumentart]);
+    return of([ART]);
+  }
+  vorschau(_id: string, seite: number): Observable<Blob> {
+    this.bilder.push(seite);
+    return this.bild;
+  }
+  aendern(_id: string, version: number, aenderung: DokumentAenderung): Observable<Dokument> {
+    this.aenderungen.push({ version, aenderung });
+    return this.geaendert;
+  }
+  kontakte(): Observable<Kontakt[]> {
+    return of([]);
   }
   adresse(_id: string, variante: Variante): Observable<DownloadAdresse> {
     this.aufrufe.push(variante);
@@ -48,12 +80,24 @@ describe('DokumentAnsicht (Req 14.6)', () => {
   let fixture: ComponentFixture<DokumentAnsicht>;
   let port: DokumentAttrappe;
   let element: HTMLElement;
+  const rolle = signal<Rolle>('inhaber');
 
   beforeEach(() => {
     port = new DokumentAttrappe();
+    rolle.set('inhaber');
     TestBed.configureTestingModule({
       imports: [DokumentAnsicht],
-      providers: [provideRouter([]), { provide: DokumentPort, useValue: port }],
+      providers: [
+        provideRouter([]),
+        { provide: DokumentPort, useValue: port },
+        {
+          provide: AnmeldungService,
+          useValue: {
+            darf: (a: Aktion) => darf(rolle(), a),
+            benutzer: () => ({ id: 'sub-inhaber', name: 'Inhaber', mandant: 'urinet', rolle: rolle() }),
+          },
+        },
+      ],
     });
   });
 
@@ -138,6 +182,110 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     await oeffnen();
     expect(element.querySelector('[data-test=titel]')).toBeNull();
     expect(port.aufrufe).toEqual([]);
+  });
+
+  describe('Metadaten bearbeiten (Req 10.1)', () => {
+    const bearbeiten = () => element.querySelector<HTMLButtonElement>('[data-test=bearbeiten]');
+
+    it('zeigt den Knopf nur mit A6 und in einem änderbaren Status', async () => {
+      await oeffnen();
+      expect(bearbeiten()!.textContent!.trim()).toBe(TEXTE.dokument.bearbeiten.knopf);
+      fixture.destroy();
+      rolle.set('treuhaender');
+      await oeffnen();
+      expect(bearbeiten()).toBeNull();
+      fixture.destroy();
+      rolle.set('inhaber');
+      port.dokument = of({ ...DOKUMENT, status: 'ARCHIVIERUNG' });
+      await oeffnen();
+      expect(bearbeiten()).toBeNull();
+    });
+
+    it('speichert mit Grund und zeigt danach das geänderte Dokument mit der neuen Fassung', async () => {
+      port.geaendert = of({
+        ...DOKUMENT,
+        titel: 'Rechnung 2026-003 korrigiert',
+        version: 2,
+        versionen: [{ version: 1, zeit: '2026-11-09T09:30:00Z', geaendertVon: 'sub-inhaber', grund: 'Tippfehler' }],
+      });
+      await oeffnen();
+      bearbeiten()!.click();
+      await fixture.whenStable();
+      const titel = element.querySelector<HTMLInputElement>('#bearbeiten-titel')!;
+      titel.value = 'Rechnung 2026-003 korrigiert';
+      titel.dispatchEvent(new Event('input'));
+      const grund = element.querySelector<HTMLTextAreaElement>('#bearbeiten-grund')!;
+      grund.value = 'Tippfehler';
+      grund.dispatchEvent(new Event('input'));
+      element.querySelector<HTMLButtonElement>('[data-test=speichern]')!.click();
+      await fixture.whenStable();
+      expect(port.aenderungen).toEqual([
+        { version: 1, aenderung: { titel: 'Rechnung 2026-003 korrigiert', grund: 'Tippfehler' } },
+      ]);
+      expect(element.querySelector('[data-test=titel]')!.textContent).toBe('Rechnung 2026-003 korrigiert');
+      expect(element.querySelector('[data-test=meldung]')!.textContent).toBe(TEXTE.dokument.gespeichert);
+      expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+      const version = element.querySelector('[data-test=version]')!.textContent!;
+      expect(version).toContain(TEXTE.dokument.version(1));
+      expect(version).toContain('09.11.2026');
+      expect(version).toContain(`${TEXTE.dokument.geaendertVon} ${TEXTE.dokument.sie}`);
+      expect(version).toContain('Tippfehler');
+    });
+
+    it('lädt bei einem Konflikt neu und sagt warum', async () => {
+      port.geaendert = throwError(() => new HttpErrorResponse({ status: 412, error: { fehlercode: 'VERSION_KONFLIKT' } }));
+      await oeffnen();
+      bearbeiten()!.click();
+      await fixture.whenStable();
+      const titel = element.querySelector<HTMLInputElement>('#bearbeiten-titel')!;
+      titel.value = 'Neu';
+      titel.dispatchEvent(new Event('input'));
+      const grund = element.querySelector<HTMLTextAreaElement>('#bearbeiten-grund')!;
+      grund.value = 'Korrektur';
+      grund.dispatchEvent(new Event('input'));
+      element.querySelector<HTMLButtonElement>('[data-test=speichern]')!.click();
+      await fixture.whenStable();
+      expect(port.gelesen).toBe(2);
+      expect(element.querySelector('[data-test=meldung]')!.textContent).toBe(
+        TEXTE.dokument.bearbeiten.fehlercode['VERSION_KONFLIKT'],
+      );
+      expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+    });
+  });
+
+  it('nennt fremde Änderer mit Kennung und ohne Fassungen einen Hinweis', async () => {
+    await oeffnen();
+    expect(element.querySelector('[data-test=versionen]')!.textContent).toContain(TEXTE.dokument.versionenLeer);
+    fixture.destroy();
+    port.dokument = of({
+      ...DOKUMENT,
+      versionen: [{ version: 1, zeit: '2026-11-09T09:30:00Z', geaendertVon: 'sub-anderer', grund: null }],
+    });
+    await oeffnen();
+    const version = element.querySelector('[data-test=version]')!.textContent!;
+    expect(version).toContain('sub-anderer');
+    expect(version).toContain(TEXTE.dokument.ohneGrund);
+  });
+
+  it('zeigt auf schmalen Bildschirmen das Vorschaubild der ersten Seite und gibt es wieder frei', async () => {
+    const erstellen = vi.fn(() => 'blob:bild-1');
+    const freigeben = vi.fn();
+    Object.assign(URL, { createObjectURL: erstellen, revokeObjectURL: freigeben });
+    port.dokument = of({ ...DOKUMENT, seiten: 2 });
+    await oeffnen();
+    const bild = element.querySelector<HTMLImageElement>('[data-test=bild]')!;
+    expect(bild.getAttribute('src')).toBe('blob:bild-1');
+    expect(bild.alt).toBe(TEXTE.dokument.bild('Rechnung 2026-003'));
+    expect(element.querySelector('[data-test=vorschau]')).toBeNull();
+    expect(port.bilder).toEqual([1]);
+    fixture.destroy();
+    expect(freigeben).toHaveBeenCalledWith('blob:bild-1');
+  });
+
+  it('holt ohne Seiten kein Vorschaubild', async () => {
+    await oeffnen();
+    expect(port.bilder).toEqual([]);
+    expect(element.querySelector('[data-test=vorschau]')).not.toBeNull();
   });
 
   it('lässt nur http(s)-Adressen in Vorschau und Link', () => {

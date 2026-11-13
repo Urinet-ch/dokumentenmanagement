@@ -65,7 +65,8 @@ public class EingangskorbResource {
         Benutzer benutzer = DokumentResource.benutzer(identitaet);
         Seite<Dokument> treffer = lesen.eingangskorb(benutzer, seite, groesse);
         return new EingangskorbDto(treffer.eintraege().stream()
-                .map(d -> DokumentResource.dto(d, json, lesen.warnungen(benutzer, d), lesen.schwelle())).toList(),
+                .map(d -> DokumentResource.dto(d, json, lesen.warnungen(benutzer, d), lesen.schwelle(),
+                        List.of())).toList(),
                 treffer.gesamt(), seite, groesse);
     }
 }

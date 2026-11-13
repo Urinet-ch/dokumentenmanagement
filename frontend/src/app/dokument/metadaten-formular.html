@@ -1,0 +1,307 @@
+@let f = formular();
+<form
+  class="formular"
+  data-test="bearbeiten-formular"
+  novalidate
+  [attr.aria-label]="texte.titel(titel())"
+  (submit)="$event.preventDefault(); speichern()"
+>
+  <h3 tabindex="-1" data-fokus="bearbeiten">{{ texte.titel(titel()) }}</h3>
+  @if (fehler()) {
+    <p class="fehler" role="alert" tabindex="-1" data-test="formular-fehler">{{ fehler() }}</p>
+  }
+
+  <div class="raster">
+    <div class="feld">
+      <label for="bearbeiten-art">{{ feldNamen['art'] }}<span aria-hidden="true"> *</span></label>
+      <select
+        id="bearbeiten-art"
+        aria-required="true"
+        [attr.aria-invalid]="ungueltig('art') || null"
+        (change)="setze('art', wert($event))"
+      >
+        @if (!f.art) {
+          <option value="" selected>{{ texte.artWaehlen }}</option>
+        }
+        @for (a of artenWahl(); track a.code) {
+          <option [value]="a.code" [selected]="a.code === f.art">{{ a.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="feld">
+      <label for="bearbeiten-titel"
+        >{{ feldNamen['titel'] }}
+        @if (pflicht('titel')) {
+          <span aria-hidden="true"> *</span>
+        }
+      </label>
+      <input
+        id="bearbeiten-titel"
+        type="text"
+        [attr.aria-required]="pflicht('titel') || null"
+        [attr.aria-invalid]="ungueltig('titel') || null"
+        [value]="f.titel"
+        (input)="setze('titel', wert($event))"
+      />
+    </div>
+    <div class="feld">
+      <label for="bearbeiten-datum"
+        >{{ feldNamen['datum'] }}
+        @if (pflicht('datum')) {
+          <span aria-hidden="true"> *</span>
+        }
+      </label>
+      <input
+        id="bearbeiten-datum"
+        type="date"
+        [attr.aria-required]="pflicht('datum') || null"
+        [attr.aria-invalid]="ungueltig('datum') || null"
+        [value]="f.datum"
+        (input)="setze('datum', wert($event))"
+      />
+    </div>
+    <div class="feld">
+      <label for="bearbeiten-geschaeftsjahr">{{ beschriftung('geschaeftsjahr') }}</label>
+      <input
+        id="bearbeiten-geschaeftsjahr"
+        type="text"
+        inputmode="numeric"
+        maxlength="4"
+        [attr.aria-invalid]="ungueltig('geschaeftsjahr') || null"
+        [value]="f.geschaeftsjahr"
+        (input)="setze('geschaeftsjahr', wert($event))"
+      />
+    </div>
+    <div class="feld breit">
+      @if (f.partnerId) {
+        <span class="label">{{ feldNamen['partner'] }}</span>
+        <p class="gewaehlt">
+          <span data-test="partner-name">{{ f.partnerName || f.partnerId }}</span>
+          <button
+            mat-button
+            type="button"
+            data-test="partner-gewaehlt"
+            (click)="partnerEntfernen()"
+          >
+            {{ korb.partnerEntfernen }}
+          </button>
+        </p>
+      } @else {
+        <label for="bearbeiten-partner"
+          >{{ korb.partnerSuchen }}
+          @if (pflicht('partnerId')) {
+            <span aria-hidden="true"> *</span>
+          }
+        </label>
+        <input
+          id="bearbeiten-partner"
+          type="search"
+          autocomplete="off"
+          data-test="partner-suche"
+          aria-describedby="bearbeiten-partner-hinweis"
+          [attr.aria-required]="pflicht('partnerId') || null"
+          [attr.aria-invalid]="ungueltig('partnerId') || null"
+          (input)="partnerSuchen(wert($event))"
+        />
+        <p class="hinweis" id="bearbeiten-partner-hinweis">{{ korb.partnerSuchenHinweis }}</p>
+        @if (treffer(); as liste) {
+          <div aria-live="polite">
+            @if (liste.length === 0) {
+              <p class="hinweis">{{ korb.partnerKeine }}</p>
+            } @else {
+              <ul class="treffer" data-test="partner-treffer">
+                @for (kontakt of liste; track kontakt.id) {
+                  <li>
+                    <button mat-stroked-button type="button" (click)="partnerWaehlen(kontakt)">
+                      {{ kontaktName(kontakt) }}
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      }
+    </div>
+    <div class="feld">
+      <label for="bearbeiten-projekt"
+        >{{ feldNamen['projekt'] }}
+        @if (pflicht('projekt')) {
+          <span aria-hidden="true"> *</span>
+        }
+      </label>
+      <input
+        id="bearbeiten-projekt"
+        type="text"
+        [attr.aria-invalid]="ungueltig('projekt') || null"
+        [value]="f.projekt"
+        (input)="setze('projekt', wert($event))"
+      />
+    </div>
+    <div class="feld">
+      <label for="bearbeiten-tags">{{ feldNamen['tags'] }}</label>
+      <input
+        id="bearbeiten-tags"
+        type="text"
+        aria-describedby="bearbeiten-tags-hinweis"
+        [attr.aria-invalid]="ungueltig('tags') || null"
+        [value]="f.tags"
+        (input)="setze('tags', wert($event))"
+      />
+      <p class="hinweis" id="bearbeiten-tags-hinweis">{{ texte.tagsHinweis }}</p>
+    </div>
+    @if (darfVertraulichkeit()) {
+      <div class="feld">
+        <label for="bearbeiten-vertraulichkeit">{{ feldNamen['vertraulichkeit'] }}</label>
+        <select id="bearbeiten-vertraulichkeit" (change)="setze('vertraulichkeit', wert($event))">
+          @for (v of vertraulichkeiten; track v) {
+            <option [value]="v" [selected]="v === f.vertraulichkeit">{{ vertraulichkeitNamen[v] }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (mitRichtung()) {
+    <fieldset class="raster" data-test="finanz">
+      <legend>{{ texte.finanz }}</legend>
+      <div class="feld">
+        <label for="bearbeiten-richtung"
+          >{{ feldNamen['richtung'] }}
+          @if (pflicht('richtung')) {
+            <span aria-hidden="true"> *</span>
+          }
+        </label>
+        <select
+          id="bearbeiten-richtung"
+          [attr.aria-required]="pflicht('richtung') || null"
+          [attr.aria-invalid]="ungueltig('richtung') || null"
+          (change)="setze('richtung', wert($event))"
+        >
+          <option value="" [selected]="!f.richtung"></option>
+          @for (r of richtungen; track r) {
+            <option [value]="r" [selected]="r === f.richtung">{{ richtungNamen[r] }}</option>
+          }
+        </select>
+      </div>
+      @for (e of finanz(); track e.feld) {
+        <ng-container *ngTemplateOutlet="eingabe; context: { $implicit: e }" />
+      }
+    </fieldset>
+  }
+
+  @if (vertrag().length > 0) {
+    <fieldset class="raster" data-test="vertrag">
+      <legend>{{ texte.vertrag }}</legend>
+      @for (e of vertrag(); track e.feld) {
+        <ng-container *ngTemplateOutlet="eingabe; context: { $implicit: e }" />
+      }
+    </fieldset>
+  }
+
+  @if (zusatz().length > 0) {
+    <fieldset class="raster" data-test="zusatz">
+      <legend>{{ texte.zusatz }}</legend>
+      @for (z of zusatz(); track z.name) {
+        <div class="feld">
+          <label [for]="'bearbeiten-zusatz-' + z.name"
+            >{{ z.name }}
+            @if (z.pflicht) {
+              <span aria-hidden="true"> *</span>
+            }
+          </label>
+          @switch (z.typ) {
+            @case ('auswahl') {
+              <select
+                [id]="'bearbeiten-zusatz-' + z.name"
+                [attr.aria-required]="z.pflicht || null"
+                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                (change)="setzeZusatz(z.name, wert($event))"
+              >
+                <option value="" [selected]="!f.zusatz[z.name]"></option>
+                @for (o of z.optionen; track o) {
+                  <option [value]="o" [selected]="o === f.zusatz[z.name]">{{ o }}</option>
+                }
+              </select>
+            }
+            @case ('janein') {
+              <select
+                [id]="'bearbeiten-zusatz-' + z.name"
+                [attr.aria-required]="z.pflicht || null"
+                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                (change)="setzeZusatz(z.name, wert($event))"
+              >
+                <option value="" [selected]="!f.zusatz[z.name]"></option>
+                <option value="true" [selected]="f.zusatz[z.name] === 'true'">{{ texte.ja }}</option>
+                <option value="false" [selected]="f.zusatz[z.name] === 'false'">{{ texte.nein }}</option>
+              </select>
+            }
+            @default {
+              <input
+                [id]="'bearbeiten-zusatz-' + z.name"
+                [type]="z.typ === 'datum' ? 'date' : 'text'"
+                [attr.inputmode]="z.typ === 'zahl' ? 'decimal' : z.typ === 'ganzzahl' ? 'numeric' : null"
+                [attr.aria-required]="z.pflicht || null"
+                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                [value]="f.zusatz[z.name] ?? ''"
+                (input)="setzeZusatz(z.name, wert($event))"
+              />
+            }
+          }
+        </div>
+      }
+    </fieldset>
+  }
+
+  <div class="feld">
+    <label for="bearbeiten-grund"
+      >{{ texte.grund }}
+      @if (archiviert()) {
+        <span aria-hidden="true"> *</span>
+      }
+    </label>
+    <textarea
+      id="bearbeiten-grund"
+      rows="3"
+      [attr.maxlength]="grundMax"
+      aria-describedby="bearbeiten-grund-hinweis"
+      [attr.aria-required]="archiviert() || null"
+      [attr.aria-invalid]="ungueltig('grund') || null"
+      [value]="f.grund"
+      (input)="setze('grund', wert($event))"
+    ></textarea>
+    <p class="hinweis" id="bearbeiten-grund-hinweis">
+      {{ archiviert() ? texte.grundPflicht : texte.grundFrei }}
+    </p>
+  </div>
+
+  <div class="knoepfe">
+    <button mat-flat-button type="submit" data-test="speichern" [disabled]="laeuft()">
+      {{ laeuft() ? texte.laeuft : texte.speichern }}
+    </button>
+    <button mat-button type="button" [disabled]="laeuft()" (click)="abbrechen()">
+      {{ texte.abbrechen }}
+    </button>
+  </div>
+</form>
+
+<ng-template #eingabe let-e>
+  <div class="feld">
+    <label [for]="'bearbeiten-' + e.feld"
+      >{{ beschriftung(e.feld) }}
+      @if (pflicht(e.feld)) {
+        <span aria-hidden="true"> *</span>
+      }
+    </label>
+    <input
+      [id]="'bearbeiten-' + e.feld"
+      [type]="e.typ"
+      [attr.inputmode]="e.modus ?? null"
+      [attr.placeholder]="e.feld === 'betrag' ? korb.betragHinweis : null"
+      [attr.aria-required]="pflicht(e.feld) || null"
+      [attr.aria-invalid]="ungueltig(e.feld) || null"
+      [value]="textWert(e.feld)"
+      (input)="setze(e.feld, wert($event))"
+    />
+  </div>
+</ng-template>

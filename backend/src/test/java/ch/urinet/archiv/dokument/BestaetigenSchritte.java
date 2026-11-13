@@ -390,6 +390,25 @@ public class BestaetigenSchritte {
                 .isLessThan(((Number) spalte(ort, "version")).intValue());
     }
 
+    /** Req 10.1: Versionsliste im DokumentDto, neueste zuerst, nur Nummer, Zeit, Benutzer und Grund. */
+    @Dann("nennt die Antwort {int} Version(en), zuletzt mit dem Grund {string} von «{word}»")
+    public void versionen(int anzahl, String grund, String benutzer) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getList("versionen")).hasSize(anzahl);
+        assertThat(antwort.jsonPath().getString("versionen[0].grund")).isEqualTo(grund);
+        assertThat(antwort.jsonPath().getString("versionen[0].geaendertVon")).isEqualTo(Testanmeldung.sub(benutzer));
+        assertThat(antwort.jsonPath().getString("versionen[0].zeit")).isNotBlank();
+        assertThat(antwort.jsonPath().getInt("versionen[0].version")).isLessThan(antwort.jsonPath().getInt("version"));
+        assertThat(antwort.jsonPath().getMap("versionen[0]").keySet())
+                .containsExactlyInAnyOrder("version", "zeit", "geaendertVon", "grund");
+    }
+
+    @Dann("nennt die Antwort keine Versionen")
+    public void keineVersionen() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getList("versionen")).isEmpty();
+    }
+
     @Dann("steht im Zugriffsprotokoll für «{word}» {int} Mal «{word}» von «{word}»")
     public void protokolliert(String name, int anzahl, String aktion, String benutzer) throws SQLException {
         Ort ort = ort(name);
