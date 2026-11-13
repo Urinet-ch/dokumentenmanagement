@@ -8,7 +8,7 @@
          Manifest mit Ablage, Signatur und den Zeitstempeln je Dienst; dazu die Blatt-Hashes je Protokollzeile, damit
          ein späterer Löschweg (Req 9.9, 10.9) einzelne Zeilen entfernen kann, ohne den Nachweis der übrigen zu
          zerstören. Alle drei Tabellen nur Einfügen (Trigger und Rechte wie zugriff_protokoll). -->
-    <changeSet id="010-manifest" author="archiv">
+    <changeSet id="013-manifest" author="archiv">
         <sql>
             create table manifest (
                 datum date not null constraint manifest_pk primary key,
@@ -49,7 +49,6 @@
                 constraint protokoll_blatt_pk primary key (tabelle, zeile_id)
             );
             create index protokoll_blatt_manifest_ix on protokoll_blatt (manifest_datum);
-            create index zugriff_protokoll_zeit_ix on zugriff_protokoll (zeit);
             create index dokument_version_zeit_ix on dokument_version (zeit);
         </sql>
         <sql splitStatements="false">
