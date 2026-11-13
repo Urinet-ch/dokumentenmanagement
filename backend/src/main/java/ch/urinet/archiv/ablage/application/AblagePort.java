@@ -82,14 +82,16 @@ public interface AblagePort {
     /**
      * Legt einen Teil des Tages-Manifests unter {@code manifest/} ab, gesperrt im konfigurierten Modus (Standard und ab
      * Stufe B fest COMPLIANCE, Req 6.11) bis zum spätesten {@code aufbewahren_bis}, ohne Frist 10 Jahre (Req 15.4).
-     * Liegt dort schon derselbe Inhalt, gilt er als abgelegt; ein anderer Inhalt bricht ab (ein Manifest je Datum).
+     * Liegt dort schon derselbe Inhalt, gilt er als abgelegt; ein anderer Inhalt, eine weitere Version oder eine
+     * Löschmarke bricht ab (ein Manifest je Datum, jeder Schlüssel nur einmal geschrieben).
      */
     AbgelegteDatei ablegenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil, byte[] inhalt,
                                    Optional<LocalDate> spaetestesAufbewahrenBis);
 
     /**
-     * Liest die neueste Version eines Manifest-Teils (Aufgabe 5.2: Wiederholung und Prüfwerkzeug); leer, wenn er fehlt.
-     * Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18).
+     * Liest die älteste Version eines Manifest-Teils (Aufgabe 5.2: Wiederholung und Prüfwerkzeug); leer, wenn er fehlt
+     * (auch wenn unter dem Schlüssel nur Löschmarken liegen). {@link ManifestDatei#weitere()} zählt weitere Versionen und
+     * Löschmarken. Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18).
      */
     Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil);
 

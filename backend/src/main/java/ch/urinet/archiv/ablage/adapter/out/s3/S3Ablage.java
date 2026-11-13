@@ -276,7 +276,11 @@ public class S3Ablage implements AblagePort {
         String sha256 = Pruefsumme.von(inhalt);
         Instant bis = Sperrfrist.manifest(spaetestesAufbewahrenBis, uhr.instant(), einstellungen.manifestHoechstfrist());
         ObjectLockMode modus = ObjectLockMode.fromValue(einstellungen.manifestSperrmodus().name());
-        for (ObjectVersion vorhanden : versionen(bucket, key)) {
+        Manifestversionen bisher = manifestVersionen(bucket, key);
+        if (bisher.weitere() > 0) {
+            throw new IllegalStateException("Unter " + key + " liegen weitere Versionen oder Löschmarken");
+        }
+        for (ObjectVersion vorhanden : bisher.versionen()) {
             Lesung lesung = lesen(bucket, key, vorhanden.versionId());
             if (!lesung.sha256().equals(sha256)) {
                 throw new IllegalStateException("Unter " + key + " liegt schon ein anderes Manifest");
@@ -300,11 +304,11 @@ public class S3Ablage implements AblagePort {
     public Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil) {
         String bucket = bucket(mandant);
         String key = teil.pfad(datum);
-        List<ObjectVersion> vorhanden = versionen(bucket, key);
-        if (vorhanden.isEmpty()) {
+        Manifestversionen vorhanden = manifestVersionen(bucket, key);
+        if (vorhanden.versionen().isEmpty()) {
             return Optional.empty();
         }
-        String versionId = vorhanden.getFirst().versionId();
+        String versionId = vorhanden.versionen().getFirst().versionId();
         byte[] inhalt;
         try (InputStream ein = s3.getObject(b -> b.bucket(bucket).key(key).versionId(versionId))) {
             inhalt = ein.readNBytes(MANIFEST_MAX_GROESSE + 1);
@@ -316,7 +320,23 @@ public class S3Ablage implements AblagePort {
         }
         Optional<Instant> sperre = retention(bucket, key, versionId).map(ObjectLockRetention::retainUntilDate);
         return Optional.of(new ManifestDatei(inhalt, new AbgelegteDatei(key, versionId, Pruefsumme.von(inhalt),
-                inhalt.length, sperre)));
+                inhalt.length, sperre), vorhanden.weitere()));
+    }
+
+    /** Versionen eines Manifest-Schlüssels, älteste zuerst, und die Zahl weiterer Versionen samt Löschmarken. */
+    private Manifestversionen manifestVersionen(String bucket, String key) {
+        List<ObjectVersion> versionen = new ArrayList<>();
+        int loeschmarken = 0;
+        for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).prefix(key))) {
+            seite.versions().stream().filter(v -> v.key().equals(key)).forEach(versionen::add);
+            loeschmarken += (int) seite.deleteMarkers().stream().filter(m -> m.key().equals(key)).count();
+        }
+        versionen.sort(Comparator.comparing(ObjectVersion::lastModified, Comparator.nullsLast(Comparator.naturalOrder())));
+        int weitere = Math.max(0, versionen.size() - 1) + loeschmarken;
+        return new Manifestversionen(versionen, weitere);
+    }
+
+    private record Manifestversionen(List<ObjectVersion> versionen, int weitere) {
     }
 
     /**

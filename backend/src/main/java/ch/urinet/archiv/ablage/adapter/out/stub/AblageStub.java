@@ -158,7 +158,11 @@ public class AblageStub implements AblagePort {
                                                        byte[] inhalt, Optional<LocalDate> spaetestesAufbewahrenBis) {
         String key = teil.pfad(datum);
         String sha256 = Pruefsumme.von(inhalt);
-        Optional<Version> vorhanden = liste(mandant, key).stream().findFirst();
+        List<Version> bisher = liste(mandant, key);
+        if (bisher.size() > 1) {
+            throw new IllegalStateException("Unter " + key + " liegen weitere Versionen");
+        }
+        Optional<Version> vorhanden = bisher.stream().findFirst();
         if (vorhanden.isPresent()) {
             if (!vorhanden.get().sha256().equals(sha256)) {
                 throw new IllegalStateException("Unter " + key + " liegt schon ein anderes Manifest");
@@ -176,11 +180,11 @@ public class AblageStub implements AblagePort {
         if (vorhanden.isEmpty()) {
             return Optional.empty();
         }
-        Version v = vorhanden.getLast();
+        Version v = vorhanden.getFirst();
         if (v.groesse() > MANIFEST_MAX_GROESSE) {
             throw new IllegalStateException("Manifest-Teil zu gross: " + key);
         }
-        return Optional.of(new ManifestDatei(lesen(v), datei(key, v)));
+        return Optional.of(new ManifestDatei(lesen(v), datei(key, v), vorhanden.size() - 1));
     }
 
     @Override

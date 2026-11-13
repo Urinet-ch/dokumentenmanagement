@@ -2,6 +2,7 @@ package ch.urinet.archiv.protokoll.application;
 
 import ch.urinet.archiv.ablage.adapter.out.stub.AblageStub;
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -54,11 +55,14 @@ class ManifestPruefenTest {
     private static final LocalDate TAG2 = TAG1.plusDays(1);
     private static final LocalDate TAG3 = TAG1.plusDays(2);
     private static final List<String> BEIDE = List.of("haupt", "zweit");
+    private static final Optional<LocalDate> SPERRE = Optional.of(LocalDate.of(2040, 1, 1));
 
     private final KeyPair paar = ed25519();
     private final AblageStub stub = new AblageStub();
     private final Map<String, byte[]> ersetzt = new HashMap<>();
     private final Set<String> entfernt = new HashSet<>();
+    private final Map<String, Integer> weitere = new HashMap<>();
+    private final Set<String> ungesperrt = new HashSet<>();
     private final AblagePort ablage = manipulierbar();
     private List<String> konfiguriert = BEIDE;
 
@@ -177,12 +181,51 @@ class ManifestPruefenTest {
     }
 
     @Test
-    void fehlendePruefdatenEinesZeitstempelsSindEinFehler() {
+    void fehlendePruefdatenEinesNichtFestgehaltenenZeitstempelsWerdenNurGemeldet() {
         kette(1, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
+
+        Pruefbericht bericht = pruefen(TAG1, TAG1);
+
+        assertThat(bericht.fehler()).isEmpty();
+        assertThat(bericht.meldungen())
+                .containsExactly("2026-01-10: Zeitstempel von zweit unvollständig (Prüfdaten fehlen), nicht festgehalten");
+    }
+
+    @Test
+    void fehlendePruefdatenEinesImFolgetagVerwiesenenZeitstempelsSindEinFehler() {
+        kette(2, BEIDE, Duration.ofMinutes(20));
         entfernt.add(ManifestTeil.kette("zweit").pfad(TAG1));
 
         assertThat(pruefen(TAG1, TAG1).fehler())
                 .containsExactly("2026-01-10: Prüfdaten des Zeitstempels von zweit fehlen");
+    }
+
+    @Test
+    void einUnvollstaendigerZeitstempelOhneGueltigenAnderenIstKeinGueltigerZeitstempel() {
+        kette(1, List.of("zweit"), Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
+
+        Pruefbericht bericht = pruefen(TAG1, TAG1);
+
+        assertThat(bericht.fehler()).containsExactly("2026-01-10: kein gültiger Zeitstempel");
+        assertThat(bericht.meldungen()).containsExactly("2026-01-10: Zeitstempel von haupt fehlt");
+    }
+
+    @Test
+    void eineWeitereVersionUnterEinemManifestSchluesselIstEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        weitere.put(ManifestTeil.JSON.pfad(TAG1), 1);
+        weitere.put(ManifestTeil.tsr("haupt").pfad(TAG1), 2);
+
+        Pruefbericht bericht = pruefen(TAG1, TAG1);
+
+        assertThat(bericht.ok()).isFalse();
+        assertThat(bericht.fehler()).containsExactly(
+                "2026-01-10: unter " + ManifestTeil.JSON.pfad(TAG1)
+                        + " liegen 1 weitere Version(en) oder Löschmarke(n); geprüft wird die älteste",
+                "2026-01-10: unter " + ManifestTeil.tsr("haupt").pfad(TAG1)
+                        + " liegen 2 weitere Version(en) oder Löschmarke(n); geprüft wird die älteste");
     }
 
     @Test
@@ -205,6 +248,15 @@ class ManifestPruefenTest {
                 .containsExactly("2026-01-10: Zeitstempel von zweit ungültig: Imprint passt nicht");
     }
 
+    @Test
+    void einUngesperrterManifestTeilIstEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        ungesperrt.add(ManifestTeil.SIG.pfad(TAG1));
+
+        assertThat(pruefen(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: " + ManifestTeil.SIG.pfad(TAG1) + " ist nicht gesperrt");
+    }
+
     private Pruefbericht pruefen(LocalDate von, LocalDate bis) {
         return new ManifestPruefen(ablage, new JacksonJsonLeser(), schluessel(), new TsaAttrappe(),
                 Duration.ofHours(24)).pruefen(MANDANT, von, bis);
@@ -224,17 +276,17 @@ class ManifestPruefenTest {
                 vorher == null ? null : vorher.sha256(), vorher == null ? null : vorher.verweis(), eintraege,
                 new TreeMap<>(), List.of()).kanonisch();
         byte[] sig = ManifestSignatur.signieren(paar.getPrivate(), json);
-        stub.ablegenManifest(MANDANT, datum, ManifestTeil.JSON, json, Optional.empty());
-        stub.ablegenManifest(MANDANT, datum, ManifestTeil.SIG, sig, Optional.empty());
+        stub.ablegenManifest(MANDANT, datum, ManifestTeil.JSON, json, SPERRE);
+        stub.ablegenManifest(MANDANT, datum, ManifestTeil.SIG, sig, SPERRE);
         byte[] imprint = ManifestSignatur.imprint(json, sig);
         List<ZeitstempelVerweis> verweise = new ArrayList<>();
         for (String dienst : dienste) {
             byte[] tsr = tsr(imprint, datum, nachEnde);
             byte[] kette = ("kette " + dienst).getBytes(StandardCharsets.UTF_8);
             byte[] crl = ("crl " + dienst + " " + datum).getBytes(StandardCharsets.UTF_8);
-            stub.ablegenManifest(MANDANT, datum, ManifestTeil.tsr(dienst), tsr, Optional.empty());
-            stub.ablegenManifest(MANDANT, datum, ManifestTeil.kette(dienst), kette, Optional.empty());
-            stub.ablegenManifest(MANDANT, datum, ManifestTeil.crl(dienst), crl, Optional.empty());
+            stub.ablegenManifest(MANDANT, datum, ManifestTeil.tsr(dienst), tsr, SPERRE);
+            stub.ablegenManifest(MANDANT, datum, ManifestTeil.kette(dienst), kette, SPERRE);
+            stub.ablegenManifest(MANDANT, datum, ManifestTeil.crl(dienst), crl, SPERRE);
             verweise.add(new ZeitstempelVerweis(dienst, Sha256.hexVon(tsr),
                     List.of(Sha256.hexVon(kette), Sha256.hexVon(crl))));
         }
@@ -296,7 +348,10 @@ class ManifestPruefenTest {
         };
     }
 
-    /** Ablage im Speicher, deren Manifest-Teile sich ersetzen oder entfernen lassen (gesperrt geht das in S3 nicht). */
+    /**
+     * Ablage im Speicher, deren Manifest-Teile sich ersetzen oder entfernen lassen (gesperrt geht das in S3 nicht) oder
+     * weitere Versionen melden.
+     */
     private AblagePort manipulierbar() {
         return (AblagePort) Proxy.newProxyInstance(AblagePort.class.getClassLoader(), new Class<?>[] {AblagePort.class},
                 (proxy, methode, argumente) -> {
@@ -305,10 +360,15 @@ class ManifestPruefenTest {
                         if (entfernt.contains(pfad)) {
                             return Optional.empty();
                         }
-                        if (ersetzt.containsKey(pfad)) {
-                            Optional<ManifestDatei> echt = stub.lesenManifest(MANDANT, (LocalDate) argumente[1],
-                                    (ManifestTeil) argumente[2]);
-                            return Optional.of(new ManifestDatei(ersetzt.get(pfad), echt.orElseThrow().datei()));
+                        if (ersetzt.containsKey(pfad) || weitere.containsKey(pfad) || ungesperrt.contains(pfad)) {
+                            ManifestDatei echt = stub.lesenManifest(MANDANT, (LocalDate) argumente[1],
+                                    (ManifestTeil) argumente[2]).orElseThrow();
+                            AbgelegteDatei datei = ungesperrt.contains(pfad)
+                                    ? new AbgelegteDatei(echt.datei().schluessel(), echt.datei().versionId(),
+                                    echt.datei().sha256(), echt.datei().groesse(), Optional.empty())
+                                    : echt.datei();
+                            return Optional.of(new ManifestDatei(ersetzt.getOrDefault(pfad, echt.inhalt()), datei,
+                                    weitere.getOrDefault(pfad, 0)));
                         }
                     }
                     try {

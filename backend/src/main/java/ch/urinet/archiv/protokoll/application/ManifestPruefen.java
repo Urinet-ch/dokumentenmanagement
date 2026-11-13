@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,10 @@ import java.util.Set;
  * Prüfwerkzeug {@code archiv manifest pruefen} (Req 15.12; design.md «Manifest»): prüft nur aus der Ablage, ohne Netz
  * und ohne Datenbank, je Datum Signatur, kanonische Form, Hash-Kette mit Erneuerung (Req 15.2) und jeden Zeitstempel
  * gegen seine abgelegten Prüfdaten. Fehler: fehlendes oder ungültiges Manifest, Lücke oder Bruch der Kette, kein gültiger
- * Zeitstempel. Meldungen: fehlender Zeitstempel eines Dienstes, Verspätung über {@code archiv.manifest.verspaetung-schwelle}.
+ * Zeitstempel, weitere Versionen oder Löschmarken unter einem Manifest-Schlüssel oder ein ungesperrter Teil (geprüft wird
+ * immer die älteste Version). Meldungen: fehlender oder unvollständiger Zeitstempel eines Dienstes (ein {@code .tsr} ohne
+ * Kette oder Prüfdaten, auf das das Folgemanifest nicht verweist, Req 15.11), Verspätung über
+ * {@code archiv.manifest.verspaetung-schwelle}.
  * <p>
  * Geprüft werden die Tokens der konfigurierten Dienste und der Dienste, auf die das Folgemanifest verweist, damit ein
  * aus der Liste ausgetragener Dienst weiter geprüft wird.
@@ -63,9 +67,10 @@ public class ManifestPruefen {
         }
         Pruefbericht bericht = new Pruefbericht();
         PublicKey oeffentlich = schluessel.oeffentlich();
+        Lauf lauf = new Lauf(mandant, bericht, new HashSet<>());
         Map<LocalDate, Optional<Gelesen>> gelesen = new HashMap<>();
         for (LocalDate datum = von; !datum.isAfter(bis); datum = datum.plusDays(1)) {
-            Optional<Gelesen> manifest = gelesen.computeIfAbsent(datum, d -> lesen(mandant, d));
+            Optional<Gelesen> manifest = gelesen.computeIfAbsent(datum, d -> lesen(lauf, d));
             if (manifest.isEmpty()) {
                 bericht.fehler(datum + ": Manifest fehlt (Lücke in der Kette)");
                 continue;
@@ -76,10 +81,10 @@ public class ManifestPruefen {
                 continue;
             }
             einzeln(mandant, datum, g, oeffentlich, bericht);
-            Optional<Gelesen> folge = gelesen.computeIfAbsent(datum.plusDays(1), d -> lesen(mandant, d));
-            stempel(mandant, datum, g, folge.filter(f -> f.inhalt() != null), bericht);
-            Optional<Gelesen> vorher = gelesen.computeIfAbsent(datum.minusDays(1), d -> lesen(mandant, d));
-            kette(mandant, datum, g, vorher, bericht);
+            Optional<Gelesen> folge = gelesen.computeIfAbsent(datum.plusDays(1), d -> lesen(lauf, d));
+            stempel(lauf, datum, g, folge.filter(f -> f.inhalt() != null));
+            Optional<Gelesen> vorher = gelesen.computeIfAbsent(datum.minusDays(1), d -> lesen(lauf, d));
+            kette(lauf, datum, g, vorher);
             bericht.geprueft();
         }
         return bericht;
@@ -96,26 +101,33 @@ public class ManifestPruefen {
         }
     }
 
-    private void stempel(MandantCode mandant, LocalDate datum, Gelesen g, Optional<Gelesen> folge,
-                         Pruefbericht bericht) {
+    private void stempel(Lauf lauf, LocalDate datum, Gelesen g, Optional<Gelesen> folge) {
+        Pruefbericht bericht = lauf.bericht();
         if (g.sig() == null) {
             return;
         }
         Set<String> dienste = new LinkedHashSet<>(zeitstempel.dienste());
-        folge.map(f -> f.inhalt().vorher()).ifPresent(v -> v.zeitstempel().forEach(z -> dienste.add(z.dienst())));
+        Set<String> verwiesen = new HashSet<>();
+        folge.map(f -> f.inhalt().vorher()).ifPresent(v -> v.zeitstempel().forEach(z -> verwiesen.add(z.dienst())));
+        dienste.addAll(verwiesen);
+        List<String> unvollstaendig = new ArrayList<>();
         byte[] imprint = ManifestSignatur.imprint(g.json(), g.sig());
         Instant bis = g.inhalt().bis();
         int gueltig = 0;
         for (String dienst : dienste) {
-            Optional<ManifestDatei> tsr = ablage.lesenManifest(mandant, datum, ManifestTeil.tsr(dienst));
+            Optional<ManifestDatei> tsr = teil(lauf, datum, ManifestTeil.tsr(dienst));
             if (tsr.isEmpty()) {
                 bericht.meldung(datum + ": Zeitstempel von " + dienst + " fehlt");
                 continue;
             }
-            Optional<ManifestDatei> kette = ablage.lesenManifest(mandant, datum, ManifestTeil.kette(dienst));
-            Optional<Pruefdaten> pruefdaten = pruefdaten(mandant, datum, dienst);
+            Optional<ManifestDatei> kette = teil(lauf, datum, ManifestTeil.kette(dienst));
+            Optional<Pruefdaten> pruefdaten = pruefdaten(lauf, datum, dienst);
             if (kette.isEmpty() || pruefdaten.isEmpty()) {
-                bericht.fehler(datum + ": Prüfdaten des Zeitstempels von " + dienst + " fehlen");
+                if (verwiesen.contains(dienst)) {
+                    bericht.fehler(datum + ": Prüfdaten des Zeitstempels von " + dienst + " fehlen");
+                } else {
+                    unvollstaendig.add(dienst);
+                }
                 continue;
             }
             try {
@@ -132,12 +144,16 @@ public class ManifestPruefen {
         }
         if (gueltig == 0) {
             bericht.fehler(datum + ": kein gültiger Zeitstempel");
+            return;
         }
+        // Req 15.11: Die Erzeugung hält das Manifest nach dem letzten Versuch ohne diesen Dienst fest
+        unvollstaendig.forEach(dienst -> bericht.meldung(datum + ": Zeitstempel von " + dienst
+                + " unvollständig (Prüfdaten fehlen), nicht festgehalten"));
     }
 
     /** Hash-Kette und Erneuerung (Req 15.2): {@code vorher_sha256}, {@code von}, {@code .sig}, {@code .tsr}, Prüfdaten. */
-    private void kette(MandantCode mandant, LocalDate datum, Gelesen g, Optional<Gelesen> vorher,
-                       Pruefbericht bericht) {
+    private void kette(Lauf lauf, LocalDate datum, Gelesen g, Optional<Gelesen> vorher) {
+        Pruefbericht bericht = lauf.bericht();
         LocalDate tag = datum.minusDays(1);
         if (g.inhalt().vorherSha256() == null) {
             if (vorher.isPresent()) {
@@ -161,24 +177,24 @@ public class ManifestPruefen {
         }
         for (ZeitstempelVerweis verweis : g.inhalt().vorher().zeitstempel()) {
             String dienst = verweis.dienst();
-            Optional<ManifestDatei> tsr = ablage.lesenManifest(mandant, tag, ManifestTeil.tsr(dienst));
+            Optional<ManifestDatei> tsr = teil(lauf, tag, ManifestTeil.tsr(dienst));
             if (tsr.isEmpty() || !Sha256.hexVon(tsr.get().inhalt()).equals(verweis.tsrSha256())) {
                 bericht.fehler(datum + ": Erneuerung: Zeitstempel von " + dienst + " vom " + tag + " passt nicht");
                 continue;
             }
             List<String> abgelegt = new ArrayList<>();
-            ablage.lesenManifest(mandant, tag, ManifestTeil.kette(dienst))
+            teil(lauf, tag, ManifestTeil.kette(dienst))
                     .ifPresent(k -> abgelegt.add(Sha256.hexVon(k.inhalt())));
-            pruefdaten(mandant, tag, dienst).ifPresent(p -> abgelegt.add(Sha256.hexVon(p.inhalt())));
+            pruefdaten(lauf, tag, dienst).ifPresent(p -> abgelegt.add(Sha256.hexVon(p.inhalt())));
             if (!abgelegt.equals(verweis.pruefdatenSha256())) {
                 bericht.fehler(datum + ": Erneuerung: Prüfdaten von " + dienst + " vom " + tag + " passen nicht");
             }
         }
     }
 
-    private Optional<Pruefdaten> pruefdaten(MandantCode mandant, LocalDate datum, String dienst) {
+    private Optional<Pruefdaten> pruefdaten(Lauf lauf, LocalDate datum, String dienst) {
         for (Pruefdaten.Art art : Pruefdaten.Art.values()) {
-            Optional<ManifestDatei> datei = ablage.lesenManifest(mandant, datum, ManifestErzeugen.teil(dienst, art));
+            Optional<ManifestDatei> datei = teil(lauf, datum, ManifestErzeugen.teil(dienst, art));
             if (datei.isPresent()) {
                 return Optional.of(new Pruefdaten(art, datei.get().inhalt()));
             }
@@ -186,13 +202,31 @@ public class ManifestPruefen {
         return Optional.empty();
     }
 
-    private Optional<Gelesen> lesen(MandantCode mandant, LocalDate datum) {
-        Optional<ManifestDatei> datei = ablage.lesenManifest(mandant, datum, ManifestTeil.JSON);
+    /**
+     * Liest die älteste Version eines Teils. Weitere Versionen oder Löschmarken und ein ungesperrter Teil sind Fehler
+     * (je Schlüssel einmal gemeldet): Jeder Schlüssel unter {@code manifest/} wird nur einmal gesperrt geschrieben.
+     */
+    private Optional<ManifestDatei> teil(Lauf lauf, LocalDate datum, ManifestTeil teil) {
+        Optional<ManifestDatei> datei = ablage.lesenManifest(lauf.mandant(), datum, teil);
+        if (datei.isPresent() && lauf.gemeldet().add(teil.pfad(datum))) {
+            if (datei.get().weitere() > 0) {
+                lauf.bericht().fehler(datum + ": unter " + teil.pfad(datum) + " liegen " + datei.get().weitere()
+                        + " weitere Version(en) oder Löschmarke(n); geprüft wird die älteste");
+            }
+            if (datei.get().datei().sperreBis().isEmpty()) {
+                lauf.bericht().fehler(datum + ": " + teil.pfad(datum) + " ist nicht gesperrt");
+            }
+        }
+        return datei;
+    }
+
+    private Optional<Gelesen> lesen(Lauf lauf, LocalDate datum) {
+        Optional<ManifestDatei> datei = teil(lauf, datum, ManifestTeil.JSON);
         if (datei.isEmpty()) {
             return Optional.empty();
         }
         byte[] bytes = datei.get().inhalt();
-        byte[] sig = ablage.lesenManifest(mandant, datum, ManifestTeil.SIG).map(ManifestDatei::inhalt).orElse(null);
+        byte[] sig = teil(lauf, datum, ManifestTeil.SIG).map(ManifestDatei::inhalt).orElse(null);
         try {
             Map<String, Object> baum = json.objekt(bytes);
             if (!Arrays.equals(Jcs.utf8(baum), bytes)) {
@@ -202,6 +236,9 @@ public class ManifestPruefen {
         } catch (IllegalArgumentException e) {
             return Optional.of(new Gelesen(bytes, sig, null, "Manifest ist ungültig: " + e.getMessage()));
         }
+    }
+
+    private record Lauf(MandantCode mandant, Pruefbericht bericht, Set<String> gemeldet) {
     }
 
     private record Gelesen(byte[] json, byte[] sig, ManifestInhalt inhalt, String fehler) {
