@@ -32,13 +32,14 @@ import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
@@ -58,7 +59,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * RFC-3161-Zeitstempel mit BouncyCastle (Req 15.3, 15.11, 15.12; 4.9-E1): An den Dienst geht nur der SHA-256-Imprint
@@ -387,23 +394,76 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         return lesen(HttpRequest.newBuilder(ziel).timeout(zeitgrenze).GET().build(), max);
     }
 
+    /**
+     * Antwort lesen, höchstens {@code max} Bytes und insgesamt höchstens {@code zeitgrenze}: {@code HttpRequest.timeout}
+     * gilt nur bis zu den Kopfzeilen, ein langsam tröpfelnder Körper bliebe sonst unbegrenzt.
+     */
     private byte[] lesen(HttpRequest anfrage, int max) throws IOException {
+        CompletableFuture<HttpResponse<byte[]>> lauf = client.sendAsync(anfrage, info -> info.statusCode() == 200
+                ? begrenzt(max) : HttpResponse.BodySubscribers.replacing(new byte[0]));
         try {
-            HttpResponse<InputStream> antwort = client.send(anfrage, HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream ein = antwort.body()) {
-                if (antwort.statusCode() != 200) {
-                    throw new IOException("HTTP " + antwort.statusCode());
-                }
-                byte[] daten = ein.readNBytes(max + 1);
-                if (daten.length > max) {
-                    throw new IOException("Antwort zu gross");
-                }
-                return daten;
+            HttpResponse<byte[]> antwort = lauf.get(zeitgrenze.toMillis(), TimeUnit.MILLISECONDS);
+            if (antwort.statusCode() != 200) {
+                throw new IOException("HTTP " + antwort.statusCode());
             }
+            return antwort.body();
+        } catch (TimeoutException e) {
+            lauf.cancel(true);
+            throw new IOException("keine vollständige Antwort innert " + zeitgrenze, e);
+        } catch (ExecutionException e) {
+            throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
         } catch (InterruptedException e) {
+            lauf.cancel(true);
             Thread.currentThread().interrupt();
             throw new IOException("unterbrochen", e);
         }
+    }
+
+    /** Sammelt den Körper bis {@code max} Bytes und bricht darüber ab. */
+    static HttpResponse.BodySubscriber<byte[]> begrenzt(int max) {
+        return new HttpResponse.BodySubscriber<>() {
+            private final ByteArrayOutputStream puffer = new ByteArrayOutputStream();
+            private final CompletableFuture<byte[]> ergebnis = new CompletableFuture<>();
+            private Flow.Subscription abo;
+
+            @Override
+            public CompletionStage<byte[]> getBody() {
+                return ergebnis;
+            }
+
+            @Override
+            public void onSubscribe(Flow.Subscription subscription) {
+                abo = subscription;
+                subscription.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(List<ByteBuffer> teile) {
+                for (ByteBuffer teil : teile) {
+                    if (ergebnis.isDone()) {
+                        return;
+                    }
+                    if (puffer.size() + teil.remaining() > max) {
+                        abo.cancel();
+                        ergebnis.completeExceptionally(new IOException("Antwort zu gross"));
+                        return;
+                    }
+                    byte[] bytes = new byte[teil.remaining()];
+                    teil.get(bytes);
+                    puffer.writeBytes(bytes);
+                }
+            }
+
+            @Override
+            public void onError(Throwable fehler) {
+                ergebnis.completeExceptionally(fehler);
+            }
+
+            @Override
+            public void onComplete() {
+                ergebnis.complete(puffer.toByteArray());
+            }
+        };
     }
 
     /** Erlaubte Policy-OIDs und ausstellende CAs. */

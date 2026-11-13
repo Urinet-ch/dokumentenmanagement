@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -212,5 +215,35 @@ class BcZeitstempelAdapterTest {
         } catch (java.io.IOException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    @Test
+    void eineTsaAntwortWirdNurBisZurHoechstgroesseGelesen() throws Exception {
+        var klein = BcZeitstempelAdapter.begrenzt(4);
+        AtomicBoolean abgebrochen = new AtomicBoolean();
+        klein.onSubscribe(abo(abgebrochen));
+        klein.onNext(List.of(ByteBuffer.wrap(new byte[] {1, 2}), ByteBuffer.wrap(new byte[] {3})));
+        klein.onComplete();
+        assertThat(klein.getBody().toCompletableFuture().get()).containsExactly(1, 2, 3);
+
+        var gross = BcZeitstempelAdapter.begrenzt(4);
+        gross.onSubscribe(abo(abgebrochen));
+        gross.onNext(List.of(ByteBuffer.wrap(new byte[5])));
+        assertThat(abgebrochen).isTrue();
+        assertThatThrownBy(() -> gross.getBody().toCompletableFuture().get())
+                .hasRootCauseMessage("Antwort zu gross");
+    }
+
+    private static Flow.Subscription abo(AtomicBoolean abgebrochen) {
+        return new Flow.Subscription() {
+            @Override
+            public void request(long n) {
+            }
+
+            @Override
+            public void cancel() {
+                abgebrochen.set(true);
+            }
+        };
     }
 }

@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.Blatt;
@@ -12,6 +13,7 @@ import ch.urinet.archiv.protokoll.application.ManifestDaten.ManifestStand;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.NeuesManifest;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.Pruefdatei;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.Zeitstempel;
+import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
@@ -27,6 +29,7 @@ import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.io.ByteArrayOutputStream;
@@ -34,7 +37,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.MonthDay;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +51,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Handler für {@code MANIFEST} (Aufgabe 5.2, Req 15.1–15.4, 15.6–15.8, 15.11; design.md «Manifest»): erzeugt für jedes
@@ -54,9 +61,12 @@ import java.util.concurrent.Future;
  * unter {@code manifest/} ab.
  * <p>
  * Idempotent und ohne Lücke: Ein Datum wird erst festgehalten, wenn mindestens ein Stempel vorliegt; die Kette endet
- * beim ersten Datum ohne Manifest, der nächste Lauf setzt dort an. Ein schon abgelegtes {@code .tsr} wird
- * wiederverwendet (ein Stempel lässt sich nicht wiederholen, ohne dass ein anderes Token entsteht). Liegt unter einem
- * Pfad schon ein anderer Inhalt, bricht der Lauf ab (fail closed).
+ * beim ersten Datum ohne Manifest, der nächste Lauf setzt dort an. Ein schon abgelegtes JSON wird wiederverwendet, wenn
+ * Fenster, Kette, Einträge und Protokoll-Hashes mit den neu gesammelten Daten übereinstimmen (sonst Abbruch); ebenso
+ * ein schon abgelegtes {@code .tsr} und abgelegte Prüfdaten (ein Stempel lässt sich nicht wiederholen, ohne dass ein
+ * anderes Token entsteht). Auch Wiederverwendetes läuft über {@link AblagePort#ablegenManifest}, damit seine Sperre auf
+ * die des Manifests verlängert wird. Liegt unter einem Pfad schon ein anderer Inhalt oder eine weitere Version, bricht
+ * der Lauf ab (fail closed).
  */
 @ApplicationScoped
 public class ManifestErzeugen implements AuftragHandler {
@@ -66,9 +76,9 @@ public class ManifestErzeugen implements AuftragHandler {
     /** Abstand zum Ende eines Tages, damit spät festgeschriebene Zeilen nicht aus dem Fenster fallen. */
     public static final Duration NACHLAUF = Duration.ofMinutes(15);
     /**
-     * Höchstens so viele Tage je Lauf; die übrigen holt ein Folgeauftrag. Je Tag schlimmstenfalls zwei Netzaufrufe zu
-     * je {@code archiv.tsa.zeitgrenze} (30 s, Stempel und Prüfdaten, die Dienste parallel): 7 Tage bleiben unter der
-     * Zeitgrenze von {@code MANIFEST} (15 min).
+     * Höchstens so viele Tage je Lauf; die übrigen holt ein Folgeauftrag. Je Tag wartet der Lauf höchstens
+     * {@code archiv.manifest.dienst-frist} (90 s, die Dienste parallel, je zwei Netzaufrufe zu {@code archiv.tsa.zeitgrenze}
+     * von 30 s): 7 Tage bleiben unter der Zeitgrenze von {@code MANIFEST} (15 min).
      */
     static final int MAX_TAGE_JE_LAUF = 7;
 
@@ -82,10 +92,16 @@ public class ManifestErzeugen implements AuftragHandler {
     private final ManifestSchluessel schluessel;
     private final MandantRegister register;
     private final InhaberBenachrichtigung benachrichtigung;
+    private final JsonLeser leser;
+    private final MandantEinstellungen einstellungen;
+    private final Duration dienstFrist;
 
     public ManifestErzeugen(ManifestSpeichern speichern, ManifestDaten daten, AblagePort ablage,
                             ZeitstempelPort zeitstempel, ManifestSchluessel schluessel, MandantRegister register,
-                            InhaberBenachrichtigung benachrichtigung) {
+                            InhaberBenachrichtigung benachrichtigung, JsonLeser json,
+                            MandantEinstellungen einstellungen,
+                            @ConfigProperty(name = "archiv.manifest.dienst-frist", defaultValue = "PT90S")
+                            Duration dienstFrist) {
         this.speichern = speichern;
         this.daten = daten;
         this.ablage = ablage;
@@ -93,6 +109,9 @@ public class ManifestErzeugen implements AuftragHandler {
         this.schluessel = schluessel;
         this.register = register;
         this.benachrichtigung = benachrichtigung;
+        this.leser = json;
+        this.einstellungen = einstellungen;
+        this.dienstFrist = dienstFrist;
     }
 
     @Override
@@ -153,19 +172,29 @@ public class ManifestErzeugen implements AuftragHandler {
     }
 
     /**
-     * Sperre des Manifests (Req 15.4): spätestes {@code aufbewahren_bis}; mit einem unbefristeten Dokument mindestens
-     * 10 Jahre (Req 6.9); ohne Dokument oder wenn alle Fristen vorbei sind, leer (10 Jahre).
+     * Sperre des Manifests: das Spätere aus dem spätesten {@code aufbewahren_bis} der enthaltenen Dateien (Req 15.4),
+     * mit einem unbefristeten Dokument {@code heute} + 10 Jahre (Req 6.9), und der Aufbewahrung der Protokolle, deren
+     * Hashes das Manifest trägt: Ende des Geschäftsjahres des Fensterdatums + 10 Jahre (Req 10.9). So endet kein
+     * Manifest vor dem Protokoll, das es belegt (Auslegung, design.md «Umsetzung (Aufgabe 5.2)»).
      */
-    static Optional<LocalDate> sperre(Fristen fristen, LocalDate heute) {
-        if (fristen.dokumente() == 0) {
-            return Optional.empty();
+    static Optional<LocalDate> sperre(Fristen fristen, LocalDate heute, LocalDate datum, MonthDay gjEnde) {
+        LocalDate sperre = protokollfrist(datum, gjEnde);
+        if (fristen.dokumente() > 0) {
+            Optional<LocalDate> spaetestens = fristen.spaetestens().filter(d -> !d.isBefore(heute));
+            if (spaetestens.isPresent() && spaetestens.get().isAfter(sperre)) {
+                sperre = spaetestens.get();
+            }
+            if (fristen.unbefristet() && heute.plusYears(10).isAfter(sperre)) {
+                sperre = heute.plusYears(10);
+            }
         }
-        Optional<LocalDate> spaetestens = fristen.spaetestens().filter(d -> !d.isBefore(heute));
-        if (fristen.unbefristet()) {
-            LocalDate zehn = heute.plusYears(10);
-            return Optional.of(spaetestens.filter(d -> d.isAfter(zehn)).orElse(zehn));
-        }
-        return spaetestens;
+        return Optional.of(sperre);
+    }
+
+    /** Ende des Geschäftsjahres, in das {@code datum} fällt, plus 10 Jahre (Req 10.9). */
+    static LocalDate protokollfrist(LocalDate datum, MonthDay gjEnde) {
+        int jahr = datum.isAfter(gjEnde.atYear(datum.getYear())) ? datum.getYear() + 1 : datum.getYear();
+        return gjEnde.atYear(jahr + 10);
     }
 
     private ManifestStand erzeugen(Auftrag auftrag, LocalDate datum, Optional<ManifestStand> vorgaenger) {
@@ -177,9 +206,15 @@ public class ManifestErzeugen implements AuftragHandler {
         ManifestInhalt inhalt = new ManifestInhalt(mandant.wert(), datum, fenster.von(), fenster.bis(),
                 vorgaenger.map(ManifestStand::sha256).orElse(null), vorgaenger.map(ManifestStand::verweis).orElse(null),
                 sammlung.eintraege(), new TreeMap<>(protokolle), List.of());
-        Optional<LocalDate> sperre = sperre(sammlung.fristen(), ManifestFenster.tag(Instant.now()));
+        Optional<LocalDate> sperre = sperre(sammlung.fristen(), ManifestFenster.tag(Instant.now()), datum,
+                einstellungen.lesen(mandant).geschaeftsjahresende().monatTag());
 
         byte[] json = inhalt.kanonisch();
+        Optional<ManifestDatei> abgelegt = ablage.lesenManifest(mandant, datum, ManifestTeil.JSON);
+        if (abgelegt.isPresent()) {
+            json = abgelegt.get().inhalt();
+            inhalt = wiederverwenden(leser, datum, json, inhalt);
+        }
         AbgelegteDatei jsonAblage = ablage.ablegenManifest(mandant, datum, ManifestTeil.JSON, json, sperre);
         byte[] sig = ManifestSignatur.signieren(schluessel.privat(), json);
         AbgelegteDatei sigAblage = ablage.ablegenManifest(mandant, datum, ManifestTeil.SIG, sig, sperre);
@@ -198,11 +233,16 @@ public class ManifestErzeugen implements AuftragHandler {
             }
             for (Map.Entry<String, Future<Zeitstempel>> lauf : laeufe.entrySet()) {
                 try {
-                    gestempelt.put(lauf.getKey(), lauf.getValue().get());
+                    gestempelt.put(lauf.getKey(), lauf.getValue().get(dienstFrist.toMillis(), TimeUnit.MILLISECONDS));
                 } catch (ExecutionException e) {
                     fehlend.add(lauf.getKey());
                     LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel (%s)", datum, lauf.getKey(),
                             e.getCause().getClass().getSimpleName());
+                } catch (TimeoutException e) {
+                    lauf.getValue().cancel(true);
+                    fehlend.add(lauf.getKey());
+                    LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel innert %s (archiv.manifest.dienst-frist)",
+                            datum, lauf.getKey(), dienstFrist);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Manifest " + datum + ": unterbrochen", e);
@@ -228,6 +268,35 @@ public class ManifestErzeugen implements AuftragHandler {
                 verweis(sigAblage.sha256(), List.copyOf(gestempelt.values())));
     }
 
+    /**
+     * Ein schon abgelegtes Manifest (früherer Versuch) gilt nur, wenn es kanonisch ist und Fenster, Kette, Einträge und
+     * Protokoll-Hashes mit den neu gesammelten Daten übereinstimmen; sonst bricht der Lauf ab (fail closed). Abweichen
+     * darf nur, was nicht aus der Datenbank gesammelt wird ({@code sicherung}, Aufgabe 5.5).
+     */
+    static ManifestInhalt wiederverwenden(JsonLeser leser, LocalDate datum, byte[] abgelegt, ManifestInhalt neu) {
+        ManifestInhalt frueher;
+        try {
+            Map<String, Object> baum = leser.objekt(abgelegt);
+            if (!Arrays.equals(Jcs.utf8(baum), abgelegt)) {
+                throw new IllegalStateException("Manifest " + datum + ": abgelegtes Manifest nicht kanonisch");
+            }
+            frueher = ManifestInhalt.aus(baum);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("Manifest " + datum + ": abgelegtes Manifest ungültig", e);
+        }
+        boolean gleich = frueher.mandant().equals(neu.mandant()) && frueher.datum().equals(neu.datum())
+                && java.util.Objects.equals(frueher.von(), neu.von()) && frueher.bis().equals(neu.bis())
+                && java.util.Objects.equals(frueher.vorherSha256(), neu.vorherSha256())
+                && java.util.Objects.equals(frueher.vorher(), neu.vorher())
+                && frueher.eintraege().equals(neu.eintraege()) && frueher.protokolle().equals(neu.protokolle());
+        if (!gleich) {
+            throw new IllegalStateException("Manifest " + datum + ": das abgelegte Manifest weicht von den gesammelten "
+                    + "Einträgen oder Protokoll-Hashes ab (verspätet festgeschriebene Zeile?)");
+        }
+        LOG.infof("Manifest %s: abgelegtes Manifest aus einem früheren Versuch wiederverwendet", datum);
+        return frueher;
+    }
+
     /** Verweis für {@code vorher} im Folgetag; Dienste nach Name, damit Lauf und Datenbank dasselbe ergeben. */
     public static Vorher verweis(String sigSha256, List<Zeitstempel> zeitstempel) {
         List<ZeitstempelVerweis> verweise = zeitstempel.stream()
@@ -245,8 +314,9 @@ public class ManifestErzeugen implements AuftragHandler {
         Stempel stempel;
         AbgelegteDatei tsr;
         if (vorhanden.isPresent()) {
-            stempel = zeitstempel.pruefen(dienst, vorhanden.get().inhalt(), imprint);
-            tsr = vorhanden.get().datei();
+            byte[] token = vorhanden.get().inhalt();
+            stempel = zeitstempel.pruefen(dienst, token, imprint);
+            tsr = ablage.ablegenManifest(mandant, datum, ManifestTeil.tsr(dienst), token, sperre);
         } else {
             stempel = zeitstempel.stempeln(dienst, imprint);
             tsr = ablage.ablegenManifest(mandant, datum, ManifestTeil.tsr(dienst), stempel.tsr(), sperre);
@@ -263,7 +333,8 @@ public class ManifestErzeugen implements AuftragHandler {
         for (Pruefdaten.Art art : Pruefdaten.Art.values()) {
             Optional<ManifestDatei> vorhanden = ablage.lesenManifest(mandant, datum, teil(dienst, art));
             if (vorhanden.isPresent()) {
-                AbgelegteDatei d = vorhanden.get().datei();
+                AbgelegteDatei d = ablage.ablegenManifest(mandant, datum, teil(dienst, art), vorhanden.get().inhalt(),
+                        sperre);
                 return new Pruefdatei(art.name().toLowerCase(java.util.Locale.ROOT), d.sha256(), d.versionId());
             }
         }
