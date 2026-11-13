@@ -26,6 +26,14 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und jedes Manifest von «mf-kette» trägt je einen gültigen Zeitstempel von «haupt» und «zweit» über SHA-256 von Manifest und Signatur
     Und das Prüfwerkzeug meldet für «mf-kette» vom «10.01.2026» bis «12.01.2026» «Ergebnis: gültig» mit Exit-Code 0
 
+  @req-3.12
+  Szenario: Das Manifest nennt den Dateinamen eines Dokuments nicht
+    Angenommen der Mandant «mf-name» ist am «10.01.2026» angelegt
+    Und im Mandanten «mf-name» wurde das Dokument «D1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
+    Und das Dokument «D1» von «mf-name» heisst «Scan_Rechnung-2026.pdf»
+    Wenn der Manifest-Lauf für «mf-name» bis «10.01.2026» läuft
+    Dann das Manifest «10.01.2026» von «mf-name» nennt den Dateinamen «Scan_Rechnung-2026.pdf» nicht, seine Einträge tragen nur Dokument, Variante, Nummer, SHA-256 und Versions-ID
+
   @req-16.7
   Szenario: An die Zeitstempeldienste geht nur der Hash von Manifest und Signatur
     Angenommen der Mandant «mf-anfrage» ist am «10.01.2026» angelegt
