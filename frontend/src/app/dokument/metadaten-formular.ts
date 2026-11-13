@@ -15,7 +15,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { Observable, Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import { Observable, Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { Dokument, Dokumentart, Kontakt } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
@@ -133,7 +133,6 @@ export class MetadatenFormular {
     this.suche
       .pipe(
         debounceTime(300),
-        distinctUntilChanged(),
         switchMap((q): Observable<readonly Kontakt[] | null> =>
           q.length < 2 ? of(null) : this.port.kontakte(q).pipe(catchError(() => of([]))),
         ),

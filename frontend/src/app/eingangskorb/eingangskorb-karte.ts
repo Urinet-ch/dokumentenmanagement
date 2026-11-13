@@ -399,7 +399,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         const meldung = this.texte.fehlerPflichtfelder(namen);
         this.imFormular(
           felder.some((f) => f.startsWith('zusatz.'))
-            ? `${meldung} ${this.texte.zusatzNichtImKorb}`
+            ? `${meldung} ${this.texte.zusatzBleibtImKorb}`
             : meldung,
           felder.map(camel),
         );

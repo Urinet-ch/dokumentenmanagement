@@ -297,6 +297,19 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(freigeben).toHaveBeenCalledWith('blob:bild-1');
   });
 
+  it('bestellt den Abruf des Vorschaubilds beim Verlassen ab und legt keine Object-URL mehr an', async () => {
+    const erstellen = vi.fn(() => 'blob:spaet');
+    Object.assign(URL, { createObjectURL: erstellen, revokeObjectURL: vi.fn() });
+    const blob = new Subject<Blob>();
+    port.bild = blob;
+    port.dokument = of({ ...DOKUMENT, seiten: 2 });
+    await oeffnen();
+    expect(port.bilder).toEqual([1]);
+    fixture.destroy();
+    blob.next(new Blob(['png'], { type: 'image/png' }));
+    expect(erstellen).not.toHaveBeenCalled();
+  });
+
   it('holt ohne Seiten kein Vorschaubild', async () => {
     await oeffnen();
     expect(port.bilder).toEqual([]);

@@ -359,11 +359,12 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     );
   });
 
-  it('nennt fehlende Pflicht-Zusatzfelder und dass der Eingangskorb sie nicht erfasst (Review PR #68, S1)', async () => {
+  it('nennt fehlende Pflicht-Zusatzfelder und verlinkt auf die Dokumentansicht (Review PR #68, S1)', async () => {
     await zeigen(dokument({ art: 'LOHNABRECHNUNG' }));
     const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
     expect(hinweis?.textContent).toContain(T.hinweisZusatz(T.zusatzFeld('periode')));
-    expect(hinweis?.textContent).toContain(T.zusatzNichtImKorb);
+    expect(hinweis?.textContent).toContain(T.zusatzErgaenzen);
+    expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1');
     await klicken(T.bestaetigen);
     await antworten(
       '/api/v1/dokumente/d1/bestaetigen',
@@ -372,7 +373,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       'Unprocessable Entity',
     );
     expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(
-      `${T.fehlerPflichtfelder(T.zusatzFeld('periode'))} ${T.zusatzNichtImKorb}`,
+      `${T.fehlerPflichtfelder(T.zusatzFeld('periode'))} ${T.zusatzBleibtImKorb}`,
     );
   });
 

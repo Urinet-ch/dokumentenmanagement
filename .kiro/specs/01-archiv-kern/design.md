@@ -1103,11 +1103,11 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     `kuendigungsfrist`, `naechsteFrist`) gehen ebenso mit, sonst löschte das Bestätigen sie.
   - Wechselt der Benutzer im Formular die Art, folgt die Vertraulichkeit: zurück auf die vorgeschlagene Art gilt wieder
     der Vorschlag, sonst leer (Standard der neuen Art); hat er die Vertraulichkeit selbst gewählt, bleibt sie.
-  - Bekannte Grenze Zusatzfelder: Der Body der Bestätigung (3.4) nimmt kein `zusatz` an, die Karte kann Zusatzfelder
-    darum nicht erfassen. Fehlt einer Art mit A7 ein Pflichtfeld `zusatz.*` am Dokument, zeigt die Karte einen Hinweis
-    mit den fehlenden Feldern, und bei 422 mit `zusatz.*` sagt die Meldung, dass das Dokument im Eingangskorb bleibt
-    (verwerfen bleibt möglich). Ergänzen lassen sich Zusatzfelder erst mit `PATCH /dokumente/{id}` (3.5) bzw. in der
-    Dokumentansicht (4.6) (Soll-Befund Review PR #68).
+  - Grenze Zusatzfelder (erledigt durch #100, Folge Review #100): Der Body der Bestätigung (3.4) nimmt kein `zusatz`
+    an, die Karte erfasst Zusatzfelder darum nicht selbst. Fehlt einer Art mit A7 ein Pflichtfeld `zusatz.*` am
+    Dokument, zeigt die Karte einen Hinweis mit den fehlenden Feldern und dem Link «In der Dokumentansicht ergänzen»
+    (`/dokument/{id}`); dort lassen sich die Zusatzfelder ergänzen (4.6). Bei 422 mit `zusatz.*` sagt die Meldung,
+    dass das Dokument im Eingangskorb bleibt (verwerfen bleibt möglich).
   - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
     `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
     `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
@@ -1166,6 +1166,13 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       `If-Match` aus `version`; ohne Änderung keine Anfrage. Bei `ARCHIVIERT` ist der Grund Pflicht (höchstens 1'000
       Zeichen), sonst freiwillig. Betrag, Währung, Geschäftsjahr, Daten und Zusatzwerte prüft schon die PWA, Beträge
       gehen als Text (`'` und `,` als Eingabe), die API prüft trotzdem.
+    - Artwechsel (Folge Review #100): Wechselt die Art, geht `zusatz` immer mit, und zwar nur mit den Schlüsseln aus
+      `properties` der neuen Art (sonst `{}`); Zusatzwerte der alten Art entfallen, weil die Schemas
+      `additionalProperties: false` tragen. Ohne Artwechsel bleibt es bei «nur bei Änderung».
+    - Die Partnersuche löst nach dem Entfernen eines Partners dieselbe Eingabe wieder aus (kein `distinctUntilChanged`;
+      `switchMap` verwirft veraltete Abrufe). Die Ansicht bestellt den Abruf des Vorschaubilds beim Verlassen ab.
+      `GET`/`PATCH /dokumente/{id}` lesen Dokument, Warnungen und Versionsliste in einer Transaktion
+      (`DokumentLesen.ansicht`).
     - Fehler: `PFLICHTFELD_FEHLT` markiert die genannten Felder; `VERSION_KONFLIKT`/412, `STATUS_KONFLIKT`/409 und
       404 schliessen das Formular, die Ansicht lädt neu und sagt warum; fachliche Fehler (`BELEGNUMMER_VERGEBEN`,
       `PARTNER_UNBEKANNT`, `ZUSATZ_UNGUELTIG`, 400) bleiben als Meldung im Formular, die Eingaben bleiben stehen.

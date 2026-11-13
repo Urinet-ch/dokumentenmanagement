@@ -28,6 +28,32 @@ Funktionalität: Metadaten bearbeiten und Versionen in der Dokumentansicht
     Und nennt die Dokumentansicht die Fassung 2 mit dem Grund «Jahr im Titel ergänzt», geändert von «Ihnen»
 
   @req-10.1
+  Szenario: Beim Artwechsel auf eine Art ohne Zusatzfelder geht kein Zusatzwert der alten Art mit
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich die Suche über das Menü öffne
+    Wenn ich nach «Altdorf» suche
+    Und ich den Treffer «Offerte Testclub Altdorf» öffne
+    Dann sehe ich die Dokumentansicht von «Offerte Testclub Altdorf»
+    Wenn ich den Knopf «Metadaten bearbeiten» wähle
+    Und ich die Art auf «Quittung» wechsle
+    Und ich als Grund «Art korrigiert» angebe und speichere
+    Dann hat die PWA die Art «QUITTUNG» mit den Zusatzwerten {} und dem Grund gesendet
+
+  @req-10.1
+  Szenario: Beim Artwechsel auf eine Art mit anderen Zusatzfeldern gehen nur deren Werte mit
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich die Suche über das Menü öffne
+    Wenn ich nach «Altdorf» suche
+    Und ich den Treffer «Offerte Testclub Altdorf» öffne
+    Dann sehe ich die Dokumentansicht von «Offerte Testclub Altdorf»
+    Wenn ich den Knopf «Metadaten bearbeiten» wähle
+    Und ich die Art auf «Lohnabrechnung» wechsle
+    Und ich das Zusatzfeld «periode» mit «2026-10» ausfülle
+    Und ich das Zusatzfeld «person» mit «Testperson» ausfülle
+    Und ich als Grund «Art korrigiert» angebe und speichere
+    Dann hat die PWA die Art «LOHNABRECHNUNG» mit den Zusatzwerten {"periode":"2026-10","person":"Testperson"} und dem Grund gesendet
+
+  @req-10.1
   Szenario: Ohne Recht A6 bietet die Ansicht kein Bearbeiten an
     Angenommen ich bin als «treuhaender» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne
