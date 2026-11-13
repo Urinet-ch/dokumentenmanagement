@@ -108,6 +108,10 @@ export const TEXTE = {
     ganzesBildVerwenden: 'Ganzes Bild verwenden',
     abbrechen: 'Abbrechen',
     abschliessen: 'Erfassung abschliessen',
+    seitenMitFehler: (nummern: number[]) =>
+      `${nummern.length === 1 ? `Seite ${nummern[0]} ist` : `Die Seiten ${nummern.join(', ')} sind`} nicht zugeschnitten. ` +
+      'Bitte zuerst die markierten Seiten verwerfen oder neu aufnehmen.',
+    speichert: 'Erfassung wird gespeichert …',
     gespeichert: 'Erfassung gespeichert. Sie wird hochgeladen, sobald eine Verbindung besteht.',
     speichernFehler:
       'Die Erfassung konnte auf diesem Gerät nicht gespeichert werden (z. B. im privaten Modus). Bitte erneut versuchen.',

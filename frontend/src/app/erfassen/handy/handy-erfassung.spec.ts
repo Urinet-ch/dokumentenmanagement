@@ -84,6 +84,8 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     });
   });
 
+  afterEach(() => vi.restoreAllMocks());
+
   async function zeigen(): Promise<void> {
     fixture = TestBed.createComponent(HandyErfassung);
     element = fixture.nativeElement;
@@ -94,7 +96,7 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === text || b.getAttribute('aria-label') === text);
 
   async function fotoWaehlen(anzahl = 1): Promise<void> {
-    knopf(TEXTE.handy.kameraOeffnen)!.click();
+    knopf(TEXTE.handy.kameraOeffnen)?.click();
     await fixture.whenStable();
     const eingabe = element.querySelector<HTMLInputElement>('input[type=file][capture=environment]')!;
     const dateien = Array.from({ length: anzahl }, (_, i) => new File([`roh${i}`], `foto${i}.jpg`, { type: 'image/jpeg' }));
@@ -167,12 +169,90 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(hinweise()).toEqual([]);
   });
 
-  it('sperrt «Erfassung abschliessen», solange eine Seite nicht zugeschnitten ist', async () => {
-    scanner.fehler = true;
+  it('meldet bei einer Seite mit Fehler beim Abschliessen und beim Anmelden, was zu tun ist', async () => {
     await zeigen();
     await fotoWaehlen();
-    expect(hinweise()).toEqual(['fehler']);
+    scanner.fehler = true;
+    await fotoWaehlen();
+    expect(hinweise()).toEqual(['kantenErkannt', 'fehler']);
+
+    knopf(TEXTE.handy.abschliessen)!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=erfassung-meldung]')!.textContent).toBe(TEXTE.handy.seitenMitFehler([2]));
+    expect(element.querySelector('.mit-fehler')).not.toBeNull();
+    expect(speicher.inhalt.size).toBe(0);
+
+    knopf(TEXTE.handy.verwerfen(1))!.click();
+    await fixture.whenStable();
+    knopf(TEXTE.anmeldung.anmelden)!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=erfassung-meldung]')!.textContent).toBe(TEXTE.handy.seitenMitFehler([1]));
+    expect(anmeldung.anmelden).not.toHaveBeenCalled();
+    expect(speicher.inhalt.size).toBe(0);
+
+    knopf(TEXTE.handy.verwerfen(1))!.click();
+    await fixture.whenStable();
+    knopf(TEXTE.anmeldung.anmelden)!.click();
+    await fixture.whenStable();
+    expect(anmeldung.anmelden).toHaveBeenCalledWith('/erfassen');
+  });
+
+  it('speichert bei Doppeltipp nur einmal, sperrt die Aufnahme und behält währenddessen aufgenommene Seiten', async () => {
+    let freigeben!: () => void;
+    const gesperrt = new Promise<void>((weiter) => (freigeben = weiter));
+    const speichern = vi.spyOn(speicher, 'speichern').mockImplementation(async (eintrag) => {
+      await gesperrt;
+      speicher.inhalt.set(eintrag.id, eintrag);
+    });
+    let n = 0;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:${++n}`);
+    const freigegeben = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    await zeigen();
+    await fotoWaehlen(2);
+
+    knopf(TEXTE.handy.abschliessen)!.click();
+    knopf(TEXTE.handy.abschliessen)!.click();
+    await fixture.whenStable();
     expect(knopf(TEXTE.handy.abschliessen)!.disabled).toBe(true);
+    expect(knopf(TEXTE.handy.fotoWaehlen)!.disabled).toBe(true);
+    expect(knopf(TEXTE.handy.verwerfen(1))!.disabled).toBe(true);
+    // Eine Aufnahme, die schon unterwegs war, kommt während des Speicherns an
+    const eingabe = element.querySelector<HTMLInputElement>('input[type=file][capture=environment]')!;
+    Object.defineProperty(eingabe, 'files', { value: [new File(['spaet'], 'spaet.jpg', { type: 'image/jpeg' })] });
+    eingabe.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(hinweise()).toHaveLength(3);
+    const spaet = element.querySelectorAll<HTMLImageElement>('[data-test=seite] img')[2].src;
+
+    freigeben();
+    await vi.waitFor(() => expect(knopf(TEXTE.handy.fotoWaehlen)!.disabled).toBe(false));
+    await fixture.whenStable();
+    expect(speichern).toHaveBeenCalledOnce();
+    expect([...speicher.inhalt.values()][0].seiten).toHaveLength(2);
+    expect(hinweise()).toEqual(['kantenErkannt']);
+    expect(element.querySelector('img')!.src).toBe(spaet);
+    expect(freigegeben).toHaveBeenCalledTimes(4);
+    expect(freigegeben.mock.calls.map(([url]) => url)).not.toContain(spaet);
+    expect(knopf(TEXTE.handy.abschliessen)!.disabled).toBe(false);
+    expect(knopf(TEXTE.handy.fotoWaehlen)!.disabled).toBe(false);
+  });
+
+  it('nennt im Dateinamen die erste verbliebene Seite, wenn die erste verworfen ist (Req 4.9)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      await zeigen();
+      vi.setSystemTime(new Date('2026-11-13T07:15:00Z'));
+      await fotoWaehlen();
+      vi.setSystemTime(new Date('2026-11-13T07:17:00Z'));
+      await fotoWaehlen();
+      knopf(TEXTE.handy.verwerfen(1))!.click();
+      await fixture.whenStable();
+      knopf(TEXTE.handy.abschliessen)!.click();
+      await fixture.whenStable();
+      expect([...speicher.inhalt.values()][0].aufgenommen).toBe('2026-11-13T07:17:00.000Z');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sichert ohne Anmeldung die Seiten vor der Anmeldung und kehrt danach zu «Erfassen» zurück', async () => {

@@ -24,6 +24,8 @@ type Hinweis = 'laeuft' | 'kantenErkannt' | 'keineKanten' | 'angepasst' | 'ganze
 
 interface Aufnahme {
   nr: number;
+  /** Zeitpunkt der Aufnahme; der der ersten Seite einer Erfassung bestimmt den Dateinamen (Req 4.9). */
+  aufgenommen: Date;
   original: Blob;
   originalUrl: string;
   vorschauUrl?: string;
@@ -62,17 +64,23 @@ export class HandyErfassung {
   protected readonly seiten = signal<Aufnahme[]>([]);
   protected readonly bearbeitet = signal<number | null>(null);
   protected readonly meldung = signal<string | null>(null);
-  protected readonly fertig = computed(() => {
+  /** Die Erfassung wird gespeichert: Aufnehmen, Dateiwahl, Zuschnitt, Verwerfen und Abschliessen sind gesperrt. */
+  protected readonly speichert = signal(false);
+  private readonly fertig = computed(() => {
     const seiten = this.seiten();
     return seiten.length > 0 && seiten.every((s) => !!s.arbeitsfassung && s.hinweis !== 'laeuft');
   });
+  /** «Abschliessen» ist bedienbar, sobald keine Seite mehr läuft; Seiten mit Fehler erklärt dann die Meldung. */
+  protected readonly abschliessbar = computed(
+    () => !this.speichert() && this.seiten().length > 0 && this.seiten().every((s) => s.hinweis !== 'laeuft'),
+  );
   protected readonly inBearbeitung = computed(() => this.seiten().find((s) => s.nr === this.bearbeitet()) ?? null);
   protected readonly name = (iso: string) => aufnahmeName(new Date(iso));
 
   private readonly video = viewChild<ElementRef<HTMLVideoElement>>('video');
   private strom: MediaStream | null = null;
-  private aufgenommen: Date | null = null;
   private naechsteNr = 0;
+  private speichern: Promise<boolean> | null = null;
   private readonly laufend = new Set<Promise<void>>();
 
   constructor() {
@@ -144,9 +152,6 @@ export class HandyErfassung {
     if (this.bearbeitet() === nr) {
       this.bearbeitet.set(null);
     }
-    if (this.seiten().length === 0) {
-      this.aufgenommen = null;
-    }
   }
 
   protected zuschnittUebernehmen(ecken: Ecken | null): void {
@@ -157,31 +162,38 @@ export class HandyErfassung {
     }
   }
 
-  /** Legt die Seiten als eine Erfassung in die Warteschlange (Req 4.4); hochgeladen wird sofort oder später. */
-  protected async abschliessen(): Promise<boolean> {
+  /**
+   * Legt die Seiten als eine Erfassung in die Warteschlange (Req 4.4); hochgeladen wird sofort oder später. Ein zweiter
+   * Aufruf während des Speicherns legt keinen zweiten Eintrag an, sondern wartet auf den ersten.
+   */
+  protected abschliessen(): Promise<boolean> {
+    if (this.speichern) {
+      return this.speichern;
+    }
     if (!this.fertig()) {
-      return false;
+      const fehler = this.seiten().flatMap((s, i) => (s.hinweis === 'fehler' ? [i + 1] : []));
+      if (fehler.length > 0) {
+        this.meldung.set(this.texte.seitenMitFehler(fehler));
+      }
+      return Promise.resolve(false);
     }
-    const seiten = this.seiten();
-    try {
-      await this.warteschlange.hinzufuegen(
-        seiten.map((s) => ({ original: s.original, arbeitsfassung: s.arbeitsfassung! })),
-        this.aufgenommen ?? new Date(),
-      );
-    } catch {
-      this.meldung.set(this.texte.speichernFehler);
-      return false;
-    }
-    seiten.forEach((s) => this.freigeben(s));
-    this.seiten.set([]);
-    this.aufgenommen = null;
-    this.meldung.set(this.texte.gespeichert);
-    return true;
+    this.speichert.set(true);
+    this.speichern = this.speichernLauf().finally(() => {
+      this.speichern = null;
+      this.speichert.set(false);
+    });
+    return this.speichern;
   }
 
-  /** Vor der Weiterleitung zu Keycloak die aufgenommenen Seiten sichern; der Arbeitsspeicher geht dabei verloren. */
+  /**
+   * Vor der Weiterleitung zu Keycloak die aufgenommenen Seiten sichern; der Arbeitsspeicher geht dabei verloren. Seiten,
+   * die nicht zugeschnitten werden konnten, halten die Anmeldung mit einer Meldung auf, statt verloren zu gehen.
+   */
   protected async anmelden(): Promise<void> {
     await Promise.all(this.laufend);
+    if (this.speichern && !(await this.speichern)) {
+      return;
+    }
     if (this.seiten().length > 0 && !(await this.abschliessen())) {
       return;
     }
@@ -192,13 +204,41 @@ export class HandyErfassung {
     return hinweis === 'laeuft' ? this.texte.wirdAufbereitet : hinweis === 'fehler' ? this.texte.aufbereitenFehler : this.texte[hinweis];
   }
 
+  /** Speichert die Seiten des Moments; danach entfernt es nur diese, später aufgenommene bleiben stehen. */
+  private async speichernLauf(): Promise<boolean> {
+    this.meldung.set(null);
+    const seiten = this.seiten();
+    try {
+      await this.warteschlange.hinzufuegen(
+        seiten.map((s) => ({ original: s.original, arbeitsfassung: s.arbeitsfassung! })),
+        seiten[0].aufgenommen,
+      );
+    } catch {
+      this.meldung.set(this.texte.speichernFehler);
+      return false;
+    }
+    const gespeichert = new Set(seiten.map((s) => s.nr));
+    this.seiten().filter((s) => gespeichert.has(s.nr)).forEach((s) => this.freigeben(s));
+    this.seiten.update((alle) => alle.filter((s) => !gespeichert.has(s.nr)));
+    this.meldung.set(this.texte.gespeichert);
+    return true;
+  }
+
   private seiteHinzufuegen(original: Blob): void {
-    this.aufgenommen ??= new Date();
     this.meldung.set(null);
     const nr = ++this.naechsteNr;
     this.seiten.update((seiten) => [
       ...seiten,
-      { nr, original, originalUrl: URL.createObjectURL(original), ecken: null, breite: 0, hoehe: 0, hinweis: 'laeuft' },
+      {
+        nr,
+        aufgenommen: new Date(),
+        original,
+        originalUrl: URL.createObjectURL(original),
+        ecken: null,
+        breite: 0,
+        hoehe: 0,
+        hinweis: 'laeuft',
+      },
     ]);
     this.aufbereiten(nr);
   }

@@ -59,3 +59,7 @@ h3 {
 .fehler {
   color: var(--urinet-fehler);
 }
+
+.seiten > li.mit-fehler {
+  outline: 2px solid var(--urinet-fehler);
+}

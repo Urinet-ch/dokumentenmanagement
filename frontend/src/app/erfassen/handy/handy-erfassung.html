@@ -39,12 +39,21 @@
       <p role="status">{{ texte.kameraLaeuft }}</p>
     }
     @case ('an') {
-      <button mat-flat-button type="button" class="ausloeser" (click)="aufnehmen()">{{ texte.aufnehmen }}</button>
+      <button mat-flat-button type="button" class="ausloeser" [disabled]="speichert()" (click)="aufnehmen()">{{ texte.aufnehmen }}</button>
     }
     @case ('nicht-verfuegbar') {
       <p>{{ texte.keineKamera }}</p>
-      <button mat-stroked-button type="button" (click)="foto.click()">{{ texte.fotoWaehlen }}</button>
-      <input #foto hidden type="file" accept="image/*" capture="environment" multiple (change)="dateienGewaehlt($event)" />
+      <button mat-stroked-button type="button" [disabled]="speichert()" (click)="foto.click()">{{ texte.fotoWaehlen }}</button>
+      <input
+        #foto
+        hidden
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        [disabled]="speichert()"
+        (change)="dateienGewaehlt($event)"
+      />
     }
   }
 
@@ -64,30 +73,41 @@
     <h3>{{ texte.seiten }}</h3>
     <ol class="liste seiten">
       @for (seite of seiten(); track seite.nr; let i = $index) {
-        <li class="karte" data-test="seite" [attr.data-hinweis]="seite.hinweis">
+        <li class="karte" data-test="seite" [class.mit-fehler]="seite.hinweis === 'fehler'" [attr.data-hinweis]="seite.hinweis">
           @if (seite.vorschauUrl) {
             <img [src]="seite.vorschauUrl" [alt]="texte.vorschau(i + 1)" />
           }
           <div>
             <strong>{{ texte.seite(i + 1) }}</strong>
-            <p role="status">{{ hinweisText(seite.hinweis) }}</p>
+            <p role="status" [class.fehler]="seite.hinweis === 'fehler'">{{ hinweisText(seite.hinweis) }}</p>
             <button
               mat-stroked-button
               type="button"
-              [disabled]="!seite.arbeitsfassung || seite.hinweis === 'laeuft'"
+              [disabled]="!seite.arbeitsfassung || seite.hinweis === 'laeuft' || speichert()"
               [attr.aria-label]="texte.anpassen(i + 1)"
               (click)="bearbeitet.set(seite.nr)"
             >
               {{ texte.zuschnitt }}
             </button>
-            <button mat-button type="button" [attr.aria-label]="texte.verwerfen(i + 1)" (click)="verwerfen(seite.nr)">
+            <button
+              mat-button
+              type="button"
+              [disabled]="speichert()"
+              [attr.aria-label]="texte.verwerfen(i + 1)"
+              (click)="verwerfen(seite.nr)"
+            >
               {{ texte.verwerfenKurz }}
             </button>
           </div>
         </li>
       }
     </ol>
-    <button mat-flat-button type="button" [disabled]="!fertig()" (click)="abschliessen()">{{ texte.abschliessen }}</button>
+    <button mat-flat-button type="button" [disabled]="!abschliessbar()" (click)="abschliessen()">
+      {{ texte.abschliessen }}
+    </button>
+  }
+  @if (speichert()) {
+    <p role="status">{{ texte.speichert }}</p>
   }
   @if (meldung(); as text) {
     <p role="status" data-test="erfassung-meldung">{{ text }}</p>
