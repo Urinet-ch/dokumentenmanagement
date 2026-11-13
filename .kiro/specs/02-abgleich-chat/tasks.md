@@ -41,6 +41,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 7.1 Werkzeuge [Backend]
   - `ArchivWerkzeuge` mit `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`; Mandant/Benutzer aus Kontext; Sichtbarkeitsfilter nach Rechtematrix (Spec 01, 2.6) auch in Summen, Anzahlen und Lücken
   - je Werkzeug Szenarien mit zwei Mandanten und den Rollen `inhaber`, `mitarbeiter`, `treuhaender`
+  - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); `dokumente_suchen` ist der erste Konsument dieser Variante
   - _Anforderungen: 3.1–3.6, 5.1, 5.2_
 
 - [ ] 7.2 Agent und Systemprompt [Backend]

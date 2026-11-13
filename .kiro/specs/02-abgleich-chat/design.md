@@ -76,6 +76,7 @@ flowchart LR
 | `wissen_index` (Spec 04) | `frage?`, `typ?`, `anzahl≤50` (nur mit `frage`) | Indexzeilen der sichtbaren Wissensseiten (Spec 04, design.md, «Chat-Werkzeuge») |
 | `wissen_seite_zeigen` (Spec 04) | `pfad` | freigegebene Fassung einer sichtbaren Wissensseite mit Quellen und Hinweisen (Spec 04, design.md, «Chat-Werkzeuge») |
 
+- Spec 01 ergänzt (Req 3.13; Review #104): `dokumente_suchen` und `dokument_zeigen` nutzen die Suche ohne Dateinamen (`mitDateiname=false`) und geben das Feld `dateiname` nicht weiter. Diese Variante prüft über `ts_filter(volltext_tsv, '{a,b,c}')`, was den GIN-Index nicht nutzt; Aufgabe 7.1 legt als erster Konsument einen passenden Index oder Vorfilter an (Spec 01, design.md, «Umsetzung 4.10»).
 - Spec 04 ergänzt den Systemprompt um die Regel für Fragen nach Wissen (zuerst `wissen_index`, dann `wissen_seite_zeigen`, Hinweise nennen; Wortlaut in Spec 04, design.md, «Chat-Werkzeuge»).
 
 - Kennzahl-SQL (Beispiel EINNAHMEN, BELEGDATUM, Gruppierung JAHR):
