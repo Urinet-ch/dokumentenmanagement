@@ -55,8 +55,13 @@ import java.util.UUID;
 public class VerarbeitenHandler implements AuftragHandler {
 
     public static final AuftragTyp TYP = new AuftragTyp("VERARBEITEN");
-    /** Schlüssel der Nutzlast; weitere Schlüssel ausser {@code ohneKi} gibt es nicht. */
+    /** Schlüssel der Nutzlast; weitere Schlüssel ausser {@code ohneKi} (und {@link #DOKUMENT_VERSION} bei {@code KI_VORSCHLAG}) gibt es nicht. */
     public static final String DOKUMENT_ID = "dokumentId";
+    /**
+     * Schlüssel der Nutzlast von {@code KI_VORSCHLAG}: die {@code version} des Dokuments direkt nach dem Speichern des
+     * Ergebnisses; der {@link KiVorschlagHandler} schreibt nur bei genau dieser Version (Review PR #93, Claude S2).
+     */
+    public static final String DOKUMENT_VERSION = "dokumentVersion";
     static final String OHNE_KI = "ohneKi";
     static final String QUELLE_GENERATOR = "GENERATOR";
     /** Medientyp einer Nachricht als Original (Spec 02, Req 1.3). */

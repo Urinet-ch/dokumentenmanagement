@@ -157,7 +157,8 @@ public class VerarbeitungTestHilfe {
     /** KI-Vorschlag des Dokuments (Aufgabe 3.2): {@code ki_vorschlag} und {@code ki_sicherheit} als JSON-Text. */
     public Map<String, Object> kiVorschlag(String mandant, UUID id) throws SQLException {
         return zeile("select status, fehler, ki_vorschlag::text as ki_vorschlag, ki_sicherheit::text as ki_sicherheit, "
-                + "partner_id::text as partner_id, partner_name, bestaetigt, version from " + schema(mandant)
+                + "partner_id::text as partner_id, partner_name, ki_partner_id::text as ki_partner_id, titel, "
+                + "bestaetigt, version from " + schema(mandant)
                 + ".dokument where id = ?", id);
     }
 

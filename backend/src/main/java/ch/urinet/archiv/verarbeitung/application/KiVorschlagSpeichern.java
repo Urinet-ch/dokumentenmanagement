@@ -46,13 +46,15 @@ public class KiVorschlagSpeichern {
 
     /**
      * Speichert den Vorschlag und setzt {@code EINGANGSKORB} (Req 7.1); verknüpft den Partner nur bei einem eindeutigen
-     * Treffer des Abgleichs (Req 7.4). Hat sich das Dokument seit dem Laden geändert (Version, Bestätigung), bleibt es
-     * unverändert; steht es dann noch in {@code VERARBEITUNG}, geht es ohne Vorschlag weiter.
+     * Treffer des Abgleichs (Req 7.4), und nur, wenn noch kein Partner verknüpft ist. Steht das Dokument nicht mehr in
+     * {@code erwarteteVersion} (Änderung, Bestätigung), bleibt es unverändert; steht es dann noch in
+     * {@code VERARBEITUNG}, geht es ohne Vorschlag weiter.
      *
+     * @param erwarteteVersion die {@code version} aus der Nutzlast bzw. beim Laden
      * @return {@code true}, wenn der Vorschlag gespeichert wurde
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean vorschlagSpeichern(Auftrag auftrag, KiStand stand, Vorschlag vorschlag) {
+    public boolean vorschlagSpeichern(Auftrag auftrag, KiStand stand, int erwarteteVersion, Vorschlag vorschlag) {
         auftraege.anspruchSichern(auftrag);
         AbgleichErgebnis ergebnis = abgleich.abgleichen(new PartnerAngaben(vorschlag.partnerName(),
                 vorschlag.partnerEmail(), vorschlag.partnerUid(), vorschlag.partnerIban()));
@@ -65,7 +67,7 @@ public class KiVorschlagSpeichern {
                 partnerName = kontakt.get().name();
             }
         }
-        if (dokumente.vorschlagSpeichern(stand.id(), stand.version(), werte(vorschlag), sicherheit(vorschlag),
+        if (dokumente.vorschlagSpeichern(stand.id(), erwarteteVersion, werte(vorschlag), sicherheit(vorschlag),
                 partnerId, partnerName)) {
             return true;
         }

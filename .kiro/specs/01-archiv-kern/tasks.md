@@ -263,6 +263,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_
   - _Abhängig von: 3.8_
   - Nachtrag (PR #120, Review zu #93): Bildweg rendert farbige Seiten als PPM statt PNG und liest sie mit `PpmLeser` direkt als `TYPE_3BYTE_BGR`; Pixel und JPEG gleich wie im Gate (`SeitenbildGleichheitTest`), 3 Seiten auf Stufe A in rund 4 s statt 34–53 s (design.md «Umsetzung (Aufgabe 3.2)», «Bildweg als PPM»)
+  - Nachtrag (PR #126, Review zu #93): `KI_VORSCHLAG` trägt die `version` des Dokuments nach der Verarbeitung in der Nutzlast (`dokumentVersion`); der `KiVorschlagHandler` ruft das Modell nur bei genau dieser Version auf und speichert nur bei ihr, sonst endet der Auftrag ohne Änderung; Szenarien zu Änderung zwischen zwei Versuchen, alter Nutzlast, letztem Fehlversuch und bestehendem Partner (design.md «Umsetzung (Aufgabe 3.2)», «Version in der Nutzlast»)
 
 - [ ] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster

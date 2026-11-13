@@ -1,11 +1,13 @@
 package ch.urinet.archiv.ki;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
+import ch.urinet.archiv.verarbeitung.application.VerarbeitenHandler;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +23,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 
 import java.awt.Graphics2D;
@@ -40,6 +43,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -68,6 +72,10 @@ public class KiVorschlagSchritte {
     private UUID kontakt;
     /** {@code version} des Dokuments direkt nach der Änderung durch den Benutzer. */
     private int versionBenutzer;
+    /** {@code version} aus der Nutzlast von {@code KI_VORSCHLAG}. */
+    private int versionNachVerarbeitung;
+    /** Zweiter Kontakt aus dem Szenario, wird danach gelöscht. */
+    private UUID andererKontakt;
 
     /** Ohne Korrekturbeispiele früherer Szenarien: Sie kämen sonst in den Prompt (Aufgabe 3.3). */
     @Angenommen("das Sprachmodell ist bereit")
@@ -104,11 +112,76 @@ public class KiVorschlagSchritte {
             hilfe.kontaktLoeschen(MANDANT, kontakt);
             kontakt = null;
         }
+        if (andererKontakt != null) {
+            hilfe.kontaktLoeschen(MANDANT, andererKontakt);
+            andererKontakt = null;
+        }
     }
 
     @Angenommen("im Mandanten gibt es den Kontakt «{}» mit der IBAN «{word}»")
     public void kontakt(String name, String iban) throws Exception {
         kontakt = hilfe.kontaktAnlegen(MANDANT, name, iban);
+    }
+
+    /** Wie bei der Erfassung gesetzt: vor der Verarbeitung, darum ohne eigene {@code version}. */
+    @Angenommen("der Beleg ist schon mit dem Kontakt «{}» ohne IBAN verknüpft")
+    public void schonVerknuepft(String name) throws Exception {
+        andererKontakt = hilfe.kontaktAnlegen(MANDANT, name, null);
+        auftraege.ausfuehren("update " + new MandantCode(MANDANT).schema() + ".dokument set partner_id = '"
+                + andererKontakt + "', partner_name = '" + name.replace("'", "''") + "' where id = '" + id + "'");
+    }
+
+    @Dann("das Dokument bleibt mit dem Kontakt «{}» verknüpft, der Abgleich fand den Kontakt mit der IBAN")
+    public void partnerBleibt(String name) throws Exception {
+        assertThat(hilfe.kiVorschlag(MANDANT, id)).containsEntry("partner_id", andererKontakt.toString())
+                .containsEntry("partner_name", name).containsEntry("ki_partner_id", kontakt.toString());
+    }
+
+    /** Wie im Eingangskorb (Req 10.4): PATCH mit {@code If-Match} der aktuellen {@code version}. */
+    @Wenn("«{word}» den Titel des Dokuments auf «{}» ändert")
+    public void titelAendern(String benutzer, String titel) throws Exception {
+        given().auth().oauth2(Testanmeldung.token(benutzer))
+                .header("If-Match", "\"" + hilfe.kiVorschlag(MANDANT, id).get("version") + "\"")
+                .contentType(ContentType.JSON).body(Map.of("titel", titel))
+                .when().patch("/api/v1/dokumente/" + id)
+                .then().statusCode(200);
+        versionBenutzer = ((Number) hilfe.kiVorschlag(MANDANT, id).get("version")).intValue();
+    }
+
+    @Dann("das Dokument hat den Titel «{}»")
+    public void titel(String titel) throws Exception {
+        assertThat(hilfe.kiVorschlag(MANDANT, id)).containsEntry("titel", titel);
+    }
+
+    @Dann("der Auftrag «KI_VORSCHLAG» trägt die Version des Dokuments nach der Verarbeitung")
+    public void versionInNutzlast() throws Exception {
+        Object version = auftraege.wert(hilfe.auftraege("KI_VORSCHLAG", id).getFirst(),
+                "(nutzlast->>'" + VerarbeitenHandler.DOKUMENT_VERSION + "')::int");
+        assertThat(version).as("Version in der Nutzlast").isNotNull();
+        versionNachVerarbeitung = ((Number) version).intValue();
+        assertThat(((Number) hilfe.kiVorschlag(MANDANT, id).get("version")).intValue())
+                .isEqualTo(versionNachVerarbeitung);
+    }
+
+    @Dann("das Dokument ist «{word}» ohne Vorschlag und in der Version nach der Verarbeitung")
+    public void unveraendertNachVerarbeitung(String status) throws Exception {
+        Map<String, Object> dokument = hilfe.kiVorschlag(MANDANT, id);
+        assertThat(dokument).containsEntry("status", status).containsEntry("ki_vorschlag", null)
+                .containsEntry("ki_sicherheit", null);
+        assertThat(((Number) dokument.get("version")).intValue()).isEqualTo(versionNachVerarbeitung);
+    }
+
+    /** Wie ein Auftrag, der vor dem Deploy dieser Änderung eingereiht wurde. */
+    @Angenommen("die Nutzlast des Auftrags «KI_VORSCHLAG» enthält keine Version")
+    public void ohneVersion() throws Exception {
+        auftraege.aendern(hilfe.auftraege("KI_VORSCHLAG", id).getFirst(),
+                "nutzlast = nutzlast - '" + VerarbeitenHandler.DOKUMENT_VERSION + "'");
+    }
+
+    @Wenn("der Auftrag «KI_VORSCHLAG» wieder fällig wird und der Worker ihn bearbeitet")
+    public void einmalWiederholen() throws Exception {
+        auftraege.aendern(hilfe.auftraege("KI_VORSCHLAG", id).getFirst(), "nicht_vor = now()");
+        hilfe.abarbeiten();
     }
 
     @Angenommen("ein Beleg als verschlüsseltes PDF")

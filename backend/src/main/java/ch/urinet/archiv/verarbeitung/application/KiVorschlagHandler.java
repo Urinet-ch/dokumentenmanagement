@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +56,12 @@ import java.util.concurrent.TimeoutException;
  * Volltext, ohne QR und Bild). Ein bestätigtes Dokument, eines mit Vorschlag oder eines in einem anderen Status lässt er
  * unverändert. Den Status setzt er nie zurück und nie auf {@code FEHLER}: Auch nach dem letzten Fehlversuch geht das
  * Dokument nur ohne Vorschlag weiter.
+ * <p>
+ * Trägt die Nutzlast {@link VerarbeitenHandler#DOKUMENT_VERSION} (die {@code version} beim Einreihen), gilt in jedem
+ * Versuch nur sie: Weicht die geladene ab, hat der Benutzer das Dokument inzwischen geändert (z. B. ein
+ * {@code pdfa_fehlt}-Dokument im Eingangskorb zwischen zwei Versuchen), und der Handler ruft das Modell nicht auf und
+ * schreibt weder Vorschlag noch Partner (Review PR #93, Claude S2). Aufträge ohne den Schlüssel (vor dem Deploy
+ * eingereiht) prüfen wie bisher die beim Laden gelesene {@code version}.
  */
 @ApplicationScoped
 public class KiVorschlagHandler implements AuftragHandler {
@@ -100,6 +107,14 @@ public class KiVorschlagHandler implements AuftragHandler {
                 .orElseThrow(() -> new IllegalArgumentException("Nutzlast ohne " + VerarbeitenHandler.DOKUMENT_ID));
         KiStand stand = speichern.laden(id)
                 .orElseThrow(() -> new IllegalStateException("Dokument fehlt im Mandanten: " + id));
+        OptionalLong erwartet = auftrag.nutzlast().zahl(VerarbeitenHandler.DOKUMENT_VERSION);
+        if (erwartet.isPresent() && stand.version() != erwartet.getAsLong()) {
+            LOG.infof("KI-Vorschlag für Dokument %s nicht erstellt: Dokument inzwischen geändert", id);
+            if (speichern.ohneVorschlagWeiter(auftrag, id)) {
+                LOG.infof("Dokument %s ohne KI-Vorschlag im Eingangskorb", id);
+            }
+            return;
+        }
         if (!zuBearbeiten(stand)) {
             LOG.infof("KI-Vorschlag übersprungen: Dokument %s ist %s (bestätigt %s, Vorschlag %s)", id, stand.status(),
                     stand.bestaetigt(), stand.vorschlagVorhanden());
@@ -113,7 +128,8 @@ public class KiVorschlagHandler implements AuftragHandler {
             }
             return;
         }
-        if (speichern.vorschlagSpeichern(auftrag, stand, vorschlag.get())) {
+        int version = erwartet.isPresent() ? (int) erwartet.getAsLong() : stand.version();
+        if (speichern.vorschlagSpeichern(auftrag, stand, version, vorschlag.get())) {
             LOG.infof("KI-Vorschlag für Dokument %s gespeichert", id);
         } else {
             LOG.infof("KI-Vorschlag für Dokument %s nicht gespeichert: Dokument inzwischen geändert", id);

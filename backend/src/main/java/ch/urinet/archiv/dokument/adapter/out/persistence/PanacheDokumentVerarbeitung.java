@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
@@ -70,13 +71,14 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
     }
 
     @Override
-    public boolean ergebnisSpeichern(UUID id, Verarbeitungsergebnis ergebnis, DokumentStatus neuerStatus) {
+    public OptionalInt ergebnisSpeichern(UUID id, Verarbeitungsergebnis ergebnis, DokumentStatus neuerStatus) {
         zeitgrenze();
-        return em().createNativeQuery("""
+        List<?> zeilen = em().createNativeQuery("""
                         update dokument set sha256_pdfa = :sha256, s3_pdfa = :s3, s3_version_pdfa = :version,
                             pdfa_fehlt = :fehlt, fehler = :fehler, seiten = :seiten, volltext = :volltext,
                             status = :status, version = version + 1, geaendert = clock_timestamp()
-                        where id = :id and status = 'VERARBEITUNG' and s3_version_pdfa is null and not pdfa_fehlt""")
+                        where id = :id and status = 'VERARBEITUNG' and s3_version_pdfa is null and not pdfa_fehlt
+                        returning version""")
                 .unwrap(NativeQuery.class)
                 // mit Typ, weil ein leerer Wert sonst ohne Typ gebunden würde
                 .setParameter("sha256", ergebnis.sha256Pdfa(), String.class)
@@ -89,7 +91,8 @@ public class PanacheDokumentVerarbeitung implements DokumentVerarbeitungPort {
                 .setParameter("volltext", ergebnis.volltext().replace("\u0000", ""))
                 .setParameter("status", neuerStatus.name())
                 .setParameter("id", id)
-                .executeUpdate() == 1;
+                .getResultList();
+        return zeilen.isEmpty() ? OptionalInt.empty() : OptionalInt.of(((Number) zeilen.getFirst()).intValue());
     }
 
     @Override

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
@@ -33,9 +34,10 @@ public interface DokumentVerarbeitungPort {
      * Schreibt PDF/A (oder den Vermerk {@code pdfa_fehlt} mit Fehlertext), Seitenzahl und Volltext und setzt den
      * Status; nur bei {@code VERARBEITUNG} und solange noch kein Ergebnis gespeichert ist.
      *
-     * @return {@code false}, wenn die Bedingung nicht hält (nichts geschrieben)
+     * @return die {@code version} des Dokuments nach dem Speichern; leer, wenn die Bedingung nicht hält (nichts
+     *         geschrieben)
      */
-    boolean ergebnisSpeichern(UUID id, Verarbeitungsergebnis ergebnis, DokumentStatus neuerStatus);
+    OptionalInt ergebnisSpeichern(UUID id, Verarbeitungsergebnis ergebnis, DokumentStatus neuerStatus);
 
     /** {@code NEU}/{@code VERARBEITUNG} → {@code FEHLER} mit Fehlertext; {@code false}, wenn nichts geändert wurde. */
     boolean fehlerSetzen(UUID id, String fehlertext);
