@@ -6,6 +6,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
+import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
@@ -130,6 +131,35 @@ public class ManifestSchritte {
             assertThat(p.executeUpdate()).isEqualTo(1);
         }
         mandanten.put(code, code);
+    }
+
+    /** Angelegt jetzt: Der erste fällige Tag (gestern) liegt vor dem Tag der Anlage, kein Manifest ist fällig. */
+    @Angenommen("der Mandant «{word}» ist eben angelegt")
+    public void mandantJetzt(String code) {
+        provisionierung.anlegen(code, null, null);
+        mandanten.put(code, code);
+    }
+
+    /**
+     * Fügt eine Zeile in {@code manifest} ein, ohne Ablage und Zeitstempel, mit {@code erstellt} in der Vergangenheit;
+     * nur für die Überwachung (Req 15.8, 16.5), die Datum und Zeitpunkt der Erstellung liest. Die Tabelle erlaubt nur
+     * Einfügen, darum lässt sich ein echter Lauf nicht zurückdatieren.
+     */
+    @Angenommen("für «{word}» wurde das Manifest «{word}» vor {int} Stunden festgehalten")
+    public void manifestZeile(String alias, String datum, int stunden) throws SQLException {
+        LocalDate tag = LocalDate.parse(datum, DATUM);
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement("insert into "
+                + schema(alias) + ".manifest (datum, bis, sha256, anzahl, protokolle, s3_schluessel, s3_version, "
+                + "sig_sha256, sig_s3_version, erstellt) values (?, ?, ?, 0, '{}'::jsonb, ?, 'v-test', ?, 'v-test', "
+                + "clock_timestamp() - ? * interval '1 hour')")) {
+            p.setObject(1, tag);
+            p.setTimestamp(2, Timestamp.from(ManifestFenster.bis(tag)));
+            p.setString(3, zufallsHash());
+            p.setString(4, "manifest/" + tag + ".json");
+            p.setString(5, zufallsHash());
+            p.setInt(6, stunden);
+            assertThat(p.executeUpdate()).isEqualTo(1);
+        }
     }
 
     @Angenommen("im Mandanten «{word}» wurde das Dokument «{word}» am «{word}» um «{word}» archiviert, aufzubewahren bis «{word}»")
@@ -282,6 +312,11 @@ public class ManifestSchritte {
                 .willReturn(aResponse().withStatus(status))));
     }
 
+    @Angenommen("die Zeitstempeldienste antworten wieder")
+    public void dienstWieder() {
+        aufraeumen();
+    }
+
     @Wenn("der Manifest-Lauf für «{word}» bis «{word}» läuft")
     public void lauf(String alias, String bis) throws Exception {
         versionenVorher = TestAblage.versionen(code(alias), "manifest/");
@@ -294,6 +329,21 @@ public class ManifestSchritte {
     @Wenn("der Manifest-Lauf für «{word}» bis «{word}» nochmals läuft")
     public void nochmals(String alias, String bis) throws Exception {
         lauf(alias, bis);
+    }
+
+    /** Nur der erste Auftrag; ein Folgeauftrag bleibt in der Schlange. Fällige Aufträge anderer Szenarien vorher. */
+    @Wenn("der erste Manifest-Lauf für «{word}» bis «{word}» läuft")
+    public void ersterLauf(String alias, String bis) throws Exception {
+        auftraege.abarbeiten();
+        auftrag = auftraege.rohEinreihen(code(alias), ManifestErzeugen.TYP,
+                "{\"" + ManifestErzeugen.BIS_TAG + "\": " + LocalDate.parse(bis, DATUM).toEpochDay() + "}");
+        auftraege.einenStarten().get(60, TimeUnit.SECONDS);
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
+    }
+
+    @Wenn("die übrigen Aufträge abgearbeitet sind")
+    public void uebrige() throws Exception {
+        auftraege.abarbeiten();
     }
 
     @Wenn("der Manifest-Lauf für «{word}» bis «{word}» bis zum letzten Versuch läuft")
@@ -653,26 +703,55 @@ public class ManifestSchritte {
         assertThat(ausgabe).contains(text);
     }
 
-    @Dann("hat der Inhaber eine Mail zum fehlenden Manifest «{word}» von «{word}» erhalten, die nur IDs nennt")
+    /** Req 15.8, 16.5, 16.7: genau eine Mail der Überwachung, die nur Mandant, Datum und Status nennt. */
+    @Dann("hat der Inhaber genau eine Mail zum fehlenden Manifest «{word}» von «{word}» erhalten, die nur Mandant, Datum und Status nennt")
     public void mail(String datum, String alias) throws SQLException {
         LocalDate tag = LocalDate.parse(datum, DATUM);
         String mailpit = "http://localhost:" + mailpitPort.orElseThrow();
-        Response nachrichten = given().baseUri(mailpit)
-                .queryParam("query", "subject:\"Manifest " + tag + " für " + code(alias) + "\"").when()
-                .get("/api/v1/search");
-        assertThat(nachrichten.statusCode()).isEqualTo(200);
-        List<String> ids = nachrichten.jsonPath().getList("messages.ID");
-        assertThat(ids).as(nachrichten.asString()).hasSize(1);
+        List<String> ids = manifestMails(alias, "Manifest " + tag + " für " + code(alias));
+        assertThat(ids).hasSize(1);
         Response nachricht = given().baseUri(mailpit).when().get("/api/v1/message/" + ids.getFirst());
         assertThat(nachricht.jsonPath().<String>getList("To.Address")).containsExactly("inhaber@example.invalid");
+        assertThat(nachricht.jsonPath().getString("Subject")).endsWith(" FEHLT");
         String text = nachricht.jsonPath().getString("Text");
-        assertThat(text).contains(auftraege.zeile(auftrag).fehlerId());
-        for (UUID id : dokumente.values()) {
-            assertThat(text).doesNotContain(id.toString());
-        }
+        assertThat(text).contains("Mandant: " + code(alias)).contains(tag.toString()).contains("FEHLT")
+                .doesNotContainPattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                .doesNotContainPattern("[0-9a-f]{64}");
         for (Object sha : daten(alias, "select sha256 from %s.dokument_datei")) {
             assertThat(text).doesNotContain((String) sha);
         }
+    }
+
+    @Dann("hat der Inhaber keine Mail zu einem fehlenden Manifest von «{word}» erhalten")
+    public void keineMail(String alias) {
+        assertThat(manifestMails(alias, "für " + code(alias))).isEmpty();
+    }
+
+    @Dann("ist der Alarm zum Manifest «{word}» von «{word}» erledigt")
+    public void alarmErledigt(String datum, String alias) throws SQLException {
+        String schluessel = "manifest:" + LocalDate.parse(datum, DATUM) + ":FEHLT";
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "select gemeldet is not null, erledigt is not null from " + schema(alias) + ".alarm "
+                        + "where schluessel = ?")) {
+            p.setString(1, schluessel);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).as(schluessel).isTrue();
+                assertThat(r.getBoolean(1)).as("gemeldet").isTrue();
+                assertThat(r.getBoolean(2)).as("erledigt").isTrue();
+            }
+        }
+    }
+
+    /** IDs der Mails in Mailpit zu Manifesten von {@code alias}, deren Betreff {@code teil} enthält. */
+    private List<String> manifestMails(String alias, String teil) {
+        Response nachrichten = given().baseUri("http://localhost:" + mailpitPort.orElseThrow())
+                .queryParam("query", "subject:\"" + teil + "\"").when().get("/api/v1/search");
+        assertThat(nachrichten.statusCode()).isEqualTo(200);
+        List<Map<String, Object>> liste = nachrichten.jsonPath().getList("messages");
+        return liste.stream().filter(m -> {
+            String betreff = String.valueOf(m.get("Subject"));
+            return betreff.startsWith("UriNet Archiv: Manifest ") && betreff.contains(" für " + code(alias) + " ");
+        }).map(m -> String.valueOf(m.get("ID"))).toList();
     }
 
     private JsonNode manifest(String alias, String datum) throws Exception {

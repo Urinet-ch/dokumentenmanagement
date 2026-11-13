@@ -24,7 +24,6 @@ import ch.urinet.archiv.protokoll.domain.Vorher;
 import ch.urinet.archiv.protokoll.domain.ZeitstempelVerweis;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandler;
-import ch.urinet.archiv.verarbeitung.application.InhaberBenachrichtigung;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
@@ -53,6 +52,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /**
  * Handler für {@code MANIFEST} (Aufgabe 5.2, Req 15.1–15.4, 15.6–15.8, 15.11; design.md «Manifest»): erzeugt für jedes
@@ -91,14 +91,13 @@ public class ManifestErzeugen implements AuftragHandler {
     private final ZeitstempelPort zeitstempel;
     private final ManifestSchluessel schluessel;
     private final MandantRegister register;
-    private final InhaberBenachrichtigung benachrichtigung;
     private final JsonLeser leser;
     private final MandantEinstellungen einstellungen;
     private final Duration dienstFrist;
 
     public ManifestErzeugen(ManifestSpeichern speichern, ManifestDaten daten, AblagePort ablage,
                             ZeitstempelPort zeitstempel, ManifestSchluessel schluessel, MandantRegister register,
-                            InhaberBenachrichtigung benachrichtigung, JsonLeser json,
+                            JsonLeser json,
                             MandantEinstellungen einstellungen,
                             @ConfigProperty(name = "archiv.manifest.dienst-frist", defaultValue = "PT90S")
                             Duration dienstFrist) {
@@ -108,7 +107,6 @@ public class ManifestErzeugen implements AuftragHandler {
         this.zeitstempel = zeitstempel;
         this.schluessel = schluessel;
         this.register = register;
-        this.benachrichtigung = benachrichtigung;
         this.leser = json;
         this.einstellungen = einstellungen;
         this.dienstFrist = dienstFrist;
@@ -151,13 +149,17 @@ public class ManifestErzeugen implements AuftragHandler {
         }
     }
 
-    /** Req 15.8: Nach dem letzten Versuch fehlt das erste noch offene Manifest. */
+    /**
+     * Req 15.8: Nach dem letzten Versuch fehlt das erste noch offene Manifest. Hier nur ein Log-Eintrag; die eine Mail
+     * an den Inhaber schickt die Überwachung ({@link ManifestBefunde}), entprellt über die Tabelle {@code alarm}.
+     */
     @Override
     public void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
         LocalDate ziel = zielTag(auftrag.nutzlast(), Instant.now());
         LocalDate fehlt = naechstes(auftrag.mandant(), speichern.letztes());
         if (!fehlt.isAfter(ziel)) {
-            benachrichtigung.manifestFehlt(auftrag.mandant(), fehlt, fehlerId);
+            LOG.warnf("Auftrag %d: Manifest %s fehlt nach dem letzten Versuch, fehler-id=%s; die Überwachung alarmiert "
+                    + "den Inhaber", auftrag.id(), fehlt, fehlerId);
         }
     }
 
@@ -172,11 +174,16 @@ public class ManifestErzeugen implements AuftragHandler {
     }
 
     private LocalDate naechstes(MandantCode mandant, Optional<ManifestStand> stand) {
-        if (stand.isPresent()) {
-            return stand.get().datum().plusDays(1);
-        }
-        return ManifestFenster.tag(register.erstellt(mandant)
-                .orElseThrow(() -> new IllegalStateException("Mandant fehlt im Register")));
+        return naechstes(stand.map(ManifestStand::datum), () -> register.erstellt(mandant));
+    }
+
+    /**
+     * Erstes Datum ohne Manifest: der Tag nach dem letzten Manifest, ohne Manifest der Tag der Anlage des Mandanten
+     * (Req 15.1). Gemeinsam für den Lauf und die Überwachung ({@link ManifestBefunde}).
+     */
+    static LocalDate naechstes(Optional<LocalDate> letztesDatum, Supplier<Optional<Instant>> angelegt) {
+        return letztesDatum.map(d -> d.plusDays(1)).orElseGet(() -> ManifestFenster.tag(angelegt.get()
+                .orElseThrow(() -> new IllegalStateException("Mandant fehlt im Register"))));
     }
 
     /**

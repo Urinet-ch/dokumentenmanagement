@@ -30,7 +30,6 @@ import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -475,11 +474,6 @@ class PrueflaufHandlerTest {
                 abbrueche.add(laufId + " Teil " + teil + " " + stand + " " + fehlerId);
                 abbruchZaehler.add(bisher);
                 abbruchAbweichungen.addAll(erste);
-            }
-
-            @Override
-            public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
-                throw new UnsupportedOperationException();
             }
 
             @Override

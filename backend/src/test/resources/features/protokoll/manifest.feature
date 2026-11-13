@@ -102,7 +102,9 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Wenn der Manifest-Lauf für «mf-alarm» bis «10.01.2026» bis zum letzten Versuch läuft
     Dann endet der Auftrag im Status «FEHLER» nach 3 Versuchen
     Und «mf-alarm» hat kein Manifest
-    Und hat der Inhaber eine Mail zum fehlenden Manifest «10.01.2026» von «mf-alarm» erhalten, die nur IDs nennt
+    Wenn die Überwachung läuft
+    Und die Überwachung läuft
+    Dann hat der Inhaber genau eine Mail zum fehlenden Manifest «10.01.2026» von «mf-alarm» erhalten, die nur Mandant, Datum und Status nennt
     Und das Prüfwerkzeug meldet für «mf-alarm» vom «10.01.2026» bis «10.01.2026» «Ergebnis: Fehler gefunden» mit Exit-Code 1
 
   @req-15.1
