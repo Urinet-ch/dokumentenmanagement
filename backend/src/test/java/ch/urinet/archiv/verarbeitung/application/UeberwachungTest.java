@@ -8,6 +8,7 @@ import ch.urinet.archiv.verarbeitung.domain.Befund;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -150,6 +151,11 @@ class UeberwachungTest {
                 return mandanten.stream().map(c -> new Mandant(c, c.wert(), c.schema(), "b-" + c.wert(),
                         Geschaeftsjahresende.STANDARD, true)).toList();
             }
+
+            @Override
+            public Optional<Instant> erstellt(MandantCode code) {
+                throw new UnsupportedOperationException();
+            }
         };
     }
 
@@ -210,6 +216,11 @@ class UeberwachungTest {
         public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil,
                                          PrueflaufRegister.Fortsetzung stand, PrueflaufRegister.Zaehler bisher,
                                          List<PrueflaufRegister.Abweichung> erste, UUID fehlerId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
             throw new UnsupportedOperationException();
         }
 

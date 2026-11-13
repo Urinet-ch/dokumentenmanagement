@@ -11,6 +11,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.Optional;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -96,6 +98,11 @@ class MicrometerKennzahlenTest {
             public List<Mandant> aktive() {
                 return aktiv.stream().map(c -> new Mandant(c, c.wert(), c.schema(), "b-" + c.wert(),
                         Geschaeftsjahresende.STANDARD, true)).toList();
+            }
+
+            @Override
+            public Optional<Instant> erstellt(MandantCode code) {
+                throw new UnsupportedOperationException();
             }
         };
     }
