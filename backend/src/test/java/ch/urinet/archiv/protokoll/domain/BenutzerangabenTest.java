@@ -34,7 +34,7 @@ class BenutzerangabenTest {
 
     @Test
     void unbekannterNameUebernimmtDenBisherigen() {
-        Benutzerangaben ohneName = new Benutzerangaben("sub-1", Optional.of("  "), Optional.of("MITARBEITER"));
+        Benutzerangaben ohneName = new Benutzerangaben("sub-1", Optional.of("  "), Optional.of("MITARBEITER"), false);
         assertThat(ohneName.neueZeile(letzter("Anna Probe", "MITARBEITER", false))).isEmpty();
         assertThat(ohneName.neueZeile(letzter("Anna Probe", "INHABER", false)))
                 .contains(new Benutzerangaben.NeueZeile(Optional.of("Anna Probe"), Optional.of("MITARBEITER")));
@@ -46,8 +46,19 @@ class BenutzerangabenTest {
                 .contains(new Benutzerangaben.NeueZeile(Optional.of("Anna Probe"), Optional.of("MITARBEITER")));
     }
 
+    @Test
+    void einVerweigerterVersuchNachDemAustrittOeffnetKeineZeile() {
+        Benutzerangaben verweigert = new Benutzerangaben("sub-1", Optional.of("Anna Muster"), Optional.of("INHABER"),
+                true);
+        assertThat(verweigert.neueZeile(letzter("Anna Probe", "MITARBEITER", true))).isEmpty();
+        assertThat(verweigert.neueZeile(Optional.empty()))
+                .contains(new Benutzerangaben.NeueZeile(Optional.of("Anna Muster"), Optional.of("INHABER")));
+        assertThat(verweigert.neueZeile(letzter("Anna Probe", "MITARBEITER", false)))
+                .contains(new Benutzerangaben.NeueZeile(Optional.of("Anna Muster"), Optional.of("INHABER")));
+    }
+
     private static Benutzerangaben angaben(String name, String rolle) {
-        return new Benutzerangaben("sub-1", Optional.of(name), Optional.of(rolle));
+        return new Benutzerangaben("sub-1", Optional.of(name), Optional.of(rolle), false);
     }
 
     private static Optional<VerzeichnisEintrag> letzter(String name, String rolle, boolean beendet) {

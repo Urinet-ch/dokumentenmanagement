@@ -11,7 +11,7 @@ Funktionalität: Generator-Schnittstelle für Skripte
     Und der Generator von «urinet» hat ein API-Token
     Und im Mandanten «urinet» gibt es den CRM-Kontakt «Probe AG» mit der crmId «K-PROBE-4711»
 
-  @req-11.1 @req-11.2
+  @req-11.1 @req-11.2 @req-10.2
   Szenario: Eine Ausgangsrechnung des Generators wird ohne KI archiviert
     Wenn der Generator die PDF «R1» mit diesen Metadaten sendet:
       """
@@ -21,6 +21,7 @@ Funktionalität: Generator-Schnittstelle für Skripte
         "tags": ["Probe"] }
       """
     Dann antwortet der Generator mit 202 und dem neuen Dokument «R1»
+    Und steht im Zugriffsprotokoll von «urinet» 1 Mal «ERFASSEN» vom Generator, ohne Rolle und Dokument-ID
     Und hat das Generator-Dokument «R1» diese Werte:
       | status          | NEU              |
       | quelle          | GENERATOR        |

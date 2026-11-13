@@ -9,7 +9,7 @@ Funktionalität: Metadaten ändern und Versionen
   Hintergrund:
     Angenommen die Archivierung ist bereit
 
-  @req-10.1
+  @req-10.1 @req-10.2
   Szenario: Im Eingangskorb ändert der Inhaber Metadaten ohne Grund und ohne Fassung
     Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «mitarbeiter-urinet»
     Wenn «inhaber-urinet» das Dokument «K» so ändert:

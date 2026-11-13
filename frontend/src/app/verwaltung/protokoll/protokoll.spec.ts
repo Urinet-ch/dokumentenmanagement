@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { ProtokollService } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { Protokoll } from './protokoll';
@@ -96,6 +96,42 @@ describe('Zugriffsprotokoll: Seite (Aufgabe 5.1)', () => {
       0,
       '2026-10-31T23:00:00.000Z',
     );
+  });
+
+  it('blättert mit dem übernommenen Filter, nicht mit gerade eingetippten Werten', async () => {
+    service.apiV1ProtokollGet.mockReturnValue(
+      of({ eintraege: [{ id: 9, zeit: '2026-11-12T09:30:00Z', aktion: 'ANZEIGEN' }], gesamt: 120, seite: 0, groesse: 50 }),
+    );
+    await eingeben('benutzer', 'sub-1');
+    knopf(TEXTE.protokoll.anzeigen).click();
+    await fixture.whenStable();
+    await eingeben('benutzer', 'sub-2');
+    await eingeben('aktion', 'VERWEIGERT');
+    knopf(TEXTE.protokoll.weiter).click();
+    await fixture.whenStable();
+    expect(service.apiV1ProtokollGet).toHaveBeenLastCalledWith(
+      undefined,
+      'sub-1',
+      undefined,
+      undefined,
+      50,
+      1,
+      undefined,
+    );
+  });
+
+  it('verwirft die Antwort einer überholten Anfrage', async () => {
+    const langsam = new Subject<unknown>();
+    service.apiV1ProtokollGet.mockReturnValueOnce(langsam);
+    await eingeben('benutzer', 'sub-1');
+    knopf(TEXTE.protokoll.anzeigen).click();
+    await fixture.whenStable();
+    knopf(TEXTE.protokoll.zuruecksetzen).click();
+    await fixture.whenStable();
+    expect(langsam.observed).toBe(false);
+    langsam.next({ eintraege: [], gesamt: 0, seite: 0, groesse: 50 });
+    await fixture.whenStable();
+    expect(element.querySelectorAll('[data-test=eintrag]').length).toBe(1);
   });
 
   it('fragt bei ungültiger Dokument-ID nicht ab und sagt, was zu tun ist', async () => {

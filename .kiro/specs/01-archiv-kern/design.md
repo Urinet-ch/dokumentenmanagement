@@ -229,7 +229,9 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | GET | `/dokumentarten` | aktive und inaktive Arten (Auswahllisten) | alle Rollen |
 | POST, PATCH | `/dokumentarten`, `/dokumentarten/{code}` | anlegen, ändern, `aktiv=false`; 422 `ZUSATZ_UNGUELTIG` bei ungültigem Schema | A11 |
 | DELETE | `/dokumentarten/{code}` | 204; 409 `DOKUMENTART_IN_GEBRAUCH` | A11 |
-| GET | `/protokoll?von=&bis=&benutzer=&dokument=` | Zugriffsprotokoll, paginiert (Req 10.5) | A13 |
+| GET | `/protokoll?von=&bis=&benutzer=&dokument=&aktion=&seite=&groesse=` | Zugriffsprotokoll, paginiert (Req 10.5), neueste zuerst, höchstens 100 je Seite; 400 `ANFRAGE_UNGUELTIG` | A13 |
+| GET | `/protokoll/benutzer` | Benutzerverzeichnis (Req 10.10) | A13 |
+| POST | `/protokoll/benutzer/{benutzer}/austritt` | Austritt einer Person → 204; 404 `NICHT_GEFUNDEN`, 409 `STATUS_KONFLIKT` (schon beendet oder API-Token) | A13 |
 | GET, POST, DELETE | `/api-tokens`, `/api-tokens/{tokenId}` | Tokens anlegen (Geheimnis nur einmal angezeigt), auflisten, widerrufen; `{tokenId}` statt `{id}`, weil `{id}` für Dokument-IDs reserviert ist (404 vor 403 im `ZugangFilter`) | A14 |
 | GET, PATCH | `/mandant/einstellungen` | Geschäftsjahresende, eigene Arten, Kennungen | wie A11 |
 
@@ -888,23 +890,52 @@ Drive-Import (Req 12):
     das Verzeichnis vor jedem Protokolleintrag mit Kennung in derselben Transaktion nach. Neue Zeile `AKTION` bei
     der ersten Aktion einer Kennung, bei geändertem Namen oder geänderter Rolle und bei der ersten Aktion nach einem
     Austritt; sonst keine. Ein fehlender Name (z. B. Token ohne Bezeichnung) übernimmt den bisherigen. Eine Zeile
-    gilt ab `gueltig_von` bis `gueltig_bis` bzw. bis zur nächsten Zeile derselben Kennung.
-  - Name: Claim `name` des Access-Tokens, sonst `preferred_username`; bei API-Tokens die Bezeichnung aus
-    `public.api_client` (Attribut `TokenIdentitaet.NAME`). Rolle der Tokens im Verzeichnis `API_TOKEN`; im
+    gilt ab `gueltig_von` bis `gueltig_bis` bzw. bis zur nächsten Zeile derselben Kennung. Ein verweigerter Versuch
+    (`VERWEIGERT`) nach einem Austritt oder Widerruf öffnet keine neue Zeile; der Eintrag gehört zur beendeten Zeile
+    (Review PR #88, Kann 4). Die erste Aktion einer unbekannten Kennung legt auch bei `VERWEIGERT` eine Zeile an.
+  - Gleichzeitige Anfragen (Review PR #88, S2): Weil das Verzeichnis nur Einfügen erlaubt, bliebe eine doppelte Zeile
+    für immer. Darum `pg_advisory_xact_lock` je Mandant und Kennung, in zwei Namensräumen: Jede Aktion nimmt die
+    geteilte Sperre «Abschluss» (Aktionen warten nicht aufeinander), eine Aktion, die einfügt, zusätzlich die exklusive
+    Sperre «Einfügen» und liest danach neu; Austritt und Widerruf nehmen «Abschluss» exklusiv vor dem Lesen. So
+    schreiben zwei gleichzeitige erste Aktionen genau eine Zeile, zwei Austritte genau einen (der zweite 409), und eine
+    Aktion läuft nie neben einem Austritt durch. Die getrennten Namensräume vermeiden das Verschärfen einer geteilten
+    Sperre (Verklemmung zwischen zwei ersten Aktionen). `VERWEIGERT` sperrt nicht: Der Eintrag entsteht in einer
+    eigenen Transaktion, oft während die ausgesetzte Transaktion der Anfrage derselben Kennung die Sperren hält (A8 bei
+    `PATCH /dokumente/{id}`, Benutzer-Anmeldung am Generator); Warten verklemmte die Anfrage, ohne dass PostgreSQL es
+    erkennt. Die ausgesetzte Transaktion wird mit der Verweigerung zurückgerollt; ein Duplikat bleibt nur möglich, wenn
+    eine erste Verweigerung gleichzeitig mit einer anderen ersten Aktion derselben Kennung einfügt. Test:
+    `BenutzerVerzeichnisSperreTest`.
+  - Name: Benutzername (`preferred_username`) des Access-Tokens; bei API-Tokens die Bezeichnung aus
+    `public.api_client` (Attribut `TokenIdentitaet.NAME`). Nicht der Claim `name` (geändert mit dem Folge-PR zu #88,
+    Review PR #88, S4; entschieden von Fabian, 13.11.2026): Vor- und Nachnamen darf jeder Benutzer in der Kontokonsole von Keycloak selbst ändern
+    (User Profile `edit: [admin, user]`), den Benutzernamen nur der Admin (`editUsernameAllowed: false`, `RealmExportTest`);
+    ein selbst gewählter Name bliebe im Verzeichnis für die ganze Frist nach Req 10.9 stehen. Folge: Einsicht und
+    Verzeichnis zeigen den Benutzernamen, nicht den Anzeigenamen. Rolle der Tokens im Verzeichnis `API_TOKEN`; im
     `zugriff_protokoll` bleibt sie leer (Check 002 unverändert), die Einsicht ergänzt sie aus dem Verzeichnis.
   - Austritt: `POST /api/v1/protokoll/benutzer/{benutzer}/austritt` (A13, nur Personen) schreibt eine Zeile `AUSTRITT`
     mit `gueltig_bis` = jetzt und `erfasst_von`; unbekannte Kennung → 404, schon beendet oder Token → 409.
-    Widerruf eines API-Tokens (A14, `DELETE /api/v1/api-tokens/{id}`) schreibt eine Zeile `WIDERRUF` mit
+    Widerruf eines API-Tokens (A14, `DELETE /api/v1/api-tokens/{tokenId}`) schreibt eine Zeile `WIDERRUF` mit
     `erfasst_von`, auch für ein nie genutztes Token (gültig ab `api_client.erstellt`).
   - Einsicht: `GET /api/v1/protokoll?von&bis&benutzer&dokument&aktion&seite&groesse` (A13; Zeitraum `[von, bis)`,
-    neueste zuerst, höchstens 100 je Seite) liefert je Eintrag Name und Rolle aus der Verzeichniszeile, die zur Zeit
+    neueste zuerst, höchstens 100 je Seite; `von` und `bis` nur in den Jahren 1 bis 9999 UTC, sonst 400) liefert je Eintrag Name und Rolle aus der Verzeichniszeile, die zur Zeit
     des Eintrags galt; `GET /api/v1/protokoll/benutzer` listet das Verzeichnis. Die Einsicht selbst wird nicht
     protokolliert (keine Aktion der Tabelle oben); verweigerte Aufrufe schon (`VERWEIGERT`, `grund` A13).
   - Kein Löschpfad (Req 10.9, Nachweis JUnit): `KeinLoeschpfadTest` durchsucht Java-Quellen und Changesets nach
-    `UPDATE`, `DELETE` und `TRUNCATE` auf `zugriff_protokoll`, `dokument_version` und `benutzer_verzeichnis`;
+    `UPDATE`, `DELETE` und `TRUNCATE` auf `zugriff_protokoll`, `dokument_version` und `benutzer_verzeichnis`, dazu
+    nach Wegen über JPA/Panache (Review PR #88, S5): Entities auf diesen Tabellen (heute `DokumentVersionEintrag`)
+    tragen `@Immutable`, kein Code ruft `delete*` oder `update*` auf ihnen auf (ArchUnit, Bytecode) und kein HQL-Text
+    löscht oder ändert über den Entity-Namen; `EntityManager.remove(objekt)` erkennt der Test nicht (Typ fehlt im
+    Bytecode), dort greifen Trigger und Rechte;
     `MandantEigentuemerTest` prüft Trigger und Rechte (nur `INSERT` und `SELECT`) aller drei Tabellen.
   - Seite `/verwaltung/protokoll` (A13): Filter (Datum in Europe/Zurich, «bis» einschliesslich), Liste mit Blättern,
-    Benutzerverzeichnis mit «Austritt erfassen» (zweistufig bestätigt).
+    Benutzerverzeichnis mit «Austritt erfassen» (zweistufig bestätigt). Blättern gilt für den zuletzt mit «Anzeigen»
+    übernommenen Filter, nicht für eingetippte Werte; eine neue Abfrage bricht die laufende ab (Review PR #88, S3).
+  - Aktionen in OpenAPI nur aus dem Enum `ProtokollAktion` (Schema `ProtokollAktion` für Antwort und Filter), damit
+    Filter, Antwort und Check nicht auseinanderlaufen.
+  - Nachweis Req 10.2 an den echten Endpunkten: je ein Schritt «steht im Zugriffsprotokoll …» in `upload.feature` und
+    `generator.feature` (`ERFASSEN`, einmal je Anfrage, ohne Dokument-ID, weil der Eintrag vor der Aktion entsteht),
+    `eingangskorb.feature` (`ANZEIGEN` an `GET /dokumente/{id}` und an der Vorschau), `download.feature`,
+    `aendern.feature`, `bestaetigen.feature`, `verwerfen.feature` und `wiederholen.feature`.
 
 **Manifest** (Req 15, P2):
 - Lauf täglich um 03:30 Europe/Zurich (`@Scheduled(cron = "0 30 3 * * ?", timeZone = "Europe/Zurich")`) und einmal beim Start der API: je Mandant ein Auftrag `MANIFEST`.

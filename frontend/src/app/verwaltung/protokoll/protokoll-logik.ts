@@ -1,11 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ProtokollEintrag, VerzeichnisEintrag } from '../../gemeinsam/api';
+import { ProtokollAktion, ProtokollEintrag, VerzeichnisEintrag } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 
 // Fachlogik der Seite «Zugriffsprotokoll» ohne Angular (Aufgabe 5.1; Req 10.5, 10.10)
 
 export const SEITE = 50;
-export const AKTIONEN = Object.values(ProtokollEintrag.AktionEnum);
+export const AKTIONEN = Object.values(ProtokollAktion);
 
 const UHR = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Zurich',
@@ -52,7 +52,7 @@ export function parameter(filter: Filter): {
   bis?: string;
   benutzer?: string;
   dokument?: string;
-  aktion?: ProtokollEintrag.AktionEnum;
+  aktion?: ProtokollAktion;
 } {
   return {
     von: tagesbeginn(filter.von) ?? undefined,

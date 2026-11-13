@@ -9,8 +9,9 @@ Funktionalität: Upload von Dateien
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
 
-  @req-3.1 @req-3.2 @req-6.1
+  @req-3.1 @req-3.2 @req-6.1 @req-10.2
   Szenario: Alle unterstützten Typen werden in einem Vorgang angenommen und eingereiht
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
     Wenn «inhaber-urinet» diese Dateien hochlädt:
       | datei        | typ  |
       | beleg.pdf    | pdf  |
@@ -27,6 +28,9 @@ Funktionalität: Upload von Dateien
       | handy.heic | NEU    |
       | bild.heif  | NEU    |
       | fax.tif    | NEU    |
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer       | rolle   | aktion   | dokument | ip | grund | fehlercode |
+      | inhaber-urinet | INHABER | ERFASSEN |          |    |       |            |
     Und steht jedes neue Dokument im Status «NEU» als «PERSONAL» mit Quelle «UPLOAD» und Erfasser «inhaber-urinet»
     Und hält das Archiv zu jeder neuen Datei die SHA-256 der gesendeten Bytes mit Empfangszeitpunkt fest
     Und liegt jede neue Datei unverändert unter «eingang/» im Bucket von «urinet»

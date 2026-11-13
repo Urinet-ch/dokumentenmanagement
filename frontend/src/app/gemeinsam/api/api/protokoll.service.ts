@@ -17,6 +17,8 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { ProtokollAktion } from '../model/protokoll-aktion';
+// @ts-ignore
 import { ProtokollSeite } from '../model/protokoll-seite';
 // @ts-ignore
 import { VerzeichnisEintrag } from '../model/verzeichnis-eintrag';
@@ -167,10 +169,10 @@ export class ProtokollService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1ProtokollGet(aktion?: 'ERFASSEN' | 'ANZEIGEN' | 'HERUNTERLADEN' | 'AENDERN' | 'BESTAETIGEN' | 'VERWERFEN' | 'WIEDERHOLEN' | 'EXPORTIEREN' | 'VERWEIGERT' | 'SPERRE_KONFLIKT' | 'REGEL_AENDERN' | 'WISSEN_ANZEIGEN' | 'WISSEN_ANNEHMEN' | 'WISSEN_VERWERFEN' | 'WISSEN_INGEST' | 'WISSEN_LINT', benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ProtokollSeite>;
-    public apiV1ProtokollGet(aktion?: 'ERFASSEN' | 'ANZEIGEN' | 'HERUNTERLADEN' | 'AENDERN' | 'BESTAETIGEN' | 'VERWERFEN' | 'WIEDERHOLEN' | 'EXPORTIEREN' | 'VERWEIGERT' | 'SPERRE_KONFLIKT' | 'REGEL_AENDERN' | 'WISSEN_ANZEIGEN' | 'WISSEN_ANNEHMEN' | 'WISSEN_VERWERFEN' | 'WISSEN_INGEST' | 'WISSEN_LINT', benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ProtokollSeite>>;
-    public apiV1ProtokollGet(aktion?: 'ERFASSEN' | 'ANZEIGEN' | 'HERUNTERLADEN' | 'AENDERN' | 'BESTAETIGEN' | 'VERWERFEN' | 'WIEDERHOLEN' | 'EXPORTIEREN' | 'VERWEIGERT' | 'SPERRE_KONFLIKT' | 'REGEL_AENDERN' | 'WISSEN_ANZEIGEN' | 'WISSEN_ANNEHMEN' | 'WISSEN_VERWERFEN' | 'WISSEN_INGEST' | 'WISSEN_LINT', benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ProtokollSeite>>;
-    public apiV1ProtokollGet(aktion?: 'ERFASSEN' | 'ANZEIGEN' | 'HERUNTERLADEN' | 'AENDERN' | 'BESTAETIGEN' | 'VERWERFEN' | 'WIEDERHOLEN' | 'EXPORTIEREN' | 'VERWEIGERT' | 'SPERRE_KONFLIKT' | 'REGEL_AENDERN' | 'WISSEN_ANZEIGEN' | 'WISSEN_ANNEHMEN' | 'WISSEN_VERWERFEN' | 'WISSEN_INGEST' | 'WISSEN_LINT', benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1ProtokollGet(aktion?: ProtokollAktion, benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ProtokollSeite>;
+    public apiV1ProtokollGet(aktion?: ProtokollAktion, benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ProtokollSeite>>;
+    public apiV1ProtokollGet(aktion?: ProtokollAktion, benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ProtokollSeite>>;
+    public apiV1ProtokollGet(aktion?: ProtokollAktion, benutzer?: string, bis?: string, dokument?: string, groesse?: number, seite?: number, von?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
 

@@ -234,6 +234,20 @@ public class GeneratorSchritte {
         }
     }
 
+    /**
+     * Req 10.2: {@code ERFASSEN} einmal je Anfrage, mit dem Principal des Tokens; ohne Dokument-ID, weil der Eintrag vor
+     * der Aktion entsteht (design.md «Protokoll und Manifest»), ohne Rolle wie jeder Token-Eintrag (Check 002).
+     */
+    @Dann("steht im Zugriffsprotokoll von «{word}» {int} Mal «{word}» vom Generator, ohne Rolle und Dokument-ID")
+    public void protokolliert(String mandant, int anzahl, String aktion) throws SQLException {
+        String principal = ApiToken.principal(ApiToken.lesen(tokenJeMandant.get(mandant)).orElseThrow().id());
+        assertThat(abfragen("select count(*) from " + schema(mandant) + ".zugriff_protokoll where benutzer = ? "
+                + "and aktion = ? and rolle is null and dokument_id is null", principal, aktion))
+                .containsExactly(String.valueOf(anzahl));
+        assertThat(abfragen("select count(*) from " + schema(mandant) + ".zugriff_protokoll where benutzer = ? "
+                + "and aktion = ?", principal, aktion)).containsExactly(String.valueOf(anzahl));
+    }
+
     @Dann("ist für das Generator-Dokument «{word}» ein Auftrag «VERARBEITEN» ohne KI eingereiht")
     public void ohneKiEingereiht(String name) throws SQLException {
         assertThat(abfragen("select nutzlast ->> 'ohneKi' as ohne_ki from public.auftrag where typ = 'VERARBEITEN' "

@@ -11,9 +11,14 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import java.util.Optional;
 
 /**
- * Name der Kennung aus der laufenden Anmeldung (Req 10.10): bei Keycloak der Claim {@code name}, sonst
- * {@code preferred_username}; bei einem API-Token die Bezeichnung aus {@code public.api_client}. Nur wenn die Anmeldung
- * zur Kennung des Eintrags gehört; ausserhalb einer Anfrage (z. B. Worker) leer.
+ * Name der Kennung aus der laufenden Anmeldung (Req 10.10): bei Keycloak der Benutzername
+ * ({@code preferred_username}), bei einem API-Token die Bezeichnung aus {@code public.api_client}. Nur wenn die
+ * Anmeldung zur Kennung des Eintrags gehört; ausserhalb einer Anfrage (z. B. Worker) leer.
+ * <p>
+ * Nicht der Claim {@code name}: Vor- und Nachnamen darf jeder Benutzer in der Kontokonsole von Keycloak selbst ändern
+ * ({@code realm-export.json}, User Profile {@code edit: [admin, user]}), den Benutzernamen nur der Admin
+ * ({@code editUsernameAllowed: false}). Weil das Verzeichnis nur Einfügen erlaubt, bliebe ein selbst gewählter Name für
+ * die ganze Frist nach Req 10.9 stehen (Review PR #88, S4).
  */
 @ApplicationScoped
 class NameAusAnmeldung {
@@ -37,7 +42,7 @@ class NameAusAnmeldung {
         if (token.isPresent() || !(id.getPrincipal() instanceof JsonWebToken jwt)) {
             return token;
         }
-        return text(jwt.getClaim("name")).or(() -> text(jwt.getClaim("preferred_username")));
+        return text(jwt.getClaim("preferred_username"));
     }
 
     private static Optional<String> text(Object wert) {

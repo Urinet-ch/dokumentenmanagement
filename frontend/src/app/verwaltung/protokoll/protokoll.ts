@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ProtokollEintrag, ProtokollService, VerzeichnisEintrag } from '../../gemeinsam/api';
 import { zeitpunkt } from '../../gemeinsam/format';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
@@ -37,7 +38,11 @@ export class Protokoll implements OnInit {
   protected readonly wer = wer;
   protected readonly person = person;
 
+  /** Eingabe der Felder; gilt erst mit «Anzeigen». */
   protected readonly filter = signal<Filter>(LEERER_FILTER);
+  /** Der zuletzt mit «Anzeigen» übernommene Filter; nur er gilt beim Blättern (Review PR #88, S3). */
+  private angewandt: Filter = LEERER_FILTER;
+  private anfrage?: Subscription;
   protected readonly eintraege = signal<readonly ProtokollEintrag[] | null>(null);
   protected readonly gesamt = signal(0);
   protected readonly seite = signal(0);
@@ -68,23 +73,30 @@ export class Protokoll implements OnInit {
   }
 
   protected anzeigen(): void {
-    this.laden(0);
+    this.anwenden(this.filter());
   }
 
   protected zuruecksetzen(): void {
     this.filter.set(LEERER_FILTER);
-    this.laden(0);
+    this.anwenden(LEERER_FILTER);
   }
 
-  protected laden(seite: number): void {
-    const fehler = filterFehler(this.filter());
+  private anwenden(filter: Filter): void {
+    const fehler = filterFehler(filter);
     if (fehler) {
       this.fehler.set(fehler);
       return;
     }
+    this.angewandt = filter;
+    this.laden(0);
+  }
+
+  /** Lädt eine Seite des übernommenen Filters; eine noch laufende ältere Anfrage wird abgebrochen. */
+  protected laden(seite: number): void {
     this.fehler.set(null);
-    const p = parameter(this.filter());
-    this.protokoll.apiV1ProtokollGet(p.aktion, p.benutzer, p.bis, p.dokument, SEITE, seite, p.von).subscribe({
+    const p = parameter(this.angewandt);
+    this.anfrage?.unsubscribe();
+    this.anfrage = this.protokoll.apiV1ProtokollGet(p.aktion, p.benutzer, p.bis, p.dokument, SEITE, seite, p.von).subscribe({
       next: (antwort) => {
         this.eintraege.set(antwort.eintraege ?? []);
         this.gesamt.set(antwort.gesamt ?? 0);

@@ -36,7 +36,8 @@ import java.util.function.Function;
  * Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis des eigenen Mandanten (A13, nur Inhaber; Req 2.19, 10.5,
  * 10.10). Andere Rollen erhalten 403 und einen Eintrag {@code VERWEIGERT} (Req 10.7). Die Einsicht selbst ist eine Liste
  * ohne Dokumentbezug und wird nicht protokolliert (design.md «Protokoll und Manifest»). Parameter kommen als Text,
- * damit jede ungültige Angabe 400 {@code ANFRAGE_UNGUELTIG} ergibt.
+ * damit jede ungültige Angabe 400 {@code ANFRAGE_UNGUELTIG} ergibt. Die Aktionen nennt OpenAPI nur über
+ * {@link ProtokollAktion}, damit Filter, Antwort und Enum nicht auseinanderlaufen.
  */
 @Path("/protokoll")
 @Tag(name = "Protokoll")
@@ -63,10 +64,7 @@ public class ProtokollResource {
             @Schema(nullable = true) String name,
             @Schema(nullable = true, description = "INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE oder API_TOKEN")
             String rolle,
-            @Schema(required = true, enumeration = {"ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN",
-                    "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN",
-                    "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT"})
-            String aktion,
+            @Schema(required = true) ProtokollAktion aktion,
             @Schema(nullable = true) UUID dokumentId,
             @Schema(nullable = true) String ip,
             @Schema(nullable = true, description = "JSON-Objekt als Text, z. B. Fehlercode oder geänderte Felder")
@@ -108,10 +106,7 @@ public class ProtokollResource {
             String benutzer,
             @QueryParam("dokument") @Parameter(description = "ID des Dokuments",
                     schema = @Schema(type = SchemaType.STRING, format = "uuid")) String dokument,
-            @QueryParam("aktion") @Parameter(schema = @Schema(type = SchemaType.STRING, enumeration = {"ERFASSEN",
-                    "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN",
-                    "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN",
-                    "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT"})) String aktion,
+            @QueryParam("aktion") @Parameter(schema = @Schema(implementation = ProtokollAktion.class)) String aktion,
             @QueryParam("seite") @Parameter(description = "ab 0", schema = @Schema(type = SchemaType.INTEGER,
                     format = "int32", defaultValue = "0")) String seite,
             @QueryParam("groesse") @Parameter(description = "1–100", schema = @Schema(type = SchemaType.INTEGER,
@@ -156,7 +151,7 @@ public class ProtokollResource {
 
     private static ProtokollEintragDto dto(ProtokollZeile z) {
         return new ProtokollEintragDto(z.id(), z.zeit(), z.benutzer().orElse(null), z.name().orElse(null),
-                z.rolle().orElse(null), z.aktion(), z.dokumentId().orElse(null), z.ip().orElse(null),
+                z.rolle().orElse(null), ProtokollAktion.valueOf(z.aktion()), z.dokumentId().orElse(null), z.ip().orElse(null),
                 z.details().orElse(null));
     }
 

@@ -34,6 +34,19 @@ class ProtokollFilterTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void zeitpunkteAusserhalbDerJahre1Bis9999WerdenAbgelehnt() {
+        for (String zeit : new String[] {"+300000-01-01T00:00:00Z", "+10000-01-01T00:00:00Z", "0000-12-31T23:59:59Z"}) {
+            Optional<Instant> wert = Optional.of(Instant.parse(zeit));
+            assertThatThrownBy(() -> filter(wert, Optional.empty(), Optional.empty(), 0, 50)).as(zeit)
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> filter(Optional.empty(), wert, Optional.empty(), 0, 50)).as(zeit)
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(filter(Optional.of(Instant.parse("0001-01-01T00:00:00Z")),
+                Optional.of(Instant.parse("9999-12-31T23:59:59Z")), Optional.empty(), 0, 50).von()).isPresent();
+    }
+
     private static ProtokollFilter filter(Optional<Instant> von, Optional<Instant> bis, Optional<String> benutzer,
                                           int seite, int groesse) {
         return new ProtokollFilter(von, bis, benutzer, Optional.empty(), Optional.empty(), seite, groesse);
