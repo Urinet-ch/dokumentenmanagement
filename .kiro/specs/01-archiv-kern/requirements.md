@@ -46,6 +46,7 @@ das Kriterium ist erst nach diesem Entscheid umsetzbar.
 - **Frist abgelaufen** – Kennzeichen eines Dokuments, dessen `aufbewahren_bis` bei der Bestätigung schon vorbei ist (Altbestand); der Inhaber entscheidet.
 - **Vertraulichkeit** – `NORMAL`, `INTERN` oder `PERSONAL`; steuert die Sichtbarkeit nach der Rechtematrix (Requirement 2.6).
 - **Erfasser** – Benutzer, der ein Dokument hochgeladen hat.
+- **Dateiname** – Name der empfangenen Datei ohne Pfadanteile, am Dokument gespeichert als Herkunftsangabe (3.9–3.14); kein Titel, nicht änderbar, nicht Teil des Volltexts des Belegs. Fehlt der Titel, zeigt die App ihn als erkennbaren Platzhalter (8.11, 14.9, 14.10) (ergänzt 13.11.2026, entschieden von Fabian).
 - **Zugeordnete Person** (`person_benutzer`) – Benutzer, dem ein `PERSONAL`-Dokument gehört, z. B. die eigene Lohnabrechnung.
 - **Partner** – Kontakt (Kunde, Lieferant, Behörde), auf den sich ein Dokument bezieht.
 - **Dublette** – Datei, deren SHA-256 im Mandanten schon zu einem nicht verworfenen Dokument gehört.
@@ -178,7 +179,13 @@ damit digitale Dokumente ohne Umweg ins Archiv kommen.
 5. WO der Benutzer mehrere Bilder als «ein Dokument» markiert, SOLL das Archiv sie in der gewählten Reihenfolge zu einem mehrseitigen Dokument zusammenfassen.
 6. FALLS eine Datei grösser als 50 MB ist, DANN SOLL das Archiv sie mit HTTP 413 `DATEI_ZU_GROSS` ablehnen.
 7. FALLS eine Datei leer oder beschädigt ist, DANN SOLL das Archiv sie mit HTTP 422 `DATEI_UNGUELTIG` ablehnen.
-8. WENN mehrere Dateien in einem Vorgang hochgeladen werden, DANN SOLL das Archiv je Datei ein eigenes Ergebnis liefern (angenommen, `DUBLETTE` oder Fehlercode nach 3.3, 3.6, 3.7) und gültige Dateien trotz abgelehnter Nachbarn annehmen.
+8. WENN mehrere Dateien in einem Vorgang hochgeladen werden, DANN SOLL das Archiv je Datei ein eigenes Ergebnis liefern (angenommen, `DUBLETTE` oder Fehlercode nach 3.3, 3.6, 3.7, 3.10) und gültige Dateien trotz abgelehnter Nachbarn annehmen (geändert 13.11.2026, entschieden von Fabian; bisher «nach 3.3, 3.6, 3.7»).
+9. WENN das Archiv eine Datei annimmt, DANN SOLL es ihren Dateinamen ohne Pfadanteile und mit höchstens 255 Zeichen (längere gekürzt) als Dateiname des neuen Dokuments speichern; bei mehreren Dateien als ein Dokument (3.5) den Namen der ersten angenommenen Datei in der gewählten Reihenfolge. Fehlt der Name oder ist er nach dem Bereinigen leer, bleibt der Dateiname leer. Für eine Dublette (3.4) und eine abgelehnte Datei legt das Archiv nichts an und speichert keinen Namen. Dokumente, die vor dieser Ergänzung erfasst wurden, bleiben ohne Dateinamen (ergänzt 13.11.2026, entschieden von Fabian).
+10. FALLS der Dateiname einer hochgeladenen Datei Steuerzeichen, Zeilen- oder Absatztrenner oder unsichtbare Formatzeichen enthält (Unicode Cc, Cs, Zl, Zp und Cf ausser den Verbindern U+200C/U+200D in Emoji; z. B. die Richtungsumkehr U+202E oder U+2028), DANN SOLL das Archiv diese Datei mit HTTP 400 `ANFRAGE_UNGUELTIG` im Ergebnis der Datei (3.8) ablehnen und weder ein Dokument noch den Namen speichern (ergänzt 13.11.2026, entschieden von Fabian; Zl und Zp neu, vorgeschlagen 13.11.2026, entschieden mit dem Merge des Spec-PR).
+11. Das Archiv SOLL den Dateinamen als Herkunftsangabe führen: Es setzt ihn nur beim Eingang (3.9, 4.9, 11.12, 12.9), übernimmt ihn nie in den Titel und ändert ihn über keine Schnittstelle (3.14). Den Dateinamen SOLL es nur liefern und durchsuchbar machen, soweit das Dokument nach 2.3 und 2.21 sichtbar ist, wie die übrigen Metadaten (ergänzt 13.11.2026, entschieden von Fabian).
+12. Das Archiv SOLL den Dateinamen nie loggen und nie in Benachrichtigungen, das Zugriffsprotokoll, Nutzlasten von Aufträgen, S3-Schlüssel, Manifeste, vorsignierte Download-Adressen (auch nicht als Parameter wie `response-content-disposition`) oder Antwort-Header aufnehmen (16.7, 14.6; zurückgegeben wird er nur als `datei` im Ergebnis des Uploads und als Feld `dateiname` nach 14.9), und es SOLL ihn nicht in die Eingabe des Metadaten-Vorschlags nach 7.1 aufnehmen: Prompt, Text und Bild bleiben wie im Gate-Lauf mit Prompt `v6-7a39224f2f5e` (Aufgabe 3.8) (ergänzt 13.11.2026, entschieden von Fabian).
+13. Das Archiv SOLL den Dateinamen nicht in Antworten von Werkzeugen an ein Sprachmodell (Chat nach Spec 02, auch der öffentliche Chat nach Spec 03, Wissensbasis nach Spec 04) und nicht über die öffentliche Schnittstelle `/public/v1` (Spec 03) ausgeben, auch nicht im Auszug; diese Schnittstellen nutzen den Auszug ohne Dateinamen (Nachweis: JUnit für die Variante des Auszugs in Spec 01; die Werkzeuge und `/public/v1` weisen es in ihren Specs nach). Ob Chat und Wissensbasis den Dateinamen dem Sprachmodell geben dürfen, ist offen (design.md «Open Points»); bis zum Entscheid gilt dieses Kriterium (ergänzt 13.11.2026 als sichere Vorgabe zu 3.12, vorgeschlagen 13.11.2026, entschieden mit dem Merge des Spec-PR).
+14. FALLS `PATCH /dokumente/{id}`, `POST /dokumente/{id}/bestaetigen` oder die Generator-Metadaten (11.1) ein Feld `dateiname` nennen, DANN SOLL das Archiv mit HTTP 400 `ANFRAGE_UNGUELTIG` antworten und nichts ändern (ergänzt 13.11.2026, entschieden von Fabian).
 
 ### Requirement 4: Handy-Erfassung als Web-App (D2)
 **User Story:** Als Inhaber möchte ich Post und Quittungen mit dem Handy fotografieren,
@@ -193,6 +200,7 @@ damit Papier sofort erfasst ist.
 6. FALLS ein Upload dreimal wegen Netzwerkfehler oder HTTP 5xx fehlschlägt, DANN SOLL die App den Eintrag als fehlerhaft markieren und eine manuelle Wiederholung anbieten, ohne ihn zu löschen; Versuche im Offline-Zustand zählen nicht.
 7. WENN eine Seite hochgeladen wird, DANN SOLL die App die unbearbeitete Rohaufnahme als Original und die zugeschnittene Fassung als Arbeitsfassung übertragen.
 8. FALLS der Server einen Upload mit HTTP 4xx ablehnt (ausser 401, dann neu anmelden), DANN SOLL die App den Eintrag sofort mit der Meldung des Servers als fehlerhaft markieren, ohne ihn zu löschen.
+9. WENN die App eine Erfassung hochlädt, DANN SOLL sie als Dateinamen der Originale «Aufnahme TT.MM.JJJJ HH:MM» mit dem Zeitpunkt der ersten aufgenommenen Seite in Ortszeit Europe/Zurich senden (z. B. «Aufnahme 13.11.2026 08:15»), auch wenn der Upload erst später aus der Warteschlange erfolgt (4.4, 4.5); das Archiv speichert ihn nach 3.9 (ergänzt 13.11.2026, entschieden von Fabian).
 
 ### Requirement 5: Verarbeitung, OCR und PDF/A (D3)
 **User Story:** Als Inhaber möchte ich, dass jedes Dokument durchsuchbar und langfristig lesbar ist,
@@ -262,6 +270,7 @@ auch auf dem Handy, damit nichts liegen bleibt.
 8. FALLS ein Benutzer ein Dokument bestätigt, das nicht mehr im Status `EINGANGSKORB` ist, DANN SOLL das Archiv mit HTTP 409 antworten und nichts ändern.
 9. FALLS beim Bestätigen einer Art, die der Mandant selbst ausstellt (für `urinet`: Ausgangsrechnung, Offerte, Lohnabrechnung), die Belegnummer für diese Art im Mandanten schon vergeben ist, DANN SOLL das Archiv die Bestätigung mit HTTP 409 verweigern. Spec 05, 2.2 ergänzt dieses Kriterium: «Art, die der Mandant selbst ausstellt» heisst Art mit `selbst_ausgestellt = ja`, nicht mehr Eintrag in `public.mandant.eigene_arten`; für `urinet` sind es nach der Migration dieselben Arten (Spec 05, 9.1; umgesetzt in Spec 05, Aufgabe 17.3).
 10. WENN bei einem Fremdbeleg bereits ein Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art existiert, DANN SOLL der Eingangskorb eine Warnung mit Verweis auf das vorhandene Dokument zeigen, die Bestätigung aber zulassen.
+11. WO ein Dokument im Eingangskorb weder einen Titel noch einen vorgeschlagenen Titel hat (z. B. ohne Vorschlag nach 7.3, in `FEHLER` oder mit `pdfa_fehlt`), SOLL der Eingangskorb an Stelle des Titels den Dateinamen als erkennbaren Platzhalter zeigen, der sich sichtbar und für Screenreader von einem Titel unterscheidet; beim Bestätigen SOLL die App den Dateinamen nie als Titel senden, und ein Pflichtfeld `titel` gilt durch den Platzhalter nicht als erfüllt (8.3). Ohne Dateinamen bleibt es bei «Ohne Titel» (ergänzt 13.11.2026, entschieden von Fabian).
 
 ### Requirement 9: Dokumentarten, Zusatzfelder und Aufbewahrung (D6)
 **User Story:** Als Inhaber möchte ich Dokumentarten und ihre Felder selbst pflegen,
@@ -311,6 +320,7 @@ direkt ablegen, damit ich sie nicht von Hand erfassen muss.
 9. FALLS das Archiv mit HTTP 409 antwortet, DANN SOLL der Client die Datei nach `archiv-konflikt/` verschieben und nicht erneut senden.
 10. WO die Standard-Vertraulichkeit der Art `PERSONAL` ist, SOLLEN `vertraulichkeit` und `personBenutzer` Pflichtfelder sein (sonst 11.6); fehlt `vertraulichkeit` bei anderen Arten, SOLL das Archiv die Standard-Vertraulichkeit der Art setzen.
 11. WENN ein Generator-Dokument verworfen wird (6.6, aus `FEHLER` oder `EINGANGSKORB`), DANN SOLL das Archiv die Reservation seiner Belegnummer in derselben Transaktion freigeben, sodass ein korrigiertes Neusenden derselben Belegnummer angenommen wird.
+12. WENN ein Generator ein PDF sendet, DANN SOLL das Archiv den Dateinamen des Teils `datei` nach 3.9 als Dateiname des Dokuments speichern; ohne Namen im Teil oder mit Zeichen nach 3.10 bleibt er leer, das PDF wird aber wie bisher angenommen (der Generator prüfte den Namen bisher nicht, ein Beleg soll nicht an seinem Namen scheitern), und bei gleicher SHA-256 (11.8) speichert es keinen Namen (ergänzt 13.11.2026, entschieden von Fabian; Umgang mit ungültigen Namen vorgeschlagen 13.11.2026, entschieden mit dem Merge des Spec-PR).
 
 ### Requirement 12: Einmaliger Import des Google-Drive-Altbestands (I2)
 **User Story:** Als Inhaber möchte ich die bisherigen Dokumente aus `UriNet/` übernehmen,
@@ -325,6 +335,7 @@ damit das Archiv vollständig ist.
 6. Office-Dateien sowie `.eml`- und ZIP-Dateien SOLL das Werkzeug in Phase 1 nicht übertragen; sie und jede vom Archiv abgelehnte Datei SOLLEN mit Pfad und Grund unter «nicht übernommen» erscheinen.
 7. WENN ein Lauf endet, DANN SOLL der Schlussbericht aufgehen: gefunden = übertragen + schon vorhanden + übersprungen + abgelehnt.
 8. WENN eine Datei importiert wird, DANN SOLL das Archiv sie wie einen Upload verarbeiten und in den Eingangskorb legen, nie direkt archivieren.
+9. WENN das Werkzeug eine Datei überträgt, DANN SOLL es als Dateinamen nur den Namen der Datei ohne Ordnerpfad senden; der Ordnerpfad geht weiter nur als Hinweis (12.1, 12.2), und das Archiv speichert den Namen nach 3.9 (ergänzt 13.11.2026, entschieden von Fabian).
 
 ### Requirement 13: CSV-Import der CRM-Daten aus 21.CRM (I6)
 **User Story:** Als Inhaber möchte ich meine Kontakte aus 21.CRM als CSV einlesen,
@@ -355,6 +366,9 @@ damit ich jede Rechnung in Sekunden habe.
 5. Die Suche SOLL Requirement 2.3 (Vertraulichkeit) und Requirement 1.2 (Mandant) einhalten.
 6. WENN der Benutzer ein Dokument öffnet, DANN SOLL das Archiv eine zeitlich begrenzte Download-Adresse (höchstens 5 Minuten gültig) für die gespeicherte Versions-ID der PDF/A-Fassung ausgeben und den Zugriff protokollieren.
 7. WENN ein Suchbegriff einer Belegnummer entspricht, DANN SOLL die Suche das Dokument mit genau dieser Belegnummer liefern; die Belegnummer SOLL zudem als exakter Filter verfügbar sein.
+8. Das Archiv SOLL den Dateinamen eines Dokuments mit der Suche nach 14.1 finden, als eigener Teil des Suchindex mit eigenem Gewicht und getrennt vom Volltext des Belegs; dabei zählt die Endung nicht, und `_`, `-` und `.` trennen Wörter (Testfall: «Rechnung» findet ein Dokument ohne Volltext mit dem Dateinamen `Scan_Rechnung-2026.pdf`, «pdf» findet es nicht). Der Auszug (14.4) darf den Dateinamen enthalten, ausser nach 3.13; 14.3 und 14.5 gelten unverändert (ergänzt 13.11.2026, entschieden von Fabian).
+9. Die API SOLL den Dateinamen in jedem Suchtreffer und in jeder Antwort mit dem Dokument (z. B. `GET /dokumente/{id}`, `GET /eingangskorb`, Antworten von `PATCH /dokumente/{id}` und vom Bestätigen) als eigenes Feld `dateiname` liefern (leer ohne Namen); WO ein Suchtreffer keinen Titel hat, auch bei Dokumenten in `NEU`, `VERARBEITUNG` und `FEHLER`, SOLL die Trefferliste an Stelle des Titels den Dateinamen als Platzhalter nach 8.11 zeigen (ergänzt 13.11.2026, entschieden von Fabian).
+10. WENN der Benutzer ein Dokument öffnet, DANN SOLL die Dokumentansicht in jedem Status den Dateinamen unter der Bezeichnung «Dateiname» zeigen und, wo kein Titel vorliegt, ihn als Platzhalter nach 8.11 an Stelle des Titels setzen; ohne gespeicherten Namen entfällt die Zeile «Dateiname». Beim Ändern der Metadaten (`PATCH /dokumente/{id}`, Recht A6) SOLL die App den Dateinamen nie als Titel vorbelegen oder senden (ergänzt 13.11.2026, entschieden von Fabian).
 
 ### Requirement 15: Tägliches Manifest (B1)
 **User Story:** Als Inhaber möchte ich nachweisen können, dass seit der Archivierung nichts verändert wurde,
