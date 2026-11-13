@@ -7,6 +7,7 @@ import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * weil der Dienst bei gelungenem Start nie endet; der unbekannte Mandant lässt einen trotzdem gelungenen Start mit
  * Exit 1 statt 3 enden, ohne etwas anzulegen.
  */
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(KeinPlatzStartTest.Einstellung.class)
 class KeinPlatzStartTest {

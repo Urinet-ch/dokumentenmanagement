@@ -5,6 +5,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -16,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Auftrag von A auf derselben Verbindung mit einem SQL-Fehler und Rollback endete. Ein Worker-Platz und ein Pool von
  * einer Verbindung erzwingen, dass B genau die Verbindung erhält, die A zuletzt benutzt hat.
  */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(AuftragSchemaNachFehlerTest.EineVerbindung.class)
 class AuftragSchemaNachFehlerTest {

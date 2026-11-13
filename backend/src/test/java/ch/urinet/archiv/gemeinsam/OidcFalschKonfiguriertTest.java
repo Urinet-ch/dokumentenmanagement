@@ -7,6 +7,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -22,6 +23,7 @@ import static org.hamcrest.Matchers.containsString;
  * 11.11.2026, PR #42 P42-1): Die Readiness meldet DOWN, damit der Deploy-Workflow zurückrollt; im Betrieb beendet sich
  * die API nach der Frist mit Exit-Code 75.
  */
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(OidcFalschKonfiguriertTest.FalscherRealm.class)
 class OidcFalschKonfiguriertTest {

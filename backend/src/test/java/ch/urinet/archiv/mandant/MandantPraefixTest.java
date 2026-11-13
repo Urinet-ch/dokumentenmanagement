@@ -5,6 +5,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -15,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Die Provisionierung nimmt den Präfix aus {@code archiv.ablage.bucket-praefix} (Req 6.11, Stufe A). */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(MandantPraefixTest.StufeA.class)
 class MandantPraefixTest {

@@ -4,6 +4,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -16,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code /run/secrets} zeigt {@code smallrye.config.source.file.locations} auf Attrappen unter
  * {@code src/test/resources/secrets-test/}. Ohne {@code smallrye-config-source-file-system} startet das nicht.
  */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(SecretDateienTest.ProdMitSecretDateien.class)
 public class SecretDateienTest {

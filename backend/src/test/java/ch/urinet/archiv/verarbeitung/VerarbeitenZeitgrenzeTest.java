@@ -8,6 +8,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * nächste Versuch verarbeitet das Dokument genau einmal. Die Zeitgrenze ist kurz, das erste Dokument lang genug, dass
  * OCRmyPDF sie sicher überschreitet; ein Beobachter hält fest, dass dabei ein Container mit {@code ocrmypdf} lief.
  */
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(VerarbeitenZeitgrenzeTest.KurzeZeitgrenze.class)
 class VerarbeitenZeitgrenzeTest {

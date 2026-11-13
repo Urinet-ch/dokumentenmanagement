@@ -6,6 +6,7 @@ import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Stufen-Prüfung der Ablage (Req 6.11, tasks.md 2.3): Ohne {@code archiv.stufe} gilt Stufe B; eine Höchstfrist für
  * {@code archiv/} bricht dann auch den Start des Workers ab, unabhängig vom Profil.
  */
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(AblageStufeWorkerStartTest.WorkerOhneStufeMitHoechstfrist.class)
 class AblageStufeWorkerStartTest {

@@ -288,7 +288,7 @@ Aufgaben 17.2 bis 17.7 und 18.2).
   - 409 `BELEGNUMMER_VERGEBEN` gilt nur für eigene Arten (`mandant.eigene_arten`) der Gruppe `finanz` mit Belegnummer, wie beim Bestätigen (Reservation in `belegnummer_eigen`). Verwerfen gibt die Reservation frei (3.4), ein Neusenden derselben Nummer wird angenommen (Req 11.11); die Dublettenprüfung übergeht verworfene Dokumente, darum wird auch dieselbe PDF neu angenommen.
   - `personBenutzer` wird als `sub` übernommen und nicht gegen Keycloak geprüft (wie beim Bestätigen).
   - Worker: `VerarbeitungSpeichern.ergebnisSpeichern(…, ohneKi)` setzt für Generator-Dokumente `ARCHIVIERUNG` und reiht `ARCHIVIEREN` ein (bei `pdfa_fehlt` `EINGANGSKORB`; der Inhaber bestätigt dann mit `ohnePdfa`, Req 5.9).
-  - Client `tools/archiv_client.py`: nur Python-Standardbibliothek (`urllib`) statt `requests`, damit er ohne Installation in jedes Generator-Skript passt; Einbau-Beispiele und Verhalten in `tools/README.md`. `archiv-ausstehend/` und `archiv-konflikt/` liegen im Ordner des PDFs (Parameter `ordner`); ausstehend wird eine Kopie samt `.json` abgelegt, bei 409 das PDF verschoben. 5xx und Zeitüberschreitung gelten als «nicht erreichbar». Tests `tools/test_archiv_client.py` (unittest gegen lokalen HTTP-Server) laufen in der CI im Job «Frontend». Zusätzlich rufen die Szenarien `@req-11.4`, `@req-11.5`, `@req-11.6` und `@req-11.9` in `generator.feature` den Client per `python3` gegen den Testserver auf (Job «Backend», `python3` des Runners). Den Fehlercode liest der Client aus `fehlercode` der Problem Details (`ArchivFehler.code`). Adresse nur `https://`, `http://` nur für `localhost`, `127.0.0.1` und `::1`; Weiterleitungen (3xx) folgt er nicht, damit das Token an keine andere Adresse geht (Review PR #69).
+  - Client `tools/archiv_client.py`: nur Python-Standardbibliothek (`urllib`) statt `requests`, damit er ohne Installation in jedes Generator-Skript passt; Einbau-Beispiele und Verhalten in `tools/README.md`. `archiv-ausstehend/` und `archiv-konflikt/` liegen im Ordner des PDFs (Parameter `ordner`); ausstehend wird eine Kopie samt `.json` abgelegt, bei 409 das PDF verschoben. 5xx und Zeitüberschreitung gelten als «nicht erreichbar». Tests `tools/test_archiv_client.py` (unittest gegen lokalen HTTP-Server) laufen in der CI im Job «Frontend». Zusätzlich rufen die Szenarien `@req-11.4`, `@req-11.5`, `@req-11.6` und `@req-11.9` in `generator.feature` den Client per `python3` gegen den Testserver auf (Job «Backend-Tests», `python3` des Runners). Den Fehlercode liest der Client aus `fehlercode` der Problem Details (`ArchivFehler.code`). Adresse nur `https://`, `http://` nur für `localhost`, `127.0.0.1` und `::1`; Weiterleitungen (3xx) folgt er nicht, damit das Token an keine andere Adresse geht (Review PR #69).
   - Grenze der Metadaten: Der Multipart-Teil `metadaten` unterliegt `quarkus.http.limits.max-form-attribute-size=4K` (aus 2.4, Hinweis); darüber folgt 413 `DATEI_ZU_GROSS` wie bei einer Datei über 50 MB. Eine Rechnung braucht weniger als 1 KB, darum bleibt die Grenze; sie steht in OpenAPI und `tools/README.md`.
   - Tests: Szenarien `features/dokument/generator.feature` (echter Worker mit OCR und Archivierung in MinIO), `api-tokens.feature` (Scope-Bindung), `VerarbeitenHandlerTest` (Generator ohne KI zur Archivierung, bei `pdfa_fehlt` in den Eingangskorb ohne `ARCHIVIEREN`; `ohneKi` bei anderer Quelle bleibt Fehlversuch).
 
@@ -1424,6 +1424,17 @@ Nachweis: jedes Kriterium ohne Vermerk «Nachweis: manuell [Fabian]», «Nachwei
 «Nachweis: JUnit» als Cucumber-Szenario mit Tag `@req-<x.y>` (Req 16.14); Features unter
 `backend/src/test/resources/features/<fachbereich>/`, je Datei auf Feature-Ebene genau ein Tag `@spec-NN`.
 Testdaten im Repository sind ausschliesslich synthetisch (Req 16.7).
+
+Aufteilung der CI (`.github/workflows/ci.yml`, Entscheid Fabian 13.11.2026; vorher ein Backend-Job mit 22.5 min, davon
+rund 12 min für 25 Klassen mit eigenem Quarkus-Start): Keine Prüfung entfällt, sie laufen parallel. «Build» baut das
+Artefakt mit Quinoa ohne Tests (`-Dmaven.test.skip=true`) und prüft Liquibase-Changesets, OpenAPI und generierten Client
+sowie das Drive-Import-Werkzeug; «Browser-Szenarien» und «Docker-Image» hängen nur von «Build» ab. «Backend-Tests» führt
+`mvn verify -DexcludedGroups=start-1,start-2` aus (Szenarien, JUnit, ArchUnit, Abdeckung `@req`, SpotBugs; Quinoa aus,
+die PWA baut «Build»), «Backend-Starttests» `mvn test -Dgroups=start-1` bzw. `start-2` (Matrix). `StartGruppenTest`
+erzwingt, dass genau die Klassen mit eigenem Start genau eine Startgruppe tragen; «Backend-Tests vollständig» prüft aus
+den Surefire-Berichten, dass jede Testklasse (Datei nach den Surefire-Mustern, nicht abstrakt, mit Test) in genau einem
+Job lief und kein Job leer ist (`pruefe-testaufteilung.py`, `TestaufteilungTest`). Die Gruppen sind nach den gemessenen
+Laufzeiten ausgeglichen; eine neue Startklasse kommt in die Gruppe mit der kleineren Summe.
 
 Reichweite der CI-Prüfung (Req 16.14, entschieden mit Aufgabe 1.1): Geprüft werden die Kriterien unter
 `_Anforderungen_` abgehakter Aufgaben ab Welle 1; die Prüfung wächst mit jeder abgehakten Aufgabe. Optionale Aufgaben

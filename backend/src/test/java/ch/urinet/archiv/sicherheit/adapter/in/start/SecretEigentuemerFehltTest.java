@@ -7,6 +7,7 @@ import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code public} entsteht kein {@code databasechangelog}. Mit DB-Devservice; die Prüfung vorher nur beim
  * {@code StartupEvent} liess Liquibase zuerst laufen (Gegenprobe im PR).
  */
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(SecretEigentuemerFehltTest.ProdOhneDbOwner.class)
 class SecretEigentuemerFehltTest {
