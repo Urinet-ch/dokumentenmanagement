@@ -65,6 +65,7 @@ class ManifestPruefenTest {
     private final Set<String> ungesperrt = new HashSet<>();
     private final AblagePort ablage = manipulierbar();
     private List<String> konfiguriert = BEIDE;
+    private final Map<LocalDate, ManifestDaten.ManifestStand> datenbank = new HashMap<>();
 
     private record Stand(LocalDate datum, Instant bis, String sha256, Vorher verweis) {
     }
@@ -177,12 +178,14 @@ class ManifestPruefenTest {
 
         Pruefbericht bericht = pruefen(TAG1, TAG1);
 
-        assertThat(bericht.fehler()).containsExactly("2026-01-10: Zeitstempel von haupt ungültig: Imprint passt nicht");
+        assertThat(bericht.fehler()).containsExactly("2026-01-10: Zeitstempel von haupt passt nicht zur Datenbank",
+                "2026-01-10: Zeitstempel von haupt ungültig: Imprint passt nicht");
     }
 
     @Test
     void fehlendePruefdatenEinesNichtFestgehaltenenZeitstempelsWerdenNurGemeldet() {
         kette(1, BEIDE, Duration.ofMinutes(20));
+        nurFestgehalten(TAG1, List.of("haupt"));
         entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
 
         Pruefbericht bericht = pruefen(TAG1, TAG1);
@@ -204,6 +207,7 @@ class ManifestPruefenTest {
     @Test
     void einUnvollstaendigerZeitstempelOhneGueltigenAnderenIstKeinGueltigerZeitstempel() {
         kette(1, List.of("zweit"), Duration.ofMinutes(20));
+        nurFestgehalten(TAG1, List.of());
         entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
 
         Pruefbericht bericht = pruefen(TAG1, TAG1);
@@ -226,6 +230,39 @@ class ManifestPruefenTest {
                         + " liegen 1 weitere Version(en) oder Löschmarke(n); geprüft wird die älteste",
                 "2026-01-10: unter " + ManifestTeil.tsr("haupt").pfad(TAG1)
                         + " liegen 2 weitere Version(en) oder Löschmarke(n); geprüft wird die älteste");
+    }
+
+    @Test
+    void fehlendePruefdatenEinesFestgehaltenenZeitstempelsSindAuchAmJuengstenTagEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
+
+        Pruefbericht bericht = pruefen(TAG1, TAG1);
+
+        assertThat(bericht.fehler()).containsExactly("2026-01-10: Prüfdaten des Zeitstempels von zweit fehlen");
+        assertThat(bericht.meldungen()).isEmpty();
+    }
+
+    @Test
+    void folgemanifestUndDatenbankMitVerschiedenenZeitstempelnSindEinFehler() {
+        kette(2, BEIDE, Duration.ofMinutes(20));
+        nurFestgehalten(TAG1, List.of("haupt"));
+
+        assertThat(pruefen(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Folgemanifest und Datenbank nennen verschiedene Zeitstempel");
+    }
+
+    @Test
+    void einManifestOhneEintragInDerDatenbankWirdGemeldetMitFolgemanifestIstEsEinFehler() {
+        kette(2, BEIDE, Duration.ofMinutes(20));
+        datenbank.remove(TAG1);
+        datenbank.remove(TAG2);
+
+        Pruefbericht bericht = pruefen(TAG1, TAG2);
+
+        assertThat(bericht.fehler()).containsExactly("2026-01-10: Manifest ist in der Datenbank nicht festgehalten, "
+                + "das Folgemanifest verweist aber darauf");
+        assertThat(bericht.meldungen()).containsExactly("2026-01-11: Manifest ist in der Datenbank nicht festgehalten");
     }
 
     @Test
@@ -259,7 +296,7 @@ class ManifestPruefenTest {
 
     private Pruefbericht pruefen(LocalDate von, LocalDate bis) {
         return new ManifestPruefen(ablage, new JacksonJsonLeser(), schluessel(), new TsaAttrappe(),
-                Duration.ofHours(24)).pruefen(MANDANT, von, bis);
+                (mandant, datum) -> Optional.ofNullable(datenbank.get(datum)), Duration.ofHours(24)).pruefen(MANDANT, von, bis);
     }
 
     private void kette(int tage, List<String> dienste, Duration nachEnde) {
@@ -290,7 +327,17 @@ class ManifestPruefenTest {
             verweise.add(new ZeitstempelVerweis(dienst, Sha256.hexVon(tsr),
                     List.of(Sha256.hexVon(kette), Sha256.hexVon(crl))));
         }
-        return new Stand(datum, fenster.bis(), Sha256.hexVon(json), new Vorher(Sha256.hexVon(sig), verweise));
+        Stand stand = new Stand(datum, fenster.bis(), Sha256.hexVon(json), new Vorher(Sha256.hexVon(sig), verweise));
+        datenbank.put(datum, new ManifestDaten.ManifestStand(datum, stand.bis(), stand.sha256(), stand.verweis()));
+        return stand;
+    }
+
+    /** Hält in der Datenbank nur die Zeitstempel {@code dienste} fest (Erzeugung nach dem letzten Versuch, 15.11). */
+    private void nurFestgehalten(LocalDate datum, List<String> dienste) {
+        ManifestDaten.ManifestStand stand = datenbank.get(datum);
+        Vorher verweis = new Vorher(stand.verweis().sigSha256(), stand.verweis().zeitstempel().stream()
+                .filter(z -> dienste.contains(z.dienst())).toList());
+        datenbank.put(datum, new ManifestDaten.ManifestStand(datum, stand.bis(), stand.sha256(), verweis));
     }
 
     /** Attrappe eines Tokens: Imprint (32 Byte) und {@code genTime} in Sekunden. */

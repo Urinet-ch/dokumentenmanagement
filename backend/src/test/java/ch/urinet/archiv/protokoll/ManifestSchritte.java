@@ -60,6 +60,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.any;
@@ -155,6 +158,45 @@ public class ManifestSchritte {
             }
         }
         dokumente.put(alias + "/" + name, id);
+    }
+
+    /**
+     * Setzt den gespeicherten Dateinamen (Req 3.12, Aufgabe 4.10). Bis 4.10 die Spalte {@code dokument.dateiname}
+     * anlegt, gibt es keinen gespeicherten Namen; dann trägt die Prüfung der Felder im Manifest das Szenario.
+     */
+    @Angenommen("das Dokument «{word}» von «{word}» heisst «{}»")
+    public void dateiname(String name, String alias, String dateiname) throws SQLException {
+        try (Connection v = datenbank.get().getConnection()) {
+            try (PreparedStatement p = v.prepareStatement("select 1 from information_schema.columns where table_schema = ? "
+                    + "and table_name = 'dokument' and column_name = 'dateiname'")) {
+                p.setString(1, schema(alias));
+                try (ResultSet r = p.executeQuery()) {
+                    if (!r.next()) {
+                        return;
+                    }
+                }
+            }
+            try (PreparedStatement p = v.prepareStatement("update " + schema(alias)
+                    + ".dokument set dateiname = ? where id = ?")) {
+                p.setString(1, dateiname);
+                p.setObject(2, dokumente.get(alias + "/" + name));
+                assertThat(p.executeUpdate()).isEqualTo(1);
+            }
+        }
+    }
+
+    @Dann("das Manifest «{word}» von «{word}» nennt den Dateinamen «{}» nicht, seine Einträge tragen nur Dokument, Variante, Nummer, SHA-256 und Versions-ID")
+    public void ohneDateiname(String datum, String alias, String dateiname) throws Exception {
+        byte[] json = datei(alias, LocalDate.parse(datum, DATUM), "json");
+        String text = new String(json, StandardCharsets.UTF_8);
+        assertThat(text).doesNotContain(dateiname).doesNotContain(dateiname.substring(0, dateiname.lastIndexOf('.')));
+        JsonNode eintraege = JSON.readTree(json).get("eintraege");
+        assertThat(eintraege).isNotEmpty();
+        for (JsonNode e : eintraege) {
+            List<String> felder = new ArrayList<>();
+            e.fieldNames().forEachRemaining(felder::add);
+            assertThat(felder).containsExactlyInAnyOrder("dokument", "variante", "nr", "sha256", "s3_version");
+        }
     }
 
     @Angenommen("im Mandanten «{word}» steht am «{word}» um «{word}» ein Eintrag im Zugriffsprotokoll")
@@ -584,12 +626,20 @@ public class ManifestSchritte {
     }
 
     @Dann("das Prüfwerkzeug meldet für «{word}» vom «{word}» bis «{word}» «{}» mit Exit-Code {int}")
-    public void pruefwerkzeug(String alias, String von, String bis, String ergebnis, int exitCode) {
+    public void pruefwerkzeug(String alias, String von, String bis, String ergebnis, int exitCode) throws Exception {
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
         ByteArrayOutputStream fehler = new ByteArrayOutputStream();
-        int code = kommando.ausfuehren(List.of("pruefen", LocalDate.parse(von, DATUM).toString(),
-                        LocalDate.parse(bis, DATUM).toString(), "--mandant", code(alias)),
-                new PrintStream(aus, true, StandardCharsets.UTF_8), new PrintStream(fehler, true, StandardCharsets.UTF_8));
+        List<String> argumente = List.of("pruefen", LocalDate.parse(von, DATUM).toString(),
+                LocalDate.parse(bis, DATUM).toString(), "--mandant", code(alias));
+        // wie die Kommandozeile in einem eigenen Thread ohne Request-Kontext und ohne Transaktion
+        ExecutorService thread = Executors.newSingleThreadExecutor();
+        int code;
+        try {
+            code = thread.submit(() -> kommando.ausfuehren(argumente, new PrintStream(aus, true, StandardCharsets.UTF_8),
+                    new PrintStream(fehler, true, StandardCharsets.UTF_8))).get(120, TimeUnit.SECONDS);
+        } finally {
+            thread.shutdownNow();
+        }
         ausgabe = aus.toString(StandardCharsets.UTF_8);
         assertThat(code).as(ausgabe + fehler.toString(StandardCharsets.UTF_8)).isEqualTo(exitCode);
         assertThat(ausgabe).contains(ergebnis);

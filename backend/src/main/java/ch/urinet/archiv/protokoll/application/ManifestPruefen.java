@@ -4,12 +4,14 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ManifestDaten.ManifestStand;
 import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.protokoll.domain.Pruefbericht;
 import ch.urinet.archiv.protokoll.domain.Pruefdaten;
 import ch.urinet.archiv.protokoll.domain.Sha256;
+import ch.urinet.archiv.protokoll.domain.Vorher;
 import ch.urinet.archiv.protokoll.domain.ZeitstempelVerweis;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -30,12 +32,14 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Prüfwerkzeug {@code archiv manifest pruefen} (Req 15.12; design.md «Manifest»): prüft nur aus der Ablage, ohne Netz
- * und ohne Datenbank, je Datum Signatur, kanonische Form, Hash-Kette mit Erneuerung (Req 15.2) und jeden Zeitstempel
- * gegen seine abgelegten Prüfdaten. Fehler: fehlendes oder ungültiges Manifest, Lücke oder Bruch der Kette, kein gültiger
+ * Prüfwerkzeug {@code archiv manifest pruefen} (Req 15.12; design.md «Manifest»): prüft ohne Netz je Datum Signatur,
+ * kanonische Form, Hash-Kette mit Erneuerung (Req 15.2) und jeden Zeitstempel gegen seine abgelegten Prüfdaten, alles
+ * aus der Ablage. Welche Zeitstempel festgehalten sind, liest es aus der Datenbank ({@link FestgehalteneManifeste},
+ * {@code manifest_zeitstempel}), auch für den jüngsten Tag ohne Folgemanifest; verweist das Folgemanifest auf andere
+ * Zeitstempel, ist das ein Fehler. Fehler: fehlendes oder ungültiges Manifest, Lücke oder Bruch der Kette, kein gültiger
  * Zeitstempel, weitere Versionen oder Löschmarken unter einem Manifest-Schlüssel oder ein ungesperrter Teil (geprüft wird
  * immer die älteste Version). Meldungen: fehlender oder unvollständiger Zeitstempel eines Dienstes (ein {@code .tsr} ohne
- * Kette oder Prüfdaten, auf das das Folgemanifest nicht verweist, Req 15.11), Verspätung über
+ * Kette oder Prüfdaten, das nicht festgehalten ist, Req 15.11), ein Manifest ohne Eintrag in der Datenbank, Verspätung über
  * {@code archiv.manifest.verspaetung-schwelle}.
  * <p>
  * Geprüft werden die Tokens der konfigurierten Dienste und der Dienste, auf die das Folgemanifest verweist, damit ein
@@ -48,16 +52,18 @@ public class ManifestPruefen {
     private final JsonLeser json;
     private final ManifestSchluessel schluessel;
     private final ZeitstempelPort zeitstempel;
+    private final FestgehalteneManifeste festgehalten;
     private final Duration schwelle;
 
     public ManifestPruefen(AblagePort ablage, JsonLeser json, ManifestSchluessel schluessel,
-                           ZeitstempelPort zeitstempel,
+                           ZeitstempelPort zeitstempel, FestgehalteneManifeste festgehalten,
                            @ConfigProperty(name = "archiv.manifest.verspaetung-schwelle", defaultValue = "PT24H")
                            Duration schwelle) {
         this.ablage = ablage;
         this.json = json;
         this.schluessel = schluessel;
         this.zeitstempel = zeitstempel;
+        this.festgehalten = festgehalten;
         this.schwelle = schwelle;
     }
 
@@ -82,7 +88,9 @@ public class ManifestPruefen {
             }
             einzeln(mandant, datum, g, oeffentlich, bericht);
             Optional<Gelesen> folge = gelesen.computeIfAbsent(datum.plusDays(1), d -> lesen(lauf, d));
-            stempel(lauf, datum, g, folge.filter(f -> f.inhalt() != null));
+            Set<String> festgehalteneDienste = festgehalten(lauf, datum, g,
+                    festgehalten.stand(mandant, datum), folge.filter(f -> f.inhalt() != null));
+            stempel(lauf, datum, g, festgehalteneDienste);
             Optional<Gelesen> vorher = gelesen.computeIfAbsent(datum.minusDays(1), d -> lesen(lauf, d));
             kette(lauf, datum, g, vorher);
             bericht.geprueft();
@@ -101,14 +109,63 @@ public class ManifestPruefen {
         }
     }
 
-    private void stempel(Lauf lauf, LocalDate datum, Gelesen g, Optional<Gelesen> folge) {
+    /**
+     * Dienste, deren Zeitstempel zum Manifest festgehalten sind: aus der Datenbank, dazu die Verweise des Folgemanifests.
+     * Fehlt der Eintrag in der Datenbank oder widerspricht er Ablage oder Folgemanifest, ist das ein Fehler; nur beim
+     * jüngsten Tag ohne Folgemanifest ist ein fehlender Eintrag eine Meldung (Erzeugung noch nicht abgeschlossen).
+     */
+    private Set<String> festgehalten(Lauf lauf, LocalDate datum, Gelesen g, Optional<ManifestStand> db,
+                                     Optional<Gelesen> folge) {
+        Pruefbericht bericht = lauf.bericht();
+        Optional<Vorher> imFolgetag = folge.map(f -> f.inhalt().vorher());
+        Set<String> dienste = new LinkedHashSet<>();
+        imFolgetag.ifPresent(v -> v.zeitstempel().forEach(z -> dienste.add(z.dienst())));
+        if (db.isEmpty()) {
+            if (imFolgetag.isPresent()) {
+                bericht.fehler(datum + ": Manifest ist in der Datenbank nicht festgehalten, das Folgemanifest verweist "
+                        + "aber darauf");
+            } else {
+                bericht.meldung(datum + ": Manifest ist in der Datenbank nicht festgehalten");
+            }
+            return dienste;
+        }
+        Vorher festgehaltenVerweis = db.get().verweis();
+        festgehaltenVerweis.zeitstempel().forEach(z -> dienste.add(z.dienst()));
+        if (!db.get().sha256().equals(Sha256.hexVon(g.json()))) {
+            bericht.fehler(datum + ": Manifest passt nicht zum SHA-256 in der Datenbank");
+        }
+        if (imFolgetag.isPresent()) {
+            if (!imFolgetag.get().equals(festgehaltenVerweis)) {
+                bericht.fehler(datum + ": Folgemanifest und Datenbank nennen verschiedene Zeitstempel");
+            }
+            return dienste;
+        }
+        // jüngster Tag: dieselben Hashes, die sonst die Erneuerung im Folgemanifest bestätigt
+        if (g.sig() == null || !Sha256.hexVon(g.sig()).equals(festgehaltenVerweis.sigSha256())) {
+            bericht.fehler(datum + ": Signatur passt nicht zur Datenbank");
+        }
+        for (ZeitstempelVerweis verweis : festgehaltenVerweis.zeitstempel()) {
+            String dienst = verweis.dienst();
+            Optional<ManifestDatei> tsr = teil(lauf, datum, ManifestTeil.tsr(dienst));
+            if (tsr.isPresent() && !Sha256.hexVon(tsr.get().inhalt()).equals(verweis.tsrSha256())) {
+                bericht.fehler(datum + ": Zeitstempel von " + dienst + " passt nicht zur Datenbank");
+            }
+            Optional<ManifestDatei> kette = teil(lauf, datum, ManifestTeil.kette(dienst));
+            Optional<Pruefdaten> pruefdaten = pruefdaten(lauf, datum, dienst);
+            if (kette.isPresent() && pruefdaten.isPresent() && !List.of(Sha256.hexVon(kette.get().inhalt()),
+                    Sha256.hexVon(pruefdaten.get().inhalt())).equals(verweis.pruefdatenSha256())) {
+                bericht.fehler(datum + ": Prüfdaten von " + dienst + " passen nicht zur Datenbank");
+            }
+        }
+        return dienste;
+    }
+
+    private void stempel(Lauf lauf, LocalDate datum, Gelesen g, Set<String> verwiesen) {
         Pruefbericht bericht = lauf.bericht();
         if (g.sig() == null) {
             return;
         }
         Set<String> dienste = new LinkedHashSet<>(zeitstempel.dienste());
-        Set<String> verwiesen = new HashSet<>();
-        folge.map(f -> f.inhalt().vorher()).ifPresent(v -> v.zeitstempel().forEach(z -> verwiesen.add(z.dienst())));
         dienste.addAll(verwiesen);
         List<String> unvollstaendig = new ArrayList<>();
         byte[] imprint = ManifestSignatur.imprint(g.json(), g.sig());

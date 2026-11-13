@@ -21,6 +21,9 @@ public interface ManifestDaten {
     /** Das jüngste Manifest, leer vor dem ersten. */
     Optional<ManifestStand> letztes();
 
+    /** Das festgehaltene Manifest des Datums mit seinen Zeitstempeln aus {@code manifest_zeitstempel}, sonst leer. */
+    Optional<ManifestStand> stand(LocalDate datum);
+
     /** Dateien der Dokumente mit {@code archiviert} in {@code [von, bis)}; {@code von = null} heisst ohne untere Grenze. */
     List<ManifestEintrag> eintraege(Instant von, Instant bis);
 

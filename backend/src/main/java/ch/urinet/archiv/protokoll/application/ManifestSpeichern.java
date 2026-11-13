@@ -41,6 +41,11 @@ public class ManifestSpeichern {
         return daten.letztes();
     }
 
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public Optional<ManifestStand> stand(LocalDate datum) {
+        return daten.stand(datum);
+    }
+
     /** Einträge, Fristen und Blätter des Fensters. */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public Sammlung sammeln(ManifestFenster fenster) {

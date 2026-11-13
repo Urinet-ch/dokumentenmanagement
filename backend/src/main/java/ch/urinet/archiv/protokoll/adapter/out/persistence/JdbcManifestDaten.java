@@ -72,6 +72,15 @@ public class JdbcManifestDaten implements ManifestDaten {
 
     @Override
     public Optional<ManifestStand> letztes() {
+        return lesenStand("order by datum desc limit 1", null);
+    }
+
+    @Override
+    public Optional<ManifestStand> stand(LocalDate tag) {
+        return lesenStand("where datum = ?", java.util.Objects.requireNonNull(tag, "datum"));
+    }
+
+    private Optional<ManifestStand> lesenStand(String auswahl, LocalDate tag) {
         String s = schema();
         try (Connection v = verbindung()) {
             LocalDate datum;
@@ -79,14 +88,19 @@ public class JdbcManifestDaten implements ManifestDaten {
             String sha256;
             String sig;
             try (PreparedStatement p = v.prepareStatement("select datum, bis, sha256, sig_sha256 from " + s
-                    + ".manifest order by datum desc limit 1"); ResultSet r = p.executeQuery()) {
-                if (!r.next()) {
-                    return Optional.empty();
+                    + ".manifest " + auswahl)) {
+                if (tag != null) {
+                    p.setObject(1, tag);
                 }
-                datum = r.getObject(1, LocalDate.class);
-                bis = r.getObject(2, OffsetDateTime.class).toInstant();
-                sha256 = r.getString(3);
-                sig = r.getString(4);
+                try (ResultSet r = p.executeQuery()) {
+                    if (!r.next()) {
+                        return Optional.empty();
+                    }
+                    datum = r.getObject(1, LocalDate.class);
+                    bis = r.getObject(2, OffsetDateTime.class).toInstant();
+                    sha256 = r.getString(3);
+                    sig = r.getString(4);
+                }
             }
             List<Zeitstempel> stempel = new ArrayList<>();
             try (PreparedStatement p = v.prepareStatement("select dienst, gen_time, tsr_sha256, s3_schluessel, "
@@ -107,7 +121,7 @@ public class JdbcManifestDaten implements ManifestDaten {
             Vorher verweis = ManifestErzeugen.verweis(sig, stempel);
             return Optional.of(new ManifestStand(datum, bis, sha256, verweis));
         } catch (SQLException | JsonProcessingException e) {
-            throw new IllegalStateException("Letztes Manifest nicht gelesen", e);
+            throw new IllegalStateException("Manifest nicht gelesen", e);
         }
     }
 
