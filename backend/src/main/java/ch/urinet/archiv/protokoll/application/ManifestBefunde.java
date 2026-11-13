@@ -62,7 +62,8 @@ public class ManifestBefunde implements ManifestUeberwachung {
      * Regel ohne Datenbank: {@code faellig} (erstes Datum ohne Manifest) fehlt, wenn der Tag schon erzeugt sein müsste
      * ({@link ManifestErzeugen#zielTag}) und (a) das Ende des Tages und der letzte Fortschritt (zuletzt erstelltes
      * Manifest; ohne Manifest kein Fortschritt) beide mehr als {@code frist} zurückliegen oder (b) ein Auftrag
-     * {@code MANIFEST} des Mandanten nach dem letzten Fortschritt (ohne Manifest: nach der Anlage des Mandanten) in
+     * {@code MANIFEST} des Mandanten nach dem letzten Fortschritt (ohne Manifest: nach der Anlage des Mandanten) und
+     * nach dem Fälligwerden von {@code faellig} (Tagesende plus {@link ManifestErzeugen#NACHLAUF}) in
      * {@code FEHLER} geendet hat. So meldet ein Nachholen über mehrere Folgeaufträge nichts, solange es vorankommt. Ein
      * neuerer Auftrag in {@code OFFEN} oder {@code LAEUFT} oder ein Lauf ohne Arbeit (Sperre belegt) hebt (b) nicht auf,
      * erst ein Fortschritt; sonst setzte der Abgleich den Alarm auf erledigt, und der nächste Fehlschlag brächte für
@@ -77,7 +78,11 @@ public class ManifestBefunde implements ManifestUeberwachung {
         boolean fristAbgelaufen = ManifestFenster.bis(faellig).isBefore(grenze)
                 && letzterFortschritt.map(e -> e.isBefore(grenze)).orElse(true);
         Optional<Instant> bezug = letzterFortschritt.or(() -> anlage);
-        boolean gescheitert = letzterFehler.filter(f -> bezug.map(f::isAfter).orElse(true)).isPresent();
+        // Ein Fehlschlag zählt erst, wenn der Tag beim Fehlschlag schon fällig war (Review PR #119): Scheitert ein Lauf
+        // bei vollständiger Kette, gälte er sonst nach Mitternacht für den neuen Tag, noch bevor ihn ein Lauf erzeugt.
+        Instant faelligAb = ManifestFenster.bis(faellig).plus(ManifestErzeugen.NACHLAUF);
+        boolean gescheitert = letzterFehler
+                .filter(f -> f.isAfter(faelligAb) && bezug.map(f::isAfter).orElse(true)).isPresent();
         if (fristAbgelaufen || gescheitert) {
             return Optional.of(new Befund(Befund.Quelle.MANIFEST, faellig.toString(), FEHLT));
         }

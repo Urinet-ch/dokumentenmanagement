@@ -109,10 +109,25 @@ class ManifestBefundeTest {
     @Test
     void einNochNichtFaelligerTagMeldetAuchBeiFehlerNichts() {
         // gestern ist erst 15 Minuten nach Mitternacht fällig (ManifestErzeugen.NACHLAUF)
-        Optional<Instant> fehler = Optional.of(zuerich(2026, 1, 11, 0, 5, 0));
+        Optional<Instant> fehler = Optional.of(zuerich(2026, 1, 11, 0, 16, 0));
         assertThat(befund(TAG, Optional.empty(), fehler, zuerich(2026, 1, 11, 0, 10, 0))).isEmpty();
         assertThat(befund(TAG, Optional.empty(), fehler, zuerich(2026, 1, 11, 0, 20, 0))).isPresent();
         assertThat(befund(TAG.plusDays(1), Optional.empty(), fehler, zuerich(2026, 1, 11, 9, 0, 0))).isEmpty();
+    }
+
+    /**
+     * Review PR #119: Ein Lauf scheitert, solange die Kette vollständig ist (nichts zu tun). Nach Mitternacht wird der
+     * neue Tag fällig; dieser alte Fehlschlag darf für ihn keinen Befund und keine Mail auslösen.
+     */
+    @Test
+    void einFehlschlagVorDemFaelligwerdenZaehltNicht() {
+        Instant fortschritt = zuerich(2026, 1, 10, 3, 31, 0);
+        Optional<Instant> fehlerVorher = Optional.of(zuerich(2026, 1, 10, 10, 20, 0));
+        assertThat(befund(TAG, Optional.of(fortschritt), fehlerVorher, zuerich(2026, 1, 11, 0, 20, 0))).isEmpty();
+        assertThat(befund(TAG, Optional.of(fortschritt), Optional.of(ManifestFenster.bis(TAG)
+                .plus(ManifestErzeugen.NACHLAUF)), zuerich(2026, 1, 11, 0, 20, 0))).isEmpty();
+        assertThat(befund(TAG, Optional.of(fortschritt), Optional.of(ManifestFenster.bis(TAG)
+                .plus(ManifestErzeugen.NACHLAUF).plusSeconds(1)), zuerich(2026, 1, 11, 0, 20, 0))).isPresent();
     }
 
     @Test
