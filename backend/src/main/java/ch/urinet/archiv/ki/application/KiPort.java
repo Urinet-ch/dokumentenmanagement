@@ -28,18 +28,27 @@ public interface KiPort {
      * @param text         gekürzter Volltext; leer auf dem Bildweg
      * @param bildJpeg     Seitenbild als JPEG auf dem Bildweg (Req 7.1), sonst leer
      * @param fehler       bei der Nachfrage der Grund der ungültigen ersten Antwort (Req 7.3)
+     * @param beispiele    Korrekturbeispiele ({@code ErfassungPrompt.beispiele}, Req 7.9); leer heisst ohne, dann
+     *                     bleibt die Nachricht die des Gate-Laufs
      */
-    record Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg, Optional<String> fehler) {
+    record Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg, Optional<String> fehler,
+                   String beispiele) {
         public Anfrage {
             Objects.requireNonNull(systemPrompt, "systemPrompt");
             Objects.requireNonNull(qr, "qr");
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(bildJpeg, "bildJpeg");
             Objects.requireNonNull(fehler, "fehler");
+            Objects.requireNonNull(beispiele, "beispiele");
+        }
+
+        public Anfrage(String systemPrompt, String qr, String text, Optional<byte[]> bildJpeg,
+                       Optional<String> fehler) {
+            this(systemPrompt, qr, text, bildJpeg, fehler, "");
         }
 
         public Anfrage nachfrage(String grund) {
-            return new Anfrage(systemPrompt, qr, text, bildJpeg, Optional.of(grund));
+            return new Anfrage(systemPrompt, qr, text, bildJpeg, Optional.of(grund), beispiele);
         }
     }
 

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Korrekturbeispiele der KI (Aufgabe 3.3, Req 7.7, 7.9; design.md «Datenmodell» und «KI»): eine Zeile je
+         bestätigtem Vorschlag mit mindestens einem korrigierten Feld. korrektur enthält nur die bestätigten Werte der
+         korrigierten Felder; die Merkmale der Vorauswahl stehen als Arrays (ein Beleg kann mehrere IBAN, UID oder
+         E-Mail-Adressen tragen). Kein Auszug des Belegtexts (Datensparsamkeit). vertraulichkeit und person_benutzer
+         stammen aus dem bestätigten Dokument und filtern die Auswahl. dokument_id ohne Fremdschlüssel, damit das Beispiel
+         die spätere Löschfunktion nicht blockiert. Nur eine neue Tabelle, rückwärtskompatibel (tech.md Regel 11). -->
+    <changeSet id="016-ki-beispiel" author="archiv">
+        <createTable tableName="ki_beispiel">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="ki_beispiel_pk"/>
+            </column>
+            <column name="partner_id" type="uuid"/>
+            <column name="art" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="korrektur" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="iban" type="text[]" defaultValueComputed="'{}'::text[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="uid" type="text[]" defaultValueComputed="'{}'::text[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="email" type="text[]" defaultValueComputed="'{}'::text[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="muster" type="text[]" defaultValueComputed="'{}'::text[]">
+                <constraints nullable="false"/>
+            </column>
+            <column name="vertraulichkeit" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="person_benutzer" type="text"/>
+            <column name="dokument_id" type="uuid"/>
+            <column name="zeit" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table ki_beispiel add constraint ki_beispiel_vertraulichkeit_ck
+                check (vertraulichkeit in ('NORMAL', 'INTERN', 'PERSONAL'));
+            create index ki_beispiel_iban_ix on ki_beispiel using gin (iban);
+            create index ki_beispiel_uid_ix on ki_beispiel using gin (uid);
+            create index ki_beispiel_email_ix on ki_beispiel using gin (email);
+            create index ki_beispiel_muster_ix on ki_beispiel using gin (muster);
+            create index ki_beispiel_zeit_ix on ki_beispiel (zeit);
+            create index ki_beispiel_dokument_ix on ki_beispiel (dokument_id);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

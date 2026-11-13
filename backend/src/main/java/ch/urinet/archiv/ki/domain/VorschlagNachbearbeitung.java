@@ -45,6 +45,11 @@ public final class VorschlagNachbearbeitung {
     private VorschlagNachbearbeitung() {
     }
 
+    /** Belegnummer-Muster des Mandanten in fester Reihenfolge, Merkmal der Vorauswahl (Req 7.9). */
+    public static List<Pattern> belegnummerMuster() {
+        return List.copyOf(MUSTER.keySet());
+    }
+
     private static Map<Pattern, String> muster() {
         Map<Pattern, String> m = new LinkedHashMap<>();
         m.put(Pattern.compile("^\\d{4}-\\d{3}$"), "AUSGANGSRECHNUNG");

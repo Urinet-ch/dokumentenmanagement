@@ -68,9 +68,12 @@ public class KiVorschlagSchritte {
     /** {@code version} des Dokuments direkt nach der Änderung durch den Benutzer. */
     private int versionBenutzer;
 
+    /** Ohne Korrekturbeispiele früherer Szenarien: Sie kämen sonst in den Prompt (Aufgabe 3.3). */
     @Angenommen("das Sprachmodell ist bereit")
     public void bereit() throws Exception {
         modell = KiWireMock.zuruecksetzen();
+        auftraege.ausfuehren("delete from m_urinet.ki_beispiel");
+        auftraege.ausfuehren("delete from m_vhf_gsk.ki_beispiel");
         verbrauchStand = hilfe.kiVerbrauchStand(MANDANT);
     }
 

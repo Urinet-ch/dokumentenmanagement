@@ -261,11 +261,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 7.1, 7.2, 7.3, 7.5, 7.6, 7.8, 7.11, 7.12, 16.21_
   - _Abhängig von: 3.8_
 
-- [ ] 3.3 Lernen aus Korrekturen [Backend]
+- [x] 3.3 Lernen aus Korrekturen [Backend]
   - Beim Bestätigen Differenz Vorschlag ↔ Ergebnis als `ki_beispiel` speichern, mit den Merkmalen IBAN, UID, E-Mail, Swiss QR Code und Belegnummer-Muster
   - Vorauswahl vor dem KI-Aufruf deterministisch über diese Merkmale, ohne Treffer die 5 neuesten; kein zweiter KI-Aufruf
   - Korrekturquote je Feld als Kennzahl fortschreiben
   - Szenario: Nach einer Korrektur bei Partner X enthält der nächste Beleg mit der IBAN von X das Beispiel
+  - Erledigt (PR #109): `ki_beispiel` (Changeset 016, Merkmale als Arrays), `KorrekturLernen` beim Bestätigen, `BeispielAuswahl` und `BeispielVorauswahl` vor dem Aufruf, Zähler `archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`; die Beispiele kommen nur mit `archiv.ki.beispiele.aktiv=true` in den Prompt (Standard aus, Gate 0), siehe design.md «Umsetzung (Aufgabe 3.3)»
   - _Anforderungen: 7.7, 7.9, 7.10_
   - _Abhängig von: 3.2_
 
