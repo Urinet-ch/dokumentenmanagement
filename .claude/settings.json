@@ -28,7 +28,35 @@
       "Bash(gh secret set:*)",
       "Bash(gh secret delete:*)",
       "Bash(sops -d:*)",
-      "Bash(sops --decrypt:*)"
+      "Bash(sops --decrypt:*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.kube/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gh/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.config/sops/**)",
+      "Read(~/Library/Application Support/sops/**)",
+      "Read(~/Library/Keychains/**)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.netrc)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.git-credentials)",
+      "Read(~/.fly/**)",
+      "Read(~/.m2/settings.xml)",
+      "Read(~/.m2/settings-security.xml)",
+      "Read(~/.gradle/gradle.properties)",
+      "Read(~/.claude.json)",
+      "Read(~/.claude/.credentials.json)",
+      "Bash(gh auth token:*)",
+      "Bash(security find-generic-password:*)",
+      "Bash(security find-internet-password:*)",
+      "Bash(security dump-keychain:*)"
+    ],
+    "ask": [
+      "Bash(printenv:*)"
     ]
   },
   "hooks": {
