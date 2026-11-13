@@ -7,6 +7,7 @@ import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainLauncher;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * den Schalter scheitert derselbe Aufruf schon beim Start. Die Prüfung selbst ohne Datenbank deckt
  * {@code ManifestPruefenTest} ({@code ohneDatenbank…}).
  */
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(ManifestKommandoOhneDatenbankTest.KeineDatenbank.class)
 class ManifestKommandoOhneDatenbankTest {
