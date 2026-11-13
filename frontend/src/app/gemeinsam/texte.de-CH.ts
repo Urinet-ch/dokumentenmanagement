@@ -160,6 +160,8 @@ export const TEXTE = {
     zusatzErgaenzen: 'In der Dokumentansicht ergänzen',
     zusatzErgaenzenArt: (art: string) =>
       `Die Dokumentansicht übernimmt die Art «${art}» als Änderung; andere ungespeicherte Angaben gehen nicht mit.`,
+    zusatzArtInaktiv: (art: string) =>
+      `Die Art «${art}» ist nicht mehr aktiv. Bitte wählen Sie zuerst eine aktive Art; die Dokumentansicht übernimmt eine inaktive Art nicht.`,
     hinweisZusatz: (felder: string) => `Für diese Art fehlen Pflichtangaben: ${felder}.`,
     pflicht: 'Pflichtfeld',
     keineAktion: 'Für dieses Dokument haben Sie hier keine Aktion.',

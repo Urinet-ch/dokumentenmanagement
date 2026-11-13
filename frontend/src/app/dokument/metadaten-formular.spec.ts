@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of, switchMap, throwError, timer } from 'rxjs';
 import { Dokument, DokumentAenderung, Dokumentart, Kontakt } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, darf } from '../gemeinsam/anmeldung/rechte';
@@ -170,6 +170,38 @@ describe('MetadatenFormular (Req 10.1)', () => {
       vi.useRealTimers();
     }
     expect(abrufe).toEqual(['Mü']);
+    expect(element.querySelector('[data-test=partner-treffer]')).toBeNull();
+  });
+
+  it('zeigt nach Wählen und Entfernen keine Antwort eines noch laufenden Abrufs (Review #107)', async () => {
+    await oeffnen();
+    const abrufe: string[] = [];
+    port.kontakte = (q?: string) => {
+      abrufe.push(q ?? '');
+      const liste = of([{ id: 'p2', name: 'Müller' }] as Kontakt[]);
+      return q === 'Mül' ? timer(200).pipe(switchMap(() => liste)) : liste;
+    };
+    vi.useFakeTimers();
+    try {
+      eingeben('[data-test=partner-suche]', 'Mü');
+      await vi.advanceTimersByTimeAsync(400);
+      fixture.detectChanges();
+      eingeben('[data-test=partner-suche]', 'Mül');
+      await vi.advanceTimersByTimeAsync(350);
+      expect(abrufe).toEqual(['Mü', 'Mül']);
+      element.querySelector<HTMLButtonElement>('[data-test=partner-treffer] button')!.click();
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(100);
+      element.querySelector<HTMLButtonElement>('[data-test=partner-gewaehlt]')!.click();
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(150);
+      fixture.detectChanges();
+      expect(element.querySelector('[data-test=partner-treffer]')).toBeNull();
+      await vi.advanceTimersByTimeAsync(1000);
+      fixture.detectChanges();
+    } finally {
+      vi.useRealTimers();
+    }
     expect(element.querySelector('[data-test=partner-treffer]')).toBeNull();
   });
 

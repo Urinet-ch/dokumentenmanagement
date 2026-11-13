@@ -328,6 +328,53 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         await oeffnen('GIBT_ES_NICHT');
         expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
       });
+
+      it('übernimmt nach einem Konflikt (412) und Neuladen die Art nicht mehr (Review #107)', async () => {
+        port.arten = [ART, LOHN];
+        port.dokument = of(IM_KORB);
+        port.geaendert = throwError(() => new HttpErrorResponse({ status: 412, error: { fehlercode: 'VERSION_KONFLIKT' } }));
+        await oeffnen('LOHNABRECHNUNG');
+        const periode = element.querySelector<HTMLInputElement>('#bearbeiten-zusatz-periode')!;
+        periode.value = '2026-10';
+        periode.dispatchEvent(new Event('input'));
+        port.dokument = of({ ...IM_KORB, art: 'AUSGANGSRECHNUNG', version: 2 });
+        element.querySelector<HTMLButtonElement>('[data-test=speichern]')!.click();
+        await fixture.whenStable();
+        expect(port.gelesen).toBe(2);
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+        bearbeiten()!.click();
+        await fixture.whenStable();
+        expect(element.querySelector<HTMLSelectElement>('#bearbeiten-art')!.value).toBe('AUSGANGSRECHNUNG');
+        expect(element.querySelector('[data-test=art-vorbelegt]')).toBeNull();
+      });
+
+      it('öffnet ohne Recht A6 kein Formular', async () => {
+        rolle.set('treuhaender');
+        port.arten = [ART, LOHN];
+        port.dokument = of(IM_KORB);
+        await oeffnen('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+        expect(bearbeiten()).toBeNull();
+      });
+
+      it('öffnet bei der gespeicherten Art kein Formular und zeigt keinen Hinweis', async () => {
+        port.arten = [ART, LOHN];
+        port.dokument = of({ ...IM_KORB, art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10' } });
+        await oeffnen('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+        bearbeiten()!.click();
+        await fixture.whenStable();
+        expect(element.querySelector<HTMLSelectElement>('#bearbeiten-art')!.value).toBe('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=art-vorbelegt]')).toBeNull();
+      });
+
+      it('öffnet in einem Status ausserhalb der änderbaren kein Formular', async () => {
+        port.arten = [ART, LOHN];
+        port.dokument = of({ ...IM_KORB, status: 'ARCHIVIERUNG' });
+        await oeffnen('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+        expect(bearbeiten()).toBeNull();
+      });
     });
   });
 

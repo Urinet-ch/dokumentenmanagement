@@ -119,7 +119,7 @@ export class DokumentAnsicht {
     }
     return this.arten().some((a) => a.code === code && a.aktiv) ? code : null;
   });
-  /** Gilt nur für das automatisch geöffnete Formular; Abbrechen oder Speichern verwirft sie. */
+  /** Gilt nur für das automatisch geöffnete Formular; Abbrechen, Speichern oder Neuladen verwirft sie. */
   protected readonly vorbelegung = signal<string | null>(null);
   private vorbelegtFuer: string | null = null;
   protected readonly meldung = signal('');
@@ -262,6 +262,9 @@ export class DokumentAnsicht {
       this.bildFreigeben();
     }
     this.bearbeiten.set(false);
+    // Nach dem Neuladen (auch 409/412/404 beim Speichern) gilt `?art=` nicht mehr; der Effekt setzt sie für ein
+    // anderes Dokument neu (Review #107).
+    this.vorbelegung.set(null);
     this.meldung.set('');
     this.laden.set('laedt');
     this.dokument.set(null);

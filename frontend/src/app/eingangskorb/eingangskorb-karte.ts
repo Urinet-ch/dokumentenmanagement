@@ -155,12 +155,18 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   });
   /**
    * Steht die Art nur im KI-Vorschlag oder ist sie hier ungespeichert gewählt, geht sie als `?art=` an die
-   * Dokumentansicht; dort gilt sie als Artwechsel, damit die Zusatzfelder dieser Art erscheinen (Review #106).
+   * Dokumentansicht; dort gilt sie als Artwechsel, damit die Zusatzfelder dieser Art erscheinen (Review #106). Die
+   * Dokumentansicht übernimmt nur eine aktive Art; eine inaktive geht nicht mit (Review #107).
    */
-  protected readonly artUebernehmen = computed(() => {
+  private readonly artNeu = computed(() => {
     const art = this.entwurf().art;
-    return art && art !== (this.dokument().art ?? '') ? { art } : null;
+    return art && art !== (this.dokument().art ?? '') ? art : null;
   });
+  protected readonly artUebernehmen = computed(() => {
+    const art = this.artNeu();
+    return art && this.art()?.aktiv ? { art } : null;
+  });
+  protected readonly artInaktiv = computed(() => !!this.artNeu() && this.art()?.aktiv === false);
   protected readonly erkannterPartner = computed(() =>
     this.entwurf().partnerId ? null : erkannterPartner(this.dokument()),
   );
