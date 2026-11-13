@@ -64,11 +64,15 @@ public class KiBasisUrlPruefung {
         }
     }
 
-    /** Req 16.22: {@code lokal} zusammen mit {@code prod} bricht ab. */
+    /** Req 16.22: {@code lokal} zusammen mit {@code prod} bricht ab, ebenso das reine Testprofil {@code ceph}. */
     public static void pruefeProfile(List<String> profile) {
         if (profile.contains("lokal") && profile.contains("prod")) {
             throw new IllegalStateException("Profil «lokal» ist zusammen mit «prod» nicht zulässig (Req 16.22); "
                     + "aktive Profile: " + String.join(",", profile));
+        }
+        if (profile.contains("ceph") && profile.contains("prod")) {
+            throw new IllegalStateException("Profil «ceph» (nur Ablage-Tests gegen Ceph RGW) ist zusammen mit «prod» "
+                    + "nicht zulässig; aktive Profile: " + String.join(",", profile));
         }
     }
 
