@@ -9,14 +9,18 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
   Szenario: Drei Tage ergeben eine signierte und doppelt gestempelte Hash-Kette, die das Prüfwerkzeug als gültig meldet
     Angenommen der Mandant «mf-kette» ist am «10.01.2026» angelegt
     Und im Mandanten «mf-kette» wurde das Dokument «D1» am «11.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
+    Und das Dokument «D1» von «mf-kette» hat eine PDF/A-Fassung
     Und im Mandanten «mf-kette» steht am «11.01.2026» um «10:00» ein Eintrag im Zugriffsprotokoll
+    Und im Mandanten «mf-kette» steht am «11.01.2026» um «10:05» ein Eintrag im Zugriffsprotokoll zum Dokument «D1» mit IP und Details
+    Und im Mandanten «mf-kette» steht am «12.01.2026» um «08:30» eine Metadaten-Version des Dokuments «D1»
     Und im Mandanten «mf-kette» steht am «12.01.2026» um «23:59» ein Eintrag im Zugriffsprotokoll
     Wenn der Manifest-Lauf für «mf-kette» bis «12.01.2026» läuft
     Dann hat «mf-kette» genau je ein Manifest für die Tage vom «10.01.2026» bis «12.01.2026»
     Und das Manifest «10.01.2026» von «mf-kette» beginnt die Kette mit «vorher_sha256» null
-    Und das Manifest «11.01.2026» von «mf-kette» enthält das Dokument «D1» mit den Varianten «original,arbeitsfassung» samt SHA-256 und Versions-ID
-    Und das Manifest «11.01.2026» von «mf-kette» enthält den Hash von 1 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
-    Und das Manifest «12.01.2026» von «mf-kette» enthält den Hash von 1 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
+    Und das Manifest «11.01.2026» von «mf-kette» enthält das Dokument «D1» mit den Varianten «original,arbeitsfassung,pdfa» samt SHA-256 und Versions-ID
+    Und das Manifest «11.01.2026» von «mf-kette» enthält den Hash von 2 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
+    Und das Manifest «12.01.2026» von «mf-kette» enthält den Hash von 1 Zeile(n) aus «zugriff_protokoll» und 1 Zeile(n) aus «dokument_version»
+    Und das Blatt jeder Protokollzeile mit IP, Details oder Metadaten von «mf-kette» ist der SHA-256 ihrer kanonischen Form über alle Spalten
     Und die Manifeste von «mf-kette» bilden eine Hash-Kette, die Signatur, Zeitstempel und Prüfdaten des Vortags erneuert
     Und jedes Manifest von «mf-kette» ist mit dem öffentlichen Manifest-Schlüssel gültig signiert
     Und jedes Manifest von «mf-kette» trägt je einen gültigen Zeitstempel von «haupt» und «zweit» über SHA-256 von Manifest und Signatur
@@ -89,3 +93,38 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und «mf-alarm» hat kein Manifest
     Und hat der Inhaber eine Mail zum fehlenden Manifest «10.01.2026» von «mf-alarm» erhalten, die nur IDs nennt
     Und das Prüfwerkzeug meldet für «mf-alarm» vom «10.01.2026» bis «10.01.2026» «Ergebnis: Fehler gefunden» mit Exit-Code 1
+
+  @req-15.1
+  Szenario: Zwei Mandanten am selben Tag erhalten getrennte Manifeste ohne fremde Dokumente
+    Angenommen der Mandant «mf-trenn-a» ist am «10.01.2026» angelegt
+    Und der Mandant «mf-trenn-b» ist am «10.01.2026» angelegt
+    Und im Mandanten «mf-trenn-a» wurde das Dokument «A1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
+    Und im Mandanten «mf-trenn-b» wurde das Dokument «B1» am «10.01.2026» um «09:20» archiviert, aufzubewahren bis «31.12.2036»
+    Und im Mandanten «mf-trenn-b» wurde das Dokument «B2» am «10.01.2026» um «11:00» archiviert, aufzubewahren bis «31.12.2036»
+    Und im Mandanten «mf-trenn-b» steht am «10.01.2026» um «10:00» ein Eintrag im Zugriffsprotokoll
+    Wenn der Manifest-Lauf für «mf-trenn-a» bis «10.01.2026» läuft
+    Und der Manifest-Lauf für «mf-trenn-b» bis «10.01.2026» läuft
+    Dann das Manifest «10.01.2026» von «mf-trenn-a» nennt nur den eigenen Mandanten und genau seine Dokumente
+    Und das Manifest «10.01.2026» von «mf-trenn-b» nennt nur den eigenen Mandanten und genau seine Dokumente
+    Und das Manifest «10.01.2026» von «mf-trenn-a» enthält den Hash von 0 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
+    Und das Manifest «10.01.2026» von «mf-trenn-b» enthält den Hash von 1 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
+
+  @req-15.11 @req-15.12
+  Szenario: Fehlen nach dem letzten Versuch nur die Prüfdaten des zweiten Diensts, gilt das Manifest mit dem Hauptdienst
+    Angenommen der Mandant «mf-pruefdaten» ist am «10.01.2026» angelegt
+    Und im Mandanten «mf-pruefdaten» wurde das Dokument «D1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
+    Und der Pfad «/zweit/crl» des Zeitstempeldiensts antwortet mit HTTP 503
+    Wenn der Manifest-Lauf für «mf-pruefdaten» bis «10.01.2026» bis zum letzten Versuch läuft
+    Dann endet der Auftrag im Status «FERTIG» nach 3 Versuchen
+    Und das Manifest «10.01.2026» von «mf-pruefdaten» hält nur den Zeitstempel von «haupt» fest, unter «manifest/» liegt «zweit.tsr», aber kein «zweit.crl.der»
+    Und das Prüfwerkzeug meldet für «mf-pruefdaten» vom «10.01.2026» bis «10.01.2026» «Ergebnis: gültig» mit Exit-Code 0
+    Und die Ausgabe des Prüfwerkzeugs nennt «MELDUNG 2026-01-10: Zeitstempel von zweit unvollständig (Prüfdaten fehlen), nicht festgehalten»
+
+  @req-15.12 @req-6.11
+  Szenario: Eine weitere Version unter einem Manifest-Schlüssel meldet das Prüfwerkzeug als Fehler
+    Angenommen der Mandant «mf-version» ist am «10.01.2026» angelegt
+    Und im Mandanten «mf-version» wurde das Dokument «D1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
+    Wenn der Manifest-Lauf für «mf-version» bis «10.01.2026» läuft
+    Und unter «manifest/2026-01-10.json» von «mf-version» eine weitere Version abgelegt wird
+    Dann das Prüfwerkzeug meldet für «mf-version» vom «10.01.2026» bis «10.01.2026» «Ergebnis: Fehler gefunden» mit Exit-Code 1
+    Und die Ausgabe des Prüfwerkzeugs nennt «weitere Version(en) oder Löschmarke(n); geprüft wird die älteste»

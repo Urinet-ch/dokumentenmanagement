@@ -5,6 +5,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
+import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -51,9 +52,12 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
@@ -96,6 +100,8 @@ public class ManifestSchritte {
     private final Map<String, String> mandanten = new HashMap<>();
     private final Map<String, UUID> dokumente = new HashMap<>();
     private final List<StubMapping> stoerungen = new ArrayList<>();
+    /** Erwartete kanonische Zeile je {@code <tabelle>/<id>}, unabhängig von {@code JdbcManifestDaten} gebildet. */
+    private final Map<String, Map<String, Object>> zeilen = new LinkedHashMap<>();
     private long auftrag;
     private List<String> versionenVorher = List.of();
     private String ausgabe = "";
@@ -158,6 +164,83 @@ public class ManifestSchritte {
             p.setTimestamp(1, Timestamp.from(zeit(datum, uhrzeit)));
             p.executeUpdate();
         }
+    }
+
+    @Angenommen("das Dokument «{word}» von «{word}» hat eine PDF\\/A-Fassung")
+    public void pdfa(String name, String alias) throws SQLException {
+        UUID id = dokumente.get(alias + "/" + name);
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement("update "
+                + schema(alias) + ".dokument set sha256_pdfa = ?, s3_pdfa = ?, s3_version_pdfa = 'v-pdfa' where id = ?")) {
+            p.setString(1, zufallsHash());
+            p.setString(2, "archiv/2026/" + id + "/pdfa.pdf");
+            p.setObject(3, id);
+            assertThat(p.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Angenommen("im Mandanten «{word}» steht am «{word}» um «{word}» ein Eintrag im Zugriffsprotokoll zum Dokument «{word}» mit IP und Details")
+    public void protokollVoll(String alias, String datum, String uhrzeit, String name) throws Exception {
+        UUID dokument = dokumente.get(alias + "/" + name);
+        Instant zeit = zeit(datum, uhrzeit);
+        String details = "{\"seite\": 2, \"grund\": \"Prüfung «Blatt»\", \"felder\": [\"betrag\", \"datum\"]}";
+        long id;
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "insert into " + schema(alias) + ".zugriff_protokoll (zeit, benutzer, rolle, aktion, dokument_id, ip, "
+                        + "details) values (?, 'inhaber', 'INHABER', 'HERUNTERLADEN', ?, '192.0.2.7', cast(? as jsonb)) "
+                        + "returning id")) {
+            p.setTimestamp(1, Timestamp.from(zeit));
+            p.setObject(2, dokument);
+            p.setString(3, details);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                id = r.getLong(1);
+            }
+        }
+        Map<String, Object> zeile = new LinkedHashMap<>();
+        zeile.put("id", id);
+        zeile.put("zeit", zeit.toString());
+        zeile.put("benutzer", "inhaber");
+        zeile.put("rolle", "INHABER");
+        zeile.put("aktion", "HERUNTERLADEN");
+        zeile.put("dokument_id", dokument.toString());
+        zeile.put("ip", "192.0.2.7/32");
+        zeile.put("details", JSON.readValue(details, Map.class));
+        zeilen.put("zugriff_protokoll/" + id, zeile);
+    }
+
+    @Angenommen("im Mandanten «{word}» steht am «{word}» um «{word}» eine Metadaten-Version des Dokuments «{word}»")
+    public void version(String alias, String datum, String uhrzeit, String name) throws Exception {
+        UUID dokument = dokumente.get(alias + "/" + name);
+        Instant zeit = zeit(datum, uhrzeit);
+        String daten = "{\"betrag\": \"1234.50\", \"waehrung\": \"CHF\", \"bestaetigt\": true, \"leer\": null}";
+        long id;
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "insert into " + schema(alias) + ".dokument_version (zeit, dokument_id, version, daten, geaendert_von, "
+                        + "grund) values (?, ?, 3, cast(? as jsonb), 'inhaber', 'Probe') returning id")) {
+            p.setTimestamp(1, Timestamp.from(zeit));
+            p.setObject(2, dokument);
+            p.setString(3, daten);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                id = r.getLong(1);
+            }
+        }
+        Map<String, Object> zeile = new LinkedHashMap<>();
+        zeile.put("id", id);
+        zeile.put("zeit", zeit.toString());
+        zeile.put("dokument_id", dokument.toString());
+        zeile.put("version", 3L);
+        zeile.put("daten", JSON.readValue(daten, Map.class));
+        zeile.put("geaendert_von", "inhaber");
+        zeile.put("grund", "Probe");
+        zeilen.put("dokument_version/" + id, zeile);
+    }
+
+    @Angenommen("der Pfad «{word}» des Zeitstempeldiensts antwortet mit HTTP {int}")
+    public void pfadStoerung(String pfad, int status) {
+        WireMock admin = new WireMock("localhost", tsaPort.orElseThrow());
+        stoerungen.add(admin.register(any(urlPathEqualTo(pfad)).atPriority(1)
+                .willReturn(aResponse().withStatus(status))));
     }
 
     @Angenommen("der Zeitstempeldienst «{word}» antwortet mit HTTP {int}")
@@ -249,8 +332,11 @@ public class ManifestSchritte {
         UUID id = dokumente.get(alias + "/" + name);
         Map<String, String[]> erwartet = new HashMap<>();
         try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
-                "select lower(rolle), sha256, s3_version from " + schema(alias) + ".dokument_datei where dokument_id = ?")) {
+                "select lower(rolle), sha256, s3_version from " + schema(alias) + ".dokument_datei where dokument_id = ? "
+                        + "union all select 'pdfa', sha256_pdfa, s3_version_pdfa from " + schema(alias)
+                        + ".dokument where id = ? and sha256_pdfa is not null")) {
             p.setObject(1, id);
+            p.setObject(2, id);
             try (ResultSet r = p.executeQuery()) {
                 while (r.next()) {
                     erwartet.put(r.getString(1), new String[] {r.getString(2), r.getString(3)});
@@ -275,14 +361,66 @@ public class ManifestSchritte {
         JsonNode prot = manifest(alias, datum).get("protokolle");
         assertThat(prot.get(tabelleA).get("anzahl").asInt()).isEqualTo(anzahlA);
         assertThat(prot.get(tabelleB).get("anzahl").asInt()).isEqualTo(anzahlB);
-        assertThat(prot.get(tabelleA).get("sha256").asText()).matches("[0-9a-f]{64}");
         // je Zeile ein Blatt (design.md «Manifest»), Wurzel = SHA-256 über die Blätter in id-Reihenfolge
-        List<Object> blaetter = daten(alias, "select sha256 from %s.protokoll_blatt where tabelle = '" + tabelleA
-                + "' and manifest_datum = '" + LocalDate.parse(datum, DATUM) + "' order by zeile_id");
-        assertThat(blaetter).hasSize(anzahlA);
-        MessageDigest sha = MessageDigest.getInstance("SHA-256");
-        blaetter.forEach(b -> sha.update(HEX.parseHex((String) b)));
-        assertThat(prot.get(tabelleA).get("sha256").asText()).isEqualTo(HEX.formatHex(sha.digest()));
+        for (Map.Entry<String, Integer> t : Map.of(tabelleA, anzahlA, tabelleB, anzahlB).entrySet()) {
+            List<Object> blaetter = daten(alias, "select sha256 from %s.protokoll_blatt where tabelle = '" + t.getKey()
+                    + "' and manifest_datum = '" + LocalDate.parse(datum, DATUM) + "' order by zeile_id");
+            assertThat(blaetter).as(t.getKey()).hasSize(t.getValue());
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            blaetter.forEach(b -> sha.update(HEX.parseHex((String) b)));
+            assertThat(prot.get(t.getKey()).get("sha256").asText()).as(t.getKey()).isEqualTo(HEX.formatHex(sha.digest()));
+        }
+    }
+
+    @Dann("das Blatt jeder Protokollzeile mit IP, Details oder Metadaten von «{word}» ist der SHA-256 ihrer kanonischen Form über alle Spalten")
+    public void blaetter(String alias) throws Exception {
+        assertThat(zeilen).isNotEmpty();
+        for (Map.Entry<String, Map<String, Object>> e : zeilen.entrySet()) {
+            String[] teile = e.getKey().split("/");
+            List<Object> blatt = daten(alias, "select sha256 from %s.protokoll_blatt where tabelle = '" + teile[0]
+                    + "' and zeile_id = " + Long.parseLong(teile[1]));
+            assertThat(blatt).as(e.getKey()).hasSize(1);
+            assertThat(blatt.getFirst()).as(e.getKey()).isEqualTo(sha256(Jcs.utf8(e.getValue())));
+            // jede Spalte zählt: ein anderer Wert ergäbe ein anderes Blatt
+            for (String spalte : e.getValue().keySet()) {
+                Map<String, Object> geaendert = new LinkedHashMap<>(e.getValue());
+                geaendert.put(spalte, "geändert");
+                assertThat(sha256(Jcs.utf8(geaendert))).as(e.getKey() + " " + spalte).isNotEqualTo(blatt.getFirst());
+            }
+        }
+        assertThat(daten(alias, "select count(*) from %s.protokoll_blatt")).containsExactly(
+                daten(alias, "select (select count(*) from %s.zugriff_protokoll) + (select count(*) from "
+                        + schema(alias) + ".dokument_version)").getFirst());
+    }
+
+    @Dann("das Manifest «{word}» von «{word}» nennt nur den eigenen Mandanten und genau seine Dokumente")
+    public void nurEigene(String datum, String alias) throws Exception {
+        JsonNode m = manifest(alias, datum);
+        assertThat(m.get("mandant").asText()).isEqualTo(code(alias));
+        Set<String> erwartet = new TreeSet<>();
+        dokumente.forEach((schluessel, id) -> {
+            if (schluessel.startsWith(alias + "/")) {
+                erwartet.add(id.toString());
+            }
+        });
+        Set<String> gefunden = new TreeSet<>();
+        m.get("eintraege").forEach(e -> gefunden.add(e.get("dokument").asText()));
+        assertThat(gefunden).isEqualTo(erwartet);
+    }
+
+    @Dann("das Manifest «{word}» von «{word}» hält nur den Zeitstempel von «{word}» fest, unter «manifest\\/» liegt «{word}», aber kein «{word}»")
+    public void nurFestgehalten(String datum, String alias, String dienst, String vorhanden, String fehlt)
+            throws SQLException {
+        LocalDate tag = LocalDate.parse(datum, DATUM);
+        assertThat(daten(alias, "select dienst from %s.manifest_zeitstempel where datum = '" + tag + "'"))
+                .containsExactly(dienst);
+        assertThat(TestAblage.versionen(code(alias), "manifest/" + tag + "." + vorhanden)).hasSize(1);
+        assertThat(TestAblage.versionen(code(alias), "manifest/" + tag + "." + fehlt)).isEmpty();
+    }
+
+    @Wenn("unter «{word}» von «{word}» eine weitere Version abgelegt wird")
+    public void weitereVersion(String schluessel, String alias) {
+        TestAblage.neueVersion(code(alias), schluessel, "{}");
     }
 
     @Dann("die Manifeste von «{word}» bilden eine Hash-Kette, die Signatur, Zeitstempel und Prüfdaten des Vortags erneuert")
@@ -403,7 +541,9 @@ public class ManifestSchritte {
                 assertThat(TestAblage.versionen(code(alias), r.getString(1)))
                         .containsExactly(r.getString(1) + "@" + r.getString(2));
                 assertThat(r.getString(3)).isEqualTo(sha256(datei(alias, tag, "json")));
-                assertThat(r.getObject(4)).isNotNull();
+                // Soll-Frist per Unit-Test (ManifestErzeugenTest.sperre); in test ist S3 auf einen Tag gekappt
+                assertThat(r.getObject(4, OffsetDateTime.class).toInstant())
+                        .isEqualTo(TestAblage.sperre(code(alias), r.getString(1), r.getString(2)).retainUntilDate());
             }
         }
     }
