@@ -341,6 +341,8 @@ Funktionalität: Metadaten ändern und Versionen
       | Vertraulichkeit leer       | {"titel": "Neu", "vertraulichkeit": null}  |
       | Art unbekannt              | {"titel": "Neu", "art": "GIBT_ES_NICHT"}   |
       | Zusatz kein Objekt         | {"titel": "Neu", "zusatz": [1]}            |
+      | Zusatz mit NaN             | {"titel": "Neu", "zusatz": {"x": NaN}}     |
+      | Zusatz mit doppeltem Feld  | {"titel": "Neu", "zusatz": {"x": "a", "x": 5}} |
 
   @req-3.14 @req-3.11
   Szenariogrundriss: Ein Feld «dateiname» in der Änderung antwortet mit 400 und ändert nichts: <fall>
@@ -370,3 +372,62 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» diese Werte:
       | titel     | Neu                    |
       | dateiname | Scan_Rechnung-2026.pdf |
+
+  @req-9.5
+  Szenario: Eine nicht endliche Zahl in den Zusatzfeldern ergibt 422, eine grosse endliche Zahl gilt
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_ZAHL", "name": "Probe Zahl", "zusatzSchema": {"type": "object"}, "vertraulichkeit": "NORMAL",
+       "aufbewahrungJahre": null, "gesetzlichePflicht": false}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_ZAHL", "zusatz": {"x": 1e400}}' ändert
+    Dann meldet das Archiv Status 422 mit Fehlercode «ZUSATZ_UNGUELTIG»
+    Und hat das Dokument «K» diese Werte:
+      | art    | null |
+      | zusatz | null |
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_ZAHL", "zusatz": {"x": 1e300}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 1e300
+
+  @req-9.5
+  Szenario: Der grösste zulässige Wert im Zusatz (400 Stellen ohne Exponent) wird gespeichert und gelesen
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_GRENZE", "name": "Probe Grenze", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false, "zusatzSchema": {"type": "object"}}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_GRENZE", "zusatz": {"x": 1.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 1.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+    Wenn «inhaber-urinet» das Dokument «K» mit Warnungen liest
+    Dann meldet das Archiv Status 200
+
+  @req-9.5
+  Szenariogrundriss: Zahlen im Zusatz gelten genau, nicht speicherbare ergeben 422 und das Dokument bleibt lesbar: <fall>
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_GENAU", "name": "Probe genau", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false,
+       "zusatzSchema": {"type": "object", "properties": {"i": {"type": "integer", "maximum": 1}}}}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_GENAU", "zusatz": {"x": 0.12345678901234567890}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 0.12345678901234567890
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"zusatz": <zusatz>}' ändert
+    Dann meldet das Archiv Status 422 mit Fehlercode «ZUSATZ_UNGUELTIG»
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 0.12345678901234567890
+    Wenn «inhaber-urinet» das Dokument «K» mit Warnungen liest
+    Dann meldet das Archiv Status 200
+
+    Beispiele:
+      | fall                                | zusatz                        |
+      | Ganzzahl knapp über maximum         | {"i": 1.00000000000000000001} |
+      | Unterlauf                           | {"x": 1e-400}                 |
+      | zu viele Stellen ohne Exponent      | {"x": 1e-1200}                |
+      | ausserhalb von numeric              | {"x": 1e-20000}               |

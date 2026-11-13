@@ -192,6 +192,58 @@ Funktionalität: Generator-Schnittstelle für Skripte
       | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "tittel": "x" } | unbekanntes Feld    |
       | { "art": "GIBT_ES_NICHT", "titel": "Probe" }                               | unbekannte Art      |
       | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "zusatz": [] } | zusatz kein Objekt  |
+      | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "zusatz": {"x": NaN} } | zusatz mit NaN |
+      | { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "P", "zusatz": {"x": "a", "x": 5} } | zusatz mit doppeltem Feld |
+
+  @req-9.5
+  Szenario: Eine nicht endliche Zahl in den Zusatzfeldern ergibt 422, eine grosse endliche Zahl gilt
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_ZAHL", "name": "Probe Zahl", "zusatzSchema": {"type": "object"}, "vertraulichkeit": "NORMAL",
+       "aufbewahrungJahre": null, "gesetzlichePflicht": false}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Wenn der Generator die PDF «Z1» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_ZAHL", "titel": "Probe", "zusatz": {"x": 1e400} }
+      """
+    Dann antwortet der Generator mit Status 422 und Fehlercode «ZUSATZ_UNGUELTIG»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «Z1»
+    Wenn der Generator die PDF «Z1» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_ZAHL", "titel": "Probe", "zusatz": {"x": 1e300} }
+      """
+    Dann antwortet der Generator mit 202 und dem neuen Dokument «Z1»
+    Und hat das Generator-Dokument «Z1» im Zusatzfeld «x» die Zahl 1e300
+
+  @req-9.5
+  Szenariogrundriss: Zahlen im Zusatz gelten genau, nicht speicherbare ergeben 422: <fall>
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_GENAU", "name": "Probe genau", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false,
+       "zusatzSchema": {"type": "object", "properties": {"i": {"type": "integer", "maximum": 1}}}}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Wenn der Generator die PDF «Z2» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_GENAU", "titel": "Probe", "zusatz": <zusatz> }
+      """
+    Dann antwortet der Generator mit Status 422 und Fehlercode «ZUSATZ_UNGUELTIG»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «Z2»
+    Wenn der Generator die PDF «Z2» mit diesen Metadaten sendet:
+      """
+      { "art": "PROBE_DA_GENAU", "titel": "Probe", "zusatz": {"i": 1, "x": 0.12345678901234567890} }
+      """
+    Dann antwortet der Generator mit 202 und dem neuen Dokument «Z2»
+    Und hat das Generator-Dokument «Z2» im Zusatzfeld «x» die Zahl 0.12345678901234567890
+
+    Beispiele:
+      | fall                                | zusatz                        |
+      | Ganzzahl knapp über maximum         | {"i": 1.00000000000000000001} |
+      | Unterlauf                           | {"x": 1e-400}                 |
+      | zu viele Stellen ohne Exponent      | {"x": 1e-1200}                |
+      | ausserhalb von numeric              | {"x": 1e-20000}               |
 
   @req-11.2
   Szenario: Eine abgelaufene Aufbewahrungsfrist ergibt 409, nichts wird angelegt

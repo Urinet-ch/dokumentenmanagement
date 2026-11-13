@@ -189,6 +189,48 @@ class NetworkntZusatzSchemaPrueferTest {
         assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":NaN}"));
     }
 
+    /** Review PR #95: Der Prüfer liest Zusatzwerte genau, so wie sie gespeichert werden; double rundete hier auf 1. */
+    @Test
+    void zahlenImZusatzGeltenGenau() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"i\":{\"type\":\"integer\",\"maximum\":1},"
+                + "\"g\":{\"exclusiveMaximum\":1}}}";
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"i\":1.00000000000000000001}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"g\":1.00000000000000000001}"));
+        assertThatCode(() -> pruefer.wertePruefen(schema, "{\"g\":0.99999999999999999999,\"i\":1.0}"))
+                .doesNotThrowAnyException();
+    }
+
+    /**
+     * Review PR #95: Zahlen, die {@code jsonb} nicht verlustfrei und lesbar hält, sind ungültig: ausserhalb des
+     * {@code double}-Bereichs, Unterlauf ungleich 0 oder mehr als {@link Jackson3Baum#MAX_STELLEN} Stellen ohne
+     * Exponent (Postgres schreibt {@code 1e-1200} mit 1'201 Stellen aus, Jackson liest höchstens 1'000).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1e400", "-1e400", "1e-400", "-1e-400", "1e-1200", "1e-20000", "1e-1000000000",
+            "1e+1000000000", "0.1e-399"})
+    void nichtSpeicherbareZahlIstUngueltig(String zahl) {
+        assertUngueltig(() -> pruefer.wertePruefen("{\"type\":\"object\"}", "{\"n\":" + zahl + "}"));
+        assertUngueltig(() -> pruefer.wertePruefen("{\"type\":\"object\"}", "{\"n\":[{\"m\":" + zahl + "}]}"));
+    }
+
+    @Test
+    void zahlMitZuVielenStellenIstUngueltig() {
+        String schema = "{\"type\":\"object\"}";
+        String nachkomma = "0.1" + "1".repeat(Jackson3Baum.MAX_STELLEN - 2);
+        assertThatCode(() -> pruefer.wertePruefen(schema, "{\"n\":" + nachkomma + "}")).doesNotThrowAnyException();
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":" + nachkomma + "1}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":1" + "0".repeat(400) + "}"));
+        assertUngueltig(() -> pruefer.wertePruefen(schema, "{\"n\":2" + "0".repeat(308) + "}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1e300", "-1e300", "1.7976931348623157e308", "1e-300", "4.9e-324", "0.0", "-0.0", "0E-400",
+            "0.12345678901234567890"})
+    void speicherbareZahlIstGueltig(String zahl) {
+        assertThatCode(() -> pruefer.wertePruefen("{\"type\":\"object\"}", "{\"n\":" + zahl + "}"))
+                .doesNotThrowAnyException();
+    }
+
     /** Review PR #83 (Nachprüfung, Soll 3): ab 3.x strenger als 2.0.8. */
     @Test
     void strengereFaelleAb3xSindUngueltig() {
@@ -199,13 +241,17 @@ class NetworkntZusatzSchemaPrueferTest {
         assertUngueltig(() -> pruefer.schemaPruefen("{\"type\":\"object\",\"exclusiveMaximum\":1e400}"));
     }
 
-    /** Ab 3.x (Review PR #83, Soll 1, Fälle 3 und 4): grosse Ganzzahlen und Grenzen über {@code int} nach Wert. */
+    /**
+     * Ab 3.x (Review PR #83, Soll 1, Fälle 3 und 4): grosse Ganzzahlen und Grenzen über {@code int} nach Wert. Als
+     * Zusatzwert gilt eine Ganzzahl nur bis {@link Jackson3Baum#MAX_STELLEN} Stellen im {@code double}-Bereich
+     * (Review PR #95); als Grenze im Schema auch darüber.
+     */
     @Test
     void grosseGanzzahlenGeltenNachWert() {
         String gross = "1" + "0".repeat(900);
         assertThatCode(() -> pruefer.wertePruefen(
                 "{\"type\":\"object\",\"properties\":{\"n\":{\"minimum\":0.1,\"multipleOf\":0.01}}}",
-                "{\"n\":" + gross + "}")).doesNotThrowAnyException();
+                "{\"n\":1" + "0".repeat(300) + "}")).doesNotThrowAnyException();
         assertThatCode(() -> pruefer.wertePruefen(
                 "{\"type\":\"object\",\"properties\":{\"l\":{\"type\":\"array\",\"maxItems\":" + gross + "}}}",
                 "{\"l\":[1,1.0]}")).doesNotThrowAnyException();
