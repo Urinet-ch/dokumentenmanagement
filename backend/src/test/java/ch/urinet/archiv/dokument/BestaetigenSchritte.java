@@ -550,6 +550,25 @@ public class BestaetigenSchritte {
         }
     }
 
+    /** Spec 02, Aufgabe 6.3: Die Kopfzeile «Titel – Art – Partner» jedes Abschnitts trägt die geänderten Angaben. */
+    @Dann("beginnt jeder Abschnitt des archivierten Dokuments «{word}» mit dem Titel {string} und endet seine Kopfzeile mit dem Partner {string}")
+    public void kopfzeile(String name, String titel, String partner) throws SQLException {
+        Ort ort = ort(name);
+        List<String> kopfzeilen = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung
+                .prepareStatement("select split_part(text, E'\\n\\n', 1) from "
+                        + new MandantCode(ort.mandant()).schema() + ".chunk where dokument_id = ? order by nr")) {
+            abfrage.setObject(1, ort.id());
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    kopfzeilen.add(z.getString(1));
+                }
+            }
+        }
+        assertThat(kopfzeilen).isNotEmpty()
+                .allSatisfy(k -> assertThat(k).startsWith(titel + " – ").endsWith(" – " + partner));
+    }
+
     /** Spalten von {@code dokument} als Text; {@code null} heisst leer. */
     @Dann("hat das Dokument «{word}» diese Werte:")
     public void werte(String name, Map<String, String> erwartet) throws SQLException {

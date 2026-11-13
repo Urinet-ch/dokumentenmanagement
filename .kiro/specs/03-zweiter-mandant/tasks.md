@@ -128,7 +128,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 11.13 Fundstelle in Suchtreffern [Backend]
   - Herkunft: Spec-Erweiterung, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
-  - Spec 02 ergänzt: `chunk.seite_von`/`seite_bis` über `Seitentext.von` (Spec 04) mit derselben Plausibilitätsprüfung gegen `dokument.seiten` (Spec 02, Aufgabe 6.3; ist sie schon umgesetzt, neues Changeset und Nachberechnung `EMBEDDING_ALLE`); `HybridSuche` gibt den besten Chunk mit (Spec 02, Aufgabe 6.4); öffentliche Suche liefert `fundstelle.seite`
+  - Spec 02 ergänzt: `chunk.seite_von`/`seite_bis` über `Seitentext.von` (Spec 04) mit derselben Plausibilitätsprüfung gegen `dokument.seiten` (erledigt mit Spec 02, Aufgabe 6.3: Changeset `db/mandant` 021 legt die Spalten an, der `Chunker` füllt sie über `gemeinsam/domain/Seitentext`; kein neues Changeset, keine Nachberechnung nötig); `HybridSuche` gibt den besten Chunk mit (Spec 02, Aufgabe 6.4); öffentliche Suche liefert `fundstelle.seite`
   - _Anforderungen: 5.7_
   - _Abhängig von: 11.2; Spec 02: 6.3, 6.4_
 

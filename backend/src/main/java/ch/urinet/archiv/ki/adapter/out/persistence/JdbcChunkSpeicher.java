@@ -22,8 +22,10 @@ import java.util.regex.Pattern;
 /**
  * {@code m_<code>.chunk} des Mandanten aus dem Kontext (Spec 02, Req 2.1, 2.4; Schema immer qualifiziert, Typ
  * {@code public.halfvec} aus pgvector). Schreibt in der laufenden Transaktion (Agroal bindet die Verbindung in die
- * JTA-Transaktion ein). {@link #ersetzen} sperrt zuerst die Zeile des Dokuments ({@code for no key update}), damit zwei
- * Aufträge für dasselbe Dokument nacheinander ersetzen. Vektoren gehen als Text ({@code [x,y,…]}) an PostgreSQL.
+ * JTA-Transaktion ein). {@link #ersetzen} nimmt zuerst eine Sperre je Dokument bis zum Commit
+ * ({@code pg_advisory_xact_lock}), damit zwei Aufträge für dasselbe Dokument nacheinander ersetzen, ohne die Zeile des
+ * Dokuments zu sperren, und fügt in Teilen zu {@link #EINFUEGEN_JE_BATCH} Zeilen mit je eigener Zeitgrenze ein.
+ * Vektoren gehen als Text ({@code [x,y,…]}) an PostgreSQL.
  * Fehlermeldungen ohne Inhalte.
  */
 @ApplicationScoped
@@ -31,6 +33,12 @@ public class JdbcChunkSpeicher implements ChunkPort {
 
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final int ZEITGRENZE_SEKUNDEN = 30;
+    /**
+     * Zeilen je {@code executeBatch}: Auf Stufe A kostet eine Zeile mit HNSW-Pflege gemessen 116 bis 221 ms (bis 1'000
+     * Abschnitte im Index), ein Teil also rund 4 s; die Reserve bis {@link #ZEITGRENZE_SEKUNDEN} deckt einen Index, der
+     * über {@code shared_buffers} hinauswächst.
+     */
+    static final int EINFUEGEN_JE_BATCH = 16;
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -65,14 +73,21 @@ public class JdbcChunkSpeicher implements ChunkPort {
     }
 
     @Override
-    public boolean ersetzen(UUID dokumentId, List<Eingebettet> chunks) {
+    public boolean ersetzen(UUID dokumentId, List<Eingebettet> chunks) throws InterruptedException {
         String s = schema();
         try (Connection verbindung = datenquelle.get().getConnection()) {
+            // Sperre je Dokument statt Zeilensperre: Andere Änderungen am Dokument warten nicht auf das Einfügen
             try (PreparedStatement sperren = verbindung.prepareStatement(
-                    "select id from " + s + ".dokument where id = ? for no key update")) {
+                    "select 1 from pg_advisory_xact_lock(hashtextextended(?, 0))")) {
                 sperren.setQueryTimeout(ZEITGRENZE_SEKUNDEN);
-                sperren.setObject(1, dokumentId);
-                try (ResultSet zeile = sperren.executeQuery()) {
+                sperren.setString(1, s + ":chunk:" + dokumentId);
+                sperren.executeQuery().close();
+            }
+            try (PreparedStatement vorhanden = verbindung.prepareStatement(
+                    "select 1 from " + s + ".dokument where id = ?")) {
+                vorhanden.setQueryTimeout(ZEITGRENZE_SEKUNDEN);
+                vorhanden.setObject(1, dokumentId);
+                try (ResultSet zeile = vorhanden.executeQuery()) {
                     if (!zeile.next()) {
                         throw new IllegalStateException("Dokument " + dokumentId + " fehlt im Mandanten");
                     }
@@ -96,28 +111,32 @@ public class JdbcChunkSpeicher implements ChunkPort {
                 loeschen.setObject(1, dokumentId);
                 loeschen.executeUpdate();
             }
-            if (chunks.isEmpty()) {
-                return true;
-            }
             try (PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + s
                     + ".chunk (dokument_id, nr, text, seite_von, seite_bis, embedding) "
                     + "values (?, ?, ?, ?, ?, ?::public.halfvec)")) {
+                // pgjdbc misst queryTimeout über einen ganzen executeBatch: darum kleine Teile mit je eigener Grenze
                 einfuegen.setQueryTimeout(ZEITGRENZE_SEKUNDEN);
-                for (Eingebettet eingebettet : chunks) {
-                    Chunk chunk = eingebettet.chunk();
-                    einfuegen.setObject(1, dokumentId);
-                    einfuegen.setInt(2, chunk.nr());
-                    einfuegen.setString(3, chunk.text());
-                    setzeZahl(einfuegen, 4, chunk.seiteVon());
-                    setzeZahl(einfuegen, 5, chunk.seiteBis());
-                    if (eingebettet.vektor() == null) {
-                        einfuegen.setNull(6, Types.VARCHAR);
-                    } else {
-                        einfuegen.setString(6, text(eingebettet.vektor()));
+                for (int start = 0; start < chunks.size(); start += EINFUEGEN_JE_BATCH) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException("Abschnitte unterbrochen");
                     }
-                    einfuegen.addBatch();
+                    for (Eingebettet eingebettet : chunks.subList(start,
+                            Math.min(chunks.size(), start + EINFUEGEN_JE_BATCH))) {
+                        Chunk chunk = eingebettet.chunk();
+                        einfuegen.setObject(1, dokumentId);
+                        einfuegen.setInt(2, chunk.nr());
+                        einfuegen.setString(3, chunk.text());
+                        setzeZahl(einfuegen, 4, chunk.seiteVon());
+                        setzeZahl(einfuegen, 5, chunk.seiteBis());
+                        if (eingebettet.vektor() == null) {
+                            einfuegen.setNull(6, Types.VARCHAR);
+                        } else {
+                            einfuegen.setString(6, text(eingebettet.vektor()));
+                        }
+                        einfuegen.addBatch();
+                    }
+                    einfuegen.executeBatch();
                 }
-                einfuegen.executeBatch();
             }
             return true;
         } catch (SQLException e) {

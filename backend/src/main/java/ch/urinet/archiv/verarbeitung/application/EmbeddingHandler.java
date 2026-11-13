@@ -7,8 +7,12 @@ import ch.urinet.archiv.ki.domain.Chunk;
 import ch.urinet.archiv.ki.domain.Chunker;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.SystemException;
+import jakarta.transaction.TransactionManager;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -21,7 +25,9 @@ import java.util.UUID;
  * Antwortet das Modell nicht passend ({@link EmbeddingAusfall}), ist es ein Fehlversuch (Spec 01, Req 5.4); die
  * bisherigen Abschnitte bleiben, das Dokument bleibt {@code ARCHIVIERT}, auch nach dem letzten Versuch. Ein Dokument,
  * das nicht {@code ARCHIVIERT} ist, bleibt ohne Abschnitte. Ohne Embedding-Modell (Stub, kein Zugang) entstehen
- * Abschnitte ohne Vektor, vorhandene Abschnitte mit Vektor bleiben ({@link ChunkPort#ersetzen}). Das Log nennt nur IDs.
+ * Abschnitte ohne Vektor, vorhandene Abschnitte mit Vektor bleiben ({@link ChunkPort#ersetzen}). Die Transaktion, die
+ * die Abschnitte ersetzt, hat die Zeitgrenze von {@code EMBEDDING} statt der Standardgrenze. Das Log nennt nur IDs und
+ * die Dauer des Schreibens.
  */
 @ApplicationScoped
 public class EmbeddingHandler implements AuftragHandler {
@@ -30,10 +36,15 @@ public class EmbeddingHandler implements AuftragHandler {
 
     private final EmbeddingSpeichern speichern;
     private final EmbeddingService embeddings;
+    private final TransactionManager transaktionen;
+    private final int zeitgrenzeSekunden;
 
-    public EmbeddingHandler(EmbeddingSpeichern speichern, EmbeddingService embeddings) {
+    public EmbeddingHandler(EmbeddingSpeichern speichern, EmbeddingService embeddings, TransactionManager transaktionen,
+                            @ConfigProperty(name = "archiv.auftrag.zeitgrenze.EMBEDDING") Duration zeitgrenze) {
         this.speichern = speichern;
         this.embeddings = embeddings;
+        this.transaktionen = transaktionen;
+        this.zeitgrenzeSekunden = Math.toIntExact(Math.max(1, zeitgrenze.toSeconds()));
     }
 
     @Override
@@ -61,11 +72,30 @@ public class EmbeddingHandler implements AuftragHandler {
             float[] vektor = vektoren.isPresent() ? vektoren.get().get(i) : null;
             eingebettet.add(new ChunkPort.Eingebettet(chunks.get(i), vektor));
         }
-        if (speichern.ersetzen(auftrag, id, eingebettet)) {
-            LOG.infof("Dokument %s: %d Abschnitte %s", id, chunks.size(),
-                    vektoren.isPresent() ? "mit Embedding" : "ohne Embedding");
+        long beginn = System.nanoTime();
+        boolean ersetzt;
+        // Standard der Transaktion (60 s) reicht auf Stufe A für grosse Dokumente nicht; die Zeitgrenze des Auftrags
+        // begrenzt den Lauf ohnehin, jede Anweisung hat ihre eigene
+        transaktionen.setTransactionTimeout(zeitgrenzeSekunden);
+        try {
+            ersetzt = speichern.ersetzen(auftrag, id, eingebettet);
+        } finally {
+            zuruecksetzen();
+        }
+        if (ersetzt) {
+            LOG.infof("Dokument %s: %d Abschnitte %s in %d ms geschrieben", id, chunks.size(),
+                    vektoren.isPresent() ? "mit Embedding" : "ohne Embedding",
+                    (System.nanoTime() - beginn) / 1_000_000);
         } else {
             LOG.infof("Dokument %s: ohne Embedding-Modell bleiben die vorhandenen Abschnitte", id);
+        }
+    }
+
+    private void zuruecksetzen() {
+        try {
+            transaktionen.setTransactionTimeout(0);
+        } catch (SystemException e) {
+            LOG.warnf("Zeitgrenze der Transaktion nicht zurückgesetzt: %s", e.getClass().getSimpleName());
         }
     }
 }

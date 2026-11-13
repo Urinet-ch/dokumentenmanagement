@@ -20,9 +20,12 @@ public interface ChunkPort {
      * Löscht alle Abschnitte des Dokuments und legt die neuen an. Ohne Vektoren ({@code null}: Stub oder kein Zugang)
      * bleiben vorhandene Abschnitte mit Vektor unverändert, damit ein fehlender Zugang keine Embeddings löscht.
      *
+     * Fügt in kleinen Teilen mit je eigener Zeitgrenze ein und prüft zwischen den Teilen auf eine Unterbrechung.
+     *
      * @return {@code false}, wenn die vorhandenen Abschnitte geblieben sind
+     * @throws InterruptedException nach einer Unterbrechung (die Transaktion rollt zurück)
      */
-    boolean ersetzen(UUID dokumentId, List<Eingebettet> chunks);
+    boolean ersetzen(UUID dokumentId, List<Eingebettet> chunks) throws InterruptedException;
 
     /**
      * Archivierte Dokumente mit einer ID über {@code nach} (aufsteigend), höchstens {@code anzahl}; mit

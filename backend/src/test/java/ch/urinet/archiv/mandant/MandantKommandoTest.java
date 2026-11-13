@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ArchivMain;
+import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
@@ -58,6 +59,21 @@ class MandantKommandoTest {
     void unbekanntesKommando(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains("Unbekanntes Kommando")
                 .contains("archiv embedding nachberechnen");
+        assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
+    }
+
+    /** Spec 02, Aufgabe 6.3: Ein falscher Aufruf von {@code embedding} endet mit Exit 2, bevor Quarkus startet. */
+    @Test
+    @Launch(value = {"embedding", "nachberechnen"}, exitCode = 2)
+    void embeddingOhneMandant(LaunchResult ergebnis) {
+        assertThat(ergebnis.getErrorOutput()).contains(EmbeddingKommando.AUFRUF);
+        assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
+    }
+
+    @Test
+    @Launch(value = {"embedding", "nachberechnen", "urinet", "--falsch"}, exitCode = 2)
+    void embeddingFalscheOption(LaunchResult ergebnis) {
+        assertThat(ergebnis.getErrorOutput()).contains(EmbeddingKommando.AUFRUF);
         assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
     }
 }

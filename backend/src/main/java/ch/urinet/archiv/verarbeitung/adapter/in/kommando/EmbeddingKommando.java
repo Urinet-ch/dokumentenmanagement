@@ -4,6 +4,7 @@ import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.EmbeddingNachberechnung;
+import ch.urinet.archiv.verarbeitung.application.EmbeddingSpeichern;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.PrintStream;
@@ -14,7 +15,9 @@ import java.util.Optional;
  * {@code archiv embedding nachberechnen <code> [--nur-fehlende]} (Spec 02, Req 2.4): reiht die Nachberechnung der
  * Embeddings eines aktiven Mandanten als Auftrag {@code EMBEDDING_ALLE} ein; der Worker arbeitet sie ab. Ohne Option
  * alle archivierten Dokumente, mit {@code --nur-fehlende} nur solche ohne Abschnitte oder mit einem Abschnitt ohne
- * Vektor. Exit 0 = eingereiht, 1 = Mandant unbekannt oder nicht aktiv, 2 = falscher Aufruf, 3 = technischer Fehler.
+ * Vektor. Läuft für den Mandanten schon eine Nachberechnung, reiht das Kommando nichts ein und nennt deren Auftrag
+ * (Exit 0). Exit 0 = eingereiht oder läuft bereits, 1 = Mandant unbekannt oder nicht aktiv, 2 = falscher Aufruf,
+ * 3 = technischer Fehler.
  * Die Ausgabe nennt nur Mandant und Auftrags-ID.
  */
 @ApplicationScoped
@@ -61,9 +64,14 @@ public class EmbeddingKommando {
                 fehler.println("Mandant «" + mandant.wert() + "» ist nicht angelegt oder nicht aktiv.");
                 return 1;
             }
-            long id = nachberechnung.starten(mandant, aufruf.get().nurFehlende());
-            aus.printf("Nachberechnung der Embeddings für Mandant %s eingereiht (Auftrag %d, %s)%n", mandant.wert(), id,
-                    aufruf.get().nurFehlende() ? "nur fehlende" : "alle archivierten Dokumente");
+            EmbeddingSpeichern.Start start = nachberechnung.starten(mandant, aufruf.get().nurFehlende());
+            if (!start.neu()) {
+                aus.printf("Nachberechnung der Embeddings für Mandant %s läuft bereits (Auftrag %d), nichts eingereiht%n",
+                        mandant.wert(), start.auftrag());
+                return 0;
+            }
+            aus.printf("Nachberechnung der Embeddings für Mandant %s eingereiht (Auftrag %d, %s)%n", mandant.wert(),
+                    start.auftrag(), aufruf.get().nurFehlende() ? "nur fehlende" : "alle archivierten Dokumente");
             return 0;
         } catch (RuntimeException e) {
             fehler.println("Technischer Fehler: " + e.getClass().getSimpleName());

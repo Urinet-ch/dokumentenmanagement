@@ -120,7 +120,10 @@ java -jar quarkus-run.jar embedding nachberechnen <code> [--nur-fehlende]
 - Reiht für den Mandanten den Auftrag `EMBEDDING_ALLE` ein; der Worker zerlegt danach jedes archivierte Dokument neu in
   Abschnitte und bettet sie ein (Spec 02, Req 2.4). Mit `--nur-fehlende` nur Dokumente ohne Abschnitte oder mit
   Abschnitten ohne Embedding (z. B. nach einem Lauf mit Stub oder ohne Token). Auf der VPS als Admin-Kommando (oben).
-- Exit-Code 0 eingereiht, 1 Mandant nicht angelegt oder nicht aktiv, 2 falscher Aufruf, 3 technischer Fehler.
+- Läuft für den Mandanten noch eine Nachberechnung, reiht das Kommando nichts ein und meldet «läuft bereits» mit der
+  Auftrags-ID; ein erneuter Aufruf ist also gefahrlos.
+- Exit-Code 0 eingereiht oder läuft bereits, 1 Mandant nicht angelegt oder nicht aktiv, 2 falscher Aufruf,
+  3 technischer Fehler.
 
 ## API-Token für Skripte (Generator-Client, Drive-Import)
 Ein API-Token `ua_<id>_<geheimnis>` gilt für genau einen Mandanten und einen Scope (`generator` oder `import`) und

@@ -6,7 +6,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Startet die Nachberechnung der Embeddings eines Mandanten (Spec 02, Req 2.4): reiht den ersten Teil von
- * {@code EMBEDDING_ALLE} ein. Nicht in einer laufenden Transaktion aufrufen.
+ * {@code EMBEDDING_ALLE} ein, sofern keine Nachberechnung des Mandanten mehr läuft. Nicht in einer laufenden Transaktion aufrufen.
  */
 @ApplicationScoped
 public class EmbeddingNachberechnung {
@@ -19,8 +19,8 @@ public class EmbeddingNachberechnung {
         this.speichern = speichern;
     }
 
-    /** @return ID des Auftrags {@code EMBEDDING_ALLE} */
-    public long starten(MandantCode mandant, boolean nurFehlende) {
+    /** @return der neue erste Teil oder, wenn schon eine Nachberechnung läuft, ein Auftrag davon */
+    public EmbeddingSpeichern.Start starten(MandantCode mandant, boolean nurFehlende) {
         return kontext.mit(mandant, () -> speichern.nachberechnungEinreihen(nurFehlende));
     }
 }
