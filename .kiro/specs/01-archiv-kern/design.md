@@ -217,7 +217,7 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 
 | Methode | Pfad | Zweck und Antworten | Recht |
 | --- | --- | --- | --- |
-| POST | `/dokumente` | Upload (siehe unten) → 202 mit Ergebnis je Datei; 413, 415, 422, 503 | A1; Token `import` |
+| POST | `/dokumente` | Upload (siehe unten) → 202 mit Ergebnis je Datei; 400, 413, 415, 422, 503 | A1; Token `import` |
 | POST | `/dokumente/generator` | PDF + `metadaten` (JSON) → 202, 200 (gleiche SHA-256), 409 `BELEGNUMMER_VERGEBEN`, 422 | Token `generator` |
 | GET | `/dokumente` | Suche/Liste mit Filtern (Req 14), nur sichtbare | A2–A4 |
 | GET | `/dokumente/{id}` | Metadaten, Status, Versionen, Warnungen; `ETag`; 404 | A2–A4 |
@@ -315,7 +315,7 @@ Aufgaben 17.2 bis 17.7 und 18.2).
 - Anzeige: Abschnitt «Frontend», Titel-Platzhalter.
 - Umsetzung 4.10 (Erkenntnisse, PR #104, 13.11.2026):
   - Changeset `015-dokument-dateiname` (012 belegt PR #91, 013 main mit `013-ki-verbrauch`, 014 PR #87 mit `014-manifest`, beim Rebase vom 13.11.2026 von `013-manifest` umbenannt).
-  - Quarkus REST behandelt einen Multipart-Teil ohne `filename` als Formularfeld; damit `dateien` ohne Namen trotzdem als Datei ankommt, nennt `quarkus.http.body.multipart.file-content-types` die Typen der Erfassung (`application/pdf`, `image/jpeg`, `image/png`, `image/heic`, `image/heif`, `image/tiff`, `application/octet-stream`). Ein Teil ohne Namen mit anderem Typ fehlt in `List<FileUpload>`; `DokumentUploadResource` erkennt ihn über die Formulardaten und führt ihn an seiner Stelle als abgelehnte Datei mit 415 `DATEITYP_UNBEKANNT` (Req 3.3, 3.8), die Nachbarn werden angenommen; mit Arbeitsfassungen antwortet der Upload mit 400 `ANFRAGE_UNGUELTIG`, weil die Zuordnung nicht eindeutig ist (Szenarien `@req-3.8`, `@req-3.3` in `upload.feature`).
+  - Quarkus REST behandelt einen Multipart-Teil ohne `filename` als Formularfeld; damit `dateien` ohne Namen trotzdem als Datei ankommt, nennt `quarkus.http.body.multipart.file-content-types` die Typen der Erfassung (`application/pdf`, `image/jpeg`, `image/png`, `image/heic`, `image/heif`, `image/tiff`, `application/octet-stream`). Ein Teil ohne Namen mit anderem Typ fehlt in `List<FileUpload>`; `DokumentUploadResource` erkennt ihn über die Formulardaten und führt ihn an seiner Stelle als abgelehnte Datei mit 415 `DATEITYP_UNBEKANNT` (Req 3.3, 3.8), die Nachbarn werden angenommen; mit Arbeitsfassungen antwortet der Upload mit 400 `ANFRAGE_UNGUELTIG`, weil die Zuordnung nicht eindeutig ist (Szenarien `@req-3.8`, `@req-3.3` in `upload.feature`, mit Arbeitsfassungen seit Folge Review #107). Passt die Zahl der Datei-Teile eines Formularfelds nicht zu `List<FileUpload>`, antwortet der Upload ebenfalls mit 400 `ANFRAGE_UNGUELTIG` statt eines 500 (Review #104); die Reihenfolge der Teile kommt aus `MultipartFormDataInput` (`DokumentUploadTeileTest`).
   - Bestätigen antwortet mit 202 und dem `DokumentDto` (inkl. `dateiname`, ETag = `version`), wie `GET` (Szenario `@req-14.9` in `bestaetigen.feature`).
   - Suche ohne Dateinamen (Req 3.13): Trefferbedingung und Rang laufen über `ts_filter(volltext_tsv, '{a,b,c}')`, damit ein Begriff nur aus dem Namen weder trifft noch rangiert und eine Verneinung `-wort` kein Orakel über den Namen ist. Dieser Ausdruck nutzt den GIN-Index nicht; einen passenden Index (oder einen Vorfilter) legt der erste Konsument in Spec 02/03 an (eingetragen in Spec 02, Aufgabe 7.1, und Spec 03, Aufgabe 11.2).
   - Rücksprung (Req 16.11): Szenario `@req-16.11` in `datenmodell.feature` führt den Insert und das Titel-Update des Vorgänger-Releases sowie dessen Trefferbedingung und Rang gegen das Schema mit 015 aus.
@@ -1064,7 +1064,9 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 
 ### Frontend
 - Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`.
-- Dokumentansicht `/dokument/:id` (Spec 04 ergänzt): Abschnitt «In der Wissensbasis verwendet» (Spec 04, Req 15.4) und Routenparameter `/dokument/:id?seite=n`, der das Dokument auf PDF-Seite n öffnet (Spec 04, Req 16.2).
+- Dokumentansicht `/dokument/:id` (Spec 04 ergänzt): Abschnitt «In der Wissensbasis verwendet» (Spec 04, Req 15.4) und Routenparameter `/dokument/:id?seite=n`, der das Dokument auf PDF-Seite n öffnet (Spec 04, Req 16.2). Dazu
+  `/dokument/:id?art=<code>` aus dem Eingangskorb: öffnet das Formular einmal mit dieser Art als Artwechsel (Abschnitt
+  «Art nur im KI-Vorschlag (Folge Review #106)» unter «Umsetzung (Aufgabe 3.6, Eingangskorb-Oberfläche)»).
 - Auslieferung über Quinoa im API-Artefakt unter `archiv.apps.urinet.ch`; die API liegt unter `/api/v1`.
 - Erfassen: `getUserMedia` (Rückkamera) mit Fallback `<input type="file" accept="image/*" capture="environment">`; Kantenerkennung und Entzerrung mit **jscanify** (OpenCV.js, als Web Worker, lazy geladen).
   - Original (Req 4.7, P13): die unbearbeitete Aufnahme, beim Fallback die Datei der Kamera, sonst das volle Videobild als JPEG 95 %.
@@ -1147,8 +1149,9 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     übernimmt `?art=` nur, wenn die Art bekannt und aktiv ist, sich von der gespeicherten unterscheidet und der Benutzer
     A6 hat und der Status änderbar ist: Sie öffnet dann das Formular einmal mit dieser Art als Artwechsel (Hinweis
     «… übernommen», gespeichert erst mit «Änderungen speichern»), sodass der PATCH `art` und `zusatz` der neuen Art
-    sendet. Nach «Abbrechen» oder dem Speichern gilt `?art=` nicht mehr; andere ungespeicherte Angaben der Karte gehen
-    nicht mit.
+    sendet. Nach Abbrechen, Speichern oder Neuladen (409/412/404) gilt `?art=` nicht mehr (Folge Review #107); andere
+    ungespeicherte Angaben der Karte gehen nicht mit. Ist die Art der Karte inaktiv, trägt der Link kein `?art=`, und
+    der Hinweis sagt, dass zuerst eine aktive Art zu wählen ist (Folge Review #107).
   - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
     `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
     `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
@@ -1212,13 +1215,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       `additionalProperties: false` tragen. Ohne Artwechsel bleibt es bei «nur bei Änderung».
     - Die Partnersuche löst nach dem Entfernen eines Partners dieselbe Eingabe wieder aus (kein `distinctUntilChanged`;
       `switchMap` verwirft veraltete Abrufe). Wählen und Entfernen setzen die Suche zurück (leerer Begriff), damit ein
-      noch laufender Debounce oder Abruf keine veraltete Trefferliste zeigt (Folge Review #106). Die Ansicht bestellt
-      den Abruf des Vorschaubilds beim Verlassen ab.
-      `GET`/`PATCH /dokumente/{id}` und `POST /bestaetigen` lesen Dokument, Warnungen und Versionsliste in einer
-      Transaktion (`DokumentLesen.ansicht`). Unter READ COMMITTED (PostgreSQL-Standard, keine eigene Isolationsstufe)
-      sieht jede Abfrage einen eigenen Stand; dass Version und Versionsliste zueinander passen, sichert darum die
-      Begrenzung der Liste auf Fassungen mit `version < dokument.version` (Folge Review #106). Eine Fassung, die ein
-      paralleler PATCH nach dem Lesen des Dokuments sichert, erscheint erst mit dessen neuer Version.
+      noch laufender Debounce oder Abruf keine veraltete Trefferliste zeigt (Folge Review #106). Dafür steht der
+      Abbruch vor dem Warten: `switchMap` auf jeden Begriff, die Wartezeit von 300 ms als `timer` im inneren Strom
+      (statt `debounceTime` davor), damit auch ein schon gestarteter Abruf sofort verworfen wird (Folge Review #107).
+      Die Ansicht bestellt den Abruf des Vorschaubilds beim Verlassen ab.
     - Fehler: `PFLICHTFELD_FEHLT` markiert die genannten Felder; `VERSION_KONFLIKT`/412, `STATUS_KONFLIKT`/409 und
       404 schliessen das Formular, die Ansicht lädt neu und sagt warum; fachliche Fehler (`BELEGNUMMER_VERGEBEN`,
       `PARTNER_UNBEKANNT`, `ZUSATZ_UNGUELTIG`, 400) bleiben als Meldung im Formular, die Eingaben bleiben stehen.
@@ -1228,6 +1228,12 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       bewusst keine früheren Werte, damit über die Versionen nichts sichtbar wird, was die Sichtregel nicht ohnehin
       zeigt; wer das Dokument lesen darf, sieht die Liste. Der Eingangskorb liefert eine leere Liste. Die Ansicht zeigt
       «Fassung n», Zeit, Änderer (die eigene Kennung als «Ihnen») und Grund.
+    - Konsistenz Versionsliste (Folge Review #106, Backend): `GET`/`PATCH /dokumente/{id}` und `POST /bestaetigen`
+      lesen Dokument, Warnungen und Versionsliste in einer Transaktion (`DokumentLesen.ansicht`). Unter READ COMMITTED
+      (PostgreSQL-Standard, keine eigene Isolationsstufe) sieht jede Abfrage einen eigenen Stand; dass Version und
+      Versionsliste zueinander passen, sichert darum die Begrenzung der Liste auf Fassungen mit
+      `version < dokument.version`. Eine Fassung, die ein paralleler PATCH nach dem Lesen des Dokuments sichert,
+      erscheint erst mit dessen neuer Version.
     - Vorschaubild: `GET /dokumente/{id}/vorschau?seite=1` (PR #68) als Blob mit Object-URL, freigegeben beim Wechsel
       und beim Verlassen. Die Ansicht zeigt es auf schmalen Bildschirmen (< 960 px) statt des eingebetteten PDF und
       immer, wenn die PDF/A-Fassung fehlt oder nicht lädt; nur mit `seiten` ≥ 1. In der Trefferliste gibt es kein

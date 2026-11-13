@@ -201,7 +201,10 @@ public class UploadSchritte {
         merken(mandantCode);
     }
 
-    /** Zeilen mit Typ {@code ohne-namen:<MIME>} gehen als Teil {@code dateien} ohne Dateinamen mit Text. */
+    /**
+     * Zeilen mit Typ {@code ohne-namen:<MIME>} gehen als Teil {@code dateien} ohne Dateinamen mit Text. Eine Spalte
+     * {@code arbeitsfassung} hängt wie die Handy-App je Datei einen Teil {@code arbeitsfassungen} an und fasst zusammen.
+     */
     @Wenn("«{word}» diese Teile «dateien» hochlädt:")
     public void teileHochladen(String benutzer, DataTable tabelle) {
         String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
@@ -215,11 +218,24 @@ public class UploadSchritte {
                         .mimeType(typ.substring("ohne-namen:".length())).charset(StandardCharsets.UTF_8)
                         .emptyFileName().build());
             } else {
-                Datei datei = new Datei(zeile.get("datei"), inhalt(zeile.get("datei"), typ), null);
+                String arbeit = zeile.get("arbeitsfassung");
+                Datei datei = new Datei(zeile.get("datei"), inhalt(zeile.get("datei"), typ),
+                        arbeit == null || arbeit.isBlank() ? null : Testdateien.erzeugen(arbeit));
                 dateien.add(datei);
                 spec = spec.multiPart(new MultiPartSpecBuilder(datei.inhalt()).controlName("dateien")
                         .fileName(datei.name()).mimeType("application/octet-stream").build());
             }
+        }
+        boolean mitArbeitsfassung = false;
+        for (Datei datei : dateien) {
+            if (datei.arbeitsfassung() != null) {
+                mitArbeitsfassung = true;
+                spec = spec.multiPart(new MultiPartSpecBuilder(datei.arbeitsfassung()).controlName("arbeitsfassungen")
+                        .fileName("arbeit.jpg").mimeType("image/jpeg").build());
+            }
+        }
+        if (mitArbeitsfassung) {
+            spec = spec.multiPart("zusammenfassen", "true");
         }
         stand(mandantCode, dateien);
         gesendet = dateien;
