@@ -2,6 +2,7 @@ package ch.urinet.archiv.verarbeitung.adapter.in.job;
 
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.verarbeitung.application.Ueberwachung;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -22,7 +23,8 @@ public class UeberwachungsTakt {
     }
 
     @Scheduled(identity = "ueberwachung", every = "${archiv.ueberwachung.intervall}",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     void pruefen() {
         if (worker) {
             try {

@@ -5,6 +5,7 @@ import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -46,7 +47,8 @@ public class AuftragPoller {
     }
 
     @Scheduled(identity = "auftrag-poller", every = "${archiv.worker.intervall}",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     void abholen() {
         if (worker) {
             try {

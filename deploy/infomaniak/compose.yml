@@ -74,7 +74,8 @@ services:
       kc:
         condition: service_healthy
     healthcheck:
-      # Readiness: Datenbank (Agroal, DatenbankBereitschaft) und OIDC-Tenant (Keycloak); das Image hat kein curl
+      # Readiness: Datenbank (Agroal, DatenbankBereitschaft), Mandanten-Schemas migriert (SchemaBereitschaftCheck) und
+      # OIDC-Tenant (Keycloak); das Image hat kein curl
       test:
         - CMD
         - bash

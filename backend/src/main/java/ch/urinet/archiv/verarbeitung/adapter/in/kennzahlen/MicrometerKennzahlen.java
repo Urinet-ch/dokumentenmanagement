@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.adapter.in.kennzahlen;
 import ch.urinet.archiv.verarbeitung.application.Kennzahlen;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -40,7 +41,8 @@ public class MicrometerKennzahlen {
     }
 
     @Scheduled(identity = "kennzahlen", every = "${archiv.kennzahlen.intervall}",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     public void aktualisieren() {
         List<Kennzahlen.Stand> staende = kennzahlen.erheben();
         Set<String> erhoben = staende.stream().map(s -> s.mandant().wert()).collect(Collectors.toSet());

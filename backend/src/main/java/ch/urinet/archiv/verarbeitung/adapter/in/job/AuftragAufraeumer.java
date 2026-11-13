@@ -2,6 +2,7 @@ package ch.urinet.archiv.verarbeitung.adapter.in.job;
 
 import ch.urinet.archiv.verarbeitung.application.AuftragAufraeumen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -25,7 +26,8 @@ public class AuftragAufraeumer {
     }
 
     @Scheduled(identity = "auftrag-aufraeumer", every = "${archiv.auftrag.aufraeumen-intervall}",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     void aufraeumen() {
         if (worker) {
             try {
