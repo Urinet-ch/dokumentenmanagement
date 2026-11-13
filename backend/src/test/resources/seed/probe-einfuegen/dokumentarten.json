@@ -1,0 +1,17 @@
+{
+  "_zweck": "Synthetischer Seed nur für Tests (Aufgaben 1.3 und 2.2)",
+  "dokumentarten": [
+    {
+      "code": "PROBE_BELEG",
+      "name": "Probebeleg",
+      "gruppen": ["finanz"],
+      "pflichtfelder": ["titel", "datum"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    }
+  ]
+}
