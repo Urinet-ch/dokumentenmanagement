@@ -18,6 +18,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { Observable, Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { Dokument, Dokumentart, Kontakt } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { fehlerAus } from '../eingangskorb/entwurf';
 import {
@@ -103,7 +104,10 @@ export class MetadatenFormular {
   protected readonly id = computed(() => this.dokument().id);
   protected readonly archiviert = computed(() => this.dokument().status === 'ARCHIVIERT');
   protected readonly darfVertraulichkeit = computed(() => this.anmeldung.darf('A8'));
-  protected readonly titel = computed(() => this.dokument().titel || TEXTE.suche.ohneTitel);
+  /** Nur zur Benennung des Formulars; das Feld `titel` startet nie mit dem Dateinamen (Req 14.10). */
+  protected readonly titel = computed(
+    () => anzeigeTitel(this.dokument().titel, null, this.dokument().dateiname).text,
+  );
   protected readonly art = computed(() => this.arten().find((a) => a.code === this.formular().art));
   protected readonly artenWahl = computed(() =>
     this.arten().filter((a) => a.aktiv || a.code === this.formular().art || a.code === this.dokument().art),

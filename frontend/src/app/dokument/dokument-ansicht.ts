@@ -20,6 +20,7 @@ import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum, zeitpunkt } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentPort, Variante } from './dokument-port';
@@ -58,7 +59,7 @@ interface Zusatzfeld {
  */
 @Component({
   selector: 'app-dokument-ansicht',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink, MetadatenFormular],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, MetadatenFormular, TitelAnzeige],
   templateUrl: './dokument-ansicht.html',
   styleUrl: './dokument-ansicht.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -123,7 +124,11 @@ export class DokumentAnsicht {
     return !!d && (d.seiten ?? 0) >= 1 && (!this.breit() || v === 'fehlt' || v === 'fehler');
   });
   private bildAbo = new Subscription();
-  protected readonly titel = computed(() => this.dokument()?.titel || TEXTE.suche.ohneTitel);
+  /** Ohne Titel der Dateiname als Platzhalter, in jedem Status (Req 14.10). */
+  protected readonly anzeige = computed(() =>
+    anzeigeTitel(this.dokument()?.titel, null, this.dokument()?.dateiname),
+  );
+  protected readonly titel = computed(() => this.anzeige().text);
   protected readonly zusatz = computed<Zusatzfeld[]>(() => {
     const z = this.dokument()?.zusatz as Record<string, unknown> | null | undefined;
     if (!z || typeof z !== 'object') {

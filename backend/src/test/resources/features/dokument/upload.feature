@@ -287,6 +287,123 @@ Funktionalität: Upload von Dateien
       | rechnung{U+202E}fdp.exe | ABGELEHNT | ANFRAGE_UNGUELTIG | 400  |
       | beleg.pdf              | NEU       |                   |      |
 
+  @req-3.9 @req-3.11
+  Szenario: Der Name einer angenommenen Datei wird als Dateiname gespeichert, der Titel bleibt leer
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei                  | typ |
+      | Scan_Rechnung-2026.pdf | pdf |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei                  | status |
+      | Scan_Rechnung-2026.pdf | NEU    |
+    Und hat jedes neue Dokument den Dateinamen «Scan_Rechnung-2026.pdf» und keinen Titel
+    Und liefert die Ansicht des neuen Dokuments für «inhaber-urinet» den Dateinamen «Scan_Rechnung-2026.pdf» und keinen Titel
+
+  @req-3.9
+  Szenariogrundriss: Pfadanteile fallen weg, lange Namen werden gekürzt, ein leerer Name bleibt leer
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei      | typ |
+      | <gesendet> | pdf |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei     | status |
+      | <anzeige> | NEU    |
+    Und hat jedes neue Dokument den Dateinamen «<gespeichert>» und keinen Titel
+
+    Beispiele:
+      | gesendet                   | anzeige          | gespeichert      | fall                          |
+      | ordner/unter/Beleg 7.pdf   | Beleg 7.pdf      | Beleg 7.pdf      | Pfad mit Schrägstrich         |
+      | C:\\Scans\\Beleg 8.pdf     | Beleg 8.pdf      | Beleg 8.pdf      | Pfad mit Backslash            |
+      | {300×a}.pdf                | {255×a}          | {255×a}          | über 255 Zeichen gekürzt      |
+      | datei                      | datei            | datei            | echte Datei namens «datei»    |
+      | ordner/                    | datei            |                  | nach dem Bereinigen leer      |
+      | ..                         | datei            |                  | nur Punkte                    |
+      | {3×Leerzeichen}            | datei            |                  | nur Leerzeichen               |
+
+  @req-3.8 @req-3.3
+  Szenario: Ein Teil «dateien» ohne Dateinamen mit fremdem Typ wird an seiner Stelle abgelehnt, die Nachbarn angenommen
+    Wenn «inhaber-urinet» diese Teile «dateien» hochlädt:
+      | datei        | typ                   |
+      | vorne.pdf    | pdf                   |
+      |              | ohne-namen:text/plain |
+      | hinten.pdf   | pdf                   |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei      | status    | fehlercode         | http |
+      | vorne.pdf  | NEU       |                    |      |
+      | datei      | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+      | hinten.pdf | NEU       |                    |      |
+
+  @req-3.3
+  Szenario: Nur ein Teil «dateien» ohne Dateinamen mit fremdem Typ ergibt 415, nichts wird angelegt
+    Wenn «inhaber-urinet» diese Teile «dateien» hochlädt:
+      | datei | typ                   |
+      |       | ohne-namen:text/plain |
+    Dann antwortet der Upload mit Status 415, Fehlercode «DATEITYP_UNBEKANNT» und diesen Ergebnissen:
+      | datei | status    | fehlercode         | http |
+      | datei | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+    Und ist im Mandanten «urinet» nichts gespeichert
+
+  @req-3.9 @req-3.4 @req-3.5
+  Szenario: Mehrere Dateien als ein Dokument tragen den Namen der ersten angenommenen Datei
+    Angenommen «inhaber-urinet» hat die Datei «alt.pdf» (pdf) hochgeladen
+    Wenn «inhaber-urinet» diese Dateien als ein Dokument mit dem Hinweis "Mappe" hochlädt:
+      | datei       | typ         |
+      | kopie.pdf   | wie:alt.pdf |
+      | notiz.txt   | text        |
+      | Seite-1.jpg | jpeg        |
+      | Seite-2.jpg | jpeg        |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei       | status    | fehlercode         | http |
+      | kopie.pdf   | DUBLETTE  |                    |      |
+      | notiz.txt   | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+      | Seite-1.jpg | NEU       |                    |      |
+      | Seite-2.jpg | NEU       |                    |      |
+    Und nennen alle Ergebnisse dasselbe Dokument mit dem Hinweis "Mappe"
+    Und hat jedes neue Dokument den Dateinamen «Seite-1.jpg» und keinen Titel
+    Und trägt kein Dokument im Mandanten «urinet» den Dateinamen «kopie.pdf» oder «notiz.txt»
+
+  @req-3.10 @req-3.8
+  Szenariogrundriss: Ein Name mit Steuer-, Trenn- oder Formatzeichen wird mit 400 abgelehnt und nicht gespeichert
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei      | typ |
+      | <gesendet> | pdf |
+      | beleg.pdf  | pdf |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei      | status    | fehlercode        | http |
+      | <gesendet> | ABGELEHNT | ANFRAGE_UNGUELTIG | 400  |
+      | beleg.pdf  | NEU       |                   |      |
+    Und hat jedes neue Dokument den Dateinamen «beleg.pdf» und keinen Titel
+    Und trägt kein Dokument im Mandanten «urinet» den Dateinamen «<gesendet>» oder «rechnung»
+
+    Beispiele:
+      | gesendet                 | zeichen                      |
+      | rechnung{U+202E}fdp.pdf  | Richtungsumkehr (Cf)         |
+      | rechnung{U+2028}neu.pdf  | Zeilentrenner (Zl)           |
+      | rechnung{U+2029}neu.pdf  | Absatztrenner (Zp)           |
+      | rechnung{U+0007}neu.pdf  | Steuerzeichen (Cc)           |
+      | rechnung{U+200B}neu.pdf  | unsichtbares Leerzeichen (Cf) |
+
+  @req-3.10
+  Szenario: Verbinder in Emoji sind im Namen erlaubt
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei                         | typ |
+      | Team {U+1F468}{U+200D}{U+1F469}.pdf | pdf |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei                         | status |
+      | Team {U+1F468}{U+200D}{U+1F469}.pdf | NEU    |
+    Und hat jedes neue Dokument den Dateinamen «Team {U+1F468}{U+200D}{U+1F469}.pdf» und keinen Titel
+
+  @req-3.12
+  Szenario: Der Dateiname erscheint nicht in Log, Zugriffsprotokoll, Aufträgen, S3-Schlüsseln, KI-Aufruf und Download
+    Angenommen die Verarbeitung ist bereit
+    Und das Sprachmodell ist bereit
+    Und das Log des Uploads wird mitgeschnitten
+    Wenn «inhaber-urinet» diese Dateien hochlädt:
+      | datei                         | typ      |
+      | Geheimname_Zwergohr-4711.pdf  | pdf-text |
+    Und der Worker die Aufträge bearbeitet
+    Und «inhaber-urinet» das neue Dokument ansieht und seine Datei öffnet
+    Dann taucht «Geheimname» weder im Log noch im Zugriffsprotokoll, in Nutzlasten von Aufträgen, S3-Schlüsseln oder Antwort-Headern auf
+    Und wurde das Sprachmodell aufgerufen, aber kein Aufruf enthält «Geheimname» oder «Zwergohr»
+
   @req-4.7
   Szenario: Die Handy-App überträgt je Seite die Rohaufnahme und die Arbeitsfassung
     Wenn «mitarbeiter-urinet» diese Seiten mit Arbeitsfassung als ein Dokument hochlädt:

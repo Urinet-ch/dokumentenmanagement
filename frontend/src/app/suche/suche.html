@@ -223,7 +223,7 @@
       <ol class="liste">
         @for (t of e.treffer; track t.id) {
           <li class="karte eintrag" data-test="treffer">
-            <a class="titel" [routerLink]="['/dokument', t.id]">{{ titel(t) }}</a>
+            <a class="titel" [routerLink]="['/dokument', t.id]"><app-titel-anzeige [anzeige]="titel(t)" /></a>
             <p class="angaben">
               <span>{{ artName()(t.art) }}</span>
               @if (t.datum) {

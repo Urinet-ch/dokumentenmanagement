@@ -22,7 +22,8 @@ public class DokumentSuche {
         this.port = port;
     }
 
+    /** Suche der PWA: mit Dateinamen in Auszug und Treffer (Req 14.8, 14.9). */
     public Suchergebnis suchen(Benutzer benutzer, Suchanfrage anfrage) {
-        return port.suchen(anfrage, Sichtregel.fuer(benutzer));
+        return port.suchen(anfrage, Sichtregel.fuer(benutzer), true);
     }
 }

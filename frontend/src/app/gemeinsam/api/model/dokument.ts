@@ -76,10 +76,14 @@ export interface Dokument {
      * Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
      */
     personBenutzer?: string | null;
+    /**
+     * Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, kein Titel (Req 3.9, 3.11, 14.9); null ohne Namen
+     */
+    dateiname?: string | null;
     finanz?: DokumentFinanz | null;
     vertrag?: DokumentVertrag | null;
     /**
-     * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET und PATCH), im Eingangskorb leer
+     * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer
      */
     versionen: Array<DokumentVersion>;
 }

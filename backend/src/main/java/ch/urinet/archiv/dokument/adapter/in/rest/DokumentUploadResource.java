@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.adapter.in.rest;
 
 import ch.urinet.archiv.dokument.application.DokumentErfassen;
 import ch.urinet.archiv.dokument.application.UploadAnfrage;
+import ch.urinet.archiv.dokument.domain.DateiName;
 import ch.urinet.archiv.dokument.domain.UploadErgebnis;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
 import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAntwort;
@@ -32,10 +33,14 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
+import org.jboss.resteasy.reactive.server.core.CurrentRequestManager;
+import org.jboss.resteasy.reactive.server.core.multipart.FormData;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +54,8 @@ import java.util.UUID;
 @Path("/dokumente")
 @Tag(name = "Dokumente")
 public class DokumentUploadResource {
+
+    private static final Logger LOG = Logger.getLogger(DokumentUploadResource.class);
 
     static final String QUELLE_HANDY = DokumentErfassen.QUELLE_SCAN;
 
@@ -106,27 +113,69 @@ public class DokumentUploadResource {
                               @RestForm("arbeitsfassungen") List<FileUpload> arbeitsfassungen,
                               @RestForm("zusammenfassen") boolean zusammenfassen,
                               @RestForm("hinweis") String hinweis) {
-        List<FileUpload> originale = dateien == null ? List.of() : dateien;
-        List<FileUpload> arbeit = arbeitsfassungen == null ? List.of() : arbeitsfassungen;
-        if (!arbeit.isEmpty() && arbeit.size() != originale.size()) {
-            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
-        }
-        List<UploadAnfrage.Seite> seiten = new ArrayList<>();
-        for (int i = 0; i < originale.size(); i++) {
-            FileUpload original = originale.get(i);
-            Optional<java.nio.file.Path> fassung = arbeit.isEmpty()
-                    ? Optional.empty() : Optional.of(arbeit.get(i).uploadedFile());
-            seiten.add(new UploadAnfrage.Seite(original.uploadedFile(), original.fileName(), fassung));
-        }
-        UploadAnfrage anfrage = new UploadAnfrage(seiten, zusammenfassen, Optional.ofNullable(hinweis),
-                erfasser(!arbeit.isEmpty()));
-        List<UploadErgebnis> ergebnisse = erfassen.erfassen(anfrage);
+        List<UploadErgebnis> ergebnisse = new ArrayList<>(erfassen(dateien, arbeitsfassungen, zusammenfassen,
+                hinweis));
         List<UploadErgebnisDto> antwort = ergebnisse.stream().map(DokumentUploadResource::dto).toList();
         if (ergebnisse.stream().allMatch(UploadErgebnis.Abgelehnt.class::isInstance)) {
             Fehlercode erster = ((UploadErgebnis.Abgelehnt) ergebnisse.getFirst()).fehler();
             return ProblemAbbildung.antwort(ProblemAntwort.mitErweiterung(erster, "ergebnisse", antwort));
         }
         return Response.accepted(antwort).type(MediaType.APPLICATION_JSON_TYPE).build();
+    }
+
+    /**
+     * Ein Teil {@code dateien} ohne Dateinamen mit einem Typ ausserhalb von
+     * {@code quarkus.http.body.multipart.file-content-types} kommt bei Quarkus als Textfeld an, nicht in
+     * {@code List<FileUpload>}. Er erhält an seiner Stelle ein eigenes Ergebnis 415 {@code DATEITYP_UNBEKANNT}, die
+     * Nachbarn werden angenommen (Req 3.3, 3.8); mit Arbeitsfassungen ist die Zuordnung nicht eindeutig (400).
+     */
+    private List<UploadErgebnis> erfassen(List<FileUpload> dateien, List<FileUpload> arbeitsfassungen,
+                                          boolean zusammenfassen, String hinweis) {
+        List<FileUpload> originale = dateien == null ? List.of() : dateien;
+        List<FileUpload> arbeit = arbeitsfassungen == null ? List.of() : arbeitsfassungen;
+        List<Boolean> teile = dateiTeile("dateien", originale.size());
+        if (!arbeit.isEmpty() && (teile.contains(false) || dateiTeile("arbeitsfassungen", arbeit.size())
+                .contains(false) || arbeit.size() != originale.size())) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        List<UploadErgebnis> ergebnisse = List.of();
+        if (!originale.isEmpty() || !teile.contains(false)) {
+            List<UploadAnfrage.Seite> seiten = new ArrayList<>();
+            for (int i = 0; i < originale.size(); i++) {
+                FileUpload original = originale.get(i);
+                Optional<java.nio.file.Path> fassung = arbeit.isEmpty()
+                        ? Optional.empty() : Optional.of(arbeit.get(i).uploadedFile());
+                seiten.add(new UploadAnfrage.Seite(original.uploadedFile(), original.fileName(), fassung));
+            }
+            ergebnisse = erfassen.erfassen(new UploadAnfrage(seiten, zusammenfassen, Optional.ofNullable(hinweis),
+                    erfasser(!arbeit.isEmpty())));
+        }
+        if (!teile.contains(false)) {
+            return ergebnisse;
+        }
+        LOG.infof("Teil ohne Dateinamen abgelehnt: teile=%d ergebnis=%s", teile.stream().filter(t -> !t).count(),
+                Fehlercode.DATEITYP_UNBEKANNT);
+        List<UploadErgebnis> alle = new ArrayList<>();
+        int naechste = 0;
+        for (boolean datei : teile) {
+            alle.add(datei ? ergebnisse.get(naechste++)
+                    : new UploadErgebnis.Abgelehnt(DateiName.ERSATZ, Fehlercode.DATEITYP_UNBEKANNT));
+        }
+        return alle;
+    }
+
+    /** Je Teil des Formularfelds in der gesendeten Reihenfolge, ob er als Datei ankam. */
+    private static List<Boolean> dateiTeile(String name, int dateien) {
+        FormData formular = CurrentRequestManager.get().getFormData();
+        var teile = formular == null ? null : formular.get(name);
+        if (teile == null) {
+            return Collections.nCopies(dateien, true);
+        }
+        List<Boolean> arten = teile.stream().map(t -> t.isFileItem()).toList();
+        if (arten.stream().filter(t -> t).count() != dateien) {
+            throw new IllegalStateException("Teile und Dateien passen nicht zusammen");
+        }
+        return arten;
     }
 
     private UploadAnfrage.Erfasser erfasser(boolean mitArbeitsfassung) {

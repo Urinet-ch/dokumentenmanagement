@@ -45,8 +45,8 @@ public class PanacheDokumentRepository implements DokumentRepository {
             limit 1""";
 
     private static final String DOKUMENT_ANLEGEN = """
-            insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis)
-            values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis)""";
+            insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis, dateiname)
+            values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis, :dateiname)""";
 
     private static final String DATEI_ANLEGEN = """
             insert into dokument_datei (dokument_id, rolle, nr, sha256, s3_schluessel, mime, groesse, empfangen)
@@ -146,6 +146,7 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 .setParameter("quelle", dokument.quelle())
                 .setParameter("erstelltVon", dokument.erstelltVon())
                 .setParameter("hinweis", dokument.hinweis().orElse(null))
+                .setParameter("dateiname", dokument.dateiname().orElse(null))
                 .executeUpdate();
     }
 
@@ -177,6 +178,7 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 DokumentStatus.valueOf(e.status), e.bestaetigt == null ? null : e.bestaetigt.toInstant(),
                 e.geschaeftsjahr, e.aufbewahrenBis, e.sperreBis, e.fristAbgelaufen, e.zusatz, e.version, e.fehler,
                 e.pdfaFehlt, e.seiten, e.partnerId, e.partnerName, e.kiVorschlag, e.kiSicherheit, e.projekt,
+                e.dateiname,
                 f == null ? null : new DokumentFinanz(f.belegnummer, f.richtung, f.betrag, f.waehrung, f.faelligkeit,
                         f.qrReferenz, f.konto),
                 v == null ? null : new DokumentVertrag(v.gueltigAb, v.gueltigBis, v.kuendigungsfrist,

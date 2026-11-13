@@ -45,9 +45,16 @@ public class PanacheDokumentSuche implements SuchePort {
 
     private static final String TSQ = "websearch_to_tsquery('german', :begriff)";
     private static final String MARKEN = "chr(2) || chr(3) || chr(31)";
+    // der Dateiname in der Form des Index, sonst bildete ts_headline andere Wörter (Req 14.8)
+    private static final String AUSZUG_DATEINAME = "nullif(archiv_dateiname_text(d.dateiname), ''), ";
+    /*
+     * Ohne Dateinamen (Req 3.13) treffen und ranken nur die Teile A–C. Bewusst ohne zusätzliches
+     * "volltext_tsv @@ q" für den GIN-Index: Bei einer Negation («-Wort») entschiede sonst der Dateiname mit.
+     */
+    private static final String OHNE_DATEINAME = "ts_filter(d.volltext_tsv, '{a,b,c}')";
     private static final String AUSZUG = "ts_headline('german', translate(concat_ws(' ', d.titel, d.partner_name, "
-            + "archiv_tags_text(d.tags), left(d.volltext, " + AUSZUG_ZEICHEN + ")), " + MARKEN + ", ''), " + TSQ + ", "
-            + "'StartSel=' || chr(2) || ', StopSel=' || chr(3) || ', FragmentDelimiter=' || chr(31) "
+            + "archiv_tags_text(d.tags), %sleft(d.volltext, " + AUSZUG_ZEICHEN + ")), " + MARKEN + ", ''), " + TSQ
+            + ", 'StartSel=' || chr(2) || ', StopSel=' || chr(3) || ', FragmentDelimiter=' || chr(31) "
             + "|| ', MaxFragments=2, MaxWords=20, MinWords=8')";
     private static final String RELEVANZ = "belegtreffer desc, rang desc, eingang desc, id desc";
     private static final String DATUM = "datum desc nulls last, eingang desc, id desc";
@@ -64,9 +71,9 @@ public class PanacheDokumentSuche implements SuchePort {
     }
 
     @Override
-    public Suchergebnis suchen(Suchanfrage anfrage, Sichtregel regel) {
+    public Suchergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname) {
         Map<String, Object> parameter = new HashMap<>();
-        String sql = sql(anfrage, regel, parameter);
+        String sql = sql(anfrage, regel, mitDateiname, parameter);
         EntityManager em = DokumentEintrag.getEntityManager();
         em.createNativeQuery("select set_config('statement_timeout', :ms, true)")
                 .setParameter("ms", Long.toString(zeitgrenze.toMillis())).getSingleResult();
@@ -85,15 +92,16 @@ public class PanacheDokumentSuche implements SuchePort {
     }
 
     /** Baut das SQL aus festen Stücken und legt die Werte in {@code parameter} ab. */
-    static String sql(Suchanfrage a, Sichtregel regel, Map<String, Object> parameter) {
+    static String sql(Suchanfrage a, Sichtregel regel, boolean mitDateiname, Map<String, Object> parameter) {
         VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
         parameter.putAll(sicht.parameter());
         List<String> bedingungen = new ArrayList<>();
         bedingungen.add(sicht.bedingung());
         boolean mitBegriff = a.begriff() != null;
+        String vektor = mitDateiname ? "d.volltext_tsv" : OHNE_DATEINAME;
         if (mitBegriff) {
             // exakte Belegnummer zählt als Treffer, auch ohne Volltext (Req 14.7)
-            bedingungen.add("(d.volltext_tsv @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
+            bedingungen.add("(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
                     + "from dokument_finanz b where b.belegnummer = :begriff)))");
             parameter.put("begriff", a.begriff());
         }
@@ -133,23 +141,24 @@ public class PanacheDokumentSuche implements SuchePort {
                 )
                 select g.gesamt, s.id, s.art, s.titel, s.datum, s.eingang, s.status, s.vertraulichkeit, s.tags,
                     s.geschaeftsjahr, s.partner_id, s.partner_name, s.belegnummer, s.betrag, s.waehrung, s.richtung,
-                    s.auszug
+                    s.auszug, s.dateiname
                 from (select count(*) as gesamt from treffer) g
                 left join (
                     select d.id, d.art, d.titel, d.datum, d.eingang, d.status,
                         case when d.bestaetigt is null then 'PERSONAL' else d.vertraulichkeit end as vertraulichkeit,
                         cast(array_to_json(d.tags) as text) as tags, d.geschaeftsjahr, d.partner_id, d.partner_name,
                         f.belegnummer, f.betrag, cast(f.waehrung as text) as waehrung, f.richtung, %s as auszug,
-                        p.rang, p.belegtreffer
+                        %s as dateiname, p.rang, p.belegtreffer
                     from seite p join dokument d on d.id = p.id
                     left join dokument_finanz f on f.dokument_id = d.id
                 ) s on true
                 order by %s""".formatted(
-                mitBegriff ? "ts_rank_cd(d.volltext_tsv, " + TSQ + ")" : "cast(0 as real)",
+                mitBegriff ? "ts_rank_cd(" + vektor + ", " + TSQ + ")" : "cast(0 as real)",
                 mitBegriff ? "coalesce(f.belegnummer = :begriff, false)" : "false",
                 String.join("\n      and ", bedingungen),
                 ordnung,
-                mitBegriff ? AUSZUG : "cast(null as text)",
+                mitBegriff ? AUSZUG.formatted(mitDateiname ? AUSZUG_DATEINAME : "") : "cast(null as text)",
+                mitDateiname ? "d.dateiname" : "cast(null as text)",
                 ordnung.replaceAll("(^|, )", "$1s."));
     }
 
@@ -165,7 +174,7 @@ public class PanacheDokumentSuche implements SuchePort {
         return new Suchtreffer((UUID) z[1], (String) z[2], (String) z[3], datum(z[4]), zeitpunkt(z[5]), (String) z[6],
                 (String) z[7], texte((String) z[8]), z[9] == null ? null : ((Number) z[9]).intValue(), (UUID) z[10],
                 (String) z[11], (String) z[12], (BigDecimal) z[13], (String) z[14], (String) z[15],
-                Auszug.zerlegen((String) z[16]));
+                Auszug.zerlegen((String) z[16]), (String) z[17]);
     }
 
     private List<String> texte(String jsonText) {

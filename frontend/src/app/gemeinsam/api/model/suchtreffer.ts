@@ -39,6 +39,10 @@ export interface Suchtreffer {
      * Textstelle mit Treffern; leer ohne Suchbegriff
      */
     auszug: Array<AuszugTeil>;
+    /**
+     * Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, kein Titel (Req 14.9); null ohne Namen
+     */
+    dateiname?: string | null;
 }
 export namespace Suchtreffer {
     export const StatusEnum = {

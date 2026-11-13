@@ -65,6 +65,9 @@ public class DokumentSchritte {
                     Testanmeldung.sub(zeile.get("erfasser")), person == null ? null : Testanmeldung.sub(person),
                     zeile.get("status")));
             dokumente.put(zeile.get("name"), new Ort(mandant, id));
+            if (zeile.get("dateiname") != null) {
+                dateinameSetzen(mandant, id, UploadSchritte.name(zeile.get("dateiname")));
+            }
         }
     }
 
@@ -86,6 +89,37 @@ public class DokumentSchritte {
                 assertThat(ProblemDetails.pruefen(antwort, status)).as(fall).isEqualTo("NICHT_GEFUNDEN");
             }
         }
+    }
+
+    /** Req 3.11: Spalte {@code dateiname} ({@code null} heisst fehlend oder JSON-null) bzw. 404 nach der Sichtregel. */
+    @Dann("sehen die Benutzer den Dateinamen so:")
+    public void dateinamenSichtbarkeit(DataTable tabelle) {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            lesen(zeile.get("benutzer"), zeile.get("dokument"));
+            String fall = zeile.get("benutzer") + " → " + zeile.get("dokument");
+            int status = Integer.parseInt(zeile.get("status"));
+            if (status == 200) {
+                assertThat(antwort.statusCode()).as(fall).isEqualTo(200);
+                assertThat(antwort.<String>path("dateiname")).as(fall).isEqualTo(zeile.get("dateiname"));
+            } else {
+                assertThat(ProblemDetails.pruefen(antwort, status)).as(fall).isEqualTo("NICHT_GEFUNDEN");
+                assertThat(antwort.asString()).as(fall).doesNotContain(".pdf");
+            }
+        }
+    }
+
+    @Dann("nennt der Eingangskorb beim Dokument «{word}» keinen Dateinamen")
+    public void eingangskorbOhneDateiname(String name) {
+        eingangskorbDateiname(name, null);
+    }
+
+    @Dann("nennt der Eingangskorb beim Dokument «{word}» den Dateinamen {string}")
+    public void eingangskorbDateiname(String name, String dateiname) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<Map<String, Object>> eintraege = antwort.jsonPath().getList("eintraege");
+        Map<String, Object> eintrag = eintraege.stream().filter(e -> id(name).toString().equals(e.get("id")))
+                .findFirst().orElseThrow(() -> new AssertionError("Dokument " + name + " fehlt im Eingangskorb"));
+        assertThat(eintrag.get("dateiname")).isEqualTo(dateiname);
     }
 
     @Wenn("«{word}» den Eingangskorb abruft")
@@ -192,6 +226,60 @@ public class DokumentSchritte {
                 anweisung.execute(sql);
             }
         }).isInstanceOf(SQLException.class).hasMessageContaining("dokument_version: nur Einfügen erlaubt");
+    }
+
+    /**
+     * Req 16.11, Rücksprung: Insert ({@code DOKUMENT_ANLEGEN} vor 4.10, ohne {@code dateiname}) und Titel-Update des
+     * Vorgänger-Releases gegen das Schema mit Changeset 015.
+     */
+    @Wenn("das Vorgänger-Release im Mandanten «{word}» das Dokument «{word}» mit dem Titel «{}» anlegt")
+    public void vorgaengerAnlegen(String mandant, String name, String titel) throws SQLException {
+        UUID id = UUID.randomUUID();
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anlegen = verbindung.prepareStatement("insert into " + schema + ".dokument "
+                     + "(id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis) "
+                     + "values (?, now(), 'UPLOAD', 'PERSONAL', ?, 'NEU', null)");
+             PreparedStatement aendern = verbindung.prepareStatement("update " + schema
+                     + ".dokument set titel = ? where id = ?")) {
+            anlegen.setObject(1, id);
+            anlegen.setString(2, Testanmeldung.sub("inhaber-" + mandant));
+            anlegen.executeUpdate();
+            aendern.setString(1, titel);
+            aendern.setObject(2, id);
+            aendern.executeUpdate();
+        }
+        dokumente.put(name, new Ort(mandant, id));
+    }
+
+    /** Req 16.11: Trefferbedingung und Rang der Suche vor 4.10 laufen gegen das neue {@code volltext_tsv}. */
+    @Dann("findet die Suche des Vorgänger-Releases mit «{}» das Dokument «{word}» ohne Dateinamen")
+    public void vorgaengerSuche(String begriff, String name) throws SQLException {
+        Ort ort = dokumente.get(name);
+        String schema = new MandantCode(ort.mandant()).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement suchen = verbindung.prepareStatement("select d.id, d.dateiname, "
+                     + "ts_rank_cd(d.volltext_tsv, websearch_to_tsquery('german', ?)) as rang from " + schema
+                     + ".dokument d where d.volltext_tsv @@ websearch_to_tsquery('german', ?) and d.id = ?")) {
+            suchen.setString(1, begriff);
+            suchen.setString(2, begriff);
+            suchen.setObject(3, ort.id());
+            try (ResultSet treffer = suchen.executeQuery()) {
+                assertThat(treffer.next()).as("Treffer").isTrue();
+                assertThat(treffer.getString("dateiname")).as("dateiname").isNull();
+                assertThat(treffer.getFloat("rang")).as("Rang").isPositive();
+            }
+        }
+    }
+
+    private void dateinameSetzen(String mandant, UUID id, String dateiname) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement setzen = verbindung.prepareStatement("update " + new MandantCode(mandant).schema()
+                     + ".dokument set dateiname = ? where id = ?")) {
+            setzen.setString(1, dateiname);
+            setzen.setObject(2, id);
+            setzen.executeUpdate();
+        }
     }
 
     @Angenommen("das Dokument «{word}» hat das Original mit der Prüfsumme «{word}»")

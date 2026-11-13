@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Dateiname des Uploads (Aufgabe 4.10; design.md «Dateiname», «Suche»; Req 3.9, 14.8, 16.11). Nummer 015: 012 belegt
+         PR #91, 013 main (013-ki-verbrauch) und PR #87 (013-manifest), 014 bleibt als Puffer frei. Rückwärtskompatibel: Das Vorgänger-Release kennt die Spalte nicht (Hibernate
+         validate stört sie nicht, seine Inserts ergeben null), volltext_tsv behält Name, Typ und Index. Bestand bleibt
+         ohne Namen. set expression schreibt die Tabelle unter einer exklusiven Sperre neu (PostgreSQL 17). -->
+    <changeSet id="015-dokument-dateiname" author="archiv">
+        <sql>
+            alter table dokument add column dateiname text null
+                constraint dokument_dateiname_ck check (dateiname is null or char_length(dateiname) between 1 and 255)
+        </sql>
+        <!-- Endung (letzter Punkt, 1–5 ASCII-Buchstaben oder Ziffern mit mindestens einem Buchstaben) weg, «_», «-»
+             und «.» als Trenner; nur IMMUTABLE-Bausteine, ASCII-Bereiche statt [[:alpha:]] (unabhängig von LC_CTYPE). -->
+        <sql splitStatements="false"><![CDATA[
+            create function archiv_dateiname_text(n text) returns text language sql immutable parallel safe as $$
+                select coalesce(translate(regexp_replace(n, '(?<=.)\.(?=[0-9]*[A-Za-z])[0-9A-Za-z]{1,5}$', ''),
+                    '_-.', '   '), '')
+            $$
+        ]]></sql>
+        <sql>
+            alter table dokument alter column volltext_tsv set expression as (
+                setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
+                || setweight(to_tsvector('german'::regconfig, coalesce(partner_name, '')), 'B')
+                || setweight(to_tsvector('german'::regconfig, archiv_tags_text(tags)), 'B')
+                || setweight(to_tsvector('german'::regconfig, coalesce(volltext, '')), 'C')
+                || setweight(to_tsvector('german'::regconfig, archiv_dateiname_text(dateiname)), 'D'))
+        </sql>
+    </changeSet>
+</databaseChangeLog>

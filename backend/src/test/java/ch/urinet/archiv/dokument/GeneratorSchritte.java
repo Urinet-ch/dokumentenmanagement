@@ -14,11 +14,15 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.RestAssured;
+import io.restassured.builder.MultiPartSpecBuilder;
+import io.restassured.config.HttpClientConfig;
+import io.restassured.config.RestAssuredConfig;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.apache.http.entity.mime.HttpMultipartMode;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -154,6 +158,24 @@ public class GeneratorSchritte {
     @Wenn("der Generator die PDF «{word}» mit diesen Metadaten sendet:")
     public void senden(String pdf, String metadaten) {
         antwort = senden(given().header("Authorization", "Bearer " + tokenJeMandant.get(mandant)), pdf, metadaten);
+    }
+
+    /**
+     * Sendet die PDF unter einem eigenen Dateinamen (Req 11.12); «{ohne}» sendet den Teil ohne Namen, Platzhalter wie
+     * im Upload ({@code {U+XXXX}}, {@code {n×z}}).
+     */
+    @Wenn("der Generator die PDF «{word}» unter dem Namen «{}» mit diesen Metadaten sendet:")
+    public void sendenMitNamen(String pdf, String name, String metadaten) {
+        MultiPartSpecBuilder teil = new MultiPartSpecBuilder(pdf(pdf)).controlName("datei").mimeType("application/pdf");
+        if ("{ohne}".equals(name)) {
+            teil.emptyFileName();
+        } else {
+            teil.fileName(UploadSchritte.name(name));
+        }
+        antwort = given().config(RestAssuredConfig.config().httpClient(HttpClientConfig.httpClientConfig()
+                        .httpMultipartMode(HttpMultipartMode.RFC6532)))
+                .header("Authorization", "Bearer " + tokenJeMandant.get(mandant))
+                .multiPart(teil.build()).multiPart("metadaten", metadaten).when().post(PFAD);
     }
 
     @Wenn("«{word}» die PDF «{word}» mit diesen Metadaten an den Generator sendet:")

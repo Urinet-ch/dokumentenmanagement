@@ -113,6 +113,31 @@ class ArchivClientTest(unittest.TestCase):
             frei.bind(("127.0.0.1", 0))
             return f"http://127.0.0.1:{frei.getsockname()[1]}"
 
+    def test_req_11_12_ersetzt_zeichen_nach_req_3_10_im_dateinamen(self):
+        faelle = {
+            "Rechnung\u202efdp.pdf": "Rechnung_fdp.pdf",
+            "a\u2028b\u2029c.pdf": "a_b_c.pdf",
+            "a\tb\r\n\x7f.pdf": "a_b___.pdf",
+            "a\udcffb.pdf": "a_b.pdf",
+            "a\u200bb\ufeff.pdf": "a_b_.pdf",
+            'Zitat "x".pdf': "Zitat _x_.pdf",
+            "Team \U0001F468\u200d\U0001F4BB \u05e9\u05dc\u05d5\u05dd.pdf":
+                "Team \U0001F468\u200d\U0001F4BB \u05e9\u05dc\u05d5\u05dd.pdf",
+            "Rechnung_2026-901.pdf": "Rechnung_2026-901.pdf",
+        }
+        for name, erwartet in faelle.items():
+            with self.subTest(name=ascii(name)):
+                self.assertEqual(erwartet, archiv_client._dateiname(name))
+
+    def test_req_11_12_sendet_den_bereinigten_dateinamen(self):
+        _Archiv.antworten = [(202, {"id": "d-1", "status": "NEU"})]
+        pdf = self.ausgabe / "Rechnung\u202efdp.pdf"
+        pdf.write_bytes(b"%PDF-1.4\n% synthetisch\n%%EOF\n")
+
+        archiv_client.archivieren(pdf, self.metadaten("2026-902"), url=self.url)
+
+        self.assertEqual("Rechnung_fdp.pdf", _Archiv.empfangen[0]["dateiname"])
+
     def test_req_11_4_sendet_pdf_und_metadaten_mit_einer_zeile(self):
         _Archiv.antworten = [(202, {"id": "d-1", "status": "NEU"})]
         pdf = self.pdf("rechnung-2026-901.pdf")

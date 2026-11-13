@@ -41,3 +41,20 @@ Funktionalität: Archivierung (ARCHIVIEREN) mit Fehlerfall und Wiederholung
       | fehler | null           |
     Und liegen alle Dateien von «A» unter archiv/ mit Versions-ID und Sperre bis mindestens heute
     Und ist der Eingang von «A» leer
+
+  @req-3.12
+  Szenario: Die Mail zur gescheiterten Archivierung nennt den Dateinamen nicht
+    Angenommen im Mandanten «urinet» liegt das Dokument «A» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und das Dokument «A» hat den Dateinamen «Geheimname_Mailprobe-4711.pdf»
+    Wenn «inhaber-urinet» das Dokument «A» so bestätigt:
+      | art      | QUITTUNG       |
+      | titel    | Probe-Quittung |
+      | datum    | 2026-03-10     |
+      | richtung | AUSGABE        |
+      | betrag   | 45.00          |
+      | waehrung | CHF            |
+    Dann meldet das Archiv Status 202
+    Angenommen die gespeicherte Prüfsumme des Originals von «A» ist verfälscht
+    Wenn der Worker die Archivierung ausführt
+    Dann ist das Dokument «A» im Status «ARCHIVIERUNG_FEHLER»
+    Und hat der Inhaber eine Mail zur gescheiterten Archivierung von «A» erhalten, die nur IDs nennt

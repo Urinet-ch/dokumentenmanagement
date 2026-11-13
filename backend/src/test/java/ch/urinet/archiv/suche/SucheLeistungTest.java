@@ -40,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Laufzeit der Volltextsuche mit 10'000 synthetischen Dokumenten (Aufgabe 4.5, Req 14.3): gemessen wird der
- * Anwendungsfall mit Sichtregel, Rang, Auszug und Zähler, ohne HTTP. Die Grenze ist locker (Stufe A und lokale Rechner
+ * Anwendungsfall mit Sichtregel, Rang, Auszug und Zähler, ohne HTTP. Jedes Dokument trägt einen synthetischen
+ * Dateinamen, ein Teil der Suchbegriffe steht nur dort (Aufgabe 4.10, Req 14.8). Die Grenze ist locker (Stufe A und lokale Rechner
  * sind klein, tech.md: Leistungsziele erst auf Stufe B mit 50'000 Dokumenten, Aufgabe 5.11); der Messwert steht in
  * der Ausgabe und in design.md.
  */
@@ -57,6 +58,8 @@ class SucheLeistungTest {
             "Reparatur", "Installation", "Schulung", "Beratung", "Material", "Kabel", "Lizenz", "Abonnement", "Porto",
             "Rabatt", "Skonto", "Mahnung", "Gutschrift", "Projekt", "Webseite", "Hosting", "Domain", "Telefon",
             "Fahrzeug", "Treibstoff", "Werkzeug", "Bürobedarf", "Verein", "Turnier"};
+    /** Wörter nur in Dateinamen, damit die Messung den Teil D des Index mit abdeckt (Req 14.8, design.md «Suche»). */
+    private static final String[] DATEIWOERTER = {"Scan", "Kassenzettel", "Fotobeleg", "Ablage", "Einzahlung"};
     private static final String[] PARTNER = {"Probe Sport AG", "Muster Bau GmbH", "Beispiel Technik", "Test Verein",
             "Feld Garage", "Stern Druck AG", "Wald Holz GmbH", "Linden Treuhand"};
     private static final String[] VERTRAULICHKEIT = {"NORMAL", "NORMAL", "NORMAL", "INTERN", "PERSONAL"};
@@ -92,8 +95,8 @@ class SucheLeistungTest {
             verbindung.setAutoCommit(false);
             try (PreparedStatement dokument = verbindung.prepareStatement("insert into " + schema + ".dokument (id, "
                     + "art, titel, datum, quelle, partner_id, partner_name, tags, vertraulichkeit, person_benutzer, "
-                    + "erstellt_von, status, bestaetigt, bestaetigt_von, geschaeftsjahr, volltext) "
-                    + "values (?, ?, ?, ?, 'UPLOAD', ?, ?, ?, ?, ?, 'probe', 'ARCHIVIERT', ?, 'probe', ?, ?)");
+                    + "erstellt_von, status, bestaetigt, bestaetigt_von, geschaeftsjahr, volltext, dateiname) "
+                    + "values (?, ?, ?, ?, 'UPLOAD', ?, ?, ?, ?, ?, 'probe', 'ARCHIVIERT', ?, 'probe', ?, ?, ?)");
                  PreparedStatement finanz = verbindung.prepareStatement("insert into " + schema + ".dokument_finanz "
                          + "(dokument_id, belegnummer, richtung, betrag, waehrung) values (?, ?, ?, ?, 'CHF')")) {
                 for (int i = 0; i < DOKUMENTE; i++) {
@@ -115,6 +118,8 @@ class SucheLeistungTest {
                     dokument.setObject(10, OffsetDateTime.now(), Types.TIMESTAMP_WITH_TIMEZONE);
                     dokument.setObject(11, datum.getYear(), Types.INTEGER);
                     dokument.setString(12, text());
+                    dokument.setString(13, DATEIWOERTER[zufall.nextInt(DATEIWOERTER.length)] + "_" + wort() + "-"
+                            + datum + ".pdf");
                     dokument.addBatch();
                     if (i % 3 == 0) {
                         finanz.setObject(1, id);
@@ -155,7 +160,8 @@ class SucheLeistungTest {
                 new Benutzer("treuhand", Rolle.TREUHAENDER));
         List<Suchanfrage> anfragen = new ArrayList<>();
         for (int i = 0; i < SUCHEN; i++) {
-            String begriff = wort();
+            // jede zehnte Suche nach einem Wort, das nur in Dateinamen steht
+            String begriff = i % 10 == 9 ? DATEIWOERTER[i % DATEIWOERTER.length] : wort();
             anfragen.add(switch (i % 5) {
                 case 0 -> anfrage(begriff, null, null, null, null);
                 case 1 -> anfrage(begriff + " " + wort(), null, null, null, null);

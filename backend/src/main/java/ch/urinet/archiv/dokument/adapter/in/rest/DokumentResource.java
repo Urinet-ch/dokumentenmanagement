@@ -155,7 +155,9 @@ public class DokumentResource {
             @Schema(nullable = true) LocalDate naechsteFrist,
             @Schema(description = "Ohne PDF/A bestätigen, wenn die PDF/A-Fassung fehlt (Req 5.9)") boolean ohnePdfa,
             @Schema(description = "Ablauf der Aufbewahrungsfrist ausdrücklich bestätigen (Req 9.8)")
-            boolean fristAbgelaufenAkzeptiert) {
+            boolean fristAbgelaufenAkzeptiert,
+            // nur, um das Feld zu erkennen und abzulehnen (Req 3.14); auch ein JSON-null kommt als NullNode an
+            @Schema(hidden = true) JsonNode dateiname) {
 
         Bestaetigung bestaetigung() {
             return new Bestaetigung(art, titel, datum, partnerId, projekt, tags, vertraulichkeit, personBenutzer,
@@ -282,10 +284,12 @@ public class DokumentResource {
             @Schema(nullable = true) String projekt,
             @Schema(nullable = true, description = "Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments")
             String personBenutzer,
+            @Schema(nullable = true, description = "Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, "
+                    + "kein Titel (Req 3.9, 3.11, 14.9); null ohne Namen") String dateiname,
             @Schema(nullable = true) FinanzDto finanz,
             @Schema(nullable = true) VertragDto vertrag,
             @Schema(required = true, description = "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim "
-                    + "einzelnen Dokument (GET und PATCH), im Eingangskorb leer") List<VersionDto> versionen) {
+                    + "einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer") List<VersionDto> versionen) {
     }
 
     @GET
@@ -357,9 +361,13 @@ public class DokumentResource {
             description = "Nur aus EINGANGSKORB (sonst 409 STATUS_KONFLIKT). Pflichtfelder der Art fehlen → 422 "
                     + "PFLICHTFELD_FEHLT mit felder; Partner unbekannt → 422 PARTNER_UNBEKANNT; Belegnummer einer "
                     + "eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN; Aufbewahrungsfrist abgelaufen ohne "
-                    + "fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.")
-    @APIResponse(responseCode = "202", description = "Bestätigt, Archivierung eingereiht",
-            headers = @Header(name = "ETag", description = "Neue Version des Dokuments"))
+                    + "fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Ein Feld dateiname → 400 ANFRAGE_UNGUELTIG "
+                    + "(Req 3.14). Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.")
+    @APIResponse(responseCode = "202", description = "Bestätigt, Archivierung eingereiht; Körper ist das Dokument "
+            + "nach der Bestätigung (Req 14.9)",
+            headers = @Header(name = "ETag", description = "Neue Version des Dokuments"),
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = DokumentDto.class)))
     @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
     @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response bestaetigen(@PathParam("id") UUID id,
@@ -367,11 +375,16 @@ public class DokumentResource {
                                 BestaetigungDto angaben) {
         aufloesung.pruefen();
         int version = version(ifMatch);
-        if (angaben == null) {
+        if (angaben == null || angaben.dateiname() != null) {
+            // dateiname ist nicht änderbar (Req 3.14), auch nicht als null
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        int neu = bestaetigen.bestaetigen(benutzer(identitaet), id, version, angaben.bestaetigung());
-        return Response.accepted().tag(new EntityTag(Integer.toString(neu))).build();
+        Benutzer benutzer = benutzer(identitaet);
+        bestaetigen.bestaetigen(benutzer, id, version, angaben.bestaetigung());
+        Dokument dokument = lesen.lesen(benutzer, id);
+        return Response.accepted(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
+                        lesen.fassungen(dokument)))
+                .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
     @POST
@@ -625,7 +638,7 @@ public class DokumentResource {
                 d.wirksameVertraulichkeit(), d.status().name(), d.bestaetigt(), d.geschaeftsjahr(), d.aufbewahrenBis(),
                 d.sperreBis(), d.fristAbgelaufen(), lesenJson(d, d.zusatz(), "zusatz", json), d.version(),
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
-                d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(),
+                d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(), d.dateiname(),
                 FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()),
                 fassungen.stream().map(VersionDto::aus).toList());
     }

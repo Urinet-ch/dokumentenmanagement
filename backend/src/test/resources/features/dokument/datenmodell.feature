@@ -77,3 +77,48 @@ Funktionalität: Datenmodell Dokument – Versionen, Zusatzfelder und Indizes (A
     Dann weist die Datenbank es mit «belegnummer_eigen_pk» ab
     Wenn das Dokument «KORB» die eigene Belegnummer «2026-001» der Art «OFFERTE» erhält
     Dann nimmt die Datenbank es an
+
+  @req-3.11 @req-14.9
+  Szenario: Den Dateinamen sieht nur, wer das Dokument sehen darf, in beiden Mandanten
+    Angenommen im Mandanten «urinet» liegen diese Dokumente:
+      | name      | art      | vertraulichkeit | bestaetigt | erfasser           | person | status       | dateiname                |
+      | DN_NORMAL | QUITTUNG | NORMAL          | ja         | inhaber-urinet     |        | ARCHIVIERT   | Quittung_Probe.pdf       |
+      | DN_INTERN | QUITTUNG | INTERN          | ja         | inhaber-urinet     |        | ARCHIVIERT   | Lohn_Probe_intern.pdf    |
+      | DN_KORB   |          | NORMAL          | nein       | mitarbeiter-urinet |        | EINGANGSKORB | Scan_Probe.pdf           |
+    Und im Mandanten «vhf-gsk» liegen diese Dokumente:
+      | name      | art | vertraulichkeit | bestaetigt | erfasser                 | person | status       | dateiname          |
+      | DN_VHF    |     | NORMAL          | nein       | geschaeftsstelle-vhf-gsk |        | EINGANGSKORB | Bulletin_Probe.pdf |
+    Dann sehen die Benutzer den Dateinamen so:
+      | benutzer                 | dokument  | status | dateiname             |
+      | inhaber-urinet           | DN_NORMAL | 200    | Quittung_Probe.pdf    |
+      | mitarbeiter-urinet       | DN_NORMAL | 200    | Quittung_Probe.pdf    |
+      | treuhaender-urinet       | DN_INTERN | 200    | Lohn_Probe_intern.pdf |
+      | mitarbeiter-urinet       | DN_INTERN | 404    |                       |
+      | mitarbeiter-urinet       | DN_KORB   | 200    | Scan_Probe.pdf        |
+      | geschaeftsstelle-vhf-gsk | DN_NORMAL | 404    |                       |
+      | inhaber-vhf-gsk          | DN_INTERN | 404    |                       |
+      | geschaeftsstelle-vhf-gsk | DN_VHF    | 200    | Bulletin_Probe.pdf    |
+      | inhaber-urinet           | DN_VHF    | 404    |                       |
+
+  @req-3.11 @req-16.11
+  Szenario: Ein Dokument ohne Dateinamen, angelegt wie vom Vorgänger-Release, bleibt lesbar
+    Angenommen im Mandanten «urinet» liegen diese Dokumente:
+      | name    | art      | vertraulichkeit | bestaetigt | erfasser       | person | status     |
+      | DN_ALT  | QUITTUNG | NORMAL          | ja         | inhaber-urinet |        | ARCHIVIERT |
+    Dann sehen die Benutzer den Dateinamen so:
+      | benutzer       | dokument | status | dateiname |
+      | inhaber-urinet | DN_ALT   | 200    |           |
+
+  @req-16.11
+  Szenario: Nach dem Rücksprung schreibt und sucht das Vorgänger-Release mit der neuen Spalte weiter
+    Wenn das Vorgänger-Release im Mandanten «urinet» das Dokument «DN_RUECK» mit dem Titel «Synthetischer Rückweg» anlegt
+    Dann findet die Suche des Vorgänger-Releases mit «Rückweg» das Dokument «DN_RUECK» ohne Dateinamen
+
+  @req-14.9 @req-3.11
+  Szenario: Der Eingangskorb nennt den Dateinamen
+    Angenommen im Mandanten «urinet» liegen diese Dokumente:
+      | name     | art | vertraulichkeit | bestaetigt | erfasser           | person | status       | dateiname              |
+      | DN_SCAN  |     | NORMAL          | nein       | mitarbeiter-urinet |        | EINGANGSKORB | Scan_Rechnung-2026.pdf |
+    Wenn «inhaber-urinet» den Eingangskorb mit Seite 0 und Grösse 100 abruft
+    Dann nennt der Eingangskorb beim Dokument «DN_SCAN» den Dateinamen "Scan_Rechnung-2026.pdf"
+    Und nennt der Eingangskorb beim Dokument «OHNE_ART» keinen Dateinamen

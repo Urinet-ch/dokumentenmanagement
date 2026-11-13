@@ -177,13 +177,17 @@ public class DriveImportSchritte {
     @Dann("hat das Archiv im Mandanten «{word}» diese Dateien mit Quelle «{word}» vom Import-Token angelegt:")
     public void angelegt(String mandantCode, String quelle, DataTable tabelle) throws SQLException {
         for (Map<String, String> zeile : tabelle.asMaps()) {
-            List<Map<String, String>> dokumente = abfragen("select d.quelle, d.hinweis, d.erstellt_von from "
+            List<Map<String, String>> dokumente = abfragen("select d.quelle, d.hinweis, d.erstellt_von, d.dateiname, d.titel from "
                     + schema(mandantCode) + ".dokument d join " + schema(mandantCode) + ".dokument_datei f on "
                     + "f.dokument_id = d.id where f.sha256 = ? and f.rolle = 'ORIGINAL'",
                     pruefsumme(zeile.get("pfad")));
             assertThat(dokumente).as(zeile.get("pfad")).singleElement().satisfies(d -> {
                 assertThat(d).containsEntry("quelle", quelle).containsEntry("hinweis", zeile.get("hinweis"))
                         .containsEntry("erstellt_von", "token:" + tokenIds.getLast());
+                if (zeile.containsKey("dateiname")) {
+                    // Req 12.9: nur der Name ohne Ordner; der Titel bleibt leer
+                    assertThat(d).containsEntry("dateiname", zeile.get("dateiname")).containsEntry("titel", null);
+                }
             });
         }
     }

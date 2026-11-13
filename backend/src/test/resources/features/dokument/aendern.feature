@@ -307,3 +307,32 @@ Funktionalität: Metadaten ändern und Versionen
       | Vertraulichkeit leer       | {"titel": "Neu", "vertraulichkeit": null}  |
       | Art unbekannt              | {"titel": "Neu", "art": "GIBT_ES_NICHT"}   |
       | Zusatz kein Objekt         | {"titel": "Neu", "zusatz": [1]}            |
+
+  @req-3.14 @req-3.11
+  Szenariogrundriss: Ein Feld «dateiname» in der Änderung antwortet mit 400 und ändert nichts: <fall>
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und das Dokument «K» hat den Dateinamen «Scan_Rechnung-2026.pdf»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '<koerper>' ändert
+    Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
+    Und hat das Dokument «K» diese Werte:
+      | titel     | null                   |
+      | dateiname | Scan_Rechnung-2026.pdf |
+
+    Beispiele:
+      | fall        | koerper                                     |
+      | neuer Name  | {"titel": "Neu", "dateiname": "anders.pdf"} |
+      | Name leeren | {"titel": "Neu", "dateiname": null}         |
+      | nur Name    | {"dateiname": "anders.pdf"}                 |
+
+  @req-14.9 @req-3.11
+  Szenario: Die Antwort der Änderung nennt den Dateinamen, der Titel kommt nur aus der Eingabe
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und das Dokument «K» hat den Dateinamen «Scan_Rechnung-2026.pdf»
+    Wenn «inhaber-urinet» das Dokument «K» so ändert:
+      | titel | Neu |
+    Dann liefert das Archiv beim Dokument «K» diese Angaben:
+      | titel     | Neu                    |
+      | dateiname | Scan_Rechnung-2026.pdf |
+    Und hat das Dokument «K» diese Werte:
+      | titel     | Neu                    |
+      | dateiname | Scan_Rechnung-2026.pdf |

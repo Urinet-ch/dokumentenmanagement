@@ -114,3 +114,19 @@ Funktionalität: Eingangskorb in der PWA
     Wenn ich beim Eintrag «Rechnung Bürobedarf» «Bestätigen» mit der Tastatur wähle
     Dann hat das Archiv «Rechnung Bürobedarf» bestätigt
     Und steht der Fokus auf «Eingangskorb»
+
+  @req-8.11
+  Szenario: Ohne Titel zeigt der Eingangskorb den Dateinamen als Platzhalter und sendet ihn nie als Titel
+    Angenommen der Eingangskorb enthält:
+      | titel | dateiname                                                      | art      | datum      | status | fehler                    |
+      |       | Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg | QUITTUNG | 2026-11-04 |        |                           |
+      |       |                                                                |          |            | FEHLER | Die Datei ist beschädigt. |
+    Wenn ich als «inhaber» im Mandanten «urinet» den Eingangskorb auf dem Handy öffne
+    Dann zeigt der Eintrag «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» den Dateinamen als Platzhalter statt eines Titels
+    Und zeigt der Eintrag mit dem Fehlertext «Die Datei ist beschädigt.» den Titel «Ohne Titel» ohne Platzhalter
+    Und scrollt die Seite nicht horizontal
+    Wenn ich beim Eintrag «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» auf «Angaben ändern» tippe
+    Dann ist beim Eintrag «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» das Feld «Titel» leer
+    Wenn ich beim Eintrag «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» auf «Bestätigen» tippe
+    Dann hat das Archiv den Eintrag mit dem Dateinamen «Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» ohne Titel bestätigt
+    Und sehe ich die Meldung ««Ohne Titel · Scan_Quittung_Testgarage_2026-11-04_Seite_01_unbearbeitet.jpg» bestätigt, wird archiviert.» mit isoliertem Dateinamen

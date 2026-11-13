@@ -17,6 +17,7 @@ import { RouterLink } from '@angular/router';
 import { Subject, Subscription, catchError, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { Dokumentart, Kontakt, Suchtreffer } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { AnzeigeTitel, TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { SucheZustand } from './suche-zustand';
@@ -40,7 +41,7 @@ const STATI = [
  */
 @Component({
   selector: 'app-suche',
-  imports: [MatButtonModule, MatProgressBarModule, RouterLink],
+  imports: [MatButtonModule, MatProgressBarModule, RouterLink, TitelAnzeige],
   templateUrl: './suche.html',
   styleUrl: './suche.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -173,8 +174,9 @@ export class Suche {
     this.senden({ ...letzte, seite: Math.min(Math.max(letzte.seite + richtung, 0), SEITE_MAX) }, true);
   }
 
-  protected titel(t: Suchtreffer): string {
-    return t.titel || this.texte.ohneTitel;
+  /** Ohne Titel der Dateiname als Platzhalter, auch in NEU, VERARBEITUNG und FEHLER (Req 14.9). */
+  protected titel(t: Suchtreffer): AnzeigeTitel {
+    return anzeigeTitel(t.titel, null, t.dateiname);
   }
 
   private suchen(seite: number, fokus: boolean): void {

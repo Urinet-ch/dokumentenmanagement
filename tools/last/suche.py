@@ -9,7 +9,9 @@ Parallelität Pflichtparameter ohne Standardwerte. `--aufwaermen` schickt vorher
 
 Das Skript liest nur. Der Mandant muss vorher mit synthetischen Dokumenten gefüllt sein (für Req 14.3: 50'000); die
 Zahl der für das Token sichtbaren Dokumente steht in der Ausgabe. Die Suchbegriffe stammen aus einer festen Liste
-synthetischer Wörter oder aus einer Datei (ein Begriff je Zeile); nie echte Belegdaten verwenden. Die Ausgabe nennt
+synthetischer Wörter oder aus einer Datei (ein Begriff je Zeile); nie echte Belegdaten verwenden. Die feste Liste
+enthält auch Wörter, die nur in den synthetischen Dateinamen der Füllung stehen, damit die Messung den Teil des Index
+für den Dateinamen abdeckt (Req 14.8, Aufgabe 4.10); eigene `--begriffe` sollten ebenso solche Wörter enthalten. Die Ausgabe nennt
 keine Suchbegriffe.
 
 Token (Regel 7): ein Access-Token (OIDC) mit Recht A2 aus einer Datei mit Rechten 600, Pfad aus ARCHIV_TOKEN_DATEI,
@@ -39,6 +41,8 @@ WOERTER = [
     "Rechnung", "Lieferung", "Trikots", "Clubhaus", "Beleuchtung", "Wartung", "Netzwerk", "Server", "Drucker",
     "Offerte", "Vertrag", "Versicherung", "Lohn", "Spesen", "Miete", "Reparatur", "Installation", "Schulung",
     "Beratung", "Material", "Kabel", "Lizenz", "Abonnement", "Mahnung", "Gutschrift", "Projekt", "Webseite", "Hosting",
+    # nur in den synthetischen Dateinamen der Füllung (Req 14.8, Aufgabe 4.10; Füllung des Mandanten `last` in 5.11)
+    "Scan", "Kassenzettel", "Fotobeleg", "Ablage", "Einzahlung",
 ]
 ARTEN = ["AUSGANGSRECHNUNG", "LIEFERANTENBELEG", "OFFERTE", "QUITTUNG", "VERTRAG", "KORRESPONDENZ"]
 
