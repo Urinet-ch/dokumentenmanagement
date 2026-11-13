@@ -3,9 +3,10 @@
 # .github/workflows/infomaniak-deploy.yml; das Bundle bringt archiv:<sha>, archiv:db-<version> und archiv:kc-<version>
 # mit, deploy-app.sh setzt daraus archiv:current, archiv:db-current und archiv:kc-current.
 # Secrets nur als Dateien unter /run/secrets (tech.md Regel 7), je Dienst nur die eigenen.
-# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 900 MiB (geändert 10.11.2026, Entscheid Fabian;
-# bisher 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Die Limits unten entsprechen dem lokal gemessenen
-# Bedarf (Spitzen unter Last: api 309, db 66, kc 358 MiB) und ergeben zusammen 820 MiB. Der Deploy-Workflow bricht vor
+# Speicherbudget Stufe A (tech.md): mem_limit zusammen höchstens 1000 MiB (geändert 13.11.2026, Entscheid Fabian;
+# bisher 900, davor 700 MiB), cpus höchstens 0.75 (Richtwert, Messung 1.10). Erste Messung (Spitzen unter Last: api 309,
+# db 66, kc 358 MiB); seit 3.2 belegt die API schon im Leerlauf rund 300 MiB, mit 320m beendete der cgroup-OOM sie bei
+# der ersten Verarbeitung (13.11.2026). Darum api 500m, zusammen 1000 MiB. Der Deploy-Workflow bricht vor
 # dem Bundle ab, sobald die Summe über dem Budget liegt (Req 16.18).
 name: archiv
 
@@ -26,7 +27,7 @@ services:
         target: /var/lib/archiv/arbeit
     cap_drop: [ALL]
     security_opt: [no-new-privileges]
-    mem_limit: 320m
+    mem_limit: 500m
     cpus: 0.3
     init: true
     environment:
