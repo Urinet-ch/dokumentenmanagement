@@ -3,20 +3,17 @@ package ch.urinet.archiv.integration.adapter.in.kommando;
 import ch.urinet.archiv.integration.application.mail.MailEinrichten;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * {@code archiv mail einrichten <mandant> <host> <port> <benutzer> <absender>…} und {@code archiv mail abschalten
  * <mandant>} (Spec 02, Aufgabe 6.2) nach dem Muster von {@code token erstellen}: Das Passwort steht in der ersten Zeile
  * der Standardeingabe, nie in den Argumenten (sie stehen in der Prozessliste und der Shell-Historie), und gelangt nie ins
- * Log. Exit 0 = gespeichert, 1 = fachlicher Fehler (Mandant nicht aktiv, kein Datenschlüssel, ungültige Angabe),
+ * Log. Gelesen wird es vor dem Start der Anwendung ({@link MailPasswortEingabe}). Exit 0 = gespeichert, 1 = fachlicher Fehler (Mandant nicht aktiv, kein Datenschlüssel, ungültige Angabe),
  * 2 = falscher Aufruf, 3 = technischer Fehler.
  */
 @ApplicationScoped
@@ -54,7 +51,11 @@ public class MailKommando {
                 List.copyOf(argumente.subList(5, argumente.size()))));
     }
 
-    public int ausfuehren(List<String> argumente, InputStream ein, PrintStream fehler) {
+    /**
+     * @param passwort liefert die erste Zeile der Standardeingabe, die {@code ArchivMain.main} vor dem Start gelesen hat
+     *                 ({@link MailPasswortEingabe}); nur für {@code einrichten} abgefragt, danach überschrieben
+     */
+    public int ausfuehren(List<String> argumente, Supplier<char[]> passwort, PrintStream fehler) {
         Optional<Aufruf> aufruf = lesen(argumente);
         if (aufruf.isEmpty()) {
             fehler.println(AUFRUF);
@@ -68,15 +69,20 @@ public class MailKommando {
                         : "Für Mandant " + a.mandant() + " ist kein Postfach eingerichtet.");
                 return 0;
             }
-            String passwort = new BufferedReader(new InputStreamReader(ein, StandardCharsets.UTF_8)).readLine();
-            einrichten.einrichten(a.mandant(), a.host(), a.port(), a.benutzer(), passwort, a.absender());
+            char[] zeichen = passwort.get();
+            try {
+                einrichten.einrichten(a.mandant(), a.host(), a.port(), a.benutzer(), new String(zeichen),
+                        a.absender());
+            } finally {
+                Arrays.fill(zeichen, '\0');
+            }
             fehler.printf("Postfach für Mandant %s eingerichtet (Port %d, %d zugelassene Absender); der Worker ruft es "
                     + "im nächsten Takt ab.%n", a.mandant(), a.port(), a.absender().size());
             return 0;
         } catch (MailEinrichten.Fehler e) {
             fehler.println(e.getMessage());
             return 1;
-        } catch (IOException | RuntimeException e) {
+        } catch (RuntimeException e) {
             fehler.println("Technischer Fehler: " + e.getClass().getSimpleName());
             return 3;
         }

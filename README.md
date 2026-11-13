@@ -173,8 +173,12 @@ im Log.
    printf '%s\n' "$MAILPASSWORT" | sudo docker compose --project-directory /srv/apps/archiv \
      -f /srv/apps/archiv/compose.yml run --rm --no-deps -T -l traefik.enable=false api \
      sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar mail einrichten <mandant> <imap-host> 993 <benutzer> <absender> [<absender> …]'
+   echo "exit=$?"
    unset MAILPASSWORT
    ```
+   `read -rs MAILPASSWORT` allein in einer Zeile eingeben und erst danach das Passwort tippen (es erscheint nicht);
+   ob es angekommen ist, zeigt `echo ${#MAILPASSWORT}` (die Länge, nicht das Passwort). Das Kommando liest die Zeile
+   gleich beim Aufruf, bevor die Anwendung startet; ohne Passwort endet es sofort mit Exit 1 («Passwort fehlt»).
    Exit-Codes wie bei `token erstellen` (0 eingerichtet, 1 fachlicher Fehler, z. B. Mandant nicht aktiv oder
    Datenschlüssel fehlt, 2 falscher Aufruf, 3 technischer Fehler). Erneut aufgerufen ersetzt das Kommando Postfach und
    Zulassungsliste; `mail abschalten <mandant>` stoppt den Abruf.
