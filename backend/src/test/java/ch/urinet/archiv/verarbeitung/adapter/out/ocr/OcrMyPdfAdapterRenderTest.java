@@ -58,13 +58,15 @@ class OcrMyPdfAdapterRenderTest {
     }
 
     @Test
-    void farbigOhneGray() throws Exception {
+    void farbigOhneGrayAlsPpm() throws Exception {
         Fake starter = new Fake(info(1, A4_BREITE, A4_HOEHE));
-        adapter(starter).seitenbilder(pdf(), new Render(3, true, PIXEL_MAX, Duration.ofSeconds(30)), List::copyOf);
+        List<Path> seiten = adapter(starter).seitenbilder(pdf(), new Render(3, true, PIXEL_MAX, Duration.ofSeconds(30)),
+                List::copyOf);
 
+        assertThat(seiten).singleElement().satisfies(p -> assertThat(p.toString()).endsWith(".ppm"));
         assertThat(starter.befehle).filteredOn(b -> b.programm().equals("pdftoppm")).singleElement()
                 .satisfies(b -> assertThat(b.argumente()).doesNotContain("-gray").containsSubsequence("-r", "300")
-                        .contains("-png").doesNotContain("-tiff"));
+                        .doesNotContain("-png", "-tiff", "-jpeg"));
     }
 
     @Test
@@ -145,7 +147,7 @@ class OcrMyPdfAdapterRenderTest {
                     }
                     case "pdftotext" -> Files.writeString(Path.of(a.getLast()), "Text mit  Layout",
                             StandardCharsets.UTF_8);
-                    case "pdftoppm" -> Files.write(Path.of(a.getLast() + "-" + a.get(a.indexOf("-f") + 1) + (a.contains("-png") ? ".png" : ".tif")),
+                    case "pdftoppm" -> Files.write(Path.of(a.getLast() + "-" + a.get(a.indexOf("-f") + 1) + (a.contains("-tiff") ? ".tif" : ".ppm")),
                             new byte[]{1});
                     default -> throw new IllegalStateException(befehl.programm());
                 }

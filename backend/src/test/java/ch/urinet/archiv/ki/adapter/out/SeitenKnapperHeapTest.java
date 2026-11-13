@@ -21,6 +21,10 @@ import javax.imageio.stream.ImageOutputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.BufferedOutputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +43,7 @@ class SeitenKnapperHeapTest {
     /** A4 mit 300 dpi wie {@code pdftoppm -r 300}. */
     private static final int BREITE = 2480;
     private static final int HOEHE = 3508;
+    private static final long PIXEL_MAX = 8_750_000;
 
     @Test
     void heapIstKnapp() {
@@ -64,9 +69,39 @@ class SeitenKnapperHeapTest {
         List<Path> seiten = List.of(seite(ordner, "s1.png", BufferedImage.TYPE_3BYTE_BGR, null),
                 seite(ordner, "s2.png", BufferedImage.TYPE_3BYTE_BGR, null));
 
-        byte[] jpeg = new AwtSeitenbild().jpeg(seiten);
+        byte[] jpeg = new AwtSeitenbild(PIXEL_MAX).jpeg(seiten);
 
         assertThat(jpeg).isNotEmpty();
+    }
+
+    /** Bildweg wie im Betrieb (Review PR #93): drei farbige A4-Seiten als PPM aus {@code pdftoppm} ohne {@code -png}. */
+    @Test
+    void seitenbildAusDreiFarbigenPpmSeitenMitVollerAufloesung(@TempDir Path ordner) throws Exception {
+        List<Path> seiten = List.of(ppm(ordner, "s1.ppm", 1), ppm(ordner, "s2.ppm", 2), ppm(ordner, "s3.ppm", 3));
+
+        byte[] jpeg = new AwtSeitenbild(PIXEL_MAX).jpeg(seiten);
+
+        assertThat(jpeg).isNotEmpty();
+    }
+
+    /** PPM zeilenweise geschrieben, ohne die ganze Seite im Heap; A4 mit 300 dpi wie bei {@code pdftoppm -r 300}. */
+    private static Path ppm(Path ordner, String name, int nummer) throws Exception {
+        Path datei = ordner.resolve(name);
+        int breite = BREITE + 1;
+        try (OutputStream aus = new BufferedOutputStream(Files.newOutputStream(datei))) {
+            aus.write(("P6\n" + breite + " " + HOEHE + "\n255\n").getBytes(StandardCharsets.US_ASCII));
+            byte[] zeile = new byte[breite * 3];
+            for (int y = 0; y < HOEHE; y++) {
+                for (int x = 0; x < breite; x++) {
+                    boolean streifen = y % 60 < 20 && x >= 200 && x < 2000;
+                    zeile[3 * x] = (byte) (streifen ? 0x20 * nummer : 255 - x % 64);
+                    zeile[3 * x + 1] = (byte) (streifen ? 0x40 : 255 - y % 32);
+                    zeile[3 * x + 2] = (byte) (streifen ? 0x80 : 250);
+                }
+                aus.write(zeile);
+            }
+        }
+        return datei;
     }
 
     private static Path seite(Path ordner, String name, int typ, String payload) throws Exception {
