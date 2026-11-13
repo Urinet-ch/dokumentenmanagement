@@ -22,8 +22,11 @@ openssl pkey -in archiv_manifest_key.pem -pubout -out manifest-schluessel.pub.pe
 3. `manifest-schluessel.pub.pem` per PR unter `docs/manifest-schluessel.pub.pem` ablegen.
 4. Die lokale Datei `archiv_manifest_key.pem` sicher löschen.
 
-Optional prüft das Archiv beim ersten Gebrauch, dass der öffentliche zum privaten Schlüssel passt
-(`archiv.manifest.oeffentlicher-schluessel`, SPKI-PEM); ohne den Wert leitet es ihn aus dem privaten ab.
+Der öffentliche Schlüssel wird nie aus dem privaten abgeleitet. Das Archiv liest ihn aus
+`archiv.manifest.oeffentlicher-schluessel` (SPKI-PEM), aus der Datei `archiv.manifest.oeffentlicher-schluessel-datei`
+oder aus `docs/manifest-schluessel.pub.pem`, das der Build ins Artefakt kopiert. Ohne öffentlichen Schlüssel bricht
+das Prüfwerkzeug ab, und das Signieren kann nicht prüfen, ob der private Schlüssel zum veröffentlichten passt; passt er
+nicht, bricht das Signieren ab. Darum muss `docs/manifest-schluessel.pub.pem` vor dem ersten Deploy auf `main` liegen.
 
 ## Wechsel
 
