@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 
 /**
@@ -64,7 +65,8 @@ public class VerarbeitungSpeichern {
      * Speichert das Ergebnis und reiht {@code KI_VORSCHLAG} in derselben Transaktion ein (kein doppelter Folgeauftrag).
      * Status: {@code EINGANGSKORB} bei {@code pdfa_fehlt} (Req 5.9, die KI läuft trotzdem) und ohne Handler für
      * {@code KI_VORSCHLAG} (nur in Tests) ohne Vorschlag; sonst bleibt {@code VERARBEITUNG}, bis der
-     * {@link KiVorschlagHandler} fertig ist (Aufgabe 3.2).
+     * {@link KiVorschlagHandler} fertig ist (Aufgabe 3.2). Die Nutzlast von {@code KI_VORSCHLAG} trägt die
+     * {@code version} nach dem Speichern ({@link VerarbeitenHandler#DOKUMENT_VERSION}).
      * <p>
      * {@code ohneKi} (Generator, Req 11.2): die Metadaten sind schon bestätigt, darum {@code ARCHIVIERUNG} und Auftrag
      * {@code ARCHIVIEREN} statt {@code KI_VORSCHLAG}; bei {@code pdfa_fehlt} {@code EINGANGSKORB} ohne Folgeauftrag, der
@@ -77,7 +79,7 @@ public class VerarbeitungSpeichern {
         auftraege.anspruchSichern(auftrag);
         if (ohneKi) {
             DokumentStatus status = ergebnis.pdfaFehlt() ? DokumentStatus.EINGANGSKORB : DokumentStatus.ARCHIVIERUNG;
-            if (!dokumente.ergebnisSpeichern(id, ergebnis, status)) {
+            if (dokumente.ergebnisSpeichern(id, ergebnis, status).isEmpty()) {
                 return false;
             }
             if (status == DokumentStatus.ARCHIVIERUNG) {
@@ -88,11 +90,13 @@ public class VerarbeitungSpeichern {
         }
         boolean ki = auftraege.hatHandler(KI_VORSCHLAG);
         DokumentStatus status = ergebnis.pdfaFehlt() || !ki ? DokumentStatus.EINGANGSKORB : DokumentStatus.VERARBEITUNG;
-        if (!dokumente.ergebnisSpeichern(id, ergebnis, status)) {
+        OptionalInt version = dokumente.ergebnisSpeichern(id, ergebnis, status);
+        if (version.isEmpty()) {
             return false;
         }
         if (ki) {
-            auftraege.einreihen(KI_VORSCHLAG, new Nutzlast(Map.of(VerarbeitenHandler.DOKUMENT_ID, id)));
+            auftraege.einreihen(KI_VORSCHLAG, new Nutzlast(Map.of(VerarbeitenHandler.DOKUMENT_ID, id,
+                    VerarbeitenHandler.DOKUMENT_VERSION, version.getAsInt())));
         }
         return true;
     }

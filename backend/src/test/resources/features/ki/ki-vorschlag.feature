@@ -106,6 +106,56 @@ Funktionalität: KI-Vorschlag der Metadaten (KI_VORSCHLAG)
       | geändert  |
       | bestätigt |
 
+  @req-7.1 @req-5.9 @req-10.4
+  Szenario: Ändert der Benutzer ein Dokument ohne PDF/A zwischen zwei Versuchen, speichert der Worker keinen Vorschlag
+    Angenommen ein Beleg als verschlüsseltes PDF
+    Und das Sprachmodell antwortet mit HTTP 500
+    Wenn der Worker die Aufträge bearbeitet
+    Dann wurde das Sprachmodell 1-mal aufgerufen
+    Und ist der Auftrag «KI_VORSCHLAG» nach 1 Versuch «OFFEN»
+    Und der Auftrag «KI_VORSCHLAG» trägt die Version des Dokuments nach der Verarbeitung
+    Wenn «inhaber-urinet» den Titel des Dokuments auf «Titel des Benutzers» ändert
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «2026-131» und Vertraulichkeit «INTERN» vor
+    Und der Auftrag «KI_VORSCHLAG» wieder fällig wird und der Worker ihn bearbeitet
+    Dann wurde das Sprachmodell 1-mal aufgerufen
+    Und das Dokument ist «EINGANGSKORB» ohne Vorschlag und in der Version des Benutzers
+    Und das Dokument hat den Titel «Titel des Benutzers»
+    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
+
+  @req-7.1 @req-5.9
+  Szenario: Ein Auftrag ohne Version in der Nutzlast läuft wie bisher
+    Angenommen ein Beleg als digitales PDF mit «Muster Buerobedarf AG» und «Rechnung 2026-132»
+    Und das Sprachmodell antwortet mit HTTP 500
+    Wenn der Worker die Aufträge bearbeitet
+    Dann ist der Auftrag «KI_VORSCHLAG» nach 1 Versuch «OFFEN»
+    Angenommen die Nutzlast des Auftrags «KI_VORSCHLAG» enthält keine Version
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «2026-132» und Vertraulichkeit «INTERN» vor
+    Wenn der Auftrag «KI_VORSCHLAG» wieder fällig wird und der Worker ihn bearbeitet
+    Dann wurde das Sprachmodell 2-mal aufgerufen
+    Und das Dokument ist «EINGANGSKORB» mit der Art «LIEFERANTENBELEG» und der Vertraulichkeit «INTERN»
+    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
+
+  @req-7.3 @req-5.4 @req-5.9
+  Szenario: Nach dem letzten Fehlversuch bleibt ein Dokument ohne PDF/A im Eingangskorb unverändert
+    Angenommen ein Beleg als verschlüsseltes PDF
+    Und das Sprachmodell antwortet mit HTTP 500
+    Wenn der Worker die Aufträge bearbeitet
+    Dann der Auftrag «KI_VORSCHLAG» trägt die Version des Dokuments nach der Verarbeitung
+    Wenn der Auftrag «KI_VORSCHLAG» zweimal wieder fällig wird und der Worker ihn bearbeitet
+    Dann wurde das Sprachmodell 3-mal aufgerufen
+    Und ist der Auftrag «KI_VORSCHLAG» nach 3 Versuchen «FEHLER»
+    Und das Dokument ist «EINGANGSKORB» ohne Vorschlag und in der Version nach der Verarbeitung
+
+  @req-7.1 @req-7.4
+  Szenario: Ein schon verknüpfter Partner wird vom Abgleich nicht überschrieben
+    Angenommen im Mandanten gibt es den Kontakt «Lieferant GmbH» mit der IBAN «CH4431999123000889012»
+    Und ein Beleg als gescanntes PDF mit «Lieferant GmbH» und einem Swiss QR Code über CHF 80.00
+    Und der Beleg ist schon mit dem Kontakt «Anderer Partner AG» ohne IBAN verknüpft
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «F-79» und Vertraulichkeit «INTERN» vor
+    Wenn der Worker die Aufträge bearbeitet
+    Dann das Dokument ist «EINGANGSKORB» mit der Art «LIEFERANTENBELEG» und der Vertraulichkeit «INTERN»
+    Und das Dokument bleibt mit dem Kontakt «Anderer Partner AG» verknüpft, der Abgleich fand den Kontakt mit der IBAN
+
   @req-7.1 @req-7.4
   Szenario: Ein eindeutiger Kontakt zur IBAN aus dem Swiss QR Code wird als Partner verknüpft
     Angenommen im Mandanten gibt es den Kontakt «Lieferant GmbH» mit der IBAN «CH4431999123000889012»
