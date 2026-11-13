@@ -161,27 +161,16 @@ public class ManifestSchritte {
     }
 
     /**
-     * Setzt den gespeicherten Dateinamen (Req 3.12, Aufgabe 4.10). Bis 4.10 die Spalte {@code dokument.dateiname}
-     * anlegt, gibt es keinen gespeicherten Namen; dann trägt die Prüfung der Felder im Manifest das Szenario.
+     * Setzt den gespeicherten Dateinamen in {@code dokument.dateiname} (Req 3.12, Aufgabe 4.10, Changeset
+     * {@code 015-dokument-dateiname}); das Manifest darf ihn trotzdem nicht enthalten.
      */
     @Angenommen("das Dokument «{word}» von «{word}» heisst «{}»")
     public void dateiname(String name, String alias, String dateiname) throws SQLException {
-        try (Connection v = datenbank.get().getConnection()) {
-            try (PreparedStatement p = v.prepareStatement("select 1 from information_schema.columns where table_schema = ? "
-                    + "and table_name = 'dokument' and column_name = 'dateiname'")) {
-                p.setString(1, schema(alias));
-                try (ResultSet r = p.executeQuery()) {
-                    if (!r.next()) {
-                        return;
-                    }
-                }
-            }
-            try (PreparedStatement p = v.prepareStatement("update " + schema(alias)
-                    + ".dokument set dateiname = ? where id = ?")) {
-                p.setString(1, dateiname);
-                p.setObject(2, dokumente.get(alias + "/" + name));
-                assertThat(p.executeUpdate()).isEqualTo(1);
-            }
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement("update "
+                + schema(alias) + ".dokument set dateiname = ? where id = ?")) {
+            p.setString(1, dateiname);
+            p.setObject(2, dokumente.get(alias + "/" + name));
+            assertThat(p.executeUpdate()).isEqualTo(1);
         }
     }
 

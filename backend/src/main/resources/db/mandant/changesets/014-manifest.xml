@@ -8,7 +8,7 @@
          Manifest mit Ablage, Signatur und den Zeitstempeln je Dienst; dazu die Blatt-Hashes je Protokollzeile, damit
          ein späterer Löschweg (Req 9.9, 10.9) einzelne Zeilen entfernen kann, ohne den Nachweis der übrigen zu
          zerstören. Alle drei Tabellen nur Einfügen (Trigger und Rechte wie zugriff_protokoll). -->
-    <changeSet id="013-manifest" author="archiv">
+    <changeSet id="014-manifest" author="archiv">
         <sql>
             create table manifest (
                 datum date not null constraint manifest_pk primary key,
