@@ -12,6 +12,8 @@ export * from './dokumentart';
 export * from './dokumentart-aenderung';
 export * from './download-adresse';
 export * from './eingangskorb-seite';
+export * from './export';
+export * from './export-anfrage';
 export * from './generator-antwort';
 export * from './generator-finanz';
 export * from './generator-metadaten';

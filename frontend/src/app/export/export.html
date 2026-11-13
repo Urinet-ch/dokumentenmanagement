@@ -1,0 +1,81 @@
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+
+<section class="karte anfordern" aria-labelledby="anfordern-titel">
+  <h2 id="anfordern-titel">{{ texte.anfordernTitel }}</h2>
+  <label class="feld">
+    <span>{{ texte.jahr }}</span>
+    <input
+      type="number"
+      inputmode="numeric"
+      [min]="min"
+      [max]="max"
+      step="1"
+      [value]="jahr() ?? ''"
+      [disabled]="laeuft()"
+      (input)="jahrSetzen($any($event.target).value)"
+      aria-describedby="jahr-hinweis"
+      data-test="jahr"
+    />
+  </label>
+  <p id="jahr-hinweis" class="hinweis">{{ texte.jahrHinweis }}</p>
+  <button mat-flat-button type="button" (click)="anfordern()" [disabled]="laeuft() || !jahrOk()">
+    {{ texte.anfordern }}
+  </button>
+  <p class="status" role="status" aria-live="polite">{{ meldung() }}</p>
+  @if (fehler()) {
+    <p class="fehler" role="alert">{{ fehler() }}</p>
+  }
+</section>
+
+<section aria-labelledby="liste-titel">
+  <h2 id="liste-titel">{{ texte.liste }}</h2>
+  @if (downloadFehler()) {
+    <p class="fehler" role="alert">{{ downloadFehler() }}</p>
+  }
+  @if (listeFehler()) {
+    <p class="fehler" role="alert">{{ listeFehler() }}</p>
+  } @else if (liste() === null) {
+    <p>{{ texte.laden }}</p>
+  } @else if (liste()!.length === 0) {
+    <p>{{ texte.keine }}</p>
+  } @else {
+    <ul class="exporte">
+      @for (eintrag of liste(); track eintrag.id) {
+        <li class="karte eintrag" data-test="export">
+          <span class="kopf">
+            <span>{{ texte.zeile(eintrag.geschaeftsjahr, zeit(eintrag.erstellt)) }}</span>
+            <span class="marke" [attr.data-status]="eintrag.status">{{
+              texte.status[eintrag.status]
+            }}</span>
+          </span>
+          @switch (eintrag.status) {
+            @case ('FERTIG') {
+              <span class="angaben">
+                {{
+                  texte.fertigZeile(
+                    zahl(eintrag.anzahl),
+                    groesse(eintrag.groesse ?? 0),
+                    zeit(eintrag.gueltigBis)
+                  )
+                }}
+              </span>
+              <span class="pruefsumme"
+                >{{ texte.pruefsumme }}: <code>{{ eintrag.sha256 }}</code></span
+              >
+              <button mat-stroked-button type="button" (click)="herunterladen(eintrag)">
+                {{ texte.herunterladen(eintrag.geschaeftsjahr) }}
+              </button>
+            }
+            @case ('ABGELAUFEN') {
+              <span class="angaben">{{ texte.abgelaufenHinweis }}</span>
+            }
+            @case ('FEHLER') {
+              <span class="angaben">{{ texte.fehlerHinweis }}</span>
+            }
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

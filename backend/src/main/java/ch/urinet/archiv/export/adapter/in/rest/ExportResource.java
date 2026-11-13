@@ -112,6 +112,8 @@ public class ExportResource {
             description = "Bei einem fertigen Export mit der vorsignierten Adresse des ZIP, gültig bis 24 Stunden nach "
                     + "der Fertigstellung (Req 7.2); jede ausgegebene Adresse protokolliert HERUNTERLADEN. Nur "
                     + "inhaber und treuhaender, sonst 403 NICHT_ERLAUBT; unbekannt → 404 NICHT_GEFUNDEN.")
+    @APIResponse(responseCode = "200", description = "Export, bei FERTIG mit Adresse; nicht zwischenspeichern",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
     public Response abrufen(@PathParam("id") String id) {
         MandantCode mandant = aufloesung.pruefen();
         UUID exportId;

@@ -69,5 +69,11 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A13')],
     title: titel(TEXTE.menue.protokoll),
   },
+  {
+    path: 'export',
+    loadComponent: () => import('./export/export').then((m) => m.Export),
+    canActivate: [rechtGuard('EXPORT')],
+    title: titel(TEXTE.menue.export),
+  },
   { path: '**', redirectTo: '' },
 ];

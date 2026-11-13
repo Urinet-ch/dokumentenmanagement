@@ -34,7 +34,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); Lasttest p95 ≤ 2 s
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6_
 
-- [ ] 6.5 Jahresexport [Backend] [Frontend]
+- [x] 6.5 Jahresexport [Backend] [Frontend]
   - Auftrag `EXPORT_JAHR`, ZIP stromweise (nur `ARCHIVIERT`, `pdfa_fehlt` mit Original), `belegliste.csv`, `pruefsummen.sha256`, Manifeste, Dateinamensmuster, Protokoll, E-Mail ohne Inhalte; S3-Lebenszyklus 7 Tage
   - Seite «Export» nur für `inhaber`/`treuhaender`, sonst 403
   - _Anforderungen: 7.1–7.6_

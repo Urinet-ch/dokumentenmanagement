@@ -16,4 +16,5 @@ export const MENUE: readonly Menuepunkt[] = [
   { pfad: '/importe', text: TEXTE.menue.importe, aktion: 'A12' },
   { pfad: '/verwaltung/dokumentarten', text: TEXTE.menue.dokumentarten, aktion: 'A11' },
   { pfad: '/verwaltung/protokoll', text: TEXTE.menue.protokoll, aktion: 'A13' },
+  { pfad: '/export', text: TEXTE.menue.export, aktion: 'EXPORT' },
 ];
