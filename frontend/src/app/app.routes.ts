@@ -4,6 +4,7 @@ import { HttpDokumentService } from './dokument/http-dokument.service';
 import { HttpUploadService } from './erfassen/http-upload.service';
 import { UploadPort } from './erfassen/upload-port';
 import { Folgt } from './folgt/folgt';
+import { erfassenGuard } from './gemeinsam/anmeldung/erfassen.guard';
 import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
 import { Aktion } from './gemeinsam/anmeldung/rechte';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -24,8 +25,8 @@ export const routes: Routes = [
   { path: 'anmeldung', component: Rueckruf, title: TEXTE.appTitel },
   {
     path: 'erfassen',
-    loadComponent: () => import('./erfassen/upload').then((m) => m.Upload),
-    canActivate: [rechtGuard('A1')],
+    loadComponent: () => import('./erfassen/handy/handy-erfassung').then((m) => m.HandyErfassung),
+    canActivate: [erfassenGuard],
     providers: [{ provide: UploadPort, useClass: HttpUploadService }],
     title: titel(TEXTE.menue.erfassen),
   },

@@ -1,0 +1,9 @@
+/* Web Worker der Handy-Erfassung (Scanner mit jscanify und OpenCV.js, Aufgabe 3.7). */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2022", "webworker"],
+    "types": []
+  },
+  "include": ["src/**/*.worker.ts", "src/**/*.d.ts"]
+}

@@ -2,6 +2,7 @@ import { Component, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
+import { WarteschlangeService } from './erfassen/handy/warteschlange/warteschlange.service';
 import { AnmeldungService, Benutzer, Sitzungszustand } from './gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
@@ -33,17 +34,21 @@ class Leer {}
 describe('App (Req 2.6, 8.6)', () => {
   let anmeldung: AnmeldungAttrappe;
   let zaehler: ZaehlerAttrappe;
+  let warteschlangeGestartet: boolean;
 
   beforeEach(() => {
     anmeldung = new AnmeldungAttrappe();
     zaehler = new ZaehlerAttrappe();
+    warteschlangeGestartet = false;
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
         provideRouter([
           { path: '', component: Leer },
           { path: 'erfassen', component: Leer },
+          { path: 'suche', component: Leer },
         ]),
+        { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
         { provide: EingangskorbZaehler, useValue: zaehler },
       ],
@@ -58,6 +63,11 @@ describe('App (Req 2.6, 8.6)', () => {
 
   const menue = (element: HTMLElement) =>
     [...element.querySelectorAll('nav a')].map((a) => a.querySelector('.punkt')?.childNodes[0]?.textContent?.trim());
+
+  it('startet die Warteschlange der Handy-Erfassung mit der App (Req 4.5)', async () => {
+    await zeigen();
+    await vi.waitFor(() => expect(warteschlangeGestartet).toBe(true));
+  });
 
   it('zeigt den Titel und ohne Anmeldung kein Menü', async () => {
     const element = await zeigen();
@@ -132,10 +142,21 @@ describe('App (Req 2.6, 8.6)', () => {
     anmeldung.als('mitarbeiter');
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
+    await router.navigateByUrl('/suche');
+    await fixture.whenStable();
+    anmeldung.zustand.set('abgelaufen');
+    await fixture.whenStable();
+    expect(router.url).toBe('/?ziel=%2Fsuche');
+  });
+
+  it('bleibt bei abgelaufener Sitzung auf «Erfassen», damit aufgenommene Seiten nicht verloren gehen', async () => {
+    anmeldung.als('mitarbeiter');
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
     await router.navigateByUrl('/erfassen');
     await fixture.whenStable();
     anmeldung.zustand.set('abgelaufen');
     await fixture.whenStable();
-    expect(router.url).toBe('/?ziel=%2Ferfassen');
+    expect(router.url).toBe('/erfassen');
   });
 });

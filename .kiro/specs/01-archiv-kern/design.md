@@ -300,7 +300,7 @@ Aufgaben 17.2 bis 17.7 und 18.2).
 - Abgelehnte Zeichen (Req 3.10): Ein Name mit Zeichen der Unicode-Kategorien Cc, Cs, Zl, Zp oder Cf ausser den Verbindern U+200C/U+200D (Emoji) führt beim Upload zu 400 `ANFRAGE_UNGUELTIG` für diese Datei. Cc, Cs und Cf galten schon bisher; Zl und Zp (U+2028, U+2029) kommen hinzu, weil der Name jetzt auch anderen Rollen angezeigt wird und ein Zeilentrenner die Anzeige umbräche (geändert 13.11.2026, vorgeschlagen 13.11.2026, entschieden mit dem Merge des Spec-PR; bisher nur Cc, Cs und Cf). Private und nicht vergebene Zeichen (Co, Cn) bleiben zulässig, sie zeigen höchstens ein Ersatzsymbol. Richtungsumkehr und ähnliche Zeichen gelangen so nie in die Anzeige; starke Zeichen von rechts nach links isoliert die Anzeige (Abschnitt «Frontend», Titel-Platzhalter).
 - Quellen:
   - Upload (`UPLOAD`): Name des Teils `dateien`. Bei `zusammenfassen=true` gilt der Name der ersten angenommenen Original-Datei in der gesendeten Reihenfolge; Dubletten und abgelehnte Dateien fallen vorher heraus (Req 3.5, 3.8), Arbeitsfassungen zählen nie.
-  - Handy-Erfassung (`SCAN`, Req 4.9): Die PWA hält beim ersten Auslösen einer Erfassung den Zeitpunkt im Eintrag der Warteschlange fest (`aufgenommen`, ISO-Zeitpunkt) und sendet als Dateinamen aller Originale dieser Erfassung `Aufnahme TT.MM.JJJJ HH:MM`, ohne Endung. Die Funktion setzt den Text aus `Intl.DateTimeFormat('de-CH', {timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(…)` zusammen (Teile `day`, `month`, `year`, `hour`, `minute`), weil `format` selbst «13.11.2026, 08:15» mit Komma liefert; Ergebnis z. B. genau `Aufnahme 13.11.2026 08:15`. Massgeblich ist die Aufnahme, nicht der Upload: Ein Eintrag, der erst am nächsten Tag aus der Warteschlange geht, trägt den Zeitpunkt der Aufnahme. Der Doppelpunkt ist kein Pfadtrenner und zulässig. Die Arbeitsfassungen behalten ihre technischen Namen; gespeichert wird nach der Regel oben ohnehin nur der Name des ersten Originals.
+  - Handy-Erfassung (`SCAN`, Req 4.9): Die PWA hält je Seite den Zeitpunkt der Aufnahme fest und legt beim Abschliessen den der ersten verbliebenen Seite in den Eintrag der Warteschlange (`aufgenommen`, ISO-Zeitpunkt; wird die erste Seite verworfen, zählt die nächste) und sendet als Dateinamen aller Originale dieser Erfassung `Aufnahme TT.MM.JJJJ HH:MM`, ohne Endung. Die Funktion setzt den Text aus `Intl.DateTimeFormat('de-CH', {timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(…)` zusammen (Teile `day`, `month`, `year`, `hour`, `minute`), weil `format` selbst «13.11.2026, 08:15» mit Komma liefert; Ergebnis z. B. genau `Aufnahme 13.11.2026 08:15`. Massgeblich ist die Aufnahme, nicht der Upload: Ein Eintrag, der erst am nächsten Tag aus der Warteschlange geht, trägt den Zeitpunkt der Aufnahme. Der Doppelpunkt ist kein Pfadtrenner und zulässig. Die Arbeitsfassungen heissen «Aufnahme TT.MM.JJJJ HH:MM Seite n.jpg»; gespeichert wird nach der Regel oben ohnehin nur der Name des ersten Originals.
   - Generator (`GENERATOR`, Req 11.12): Name des Teils `datei` (`tools/archiv_client.py` sendet `pdf.name`), bereinigt mit `DateiName` und als `speicherbar()` an `generatorAnlegen` übergeben. Anders als beim Upload lehnt der Generator ein PDF wegen seines Namens nicht ab: Er prüfte den Namen bisher nicht, und ein gültiger Beleg soll nicht im Client liegen bleiben; ein Name mit Zeichen nach Req 3.10 ergibt `dateiname = null`. `tools/archiv_client.py` ersetzt vor dem Senden jedes Zeichen, das der Server nach Req 3.10 verwirft, durch `_` (bisher nur `"`, CR und LF), damit der Name normalerweise erhalten bleibt. Bei 200 (gleiche SHA-256, Req 11.8) speichert das Archiv nichts, auch keinen Namen am vorhandenen Dokument.
   - Drive-Import (`DRIVE`, Req 12.9): Das Werkzeug sendet seit Aufgabe 4.8 nur `OrdnerHinweis.sauber(datei.getFileName())`, also ohne Ordner; der Ordnerpfad bleibt allein im `hinweis`. Das Archiv kürzt zusätzlich jeden Pfadanteil weg (`DateiName`).
   - Dublette (Req 3.4) und abgelehnte Datei: kein Dokument, kein Name. Die Meldung zu einer Dublette ohne Leserecht nennt weder ID noch gespeicherten Namen des vorhandenen Dokuments; `datei` im Ergebnis ist der Name der eben gesendeten Datei.
@@ -1072,7 +1072,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 - Erfassen: `getUserMedia` (Rückkamera) mit Fallback `<input type="file" accept="image/*" capture="environment">`; Kantenerkennung und Entzerrung mit **jscanify** (OpenCV.js, als Web Worker, lazy geladen).
   - Original (Req 4.7, P13): die unbearbeitete Aufnahme, beim Fallback die Datei der Kamera, sonst das volle Videobild als JPEG 95 %.
   - Arbeitsfassung: Zuschnitt und Entzerrung, JPEG 85 %, lange Kante 2'480 px (≈ 300 dpi für A4). Erkennt jscanify keine Kanten, ist die Arbeitsfassung das ganze Bild (Req 4.3).
-- Offline-Warteschlange (Req 4.4–4.6, 4.8): IndexedDB (`idb`), Eintrag mit Seiten (Original + Arbeitsfassung), `fehlversuche` und `zustand`. Senden bei `online`-Event, beim Öffnen der App und über Service Worker Background Sync, wo verfügbar.
+- Offline-Warteschlange (Req 4.4–4.6, 4.8): IndexedDB (`idb`), Eintrag mit Seiten (Original + Arbeitsfassung), `fehlversuche` und `zustand`. Senden bei `online`, beim Start der App, nach der Anmeldung und nach dem Erfassen; kein Background Sync (siehe Umsetzung 3.7).
   - 202, auch mit `DUBLETTE` → Eintrag löschen.
   - Netzwerkfehler oder 5xx bei `navigator.onLine === true` → `fehlversuche + 1`, nach 3 «fehlerhaft» mit manueller Wiederholung. Versuche im Offline-Zustand zählen nicht.
   - 4xx ausser 401 → sofort «fehlerhaft» mit der Meldung des Servers; 401 → neu anmelden, der Eintrag bleibt.
@@ -1166,6 +1166,71 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler.
+- Umsetzung (Aufgabe 3.7, Handy-Erfassung, 13.11.2026):
+  - Seite `/erfassen` (Komponente `erfassen/handy/handy-erfassung`, lazy geladen, `erfassenGuard`): angemeldet mit Recht A1; ohne Anmeldung nur offline
+    zugänglich (Tokens nur im Arbeitsspeicher, entschieden von Fabian am 11.11.2026), online führt der Weg über die
+    Anmeldung. Die Startseite verlinkt «Ohne Verbindung erfassen», solange das Gerät offline ist. Den Online-Zustand
+    liefert das Token `ONLINE` (Signal aus `navigator.onLine` und den Ereignissen `online`/`offline`). Die Umleitung
+    der App auf die Anmeldung spart `/erfassen` aus, damit Aufnahmen vor der Anmeldung gesichert werden (Req 4.4).
+  - Kamera: `getUserMedia` mit `facingMode: { ideal: 'environment' }`; auf Geräten mit Touch (`pointer: coarse`)
+    startet sie beim Öffnen, sonst per Knopf; ohne Kamera oder ohne Erlaubnis der Fallback
+    `<input type="file" accept="image/*" capture="environment">`. Original ist das volle Videobild als JPEG 0.95 bzw. die
+    Datei der Kamera (Req 4.7).
+  - Scanner im Web Worker (`scanner.worker.ts`, eigener Chunk mit OpenCV.js `@techstark/opencv-js` 4.12 und
+    `jscanify` 1.4.3, beide Apache-2.0 bzw. MIT): Kanten auf einer Verkleinerung (lange Kante 1'000 px) suchen, Ecken
+    prüfen (im Bild, konvex, Fläche mindestens 20 % des Bilds), sonst das ganze Bild (Req 4.3); Entzerrung auf
+    2'480 px an der langen Kante, kleinere Aufnahmen werden hochskaliert, JPEG 0.85. Die Ecken lassen sich in der
+    Vorschau verschieben (auch per Tastatur, Shift + Pfeil), die Seite lässt sich verwerfen.
+  - Erkenntnisse OpenCV.js: Das Emscripten-Modul ist ein Thenable; `await` darauf oder ein dynamisches `import()`
+    hängt. Es wird darum im Worker geladen und über `onRuntimeInitialized` abgewartet; jscanify braucht das globale
+    `cv`. Die Verweise auf `fs`/`path` in OpenCV.js sind in `angular.json` als `externalDependencies` ausgenommen,
+    `canvas`/`jsdom` (nur für Node in jscanify) werden nicht gebündelt. Weil OpenCV.js unter Vitest hängt, prüfen
+    Unit-Tests nur die Geometrie (`ecken.ts`); Worker und OpenCV.js prüfen die Browser-Szenarien.
+  - Bundle und Offline: Der Worker-Chunk (rund 10.8 MB, übertragen rund 2.5 MB) liegt in der Gruppe «app» des Service
+    Workers und wird bei der Installation vorgeladen. Beim Öffnen der Seite startet die PWA den Worker sofort
+    (`ScannerPort.vorbereiten()`), damit eine danach offline aufgenommene Seite ihn nicht erst laden muss. Die
+    Warteschlange (`idb`) wird in `App` nachgeladen; das erste Bundle bleibt bei rund 525 kB (die Budget-Warnung von
+    500 kB besteht schon auf `main`).
+  - Warteschlange (Req 4.4–4.8): ein Eintrag je Erfassung mit `aufgenommen` (Zeitpunkt der ersten Seite), Seiten
+    (Original und Arbeitsfassung), `fehlversuche`, `zustand`, `meldung` sowie Benutzer (`sub`) und Mandant (Claim
+    `mandant`) der Anmeldung; ohne Anmeldung bleiben beide leer, nach Ablauf der Sitzung gilt der zuletzt angemeldete
+    Benutzer weiter. Einträge ohne Benutzer übernimmt vor dem nächsten Lauf die erste Anmeldung mit Recht A1 samt
+    ihrem Mandanten. Sichtbar (Zähler «Wartet auf Upload», Liste «Nicht hochgeladen», «Erneut versuchen») sind nur die
+    eigenen Einträge (gleicher Benutzer und Mandant) und die ohne Benutzer; Einträge anderer Benutzer oder Mandanten auf
+    demselben Gerät bleiben verborgen und unberührt, bis sich deren Benutzer anmeldet. Hochgeladen wird nacheinander,
+    nur online, nur mit Recht A1 und nur eigene Einträge; Anlässe sind Start der App, Wechsel auf online, Anmeldung und
+    neue Erfassung. Upload je Erfassung als ein Dokument (`zusammenfassen=true` immer, auch bei einer Seite), Originale als `dateien`, Arbeitsfassungen als
+    `arbeitsfassungen`; Dateiname der Originale «Aufnahme TT.MM.JJJJ HH:MM» aus `aufgenommen` (`aufnahmeName`, Req 4.9),
+    der Arbeitsfassungen «… Seite n.jpg». Bewertung (`bewerten`, reine Funktion): 202 mit `NEU` oder `DUBLETTE` →
+    löschen; ein Ergebnis `ABGELEHNT` → fehlerhaft mit der Meldung des Archivs; Netzwerkfehler oder 5xx online →
+    Fehlversuch, nächster Versuch nach 30 s × Fehlversuche, beim Wechsel auf online sofort; offline zählt nicht;
+    nach 3 Fehlversuchen fehlerhaft mit «Erneut versuchen» (setzt die Fehlversuche zurück); 4xx ausser 401 → sofort
+    fehlerhaft mit `detail` bzw. Text zum `fehlercode`; 401 → «Sitzung abgelaufen», der Eintrag bleibt und geht nach
+    der Anmeldung hoch. `navigator.storage.persist()` bittet den Browser, die Daten nicht zu räumen. Die Antwort des
+    Archivs (Status, `fehlercode`, `detail`, Ergebnisse) liest für die Warteschlange und die Upload-Seite dieselbe
+    Funktion `uploadProblem` (`erfassen/upload-problem.ts`).
+  - Abschliessen: «Erfassung abschliessen» ist bedienbar, sobald keine Seite mehr zugeschnitten wird. Hat eine Seite
+    den Zustand «fehler» (Zuschnitt fehlgeschlagen, z. B. zu wenig Speicher), legt die PWA nichts in die
+    Warteschlange, markiert die Seite und meldet «Seite n ist nicht zugeschnitten. Bitte zuerst die markierten Seiten
+    verwerfen oder neu aufnehmen.»; dasselbe gilt vor der Anmeldung, die die Seiten sonst sichert. Ein Rückfall auf das
+    ganze Bild ist nach Req 4.3 nur für fehlende Kanten vorgesehen und würde bei Speichermangel kaum helfen. Während
+    des Speicherns sind Abschliessen, Aufnehmen, Dateiwahl, Zuschnitt und Verwerfen gesperrt; ein zweiter Aufruf legt
+    keinen zweiten Eintrag an. Danach entfernt die PWA nur die gespeicherten Seiten; eine Aufnahme, die während des
+    Speicherns noch ankam, bleibt für die nächste Erfassung stehen.
+  - Abweichung: kein Background Sync. Die Tokens liegen nur im Arbeitsspeicher der Seite, ein Service Worker könnte
+    ohne Token nicht hochladen; die Warteschlange läuft, sobald die PWA offen ist.
+  - Upload-Seite: Der Titel ist ein `h2` unter dem Seitentitel, damit «Handy-Erfassung» und «Datei hochladen» eine
+    Überschriftenfolge bilden.
+  - Browser-Szenarien (`features/dokument/erfassen-handy-pwa.feature`, `frontend/e2e/schritte/erfassen.mjs`): Chromium
+    als Handy (390 × 844, Touch) mit Fake-Kamera; sie spielt ein synthetisches Y4M-Video aus `e2e/hilfen/testbild.mjs`
+    (Blatt auf dunklem Grund, 10 Bilder pro Sekunde). Jedes Szenario trägt eine zufällige Kennung und jedes Videobild
+    seine Nummer als kaum sichtbare Felder ausserhalb des Blatts, damit das Archiv im Testmodus, dessen Daten über
+    die Szenarien bestehen bleiben, keine Aufnahme als Dublette erkennt. Was die PWA sendet, schreibt ein Init-Script
+    über `exposeFunction` mit (über Anmeldung und Neuladen hinweg); der Angular-HttpClient sendet über `fetch`, darum
+    sind `fetch` und `XMLHttpRequest` umschlossen. Den Offline-Start mit installierter PWA prüft ein Szenario mit
+    Service Worker, «installiert» heisst: alle Dateien der Gruppe «app» aus `ngsw.json` liegen im Cache. Req 4.9 prüft
+    ein Szenario in der Zeitzone Asia/Tokyo mit fester Uhr (23:59 in Zürich) und Upload nach Mitternacht; den
+    gespeicherten Dateinamen liest es über die API. Req 4.1 (Installation, echte Geräte) weist Fabian manuell nach.
 - Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
