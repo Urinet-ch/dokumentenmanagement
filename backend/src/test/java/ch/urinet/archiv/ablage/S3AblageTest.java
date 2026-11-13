@@ -10,10 +10,12 @@ import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
+import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,8 +24,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.core.SdkResponse;
+import software.amazon.awssdk.core.interceptor.Context;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -41,6 +49,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -496,5 +505,88 @@ class S3AblageTest {
         String key = KeinBypassInterceptor.SELBSTTEST + "/objekt";
         assertThatThrownBy(() -> s3.deleteObject(b -> b.bucket(bucket).key(key).bypassGovernanceRetention(true)))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining(KeinBypassInterceptor.HEADER);
+    }
+
+    /** Fortsetzung über mehrere Seiten (Req 15.10): jede Version und jede Löschmarke genau einmal. */
+    @Test
+    void versionenUeberMehrereSeiten() {
+        String a = "archiv/2026/" + UUID.randomUUID() + "/1-original.pdf";
+        String b = "archiv/2026/" + UUID.randomUUID() + "/1-original.pdf";
+        verwaltung.putObject(r -> r.bucket(bucket).key(a), RequestBody.fromString("a1"));
+        verwaltung.putObject(r -> r.bucket(bucket).key(a), RequestBody.fromString("a2"));
+        verwaltung.putObject(r -> r.bucket(bucket).key(b), RequestBody.fromString("b1"));
+        verwaltung.deleteObject(r -> r.bucket(bucket).key(b));
+        verwaltung.putObject(r -> r.bucket(bucket).key("eingang/2026/x.pdf"), RequestBody.fromString("x"));
+
+        S3Ablage ablage = ablage();
+        List<Objektversion> alle = new ArrayList<>();
+        Optional<Versionsseite.Marke> marke = Optional.empty();
+        int seiten = 0;
+        do {
+            Versionsseite seite = ablage.versionen(mandant, "archiv/", marke, 1);
+            alle.addAll(seite.versionen());
+            marke = seite.weiter();
+            assertThat(++seiten).isLessThan(10);
+        } while (marke.isPresent());
+
+        var erwartet = verwaltung.listObjectVersions(r -> r.bucket(bucket).prefix("archiv/"));
+        assertThat(seiten).isGreaterThanOrEqualTo(4);
+        assertThat(alle).doesNotHaveDuplicates().hasSize(4)
+                .containsAll(erwartet.versions().stream().map(v -> new Objektversion(v.key(), v.versionId(), false))
+                        .toList())
+                .containsAll(erwartet.deleteMarkers().stream()
+                        .map(m -> new Objektversion(m.key(), m.versionId(), true)).toList());
+    }
+
+    /**
+     * Ohne {@code NextVersionIdMarker} in der Antwort geht es nur mit dem key-marker weiter, nie mit einem leeren
+     * version-id-marker (Req 15.10).
+     */
+    @Test
+    void ohneNaechsteVersionsIdKeinLeererVersionIdMarker() {
+        List<String> schluessel = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            String key = "manifest/2026/11/" + (10 + i) + ".json";
+            verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("m" + key));
+            schluessel.add(key);
+        }
+        List<ListObjectVersionsRequest> anfragen = new ArrayList<>();
+        ExecutionInterceptor ohneVersionsMarker = new ExecutionInterceptor() {
+            @Override
+            public void beforeExecution(Context.BeforeExecution kontext, ExecutionAttributes attribute) {
+                if (kontext.request() instanceof ListObjectVersionsRequest anfrage) {
+                    anfragen.add(anfrage);
+                }
+            }
+
+            @Override
+            public SdkResponse modifyResponse(Context.ModifyResponse kontext, ExecutionAttributes attribute) {
+                return kontext.response() instanceof ListObjectVersionsResponse antwort
+                        ? antwort.toBuilder().nextVersionIdMarker(null).build()
+                        : kontext.response();
+            }
+        };
+        try (S3Client ohne = TestBucket.client(new BypassVerbot(), new KeinBypassInterceptor(), ohneVersionsMarker)) {
+            var ablage = new S3Ablage(ohne, S3Ablage.presigner(ohne, true), new AblageEinstellungen(TestBucket.PRAEFIX,
+                    Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)),
+                    Duration.ofMinutes(5), ZWISCHENABLAGE), Clock.systemUTC());
+            List<String> gelistet = new ArrayList<>();
+            Optional<Versionsseite.Marke> marke = Optional.empty();
+            do {
+                Versionsseite seite = ablage.versionen(mandant, "manifest/", marke, 1);
+                seite.versionen().forEach(v -> gelistet.add(v.schluessel()));
+                marke = seite.weiter();
+                marke.ifPresent(m -> assertThat(m.versionId()).isEmpty());
+                assertThat(gelistet).hasSizeLessThan(10);
+            } while (marke.isPresent());
+
+            assertThat(gelistet).containsExactlyElementsOf(schluessel);
+            assertThat(anfragen).hasSizeGreaterThanOrEqualTo(3);
+            assertThat(anfragen.getFirst().keyMarker()).isNull();
+            assertThat(anfragen.subList(1, anfragen.size())).allSatisfy(anfrage -> {
+                assertThat(anfrage.keyMarker()).isNotBlank();
+                assertThat(anfrage.versionIdMarker()).isNull();
+            });
+        }
     }
 }

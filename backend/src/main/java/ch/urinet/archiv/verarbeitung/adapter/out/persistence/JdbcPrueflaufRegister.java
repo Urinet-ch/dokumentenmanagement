@@ -66,7 +66,7 @@ public class JdbcPrueflaufRegister implements PrueflaufRegister {
                 }
                 Optional<Versionsseite.Marke> marke = z.getString("marke_schluessel") == null ? Optional.empty()
                         : Optional.of(new Versionsseite.Marke(z.getString("marke_schluessel"),
-                        z.getString("marke_version")));
+                        Optional.ofNullable(z.getString("marke_version")).filter(x -> !x.isEmpty())));
                 Fortsetzung stand = new Fortsetzung(Phase.valueOf(z.getString("phase")),
                         Optional.ofNullable(z.getObject("nach_dokument", UUID.class)), marke);
                 Zaehler zaehler = new Zaehler(z.getInt("dateien"), z.getInt("versionen"), z.getInt("manifeste"),
@@ -95,7 +95,7 @@ public class JdbcPrueflaufRegister implements PrueflaufRegister {
                 s.setString(i++, weiter.phase().name());
                 s.setObject(i++, weiter.nachDokument().orElse(null), Types.OTHER);
                 s.setString(i++, weiter.marke().map(Versionsseite.Marke::schluessel).orElse(null));
-                s.setString(i++, weiter.marke().map(Versionsseite.Marke::versionId).orElse(null));
+                s.setString(i++, weiter.marke().flatMap(Versionsseite.Marke::versionId).orElse(null));
                 s.setInt(i++, zuwachs.dateien());
                 s.setInt(i++, zuwachs.versionen());
                 s.setInt(i++, zuwachs.manifeste());

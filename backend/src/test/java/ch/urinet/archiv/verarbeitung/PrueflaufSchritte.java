@@ -215,6 +215,19 @@ public class PrueflaufSchritte {
                 RequestBody.fromBytes(VerarbeitungTestHilfe.zufall(64))).versionId();
     }
 
+    @Angenommen("das Manifest hat eine Löschmarke")
+    public void manifestLoeschmarke() {
+        // ohne Versions-ID: legt eine Löschmarke an, die gesperrte Version bleibt
+        s3.deleteObject(b -> b.bucket(bucket()).key(manifestSchluessel));
+    }
+
+    @Dann("meldet der Prüflauf für das Manifest nur eine «LOESCHMARKE» ohne Dokument")
+    public void manifestLoeschmarkeGemeldet() throws SQLException {
+        assertThat(abfragen("select art || ':' || coalesce(dokument_id::text, '-') from " + schema()
+                + ".prueflauf_abweichung where lauf_id = '" + laeufe.getLast() + "' and s3_schluessel = '"
+                + manifestSchluessel + "'", String.class)).containsExactly("LOESCHMARKE:-");
+    }
+
     @Dann("meldet der Prüflauf für das Manifest nichts")
     public void manifestOhneMeldung() throws SQLException {
         assertThat(abfragen("select art from " + schema() + ".prueflauf_abweichung where lauf_id = '"

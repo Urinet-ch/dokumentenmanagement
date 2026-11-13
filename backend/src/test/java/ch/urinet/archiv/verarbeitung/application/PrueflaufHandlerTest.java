@@ -1,6 +1,7 @@
 package ch.urinet.archiv.verarbeitung.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.domain.AblageGestoert;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
@@ -18,8 +19,11 @@ import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Fortsetzung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Lauf;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Phase;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Zaehler;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.InterruptedIOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
@@ -27,6 +31,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,8 +41,12 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Prüflauf ohne Quarkus (Req 15.9, 16.24): Stufe P zählt nur, Stufe A verlängert höchstens bis jetzt + 1 Tag. */
+/**
+ * Prüflauf ohne Quarkus (Req 15.5, 15.9, 15.10, 16.24): Stufe P zählt nur, Stufe A verlängert höchstens bis jetzt + 1 Tag;
+ * vorübergehende Fehler wiederholen den Teil, erst der letzte Versuch meldet {@code PRUEFFEHLER}.
+ */
 class PrueflaufHandlerTest {
 
     private static final Instant JETZT = Instant.parse("2026-12-01T03:00:00Z");
@@ -46,9 +57,27 @@ class PrueflaufHandlerTest {
     private static final String SHA = "a".repeat(64);
     private static final Duration EIN_TAG = Duration.ofDays(1);
 
+    private static final Instant BALD_ABGELAUFEN = JETZT.plus(Duration.ofHours(2));
+
     private final List<String> verlaengert = new ArrayList<>();
     private final List<UUID> mails = new ArrayList<>();
-    private String unlesbar;
+    /** Ausnahme, die {@code pruefen} für diesen Schlüssel wirft. */
+    private final Map<String, RuntimeException> fehler = new HashMap<>();
+    /** abweichende Sperre je Schlüssel; sonst läuft die Sperre in 2 Stunden ab */
+    private final Map<String, Optional<Instant>> sperren = new HashMap<>();
+    private final List<String> geprueft = new ArrayList<>();
+    private final List<Optional<Versionsseite.Marke>> marken = new ArrayList<>();
+    private List<Objektversion> archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
+            new Objektversion(SCHLUESSEL, "v0", false));
+    private List<Objektversion> manifestVersionen = List.of(new Objektversion(MANIFEST, "m1", false));
+    private int dokumenteJeTeil = 100;
+    private int versionenJeTeil = 500;
+    private int abbruchNachFehlern = 5;
+
+    @AfterEach
+    void interruptFlagZuruecksetzen() {
+        Thread.interrupted();
+    }
 
     @Test
     void stufePVerlaengertNieUndZaehltNur() throws Exception {
@@ -86,9 +115,9 @@ class PrueflaufHandlerTest {
     }
 
     @Test
-    void fehlerBeiEinerDateiWirdGemeldetUndDerLaufGehtWeiter() throws Exception {
+    void dauerhafterFehlerBeiEinerDateiWirdGemeldetUndDerLaufGehtWeiter() throws Exception {
         Speicher speicher = new Speicher(Stufe.A);
-        unlesbar = SCHLUESSEL;
+        fehler.put(SCHLUESSEL, new IllegalStateException("Sperre nicht verlängert"));
         lauf(handler(speicher), speicher);
 
         assertThat(speicher.lauf.stand().phase()).isEqualTo(Phase.ABGESCHLOSSEN);
@@ -98,6 +127,157 @@ class PrueflaufHandlerTest {
         // das Manifest nach der unlesbaren Datei wird weiter gepflegt
         assertThat(verlaengert).containsExactly(MANIFEST + "@" + JETZT.plus(EIN_TAG));
         assertThat(mails).containsExactly(speicher.lauf.id());
+    }
+
+    @Test
+    void voruebergehenderFehlerWiederholtDenTeilUndMeldetErstImLetztenVersuch() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        fehler.put(SCHLUESSEL, new AblageGestoert(SCHLUESSEL, new RuntimeException("503")));
+        PrueflaufHandler handler = handler(speicher);
+
+        for (int versuche = 0; versuche < 2; versuche++) {
+            Auftrag auftrag = auftrag(speicher.lauf.id(), 1, versuche);
+            assertThatThrownBy(() -> handler.ausfuehren(auftrag)).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Teil wird wiederholt").hasRootCauseMessage("503")
+                    .message().doesNotContain(SCHLUESSEL);
+            assertThat(speicher.lauf.teil()).isZero();
+            assertThat(speicher.abweichungen).isEmpty();
+        }
+        assertThat(Thread.currentThread().isInterrupted()).isFalse();
+
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
+        assertThat(speicher.lauf.teil()).isEqualTo(1);
+        assertThat(speicher.abweichungen).extracting(Abweichung::art).containsExactly(Art.PRUEFFEHLER);
+    }
+
+    @Test
+    void fehlerInFolgeBrechenDenTeilAbImLetztenVersuchOhneWeitereAufrufe() throws Exception {
+        abbruchNachFehlern = 2;
+        Speicher speicher = new Speicher(Stufe.A, 4);
+        speicher.dokumente.forEach(d -> fehler.put(d.dateien().getFirst().schluessel(),
+                new IllegalStateException("verweigert")));
+        PrueflaufHandler handler = handler(speicher);
+
+        assertThatThrownBy(() -> handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 1)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("2 Prüffehler in Folge");
+        assertThat(geprueft).hasSize(2);
+        assertThat(speicher.lauf.teil()).isZero();
+
+        geprueft.clear();
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
+        // nach der Grenze ohne weiteren Aufruf als PRUEFFEHLER gemeldet
+        assertThat(geprueft).hasSize(2);
+        assertThat(speicher.lauf.zaehler().dateien()).isEqualTo(4);
+        assertThat(speicher.abweichungen).hasSize(4).extracting(Abweichung::art).containsOnly(Art.PRUEFFEHLER);
+        assertThat(speicher.abweichungen).extracting(Abweichung::dokumentId)
+                .containsExactlyElementsOf(speicher.dokumente.stream().map(d -> Optional.of(d.id())).toList());
+    }
+
+    @Test
+    void erfolgreichePruefungSetztDieFolgeZurueck() throws Exception {
+        abbruchNachFehlern = 2;
+        Speicher speicher = new Speicher(Stufe.A, 3);
+        fehler.put(speicher.dokumente.get(0).dateien().getFirst().schluessel(), new IllegalStateException("x"));
+        fehler.put(speicher.dokumente.get(2).dateien().getFirst().schluessel(), new IllegalStateException("x"));
+
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1, 0));
+
+        assertThat(geprueft).hasSize(3);
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER);
+    }
+
+    /** Das SDK löscht das Interrupt-Flag bei einer Unterbrechung; erkannt wird sie an der Ursache, auch im letzten Versuch. */
+    @Test
+    void abbruchOhneInterruptFlagIstKeinPrueffehler() {
+        Speicher speicher = new Speicher(Stufe.A);
+        fehler.put(SCHLUESSEL, new UncheckedIOException(new InterruptedIOException("unterbrochen")));
+        PrueflaufHandler handler = handler(speicher);
+
+        assertThatThrownBy(() -> handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2)))
+                .isInstanceOf(UncheckedIOException.class);
+        assertThat(Thread.currentThread().isInterrupted()).as("Flag neu gesetzt").isTrue();
+        assertThat(speicher.lauf.teil()).isZero();
+        assertThat(speicher.abweichungen).isEmpty();
+    }
+
+    @Test
+    void loeschmarkeUnterManifestIstEineAbweichung() throws Exception {
+        manifestVersionen = List.of(new Objektversion(MANIFEST, "m2", true), new Objektversion(MANIFEST, "m1", false));
+        Speicher speicher = new Speicher(Stufe.A);
+        lauf(handler(speicher), speicher);
+
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.FREMDE_VERSION, Art.LOESCHMARKE);
+        Abweichung marke = speicher.abweichungen.getLast();
+        assertThat(marke.schluessel()).isEqualTo(MANIFEST);
+        assertThat(marke.versionId()).contains("m2");
+        assertThat(marke.dokumentId()).isEmpty();
+        // die Löschmarke wird nicht gelesen; das Manifest dahinter schon
+        assertThat(geprueft).containsExactly(SCHLUESSEL + "@v1", MANIFEST + "@m1");
+        assertThat(speicher.lauf.zaehler().manifeste()).isEqualTo(1);
+    }
+
+    @Test
+    void fehlendeSperreIstNurInStufeBEineAbweichung() throws Exception {
+        sperren.put(SCHLUESSEL, Optional.empty());
+        sperren.put(MANIFEST, Optional.of(JETZT.minusSeconds(1)));
+        Speicher speicherB = new Speicher(Stufe.B);
+        lauf(handler(speicherB), speicherB);
+
+        assertThat(speicherB.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.SPERRE_FEHLT, Art.FREMDE_VERSION, Art.SPERRE_FEHLT);
+        assertThat(speicherB.abweichungen.getFirst().dokumentId()).contains(DOKUMENT);
+        assertThat(speicherB.abweichungen.getLast().schluessel()).isEqualTo(MANIFEST);
+        // ohne aktive Sperre setzt der Prüflauf keine neue
+        assertThat(verlaengert).isEmpty();
+
+        Speicher speicherA = new Speicher(Stufe.A);
+        lauf(handler(speicherA), speicherA);
+        assertThat(speicherA.abweichungen).extracting(Abweichung::art).containsExactly(Art.FREMDE_VERSION);
+    }
+
+    @Test
+    void fortsetzungUeberMehrereSeiten() throws Exception {
+        dokumenteJeTeil = 1;
+        versionenJeTeil = 1;
+        archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
+                new Objektversion(SCHLUESSEL, "v0", false), new Objektversion(SCHLUESSEL, "v9", true));
+        manifestVersionen = List.of(new Objektversion(MANIFEST, "m1", false),
+                new Objektversion("manifest/2026/12/01.json", "m2", false));
+        Speicher speicher = new Speicher(Stufe.A, 2);
+        lauf(handler(speicher), speicher);
+
+        assertThat(speicher.lauf.zaehler()).isEqualTo(new Zaehler(2, 3, 2, 4, 0, 2));
+        assertThat(marken).containsExactly(Optional.empty(), Optional.of(new Versionsseite.Marke(SCHLUESSEL, "v1")),
+                Optional.of(new Versionsseite.Marke(SCHLUESSEL, "v0")),
+                Optional.empty(), Optional.of(new Versionsseite.Marke(MANIFEST, "m1")));
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.FREMDE_VERSION, Art.LOESCHMARKE);
+        // jede Datei und jedes Manifest genau einmal
+        assertThat(geprueft).doesNotHaveDuplicates().hasSize(4);
+    }
+
+    /**
+     * ARCHIVIEREN hält Status und Versions-IDs zwischen den beiden Lesungen fest. Gelesen wird zuerst der Status
+     * ({@code ARCHIVIERUNG}, übersprungen), dann die Versionen; umgekehrt wäre die neue Version fremd.
+     */
+    @Test
+    void archivierenZwischenDenLesungenErgibtKeineFremdeVersion() throws Exception {
+        UUID neu = UUID.fromString("3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f");
+        String neuerSchluessel = "archiv/2026/" + neu + "/1-original.pdf";
+        archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
+                new Objektversion(neuerSchluessel, "n1", false));
+        Speicher speicher = new Speicher(Stufe.A);
+        speicher.status.put(neu, DokumentStatus.ARCHIVIERUNG);
+        speicher.nachErsterLesung = () -> {
+            speicher.status.put(neu, DokumentStatus.ARCHIVIERT);
+            speicher.bekannt.add(new Bekannt(neuerSchluessel, "n1"));
+        };
+        lauf(handler(speicher), speicher);
+
+        assertThat(speicher.abweichungen).isEmpty();
+        assertThat(speicher.lesungen).containsExactly("status", "bekannte");
     }
 
     @Test
@@ -120,7 +300,7 @@ class PrueflaufHandlerTest {
 
     private void lauf(PrueflaufHandler handler, Speicher speicher) throws Exception {
         for (int teil = 1; speicher.lauf.stand().phase() != Phase.ABGESCHLOSSEN; teil++) {
-            assertThat(teil).isLessThan(10);
+            assertThat(teil).isLessThan(20);
             handler.ausfuehren(auftrag(speicher.lauf.id(), teil));
         }
     }
@@ -130,19 +310,24 @@ class PrueflaufHandlerTest {
     }
 
     private PrueflaufHandler handler(Speicher speicher, Stufe stufe) {
-        Instant baldAbgelaufen = JETZT.plus(Duration.ofHours(2));
         AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{AblagePort.class}, (proxy, methode, argumente) -> switch (methode.getName()) {
                     case "pruefen" -> {
-                        if (argumente[1].equals(unlesbar)) {
-                            throw new IllegalStateException("S3 503");
+                        String schluessel = (String) argumente[1];
+                        geprueft.add(schluessel + "@" + argumente[2]);
+                        if (fehler.containsKey(schluessel)) {
+                            throw fehler.get(schluessel);
                         }
-                        yield Optional.of(new Dateipruefung(SHA, 10, Optional.of(baldAbgelaufen)));
+                        yield Optional.of(new Dateipruefung(SHA, 10,
+                                sperren.getOrDefault(schluessel, Optional.of(BALD_ABGELAUFEN))));
                     }
-                    case "versionen" -> argumente[1].equals("archiv/")
-                            ? new Versionsseite(List.of(new Objektversion(SCHLUESSEL, "v1", false),
-                            new Objektversion(SCHLUESSEL, "v0", false)), Optional.empty())
-                            : new Versionsseite(List.of(new Objektversion(MANIFEST, "m1", false)), Optional.empty());
+                    case "versionen" -> {
+                        @SuppressWarnings("unchecked")
+                        Optional<Versionsseite.Marke> ab = (Optional<Versionsseite.Marke>) argumente[2];
+                        marken.add(ab);
+                        yield seite(argumente[1].equals("archiv/") ? archivVersionen : manifestVersionen, ab,
+                                (int) argumente[3]);
+                    }
                     case "sperreVerlaengernBis" -> {
                         verlaengert.add(argumente[1] + "@" + argumente[3]);
                         yield new SperrAenderung((String) argumente[1], (String) argumente[2],
@@ -164,22 +349,65 @@ class PrueflaufHandlerTest {
         };
         Optional<Duration> frist = Optional.of(EIN_TAG);
         return new PrueflaufHandler(speicher, ablage, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC), stufe,
-                frist, frist, 100, 500);
+                frist, frist, dokumenteJeTeil, versionenJeTeil, abbruchNachFehlern);
+    }
+
+    /** Seite wie S3: nach der Marke (Schlüssel und Versions-ID) höchstens {@code anzahl}, Marke = letzte Version. */
+    private static Versionsseite seite(List<Objektversion> alle, Optional<Versionsseite.Marke> ab, int anzahl) {
+        int start = ab.map(m -> {
+            for (int i = 0; i < alle.size(); i++) {
+                if (alle.get(i).schluessel().equals(m.schluessel())
+                        && m.versionId().orElseThrow().equals(alle.get(i).versionId())) {
+                    return i + 1;
+                }
+            }
+            throw new IllegalArgumentException("Marke unbekannt");
+        }).orElse(0);
+        int ende = Math.min(alle.size(), start + anzahl);
+        List<Objektversion> teil = alle.subList(start, ende);
+        return new Versionsseite(teil, ende < alle.size()
+                ? Optional.of(new Versionsseite.Marke(teil.getLast().schluessel(), teil.getLast().versionId()))
+                : Optional.empty());
     }
 
     private static Auftrag auftrag(UUID lauf, int teil) {
-        return new Auftrag(teil, MANDANT, PrueflaufHandler.TYP, PrueflaufSpeichern.nutzlast(lauf, teil), 0);
+        return auftrag(lauf, teil, 0);
     }
 
-    /** Ein Lauf mit einem unbefristeten Dokument; v0 ist eine fremde Version unter archiv/. */
+    private static Auftrag auftrag(UUID lauf, int teil, int versuche) {
+        return new Auftrag(teil, MANDANT, PrueflaufHandler.TYP, PrueflaufSpeichern.nutzlast(lauf, teil), versuche);
+    }
+
+    /**
+     * Ein Lauf mit unbefristeten Dokumenten (das erste ist {@link #DOKUMENT} mit {@link #SCHLUESSEL}); v0 ist eine
+     * fremde Version unter archiv/.
+     */
     private static final class Speicher extends PrueflaufSpeichern {
 
         private Lauf lauf;
         private final List<Abweichung> abweichungen = new ArrayList<>();
+        private final List<Pruefdokument> dokumente = new ArrayList<>();
+        private final Map<UUID, DokumentStatus> status = new HashMap<>();
+        private final Set<Bekannt> bekannt = new HashSet<>();
+        private final List<String> lesungen = new ArrayList<>();
+        private Runnable nachErsterLesung = () -> { };
 
         Speicher(Stufe stufe) {
+            this(stufe, 1);
+        }
+
+        Speicher(Stufe stufe, int anzahl) {
             super(null, null, null);
             lauf = new Lauf(UUID.randomUUID(), stufe, 0, Fortsetzung.beginn(Phase.DATEIEN), Zaehler.NULL);
+            for (int i = 0; i < anzahl; i++) {
+                UUID id = i == 0 ? DOKUMENT : new UUID(DOKUMENT.getMostSignificantBits(), i);
+                String schluessel = "archiv/2026/" + id + "/1-original.pdf";
+                dokumente.add(new Pruefdokument(id, DokumentStatus.ARCHIVIERT, Sperrvorgabe.unbefristet(),
+                        List.of(new Datei(schluessel, Optional.of("v1"), Optional.of(SHA)))));
+                status.put(id, DokumentStatus.ARCHIVIERT);
+                bekannt.add(new Bekannt(schluessel, "v1"));
+            }
+            dokumente.sort(Comparator.comparing(Pruefdokument::id));
         }
 
         @Override
@@ -189,18 +417,31 @@ class PrueflaufHandlerTest {
 
         @Override
         public List<Pruefdokument> archivierte(Optional<UUID> nach, int anzahl) {
-            return List.of(new Pruefdokument(DOKUMENT, DokumentStatus.ARCHIVIERT, Sperrvorgabe.unbefristet(),
-                    List.of(new Datei(SCHLUESSEL, Optional.of("v1"), Optional.of(SHA)))));
+            return dokumente.stream().filter(d -> nach.map(n -> d.id().compareTo(n) > 0).orElse(true))
+                    .limit(anzahl).toList();
         }
 
         @Override
         public Set<Bekannt> bekannte(Collection<String> schluessel) {
-            return Set.of(new Bekannt(SCHLUESSEL, "v1"));
+            Set<Bekannt> ergebnis = bekannt.stream().filter(b -> schluessel.contains(b.schluessel()))
+                    .collect(java.util.stream.Collectors.toSet());
+            gelesen("bekannte");
+            return ergebnis;
         }
 
         @Override
         public Map<UUID, DokumentStatus> status(Collection<UUID> ids) {
-            return Map.of(DOKUMENT, DokumentStatus.ARCHIVIERT);
+            Map<UUID, DokumentStatus> ergebnis = new HashMap<>();
+            ids.forEach(id -> ergebnis.put(id, status.get(id)));
+            gelesen("status");
+            return ergebnis;
+        }
+
+        private void gelesen(String was) {
+            lesungen.add(was);
+            if (lesungen.size() == 1) {
+                nachErsterLesung.run();
+            }
         }
 
         @Override

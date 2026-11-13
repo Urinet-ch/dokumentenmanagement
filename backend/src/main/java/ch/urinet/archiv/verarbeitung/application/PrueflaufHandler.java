@@ -1,6 +1,7 @@
 package ch.urinet.archiv.verarbeitung.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.domain.AblageGestoert;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
@@ -22,6 +23,7 @@ import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Lauf;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Phase;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Zaehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
+import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -55,8 +57,14 @@ import java.util.UUID;
  * Sperre ist nur in Stufe B eine Abweichung; in den Stufen A und P laufen Sperren nach einem Tag ab (Req 6.11). Am Ende
  * Bericht im Log und in {@code prueflauf}; bei Abweichungen E-Mail an den Inhaber, nur mit IDs (Req 16.7).
  * <p>
- * Ein Fehler beim Prüfen einer einzelnen Datei oder Manifest-Version (S3, Lesen, Verlängern) hält der Lauf als
- * {@code PRUEFFEHLER} fest und prüft weiter, damit eine dauerhaft unlesbare Datei nicht den ganzen Lauf blockiert.
+ * Fehler beim Prüfen einer einzelnen Datei oder Manifest-Version (S3, Lesen, Verlängern): Ist der Object Storage
+ * vorübergehend gestört ({@link AblageGestoert}) oder scheitern {@code archiv.prueflauf.abbruch-nach-fehlern} Prüfungen
+ * in Folge, bricht der Teil ohne Wirkung ab, und die Auftragsschlange wiederholt ihn. Erst im letzten Versuch
+ * ({@link Wiederholung#MAX_VERSUCHE}) hält der Lauf solche Fehler als {@code PRUEFFEHLER} fest und prüft weiter; nach
+ * der Grenze in Folge meldet er den Rest des Teils ohne weiteren Aufruf als {@code PRUEFFEHLER}, damit der Teil nicht
+ * an der Zeitgrenze scheitert. Ein einzelner dauerhafter Fehler wird sofort als {@code PRUEFFEHLER} festgehalten, damit
+ * eine dauerhaft unlesbare Datei nicht den ganzen Lauf blockiert. Eine Unterbrechung (Zeitgrenze, Herunterfahren) gilt
+ * nie als Prüffehler, auch wenn das SDK das Interrupt-Flag gelöscht hat: Sie wird an der Ursache erkannt.
  * <p>
  * Idempotent: Ein Teil, den der Lauf schon festgehalten hat, endet ohne Wirkung; Verlängerungen sind ohnehin
  * wiederholbar (nie verkürzt).
@@ -82,6 +90,7 @@ public class PrueflaufHandler implements AuftragHandler {
     private final Optional<Duration> manifestHoechstfrist;
     private final int dokumenteJeTeil;
     private final int versionenJeTeil;
+    private final int abbruchNachFehlern;
 
     @Inject
     public PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
@@ -92,17 +101,20 @@ public class PrueflaufHandler implements AuftragHandler {
                             @ConfigProperty(name = "archiv.prueflauf.dokumente-je-teil", defaultValue = "100")
                             int dokumenteJeTeil,
                             @ConfigProperty(name = "archiv.prueflauf.versionen-je-teil", defaultValue = "500")
-                            int versionenJeTeil) {
+                            int versionenJeTeil,
+                            @ConfigProperty(name = "archiv.prueflauf.abbruch-nach-fehlern", defaultValue = "5")
+                            int abbruchNachFehlern) {
         this(speichern, ablage, benachrichtigung, Clock.systemUTC(), Stufe.aus(stufe), archivHoechstfrist,
-                manifestHoechstfrist, dokumenteJeTeil, versionenJeTeil);
+                manifestHoechstfrist, dokumenteJeTeil, versionenJeTeil, abbruchNachFehlern);
     }
 
     PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
                      Clock uhr, Stufe stufe, Optional<Duration> archivHoechstfrist,
                      Optional<Duration> manifestHoechstfrist,
-                     int dokumenteJeTeil, int versionenJeTeil) {
-        if (dokumenteJeTeil < 1 || versionenJeTeil < 1 || versionenJeTeil > 1000) {
-            throw new IllegalStateException("archiv.prueflauf.dokumente-je-teil muss ≥ 1, "
+                     int dokumenteJeTeil, int versionenJeTeil, int abbruchNachFehlern) {
+        if (dokumenteJeTeil < 1 || versionenJeTeil < 1 || versionenJeTeil > 1000 || abbruchNachFehlern < 1) {
+            throw new IllegalStateException("archiv.prueflauf.dokumente-je-teil und "
+                    + "archiv.prueflauf.abbruch-nach-fehlern müssen ≥ 1, "
                     + "archiv.prueflauf.versionen-je-teil zwischen 1 und 1000 liegen");
         }
         this.speichern = speichern;
@@ -114,6 +126,7 @@ public class PrueflaufHandler implements AuftragHandler {
         this.manifestHoechstfrist = manifestHoechstfrist;
         this.dokumenteJeTeil = dokumenteJeTeil;
         this.versionenJeTeil = versionenJeTeil;
+        this.abbruchNachFehlern = abbruchNachFehlern;
     }
 
     @Override
@@ -139,10 +152,11 @@ public class PrueflaufHandler implements AuftragHandler {
             LOG.warnf("Prüflauf %s angelegt in Stufe %s, läuft in Stufe %s: massgeblich ist %s", id, lauf.stufe(),
                     stufe, stufe);
         }
+        Sammler s = new Sammler(id, teil, auftrag.versuche() + 1 >= Wiederholung.MAX_VERSUCHE);
         Ergebnis ergebnis = switch (lauf.stand().phase()) {
-            case DATEIEN -> dateien(auftrag.mandant(), lauf);
-            case ARCHIV_VERSIONEN -> archivVersionen(auftrag.mandant(), lauf);
-            case MANIFEST_VERSIONEN -> manifeste(auftrag.mandant(), lauf);
+            case DATEIEN -> dateien(auftrag.mandant(), lauf, s);
+            case ARCHIV_VERSIONEN -> archivVersionen(auftrag.mandant(), lauf, s);
+            case MANIFEST_VERSIONEN -> manifeste(auftrag.mandant(), lauf, s);
             case ABGESCHLOSSEN -> throw new IllegalStateException("unerreichbar");
         };
         if (!speichern.fortschreiben(auftrag, id, teil, ergebnis.weiter(), ergebnis.zaehler(),
@@ -155,15 +169,19 @@ public class PrueflaufHandler implements AuftragHandler {
         }
     }
 
-    private Ergebnis dateien(MandantCode mandant, Lauf lauf) throws InterruptedException {
+    private Ergebnis dateien(MandantCode mandant, Lauf lauf, Sammler s) throws InterruptedException {
         List<Pruefdokument> seite = speichern.archivierte(lauf.stand().nachDokument(), dokumenteJeTeil);
-        Sammler s = new Sammler();
         for (Pruefdokument dokument : seite) {
             for (Datei datei : dokument.dateien()) {
                 unterbrochen();
                 s.dateien++;
+                if (s.gestoert) {
+                    s.abweichung(Art.PRUEFFEHLER, Optional.of(dokument.id()), datei.schluessel(), datei.versionId());
+                    continue;
+                }
                 try {
                     pruefeDatei(mandant, dokument, datei, s);
+                    s.fehlerInFolge = 0;
                 } catch (RuntimeException e) {
                     prueffehler(e, Optional.of(dokument.id()), datei.schluessel(), datei.versionId(), s);
                 }
@@ -201,28 +219,32 @@ public class PrueflaufHandler implements AuftragHandler {
         }
     }
 
-    private Ergebnis archivVersionen(MandantCode mandant, Lauf lauf) {
+    /**
+     * Reihenfolge gegen den Wettlauf mit {@code ARCHIVIEREN}: Das Archivieren setzt {@code ARCHIVIERUNG}, legt die
+     * Versionen ab und hält danach Status {@code ARCHIVIERT} und Versions-IDs in einer Transaktion fest. Gelistet ist vor
+     * beiden Lesungen; darum zuerst den Status, dann die bekannten Versionen lesen: Wer {@code ARCHIVIERUNG} sieht,
+     * überspringt, wer {@code ARCHIVIERT} sieht, sieht danach auch die Versions-IDs (READ COMMITTED).
+     */
+    private Ergebnis archivVersionen(MandantCode mandant, Lauf lauf, Sammler s) {
         Versionsseite seite = ablage.versionen(mandant, ARCHIV, lauf.stand().marke(), versionenJeTeil);
-        Sammler s = new Sammler();
         Set<String> schluessel = new HashSet<>();
-        seite.versionen().forEach(v -> schluessel.add(v.schluessel()));
-        Set<Bekannt> bekannt = speichern.bekannte(schluessel);
-        List<Objektversion> fremd = new ArrayList<>();
+        Set<UUID> ids = new HashSet<>();
         for (Objektversion v : seite.versionen()) {
-            s.versionen++;
-            if (v.loeschmarke()) {
-                s.abweichung(Art.LOESCHMARKE, dokumentId(v.schluessel()), v.schluessel(), Optional.of(v.versionId()));
-            } else if (!bekannt.contains(new Bekannt(v.schluessel(), v.versionId()))) {
-                fremd.add(v);
+            if (!v.loeschmarke()) {
+                schluessel.add(v.schluessel());
+                dokumentId(v.schluessel()).ifPresent(ids::add);
             }
         }
-        Set<UUID> ids = new HashSet<>();
-        fremd.forEach(v -> dokumentId(v.schluessel()).ifPresent(ids::add));
         Map<UUID, DokumentStatus> status = speichern.status(ids);
-        for (Objektversion v : fremd) {
+        Set<Bekannt> bekannt = speichern.bekannte(schluessel);
+        for (Objektversion v : seite.versionen()) {
+            s.versionen++;
             Optional<UUID> dokument = dokumentId(v.schluessel());
-            // während ARCHIVIERUNG stehen die Versions-IDs noch nicht in der Datenbank (design.md «Ablage»)
-            if (dokument.map(status::get).filter(st -> st == DokumentStatus.ARCHIVIERUNG).isEmpty()) {
+            if (v.loeschmarke()) {
+                s.abweichung(Art.LOESCHMARKE, dokument, v.schluessel(), Optional.of(v.versionId()));
+            } else if (!bekannt.contains(new Bekannt(v.schluessel(), v.versionId()))
+                    // während ARCHIVIERUNG stehen die Versions-IDs noch nicht in der Datenbank (design.md «Ablage»)
+                    && dokument.map(status::get).filter(st -> st == DokumentStatus.ARCHIVIERUNG).isEmpty()) {
                 s.abweichung(Art.FREMDE_VERSION, dokument, v.schluessel(), Optional.of(v.versionId()));
             }
         }
@@ -232,9 +254,8 @@ public class PrueflaufHandler implements AuftragHandler {
         return s.ergebnis(weiter);
     }
 
-    private Ergebnis manifeste(MandantCode mandant, Lauf lauf) throws InterruptedException {
+    private Ergebnis manifeste(MandantCode mandant, Lauf lauf, Sammler s) throws InterruptedException {
         Versionsseite seite = ablage.versionen(mandant, MANIFEST, lauf.stand().marke(), versionenJeTeil);
-        Sammler s = new Sammler();
         Instant jetzt = uhr.instant();
         for (Objektversion v : seite.versionen()) {
             unterbrochen();
@@ -243,8 +264,13 @@ public class PrueflaufHandler implements AuftragHandler {
                 continue;
             }
             s.manifeste++;
+            if (s.gestoert) {
+                s.abweichung(Art.PRUEFFEHLER, Optional.empty(), v.schluessel(), Optional.of(v.versionId()));
+                continue;
+            }
             try {
                 pruefeManifest(mandant, v, jetzt, s);
+                s.fehlerInFolge = 0;
             } catch (RuntimeException e) {
                 prueffehler(e, Optional.empty(), v.schluessel(), Optional.of(v.versionId()), s);
             }
@@ -268,15 +294,33 @@ public class PrueflaufHandler implements AuftragHandler {
         pflegen(mandant, v.schluessel(), v.versionId(), bisher, manifestHoechstfrist, s);
     }
 
-    /** Fehler bei einer Datei: festhalten und weiterprüfen; eine Unterbrechung reicht er weiter. */
-    private static void prueffehler(RuntimeException e, Optional<UUID> dokument, String schluessel,
-                                    Optional<String> version, Sammler s) {
-        if (Thread.currentThread().isInterrupted()) {
+    /**
+     * Fehler bei einer Datei. Eine Unterbrechung reicht er weiter, auch wenn das SDK das Interrupt-Flag gelöscht hat (an
+     * der Ursache erkannt; das Flag wird neu gesetzt). Ausser im letzten Versuch bricht ein vorübergehender Fehler oder
+     * die Grenze in Folge den Teil ab, damit die Auftragsschlange ihn wiederholt; sonst festhalten und weiterprüfen.
+     */
+    private void prueffehler(RuntimeException e, Optional<UUID> dokument, String schluessel,
+                             Optional<String> version, Sammler s) {
+        if (Thread.currentThread().isInterrupted() || Ursachen.unterbrechung(e)) {
+            Thread.currentThread().interrupt();
             throw e;
         }
+        s.fehlerInFolge++;
+        boolean voruebergehend = Ursachen.enthaelt(e, AblageGestoert.class);
+        boolean grenze = s.fehlerInFolge >= abbruchNachFehlern;
+        if (!s.letzterVersuch && (voruebergehend || grenze)) {
+            throw new IllegalStateException("Prüflauf " + s.lauf + " Teil " + s.teil + ": "
+                    + (voruebergehend ? "Object Storage vorübergehend gestört" : s.fehlerInFolge + " Prüffehler in Folge")
+                    + ", Teil wird wiederholt", e);
+        }
         // nur Schlüssel und Klassennamen, keine Inhalte (Req 16.7)
-        LOG.warnf("Prüflauf: %s nicht geprüft, ursache=%s", schluessel, Ursachen.kette(e));
+        LOG.warnf("Prüflauf %s Teil %d: %s nicht geprüft, ursache=%s", s.lauf, s.teil, schluessel, Ursachen.kette(e));
         s.abweichung(Art.PRUEFFEHLER, dokument, schluessel, version);
+        if (grenze && !s.gestoert) {
+            s.gestoert = true;
+            LOG.warnf("Prüflauf %s Teil %d: %d Prüffehler in Folge im letzten Versuch, Rest des Teils als PRUEFFEHLER "
+                    + "ohne weitere Prüfung", s.lauf, s.teil, s.fehlerInFolge);
+        }
     }
 
     private void pflegen(MandantCode mandant, String schluessel, String version,
@@ -335,12 +379,23 @@ public class PrueflaufHandler implements AuftragHandler {
     }
 
     private static final class Sammler {
+        private final UUID lauf;
+        private final int teil;
+        private final boolean letzterVersuch;
+        private int fehlerInFolge;
+        private boolean gestoert;
         private int dateien;
         private int versionen;
         private int manifeste;
         private int verlaengert;
         private int nurGezaehlt;
         private final List<Abweichung> abweichungen = new ArrayList<>();
+
+        Sammler(UUID lauf, int teil, boolean letzterVersuch) {
+            this.lauf = lauf;
+            this.teil = teil;
+            this.letzterVersuch = letzterVersuch;
+        }
 
         void abweichung(Art art, Optional<UUID> dokument, String schluessel, Optional<String> version) {
             abweichungen.add(new Abweichung(art, dokument, schluessel, version));

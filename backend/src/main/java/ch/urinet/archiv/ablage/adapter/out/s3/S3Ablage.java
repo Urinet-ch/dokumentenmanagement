@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ablage.adapter.out.s3;
 
 import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
+import ch.urinet.archiv.ablage.domain.AblageGestoert;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
@@ -21,6 +22,7 @@ import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,6 +30,9 @@ import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+import software.amazon.awssdk.core.exception.AbortedException;
+import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
+import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
@@ -66,6 +71,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * S3-Adapter der Ablage (design.md «Ablage»; Spike 0.2: Ceph bei Infomaniak). Nutzt nur den S3-Client von Quarkus mit
@@ -604,6 +610,10 @@ public class S3Ablage implements AblagePort {
     @Override
     public Optional<Dateipruefung> pruefen(MandantCode mandant, String schluessel, String versionId) {
         bereichPruefen(schluessel, versionId);
+        return pruefzugriff(schluessel, () -> pruefenOhneUebersetzung(mandant, schluessel, versionId));
+    }
+
+    private Optional<Dateipruefung> pruefenOhneUebersetzung(MandantCode mandant, String schluessel, String versionId) {
         String bucket = bucket(mandant);
         Lesung lesung;
         try {
@@ -629,10 +639,14 @@ public class S3Ablage implements AblagePort {
             throw new IllegalArgumentException("anzahl zwischen 1 und 1000");
         }
         String bucket = bucket(mandant);
-        ListObjectVersionsResponse antwort = s3.listObjectVersions(b -> {
+        // ohne Versions-ID nur key-marker, nie ein leerer version-id-marker (S3 lehnt ihn ab)
+        ListObjectVersionsResponse antwort = pruefzugriff(praefix, () -> s3.listObjectVersions(b -> {
             b.bucket(bucket).prefix(praefix).maxKeys(anzahl);
-            ab.ifPresent(m -> b.keyMarker(m.schluessel()).versionIdMarker(m.versionId()));
-        });
+            ab.ifPresent(m -> {
+                b.keyMarker(m.schluessel());
+                m.versionId().ifPresent(b::versionIdMarker);
+            });
+        }));
         List<Objektversion> versionen = new ArrayList<>();
         antwort.versions().forEach(v -> versionen.add(new Objektversion(v.key(), v.versionId(), false)));
         antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true)));
@@ -640,7 +654,7 @@ public class S3Ablage implements AblagePort {
         Optional<Versionsseite.Marke> weiter = Boolean.TRUE.equals(antwort.isTruncated())
                 && antwort.nextKeyMarker() != null
                 ? Optional.of(new Versionsseite.Marke(antwort.nextKeyMarker(),
-                        Objects.requireNonNullElse(antwort.nextVersionIdMarker(), "")))
+                        Optional.ofNullable(antwort.nextVersionIdMarker()).filter(v -> !v.isEmpty())))
                 : Optional.empty();
         return new Versionsseite(versionen, weiter);
     }
@@ -649,6 +663,10 @@ public class S3Ablage implements AblagePort {
     public SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId,
                                                Instant bis) {
         bereichPruefen(schluessel, versionId);
+        return pruefzugriff(schluessel, () -> verlaengern(mandant, schluessel, versionId, bis));
+    }
+
+    private SperrAenderung verlaengern(MandantCode mandant, String schluessel, String versionId, Instant bis) {
         String bucket = bucket(mandant);
         Instant jetzt = uhr.instant();
         Optional<Duration> hoechstfrist = schluessel.startsWith(ARCHIV)
@@ -672,6 +690,31 @@ public class S3Ablage implements AblagePort {
             throw new IllegalStateException("Sperre nicht verlängert: " + schluessel);
         }
         return aenderung(datei, SperrAenderung.Ergebnis.VERLAENGERT, Optional.of(kontrolle.get().retainUntilDate()));
+    }
+
+    /**
+     * Fehler beim Prüflauf übersetzen (Req 15.5): Eine Unterbrechung (Zeitgrenze, Herunterfahren) bleibt eine
+     * Unterbrechung, auch wenn das SDK das Interrupt-Flag gelöscht hat ({@link AbortedException}); das Flag wird neu
+     * gesetzt. Netz- und Lesefehler, Zeitüberschreitungen des SDK, 5xx und 429 sind vorübergehend
+     * ({@link AblageGestoert}), der Prüflauf wiederholt dann den Teil. Alles andere bleibt unverändert.
+     */
+    static <T> T pruefzugriff(String schluessel, Supplier<T> aufruf) {
+        try {
+            return aufruf.get();
+        } catch (RuntimeException e) {
+            // der eigene Timer des SDK unterbricht ebenfalls; das ist eine Zeitüberschreitung, kein Abbruch
+            boolean zeitueberschreitung = Ursachen.enthaelt(e, ApiCallTimeoutException.class)
+                    || Ursachen.enthaelt(e, ApiCallAttemptTimeoutException.class);
+            if (!zeitueberschreitung && (Ursachen.enthaelt(e, AbortedException.class) || Ursachen.unterbrechung(e))) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
+            if (e instanceof SdkClientException
+                    || (e instanceof S3Exception s3e && (s3e.statusCode() >= 500 || s3e.statusCode() == 429))) {
+                throw new AblageGestoert(schluessel, e);
+            }
+            throw e;
+        }
     }
 
     private static void bereichPruefen(String schluessel, String versionId) {
