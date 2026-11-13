@@ -22,6 +22,9 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
+            "webWorkerTsConfig": "tsconfig.worker.json",
+            "externalDependencies": ["fs", "path"],
+            "allowedCommonJsDependencies": ["@techstark/opencv-js", "jscanify/client"],
             "inlineStyleLanguage": "scss",
             "assets": [
               {
