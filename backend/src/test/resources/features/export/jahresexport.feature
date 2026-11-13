@@ -94,6 +94,16 @@ Funktionalität: Jahresexport für den Treuhänder (Aufgabe 6.5)
     Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag VERWEIGERT von «<benutzer>»
     Wenn «<benutzer>» die Liste der Exporte abruft
     Dann antwortet das Archiv auf die Anforderung mit 403 «NICHT_ERLAUBT»
+    # erst das Recht, dann die Eingabe: auch eine ungültige ID oder ein falscher Body ergibt 403 mit VERWEIGERT
+    Angenommen der Stand des Zugriffsprotokolls für den Export von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» den Export «keine-uuid» abruft
+    Dann antwortet das Archiv auf die Anforderung mit 403 «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag VERWEIGERT von «<benutzer>»
+    Angenommen der Stand des Zugriffsprotokolls für den Export von «<mandant>» ist gemerkt
+    Wenn «<benutzer>» den Jahresexport mit dem Body «{"geschaeftsjahr":"x"}» anfordert
+    Dann antwortet das Archiv auf die Anforderung mit 403 «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «<mandant>» hat genau einen neuen Eintrag VERWEIGERT von «<benutzer>»
+    Und für «<mandant>» ist kein Auftrag «EXPORT_JAHR» eingereiht
 
     Beispiele:
       | benutzer                       | mandant |
@@ -119,6 +129,27 @@ Funktionalität: Jahresexport für den Treuhänder (Aufgabe 6.5)
     Dann antwortet das Archiv auf die Anforderung mit 409 «STATUS_KONFLIKT»
     Wenn «inhaber-urinet» den Jahresexport 1899 anfordert
     Dann antwortet das Archiv auf die Anforderung mit 400 «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» den Jahresexport mit dem Body «{"geschaeftsjahr":"2025"}» anfordert
+    Dann antwortet das Archiv auf die Anforderung mit 400 «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» den Jahresexport mit dem Body «{"geschaeftsjahr":2025.5}» anfordert
+    Dann antwortet das Archiv auf die Anforderung mit 400 «ANFRAGE_UNGUELTIG»
+    Wenn «treuhaender-urinet» den Export «keine-uuid» abruft
+    Dann antwortet das Archiv auf die Anforderung mit 404 «NICHT_GEFUNDEN»
+
+  @req-7.1
+  Szenario: Ein vor Beginn des Geschäftsjahres archivierter Beleg bringt das Manifest seines Archivierungstags mit
+    Angenommen im Mandanten «urinet» wurde «B_LOHN» am 2024-12-20 archiviert
+    Und im Mandanten «urinet» liegt das Manifest vom 2024-12-20 mit Zeitstempel «sgpki»
+    Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
+    Und der Worker die Aufträge abarbeitet
+    Dann ist der Export «FERTIG» mit 3 Belegen
+    Und das ZIP enthält diese Dateien:
+      | datei |
+      | manifeste/2024-12-20.json |
+      | manifeste/2024-12-20.sig |
+      | manifeste/2024-12-20.sgpki.tsr |
+      | manifeste/2025-03-14.json |
+    Und das ZIP enthält keine Datei «manifeste/2024-06-01.json»
 
   @req-7.1
   Szenario: Das ZIP liegt ohne Sperre unter «exporte/», und der Bucket entfernt es nach 7 Tagen

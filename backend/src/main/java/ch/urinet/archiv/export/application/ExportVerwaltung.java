@@ -100,7 +100,11 @@ public class ExportVerwaltung {
         return new Abruf(export, Optional.of(adresse));
     }
 
-    private void pruefen(Benutzer benutzer) {
+    /**
+     * Exportrecht (Req 7.5): sonst 403 mit Eintrag {@code VERWEIGERT}. Die REST-Schicht ruft es vor jeder Prüfung der
+     * Eingabe auf (ID, Body), damit Benutzer ohne Recht immer 403 erhalten, nie 400 oder 404 (Req 10.7).
+     */
+    public void pruefen(Benutzer benutzer) {
         if (!Exportrecht.erlaubt(benutzer.rolle())) {
             berechtigung.ohneZugang(Optional.of(benutzer.id()), Optional.of(benutzer.rolle()), Optional.empty());
         }

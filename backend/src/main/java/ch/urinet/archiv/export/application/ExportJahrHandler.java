@@ -92,6 +92,10 @@ public class ExportJahrHandler implements AuftragHandler {
         LOG.infof("Export %s fertig: geschaeftsjahr=%d belege=%d dateien=%d manifestdateien=%d groesse=%d",
                 id, export.geschaeftsjahr(), ergebnis.belege(), ergebnis.belegdateien(),
                 ergebnis.manifestdateien(), zip.groesse());
+        if (ergebnis.ohneManifest() > 0) {
+            LOG.infof("Export %s: %d Belege ohne Tages-Manifest ihres Archivierungstags (Manifest folgt nach "
+                    + "Tagesende)", id, ergebnis.ohneManifest());
+        }
         if (stufe != Stufe.P) {
             benachrichtigung.fertig(mandant, id);
         }

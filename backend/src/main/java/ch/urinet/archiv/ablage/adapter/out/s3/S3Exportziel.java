@@ -103,7 +103,12 @@ final class S3Exportziel extends OutputStream implements Exportziel {
         return new AbgelegteDatei(key, versionId, Pruefsumme.hex(digest), groesse, Optional.empty());
     }
 
-    /** Ohne Abschluss: Upload abbrechen; ein Fehler dabei bleibt im Log, die Teile entfernt der Lebenszyklus. */
+    /**
+     * Ohne Abschluss: Upload abbrechen; ein Fehler dabei bleibt im Log, die Teile entfernt der Lebenszyklus (nicht
+     * bei MinIO). Nach einer Unterbrechung (Zeitgrenze, Herunterfahren) ist das Interrupt-Flag gesetzt, und das SDK
+     * bräche jeden Aufruf sofort ab ({@code SdkInterruptedException}); darum löscht der Abbruch das Flag für diesen
+     * einen Aufruf und setzt es danach wieder.
+     */
     @Override
     public void close() {
         if (beendet) {
@@ -113,11 +118,16 @@ final class S3Exportziel extends OutputStream implements Exportziel {
         if (uploadId == null) {
             return;
         }
+        boolean unterbrochen = Thread.interrupted();
         try {
             s3.abortMultipartUpload(b -> b.bucket(bucket).key(key).uploadId(uploadId));
             LOG.debugf("Export-Upload abgebrochen: %s", key);
         } catch (RuntimeException e) {
             LOG.warnf("Export-Upload nicht abgebrochen: %s (%s)", key, e.getClass().getName());
+        } finally {
+            if (unterbrochen) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

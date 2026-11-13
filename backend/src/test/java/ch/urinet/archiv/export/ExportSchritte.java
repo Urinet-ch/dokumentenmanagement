@@ -155,6 +155,13 @@ public class ExportSchritte {
     @Angenommen("im Mandanten «{word}» liegen die Manifeste vom {word} und vom {word} mit Zeitstempel «{word}»")
     public void manifesteAnlegen(String mandant, String erstes, String zweites, String dienst) throws SQLException {
         for (String tag : List.of(erstes, zweites)) {
+            manifestAnlegen(mandant, tag, dienst);
+        }
+    }
+
+    @Angenommen("im Mandanten «{word}» liegt das Manifest vom {word} mit Zeitstempel «{word}»")
+    public void manifestAnlegen(String mandant, String tag, String dienst) throws SQLException {
+        {
             LocalDate datum = LocalDate.parse(tag);
             manifestLoeschen(mandant, datum);
             manifeste.add(new String[]{mandant, tag});
@@ -176,6 +183,23 @@ public class ExportSchritte {
                     OffsetDateTime.now(), tsr[2], tsr[0], tsr[1], "[{\"art\":\"kette\",\"sha256\":\"" + kette[2]
                             + "\",\"s3_version\":\"" + kette[1] + "\"}]");
         }
+    }
+
+    @Angenommen("im Mandanten «{word}» wurde «{word}» am {word} archiviert")
+    public void archiviertAm(String mandant, String name, String tag) throws SQLException {
+        ausfuehren("update " + schema(mandant) + ".dokument set archiviert = ? where id = ?",
+                OffsetDateTime.parse(tag + "T10:00:00+01:00"), belege.get(name).id());
+    }
+
+    @Wenn("«{word}» den Jahresexport mit dem Body «{}» anfordert")
+    public void anfordernRoh(String benutzer, String body) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType("application/json")
+                .body(body).when().post("/api/v1/exporte");
+    }
+
+    @Wenn("«{word}» den Export «{word}» abruft")
+    public void abrufenRoh(String benutzer, String id) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get("/api/v1/exporte/" + id);
     }
 
     @Wenn("«{word}» den Jahresexport {int} anfordert")
@@ -232,6 +256,16 @@ public class ExportSchritte {
     public void dateien(DataTable tabelle) throws Exception {
         List<String> erwartet = tabelle.asMaps().stream().map(z -> ersetzen(z.get("datei"))).toList();
         assertThat(zip().keySet()).containsExactlyInAnyOrderElementsOf(erwartet);
+    }
+
+    @Und("das ZIP enthält diese Dateien:")
+    public void enthaelt(DataTable tabelle) throws Exception {
+        assertThat(zip().keySet()).containsAll(tabelle.asMaps().stream().map(z -> ersetzen(z.get("datei"))).toList());
+    }
+
+    @Und("das ZIP enthält keine Datei «{}»")
+    public void enthaeltNicht(String datei) throws Exception {
+        assertThat(zip().keySet()).doesNotContain(datei);
     }
 
     @Und("im ZIP hat «{}» den Inhalt «{}»")

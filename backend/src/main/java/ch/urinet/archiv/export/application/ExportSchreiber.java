@@ -17,10 +17,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
@@ -32,10 +36,13 @@ import java.util.zip.ZipOutputStream;
  *     <li>{@code belege/<name>} je Datei der Belege des Geschäftsjahres (Status {@code ARCHIVIERT}; PDF/A, bei
  *     {@code pdfa_fehlt} die Originale), seitenweise gelesen und je Datei direkt aus dem Object Storage in das ZIP
  *     kopiert; weicht die SHA-256 von der Datenbank ab, bricht der Export ab.</li>
- *     <li>{@code manifeste/<datum>.<teil>}: die Tages-Manifeste vom ersten Tag des Geschäftsjahres bis zu seinem
- *     letzten Tag oder, falls später, bis zum Tag der letzten Archivierung eines exportierten Belegs (Europe/Zurich),
- *     damit auch spät archivierte Belege des Jahres ihren Nachweis haben; je Manifest JSON, Signatur, Zeitstempel und
- *     Prüfdaten, ebenfalls mit Vergleich der SHA-256.</li>
+ *     <li>{@code manifeste/<datum>.<teil>}: die Tages-Manifeste vom ersten Tag des Geschäftsjahres oder, falls früher,
+ *     vom Tag der ersten Archivierung eines exportierten Belegs bis zum letzten Tag des Geschäftsjahres oder, falls
+ *     später, bis zum Tag der letzten Archivierung (Europe/Zurich), damit jeder exportierte Beleg seinen Nachweis hat
+ *     (auch einer, der vor Beginn oder nach Ende seines Geschäftsjahres archiviert wurde); je Manifest JSON, Signatur,
+ *     Zeitstempel und Prüfdaten, ebenfalls mit Vergleich der SHA-256. Belege, deren Archivierungstag noch kein
+ *     Manifest hat (z. B. am Exporttag archiviert, Manifest erst nach Tagesende), zählt {@link Ergebnis#ohneManifest}
+ *     nur; der Export bleibt gültig, ihr Nachweis folgt im Archiv.</li>
  *     <li>{@code belegliste.csv} ({@link Belegliste}) und zuletzt {@code pruefsummen.sha256} ({@link Pruefsummen}).</li>
  * </ol>
  * Im Heap liegen nur der Puffer der Kopie, je Datei eine Zeile der Belegliste und der Prüfsummen (rund 300 Byte) und
@@ -55,8 +62,11 @@ public class ExportSchreiber {
         Kopie kopieren(String schluessel, String versionId, OutputStream ziel);
     }
 
-    /** Ergebnis: Zahl der Belege (Dokumente) und der Dateien unter {@code belege/} und {@code manifeste/}. */
-    public record Ergebnis(int belege, int belegdateien, int manifestdateien) {
+    /**
+     * Ergebnis: Zahl der Belege (Dokumente), der Dateien unter {@code belege/} und {@code manifeste/} und der Belege,
+     * deren Archivierungstag (noch) kein Tages-Manifest hat.
+     */
+    public record Ergebnis(int belege, int belegdateien, int manifestdateien, int ohneManifest) {
     }
 
     /** Die SHA-256 einer kopierten Datei weicht von der Datenbank ab; nur Schlüssel bzw. Dokument-ID, kein Inhalt. */
@@ -85,7 +95,9 @@ public class ExportSchreiber {
         List<Belegliste.Zeile> zeilen = new ArrayList<>();
         List<String[]> summen = new ArrayList<>();
         ExportDateiname.Vergabe namen = new ExportDateiname.Vergabe();
+        LocalDate von = jahr.ersterTag();
         LocalDate bis = jahr.letzterTag();
+        Map<LocalDate, Integer> archivierungstage = new HashMap<>();
         int anzahl = 0;
         Optional<UUID> nach = Optional.empty();
         while (true) {
@@ -113,7 +125,9 @@ public class ExportSchreiber {
                 }
                 if (beleg.archiviert() != null) {
                     LocalDate archiviert = LocalDate.ofInstant(beleg.archiviert(), ZUERICH);
+                    von = archiviert.isBefore(von) ? archiviert : von;
                     bis = archiviert.isAfter(bis) ? archiviert : bis;
+                    archivierungstage.merge(archiviert, 1, Integer::sum);
                 }
                 anzahl++;
             }
@@ -123,7 +137,8 @@ public class ExportSchreiber {
             nach = Optional.of(liste.getLast().id());
         }
         int manifestdateien = 0;
-        for (ExportBelege.Manifestdatei m : belege.manifeste(jahr.ersterTag(), bis)) {
+        Set<LocalDate> mitManifest = new HashSet<>();
+        for (ExportBelege.Manifestdatei m : belege.manifeste(von, bis)) {
             unterbrochen();
             String pfad = MANIFESTE + m.datum() + "." + m.endung();
             Kopie kopie = eintrag(zip, pfad, null, m.schluessel(), m.versionId());
@@ -132,6 +147,7 @@ public class ExportSchreiber {
             }
             summen.add(new String[]{kopie.sha256(), pfad});
             manifestdateien++;
+            mitManifest.add(m.datum());
         }
         MessageDigest liste = sha256();
         zip.putNextEntry(new ZipEntry(Belegliste.DATEINAME));
@@ -149,7 +165,9 @@ public class ExportSchreiber {
         zip.closeEntry();
         zip.finish();
         zip.flush();
-        return new Ergebnis(anzahl, zeilen.size(), manifestdateien);
+        int ohneManifest = archivierungstage.entrySet().stream().filter(t -> !mitManifest.contains(t.getKey()))
+                .mapToInt(Map.Entry::getValue).sum();
+        return new Ergebnis(anzahl, zeilen.size(), manifestdateien, ohneManifest);
     }
 
     private Kopie eintrag(ZipOutputStream zip, String pfad, Instant zeit, String schluessel, String versionId)

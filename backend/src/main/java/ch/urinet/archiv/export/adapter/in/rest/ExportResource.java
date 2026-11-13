@@ -10,6 +10,9 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
@@ -48,6 +51,7 @@ public class ExportResource {
     private final ExportVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
+    private static final ObjectMapper JSON = new ObjectMapper();
     private final Clock uhr = Clock.systemUTC();
 
     public ExportResource(ExportVerwaltung verwaltung, MandantAufloesung aufloesung, SecurityIdentity identitaet) {
@@ -88,9 +92,12 @@ public class ExportResource {
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ExportAnfrageDto.class)))
     @APIResponse(responseCode = "202", description = "Export angelegt und eingereiht",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
-    public Response anfordern(ExportAnfrageDto anfrage) {
+    public Response anfordern(String body) {
         aufloesung.pruefen();
-        Export export = verwaltung.anfordern(benutzer(), anfrage == null ? null : anfrage.geschaeftsjahr());
+        Benutzer benutzer = benutzer();
+        // erst das Recht, dann der Body: ohne Recht immer 403 mit VERWEIGERT, nie 400 (Req 7.5, 10.7)
+        verwaltung.pruefen(benutzer);
+        Export export = verwaltung.anfordern(benutzer, geschaeftsjahr(body));
         return Response.status(Response.Status.ACCEPTED).entity(dto(export, null)).build();
     }
 
@@ -116,15 +123,32 @@ public class ExportResource {
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
     public Response abrufen(@PathParam("id") String id) {
         MandantCode mandant = aufloesung.pruefen();
+        Benutzer benutzer = benutzer();
+        // erst das Recht, dann die ID: ohne Recht immer 403 mit VERWEIGERT, nie 404 (Req 7.5, 10.7)
+        verwaltung.pruefen(benutzer);
         UUID exportId;
         try {
             exportId = UUID.fromString(id);
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
-        ExportVerwaltung.Abruf abruf = verwaltung.abrufen(benutzer(), mandant, exportId);
+        ExportVerwaltung.Abruf abruf = verwaltung.abrufen(benutzer, mandant, exportId);
         String url = abruf.adresse().map(a -> a.url().toString()).orElse(null);
         return Response.ok(dto(abruf.export(), url)).header(HttpHeaders.CACHE_CONTROL, "no-store").build();
+    }
+
+    /** {@code {"geschaeftsjahr": <ganze Zahl>}}; alles andere ergibt 400 {@code ANFRAGE_UNGUELTIG}. */
+    static Integer geschaeftsjahr(String body) {
+        try {
+            JsonNode wurzel = body == null || body.isBlank() ? null : JSON.readTree(body);
+            JsonNode jahr = wurzel == null || !wurzel.isObject() ? null : wurzel.get("geschaeftsjahr");
+            if (jahr == null || !jahr.isIntegralNumber() || !jahr.canConvertToInt()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            return jahr.intValue();
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
     }
 
     private ExportDto dto(Export e, String url) {

@@ -25,6 +25,12 @@ export function inArbeit(liste: readonly Export[] | null): boolean {
   return (liste ?? []).some((e) => e.status === 'OFFEN');
 }
 
+/** Nach einem Fehler weiter nachfragen, ausser die Sitzung ist abgelaufen oder das Recht fehlt (401, 403). */
+export function weiterFragen(fehler: unknown): boolean {
+  const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
+  return status !== 401 && status !== 403;
+}
+
 export function fehlerText(fehler: unknown): string {
   const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
   if (status === 401) {

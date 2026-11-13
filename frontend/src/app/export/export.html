@@ -35,8 +35,11 @@
   }
   @if (listeFehler()) {
     <p class="fehler" role="alert">{{ listeFehler() }}</p>
-  } @else if (liste() === null) {
-    <p>{{ texte.laden }}</p>
+  }
+  @if (liste() === null) {
+    @if (!listeFehler()) {
+      <p>{{ texte.laden }}</p>
+    }
   } @else if (liste()!.length === 0) {
     <p>{{ texte.keine }}</p>
   } @else {

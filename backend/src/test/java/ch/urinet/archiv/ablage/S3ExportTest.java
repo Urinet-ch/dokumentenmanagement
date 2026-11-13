@@ -113,6 +113,25 @@ class S3ExportTest {
         assertThat(verwaltung.listMultipartUploads(b -> b.bucket(bucket)).uploads()).isEmpty();
     }
 
+    /** Zeitgrenze oder Herunterfahren: Der Abbruch läuft trotz gesetztem Interrupt-Flag, das danach bleibt. */
+    @Test
+    void nachUnterbrechungWirdDerUploadAbgebrochen() throws Exception {
+        UUID id = UUID.randomUUID();
+        boolean nochUnterbrochen;
+        try {
+            try (Exportziel ziel = ablage.exportSchreiben(mandant, id)) {
+                ziel.strom().write(new byte[TEIL + 1]);
+                assertThat(verwaltung.listMultipartUploads(b -> b.bucket(bucket)).uploads()).hasSize(1);
+                Thread.currentThread().interrupt();
+            }
+        } finally {
+            nochUnterbrochen = Thread.interrupted();
+        }
+        assertThat(nochUnterbrochen).isTrue();
+        assertThat(verwaltung.listMultipartUploads(b -> b.bucket(bucket)).uploads()).isEmpty();
+        assertThat(verwaltung.listObjectVersions(b -> b.bucket(bucket).prefix("exporte/")).versions()).isEmpty();
+    }
+
     @Test
     void kopiertGenauDieVersionUndNurAusArchivUndManifest() {
         String key = "archiv/2026/" + UUID.randomUUID() + "/pdfa.pdf";

@@ -18,6 +18,7 @@ import {
   inArbeit,
   jahrGueltig,
   standardJahr,
+  weiterFragen,
 } from './export-logik';
 
 /**
@@ -108,15 +109,23 @@ export class Export implements OnInit {
 
   protected laden(): void {
     clearTimeout(this.abfrage);
-    this.listeFehler.set(null);
     this.exporte.apiV1ExporteGet().subscribe({
       next: (liste) => {
+        this.listeFehler.set(null);
         this.liste.set(liste);
-        if (inArbeit(liste) && !this.beendet) {
-          this.abfrage = setTimeout(() => this.laden(), ABFRAGE_MS);
-        }
+        this.weiter(inArbeit(liste));
       },
-      error: (fehler: unknown) => this.listeFehler.set(fehlerText(fehler)),
+      error: (fehler: unknown) => {
+        // die letzte Liste bleibt stehen; ein vorübergehender Fehler beendet das Nachfragen nicht
+        this.listeFehler.set(fehlerText(fehler));
+        this.weiter(inArbeit(this.liste()) && weiterFragen(fehler));
+      },
     });
+  }
+
+  private weiter(nochmals: boolean): void {
+    if (nochmals && !this.beendet) {
+      this.abfrage = setTimeout(() => this.laden(), ABFRAGE_MS);
+    }
   }
 }

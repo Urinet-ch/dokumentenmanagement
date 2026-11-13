@@ -101,7 +101,8 @@ class ExportSchreiberTest {
         ExportSchreiber.Ergebnis ergebnis = new ExportSchreiber(belege(alle, List.of(manifest)), quelle(), 2)
                 .schreiben(JAHR, aus);
 
-        assertThat(ergebnis).isEqualTo(new ExportSchreiber.Ergebnis(5, 5, 1));
+        // 4 Belege am 2026-02-01 mit Manifest, einer am 2027-02-03 ohne
+        assertThat(ergebnis).isEqualTo(new ExportSchreiber.Ergebnis(5, 5, 1, 1));
         Map<String, byte[]> zip = entpacken(aus.toByteArray());
         assertThat(zip.keySet()).hasSize(8).contains("belege/2026-01-01_QUITTUNG_Q0_Partner.pdf",
                 "manifeste/2026-02-01.json", "belegliste.csv", "pruefsummen.sha256");
@@ -117,6 +118,24 @@ class ExportSchreiberTest {
         String summen = new String(zip.get("pruefsummen.sha256"), StandardCharsets.US_ASCII);
         assertThat(summen.lines().toList()).hasSize(7)
                 .contains(Pruefsumme.von(zip.get("belegliste.csv")) + "  belegliste.csv");
+    }
+
+    /** Vor Beginn des Geschäftsjahres archiviert (GJ aus dem Belegdatum): Manifeste ab dem Archivierungstag. */
+    @Test
+    void manifesteAbDerFruehestenArchivierung() throws Exception {
+        UUID id = new UUID(0, 11);
+        var beleg = new ExportBelege.Beleg(id, "AUSGANGSRECHNUNG", LocalDate.of(2026, 1, 5),
+                Instant.parse("2025-12-20T08:00:00Z"), Instant.parse("2025-12-20T09:00:00Z"), null, null, null, null,
+                null, List.of(datei("archiv/2025/" + id + "/pdfa.pdf", "frueh")));
+
+        ExportSchreiber.Ergebnis ergebnis = new ExportSchreiber(belege(List.of(beleg), List.of()), quelle(), 10)
+                .schreiben(JAHR, OutputStream.nullOutputStream());
+
+        assertThat(manifestAbfragen).singleElement().satisfies(f -> {
+            assertThat(f[0]).isEqualTo(LocalDate.of(2025, 12, 20));
+            assertThat(f[1]).isEqualTo(LocalDate.of(2026, 12, 31));
+        });
+        assertThat(ergebnis.ohneManifest()).isEqualTo(1);
     }
 
     @Test

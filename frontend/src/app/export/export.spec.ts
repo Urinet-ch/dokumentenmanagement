@@ -4,7 +4,14 @@ import { of, throwError } from 'rxjs';
 import { Export as ExportEintrag, ExporteService } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Export } from './export';
-import { ABFRAGE_MS, fehlerText, inArbeit, jahrGueltig, standardJahr } from './export-logik';
+import {
+  ABFRAGE_MS,
+  fehlerText,
+  inArbeit,
+  jahrGueltig,
+  standardJahr,
+  weiterFragen,
+} from './export-logik';
 
 const FERTIG: ExportEintrag = {
   id: 'e1',
@@ -112,6 +119,42 @@ describe('Export: Jahresexport anfordern und herunterladen (Spec 02, Aufgabe 6.5
     expect(service.apiV1ExporteGet).toHaveBeenCalledTimes(2);
   });
 
+  it('fragt nach einem vorübergehenden Fehler weiter nach und behält die Liste', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await starten([{ ...FERTIG, status: 'OFFEN' }], false);
+    service.apiV1ExporteGet.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 502 })),
+    );
+    vi.advanceTimersByTime(ABFRAGE_MS);
+    fixture.detectChanges();
+    expect(service.apiV1ExporteGet).toHaveBeenCalledTimes(2);
+    expect(element.querySelector('[role=alert]')!.textContent).toContain(
+      TEXTE.export.fehlerAllgemein,
+    );
+    expect(element.querySelector('[data-test=export]')!.textContent).toContain(
+      TEXTE.export.status['OFFEN'],
+    );
+    service.apiV1ExporteGet.mockReturnValue(of([FERTIG]));
+    vi.advanceTimersByTime(ABFRAGE_MS);
+    fixture.detectChanges();
+    expect(service.apiV1ExporteGet).toHaveBeenCalledTimes(3);
+    expect(element.querySelector('[role=alert]')).toBeNull();
+    expect(element.querySelector('[data-test=export]')!.textContent).toContain(
+      TEXTE.export.status['FERTIG'],
+    );
+  });
+
+  it('hört bei abgelaufener Sitzung auf nachzufragen', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await starten([{ ...FERTIG, status: 'OFFEN' }], false);
+    service.apiV1ExporteGet.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 401 })),
+    );
+    vi.advanceTimersByTime(ABFRAGE_MS);
+    vi.advanceTimersByTime(3 * ABFRAGE_MS);
+    expect(service.apiV1ExporteGet).toHaveBeenCalledTimes(2);
+  });
+
   it('zeigt abgelaufene und fehlgeschlagene Exporte ohne Download', async () => {
     await starten([
       { ...FERTIG, id: 'a', status: 'ABGELAUFEN' },
@@ -139,5 +182,9 @@ describe('Export: Jahresexport anfordern und herunterladen (Spec 02, Aufgabe 6.5
     expect(fehlerText(new HttpErrorResponse({ status: 0 }))).toBe(TEXTE.export.fehlerVerbindung);
     expect(fehlerText(new Error('x'))).toBe(TEXTE.export.fehlerVerbindung);
     expect(fehlerText(new HttpErrorResponse({ status: 500 }))).toBe(TEXTE.export.fehlerAllgemein);
+    expect(weiterFragen(new HttpErrorResponse({ status: 502 }))).toBe(true);
+    expect(weiterFragen(new Error('Netz'))).toBe(true);
+    expect(weiterFragen(new HttpErrorResponse({ status: 401 }))).toBe(false);
+    expect(weiterFragen(new HttpErrorResponse({ status: 403 }))).toBe(false);
   });
 });
