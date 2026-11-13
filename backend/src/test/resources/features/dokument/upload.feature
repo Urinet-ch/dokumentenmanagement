@@ -331,6 +331,15 @@ Funktionalität: Upload von Dateien
       | datei      | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
       | hinten.pdf | NEU       |                    |      |
 
+  @req-3.8 @req-3.3
+  Szenario: Handy-Upload mit Arbeitsfassungen und einem Teil «dateien» ohne Dateinamen ergibt 400, nichts wird angelegt
+    Wenn «mitarbeiter-urinet» diese Teile «dateien» hochlädt:
+      | datei      | typ                   | arbeitsfassung |
+      | seite1.jpg | jpeg                  | jpeg           |
+      |            | ohne-namen:text/plain |                |
+    Dann antwortet der Upload mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und ist im Mandanten «urinet» nichts gespeichert
+
   @req-3.3
   Szenario: Nur ein Teil «dateien» ohne Dateinamen mit fremdem Typ ergibt 415, nichts wird angelegt
     Wenn «inhaber-urinet» diese Teile «dateien» hochlädt:

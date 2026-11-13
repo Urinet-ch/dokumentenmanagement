@@ -58,7 +58,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
   let erledigt: string[];
   let veraltet: string[];
 
-  async function zeigen(d: Dokument, rolle: Rolle = 'inhaber') {
+  async function zeigen(d: Dokument, rolle: Rolle = 'inhaber', arten: Dokumentart[] = ARTEN) {
     TestBed.configureTestingModule({
       imports: [EingangskorbKarte],
       providers: [
@@ -72,7 +72,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(EingangskorbKarte);
     fixture.componentRef.setInput('dokument', d);
-    fixture.componentRef.setInput('arten', new Map(ARTEN.map((a) => [a.code, a])));
+    fixture.componentRef.setInput('arten', new Map(arten.map((a) => [a.code, a])));
     erledigt = [];
     veraltet = [];
     fixture.componentInstance.erledigt.subscribe((m) => erledigt.push(m));
@@ -382,6 +382,15 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
     expect(hinweis?.textContent).toContain(T.zusatzErgaenzenArt('Lohnabrechnung'));
     expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1?art=LOHNABRECHNUNG');
+  });
+
+  it('gibt eine inaktive Vorschlags-Art nicht weiter und verlangt zuerst eine aktive Art (Review #107)', async () => {
+    const arten = ARTEN.map((a) => (a.code === 'LOHNABRECHNUNG' ? { ...a, aktiv: false } : a));
+    await zeigen(dokument({ vorschlag: { art: 'LOHNABRECHNUNG' } }), 'inhaber', arten);
+    const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
+    expect(hinweis?.querySelector('[data-test=art-inaktiv]')?.textContent).toBe(T.zusatzArtInaktiv('Lohnabrechnung'));
+    expect(hinweis?.textContent).not.toContain(T.zusatzErgaenzenArt('Lohnabrechnung'));
+    expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1');
   });
 
   it('zeigt keinen Zusatz-Hinweis, wenn das Zusatzfeld am Dokument steht', async () => {

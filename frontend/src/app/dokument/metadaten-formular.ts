@@ -16,7 +16,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { Observable, Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
+import { Observable, Subject, catchError, of, switchMap, timer } from 'rxjs';
 import { Dokument, Dokumentart, Kontakt } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
@@ -143,9 +143,12 @@ export class MetadatenFormular {
   constructor() {
     this.suche
       .pipe(
-        debounceTime(300),
+        // Abbruch vor dem Warten: Jeder neue Begriff (auch '' nach «Wählen»/«Entfernen») verwirft sofort einen
+        // laufenden Debounce oder Abruf (Review #107).
         switchMap((q): Observable<readonly Kontakt[] | null> =>
-          q.length < 2 ? of(null) : this.port.kontakte(q).pipe(catchError(() => of([]))),
+          q.length < 2
+            ? of(null)
+            : timer(300).pipe(switchMap(() => this.port.kontakte(q).pipe(catchError(() => of([]))))),
         ),
         takeUntilDestroyed(),
       )

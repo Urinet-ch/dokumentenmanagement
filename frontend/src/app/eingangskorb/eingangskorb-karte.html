@@ -58,6 +58,8 @@
       {{ texte.hinweisZusatz(zusatzNamen()) }}
       @if (artUebernehmen(); as uebernehmen) {
         {{ texte.zusatzErgaenzenArt(art()?.name ?? uebernehmen.art) }}
+      } @else if (artInaktiv()) {
+        <span data-test="art-inaktiv">{{ texte.zusatzArtInaktiv(art()!.name) }}</span>
       }
       <a
         [routerLink]="['/dokument', d.id]"
