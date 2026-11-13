@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
  * IBAN (Prüfziffer mod 97, auch die Kreditor-IBAN des Swiss QR Codes), UID, E-Mail-Adressen und die Belegnummer-Muster,
  * die ein Wort des Belegs treffen. Werte normalisiert (IBAN gross ohne Leerzeichen, E-Mail klein, Muster als Text des
  * regulären Ausdrucks), je Typ höchstens {@value #MAX_JE_TYP} in der Reihenfolge des Vorkommens. Die eigenen Kennungen
- * des Mandanten zählen nicht, sie stehen auf fast jedem Beleg.
+ * des Mandanten zählen nicht, sie stehen auf fast jedem Beleg; die eigene UID wird nur über ihre 9 Ziffern verglichen
+ * (Schreibweise und Zusatz wie «MWST» egal). Alle Ausdrücke laufen in linearer Zeit zur Textlänge: Die E-Mail beginnt
+ * nur am Anfang einer Folge von Zeichen des lokalen Teils und liest diese possessiv.
  */
 public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, Set<String> muster) {
 
@@ -31,7 +33,8 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     private static final Pattern IBAN = Pattern.compile("\\b[A-Z]{2}\\d{2}(?: ?[A-Z0-9]){11,30}");
     private static final Pattern UID = Pattern.compile("CHE-\\d{3}\\.\\d{3}\\.\\d{3}");
-    private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}");
+    private static final Pattern EMAIL = Pattern.compile(
+            "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]++@[A-Za-z0-9-]++(?:\\.[A-Za-z0-9-]++)*+(?<=\\.[A-Za-z]{2,63})");
     private static final Pattern WORT = Pattern.compile("[\\s,;:()]+");
     /** Länge der IBAN der häufigen Länder; sonst gilt die längste gültige. */
     private static final Map<String, Integer> IBAN_LAENGE = Map.of("CH", 21, "LI", 21, "DE", 22, "AT", 20,
@@ -116,11 +119,11 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         while (m.find() && ibans.size() < MAX_JE_TYP) {
             iban(ibanNormal(m.group())).filter(i -> !eigene.contains(i)).ifPresent(ibans::add);
         }
-        String uidEigen = eigeneUid == null ? null : eigeneUid.strip();
+        String uidEigen = ziffern(eigeneUid);
         Set<String> uids = new LinkedHashSet<>();
         m = UID.matcher(t);
         while (m.find() && uids.size() < MAX_JE_TYP) {
-            if (!m.group().equals(uidEigen)) {
+            if (!ziffern(m.group()).equals(uidEigen)) {
                 uids.add(m.group());
             }
         }
@@ -160,6 +163,12 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         } catch (FristAbgelaufen e) {
             return Auswertung.ABGEBROCHEN;
         }
+    }
+
+    /** Die 9 Ziffern einer UID; leer, wenn es nicht genau 9 sind. */
+    private static String ziffern(String uid) {
+        String z = uid == null ? "" : uid.replaceAll("\\D", "");
+        return z.length() == 9 ? z : "";
     }
 
     /** IBAN normalisiert: gross, ohne Leerzeichen. */

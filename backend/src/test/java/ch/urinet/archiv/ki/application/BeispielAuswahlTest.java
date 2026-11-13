@@ -29,6 +29,7 @@ class BeispielAuswahlTest {
     private static final class Port implements KiBeispielPort {
         RuntimeException fehler;
         BeispielSicht sicht;
+        boolean ohneTreffer;
 
         @Override
         public Optional<Lernstand> lernstand(UUID dokumentId) {
@@ -50,22 +51,27 @@ class BeispielAuswahlTest {
                 throw fehler;
             }
             this.sicht = sicht;
-            return List.of(new Beispiel(1, "KORRESPONDENZ", Map.of(Feld.TITEL, "Lernprobe"), merkmale, "NORMAL",
-                    null, Instant.EPOCH));
+            return ohneTreffer ? List.of() : List.of(new Beispiel(1, "KORRESPONDENZ", Map.of(Feld.TITEL, "Lernprobe"),
+                    merkmale, "NORMAL", null, Instant.EPOCH));
         }
 
         @Override
         public List<Beispiel> neueste(BeispielSicht sicht, int anzahl) {
-            return List.of();
+            return List.of(new Beispiel(2, "KORRESPONDENZ", Map.of(Feld.TITEL, "Neueste"), Merkmale.KEINE, "NORMAL",
+                    null, Instant.EPOCH));
         }
     }
 
     private static BenutzerVerzeichnis verzeichnis(String rolle) {
+        return verzeichnis(rolle, Optional.empty(), false);
+    }
+
+    private static BenutzerVerzeichnis verzeichnis(String rolle, Optional<Instant> bis, boolean ohneEintrag) {
         return new BenutzerVerzeichnis() {
             @Override
             public Optional<VerzeichnisEintrag> letzter(Optional<MandantCode> mandant, String benutzer) {
-                return Optional.of(new VerzeichnisEintrag(1, Instant.EPOCH, benutzer, Optional.empty(),
-                        Optional.of(rolle), Instant.EPOCH, Optional.empty(), VerzeichnisEintrag.Anlass.AKTION,
+                return ohneEintrag ? Optional.empty() : Optional.of(new VerzeichnisEintrag(1, Instant.EPOCH, benutzer,
+                        Optional.empty(), Optional.of(rolle), Instant.EPOCH, bis, VerzeichnisEintrag.Anlass.AKTION,
                         Optional.empty()));
             }
 
@@ -85,7 +91,11 @@ class BeispielAuswahlTest {
     }
 
     private static BeispielAuswahl auswahl(Port port, String rolle, boolean aktiv) {
-        return new BeispielAuswahl(port, verzeichnis(rolle), aktiv, Duration.ofMillis(100));
+        return auswahl(port, verzeichnis(rolle), aktiv);
+    }
+
+    private static BeispielAuswahl auswahl(Port port, BenutzerVerzeichnis verzeichnis, boolean aktiv) {
+        return new BeispielAuswahl(port, verzeichnis, new BeispielSchalter(aktiv), Duration.ofMillis(100));
     }
 
     @Test
@@ -93,7 +103,8 @@ class BeispielAuswahlTest {
         Port port = new Port();
 
         assertThat(auswahl(port, "MITARBEITER", true).fuer(UUID.randomUUID(), URINET, TEXT, Optional.empty(), EIGENE))
-                .isEqualTo("- art=KORRESPONDENZ; titel=Lernprobe");
+                .startsWith("Bei früheren Belegen mit gleichen Merkmalen")
+                .endsWith("passt.\n- art=KORRESPONDENZ; titel=Lernprobe");
         assertThat(port.sicht).isEqualTo(new BeispielSicht("joel", true, false));
     }
 
@@ -110,6 +121,28 @@ class BeispielAuswahlTest {
 
         assertThat(auswahl(port, "INHABER", true).fuer(UUID.randomUUID(), URINET, TEXT, Optional.empty(), EIGENE))
                 .isEmpty();
+    }
+
+    @Test
+    void ohneTrefferKommenDieNeuestenMitEigenerEinleitung() {
+        Port port = new Port();
+        port.ohneTreffer = true;
+
+        assertThat(auswahl(port, "MITARBEITER", true).fuer(UUID.randomUUID(), URINET, TEXT, Optional.empty(), EIGENE))
+                .startsWith("Bei den neuesten früheren Belegen, ohne gleiche Merkmale")
+                .endsWith("\n- art=KORRESPONDENZ; titel=Neueste");
+    }
+
+    @Test
+    void nachAustrittOderOhneEintragNurNormaleBeispiele() {
+        for (BenutzerVerzeichnis verzeichnis : List.of(verzeichnis("INHABER", Optional.of(Instant.EPOCH), false),
+                verzeichnis("INHABER", Optional.empty(), true), verzeichnis("API_TOKEN"))) {
+            Port port = new Port();
+
+            auswahl(port, verzeichnis, true).fuer(UUID.randomUUID(), URINET, TEXT, Optional.empty(), EIGENE);
+
+            assertThat(port.sicht).isEqualTo(new BeispielSicht("joel", true, false));
+        }
     }
 
     @Test

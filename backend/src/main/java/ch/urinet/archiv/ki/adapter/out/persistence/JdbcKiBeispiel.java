@@ -4,6 +4,7 @@ import ch.urinet.archiv.ki.application.KiBeispielPort;
 import ch.urinet.archiv.ki.domain.Beispiel;
 import ch.urinet.archiv.ki.domain.BeispielSicht;
 import ch.urinet.archiv.ki.domain.Feld;
+import ch.urinet.archiv.ki.domain.Korrektur;
 import ch.urinet.archiv.ki.domain.Merkmale;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,9 +35,12 @@ import java.util.regex.Pattern;
 
 /**
  * {@code m_<code>.ki_beispiel} des Mandanten aus dem Kontext (Req 7.7, 7.9; Schema immer qualifiziert). Liest dazu aus
- * {@code m_<code>.dokument} Vorschlag, Volltext, Partner und Erfasser. Schreibt in der laufenden Transaktion (die
- * Verbindung von Agroal ist in die JTA-Transaktion eingebunden). Die Sicht filtert schon in SQL; die Domain prüft
- * erneut. Fehlermeldungen ohne Inhalte.
+ * {@code m_<code>.dokument} Vorschlag, Volltext, den Kontakt des Abgleichs und den Erfasser. Schreibt in der laufenden
+ * Transaktion (die Verbindung von Agroal ist in die JTA-Transaktion eingebunden). Die Sicht (Vertraulichkeit, betroffene
+ * Person) liest die Auswahl bei jedem Aufruf aus dem Dokument des Beispiels und filtert schon in SQL; nur bestätigte,
+ * nicht verworfene Dokumente zählen. Die Domain prüft erneut. Die Kandidaten rangiert schon SQL nach der Anzahl
+ * gemeinsamer Merkmale, damit die Grenze von {@code hoechstens} keinen besseren Treffer abschneidet. Fehlermeldungen ohne
+ * Inhalte.
  */
 @ApplicationScoped
 public class JdbcKiBeispiel implements KiBeispielPort {
@@ -44,10 +48,11 @@ public class JdbcKiBeispiel implements KiBeispielPort {
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
-    private static final String SPALTEN = "id, art, korrektur::text, iban, uid, email, muster, vertraulichkeit, "
-            + "person_benutzer, zeit";
-    private static final String SICHT = "(vertraulichkeit = 'NORMAL' and ? or vertraulichkeit = 'INTERN' and ? "
-            + "or vertraulichkeit = 'PERSONAL' and person_benutzer = ?)";
+    private static final String SPALTEN = "b.id, b.art, b.korrektur::text, b.iban, b.uid, b.email, b.muster, "
+            + "d.vertraulichkeit, d.person_benutzer, b.zeit";
+    private static final String SICHT = "d.bestaetigt is not null and d.status <> 'VERWORFEN' "
+            + "and (d.vertraulichkeit = 'NORMAL' and ? or d.vertraulichkeit = 'INTERN' and ? "
+            + "or d.vertraulichkeit = 'PERSONAL' and d.person_benutzer = ?)";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -59,7 +64,7 @@ public class JdbcKiBeispiel implements KiBeispielPort {
 
     @Override
     public Optional<Lernstand> lernstand(UUID dokumentId) {
-        String sql = "select ki_vorschlag::text, volltext, partner_id from " + schema() + ".dokument where id = ?";
+        String sql = "select ki_vorschlag::text, volltext, ki_partner_id from " + schema() + ".dokument where id = ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setObject(1, dokumentId);
@@ -70,7 +75,9 @@ public class JdbcKiBeispiel implements KiBeispielPort {
                 JsonNode vorschlag = JSON.readTree(zeile.getString(1));
                 Map<Feld, String> werte = new EnumMap<>(Feld.class);
                 for (Feld feld : Feld.values()) {
-                    text(vorschlag.get(feld.schluessel())).ifPresent(w -> werte.put(feld, w));
+                    JsonNode knoten = vorschlag.get(feld.schluessel());
+                    Optional<String> wert = feld == Feld.TAGS ? tags(knoten) : text(knoten);
+                    wert.ifPresent(w -> werte.put(feld, w));
                 }
                 return Optional.of(new Lernstand(werte, zeile.getString(2), text(vorschlag.get("partnerIban")),
                         Optional.ofNullable(zeile.getObject(3, UUID.class))));
@@ -97,7 +104,7 @@ public class JdbcKiBeispiel implements KiBeispielPort {
     @Override
     public void speichern(Neu b) {
         String sql = "insert into " + schema() + ".ki_beispiel (partner_id, art, korrektur, iban, uid, email, muster, "
-                + "vertraulichkeit, person_benutzer, dokument_id) values (?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?)";
+                + "dokument_id) values (?, ?, cast(? as jsonb), ?, ?, ?, ?, ?)";
         Map<String, String> korrektur = new LinkedHashMap<>();
         b.korrektur().forEach((feld, wert) -> korrektur.put(feld.schluessel(), wert));
         try (Connection verbindung = datenquelle.get().getConnection();
@@ -109,9 +116,7 @@ public class JdbcKiBeispiel implements KiBeispielPort {
             einfuegen.setArray(5, feld(verbindung, b.merkmale().uids()));
             einfuegen.setArray(6, feld(verbindung, b.merkmale().emails()));
             einfuegen.setArray(7, feld(verbindung, b.merkmale().muster()));
-            einfuegen.setString(8, b.vertraulichkeit());
-            einfuegen.setString(9, b.personBenutzer());
-            einfuegen.setObject(10, b.dokumentId());
+            einfuegen.setObject(8, b.dokumentId());
             einfuegen.executeUpdate();
         } catch (SQLException | JsonProcessingException e) {
             throw new IllegalStateException("KI-Beispiel nicht gespeichert", e);
@@ -120,8 +125,12 @@ public class JdbcKiBeispiel implements KiBeispielPort {
 
     @Override
     public List<Beispiel> kandidaten(Merkmale merkmale, BeispielSicht sicht, int hoechstens) {
-        String sql = "select " + SPALTEN + " from " + schema() + ".ki_beispiel where (iban && ? or uid && ? "
-                + "or email && ? or muster && ?) and " + SICHT + " order by zeit desc, id desc limit ?";
+        String sql = "with m (iban, uid, email, muster) as (select ?::text[], ?::text[], ?::text[], ?::text[]) "
+                + "select " + SPALTEN + " from " + schema() + ".ki_beispiel b join " + schema()
+                + ".dokument d on d.id = b.dokument_id cross join m "
+                + "where (b.iban && m.iban or b.uid && m.uid or b.email && m.email or b.muster && m.muster) and " + SICHT
+                + " order by " + gemeinsam("iban") + " + " + gemeinsam("uid") + " + " + gemeinsam("email") + " + "
+                + gemeinsam("muster") + " desc, b.zeit desc, b.id desc limit ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setArray(1, feld(verbindung, merkmale.ibans()));
@@ -138,8 +147,8 @@ public class JdbcKiBeispiel implements KiBeispielPort {
 
     @Override
     public List<Beispiel> neueste(BeispielSicht sicht, int anzahl) {
-        String sql = "select " + SPALTEN + " from " + schema() + ".ki_beispiel where " + SICHT
-                + " order by zeit desc, id desc limit ?";
+        String sql = "select " + SPALTEN + " from " + schema() + ".ki_beispiel b join " + schema()
+                + ".dokument d on d.id = b.dokument_id where " + SICHT + " order by b.zeit desc, b.id desc limit ?";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             sicht(abfrage, 1, sicht);
@@ -148,6 +157,11 @@ public class JdbcKiBeispiel implements KiBeispielPort {
         } catch (SQLException e) {
             throw new IllegalStateException("KI-Beispiele nicht gelesen", e);
         }
+    }
+
+    /** Anzahl gemeinsamer Werte eines Merkmals (wie {@link Merkmale#treffer}). */
+    private static String gemeinsam(String spalte) {
+        return "cardinality(array(select unnest(b." + spalte + ") intersect select unnest(m." + spalte + ")))";
     }
 
     private static void sicht(PreparedStatement abfrage, int ab, BeispielSicht sicht) throws SQLException {
@@ -182,6 +196,15 @@ public class JdbcKiBeispiel implements KiBeispielPort {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("KI-Beispiel nicht lesbar", e);
         }
+    }
+
+    private static Optional<String> tags(JsonNode knoten) {
+        if (knoten == null || !knoten.isArray()) {
+            return text(knoten);
+        }
+        List<String> liste = new ArrayList<>();
+        knoten.forEach(t -> liste.add(t.asText()));
+        return Optional.ofNullable(Korrektur.tags(liste));
     }
 
     private static Optional<String> text(JsonNode knoten) {

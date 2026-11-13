@@ -7,9 +7,11 @@
     <!-- Korrekturbeispiele der KI (Aufgabe 3.3, Req 7.7, 7.9; design.md «Datenmodell» und «KI»): eine Zeile je
          bestätigtem Vorschlag mit mindestens einem korrigierten Feld. korrektur enthält nur die bestätigten Werte der
          korrigierten Felder; die Merkmale der Vorauswahl stehen als Arrays (ein Beleg kann mehrere IBAN, UID oder
-         E-Mail-Adressen tragen). Kein Auszug des Belegtexts (Datensparsamkeit). vertraulichkeit und person_benutzer
-         stammen aus dem bestätigten Dokument und filtern die Auswahl. dokument_id ohne Fremdschlüssel, damit das Beispiel
-         die spätere Löschfunktion nicht blockiert. Nur eine neue Tabelle, rückwärtskompatibel (tech.md Regel 11). -->
+         E-Mail-Adressen tragen). Kein Auszug des Belegtexts (Datensparsamkeit). Die Sicht (Vertraulichkeit, betroffene
+         Person, bestätigt) liest die Auswahl bei jedem Aufruf aus dem Dokument über dokument_id, damit eine spätere
+         Umstufung sofort wirkt; ein Beispiel ohne Dokument wird nie ausgewählt. dokument_id ohne Fremdschlüssel, damit
+         das Beispiel die spätere Löschfunktion nicht blockiert. Nur eine neue Tabelle, rückwärtskompatibel
+         (tech.md Regel 11). -->
     <changeSet id="016-ki-beispiel" author="archiv">
         <createTable tableName="ki_beispiel">
             <column name="id" type="bigserial">
@@ -34,18 +36,14 @@
             <column name="muster" type="text[]" defaultValueComputed="'{}'::text[]">
                 <constraints nullable="false"/>
             </column>
-            <column name="vertraulichkeit" type="text">
+            <column name="dokument_id" type="uuid">
                 <constraints nullable="false"/>
             </column>
-            <column name="person_benutzer" type="text"/>
-            <column name="dokument_id" type="uuid"/>
             <column name="zeit" type="timestamptz" defaultValueComputed="now()">
                 <constraints nullable="false"/>
             </column>
         </createTable>
         <sql>
-            alter table ki_beispiel add constraint ki_beispiel_vertraulichkeit_ck
-                check (vertraulichkeit in ('NORMAL', 'INTERN', 'PERSONAL'));
             create index ki_beispiel_iban_ix on ki_beispiel using gin (iban);
             create index ki_beispiel_uid_ix on ki_beispiel using gin (uid);
             create index ki_beispiel_email_ix on ki_beispiel using gin (email);
@@ -53,5 +51,15 @@
             create index ki_beispiel_zeit_ix on ki_beispiel (zeit);
             create index ki_beispiel_dokument_ix on ki_beispiel (dokument_id);
         </sql>
+    </changeSet>
+
+    <!-- Kontakt, den der Abgleich (Req 7.4) beim KI-Vorschlag verknüpft hat (Aufgabe 3.3, Req 7.7): Grundlage für
+         «Partner übernommen» beim Bestätigen. partner_id ändert der Benutzer im Eingangskorb per PATCH und taugt darum
+         nicht als Stand des Vorschlags; ki_partner_id schreibt nur der KI-Vorschlag. Nur eine neue, leere Spalte,
+         rückwärtskompatibel (tech.md Regel 11). -->
+    <changeSet id="016-dokument-ki-partner" author="archiv">
+        <addColumn tableName="dokument">
+            <column name="ki_partner_id" type="uuid"/>
+        </addColumn>
     </changeSet>
 </databaseChangeLog>

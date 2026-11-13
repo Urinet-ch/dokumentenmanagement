@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application;
 
+import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Korrektur;
 import ch.urinet.archiv.ki.domain.Merkmale;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,14 +26,18 @@ import java.util.UUID;
 /**
  * Lernen aus Korrekturen beim Bestätigen (Req 7.7; design.md «KI», Korrektur): Differenz zwischen KI-Vorschlag und
  * bestätigtem Ergebnis; bei mindestens einem korrigierten Feld ein Beispiel in {@code ki_beispiel} mit den Merkmalen der
- * Vorauswahl (Req 7.9), in derselben Transaktion wie die Bestätigung. Die Zähler der Korrekturquote laufen erst nach
- * dem Commit, damit eine abgebrochene Bestätigung nicht zählt. Ohne KI-Vorschlag gibt es nichts zu lernen. Das Log
- * nennt nur die Dokument-ID und Anzahlen.
+ * Vorauswahl (Req 7.9), in derselben Transaktion wie die Bestätigung. Die Merkmale kommen aus demselben gekürzten
+ * Text wie bei der Auswahl ({@link ErfassungPrompt#gekuerzt}). Der Partner gilt als übernommen, wenn der bestätigte
+ * Kontakt der ist, den der Abgleich beim Vorschlag verknüpft hat ({@code ki_partner_id}); eine Änderung im
+ * Eingangskorb zählt als Korrektur. Die Zähler der Korrekturquote laufen erst nach dem Commit, damit eine abgebrochene
+ * Bestätigung nicht zählt. Ohne KI-Vorschlag gibt es nichts zu lernen. Das Log nennt nur die Dokument-ID und Anzahlen.
  */
 @ApplicationScoped
 public class KorrekturLernen {
 
     private static final Logger LOG = Logger.getLogger(KorrekturLernen.class);
+    /** Wie {@code DokumentBestaetigen}: ohne Angabe speichert die Bestätigung CHF. */
+    static final String STANDARD_WAEHRUNG = "CHF";
 
     private final KiBeispielPort beispiele;
     private final KorrekturZaehlerPort zaehler;
@@ -49,10 +55,14 @@ public class KorrekturLernen {
         this.zeitgrenze = zeitgrenze;
     }
 
-    /** Bestätigte Werte, wie sie in {@code dokument} und {@code dokument_finanz} landen. */
+    /**
+     * Bestätigte Werte, wie sie in {@code dokument} und {@code dokument_finanz} landen; {@code waehrung} ist die
+     * Eingabe des Benutzers ohne den Standard {@code CHF}. Den Standard setzt {@link #lernen} nur ein,
+     * wenn der Vorschlag eine Währung hatte: Ein vom System eingesetzter Standard ist keine Korrektur.
+     */
     public record Ergebnis(String art, String titel, LocalDate datum, UUID partnerId, String partnerName,
                            boolean finanz, String belegnummer, String richtung, BigDecimal betrag, String waehrung,
-                           LocalDate faelligkeit, String qrReferenz, String vertraulichkeit, String personBenutzer) {
+                           LocalDate faelligkeit, String qrReferenz, String vertraulichkeit, List<String> tags) {
         public Ergebnis {
             Objects.requireNonNull(art, "art");
             Objects.requireNonNull(vertraulichkeit, "vertraulichkeit");
@@ -71,11 +81,12 @@ public class KorrekturLernen {
             w.put(Feld.FAELLIGKEIT, faelligkeit == null ? null : faelligkeit.toString());
             w.put(Feld.QR_REFERENZ, qrReferenz);
             w.put(Feld.VERTRAULICHKEIT, vertraulichkeit);
+            w.put(Feld.TAGS, Korrektur.tags(tags));
             return w;
         }
     }
 
-    /** Stand vor dem Bestätigen (Vorschlag, Volltext, Partner); vor dem Schreiben der Bestätigung lesen. */
+    /** Stand vor dem Bestätigen (Vorschlag, Volltext, Kontakt des Abgleichs); vor dem Schreiben der Bestätigung lesen. */
     public Optional<KiBeispielPort.Lernstand> vorher(UUID dokumentId) {
         return beispiele.lernstand(dokumentId);
     }
@@ -83,18 +94,21 @@ public class KorrekturLernen {
     public void lernen(MandantCode mandant, UUID dokumentId, KiBeispielPort.Lernstand vorher, Ergebnis ergebnis) {
         boolean partnerUebernommen = ergebnis.partnerId() != null
                 && vorher.partnerId().equals(Optional.of(ergebnis.partnerId()));
-        Korrektur korrektur = Korrektur.ermitteln(vorher.vorschlag(), ergebnis.werte(), ergebnis.finanz(),
-                partnerUebernommen);
+        Map<Feld, String> werte = ergebnis.werte();
+        if (werte.get(Feld.WAEHRUNG) == null && vorher.vorschlag().get(Feld.WAEHRUNG) != null) {
+            werte.put(Feld.WAEHRUNG, STANDARD_WAEHRUNG);
+        }
+        Korrektur korrektur = Korrektur.ermitteln(vorher.vorschlag(), werte, ergebnis.finanz(), partnerUebernommen);
         if (korrektur.beispiel()) {
             MandantEinstellungen.Werte eigene = einstellungen.lesen(mandant);
-            Merkmale.Ergebnis merkmale = Merkmale.erkennen(vorher.volltext(), vorher.partnerIban(), eigene.uid(),
+            Merkmale.Ergebnis merkmale = Merkmale.erkennen(ErfassungPrompt.gekuerzt(vorher.volltext()),
+                    vorher.partnerIban(), eigene.uid(),
                     eigene.ibans(), BeispielAuswahl.muster(), Merkmale.Frist.cpu(zeitgrenze));
             merkmale.abgebrochen().forEach(nr -> LOG.warnf(
                     "Belegnummer-Muster %d für Dokument %s nach %s abgebrochen, gilt als nicht zutreffend", nr,
                     dokumentId, zeitgrenze));
             beispiele.speichern(new KiBeispielPort.Neu(dokumentId, ergebnis.art(), korrektur.korrigiert(),
-                    merkmale.merkmale(), ergebnis.vertraulichkeit(), ergebnis.personBenutzer(),
-                    Optional.ofNullable(ergebnis.partnerId())));
+                    merkmale.merkmale(), Optional.ofNullable(ergebnis.partnerId())));
         }
         LOG.infof("Korrektur für Dokument %s: %d von %d Feldern korrigiert, Beispiel %s", dokumentId,
                 korrektur.korrigiert().size(), korrektur.bestaetigt().size(), korrektur.beispiel());

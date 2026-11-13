@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.AntwortSchema;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe.Quelle;
 import ch.urinet.archiv.verarbeitung.adapter.out.ocr.OcrTestdateien;
@@ -72,8 +73,9 @@ public class KiVorschlagSchritte {
     @Angenommen("das Sprachmodell ist bereit")
     public void bereit() throws Exception {
         modell = KiWireMock.zuruecksetzen();
-        auftraege.ausfuehren("delete from m_urinet.ki_beispiel");
-        auftraege.ausfuehren("delete from m_vhf_gsk.ki_beispiel");
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            auftraege.ausfuehren("delete from " + new MandantCode(code).schema() + ".ki_beispiel");
+        }
         verbrauchStand = hilfe.kiVerbrauchStand(MANDANT);
     }
 

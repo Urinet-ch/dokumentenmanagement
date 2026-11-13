@@ -26,9 +26,11 @@ import java.util.regex.Pattern;
 
 /**
  * Korrekturbeispiele für den Aufruf der Erfassung (Req 7.9; design.md «KI», {@code BeispielVorauswahl}): Merkmale des
- * Belegs erkennen, Kandidaten aus {@code ki_beispiel} lesen und deterministisch auswählen, ohne zweiten KI-Aufruf. In den
- * Prompt kommen sie nur mit {@code archiv.ki.beispiele.aktiv=true}; sonst bleibt die Nachricht die des Gate-Laufs, und
- * das Log nennt nur die Anzahl. Ein Fehler beim Lesen kostet nur die Beispiele, nicht den Vorschlag.
+ * Belegs aus dem Text, der ans Modell geht, erkennen, Kandidaten aus {@code ki_beispiel} lesen und deterministisch
+ * auswählen, ohne zweiten KI-Aufruf. In den Prompt kommen sie nur mit {@code archiv.ki.beispiele.aktiv=true}
+ * ({@link BeispielSchalter}); sonst bleibt die Nachricht die des Gate-Laufs, und das Log nennt nur die Anzahl. Die
+ * Einleitung sagt dem Modell, ob die Beispiele gleiche Merkmale tragen oder nur die neuesten sind. Ein Fehler beim
+ * Lesen kostet nur die Beispiele, nicht den Vorschlag.
  */
 @ApplicationScoped
 public class BeispielAuswahl {
@@ -39,35 +41,41 @@ public class BeispielAuswahl {
 
     private final KiBeispielPort beispiele;
     private final BenutzerVerzeichnis verzeichnis;
-    private final boolean aktiv;
+    private final BeispielSchalter schalter;
     private final Duration zeitgrenze;
 
-    public BeispielAuswahl(KiBeispielPort beispiele, BenutzerVerzeichnis verzeichnis,
-                           @ConfigProperty(name = "archiv.ki.beispiele.aktiv") boolean aktiv,
+    public BeispielAuswahl(KiBeispielPort beispiele, BenutzerVerzeichnis verzeichnis, BeispielSchalter schalter,
                            @ConfigProperty(name = "archiv.dokumentart.muster-zeitgrenze") Duration zeitgrenze) {
         this.beispiele = beispiele;
         this.verzeichnis = verzeichnis;
-        this.aktiv = aktiv;
+        this.schalter = schalter;
         this.zeitgrenze = zeitgrenze;
     }
 
-    /** Text für {beispiele}; leer ohne Beispiele oder mit ausgeschaltetem Schalter. */
+    /**
+     * Text für {beispiele}; leer ohne Beispiele oder mit ausgeschaltetem Schalter.
+     *
+     * @param text derselbe (gekürzte) Text, der ans Modell geht ({@code ErfassungPrompt.gekuerzt})
+     */
     public String fuer(UUID dokumentId, MandantCode mandant, String text, Optional<String> qrIban,
                        ErfassungMandant eigene) {
         List<Beispiel> auswahl;
+        boolean nachMerkmalen;
         try {
             Merkmale merkmale = merkmale(text, qrIban, eigene, dokumentId);
             BeispielSicht sicht = sicht(dokumentId, mandant);
             auswahl = BeispielVorauswahl.auswaehlen(merkmale,
                     merkmale.leer() ? List.of() : beispiele.kandidaten(merkmale, sicht, KANDIDATEN_MAX),
                     beispiele.neueste(sicht, BeispielVorauswahl.ANZAHL), sicht);
+            nachMerkmalen = auswahl.stream().anyMatch(b -> merkmale.treffer(b.merkmale()) > 0);
         } catch (RuntimeException e) {
             LOG.warnf("Korrekturbeispiele für Dokument %s nicht gelesen (%s)", dokumentId, e.getClass().getName());
             return "";
         }
-        LOG.infof("Korrekturbeispiele für Dokument %s: %d ausgewählt, im Prompt %s", dokumentId, auswahl.size(),
-                aktiv && !auswahl.isEmpty());
-        return aktiv ? ErfassungPrompt.beispiele(auswahl) : "";
+        boolean aktiv = schalter.aktiv();
+        LOG.infof("Korrekturbeispiele für Dokument %s: %d ausgewählt (%s), im Prompt %s", dokumentId, auswahl.size(),
+                nachMerkmalen ? "Merkmale" : "neueste", aktiv && !auswahl.isEmpty());
+        return aktiv ? ErfassungPrompt.beispiele(auswahl, nachMerkmalen) : "";
     }
 
     /** Merkmale nach {@link Merkmale#erkennen}; ein abgebrochenes Muster nur mit seiner Nummer im Log (Spec 05, Req 2.4). */

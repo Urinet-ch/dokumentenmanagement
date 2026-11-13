@@ -88,14 +88,18 @@ public final class ErfassungPrompt {
 
     /**
      * Korrekturbeispiele vor {@link #BENUTZER} bzw. {@link #BENUTZER_K1} (Req 7.9); {beispiele} aus
-     * {@link #beispiele(List)}. Nicht Teil von {@link #hash}: Ohne Beispiele bleibt die Nachricht die des Gate-Laufs.
+     * {@link #beispiele(List, boolean)} mit der Einleitung je nach Auswahl. Nicht Teil von {@link #hash}: Ohne Beispiele
+     * bleibt die Nachricht die des Gate-Laufs.
      */
     public static final String BEISPIELE = """
-            Korrekturbeispiele: Bei früheren Belegen mit gleichen Merkmalen (IBAN, UID, E-Mail, Belegnummer-Muster) hat \
-            der Benutzer diese Werte bestätigt. Übernimm sie nur, wenn der Beleg dazu passt.
-            {beispiele}
+            Korrekturbeispiele: {beispiele}
 
             """;
+    static final String EINLEITUNG_MERKMALE = "Bei früheren Belegen mit gleichen Merkmalen (IBAN, UID, E-Mail, "
+            + "Belegnummer-Muster) hat der Benutzer diese Werte bestätigt. Übernimm sie nur, wenn der Beleg dazu passt.";
+    static final String EINLEITUNG_NEUESTE = "Bei den neuesten früheren Belegen, ohne gleiche Merkmale wie dieser "
+            + "Beleg, hat der Benutzer diese Werte bestätigt. Sie zeigen nur, worauf er achtet; übernimm keinen Wert, der "
+            + "nicht aus diesem Beleg hervorgeht.";
 
     public static final int MAX_ZEICHEN = 12_000;
     /** Höchstlänge eines Werts in {@link #beispiele(List)}. */
@@ -137,11 +141,19 @@ public final class ErfassungPrompt {
     }
 
     /**
-     * Wert für {beispiele}: je Beispiel eine Zeile mit der bestätigten Art und nur den korrigierten Feldern in der
-     * Reihenfolge von {@link Feld}, Leerraum zusammengefasst, Werte höchstens {@value #MAX_WERT} Zeichen; leer ohne
-     * Beispiele.
+     * Wert für {beispiele}: die Einleitung (Auswahl nach Merkmalen oder Rückfall auf die neuesten), dann je Beispiel
+     * eine Zeile mit der bestätigten Art und nur den korrigierten Feldern in der Reihenfolge von {@link Feld},
+     * Leerraum zusammengefasst, Werte höchstens {@value #MAX_WERT} Zeichen; leer ohne Beispiele.
      */
-    public static String beispiele(List<Beispiel> beispiele) {
+    public static String beispiele(List<Beispiel> beispiele, boolean nachMerkmalen) {
+        if (beispiele.isEmpty()) {
+            return "";
+        }
+        return (nachMerkmalen ? EINLEITUNG_MERKMALE : EINLEITUNG_NEUESTE) + "\n" + zeilen(beispiele);
+    }
+
+    /** Je Beispiel eine Zeile (ohne Einleitung). */
+    static String zeilen(List<Beispiel> beispiele) {
         List<String> zeilen = new ArrayList<>();
         for (Beispiel b : beispiele) {
             StringBuilder sb = new StringBuilder("- art=").append(wert(b.art()));

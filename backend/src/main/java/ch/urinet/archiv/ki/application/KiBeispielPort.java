@@ -26,17 +26,21 @@ public interface KiBeispielPort {
     /** Speichert in der laufenden Transaktion: Scheitert die Bestätigung, entfällt auch das Beispiel. */
     void speichern(Neu beispiel);
 
-    /** Beispiele mit mindestens einem gemeinsamen Merkmal, die die Sicht erlaubt, neueste zuerst. */
+    /**
+     * Beispiele mit mindestens einem gemeinsamen Merkmal, deren Dokument bestätigt ist und die die Sicht nach dem
+     * aktuellen Stand des Dokuments erlaubt; die meisten gemeinsamen Merkmale zuerst, dann die neuesten.
+     */
     List<Beispiel> kandidaten(Merkmale merkmale, BeispielSicht sicht, int hoechstens);
 
-    /** Die neuesten Beispiele, die die Sicht erlaubt. */
+    /** Die neuesten Beispiele, deren Dokument bestätigt ist und die die Sicht erlaubt. */
     List<Beispiel> neueste(BeispielSicht sicht, int anzahl);
 
     /**
      * @param vorschlag   Werte aus {@code ki_vorschlag} je Feld (Text, wie gespeichert)
      * @param volltext    Volltext des Belegs für die Merkmale
      * @param partnerIban vorgeschlagene IBAN des Partners ({@code ki_vorschlag.partnerIban})
-     * @param partnerId   verknüpfter Kontakt vor dem Bestätigen (Abgleich, Req 7.4)
+     * @param partnerId   Kontakt, den der Abgleich beim KI-Vorschlag verknüpft hat ({@code ki_partner_id}, Req 7.4);
+     *                    eine Änderung des Benutzers im Eingangskorb ändert ihn nicht
      */
     record Lernstand(Map<Feld, String> vorschlag, String volltext, Optional<String> partnerIban,
                      Optional<UUID> partnerId) {
@@ -48,14 +52,12 @@ public interface KiBeispielPort {
         }
     }
 
-    record Neu(UUID dokumentId, String art, Map<Feld, String> korrektur, Merkmale merkmale, String vertraulichkeit,
-               String personBenutzer, Optional<UUID> partnerId) {
+    record Neu(UUID dokumentId, String art, Map<Feld, String> korrektur, Merkmale merkmale, Optional<UUID> partnerId) {
         public Neu {
             Objects.requireNonNull(dokumentId, "dokumentId");
             Objects.requireNonNull(art, "art");
             Objects.requireNonNull(korrektur, "korrektur");
             Objects.requireNonNull(merkmale, "merkmale");
-            Objects.requireNonNull(vertraulichkeit, "vertraulichkeit");
             Objects.requireNonNull(partnerId, "partnerId");
         }
     }

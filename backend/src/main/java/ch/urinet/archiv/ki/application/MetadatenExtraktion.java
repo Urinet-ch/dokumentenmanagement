@@ -105,8 +105,8 @@ public class MetadatenExtraktion {
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
         String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
-        String auswahl = beispiele.fuer(eingabe.dokumentId(), eingabe.mandant(), eingabe.text(),
-                qr.map(QrDaten::iban), mandant);
+        String auswahl = beispiele.fuer(eingabe.dokumentId(), eingabe.mandant(),
+                ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
                 auswahl);
         String kennung = ErfassungPrompt.hash(system, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);

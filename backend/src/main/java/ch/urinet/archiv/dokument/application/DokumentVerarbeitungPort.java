@@ -45,7 +45,8 @@ public interface DokumentVerarbeitungPort {
 
     /**
      * Speichert den KI-Vorschlag ({@code ki_vorschlag}, {@code ki_sicherheit} als JSON-Objekte), verknüpft bei
-     * {@code partnerId} den Kontakt (nur, wenn noch keiner verknüpft ist) und setzt {@code EINGANGSKORB} (Req 7.1, 7.4). Nur bei {@code VERARBEITUNG} oder
+     * {@code partnerId} den Kontakt (nur, wenn noch keiner verknüpft ist), hält ihn in {@code ki_partner_id} als Stand
+     * des Abgleichs fest (Req 7.7) und setzt {@code EINGANGSKORB} (Req 7.1, 7.4). Nur bei {@code VERARBEITUNG} oder
      * {@code EINGANGSKORB}, solange nicht bestätigt, ohne Vorschlag und mit {@code version = erwarteteVersion}; ändert
      * sonst nichts, setzt also einen Status nie zurück und überschreibt keine Änderung des Benutzers.
      *

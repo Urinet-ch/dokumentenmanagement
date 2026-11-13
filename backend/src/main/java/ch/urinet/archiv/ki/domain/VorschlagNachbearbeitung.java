@@ -68,6 +68,9 @@ public final class VorschlagNachbearbeitung {
                                       List<ArtEintrag> arten, LocalDate eingang) {
         Map<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
+            if (!f.mitSicherheit()) {
+                continue;
+            }
             sicherheit.put(f, wert(v.sicherheit().get(f)));
         }
 

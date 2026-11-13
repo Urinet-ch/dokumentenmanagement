@@ -73,9 +73,20 @@ class BeispielVorauswahlTest {
         korrektur.put(Feld.PARTNER, null);
         Beispiel b = new Beispiel(1, "LIEFERANTENBELEG", korrektur, Merkmale.KEINE, "NORMAL", null, Instant.EPOCH);
 
-        String text = ErfassungPrompt.beispiele(List.of(b, beispiel(2, 1, Set.of(), Set.of(), "NORMAL", null)));
+        List<Beispiel> liste = List.of(b, beispiel(2, 1, Set.of(), Set.of(), "NORMAL", null));
+        String zeilen = "- art=LIEFERANTENBELEG; titel=Rechnung Büromaterial; partnerName=null; belegnummer="
+                + "x".repeat(200) + "…\n- art=LIEFERANTENBELEG; titel=Titel 2";
 
-        assertThat(text).isEqualTo("- art=LIEFERANTENBELEG; titel=Rechnung Büromaterial; partnerName=null; belegnummer="
-                + "x".repeat(200) + "…\n- art=LIEFERANTENBELEG; titel=Titel 2");
+        assertThat(ErfassungPrompt.beispiele(liste, true)).isEqualTo(ErfassungPrompt.EINLEITUNG_MERKMALE + "\n" + zeilen);
+        assertThat(ErfassungPrompt.beispiele(liste, false)).isEqualTo(ErfassungPrompt.EINLEITUNG_NEUESTE + "\n" + zeilen);
+        assertThat(ErfassungPrompt.beispiele(List.of(), true)).isEmpty();
+    }
+
+    @Test
+    void tagsErscheinenAlsKommaliste() {
+        Beispiel b = new Beispiel(1, "LIEFERANTENBELEG", Map.of(Feld.TAGS, "Büro, Steuern"), Merkmale.KEINE, "NORMAL",
+                null, Instant.EPOCH);
+
+        assertThat(ErfassungPrompt.beispiele(List.of(b), true)).endsWith("\n- art=LIEFERANTENBELEG; tags=Büro, Steuern");
     }
 }

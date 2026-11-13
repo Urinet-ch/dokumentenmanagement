@@ -1,17 +1,21 @@
 package ch.urinet.archiv.ki.domain;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Differenz zwischen KI-Vorschlag und bestätigtem Ergebnis (Req 7.7, design.md «KI», Korrektur). Ein Feld zählt als
  * bestätigt, wenn Vorschlag oder Ergebnis einen Wert tragen; als korrigiert, wenn die Werte verschieden sind. Die
- * Finanzfelder zählen nur, wenn die bestätigte Art die Gruppe {@code finanz} hat. {@link #korrigiert()} enthält nur die
+ * Finanzfelder zählen nur, wenn die bestätigte Art die Gruppe {@code finanz} hat. Tags vergleicht die Korrektur als
+ * Menge ohne Reihenfolge (Text nach {@link #tags}). {@link #korrigiert()} enthält nur die
  * bestätigten Werte der korrigierten Felder ({@code null}, wenn der Benutzer einen Wert entfernt hat).
  */
 public record Korrektur(Set<Feld> bestaetigt, Map<Feld, String> korrigiert) {
@@ -77,6 +81,16 @@ public record Korrektur(Set<Feld> bestaetigt, Map<Feld, String> korrigiert) {
         } catch (NumberFormatException ungueltig) {
             return v.equals(e);
         }
+    }
+
+    /** Tags als Text für den Vergleich: ohne Leerraum am Rand, ohne leere und doppelte, sortiert; {@code null} ohne Tags. */
+    public static String tags(Collection<String> tags) {
+        if (tags == null) {
+            return null;
+        }
+        TreeSet<String> menge = new TreeSet<>();
+        tags.stream().filter(Objects::nonNull).map(String::strip).filter(t -> !t.isEmpty()).forEach(menge::add);
+        return menge.isEmpty() ? null : String.join(", ", menge);
     }
 
     private static String name(String wert) {

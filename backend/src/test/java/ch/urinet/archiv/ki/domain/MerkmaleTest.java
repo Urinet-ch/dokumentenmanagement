@@ -74,4 +74,21 @@ class MerkmaleTest {
         assertThat(a.treffer(b)).isEqualTo(2);
         assertThat(a.treffer(Merkmale.KEINE)).isZero();
     }
+    @Test
+    void eigeneUidZaehltAuchMitZusatzOderAndererSchreibweise() {
+        Merkmale m = Merkmale.erkennen("Von CHE-111.222.333 MWST", Optional.empty(), "che 111 222 333 MWST",
+                List.of(), List.of(), OHNE_GRENZE).merkmale();
+
+        assertThat(m.uids()).isEmpty();
+    }
+
+    /** Lange Läufe ohne {@code @} dürfen den E-Mail-Ausdruck nicht quadratisch machen. */
+    @Test
+    @org.junit.jupiter.api.Timeout(5)
+    void langerTextOhneAtLaeuftLinear() {
+        String text = "a.".repeat(50_000) + " b-".repeat(50_000);
+
+        assertThat(Merkmale.erkennen(text, Optional.empty(), null, List.of(), List.of(), OHNE_GRENZE).merkmale()
+                .emails()).isEmpty();
+    }
 }

@@ -56,4 +56,18 @@ class KorrekturTest {
                 werte(Feld.PARTNER, "Muster Bürobedarf AG"), false, false).korrigiert())
                 .containsEntry(Feld.PARTNER, "Muster Bürobedarf AG");
     }
+
+    @Test
+    void tagsSindEineMengeOhneReihenfolgeUndDuplikate() {
+        assertThat(Korrektur.tags(java.util.List.of("Steuern", " Büro", "Steuern", ""))).isEqualTo("Büro, Steuern");
+        assertThat(Korrektur.tags(java.util.List.of())).isNull();
+        assertThat(Korrektur.ermitteln(werte(Feld.TAGS, "Büro, Steuern"), werte(Feld.TAGS, "Büro"), false, false)
+                .korrigiert()).containsEntry(Feld.TAGS, "Büro");
+    }
+
+    @Test
+    void ohneWaehrungInVorschlagUndErgebnisKeineKorrektur() {
+        assertThat(Korrektur.ermitteln(werte(Feld.WAEHRUNG, null), werte(Feld.WAEHRUNG, null), true, false)
+                .beispiel()).isFalse();
+    }
 }

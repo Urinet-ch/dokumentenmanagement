@@ -156,8 +156,7 @@ public class DokumentBestaetigen {
         }
         vorher.ifPresent(v -> lernen.lernen(mandantCode, id, v, new KorrekturLernen.Ergebnis(art.code(), b.titel(),
                 b.datum(), b.partnerId(), partnerName, finanz, b.belegnummer(), b.richtung(), b.betrag(),
-                b.waehrung() != null ? b.waehrung() : "CHF", b.faelligkeit(), b.qrReferenz(), vertraulichkeit,
-                b.personBenutzer())));
+                b.waehrung(), b.faelligkeit(), b.qrReferenz(), vertraulichkeit, b.tags())));
         auftraege.einreihen(ARCHIVIEREN, new Nutzlast(Map.of(NUTZLAST_DOKUMENT, id)));
         return erwarteteVersion + 1;
     }
