@@ -17,6 +17,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 6.2 Postfach `archiv@urinet.ch` einrichten [Fabian]
   - Postfach bei Infomaniak anlegen, Ordner erstellen, Zulassungsliste (eigene Adressen) pflegen
+  - Stand 13.11.2026: Postfach `archiv@urinet.ch` von Fabian bei Hostpoint angelegt, nicht bei Infomaniak (entschieden von Fabian; Hostpoint ist Schweizer Anbieter, die Mails bleiben in der Schweiz, Spec 01, Req 16.7). IMAP-Server, Benutzer und Passwort sind Konfiguration bzw. Secret, nie im Repo. Offen: Ordner `Archiviert`/`Quarantaene` anlegen, Zulassungsliste, Zugangsdaten im Archiv hinterlegen (nach 6.1)
   - Zugangsdaten nie ins Repo; Ablage gemäss design.md (verschlüsselt in `integration_mail`, Schlüssel aus `/run/secrets/`)
   - _Anforderungen: 1.1, 1.4_
 
