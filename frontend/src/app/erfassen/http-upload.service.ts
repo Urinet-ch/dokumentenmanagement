@@ -1,8 +1,9 @@
-import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
+import { HttpEventType } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, filter, map, of } from 'rxjs';
 import { DokumenteService } from '../gemeinsam/api';
-import { UploadEreignis, UploadErgebnis, UploadPort } from './upload-port';
+import { UploadEreignis, UploadPort } from './upload-port';
+import { uploadProblem } from './upload-problem';
 
 export const UPLOAD_PFAD = '/api/v1/dokumente';
 
@@ -36,18 +37,6 @@ export class HttpUploadService extends UploadPort {
 
 // Sind alle Dateien abgelehnt, kommt Problem Details mit der Erweiterung `ergebnisse` (design.md «Upload»)
 function fehlerAlsEreignis(fehler: unknown): UploadEreignis {
-  const antwort = fehler instanceof HttpErrorResponse ? fehler : null;
-  const inhalt: unknown = antwort?.error;
-  const problem = typeof inhalt === 'object' && inhalt !== null ? (inhalt as Record<string, unknown>) : {};
-  if (Array.isArray(problem['ergebnisse'])) {
-    return { typ: 'fertig', ergebnisse: problem['ergebnisse'] as UploadErgebnis[] };
-  }
-  return {
-    typ: 'fehler',
-    fehler: {
-      status: antwort?.status ?? 0,
-      fehlercode: typeof problem['fehlercode'] === 'string' ? problem['fehlercode'] : undefined,
-      detail: typeof problem['detail'] === 'string' ? problem['detail'] : undefined,
-    },
-  };
+  const { ergebnisse, ...problem } = uploadProblem(fehler);
+  return ergebnisse ? { typ: 'fertig', ergebnisse } : { typ: 'fehler', fehler: problem };
 }

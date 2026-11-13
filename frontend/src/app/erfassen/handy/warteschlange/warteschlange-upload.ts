@@ -1,9 +1,8 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DokumenteService } from '../../../gemeinsam/api';
 import { aufnahmeName } from '../../../gemeinsam/aufnahme-name';
-import { UploadErgebnis } from '../../upload-port';
+import { uploadProblem } from '../../upload-problem';
 import { Ausgang, Eintrag } from './eintrag';
 
 /** Sendet einen Eintrag der Warteschlange als ein Dokument an POST /api/v1/dokumente (design.md «Upload», Req 4.7). */
@@ -22,14 +21,7 @@ export class WarteschlangeUpload {
       const ergebnisse = await firstValueFrom(this.dokumente.apiV1DokumentePost(originale, arbeitsfassungen, true));
       return { art: 'angenommen', ergebnisse: ergebnisse ?? [] };
     } catch (fehler) {
-      const antwort = fehler instanceof HttpErrorResponse ? fehler : null;
-      const problem = typeof antwort?.error === 'object' && antwort.error !== null ? (antwort.error as Record<string, unknown>) : {};
-      return {
-        art: 'abgelehnt',
-        status: antwort?.status ?? 0,
-        detail: typeof problem['detail'] === 'string' ? problem['detail'] : undefined,
-        ergebnisse: Array.isArray(problem['ergebnisse']) ? (problem['ergebnisse'] as UploadErgebnis[]) : undefined,
-      };
+      return { art: 'abgelehnt', ...uploadProblem(fehler) };
     }
   }
 }

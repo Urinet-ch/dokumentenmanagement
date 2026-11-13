@@ -19,6 +19,10 @@ const MELDUNGEN: Meldungen = {
  * Warteschlange der Handy-Erfassung (Req 4.4–4.8): hält Erfassungen in IndexedDB und lädt sie hoch, sobald das Gerät
  * online und der Benutzer mit Recht A1 angemeldet ist – beim Start der App, beim Wechsel auf online, nach der Anmeldung
  * und nach dem Erfassen. Die Tokens liegen nur im Arbeitsspeicher (AnmeldungService), darum kein Background Sync.
+ *
+ * Mandantentrennung: Jeder Eintrag gehört einem Benutzer in einem Mandanten. Nur dieser sieht ihn (Zähler, Liste) und
+ * lädt ihn hoch. Ist die Sitzung abgelaufen, gilt bis zur nächsten Anmeldung weiter der zuletzt angemeldete Benutzer.
+ * Einträge ohne Anmeldung erfasst gehören niemandem; die nächste Anmeldung mit Recht A1 übernimmt sie.
  */
 @Injectable({ providedIn: 'root' })
 export class WarteschlangeService {
@@ -34,10 +38,26 @@ export class WarteschlangeService {
   /** Frühester nächster Versuch je Eintrag nach einem Fehlversuch (nur im Arbeitsspeicher). */
   private readonly nichtVor = new Map<string, number>();
 
-  readonly eintraege = this.alleEintraege.asReadonly();
+  /** Zuletzt angemeldet; gilt weiter, solange die Sitzung nur abgelaufen ist (nicht nach Abmelden oder Neuladen). */
+  private readonly zuletzt = signal<Inhaber | null>(null);
+  private readonly angemeldet = computed<Inhaber | null>(() => {
+    const benutzer = this.anmeldung.benutzer();
+    return this.anmeldung.angemeldet() && benutzer?.id && benutzer.mandant
+      ? { benutzer: benutzer.id, mandant: benutzer.mandant }
+      : null;
+  });
+  private readonly inhaber = computed(
+    () => this.angemeldet() ?? (this.anmeldung.zustand() === 'abgelaufen' ? this.zuletzt() : null),
+  );
+
+  /** Einträge, die das Gerät gerade zeigen darf: die eigenen und die ohne Benutzer, nie die anderer Benutzer. */
+  readonly eintraege = computed(() => {
+    const inhaber = this.inhaber();
+    return this.alleEintraege().filter((e) => !e.benutzer || (!!inhaber && gehoert(e, inhaber)));
+  });
   /** Zähler «wartet auf Upload» (Req 4.4). */
-  readonly wartend = computed(() => this.alleEintraege().filter((e) => e.zustand === 'wartet').length);
-  readonly fehlerhaft = computed(() => this.alleEintraege().filter((e) => e.zustand === 'fehlerhaft'));
+  readonly wartend = computed(() => this.eintraege().filter((e) => e.zustand === 'wartet').length);
+  readonly fehlerhaft = computed(() => this.eintraege().filter((e) => e.zustand === 'fehlerhaft'));
   readonly geladen: Promise<void>;
 
   constructor() {
@@ -53,7 +73,14 @@ export class WarteschlangeService {
       warOnline = online;
     });
     effect(() => {
-      if (this.anmeldung.angemeldet() && this.online()) {
+      const angemeldet = this.angemeldet();
+      if (angemeldet) {
+        untracked(() => this.zuletzt.set(angemeldet));
+      }
+    });
+    // Nach der Anmeldung übernimmt der Lauf die Einträge ohne Benutzer und lädt sie hoch
+    effect(() => {
+      if (this.angemeldet() && this.online()) {
         untracked(() => void this.verarbeiten());
       }
     });
@@ -68,7 +95,7 @@ export class WarteschlangeService {
       seiten,
       fehlversuche: 0,
       zustand: 'wartet',
-      benutzer: this.anmeldung.benutzer()?.id || undefined,
+      ...this.inhaber(),
     };
     await this.speicher.speichern(eintrag);
     // Bittet den Browser, die Warteschlange nicht bei Platzmangel zu räumen (vor allem Safari)
@@ -79,7 +106,7 @@ export class WarteschlangeService {
 
   /** Manuelle Wiederholung eines fehlerhaften Eintrags (Req 4.6, 4.8). */
   async wiederholen(id: string): Promise<void> {
-    const eintrag = this.alleEintraege().find((e) => e.id === id);
+    const eintrag = this.eintraege().find((e) => e.id === id);
     if (eintrag) {
       this.nichtVor.delete(id);
       await this.speicher.speichern({ ...eintrag, zustand: 'wartet', fehlversuche: 0, meldung: undefined });
@@ -108,6 +135,11 @@ export class WarteschlangeService {
 
   private async lauf(): Promise<void> {
     await this.geladen;
+    const angemeldet = this.angemeldet();
+    if (angemeldet) {
+      this.zuletzt.set(angemeldet);
+    }
+    await this.zuordnen();
     for (const eintrag of this.alleEintraege()) {
       if (!this.darfHochladen(eintrag)) {
         continue;
@@ -151,17 +183,35 @@ export class WarteschlangeService {
     this.timer = setTimeout(() => void this.verarbeiten(), nachMs);
   }
 
-  /** Nur mit Recht A1 und nur Einträge, die dieser Benutzer erfasst hat (ohne Benutzer: jeder mit A1). */
+  /** Ordnet Einträge ohne Benutzer dem angemeldeten Benutzer mit Recht A1 und seinem Mandanten zu. */
+  private async zuordnen(): Promise<void> {
+    const inhaber = this.angemeldet();
+    const ohne = this.alleEintraege().filter((e) => !e.benutzer);
+    if (!inhaber || !this.anmeldung.darf('A1') || ohne.length === 0) {
+      return;
+    }
+    for (const eintrag of ohne) {
+      await this.speicher.speichern({ ...eintrag, ...inhaber });
+    }
+    await this.neuLaden();
+  }
+
+  /** Nur angemeldet mit Recht A1 und nur Einträge dieses Benutzers in seinem Mandanten. */
   private darfHochladen(eintrag: Eintrag): boolean {
-    const benutzer = this.anmeldung.benutzer()?.id;
-    return (
-      eintrag.zustand === 'wartet' &&
-      this.anmeldung.darf('A1') &&
-      (!eintrag.benutzer || eintrag.benutzer === benutzer)
-    );
+    const inhaber = this.angemeldet();
+    return eintrag.zustand === 'wartet' && this.anmeldung.darf('A1') && !!inhaber && gehoert(eintrag, inhaber);
   }
 
   private async neuLaden(): Promise<void> {
     this.alleEintraege.set(await this.speicher.alle());
   }
+}
+
+interface Inhaber {
+  benutzer: string;
+  mandant: string;
+}
+
+function gehoert(eintrag: Eintrag, inhaber: Inhaber): boolean {
+  return eintrag.benutzer === inhaber.benutzer && eintrag.mandant === inhaber.mandant;
 }

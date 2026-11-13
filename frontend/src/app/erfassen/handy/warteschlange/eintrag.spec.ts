@@ -55,6 +55,11 @@ describe('bewerten (Req 4.5, 4.6, 4.8)', () => {
       art: 'behalten',
       eintrag: { ...eintrag(), zustand: 'fehlerhaft', meldung: 'Zu gross.' },
     });
+    const nurFehlercode = bewerten(eintrag(), fehler(415, { fehlercode: 'DATEITYP_NICHT_ERLAUBT' }), true, MELDUNGEN);
+    expect(nurFehlercode).toEqual({
+      art: 'behalten',
+      eintrag: { ...eintrag(), zustand: 'fehlerhaft', meldung: 'Dateityp nicht erlaubt' },
+    });
     const ohneDetail = bewerten(eintrag(), fehler(400), true, MELDUNGEN);
     expect(ohneDetail).toEqual({ art: 'behalten', eintrag: { ...eintrag(), zustand: 'fehlerhaft', meldung: 'unbekannt' } });
   });

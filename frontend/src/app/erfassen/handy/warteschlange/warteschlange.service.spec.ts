@@ -1,6 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { AnmeldungService, Benutzer } from '../../../gemeinsam/anmeldung/anmeldung.service';
+import { AnmeldungService, Benutzer, Sitzungszustand } from '../../../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, darf } from '../../../gemeinsam/anmeldung/rechte';
 import { ONLINE } from '../../../gemeinsam/online';
 import { Ausgang, Eintrag } from './eintrag';
@@ -10,14 +10,20 @@ import { WarteschlangeService } from './warteschlange.service';
 
 class AnmeldungAttrappe {
   readonly benutzer = signal<Benutzer | null>(null);
-  readonly angemeldet = computed(() => this.benutzer() !== null);
-  readonly sitzungAbgelaufen = vi.fn(() => this.benutzer.set(null));
+  readonly zustand = signal<Sitzungszustand>('abgemeldet');
+  readonly angemeldet = computed(() => this.zustand() === 'angemeldet');
+  readonly sitzungAbgelaufen = vi.fn(() => this.ende('abgelaufen'));
   darf(aktion: 'A1') {
     const b = this.benutzer();
-    return !!b?.mandant && darf(b.rolle, aktion);
+    return this.angemeldet() && !!b?.mandant && darf(b.rolle, aktion);
   }
-  als(id: string, rolle: Rolle = 'mitarbeiter') {
-    this.benutzer.set({ id, name: 'Test', mandant: 'urinet', rolle });
+  als(id: string, rolle: Rolle = 'mitarbeiter', mandant = 'urinet') {
+    this.benutzer.set({ id, name: 'Test', mandant, rolle });
+    this.zustand.set('angemeldet');
+  }
+  ende(zustand: Sitzungszustand = 'abgemeldet') {
+    this.benutzer.set(null);
+    this.zustand.set(zustand);
   }
 }
 
@@ -184,5 +190,74 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
     anmeldung.als('u1');
     await ruhig();
     expect(upload.gesendet).toHaveLength(1);
+  });
+
+  it('ordnet Einträge ohne Anmeldung der nächsten Anmeldung zu und lädt sie nur in deren Mandanten hoch', async () => {
+    await schlange.hinzufuegen([seite()], new Date());
+    expect(schlange.wartend()).toBe(1);
+    anmeldung.als('a', 'mitarbeiter', 'vhf-gsk');
+    await ruhig();
+    expect([...speicher.inhalt.values()][0]).toMatchObject({ benutzer: 'a', mandant: 'vhf-gsk' });
+    expect(upload.gesendet).toEqual([]);
+
+    online.set(true);
+    for (const [id, mandant] of [['a', 'urinet'], ['b', 'urinet'], ['b', 'vhf-gsk']]) {
+      anmeldung.als(id, 'inhaber', mandant);
+      await ruhig();
+      expect(schlange.wartend()).toBe(0);
+    }
+    anmeldung.ende();
+    await ruhig();
+    expect(schlange.wartend()).toBe(0);
+    expect(upload.gesendet).toEqual([]);
+
+    anmeldung.als('a', 'mitarbeiter', 'vhf-gsk');
+    await ruhig();
+    expect(upload.gesendet).toHaveLength(1);
+  });
+
+  it('zeigt fremde Einträge weder im Zähler noch unter «Nicht hochgeladen»', async () => {
+    anmeldung.als('u1');
+    upload.antworten.push({ art: 'abgelehnt', status: 400, detail: 'Ungültig.' });
+    online.set(true);
+    await schlange.hinzufuegen([seite()], new Date('2026-11-13T07:00:00Z'));
+    await ruhig();
+    online.set(false);
+    await schlange.hinzufuegen([seite()], new Date('2026-11-13T08:00:00Z'));
+    await ruhig();
+    expect(schlange.fehlerhaft()).toHaveLength(1);
+    expect(schlange.wartend()).toBe(1);
+
+    anmeldung.als('u2');
+    await ruhig();
+    expect(schlange.fehlerhaft()).toEqual([]);
+    expect(schlange.wartend()).toBe(0);
+    await schlange.wiederholen([...speicher.inhalt.keys()][0]);
+    expect([...speicher.inhalt.values()][0]).toMatchObject({ zustand: 'fehlerhaft' });
+
+    anmeldung.ende();
+    await ruhig();
+    expect(schlange.fehlerhaft()).toEqual([]);
+    expect(schlange.wartend()).toBe(0);
+  });
+
+  it('ordnet nach Ablauf der Sitzung neue Erfassungen weiter dem zuletzt angemeldeten Benutzer zu', async () => {
+    anmeldung.als('u1');
+    upload.antworten.push({ art: 'abgelehnt', status: 401 });
+    online.set(true);
+    await schlange.hinzufuegen([seite()], new Date('2026-11-13T07:00:00Z'));
+    await ruhig();
+    expect(anmeldung.zustand()).toBe('abgelaufen');
+    await schlange.hinzufuegen([seite()], new Date('2026-11-13T08:00:00Z'));
+    expect(schlange.wartend()).toBe(2);
+    expect([...speicher.inhalt.values()].map((e) => e.benutzer)).toEqual(['u1', 'u1']);
+
+    anmeldung.als('u2');
+    await ruhig();
+    expect(schlange.wartend()).toBe(0);
+    expect(upload.gesendet).toHaveLength(1);
+    anmeldung.als('u1');
+    await ruhig();
+    expect(upload.gesendet).toHaveLength(3);
   });
 });

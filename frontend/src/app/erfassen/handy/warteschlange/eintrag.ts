@@ -20,8 +20,12 @@ export interface Eintrag {
   zustand: Zustand;
   /** Meldung des Servers bzw. Grund bei «fehlerhaft». */
   meldung?: string;
-  /** Benutzer (`sub`), der die Seiten erfasst hat; nur er lädt sie hoch. */
+  /**
+   * Benutzer (`sub`) und Mandant, für die die Seiten erfasst sind; nur dieser Benutzer lädt sie in diesen Mandanten hoch
+   * und sieht sie. Fehlen beide (erfasst ohne Anmeldung), ordnet die nächste Anmeldung mit Recht A1 den Eintrag zu.
+   */
   benutzer?: string;
+  mandant?: string;
 }
 
 export const MAX_FEHLVERSUCHE = 3;
@@ -29,7 +33,7 @@ export const MAX_FEHLVERSUCHE = 3;
 /** Ausgang eines Upload-Versuchs, ohne Angular-Typen. */
 export type Ausgang =
   | { art: 'angenommen'; ergebnisse: UploadErgebnis[] }
-  | { art: 'abgelehnt'; status: number; detail?: string; ergebnisse?: UploadErgebnis[] };
+  | { art: 'abgelehnt'; status: number; fehlercode?: string; detail?: string; ergebnisse?: UploadErgebnis[] };
 
 export type Bewertung =
   | { art: 'loeschen' }
@@ -55,7 +59,10 @@ export function bewerten(eintrag: Eintrag, ausgang: Ausgang, online: boolean, me
     return { art: 'anmelden' };
   }
   if (status >= 400 && status < 500) {
-    const meldung = ausgang.detail ?? meldungAusErgebnissen(ausgang.ergebnisse ?? [], meldungen);
+    const meldung =
+      ausgang.detail ??
+      (ausgang.fehlercode && meldungen.fehlercode[ausgang.fehlercode]) ??
+      meldungAusErgebnissen(ausgang.ergebnisse ?? [], meldungen);
     return fehlerhaft(eintrag, meldung || meldungen.unbekannt);
   }
   if (!online) {
