@@ -256,9 +256,11 @@ PR #87). **Nur von Hand durch Fabian, vor dem ersten Deploy mit Manifest und nac
 `mvn verify` ohnehin nicht aus.
 
 Gestempelt wird nur der SHA-256 einer Zufallsfolge. Je Dienst prüft der Test Token, Policy und CA, holt die
-Prüfdaten (OCSP bzw. CRL) und prüft sie zu `genTime` mit `archiv.tsa.pruefdaten-hoechstalter` (P7D). Scheitert die
-CRL eines Diensts am Höchstalter (z. B. FreeTSA mit seltener ausgestellter CRL), ist das ein Befund für die
-Konfiguration, nicht für den Test.
+Prüfdaten (OCSP bzw. CRL) und prüft sie zu `genTime`: `nextUpdate` nicht vor `genTime` und ausgestellt höchstens
+`archiv.tsa.dienst.<kennung>.pruefdaten-hoechstalter` vor `genTime` (ohne Eintrag `archiv.tsa.pruefdaten-hoechstalter`,
+P7D). Der Test gibt je Dienst `producedAt` (nur OCSP), `thisUpdate` und `nextUpdate` der Prüfdaten aus. Scheitert die
+CRL eines Diensts am Höchstalter (z. B. FreeTSA mit seltener ausgestellter CRL), wird das Höchstalter dieses Diensts
+nach den ausgegebenen Werten gesetzt (nicht das globale), danach den Test wiederholen.
 
 ```bash
 mvn -ntp test -Dtest=TsaSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Darchiv.smoke.tsa=ja \

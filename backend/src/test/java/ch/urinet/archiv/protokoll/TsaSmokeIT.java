@@ -28,8 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Gestempelt wird nur der SHA-256 einer Zufallsfolge, nie ein Inhalt. Je Dienst prüft der Test Token, Policy und
  * CA gegen die Allowlist, holt die Prüfdaten (OCSP bzw. CRL), prüft sie zu {@code genTime} mit dem Höchstalter aus
- * {@code archiv.tsa.pruefdaten-hoechstalter} und prüft den abgelegten Stand wie das Prüfwerkzeug. Ausgabe nur Kennung,
- * {@code genTime}, Art und Grösse der Prüfdaten.
+ * {@code archiv.tsa.dienst.<kennung>.pruefdaten-hoechstalter} (sonst {@code archiv.tsa.pruefdaten-hoechstalter}) und
+ * prüft den abgelegten Stand wie das Prüfwerkzeug. Ausgabe nur Kennung, {@code genTime}, Art und Grösse der Prüfdaten
+ * sowie deren {@code producedAt} (nur OCSP), {@code thisUpdate} und {@code nextUpdate}, damit das Höchstalter je Dienst
+ * an den tatsächlichen Werten festgelegt werden kann.
  */
 @EnabledIfSystemProperty(named = "archiv.smoke.tsa", matches = "ja")
 class TsaSmokeIT {
@@ -51,6 +53,9 @@ class TsaSmokeIT {
         for (String dienst : dienste) {
             Stempel stempel = adapter.stempeln(dienst, imprint);
             Pruefdaten pruefdaten = adapter.pruefdaten(dienst, stempel);
+            BcZeitstempelAdapter.Zeitraum zeitraum = BcZeitstempelAdapter.zeitraum(pruefdaten);
+            System.out.printf("SMOKE %s pruefdaten=%s producedAt=%s thisUpdate=%s nextUpdate=%s%n", dienst,
+                    pruefdaten.art(), zeitraum.producedAt(), zeitraum.thisUpdate(), zeitraum.nextUpdate());
             Instant genTime = adapter.pruefenAbgelegt(dienst, stempel.tsr(), imprint, stempel.kettePem(), pruefdaten);
             assertThat(genTime).isEqualTo(stempel.genTime());
             System.out.printf("SMOKE %s genTime=%s pruefdaten=%s (%d Bytes) gültig%n", dienst, genTime,

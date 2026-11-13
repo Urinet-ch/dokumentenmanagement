@@ -72,8 +72,9 @@ import java.util.concurrent.TimeoutException;
  * (Req 16.7). Eine Antwort gilt nur, wenn Status, Nonce und Imprint stimmen, die Policy-OID und die ausstellende CA in
  * der Allowlist des Dienstes stehen und die Signatur des Tokens mit dem TSA-Zertifikat (kritische EKU timeStamping)
  * besteht. Prüfdaten (OCSP oder CRL) kommen nur von den konfigurierten Adressen, nie aus dem Zertifikat (AIA), und
- * müssen die Zeit des Stempels abdecken: nicht älter als {@code archiv.tsa.pruefdaten-hoechstalter} vor {@code genTime}
- * und, falls angegeben, nicht vor {@code genTime} abgelaufen.
+ * müssen die Zeit des Stempels abdecken: {@code nextUpdate} (falls angegeben) nicht vor {@code genTime} und ausgestellt
+ * höchstens das Höchstalter des Dienstes vor {@code genTime} ({@code archiv.tsa.dienst.<kennung>.pruefdaten-hoechstalter},
+ * sonst {@code archiv.tsa.pruefdaten-hoechstalter}, Startwert P7D).
  */
 @ApplicationScoped
 public class BcZeitstempelAdapter implements ZeitstempelPort {
@@ -160,11 +161,11 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                 builder.addRequest(zertifikatId(tsa, ca));
                 byte[] antwort = senden(d.ocsp().get(), "application/ocsp-request", builder.build().getEncoded(),
                         MAX_ANTWORT);
-                ocspPruefen(antwort, tsa, ca, stempel.genTime(), hoechstalter);
+                ocspPruefen(antwort, tsa, ca, stempel.genTime(), hoechstalter(d));
                 return new Pruefdaten(Pruefdaten.Art.OCSP, antwort);
             }
             byte[] crl = holen(d.crl().orElseThrow(), MAX_CRL);
-            crlPruefen(crl, tsa, ca, stempel.genTime(), hoechstalter);
+            crlPruefen(crl, tsa, ca, stempel.genTime(), hoechstalter(d));
             return new Pruefdaten(Pruefdaten.Art.CRL, crl);
         } catch (OCSPException | IOException e) {
             throw new ZeitstempelFehler("Prüfdaten für " + kennung + " nicht erhalten", e);
@@ -173,7 +174,8 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
 
     @Override
     public Instant pruefenAbgelegt(String kennung, byte[] tsr, byte[] imprint, String kettePem, Pruefdaten pruefdaten) {
-        Allowlist erlaubt = Allowlist.von(konfiguriert(kennung));
+        TsaDienst d = konfiguriert(kennung);
+        Allowlist erlaubt = Allowlist.von(d);
         List<X509Certificate> kette = kette(kettePem);
         Stempel stempel = geprueft(kennung, erlaubt, tsr, imprint, kette);
         List<X509Certificate> geprueft = kette(stempel.kettePem());
@@ -181,10 +183,44 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             throw new ZeitstempelFehler("Abgelegte Zertifikatskette passt nicht zum Zeitstempel von " + kennung);
         }
         switch (pruefdaten.art()) {
-            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(), hoechstalter);
-            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(), hoechstalter);
+            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(),
+                    hoechstalter(d));
+            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(),
+                    hoechstalter(d));
         }
         return stempel.genTime();
+    }
+
+    private Duration hoechstalter(TsaDienst d) {
+        return d.pruefdatenHoechstalter().orElse(hoechstalter);
+    }
+
+    /** Ausstellung und Ablauf von Prüfdaten (OCSP: {@code producedAt}, {@code thisUpdate}, {@code nextUpdate}). */
+    public record Zeitraum(Instant producedAt, Instant thisUpdate, Instant nextUpdate) {
+    }
+
+    /** Liest den Zeitraum von Prüfdaten ohne weitere Prüfung (für den Smoke-Test); leere Felder sind {@code null}. */
+    public static Zeitraum zeitraum(Pruefdaten pruefdaten) {
+        try {
+            if (pruefdaten.art() == Pruefdaten.Art.CRL) {
+                X509CRL crl = (X509CRL) CertificateFactory.getInstance("X.509")
+                        .generateCRL(new ByteArrayInputStream(pruefdaten.inhalt()));
+                return new Zeitraum(null, instant(crl.getThisUpdate()), instant(crl.getNextUpdate()));
+            }
+            OCSPResp resp = new OCSPResp(pruefdaten.inhalt());
+            if (!(resp.getResponseObject() instanceof BasicOCSPResp basic) || basic.getResponses().length == 0) {
+                throw new ZeitstempelFehler("OCSP-Antwort ohne Ergebnis");
+            }
+            SingleResp einzel = basic.getResponses()[0];
+            return new Zeitraum(instant(basic.getProducedAt()), instant(einzel.getThisUpdate()),
+                    instant(einzel.getNextUpdate()));
+        } catch (IOException | OCSPException | CRLException | CertificateException e) {
+            throw new ZeitstempelFehler("Prüfdaten nicht lesbar", e);
+        }
+    }
+
+    private static Instant instant(Date d) {
+        return d == null ? null : d.toInstant();
     }
 
     /** Prüft ein Token gegen Imprint und Allowlist; {@code zusatz} sind weitere Zertifikate (abgelegte Kette). */
@@ -330,7 +366,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
      */
     static void aktuell(String was, Date ausgestellt, Date naechstes, Instant genTime, Duration hoechstalter) {
         if (ausgestellt == null || ausgestellt.toInstant().isBefore(genTime.minus(hoechstalter))) {
-            throw new ZeitstempelFehler(was + " ist zu alt für den Zeitstempel (archiv.tsa.pruefdaten-hoechstalter)");
+            throw new ZeitstempelFehler(was + " ist zu alt für den Zeitstempel (pruefdaten-hoechstalter des Diensts)");
         }
         if (naechstes != null && naechstes.toInstant().isBefore(genTime)) {
             throw new ZeitstempelFehler(was + " war zur Zeit des Zeitstempels abgelaufen");

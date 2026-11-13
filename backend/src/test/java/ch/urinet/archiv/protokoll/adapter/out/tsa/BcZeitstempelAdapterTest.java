@@ -158,6 +158,38 @@ class BcZeitstempelAdapterTest {
     }
 
     @Test
+    void dasHoechstalterDerPruefdatenGiltJeDienst(@TempDir Path ordner) throws Exception {
+        TsaTestPki b = TsaTestPki.neu("b");
+        Map<String, String> werte = new HashMap<>();
+        werte.put("archiv.tsa.dienste", "a,b");
+        block(werte, ordner, "a", PKI, POLICY);
+        block(werte, ordner, "b", b, POLICY);
+        werte.put("archiv.tsa.dienst.b.pruefdaten-hoechstalter", "P40D");
+        Instant jetzt = Instant.now();
+        Instant ausgestellt = jetzt.minus(Duration.ofDays(30));
+        Instant naechstes = jetzt.plus(Duration.ofDays(30));
+        byte[] tsrA = PKI.tsr(anfrage(IMPRINT), POLICY);
+        byte[] tsrB = b.tsr(anfrage(IMPRINT), POLICY);
+        Pruefdaten crlA = new Pruefdaten(Pruefdaten.Art.CRL, PKI.crl(false, ausgestellt, naechstes));
+        Pruefdaten crlB = new Pruefdaten(Pruefdaten.Art.CRL, b.crl(false, ausgestellt, naechstes));
+        BcZeitstempelAdapter adapter = adapter(werte);
+
+        assertThat(adapter.pruefenAbgelegt("b", tsrB, IMPRINT, TsaTestPki.pem(b.tsa) + TsaTestPki.pem(b.ca), crlB))
+                .isAfter(jetzt.minus(Duration.ofMinutes(1)));
+        assertThatThrownBy(() -> adapter.pruefenAbgelegt("a", tsrA, IMPRINT,
+                TsaTestPki.pem(PKI.tsa) + TsaTestPki.pem(PKI.ca), crlA))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("zu alt");
+        BcZeitstempelAdapter.Zeitraum zeitraum = BcZeitstempelAdapter.zeitraum(crlB);
+        assertThat(zeitraum.thisUpdate()).isBetween(ausgestellt.minusSeconds(1), ausgestellt.plusSeconds(1));
+        assertThat(zeitraum.nextUpdate()).isBetween(naechstes.minusSeconds(1), naechstes.plusSeconds(1));
+
+        werte.put("archiv.tsa.dienst.b.pruefdaten-hoechstalter", "7 Tage");
+        assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("b", tsrB, IMPRINT,
+                TsaTestPki.pem(b.tsa) + TsaTestPki.pem(b.ca), crlB))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessage("Zeitstempeldienst b ist falsch konfiguriert");
+    }
+
+    @Test
     void einDienstMitPolicyEinesAnderenAberFremderCaWirdAbgelehnt(@TempDir Path ordner) throws Exception {
         TsaTestPki b = TsaTestPki.neu("b");
         Map<String, String> werte = new HashMap<>();

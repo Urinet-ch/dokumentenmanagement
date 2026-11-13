@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,10 +25,11 @@ import java.util.stream.Stream;
 /**
  * Konfiguration eines Zeitstempeldienstes {@code archiv.tsa.dienst.<kennung>.*} (Req 15.3, 15.11; 4.9-E1): {@code url},
  * {@code policies} (erlaubte Policy-OIDs), {@code ca} (PEM der erlaubten ausstellenden CAs; beginnt der Wert mit
- * {@code /}, ist es eine Datei, sonst eine Ressource im Classpath), dazu {@code ocsp-url} oder {@code crl-url}.
+ * {@code /}, ist es eine Datei, sonst eine Ressource im Classpath), dazu {@code ocsp-url} oder {@code crl-url} und
+ * optional {@code pruefdaten-hoechstalter} (sonst {@code archiv.tsa.pruefdaten-hoechstalter}).
  */
 record TsaDienst(String kennung, URI url, Set<String> policies, List<X509Certificate> cas, Optional<URI> ocsp,
-                 Optional<URI> crl) {
+                 Optional<URI> crl, Optional<Duration> pruefdatenHoechstalter) {
 
     static final String DIENSTE = "archiv.tsa.dienste";
     private static final Pattern OID = Pattern.compile("[0-2](\\.\\d+)+");
@@ -39,7 +42,7 @@ record TsaDienst(String kennung, URI url, Set<String> policies, List<X509Certifi
     /** Ob ein Block {@code archiv.tsa.dienst.<kennung>.*} konfiguriert ist (auch für ausgetragene Dienste). */
     static boolean vorhanden(Config config, String kennung) {
         String p = "archiv.tsa.dienst." + kennung + ".";
-        return Stream.of("url", "policies", "ca", "ocsp-url", "crl-url")
+        return Stream.of("url", "policies", "ca", "ocsp-url", "crl-url", "pruefdaten-hoechstalter")
                 .anyMatch(s -> config.getOptionalValue(p + s, String.class).isPresent());
     }
 
@@ -61,7 +64,21 @@ record TsaDienst(String kennung, URI url, Set<String> policies, List<X509Certifi
         if (ocsp.isEmpty() && crl.isEmpty()) {
             throw new IllegalStateException(p + "ocsp-url oder " + p + "crl-url fehlt (Prüfdaten, Req 15.11)");
         }
-        return new TsaDienst(kennung, url, Set.copyOf(policies), List.copyOf(cas), ocsp, crl);
+        Optional<Duration> hoechstalter = config.getOptionalValue(p + "pruefdaten-hoechstalter", String.class)
+                .map(w -> dauer(w, p + "pruefdaten-hoechstalter"));
+        return new TsaDienst(kennung, url, Set.copyOf(policies), List.copyOf(cas), ocsp, crl, hoechstalter);
+    }
+
+    private static Duration dauer(String wert, String schluessel) {
+        try {
+            Duration d = Duration.parse(wert.trim());
+            if (d.isNegative() || d.isZero()) {
+                throw new IllegalStateException(schluessel + " muss grösser als 0 sein");
+            }
+            return d;
+        } catch (DateTimeParseException e) {
+            throw new IllegalStateException(schluessel + " ist keine Dauer (ISO 8601, z. B. P7D)", e);
+        }
     }
 
     private static IllegalStateException fehlt(String schluessel) {
