@@ -228,6 +228,50 @@ public class DokumentSchritte {
         }).isInstanceOf(SQLException.class).hasMessageContaining("dokument_version: nur Einfügen erlaubt");
     }
 
+    /**
+     * Req 16.11, Rücksprung: Insert ({@code DOKUMENT_ANLEGEN} vor 4.10, ohne {@code dateiname}) und Titel-Update des
+     * Vorgänger-Releases gegen das Schema mit Changeset 015.
+     */
+    @Wenn("das Vorgänger-Release im Mandanten «{word}» das Dokument «{word}» mit dem Titel «{}» anlegt")
+    public void vorgaengerAnlegen(String mandant, String name, String titel) throws SQLException {
+        UUID id = UUID.randomUUID();
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anlegen = verbindung.prepareStatement("insert into " + schema + ".dokument "
+                     + "(id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis) "
+                     + "values (?, now(), 'UPLOAD', 'PERSONAL', ?, 'NEU', null)");
+             PreparedStatement aendern = verbindung.prepareStatement("update " + schema
+                     + ".dokument set titel = ? where id = ?")) {
+            anlegen.setObject(1, id);
+            anlegen.setString(2, Testanmeldung.sub("inhaber-" + mandant));
+            anlegen.executeUpdate();
+            aendern.setString(1, titel);
+            aendern.setObject(2, id);
+            aendern.executeUpdate();
+        }
+        dokumente.put(name, new Ort(mandant, id));
+    }
+
+    /** Req 16.11: Trefferbedingung und Rang der Suche vor 4.10 laufen gegen das neue {@code volltext_tsv}. */
+    @Dann("findet die Suche des Vorgänger-Releases mit «{}» das Dokument «{word}» ohne Dateinamen")
+    public void vorgaengerSuche(String begriff, String name) throws SQLException {
+        Ort ort = dokumente.get(name);
+        String schema = new MandantCode(ort.mandant()).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement suchen = verbindung.prepareStatement("select d.id, d.dateiname, "
+                     + "ts_rank_cd(d.volltext_tsv, websearch_to_tsquery('german', ?)) as rang from " + schema
+                     + ".dokument d where d.volltext_tsv @@ websearch_to_tsquery('german', ?) and d.id = ?")) {
+            suchen.setString(1, begriff);
+            suchen.setString(2, begriff);
+            suchen.setObject(3, ort.id());
+            try (ResultSet treffer = suchen.executeQuery()) {
+                assertThat(treffer.next()).as("Treffer").isTrue();
+                assertThat(treffer.getString("dateiname")).as("dateiname").isNull();
+                assertThat(treffer.getFloat("rang")).as("Rang").isPositive();
+            }
+        }
+    }
+
     private void dateinameSetzen(String mandant, UUID id, String dateiname) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement setzen = verbindung.prepareStatement("update " + new MandantCode(mandant).schema()

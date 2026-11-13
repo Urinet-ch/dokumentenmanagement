@@ -47,6 +47,11 @@ public class PanacheDokumentSuche implements SuchePort {
     private static final String MARKEN = "chr(2) || chr(3) || chr(31)";
     // der Dateiname in der Form des Index, sonst bildete ts_headline andere Wörter (Req 14.8)
     private static final String AUSZUG_DATEINAME = "nullif(archiv_dateiname_text(d.dateiname), ''), ";
+    /*
+     * Ohne Dateinamen (Req 3.13) treffen und ranken nur die Teile A–C. Bewusst ohne zusätzliches
+     * "volltext_tsv @@ q" für den GIN-Index: Bei einer Negation («-Wort») entschiede sonst der Dateiname mit.
+     */
+    private static final String OHNE_DATEINAME = "ts_filter(d.volltext_tsv, '{a,b,c}')";
     private static final String AUSZUG = "ts_headline('german', translate(concat_ws(' ', d.titel, d.partner_name, "
             + "archiv_tags_text(d.tags), %sleft(d.volltext, " + AUSZUG_ZEICHEN + ")), " + MARKEN + ", ''), " + TSQ
             + ", 'StartSel=' || chr(2) || ', StopSel=' || chr(3) || ', FragmentDelimiter=' || chr(31) "
@@ -93,9 +98,10 @@ public class PanacheDokumentSuche implements SuchePort {
         List<String> bedingungen = new ArrayList<>();
         bedingungen.add(sicht.bedingung());
         boolean mitBegriff = a.begriff() != null;
+        String vektor = mitDateiname ? "d.volltext_tsv" : OHNE_DATEINAME;
         if (mitBegriff) {
             // exakte Belegnummer zählt als Treffer, auch ohne Volltext (Req 14.7)
-            bedingungen.add("(d.volltext_tsv @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
+            bedingungen.add("(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
                     + "from dokument_finanz b where b.belegnummer = :begriff)))");
             parameter.put("begriff", a.begriff());
         }
@@ -147,7 +153,7 @@ public class PanacheDokumentSuche implements SuchePort {
                     left join dokument_finanz f on f.dokument_id = d.id
                 ) s on true
                 order by %s""".formatted(
-                mitBegriff ? "ts_rank_cd(d.volltext_tsv, " + TSQ + ")" : "cast(0 as real)",
+                mitBegriff ? "ts_rank_cd(" + vektor + ", " + TSQ + ")" : "cast(0 as real)",
                 mitBegriff ? "coalesce(f.belegnummer = :begriff, false)" : "false",
                 String.join("\n      and ", bedingungen),
                 ordnung,

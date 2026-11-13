@@ -486,7 +486,18 @@ public class BestaetigenSchritte {
     /** Pfade wie {@code finanz.konto} im Dokument der Antwort; ohne Eintrag im Eingangskorb das Dokument selbst. */
     @Dann("liefert das Archiv beim Dokument «{word}» diese Angaben:")
     public void angaben(String name, Map<String, String> erwartet) {
-        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        angaben(200, name, erwartet);
+    }
+
+    /** Wie {@link #angaben(String, Map)} für die Antwort mit 202 vom Bestätigen (Req 14.9). */
+    @Dann("liefert die Bestätigung beim Dokument «{word}» diese Angaben:")
+    public void bestaetigungsAngaben(String name, Map<String, String> erwartet) {
+        angaben(202, name, erwartet);
+        assertThat(antwort.header("ETag")).isEqualTo("\"" + antwort.<Integer>path("version") + "\"");
+    }
+
+    private void angaben(int status, String name, Map<String, String> erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);
         String basis = antwort.jsonPath().get("eintraege") != null
                 ? "eintraege.find { it.id == '" + ort(name).id() + "' }." : "";
         if (basis.isEmpty()) {

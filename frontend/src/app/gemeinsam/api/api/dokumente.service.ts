@@ -355,10 +355,10 @@ export class DokumenteService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Dokument>;
+    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Dokument>>;
+    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Dokument>>;
+    public apiV1DokumenteIdBestaetigenPost(id: string, ifMatch: string, bestaetigung: Bestaetigung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiV1DokumenteIdBestaetigenPost.');
         }
@@ -378,6 +378,7 @@ export class DokumenteService extends BaseService {
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
 
         const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
         ]);
         if (localVarHttpHeaderAcceptSelected !== undefined) {
             localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
@@ -410,7 +411,7 @@ export class DokumenteService extends BaseService {
 
         let localVarPath = `/api/v1/dokumente/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}/bestaetigen`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<any>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Dokument>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: bestaetigung,

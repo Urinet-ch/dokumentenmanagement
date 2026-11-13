@@ -19,7 +19,21 @@ describe('aufnahmeName (Req 4.9)', () => {
   });
 
   it('hängt nicht von der Zeitzone des Geräts ab', () => {
-    // Derselbe Zeitpunkt, als Ortszeit eines Geräts in New York (UTC−5) geschrieben
-    expect(aufnahmeName(new Date('2026-11-13T02:15:00-05:00'))).toBe('Aufnahme 13.11.2026 08:15');
+    // Zeitzone des Prozesses (Node) auf New York (UTC−5) umstellen; die Probe zeigt, dass die Umstellung wirkt
+    const umgebung = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process
+      .env;
+    const vorher = umgebung['TZ'];
+    umgebung['TZ'] = 'America/New_York';
+    try {
+      expect(new Date('2026-11-13T07:15:00Z').getHours()).toBe(2);
+      expect(aufnahmeName(new Date('2026-11-13T07:15:00Z'))).toBe('Aufnahme 13.11.2026 08:15');
+      expect(aufnahmeName(new Date('2026-11-13T04:30:00Z'))).toBe('Aufnahme 13.11.2026 05:30');
+    } finally {
+      if (vorher === undefined) {
+        delete umgebung['TZ'];
+      } else {
+        umgebung['TZ'] = vorher;
+      }
+    }
   });
 });

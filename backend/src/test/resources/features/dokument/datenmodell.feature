@@ -109,6 +109,11 @@ Funktionalität: Datenmodell Dokument – Versionen, Zusatzfelder und Indizes (A
       | benutzer       | dokument | status | dateiname |
       | inhaber-urinet | DN_ALT   | 200    |           |
 
+  @req-16.11
+  Szenario: Nach dem Rücksprung schreibt und sucht das Vorgänger-Release mit der neuen Spalte weiter
+    Wenn das Vorgänger-Release im Mandanten «urinet» das Dokument «DN_RUECK» mit dem Titel «Synthetischer Rückweg» anlegt
+    Dann findet die Suche des Vorgänger-Releases mit «Rückweg» das Dokument «DN_RUECK» ohne Dateinamen
+
   @req-14.9 @req-3.11
   Szenario: Der Eingangskorb nennt den Dateinamen
     Angenommen im Mandanten «urinet» liegen diese Dokumente:

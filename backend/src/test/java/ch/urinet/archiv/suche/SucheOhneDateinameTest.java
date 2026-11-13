@@ -35,8 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Variante der Suche ohne Dateinamen (Req 3.13, design.md «Dateiname»): Werkzeuge anderer Sprachmodelle und
- * {@code /public/v1} erhalten weder das Feld {@code dateiname} noch den Namen im Auszug; die PWA-Variante schon
- * (Req 14.8, 14.9). Synthetische Daten.
+ * {@code /public/v1} erhalten weder das Feld {@code dateiname} noch den Namen im Auszug, und der Name wirkt dort
+ * auch nicht über die Treffermenge; die PWA-Variante schon (Req 14.8, 14.9). Synthetische Daten.
  */
 @QuarkusTest
 class SucheOhneDateinameTest {
@@ -89,34 +89,44 @@ class SucheOhneDateinameTest {
 
     @Test
     void ohneDateinameFehltErInTrefferUndAuszug() throws Exception {
-        Suchtreffer treffer = einzigerTreffer(false);
-        assertThat(treffer.dateiname()).isNull();
-        assertThat(treffer.auszug()).extracting(AuszugTeil::text)
+        List<Suchtreffer> treffer = suchen("Synthetischer", false);
+        assertThat(treffer).extracting(Suchtreffer::id).containsExactly(id);
+        assertThat(treffer.getFirst().dateiname()).isNull();
+        assertThat(treffer.getFirst().auszug()).extracting(AuszugTeil::text)
                 .noneMatch(t -> t.contains("Zebrafink") || t.contains("Abschluss"));
     }
 
     @Test
+    void ohneDateinameTrifftEinWortNurAusDemNamenNicht() throws Exception {
+        assertThat(suchen("Zebrafink", false)).isEmpty();
+        assertThat(suchen("Abschluss", false)).isEmpty();
+    }
+
+    @Test
+    void ohneDateinameWirktAuchEineNegationNichtUeberDenNamen() throws Exception {
+        assertThat(suchen("Synthetischer -Zebrafink", false)).extracting(Suchtreffer::id).containsExactly(id);
+    }
+
+    @Test
     void mitDateinameLiefertDiePwaVarianteNameUndHervorhebung() throws Exception {
-        Suchtreffer treffer = einzigerTreffer(true);
-        assertThat(treffer.dateiname()).isEqualTo(NAME);
-        assertThat(treffer.auszug()).contains(new AuszugTeil("Zebrafink", true));
+        List<Suchtreffer> treffer = suchen("Zebrafink", true);
+        assertThat(treffer).extracting(Suchtreffer::id).containsExactly(id);
+        assertThat(treffer.getFirst().dateiname()).isEqualTo(NAME);
+        assertThat(treffer.getFirst().auszug()).contains(new AuszugTeil("Zebrafink", true));
     }
 
     /** Eigener Thread ohne Anfrage-Kontext, wie im {@link SucheLeistungTest}. */
-    private Suchtreffer einzigerTreffer(boolean mitDateiname) throws Exception {
-        Suchanfrage anfrage = new Suchanfrage("Zebrafink", null, null, null, null, null, null, null, List.of(lauf),
+    private List<Suchtreffer> suchen(String begriff, boolean mitDateiname) throws Exception {
+        Suchanfrage anfrage = new Suchanfrage(begriff, null, null, null, null, null, null, null, List.of(lauf),
                 null, null, null, null, 0, Suchanfrage.GROESSE_STANDARD);
         Sichtregel regel = Sichtregel.fuer(new Benutzer("fabian", Rolle.INHABER));
         ExecutorService worker = Executors.newSingleThreadExecutor();
-        List<Suchtreffer> treffer;
         try {
-            treffer = worker.submit(() -> kontext.mit(new MandantCode(MANDANT),
+            return worker.submit(() -> kontext.mit(new MandantCode(MANDANT),
                     () -> QuarkusTransaction.requiringNew().call(() -> suche.suchen(anfrage, regel, mitDateiname))))
                     .get(30, TimeUnit.SECONDS).treffer();
         } finally {
             worker.shutdown();
         }
-        assertThat(treffer).extracting(Suchtreffer::id).containsExactly(id);
-        return treffer.getFirst();
     }
 }

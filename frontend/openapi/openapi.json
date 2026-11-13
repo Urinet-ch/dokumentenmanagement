@@ -363,7 +363,7 @@
             "items" : {
               "$ref" : "#/components/schemas/DokumentVersion"
             },
-            "description" : "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET und PATCH), im Eingangskorb leer"
+            "description" : "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer"
           }
         }
       },
@@ -2378,10 +2378,17 @@
         },
         "responses" : {
           "202" : {
-            "description" : "Bestätigt, Archivierung eingereiht",
+            "description" : "Bestätigt, Archivierung eingereiht; Körper ist das Dokument nach der Bestätigung (Req 14.9)",
             "headers" : {
               "ETag" : {
                 "description" : "Neue Version des Dokuments"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Dokument"
+                }
               }
             }
           },

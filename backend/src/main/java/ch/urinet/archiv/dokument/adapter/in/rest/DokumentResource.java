@@ -289,7 +289,7 @@ public class DokumentResource {
             @Schema(nullable = true) FinanzDto finanz,
             @Schema(nullable = true) VertragDto vertrag,
             @Schema(required = true, description = "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim "
-                    + "einzelnen Dokument (GET und PATCH), im Eingangskorb leer") List<VersionDto> versionen) {
+                    + "einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer") List<VersionDto> versionen) {
     }
 
     @GET
@@ -363,8 +363,11 @@ public class DokumentResource {
                     + "eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN; Aufbewahrungsfrist abgelaufen ohne "
                     + "fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Ein Feld dateiname → 400 ANFRAGE_UNGUELTIG "
                     + "(Req 3.14). Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.")
-    @APIResponse(responseCode = "202", description = "Bestätigt, Archivierung eingereiht",
-            headers = @Header(name = "ETag", description = "Neue Version des Dokuments"))
+    @APIResponse(responseCode = "202", description = "Bestätigt, Archivierung eingereiht; Körper ist das Dokument "
+            + "nach der Bestätigung (Req 14.9)",
+            headers = @Header(name = "ETag", description = "Neue Version des Dokuments"),
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = DokumentDto.class)))
     @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
     @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response bestaetigen(@PathParam("id") UUID id,
@@ -376,8 +379,12 @@ public class DokumentResource {
             // dateiname ist nicht änderbar (Req 3.14), auch nicht als null
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        int neu = bestaetigen.bestaetigen(benutzer(identitaet), id, version, angaben.bestaetigung());
-        return Response.accepted().tag(new EntityTag(Integer.toString(neu))).build();
+        Benutzer benutzer = benutzer(identitaet);
+        bestaetigen.bestaetigen(benutzer, id, version, angaben.bestaetigung());
+        Dokument dokument = lesen.lesen(benutzer, id);
+        return Response.accepted(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
+                        lesen.fassungen(dokument)))
+                .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
     @POST

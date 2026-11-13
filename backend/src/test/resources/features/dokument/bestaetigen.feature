@@ -250,12 +250,34 @@ Funktionalität: Dokument bestätigen und archivieren
     Und ist für das Dokument «Q» kein Auftrag «ARCHIVIEREN» eingereiht
 
   @req-3.14
-  Szenario: Ein Feld «dateiname» in der Bestätigung antwortet mit 400, das Dokument bleibt im Eingangskorb
+  Szenariogrundriss: Ein Feld «dateiname» in der Bestätigung antwortet mit 400, das Dokument bleibt im Eingangskorb (<fall>)
     Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und das Dokument «Q» hat den Dateinamen «Quittung_Probe.pdf»
-    Wenn «inhaber-urinet» das Dokument «Q» mit dem Körper '{"art": "QUITTUNG", "titel": "Quittung", "datum": "2026-03-10", "richtung": "AUSGABE", "betrag": "12.00", "waehrung": "CHF", "dateiname": "anders.pdf"}' bestätigt
+    Wenn «inhaber-urinet» das Dokument «Q» mit dem Körper '{"art": "QUITTUNG", "titel": "Quittung", "datum": "2026-03-10", "richtung": "AUSGABE", "betrag": "12.00", "waehrung": "CHF", "dateiname": <wert>}' bestätigt
     Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
     Und ist das Dokument «Q» im Status «EINGANGSKORB»
     Und ist für das Dokument «Q» kein Auftrag «ARCHIVIEREN» eingereiht
     Und hat das Dokument «Q» diese Werte:
       | dateiname | Quittung_Probe.pdf |
+
+    Beispiele:
+      | fall       | wert         |
+      | neuer Name | "anders.pdf" |
+      | null       | null         |
+
+  @req-14.9
+  Szenario: Die Antwort vom Bestätigen ist das Dokument mit seinem Dateinamen
+    Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und das Dokument «Q» hat den Dateinamen «Quittung_Probe.pdf»
+    Wenn «inhaber-urinet» das Dokument «Q» so bestätigt:
+      | art      | QUITTUNG   |
+      | titel    | Quittung   |
+      | datum    | 2026-03-10 |
+      | richtung | AUSGABE    |
+      | betrag   | 12.00      |
+      | waehrung | CHF        |
+    Dann liefert die Bestätigung beim Dokument «Q» diese Angaben:
+      | status    | ARCHIVIERUNG       |
+      | titel     | Quittung           |
+      | dateiname | Quittung_Probe.pdf |
+    Und trägt die Antwort das ETag der neuen Version von «Q»

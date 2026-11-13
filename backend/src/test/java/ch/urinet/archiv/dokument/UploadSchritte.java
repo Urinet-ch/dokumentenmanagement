@@ -201,6 +201,33 @@ public class UploadSchritte {
         merken(mandantCode);
     }
 
+    /** Zeilen mit Typ {@code ohne-namen:<MIME>} gehen als Teil {@code dateien} ohne Dateinamen mit Text. */
+    @Wenn("«{word}» diese Teile «dateien» hochlädt:")
+    public void teileHochladen(String benutzer, DataTable tabelle) {
+        String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
+        List<Datei> dateien = new ArrayList<>();
+        RequestSpecification spec = given().auth().oauth2(Testanmeldung.token(benutzer)).config(UTF8)
+                .contentType("multipart/form-data; charset=UTF-8");
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            String typ = zeile.get("typ");
+            if (typ.startsWith("ohne-namen:")) {
+                spec = spec.multiPart(new MultiPartSpecBuilder("synthetischer Text").controlName("dateien")
+                        .mimeType(typ.substring("ohne-namen:".length())).charset(StandardCharsets.UTF_8)
+                        .emptyFileName().build());
+            } else {
+                Datei datei = new Datei(zeile.get("datei"), inhalt(zeile.get("datei"), typ), null);
+                dateien.add(datei);
+                spec = spec.multiPart(new MultiPartSpecBuilder(datei.inhalt()).controlName("dateien")
+                        .fileName(datei.name()).mimeType("application/octet-stream").build());
+            }
+        }
+        stand(mandantCode, dateien);
+        gesendet = dateien;
+        rohAntwort = null;
+        antwort = spec.when().post(PFAD);
+        merken(mandantCode);
+    }
+
     @Angenommen("das Dokument zur Datei «{}» ist verworfen")
     public void verworfen(String name) throws SQLException {
         UUID id = dokumentVon.get(name);

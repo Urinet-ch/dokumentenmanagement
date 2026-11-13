@@ -318,6 +318,29 @@ Funktionalität: Upload von Dateien
       | ..                         | datei            |                  | nur Punkte                    |
       | {3×Leerzeichen}            | datei            |                  | nur Leerzeichen               |
 
+  @req-3.8 @req-3.3
+  Szenario: Ein Teil «dateien» ohne Dateinamen mit fremdem Typ wird an seiner Stelle abgelehnt, die Nachbarn angenommen
+    Wenn «inhaber-urinet» diese Teile «dateien» hochlädt:
+      | datei        | typ                   |
+      | vorne.pdf    | pdf                   |
+      |              | ohne-namen:text/plain |
+      | hinten.pdf   | pdf                   |
+    Dann antwortet der Upload mit Status 202 und diesen Ergebnissen:
+      | datei      | status    | fehlercode         | http |
+      | vorne.pdf  | NEU       |                    |      |
+      | datei      | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+      | hinten.pdf | NEU       |                    |      |
+
+  @req-3.3
+  Szenario: Nur ein Teil «dateien» ohne Dateinamen mit fremdem Typ ergibt 415, nichts wird angelegt
+    Wenn «inhaber-urinet» diese Teile «dateien» hochlädt:
+      | datei | typ                   |
+      |       | ohne-namen:text/plain |
+    Dann antwortet der Upload mit Status 415, Fehlercode «DATEITYP_UNBEKANNT» und diesen Ergebnissen:
+      | datei | status    | fehlercode         | http |
+      | datei | ABGELEHNT | DATEITYP_UNBEKANNT | 415  |
+    Und ist im Mandanten «urinet» nichts gespeichert
+
   @req-3.9 @req-3.4 @req-3.5
   Szenario: Mehrere Dateien als ein Dokument tragen den Namen der ersten angenommenen Datei
     Angenommen «inhaber-urinet» hat die Datei «alt.pdf» (pdf) hochgeladen
@@ -369,15 +392,17 @@ Funktionalität: Upload von Dateien
     Und hat jedes neue Dokument den Dateinamen «Team {U+1F468}{U+200D}{U+1F469}.pdf» und keinen Titel
 
   @req-3.12
-  Szenario: Der Dateiname erscheint nicht in Log, Zugriffsprotokoll, Aufträgen, S3-Schlüsseln und Download
+  Szenario: Der Dateiname erscheint nicht in Log, Zugriffsprotokoll, Aufträgen, S3-Schlüsseln, KI-Aufruf und Download
     Angenommen die Verarbeitung ist bereit
+    Und das Sprachmodell ist bereit
     Und das Log des Uploads wird mitgeschnitten
     Wenn «inhaber-urinet» diese Dateien hochlädt:
       | datei                         | typ      |
-      | Geheimname_Ablage-4711.pdf    | pdf-text |
+      | Geheimname_Zwergohr-4711.pdf  | pdf-text |
     Und der Worker die Aufträge bearbeitet
     Und «inhaber-urinet» das neue Dokument ansieht und seine Datei öffnet
     Dann taucht «Geheimname» weder im Log noch im Zugriffsprotokoll, in Nutzlasten von Aufträgen, S3-Schlüsseln oder Antwort-Headern auf
+    Und wurde das Sprachmodell aufgerufen, aber kein Aufruf enthält «Geheimname» oder «Zwergohr»
 
   @req-4.7
   Szenario: Die Handy-App überträgt je Seite die Rohaufnahme und die Arbeitsfassung

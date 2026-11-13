@@ -276,6 +276,13 @@ public class KiVorschlagSchritte {
         assertThat(anfrage).contains(text).contains("LIEFERANTENBELEG").contains("AUSGANGSRECHNUNG");
     }
 
+    /** Req 3.12: weder der Name noch seine Wörter in der Form von {@code archiv_dateiname_text}, ohne Gross/klein. */
+    @Dann("wurde das Sprachmodell aufgerufen, aber kein Aufruf enthält «{}» oder «{}»")
+    public void ohneDateiname(String erstes, String zweites) {
+        assertThat(anfragen()).isNotEmpty().allSatisfy(a -> assertThat(a.getBodyAsString())
+                .doesNotContainIgnoringCase(erstes).doesNotContainIgnoringCase(zweites));
+    }
+
     @Dann("der Aufruf enthält ein Seitenbild als JPEG")
     public void seitenbild() {
         assertThat(anfragen().getFirst().getBodyAsString()).contains("data:image/jpeg;base64,");

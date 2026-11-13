@@ -4,8 +4,8 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <!-- Dateiname des Uploads (Aufgabe 4.10; design.md «Dateiname», «Suche»; Req 3.9, 14.8, 16.11). Nummer 015, weil
-         offene PRs 012 bis 014 belegen. Rückwärtskompatibel: Das Vorgänger-Release kennt die Spalte nicht (Hibernate
+    <!-- Dateiname des Uploads (Aufgabe 4.10; design.md «Dateiname», «Suche»; Req 3.9, 14.8, 16.11). Nummer 015: 012 belegt
+         PR #91, 013 main (013-ki-verbrauch) und PR #87 (013-manifest), 014 bleibt als Puffer frei. Rückwärtskompatibel: Das Vorgänger-Release kennt die Spalte nicht (Hibernate
          validate stört sie nicht, seine Inserts ergeben null), volltext_tsv behält Name, Typ und Index. Bestand bleibt
          ohne Namen. set expression schreibt die Tabelle unter einer exklusiven Sperre neu (PostgreSQL 17). -->
     <changeSet id="015-dokument-dateiname" author="archiv">

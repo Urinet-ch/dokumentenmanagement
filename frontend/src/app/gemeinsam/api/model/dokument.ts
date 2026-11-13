@@ -83,7 +83,7 @@ export interface Dokument {
     finanz?: DokumentFinanz | null;
     vertrag?: DokumentVertrag | null;
     /**
-     * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET und PATCH), im Eingangskorb leer
+     * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer
      */
     versionen: Array<DokumentVersion>;
 }
