@@ -331,9 +331,31 @@ public class S3Ablage implements AblagePort {
             seite.versions().stream().filter(v -> v.key().equals(key)).forEach(versionen::add);
             loeschmarken += (int) seite.deleteMarkers().stream().filter(m -> m.key().equals(key)).count();
         }
-        versionen.sort(Comparator.comparing(ObjectVersion::lastModified, Comparator.nullsLast(Comparator.naturalOrder())));
-        int weitere = Math.max(0, versionen.size() - 1) + loeschmarken;
-        return new Manifestversionen(versionen, weitere);
+        List<ObjectVersion> sortiert = aeltesteZuerst(key, versionen);
+        int weitere = Math.max(0, sortiert.size() - 1) + loeschmarken;
+        return new Manifestversionen(sortiert, weitere);
+    }
+
+    /**
+     * Sortiert die Versionen nach {@code lastModified}, älteste zuerst. Ist die älteste nicht eindeutig (gleicher
+     * Zeitpunkt wie die nächste oder ohne Zeitpunkt), bricht es ab, statt eine zufällig zuerst gelistete zu wählen:
+     * S3 nennt {@code lastModified} nur auf die Sekunde genau, und die Reihenfolge der Liste ist kein Beleg.
+     */
+    static List<ObjectVersion> aeltesteZuerst(String key, List<ObjectVersion> versionen) {
+        List<ObjectVersion> sortiert = new ArrayList<>(versionen);
+        if (sortiert.size() < 2) {
+            return sortiert;
+        }
+        if (sortiert.stream().anyMatch(v -> v.lastModified() == null)) {
+            throw new IllegalStateException("Unter " + key + " liegen mehrere Versionen, nicht alle mit Zeitpunkt; "
+                    + "die älteste ist nicht eindeutig");
+        }
+        sortiert.sort(Comparator.comparing(ObjectVersion::lastModified));
+        if (sortiert.get(0).lastModified().equals(sortiert.get(1).lastModified())) {
+            throw new IllegalStateException("Unter " + key + " liegen mehrere Versionen mit gleichem Zeitpunkt; "
+                    + "die älteste ist nicht eindeutig");
+        }
+        return sortiert;
     }
 
     private record Manifestversionen(List<ObjectVersion> versionen, int weitere) {
