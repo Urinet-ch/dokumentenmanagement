@@ -224,8 +224,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - API-Client aus OpenAPI generieren (Generator `npm run api:generieren` besteht; der Upload-Endpunkt fehlt noch, darum Upload-Seite hinter `UploadPort` und Anschluss an den generierten Client in 2.4)
   - _Anforderungen: 3.1, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
 
-- [ ] 2.8 Mindestversionen der Handys festlegen [Fabian]
-  - Mindestversionen iOS (Safari) und Android (Chrome) festlegen [offen: Mindestversionen iOS und Android – Entscheid vor Welle 3] und per PR in Requirement 4.1 nachtragen; Testgeräte für 3.7 bereitstellen
+- [x] 2.8 Mindestversionen der Handys festlegen [Fabian]
+  - Mindestversionen iOS (Safari) und Android (Chrome) festlegen und per PR in Requirement 4.1 nachtragen; Testgeräte für 3.7 bereitstellen
+  - Stand 13.11.2026: entschieden von Fabian – nur die aktuelle Hauptversion von iOS (Safari) und das aktuelle Chrome auf Android (Req 4.1); Testgeräte sind Fabians eigene Handys (Gerätetest in 3.7)
   - _Anforderungen: 4.1_
 
 - [ ] 2.9 Ziel für echte Belege festlegen (Auflage A2 aus Gate 0) [Fabian]

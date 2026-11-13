@@ -1,6 +1,6 @@
 # Implementation Plan — 02 Abgleich und Chat
 
-Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Wellen, Rollen und Gates wie in
+Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.5) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 folgt nach Plan. Wellen, Rollen und Gates wie in
 `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
 Welle 8 (AbaNinja) läuft **nur**, wenn der Konzept-Entscheid E1 = ja; sonst wird sie übersprungen und die
 Werkzeuge melden «Zahlstatus unbekannt». Optionale Aufgaben sind mit `*` markiert.
@@ -17,6 +17,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 6.2 Postfach `archiv@urinet.ch` einrichten [Fabian]
   - Postfach bei Infomaniak anlegen, Ordner erstellen, Zulassungsliste (eigene Adressen) pflegen
+  - Stand 13.11.2026: Postfach `archiv@urinet.ch` von Fabian bei Hostpoint angelegt, nicht bei Infomaniak (entschieden von Fabian; Hostpoint ist Schweizer Anbieter, die Mails bleiben in der Schweiz, Spec 01, Req 16.7). IMAP-Server, Benutzer und Passwort sind Konfiguration bzw. Secret, nie im Repo. Offen: Ordner `Archiviert`/`Quarantaene` anlegen, Zulassungsliste, Zugangsdaten im Archiv hinterlegen (nach 6.1)
   - Zugangsdaten nie ins Repo; Ablage gemäss design.md (verschlüsselt in `integration_mail`, Schlüssel aus `/run/secrets/`)
   - _Anforderungen: 1.1, 1.4_
 
