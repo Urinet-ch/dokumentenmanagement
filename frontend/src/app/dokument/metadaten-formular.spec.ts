@@ -122,6 +122,30 @@ describe('MetadatenFormular (Req 10.1)', () => {
     expect(element.querySelector('#bearbeiten-zusatz-aktenzeichen')).toBeNull();
   });
 
+  it('sucht nach dem Entfernen eines Partners mit demselben Begriff erneut', async () => {
+    await oeffnen({ ...DOKUMENT, partnerId: 'p1', partnerName: 'Testverein' });
+    const abrufe: string[] = [];
+    port.kontakte = (q?: string) => {
+      abrufe.push(q ?? '');
+      return of([{ id: 'p2', name: 'Müller' }] as Kontakt[]);
+    };
+    element.querySelector<HTMLButtonElement>('[data-test=partner-gewaehlt]')!.click();
+    await fixture.whenStable();
+    for (let i = 0; i < 2; i++) {
+      eingeben('[data-test=partner-suche]', 'Mül');
+      await new Promise((r) => setTimeout(r, 400));
+      await fixture.whenStable();
+      expect(element.querySelector('[data-test=partner-treffer]')).not.toBeNull();
+      if (i === 0) {
+        element.querySelector<HTMLButtonElement>('[data-test=partner-treffer] button')!.click();
+        await fixture.whenStable();
+        element.querySelector<HTMLButtonElement>('[data-test=partner-gewaehlt]')!.click();
+        await fixture.whenStable();
+      }
+    }
+    expect(abrufe).toEqual(['Mül', 'Mül']);
+  });
+
   it('sendet ohne Grund nichts und markiert das Feld', async () => {
     await oeffnen();
     eingeben('#bearbeiten-titel', 'Brief Gemeinde Seedorf');

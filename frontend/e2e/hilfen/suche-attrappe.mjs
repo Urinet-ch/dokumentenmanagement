@@ -13,6 +13,23 @@ const ARTEN = [
   { code: 'LIEFERANTENRECHNUNG', name: 'Lieferantenrechnung' },
 ].map((a) => ({ ...a, gruppen: ['finanz'], pflichtfelder: [], zusatzSchema: {}, vertraulichkeit: 'NORMAL', gesetzlichePflicht: true, aktiv: true }));
 
+// Wie im Seed: additionalProperties false, darum muss ein Artwechsel die Zusatzwerte der alten Art weglassen.
+const schema = (properties) => ({ type: 'object', properties, additionalProperties: false });
+ARTEN.push(
+  { code: 'OFFERTE', name: 'Offerte', gruppen: ['finanz'], pflichtfelder: [], zusatzSchema: schema({ angebot_gueltig_bis: { type: 'string', format: 'date' } }) },
+  { code: 'QUITTUNG', name: 'Quittung', gruppen: ['finanz'], pflichtfelder: [], zusatzSchema: schema({}) },
+  {
+    code: 'LOHNABRECHNUNG',
+    name: 'Lohnabrechnung',
+    gruppen: [],
+    pflichtfelder: ['zusatz.periode', 'zusatz.person'],
+    zusatzSchema: schema({ periode: { type: 'string' }, person: { type: 'string' } }),
+  },
+);
+for (const a of ARTEN.slice(2)) {
+  Object.assign(a, { vertraulichkeit: 'NORMAL', gesetzlichePflicht: true, aktiv: true });
+}
+
 export const DOKUMENTE = [
   {
     id: '0b6f1d3e-0000-4000-8000-000000000001',
@@ -58,6 +75,21 @@ export const DOKUMENTE = [
     tags: [],
     text: '',
   },
+  {
+    id: '0b6f1d3e-0000-4000-8000-000000000005',
+    titel: 'Offerte Testclub Altdorf',
+    art: 'OFFERTE',
+    datum: '2026-04-01',
+    partnerId: '0b6f1d3e-0000-4000-8000-0000000000a3',
+    partnerName: 'Testclub Altdorf',
+    belegnummer: 'O-2026-005',
+    betrag: 500,
+    richtung: 'EINNAHME',
+    tags: [],
+    zusatz: { angebot_gueltig_bis: '2026-12-31' },
+    nurMitSuchbegriff: true,
+    text: 'Offerte für das Clubheim Altdorf.',
+  },
 ];
 
 function auszug(text, q) {
@@ -102,7 +134,7 @@ function treffer(d, q) {
 function dokument(d, stand) {
   return {
     id: d.id,
-    art: d.art,
+    art: stand?.art ?? d.art,
     titel: stand ? stand.titel : d.titel,
     dateiname: d.dateiname ?? null,
     datum: d.datum,
@@ -120,7 +152,7 @@ function dokument(d, stand) {
         }
       : {}),
     fristAbgelaufen: false,
-    zusatz: {},
+    zusatz: stand?.zusatz ?? d.zusatz ?? {},
     partnerId: d.partnerId,
     partnerName: d.partnerName,
     seiten: 1,
@@ -181,6 +213,7 @@ export async function sucheAttrappe(welt) {
       const q = p.get('q') ?? '';
       const liste = DOKUMENTE.filter(
         (d) =>
+          (!d.nurMitSuchbegriff || q) &&
           (!q || [d.titel, d.text, d.partnerName, d.belegnummer, d.dateiname].join(' ').toLowerCase().includes(q.toLowerCase())) &&
           (!p.get('belegnummer') || d.belegnummer === p.get('belegnummer')) &&
           (!p.get('art') || d.art === p.get('art')) &&
@@ -226,7 +259,7 @@ export async function sucheAttrappe(welt) {
       return json(route, 422, { status: 422, title: 'Pflichtfeld fehlt', fehlercode: 'PFLICHTFELD_FEHLT', felder: ['grund'] });
     }
     const fassung = { version: bisher.version, zeit: new Date().toISOString(), geaendertVon: welt.keycloak.benutzer.id, grund: body.grund ?? null };
-    const stand = { titel: 'titel' in body ? body.titel : bisher.titel, version: bisher.version + 1, versionen: [fassung, ...bisher.versionen] };
+    const stand = { titel: 'titel' in body ? body.titel : bisher.titel, art: body.art ?? bisher.art, zusatz: body.zusatz ?? bisher.zusatz, version: bisher.version + 1, versionen: [fassung, ...bisher.versionen] };
     zustand.stand.set(d.id, stand);
     return json(route, 200, dokument(d, stand));
   }

@@ -155,8 +155,9 @@ export const TEXTE = {
     erfolgArchivierung: (titel: string) => `Archivierung von «${titel}» wird wiederholt.`,
     fehlerPflichtfelder: (felder: string) => `Bitte ergänzen: ${felder}.`,
     zusatzFeld: (name: string) => `Zusatzfeld «${name}»`,
-    zusatzNichtImKorb:
-      'Zusatzfelder lassen sich im Eingangskorb noch nicht erfassen. Das Dokument bleibt darum im Eingangskorb, bis die Zusatzfelder ergänzt sind; Sie können es auch verwerfen.',
+    zusatzBleibtImKorb:
+      'Das Dokument bleibt im Eingangskorb, bis die Zusatzfelder in der Dokumentansicht ergänzt sind; Sie können es auch verwerfen.',
+    zusatzErgaenzen: 'In der Dokumentansicht ergänzen',
     hinweisZusatz: (felder: string) => `Für diese Art fehlen Pflichtangaben: ${felder}.`,
     pflicht: 'Pflichtfeld',
     keineAktion: 'Für dieses Dokument haben Sie hier keine Aktion.',

@@ -285,12 +285,17 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
   }
   const zusatz = zusatzFelder(kontext.art);
   const zusatzGeaendert = zusatz.filter((f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim());
-  if (zusatzGeaendert.length > 0) {
+  const artGewechselt = aenderung['art'] !== undefined;
+  if (zusatzGeaendert.length > 0 || artGewechselt) {
     const ungueltig = zusatz.filter((f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? ''));
     if (ungueltig.length > 0) {
       felder.push(...ungueltig.map((f) => `zusatz.${f.name}`));
     } else {
-      const werte: Record<string, unknown> = { ...objekt(dokument.zusatz) };
+      // Bei einem Artwechsel nur Schlüssel der neuen Art behalten (additionalProperties false im Schema).
+      const bekannt = new Set(Object.keys(objekt(objekt(kontext.art?.zusatzSchema)['properties'])));
+      const werte: Record<string, unknown> = artGewechselt
+        ? Object.fromEntries(Object.entries(objekt(dokument.zusatz)).filter(([k]) => bekannt.has(k)))
+        : { ...objekt(dokument.zusatz) };
       for (const f of zusatz) {
         const wert = neu.zusatz[f.name] ?? '';
         if (wert.trim() === '') {

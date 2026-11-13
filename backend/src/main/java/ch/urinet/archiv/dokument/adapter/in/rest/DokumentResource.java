@@ -306,9 +306,9 @@ public class DokumentResource {
     public Response dokument(@PathParam("id") UUID id) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer(identitaet);
-        Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
-                        lesen.fassungen(dokument)))
+        DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
+        Dokument dokument = ansicht.dokument();
+        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -345,9 +345,9 @@ public class DokumentResource {
         }
         int version = version(ifMatch);
         aendern.aendern(benutzer, id, version, () -> aenderung(knoten(inhalt)));
-        Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
-                        lesen.fassungen(dokument)))
+        DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
+        Dokument dokument = ansicht.dokument();
+        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 

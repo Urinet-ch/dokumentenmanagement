@@ -152,6 +152,7 @@ export class DokumentAnsicht {
     inject(DestroyRef).onDestroy(() => {
       arten.unsubscribe();
       this.abos.unsubscribe();
+      this.bildAbo.unsubscribe();
       medien?.removeEventListener?.('change', wechsel);
       this.bildFreigeben();
     });

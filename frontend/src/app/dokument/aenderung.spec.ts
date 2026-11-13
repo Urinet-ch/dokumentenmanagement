@@ -64,6 +64,33 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
     expect(ergebnis).toEqual({ aenderung: { titel: 'Offerte FC', grund: 'Tippfehler' } });
   });
 
+  it('sendet beim Artwechsel zusatz ohne Schlüssel der alten Art (QUITTUNG ohne Felder)', () => {
+    const d = DOKUMENT();
+    const start = formularAus(d);
+    const quittung = ART({ code: 'QUITTUNG', zusatzSchema: { type: 'object', properties: {} }, pflichtfelder: [] });
+    const ergebnis = aenderungAus(d, start, { ...start, art: 'QUITTUNG', grund: 'Art korrigiert' }, kontext({ art: quittung }));
+    expect(ergebnis).toEqual({ aenderung: { art: 'QUITTUNG', zusatz: {}, grund: 'Art korrigiert' } });
+  });
+
+  it('sendet beim Artwechsel nur die Felder der neuen Art (LOHNABRECHNUNG)', () => {
+    const d = DOKUMENT();
+    const start = formularAus(d);
+    const lohn = ART({
+      code: 'LOHNABRECHNUNG',
+      zusatzSchema: { type: 'object', properties: { periode: { type: 'string' }, person: { type: 'string' } } },
+      pflichtfelder: ['zusatz.periode', 'zusatz.person'],
+    });
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, art: 'LOHNABRECHNUNG', grund: 'g', zusatz: { periode: '2026-10', person: 'Joel' } },
+      kontext({ art: lohn }),
+    );
+    expect(ergebnis).toEqual({
+      aenderung: { art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10', person: 'Joel' }, grund: 'g' },
+    });
+  });
+
   it('verlangt bei ARCHIVIERT einen Grund und sendet dann nichts', () => {
     const d = DOKUMENT();
     const start = formularAus(d);

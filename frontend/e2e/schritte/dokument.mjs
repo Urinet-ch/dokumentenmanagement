@@ -13,6 +13,14 @@ When(/^ich den Titel auf «(.+)» ändere$/, async function (titel) {
   await formular(this.seite).getByLabel('Titel', { exact: true }).fill(titel);
 });
 
+When(/^ich die Art auf «(.+)» wechsle$/, async function (art) {
+  await formular(this.seite).locator('#bearbeiten-art').selectOption({ label: art });
+});
+
+When(/^ich das Zusatzfeld «(.+)» mit «(.+)» ausfülle$/, async function (feld, wert) {
+  await formular(this.seite).locator(`#bearbeiten-zusatz-${feld}`).fill(wert);
+});
+
 When('ich ohne Grund speichere', async function () {
   await formular(this.seite).getByRole('button', { name: 'Änderungen speichern' }).click();
 });
@@ -96,4 +104,13 @@ Then(/^hat die PWA die Änderung ohne Titel und ohne den Dateinamen «(.+)» ges
   assert.ok(!('titel' in body), JSON.stringify(body));
   assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
   assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
+});
+
+Then(/^hat die PWA die Art «(.+)» mit den Zusatzwerten (.+) und dem Grund gesendet$/, async function (art, zusatz) {
+  await this.seite.locator('[data-test=bearbeiten-formular]').waitFor({ state: 'detached' });
+  assert.equal(this.suche.aenderungen.length, 1);
+  const [{ body }] = this.suche.aenderungen;
+  assert.deepEqual(Object.keys(body).sort(), ['art', 'grund', 'zusatz']);
+  assert.equal(body.art, art);
+  assert.deepEqual(body.zusatz, JSON.parse(zusatz));
 });
