@@ -12,6 +12,8 @@ public final class TokenIdentitaet {
     public static final String SCOPE = "api-token-scope";
     /** Wert: Mandant-Code als Text. */
     public static final String MANDANT = "mandant";
+    /** Wert: Bezeichnung des Tokens als Text (für das Benutzerverzeichnis, Req 10.10). */
+    public static final String NAME = "api-token-name";
 
     private TokenIdentitaet() {
     }

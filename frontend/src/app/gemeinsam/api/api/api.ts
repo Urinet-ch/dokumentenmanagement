@@ -8,4 +8,6 @@ export * from './importe.service';
 import { ImporteService } from './importe.service';
 export * from './kontakte.service';
 import { KontakteService } from './kontakte.service';
-export const APIS = [APITokensService, DokumentartenService, DokumenteService, ImporteService, KontakteService];
+export * from './protokoll.service';
+import { ProtokollService } from './protokoll.service';
+export const APIS = [APITokensService, DokumentartenService, DokumenteService, ImporteService, KontakteService, ProtokollService];

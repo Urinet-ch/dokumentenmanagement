@@ -835,7 +835,7 @@ Drive-Import (Req 12):
 
 - `zugriff_protokoll` und `dokument_version` sind INSERT-only: Trigger `BEFORE UPDATE OR DELETE → RAISE EXCEPTION`, und die DB-Rolle `archiv_app` hat auf beiden nur `INSERT` und `SELECT` (Req 10.3).
 - Aufbewahrung (Req 10.9, vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86): Ein Eintrag bleibt mindestens bis zum Späteren von (a) `aufbewahren_bis` des Dokuments und (b) Ende des Geschäftsjahres des Eintrags (Geschäftsjahr des Mandanten zum Zeitpunkt des Eintrags) plus 10 Jahre. (a) gilt nur, wenn `dokument_id` über die Tabelle `dokument` auf ein bestätigtes Dokument einer Art mit `gesetzliche_pflicht` oder mit Sperre (`sperre_bis`) zeigt; massgeblich ist das aktuelle `aufbewahren_bis`, bei «unbefristet» so lange, wie das Dokument besteht. `aufbewahren_bis = null` bei einem nie bestätigten oder verworfenen Dokument heisst nicht «unbefristet»; für solche Dokumente, für Arten ohne Pflicht und für Seiten-, Entwurfs- und Export-IDs (kein Fremdschlüssel auf `dokument`) gilt nur (b). `dokument_version` bleibt so lange wie das Dokument. In Phase 1 löscht und pseudonymisiert nichts; Trigger und Rechte bleiben. Den Löschweg baut die Spec zur Löschfunktion (Req 9.9): neues Changeset mit geändertem Trigger (z. B. SECURITY DEFINER mit eigener Rolle), Sammeleintrag `PROTOKOLL_BEREINIGT` mit Anzahl und SHA-256 der entfernten Zeilen im Manifest; nach einer Wiederherstellung läuft der Löschlauf erneut. Zweck und Einsicht (nur Inhaber, A13; keine Auswertung des Verhaltens) hält die Verfahrensbeschreibung fest (Aufgabe 5.7).
-- Benutzerverzeichnis (Req 10.10): Tabelle `benutzer_verzeichnis` je Mandant, nur Einfügen wie `zugriff_protokoll`; je Eintrag `benutzer` (Keycloak-`sub` oder `token:<id>`), Name, Rolle, gültig von, gültig bis. Es überlebt einen Neuaufbau von Keycloak (der Realm-Export enthält keine Benutzer). API-Tokens bleiben nach dem Widerruf als Zeile erhalten (siehe «Sicherheit»). Wann ein Eintrag entsteht, legt Aufgabe 5.1 fest.
+- Benutzerverzeichnis (Req 10.10): Tabelle `benutzer_verzeichnis` je Mandant, nur Einfügen wie `zugriff_protokoll`; je Eintrag `benutzer` (Keycloak-`sub` oder `token:<id>`), Name, Rolle, gültig von, gültig bis. Es überlebt einen Neuaufbau von Keycloak (der Realm-Export enthält keine Benutzer). API-Tokens bleiben nach dem Widerruf als Zeile erhalten (siehe «Sicherheit»). Wann ein Eintrag entsteht, legt Aufgabe 5.1 fest (siehe «Umsetzung (Aufgabe 5.1)» unten).
 - Umsetzung (Aufgabe 1.6; `dokument_version` folgt mit 2.2):
   - Changeset `db/mandant/changesets/002-zugriff-protokoll.xml`: Trigger `BEFORE UPDATE OR DELETE` je Zeile und
     `BEFORE TRUNCATE` je Anweisung mit «nur Einfügen erlaubt»; er gilt auch für den Eigentümer `archiv_owner`. Die
@@ -854,6 +854,33 @@ Drive-Import (Req 12):
     403 bzw. 404.
   - `EndpunktWaechterTest` prüft, dass jeder Endpunkt mit einer Aktion aus der Tabelle die passende
     `@Protokolliert`-Aktion trägt (A2–A4 nur mit `{id}`, `…/datei` → `HERUNTERLADEN`).
+- Umsetzung (Aufgabe 5.1; Req 2.19, 10.5, 10.9, 10.10):
+  - Changeset `db/mandant/changesets/010-benutzer-verzeichnis.xml`: Tabelle `benutzer_verzeichnis` mit `anlass`
+    (`AKTION`, `AUSTRITT`, `WIDERRUF`) und `erfasst_von` zusätzlich zum Datenmodell; Rolle wie `zugriff_protokoll`
+    plus `API_TOKEN`; Trigger «nur Einfügen erlaubt» gegen `UPDATE`, `DELETE` und `TRUNCATE` wie 002, Rechte über
+    `NUR_EINFUEGEN`. Dazu Indizes auf `zugriff_protokoll` (`zeit`; `benutzer, zeit`; `dokument_id, zeit`) für die
+    Filter der Einsicht.
+  - Wann eine Zeile entsteht (`BenutzerVerzeichnisPflege`, Domain `Benutzerangaben`): `JdbcZugriffProtokoll` führt
+    das Verzeichnis vor jedem Protokolleintrag mit Kennung in derselben Transaktion nach. Neue Zeile `AKTION` bei
+    der ersten Aktion einer Kennung, bei geändertem Namen oder geänderter Rolle und bei der ersten Aktion nach einem
+    Austritt; sonst keine. Ein fehlender Name (z. B. Token ohne Bezeichnung) übernimmt den bisherigen. Eine Zeile
+    gilt ab `gueltig_von` bis `gueltig_bis` bzw. bis zur nächsten Zeile derselben Kennung.
+  - Name: Claim `name` des Access-Tokens, sonst `preferred_username`; bei API-Tokens die Bezeichnung aus
+    `public.api_client` (Attribut `TokenIdentitaet.NAME`). Rolle der Tokens im Verzeichnis `API_TOKEN`; im
+    `zugriff_protokoll` bleibt sie leer (Check 002 unverändert), die Einsicht ergänzt sie aus dem Verzeichnis.
+  - Austritt: `POST /api/v1/protokoll/benutzer/{benutzer}/austritt` (A13, nur Personen) schreibt eine Zeile `AUSTRITT`
+    mit `gueltig_bis` = jetzt und `erfasst_von`; unbekannte Kennung → 404, schon beendet oder Token → 409.
+    Widerruf eines API-Tokens (A14, `DELETE /api/v1/api-tokens/{id}`) schreibt eine Zeile `WIDERRUF` mit
+    `erfasst_von`, auch für ein nie genutztes Token (gültig ab `api_client.erstellt`).
+  - Einsicht: `GET /api/v1/protokoll?von&bis&benutzer&dokument&aktion&seite&groesse` (A13; Zeitraum `[von, bis)`,
+    neueste zuerst, höchstens 100 je Seite) liefert je Eintrag Name und Rolle aus der Verzeichniszeile, die zur Zeit
+    des Eintrags galt; `GET /api/v1/protokoll/benutzer` listet das Verzeichnis. Die Einsicht selbst wird nicht
+    protokolliert (keine Aktion der Tabelle oben); verweigerte Aufrufe schon (`VERWEIGERT`, `grund` A13).
+  - Kein Löschpfad (Req 10.9, Nachweis JUnit): `KeinLoeschpfadTest` durchsucht Java-Quellen und Changesets nach
+    `UPDATE`, `DELETE` und `TRUNCATE` auf `zugriff_protokoll`, `dokument_version` und `benutzer_verzeichnis`;
+    `MandantEigentuemerTest` prüft Trigger und Rechte (nur `INSERT` und `SELECT`) aller drei Tabellen.
+  - Seite `/verwaltung/protokoll` (A13): Filter (Datum in Europe/Zurich, «bis» einschliesslich), Liste mit Blättern,
+    Benutzerverzeichnis mit «Austritt erfassen» (zweistufig bestätigt).
 
 **Manifest** (Req 15, P2):
 - Lauf täglich um 03:30 Europe/Zurich (`@Scheduled(cron = "0 30 3 * * ?", timeZone = "Europe/Zurich")`) und einmal beim Start der API: je Mandant ein Auftrag `MANIFEST`.
@@ -1177,7 +1204,8 @@ zugriff_protokoll(id bigserial pk, zeit timestamptz, benutzer text, rolle text, 
   -- INSERT-only wie dokument_version; Aufbewahrung nach Req 10.9 (siehe «Protokoll und Manifest»)
 
 benutzer_verzeichnis(id bigserial pk, benutzer text, name text, rolle text,
-                     gueltig_von timestamptz, gueltig_bis timestamptz null, zeit timestamptz)
+                     gueltig_von timestamptz, gueltig_bis timestamptz null, zeit timestamptz,
+                     anlass text, erfasst_von text null)   -- anlass: AKTION | AUSTRITT | WIDERRUF (Aufgabe 5.1)
   -- Req 10.10; INSERT-only wie zugriff_protokoll; eine Änderung ist eine neue Zeile
 
 manifest(datum date pk, von timestamptz null, bis timestamptz, sha256 text,

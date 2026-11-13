@@ -6,6 +6,7 @@ import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -24,6 +25,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * API-Tokens des eigenen Mandanten verwalten (A14, nur {@code inhaber}; Req 2.5, 2.20). Der Mandant kommt nur aus der
@@ -36,10 +38,12 @@ public class ApiTokenResource {
 
     private final ApiTokenVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
+    private final SecurityIdentity identitaet;
 
-    public ApiTokenResource(ApiTokenVerwaltung verwaltung, MandantAufloesung aufloesung) {
+    public ApiTokenResource(ApiTokenVerwaltung verwaltung, MandantAufloesung aufloesung, SecurityIdentity identitaet) {
         this.verwaltung = verwaltung;
         this.aufloesung = aufloesung;
+        this.identitaet = identitaet;
     }
 
     @Schema(name = "ApiTokenNeu")
@@ -99,7 +103,7 @@ public class ApiTokenResource {
     @Operation(summary = "API-Token widerrufen", description = "Wirkt sofort; fremde oder unbekannte IDs → 404.")
     @APIResponse(responseCode = "204", description = "Widerrufen")
     public void widerrufen(@PathParam("tokenId") String tokenId) {
-        verwaltung.widerrufen(mandant(), tokenId);
+        verwaltung.widerrufen(mandant(), tokenId, Optional.of(identitaet.getPrincipal().getName()));
     }
 
     private MandantCode mandant() {

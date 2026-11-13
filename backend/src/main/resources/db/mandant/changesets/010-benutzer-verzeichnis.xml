@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Benutzerverzeichnis je Mandant (Req 10.10, Aufgabe 5.1; design.md «Protokoll und Manifest», «Umsetzung 5.1»).
+         Ordnet jede Kennung im Feld benutzer des Zugriffsprotokolls (Keycloak-sub, token:<id>) Name und Rolle zu.
+         Nur Einfügen wie zugriff_protokoll: Trigger gegen UPDATE und DELETE je Zeile und gegen TRUNCATE je Anweisung;
+         die App-Rolle hat nur INSERT und SELECT (LiquibaseMandantDatenbank.NUR_EINFUEGEN). Eine Änderung (Name, Rolle,
+         Austritt, Widerruf eines API-Tokens) ist eine neue Zeile. -->
+    <changeSet id="010-benutzer-verzeichnis" author="archiv">
+        <createTable tableName="benutzer_verzeichnis">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" primaryKeyName="benutzer_verzeichnis_pk"/>
+            </column>
+            <column name="zeit" type="timestamptz" defaultValueComputed="clock_timestamp()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="benutzer" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="text"/>
+            <column name="rolle" type="text"/>
+            <column name="gueltig_von" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="gueltig_bis" type="timestamptz"/>
+            <column name="anlass" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="erfasst_von" type="text"/>
+        </createTable>
+        <sql>
+            alter table benutzer_verzeichnis add constraint benutzer_verzeichnis_rolle_ck
+                check (rolle in ('INHABER', 'MITARBEITER', 'TREUHAENDER', 'GESCHAEFTSSTELLE', 'API_TOKEN'));
+            alter table benutzer_verzeichnis add constraint benutzer_verzeichnis_anlass_ck
+                check (anlass in ('AKTION', 'AUSTRITT', 'WIDERRUF'));
+            alter table benutzer_verzeichnis add constraint benutzer_verzeichnis_gueltig_ck
+                check (gueltig_bis is null or gueltig_bis >= gueltig_von);
+            create index benutzer_verzeichnis_benutzer_ix on benutzer_verzeichnis (benutzer, id);
+            create index zugriff_protokoll_zeit_ix on zugriff_protokoll (zeit);
+            create index zugriff_protokoll_benutzer_ix on zugriff_protokoll (benutzer, zeit);
+            create index zugriff_protokoll_dokument_ix on zugriff_protokoll (dokument_id, zeit);
+        </sql>
+        <sql splitStatements="false">
+            create function benutzer_verzeichnis_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception 'benutzer_verzeichnis: nur Einfügen erlaubt (% verweigert)', tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger benutzer_verzeichnis_nur_einfuegen before update or delete on benutzer_verzeichnis
+                for each row execute function benutzer_verzeichnis_nur_einfuegen();
+            create trigger benutzer_verzeichnis_kein_truncate before truncate on benutzer_verzeichnis
+                for each statement execute function benutzer_verzeichnis_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>

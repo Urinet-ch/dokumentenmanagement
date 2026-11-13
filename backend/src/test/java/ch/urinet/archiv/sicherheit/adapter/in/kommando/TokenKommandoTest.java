@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit.adapter.in.kommando;
 
+import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnisPflege;
 import ch.urinet.archiv.sicherheit.application.ApiClientRegister;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.GeheimnisHasher;
@@ -29,7 +30,7 @@ class TokenKommandoTest {
 
     private final TokenKommando kommando = new TokenKommando(new ApiTokenVerwaltung(new Register(), new Hasher(),
             code -> code.wert().equals("urinet") ? Optional.of("m_urinet") : Optional.empty(),
-            new HashSperre(1, Duration.ZERO)));
+            new HashSperre(1, Duration.ZERO), new BenutzerVerzeichnisPflege(null)));
 
     @Test
     void erstelltUndGibtDasTokenNurAufStdoutAus() {

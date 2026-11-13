@@ -1319,6 +1319,75 @@
         "format" : "date",
         "examples" : [ "2022-03-10" ]
       },
+      "ProtokollEintrag" : {
+        "description" : "Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis zur Zeit des Eintrags (Req 10.10)",
+        "type" : "object",
+        "required" : [ "id", "zeit", "aktion" ],
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "zeit" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "benutzer" : {
+            "type" : [ "string", "null" ],
+            "description" : "Keycloak-Kennung (sub) oder token:<id>; leer bei Systemaktionen"
+          },
+          "name" : {
+            "type" : [ "string", "null" ]
+          },
+          "rolle" : {
+            "type" : [ "string", "null" ],
+            "description" : "INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE oder API_TOKEN"
+          },
+          "aktion" : {
+            "type" : "string",
+            "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT" ]
+          },
+          "dokumentId" : {
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/UUID"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "ip" : {
+            "type" : [ "string", "null" ]
+          },
+          "details" : {
+            "type" : [ "string", "null" ],
+            "description" : "JSON-Objekt als Text, z. B. Fehlercode oder geänderte Felder"
+          }
+        }
+      },
+      "ProtokollSeite" : {
+        "type" : "object",
+        "required" : [ "eintraege", "gesamt", "seite", "groesse" ],
+        "properties" : {
+          "eintraege" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ProtokollEintrag"
+            }
+          },
+          "gesamt" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Zahl aller Treffer des Filters"
+          },
+          "seite" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "groesse" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "Suchergebnis" : {
         "type" : "object",
         "required" : [ "treffer", "gesamt", "seite", "groesse" ],
@@ -1489,6 +1558,51 @@
           }
         }
       },
+      "VerzeichnisEintrag" : {
+        "description" : "Zeile des Benutzerverzeichnisses (Req 10.10); gilt ab gueltigVon bis gueltigBis oder bis zur nächsten Zeile derselben Kennung",
+        "type" : "object",
+        "required" : [ "id", "zeit", "benutzer", "gueltigVon", "anlass" ],
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "zeit" : {
+            "description" : "Zeitpunkt der Zeile",
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "benutzer" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : [ "string", "null" ]
+          },
+          "rolle" : {
+            "type" : [ "string", "null" ]
+          },
+          "gueltigVon" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "anlass" : {
+            "type" : "string",
+            "enum" : [ "AKTION", "AUSTRITT", "WIDERRUF" ]
+          },
+          "erfasstVon" : {
+            "type" : [ "string", "null" ],
+            "description" : "Kennung, die Austritt oder Widerruf erfasst hat"
+          }
+        }
+      },
       "Warnung" : {
         "type" : "object",
         "description" : "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)",
@@ -1529,6 +1643,8 @@
     "name" : "Importe"
   }, {
     "name" : "Kontakte"
+  }, {
+    "name" : "Protokoll"
   } ],
   "paths" : {
     "/api/v1/api-tokens" : {
@@ -2945,6 +3061,151 @@
                 }
               }
             }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/protokoll" : {
+      "get" : {
+        "summary" : "Zugriffsprotokoll durchsuchen",
+        "description" : "Neueste zuerst; alle Filter mit «und». Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "tags" : [ "Protokoll" ],
+        "parameters" : [ {
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT" ]
+          },
+          "name" : "aktion",
+          "in" : "query"
+        }, {
+          "description" : "Kennung (sub oder token:<id>), höchstens 200 Zeichen",
+          "name" : "benutzer",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Zeitpunkt bis (exklusive), ISO 8601 in UTC",
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "name" : "bis",
+          "in" : "query"
+        }, {
+          "description" : "ID des Dokuments",
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : "dokument",
+          "in" : "query"
+        }, {
+          "description" : "1–100",
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer",
+            "default" : 50
+          },
+          "name" : "groesse",
+          "in" : "query"
+        }, {
+          "description" : "ab 0",
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer",
+            "default" : 0
+          },
+          "name" : "seite",
+          "in" : "query"
+        }, {
+          "description" : "Zeitpunkt ab (inklusive), ISO 8601 in UTC",
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "name" : "von",
+          "in" : "query"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProtokollSeite"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/protokoll/benutzer" : {
+      "get" : {
+        "summary" : "Benutzerverzeichnis",
+        "description" : "Alle Zeilen, nach Kennung und Reihenfolge des Eintrags; nur Einfügen, nie geändert.",
+        "tags" : [ "Protokoll" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/VerzeichnisEintrag"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/protokoll/benutzer/{benutzer}/austritt" : {
+      "post" : {
+        "summary" : "Austritt erfassen",
+        "description" : "Beendet die Zuordnung der Kennung mit einer neuen Zeile (gültig bis jetzt). Unbekannte Kennung → 404; schon beendet oder API-Token (Widerruf über A14) → 409.",
+        "tags" : [ "Protokoll" ],
+        "parameters" : [ {
+          "name" : "benutzer",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Austritt erfasst"
           },
           "401" : {
             "description" : "Not Authorized"

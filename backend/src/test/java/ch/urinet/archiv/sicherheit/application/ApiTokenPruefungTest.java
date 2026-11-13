@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit.application;
 
+import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnisPflege;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -96,7 +97,7 @@ class ApiTokenPruefungTest {
         HashSperre sperre = new HashSperre(1, Duration.ofMillis(50));
         ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, sperre);
         ApiTokenVerwaltung verwaltung = new ApiTokenVerwaltung(register, hasher,
-                code -> Optional.of("m_" + code.wert()), sperre);
+                code -> Optional.of("m_" + code.wert()), sperre, new BenutzerVerzeichnisPflege(null));
         ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
         CompletableFuture<Optional<ApiClient>> erste = CompletableFuture.supplyAsync(() -> eng.pruefen(bekannt));
         assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
