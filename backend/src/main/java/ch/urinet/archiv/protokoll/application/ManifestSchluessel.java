@@ -11,6 +11,9 @@ public interface ManifestSchluessel {
 
     PrivateKey privat();
 
-    /** Öffentlicher Schlüssel zum Prüfen: der konfigurierte (wie unter {@code docs/}), sonst aus dem privaten abgeleitet. */
+    /**
+     * Öffentlicher Schlüssel zum Prüfen, nur aus der Konfiguration bzw. der Datei wie unter {@code docs/}; nie aus dem
+     * privaten abgeleitet, damit das Prüfwerkzeug ohne den privaten Schlüssel läuft. Fehlt er, bricht der Aufruf ab.
+     */
     PublicKey oeffentlich();
 }

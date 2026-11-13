@@ -249,6 +249,19 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- Öffentlicher Manifest-Schlüssel (Req 15.12): eine Quelle unter docs/, im Artefakt für das Prüfwerkzeug -->
+            <resource>
+                <directory>${project.basedir}/../docs</directory>
+                <targetPath>manifest</targetPath>
+                <includes>
+                    <include>manifest-schluessel.pub.pem</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>io.quarkus.platform</groupId>
