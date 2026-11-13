@@ -212,6 +212,26 @@ public class DokumentSchritte {
         });
     }
 
+    /**
+     * Stellt den Wettlauf nach (Review #106): Eine Fassung mit der aktuellen Version entsteht so, wie wenn ein
+     * paralleler PATCH sie nach dem Lesen des Dokuments sichert, bevor die Versionsliste gelesen wird.
+     */
+    @Angenommen("in dokument_version von «{word}» steht schon eine Fassung mit der aktuellen Version")
+    public void fassungMitAktuellerVersion(String name) throws SQLException {
+        Ort ort = dokumente.get(name);
+        ausfuehren("insert into " + schema(ort) + ".dokument_version (dokument_id, version, daten, geaendert_von, "
+                + "grund) values (?, ?, '{}'::jsonb, 'probe-parallel', 'Wettlauf')", ort.id(), version(name));
+        assertThat((Throwable) datenbankFehler).as("Datenbankfehler").isNull();
+    }
+
+    /** Versionsnummern aus {@code versionen} der Antwort, neueste zuerst, mit Komma getrennt. */
+    @Dann("nennt die Antwort die Fassungen {string}")
+    public void fassungenDerAntwort(String erwartet) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<Integer> versionen = antwort.jsonPath().getList("versionen.version", Integer.class);
+        assertThat(String.join(",", versionen.stream().map(String::valueOf).toList())).isEqualTo(erwartet);
+    }
+
     @Dann("verweigert die Datenbank von «{word}» {word} auf dokument_version")
     public void nurEinfuegen(String mandant, String befehl) {
         String tabelle = new MandantCode(mandant).schema() + ".dokument_version";

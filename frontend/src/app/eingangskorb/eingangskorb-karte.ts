@@ -153,6 +153,14 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         return wert === undefined || wert === null || wert === '';
       });
   });
+  /**
+   * Steht die Art nur im KI-Vorschlag oder ist sie hier ungespeichert gewählt, geht sie als `?art=` an die
+   * Dokumentansicht; dort gilt sie als Artwechsel, damit die Zusatzfelder dieser Art erscheinen (Review #106).
+   */
+  protected readonly artUebernehmen = computed(() => {
+    const art = this.entwurf().art;
+    return art && art !== (this.dokument().art ?? '') ? { art } : null;
+  });
   protected readonly erkannterPartner = computed(() =>
     this.entwurf().partnerId ? null : erkannterPartner(this.dokument()),
   );

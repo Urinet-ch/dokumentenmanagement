@@ -1108,6 +1108,14 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     Dokument, zeigt die Karte einen Hinweis mit den fehlenden Feldern und dem Link «In der Dokumentansicht ergänzen»
     (`/dokument/{id}`); dort lassen sich die Zusatzfelder ergänzen (4.6). Bei 422 mit `zusatz.*` sagt die Meldung,
     dass das Dokument im Eingangskorb bleibt (verwerfen bleibt möglich).
+  - Art nur im KI-Vorschlag (Folge Review #106): Der KI-Vorschlag schreibt die Art nur in `ki_vorschlag`, die Spalte
+    `art` bleibt bis zum Bestätigen leer. Weicht die Art der Karte (Vorschlag oder ungespeicherte Wahl) von der
+    gespeicherten ab, trägt der Link `?art=<code>` und der Hinweis sagt, dass nur die Art mitgeht. Die Dokumentansicht
+    übernimmt `?art=` nur, wenn die Art bekannt und aktiv ist, sich von der gespeicherten unterscheidet und der Benutzer
+    A6 hat und der Status änderbar ist: Sie öffnet dann das Formular einmal mit dieser Art als Artwechsel (Hinweis
+    «… übernommen», gespeichert erst mit «Änderungen speichern»), sodass der PATCH `art` und `zusatz` der neuen Art
+    sendet. Nach «Abbrechen» oder dem Speichern gilt `?art=` nicht mehr; andere ungespeicherte Angaben der Karte gehen
+    nicht mit.
   - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
     `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
     `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
@@ -1170,9 +1178,14 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       `properties` der neuen Art (sonst `{}`); Zusatzwerte der alten Art entfallen, weil die Schemas
       `additionalProperties: false` tragen. Ohne Artwechsel bleibt es bei «nur bei Änderung».
     - Die Partnersuche löst nach dem Entfernen eines Partners dieselbe Eingabe wieder aus (kein `distinctUntilChanged`;
-      `switchMap` verwirft veraltete Abrufe). Die Ansicht bestellt den Abruf des Vorschaubilds beim Verlassen ab.
-      `GET`/`PATCH /dokumente/{id}` lesen Dokument, Warnungen und Versionsliste in einer Transaktion
-      (`DokumentLesen.ansicht`).
+      `switchMap` verwirft veraltete Abrufe). Wählen und Entfernen setzen die Suche zurück (leerer Begriff), damit ein
+      noch laufender Debounce oder Abruf keine veraltete Trefferliste zeigt (Folge Review #106). Die Ansicht bestellt
+      den Abruf des Vorschaubilds beim Verlassen ab.
+      `GET`/`PATCH /dokumente/{id}` und `POST /bestaetigen` lesen Dokument, Warnungen und Versionsliste in einer
+      Transaktion (`DokumentLesen.ansicht`). Unter READ COMMITTED (PostgreSQL-Standard, keine eigene Isolationsstufe)
+      sieht jede Abfrage einen eigenen Stand; dass Version und Versionsliste zueinander passen, sichert darum die
+      Begrenzung der Liste auf Fassungen mit `version < dokument.version` (Folge Review #106). Eine Fassung, die ein
+      paralleler PATCH nach dem Lesen des Dokuments sichert, erscheint erst mit dessen neuer Version.
     - Fehler: `PFLICHTFELD_FEHLT` markiert die genannten Felder; `VERSION_KONFLIKT`/412, `STATUS_KONFLIKT`/409 und
       404 schliessen das Formular, die Ansicht lädt neu und sagt warum; fachliche Fehler (`BELEGNUMMER_VERGEBEN`,
       `PARTNER_UNBEKANNT`, `ZUSATZ_UNGUELTIG`, 400) bleiben als Meldung im Formular, die Eingaben bleiben stehen.

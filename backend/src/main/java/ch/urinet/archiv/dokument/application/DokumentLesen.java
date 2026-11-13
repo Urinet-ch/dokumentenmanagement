@@ -57,7 +57,11 @@ public class DokumentLesen {
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
     }
 
-    /** Dokument, Warnungen und Fassungen aus einer Transaktion, damit Version und Versionsliste zueinander passen. */
+    /**
+     * Dokument, Warnungen und Fassungen in einer Transaktion. Unter READ COMMITTED (PostgreSQL-Standard) sieht jede
+     * Abfrage einen eigenen Stand; dass Version und Versionsliste zueinander passen, sichert erst die Begrenzung der
+     * Fassungen auf {@code version < dokument.version()} (Review #106).
+     */
     public Ansicht ansicht(Benutzer benutzer, UUID id) {
         Dokument dokument = lesen(benutzer, id);
         return new Ansicht(dokument, warnungen(benutzer, dokument), fassungen(dokument));
@@ -66,9 +70,12 @@ public class DokumentLesen {
     public record Ansicht(Dokument dokument, List<Warnung> warnungen, List<Fassung> fassungen) {
     }
 
-    /** Versionsliste eines mit {@link #lesen} gelesenen, also sichtbaren Dokuments, neueste zuerst (Req 10.1). */
+    /**
+     * Versionsliste eines mit {@link #lesen} gelesenen, also sichtbaren Dokuments, neueste zuerst (Req 10.1), nur
+     * Fassungen vor dessen Version: Eine nach dem Lesen gesicherte Fassung gehört zu einer neueren Version.
+     */
     public List<Fassung> fassungen(Dokument dokument) {
-        return repository.fassungen(dokument.id());
+        return repository.fassungen(dokument.id(), dokument.version());
     }
 
     /**

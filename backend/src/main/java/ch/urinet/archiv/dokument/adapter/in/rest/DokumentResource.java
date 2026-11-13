@@ -381,9 +381,9 @@ public class DokumentResource {
         }
         Benutzer benutzer = benutzer(identitaet);
         bestaetigen.bestaetigen(benutzer, id, version, angaben.bestaetigung());
-        Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.accepted(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
-                        lesen.fassungen(dokument)))
+        DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
+        Dokument dokument = ansicht.dokument();
+        return Response.accepted(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 

@@ -27,6 +27,9 @@
           <option [value]="a.code" [selected]="a.code === f.art">{{ a.name }}</option>
         }
       </select>
+      @if (vorbelegt(); as name) {
+        <p class="hinweis" data-test="art-vorbelegt">{{ texte.artVorbelegt(name) }}</p>
+      }
     </div>
     <div class="feld">
       <label for="bearbeiten-titel"

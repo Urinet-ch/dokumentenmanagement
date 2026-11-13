@@ -377,6 +377,13 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     );
   });
 
+  it('gibt eine Art, die nur im Vorschlag steht, als ?art= an die Dokumentansicht weiter (Review #106)', async () => {
+    await zeigen(dokument({ vorschlag: { art: 'LOHNABRECHNUNG' } }));
+    const hinweis = element.querySelector('[data-test=hinweis-zusatz]');
+    expect(hinweis?.textContent).toContain(T.zusatzErgaenzenArt('Lohnabrechnung'));
+    expect(hinweis?.querySelector('a')?.getAttribute('href')).toBe('/dokument/d1?art=LOHNABRECHNUNG');
+  });
+
   it('zeigt keinen Zusatz-Hinweis, wenn das Zusatzfeld am Dokument steht', async () => {
     await zeigen(dokument({ art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10' } }));
     expect(element.querySelector('[data-test=hinweis-zusatz]')).toBeNull();

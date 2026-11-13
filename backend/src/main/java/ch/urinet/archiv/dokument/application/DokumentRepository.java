@@ -19,10 +19,11 @@ public interface DokumentRepository {
     boolean sichtbar(UUID id, Sichtregel regel);
 
     /**
-     * Gesicherte Fassungen eines Dokuments (Req 10.1), neueste zuerst, ohne Sichtregel: Der Aufrufer hat das Dokument
-     * vorher mit {@link #finden} für den Benutzer gelesen.
+     * Gesicherte Fassungen eines Dokuments (Req 10.1) mit {@code version < bisVersion}, neueste zuerst, ohne
+     * Sichtregel: Der Aufrufer hat das Dokument vorher mit {@link #finden} für den Benutzer gelesen und übergibt
+     * dessen Version, damit eine danach gesicherte Fassung nicht in der Liste erscheint.
      */
-    List<Fassung> fassungen(UUID id);
+    List<Fassung> fassungen(UUID id, int bisVersion);
 
     /**
      * Pfad und Versions-ID einer Datei des sichtbaren, nicht verworfenen Dokuments (Req 14.6): {@code PDFA} aus dem

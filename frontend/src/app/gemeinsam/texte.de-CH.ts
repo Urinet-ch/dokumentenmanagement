@@ -158,6 +158,8 @@ export const TEXTE = {
     zusatzBleibtImKorb:
       'Das Dokument bleibt im Eingangskorb, bis die Zusatzfelder in der Dokumentansicht ergänzt sind; Sie können es auch verwerfen.',
     zusatzErgaenzen: 'In der Dokumentansicht ergänzen',
+    zusatzErgaenzenArt: (art: string) =>
+      `Die Dokumentansicht übernimmt die Art «${art}» als Änderung; andere ungespeicherte Angaben gehen nicht mit.`,
     hinweisZusatz: (felder: string) => `Für diese Art fehlen Pflichtangaben: ${felder}.`,
     pflicht: 'Pflichtfeld',
     keineAktion: 'Für dieses Dokument haben Sie hier keine Aktion.',
@@ -315,6 +317,8 @@ export const TEXTE = {
       grundFehlt: 'Bitte einen Grund für die Änderung angeben: Das Dokument ist archiviert.',
       grundZuLang: 'Der Grund ist zu lang (höchstens 1000 Zeichen).',
       artWaehlen: 'Bitte eine Art wählen.',
+      artVorbelegt: (art: string) =>
+        `Art «${art}» aus dem Eingangskorb übernommen. Sie wird erst mit «Änderungen speichern» geändert.`,
       keineAenderung: 'Sie haben nichts geändert.',
       ungueltig: (felder: string) => `Bitte prüfen: ${felder}.`,
       feld: {
