@@ -25,6 +25,8 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und jedes Manifest von «mf-kette» ist mit dem öffentlichen Manifest-Schlüssel gültig signiert
     Und jedes Manifest von «mf-kette» trägt je einen gültigen Zeitstempel von «haupt» und «zweit» über SHA-256 von Manifest und Signatur
     Und das Prüfwerkzeug meldet für «mf-kette» vom «10.01.2026» bis «12.01.2026» «Ergebnis: gültig» mit Exit-Code 0
+    Und das Prüfwerkzeug ohne Datenbank meldet für «mf-kette» vom «10.01.2026» bis «12.01.2026» «Ergebnis: gültig» mit Exit-Code 0
+    Und die Ausgabe des Prüfwerkzeugs nennt «MELDUNG 2026-01-12: festgehaltene Zeitstempel ohne Datenbank nicht bestimmbar (kein Folgemanifest)»
 
   @req-3.12
   Szenario: Das Manifest nennt den Dateinamen eines Dokuments nicht

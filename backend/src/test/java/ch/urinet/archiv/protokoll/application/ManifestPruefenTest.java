@@ -40,12 +40,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Prüfwerkzeug {@code archiv manifest pruefen} (Req 15.12, Nachweis: JUnit): Signatur, Hash-Kette, Zeitstempel,
- * Erneuerung nach 15.2, Lücke, fehlender Zeitstempel und Verspätung. Ablage im Speicher ({@link AblageStub}),
+ * Erneuerung nach 15.2, Lücke, fehlender Zeitstempel und Verspätung, mit und ohne Datenbank. Ablage im Speicher ({@link AblageStub}),
  * Zeitstempel als Attrappe; die echte RFC-3161-Prüfung deckt {@code BcZeitstempelAdapterTest}.
  */
 class ManifestPruefenTest {
@@ -294,9 +295,123 @@ class ManifestPruefenTest {
                 .containsExactly("2026-01-10: " + ManifestTeil.SIG.pfad(TAG1) + " ist nicht gesperrt");
     }
 
+    @Test
+    void ohneDatenbankIstEineVollstaendigeKetteGueltigNurDerJuengsteTagIstNichtBestimmbar() {
+        kette(3, BEIDE, Duration.ofMinutes(20));
+
+        Pruefbericht bericht = ohneDatenbank(TAG1, TAG3);
+
+        assertThat(bericht.fehler()).isEmpty();
+        assertThat(bericht.meldungen()).containsExactly(
+                "2026-01-12: festgehaltene Zeitstempel ohne Datenbank nicht bestimmbar (kein Folgemanifest)");
+        assertThat(bericht.anzahlGeprueft()).isEqualTo(3);
+    }
+
+    @Test
+    void ohneDatenbankSindFehlendePruefdatenAmJuengstenTagNurEineMeldung() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.crl("zweit").pfad(TAG1));
+
+        Pruefbericht bericht = ohneDatenbank(TAG1, TAG1);
+
+        assertThat(bericht.fehler()).isEmpty();
+        assertThat(bericht.meldungen()).containsExactly(
+                "2026-01-10: festgehaltene Zeitstempel ohne Datenbank nicht bestimmbar (kein Folgemanifest)",
+                "2026-01-10: Zeitstempel von zweit unvollständig (Prüfdaten fehlen)");
+    }
+
+    @Test
+    void ohneDatenbankBestimmtDasFolgemanifestWasFestgehaltenIst() {
+        kette(2, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.kette("zweit").pfad(TAG1));
+
+        assertThat(ohneDatenbank(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Prüfdaten des Zeitstempels von zweit fehlen");
+    }
+
+    @Test
+    void einFehlendesTsrEinesInDerDatenbankFestgehaltenenZeitstempelsIstEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.tsr("zweit").pfad(TAG1));
+
+        Pruefbericht bericht = pruefen(TAG1, TAG1);
+
+        assertThat(bericht.fehler()).containsExactly("2026-01-10: Zeitstempel von zweit fehlt, ist aber festgehalten");
+        assertThat(bericht.meldungen()).isEmpty();
+    }
+
+    @Test
+    void ohneDatenbankIstEinFehlendesTsrEinesImFolgetagVerwiesenenZeitstempelsEinFehler() {
+        kette(2, BEIDE, Duration.ofMinutes(20));
+        entfernt.add(ManifestTeil.tsr("zweit").pfad(TAG1));
+
+        assertThat(ohneDatenbank(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Zeitstempel von zweit fehlt, ist aber festgehalten");
+    }
+
+    @Test
+    void amJuengstenTagIstEinAbweichenderManifestHashInDerDatenbankEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        ManifestDaten.ManifestStand stand = datenbank.get(TAG1);
+        datenbank.put(TAG1, new ManifestDaten.ManifestStand(TAG1, stand.bis(), "0".repeat(64), stand.verweis()));
+
+        assertThat(pruefen(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Manifest passt nicht zum SHA-256 in der Datenbank");
+    }
+
+    @Test
+    void amJuengstenTagIstEineAbweichendeSignaturInDerDatenbankEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        verweisAendern(TAG1, v -> new Vorher("0".repeat(64), v.zeitstempel()));
+
+        assertThat(pruefen(TAG1, TAG1).fehler()).containsExactly("2026-01-10: Signatur passt nicht zur Datenbank");
+    }
+
+    @Test
+    void amJuengstenTagIstEinAbweichendesTsrInDerDatenbankEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        verweisAendern(TAG1, v -> new Vorher(v.sigSha256(), v.zeitstempel().stream()
+                .map(z -> z.dienst().equals("haupt")
+                        ? new ZeitstempelVerweis(z.dienst(), "0".repeat(64), z.pruefdatenSha256()) : z)
+                .toList()));
+
+        assertThat(pruefen(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Zeitstempel von haupt passt nicht zur Datenbank");
+    }
+
+    @Test
+    void amJuengstenTagSindAbweichendePruefdatenInDerDatenbankEinFehler() {
+        kette(1, BEIDE, Duration.ofMinutes(20));
+        verweisAendern(TAG1, v -> new Vorher(v.sigSha256(), v.zeitstempel().stream()
+                .map(z -> z.dienst().equals("zweit")
+                        ? new ZeitstempelVerweis(z.dienst(), z.tsrSha256(), List.of(z.pruefdatenSha256().getFirst(),
+                        "0".repeat(64))) : z)
+                .toList()));
+
+        assertThat(pruefen(TAG1, TAG1).fehler())
+                .containsExactly("2026-01-10: Prüfdaten von zweit passen nicht zur Datenbank");
+    }
+
     private Pruefbericht pruefen(LocalDate von, LocalDate bis) {
-        return new ManifestPruefen(ablage, new JacksonJsonLeser(), schluessel(), new TsaAttrappe(),
-                (mandant, datum) -> Optional.ofNullable(datenbank.get(datum)), Duration.ofHours(24)).pruefen(MANDANT, von, bis);
+        return pruefwerkzeug((mandant, datum) -> Optional.ofNullable(datenbank.get(datum))).pruefen(MANDANT, von, bis, true);
+    }
+
+    /** Nur aus der Ablage; die Datenbank darf dabei nicht gelesen werden. */
+    private Pruefbericht ohneDatenbank(LocalDate von, LocalDate bis) {
+        return pruefwerkzeug((mandant, datum) -> {
+            throw new AssertionError("ohne Datenbank gelesen");
+        }).pruefen(MANDANT, von, bis, false);
+    }
+
+    private ManifestPruefen pruefwerkzeug(FestgehalteneManifeste festgehalten) {
+        return new ManifestPruefen(ablage, new JacksonJsonLeser(), schluessel(), new TsaAttrappe(), festgehalten,
+                Duration.ofHours(24));
+    }
+
+    private void verweisAendern(LocalDate datum, UnaryOperator<Vorher> aendern) {
+        ManifestDaten.ManifestStand stand = datenbank.get(datum);
+        datenbank.put(datum, new ManifestDaten.ManifestStand(datum, stand.bis(), stand.sha256(),
+                aendern.apply(stand.verweis())));
     }
 
     private void kette(int tage, List<String> dienste, Duration nachEnde) {

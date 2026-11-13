@@ -7,8 +7,9 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 /**
- * Was die Erzeugung zu einem Datum festgehalten hat ({@code manifest}, {@code manifest_zeitstempel}): eindeutige
- * Quelle des Prüfwerkzeugs dafür, welche Zeitstempel zum Manifest gehören, auch für den jüngsten Tag ohne Folgemanifest.
+ * Was die Erzeugung zu einem Datum festgehalten hat ({@code manifest}, {@code manifest_zeitstempel}). Prüft das
+ * Prüfwerkzeug mit Datenbank, bestimmt dies, welche Zeitstempel zum Manifest gehören, auch für den jüngsten Tag ohne
+ * Folgemanifest; ohne Datenbank kommt das nur aus dem Folgemanifest ({@link ManifestPruefen}).
  */
 @FunctionalInterface
 public interface FestgehalteneManifeste {

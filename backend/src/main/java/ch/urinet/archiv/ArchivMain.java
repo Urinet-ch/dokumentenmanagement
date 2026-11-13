@@ -38,6 +38,17 @@ public class ArchivMain implements QuarkusApplication {
             "quarkus.log.console.stderr", "true",
             "liquibase.command.showSummaryOutput", "log");
 
+    /**
+     * {@code archiv manifest pruefen … --ohne-datenbank} (Req 15.12): Das Prüfwerkzeug braucht nur Ablage und öffentlichen
+     * Schlüssel. Ohne Datasource entfallen Migration (Liquibase) und Hibernate, die Pflicht zur Adresse der Datenbank
+     * ({@code DatenbankAdressePruefung}) gilt dann nicht.
+     */
+    public static final Map<String, String> OHNE_DATENBANK = Map.of(
+            "quarkus.datasource.active", "false",
+            "quarkus.hibernate-orm.active", "false",
+            "quarkus.liquibase.migrate-at-start", "false",
+            "archiv.db.url-pflicht", "false");
+
     static final int FALSCHER_AUFRUF = 2;
     static final int TECHNISCHER_FEHLER = 3;
 
@@ -69,6 +80,9 @@ public class ArchivMain implements QuarkusApplication {
             return;
         }
         KOMMANDO.forEach(System::setProperty);
+        if (argumente[0].equals("manifest") && List.of(argumente).contains(ManifestKommando.OHNE_DATENBANK)) {
+            OHNE_DATENBANK.forEach(System::setProperty);
+        }
         String liquibaseScope = liquibaseInsLog();
         // Zweite Sicherung: Was eine Bibliothek trotzdem auf System.out schreibt, geht auf stderr, nicht ins Ergebnis.
         ergebnis = System.out;

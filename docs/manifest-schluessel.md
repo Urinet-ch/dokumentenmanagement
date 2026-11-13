@@ -5,6 +5,30 @@ Schlüssel liegt nur als Secret-Datei `/run/secrets/archiv_manifest_key` auf dem
 Passwort-Manager; der öffentliche Schlüssel liegt unter `docs/manifest-schluessel.pub.pem`, damit jedes Manifest
 ohne Zugang zum Server prüfbar ist.
 
+## Prüfen ohne Datenbank
+
+Das Prüfwerkzeug braucht nur die Ablage (Lesezugriff auf den Bucket des Mandanten) und den öffentlichen Schlüssel:
+
+```sh
+archiv manifest pruefen <datum> [<bis-datum>] --mandant <code> --ohne-datenbank
+```
+
+Mit `--ohne-datenbank` startet es ohne Datenbank (keine Migration, keine Verbindung) und prüft Signatur, kanonische
+Form, Hash-Kette mit Erneuerung und jeden Zeitstempel gegen seine abgelegten Prüfdaten. Welche Zeitstempel zu einem
+Manifest festgehalten sind, liest es aus `vorher` des Folgemanifests. Für den jüngsten Tag eines Zeitraums ohne
+Folgemanifest ist das nicht bestimmbar; das meldet es («festgehaltene Zeitstempel ohne Datenbank nicht bestimmbar»),
+und ein unvollständiger Zeitstempel dieses Tages ist dann nur eine Meldung. `--mandant` ist Pflicht, weil die Liste der
+Mandanten in der Datenbank steht.
+
+Ohne den Schalter und mit konfigurierter Datenbank prüft das Werkzeug zusätzlich gegen die festgehaltenen Manifeste
+(strenger): Die Datenbank bestimmt auch am jüngsten Tag, welche Zeitstempel festgehalten sind, und jede Abweichung
+zwischen Datenbank, Ablage und Folgemanifest ist ein Fehler. Ist die Datenbank konfiguriert, aber nicht erreichbar,
+endet das Werkzeug mit Exit 3, statt still auf die schwächere Prüfung auszuweichen.
+
+Gestartet wird das Werkzeug mit derselben Konfiguration wie das Archiv. Im Profil `prod` verlangt die Startprüfung
+weiterhin die Secret-Dateien aus `archiv.secrets.pflicht`. Ausserhalb des Servers braucht es darum eine eigene
+Konfiguration mit Lesezugriff auf den Bucket; eine solche Revisions-Konfiguration ist noch nicht vorbereitet.
+
 ## Erzeugen (einmalig, Inhaber)
 
 Auf einem vertrauenswürdigen Rechner, nicht auf dem Server und nicht in einer Agenten-Sitzung:

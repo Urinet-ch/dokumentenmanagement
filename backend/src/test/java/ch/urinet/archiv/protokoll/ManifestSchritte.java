@@ -627,10 +627,24 @@ public class ManifestSchritte {
 
     @Dann("das Prüfwerkzeug meldet für «{word}» vom «{word}» bis «{word}» «{}» mit Exit-Code {int}")
     public void pruefwerkzeug(String alias, String von, String bis, String ergebnis, int exitCode) throws Exception {
+        pruefwerkzeug(alias, von, bis, ergebnis, exitCode, List.of());
+    }
+
+    /** Nur aus der Ablage (Req 15.12, docs/manifest-schluessel.md), obwohl die Datenbank erreichbar ist. */
+    @Dann("das Prüfwerkzeug ohne Datenbank meldet für «{word}» vom «{word}» bis «{word}» «{}» mit Exit-Code {int}")
+    public void pruefwerkzeugOhneDatenbank(String alias, String von, String bis, String ergebnis, int exitCode)
+            throws Exception {
+        pruefwerkzeug(alias, von, bis, ergebnis, exitCode, List.of(ManifestKommando.OHNE_DATENBANK));
+        assertThat(ausgabe).contains("Geprüft nur aus der Ablage (ohne Datenbank)");
+    }
+
+    private void pruefwerkzeug(String alias, String von, String bis, String ergebnis, int exitCode, List<String> zusatz)
+            throws Exception {
         ByteArrayOutputStream aus = new ByteArrayOutputStream();
         ByteArrayOutputStream fehler = new ByteArrayOutputStream();
-        List<String> argumente = List.of("pruefen", LocalDate.parse(von, DATUM).toString(),
-                LocalDate.parse(bis, DATUM).toString(), "--mandant", code(alias));
+        List<String> argumente = new ArrayList<>(List.of("pruefen", LocalDate.parse(von, DATUM).toString(),
+                LocalDate.parse(bis, DATUM).toString(), "--mandant", code(alias)));
+        argumente.addAll(zusatz);
         // wie die Kommandozeile in einem eigenen Thread ohne Request-Kontext und ohne Transaktion
         ExecutorService thread = Executors.newSingleThreadExecutor();
         int code;
