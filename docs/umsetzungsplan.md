@@ -84,7 +84,7 @@ und Chat-Agent aus Spec 02 (Wellen 6–7) auf.
 | 1 | Gerüst, CI, Dev-Umgebung, Mandanten, Rollen, API-Tokens, Stammdaten Dokumentarten, Leitplanken, Deploy-Workflow, Stufe A einrichten und Speicherbudget messen, Profil lokal | 01: 1.1–1.11 | Infra ∥ Backend ∥ Fabian | 3 T |
 | 2 | Dokumentarten, Datenmodell, S3, Upload, Aufträge, OCR, Frontend-Gerüst, Mindestversionen Handys | 01: 2.1–2.8 | Backend ∥ Infra ∥ Frontend ∥ Fabian | 4 T |
 | 3 | Kontakte, Golden-Generator nach F4/F6, KI-Vorschlag, Lernen, Bestätigen, Versionen, Eingangskorb, PWA | 01: 3.1–3.8 (3.8 vor 3.2) | Backend ∥ Frontend ∥ Fabian | 4 T |
-| 4 | CSV-Import, Suche, Generator-Client, Drive-Import, Entscheide vor Welle 5 (inkl. K5) | 01: 4.1–4.9 | Backend ∥ Frontend ∥ Fabian | 3 T |
+| 4 | CSV-Import, Suche, Generator-Client, Drive-Import, Entscheide vor Welle 5 (inkl. K5) | 01: 4.1–4.10 | Backend ∥ Frontend ∥ Fabian | 3 T |
 | 5 | Wechsel auf Stufe B, Protokoll, Manifest, Prüflauf, Produktion, Sicherung, Überwachung und Monitoring-Anbindung, Verfahrensbeschreibung, Übernahme, Notfallunterlagen | 01: 5.1–5.11 | Backend ∥ Infra ∥ Fabian | 2 T |
 | 6 | E-Mail-Eingang, Embeddings, Hybridsuche, Jahresexport | 02: 6.1–6.5 | Backend ∥ Frontend ∥ Fabian | 3 T |
 | 7 | Werkzeuge, Agent, SSE, Chat-Oberfläche | 02: 7.1–7.4 | Backend ∥ Frontend | 4 T |
