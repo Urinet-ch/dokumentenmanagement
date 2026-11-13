@@ -43,7 +43,7 @@ docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv backend
 .github/scripts/pruefe-liquibase.sh origin/main
 ```
 
-Die CI (`.github/workflows/ci.yml`) führt dieselben Schritte bei jedem PR aus, ohne Secrets, ohne echte KI und
+Die CI (`.github/workflows/ci.yml`) führt dieselben Schritte bei jedem PR aus (ausser bei reinen Spec-Anpassungen, siehe unten), ohne Secrets, ohne echte KI und
 ohne Golden-Lauf. Die Backend-Tests verteilt sie auf drei parallele Jobs: «Backend-Tests» (alles ohne eigenen
 Quarkus-Start, dazu SpotBugs) und «Backend-Starttests» `start-1` und `start-2` (Klassen mit `@TestProfile` oder
 `@QuarkusMainTest`, je mit `@Tag("start-1")` oder `@Tag("start-2")`, erzwungen durch `StartGruppenTest`). Der Job
@@ -51,6 +51,9 @@ Quarkus-Start, dazu SpotBugs) und «Backend-Starttests» `start-1` und `start-2`
 (`.github/scripts/pruefe-testaufteilung.py`). Das Artefakt für Browser-Szenarien und Docker-Image baut der Job «Build»
 ohne Tests; dort laufen auch die Liquibase-, OpenAPI- und Drive-Import-Prüfungen. Eine neue Klasse mit eigenem Start
 bekommt die Startgruppe mit der kleineren Laufzeit-Summe. Lokal deckt `mvn verify` weiterhin alles in einem Lauf ab.
+Ändert ein PR oder Push nur `.md`-Dateien unter `.kiro/` oder `docs/` (`.github/scripts/nur-spec.py`), laufen statt
+dieser Jobs nur die «Spec-Prüfungen» (Tests, die Specs und Docs lesen, ohne Quarkus-Start; tech.md «Tests und
+Qualität»).
 
 Die Szenario-Prüfung «Abdeckung» verlangt für jedes Kriterium unter `_Anforderungen_` einer
 abgehakten Aufgabe ab Welle 1 ein Szenario `@req-x.y` oder einen Nachweis-Vermerk in `requirements.md`.
