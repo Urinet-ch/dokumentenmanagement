@@ -1,14 +1,23 @@
 package ch.urinet.archiv.protokoll;
 
 import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.gemeinsam.SchedulerTakt;
+import ch.urinet.archiv.mandant.application.MandantAusAnmeldung;
+import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.adapter.in.job.ManifestPlaner;
+import ch.urinet.archiv.protokoll.adapter.in.job.ManifestPlanerAusloesen;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
+import ch.urinet.archiv.protokoll.application.ManifestPlanen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +29,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.scheduler.Scheduler;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -93,6 +103,21 @@ public class ManifestSchritte {
     @Inject
     ManifestKommando kommando;
 
+    @Inject
+    MandantRegister register;
+
+    @Inject
+    MandantKontext kontext;
+
+    @Inject
+    AuftragService auftragService;
+
+    @Inject
+    Scheduler scheduler;
+
+    @Inject
+    MandantAusAnmeldung anmeldung;
+
     @ConfigProperty(name = "archiv.test.tsa-port")
     Optional<Integer> tsaPort;
 
@@ -108,6 +133,7 @@ public class ManifestSchritte {
     /** Erwartete kanonische Zeile je {@code <tabelle>/<id>}, unabhängig von {@code JdbcManifestDaten} gebildet. */
     private final Map<String, Map<String, Object>> zeilen = new LinkedHashMap<>();
     private long auftrag;
+    private LocalDate planerGestern;
     private List<String> versionenVorher = List.of();
     private String ausgabe = "";
 
@@ -344,6 +370,59 @@ public class ManifestSchritte {
     @Wenn("die übrigen Aufträge abgearbeitet sind")
     public void uebrige() throws Exception {
         auftraege.abarbeiten();
+    }
+
+    /**
+     * Der Takt des {@link ManifestPlaner} (03:30, Req 15.1) wie im Betrieb über einen Job des Quarkus-Schedulers mit
+     * Request-Kontext und ohne Anmeldung ({@link SchedulerTakt}; Review PR #130). Der Planer sieht nur den Mandanten des
+     * Szenarios, damit keine Aufträge für die Mandanten anderer Szenarien entstehen; Zeitplan und Lauf beim Start sind
+     * im Profil {@code test} aus.
+     */
+    @Wenn("der Takt des Manifest-Planers für «{word}» im Scheduler auslöst")
+    public void planerTakt(String alias) throws Exception {
+        MandantCode code = new MandantCode(code(alias));
+        MandantRegister nurDieser = new MandantRegister() {
+            @Override
+            public boolean existiert(MandantCode c) {
+                return register.existiert(c);
+            }
+
+            @Override
+            public void eintragen(Mandant mandant) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<Mandant> aktive() {
+                return register.aktive().stream().filter(m -> m.code().equals(code)).toList();
+            }
+
+            @Override
+            public Optional<Instant> erstellt(MandantCode c) {
+                return register.erstellt(c);
+            }
+        };
+        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, auftragService), "worker",
+                false);
+        planerGestern = ManifestFenster.tag(Instant.now()).minusDays(1);
+        SchedulerTakt.ausloesen(scheduler, anmeldung, "manifest-planer", () -> ManifestPlanerAusloesen.planen(planer));
+    }
+
+    @Dann("ist für «{word}» genau ein Manifest-Auftrag bis gestern eingereiht")
+    public void planerEingereiht(String alias) throws SQLException {
+        List<Long> bis = new ArrayList<>();
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "select (nutzlast ->> '" + ManifestErzeugen.BIS_TAG + "')::bigint from public.auftrag "
+                        + "where mandant = ? and typ = ? and status = 'OFFEN'")) {
+            p.setString(1, code(alias));
+            p.setString(2, ManifestErzeugen.TYP.wert());
+            try (ResultSet z = p.executeQuery()) {
+                while (z.next()) {
+                    bis.add(z.getLong(1));
+                }
+            }
+        }
+        assertThat(bis).as("vom Takt eingereiht").containsExactly(planerGestern.toEpochDay());
     }
 
     @Wenn("der Manifest-Lauf für «{word}» bis «{word}» bis zum letzten Versuch läuft")

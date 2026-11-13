@@ -3,6 +3,7 @@ package ch.urinet.archiv.integration;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
+import ch.urinet.archiv.gemeinsam.SchedulerTakt;
 import ch.urinet.archiv.integration.adapter.in.job.MailTakt;
 import ch.urinet.archiv.integration.adapter.in.job.MailTaktAusloesen;
 import ch.urinet.archiv.integration.application.mail.MailEingang;
@@ -18,8 +19,6 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Und;
 import io.cucumber.java.de.Wenn;
-import io.quarkus.arc.Arc;
-import io.quarkus.scheduler.Scheduled;
 import io.quarkus.scheduler.Scheduler;
 import jakarta.activation.DataHandler;
 import jakarta.inject.Inject;
@@ -53,7 +52,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
@@ -190,34 +188,12 @@ public class MailSchritte {
 
     /**
      * Wie im Betrieb: Ein Job des Quarkus-Schedulers ruft einmal {@link MailTakt} auf, im Thread des Schedulers mit dem
-     * Request-Kontext, den Quarkus für jeden Takt aktiviert, und ohne Anmeldung (Befund prod 13.11.2026). Der Takt in
+     * Request-Kontext und ohne Anmeldung ({@link SchedulerTakt}; Befund prod 13.11.2026). Der Takt in
      * der Konfiguration ist im Profil {@code test} aus ({@code archiv.mail.intervall=off}).
      */
     @Wenn("der Takt des Workers das Postfach im Scheduler abruft")
     public void imTakt() throws Exception {
-        String job = "mail-eingang-szenario-" + UUID.randomUUID();
-        AtomicBoolean gestartet = new AtomicBoolean();
-        CompletableFuture<String> lauf = new CompletableFuture<>();
-        scheduler.newJob(job).setInterval("1s").setConcurrentExecution(Scheduled.ConcurrentExecution.SKIP)
-                .setTask(ausfuehrung -> {
-                    if (!gestartet.compareAndSet(false, true)) {
-                        return;
-                    }
-                    try {
-                        String bedingung = "requestKontext=" + Arc.container().requestContext().isActive()
-                                + " anmeldung=" + anmeldung.ermitteln().getClass().getSimpleName();
-                        MailTaktAusloesen.abrufen(takt);
-                        lauf.complete(bedingung);
-                    } catch (Throwable t) {
-                        lauf.completeExceptionally(t);
-                    }
-                }).schedule();
-        try {
-            assertThat(lauf.get(2, TimeUnit.MINUTES)).as("Bedingungen im Thread des Schedulers")
-                    .isEqualTo("requestKontext=true anmeldung=Anonym");
-        } finally {
-            scheduler.unscheduleJob(job);
-        }
+        SchedulerTakt.ausloesen(scheduler, anmeldung, "mail-eingang", () -> MailTaktAusloesen.abrufen(takt));
     }
 
     @Angenommen("im Postfach liegt eine Mail aus Gmail von «{}» mit einem PDF «{}»")
