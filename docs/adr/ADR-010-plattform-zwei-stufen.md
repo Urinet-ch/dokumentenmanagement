@@ -100,6 +100,14 @@ rund 1'140 MB frei. Das Abbruchkriterium aus Req 16.18 bleibt: Ein Speicherabbru
 App beendet den Deploy, das Archiv wird auf Stufe A gestoppt und Stufe B (5.11) vorgezogen. Punkt 4 «Budget» oben gilt
 mit dem neuen Wert; nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.9, 1.10) und im Deploy-Workflow.
 
+## Nachtrag 13.11.2026 (Speicherbudget der Stufe A, zweite Anhebung)
+Entschieden von Fabian am 13.11.2026: Das Speicherbudget der Stufe A steigt von 900 auf **1000 MiB** (Summe `mem_limit`),
+die API bekommt 500m statt 320m; `cpus` bleibt bei höchstens 0.75. Anlass: Nach dem Deploy von 3.2 (KI-Extraktor) belegte
+die API schon im Leerlauf rund 300 von 320 MiB, und der cgroup-OOM beendete sie bei der ersten Verarbeitung viermal
+(ohne manuellen Eingriff). Nach Req 16.18 hätte das den vorzeitigen Wechsel auf Stufe B ausgelöst; Fabian hat stattdessen
+das Kriterium angepasst, weil auf Stufe A nur Testdaten liegen und die VPS rund 490 MiB frei hat. Der Wechsel auf Stufe B
+bleibt bei 5.11. Nachgeführt in Req 16.18, `tech.md`, design.md, tasks.md (1.10), compose.yml und im Deploy-Workflow.
+
 ## Nachtrag 12.11.2026 (K5: Grösse der VPS für Stufe B)
 Vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86 (Aufgabe 4.9, Entscheid 4.9-E7; Spec 01, Req 16.1, 16.16–16.18, 16.26):
 - **Grösse:** eigene Infomaniak VPS Lite mit 4 vCPU, 4 GB RAM und 80 GB Disk nur für das Archiv, CHF 9.00/Mt. bei
