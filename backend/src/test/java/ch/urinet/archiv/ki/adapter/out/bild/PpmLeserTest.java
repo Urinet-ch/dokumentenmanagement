@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.adapter.out.bild;
 
+import ch.urinet.archiv.ki.application.SeiteUngeeignet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -49,7 +50,7 @@ class PpmLeserTest {
                 "P6\n1 1 255x", "P6\n1234567890 1\n255\n")) {
             Path datei = ppm(kopf, pixel);
             assertThatThrownBy(() -> PpmLeser.lesen(datei, PIXEL_MAX)).as(kopf)
-                    .isInstanceOf(java.io.IOException.class);
+                    .isInstanceOf(SeiteUngeeignet.class);
         }
     }
 
@@ -66,8 +67,9 @@ class PpmLeserTest {
     void pixelgrenzeGreiftVorDemAnlegen() throws Exception {
         Path datei = ppm("P6\n100000 100000\n255\n", new byte[]{1, 2, 3});
 
-        assertThatThrownBy(() -> PpmLeser.lesen(datei, PIXEL_MAX)).hasMessageContaining("über der Grenze");
-        assertThatThrownBy(() -> new AwtSeitenbild(PIXEL_MAX).jpeg(List.of(datei)))
+        assertThatThrownBy(() -> PpmLeser.lesen(datei, PIXEL_MAX)).isInstanceOf(SeiteUngeeignet.class)
+                .hasMessageContaining("über der Grenze");
+        assertThatThrownBy(() -> new AwtSeitenbild(PIXEL_MAX).jpeg(List.of(datei))).isInstanceOf(SeiteUngeeignet.class)
                 .hasMessageContaining("über der Grenze");
     }
 

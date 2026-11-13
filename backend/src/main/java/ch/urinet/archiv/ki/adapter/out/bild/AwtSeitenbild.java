@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.adapter.out.bild;
 
+import ch.urinet.archiv.ki.application.SeiteUngeeignet;
 import ch.urinet.archiv.ki.application.SeitenbildPort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -31,7 +32,9 @@ import java.util.List;
  * <p>
  * Seiten kommen als PPM ({@code pdftoppm} ohne {@code -png}, Review PR #93): {@link PpmLeser} liest sie mit denselben
  * Pixeln in denselben Bildtyp ({@code TYPE_3BYTE_BGR}) wie ImageIO das PNG des Golden-Laufs, darum entsteht dasselbe
- * JPEG ({@code SeitenbildGleichheitTest}). Andere Formate (PNG) liest weiter ImageIO.
+ * JPEG ({@code SeitenbildGleichheitTest}). Andere Formate (PNG) liest weiter ImageIO. Ist ein Kopf nicht lesbar oder
+ * hat eine Seite mehr als {@code archiv.ki.render-pixel-max} Pixel, wirft sie {@link SeiteUngeeignet}, bevor ein
+ * Raster angelegt wird (Review PR #120).
  */
 @ApplicationScoped
 public class AwtSeitenbild implements SeitenbildPort {
@@ -69,7 +72,7 @@ public class AwtSeitenbild implements SeitenbildPort {
             for (int i = 0; i < seiten.size(); i++) {
                 BufferedImage bild = lesen(seiten.get(i));
                 if (bild == null) {
-                    throw new IOException("Seite nicht lesbar");
+                    throw new SeiteUngeeignet("Seite nicht lesbar");
                 }
                 int bh = (int) (masse.get(i)[1] * faktor);
                 g.drawImage(bild, 0, y, (int) (masse.get(i)[0] * faktor), bh, null);
@@ -93,12 +96,17 @@ public class AwtSeitenbild implements SeitenbildPort {
         try (ImageInputStream ein = ImageIO.createImageInputStream(seite.toFile())) {
             Iterator<ImageReader> leser = ein == null ? null : ImageIO.getImageReaders(ein);
             if (leser == null || !leser.hasNext()) {
-                throw new IOException("Seite nicht lesbar");
+                throw new SeiteUngeeignet("Seite nicht lesbar");
             }
             ImageReader reader = leser.next();
             try {
                 reader.setInput(ein, true, true);
-                return new int[]{reader.getWidth(0), reader.getHeight(0)};
+                int breite = reader.getWidth(0);
+                int hoehe = reader.getHeight(0);
+                if ((long) breite * hoehe > pixelMax) {
+                    throw new SeiteUngeeignet("Seite mit " + (long) breite * hoehe + " Pixeln über der Grenze");
+                }
+                return new int[]{breite, hoehe};
             } finally {
                 reader.dispose();
             }

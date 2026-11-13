@@ -59,8 +59,8 @@ public class MetadatenExtraktion {
     /**
      * @param text    Text für Modell, Nachbearbeitung und Kopf/Fuss-Erkennung wie im Golden-Lauf ({@code pdftotext
      *                -layout}), Seiten durch Seitenvorschub getrennt; bei {@code pdfa_fehlt} der Volltext
-     * @param qr      Swiss QR Code aus {@link #qr(List)}; leer bei {@code pdfa_fehlt}
-     * @param bild    Seitenbild des Bildwegs aus {@link #bild(List)}: Quelle ist ein Bild (Handy-Erfassung), das Bild
+     * @param qr      Swiss QR Code aus {@link #qr(UUID, List)}; leer bei {@code pdfa_fehlt}
+     * @param bild    Seitenbild des Bildwegs aus {@link #bild(UUID, List)}: Quelle ist ein Bild (Handy-Erfassung), das Bild
      *                geht statt des Texts an das Modell (Req 7.1); leer für den Textweg
      * @param eingang Eingangsdatum in Europe/Zurich (Regel R3)
      */
@@ -76,18 +76,33 @@ public class MetadatenExtraktion {
         }
     }
 
-    /** Erster Swiss QR Code auf den gerenderten Seiten (Req 7.11); ohne Seiten keiner. */
-    public Optional<QrDaten> qr(List<Path> seiten) {
-        return seiten.isEmpty() ? Optional.empty() : qrLeser.lesen(seiten);
+    /**
+     * Erster Swiss QR Code auf den gerenderten Seiten (Req 7.11); ohne Seiten keiner. Eine Seite über
+     * {@code archiv.ki.render-pixel-max} lässt der Leser aus (Review PR #120).
+     */
+    public Optional<QrDaten> qr(UUID dokumentId, List<Path> seiten) {
+        return seiten.isEmpty() ? Optional.empty() : qrLeser.lesen(dokumentId, seiten);
     }
 
     /**
      * Seitenbild des Bildwegs wie im Golden-Lauf (Req 7.1); ohne Seiten keines (dann geht der Text an das Modell).
+     * Ebenso keines, wenn eine Seite einen ungültigen Kopf oder mehr als {@code archiv.ki.render-pixel-max} Pixel hat
+     * ({@link SeiteUngeeignet}, Review PR #120): kein Fehlversuch, denn jeder Versuch brächte dasselbe; das Log warnt
+     * mit der ID.
      *
-     * @throws IOException wenn eine Seite nicht lesbar ist (Fehlversuch des Auftrags)
+     * @throws IOException wenn eine Seite sonst nicht lesbar ist (Fehlversuch des Auftrags)
      */
-    public Optional<byte[]> bild(List<Path> seiten) throws IOException {
-        return seiten.isEmpty() ? Optional.empty() : Optional.of(seitenbild.jpeg(seiten));
+    public Optional<byte[]> bild(UUID dokumentId, List<Path> seiten) throws IOException {
+        if (seiten.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(seitenbild.jpeg(seiten));
+        } catch (SeiteUngeeignet e) {
+            LOG.warnf("Seitenbild für Dokument %s nicht erstellt (%s): weiter ohne Seitenbild", dokumentId,
+                    e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

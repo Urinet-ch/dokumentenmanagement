@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.adapter.out;
 
 import ch.urinet.archiv.ki.adapter.out.bild.AwtSeitenbild;
 import ch.urinet.archiv.ki.adapter.out.qr.ZxingQrLeser;
+import ch.urinet.archiv.ki.application.SeiteUngeeignet;
 import ch.urinet.archiv.ki.domain.QrDaten;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -22,20 +23,29 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Speicherbudget Stufe A (Review PR #93, M3; design.md «Umsetzung 3.2»): Swiss QR Code und Seitenbild aus Seiten in der
- * grössten zulässigen Grösse ({@code archiv.ki.render-pixel-max}) ohne {@link OutOfMemoryError}. Läuft nur in der
- * Surefire-Ausführung {@code speicher} mit {@code -Xmx64m} (pom.xml); synthetische Seiten.
+ * grössten zulässigen Grösse ({@code archiv.ki.render-pixel-max}) ohne {@link OutOfMemoryError}; Seiten darüber werden
+ * ausgelassen, bevor ein Raster angelegt wird (Review PR #120). Läuft nur in der Surefire-Ausführung {@code speicher}
+ * mit {@code -Xmx64m} (pom.xml); synthetische Seiten.
  */
 @EnabledIfSystemProperty(named = "archiv.speicher-test", matches = "true")
 class SeitenKnapperHeapTest {
@@ -59,9 +69,37 @@ class SeitenKnapperHeapTest {
                 seite(ordner, "s2.tif", BufferedImage.TYPE_BYTE_GRAY, null),
                 seite(ordner, "s3.tif", BufferedImage.TYPE_BYTE_GRAY, spc));
 
-        Optional<QrDaten> qr = new ZxingQrLeser().lesen(seiten);
+        Optional<QrDaten> qr = new ZxingQrLeser(PIXEL_MAX).lesen(UUID.randomUUID(), seiten);
 
         assertThat(qr).hasValueSatisfying(q -> assertThat(q.iban()).isEqualTo("CH4431999123000889012"));
+    }
+
+    /**
+     * Review PR #120: Eine überformatige graue Seite (rund 0.4 MB auf der Platte, 400 Mio. Pixel) wird ausgelassen,
+     * bevor ein Raster angelegt wird; der Code der nächsten Seite wird trotzdem gefunden, ohne {@link OutOfMemoryError}.
+     */
+    @Test
+    void qrUeberformatigeSeiteWirdOhneOomAusgelassen(@TempDir Path ordner) throws Exception {
+        String spc = String.join("\n", "SPC", "0200", "1", "CH4431999123000889012", "S", "Lieferant GmbH",
+                "Teststrasse", "1", "6000", "Luzern", "CH", "", "", "", "", "", "", "", "99.95", "CHF", "S",
+                "Testfirma AG", "Testweg", "2", "6460", "Altdorf", "CH", "NON", "", "Rechnung", "EPD");
+        List<Path> seiten = List.of(riesigesTiff(ordner), seite(ordner, "s2.tif", BufferedImage.TYPE_BYTE_GRAY, spc));
+
+        Optional<QrDaten> qr = new ZxingQrLeser(PIXEL_MAX).lesen(UUID.randomUUID(), seiten);
+
+        assertThat(qr).hasValueSatisfying(q -> assertThat(q.iban()).isEqualTo("CH4431999123000889012"));
+    }
+
+    /**
+     * Review PR #120: dieselbe Seite auf dem Bildweg ergibt {@link SeiteUngeeignet}, keinen OOM; die Meldung belegt,
+     * dass ImageIO die Abmessungen aus dem Kopf gelesen hat (die Seite also nicht nur unlesbar ist).
+     */
+    @Test
+    void seitenbildUeberformatigeSeiteOhneOom(@TempDir Path ordner) throws Exception {
+        Path riesig = riesigesTiff(ordner);
+
+        assertThatThrownBy(() -> new AwtSeitenbild(PIXEL_MAX).jpeg(List.of(riesig)))
+                .isInstanceOf(SeiteUngeeignet.class).hasMessageContaining("400000000 Pixeln über der Grenze");
     }
 
     @Test
@@ -100,6 +138,45 @@ class SeitenKnapperHeapTest {
                 }
                 aus.write(zeile);
             }
+        }
+        return datei;
+    }
+
+    /**
+     * Graues TIFF mit 20'000 × 20'000 weissen Pixeln, mit Deflate komprimiert: rund 0.4 MB auf der Platte, als Raster
+     * 400 MB. Zeilenweise geschrieben, ohne die Seite im Heap.
+     */
+    private static Path riesigesTiff(Path ordner) throws Exception {
+        int seite = 20_000;
+        ByteArrayOutputStream daten = new ByteArrayOutputStream();
+        try (DeflaterOutputStream aus = new DeflaterOutputStream(daten, new Deflater(Deflater.BEST_COMPRESSION))) {
+            byte[] zeile = new byte[seite];
+            Arrays.fill(zeile, (byte) 255);
+            for (int y = 0; y < seite; y++) {
+                aus.write(zeile);
+            }
+        }
+        short[][] eintraege = {{256, 4}, {257, 4}, {258, 3}, {259, 3}, {262, 3}, {273, 4}, {277, 3}, {278, 4},
+                {279, 4}};
+        int ifd = 8;
+        int start = ifd + 2 + eintraege.length * 12 + 4;
+        long[] werte = {seite, seite, 8, 8, 1, start, 1, seite, daten.size()};
+        ByteBuffer kopf = ByteBuffer.allocate(start).order(ByteOrder.LITTLE_ENDIAN);
+        kopf.put((byte) 'I').put((byte) 'I').putShort((short) 42).putInt(ifd);
+        kopf.putShort((short) eintraege.length);
+        for (int i = 0; i < eintraege.length; i++) {
+            kopf.putShort(eintraege[i][0]).putShort(eintraege[i][1]).putInt(1);
+            if (eintraege[i][1] == 3) {
+                kopf.putShort((short) werte[i]).putShort((short) 0);
+            } else {
+                kopf.putInt((int) werte[i]);
+            }
+        }
+        kopf.putInt(0);
+        Path datei = ordner.resolve("riesig.tif");
+        try (OutputStream aus = Files.newOutputStream(datei)) {
+            aus.write(kopf.array());
+            daten.writeTo(aus);
         }
         return datei;
     }
