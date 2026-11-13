@@ -51,7 +51,13 @@ public class OcrMyPdfAdapter implements OcrPort {
     static final int OCRMYPDF_PDFA_GESCHEITERT = 10;
 
     private static final Pattern VORSCHAU = Pattern.compile("vorschau-(\\d+)\\.png");
-    private static final Pattern SEITE = Pattern.compile("seite-(\\d+)\\.png");
+    /**
+     * Graue Seitenbilder (QR) als TIFF mit LZW: verlustfrei wie PNG (gleiche Pixel), aber ohne dessen teure Kompression
+     * (A4 mit 300 dpi: rund 0.15 s statt 6.5 s CPU je Seite; Nachtrag PR #93). Farbige Seiten (Bildweg) bleiben PNG wie
+     * im Golden-Lauf: Ein farbiges TIFF liest ImageIO nicht als {@code TYPE_3BYTE_BGR}, und das Skalieren in
+     * {@code AwtSeitenbild} bräuchte dann ein volles Int-Raster (OOM mit {@code -Xmx112m}).
+     */
+    private static final Pattern SEITE = Pattern.compile("seite-(\\d+)\\.(?:tif|png)");
     /** Auflösung des Golden-Laufs ({@code pdftoppm -r 300}). */
     static final int RENDER_DPI = 300;
     static final int MIN_DPI = 10;
@@ -346,7 +352,8 @@ public class OcrMyPdfAdapter implements OcrPort {
 
         /**
          * Seiten Seite für Seite mit der Auflösung aus {@link #dpi}, farbig wie im Golden-Lauf ({@code pdftoppm -r 300
-         * -png}) oder mit {@code -gray}; das PDF wird zuerst ins Laufverzeichnis kopiert.
+         * -png}) oder mit {@code -gray} als TIFF mit LZW (siehe {@link #SEITE}); das PDF wird zuerst ins
+         * Laufverzeichnis kopiert.
          */
         List<Path> seitenbilder(Path pdf, Render render) throws IOException, InterruptedException {
             Path kopie = datei("seiten.pdf");
@@ -370,10 +377,12 @@ public class OcrMyPdfAdapter implements OcrPort {
                 }
                 List<String> argumente = new ArrayList<>(List.of("-q", "-r", Integer.toString(dpi.getAsInt()),
                         "-f", Integer.toString(nummer), "-l", Integer.toString(nummer)));
-                if (!render.farbig()) {
-                    argumente.add("-gray");
+                if (render.farbig()) {
+                    argumente.add("-png");
+                } else {
+                    argumente.addAll(List.of("-gray", "-tiff", "-tiffcompression", "lzw"));
                 }
-                argumente.addAll(List.of("-png", kopie.toString(), datei("seite").toString()));
+                argumente.addAll(List.of(kopie.toString(), datei("seite").toString()));
                 erfolgreich(new Befehl("pdftoppm", argumente));
             }
             return nummeriert(SEITE).stream().map(Path::of).toList();

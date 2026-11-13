@@ -13,7 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -46,9 +50,9 @@ class SeitenKnapperHeapTest {
         String spc = String.join("\n", "SPC", "0200", "1", "CH4431999123000889012", "S", "Lieferant GmbH",
                 "Teststrasse", "1", "6000", "Luzern", "CH", "", "", "", "", "", "", "", "99.95", "CHF", "S",
                 "Testfirma AG", "Testweg", "2", "6460", "Altdorf", "CH", "NON", "", "Rechnung", "EPD");
-        List<Path> seiten = List.of(seite(ordner, "s1.png", BufferedImage.TYPE_BYTE_GRAY, null),
-                seite(ordner, "s2.png", BufferedImage.TYPE_BYTE_GRAY, null),
-                seite(ordner, "s3.png", BufferedImage.TYPE_BYTE_GRAY, spc));
+        List<Path> seiten = List.of(seite(ordner, "s1.tif", BufferedImage.TYPE_BYTE_GRAY, null),
+                seite(ordner, "s2.tif", BufferedImage.TYPE_BYTE_GRAY, null),
+                seite(ordner, "s3.tif", BufferedImage.TYPE_BYTE_GRAY, spc));
 
         Optional<QrDaten> qr = new ZxingQrLeser().lesen(seiten);
 
@@ -82,7 +86,21 @@ class SeitenKnapperHeapTest {
         }
         g.dispose();
         Path datei = ordner.resolve(name);
-        ImageIO.write(bild, "png", datei.toFile());
+        if (name.endsWith(".png")) {
+            ImageIO.write(bild, "png", datei.toFile());
+            return datei;
+        }
+        // graue Seiten wie pdftoppm -gray -tiff -tiffcompression lzw (OcrMyPdfAdapter)
+        ImageWriter schreiber = ImageIO.getImageWritersByFormatName("tiff").next();
+        ImageWriteParam parameter = schreiber.getDefaultWriteParam();
+        parameter.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        parameter.setCompressionType("LZW");
+        try (ImageOutputStream aus = ImageIO.createImageOutputStream(datei.toFile())) {
+            schreiber.setOutput(aus);
+            schreiber.write(null, new IIOImage(bild, null, null), parameter);
+        } finally {
+            schreiber.dispose();
+        }
         return datei;
     }
 }

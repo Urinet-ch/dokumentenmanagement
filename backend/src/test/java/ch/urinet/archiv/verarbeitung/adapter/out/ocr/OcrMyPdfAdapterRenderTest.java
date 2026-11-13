@@ -50,7 +50,8 @@ class OcrMyPdfAdapterRenderTest {
 
         List<Befehl> render = starter.befehle.stream().filter(b -> b.programm().equals("pdftoppm")).toList();
         assertThat(render).hasSize(3).allSatisfy(b -> assertThat(b.argumente()).contains("-gray")
-                .containsSubsequence("-r", "300"));
+                .containsSubsequence("-r", "300").containsSubsequence("-tiff", "-tiffcompression", "lzw")
+                .doesNotContain("-png"));
         assertThat(render).extracting(b -> b.argumente().get(b.argumente().indexOf("-f") + 1))
                 .containsExactly("1", "2", "5");
         assertThat(seiten).hasSize(3);
@@ -62,7 +63,8 @@ class OcrMyPdfAdapterRenderTest {
         adapter(starter).seitenbilder(pdf(), new Render(3, true, PIXEL_MAX, Duration.ofSeconds(30)), List::copyOf);
 
         assertThat(starter.befehle).filteredOn(b -> b.programm().equals("pdftoppm")).singleElement()
-                .satisfies(b -> assertThat(b.argumente()).doesNotContain("-gray").containsSubsequence("-r", "300"));
+                .satisfies(b -> assertThat(b.argumente()).doesNotContain("-gray").containsSubsequence("-r", "300")
+                        .contains("-png").doesNotContain("-tiff"));
     }
 
     @Test
@@ -143,7 +145,7 @@ class OcrMyPdfAdapterRenderTest {
                     }
                     case "pdftotext" -> Files.writeString(Path.of(a.getLast()), "Text mit  Layout",
                             StandardCharsets.UTF_8);
-                    case "pdftoppm" -> Files.write(Path.of(a.getLast() + "-" + a.get(a.indexOf("-f") + 1) + ".png"),
+                    case "pdftoppm" -> Files.write(Path.of(a.getLast() + "-" + a.get(a.indexOf("-f") + 1) + (a.contains("-png") ? ".png" : ".tif")),
                             new byte[]{1});
                     default -> throw new IllegalStateException(befehl.programm());
                 }

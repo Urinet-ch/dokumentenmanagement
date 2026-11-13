@@ -268,6 +268,15 @@ public class VerarbeitungTestHilfe {
                 + HexFormat.of().formatHex(zufall(32)) + "' where dokument_id = '" + id + "'");
     }
 
+    /**
+     * Ändert das Dokument wie ein Benutzer im Eingangskorb: {@code setzen} (fester SQL-Ausdruck aus dem Test), dazu
+     * {@code version + 1}.
+     */
+    public void dokumentAendern(String mandant, UUID id, String setzen) throws SQLException {
+        auftraege.ausfuehren("update " + schema(mandant) + ".dokument set " + setzen
+                + ", version = version + 1, geaendert = clock_timestamp() where id = '" + id + "'");
+    }
+
     /** IDs der Aufträge eines Typs für dieses Dokument. */
     /** Status der Aufträge {@code typ} zum Dokument, nach ID sortiert. */
     public List<String> auftragStatus(String typ, UUID id) throws SQLException {

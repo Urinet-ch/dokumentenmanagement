@@ -96,8 +96,9 @@ sudo docker compose --project-directory /srv/apps/archiv -f /srv/apps/archiv/com
   run --rm --no-deps -T -l traefik.enable=false api \
   sh -c 'exec java $JAVA_OPTS_APPEND -jar /deployments/quarkus-run.jar <kommando>'
 ```
-- `<kommando>` z. B. `mandant anlegen urinet --name "Urinet Aschwanden"`; der Exit-Code des Kommandos ist der von
-  `docker compose run`.
+- `<kommando>` z. B. `mandant anlegen urinet --name "UriNet Aschwanden"`; der Exit-Code des Kommandos ist der von
+  `docker compose run`. Der Name geht in den Prompt des KI-Vorschlags ein: Nur mit genau «UriNet Aschwanden» (und den
+  Seed-Arten) entspricht die Prompt-Kennung der von Gate 0 (`v6-7a39224f2f5e`), sonst warnt das Log bei jedem Aufruf.
 - Der Wegwerf-Container belegt für einige Sekunden ein zweites `mem_limit` der API; nicht während einer Messung des
   Speicherbudgets (Aufgabe 1.10) starten.
 

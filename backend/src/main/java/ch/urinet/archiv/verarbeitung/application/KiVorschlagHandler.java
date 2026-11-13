@@ -12,6 +12,7 @@ import ch.urinet.archiv.ki.domain.QrDaten;
 import ch.urinet.archiv.ki.domain.Vorschlag;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
+import ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen;
 import ch.urinet.archiv.verarbeitung.domain.Quelltyp;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,7 +44,8 @@ import java.util.concurrent.TimeoutException;
  * Nachfrage, Nachbearbeitung), Vorschlag speichern, Partner bei eindeutigem Treffer verknüpfen und
  * {@code EINGANGSKORB} setzen. Antwortet das Modell zweimal ausserhalb des Schemas, geht das Dokument ohne Vorschlag in
  * den Eingangskorb (Req 7.3); antwortet es nicht ({@link KiAusfall}) oder scheitert das Rendern, ist es ein Fehlversuch
- * des Auftrags (Req 5.4). Das Log nennt nur IDs.
+ * des Auftrags (Req 5.4). Reicht die Frist des Renderns nicht, geht es ohne QR bzw. Seitenbild weiter (kein
+ * Fehlversuch). Das Log nennt nur IDs.
  * <p>
  * Rendern und QR-Lesen belegen viel Heap; sie laufen darum in der JVM nacheinander (eine Sperre mit einem Platz) und
  * innerhalb von {@code archiv.ki.render-zeitgrenze}, der Aufruf des Modells danach ausserhalb der Sperre.
@@ -158,20 +160,30 @@ public class KiVorschlagHandler implements AuftragHandler {
             Instant ende = Instant.now().plus(renderZeitgrenze);
             String layout = ocr.layoutText(datei, rest(ende));
             String text = layout.isBlank() ? stand.volltext() : layout;
-            Optional<QrDaten> qr;
+            Optional<QrDaten> qr = Optional.empty();
             Optional<byte[]> bild = Optional.empty();
-            if (!sperre.tryAcquire(rest(ende).toMillis(), TimeUnit.MILLISECONDS)) {
-                throw new TimeoutException("Rendern für Dokument " + stand.id() + " nicht innerhalb der Frist frei");
-            }
             try {
-                qr = ocr.seitenbilder(datei, new OcrPort.Render(renderSeitenMax, false, renderPixelMax, rest(ende)),
-                        extraktion::qr);
-                if (bildweg) {
-                    bild = ocr.seitenbilder(datei,
-                            new OcrPort.Render(renderSeitenMax, true, renderPixelMax, rest(ende)), extraktion::bild);
+                if (!sperre.tryAcquire(rest(ende).toMillis(), TimeUnit.MILLISECONDS)) {
+                    throw new TimeoutException("Rendern für Dokument " + stand.id() + " nicht innerhalb der Frist frei");
                 }
-            } finally {
-                sperre.release();
+                try {
+                    qr = ocr.seitenbilder(datei,
+                            new OcrPort.Render(renderSeitenMax, false, renderPixelMax, rest(ende)), extraktion::qr);
+                    if (bildweg) {
+                        bild = ocr.seitenbilder(datei,
+                                new OcrPort.Render(renderSeitenMax, true, renderPixelMax, rest(ende)),
+                                extraktion::bild);
+                    }
+                } finally {
+                    sperre.release();
+                }
+            } catch (TimeoutException e) {
+                fristAbgelaufen(stand.id(), qr.isPresent(), bildweg);
+            } catch (OcrFehlgeschlagen e) {
+                if (e.art() != OcrFehlgeschlagen.Art.ZEITUEBERSCHREITUNG) {
+                    throw e;
+                }
+                fristAbgelaufen(stand.id(), qr.isPresent(), bildweg);
             }
             eingabe = new MetadatenExtraktion.Eingabe(stand.id(), mandant, text, qr, bild, eingang);
         } finally {
@@ -179,6 +191,16 @@ public class KiVorschlagHandler implements AuftragHandler {
         }
         unterbrochen();
         return extraktion.vorschlagen(eingabe);
+    }
+
+    /**
+     * Seiten nicht innerhalb von {@code archiv.ki.render-zeitgrenze} gerendert (z. B. ein langer Scan auf Stufe A mit
+     * {@code cpus: 0.3}): kein Fehlversuch, sondern weiter mit dem Text und ohne, was fehlt (QR, Seitenbild). Ein
+     * Fehlversuch lieferte bei denselben Seiten dreimal dasselbe und das Dokument käme nie zu einem Vorschlag.
+     */
+    private void fristAbgelaufen(UUID id, boolean qrGelesen, boolean bildweg) {
+        LOG.warnf("Seiten von Dokument %s nicht innerhalb von %s gerendert: weiter ohne %s", id, renderZeitgrenze,
+                qrGelesen ? "Seitenbild" : bildweg ? "Swiss QR Code und Seitenbild" : "Swiss QR Code");
     }
 
     /** Restzeit bis {@code ende}; abgelaufen ist ein Fehlversuch (Frist des Renderns, nicht die des Auftrags). */

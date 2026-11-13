@@ -29,6 +29,9 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -62,6 +65,8 @@ public class KiVorschlagSchritte {
     private boolean kennungenGeaendert;
     /** Kontakt aus dem Szenario, wird danach gelöscht. */
     private UUID kontakt;
+    /** {@code version} des Dokuments direkt nach der Änderung durch den Benutzer. */
+    private int versionBenutzer;
 
     @Angenommen("das Sprachmodell ist bereit")
     public void bereit() throws Exception {
@@ -135,6 +140,52 @@ public class KiVorschlagSchritte {
     public void schlaegtVor(String art, String belegnummer, String vertraulichkeit) throws Exception {
         modell.register(post(urlPathEqualTo(PFAD)).willReturn(okJson(antwort(modellVorschlag(art, belegnummer,
                 vertraulichkeit)))));
+    }
+
+    @Angenommen("das Sprachmodell schlägt «{word}» mit Belegnummer «{}» und Vertraulichkeit «{word}» erst nach {int} Sekunden vor")
+    public void schlaegtVerzoegertVor(String art, String belegnummer, String vertraulichkeit, int sekunden)
+            throws Exception {
+        modell.register(post(urlPathEqualTo(PFAD)).willReturn(okJson(antwort(modellVorschlag(art, belegnummer,
+                vertraulichkeit))).withFixedDelay(sekunden * 1000)));
+    }
+
+    /**
+     * Der Worker läuft im Hintergrund; sobald der WireMock die Anfrage erhalten hat (vor der verzögerten Antwort), ändert
+     * bzw. bestätigt der Schritt das Dokument. Das liegt damit sicher zwischen Laden und Speichern des Vorschlags.
+     */
+    @Wenn("der Worker die Aufträge bearbeitet und das Dokument während des Aufrufs {word} wird")
+    public void aendernWaehrendAufruf(String aenderung) throws Exception {
+        String setzen = switch (aenderung) {
+            case "geändert" -> "titel = 'Titel des Benutzers'";
+            case "bestätigt" -> "bestaetigt = clock_timestamp(), bestaetigt_von = 'test-benutzer'";
+            default -> throw new IllegalArgumentException("Unbekannte Änderung: " + aenderung);
+        };
+        CompletableFuture<Void> lauf = CompletableFuture.runAsync(() -> {
+            try {
+                hilfe.abarbeiten();
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        });
+        try {
+            long ende = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+            while (anfragen().isEmpty()) {
+                assertThat(lauf.isDone() || System.nanoTime() > ende).as("Sprachmodell aufgerufen").isFalse();
+                Thread.sleep(20);
+            }
+            hilfe.dokumentAendern(MANDANT, id, setzen);
+            versionBenutzer = ((Number) hilfe.kiVorschlag(MANDANT, id).get("version")).intValue();
+        } finally {
+            lauf.get(5, TimeUnit.MINUTES);
+        }
+    }
+
+    @Dann("das Dokument ist «{word}» ohne Vorschlag und in der Version des Benutzers")
+    public void unveraendertNachBenutzer(String status) throws Exception {
+        Map<String, Object> dokument = hilfe.kiVorschlag(MANDANT, id);
+        assertThat(dokument).containsEntry("status", status).containsEntry("ki_vorschlag", null)
+                .containsEntry("ki_sicherheit", null);
+        assertThat(((Number) dokument.get("version")).intValue()).isEqualTo(versionBenutzer);
     }
 
     @Angenommen("das Sprachmodell antwortet zuerst ausserhalb des Schemas und danach mit «{word}»")

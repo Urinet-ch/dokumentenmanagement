@@ -92,6 +92,20 @@ Funktionalität: KI-Vorschlag der Metadaten (KI_VORSCHLAG)
     Und der Aufruf enthält kein Seitenbild
     Und das Dokument ist «EINGANGSKORB» mit der Art «LIEFERANTENBELEG» und der Vertraulichkeit «INTERN»
 
+  @req-7.1 @req-5.9
+  Szenariogrundriss: Wird das Dokument während des Aufrufs <aenderung>, speichert der Worker keinen Vorschlag
+    Angenommen ein Beleg als verschlüsseltes PDF
+    Und das Sprachmodell schlägt «LIEFERANTENBELEG» mit Belegnummer «2026-130» und Vertraulichkeit «INTERN» erst nach 3 Sekunden vor
+    Wenn der Worker die Aufträge bearbeitet und das Dokument während des Aufrufs <aenderung> wird
+    Dann wurde das Sprachmodell 1-mal aufgerufen
+    Und das Dokument ist «EINGANGSKORB» ohne Vorschlag und in der Version des Benutzers
+    Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
+
+    Beispiele:
+      | aenderung |
+      | geändert  |
+      | bestätigt |
+
   @req-7.1 @req-7.4
   Szenario: Ein eindeutiger Kontakt zur IBAN aus dem Swiss QR Code wird als Partner verknüpft
     Angenommen im Mandanten gibt es den Kontakt «Lieferant GmbH» mit der IBAN «CH4431999123000889012»
