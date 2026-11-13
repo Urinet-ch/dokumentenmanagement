@@ -19,6 +19,7 @@ export const TEXTE = {
     importe: 'Importe',
     dokumentarten: 'Dokumentarten',
     protokoll: 'Zugriffsprotokoll',
+    export: 'Jahresexport',
   },
   eingangskorbAnzahl: (anzahl: number) =>
     anzahl === 1 ? '1 Dokument im Eingangskorb' : `${anzahl} Dokumente im Eingangskorb`,
@@ -566,6 +567,44 @@ export const TEXTE = {
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
   // Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe 5.1; Req 10.5, 10.10; Recht A13)
+  /** Seite «Export» (Spec 02, Aufgabe 6.5; Req 7.1, 7.2, 7.5): nur Inhaber und Treuhänder. */
+  export: {
+    titel: 'Jahresexport',
+    einleitung:
+      'Alle archivierten Belege eines Geschäftsjahres als ZIP: PDF/A-Fassungen (sonst das Original), Belegliste ' +
+      '(CSV für Excel), Prüfsummen und die Manifeste des Jahres. Das Archiv erstellt den Export im Hintergrund und ' +
+      'meldet ihn per E-Mail; der Download-Link gilt 24 Stunden ab Fertigstellung.',
+    anfordernTitel: 'Export anfordern',
+    jahr: 'Geschäftsjahr',
+    jahrHinweis: 'Das Geschäftsjahr heisst nach dem Kalenderjahr, in dem es endet.',
+    anfordern: 'Export starten',
+    angefordert: 'Der Export ist angefordert. Sie erhalten eine E-Mail, sobald er bereit ist.',
+    liste: 'Exporte',
+    laden: 'Exporte werden geladen …',
+    keine: 'Noch keine Exporte.',
+    status: {
+      OFFEN: 'In Arbeit',
+      FERTIG: 'Bereit',
+      ABGELAUFEN: 'Abgelaufen',
+      FEHLER: 'Fehlgeschlagen',
+    } as Record<string, string>,
+    zeile: (jahr: number, erstellt: string) => `Geschäftsjahr ${jahr} · angefordert ${erstellt}`,
+    fertigZeile: (anzahl: string, groesse: string, bis: string) =>
+      `${anzahl} Belege · ${groesse} · Download bis ${bis}`,
+    abgelaufenHinweis: 'Der Download-Link ist abgelaufen. Bitte fordern Sie einen neuen Export an.',
+    fehlerHinweis: 'Der Export ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    herunterladen: (jahr: number) => `Export ${jahr} herunterladen`,
+    pruefsumme: 'SHA-256 des ZIP',
+    fehlercode: {
+      STATUS_KONFLIKT: 'Es läuft bereits ein Export. Bitte warten Sie, bis er fertig ist.',
+      ANFRAGE_UNGUELTIG: 'Bitte ein Geschäftsjahr zwischen 1900 und 2999 angeben.',
+      NICHT_ERLAUBT: 'Den Jahresexport dürfen nur Inhaber und Treuhänder anfordern.',
+      NICHT_GEFUNDEN: 'Diesen Export gibt es nicht mehr. Bitte laden Sie die Seite neu.',
+    } as Record<string, string>,
+    fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+  },
   protokoll: {
     titel: 'Zugriffsprotokoll',
     einleitung:

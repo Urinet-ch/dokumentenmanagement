@@ -4,6 +4,8 @@ import org.eclipse.microprofile.config.ConfigProvider;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.LifecycleRule;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 
@@ -68,6 +70,37 @@ public final class TestAblage {
             ResponseBytes<GetObjectResponse> inhalt = s3.getObjectAsBytes(b -> b.bucket(bucket(mandant))
                     .key(schluessel).versionId(versionId));
             return inhalt.asByteArray();
+        }
+    }
+
+    /** Legt eine neue Version ohne Sperre ab und liefert ihre Versions-ID (synthetische Testdaten). */
+    public static String ablegen(String mandant, String schluessel, byte[] inhalt) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            return s3.putObject(b -> b.bucket(bucket(mandant)).key(schluessel), RequestBody.fromBytes(inhalt))
+                    .versionId();
+        }
+    }
+
+    /** Regeln des Lebenszyklus des Buckets; leer ohne Konfiguration. */
+    public static List<LifecycleRule> lebenszyklus(String mandant) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            return s3.getBucketLifecycleConfiguration(b -> b.bucket(bucket(mandant))).rules();
+        } catch (S3Exception e) {
+            if (e.awsErrorDetails() != null && "NoSuchLifecycleConfiguration".equals(e.awsErrorDetails().errorCode())) {
+                return List.of();
+            }
+            throw e;
+        }
+    }
+
+    /** Ob die Version eine Object-Lock-Sperre trägt (Modus oder Datum); ohne Sperre antwortet S3 mit einem Fehler. */
+    public static boolean gesperrt(String mandant, String schluessel, String versionId) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            var r = s3.getObjectRetention(b -> b.bucket(bucket(mandant)).key(schluessel).versionId(versionId))
+                    .retention();
+            return r != null && (r.mode() != null || r.retainUntilDate() != null);
+        } catch (S3Exception e) {
+            return false;
         }
     }
 }

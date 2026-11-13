@@ -7,8 +7,11 @@ import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
+import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
+import ch.urinet.archiv.ablage.domain.Exportdatei;
+import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
@@ -40,6 +43,8 @@ import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CopyObjectResponse;
+import software.amazon.awssdk.services.s3.model.ExpirationStatus;
+import software.amazon.awssdk.services.s3.model.LifecycleRule;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
@@ -73,6 +78,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * S3-Adapter der Ablage (design.md «Ablage»; Spike 0.2: Ceph bei Infomaniak). Nutzt nur den S3-Client von Quarkus mit
@@ -99,6 +105,9 @@ public class S3Ablage implements AblagePort {
     private static final Set<String> ZEITUEBERSCHREITUNG = Set.of("RequestTimeout", "RequestTimeoutException");
     private static final String MANIFEST = "manifest/";
     private static final Set<String> PRUEFBEREICHE = Set.of(ARCHIV, MANIFEST);
+    static final String EXPORT_REGEL = "exporte-7-tage";
+    private static final Duration MAX_SIGNATUR = Duration.ofDays(7);
+    private static final Pattern EXPORT_NAME = Pattern.compile("^[A-Za-z0-9._-]{1,100}\\.zip$");
 
     private final S3Client s3;
     private final S3Presigner presigner;
@@ -751,6 +760,95 @@ public class S3Ablage implements AblagePort {
             throw new IllegalStateException("Sperre nicht verlängert: " + schluessel);
         }
         return aenderung(datei, SperrAenderung.Ergebnis.VERLAENGERT, Optional.of(kontrolle.get().retainUntilDate()));
+    }
+
+    @Override
+    public Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
+        bereichPruefen(schluessel, versionId);
+        Objects.requireNonNull(ziel, "ziel");
+        String bucket = bucket(mandant);
+        boolean[] begonnen = {false};
+        // ein Retry des SDK riefe den Transformer erneut auf; die Bytes stünden dann doppelt im Ziel
+        return s3.getObject(b -> b.bucket(bucket).key(schluessel).versionId(versionId), (antwort, inhalt) -> {
+            if (begonnen[0]) {
+                throw new IllegalStateException("Kopie nach Teilabbruch nicht wiederholbar: " + schluessel);
+            }
+            begonnen[0] = true;
+            MessageDigest digest = Pruefsumme.sha256();
+            long groesse;
+            try (InputStream ein = new DigestInputStream(inhalt, digest)) {
+                groesse = ein.transferTo(ziel);
+            }
+            return new Kopie(Pruefsumme.hex(digest), groesse);
+        });
+    }
+
+    @Override
+    public Exportziel exportSchreiben(MandantCode mandant, UUID exportId) {
+        return new S3Exportziel(s3, bucket(mandant), Exportdatei.schluessel(exportId), einstellungen.exportTeil());
+    }
+
+    @Override
+    public VorsignierteUrl exportUrl(MandantCode mandant, String schluessel, String versionId, Instant gueltigBis,
+                                     String dateiname) {
+        if (schluessel == null || !schluessel.startsWith(Exportdatei.PRAEFIX) || ohneVersion(versionId)) {
+            throw new IllegalArgumentException("Nur Versionen unter exporte/: " + schluessel);
+        }
+        if (dateiname == null || !EXPORT_NAME.matcher(dateiname).matches()) {
+            throw new IllegalArgumentException("Ungültiger Name des Exports");
+        }
+        Duration dauer = Duration.between(uhr.instant(), gueltigBis);
+        if (dauer.compareTo(Duration.ofSeconds(1)) < 0 || dauer.compareTo(MAX_SIGNATUR) > 0) {
+            throw new IllegalArgumentException("Gültigkeit der Export-Adresse ausserhalb 1 s bis 7 Tage");
+        }
+        String bucket = bucket(mandant);
+        var signiert = presigner.presignGetObject(r -> r.signatureDuration(dauer)
+                .getObjectRequest(g -> g.bucket(bucket).key(schluessel).versionId(versionId)
+                        .responseContentType("application/zip")
+                        .responseContentDisposition("attachment; filename=\"" + dateiname + "\"")));
+        try {
+            // die URL ist für ihre Dauer ein Zugangsschlüssel: nie loggen
+            return new VorsignierteUrl(signiert.url().toURI(), signiert.expiration());
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Vorsignierte URL ungültig: " + schluessel, e);
+        }
+    }
+
+    /**
+     * Regel {@value #EXPORT_REGEL}: aktuelle Version nach 7 Tagen ablaufen lassen (im versionierten Bucket wird sie zur
+     * älteren Version), ältere Versionen nach einem weiteren Tag löschen, unvollständige Uploads nach einem Tag.
+     * Liest die bestehende Konfiguration und ersetzt nur diese Regel, weil {@code PutBucketLifecycleConfiguration} die
+     * ganze Konfiguration ersetzt. Sperren berührt die Regel nicht ({@code exporte/} wird nie gesperrt).
+     */
+    @Override
+    public void exportLebenszyklusSichern(MandantCode mandant) {
+        String bucket = bucket(mandant);
+        List<LifecycleRule> bisher;
+        try {
+            bisher = s3.getBucketLifecycleConfiguration(b -> b.bucket(bucket)).rules();
+        } catch (S3Exception e) {
+            if (!"NoSuchLifecycleConfiguration".equals(fehlercode(e))) {
+                throw e;
+            }
+            bisher = List.of();
+        }
+        LifecycleRule soll = exportRegel();
+        if (bisher.contains(soll)) {
+            return;
+        }
+        List<LifecycleRule> regeln = new ArrayList<>(bisher.stream().filter(r -> !EXPORT_REGEL.equals(r.id())).toList());
+        regeln.add(soll);
+        s3.putBucketLifecycleConfiguration(b -> b.bucket(bucket).lifecycleConfiguration(l -> l.rules(regeln)));
+        LOG.infof("Lebenszyklus für %s in %s gesetzt", Exportdatei.PRAEFIX, bucket);
+    }
+
+    static LifecycleRule exportRegel() {
+        return LifecycleRule.builder().id(EXPORT_REGEL).status(ExpirationStatus.ENABLED)
+                .filter(f -> f.prefix(Exportdatei.PRAEFIX))
+                .expiration(e -> e.days(Exportdatei.LEBENSZYKLUS_TAGE))
+                .noncurrentVersionExpiration(n -> n.noncurrentDays(1))
+                .abortIncompleteMultipartUpload(a -> a.daysAfterInitiation(1))
+                .build();
     }
 
     /**

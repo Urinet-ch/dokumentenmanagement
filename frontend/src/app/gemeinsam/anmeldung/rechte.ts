@@ -5,7 +5,8 @@ export type Rolle = 'inhaber' | 'geschaeftsstelle' | 'mitarbeiter' | 'treuhaende
 // Rangfolge nach Req 2.2: Bei mehreren Archiv-Rollen gilt nur die stärkste, die Rechte werden nicht vereinigt.
 const RANGFOLGE: readonly Rolle[] = ['inhaber', 'geschaeftsstelle', 'mitarbeiter', 'treuhaender'];
 
-export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A11' | 'A12' | 'A13' | 'A14';
+// EXPORT: Jahresexport (Spec 02, Req 7.1, 7.5), keine Zeile der Rechtematrix, aber dieselbe Prüfung im Backend
+export type Aktion = 'A1' | 'A2' | 'A5' | 'A6' | 'A7' | 'A8' | 'A9' | 'A10' | 'A11' | 'A12' | 'A13' | 'A14' | 'EXPORT';
 
 // Rollen, für die die Aktion nicht 403 ist (A2: alle Rollen; Einschränkungen nach Vertraulichkeit macht das Backend).
 const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
@@ -21,6 +22,7 @@ const ERLAUBT: Record<Aktion, readonly Rolle[]> = {
   A12: ['inhaber'],
   A13: ['inhaber'],
   A14: ['inhaber'],
+  EXPORT: ['inhaber', 'treuhaender'],
 };
 
 export function rolleAusRealmRollen(rollen: readonly unknown[] | undefined): Rolle | null {

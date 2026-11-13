@@ -4,6 +4,7 @@ api/api-tokens.service.ts
 api/api.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
+api/exporte.service.ts
 api/importe.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
@@ -24,6 +25,8 @@ model/dokumentart-aenderung.ts
 model/dokumentart.ts
 model/download-adresse.ts
 model/eingangskorb-seite.ts
+model/export-anfrage.ts
+model/export.ts
 model/generator-antwort.ts
 model/generator-finanz.ts
 model/generator-metadaten.ts

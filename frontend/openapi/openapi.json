@@ -730,6 +730,76 @@
           }
         }
       },
+      "Export" : {
+        "description" : "Jahresexport; status ABGELAUFEN heisst fertig, aber der Download-Link (24 Stunden ab Fertigstellung) gilt nicht mehr",
+        "type" : "object",
+        "required" : [ "id", "geschaeftsjahr", "status", "erstellt" ],
+        "properties" : {
+          "id" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "geschaeftsjahr" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OFFEN", "FERTIG", "ABGELAUFEN", "FEHLER" ]
+          },
+          "erstellt" : {
+            "type" : "string",
+            "$ref" : "#/components/schemas/Instant"
+          },
+          "fertig" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "gueltigBis" : {
+            "description" : "Ende der Gültigkeit des Download-Links",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "anzahl" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "Zahl der Belege (Dokumente)"
+          },
+          "groesse" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64",
+            "description" : "Grösse des ZIP in Byte"
+          },
+          "sha256" : {
+            "type" : [ "string", "null" ],
+            "description" : "SHA-256 des ZIP (hex)"
+          },
+          "url" : {
+            "type" : [ "string", "null" ],
+            "description" : "vorsignierte Adresse des ZIP, nur bei GET /exporte/{id} für einen fertigen, nicht abgelaufenen Export"
+          }
+        }
+      },
+      "ExportAnfrage" : {
+        "type" : "object",
+        "required" : [ "geschaeftsjahr" ],
+        "properties" : {
+          "geschaeftsjahr" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 2999,
+            "minimum" : 1900,
+            "description" : "Geschäftsjahr, bezeichnet nach dem Kalenderjahr seines Endes"
+          }
+        }
+      },
       "GeneratorAntwort" : {
         "type" : "object",
         "required" : [ "id", "status" ],
@@ -1682,6 +1752,8 @@
     "name" : "Dokumentarten"
   }, {
     "name" : "Dokumente"
+  }, {
+    "name" : "Exporte"
   }, {
     "name" : "Importe"
   }, {
@@ -2651,6 +2723,112 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/EingangskorbSeite"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/exporte" : {
+      "get" : {
+        "summary" : "Jahresexporte",
+        "description" : "Die neuesten 20, neueste zuerst, ohne Download-Adresse. Nur inhaber und treuhaender, sonst 403 NICHT_ERLAUBT.",
+        "tags" : [ "Exporte" ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Export"
+                  }
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Jahresexport anfordern",
+        "description" : "Nur inhaber und treuhaender (Req 7.1, 7.5), sonst 403 NICHT_ERLAUBT ohne Auftrag. Reiht den Auftrag EXPORT_JAHR ein und protokolliert EXPORTIEREN. Ungültiges Geschäftsjahr → 400; läuft im Mandanten schon ein Export → 409 STATUS_KONFLIKT.",
+        "tags" : [ "Exporte" ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExportAnfrage"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Export angelegt und eingereiht",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Export"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/exporte/{id}" : {
+      "get" : {
+        "summary" : "Jahresexport abrufen",
+        "description" : "Bei einem fertigen Export mit der vorsignierten Adresse des ZIP, gültig bis 24 Stunden nach der Fertigstellung (Req 7.2); jede ausgegebene Adresse protokolliert HERUNTERLADEN. Nur inhaber und treuhaender, sonst 403 NICHT_ERLAUBT; unbekannt → 404 NICHT_GEFUNDEN.",
+        "tags" : [ "Exporte" ],
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Export, bei FERTIG mit Adresse; nicht zwischenspeichern",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Export"
                 }
               }
             }
