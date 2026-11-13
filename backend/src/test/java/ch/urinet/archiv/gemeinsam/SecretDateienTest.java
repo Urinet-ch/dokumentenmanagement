@@ -56,5 +56,6 @@ public class SecretDateienTest {
                 .isEqualTo("attrappe-geheimnis");
         assertThat(config.getValue("quarkus.datasource.password", String.class)).isEqualTo("attrappe-app");
         assertThat(config.getValue("quarkus.liquibase.password", String.class)).isEqualTo("attrappe-owner");
+        assertThat(config.getValue("infomaniak_ai_token", String.class).strip()).isEqualTo("attrappe-ki-token");
     }
 }
