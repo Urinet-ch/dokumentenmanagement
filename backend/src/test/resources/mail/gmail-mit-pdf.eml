@@ -1,0 +1,61 @@
+Return-Path: <{{absender}}>
+Delivered-To: archiv@example.invalid
+Received: from mx.example.invalid
+	by imap.example.invalid with LMTP
+	id abc123 (envelope-from <{{absender}}>)
+	for <archiv@example.invalid>; Fri, 13 Nov 2026 21:45:13 +0100
+Received: by mail-wr1-f41.google.example.invalid with SMTP id 5b1f17b1804b1-43;
+        Fri, 13 Nov 2026 12:45:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=example.invalid; s=20230601; t=1763066712; x=1763671512; darn=example.invalid;
+        h=to:subject:message-id:date:from:mime-version:from:to:cc:subject
+         :date:message-id:reply-to;
+        bh=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=;
+        b=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.example.invalid; s=20230601; t=1763066712; x=1763671512;
+        bh=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=;
+        b=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+X-Gm-Message-State: AOJu0YzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+X-Google-Smtp-Source: AGHT+IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+X-Received: by 2002:a05:6000:1:b0:38:: with SMTP id 5b1f17b1804b1-43;
+        Fri, 13 Nov 2026 12:45:12 -0800 (PST)
+MIME-Version: 1.0
+From: =?UTF-8?Q?Inhaber_M=C3=BCller?= <{{absender}}>
+Date: Fri, 13 Nov 2026 21:45:01 +0100
+X-Gm-Features: AQ_AAAAAAAAAAAAAAA
+Message-ID: {{message-id}}
+Subject: =?UTF-8?Q?Testbeleg_f=C3=BCr_das_Archiv?=
+To: archiv@example.invalid
+Content-Type: multipart/mixed; boundary="0000000000004f5a1c0643a1b2c3"
+
+--0000000000004f5a1c0643a1b2c3
+Content-Type: multipart/alternative; boundary="0000000000004f5a1a0643a1b2c1"
+
+--0000000000004f5a1a0643a1b2c1
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+Gr=C3=BCezi
+
+Anbei der Testbeleg.
+
+Freundliche Gr=C3=BCsse
+
+--0000000000004f5a1a0643a1b2c1
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div>Gr=C3=BCezi</div><div><br></div><div>Anbei der Testbel=
+eg.</div><div><br></div><div>Freundliche Gr=C3=BCsse</div></div>
+
+--0000000000004f5a1a0643a1b2c1--
+--0000000000004f5a1c0643a1b2c3
+Content-Type: application/pdf; name="{{dateiname}}"
+Content-Disposition: attachment; filename="{{dateiname}}"
+Content-Transfer-Encoding: base64
+Content-ID: <f_mhx3k1q90>
+X-Attachment-Id: f_mhx3k1q90
+
+{{pdf}}
+--0000000000004f5a1c0643a1b2c3--

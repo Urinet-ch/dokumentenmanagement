@@ -2,6 +2,7 @@ package ch.urinet.archiv.protokoll.adapter.in.job;
 
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.protokoll.application.ManifestPlanen;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.TaktThread;
 import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import ch.urinet.archiv.gemeinsam.application.SchemasBereit;
 import io.quarkus.scheduler.Scheduled;
@@ -21,6 +22,9 @@ import java.util.Arrays;
  * Der Lauf beim Start folgt auf {@link SchemasBereit}, also erst nach der Migration bzw. Prüfung der Mandanten-Schemas;
  * ein Takt vor der Migration wird übersprungen ({@link VorMigrationUeberspringen}). Fällt der Zeitplan in die Migration,
  * holt der Lauf beim Start ihn nach (design.md «Mandant», «Start und Migration»).
+ * <p>
+ * Beide Läufe planen in einem eigenen Thread ohne den Request-Kontext des Schedulers ({@link TaktThread}), sonst
+ * verweigert {@code MandantKontext.mit} im Takt den Mandanten.
  */
 @ApplicationScoped
 public class ManifestPlaner {
@@ -50,10 +54,10 @@ public class ManifestPlaner {
     void planen() {
         if (worker) {
             try {
-                planen.planen(Instant.now());
+                TaktThread.ausfuehren("manifest-planer", () -> planen.planen(Instant.now()));
             } catch (RuntimeException e) {
-                // nächster Lauf (spätestens morgen, sonst beim Start) holt nach; nur Klassennamen (Req 16.7)
-                LOG.errorf("Manifest-Planung fehlgeschlagen, ursache=%s", Ursachen.kette(e));
+                // nächster Lauf (spätestens morgen, sonst beim Start) holt nach; Klassennamen, feste Meldungen (Req 16.7)
+                LOG.errorf("Manifest-Planung fehlgeschlagen, ursache=%s", Ursachen.ketteMitMeldung(e));
             }
         }
     }

@@ -72,7 +72,7 @@ public class MailEingang {
                 abrufen(mandant.code());
             } catch (RuntimeException e) {
                 LOG.warnf("Mail-Eingang für Mandant %s fehlgeschlagen, ursache=%s", mandant.code().wert(),
-                        Ursachen.kette(e));
+                        Ursachen.ketteMitMeldung(e));
             }
         }
     }
@@ -117,7 +117,7 @@ public class MailEingang {
     private void fehlschlag(MandantCode mandant, String stelle, Throwable ursache) {
         int folge = konfiguration.fehlschlagZaehlen(mandant);
         LOG.warnf("Mail-Eingang: Abruf für Mandant %s gescheitert (%d in Folge), stelle=%s, ursache=%s",
-                mandant.wert(), folge, stelle, Ursachen.kette(ursache));
+                mandant.wert(), folge, stelle, Ursachen.ketteMitMeldung(ursache));
         if (folge == MELDEN_NACH) {
             benachrichtigung.mailAbrufGestoert(mandant, folge);
         }
