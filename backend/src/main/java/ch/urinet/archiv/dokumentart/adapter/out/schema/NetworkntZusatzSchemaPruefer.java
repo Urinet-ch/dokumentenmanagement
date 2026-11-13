@@ -48,9 +48,10 @@ import java.util.regex.Pattern;
  * <p>
  * Schutz gegen SSRF und übergrosse Eingaben: Schemas haben höchstens {@value #MAX_SCHEMA_BYTES} Byte und
  * {@value #MAX_TIEFE} Ebenen; {@code $id}, {@code $vocabulary} und Verweise, die nicht mit {@code #} beginnen, sind
- * ungültig; {@code $schema} ist nur der Dialekt 2020-12. Die Bibliothek lädt zudem keine entfernten Ressourcen; das
- * Meta-Schema kommt aus dem JAR. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7). Die Bibliothek (ab 3.0)
- * arbeitet mit Jackson 3; gelesen und vorgeprüft wird weiter mit dem Jackson 2 von Quarkus ({@code StrengesJson}), und
+ * ungültig; {@code $schema} ist nur der Dialekt 2020-12. Die Bibliothek lädt zudem keine entfernten Ressourcen, und ihr
+ * Schema-Lader lässt nur die eingebauten Meta-Schemas 2020-12 aus dem JAR zu ({@link #META_SCHEMAS}), auch ohne die
+ * eigene Vorprüfung. Fehlertexte der Bibliothek gehen nicht nach aussen (Req 16.7). Die Bibliothek (ab 3.0) arbeitet
+ * mit Jackson 3; gelesen und vorgeprüft wird weiter mit dem Jackson 2 von Quarkus ({@code StrengesJson}), und
  * {@link Jackson3Baum} überträgt den geprüften Baum mit gleichen Knoten- und Zahlentypen.
  * <p>
  * Schutz gegen Rechenzeit (Review PR #40): Ein Aufruf von {@link #schemaPruefen} oder {@link #wertePruefen} hat
@@ -86,6 +87,21 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     static final int MAX_MUSTER_ZEICHEN = 1_000;
     private static final int CACHE_GROESSE = 32;
     private static final String DIALEKT = "https://json-schema.org/draft/2020-12/schema";
+    /**
+     * Einzige Ziele, die der Schema-Lader lädt (Review PR #83, Kann 2): das Meta-Schema 2020-12 und seine Vokabulare,
+     * die die Bibliothek aus ihrem JAR liest. Der Lader liest sonst jede IRI mit {@code classpath:} oder
+     * {@code resource:} und jeden Pfad unter {@code json-schema.org} aus dem Klassenpfad, auch mit
+     * {@code fetchRemoteResources(false)}.
+     */
+    private static final Set<String> META_SCHEMAS = Set.of(DIALEKT,
+            "https://json-schema.org/draft/2020-12/meta/core",
+            "https://json-schema.org/draft/2020-12/meta/applicator",
+            "https://json-schema.org/draft/2020-12/meta/unevaluated",
+            "https://json-schema.org/draft/2020-12/meta/validation",
+            "https://json-schema.org/draft/2020-12/meta/meta-data",
+            "https://json-schema.org/draft/2020-12/meta/format-annotation",
+            "https://json-schema.org/draft/2020-12/meta/format-assertion",
+            "https://json-schema.org/draft/2020-12/meta/content");
     private static final Set<String> VERWEISE = Set.of("$ref", "$dynamicRef", "$recursiveRef");
     private static final Set<String> VERBOTEN = Set.of("$id", "$vocabulary", "$anchor", "$dynamicAnchor",
             "$recursiveAnchor");
@@ -156,7 +172,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
                 }))
                 .build();
         this.registry = SchemaRegistry.withDefaultDialect(mitFrist,
-                b -> b.schemaLoader(l -> l.fetchRemoteResources(false))
+                b -> b.schemaLoader(l -> l.fetchRemoteResources(false)
+                                .allow(iri -> iri != null && META_SCHEMAS.contains(iri.toString())))
                         .schemaRegistryConfig(SchemaRegistryConfig.builder()
                                 .formatAssertionsEnabled(true)
                                 .regularExpressionFactory(this::muster)

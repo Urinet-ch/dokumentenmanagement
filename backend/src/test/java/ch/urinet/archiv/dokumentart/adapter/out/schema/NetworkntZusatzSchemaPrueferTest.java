@@ -4,7 +4,9 @@ import ch.urinet.archiv.dokumentart.adapter.out.schema.NetworkntZusatzSchemaPrue
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.InvalidSchemaException;
 import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaLocation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -242,6 +244,41 @@ class NetworkntZusatzSchemaPrueferTest {
             annehmen.join(Duration.ofSeconds(1));
         }
         assertThat(verbindungen).hasValue(0);
+    }
+
+    /**
+     * Review PR #83, Kann 2: Der Schema-Lader des Prüfers lädt auch ohne die eigene Vorprüfung nur die eingebauten
+     * Meta-Schemas des Dialekts 2020-12; {@code classpath:}, {@code resource:}, {@code jar:} und andere Pfade unter
+     * {@code json-schema.org} scheitern in der Bibliothek selbst.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "classpath:seed/urinet/dokumentarten.json",
+            "classpath:/seed/urinet/dokumentarten.json",
+            "resource:seed/urinet/dokumentarten.json",
+            "classpath:draft/2020-12/schema",
+            "jar:file:/x.jar!/seed/urinet/dokumentarten.json",
+            "https://json-schema.org/draft-07/schema",
+            "http://json-schema.org/draft/2020-12/schema",
+            "https://json-schema.org/draft/2020-12/meta/../../../seed/urinet/dokumentarten.json"
+    })
+    void registryLaedtOhneVorpruefungNurDieMetaSchemas(String ziel) throws Exception {
+        tools.jackson.databind.JsonNode schema = Jackson3Baum.von(new ObjectMapper().readTree(
+                "{\"type\":\"object\",\"properties\":{\"a\":{\"$ref\":\"" + ziel + "\"}}}"));
+        assertThatThrownBy(() -> {
+            Schema kompiliert = pruefer.registry().getSchema(schema);
+            kompiliert.initializeValidators();
+        }).isInstanceOf(InvalidSchemaException.class).hasMessageContaining("not allowed to be loaded");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"schema", "meta/core", "meta/applicator", "meta/unevaluated", "meta/validation",
+            "meta/meta-data", "meta/format-annotation", "meta/format-assertion", "meta/content"})
+    void eingebauteMetaSchemasLadenWeiter(String pfad) {
+        Schema meta = pruefer.registry().getSchema(SchemaLocation.of("https://json-schema.org/draft/2020-12/" + pfad));
+        assertThatCode(meta::initializeValidators).doesNotThrowAnyException();
+        assertThat(meta.validate(Jackson3Baum.von(new ObjectMapper().createObjectNode().put("type", "object"))))
+                .isEmpty();
     }
 
     @Test
