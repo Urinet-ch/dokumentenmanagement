@@ -137,8 +137,16 @@ public class ManifestErzeugen implements AuftragHandler {
                             erzeugt, ziel, folge);
                     return;
                 }
-                stand = Optional.of(erzeugen(auftrag, datum, stand));
+                Erzeugt ergebnis = erzeugen(auftrag, datum, stand);
+                stand = Optional.of(ergebnis.stand());
                 erzeugt++;
+                if (ergebnis.unvollstaendig() && datum.isBefore(ziel)) {
+                    // Review PR #87 (Claude KANN 1): die Ausnahme nach 15.11 gilt nur für diesen Tag
+                    long folge = speichern.folgeauftrag(auftrag, ziel);
+                    LOG.infof("Auftrag %d: Manifest %s ohne alle Zeitstempel, die übrigen Tage bis %s holt Auftrag %d "
+                            + "mit neuen Versuchen", auftrag.id(), datum, ziel, folge);
+                    return;
+                }
             }
         }
     }
@@ -197,7 +205,11 @@ public class ManifestErzeugen implements AuftragHandler {
         return gjEnde.atYear(jahr + 10);
     }
 
-    private ManifestStand erzeugen(Auftrag auftrag, LocalDate datum, Optional<ManifestStand> vorgaenger) {
+    /** Ergebnis eines Tages; {@code unvollstaendig}: gilt nach dem letzten Versuch ohne alle Zeitstempel (Req 15.11). */
+    private record Erzeugt(ManifestStand stand, boolean unvollstaendig) {
+    }
+
+    private Erzeugt erzeugen(Auftrag auftrag, LocalDate datum, Optional<ManifestStand> vorgaenger) {
         MandantCode mandant = auftrag.mandant();
         ManifestFenster fenster = ManifestFenster.fuer(datum, vorgaenger.map(ManifestStand::bis).orElse(null));
         ManifestSpeichern.Sammlung sammlung = speichern.sammeln(fenster);
@@ -264,8 +276,8 @@ public class ManifestErzeugen implements AuftragHandler {
                 List.copyOf(gestempelt.values()), sammlung.blaetter()));
         LOG.infof("Manifest %s festgehalten (%d Einträge, %d Zeitstempel)", datum, inhalt.eintraege().size(),
                 gestempelt.size());
-        return new ManifestStand(datum, fenster.bis(), jsonAblage.sha256(),
-                verweis(sigAblage.sha256(), List.copyOf(gestempelt.values())));
+        return new Erzeugt(new ManifestStand(datum, fenster.bis(), jsonAblage.sha256(),
+                verweis(sigAblage.sha256(), List.copyOf(gestempelt.values()))), !fehlend.isEmpty());
     }
 
     /**

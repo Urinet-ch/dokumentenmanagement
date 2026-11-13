@@ -75,9 +75,10 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Angenommen der Mandant «mf-zweit» ist am «10.01.2026» angelegt
     Und im Mandanten «mf-zweit» wurde das Dokument «D1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»
     Und der Zeitstempeldienst «zweit» antwortet mit HTTP 503
-    Wenn der Manifest-Lauf für «mf-zweit» bis «10.01.2026» bis zum letzten Versuch läuft
+    Wenn der Manifest-Lauf für «mf-zweit» bis «11.01.2026» bis zum letzten Versuch läuft
     Dann endet der Auftrag im Status «FERTIG» nach 3 Versuchen
     Und hat «mf-zweit» genau je ein Manifest für die Tage vom «10.01.2026» bis «10.01.2026»
+    Und den Tag «11.01.2026» holt für «mf-zweit» ein Folgeauftrag mit neuen Versuchen
     Und das Manifest «10.01.2026» von «mf-zweit» trägt nur einen Zeitstempel von «haupt»
     Und das Prüfwerkzeug meldet für «mf-zweit» vom «10.01.2026» bis «10.01.2026» «Ergebnis: gültig» mit Exit-Code 0
     Und die Ausgabe des Prüfwerkzeugs nennt «MELDUNG 2026-01-10: Zeitstempel von zweit fehlt»

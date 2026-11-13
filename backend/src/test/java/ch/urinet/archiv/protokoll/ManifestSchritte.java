@@ -8,6 +8,7 @@ import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
+import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.WireMock;
@@ -298,6 +299,26 @@ public class ManifestSchritte {
         assertThat(daten(alias, "select datum from %s.manifest order by datum")).containsExactlyElementsOf(erwartet);
         for (LocalDate d : erwartet) {
             assertThat(TestAblage.versionen(code(alias), "manifest/" + d + ".json")).hasSize(1);
+        }
+    }
+
+    @Dann("den Tag «{word}» holt für «{word}» ein Folgeauftrag mit neuen Versuchen")
+    public void folgeauftrag(String datum, String alias) throws SQLException {
+        long bisTag = LocalDate.parse(datum, DATUM).toEpochDay();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select status, versuche from public.auftrag where mandant = ? and typ = ? "
+                        + "and id > ? and (nutzlast ->> ?)::bigint = ?")) {
+            abfrage.setString(1, code(alias));
+            abfrage.setString(2, ManifestErzeugen.TYP.wert());
+            abfrage.setLong(3, auftrag);
+            abfrage.setString(4, ManifestErzeugen.BIS_TAG);
+            abfrage.setLong(5, bisTag);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).as("Folgeauftrag").isTrue();
+                assertThat(zeile.getString("status")).isEqualTo("OFFEN");
+                assertThat(zeile.getInt("versuche")).isLessThan(Wiederholung.MAX_VERSUCHE - 1);
+                assertThat(zeile.next()).as("nur ein Folgeauftrag").isFalse();
+            }
         }
     }
 
