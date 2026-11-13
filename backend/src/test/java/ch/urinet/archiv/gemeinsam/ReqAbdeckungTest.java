@@ -14,6 +14,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Req 16.14: Abdeckungsprüfung für die CI. */
 class ReqAbdeckungTest {
 
+    /**
+     * Dieselbe Prüfung wie das Szenario in ci.feature, aber ohne Quarkus-Start: Bei reinen Spec-Anpassungen läuft in der
+     * CI nur der Job «Spec-Prüfungen» (entschieden von Fabian am 13.11.2026), und ein abgehakter Task in tasks.md muss
+     * dort schon auffallen.
+     */
+    @Test
+    void repositoryIstAbgedeckt() {
+        assertThat(ReqAbdeckung.luecken(GemeinsamSchritte.REPO)).as("Kriterien ohne Szenario oder Nachweis-Vermerk")
+                .isEmpty();
+    }
+
     @Test
     void bereicheWerdenAufgeloest() {
         assertThat(ReqAbdeckung.kriterien("1.7, 16.20–16.22, 9.1 – 9.2, 4.3–4"))

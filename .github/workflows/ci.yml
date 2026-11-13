@@ -20,13 +20,93 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Reine Spec-Anpassungen ohne vollständigen Lauf (entschieden von Fabian am 13.11.2026): «art» bestimmt mit
+  # .github/scripts/nur-spec.py, ob jede geänderte Datei eine .md-Datei unter .kiro/ oder docs/ ist (strenge
+  # Positivliste; PR: alle Dateien zwischen Basis und Kopf, Push auf main: gegenüber «before», neuer Branch oder
+  # überschriebener Push und workflow_dispatch nie). Dann läuft nur «spec» mit den Tests, die Specs und Docs lesen, ohne
+  # Quarkus-Start; alle anderen Jobs (auch «testzahl») sind übersprungen. Der Deploy-Nachweis (pruefe-ci-nachweis.py)
+  # nutzt dieselbe Regel: Ein solcher Commit auf main erbt den Nachweis seines Vorgängers; dafür braucht er den Lauf
+  # auf dem Push nach main. Secret-Scan und Leitplanken (secret-scan.yml) laufen unverändert bei jedem Push. Entwürfe
+  # überspringen «art» und «spec», damit alle Jobs.
+  # Die Regel kommt aus dem Basis-Stand (PR: Basis, Push: before), nicht aus dem geprüften Commit (Review 13.11.2026):
+  # Ein PR, der nur-spec.py fehlerhaft ändert, kann sich so nicht selbst als «nur Spec» einstufen und die schweren
+  # Jobs samt NurSpecTest überspringen. Fehlt die Regel im Basis-Stand, ist das Ergebnis «false».
+  art:
+    name: Änderungsart (nur Spec?)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    outputs:
+      nur-spec: ${{ steps.art.outputs.nur-spec }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # ganze Historie: Basis, Kopf und Vorgänger müssen für git diff vorhanden sein
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Nur Spec? (nur-spec.py)
+        id: art
+        env:
+          EREIGNIS: ${{ github.event_name }}
+          BASIS: ${{ github.event.pull_request.base.sha }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+          VORHER: ${{ github.event.before }}
+        run: |
+          case "$EREIGNIS" in
+            pull_request) stand=$BASIS von=$BASIS bis=$KOPF art=pr ;;
+            push) stand=$VORHER von=$VORHER bis=$GITHUB_SHA art=push ;;
+            *) stand= ;;
+          esac
+          regel="$RUNNER_TEMP/nur-spec.py"
+          if [ -n "$stand" ] && git show "$stand:.github/scripts/nur-spec.py" > "$regel" 2> /dev/null; then
+            ergebnis=$(python3 -I "$regel" "$art" "$von" "$bis")
+          else
+            echo "Keine Regel nur-spec.py im Basis-Stand ($EREIGNIS): voller Lauf"
+            ergebnis=false
+          fi
+          case "$ergebnis" in
+            true|false) ;;
+            *) echo "::error::nur-spec.py lieferte weder true noch false"; exit 1 ;;
+          esac
+          echo "nur-spec=$ergebnis" >> "$GITHUB_OUTPUT"
+          if [ "$ergebnis" = true ]; then
+            echo "Nur Spec: Es laufen nur die Spec-Prüfungen, die übrigen Jobs sind übersprungen." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  spec:
+    # Name gleich SPEC_JOB in nur-spec.py: Daran erkennt der Deploy-Nachweis den Lauf. Läuft in jedem Lauf (ausser
+    # Entwurf), nicht nur bei «nur Spec» (Review 13.11.2026): Ein voller Lauf hat damit weiterhin keinen übersprungenen
+    # Job, und Regel 1 des Deploy-Nachweises («jeder Job erfolgreich») bleibt unverändert; die Doppelung mit «backend»
+    # kostet etwa eine Minute auf einem eigenen Runner, parallel zu den anderen Jobs.
+    name: Spec-Prüfungen (nur Spec)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # Jede Testklasse, die .kiro/ oder docs/ liest: Abdeckung @req (Req 16.14), Fehlercodes, Rechtematrix,
+      # Stammdaten-Tabelle gegen den Seed; dazu die Regel selbst (NurSpecTest, CiNachweisTest). NurSpecTest prüft, dass
+      # jede Klasse mit einem Pfad nach .kiro/ oder docs/ (oder ihr Nutzer) hier steht, und dass es jede genannte gibt
+      - name: Spec-Tests (ohne Quarkus-Start)
+        env:
+          SPEC_TESTS: ReqAbdeckungTest,FehlercodeSpecTest,RechtematrixSpecTest,DokumentartSeedTest,NurSpecTest,CiNachweisTest
+        run: |
+          mvn -B -ntp -f backend/pom.xml test -Dtest="$SPEC_TESTS" -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dquarkus.quinoa=false
+
   # Die Backend-Tests laufen in drei parallelen Jobs (Entscheid Fabian 13.11.2026, vorher ein Job mit 22 min): Klassen
   # mit eigenem Quarkus-Start (Profil, Main-Test) tragen genau eine Startgruppe @Tag("start-1") oder @Tag("start-2"),
   # alle anderen keine (StartGruppenTest). «testzahl» prüft, dass jede Testklasse in genau einem Job lief. Das Artefakt
   # für Browser-Szenarien und Docker baut «build» ohne Tests; lokal deckt «mvn verify» weiterhin alles in einem Lauf ab.
   build:
     name: Build (Quinoa, OpenAPI, Liquibase, Drive-Import)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: art
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,7 +159,8 @@ jobs:
 
   backend:
     name: Backend-Tests (Szenarien, JUnit, ArchUnit, SpotBugs)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: art
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,7 +183,8 @@ jobs:
 
   starttests:
     name: Backend-Starttests (${{ matrix.gruppe }})
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: art
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -132,8 +214,8 @@ jobs:
 
   testzahl:
     name: Backend-Tests vollständig (jede Klasse genau einmal)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    needs: [backend, starttests]
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: [art, backend, starttests]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,7 +231,8 @@ jobs:
 
   frontend:
     name: Frontend (ng test)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: art
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -174,8 +257,8 @@ jobs:
 
   browser:
     name: Browser-Szenarien (Cucumber.js, Playwright)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    needs: build
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: [art, build]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -259,8 +342,8 @@ jobs:
 
   docker:
     name: Docker-Image (nur bauen)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    needs: build
+    if: needs.art.outputs.nur-spec != 'true'
+    needs: [art, build]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
