@@ -192,7 +192,7 @@ damit digitale Dokumente ohne Umweg ins Archiv kommen.
 damit Papier sofort erfasst ist.
 
 #### Acceptance Criteria
-1. Die Web-App SOLL als installierbare PWA auf iOS (Safari) und Android (Chrome) funktionieren ([offen: Mindestversionen iOS und Android – Entscheid vor Welle 3]); Prüfumfang je Plattform auf einem echten Gerät: Installation und 4.2 bis 4.8. Nachweis: manuell [Fabian].
+1. Die Web-App SOLL als installierbare PWA auf iOS (Safari) und Android (Chrome) funktionieren (Mindestversion: jeweils die aktuelle Hauptversion von iOS mit Safari und das aktuelle Chrome auf Android; ältere Versionen werden nicht unterstützt und nicht geprüft; entschieden von Fabian am 13.11.2026, Aufgabe 2.8); Prüfumfang je Plattform auf einem echten Gerät: Installation und 4.2 bis 4.8. Nachweis: manuell [Fabian].
 2. WENN der Benutzer «Erfassen» wählt, DANN SOLL die App die Rückkamera öffnen und mehrere Seiten nacheinander aufnehmen lassen.
 3. WENN eine Seite aufgenommen ist, DANN SOLL die App die Dokumentkanten erkennen, einen Zuschnitt vorschlagen, die Perspektive entzerren und eine Vorschau zeigen, die der Benutzer anpassen oder verwerfen kann; erkennt sie keine Kanten, SOLL sie das ganze Bild verwenden.
 4. SOLANGE das Handy offline ist, SOLL die App Aufnahmen in einer lokalen Warteschlange (IndexedDB) halten und den Zähler «wartet auf Upload» anzeigen.
