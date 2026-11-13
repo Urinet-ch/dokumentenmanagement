@@ -7,6 +7,7 @@ import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
 import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ausfallen. Über das Admin-Kommando wie {@code WartezeitNegativStartTest}, weil der Dienst bei gelungenem Start nie
  * endet; der unbekannte Mandant lässt einen trotzdem gelungenen Start mit Exit 1 statt 3 enden.
  */
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(UeberwachungGrenzeStartTest.Einstellung.class)
 class UeberwachungGrenzeStartTest {
