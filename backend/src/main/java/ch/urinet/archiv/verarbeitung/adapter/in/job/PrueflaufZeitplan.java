@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufStarten;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -46,7 +47,8 @@ public class PrueflaufZeitplan {
     }
 
     @Scheduled(identity = "prueflauf", cron = "${archiv.prueflauf.zeitplan}", timeZone = "Europe/Zurich",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     public void starten() {
         if (!worker) {
             return;

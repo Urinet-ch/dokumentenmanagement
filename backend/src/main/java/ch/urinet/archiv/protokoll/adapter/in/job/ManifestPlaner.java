@@ -2,7 +2,8 @@ package ch.urinet.archiv.protokoll.adapter.in.job;
 
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.protokoll.application.ManifestPlanen;
-import io.quarkus.runtime.StartupEvent;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
+import ch.urinet.archiv.gemeinsam.application.SchemasBereit;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -16,6 +17,10 @@ import java.util.Arrays;
  * Täglicher Lauf des Tages-Manifests um 03:30 Europe/Zurich (Req 15.1, 15.7; {@code archiv.manifest.zeitplan}) und
  * einmal beim Start ({@code archiv.manifest.beim-start}), damit verpasste Läufe nachgeholt werden (Req 15.6). Nur mit
  * der Rolle {@code worker}; die Aufträge selbst laufen über die Auftragsschlange.
+ * <p>
+ * Der Lauf beim Start folgt auf {@link SchemasBereit}, also erst nach der Migration bzw. Prüfung der Mandanten-Schemas;
+ * ein Takt vor der Migration wird übersprungen ({@link VorMigrationUeberspringen}). Fällt der Zeitplan in die Migration,
+ * holt der Lauf beim Start ihn nach (design.md «Mandant», «Start und Migration»).
  */
 @ApplicationScoped
 public class ManifestPlaner {
@@ -33,14 +38,15 @@ public class ManifestPlaner {
         this.beimStart = beimStart;
     }
 
-    void start(@Observes StartupEvent ereignis) {
+    void start(@Observes SchemasBereit ereignis) {
         if (beimStart) {
             planen();
         }
     }
 
     @Scheduled(identity = "manifest-planer", cron = "${archiv.manifest.zeitplan}", timeZone = "Europe/Zurich",
-            concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+            concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
+            skipExecutionIf = VorMigrationUeberspringen.class)
     void planen() {
         if (worker) {
             try {
