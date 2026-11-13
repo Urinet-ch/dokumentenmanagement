@@ -648,6 +648,9 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - Alles andere bricht den Start ab (Req 16.21); die Meldung nennt nur den abgelehnten Host und das
   aktive Profil.
 - `lokal` zusammen mit `prod` bricht den Start ab (Req 16.22).
+- Ebenso bricht `ceph` (reines Testprofil der Ablage für die Tests gegen Ceph RGW, siehe «Teststrategie») zusammen
+  mit `prod` den Start ab. Die Regel liegt hier, weil `KiBasisUrlPruefung` die Profile beim Start ohnehin prüft
+  (`pruefeProfile`); sie folgt nicht aus Req 16.22.
 - Die Prüflogik ist eine reine Funktion (Profilnamen und URI als Eingabe) und wird als Unit-Test ohne
   aktives Quarkus-Profil `lokal` geprüft; die CI aktiviert `lokal` nie.
 - `GoldenLauf` und `GoldenDatensatzIT` laufen nur per HTTPS gegen `api.infomaniak.com`, sonst Abbruch

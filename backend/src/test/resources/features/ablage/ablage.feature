@@ -1,7 +1,7 @@
 # language: de
 @spec-01
 Funktionalität: Ablage im Object Storage
-  Der S3-Adapter legt Dateien gegen MinIO aus den Compose Dev Services ab zusätzlich nicht blockierend gegen Ceph RGW (ceph.yml); Höchstfrist 1 Tag wie auf Stufe A.
+  Der S3-Adapter legt Dateien gegen MinIO aus den Compose Dev Services ab, zusätzlich nicht blockierend gegen Ceph RGW (ceph.yml). Höchstfrist 1 Tag wie auf Stufe A.
   Status, Versions-IDs in dokument_datei und Benachrichtigung folgen mit dem Handler ARCHIVIEREN (Aufgabe 2.6),
   das Protokoll des Downloads mit dem Endpunkt (Aufgabe 2.5).
 

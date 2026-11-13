@@ -222,18 +222,22 @@ Ceph-Einrichtung oder die Ablage ändern; nicht blockierend, ein roter Nachtlauf
 Endpunkt und den Zugang des S3-Clients um (nur zusammen mit `test`; mit `prod` bricht der Start ab); der Zugang wird zufällig erzeugt und liegt nur als Dateien (Rechte 600) vor.
 
 Lokal im Ordner `backend/` (Docker nötig; Ceph braucht rund 15–60 s bis zur Bereitschaft). Ist Port 7480 belegt (z. B.
-durch einen zweiten Worktree), `CEPH_PORT` und `CEPH_CONTAINER` setzen und denselben Port als `-Darchiv.ceph.port` und
-im Smoke-Endpunkt angeben; existiert der Container schon, bricht das Skript ab, ein nicht startender wird entfernt:
+durch einen zweiten Worktree), `CEPH_PORT` und `CEPH_CONTAINER` **exportieren** (das Skript liest beide aus der
+Umgebung, ein nur gesetzter Port bliebe bei 7480) und einen eigenen Containernamen wählen; der Block reicht den Port an
+Maven weiter. Existiert der Container schon, bricht das Skript ab, ein nicht startender wird entfernt. Die `&&`-Kette
+sorgt dafür, dass nach einem Startfehler weder Tests laufen noch ein Container entfernt wird; entfernt wird nur der
+selbst gestartete:
 ```bash
+export CEPH_PORT=7480 CEPH_CONTAINER=archiv-ceph-rgw   # zweiter Worktree z. B. 7481 und archiv-ceph-rgw-2
 Z=$(pwd)/target/ceph-zugang
-P=${CEPH_PORT:-7480}
-src/test/ceph/ceph-starten.sh "$Z"
-mvn -ntp test -Dtest='S3AblageTest,AblageSzenarienIT' -Dsurefire.failIfNoSpecifiedTests=false \
-  -Dquarkus.quinoa.enabled=false -Dquarkus.test.profile=test,ceph -Dsmallrye.config.source.file.locations="$Z" \
-  -Darchiv.ceph.port=$P
-mvn -ntp test -Dtest=InfomaniakAblageSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Dquarkus.quinoa.enabled=false \
-  -Darchiv.smoke.zugang="$Z" -Darchiv.smoke.endpunkt=http://127.0.0.1:$P -Darchiv.smoke.region=us-east-1
-docker rm -f "${CEPH_CONTAINER:-archiv-ceph-rgw}"
+src/test/ceph/ceph-starten.sh "$Z" && {
+  mvn -ntp test -Dtest='S3AblageTest,AblageSzenarienIT' -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dquarkus.quinoa.enabled=false -Dquarkus.test.profile=test,ceph -Dsmallrye.config.source.file.locations="$Z" \
+    -Darchiv.ceph.port="$CEPH_PORT"
+  mvn -ntp test -Dtest=InfomaniakAblageSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Dquarkus.quinoa.enabled=false \
+    -Darchiv.smoke.zugang="$Z" -Darchiv.smoke.endpunkt="http://127.0.0.1:$CEPH_PORT" -Darchiv.smoke.region=us-east-1
+  docker rm -f "$CEPH_CONTAINER"
+}
 ```
 Ohne `-Dquarkus.test.profile=test,ceph` laufen dieselben Tests gegen MinIO. Abweichungen zwischen den Servern, die die
 Tests schon abdecken: `GetObjectRetention` ohne Sperre (MinIO 400 `NoSuchObjectLockConfiguration`, Ceph 404
