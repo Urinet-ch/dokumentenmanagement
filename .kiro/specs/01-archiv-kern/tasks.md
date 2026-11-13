@@ -394,6 +394,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Bericht und E-Mail an den Inhaber bei Abweichung (nur IDs)
   - _Anforderungen: 6.9, 15.5, 15.9, 15.10, 16.24_
   - Teil erledigt (PR #89): `PRUEFLAUF` mit Vergleich gegen die Datenbank, fremden Versionen und Löschmarken unter `archiv/` und `manifest/`, Sperrpflege (Stufe A gekappt auf 1 Tag, Manifeste im bisherigen Modus), Fehler je Datei als `PRUEFFEHLER`, täglicher Takt mit Nachholen (ein Lauf je Monat), Bericht und Mail nur mit IDs; Stufe P ist im Handler vorbereitet (nur zählen), als Startwert aber bis 5.5 abgelehnt (design.md, «Prüflauf», Umsetzung 5.3). Offen: der Vergleich mit dem Manifest-Inhalt, er folgt als Unterpunkt von 5.2, sobald es Tages-Manifeste gibt; die Checkbox bleibt bis dahin offen
+  - Nachtrag (PR #97, Review zu PR #89): vorübergehende S3-Fehler und Fehler in Folge wiederholen den Teil, `PRUEFFEHLER` erst im letzten Versuch; Abbruch an der Zeitgrenze auch ohne Interrupt-Flag erkannt; Wettlauf mit `ARCHIVIEREN` behoben (erst Status, dann bekannte Versionen); kein leerer `version-id-marker`; Tests für Löschmarke unter `manifest/`, `SPERRE_FEHLT` in Stufe B und Fortsetzung über mehrere Seiten
 
 - [ ] 5.4 Produktivbetrieb aufsetzen [Infra] [Fabian]
   - Produktion auf Stufe B (VPS aus 5.11) mit `deploy/infomaniak/compose.yml` und dem Deploy-Workflow aus 1.9 unter `archiv.apps.urinet.ch` und `archiv-auth.apps.urinet.ch`; Keycloak-Realm produktiv mit TOTP

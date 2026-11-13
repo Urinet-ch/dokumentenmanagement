@@ -15,12 +15,23 @@ public record Versionsseite(List<Objektversion> versionen, Optional<Marke> weite
         Objects.requireNonNull(weiter, "weiter");
     }
 
-    /** Fortsetzung nach Schlüssel und Versions-ID ({@code key-marker}, {@code version-id-marker}). */
-    public record Marke(String schluessel, String versionId) {
+    /**
+     * Fortsetzung nach Schlüssel und Versions-ID ({@code key-marker}, {@code version-id-marker}). Ohne Versions-ID
+     * (der Object Storage hat keine {@code NextVersionIdMarker} geliefert) geht es nur mit dem {@code key-marker} weiter;
+     * ein leerer {@code version-id-marker} wird nie gesendet.
+     */
+    public record Marke(String schluessel, Optional<String> versionId) {
 
         public Marke {
             Objects.requireNonNull(schluessel, "schluessel");
             Objects.requireNonNull(versionId, "versionId");
+            if (versionId.filter(String::isEmpty).isPresent()) {
+                throw new IllegalArgumentException("leere Versions-ID in der Marke");
+            }
+        }
+
+        public Marke(String schluessel, String versionId) {
+            this(schluessel, Optional.of(versionId));
         }
     }
 }

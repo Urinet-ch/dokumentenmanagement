@@ -257,11 +257,13 @@ public class AblageStub implements AblagePort {
         versionen.keySet().stream().filter(k -> k.startsWith(vorsatz + praefix)).sorted().forEach(k ->
                 versionen.get(k).forEach(v -> alle.add(new Objektversion(k.substring(vorsatz.length()), v.versionId(),
                         false))));
+        // wie S3: mit Versions-ID nach dieser Version, nur mit Schlüssel nach allen Versionen des Schlüssels
         int start = ab.map(m -> {
             for (int i = 0; i < alle.size(); i++) {
                 Objektversion o = alle.get(i);
-                if (o.schluessel().equals(m.schluessel()) && o.versionId().equals(m.versionId())) {
-                    return i + 1;
+                if (m.versionId().isEmpty() ? o.schluessel().compareTo(m.schluessel()) > 0
+                        : o.schluessel().equals(m.schluessel()) && o.versionId().equals(m.versionId().get())) {
+                    return m.versionId().isEmpty() ? i : i + 1;
                 }
             }
             return alle.size();

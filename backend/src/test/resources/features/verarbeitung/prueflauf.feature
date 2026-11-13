@@ -42,6 +42,15 @@ Funktionalität: Monatlicher Prüflauf (PRUEFLAUF)
     Und meldet der Prüflauf für das Manifest nichts
     Und ist die Sperre des Manifests im Modus COMPLIANCE verlängert, höchstens bis jetzt plus 1 Tag
 
+  @req-15.10
+  Szenario: Eine Löschmarke unter manifest/ steht im Bericht, ohne Dokument
+    Angenommen im Mandanten «urinet» liegt ein Manifest im Modus COMPLIANCE, gesperrt für 2 Stunden
+    Und das Manifest hat eine Löschmarke
+    Wenn der Prüflauf für «urinet» läuft
+    Dann ist der Prüflauf abgeschlossen
+    Und meldet der Prüflauf für das Manifest nur eine «LOESCHMARKE» ohne Dokument
+    Und ist die Sperre des Manifests im Modus COMPLIANCE verlängert, höchstens bis jetzt plus 1 Tag
+
   @req-15.5
   Szenario: Der Zeitplan startet je Monat höchstens einen Lauf
     Wenn der Prüflauf für «urinet» und den Monat «2999-01» zweimal gestartet wird
