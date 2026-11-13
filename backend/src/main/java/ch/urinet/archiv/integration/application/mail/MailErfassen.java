@@ -110,7 +110,12 @@ public class MailErfassen {
             }
         }
         if (!erfasst) {
-            korrespondenz(nachricht, hinweis).ifPresent(neu::add);
+            Optional<UUID> korrespondenz = korrespondenz(nachricht, hinweis);
+            korrespondenz.ifPresent(neu::add);
+            if (korrespondenz.isEmpty()) {
+                // abgelehnt oder Dublette; der Grund steht mit der Prüfsumme im Log, die Mail bleibt in «Archiviert»
+                LOG.warnf("Mail ohne neues Dokument: mandant=%s nachricht=%s", mandant.wert(), kurz);
+            }
         }
         register.dokumenteSetzen(mandant, nachricht.messageId(), neu);
         LOG.infof("Mail erfasst: mandant=%s nachricht=%s anhaenge=%d unterstuetzt=%d dokumente=%s", mandant.wert(),
