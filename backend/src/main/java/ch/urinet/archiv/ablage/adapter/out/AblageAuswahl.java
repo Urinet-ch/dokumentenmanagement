@@ -10,6 +10,7 @@ import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
+import io.quarkus.runtime.configuration.MemorySize;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.file.Path;
@@ -43,8 +44,9 @@ public class AblageAuswahl {
             Sperrmodus manifestSperrmodus,
             @ConfigProperty(name = "archiv.ablage.manifest-max-sperrfrist") Optional<Duration> manifestHoechstfrist,
             @ConfigProperty(name = "archiv.ablage.url-gueltigkeit", defaultValue = "PT5M") Duration urlGueltigkeit,
-            @ConfigProperty(name = "archiv.ablage.zwischenablage") Path zwischenablage) {
+            @ConfigProperty(name = "archiv.ablage.zwischenablage") Path zwischenablage,
+            @ConfigProperty(name = "archiv.export.teil-groesse", defaultValue = "8M") MemorySize exportTeil) {
         return new AblageEinstellungen(bucketPraefix, archivHoechstfrist, manifestSperrmodus, manifestHoechstfrist,
-                urlGueltigkeit, zwischenablage);
+                urlGueltigkeit, zwischenablage, Math.toIntExact(exportTeil.asLongValue()));
     }
 }

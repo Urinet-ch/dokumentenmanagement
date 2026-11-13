@@ -169,11 +169,13 @@ class ArchitekturTest {
 
     /**
      * Uploads und abgelegte Dateien laufen als Strom oder über temporäre Dateien, nie ganz im Heap (Speicherbudget
-     * Stufe A, design.md «Umsetzung 2.4»; Review PR #53, K1). Die Stubs für dev und Tests sind ausgenommen.
+     * Stufe A, design.md «Umsetzung 2.4»; Review PR #53, K1), ebenso der Jahresexport (Spec 02, Req 7.1). Die Stubs
+     * für dev und Tests sind ausgenommen.
      */
     @ArchTest
     static final ArchRule dateienNieGanzImHeap = noClasses()
-            .that().resideInAnyPackage("ch.urinet.archiv.dokument..", "ch.urinet.archiv.ablage..")
+            .that().resideInAnyPackage("ch.urinet.archiv.dokument..", "ch.urinet.archiv.ablage..",
+                    "ch.urinet.archiv.export..")
             .and().resideOutsideOfPackage("ch.urinet.archiv..adapter.out.stub..")
             .should().accessTargetWhere(DescribedPredicate.describe("ganze Datei als byte[]",
                     zugriff -> Set.of("readAllBytes", "toByteArray", "getObjectAsBytes", "asByteArray")

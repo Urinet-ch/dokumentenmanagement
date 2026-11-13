@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
@@ -16,6 +17,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -157,4 +159,31 @@ public interface AblagePort {
      * Aufruf keine neue ({@code KEINE_SPERRE}); eine längere Sperre bleibt ({@code UNVERAENDERT}), nie verkürzt.
      */
     SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId, Instant bis);
+
+    /**
+     * Jahresexport (Spec 02, Req 7.1): kopiert genau diese Version unter {@code archiv/} oder {@code manifest/}
+     * stromweise nach {@code ziel} (bleibt offen) und liefert SHA-256 und Grösse der kopierten Bytes. Das Lesen läuft
+     * innerhalb des Aufrufs, damit die Zeitgrenze des Object Storage auch den Inhalt begrenzt; ein zweiter Versuch
+     * innerhalb des Aufrufs schreibt nie ein zweites Mal nach {@code ziel}, sondern bricht ab.
+     */
+    Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel);
+
+    /**
+     * Jahresexport (Spec 02, Req 7.1): öffnet {@code exporte/<exportId>.zip} zum stromweisen Schreiben, ohne Sperre.
+     */
+    Exportziel exportSchreiben(MandantCode mandant, UUID exportId);
+
+    /**
+     * Jahresexport (Spec 02, Req 7.2): Download-Adresse nur für GET auf genau diese Version unter {@code exporte/},
+     * gültig bis {@code gueltigBis} (höchstens 7 Tage, Grenze von SigV4), mit {@code dateiname} als Name beim Speichern.
+     */
+    VorsignierteUrl exportUrl(MandantCode mandant, String schluessel, String versionId, Instant gueltigBis,
+                              String dateiname);
+
+    /**
+     * Jahresexport (design.md «Jahresexport»): stellt sicher, dass der Bucket alles unter {@code exporte/} nach
+     * {@link ch.urinet.archiv.ablage.domain.Exportdatei#LEBENSZYKLUS_TAGE} Tagen entfernt (auch ältere Versionen und
+     * unvollständige Uploads); andere Regeln des Buckets bleiben unverändert. Idempotent.
+     */
+    void exportLebenszyklusSichern(MandantCode mandant);
 }

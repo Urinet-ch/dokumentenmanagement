@@ -1,12 +1,15 @@
 package ch.urinet.archiv.ablage.adapter.out.stub;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
+import ch.urinet.archiv.ablage.domain.Exportdatei;
+import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
@@ -26,6 +29,7 @@ import jakarta.enterprise.inject.Typed;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -316,6 +320,81 @@ public class AblageStub implements AblagePort {
         }
         ersetzen(mandant, schluessel, v, bis);
         return new SperrAenderung(schluessel, versionId, SperrAenderung.Ergebnis.VERLAENGERT, Optional.of(bis));
+    }
+
+    @Override
+    public synchronized Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
+        Version v = liste(mandant, schluessel).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
+                .filter(x -> Files.exists(x.datei()))
+                .orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + schluessel));
+        byte[] daten = lesen(v);
+        try {
+            ziel.write(daten);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return new Kopie(Pruefsumme.von(daten), daten.length);
+    }
+
+    /** Im Stub über eine Datei im Stub-Verzeichnis; sie wird beim Abschluss als neue Version übernommen. */
+    @Override
+    public synchronized Exportziel exportSchreiben(MandantCode mandant, UUID exportId) {
+        String key = Exportdatei.schluessel(exportId);
+        try {
+            if (wurzel == null) {
+                wurzel = Files.createTempDirectory("archiv-ablage-stub-");
+            }
+            String versionId = UUID.randomUUID().toString();
+            Path datei = wurzel.resolve(versionId);
+            OutputStream aus = Files.newOutputStream(datei);
+            return new Exportziel() {
+                private boolean fertig;
+
+                @Override
+                public OutputStream strom() {
+                    return aus;
+                }
+
+                @Override
+                public AbgelegteDatei abschliessen() throws IOException {
+                    aus.close();
+                    fertig = true;
+                    byte[] daten = Files.readAllBytes(datei);
+                    Version v = new Version(versionId, datei, Pruefsumme.von(daten), daten.length, null);
+                    synchronized (AblageStub.this) {
+                        versionen.computeIfAbsent(mandant.wert() + "/" + key, k -> new ArrayList<>()).add(v);
+                    }
+                    return datei(key, v);
+                }
+
+                @Override
+                public void close() {
+                    if (!fertig) {
+                        try {
+                            aus.close();
+                        } catch (IOException e) {
+                            // nur Stub
+                        }
+                        loeschen(datei);
+                    }
+                }
+            };
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public synchronized VorsignierteUrl exportUrl(MandantCode mandant, String schluessel, String versionId,
+                                                  Instant gueltigBis, String dateiname) {
+        Version v = liste(mandant, schluessel).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + schluessel));
+        return new VorsignierteUrl(v.datei().toUri(), gueltigBis);
+    }
+
+    @Override
+    public void exportLebenszyklusSichern(MandantCode mandant) {
+        // der Stub löscht beim Ende der JVM ohnehin alles
     }
 
     private Version speichern(MandantCode mandant, String key, byte[] daten, Instant sperreBis) {
