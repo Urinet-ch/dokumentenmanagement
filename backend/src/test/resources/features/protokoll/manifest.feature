@@ -93,7 +93,7 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und das Prüfwerkzeug meldet für «mf-zweit» vom «10.01.2026» bis «10.01.2026» «Ergebnis: gültig» mit Exit-Code 0
     Und die Ausgabe des Prüfwerkzeugs nennt «MELDUNG 2026-01-10: Zeitstempel von zweit fehlt»
 
-  @req-15.8 @req-15.11
+  @req-15.8 @req-15.11 @req-16.5 @req-16.7
   Szenario: Ohne jeden Zeitstempel fehlt das Manifest, und der Inhaber wird alarmiert
     Angenommen der Mandant «mf-alarm» ist am «10.01.2026» angelegt
     Und im Mandanten «mf-alarm» wurde das Dokument «D1» am «10.01.2026» um «09:15» archiviert, aufzubewahren bis «31.12.2036»

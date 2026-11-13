@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.ServerSocket;
 import java.util.Map;
+import java.util.Set;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,8 +22,11 @@ import static org.hamcrest.Matchers.containsString;
  * Geplante Jobs greifen erst nach {@code MigrationBeimStart} auf Mandanten-Schemas zu (design.md «Mandant», Abschnitt
  * «Start und Migration»): Der Start hält vor der Migration an ({@link VorMigrationBeobachter}), während der Takt
  * {@code kennzahlen} schon jede Sekunde auslöst und das Schema des Mandanten {@code probe-vor-migration} noch leer ist.
- * Bis zur Migration überspringt der Scheduler den Takt ohne Warnung im Log, die Readiness meldet nicht bereit; danach
- * läuft der Takt normal.
+ * Bis zur Migration überspringt der Scheduler den Takt ohne Warnung im Log, und {@code /q/health/ready} ist noch nicht
+ * erreichbar (der HTTP-Server öffnet erst nach den Start-Beobachtern); danach läuft der Takt normal. Der Nachhollauf der
+ * Manifeste beim Start (Req 15.6, {@code archiv.manifest.beim-start}, Rolle {@code worker}) läuft genau einmal, erst
+ * nach dem Signal ({@link ManifestPlanenAttrappe}; Review PR #113). DOWN vor dem Signal zeigt
+ * {@code SchemaBereitschaftCheckTest}.
  */
 @Tag("start-2")
 @QuarkusTest
@@ -41,7 +45,14 @@ class JobsVorMigrationTest {
                     "archiv.test.vor-migration-warten", "3s",
                     "quarkus.http.test-port", String.valueOf(PORT),
                     // nur lesend, ohne Nebenwirkungen auf andere Tests
-                    "archiv.kennzahlen.intervall", "1s");
+                    "archiv.kennzahlen.intervall", "1s",
+                    // Rolle api,worker wie im Testprofil; planen läuft gegen die Attrappe, ohne Aufträge
+                    "archiv.manifest.beim-start", "true");
+        }
+
+        @Override
+        public Set<Class<?>> getEnabledAlternatives() {
+            return Set.of(ManifestPlanenAttrappe.class);
         }
 
         private static int freierPort() {
@@ -56,14 +67,19 @@ class JobsVorMigrationTest {
     @Inject
     VorMigrationBeobachter beobachter;
 
+    @Inject
+    ManifestPlanenAttrappe planen;
+
     @Test
     void taktWartetAufDieMigrationUndLaeuftDanach() throws InterruptedException {
         assertSoftly(vor -> {
             vor.assertThat(beobachter.uebersprungenVor()).contains("kennzahlen");
             vor.assertThat(beobachter.gelaufenVor()).isEmpty();
             vor.assertThat(beobachter.warnungenVor()).isEmpty();
-            vor.assertThat(beobachter.readinessVorMigration()).isNotEqualTo(200);
+            vor.assertThat(beobachter.readinessVorMigration()).as("Server noch zu").isEqualTo(-1);
         });
+        // der Start meldet das Signal synchron in MigrationBeimStart, vor dem ersten Test
+        assertThat(planen.aufrufe()).as("Nachhollauf nur nach dem Signal").containsExactly(true);
 
         long frist = System.nanoTime() + 10_000_000_000L;
         while (!beobachter.gelaufenNach().contains("kennzahlen") && System.nanoTime() < frist) {

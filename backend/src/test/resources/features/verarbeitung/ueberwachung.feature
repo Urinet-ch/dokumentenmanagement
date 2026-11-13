@@ -54,6 +54,24 @@ Funktionalität: Überwachung, Alarm an den Inhaber und Kennzahlen
     Dann ist der Alarm zum Manifest «10.01.2026» von «mu-fehler» erledigt
     Und hat der Inhaber genau eine Mail zum fehlenden Manifest «10.01.2026» von «mu-fehler» erhalten, die nur Mandant, Datum und Status nennt
 
+  @req-16.5 @req-16.7 @req-15.8
+  Szenario: Ein neuer Manifest-Auftrag nach einem Fehlschlag hebt den Alarm nicht auf, der nächste Fehlschlag meldet nicht nochmals
+    Angenommen der Mandant «mu-neustart» ist am «10.01.2026» angelegt
+    Wenn der Manifest-Lauf für «mu-neustart» bis «10.01.2026» läuft
+    Angenommen der Zeitstempeldienst «haupt» antwortet mit HTTP 503
+    Und der Zeitstempeldienst «zweit» antwortet mit HTTP 503
+    Wenn der Manifest-Lauf für «mu-neustart» bis «11.01.2026» bis zum letzten Versuch läuft
+    Dann endet der Auftrag im Status «FEHLER» nach 3 Versuchen
+    Wenn die Überwachung läuft
+    Und für «mu-neustart» wird ein Manifest-Auftrag bis «11.01.2026» eingereiht
+    Und die Überwachung läuft
+    Dann ist der Alarm zum Manifest «11.01.2026» von «mu-neustart» offen
+    Wenn der eingereihte Manifest-Auftrag bis zum letzten Versuch läuft
+    Dann endet der Auftrag im Status «FEHLER» nach 3 Versuchen
+    Wenn die Überwachung läuft
+    Dann hat der Inhaber genau eine Mail zum fehlenden Manifest «11.01.2026» von «mu-neustart» erhalten, die nur Mandant, Datum und Status nennt
+    Und ist der Alarm zum Manifest «11.01.2026» von «mu-neustart» offen
+
   @req-16.5 @req-15.8
   Szenario: Ohne Fortschritt innerhalb der Frist meldet die Überwachung den ersten fälligen Tag ohne Manifest
     Angenommen der Mandant «mu-frist-innen» ist am «10.01.2026» angelegt

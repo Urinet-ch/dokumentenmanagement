@@ -11,9 +11,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
-/** Liest den Status des jüngsten Auftrags (höchste ID) eines Typs und Mandanten aus {@code public.auftrag}. */
+/** Liest das Ende des zuletzt gescheiterten Auftrags eines Typs und Mandanten aus {@code public.auftrag}. */
 @ApplicationScoped
 public class JdbcAuftragStand implements AuftragStand {
 
@@ -24,14 +26,15 @@ public class JdbcAuftragStand implements AuftragStand {
     }
 
     @Override
-    public Optional<String> juengsterStatus(MandantCode mandant, AuftragTyp typ) {
+    public Optional<Instant> letzterFehler(MandantCode mandant, AuftragTyp typ) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
-                verbindung.prepareStatement("select status from public.auftrag where mandant = ? and typ = ? "
-                        + "order by id desc limit 1")) {
+                verbindung.prepareStatement("select max(beendet) from public.auftrag where mandant = ? and typ = ? "
+                        + "and status = 'FEHLER'")) {
             abfrage.setString(1, mandant.wert());
             abfrage.setString(2, typ.wert());
             try (ResultSet zeile = abfrage.executeQuery()) {
-                return zeile.next() ? Optional.of(zeile.getString(1)) : Optional.empty();
+                zeile.next();
+                return Optional.ofNullable(zeile.getObject(1, OffsetDateTime.class)).map(OffsetDateTime::toInstant);
             }
         } catch (SQLException e) {
             throw JdbcAuftragSchlange.fehler("Stand der Aufträge nicht gelesen", e);

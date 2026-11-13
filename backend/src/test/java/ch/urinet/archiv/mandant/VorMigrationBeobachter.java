@@ -31,7 +31,7 @@ import java.util.logging.LogRecord;
 @ApplicationScoped
 public class VorMigrationBeobachter {
 
-    /** Readiness-Status vor der Migration; -1, wenn der HTTP-Server noch nicht antwortet. */
+    /** Readiness-Status vor der Migration; -1, wenn der HTTP-Server noch nicht antwortet, ungemessen MIN_VALUE. */
     private volatile int readinessVorMigration = Integer.MIN_VALUE;
     private volatile boolean vorMigration;
     private final List<String> uebersprungenVor = new CopyOnWriteArrayList<>();

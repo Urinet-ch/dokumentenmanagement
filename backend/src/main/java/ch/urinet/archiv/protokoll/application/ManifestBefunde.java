@@ -27,7 +27,6 @@ import java.util.Optional;
 public class ManifestBefunde implements ManifestUeberwachung {
 
     static final String FEHLT = "FEHLT";
-    private static final String FEHLER = "FEHLER";
 
     private final ManifestFortschritt fortschritt;
     private final AuftragStand auftraege;
@@ -42,33 +41,44 @@ public class ManifestBefunde implements ManifestUeberwachung {
         this.register = register;
     }
 
+    /**
+     * Liest zuerst den letzten Fehlschlag, danach den Stand der Kette (Review PR #114, Kann 2): Ein Lauf hält jedes
+     * Manifest in einer eigenen Transaktion fest, bevor er in {@code FEHLER} endet. Sieht die erste Abfrage diesen
+     * Fehlschlag, zeigt die zweite darum mindestens den Stand danach, und der Befund nennt nie ein Datum, das schon ein
+     * Manifest hat. Umgekehrt verpasst ein Takt höchstens einen Fehlschlag, der zwischen den Abfragen endet; den meldet
+     * der nächste Takt. Ein gemeinsamer Schnappschuss ist darum nicht nötig, und beide Ports bleiben im eigenen Modul.
+     */
     @Override
     public Optional<List<Befund>> befunde(MandantCode mandant) {
+        Optional<Instant> letzterFehler = auftraege.letzterFehler(mandant, ManifestErzeugen.TYP);
         Optional<ManifestFortschritt.Stand> stand = fortschritt.stand(mandant);
-        LocalDate faellig = ManifestErzeugen.naechstes(stand.map(ManifestFortschritt.Stand::letztesDatum),
-                () -> register.erstellt(mandant));
-        return Optional.of(befund(faellig, stand.map(ManifestFortschritt.Stand::zuletztErstellt),
-                auftraege.juengsterStatus(mandant, ManifestErzeugen.TYP), frist, Instant.now())
-                .stream().toList());
+        Optional<Instant> anlage = stand.isPresent() ? Optional.empty() : register.erstellt(mandant);
+        LocalDate faellig = ManifestErzeugen.naechstes(stand.map(ManifestFortschritt.Stand::letztesDatum), () -> anlage);
+        return Optional.of(befund(faellig, stand.map(ManifestFortschritt.Stand::zuletztErstellt), anlage,
+                letzterFehler, frist, Instant.now()).stream().toList());
     }
 
     /**
      * Regel ohne Datenbank: {@code faellig} (erstes Datum ohne Manifest) fehlt, wenn der Tag schon erzeugt sein müsste
-     * ({@link ManifestErzeugen#zielTag}) und entweder das Ende des Tages und der letzte Fortschritt (zuletzt erstelltes
-     * Manifest; ohne Manifest kein Fortschritt) beide mehr als {@code frist} zurückliegen oder der jüngste Auftrag
-     * {@code MANIFEST} des Mandanten in {@code FEHLER} steht. So meldet ein Nachholen über mehrere Folgeaufträge nichts,
-     * solange es vorankommt.
+     * ({@link ManifestErzeugen#zielTag}) und (a) das Ende des Tages und der letzte Fortschritt (zuletzt erstelltes
+     * Manifest; ohne Manifest kein Fortschritt) beide mehr als {@code frist} zurückliegen oder (b) ein Auftrag
+     * {@code MANIFEST} des Mandanten nach dem letzten Fortschritt (ohne Manifest: nach der Anlage des Mandanten) in
+     * {@code FEHLER} geendet hat. So meldet ein Nachholen über mehrere Folgeaufträge nichts, solange es vorankommt. Ein
+     * neuerer Auftrag in {@code OFFEN} oder {@code LAEUFT} oder ein Lauf ohne Arbeit (Sperre belegt) hebt (b) nicht auf,
+     * erst ein Fortschritt; sonst setzte der Abgleich den Alarm auf erledigt, und der nächste Fehlschlag brächte für
+     * denselben Tag eine zweite Mail (Review PR #114, Req 16.5).
      */
-    static Optional<Befund> befund(LocalDate faellig, Optional<Instant> letzterFortschritt,
-                                   Optional<String> juengsterAuftrag, Duration frist,
-                                   Instant jetzt) {
+    static Optional<Befund> befund(LocalDate faellig, Optional<Instant> letzterFortschritt, Optional<Instant> anlage,
+                                   Optional<Instant> letzterFehler, Duration frist, Instant jetzt) {
         if (faellig.isAfter(ManifestErzeugen.zielTag(Nutzlast.leer(), jetzt))) {
             return Optional.empty();
         }
         Instant grenze = jetzt.minus(frist);
         boolean fristAbgelaufen = ManifestFenster.bis(faellig).isBefore(grenze)
                 && letzterFortschritt.map(e -> e.isBefore(grenze)).orElse(true);
-        if (fristAbgelaufen || juengsterAuftrag.filter(FEHLER::equals).isPresent()) {
+        Optional<Instant> bezug = letzterFortschritt.or(() -> anlage);
+        boolean gescheitert = letzterFehler.filter(f -> bezug.map(f::isAfter).orElse(true)).isPresent();
+        if (fristAbgelaufen || gescheitert) {
             return Optional.of(new Befund(Befund.Quelle.MANIFEST, faellig.toString(), FEHLT));
         }
         return Optional.empty();
