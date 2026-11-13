@@ -153,20 +153,29 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
     public Pruefdaten pruefdaten(String kennung, Stempel stempel) {
         TsaDienst d = dienst(kennung);
         List<X509Certificate> kette = kette(stempel.kettePem());
-        X509Certificate tsa = kette.get(0);
-        X509Certificate ca = kette.get(1);
+        Pruefdaten pruefdaten = abrufen(kennung, d, kette.get(0), kette.get(1));
+        pruefdatenPruefen(pruefdaten, kette, stempel.genTime(), d);
+        return pruefdaten;
+    }
+
+    /**
+     * Holt die Prüfdaten wie {@link #pruefdaten}, aber ohne sie zu prüfen: nur für den Smoke-Test, damit er
+     * {@link #zeitraum} auch dann ausgeben kann, wenn die Prüfung danach scheitert (z. B. am Höchstalter).
+     */
+    public Pruefdaten pruefdatenUngeprueft(String kennung, Stempel stempel) {
+        List<X509Certificate> kette = kette(stempel.kettePem());
+        return abrufen(kennung, dienst(kennung), kette.get(0), kette.get(1));
+    }
+
+    private Pruefdaten abrufen(String kennung, TsaDienst d, X509Certificate tsa, X509Certificate ca) {
         try {
             if (d.ocsp().isPresent()) {
                 OCSPReqBuilder builder = new OCSPReqBuilder();
                 builder.addRequest(zertifikatId(tsa, ca));
-                byte[] antwort = senden(d.ocsp().get(), "application/ocsp-request", builder.build().getEncoded(),
-                        MAX_ANTWORT);
-                ocspPruefen(antwort, tsa, ca, stempel.genTime(), hoechstalter(d));
-                return new Pruefdaten(Pruefdaten.Art.OCSP, antwort);
+                return new Pruefdaten(Pruefdaten.Art.OCSP, senden(d.ocsp().get(), "application/ocsp-request",
+                        builder.build().getEncoded(), MAX_ANTWORT));
             }
-            byte[] crl = holen(d.crl().orElseThrow(), MAX_CRL);
-            crlPruefen(crl, tsa, ca, stempel.genTime(), hoechstalter(d));
-            return new Pruefdaten(Pruefdaten.Art.CRL, crl);
+            return new Pruefdaten(Pruefdaten.Art.CRL, holen(d.crl().orElseThrow(), MAX_CRL));
         } catch (OCSPException | IOException e) {
             throw new ZeitstempelFehler("Prüfdaten für " + kennung + " nicht erhalten", e);
         }
@@ -182,13 +191,16 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         if (!gleich(geprueft.get(0), kette.get(0)) || !gleich(geprueft.get(1), kette.get(1))) {
             throw new ZeitstempelFehler("Abgelegte Zertifikatskette passt nicht zum Zeitstempel von " + kennung);
         }
-        switch (pruefdaten.art()) {
-            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(),
-                    hoechstalter(d));
-            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(),
-                    hoechstalter(d));
-        }
+        pruefdatenPruefen(pruefdaten, kette, stempel.genTime(), d);
         return stempel.genTime();
+    }
+
+    /** Prüfdaten zu {@code genTime} mit dem Höchstalter des Diensts; {@code kette} = TSA-Zertifikat, CA. */
+    private void pruefdatenPruefen(Pruefdaten pruefdaten, List<X509Certificate> kette, Instant genTime, TsaDienst d) {
+        switch (pruefdaten.art()) {
+            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), genTime, hoechstalter(d));
+            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), genTime, hoechstalter(d));
+        }
     }
 
     private Duration hoechstalter(TsaDienst d) {
