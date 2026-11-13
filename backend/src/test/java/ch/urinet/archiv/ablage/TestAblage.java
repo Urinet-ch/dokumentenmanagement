@@ -5,6 +5,7 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +52,14 @@ public final class TestAblage {
     public static void neueVersion(String mandant, String schluessel, String inhalt) {
         try (S3Client s3 = TestBucket.verwaltung()) {
             s3.putObject(b -> b.bucket(bucket(mandant)).key(schluessel), RequestBody.fromString(inhalt));
+        }
+    }
+
+    /** Object-Lock-Sperre einer Version (Modus und Ablauf). */
+    public static ObjectLockRetention sperre(String mandant, String schluessel, String versionId) {
+        try (S3Client s3 = TestBucket.verwaltung()) {
+            return s3.getObjectRetention(b -> b.bucket(bucket(mandant)).key(schluessel).versionId(versionId))
+                    .retention();
         }
     }
 

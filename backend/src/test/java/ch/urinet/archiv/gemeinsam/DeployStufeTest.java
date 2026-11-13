@@ -68,14 +68,28 @@ class DeployStufeTest {
         assertThat(pruefen(ohneManifestFrist)).containsExactly("archiv.ablage.manifest-max-sperrfrist");
     }
 
+    /** Req 15.3, 15.11: zwei Zeitstempeldienste, je mit Endpunkt, Policy-OIDs, CA im Classpath und Prüfdaten-Adresse. */
+    @Test
+    void dieApiHatZweiVollstaendigKonfigurierteZeitstempeldienste() throws IOException {
+        SmallRyeConfig config = prodConfig(apiUmgebung());
+        List<String> dienste = config.getValues("archiv.tsa.dienste", String.class);
+
+        assertThat(dienste).hasSize(2).doesNotHaveDuplicates();
+        for (String dienst : dienste) {
+            String p = "archiv.tsa.dienst." + dienst + ".";
+            assertThat(config.getOptionalValue(p + "url", String.class)).as(p + "url").isPresent();
+            assertThat(config.getOptionalValues(p + "policies", String.class)).as(p + "policies").isPresent();
+            String ca = config.getValue(p + "ca", String.class);
+            assertThat(DeployStufeTest.class.getClassLoader().getResource(ca)).as(p + "ca").isNotNull();
+            assertThat(config.getOptionalValue(p + "ocsp-url", String.class)
+                    .or(() -> config.getOptionalValue(p + "crl-url", String.class))).as(p + "ocsp-url/crl-url")
+                    .isPresent();
+        }
+    }
+
     /** Abweichungen als Schlüssel der Konfiguration; leer, wenn die Umgebung zur Stufe passt. */
     static List<String> pruefen(Map<String, String> umgebung) throws IOException {
-        SmallRyeConfig config = new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
-                .withSources(new PropertiesConfigSource(DeployStufeTest.class.getClassLoader()
-                        .getResource("application.properties")))
-                .withSources(new EnvConfigSource(umgebung, 300) {
-                })
-                .build();
+        SmallRyeConfig config = prodConfig(umgebung);
         var einstellungen = new Stufenregel.Ablageeinstellungen(
                 config.getValue("archiv.ablage.manifest-sperrmodus", Sperrmodus.class),
                 config.getOptionalValue("archiv.ablage.manifest-max-sperrfrist", Duration.class),
@@ -91,6 +105,15 @@ class DeployStufeTest {
             }
         }
         return abweichungen;
+    }
+
+    private static SmallRyeConfig prodConfig(Map<String, String> umgebung) throws IOException {
+        return new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
+                .withSources(new PropertiesConfigSource(DeployStufeTest.class.getClassLoader()
+                        .getResource("application.properties")))
+                .withSources(new EnvConfigSource(umgebung, 300) {
+                })
+                .build();
     }
 
     private static boolean hoechstensEinTag(Optional<Duration> frist) {

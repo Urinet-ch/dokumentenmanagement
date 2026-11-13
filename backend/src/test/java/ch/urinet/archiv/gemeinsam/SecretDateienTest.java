@@ -46,7 +46,10 @@ public class SecretDateienTest {
                 "quarkus.quinoa", "false",
                 "quarkus.compose.devservices.enabled", "false",
                 // /var/lib/archiv/arbeit gibt es nur im Image
-                "archiv.arbeit.verzeichnis", Path.of("target", "arbeit-prod").toAbsolutePath().toString());
+                "archiv.arbeit.verzeichnis", Path.of("target", "arbeit-prod").toAbsolutePath().toString(),
+                // wie compose.yml; ohne Dienst bricht TsaStartpruefung den Start ab
+                "archiv.tsa.dienste", "sgpki,freetsa",
+                "archiv.manifest.beim-start", "false");
     }
 
     @Test
@@ -59,5 +62,7 @@ public class SecretDateienTest {
         assertThat(config.getValue("quarkus.datasource.password", String.class)).isEqualTo("attrappe-app");
         assertThat(config.getValue("quarkus.liquibase.password", String.class)).isEqualTo("attrappe-owner");
         assertThat(config.getValue("infomaniak_ai_token", String.class).strip()).isEqualTo("attrappe-ki-token");
+        assertThat(config.getValue("archiv.manifest.schluessel", String.class))
+                .isEqualTo("attrappe-manifest-schluessel");
     }
 }

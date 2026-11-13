@@ -18,7 +18,7 @@ import java.util.function.Function;
 
 /**
  * Fail closed für Secret-Dateien (tech.md Regel 7, design.md «Secrets und Konfiguration»), schon in der
- * Konfigurationsphase: Liest Quarkus in RUNTIME_INIT einen Zugang aus {@link #ZIELE} (Agroal, Liquibase, S3), prüft der
+ * Konfigurationsphase: Liest Quarkus in RUNTIME_INIT einen Zugang aus {@link #ZIELE} (Agroal, Liquibase, S3, Manifest), prüft der
  * Interceptor vorher alle Pflicht-Dateien. Jeder Schlüssel aus {@code archiv.secrets.pflicht} muss aus einer Datei unter
  * {@code smallrye.config.source.file.locations} kommen und darf nicht leer sein; {@code archiv.secrets.pflicht-migration}
  * nur, wenn beim Start migriert wird (API, Admin-Kommando), der Worker nicht. Zusätzlich muss der Zugang selbst aus der
@@ -36,7 +36,8 @@ public class SecretPruefung implements ConfigSourceInterceptor {
             "quarkus.datasource.password", "archiv_db_app",
             "quarkus.liquibase.password", "archiv_db_owner",
             "quarkus.s3.aws.credentials.static-provider.access-key-id", "s3_app_zugang_id",
-            "quarkus.s3.aws.credentials.static-provider.secret-access-key", "s3_app_zugang_geheimnis");
+            "quarkus.s3.aws.credentials.static-provider.secret-access-key", "s3_app_zugang_geheimnis",
+            "archiv.manifest.schluessel", "archiv_manifest_key");
     private static final String DATEI_QUELLE = "FileSystemConfigSource[";
 
     private final BooleanSupplier aktiv;

@@ -1,6 +1,7 @@
 package ch.urinet.archiv;
 
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
+import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
@@ -37,6 +38,17 @@ public class ArchivMain implements QuarkusApplication {
             "quarkus.log.console.stderr", "true",
             "liquibase.command.showSummaryOutput", "log");
 
+    /**
+     * {@code archiv manifest pruefen … --ohne-datenbank} (Req 15.12): Das Prüfwerkzeug braucht nur Ablage und öffentlichen
+     * Schlüssel. Ohne Datasource entfallen Migration (Liquibase) und Hibernate, die Pflicht zur Adresse der Datenbank
+     * ({@code DatenbankAdressePruefung}) gilt dann nicht.
+     */
+    public static final Map<String, String> OHNE_DATENBANK = Map.of(
+            "quarkus.datasource.active", "false",
+            "quarkus.hibernate-orm.active", "false",
+            "quarkus.liquibase.migrate-at-start", "false",
+            "archiv.db.url-pflicht", "false");
+
     static final int FALSCHER_AUFRUF = 2;
     static final int TECHNISCHER_FEHLER = 3;
 
@@ -48,6 +60,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     TokenKommando token;
+
+    @Inject
+    ManifestKommando manifest;
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
@@ -65,6 +80,9 @@ public class ArchivMain implements QuarkusApplication {
             return;
         }
         KOMMANDO.forEach(System::setProperty);
+        if (argumente[0].equals("manifest") && List.of(argumente).contains(ManifestKommando.OHNE_DATENBANK)) {
+            OHNE_DATENBANK.forEach(System::setProperty);
+        }
         String liquibaseScope = liquibaseInsLog();
         // Zweite Sicherung: Was eine Bibliothek trotzdem auf System.out schreibt, geht auf stderr, nicht ins Ergebnis.
         ergebnis = System.out;
@@ -113,8 +131,10 @@ public class ArchivMain implements QuarkusApplication {
                     : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
+            case "manifest" -> ManifestKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(ManifestKommando.AUFRUF);
             default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
-                    + TokenKommando.AUFRUF);
+                    + TokenKommando.AUFRUF + System.lineSeparator() + ManifestKommando.AUFRUF);
         };
     }
 
@@ -134,7 +154,10 @@ public class ArchivMain implements QuarkusApplication {
         }
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
-        return liste.getFirst().equals("token") ? token.ausfuehren(rest, ergebnis, System.err)
-                : mandant.ausfuehren(rest, ergebnis, System.err);
+        return switch (liste.getFirst()) {
+            case "token" -> token.ausfuehren(rest, ergebnis, System.err);
+            case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
+            default -> mandant.ausfuehren(rest, ergebnis, System.err);
+        };
     }
 }

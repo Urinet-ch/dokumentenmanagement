@@ -401,7 +401,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 4.9_
   - Erledigt: Changeset `010-benutzer-verzeichnis` (nur Einfügen, Indizes für die Filter), `BenutzerVerzeichnisPflege` im Schreibweg von `JdbcZugriffProtokoll` und beim Widerruf eines Tokens, `ProtokollResource` (`GET /protokoll`, `GET /protokoll/benutzer`, `POST /protokoll/benutzer/{benutzer}/austritt`, A13), Seite `/verwaltung/protokoll`; Szenarien `features/protokoll/protokoll-einsicht.feature` (`@req-2.19`, `@req-10.5`, `@req-10.10`), bestehende Szenarien für `10.2`, `10.3`, `10.7`, `10.8`; `10.9` per JUnit (`KeinLoeschpfadTest`, `MandantEigentuemerTest`); Teilnachweis «Dokument» für 10.9 folgt mit 5.7 (design.md «Umsetzung (Aufgabe 5.1)»)
 
-- [ ] 5.2 Tages-Manifest [Backend]
+- [x] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
   - Protokollzeilen so hashen, dass ein späterer Löschweg (9.9) einzelne Zeilen entfernen kann, ohne den Nachweis der übrigen zu zerstören: SHA-256 je Zeile (bevorzugt, weil sich die Frist eines Dokuments nach 9.7 ändern kann) oder je Fristklasse nach 10.9; Wahl im PR (design.md «Manifest»)
   - Feld `sicherung`: SHA-256 der Exporte von `archiv-sicherung` seit dem vorigen Manifest, damit eine Wiederherstellung nach Verlust der VPS nur belegte Snapshots einspielt (design.md «Manifest»); bleibt leer, bis 5.5 die Liste anbindet
@@ -413,6 +413,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Prüfwerkzeug `archiv manifest pruefen <datum>` (15.12): Signatur, Kette inkl. Erneuerung, jeder Zeitstempel; Lücke in der Kette ist ein Fehler, fehlender Stempel eines Dienstes und `genTime` später als `archiv.manifest.verspaetung-schwelle` nach `bis` werden gemeldet
   - Prüflauf: SHA-256 mit dem Manifest-Inhalt vergleichen (Rest von 5.3, Req 15.5): der `PRUEFLAUF` vergleicht die Prüfsumme jeder Datei zusätzlich mit ihrem Eintrag im Tages-Manifest; fehlt der Eintrag oder weicht er ab, ist das eine Abweichung im Bericht
   - Manifest ohne Dateinamen (Req 3.12, Aufgabe 4.10): Szenario `@req-3.12` prüft, dass der Dateiname eines Testdokuments im Manifest fehlt (ergänzt 13.11.2026, entschieden von Fabian)
+  - Reviews zu PR #87: Changeset `014-manifest` (bis zum Rebase vom 13.11.2026 `013-manifest`) ohne Index auf `zugriff_protokoll` (kommt mit 5.1, PR #88; 5.2 erst nach #88 mergen), Prüfdaten aktuell zu `genTime`, ausgetragene Dienste mit eigener Allowlist, öffentlicher Schlüssel nie aus dem privaten, Wiederverwenden nur gleicher Manifeste, Sperre mindestens bis zur Protokollfrist nach 10.9, weitere Versionen unter `manifest/` als Fehler, PDF/A als dritte Variante, Smoke-Test `TsaSmokeIT` gegen die echten Dienste vor dem Merge; Nachtrag: «festgehalten» aus der Datenbank (auch am jüngsten Tag), Höchstalter der Prüfdaten je Dienst, älteste Version unter `manifest/` eindeutig oder Abbruch (design.md «Manifest», «Umsetzung»)
   - 3.12 in den Anforderungen ergänzt 13.11.2026
   - _Anforderungen: 3.12, 6.11, 15.1–15.4, 15.5, 15.6, 15.7, 15.8, 15.11, 15.12, 16.7, 16.9_
   - _Abhängig von: 4.9, 4.10_ (4.10 ergänzt 13.11.2026)

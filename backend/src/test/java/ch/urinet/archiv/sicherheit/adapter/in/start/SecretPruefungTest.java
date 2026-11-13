@@ -39,7 +39,7 @@ class SecretPruefungTest {
 
     @Test
     void dateiFehlt() throws IOException {
-        dateien("s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_db_owner");
+        dateien("s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_db_owner", "archiv_manifest_key");
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_OWNER, String.class))
                 .hasMessageContaining("Secret-Datei fehlt, ist leer oder wird übersteuert: archiv_db_app.")
                 .hasMessageContaining(verzeichnis.toString());
@@ -71,7 +71,7 @@ class SecretPruefungTest {
 
     @Test
     void eigentuemerNurBeiMigration() throws IOException {
-        dateien("archiv_db_app", "s3_app_zugang_id", "s3_app_zugang_geheimnis");
+        dateien("archiv_db_app", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_manifest_key");
         assertThatCode(() -> config("worker", Map.of()).getValue(DB_APP, String.class)).as("Worker")
                 .doesNotThrowAnyException();
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_APP, String.class)).as("API")
@@ -85,7 +85,7 @@ class SecretPruefungTest {
     }
 
     private void alleDateien() throws IOException {
-        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis");
+        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_manifest_key");
     }
 
     private void dateien(String... namen) throws IOException {
@@ -102,7 +102,7 @@ class SecretPruefungTest {
     private SmallRyeConfigBuilder builder(String rolle, Map<String, String> uebersteuert) {
         Map<String, String> werte = new HashMap<>();
         werte.put("archiv.rolle", rolle);
-        werte.put("%prod." + SecretPruefung.PFLICHT, "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis");
+        werte.put("%prod." + SecretPruefung.PFLICHT, "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis,archiv_manifest_key");
         werte.put("%prod." + SecretPruefung.PFLICHT_MIGRATION, "archiv_db_owner");
         werte.put(SecretPruefung.MIGRIEREN, "true");
         werte.put("%prod.smallrye.config.source.file.locations", verzeichnis.toString());

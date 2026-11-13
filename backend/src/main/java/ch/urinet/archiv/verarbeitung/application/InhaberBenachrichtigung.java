@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.application;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -32,4 +33,7 @@ public interface InhaberBenachrichtigung {
     void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
                               PrueflaufRegister.Zaehler bisher, List<PrueflaufRegister.Abweichung> erste,
                               UUID fehlerId);
+
+    /** Für {@code datum} liegt nach dem letzten Versuch kein gültiges Manifest vor (Req 15.8, Aufgabe 5.2). */
+    void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId);
 }

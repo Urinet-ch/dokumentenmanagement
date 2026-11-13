@@ -46,6 +46,10 @@ services:
       ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
       ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
       ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
+      # Zeitstempeldienste des Manifests (Req 15.3, 15.11; 4.9-E1): zuerst der Hauptdienst (TSA der Swiss Government
+      # PKI), dann der zweite Dienst; Endpunkte, Policy-OIDs und CAs stehen in application.properties. Ohne Dienst
+      # startet prod nicht, mit nur einem warnt der Start (TsaStartpruefung); DeployStufeTest prüft die zwei Dienste.
+      ARCHIV_TSA_DIENSTE: sgpki,freetsa
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
@@ -57,6 +61,7 @@ services:
       - s3_app_zugang_id
       - s3_app_zugang_geheimnis
       - infomaniak_ai_token
+      - archiv_manifest_key
     networks:
       intern: {}
       web: {}
@@ -246,6 +251,8 @@ secrets:
     file: ./secrets/s3_app_zugang_geheimnis
   infomaniak_ai_token:
     file: ./secrets/infomaniak_ai_token
+  archiv_manifest_key:
+    file: ./secrets/archiv_manifest_key
   archiv_db_postgres:
     file: ./secrets/archiv_db_postgres
   archiv_db_owner_scram:

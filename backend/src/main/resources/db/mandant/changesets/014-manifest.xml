@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Tages-Manifest (Aufgabe 5.2; design.md «Protokoll und Manifest»; Req 15.1–15.4, 15.6, 15.11): je Datum ein
+         Manifest mit Ablage, Signatur und den Zeitstempeln je Dienst; dazu die Blatt-Hashes je Protokollzeile, damit
+         ein späterer Löschweg (Req 9.9, 10.9) einzelne Zeilen entfernen kann, ohne den Nachweis der übrigen zu
+         zerstören. Alle drei Tabellen nur Einfügen (Trigger und Rechte wie zugriff_protokoll). -->
+    <changeSet id="014-manifest" author="archiv">
+        <sql>
+            create table manifest (
+                datum date not null constraint manifest_pk primary key,
+                von timestamptz,
+                bis timestamptz not null,
+                sha256 text not null constraint manifest_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                vorher_sha256 text constraint manifest_vorher_sha256_ck check (vorher_sha256 ~ '^[0-9a-f]{64}$'),
+                anzahl int not null constraint manifest_anzahl_ck check (anzahl &gt;= 0),
+                protokolle jsonb not null constraint manifest_protokolle_ck check (jsonb_typeof(protokolle) = 'object'),
+                s3_schluessel text not null,
+                s3_version text not null,
+                sig_sha256 text not null constraint manifest_sig_sha256_ck check (sig_sha256 ~ '^[0-9a-f]{64}$'),
+                sig_s3_version text not null,
+                sperre_bis timestamptz,
+                erstellt timestamptz not null default clock_timestamp(),
+                constraint manifest_fenster_ck check (von is null or von &lt; bis),
+                constraint manifest_kette_ck check ((von is null) = (vorher_sha256 is null))
+            );
+
+            create table manifest_zeitstempel (
+                datum date not null constraint manifest_zeitstempel_manifest_fk references manifest (datum),
+                dienst text not null constraint manifest_zeitstempel_dienst_ck check (dienst ~ '^[a-z0-9][a-z0-9-]{0,31}$'),
+                gen_time timestamptz not null,
+                tsr_sha256 text not null constraint manifest_zeitstempel_sha256_ck check (tsr_sha256 ~ '^[0-9a-f]{64}$'),
+                s3_schluessel text not null,
+                s3_version text not null,
+                pruefdaten jsonb not null constraint manifest_zeitstempel_pruefdaten_ck
+                    check (jsonb_typeof(pruefdaten) = 'array'),
+                constraint manifest_zeitstempel_pk primary key (datum, dienst)
+            );
+
+            create table protokoll_blatt (
+                tabelle text not null constraint protokoll_blatt_tabelle_ck
+                    check (tabelle in ('zugriff_protokoll', 'dokument_version')),
+                zeile_id bigint not null,
+                manifest_datum date not null constraint protokoll_blatt_manifest_fk references manifest (datum),
+                sha256 text not null constraint protokoll_blatt_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                constraint protokoll_blatt_pk primary key (tabelle, zeile_id)
+            );
+            create index protokoll_blatt_manifest_ix on protokoll_blatt (manifest_datum);
+            create index dokument_version_zeit_ix on dokument_version (zeit);
+        </sql>
+        <sql splitStatements="false">
+            create function manifest_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception '%: nur Einfügen erlaubt (% verweigert)', tg_table_name, tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger manifest_nur_einfuegen before update or delete on manifest
+                for each row execute function manifest_nur_einfuegen();
+            create trigger manifest_kein_truncate before truncate on manifest
+                for each statement execute function manifest_nur_einfuegen();
+            create trigger manifest_zeitstempel_nur_einfuegen before update or delete on manifest_zeitstempel
+                for each row execute function manifest_nur_einfuegen();
+            create trigger manifest_zeitstempel_kein_truncate before truncate on manifest_zeitstempel
+                for each statement execute function manifest_nur_einfuegen();
+            create trigger protokoll_blatt_nur_einfuegen before update or delete on protokoll_blatt
+                for each row execute function manifest_nur_einfuegen();
+            create trigger protokoll_blatt_kein_truncate before truncate on protokoll_blatt
+                for each statement execute function manifest_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>

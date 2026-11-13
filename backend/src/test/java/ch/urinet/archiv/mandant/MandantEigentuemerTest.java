@@ -202,6 +202,47 @@ class MandantEigentuemerTest {
     }
 
     /**
+     * Alle Tabellen mit «nur Einfügen» (Req 10.3, 15.1; Review PR #87, S-g): {@code archiv_app} hat weder UPDATE,
+     * DELETE noch TRUNCATE, und für den Eigentümer gilt ein Zeilen-Trigger auf UPDATE und DELETE sowie ein Trigger auf
+     * TRUNCATE. Die Liste muss {@code LiquibaseMandantDatenbank.NUR_EINFUEGEN} entsprechen.
+     */
+    @Test
+    void alleNurEinfuegenTabellenSindGeschuetzt() throws Exception {
+        List<String> tabellen = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
+                "manifest", "manifest_zeitstempel", "protokoll_blatt");
+        var feld = Class.forName("ch.urinet.archiv.mandant.adapter.out.persistence.LiquibaseMandantDatenbank")
+                .getDeclaredField("NUR_EINFUEGEN");
+        feld.setAccessible(true);
+        assertThat(feld.get(null)).isEqualTo(tabellen);
+
+        provisionierung.anlegen("probe-einfuegen", null, null);
+        String schema = "m_probe_einfuegen";
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            for (String tabelle : tabellen) {
+                for (String recht : List.of("UPDATE", "DELETE", "TRUNCATE")) {
+                    assertThat(wahr(befehl, "has_table_privilege('" + schema + "." + tabelle + "', '" + recht + "')"))
+                            .as(tabelle + " " + recht).isFalse();
+                }
+                assertThat(wahr(befehl, "has_table_privilege('" + schema + "." + tabelle + "', 'INSERT')"))
+                        .as(tabelle).isTrue();
+            }
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String tabelle : tabellen) {
+                String klasse = "'" + schema + "." + tabelle + "'::regclass";
+                // tgtype: 1 = je Zeile, 2 = BEFORE, 8 = DELETE, 16 = UPDATE, 32 = TRUNCATE
+                assertThat(wahr(befehl, "exists (select 1 from pg_trigger where tgrelid = " + klasse
+                        + " and not tgisinternal and tgtype & 27 = 27)")).as(tabelle + " UPDATE/DELETE").isTrue();
+                assertThat(wahr(befehl, "exists (select 1 from pg_trigger where tgrelid = " + klasse
+                        + " and not tgisinternal and tgtype & 34 = 34)")).as(tabelle + " TRUNCATE").isTrue();
+                assertThatThrownBy(() -> befehl.execute("truncate " + schema + "." + tabelle + " cascade"))
+                        .as(tabelle).isInstanceOf(SQLException.class).hasMessageContaining("nur Einfügen erlaubt");
+            }
+        }
+    }
+
+    /**
      * {@code berechtigen()} ist atomar (Review PR #29): Scheitert das REVOKE auf {@code databasechangelog*} nach den GRANTs,
      * bleibt kein Recht der App-Rolle zurück – weder auf die Changelog-Tabellen noch auf die übrigen Tabellen.
      */

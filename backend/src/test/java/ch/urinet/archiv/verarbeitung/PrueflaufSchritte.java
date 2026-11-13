@@ -193,6 +193,11 @@ public class PrueflaufSchritte {
                 MandantCode code = new MandantCode(MANDANT);
                 return List.of(new Mandant(code, MANDANT, code.schema(), bucket(), null, true));
             }
+
+            @Override
+            public Optional<Instant> erstellt(MandantCode code) {
+                throw new UnsupportedOperationException();
+            }
         };
         PrueflaufZeitplan zeitplan = new PrueflaufZeitplan(nurUrinet, starten, "api,worker", uhr);
         List<UUID> vorher = laeufeIm("2999-01");

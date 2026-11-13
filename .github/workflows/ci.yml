@@ -227,13 +227,16 @@ jobs:
           # prod nutzt /var/lib/archiv/arbeit (im Image angelegt, Volume archiv_arbeit); auf dem Runner darf der
           # Prozess es nicht anlegen, und der Start bricht ab (PR #55). Hier ein Verzeichnis des Runners
           ARCHIV_ARBEIT_VERZEICHNIS: ${{ runner.temp }}/arbeit
+          # prod startet ohne Zeitstempeldienst nicht (Req 15.3, Aufgabe 5.2); dieselben Dienste wie in compose.yml.
+          # Ohne Datenbank plant der Worker keine Manifeste, es geht also keine Anfrage an die Dienste
+          ARCHIV_TSA_DIENSTE: sgpki,freetsa
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
         # bricht der Start ab (design.md, Abschnitt zu Konfiguration und Geheimnissen). Dieses Archiv liefert nur die
         # PWA aus; die Uploads leiten die Szenarien an das echte Archiv im Testmodus weiter (frontend/e2e/schritte/upload.mjs)
         run: |
           DATEIEN="$RUNNER_TEMP/secret-dateien"
           mkdir -p "$DATEIEN"
-          for datei in archiv_db_app archiv_db_owner s3_app_zugang_id s3_app_zugang_geheimnis infomaniak_ai_token; do
+          for datei in archiv_db_app archiv_db_owner s3_app_zugang_id s3_app_zugang_geheimnis infomaniak_ai_token archiv_manifest_key; do
             printf 'ci-platzhalter' > "$DATEIEN/$datei"
           done
           # Log in eine Datei; bei einem Fehler die letzten 80 Zeilen (nur Platzhalter, keine echten Geheimnisse)
