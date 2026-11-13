@@ -24,6 +24,9 @@ import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.verarbeitung.application.EmbeddingSpeichern;
+import ch.urinet.archiv.verarbeitung.application.VerarbeitenHandler;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -49,6 +52,9 @@ import java.util.regex.Pattern;
  * die Frist neu berechnet: später oder unbefristet verlängert Frist und Sperre; früher ändert bei Sperre nichts und
  * wird als {@code SPERRE_KONFLIKT} protokolliert, ohne Sperre gilt das neue Ergebnis (design.md «Aufbewahrung»).
  * In {@code EINGANGSKORB} und {@code FEHLER} gelten Frist, Belegnummer und Pflichtfelder erst beim Bestätigen.
+ * Ändern sich Titel, Art oder Partner eines archivierten Dokuments, reiht die Änderung {@code EMBEDDING} ein (Spec 02,
+ * Aufgabe 6.3), weil diese Angaben in der Kopfzeile jedes Abschnitts stehen; ist für das Dokument schon eines offen,
+ * kein zweites.
  */
 @ApplicationScoped
 @Transactional
@@ -74,11 +80,12 @@ public class DokumentAendern {
     private final KontaktRegister kontakte;
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
+    private final AuftragService auftraege;
 
     public DokumentAendern(DokumentRepository repository, DokumentAenderungPort port, DokumentStatusPort status,
                            SperrKonfliktProtokollPort konfliktProtokoll, AblagePort ablage,
                            DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
-                           MandantEinstellungen einstellungen) {
+                           MandantEinstellungen einstellungen, AuftragService auftraege) {
         this.repository = repository;
         this.port = port;
         this.status = status;
@@ -88,6 +95,7 @@ public class DokumentAendern {
         this.kontakte = kontakte;
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
+        this.auftraege = auftraege;
     }
 
     /**
@@ -150,7 +158,23 @@ public class DokumentAendern {
             neu = fristUndSperre(id, a, alt, neu, neueArt, artGewechselt, mandant);
             port.versionSichern(id, benutzer.id(), grund);
         }
-        return port.speichern(neu);
+        int version = port.speichern(neu);
+        // ein schon offenes EMBEDDING liest beim Lauf den neuen Stand; die Zeilensperre des Dokuments
+        // (ladenUndSperren) ordnet zwei Änderungen, die zweite sieht den Auftrag der ersten
+        if (archiviert && kopfzeileGeaendert(alt, neu) && auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)
+                && !auftraege.offenMit(EmbeddingSpeichern.EMBEDDING, VerarbeitenHandler.DOKUMENT_ID, id)) {
+            auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
+        }
+        return version;
+    }
+
+    /**
+     * Titel, Art und Partner bilden die Kopfzeile jedes Abschnitts (Spec 02, design.md «Chunker»); ändert sich eines
+     * davon an einem archivierten Dokument, werden die Abschnitte in derselben Transaktion neu eingereiht.
+     */
+    private static boolean kopfzeileGeaendert(Metadaten alt, Metadaten neu) {
+        return !Objects.equals(alt.titel(), neu.titel()) || !Objects.equals(alt.art(), neu.art())
+                || !Objects.equals(alt.partnerName(), neu.partnerName());
     }
 
     /** Unbekannte oder inaktive Art: 400, weil die Oberfläche nur aktive Arten anbietet (wie beim Bestätigen). */

@@ -24,5 +24,6 @@
     <include file="changesets/017-integration-mail.xml" relativeToChangelogFile="true"/>
     <include file="changesets/018-mail-eingang.xml" relativeToChangelogFile="true"/>
     <include file="changesets/019-export.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/021-chunk.xml" relativeToChangelogFile="true"/>
     <include file="changesets/022-dokument-ki-partner-nachtrag.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

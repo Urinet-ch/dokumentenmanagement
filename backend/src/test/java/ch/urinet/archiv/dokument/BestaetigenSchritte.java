@@ -134,7 +134,8 @@ public class BestaetigenSchritte {
     @Angenommen("die Archivierung ist bereit")
     public void bereit() throws SQLException {
         auftraege.vorbereiten();
-        auftraege.ausfuehren("delete from public.auftrag where typ in ('ARCHIVIEREN', 'VERARBEITEN', 'KI_VORSCHLAG')");
+        auftraege.ausfuehren("delete from public.auftrag where typ in ('ARCHIVIEREN', 'VERARBEITEN', 'KI_VORSCHLAG', "
+                + "'EMBEDDING', 'EMBEDDING_ALLE')");
         for (String mandant : List.of("urinet", "vhf-gsk")) {
             buckets.einrichten(bucket(mandant));
         }
@@ -531,6 +532,41 @@ public class BestaetigenSchritte {
     @Dann("ist das Dokument «{word}» im Status «{word}»")
     public void dokumentStatus(String name, String status) throws SQLException {
         assertThat(spalte(ort(name), "status")).isEqualTo(status);
+    }
+
+    /** Spec 02, Req 2.1: Nach der Archivierung hat das Dokument Abschnitte, alle mit Embedding (Aufgabe 6.3). */
+    @Dann("hat das archivierte Dokument «{word}» Abschnitte mit Embedding")
+    public void abschnitteMitEmbedding(String name) throws SQLException {
+        Ort ort = ort(name);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung
+                .prepareStatement("select count(*), count(embedding) from " + new MandantCode(ort.mandant()).schema()
+                        + ".chunk where dokument_id = ?")) {
+            abfrage.setObject(1, ort.id());
+            try (ResultSet z = abfrage.executeQuery()) {
+                z.next();
+                assertThat(z.getInt(1)).as("Abschnitte").isPositive();
+                assertThat(z.getInt(2)).as("Abschnitte mit Embedding").isEqualTo(z.getInt(1));
+            }
+        }
+    }
+
+    /** Spec 02, Aufgabe 6.3: Die Kopfzeile «Titel – Art – Partner» jedes Abschnitts trägt die geänderten Angaben. */
+    @Dann("beginnt jeder Abschnitt des archivierten Dokuments «{word}» mit dem Titel {string} und endet seine Kopfzeile mit dem Partner {string}")
+    public void kopfzeile(String name, String titel, String partner) throws SQLException {
+        Ort ort = ort(name);
+        List<String> kopfzeilen = new ArrayList<>();
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung
+                .prepareStatement("select split_part(text, E'\\n\\n', 1) from "
+                        + new MandantCode(ort.mandant()).schema() + ".chunk where dokument_id = ? order by nr")) {
+            abfrage.setObject(1, ort.id());
+            try (ResultSet z = abfrage.executeQuery()) {
+                while (z.next()) {
+                    kopfzeilen.add(z.getString(1));
+                }
+            }
+        }
+        assertThat(kopfzeilen).isNotEmpty()
+                .allSatisfy(k -> assertThat(k).startsWith(titel + " – ").endsWith(" – " + partner));
     }
 
     /** Spalten von {@code dokument} als Text; {@code null} heisst leer. */

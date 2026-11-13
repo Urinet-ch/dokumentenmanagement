@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -754,6 +755,26 @@ class AuftragArbeiterTest {
         public boolean verwaistFreigeben(Auftrag auftrag, Duration zeitgrenze, String fehler,
                                          Optional<Duration> wartezeit) {
             return echt.verwaistFreigeben(auftrag, zeitgrenze, fehler, wartezeit);
+        }
+
+        @Override
+        public boolean nachfolgerVorhanden(Auftrag vorgaenger, String schluessel) {
+            return echt.nachfolgerVorhanden(vorgaenger, schluessel);
+        }
+
+        @Override
+        public void typSperren(MandantCode mandant, AuftragTyp typ) {
+            echt.typSperren(mandant, typ);
+        }
+
+        @Override
+        public OptionalLong offen(MandantCode mandant, AuftragTyp typ, Optional<String> schluessel) {
+            return echt.offen(mandant, typ, schluessel);
+        }
+
+        @Override
+        public boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert) {
+            return echt.offenMit(mandant, typ, schluessel, wert);
         }
 
         @Override

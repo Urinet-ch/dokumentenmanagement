@@ -34,7 +34,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
 
 - [ ] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
-  - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext
+  - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext (besteht seit Spec 02, Aufgabe 6.3, als `gemeinsam/domain/Seitentext`; wiederverwenden, nicht neu bauen)
   - `WissensPruefung` mit allen Befunden aus design.md, als reine Domain-Logik mit JUnit-Tests; Links aus dem Inhalt nach `wissensseite_link`
   - _Anforderungen: 2.1–2.8, 3.5, 3.7_
   - _Abhängig von: 13.3_

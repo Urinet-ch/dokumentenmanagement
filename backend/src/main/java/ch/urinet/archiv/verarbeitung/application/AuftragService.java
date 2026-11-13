@@ -8,6 +8,7 @@ import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Reiht Aufträge ein (Req 1.6): Der Mandant stammt aus dem Mandanten-Kontext des Workers oder aus der verifizierten
@@ -53,6 +54,37 @@ public class AuftragService {
         if (!schlange.anspruchSperren(auftrag)) {
             throw new AnspruchVerloren();
         }
+    }
+
+    /**
+     * Für Handler, die Folgeaufträge einreihen: in derselben Transaktion nach {@link #anspruchSichern} aufrufen. Ob
+     * schon ein Auftrag eingereiht ist, dessen Nutzlast unter {@code schluessel} die ID von {@code vorgaenger} trägt;
+     * dann hat ein früherer Lauf desselben Auftrags committet, und der Handler reiht nichts mehr ein (idempotent).
+     */
+    public boolean nachfolgerVorhanden(Auftrag vorgaenger, String schluessel) {
+        return schlange.nachfolgerVorhanden(vorgaenger, schluessel);
+    }
+
+    /**
+     * Kleinste ID eines Auftrags {@code typ} des Mandanten aus dem Kontext in {@code OFFEN} oder {@code LAEUFT} (mit
+     * {@code schluessel} nur mit diesem Schlüssel in der Nutzlast). Mit {@code sperren} sperrt der Aufruf den Typ für
+     * den Mandanten bis zum Commit, damit zwei Aufrufer nicht beide einreihen (nur in einer laufenden Transaktion).
+     */
+    public OptionalLong offen(AuftragTyp typ, Optional<String> schluessel, boolean sperren) {
+        MandantCode mandant = mandant();
+        if (sperren) {
+            schlange.typSperren(mandant, typ);
+        }
+        return schlange.offen(mandant, typ, schluessel);
+    }
+
+    /**
+     * Ob für den Mandanten aus dem Kontext schon ein Auftrag {@code typ} {@code OFFEN} ist, dessen Nutzlast unter
+     * {@code schluessel} den Wert {@code wert} trägt (z. B. dasselbe Dokument). Ein solcher Auftrag liest beim Lauf den
+     * dann aktuellen Stand; ein zweiter wäre doppelte Arbeit.
+     */
+    public boolean offenMit(AuftragTyp typ, String schluessel, Object wert) {
+        return schlange.offenMit(mandant(), typ, schluessel, String.valueOf(wert));
     }
 
     /** Der Auftrag gehört nicht mehr diesem Lauf (freigegeben oder neu geholt). */

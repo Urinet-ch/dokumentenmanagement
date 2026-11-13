@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 02, Aufgabe 6.3 (Req 2.1, design.md «Embeddings und Hybridsuche»): pgvector für m_<code>.chunk.embedding
+         (public.halfvec, public.halfvec_cosine_ops). pgvector ist nicht «trusted»: Auf der VPS legt das Init-Skript
+         deploy/infomaniak/db/10-archiv-rollen.sh die Extension als Superuser an (seit Aufgabe 1.9), in den Dev Services
+         läuft Liquibase als Superuser. Besteht die Extension schon, bricht «if not exists» vor jeder Rechteprüfung ab
+         (nur ein NOTICE); fehlt sie und ist der Owner kein Superuser, scheitert der Start mit einer klaren Meldung statt
+         erst beim Changeset der Mandanten. Immer im Schema public, damit jedes Mandanten-Schema die Typen qualifiziert
+         erreicht. -->
+    <changeSet id="009-pgvector" author="archiv">
+        <sql>create extension if not exists vector with schema public</sql>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 02, Aufgabe 6.3 (Req 2.1, 2.4; design.md «Embeddings und Hybridsuche»): Abschnitte archivierter Dokumente
+         mit dem Embedding von bge_multilingual_gemma2 (3'584 Dimensionen, Spike 0.3). halfvec statt vector, weil HNSW
+         für vector höchstens 2'000 Dimensionen indexiert (halfvec bis 4'000); Kosinus, weil das Modell nicht normiert.
+         embedding ist leer, solange der Dev-Stub läuft oder das Embedding noch fehlt (Nachberechnung, Req 2.4).
+         seite_von/seite_bis 1-basiert aus den Seitentrennern des Volltexts, sonst beide leer (Spec 03, Req 5.7).
+         Typen und Operatorklasse qualifiziert aus public (009-pgvector). Der HNSW-Index wird beim Einfügen gepflegt;
+         maintenance_work_mem bleibt (Stufe A 16MB), ein Neuaufbau des Index ist nicht nötig. -->
+    <changeSet id="021-chunk" author="archiv">
+        <sql>
+            create table chunk (
+                id bigserial constraint chunk_pk primary key,
+                dokument_id uuid not null constraint chunk_dokument_fk references dokument (id) on delete cascade,
+                nr int not null constraint chunk_nr_ck check (nr >= 1),
+                text text not null,
+                seite_von int,
+                seite_bis int,
+                embedding public.halfvec(3584),
+                constraint chunk_dokument_nr_uk unique (dokument_id, nr),
+                constraint chunk_seiten_ck check (
+                    (seite_von is null and seite_bis is null)
+                    or (seite_von >= 1 and seite_bis >= seite_von))
+            )
+        </sql>
+        <sql>
+            create index chunk_embedding_hnsw on chunk using hnsw (embedding public.halfvec_cosine_ops)
+        </sql>
+    </changeSet>
+</databaseChangeLog>

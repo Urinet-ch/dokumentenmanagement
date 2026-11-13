@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 
@@ -268,6 +269,80 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
             }
         } catch (SQLException e) {
             throw fehler("Anspruch nicht geprüft", e);
+        }
+    }
+
+    @Override
+    public boolean nachfolgerVorhanden(Auftrag vorgaenger, String schluessel) {
+        // nach id geordnet: Index-Scan ab dem Vorgänger, die Folgeaufträge stehen direkt dahinter
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select 1 from public.auftrag where id > ? and mandant = ? "
+                        + "and nutzlast ->> ? = ? order by id limit 1")) {
+            abfrage.setLong(1, vorgaenger.id());
+            abfrage.setString(2, vorgaenger.mandant().wert());
+            abfrage.setString(3, schluessel);
+            abfrage.setString(4, Long.toString(vorgaenger.id()));
+            abfrage.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next();
+            }
+        } catch (SQLException e) {
+            throw fehler("Folgeaufträge nicht geprüft", e);
+        }
+    }
+
+    @Override
+    public void typSperren(MandantCode mandant, AuftragTyp typ) {
+        if (!QuarkusTransaction.isActive()) {
+            throw new IllegalStateException("Typ nur in einer laufenden Transaktion sperren");
+        }
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement sperren =
+                verbindung.prepareStatement("select 1 from pg_advisory_xact_lock(hashtextextended(?, 0))")) {
+            sperren.setString(1, "auftrag:" + mandant.wert() + ":" + typ.wert());
+            sperren.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
+            sperren.executeQuery().close();
+        } catch (SQLException e) {
+            throw fehler("Typ nicht gesperrt", e);
+        }
+    }
+
+    @Override
+    public OptionalLong offen(MandantCode mandant, AuftragTyp typ, Optional<String> schluessel) {
+        String sql = "select min(id) from public.auftrag where mandant = ? and typ = ? "
+                + "and status in ('OFFEN', 'LAEUFT')" + (schluessel.isPresent() ? " and nutzlast ->> ? is not null" : "");
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setString(1, mandant.wert());
+            abfrage.setString(2, typ.wert());
+            if (schluessel.isPresent()) {
+                abfrage.setString(3, schluessel.get());
+            }
+            abfrage.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                long id = zeile.getLong(1);
+                return zeile.wasNull() ? OptionalLong.empty() : OptionalLong.of(id);
+            }
+        } catch (SQLException e) {
+            throw fehler("Offene Aufträge nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select 1 from public.auftrag where status = 'OFFEN' and mandant = ? "
+                        + "and typ = ? and nutzlast ->> ? = ? limit 1")) {
+            abfrage.setString(1, mandant.wert());
+            abfrage.setString(2, typ.wert());
+            abfrage.setString(3, schluessel);
+            abfrage.setString(4, wert);
+            abfrage.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next();
+            }
+        } catch (SQLException e) {
+            throw fehler("Offene Aufträge nicht gelesen", e);
         }
     }
 
