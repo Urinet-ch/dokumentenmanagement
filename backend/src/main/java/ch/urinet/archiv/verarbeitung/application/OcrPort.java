@@ -43,10 +43,10 @@ public interface OcrPort {
 
     /**
      * Rendert die ersten {@link Render#maxSeiten()} Seiten eines PDF und, wenn es mehr hat, zusätzlich die letzte Seite
-     * als PNG ({@code pdftoppm}) für den Swiss QR Code und den Bildweg der KI (Aufgabe 3.2; Req 7.1, 7.11) und übergibt
-     * sie in Seitenreihenfolge an {@code verwertung}, solange die Dateien bestehen. Jede Seite wird mit 300 dpi
-     * gerendert wie im Golden-Lauf, ausser sie hätte dann mehr als {@link Render#pixelMax()} Pixel: dann mit so viel
-     * weniger dpi, dass sie hineinpasst. Eine Seite ohne lesbares Format fehlt in der Liste. Das PDF bleibt unverändert.
+     * ({@code pdftoppm}; graustufig als TIFF, farbig als PPM, beide verlustfrei) für den Swiss QR Code und den Bildweg
+     * der KI (Aufgabe 3.2; Req 7.1, 7.11) und übergibt sie in Seitenreihenfolge an {@code verwertung}, solange die
+     * Dateien bestehen. Jede Seite wird mit 300 dpi gerendert wie im Golden-Lauf, ausser sie hätte dann mehr als
+     * {@link Render#pixelMax()} Pixel: dann mit so viel weniger dpi, dass sie hineinpasst. Eine Seite ohne lesbares Format fehlt in der Liste. Das PDF bleibt unverändert.
      *
      * @throws ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen bei Zeitüberschreitung, Werkzeug- oder E/A-Fehler
      * @throws InterruptedException                                    nach einer Unterbrechung

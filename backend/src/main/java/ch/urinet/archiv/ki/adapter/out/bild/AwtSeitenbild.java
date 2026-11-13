@@ -2,6 +2,8 @@ package ch.urinet.archiv.ki.adapter.out.bild;
 
 import ch.urinet.archiv.ki.application.SeitenbildPort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -26,11 +28,22 @@ import java.util.List;
  * untereinander in einem Bild, lange Kante höchstens {@value #LANGE_KANTE} px, weisser Grund, bikubisch, JPEG mit
  * Qualität 0.85. Die Abmessungen kommen zuerst aus den Köpfen der Dateien, danach wird Seite für Seite gezeichnet,
  * damit höchstens eine Seite in voller Auflösung im Speicher liegt (Speicherbudget Stufe A).
+ * <p>
+ * Seiten kommen als PPM ({@code pdftoppm} ohne {@code -png}, Review PR #93): {@link PpmLeser} liest sie mit denselben
+ * Pixeln in denselben Bildtyp ({@code TYPE_3BYTE_BGR}) wie ImageIO das PNG des Golden-Laufs, darum entsteht dasselbe
+ * JPEG ({@code SeitenbildGleichheitTest}). Andere Formate (PNG) liest weiter ImageIO.
  */
 @ApplicationScoped
 public class AwtSeitenbild implements SeitenbildPort {
 
     static final int LANGE_KANTE = 2000;
+
+    private final long pixelMax;
+
+    @Inject
+    public AwtSeitenbild(@ConfigProperty(name = "archiv.ki.render-pixel-max") long pixelMax) {
+        this.pixelMax = pixelMax;
+    }
 
     @Override
     public byte[] jpeg(List<Path> seiten) throws IOException {
@@ -54,7 +67,7 @@ public class AwtSeitenbild implements SeitenbildPort {
             g.fillRect(0, 0, b, h);
             int y = 0;
             for (int i = 0; i < seiten.size(); i++) {
-                BufferedImage bild = ImageIO.read(seiten.get(i).toFile());
+                BufferedImage bild = lesen(seiten.get(i));
                 if (bild == null) {
                     throw new IOException("Seite nicht lesbar");
                 }
@@ -68,7 +81,15 @@ public class AwtSeitenbild implements SeitenbildPort {
         return alsJpeg(ziel);
     }
 
-    private static int[] abmessungen(Path seite) throws IOException {
+    private BufferedImage lesen(Path seite) throws IOException {
+        return PpmLeser.istPpm(seite) ? PpmLeser.lesen(seite, pixelMax) : ImageIO.read(seite.toFile());
+    }
+
+    private int[] abmessungen(Path seite) throws IOException {
+        if (PpmLeser.istPpm(seite)) {
+            PpmLeser.Kopf kopf = PpmLeser.kopf(seite, pixelMax);
+            return new int[]{kopf.breite(), kopf.hoehe()};
+        }
         try (ImageInputStream ein = ImageIO.createImageInputStream(seite.toFile())) {
             Iterator<ImageReader> leser = ein == null ? null : ImageIO.getImageReaders(ein);
             if (leser == null || !leser.hasNext()) {
