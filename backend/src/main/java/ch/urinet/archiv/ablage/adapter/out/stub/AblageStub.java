@@ -52,6 +52,7 @@ public class AblageStub implements AblagePort {
 
     private final Map<String, List<Version>> versionen = new HashMap<>();
     private Path wurzel;
+    private boolean ohneVersionsIdMarker;
 
     private record Version(String versionId, Path datei, String sha256, long groesse, Instant sperreBis) {
 
@@ -257,23 +258,28 @@ public class AblageStub implements AblagePort {
         versionen.keySet().stream().filter(k -> k.startsWith(vorsatz + praefix)).sorted().forEach(k ->
                 versionen.get(k).forEach(v -> alle.add(new Objektversion(k.substring(vorsatz.length()), v.versionId(),
                         false))));
-        // wie S3: mit Versions-ID nach dieser Version, nur mit Schlüssel nach allen Versionen des Schlüssels
+        // wie S3 mit key-marker und version-id-marker: nach genau dieser Version; ohne Versions-ID kein Fortsetzen
         int start = ab.map(m -> {
+            String versionId = m.versionIdZumFortsetzen(praefix);
             for (int i = 0; i < alle.size(); i++) {
                 Objektversion o = alle.get(i);
-                if (m.versionId().isEmpty() ? o.schluessel().compareTo(m.schluessel()) > 0
-                        : o.schluessel().equals(m.schluessel()) && o.versionId().equals(m.versionId().get())) {
-                    return m.versionId().isEmpty() ? i : i + 1;
+                if (o.schluessel().equals(m.schluessel()) && o.versionId().equals(versionId)) {
+                    return i + 1;
                 }
             }
             return alle.size();
         }).orElse(0);
         int ende = Math.min(alle.size(), start + anzahl);
         List<Objektversion> seite = alle.subList(start, ende);
-        Optional<Versionsseite.Marke> weiter = ende < alle.size() && !seite.isEmpty()
-                ? Optional.of(new Versionsseite.Marke(seite.getLast().schluessel(), seite.getLast().versionId()))
-                : Optional.empty();
-        return new Versionsseite(seite, weiter);
+        boolean abgeschnitten = ende < alle.size() && !seite.isEmpty();
+        return new Versionsseite(seite, Versionsseite.weiter(praefix, abgeschnitten,
+                abgeschnitten ? seite.getLast().schluessel() : null,
+                abgeschnitten && !ohneVersionsIdMarker ? seite.getLast().versionId() : null));
+    }
+
+    /** Nur für Tests: abgeschnittene Seiten ohne {@code NextVersionIdMarker}, wie ihn ein Object Storage weglassen kann. */
+    synchronized void ohneVersionsIdMarker(boolean ohne) {
+        this.ohneVersionsIdMarker = ohne;
     }
 
     @Override

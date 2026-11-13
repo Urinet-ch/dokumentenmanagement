@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 
@@ -59,12 +60,18 @@ import java.util.UUID;
  * <p>
  * Fehler beim Prüfen einer einzelnen Datei oder Manifest-Version (S3, Lesen, Verlängern): Ist der Object Storage
  * vorübergehend gestört ({@link AblageGestoert}) oder scheitern {@code archiv.prueflauf.abbruch-nach-fehlern} Prüfungen
- * in Folge, bricht der Teil ohne Wirkung ab, und die Auftragsschlange wiederholt ihn. Erst im letzten Versuch
- * ({@link Wiederholung#MAX_VERSUCHE}) hält der Lauf solche Fehler als {@code PRUEFFEHLER} fest und prüft weiter; nach
- * der Grenze in Folge meldet er den Rest des Teils ohne weiteren Aufruf als {@code PRUEFFEHLER}, damit der Teil nicht
- * an der Zeitgrenze scheitert. Ein einzelner dauerhafter Fehler wird sofort als {@code PRUEFFEHLER} festgehalten, damit
- * eine dauerhaft unlesbare Datei nicht den ganzen Lauf blockiert. Eine Unterbrechung (Zeitgrenze, Herunterfahren) gilt
- * nie als Prüffehler, auch wenn das SDK das Interrupt-Flag gelöscht hat: Sie wird an der Ursache erkannt.
+ * in Folge, bricht der Teil ab, ohne Zähler und Abweichungen festzuhalten, und die Auftragsschlange wiederholt ihn.
+ * Sperren, die der Teil bis dahin verlängert hat, bleiben verlängert; der Zähler {@code verlaengert} zählt nur den
+ * erfolgreichen Versuch und ist nach Wiederholungen darum eine Untergrenze. Erst im letzten Versuch
+ * ({@link Wiederholung#MAX_VERSUCHE}) hält der Lauf solche Fehler als {@code PRUEFFEHLER} fest und prüft weiter. Nur
+ * wenn die Grenze in Folge aus vorübergehenden Fehlern besteht, meldet er den Rest des Teils ohne weiteren Aufruf als
+ * {@code PRUEFFEHLER}, damit der Teil nicht an der Zeitgrenze scheitert; dauerhafte Fehler (z. B. eine einzelne
+ * unlesbare Datei) hält er einzeln fest und prüft weiter, damit eine Folge solcher Dateien keine Abweichung danach
+ * verdeckt. Eine Unterbrechung (Zeitgrenze, Herunterfahren) gilt nie als Prüffehler, auch wenn das SDK das
+ * Interrupt-Flag gelöscht hat: Sie wird an der Ursache erkannt.
+ * <p>
+ * Endet ein Teil nach dem letzten Versuch in {@code FEHLER}, bleibt der Lauf an dieser Stelle stehen (der Monat ist
+ * belegt) und der Inhaber erhält eine E-Mail nur mit Lauf-ID, Phase und Marke ({@link #nachLetztemFehlversuch}).
  * <p>
  * Idempotent: Ein Teil, den der Lauf schon festgehalten hat, endet ohne Wirkung; Verlängerungen sind ohnehin
  * wiederholbar (nie verkürzt).
@@ -169,6 +176,32 @@ public class PrueflaufHandler implements AuftragHandler {
         }
     }
 
+    /**
+     * Nach dem letzten Fehlversuch eines Teils (Auftrag in {@code FEHLER}): Der Lauf bleibt an seinem Stand stehen, der
+     * Inhaber erhält eine E-Mail nur mit IDs (Req 15.5, 16.7); in Stufe P keine E-Mail. Hat ein anderer Lauf des Teils
+     * ihn schon festgehalten oder ist der Lauf abgeschlossen, nichts. Idempotent bis auf eine zweite E-Mail, falls der
+     * Aufräumer den Hook nach dem Versand wiederholt (Absturz zwischen Versand und Abschluss).
+     */
+    @Override
+    public void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
+        Optional<UUID> id = auftrag.nutzlast().uuid(LAUF_ID);
+        OptionalLong teil = auftrag.nutzlast().zahl(TEIL);
+        if (id.isEmpty() || teil.isEmpty()) {
+            return;
+        }
+        Optional<Lauf> lauf = speichern.laden(id.get());
+        if (lauf.isEmpty() || lauf.get().teil() >= teil.getAsLong()
+                || lauf.get().stand().phase() == Phase.ABGESCHLOSSEN) {
+            return;
+        }
+        LOG.errorf("Prüflauf %s Teil %d nach %d Versuchen gescheitert, Lauf bleibt in Phase %s stehen (fehler-id=%s)",
+                id.get(), teil.getAsLong(), Wiederholung.MAX_VERSUCHE, lauf.get().stand().phase(), fehlerId);
+        if (stufe != Stufe.P) {
+            benachrichtigung.prueflaufAbgebrochen(auftrag.mandant(), id.get(), Math.toIntExact(teil.getAsLong()),
+                    lauf.get().stand(), fehlerId);
+        }
+    }
+
     private Ergebnis dateien(MandantCode mandant, Lauf lauf, Sammler s) throws InterruptedException {
         List<Pruefdokument> seite = speichern.archivierte(lauf.stand().nachDokument(), dokumenteJeTeil);
         for (Pruefdokument dokument : seite) {
@@ -181,7 +214,7 @@ public class PrueflaufHandler implements AuftragHandler {
                 }
                 try {
                     pruefeDatei(mandant, dokument, datei, s);
-                    s.fehlerInFolge = 0;
+                    s.geprueft();
                 } catch (RuntimeException e) {
                     prueffehler(e, Optional.of(dokument.id()), datei.schluessel(), datei.versionId(), s);
                 }
@@ -270,7 +303,7 @@ public class PrueflaufHandler implements AuftragHandler {
             }
             try {
                 pruefeManifest(mandant, v, jetzt, s);
-                s.fehlerInFolge = 0;
+                s.geprueft();
             } catch (RuntimeException e) {
                 prueffehler(e, Optional.empty(), v.schluessel(), Optional.of(v.versionId()), s);
             }
@@ -297,7 +330,8 @@ public class PrueflaufHandler implements AuftragHandler {
     /**
      * Fehler bei einer Datei. Eine Unterbrechung reicht er weiter, auch wenn das SDK das Interrupt-Flag gelöscht hat (an
      * der Ursache erkannt; das Flag wird neu gesetzt). Ausser im letzten Versuch bricht ein vorübergehender Fehler oder
-     * die Grenze in Folge den Teil ab, damit die Auftragsschlange ihn wiederholt; sonst festhalten und weiterprüfen.
+     * die Grenze in Folge den Teil ab, damit die Auftragsschlange ihn wiederholt; sonst festhalten und weiterprüfen. Im
+     * letzten Versuch gilt der Rest des Teils nur nach vorübergehenden Fehlern in Folge als ungeprüft.
      */
     private void prueffehler(RuntimeException e, Optional<UUID> dokument, String schluessel,
                              Optional<String> version, Sammler s) {
@@ -307,6 +341,7 @@ public class PrueflaufHandler implements AuftragHandler {
         }
         s.fehlerInFolge++;
         boolean voruebergehend = Ursachen.enthaelt(e, AblageGestoert.class);
+        s.gestoertInFolge = voruebergehend ? s.gestoertInFolge + 1 : 0;
         boolean grenze = s.fehlerInFolge >= abbruchNachFehlern;
         if (!s.letzterVersuch && (voruebergehend || grenze)) {
             throw new IllegalStateException("Prüflauf " + s.lauf + " Teil " + s.teil + ": "
@@ -316,10 +351,10 @@ public class PrueflaufHandler implements AuftragHandler {
         // nur Schlüssel und Klassennamen, keine Inhalte (Req 16.7)
         LOG.warnf("Prüflauf %s Teil %d: %s nicht geprüft, ursache=%s", s.lauf, s.teil, schluessel, Ursachen.kette(e));
         s.abweichung(Art.PRUEFFEHLER, dokument, schluessel, version);
-        if (grenze && !s.gestoert) {
+        if (s.gestoertInFolge >= abbruchNachFehlern && !s.gestoert) {
             s.gestoert = true;
-            LOG.warnf("Prüflauf %s Teil %d: %d Prüffehler in Folge im letzten Versuch, Rest des Teils als PRUEFFEHLER "
-                    + "ohne weitere Prüfung", s.lauf, s.teil, s.fehlerInFolge);
+            LOG.warnf("Prüflauf %s Teil %d: %d vorübergehende Prüffehler in Folge im letzten Versuch, Rest des Teils "
+                    + "als PRUEFFEHLER ohne weitere Prüfung", s.lauf, s.teil, s.gestoertInFolge);
         }
     }
 
@@ -383,6 +418,7 @@ public class PrueflaufHandler implements AuftragHandler {
         private final int teil;
         private final boolean letzterVersuch;
         private int fehlerInFolge;
+        private int gestoertInFolge;
         private boolean gestoert;
         private int dateien;
         private int versionen;
@@ -395,6 +431,11 @@ public class PrueflaufHandler implements AuftragHandler {
             this.lauf = lauf;
             this.teil = teil;
             this.letzterVersuch = letzterVersuch;
+        }
+
+        void geprueft() {
+            fehlerInFolge = 0;
+            gestoertInFolge = 0;
         }
 
         void abweichung(Art art, Optional<UUID> dokument, String schluessel, Optional<String> version) {

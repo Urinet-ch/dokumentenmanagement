@@ -3,6 +3,7 @@ package ch.urinet.archiv.ablage.adapter.out.s3;
 import ch.urinet.archiv.ablage.domain.AblageGestoert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.core.exception.AbortedException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -34,6 +35,24 @@ class PruefzugriffTest {
             })).isInstanceOf(AblageGestoert.class).hasCause(fehler).hasMessageContaining(SCHLUESSEL);
         }
         assertThat(Thread.currentThread().isInterrupted()).isFalse();
+    }
+
+    /** Zeitüberschreitung beim Server: {@code RequestTimeout} mit 400 (wie bei AWS) oder HTTP 408 (Review PR #97). */
+    @Test
+    void zeitueberschreitungDesServersIstVoruebergehend() {
+        S3Exception code = (S3Exception) S3Exception.builder().statusCode(400)
+                .awsErrorDetails(AwsErrorDetails.builder().errorCode("RequestTimeout").build()).build();
+        S3Exception status = (S3Exception) S3Exception.builder().statusCode(408).build();
+        for (S3Exception fehler : new S3Exception[]{code, status}) {
+            assertThatThrownBy(() -> S3Ablage.pruefzugriff(SCHLUESSEL, () -> {
+                throw fehler;
+            })).isInstanceOf(AblageGestoert.class).hasCause(fehler);
+        }
+        S3Exception andererCode = (S3Exception) S3Exception.builder().statusCode(400)
+                .awsErrorDetails(AwsErrorDetails.builder().errorCode("InvalidArgument").build()).build();
+        assertThatThrownBy(() -> S3Ablage.pruefzugriff(SCHLUESSEL, () -> {
+            throw andererCode;
+        })).isSameAs(andererCode);
     }
 
     @Test

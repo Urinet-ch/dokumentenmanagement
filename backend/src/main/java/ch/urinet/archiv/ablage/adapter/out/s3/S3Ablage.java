@@ -95,6 +95,7 @@ public class S3Ablage implements AblagePort {
     public static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
             "ObjectLockConfigurationNotFoundError");
     private static final Set<String> FEHLT = Set.of("NoSuchKey", "NoSuchVersion");
+    private static final Set<String> ZEITUEBERSCHREITUNG = Set.of("RequestTimeout", "RequestTimeoutException");
     private static final String MANIFEST = "manifest/";
     private static final Set<String> PRUEFBEREICHE = Set.of(ARCHIV, MANIFEST);
 
@@ -639,24 +640,18 @@ public class S3Ablage implements AblagePort {
             throw new IllegalArgumentException("anzahl zwischen 1 und 1000");
         }
         String bucket = bucket(mandant);
-        // ohne Versions-ID nur key-marker, nie ein leerer version-id-marker (S3 lehnt ihn ab)
+        // immer key-marker und version-id-marker zusammen; nur mit key-marker fielen Versionen des Schlüssels weg
+        Optional<String> versionIdMarker = ab.map(m -> m.versionIdZumFortsetzen(praefix));
         ListObjectVersionsResponse antwort = pruefzugriff(praefix, () -> s3.listObjectVersions(b -> {
             b.bucket(bucket).prefix(praefix).maxKeys(anzahl);
-            ab.ifPresent(m -> {
-                b.keyMarker(m.schluessel());
-                m.versionId().ifPresent(b::versionIdMarker);
-            });
+            ab.ifPresent(m -> b.keyMarker(m.schluessel()).versionIdMarker(versionIdMarker.orElseThrow()));
         }));
         List<Objektversion> versionen = new ArrayList<>();
         antwort.versions().forEach(v -> versionen.add(new Objektversion(v.key(), v.versionId(), false)));
         antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true)));
         versionen.sort(Comparator.comparing(Objektversion::schluessel));
-        Optional<Versionsseite.Marke> weiter = Boolean.TRUE.equals(antwort.isTruncated())
-                && antwort.nextKeyMarker() != null
-                ? Optional.of(new Versionsseite.Marke(antwort.nextKeyMarker(),
-                        Optional.ofNullable(antwort.nextVersionIdMarker()).filter(v -> !v.isEmpty())))
-                : Optional.empty();
-        return new Versionsseite(versionen, weiter);
+        return new Versionsseite(versionen, Versionsseite.weiter(praefix, Boolean.TRUE.equals(antwort.isTruncated()),
+                antwort.nextKeyMarker(), antwort.nextVersionIdMarker()));
     }
 
     @Override
@@ -695,8 +690,8 @@ public class S3Ablage implements AblagePort {
     /**
      * Fehler beim Prüflauf übersetzen (Req 15.5): Eine Unterbrechung (Zeitgrenze, Herunterfahren) bleibt eine
      * Unterbrechung, auch wenn das SDK das Interrupt-Flag gelöscht hat ({@link AbortedException}); das Flag wird neu
-     * gesetzt. Netz- und Lesefehler, Zeitüberschreitungen des SDK, 5xx und 429 sind vorübergehend
-     * ({@link AblageGestoert}), der Prüflauf wiederholt dann den Teil. Alles andere bleibt unverändert.
+     * gesetzt. Netz- und Lesefehler, Zeitüberschreitungen des SDK und des Servers (408, {@code RequestTimeout}), 5xx
+     * und 429 sind vorübergehend ({@link AblageGestoert}), der Prüflauf wiederholt dann den Teil. Alles andere bleibt unverändert.
      */
     static <T> T pruefzugriff(String schluessel, Supplier<T> aufruf) {
         try {
@@ -709,12 +704,17 @@ public class S3Ablage implements AblagePort {
                 Thread.currentThread().interrupt();
                 throw e;
             }
-            if (e instanceof SdkClientException
-                    || (e instanceof S3Exception s3e && (s3e.statusCode() >= 500 || s3e.statusCode() == 429))) {
+            if (e instanceof SdkClientException || (e instanceof S3Exception s3e && voruebergehend(s3e))) {
                 throw new AblageGestoert(schluessel, e);
             }
             throw e;
         }
+    }
+
+    // RequestTimeout meldet der Server mit 400 (bei AWS) oder 408; das SDK stuft den Code als wiederholbar ein
+    private static boolean voruebergehend(S3Exception e) {
+        return e.statusCode() >= 500 || e.statusCode() == 429 || e.statusCode() == 408
+                || (fehlercode(e) != null && ZEITUEBERSCHREITUNG.contains(fehlercode(e)));
     }
 
     private static void bereichPruefen(String schluessel, String versionId) {

@@ -15,6 +15,7 @@ import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
+import ch.urinet.archiv.ablage.domain.UnsichereFortsetzung;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -548,17 +549,15 @@ class S3AblageTest {
     }
 
     /**
-     * Ohne {@code NextVersionIdMarker} in der Antwort geht es nur mit dem key-marker weiter, nie mit einem leeren
-     * version-id-marker (Req 15.10).
+     * Ohne {@code NextVersionIdMarker} in einer abgeschnittenen Antwort lässt sich nicht sicher fortsetzen: Nur mit dem
+     * key-marker fielen die übrigen Versionen dieses Schlüssels weg. Die Ablage bricht darum ab, statt still zu
+     * überspringen, und sendet nie einen leeren version-id-marker (Req 15.10; Review PR #97).
      */
     @Test
-    void ohneNaechsteVersionsIdKeinLeererVersionIdMarker() {
-        List<String> schluessel = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            String key = "manifest/2026/11/" + (10 + i) + ".json";
-            verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("m" + key));
-            schluessel.add(key);
-        }
+    void ohneNaechsteVersionsIdBrichtAbStattVersionenZuUeberspringen() {
+        String key = "manifest/2026/11/" + UUID.randomUUID() + ".json";
+        verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("m1"));
+        verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("m2"));
         List<ListObjectVersionsRequest> anfragen = new ArrayList<>();
         ExecutionInterceptor ohneVersionsMarker = new ExecutionInterceptor() {
             @Override
@@ -579,23 +578,16 @@ class S3AblageTest {
             var ablage = new S3Ablage(ohne, S3Ablage.presigner(ohne, true), new AblageEinstellungen(TestBucket.PRAEFIX,
                     Optional.of(Duration.ofDays(1)), Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)),
                     Duration.ofMinutes(5), ZWISCHENABLAGE), Clock.systemUTC());
-            List<String> gelistet = new ArrayList<>();
-            Optional<Versionsseite.Marke> marke = Optional.empty();
-            do {
-                Versionsseite seite = ablage.versionen(mandant, "manifest/", marke, 1);
-                seite.versionen().forEach(v -> gelistet.add(v.schluessel()));
-                marke = seite.weiter();
-                marke.ifPresent(m -> assertThat(m.versionId()).isEmpty());
-                assertThat(gelistet).hasSizeLessThan(10);
-            } while (marke.isPresent());
 
-            assertThat(gelistet).containsExactlyElementsOf(schluessel);
-            assertThat(anfragen).hasSizeGreaterThanOrEqualTo(3);
+            assertThatThrownBy(() -> ablage.versionen(mandant, "manifest/", Optional.empty(), 1))
+                    .isInstanceOf(UnsichereFortsetzung.class).hasMessageContaining("manifest/");
+            assertThatThrownBy(() -> ablage.versionen(mandant, "manifest/",
+                    Optional.of(new Versionsseite.Marke(key, Optional.empty())), 1))
+                    .isInstanceOf(UnsichereFortsetzung.class).hasMessageContaining(key);
+
+            assertThat(anfragen).hasSize(1);
             assertThat(anfragen.getFirst().keyMarker()).isNull();
-            assertThat(anfragen.subList(1, anfragen.size())).allSatisfy(anfrage -> {
-                assertThat(anfrage.keyMarker()).isNotBlank();
-                assertThat(anfrage.versionIdMarker()).isNull();
-            });
+            assertThat(anfragen.getFirst().versionIdMarker()).isNull();
         }
     }
 }
