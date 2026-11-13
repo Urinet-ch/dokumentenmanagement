@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Konfiguration eines Zeitstempeldienstes {@code archiv.tsa.dienst.<kennung>.*} (Req 15.3, 15.11; 4.9-E1): {@code url},
@@ -33,6 +34,13 @@ record TsaDienst(String kennung, URI url, Set<String> policies, List<X509Certifi
     static List<String> kennungen(Config config) {
         return config.getOptionalValues(DIENSTE, String.class).orElse(List.of()).stream()
                 .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
+    }
+
+    /** Ob ein Block {@code archiv.tsa.dienst.<kennung>.*} konfiguriert ist (auch für ausgetragene Dienste). */
+    static boolean vorhanden(Config config, String kennung) {
+        String p = "archiv.tsa.dienst." + kennung + ".";
+        return Stream.of("url", "policies", "ca", "ocsp-url", "crl-url")
+                .anyMatch(s -> config.getOptionalValue(p + s, String.class).isPresent());
     }
 
     static TsaDienst laden(Config config, String kennung) {

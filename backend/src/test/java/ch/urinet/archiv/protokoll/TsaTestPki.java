@@ -114,15 +114,22 @@ public final class TsaTestPki {
 
     /** Signierte OCSP-Antwort der CA: jedes angefragte Zertifikat gut, mit {@code gesperrt} widerrufen. */
     public byte[] ocsp(byte[] anfrage, boolean gesperrt) {
+        Instant jetzt = Instant.now();
+        return ocsp(anfrage, gesperrt, jetzt, jetzt, null);
+    }
+
+    /** OCSP-Antwort mit wählbaren Zeiten {@code producedAt}, {@code thisUpdate} und {@code nextUpdate} (optional). */
+    public byte[] ocsp(byte[] anfrage, boolean gesperrt, Instant erstellt, Instant diesesUpdate, Instant naechstesUpdate) {
         try {
             OCSPReq req = new OCSPReq(anfrage);
             var bau = new JcaBasicOCSPRespBuilder(ca.getPublicKey(), new JcaDigestCalculatorProviderBuilder().build()
                     .get(org.bouncycastle.cert.ocsp.CertificateID.HASH_SHA1));
             for (Req einzel : req.getRequestList()) {
                 bau.addResponse(einzel.getCertID(), gesperrt
-                        ? new RevokedStatus(new Date(), CRLReason.keyCompromise) : CertificateStatus.GOOD);
+                        ? new RevokedStatus(new Date(), CRLReason.keyCompromise) : CertificateStatus.GOOD,
+                        Date.from(diesesUpdate), naechstesUpdate == null ? null : Date.from(naechstesUpdate), null);
             }
-            BasicOCSPResp basic = bau.build(signer(caSchluessel), null, new Date());
+            BasicOCSPResp basic = bau.build(signer(caSchluessel), null, Date.from(erstellt));
             return new OCSPRespBuilder().build(OCSPResp.SUCCESSFUL, basic).getEncoded();
         } catch (Exception e) {
             throw new IllegalStateException("OCSP-Antwort nicht erzeugt", e);
@@ -131,9 +138,15 @@ public final class TsaTestPki {
 
     /** Sperrliste der CA; mit {@code gesperrt} steht das TSA-Zertifikat darauf. */
     public byte[] crl(boolean gesperrt) {
+        Instant jetzt = Instant.now();
+        return crl(gesperrt, jetzt, jetzt.plus(Duration.ofDays(7)));
+    }
+
+    /** Sperrliste mit wählbarem {@code thisUpdate} und {@code nextUpdate}. */
+    public byte[] crl(boolean gesperrt, Instant diesesUpdate, Instant naechstesUpdate) {
         try {
-            var bau = new X509v2CRLBuilder(new JcaX509CertificateHolder(ca).getSubject(), new Date());
-            bau.setNextUpdate(Date.from(Instant.now().plus(Duration.ofDays(7))));
+            var bau = new X509v2CRLBuilder(new JcaX509CertificateHolder(ca).getSubject(), Date.from(diesesUpdate));
+            bau.setNextUpdate(Date.from(naechstesUpdate));
             if (gesperrt) {
                 bau.addCRLEntry(tsa.getSerialNumber(), new Date(), CRLReason.keyCompromise);
             }

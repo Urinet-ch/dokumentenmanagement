@@ -53,7 +53,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * RFC-3161-Zeitstempel mit BouncyCastle (Req 15.3, 15.11, 15.12; 4.9-E1): An den Dienst geht nur der SHA-256-Imprint
  * (Req 16.7). Eine Antwort gilt nur, wenn Status, Nonce und Imprint stimmen, die Policy-OID und die ausstellende CA in
  * der Allowlist des Dienstes stehen und die Signatur des Tokens mit dem TSA-Zertifikat (kritische EKU timeStamping)
- * besteht. Prüfdaten (OCSP oder CRL) kommen nur von den konfigurierten Adressen, nie aus dem Zertifikat (AIA).
+ * besteht. Prüfdaten (OCSP oder CRL) kommen nur von den konfigurierten Adressen, nie aus dem Zertifikat (AIA), und
+ * müssen die Zeit des Stempels abdecken: nicht älter als {@code archiv.tsa.pruefdaten-hoechstalter} vor {@code genTime}
+ * und, falls angegeben, nicht vor {@code genTime} abgelaufen.
  */
 @ApplicationScoped
 public class BcZeitstempelAdapter implements ZeitstempelPort {
@@ -75,14 +76,18 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
 
     private final Config config;
     private final Duration zeitgrenze;
+    private final Duration hoechstalter;
     private final Map<String, TsaDienst> dienste = new ConcurrentHashMap<>();
     private final SecureRandom zufall = new SecureRandom();
     private final HttpClient client;
 
     public BcZeitstempelAdapter(Config config,
-                                @ConfigProperty(name = "archiv.tsa.zeitgrenze", defaultValue = "PT30S") Duration zeitgrenze) {
+                                @ConfigProperty(name = "archiv.tsa.zeitgrenze", defaultValue = "PT30S") Duration zeitgrenze,
+                                @ConfigProperty(name = "archiv.tsa.pruefdaten-hoechstalter", defaultValue = "P7D")
+                                Duration hoechstalter) {
         this.config = config;
         this.zeitgrenze = zeitgrenze;
+        this.hoechstalter = hoechstalter;
         this.client = HttpClient.newBuilder().connectTimeout(zeitgrenze)
                 .followRedirects(HttpClient.Redirect.NEVER).build();
     }
@@ -95,6 +100,18 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
     private TsaDienst dienst(String kennung) {
         if (!dienste().contains(kennung)) {
             throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " ist nicht konfiguriert");
+        }
+        return konfiguriert(kennung);
+    }
+
+    /**
+     * Lädt den Block {@code archiv.tsa.dienst.<kennung>.*}, auch für einen Dienst, der nicht mehr in
+     * {@code archiv.tsa.dienste} steht: Die Liste regelt nur, wer stempelt; geprüft wird jeder Token gegen die Allowlist
+     * seines eigenen Dienstes.
+     */
+    private TsaDienst konfiguriert(String kennung) {
+        if (!TsaDienst.vorhanden(config, kennung)) {
+            throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " nicht mehr konfiguriert");
         }
         try {
             return dienste.computeIfAbsent(kennung, k -> TsaDienst.laden(config, k));
@@ -136,11 +153,11 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                 builder.addRequest(zertifikatId(tsa, ca));
                 byte[] antwort = senden(d.ocsp().get(), "application/ocsp-request", builder.build().getEncoded(),
                         MAX_ANTWORT);
-                ocspPruefen(antwort, tsa, ca);
+                ocspPruefen(antwort, tsa, ca, stempel.genTime(), hoechstalter);
                 return new Pruefdaten(Pruefdaten.Art.OCSP, antwort);
             }
             byte[] crl = holen(d.crl().orElseThrow(), MAX_CRL);
-            crlPruefen(crl, tsa, ca);
+            crlPruefen(crl, tsa, ca, stempel.genTime(), hoechstalter);
             return new Pruefdaten(Pruefdaten.Art.CRL, crl);
         } catch (OCSPException | IOException e) {
             throw new ZeitstempelFehler("Prüfdaten für " + kennung + " nicht erhalten", e);
@@ -149,7 +166,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
 
     @Override
     public Instant pruefenAbgelegt(String kennung, byte[] tsr, byte[] imprint, String kettePem, Pruefdaten pruefdaten) {
-        Allowlist erlaubt = dienste().contains(kennung) ? Allowlist.von(dienst(kennung)) : alleDienste();
+        Allowlist erlaubt = Allowlist.von(konfiguriert(kennung));
         List<X509Certificate> kette = kette(kettePem);
         Stempel stempel = geprueft(kennung, erlaubt, tsr, imprint, kette);
         List<X509Certificate> geprueft = kette(stempel.kettePem());
@@ -157,24 +174,10 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             throw new ZeitstempelFehler("Abgelegte Zertifikatskette passt nicht zum Zeitstempel von " + kennung);
         }
         switch (pruefdaten.art()) {
-            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1));
-            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1));
+            case OCSP -> ocspPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(), hoechstalter);
+            case CRL -> crlPruefen(pruefdaten.inhalt(), kette.get(0), kette.get(1), stempel.genTime(), hoechstalter);
         }
         return stempel.genTime();
-    }
-
-    private Allowlist alleDienste() {
-        Set<String> policies = new HashSet<>();
-        List<X509Certificate> cas = new ArrayList<>();
-        for (String k : dienste()) {
-            TsaDienst d = dienst(k);
-            policies.addAll(d.policies());
-            cas.addAll(d.cas());
-        }
-        if (cas.isEmpty()) {
-            throw new ZeitstempelFehler("Keine Zeitstempeldienste konfiguriert (archiv.tsa.dienste)");
-        }
-        return new Allowlist(policies, cas);
     }
 
     /** Prüft ein Token gegen Imprint und Allowlist; {@code zusatz} sind weitere Zertifikate (abgelegte Kette). */
@@ -238,7 +241,9 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         return Optional.empty();
     }
 
-    static void ocspPruefen(byte[] inhalt, X509Certificate tsa, X509Certificate ca) {
+    /** OCSP-Antwort der CA für das TSA-Zertifikat, gut und aktuell zu {@code genTime}. */
+    static void ocspPruefen(byte[] inhalt, X509Certificate tsa, X509Certificate ca, Instant genTime,
+                            Duration hoechstalter) {
         try {
             OCSPResp resp = new OCSPResp(inhalt);
             if (resp.getStatus() != OCSPResp.SUCCESSFUL || !(resp.getResponseObject() instanceof BasicOCSPResp basic)) {
@@ -247,6 +252,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             if (!ocspSignaturGueltig(basic, ca)) {
                 throw new ZeitstempelFehler("OCSP-Antwort ist nicht von der CA signiert");
             }
+            aktuell("OCSP-Antwort", basic.getProducedAt(), null, genTime, hoechstalter);
             CertificateID id = zertifikatId(tsa, ca);
             boolean gefunden = false;
             for (SingleResp einzel : basic.getResponses()) {
@@ -255,6 +261,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                     if (einzel.getCertStatus() != null) {
                         throw new ZeitstempelFehler("TSA-Zertifikat ist laut OCSP gesperrt oder unbekannt");
                     }
+                    aktuell("OCSP-Antwort", einzel.getThisUpdate(), einzel.getNextUpdate(), genTime, hoechstalter);
                 }
             }
             if (!gefunden) {
@@ -288,7 +295,9 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         return false;
     }
 
-    static void crlPruefen(byte[] inhalt, X509Certificate tsa, X509Certificate ca) {
+    /** Sperrliste der CA ohne das TSA-Zertifikat, aktuell zu {@code genTime}. */
+    static void crlPruefen(byte[] inhalt, X509Certificate tsa, X509Certificate ca, Instant genTime,
+                           Duration hoechstalter) {
         try {
             X509CRL crl = (X509CRL) CertificateFactory.getInstance("X.509")
                     .generateCRL(new ByteArrayInputStream(inhalt));
@@ -299,10 +308,25 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             if (crl.isRevoked(tsa)) {
                 throw new ZeitstempelFehler("TSA-Zertifikat ist laut Sperrliste gesperrt");
             }
+            aktuell("Sperrliste", crl.getThisUpdate(), crl.getNextUpdate(), genTime, hoechstalter);
         } catch (CRLException | CertificateException e) {
             throw new ZeitstempelFehler("Sperrliste ist ungültig", e);
         } catch (GeneralSecurityException e) {
             throw new ZeitstempelFehler("Sperrliste ist nicht von der CA signiert", e);
+        }
+    }
+
+    /**
+     * Prüfdaten decken {@code genTime} ab: ausgestellt höchstens {@code hoechstalter} vor dem Stempel und, falls ein
+     * nächstes Update angegeben ist, nicht vor dem Stempel abgelaufen. Später ausgestellte Prüfdaten sind zulässig,
+     * weil eine Sperrung nicht rückgängig gemacht wird.
+     */
+    static void aktuell(String was, Date ausgestellt, Date naechstes, Instant genTime, Duration hoechstalter) {
+        if (ausgestellt == null || ausgestellt.toInstant().isBefore(genTime.minus(hoechstalter))) {
+            throw new ZeitstempelFehler(was + " ist zu alt für den Zeitstempel (archiv.tsa.pruefdaten-hoechstalter)");
+        }
+        if (naechstes != null && naechstes.toInstant().isBefore(genTime)) {
+            throw new ZeitstempelFehler(was + " war zur Zeit des Zeitstempels abgelaufen");
         }
     }
 
