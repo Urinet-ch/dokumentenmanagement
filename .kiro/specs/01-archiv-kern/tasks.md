@@ -509,6 +509,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - Herkunft: Review von PR #37 (Aufgabe 1.5); Grundlage: Tokens laufen nicht ab, sie gelten bis zum Widerruf (entschieden von Fabian am 10.11.2026)
   - ungenutzte Tokens nach `zuletzt` in der Token-Verwaltung anzeigen
   - optionales `gueltig_bis` je Token, vor dem Wechsel auf Stufe B (5.11); ohne Wert gilt das Token weiter bis zum Widerruf
+  - Spec 03 ergänzt: Die Spalte `gueltig_bis` legt Spec 03, Aufgabe 11.7 für Webseiten-Schlüssel nach einer Rotation an (Spec 03, Req 12.4); diese Option nutzt sie für `generator` und `import` mit
   - _Anforderungen: 2.5_
 
 - [ ]* O.8 Anmeldung mit Google [Infra] [Backend] [Fabian]

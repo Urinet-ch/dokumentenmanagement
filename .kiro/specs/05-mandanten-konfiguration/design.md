@@ -24,7 +24,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | --- | --- |
 | Vertraulichkeit `NORMAL`, `INTERN`, `PERSONAL` und Rechtematrix A1–A19 | Trägt Sichtbarkeit und Rechte (ADR-009) bis in Summen, Chat und Wissensbasis; eine Stufe je Mandant hiesse Rechte je Mandant konfigurieren. Je Art bleibt die Standard-Vertraulichkeit konfigurierbar. |
 | Gruppen `finanz`, `vertrag`, `frei` und ihre Spalten | Echte Spalten (`dokument_finanz`, `dokument_vertrag`) gehören in den gemeinsamen Changelog; Mandantenfelder sind Zusatzfelder (`zusatz`, JSON Schema). |
-| Reservierte Felder `zugriff` und `veroeffentlicht` (Spec 03, 3.3–3.4, 5.3) | Sie entscheiden, was öffentlich wird. Ihre Definition steht fest in Spec 03 design.md; `Konfiguration.pruefen` lehnt jede Abweichung ab (Req 2.7), und der Filter der öffentlichen Schnittstelle bleibt Code. |
+| Reservierte Felder `zugriff` und `veroeffentlicht` (Spec 03, 3.3–3.4, 5.3) | Sie entscheiden, was öffentlich wird. Ihre Definition steht fest in Spec 03 design.md (Tabelle «Reservierte Felder»; seit 13.11.2026 drei Stufen `oeffentlich`, `mitglieder`, `vorstand`, Spec 03, 3.7); `Konfiguration.pruefen` lehnt jede Abweichung ab (Req 2.7), und der Filter der öffentlichen Schnittstelle bleibt Code. |
 | Feste Eigenschaften von `WISSENSQUELLE` | Entscheid 09.11.2026 (Spec 04, 1.1 und 1.5); Req 2.6. |
 | Sperrlogik, Modus, Stufen, Manifest (Spec 01, 6 und 15) | GeBüV und ADR-004/007; je Art konfigurierbar bleibt nur `gesetzliche_pflicht` und die Frist. |
 | Löschung am Fristende | Spec 01, 9.9: eigene, spätere Spec. |
@@ -96,12 +96,15 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   selben Sichtbarkeitsfilter wie Spec 01, 14.5; die Namen der zugeordneten Werte gehen mit Gewicht C in den
   `tsvector` (Neuberechnung bei Zuordnung und bei Namensänderung des Werts). Klassifikations-Codes kommen nur aus der
   geprüften Konfiguration, nie als SQL-Bezeichner aus der Anfrage.
-- `integration/wordpress/` (Spec 03, Folgeänderung; umgesetzt in Spec 03, Aufgaben 11.2 und 11.5) – Parameter der
-  öffentlichen Liste: zusätzlich die Codes der Klassifikationen
+- `integration/webseite/` (bisher `integration/wordpress/`; Spec 03, Folgeänderung; umgesetzt in Spec 03, Aufgaben
+  11.2 und 11.5) – Parameter der öffentlichen Liste: zusätzlich die Codes der Klassifikationen
   mit `oeffentlich_filter`, z. B. `?fachgebiet=bad`; der feste Sicherheitsfilter aus Spec 03 design.md bleibt
   unverändert davor. Feste Parameter, die kein Klassifikations-Code sein dürfen (Req 8.6): `q`, `reihe`, `jahr`,
-  `ausgabe`, `seite`, `pro_seite`, `id`, `sortierung`, `gespraech_id`, `zugriff`, `veroeffentlicht`. Ausgegeben
-  werden nur Klassifikationen mit `oeffentlich_filter`.
+  `ausgabe`, `seite`, `pro_seite`, `id`, `sortierung`, `gespraech_id`, `zugriff`, `veroeffentlicht`, `seit`, `max`,
+  `referenz`, `groesse`, `status`, `url`. Ausgegeben werden nur Klassifikationen mit `oeffentlich_filter`.
+  Spec 03 ergänzt (Spec 03, Req 5.10, 10.3, 10.13, 11.1, 14.3; 13.11.2026): Das Paket heisst `integration/webseite/`,
+  weil die Schnittstelle für jede Webseite gilt; die letzten sechs festen Parameter der Liste oben kommen hinzu, weil
+  Änderungs-Feed, Umleitung und Erfassung sie im selben Vertrag nutzen.
 
 ## REST-Schnittstelle (Ergänzung zu Spec 01 design.md)
 | Methode | Pfad | Zweck | Recht |

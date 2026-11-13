@@ -32,7 +32,7 @@ dokumentenmanagement/
 │       ├── suche/           Volltext, Filter, später Hybridsuche
 │       ├── protokoll/       Zugriffsprotokoll, Tages-Manifest
 │       ├── export/          Jahresexport (Spec 02)
-│       ├── integration/     abaninja/, mail/, wordpress/ (Spec 02/03)
+│       ├── integration/     abaninja/, mail/, webseite/ (Spec 02/03; Webseiten-Schnittstelle /public/, bisher wordpress/)
 │       ├── wissen/          Wissensbasis: Seiten, Ingest, Freigabe, Lint, OKF-Export (Spec 04)
 │       ├── konfiguration/   Konfiguration je Mandant: Versionen, Klassifikationen, Regeln, KI-Texte, Konfigurationsdatei (Spec 05)
 │       └── gemeinsam/       Fehler (Problem Details), Zeit, Geld
@@ -88,7 +88,8 @@ ArchUnit prüft: `domain` hängt von nichts ab, `application` nur von `domain`, 
 - Tabellen und Spalten `snake_case`, Singular: `dokument`, `dokument_datei`, `dokument_finanz`, `import_lauf`.
 - Enums als Text speichern: `status IN ('NEU','VERARBEITUNG','EINGANGSKORB','ARCHIVIERUNG','ARCHIVIERUNG_FEHLER','ARCHIVIERT','FEHLER','VERWORFEN')`; `vertraulichkeit IN ('NORMAL','INTERN','PERSONAL')`.
 - REST: Plural, Kleinschreibung: `/api/v1/dokumente`, `/api/v1/dokumente/{id}/wiederholen`, `/api/v1/importe/crm`.
-- API-Token-Scopes: `generator`, `import` (Spec 01), `wordpress` (Site-Key, Spec 03).
+- API-Token-Scopes: `generator`, `import` (Spec 01), `webseite-lesen` und `webseite-erfassung` (Webseiten-Schlüssel, Spec 03, Requirement 12; bisher `wordpress` als Site-Key, geändert 13.11.2026).
+- Webseiten-Schnittstelle: Pfade unter `/public/v<n>` (Lesen) und `/public/v<n>/erfassung`; Vertrag `docs/schnittstelle/public-v<n>.yaml` (Spec 03, Requirement 11, ADR-014).
 - Branches `feature/<spec>-<aufgabe>-<stichwort>` (z. B. `feature/01-2.6-ocr`), Commits nach Conventional Commits, Text deutsch, Verweis auf das Kriterium als `req-<x.y>`: `feat(verarbeitung): OCR mit OCRmyPDF (req-5.1)`. `A1`–`A19` bezeichnen nur die Zeilen der Rechtematrix (Spec 01, Requirement 2.6; A15–A19 aus Spec 04, Requirement 12.1).
 
 ## Belegnummern (Erkennung und Validierung)

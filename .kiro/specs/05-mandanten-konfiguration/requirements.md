@@ -124,6 +124,9 @@ im Code stehen.
 7. FALLS eine Art die reservierten Felder `zugriff` oder `veroeffentlicht` anders definiert als Spec 03 design.md
    (Typ, Werte, Standard, Pflicht), sie in `ki_felder` nennt oder eine Klassifikation diese Codes trägt, DANN SOLL
    das Archiv die Konfiguration mit HTTP 422 `KONFIGURATION_UNGUELTIG` ablehnen.
+   Spec 03, 3.7 ergänzt dieses Kriterium (13.11.2026, entschieden von Fabian, E-C): Massgeblich ist die Tabelle
+   «Reservierte Felder» in Spec 03 design.md; `zugriff` hat die Werte `oeffentlich`, `mitglieder`, `vorstand`
+   (String), `veroeffentlicht` ist ein JSON-Wahrheitswert (umgesetzt in Spec 05, Aufgabe 17.3).
 8. FALLS `fremdbeleg_art` oder `ohne_zahlungsdaten_art` auf eine inaktive Art oder auf eine Art mit niedrigerer
    Standard-Vertraulichkeit (`NORMAL` < `INTERN` < `PERSONAL`) verweist, DANN SOLL das Archiv die Konfiguration
    mit HTTP 422 `KONFIGURATION_UNGUELTIG` ablehnen.

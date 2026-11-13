@@ -49,6 +49,7 @@ flowchart LR
 - Tabelle `chunk(id bigserial, dokument_id uuid, nr int, text text, embedding halfvec(<dim>))`, HNSW-Index `halfvec_cosine_ops`.
   Spike AI Services (Spec 01, Aufgabe 0.3): `bge_multilingual_gemma2` liefert 3'584 Dimensionen – über der HNSW-Grenze von 2'000 für `vector`, aber innerhalb der Grenze von 4'000 für `halfvec`; daher `halfvec(3584)`. Die Vektoren sind nicht normiert, daher Kosinus (`halfvec_cosine_ops`), nicht Skalarprodukt.
 - `Chunker`: Absätze zusammenfassen bis ≈ 3'000 Zeichen, 400 Zeichen Überlappung, Titel + Art + Partner als Kopfzeile jedes Chunks.
+  Spec 03 ergänzt (Spec 03, Req 5.7; 13.11.2026; umgesetzt in Spec 02, Aufgaben 6.3 und 6.4): `chunk` erhält `seite_von` und `seite_bis` (1-basiert), bestimmt aus den `\f` in `dokument.volltext` über `Seitentext.von` (Spec 04 design.md), `null` ohne Seitentrenner (z. B. bei `pdfa_fehlt`) oder wenn die Zahl der Seiten nicht `dokument.seiten` entspricht; `HybridSuche.suchen` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit. Treffer nur aus dem Volltext haben keinen Seitenbereich.
 - `EmbeddingService` (LangChain4j `EmbeddingModel`, OpenAI-kompatibel), Batch 16 Chunks, Auftrag `EMBEDDING` nach erfolgreichem `ARCHIVIEREN` (Status `ARCHIVIERT`); Nachberechnung `EMBEDDING_ALLE`.
 - `HybridSuche.suchen(frage, filter, k)`:
   1. Volltext: Top 50 nach `ts_rank_cd`.
