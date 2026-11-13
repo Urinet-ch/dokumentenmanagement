@@ -410,6 +410,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `backend/pom.xml`: `bcpkix-jdk18on` vom Scope `test` in den Compile-Scope (TSP-Anfrage und -Prüfung); WireMock-Stubs für beide Dienste
   - Ablage unter `manifest/` mit Object Lock im Modus COMPLIANCE (6.11, Option B) bis zum spätesten `aufbewahren_bis` der enthaltenen Dateien, Tabelle `manifest`
   - verpasste Läufe in Datumsreihenfolge nachholen, höchstens ein Manifest pro Datum; Tests für 29.03.2026 und 25.10.2026; Alarm bei fehlendem Manifest
+  - Port `ManifestUeberwachung` (5.6) umsetzen, ersetzt den Platzhalter `ManifestUeberwachungNichtAngebunden`; Szenario `@req-16.5` für ein fehlendes Manifest
   - Prüfwerkzeug `archiv manifest pruefen <datum>` (15.12): Signatur, Kette inkl. Erneuerung, jeder Zeitstempel; Lücke in der Kette ist ein Fehler, fehlender Stempel eines Dienstes und `genTime` später als `archiv.manifest.verspaetung-schwelle` nach `bis` werden gemeldet
   - Prüflauf: SHA-256 mit dem Manifest-Inhalt vergleichen (Rest von 5.3, Req 15.5): der `PRUEFLAUF` vergleicht die Prüfsumme jeder Datei zusätzlich mit ihrem Eintrag im Tages-Manifest; fehlt der Eintrag oder weicht er ab, ist das eine Abweichung im Bericht
   - Manifest ohne Dateinamen (Req 3.12, Aufgabe 4.10): Szenario `@req-3.12` prüft, dass der Dateiname eines Testdokuments im Manifest fehlt (ergänzt 13.11.2026, entschieden von Fabian)
@@ -448,6 +449,7 @@ Arbeitsweise je Aufgabe (Claude Code):
     - Mit 5.3 vorbereitet (PR #89): Enum `Stufe.P` (beim Start über `Stufe.aus` weiter abgelehnt), die P-Regeln in `Stufenregel` (Präfix, Höchstfristen, COMPLIANCE), `MandantCode` lehnt `p-` ab, `Sperrpflege` mit `NUR_ZAEHLEN`, der `PRUEFLAUF` entscheidet nach der konfigurierten Stufe und zählt in P nur. Offen hier: `Stufe.aus` für `P` freigeben, kein `MANIFEST`, Worker nur `PRUEFLAUF`, ohne SMTP und KI, TSA-Startprüfung, Konfigurationstest für P und `DeployStufeTest` für `deploy/probe/compose.yml`
   - [Backend] Wiederherstellungswerkzeug: setzt die Sperren aus dem Inventar, kappt nur bei einem Ziel-Bucket mit Präfix `urinet-archiv-p-` und bricht ab, wenn bei einem anderen Präfix eine Kappung verlangt wird; JUnit-Test für beide Fälle (Req 16.27)
   - [Fabian] Probe-Projekt (eigenes Public-Cloud-Projekt) und dessen S3-Schlüssel anlegen, Schlüssel als GitHub-Secret des App-Repos
+  - [Backend] Port `SicherungUeberwachung` (5.6) umsetzen, ersetzt den Platzhalter `SicherungUeberwachungNichtAngebunden`; Szenario `@req-16.5` für eine fehlgeschlagene oder zu alte Sicherung
   - `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian]); darin: nur Snapshots einspielen, deren SHA-256 ein Manifest unter `sicherung` belegt; Sperren nach der Wiederherstellung aus dem Inventar ohne Kappung neu setzen; Ausdünnen von Hand; Rückfall cloudscale.ch
   - solange Stufe A läuft: nur Funktionstest mit Testdaten und eigenem Testschlüsselpaar auf der VPS der Stufe A (16.19; der Probe-Schlüssel entsteht erst auf Stufe B), keine Aufbewahrungspflicht; Aufbewahrung nach 16.2 erst auf Stufe B (5.11)
   - _Anforderungen: 6.11, 16.2, 16.3, 16.7, 16.8, 16.19, 16.23, 16.24, 16.27_
@@ -456,6 +458,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
   - Health: öffentlich nur ein schlanker Pfad über Traefik; Detail-Health und Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb, Korrekturquote je Feld) nur intern
   - E-Mail an den Inhaber bei einem Dokument > 1 h in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER`, bei fehlgeschlagener Sicherung und fehlendem Manifest; Inhalte nur IDs
+  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; offen: Korrekturquote (mit 3.3), Anbindung Manifest (5.2) und Sicherung (5.5), SMTP-Zugang in prod, Teil Infra
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 
