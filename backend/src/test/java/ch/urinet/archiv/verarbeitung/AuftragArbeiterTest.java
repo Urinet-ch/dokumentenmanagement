@@ -773,6 +773,11 @@ class AuftragArbeiterTest {
         }
 
         @Override
+        public boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert) {
+            return echt.offenMit(mandant, typ, schluessel, wert);
+        }
+
+        @Override
         public List<Fehlgeschlagen> ohneNachbearbeitung(Map<AuftragTyp, Duration> zeitgrenzen) {
             return echt.ohneNachbearbeitung(zeitgrenzen);
         }

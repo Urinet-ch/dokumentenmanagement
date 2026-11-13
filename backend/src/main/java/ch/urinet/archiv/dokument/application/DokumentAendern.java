@@ -26,6 +26,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.EmbeddingSpeichern;
+import ch.urinet.archiv.verarbeitung.application.VerarbeitenHandler;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -52,7 +53,8 @@ import java.util.regex.Pattern;
  * wird als {@code SPERRE_KONFLIKT} protokolliert, ohne Sperre gilt das neue Ergebnis (design.md «Aufbewahrung»).
  * In {@code EINGANGSKORB} und {@code FEHLER} gelten Frist, Belegnummer und Pflichtfelder erst beim Bestätigen.
  * Ändern sich Titel, Art oder Partner eines archivierten Dokuments, reiht die Änderung {@code EMBEDDING} ein (Spec 02,
- * Aufgabe 6.3), weil diese Angaben in der Kopfzeile jedes Abschnitts stehen.
+ * Aufgabe 6.3), weil diese Angaben in der Kopfzeile jedes Abschnitts stehen; ist für das Dokument schon eines offen,
+ * kein zweites.
  */
 @ApplicationScoped
 @Transactional
@@ -157,7 +159,10 @@ public class DokumentAendern {
             port.versionSichern(id, benutzer.id(), grund);
         }
         int version = port.speichern(neu);
-        if (archiviert && kopfzeileGeaendert(alt, neu) && auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)) {
+        // ein schon offenes EMBEDDING liest beim Lauf den neuen Stand; die Zeilensperre des Dokuments
+        // (ladenUndSperren) ordnet zwei Änderungen, die zweite sieht den Auftrag der ersten
+        if (archiviert && kopfzeileGeaendert(alt, neu) && auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)
+                && !auftraege.offenMit(EmbeddingSpeichern.EMBEDDING, VerarbeitenHandler.DOKUMENT_ID, id)) {
             auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
         }
         return version;

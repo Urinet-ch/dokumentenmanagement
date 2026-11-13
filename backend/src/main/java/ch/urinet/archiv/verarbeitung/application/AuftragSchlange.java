@@ -103,4 +103,10 @@ public interface AuftragSchlange {
      * nur solche, deren Nutzlast den Schlüssel trägt.
      */
     OptionalLong offen(MandantCode mandant, AuftragTyp typ, Optional<String> schluessel);
+
+    /**
+     * Ob ein Auftrag {@code typ} des Mandanten {@code OFFEN} ist (noch nicht geholt), dessen Nutzlast unter
+     * {@code schluessel} den Text {@code wert} trägt.
+     */
+    boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert);
 }

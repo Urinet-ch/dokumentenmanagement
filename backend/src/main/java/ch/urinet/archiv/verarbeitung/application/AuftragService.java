@@ -78,6 +78,15 @@ public class AuftragService {
         return schlange.offen(mandant, typ, schluessel);
     }
 
+    /**
+     * Ob für den Mandanten aus dem Kontext schon ein Auftrag {@code typ} {@code OFFEN} ist, dessen Nutzlast unter
+     * {@code schluessel} den Wert {@code wert} trägt (z. B. dasselbe Dokument). Ein solcher Auftrag liest beim Lauf den
+     * dann aktuellen Stand; ein zweiter wäre doppelte Arbeit.
+     */
+    public boolean offenMit(AuftragTyp typ, String schluessel, Object wert) {
+        return schlange.offenMit(mandant(), typ, schluessel, String.valueOf(wert));
+    }
+
     /** Der Auftrag gehört nicht mehr diesem Lauf (freigegeben oder neu geholt). */
     public static final class AnspruchVerloren extends RuntimeException {
         AnspruchVerloren() {

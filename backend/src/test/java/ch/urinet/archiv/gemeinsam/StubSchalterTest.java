@@ -4,7 +4,10 @@ import ch.urinet.archiv.ablage.adapter.out.AblageAuswahl;
 import ch.urinet.archiv.ablage.adapter.out.stub.AblageStub;
 import ch.urinet.archiv.integration.adapter.out.IntegrationAuswahl;
 import ch.urinet.archiv.integration.adapter.out.stub.IntegrationStub;
+import ch.urinet.archiv.ki.adapter.out.EmbeddingAuswahl;
 import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
+import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jEmbeddingAdapter;
+import ch.urinet.archiv.ki.adapter.out.stub.EmbeddingStub;
 import ch.urinet.archiv.ki.adapter.out.stub.KiStub;
 import ch.urinet.archiv.verarbeitung.adapter.out.OcrAuswahl;
 import ch.urinet.archiv.verarbeitung.adapter.out.stub.OcrStub;
@@ -12,11 +15,13 @@ import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
 import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
+import jakarta.enterprise.inject.Instance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +45,35 @@ class StubSchalterTest {
         for (String port : PORTS) {
             assertThat(config.getValue("archiv." + port + ".stub", Boolean.class)).as(port).isEqualTo(erwartet);
         }
+        assertThat(config.getValue("archiv.ki.embedding-stub", Boolean.class)).as("embedding").isEqualTo(erwartet);
+    }
+
+    /**
+     * Die echte Auswahl von {@link EmbeddingAuswahl} (in den Quarkus-Tests ersetzt sie {@code TestEmbeddingPort}): mit
+     * Schalter der Dev-Stub, ohne Schalter der LangChain4j-Adapter.
+     */
+    @Test
+    void embeddingSchalterWaehltStubOderAdapter() {
+        EmbeddingStub stub = new EmbeddingStub();
+        LangChain4jEmbeddingAdapter adapter = new LangChain4jEmbeddingAdapter(null);
+        assertThat(new EmbeddingAuswahl().embedding(true, stub, instanz(adapter))).isSameAs(stub);
+        assertThat(new EmbeddingAuswahl().embedding(false, stub, instanz(adapter))).isSameAs(adapter);
+        assertThat(PortAuswahl.pruefe(List.of(new EmbeddingAuswahl().auswahl(false))).abbrueche()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new EmbeddingAuswahl().auswahl(false))).warnungen()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new EmbeddingAuswahl().auswahl(true))).abbrueche())
+                .containsExactly("EmbeddingPort: Dev-Stub ist in prod nicht zulässig");
+    }
+
+    /** {@link Instance} mit genau diesem Wert; andere Methoden werden nicht gebraucht. */
+    @SuppressWarnings("unchecked")
+    private static <T> Instance<T> instanz(T wert) {
+        return (Instance<T>) Proxy.newProxyInstance(StubSchalterTest.class.getClassLoader(),
+                new Class<?>[]{Instance.class}, (proxy, methode, argumente) -> {
+                    if (methode.getName().equals("get") && methode.getParameterCount() == 0) {
+                        return wert;
+                    }
+                    throw new UnsupportedOperationException(methode.getName());
+                });
     }
 
     @Test

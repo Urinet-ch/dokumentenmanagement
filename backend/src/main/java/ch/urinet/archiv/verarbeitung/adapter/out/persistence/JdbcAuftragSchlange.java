@@ -328,6 +328,24 @@ public class JdbcAuftragSchlange implements AuftragSchlange {
         }
     }
 
+    @Override
+    public boolean offenMit(MandantCode mandant, AuftragTyp typ, String schluessel, String wert) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select 1 from public.auftrag where status = 'OFFEN' and mandant = ? "
+                        + "and typ = ? and nutzlast ->> ? = ? limit 1")) {
+            abfrage.setString(1, mandant.wert());
+            abfrage.setString(2, typ.wert());
+            abfrage.setString(3, schluessel);
+            abfrage.setString(4, wert);
+            abfrage.setQueryTimeout(ANSPRUCH_WARTEZEIT_SEKUNDEN);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next();
+            }
+        } catch (SQLException e) {
+            throw fehler("Offene Aufträge nicht gelesen", e);
+        }
+    }
+
     /**
      * Wandelt eine Zeile um. Ist sie unlesbar, setzt sie ihren Auftrag (sofern noch im erwarteten Status) mit Fehler-ID
      * auf {@code FEHLER} und gleich auf {@code nachbearbeitet}: Ohne lesbare Nutzlast kann kein Handler nachbearbeiten.

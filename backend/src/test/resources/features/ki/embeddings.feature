@@ -129,7 +129,7 @@ Funktionalität: Abschnitte und Embeddings archivierter Dokumente
     Und liegt im Mandanten «urinet» kein Abschnitt von «V»
 
   @req-2.1
-  Szenario: Ändern sich Titel und Partner eines archivierten Dokuments, entstehen die Abschnitte mit der neuen Kopfzeile
+  Szenario: Ändern sich Titel und Partner eines archivierten Dokuments, entstehen die Abschnitte einmal mit der neuen Kopfzeile
     Angenommen die Archivierung ist bereit
     Und im Mandanten «urinet» gibt es den Kontakt «Probe-Garage»
     Und im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
@@ -147,8 +147,13 @@ Funktionalität: Abschnitte und Embeddings archivierter Dokumente
       | grund   | Partner ergänzt    |
     Dann meldet das Archiv Status 200
     Und ist für das Dokument «Q» ein Auftrag «EMBEDDING» eingereiht
+    Wenn «inhaber-urinet» das Dokument «Q» so ändert:
+      | titel | Quittung Werkstatt Uri |
+      | grund | Titel präzisiert       |
+    Dann meldet das Archiv Status 200
+    Und ist für das Dokument «Q» ein Auftrag «EMBEDDING» eingereiht
     Wenn der Worker die Archivierung ausführt
-    Dann beginnt jeder Abschnitt des archivierten Dokuments «Q» mit dem Titel "Quittung Werkstatt" und endet seine Kopfzeile mit dem Partner "Probe-Garage"
+    Dann beginnt jeder Abschnitt des archivierten Dokuments «Q» mit dem Titel "Quittung Werkstatt Uri" und endet seine Kopfzeile mit dem Partner "Probe-Garage"
     Und hat das archivierte Dokument «Q» Abschnitte mit Embedding
     Wenn «inhaber-urinet» das Dokument «Q» so ändert:
       | tags  | Werkstatt   |
