@@ -68,16 +68,17 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
 
     @Override
     public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
+                                     PrueflaufRegister.Zaehler bisher, List<PrueflaufRegister.Abweichung> erste,
                                      UUID fehlerId) {
         Optional<String> empfaenger = empfaenger(mandant);
         if (empfaenger.isEmpty()) {
-            LOG.warnf("Prüflauf %s Teil %d endgültig gescheitert (fehler-id=%s); kein Empfänger für die "
-                    + "Benachrichtigung konfiguriert", laufId, teil, fehlerId);
+            LOG.warnf("Prüflauf %s Teil %d endgültig gescheitert mit %d Abweichungen bis dahin (fehler-id=%s); kein "
+                    + "Empfänger für die Benachrichtigung konfiguriert", laufId, teil, bisher.abweichungen(), fehlerId);
             return;
         }
         try {
-            mailer.send(Mail.withText(empfaenger.get(), abbruchBetreff(laufId),
-                    abbruchText(laufId, teil, stand, fehlerId)));
+            mailer.send(Mail.withText(empfaenger.get(), abbruchBetreff(laufId, bisher),
+                    abbruchText(laufId, teil, stand, bisher, erste, fehlerId)));
             LOG.infof("Inhaber über den abgebrochenen Prüflauf %s benachrichtigt", laufId);
         } catch (RuntimeException e) {
             LOG.warnf("Benachrichtigung zum Prüflauf %s nicht versandt (%s)", laufId, e.getClass().getName());
@@ -96,8 +97,15 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
     static String prueflaufText(UUID laufId, PrueflaufRegister.Zaehler zaehler,
                                 List<PrueflaufRegister.Abweichung> erste) {
         StringBuilder text = new StringBuilder("Der monatliche Prüflauf ").append(laufId)
-                .append(" hat Abweichungen festgestellt.\n\n")
-                .append("Geprüfte Dateien: ").append(zaehler.dateien()).append('\n')
+                .append(" hat Abweichungen festgestellt.\n\n");
+        zaehlerUndAbweichungen(text, laufId, zaehler, erste);
+        return text.append("\nDie betroffenen Dateien nicht ändern oder löschen und die Abweichungen klären; "
+                + "Details im Log unter der Lauf-ID.\n").toString();
+    }
+
+    private static void zaehlerUndAbweichungen(StringBuilder text, UUID laufId, PrueflaufRegister.Zaehler zaehler,
+                                               List<PrueflaufRegister.Abweichung> erste) {
+        text.append("Geprüfte Dateien: ").append(zaehler.dateien()).append('\n')
                 .append("Geprüfte Versionen unter archiv/: ").append(zaehler.versionen()).append('\n')
                 .append("Geprüfte Manifeste: ").append(zaehler.manifeste()).append('\n')
                 .append("Verlängerte Sperren: ").append(zaehler.verlaengert()).append('\n')
@@ -110,24 +118,48 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         if (erste.size() < zaehler.abweichungen()) {
             text.append("- … weitere in der Tabelle prueflauf_abweichung (lauf_id ").append(laufId).append(")\n");
         }
-        return text.append("\nDie betroffenen Dateien nicht ändern oder löschen und die Abweichungen klären; "
-                + "Details im Log unter der Lauf-ID.\n").toString();
     }
 
-    static String abbruchBetreff(UUID laufId) {
-        return "UriNet Archiv: Prüflauf " + laufId + " abgebrochen";
+    static String abbruchBetreff(UUID laufId, PrueflaufRegister.Zaehler bisher) {
+        return "UriNet Archiv: Prüflauf " + laufId + " abgebrochen"
+                + (bisher.abweichungen() > 0 ? ", " + bisher.abweichungen() + " Abweichungen bis dahin" : "");
     }
 
-    static String abbruchText(UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand, UUID fehlerId) {
-        return "Der monatliche Prüflauf " + laufId + " ist nach mehreren Versuchen abgebrochen und wird in diesem "
-                + "Monat nicht fortgesetzt; der nächste Monatslauf beginnt von vorn.\n\n"
-                + "Teil: " + teil + '\n'
-                + "Phase: " + stand.phase() + '\n'
-                + "Nach Dokument: " + stand.nachDokument().map(UUID::toString).orElse("-") + '\n'
-                + "Marke: " + stand.marke().map(m -> m.schluessel() + ", Version " + m.versionId().orElse("-"))
-                .orElse("-") + "\n\n"
-                + "Den Object Storage prüfen und im Log nach der Fehler-ID " + fehlerId + " und der Lauf-ID suchen. "
-                + "Bis zum nächsten vollständigen Lauf sind Prüfsummen und Sperren ab dieser Stelle nicht geprüft.\n";
+    static String abbruchText(UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
+                              PrueflaufRegister.Zaehler bisher, List<PrueflaufRegister.Abweichung> erste,
+                              UUID fehlerId) {
+        StringBuilder text = new StringBuilder("Der monatliche Prüflauf ").append(laufId)
+                .append(" ist nach mehreren Versuchen abgebrochen und wird in diesem Monat nicht fortgesetzt; der "
+                        + "nächste Monatslauf beginnt von vorn.\n\n")
+                .append("Teil: ").append(teil).append('\n')
+                .append("Phase: ").append(stand.phase()).append('\n')
+                .append("Nach Dokument: ").append(stand.nachDokument().map(UUID::toString).orElse("-")).append('\n')
+                .append("Marke: ").append(stand.marke()
+                        .map(m -> m.schluessel() + ", Version " + m.versionId().orElse("-")).orElse("-"))
+                .append("\n\nBis zum Abbruch festgehalten:\n");
+        zaehlerUndAbweichungen(text, laufId, bisher, erste);
+        if (bisher.abweichungen() > 0) {
+            text.append("\nDie betroffenen Dateien nicht ändern oder löschen und die Abweichungen klären.\n\n");
+        }
+        return text.append(nichtGeprueft(stand.phase())).append('\n')
+                .append("Den Object Storage prüfen und im Log nach der Fehler-ID ").append(fehlerId)
+                .append(" und der Lauf-ID suchen.\n").toString();
+    }
+
+    /** Was der abgebrochene Lauf je Phase nicht mehr geprüft hat (Reihenfolge der Phasen wie im Prüflauf). */
+    static String nichtGeprueft(PrueflaufRegister.Phase phase) {
+        return switch (phase) {
+            case DATEIEN -> "Bis zum nächsten vollständigen Lauf sind ab dieser Stelle Prüfsummen und Sperren der "
+                    + "Dateien unter archiv/ nicht geprüft, ebenso alle Versionen und Löschmarken unter archiv/ und "
+                    + "alle Manifeste mit ihren Sperren.";
+            case ARCHIV_VERSIONEN -> "Prüfsummen und Sperren der Dateien unter archiv/ sind geprüft. Bis zum nächsten "
+                    + "vollständigen Lauf sind ab dieser Stelle die Versionen und Löschmarken unter archiv/ nicht "
+                    + "geprüft, ebenso alle Manifeste mit ihren Sperren und Löschmarken.";
+            case MANIFEST_VERSIONEN -> "Prüfsummen und Sperren der Dateien sowie die Versionen unter archiv/ sind "
+                    + "geprüft. Bis zum nächsten vollständigen Lauf sind ab dieser Stelle die Manifeste mit ihren "
+                    + "Sperren und Löschmarken nicht geprüft.";
+            case ABGESCHLOSSEN -> "Der Lauf war schon vollständig geprüft.";
+        };
     }
 
     static String betreff(UUID dokumentId) {

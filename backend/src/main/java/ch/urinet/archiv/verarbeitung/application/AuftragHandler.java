@@ -29,8 +29,9 @@ public interface AuftragHandler {
     /**
      * Nach dem letzten Fehlversuch, wenn der Auftrag schon {@code FEHLER} ist, im Kontext des Mandanten; z. B. setzt
      * {@code VERARBEITEN} hier das Dokument auf {@code FEHLER} (Req 5.4). {@code fehlerId} steht auch in
-     * {@code auftrag.fehler} und im Log; eine Meldung gibt es bewusst nicht (Req 16.7). Muss idempotent sein: Endet der
-     * Hook nicht erfolgreich (Absturz, Ausnahme, Zeitgrenze), ruft der Aufräumer ihn mit Wartezeit erneut auf,
+     * {@code auftrag.fehler} und im Log. Meldet der Hook den Fehler (z. B. {@code ARCHIVIEREN} und {@code PRUEFLAUF} per
+     * E-Mail an den Inhaber), dann nur mit IDs, nie mit Inhalten oder der Fehlermeldung (Req 16.7); die Fehlermeldung
+     * selbst steht nur im Log. Muss idempotent sein: Endet der Hook nicht erfolgreich (Absturz, Ausnahme, Zeitgrenze), ruft der Aufräumer ihn mit Wartezeit erneut auf,
      * höchstens {@link ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung#MAX_VERSUCHE}-mal. Er belegt einen Platz wie
      * ein Handler und gehorcht denselben Pflichten. Standard: nichts.
      */

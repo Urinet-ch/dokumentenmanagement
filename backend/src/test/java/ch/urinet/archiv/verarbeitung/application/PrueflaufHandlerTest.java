@@ -7,6 +7,7 @@ import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.Stufe;
+import ch.urinet.archiv.ablage.domain.UnsichereFortsetzung;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Bekannt;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Datei;
@@ -70,6 +71,10 @@ class PrueflaufHandlerTest {
     /** abweichende Prüfsumme im Object Storage je Schlüssel; sonst {@link #SHA} */
     private final Map<String, String> pruefsummen = new HashMap<>();
     private final List<String> abbrueche = new ArrayList<>();
+    private final List<Zaehler> abbruchZaehler = new ArrayList<>();
+    private final List<Abweichung> abbruchAbweichungen = new ArrayList<>();
+    /** Präfix, unter dem {@code versionen} keine sichere Fortsetzung liefert */
+    private Optional<String> unsicherUnter = Optional.empty();
     private final List<Optional<Versionsseite.Marke>> marken = new ArrayList<>();
     private List<Objektversion> archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
             new Objektversion(SCHLUESSEL, "v0", false));
@@ -341,7 +346,7 @@ class PrueflaufHandlerTest {
         assertThat(verlaengert).hasSize(1);
     }
 
-    /** Endgültig gescheiterter Teil (Req 15.5): Mail an den Inhaber nur mit Lauf-ID, Phase und Marke (Req 16.7). */
+    /** Endgültig gescheiterter Teil (Req 15.5): Mail an den Inhaber nur mit IDs (Req 16.7), ohne Abweichungen keine. */
     @Test
     void nachDemLetztenFehlversuchErhaeltDerInhaberEineMeldung() throws Exception {
         Speicher speicher = new Speicher(Stufe.A);
@@ -356,7 +361,35 @@ class PrueflaufHandlerTest {
 
         assertThat(abbrueche).containsExactly(speicher.lauf.id() + " Teil 3 " + speicher.lauf.stand() + " "
                 + fehlerId);
+        assertThat(abbruchZaehler).containsExactly(speicher.lauf.zaehler());
+        assertThat(abbruchAbweichungen).isEmpty();
         assertThat(mails).isEmpty();
+    }
+
+    /**
+     * Abweichung in {@code DATEIEN}, danach bricht {@code ARCHIV_VERSIONEN} in jedem Versuch ab: Der Lauf schliesst nie
+     * ab, die Abbruch-Mail nennt darum die schon festgehaltene Abweichung und die Zähler (Req 15.5, Review PR #98).
+     */
+    @Test
+    void abbruchNachAbweichungMeldetDieAbweichung() throws Exception {
+        pruefsummen.put(SCHLUESSEL, "b".repeat(64));
+        unsicherUnter = Optional.of(PrueflaufHandler.ARCHIV);
+        Speicher speicher = new Speicher(Stufe.A);
+        PrueflaufHandler handler = handler(speicher);
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1));
+        assertThat(speicher.lauf.stand().phase()).isEqualTo(Phase.ARCHIV_VERSIONEN);
+
+        for (int versuche = 0; versuche < 3; versuche++) {
+            Auftrag auftrag = auftrag(speicher.lauf.id(), 2, versuche);
+            assertThatThrownBy(() -> handler.ausfuehren(auftrag)).isInstanceOf(UnsichereFortsetzung.class);
+        }
+        handler.nachLetztemFehlversuch(auftrag(speicher.lauf.id(), 2, 3), UUID.randomUUID());
+
+        assertThat(mails).as("abgeschlossen wird der Lauf nie").isEmpty();
+        assertThat(abbrueche).hasSize(1);
+        assertThat(abbruchZaehler).containsExactly(new Zaehler(1, 0, 0, 1, 0, 1));
+        assertThat(abbruchAbweichungen).containsExactly(
+                new Abweichung(Art.PRUEFSUMME, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")));
     }
 
     @Test
@@ -410,6 +443,9 @@ class PrueflaufHandlerTest {
                         @SuppressWarnings("unchecked")
                         Optional<Versionsseite.Marke> ab = (Optional<Versionsseite.Marke>) argumente[2];
                         marken.add(ab);
+                        if (unsicherUnter.filter(argumente[1]::equals).isPresent()) {
+                            throw new UnsichereFortsetzung((String) argumente[1], Optional.empty());
+                        }
                         yield seite(argumente[1].equals("archiv/") ? archivVersionen : manifestVersionen, ab,
                                 (int) argumente[3]);
                     }
@@ -434,8 +470,10 @@ class PrueflaufHandlerTest {
 
             @Override
             public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, Fortsetzung stand,
-                                             UUID fehlerId) {
+                                             Zaehler bisher, List<Abweichung> erste, UUID fehlerId) {
                 abbrueche.add(laufId + " Teil " + teil + " " + stand + " " + fehlerId);
+                abbruchZaehler.add(bisher);
+                abbruchAbweichungen.addAll(erste);
             }
         };
         Optional<Duration> frist = Optional.of(EIN_TAG);
