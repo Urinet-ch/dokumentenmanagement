@@ -39,7 +39,7 @@ Zeilen A15–A19 in Spec 04, Requirement 12.1).
 
 ## Mandanten
 - Mandant 1: `urinet` (ab Phase 1).
-- Mandant 2: `vhf-gsk` – Bulletin-/Merkblatt-Archiv mit Suche und Chatbot für die WordPress-Seite (Phase 3).
+- Mandant 2: `vhf-gsk` – Bulletin-/Merkblatt-Archiv mit Suche und Chatbot für die WordPress-Seite (Phase 3); die Webseite bindet das Archiv über die Webseiten-Schnittstelle ein und kann auch die Erfassung der Geschäftsstelle übernehmen (Spec 03, ergänzt 13.11.2026).
 - Ein neuer Mandant ist Konfiguration, kein neues Projekt.
 
 ## Abgrenzung
@@ -53,7 +53,7 @@ Zeilen A15–A19 in Spec 04, Requirement 12.1).
 | 0 Klären | `01-archiv-kern`, Welle 0 | Spikes, Golden-Datensatz, Test-Export 21.CRM | ≥ 18 von 20 zurückgehaltenen Belegen richtig erkannt (30 zum Abstimmen), höchstens 1 Fehler unter den sicheren Feldern |
 | 1 Archiv-Kern | `01-archiv-kern`, Wellen 1–5 | Erfassung, OCR, KI-Vorschläge, Eingangskorb, Suche, GeBüV-Ablage, CRM-CSV-Import | Belege 2026 im Archiv, Prüflauf ohne Abweichung |
 | 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport, AbaNinja (nur mit Abo Basic) | 7 Beispielfragen richtig und mit Quelle |
-| 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, öffentliche Schnittstelle, WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |
+| 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, Webseiten-Schnittstelle (Lesen und Erfassung, versionierter Vertrag), WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |
 | 4 Wissensbasis | `04-wissensbasis` | Wissensbasis nach LLM-Wiki-Muster | Gate Phase 4: 5 Wissensquellen, ≥ 47 von 50 Fussnoten belegt, ≥ 14 von 15 Fragen mit Seite und Quelldokument richtig |
 
 ## Beispielfragen (Abnahme Chat, Phase 2)

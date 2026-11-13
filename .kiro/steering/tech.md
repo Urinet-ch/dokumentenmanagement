@@ -67,7 +67,7 @@ Dieser Abschnitt gilt auch ohne Zugriff auf andere Repos, Wikis oder Skills. Was
 
 ## Konventionen Backend
 - Paketstruktur hexagonal je Fachbereich (`domain`, `application`, `adapter`), siehe `structure.md`. Driven Ports für Ablage, KI, OCR und Integration, jeweils mit Dev-Stub.
-- REST unter `/api/v1`, JSON, OpenAPI über `quarkus-smallrye-openapi`; Fehler als RFC 9457 Problem Details.
+- REST unter `/api/v1`, JSON, OpenAPI über `quarkus-smallrye-openapi`; Fehler als RFC 9457 Problem Details. Die Webseiten-Schnittstelle unter `/public/v<n>` (Spec 03) hat einen eigenen, versionierten Vertrag (`docs/schnittstelle/public-v<n>.yaml`, innerhalb einer Hauptversion nur additiv, ADR-014) und gehört nicht in den Angular-Client.
 - Optimistisches Locking über `version` und `If-Match`/`ETag` bei `PATCH`.
 - Lange Arbeiten (OCR, KI, Archivierung, Import, Manifest) laufen als Auftrag in der Tabelle `public.auftrag`, abgeholt mit `SELECT … FOR UPDATE SKIP LOCKED`. Kein Message-Broker.
 - Konfiguration in `application.properties` mit Profilen `dev`, `test`, `prod`, dazu `lokal` (nur Entwicklerrechner, ADR-012); Infomaniak-Endpunkte und Modellnamen konfigurierbar.

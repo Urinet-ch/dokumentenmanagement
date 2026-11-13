@@ -22,11 +22,13 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 6.3 Chunks und Embeddings [Backend]
   - Liquibase-Changeset (`db/mandant`) `chunk` mit `halfvec(<dim aus Spike>)` + HNSW; `Chunker`; `EmbeddingService`; Auftrag `EMBEDDING` nach Archivierung; Nachberechnung `EMBEDDING_ALLE`
+  - Spec 03 ergänzt: `chunk.seite_von`/`seite_bis` aus den Seitentrennern über `Seitentext.von` (Spec 04), `null` ohne Trenner oder bei abweichender Seitenzahl (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Embedding-Port wählt Adapter oder Stub über den Schalter `archiv.ki.embedding-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
   - _Anforderungen: 2.1, 2.4_
 
 - [ ] 6.4 Hybridsuche [Backend]
   - `HybridSuche` (Volltext + Vektor + RRF + Reranker), Rückfall auf Volltext mit `degradiert`, Modus `hybrid` in `GET /dokumente`
+  - Spec 03 ergänzt: `HybridSuche` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Reranker-Port wählt Adapter oder Stub über den Schalter `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
   - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); Lasttest p95 ≤ 2 s
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6_

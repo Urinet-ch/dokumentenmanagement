@@ -340,7 +340,8 @@ design.md); Lebenszeichen, Wiederholung und Aufräumen wie dort:
 `backend/src/main/resources/seed/_alle/dokumentarten-wissen.json`, mandantenunabhängig, eingelesen nach dem Seed des
 Mandanten beim Anlegen jedes Mandanten (Spec 04 ergänzt Spec 01, 1.5 und Spec 03, 1.1) und nur angelegt, wenn der Code
 fehlt; für `vhf-gsk` ergänzt um die Zusatzfelder nach Spec 03, 1.2 (mindestens `zugriff`, Pflicht, Standard
-`mitglieder`, und `veroeffentlicht`, Standard `false`). Eigener `WissensquelleSeedTest`; `DokumentartSeedTest`
+`mitglieder`, Werte `oeffentlich`, `mitglieder`, `vorstand` nach Spec 03 design.md «Reservierte Felder», ergänzt
+13.11.2026, Spec 03, 3.7; und `veroeffentlicht`, Standard `false`). Eigener `WissensquelleSeedTest`; `DokumentartSeedTest`
 (Spec 01) bleibt unverändert. Die Art steht nicht in der Artenliste des KI-Vorschlags (Requirement 1.5) und wird vom
 Jahresexport ausgenommen (Requirement 1.6).
 Spec 05 ergänzt (Spec 05, Req 2.6; umgesetzt in Spec 05, Aufgabe 17.3): Die Ergänzung für `vhf-gsk` (`zugriff`,
@@ -542,6 +543,8 @@ das hier als «Spec 04 ergänzt …» beschrieben ist.
    `seed/_alle/dokumentarten-wissen.json`, für `vhf-gsk` mit `zugriff` (Pflicht, Standard `mitglieder`) und
    `veroeffentlicht` (Standard `false`) (Spec 04, 1.1). Grund: Die Arten von VHF/GSK und ihre Zusatzfelder sind dort
    aufgezählt; ohne Zugriffsstufe wäre eine Wissensquelle nach Veröffentlichung für alle Besucher abrufbar.
+   Spec 03 ergänzt (Spec 03, 3.7; 13.11.2026): drei Stufen `oeffentlich` < `mitglieder` < `vorstand`; eine
+   Wissensquelle der Stufe `vorstand` sehen über die Webseiten-Schnittstelle nur Anfragen mit dieser Stufe.
 5. **design.md, `mandant_budget`:** Hinweis, dass die Wissensbasis ein eigenes Monatsbudget in `m_<code>` führt und
    `mandant_budget` nicht belastet (Spec 04, 13.6). Grund: Ein Ingest soll den Chatbot nicht sperren und umgekehrt.
 6. **Rechte der Geschäftsstelle:** A19 für die Geschäftsstelle ist 403 (entschieden von Fabian am 09.11.2026); bei den Rechten der

@@ -39,7 +39,7 @@ damit ich «Unfallversicherung» finde, auch wenn auf der Police «UVG» steht.
 
 #### Acceptance Criteria
 1. WENN ein Dokument archiviert wird, DANN SOLL das Archiv seinen Text in Abschnitte (ca. 3'000 Zeichen, 400 Zeichen Überlappung) teilen und für jeden Abschnitt ein Embedding über Infomaniak AI Services speichern.
-2. Das Archiv SOLL eine Hybridsuche anbieten: je 50 Treffer aus Volltext- und Vektorsuche, zusammengeführt mit RRF (k = 60), die besten 30 neu sortiert durch den Reranker.
+2. Das Archiv SOLL eine Hybridsuche anbieten: je 50 Treffer aus Volltext- und Vektorsuche, zusammengeführt mit RRF (k = 60), die besten 30 neu sortiert durch den Reranker. Spec 03, 5.7 ergänzt dieses Kriterium (13.11.2026, vorgeschlagen, entschieden mit dem Merge des Spec-PR von Spec 03): Jeder Chunk trägt den Seitenbereich (`seite_von`, `seite_bis` aus den Seitentrennern, sonst leer), und die Hybridsuche gibt je Dokument den besten Chunk mit, damit Treffer die Fundstelle zeigen können (umgesetzt in Spec 02, Aufgaben 6.3 und 6.4, und Spec 03, Aufgabe 11.13).
 3. FALLS der Embedding- oder Reranker-Dienst nicht erreichbar ist, DANN SOLL das Archiv auf die reine Volltextsuche zurückfallen und dies in der Antwort kennzeichnen.
 4. Das Archiv SOLL für bestehende Dokumente eine einmalige Nachberechnung der Embeddings als Auftrag anbieten.
 5. Die Hybridsuche SOLL Mandant und Vertraulichkeit genau wie die Volltextsuche einhalten (Spec 01, Requirement 1.2, 2.3 und Rechtematrix 2.6).

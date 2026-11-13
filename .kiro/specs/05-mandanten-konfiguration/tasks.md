@@ -32,6 +32,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     `selbst_ausgestellt`, `eigene_arten` nicht mehr lesen, Muster und Umstufungs-Arten in die Arten von `urinet`
     (Changeset, Version mit Quelle `MIGRATION`), Ablehnung ungültiger Muster, feste Eigenschaften von
     `WISSENSQUELLE` (sobald Spec 04: 13.2 umgesetzt ist, vorher mit Test-Art), reservierte Felder.
+  - Spec 03 ergänzt: reservierte Felder nach Spec 03 design.md «Reservierte Felder» (`zugriff` mit drei Stufen,
+    `veroeffentlicht` als JSON-Wahrheitswert) (Spec 03, Req 3.7)
   - _Anforderungen: 2.1, 2.2, 2.6, 2.7, 2.8_
   - _Abhängig von: 17.2_
 
@@ -44,6 +46,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - Changeset `<nnn>-klassifikation`, Domain, REST, Zuordnung zu Arten, Prüfung an Dokumenten, Artwechsel,
     Versionierung, reservierte Parameternamen der öffentlichen Schnittstelle, Kennzeichnung ungültiger Werte im
     Eingangskorb nach einer Konfigurationsänderung.
+  - Spec 03 ergänzt: reservierte Parameternamen zusätzlich `seit`, `max`, `referenz`, `groesse`, `status`, `url`
+    (Spec 03, Req 5.10, 10.3, 10.13, 14.3)
   - _Anforderungen: 1.7, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
   - _Abhängig von: 17.3; Spec 01: 4.7_
 
