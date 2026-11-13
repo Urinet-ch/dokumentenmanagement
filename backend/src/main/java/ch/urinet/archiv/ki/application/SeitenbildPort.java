@@ -10,5 +10,9 @@ import java.util.List;
  */
 public interface SeitenbildPort {
 
+    /**
+     * @throws SeiteUngeeignet wenn eine Seite einen ungültigen Kopf oder mehr als {@code archiv.ki.render-pixel-max}
+     *                         Pixel hat
+     */
     byte[] jpeg(List<Path> seiten) throws IOException;
 }

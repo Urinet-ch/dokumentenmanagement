@@ -14,23 +14,32 @@ import com.google.zxing.common.GlobalHistogramBinarizer;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.multi.GenericMultipleBarcodeReader;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Liest den Swiss QR Code (Req 7.11, design.md «KI», {@code SwissQrLeser}) aus den mit {@code pdftoppm -r 300}
  * gerenderten Seiten, wie im Golden-Lauf: je Seite das Original und, nur wenn dort keiner gefunden wird, eine Fassung
  * mit halber Grösse, je mit zwei Binarisierern; nur Payloads mit Kopf {@code SPC} zählen. Speicher (Stufe A,
  * design.md «Umsetzung 3.2»): Seite für Seite, graue Seiten ({@code pdftoppm -gray}) ohne Kopie als Helligkeit, die
- * halbe Fassung als Byte-Feld; eine Seite von 8.7 Mio. Pixeln belegt so rund 11 MB statt über 40 MB.
+ * halbe Fassung als Byte-Feld; eine Seite von 8.7 Mio. Pixeln belegt so rund 11 MB statt über 40 MB. Breite und Höhe
+ * kommen zuerst aus dem Kopf der Datei; hat eine Seite mehr als {@code archiv.ki.render-pixel-max} Pixel, wird sie
+ * ausgelassen, bevor ein Raster angelegt wird (Review PR #120: ein PDF mit grosser MediaBox, ein graues TIFF mit LZW
+ * ist klein auf der Platte, sein Raster aber nicht).
  */
 @ApplicationScoped
 public class ZxingQrLeser implements QrLeserPort {
@@ -42,15 +51,24 @@ public class ZxingQrLeser implements QrLeserPort {
             DecodeHintType.POSSIBLE_FORMATS, List.of(BarcodeFormat.QR_CODE),
             DecodeHintType.CHARACTER_SET, "UTF-8");
 
+    private final long pixelMax;
+
+    @Inject
+    public ZxingQrLeser(@ConfigProperty(name = "archiv.ki.render-pixel-max") long pixelMax) {
+        this.pixelMax = pixelMax;
+    }
+
     @Override
-    public Optional<QrDaten> lesen(List<Path> seiten) {
-        for (Path seite : seiten) {
+    public Optional<QrDaten> lesen(UUID dokument, List<Path> seiten) {
+        for (int i = 0; i < seiten.size(); i++) {
             try {
-                BufferedImage bild = ImageIO.read(seite.toFile());
-                if (bild == null) {
+                Optional<BufferedImage> bild = bild(seiten.get(i));
+                if (bild.isEmpty()) {
+                    LOG.warnf("Swiss QR Code: Seite %d von Dokument %s über %d Pixeln, ausgelassen", i + 1, dokument,
+                            pixelMax);
                     continue;
                 }
-                Optional<QrDaten> qr = lesen(bild);
+                Optional<QrDaten> qr = lesen(bild.get());
                 if (qr.isPresent()) {
                     return qr;
                 }
@@ -60,6 +78,29 @@ public class ZxingQrLeser implements QrLeserPort {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Seite wie {@link ImageIO#read(java.io.File)}, aber mit Prüfung der Abmessungen aus dem Kopf vor dem Lesen; leer,
+     * wenn die Seite mehr als {@link #pixelMax} Pixel hat.
+     */
+    private Optional<BufferedImage> bild(Path seite) throws IOException {
+        try (ImageInputStream ein = ImageIO.createImageInputStream(seite.toFile())) {
+            Iterator<ImageReader> leser = ein == null ? null : ImageIO.getImageReaders(ein);
+            if (leser == null || !leser.hasNext()) {
+                throw new IOException("Seite nicht lesbar");
+            }
+            ImageReader reader = leser.next();
+            try {
+                reader.setInput(ein, true, true);
+                if ((long) reader.getWidth(0) * reader.getHeight(0) > pixelMax) {
+                    return Optional.empty();
+                }
+                return Optional.of(reader.read(0, reader.getDefaultReadParam()));
+            } finally {
+                reader.dispose();
+            }
+        }
     }
 
     static Optional<QrDaten> lesen(BufferedImage bild) {

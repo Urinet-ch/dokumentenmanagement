@@ -8,6 +8,8 @@ import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.Datei;
 import ch.urinet.archiv.dokument.application.DokumentVerarbeitungPort.KiStand;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.ki.application.MetadatenExtraktion;
+import ch.urinet.archiv.ki.application.SeiteUngeeignet;
+import ch.urinet.archiv.ki.application.SeitenbildPort;
 import ch.urinet.archiv.ki.domain.Vorschlag;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
@@ -16,6 +18,7 @@ import ch.urinet.archiv.verarbeitung.domain.OcrFehlgeschlagen;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Frist des Renderns im {@link KiVorschlagHandler} (Nachtrag PR #93): Reicht {@code archiv.ki.render-zeitgrenze} nicht,
  * geht das Dokument mit dem Text und ohne QR bzw. Seitenbild weiter, statt als Fehlversuch dreimal dasselbe zu
- * versuchen. Andere Fehler beim Rendern bleiben Fehlversuche. Ohne Quarkus, mit Attrappen der Ports.
+ * versuchen. Ebenso ohne Seitenbild, wenn eine Seite einen ungültigen Kopf oder zu viele Pixel hat (Review PR #120).
+ * Andere Fehler beim Rendern bleiben Fehlversuche. Ohne Quarkus, mit Attrappen der Ports.
  */
 class KiVorschlagHandlerFristTest {
 
@@ -77,6 +81,31 @@ class KiVorschlagHandlerFristTest {
         assertThat(ohneVorschlag).isZero();
     }
 
+    @Test
+    void ungeeigneteSeiteGehtOhneSeitenbildWeiter(@TempDir Path ordner) throws Exception {
+        handler(ordner, "image/jpeg", seiten -> {
+            throw new SeiteUngeeignet("Seite mit 9000000 Pixeln über der Grenze");
+        }).ausfuehren(auftrag());
+
+        assertThat(gerendert).containsExactly(false, true);
+        assertThat(eingaben).singleElement().satisfies(e -> {
+            assertThat(e.text()).isEqualTo("Text mit Layout");
+            assertThat(e.bild()).isEmpty();
+        });
+        assertThat(ohneVorschlag).isEqualTo(1);
+    }
+
+    @Test
+    void andererLesefehlerDesSeitenbildsBleibtFehlversuch(@TempDir Path ordner) {
+        KiVorschlagHandler handler = handler(ordner, "image/jpeg", seiten -> {
+            throw new IOException("PPM zu kurz");
+        });
+
+        assertThatThrownBy(() -> handler.ausfuehren(auftrag())).isInstanceOf(OcrFehlgeschlagen.class);
+        assertThat(eingaben).isEmpty();
+        assertThat(ohneVorschlag).isZero();
+    }
+
     private Auftrag auftrag() {
         return new Auftrag(1, new MandantCode("urinet"), VerarbeitungSpeichern.KI_VORSCHLAG,
                 new Nutzlast(Map.of(VerarbeitenHandler.DOKUMENT_ID, id)), 0);
@@ -87,6 +116,19 @@ class KiVorschlagHandlerFristTest {
      * schon beim grauen.
      */
     private KiVorschlagHandler handler(Path ordner, String mime, OcrFehlgeschlagen.Art fehler, boolean nurFarbig) {
+        return handler(ordner, mime, fehler, nurFarbig, null);
+    }
+
+    /**
+     * Handler ohne Fehler beim Rendern; das Seitenbild kommt aus {@code seitenbild}. Wie im echten Adapter wird ein
+     * Lesefehler der Verwertung zu {@link OcrFehlgeschlagen} mit {@code EIN_AUSGABE}.
+     */
+    private KiVorschlagHandler handler(Path ordner, String mime, SeitenbildPort seitenbild) {
+        return handler(ordner, mime, null, false, seitenbild);
+    }
+
+    private KiVorschlagHandler handler(Path ordner, String mime, OcrFehlgeschlagen.Art fehler, boolean nurFarbig,
+                                       SeitenbildPort seitenbild) {
         String schluessel = DateiSchluessel.pdfa(2026, id).pfad(Ablageort.EINGANG);
         KiStand stand = new KiStand(id, DokumentStatus.VERARBEITUNG, false, 1, false, false, "Volltext", EINGANG,
                 Optional.of(new Datei(DateiRolle.PDFA, 1, "application/pdf", schluessel, "v1", "ab".repeat(32))),
@@ -103,7 +145,8 @@ class KiVorschlagHandlerFristTest {
                 return true;
             }
         };
-        MetadatenExtraktion extraktion = new MetadatenExtraktion(null, null, null, null, null, null, null) {
+        MetadatenExtraktion extraktion = new MetadatenExtraktion(null, (dokument, seiten) -> Optional.empty(),
+                seitenbild, null, null, null, null) {
             @Override
             public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
                 eingaben.add(eingabe);
@@ -132,12 +175,14 @@ class KiVorschlagHandlerFristTest {
             @Override
             public <T> T seitenbilder(Path pdf, Render render, Seitenverwertung<T> verwertung) {
                 gerendert.add(render.farbig());
-                if (render.farbig() || !nurFarbig) {
+                if (fehler != null && (render.farbig() || !nurFarbig)) {
                     throw new OcrFehlgeschlagen(fehler, "Testfehler");
                 }
                 try {
-                    return verwertung.verwerten(List.of());
-                } catch (Exception e) {
+                    return verwertung.verwerten(fehler == null ? List.of(ordner.resolve("seite-1.ppm")) : List.of());
+                } catch (IOException e) {
+                    throw new OcrFehlgeschlagen(OcrFehlgeschlagen.Art.EIN_AUSGABE, "Seitenbild nicht lesbar", e);
+                } catch (InterruptedException e) {
                     throw new IllegalStateException(e);
                 }
             }
