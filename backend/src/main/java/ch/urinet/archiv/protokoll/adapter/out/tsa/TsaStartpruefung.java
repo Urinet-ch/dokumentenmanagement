@@ -26,9 +26,17 @@ public class TsaStartpruefung {
 
     void beimStart(@Observes StartupEvent ereignis, @ConfigProperty(name = "archiv.rolle") String rolle) {
         SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
-        boolean prod = config.getProfiles().contains("prod");
+        beimStart(config, config.getProfiles(), rolle);
+    }
+
+    /**
+     * Prüft die Dienste in {@code prod} ausser im Kommando-Modus und warnt bei nur einem Dienst.
+     *
+     * @throws IllegalStateException ohne Dienst oder bei unvollständiger Konfiguration
+     */
+    static void beimStart(Config config, List<String> profile, String rolle) {
         boolean kommando = Arrays.stream(rolle.split(",")).map(String::trim).allMatch("kommando"::equals);
-        if (!prod || kommando) {
+        if (!profile.contains("prod") || kommando) {
             return;
         }
         List<String> dienste = pruefen(config);

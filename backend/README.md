@@ -246,3 +246,23 @@ Infomaniak 403 `AccessDenied`; `S3AblageTest` lässt genau diese beiden Paare zu
 MinIO für den Root-Zugang nicht anwendet (Test-Buckets tragen darum keine Policy). Versionen in COMPLIANCE lassen sich
 beim Aufräumen nicht löschen; `TestBucket` meldet das als Warnung mit Bucket und Fehlercodes, der Bucket verschwindet
 mit dem Container.
+
+## Smoke-Test Zeitstempeldienste
+
+Die Tests des Manifests (Aufgabe 5.2) laufen gegen eine Test-PKI hinter WireMock. `TsaSmokeIT` prüft die Dienste aus
+`application.properties` (Profil `prod`, `archiv.tsa.dienste`) einmal gegen die echten Zeitstempeldienste (Review
+PR #87). **Nur von Hand durch Fabian, vor dem ersten Deploy mit Manifest und nach jeder Änderung an
+`archiv.tsa.dienst.*`, nie in der CI.** Ohne `-Darchiv.smoke.tsa=ja` wird der Test übersprungen; als `*IT` führt ihn
+`mvn verify` ohnehin nicht aus.
+
+Gestempelt wird nur der SHA-256 einer Zufallsfolge. Je Dienst prüft der Test Token, Policy und CA, holt die
+Prüfdaten (OCSP bzw. CRL) und prüft sie zu `genTime` mit `archiv.tsa.pruefdaten-hoechstalter` (P7D). Scheitert die
+CRL eines Diensts am Höchstalter (z. B. FreeTSA mit seltener ausgestellter CRL), ist das ein Befund für die
+Konfiguration, nicht für den Test.
+
+```bash
+mvn -ntp test -Dtest=TsaSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Darchiv.smoke.tsa=ja \
+  | grep -E "SMOKE|Tests run|FAIL"
+```
+
+Ergebnis (die Zeilen `SMOKE`) im PR bzw. in design.md, «Umsetzung (Aufgabe 5.2)», festhalten.
