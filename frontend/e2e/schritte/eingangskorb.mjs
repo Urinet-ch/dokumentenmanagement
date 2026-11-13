@@ -4,6 +4,7 @@ import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { basisUrl, benutzer, keycloakAttrappe } from '../hilfen/keycloak-attrappe.mjs';
 import { dokumentAus } from '../hilfen/archiv-attrappe.mjs';
+import { platzhalterPruefen } from '../hilfen/platzhalter.mjs';
 
 const eintrag = (welt, titel) =>
   welt.seite
@@ -256,4 +257,50 @@ Then(/^zeigt die Navigation den Eingangskorb-Zähler «(\d+)»$/, async function
     .locator('.nur-screenreader')
     .textContent();
   assert.match(vorgelesen ?? '', new RegExp(anzahl));
+});
+
+Then(
+  /^zeigt der Eintrag «([^»]+)» den Dateinamen als Platzhalter statt eines Titels$/,
+  async function (name) {
+    const karte = eintrag(this, name);
+    await platzhalterPruefen(karte.locator('h2'), name);
+    await karte
+      .getByRole('heading', { name: `Ohne Titel, Dateiname ${name}`, exact: true, level: 2 })
+      .waitFor();
+  },
+);
+
+Then(
+  /^zeigt der Eintrag mit dem Fehlertext «([^»]+)» den Titel «([^»]+)» ohne Platzhalter$/,
+  async function (fehler, titel) {
+    const karte = this.seite.locator('[data-test=eintrag]').filter({ hasText: fehler });
+    assert.equal((await karte.locator('h2').innerText()).trim(), titel);
+    assert.equal(await karte.locator('[data-test=titel-platzhalter]').count(), 0);
+  },
+);
+
+Then(/^ist beim Eintrag «([^»]+)» das Feld «([^»]+)» leer$/, async function (titel, feld) {
+  assert.equal(await eintrag(this, titel).getByLabel(feld, { exact: true }).inputValue(), '');
+});
+
+Then(
+  /^hat das Archiv den Eintrag mit dem Dateinamen «([^»]+)» ohne Titel bestätigt$/,
+  async function (name) {
+    const treffer = () =>
+      this.archiv.aktionen.find(
+        (a) => a.dateiname === name && a.aktion === 'bestaetigen' && !a.abgelehnt,
+      );
+    await warten(() => Boolean(treffer()), `«${name}» nicht bestätigt`);
+    const { body } = treffer();
+    assert.equal(body.titel ?? null, null, JSON.stringify(body));
+    assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
+  },
+);
+
+// Die Meldung isoliert den Dateinamen mit FSI … PDI (U+2068, U+2069), damit Schrift von rechts nach links den Satz
+// nicht umdreht; im Szenario steht der Name ohne die unsichtbaren Zeichen.
+Then(/^sehe ich die Meldung «(.+)» mit isoliertem Dateinamen$/, async function (text) {
+  const erwartet = text.replace(/ · ([^»]+)»/, ' · \u2068$1\u2069»');
+  assert.notEqual(erwartet, text, 'kein Dateiname im Platzhalter');
+  await this.seite.getByText(erwartet, { exact: true }).waitFor();
 });

@@ -97,8 +97,8 @@ public class SucheSchritte {
         tags.add(lauf);
         try (PreparedStatement befehl = verbindung.prepareStatement("insert into " + schema + ".dokument (id, art, "
                 + "titel, datum, quelle, partner_id, partner_name, tags, vertraulichkeit, person_benutzer, erstellt_von, "
-                + "status, bestaetigt, bestaetigt_von, geschaeftsjahr, volltext) "
-                + "values (?, ?, ?, ?, 'UPLOAD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                + "status, bestaetigt, bestaetigt_von, geschaeftsjahr, volltext, dateiname) "
+                + "values (?, ?, ?, ?, 'UPLOAD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             befehl.setObject(1, id);
             befehl.setString(2, z.get("art"));
             befehl.setString(3, z.get("titel"));
@@ -114,6 +114,7 @@ public class SucheSchritte {
             befehl.setString(13, bestaetigt ? "probe" : null);
             befehl.setObject(14, datum == null ? null : datum.getYear(), Types.INTEGER);
             befehl.setString(15, z.get("text"));
+            befehl.setString(16, z.get("dateiname"));
             befehl.executeUpdate();
         }
     }
@@ -271,6 +272,17 @@ public class SucheSchritte {
         });
         String text = String.join("", teile.stream().map(t -> (String) t.get("text")).toList());
         assertThat(text).doesNotContain("\u0002", "\u0003", "\u001f", "<b>");
+    }
+
+    /** Req 14.9: eigenes Feld {@code dateiname}; der Titel bleibt leer und wird nie aus dem Namen gebildet. */
+    @Dann("liefert der Treffer «{word}» den Dateinamen «{}» und keinen Titel")
+    public void trefferDateiname(String name, String dateiname) {
+        assertThat(antwort.statusCode()).isEqualTo(200);
+        List<Map<String, Object>> treffer = antwort.jsonPath().getList("treffer");
+        String id = dokumente.get(name).id().toString();
+        Map<String, Object> eintrag = treffer.stream().filter(t -> id.equals(t.get("id"))).findFirst().orElseThrow();
+        assertThat(eintrag.get("dateiname")).isEqualTo(dateiname);
+        assertThat(eintrag.get("titel")).isNull();
     }
 
     @Dann("ist der Auszug von «{word}» leer")

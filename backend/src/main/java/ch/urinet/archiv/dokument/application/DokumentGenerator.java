@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokument.application.DokumentErfassen.Geprueft;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Bestaetigt;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Finanz;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Vertrag;
+import ch.urinet.archiv.dokument.domain.DateiName;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung;
@@ -100,9 +101,11 @@ public class DokumentGenerator {
 
     /**
      * @param erstelltVon Principal des API-Tokens ({@code token:<id>}); auch {@code bestaetigt_von}
+     * @param dateiname   Name des Teils {@code datei} aus dem Multipart, ungeprüft; gespeichert nur bereinigt und gültig
+     *                    (Req 11.12), sonst leer, ohne die PDF abzulehnen
      * @param metadaten   erst nach der Prüfsumme der PDF gelesen (Regel 3); darf mit {@link FachFehler} abbrechen
      */
-    public Ergebnis annehmen(String erstelltVon, Path datei, Supplier<Anfrage> metadaten) {
+    public Ergebnis annehmen(String erstelltVon, Path datei, String dateiname, Supplier<Anfrage> metadaten) {
         Geprueft pdf = erfassen.pdfPruefen(datei);
         Anfrage anfrage = metadaten.get();
         Bestaetigung b = anfrage.angaben();
@@ -166,7 +169,8 @@ public class DokumentGenerator {
             throw new FachFehler(Fehlercode.FRIST_ABGELAUFEN);
         }
 
-        UUID id = erfassen.generatorAnlegen(pdf, datei, erstelltVon, eingang);
+        UUID id = erfassen.generatorAnlegen(pdf, datei, DateiName.aus(dateiname).speicherbar(), erstelltVon,
+                eingang);
         String vertraulichkeit = b.vertraulichkeit() != null ? b.vertraulichkeit() : art.vertraulichkeit().name();
         Bestaetigt daten = new Bestaetigt(art.code(), b.titel(), b.datum(), partner.map(Kontakt::id).orElse(null),
                 partner.map(Kontakt::name).orElse(null), b.projekt(), b.tags(), vertraulichkeit, b.personBenutzer(),

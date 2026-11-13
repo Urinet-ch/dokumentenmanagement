@@ -158,7 +158,8 @@ public class DokumentErfassen {
                 id = gemeinsam;
                 nr++;
             } else {
-                id = anlegen(anfrage, mandant, jahr, eingang);
+                // bei zusammenfassen der Name der ersten angenommenen Original-Datei (Req 3.9)
+                id = anlegen(anfrage, mandant, jahr, eingang, name.speicherbar());
                 gemeinsam = id;
                 nr = 1;
                 neue.add(id);
@@ -203,12 +204,16 @@ public class DokumentErfassen {
      * Legt das Generator-Dokument mit {@code quelle = GENERATOR} an und die geprüfte PDF unter {@code eingang/} ab;
      * Metadaten und Auftrag folgen beim Aufrufer in derselben Transaktion. Rollt sie zurück, räumt das Archiv den
      * Eingang wieder auf.
+     *
+     * @param dateiname Name des Teils {@code datei} nach {@link DateiName#speicherbar()}; ein ungültiger Name lehnt
+     *                  die PDF nicht ab, er bleibt nur leer (Req 11.12)
      */
-    UUID generatorAnlegen(Geprueft pdf, Path datei, String erstelltVon, Instant eingang) {
+    UUID generatorAnlegen(Geprueft pdf, Path datei, Optional<String> dateiname, String erstelltVon, Instant eingang) {
         MandantCode mandant = aufloesung.pruefen();
         int jahr = eingang.atZone(ZUERICH).getYear();
         UUID id = UUID.randomUUID();
-        repository.anlegen(new NeuesDokument(id, eingang, QUELLE_GENERATOR, erstelltVon, Optional.empty()));
+        repository.anlegen(new NeuesDokument(id, eingang, QUELLE_GENERATOR, erstelltVon, Optional.empty(),
+                dateiname));
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
         ablegen(mandant, DateiSchluessel.original(jahr, id, 1, pdf.typ().endung()), DateiRolle.ORIGINAL, datei, pdf);
         LOG.infof("Datei angenommen: mandant=%s sha256=%s ergebnis=ANGENOMMEN dokument=%s nr=1", mandant.wert(),
@@ -223,10 +228,11 @@ public class DokumentErfassen {
                 .map(benutzer -> vorhanden);
     }
 
-    private UUID anlegen(UploadAnfrage anfrage, MandantCode mandant, int jahr, Instant eingang) {
+    private UUID anlegen(UploadAnfrage anfrage, MandantCode mandant, int jahr, Instant eingang,
+                         Optional<String> dateiname) {
         UUID id = UUID.randomUUID();
         repository.anlegen(new NeuesDokument(id, eingang, anfrage.erfasser().quelle(), anfrage.erfasser().id(),
-                anfrage.hinweis().filter(h -> !h.isBlank())));
+                anfrage.hinweis().filter(h -> !h.isBlank()), dateiname));
         transaktion.registerInterposedSynchronization(new EingangAufraeumen(mandant, jahr, id));
         return id;
     }

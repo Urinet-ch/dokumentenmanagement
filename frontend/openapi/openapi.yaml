@@ -355,6 +355,12 @@ components:
           - string
           - "null"
           description: Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
+        dateiname:
+          type:
+          - string
+          - "null"
+          description: "Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe,\
+            \ kein Titel (Req 3.9, 3.11, 14.9); null ohne Namen"
         finanz:
           anyOf:
           - $ref: "#/components/schemas/DokumentFinanz"
@@ -1516,6 +1522,12 @@ components:
           items:
             $ref: "#/components/schemas/AuszugTeil"
           description: Textstelle mit Treffern; leer ohne Suchbegriff
+        dateiname:
+          type:
+          - string
+          - "null"
+          description: "Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe,\
+            \ kein Titel (Req 14.9); null ohne Namen"
     UUID:
       type: string
       format: uuid
@@ -2183,7 +2195,8 @@ paths:
         der Art fehlen → 422 PFLICHTFELD_FEHLT mit felder; Partner unbekannt → 422
         PARTNER_UNBEKANNT; Belegnummer einer eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN;
         Aufbewahrungsfrist abgelaufen ohne fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN.
-        Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.
+        Ein Feld dateiname → 400 ANFRAGE_UNGUELTIG (Req 3.14). Danach ARCHIVIERUNG
+        und Auftrag ARCHIVIEREN.
       tags:
       - Dokumente
       parameters:

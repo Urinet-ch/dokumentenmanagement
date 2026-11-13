@@ -258,6 +258,28 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(erledigt).toEqual([T.erfolgWiederholt(T.ohneTitel)]);
   });
 
+  it('zeigt ohne Titel und Vorschlag den Dateinamen als Platzhalter und sendet ihn nie als Titel (Req 8.11)', async () => {
+    await zeigen(dokument({ art: 'LIEFERANTENRECHNUNG', dateiname: 'Scan_Rechnung-2026.pdf' }));
+    const titel = element.querySelector('h2')!;
+    expect(titel.querySelector('bdi')!.textContent).toBe('Scan_Rechnung-2026.pdf');
+    expect(titel.querySelector('.nur-screenreader')!.textContent).toBe(
+      'Ohne Titel, Dateiname Scan_Rechnung-2026.pdf',
+    );
+    await klicken(T.aendern);
+    expect(element.querySelector<HTMLInputElement>('#d1-titel')!.value).toBe('');
+    await klicken(T.bestaetigen);
+    const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
+    expect((anfrage.body as { titel?: unknown }).titel ?? null).toBeNull();
+    expect(JSON.stringify(anfrage.body)).not.toContain('Scan_Rechnung');
+    expect(erledigt).toEqual([T.erfolgBestaetigt('Ohne Titel · \u2068Scan_Rechnung-2026.pdf\u2069')]);
+  });
+
+  it('nimmt den vorgeschlagenen Titel vor dem Dateinamen (Req 8.11)', async () => {
+    await zeigen({ ...MIT_VORSCHLAG, dateiname: 'Scan.pdf' });
+    expect(element.querySelector('h2')!.textContent).toContain('Rechnung Muster AG');
+    expect(element.querySelector('[data-test=titel-platzhalter]')).toBeNull();
+  });
+
   it('bietet bei ARCHIVIERUNG_FEHLER nur «Archivierung wiederholen» (Req 8.7)', async () => {
     await zeigen(dokument({ status: 'ARCHIVIERUNG_FEHLER', fehler: 'Ablage nicht erreichbar' }));
     expect(knoepfe()).toEqual([T.archivierungWiederholen]);

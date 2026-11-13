@@ -92,3 +92,30 @@ Funktionalität: Suche und Dokumentansicht im Browser
     Wenn ich den Link «Zurück zur Suche» wähle
     Dann steht im Suchfeld «Seedorf»
     Und sehe ich genau die Treffer «Rechnung Vereinsfest Seedorf»
+
+  @req-14.9 @req-14.10
+  Szenario: Ein Treffer ohne Titel zeigt den Dateinamen als Platzhalter, auch in Verarbeitung und auf dem Handy
+    Angenommen das Browserfenster ist 375 Pixel breit
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich die Suche über das Menü öffne
+    Wenn ich nach «Kassenzettel» suche
+    Dann zeigt der Treffer «Scan_Kassenzettel_Testladen_2026-11-13_Seite_01_bis_12_unbearbeitet.pdf» den Dateinamen als Platzhalter statt eines Titels
+    Und lässt sich die Seite nicht waagrecht scrollen
+    Wenn ich den Treffer «Scan_Kassenzettel_Testladen_2026-11-13_Seite_01_bis_12_unbearbeitet.pdf» öffne
+    Dann sehe ich die Dokumentansicht von «Scan_Kassenzettel_Testladen_2026-11-13_Seite_01_bis_12_unbearbeitet.pdf»
+    Und zeigt die Dokumentansicht den Dateinamen «Scan_Kassenzettel_Testladen_2026-11-13_Seite_01_bis_12_unbearbeitet.pdf» als Platzhalter und in der Zeile «Dateiname»
+    Und lässt sich die Seite nicht waagrecht scrollen
+
+  @req-14.10
+  Szenario: Die Dokumentansicht zeigt einen Dateinamen mit Markup und Schrift von rechts nach links nur als Text und sendet ihn nie als Titel
+    Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich die Suche über das Menü öffne
+    Wenn ich nach «Fotobeleg» suche
+    Und ich den Treffer «קבלה_<b>Fotobeleg</b>.pdf» öffne
+    Dann sehe ich die Dokumentansicht von «קבלה_<b>Fotobeleg</b>.pdf»
+    Und zeigt die Dokumentansicht den Dateinamen «קבלה_<b>Fotobeleg</b>.pdf» als Platzhalter und in der Zeile «Dateiname»
+    Wenn ich den Knopf «Metadaten bearbeiten» wähle
+    Dann ist im Formular das Feld «Titel» leer
+    Wenn ich die Tags auf «quittung» ändere
+    Und ich ohne Grund speichere
+    Dann hat die PWA die Änderung ohne Titel und ohne den Dateinamen «קבלה_<b>Fotobeleg</b>.pdf» gesendet

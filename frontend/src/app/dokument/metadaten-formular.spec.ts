@@ -153,6 +153,17 @@ describe('MetadatenFormular (Req 10.1)', () => {
     expect(gespeichert).toEqual([DOKUMENT]);
   });
 
+  it('belegt den Titel nie mit dem Dateinamen vor und sendet ihn nicht (Req 14.10)', async () => {
+    await oeffnen({ ...DOKUMENT, titel: null, dateiname: 'Scan_Brief.pdf' });
+    expect(element.querySelector<HTMLInputElement>('#bearbeiten-titel')!.value).toBe('');
+    eingeben('#bearbeiten-datum', '2026-11-09');
+    eingeben('#bearbeiten-grund', 'Datum korrigiert');
+    await speichern();
+    expect(port.aufrufe.length).toBe(1);
+    expect(port.aufrufe[0].aenderung).not.toHaveProperty('titel');
+    expect(JSON.stringify(port.aufrufe[0].aenderung)).not.toContain('Scan_Brief');
+  });
+
   it('zeigt die Vertraulichkeit nur mit A8', async () => {
     rolle = 'mitarbeiter';
     await oeffnen();

@@ -2,6 +2,7 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { DOKUMENTE, S3_PFAD, sucheAttrappe } from '../hilfen/suche-attrappe.mjs';
+import { platzhalterPruefen } from '../hilfen/platzhalter.mjs';
 
 const FELDER = {
   Suchbegriff: 'q',
@@ -18,7 +19,8 @@ const FELDER = {
 };
 
 const dokumentId = (titel) => {
-  const d = DOKUMENTE.find((x) => x.titel === titel);
+  // Ohne Titel nennt das Szenario den Dateinamen (Platzhalter, Req 14.9)
+  const d = DOKUMENTE.find((x) => x.titel === titel || (!x.titel && x.dateiname === titel));
   assert.ok(d, `kein synthetisches Dokument «${titel}»`);
   return d.id;
 };
@@ -168,4 +170,18 @@ Then(/^steht «(.+)» weder in der Adresse noch im Browser-Speicher$/, async fun
 
 Then(/^steht im Suchfeld «(.+)»$/, async function (begriff) {
   assert.equal(await this.seite.getByRole('searchbox', { name: 'Suchbegriff' }).inputValue(), begriff);
+});
+
+Then(/^zeigt der Treffer «(.+)» den Dateinamen als Platzhalter statt eines Titels$/, async function (name) {
+  const link = this.seite.locator('[data-test=treffer] a.titel', { has: this.seite.locator(`[title="${name}"]`) });
+  await platzhalterPruefen(link, name);
+  await this.seite.getByRole('link', { name: `Ohne Titel, Dateiname ${name}`, exact: true }).waitFor();
+});
+
+Then(/^zeigt die Dokumentansicht den Dateinamen «(.+)» als Platzhalter und in der Zeile «Dateiname»$/, async function (name) {
+  await platzhalterPruefen(this.seite.locator('h1'), name);
+  const zeile = this.seite.locator('dd[data-test=dateiname]');
+  assert.equal(await this.seite.locator('dt', { hasText: 'Dateiname' }).locator('xpath=following-sibling::dd[1]').getAttribute('data-test'), 'dateiname');
+  assert.equal(await zeile.locator('bdi').textContent(), name);
+  assert.equal(await zeile.locator('bdi *').count(), 0, 'der Dateiname erscheint als Markup');
 });

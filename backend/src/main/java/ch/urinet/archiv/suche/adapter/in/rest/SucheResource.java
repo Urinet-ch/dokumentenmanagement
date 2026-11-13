@@ -83,7 +83,9 @@ public class SucheResource {
             @Schema(nullable = true) String waehrung,
             @Schema(nullable = true, enumeration = {"EINNAHME", "AUSGABE"}) String richtung,
             @Schema(required = true, description = "Textstelle mit Treffern; leer ohne Suchbegriff")
-            List<AuszugTeilDto> auszug) {
+            List<AuszugTeilDto> auszug,
+            @Schema(nullable = true, description = "Name der empfangenen Datei ohne Pfad, nur lesend; "
+                    + "Herkunftsangabe, kein Titel (Req 14.9); null ohne Namen") String dateiname) {
     }
 
     @Schema(name = "Suchergebnis")
@@ -155,7 +157,7 @@ public class SucheResource {
     private static SuchtrefferDto dto(Suchtreffer t) {
         return new SuchtrefferDto(t.id(), t.art(), t.titel(), t.datum(), t.eingang(), t.status(), t.vertraulichkeit(),
                 t.tags(), t.geschaeftsjahr(), t.partnerId(), t.partnerName(), t.belegnummer(), t.betrag(),
-                t.waehrung(), t.richtung(), t.auszug().stream().map(SucheResource::dto).toList());
+                t.waehrung(), t.richtung(), t.auszug().stream().map(SucheResource::dto).toList(), t.dateiname());
     }
 
     private static AuszugTeilDto dto(AuszugTeil teil) {

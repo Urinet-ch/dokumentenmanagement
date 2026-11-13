@@ -80,3 +80,20 @@ Then(/^zeigt die Dokumentansicht das Vorschaubild der Seite (\d+) von «(.+)»$/
 Then(/^trägt die Dokumentansicht den Titel «(.+)»$/, async function (titel) {
   await this.seite.getByRole('heading', { name: titel, level: 1 }).waitFor();
 });
+
+Then(/^ist im Formular das Feld «(.+)» leer$/, async function (feld) {
+  assert.equal(await formular(this.seite).getByLabel(feld, { exact: true }).inputValue(), '');
+});
+
+When(/^ich die Tags auf «(.+)» ändere$/, async function (tags) {
+  await formular(this.seite).locator('#bearbeiten-tags').fill(tags);
+});
+
+Then(/^hat die PWA die Änderung ohne Titel und ohne den Dateinamen «(.+)» gesendet$/, async function (name) {
+  await formular(this.seite).waitFor({ state: 'detached' });
+  assert.equal(this.suche.aenderungen.length, 1);
+  const { body } = this.suche.aenderungen[0];
+  assert.ok(!('titel' in body), JSON.stringify(body));
+  assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
+  assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
+});

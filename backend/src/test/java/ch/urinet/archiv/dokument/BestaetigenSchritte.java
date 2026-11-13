@@ -203,6 +203,13 @@ public class BestaetigenSchritte {
         ausfuehren("update " + schema(ort.mandant()) + ".dokument set fehler = ? where id = ?", fehler, ort.id());
     }
 
+    @Angenommen("das Dokument «{word}» hat den Dateinamen «{}»")
+    public void dateiname(String name, String dateiname) throws SQLException {
+        Ort ort = ort(name);
+        ausfuehren("update " + schema(ort.mandant()) + ".dokument set dateiname = ? where id = ?",
+                UploadSchritte.name(dateiname), ort.id());
+    }
+
     /** Zeile in {@code dokument_finanz} bzw. {@code dokument_vertrag}; Spaltennamen wie in der Tabelle. */
     @Angenommen("das Dokument «{word}» hat in {word} gespeichert:")
     public void gespeichert(String name, String tabelle, Map<String, String> werte) throws SQLException {
@@ -253,6 +260,12 @@ public class BestaetigenSchritte {
     @Wenn("«{word}» das Dokument «{word}» so bestätigt:")
     public void bestaetigen(String benutzer, String name, Map<String, String> felder) throws SQLException {
         antwort = mitVersion(benutzer, name).contentType(ContentType.JSON).body(body(felder))
+                .when().post("/api/v1/dokumente/" + ort(name).id() + "/bestaetigen");
+    }
+
+    @Wenn("«{word}» das Dokument «{word}» mit dem Körper {string} bestätigt")
+    public void bestaetigenRoh(String benutzer, String name, String koerper) throws SQLException {
+        antwort = mitVersion(benutzer, name).contentType(ContentType.JSON).body(koerper)
                 .when().post("/api/v1/dokumente/" + ort(name).id() + "/bestaetigen");
     }
 
@@ -652,6 +665,11 @@ public class BestaetigenSchritte {
         String text = nachricht.jsonPath().getString("Text");
         assertThat(text).contains(ort.id().toString()).contains(fehlerId((String) spalte(ort, "fehler")));
         assertThat(text).doesNotContain((String) spalte(ort, "titel"));
+        // Req 3.12: auch der gespeicherte Dateiname nie, weder im Betreff noch im Text
+        if (spalte(ort, "dateiname") instanceof String dateiname) {
+            assertThat(text).doesNotContain(dateiname);
+            assertThat(nachricht.jsonPath().getString("Subject")).doesNotContain(dateiname);
+        }
     }
 
     @Dann("zeigt das Dokument «{word}» die Warnung «{word}» mit Verweis auf «{word}»")

@@ -6,6 +6,12 @@ export const TEXTE = {
   zumInhalt: 'Zum Inhalt springen',
   menueOeffnen: 'Menü öffnen',
   menueSchliessen: 'Menü schliessen',
+  /** Platzhalter an Stelle des Titels (Req 8.11, 14.9, 14.10): der Dateiname, kein Titel. */
+  titelPlatzhalter: {
+    ohneTitel: 'Ohne Titel',
+    trenner: ' · ',
+    screenreader: (dateiname: string) => `Ohne Titel, Dateiname ${dateiname}`,
+  },
   menue: {
     erfassen: 'Erfassen',
     eingangskorb: 'Eingangskorb',
@@ -242,6 +248,7 @@ export const TEXTE = {
     art: 'Dokumentart',
     datum: 'Belegdatum',
     eingang: 'Eingang',
+    dateiname: 'Dateiname',
     quelle: 'Quelle',
     status: 'Status',
     vertraulichkeit: 'Vertraulichkeit',

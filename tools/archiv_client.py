@@ -38,6 +38,7 @@ import shutil
 import socket
 import stat
 import sys
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -177,7 +178,7 @@ def _behandeln(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]
 
 def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -> tuple[int, dict]:
     grenze = f"----archiv-client-{uuid.uuid4().hex}"
-    dateiname = pdf.name.replace('"', "_").replace("\r", "_").replace("\n", "_")
+    dateiname = _dateiname(pdf.name)
     koerper = b"".join([
         f"--{grenze}\r\n".encode("ascii"),
         f'Content-Disposition: form-data; name="datei"; filename="{dateiname}"\r\n'.encode("utf-8"),
@@ -207,6 +208,15 @@ def _senden(adresse: str, token: str, pdf: Path, metadaten: Mapping[str, Any]) -
         return fehler.code, inhalt
     except (urllib.error.URLError, socket.timeout, ConnectionError, TimeoutError) as fehler:
         raise _NichtErreichbar(f"Das Archiv ist nicht erreichbar ({fehler}).") from None
+
+
+def _dateiname(name: str) -> str:
+    """Ersetzt Anführungszeichen und die Zeichen nach Req 3.10 (Cc, Cs, Zl, Zp, Cf ausser U+200C/U+200D) durch «_».
+
+    Das Archiv speichert den Namen nach Req 11.12 und liesse einen ungültigen leer; so bleibt er erhalten.
+    """
+    return "".join("_" if z == '"' or (unicodedata.category(z) in {"Cc", "Cs", "Zl", "Zp", "Cf"}
+                                         and z not in "\u200c\u200d") else z for z in name)
 
 
 def _json(inhalt: bytes) -> dict:

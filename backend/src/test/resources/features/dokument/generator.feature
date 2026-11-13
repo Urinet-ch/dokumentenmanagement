@@ -265,3 +265,46 @@ Funktionalität: Generator-Schnittstelle für Skripte
       """
     Dann meldet der Python-Client den Fehler 422 «PFLICHTFELD_FEHLT»
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «C1»
+
+  @req-11.12 @req-3.9 @req-3.11
+  Szenariogrundriss: Der Generator speichert den Dateinamen des Teils «datei», ein fehlender oder ungültiger Name hält das PDF nicht auf: <fall>
+    Wenn der Generator die PDF «N1» unter dem Namen «<name>» mit diesen Metadaten sendet:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "Probe" }
+      """
+    Dann antwortet der Generator mit 202 und dem neuen Dokument «N1»
+    Und hat das Generator-Dokument «N1» diese Werte:
+      | dateiname | <gespeichert> |
+      | titel     | Probe         |
+
+    Beispiele:
+      | name                         | gespeichert           | fall                       |
+      | Rechnung_2026-901.pdf        | Rechnung_2026-901.pdf | mit Namen                  |
+      | ablage/Rechnung_2026-902.pdf | Rechnung_2026-902.pdf | Pfadanteil fällt weg       |
+      | {ohne}                       | null                  | ohne Namen                 |
+      | Rechnung{U+202E}fdp.pdf      | null                  | Richtungsumkehr (Req 3.10) |
+      | Rechnung{U+2028}2026.pdf     | null                  | Zeilentrenner (Req 3.10)   |
+
+  @req-11.12 @req-11.8
+  Szenario: Dieselbe PDF unter anderem Namen ergibt 200 und ändert den Dateinamen nicht
+    Wenn der Generator die PDF «N2» unter dem Namen «Erster_Name.pdf» mit diesen Metadaten sendet:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "Probe" }
+      """
+    Dann antwortet der Generator mit 202 und dem neuen Dokument «N2»
+    Wenn der Generator die PDF «N2» unter dem Namen «Zweiter_Name.pdf» mit diesen Metadaten sendet:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "Probe" }
+      """
+    Dann antwortet der Generator mit 200 und dem vorhandenen Dokument «N2» im Status «NEU»
+    Und hat das Generator-Dokument «N2» diese Werte:
+      | dateiname | Erster_Name.pdf |
+
+  @req-3.14
+  Szenario: Die Generator-Metadaten setzen keinen Dateinamen
+    Wenn der Generator die PDF «N3» mit diesen Metadaten sendet:
+      """
+      { "art": "PROJEKTDOKUMENT", "titel": "Probe", "projekt": "Probe", "dateiname": "anders.pdf" }
+      """
+    Dann antwortet der Generator mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «N3»

@@ -72,13 +72,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class UploadSchritte {
 
     private static final String PFAD = "/api/v1/dokumente";
+    private static final java.util.regex.Pattern ZEICHEN = java.util.regex.Pattern.compile("\\{U\\+([0-9A-F]{4,6})}");
+    private static final java.util.regex.Pattern WIEDERHOLT = java.util.regex.Pattern.compile(
+            "\\{(\\d+)×(Leerzeichen|.)}");
     /** Teile eines Uploads (quarkus.http.body.uploads-directory) im Arbeitsverzeichnis archiv.arbeit.verzeichnis. */
     private static final Path TEMP = Path.of(ConfigProvider.getConfig().getValue("quarkus.http.body.uploads-directory",
             String.class));
     private static final Path ARBEIT = Path.of(ConfigProvider.getConfig().getValue("archiv.arbeit.verzeichnis",
             String.class));
+    /**
+     * RFC 6532 sendet Namen als UTF-8 und den Content-Type der Teile ohne Parameter wie ein Browser; BROWSER_COMPATIBLE
+     * liess bei einem leeren Namen auch den Content-Type weg, der Teil kam dann als Textfeld an.
+     */
     private static final RestAssuredConfig UTF8 = RestAssuredConfig.config().httpClient(
-            HttpClientConfig.httpClientConfig().httpMultipartMode(HttpMultipartMode.BROWSER_COMPATIBLE));
+            HttpClientConfig.httpClientConfig().httpMultipartMode(HttpMultipartMode.RFC6532));
 
     /** Eine gesendete Datei: Name im Szenario und Inhalt. */
     private record Datei(String name, byte[] inhalt, byte[] arbeitsfassung) {
@@ -114,6 +121,7 @@ public class UploadSchritte {
     private Response antwort;
     private HttpResponse<String> rohAntwort;
     private LogMitschnitt mitschnitt;
+    private List<Response> geoeffnet = List.of();
 
     @After
     public void aufraeumen() throws SQLException {
@@ -565,7 +573,7 @@ public class UploadSchritte {
         RequestSpecification spec = anfrage.config(UTF8).contentType("multipart/form-data; charset=UTF-8");
         for (Datei datei : dateien) {
             spec = spec.multiPart(new MultiPartSpecBuilder(datei.inhalt()).controlName("dateien")
-                    .fileName(datei.name()).mimeType("application/octet-stream").charset(StandardCharsets.UTF_8)
+                    .fileName(datei.name()).mimeType("application/octet-stream")
                     .build());
         }
         for (Datei datei : dateien) {
@@ -632,7 +640,7 @@ public class UploadSchritte {
             Map<String, String> soll = erwartet.get(i);
             Map<String, Object> ist = liste.get(i);
             String fall = "Ergebnis " + (i + 1);
-            assertThat(ist.get("datei")).as(fall).isEqualTo(name(soll.get("datei")).replace("\u202E", ""));
+            assertThat(ist.get("datei")).as(fall).isEqualTo(ohneVerboteneZeichen(name(soll.get("datei"))));
             assertThat(ist.get("status")).as(fall).isEqualTo(soll.get("status"));
             switch (soll.get("status")) {
                 case "NEU" -> assertThat(ist).as(fall).containsKey("id").doesNotContainKeys("vorhandenId", "fehler");
@@ -661,9 +669,85 @@ public class UploadSchritte {
         return dateien;
     }
 
-    /** {@code {U+202E}} im Namen steht für die unsichtbare Richtungsumkehr. */
-    private static String name(String roh) {
-        return roh.replace("{U+202E}", "\u202E");
+    /**
+     * {@code {U+XXXX}} im Namen steht für das Zeichen mit diesem Code (z. B. die unsichtbare Richtungsumkehr
+     * U+202E), {@code {n×z}} für n-mal das Zeichen z, {@code Leerzeichen} für ein Leerzeichen.
+     */
+    static String name(String roh) {
+        String name = ZEICHEN.matcher(roh).replaceAll(m -> Character.toString(Integer.parseInt(m.group(1), 16)));
+        return WIEDERHOLT.matcher(name).replaceAll(m -> java.util.regex.Matcher.quoteReplacement(
+                ("Leerzeichen".equals(m.group(2)) ? " " : m.group(2)).repeat(Integer.parseInt(m.group(1)))));
+    }
+
+    /** Die Anzeige eines Namens mit verbotenen Zeichen enthält diese nicht (Req 3.10). */
+    private static String ohneVerboteneZeichen(String name) {
+        return name.replaceAll("[\\p{Cc}\\p{Cs}\\p{Zl}\\p{Zp}\\p{Cf}&&[^\\u200C\\u200D]]", "");
+    }
+
+    @Dann("hat jedes neue Dokument den Dateinamen «{}» und keinen Titel")
+    public void dateiname(String erwartet) throws SQLException {
+        String name = name(erwartet);
+        assertThat(neueIds()).isNotEmpty();
+        for (UUID id : neueIds()) {
+            Map<String, String> zeile = abfragen("select dateiname, titel from " + schema()
+                    + ".dokument where id = ?::uuid", id.toString()).getFirst();
+            assertThat(zeile.get("dateiname")).as("dateiname").isEqualTo(name.isEmpty() ? null : name);
+            assertThat(zeile.get("titel")).as("titel").isNull();
+        }
+    }
+
+    @Dann("liefert die Ansicht des neuen Dokuments für «{word}» den Dateinamen «{}» und keinen Titel")
+    public void dateinameInDerAnsicht(String benutzer, String erwartet) {
+        assertThat(neueIds()).hasSize(1);
+        Response ansicht = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .get(PFAD + "/" + neueIds().getFirst());
+        assertThat(ansicht.statusCode()).as(ansicht.asString()).isEqualTo(200);
+        assertThat(ansicht.jsonPath().getString("dateiname")).isEqualTo(name(erwartet));
+        assertThat(ansicht.jsonPath().getString("titel")).isNull();
+    }
+
+    @Dann("trägt kein Dokument im Mandanten «{word}» den Dateinamen «{}» oder «{}»")
+    public void keinDateiname(String mandantCode, String erster, String zweiter) throws SQLException {
+        for (String teil : List.of(name(erster), name(zweiter))) {
+            assertThat(abfragen("select id from " + new MandantCode(mandantCode).schema() + ".dokument where "
+                    + "strpos(dateiname, ?) > 0", teil)).as(teil).isEmpty();
+        }
+    }
+
+    @Wenn("«{word}» das neue Dokument ansieht und seine Datei öffnet")
+    public void ansehenUndOeffnen(String benutzer) {
+        assertThat(neueIds()).hasSize(1);
+        String token = Testanmeldung.token(benutzer);
+        Response ansicht = given().auth().oauth2(token).when().get(PFAD + "/" + neueIds().getFirst());
+        assertThat(ansicht.statusCode()).as(ansicht.asString()).isEqualTo(200);
+        Response umleitung = given().auth().oauth2(token).redirects().follow(false).when()
+                .get(PFAD + "/" + neueIds().getFirst() + "/datei");
+        Response json = given().auth().oauth2(token).redirects().follow(false).accept("application/json").when()
+                .get(PFAD + "/" + neueIds().getFirst() + "/datei");
+        assertThat(umleitung.statusCode()).as(umleitung.asString()).isEqualTo(302);
+        assertThat(json.statusCode()).as(json.asString()).isEqualTo(200);
+        geoeffnet = List.of(antwort, ansicht, umleitung, json);
+    }
+
+    @Dann("taucht «{}» weder im Log noch im Zugriffsprotokoll, in Nutzlasten von Aufträgen, S3-Schlüsseln oder "
+            + "Antwort-Headern auf")
+    public void nirgends(String teil) throws SQLException {
+        assertThat(mitschnitt.volltext()).as("Log").doesNotContain(teil);
+        assertThat(abfragen("select id from " + schema() + ".zugriff_protokoll where strpos(coalesce(details::text, "
+                + "''), ?) > 0", teil)).as("Zugriffsprotokoll").isEmpty();
+        assertThat(abfragen("select id from public.auftrag where strpos(nutzlast::text, ?) > 0", teil))
+                .as("Nutzlasten der Aufträge").isEmpty();
+        assertThat(abfragen("select count(*) as anzahl from public.auftrag where nutzlast->>'dokumentId' = ?",
+                neueIds().getFirst().toString()).getFirst().get("anzahl")).as("Aufträge des Dokuments")
+                .isNotEqualTo("0");
+        assertThat(TestAblage.versionen(mandant, "")).as("S3-Schlüssel").isNotEmpty()
+                .noneMatch(schluessel -> schluessel.contains(teil));
+        for (Response r : geoeffnet) {
+            assertThat(r.headers().asList()).as("Header").noneMatch(h -> h.getValue().contains(teil)
+                    || h.getName().contains(teil));
+        }
+        assertThat(geoeffnet.get(1).jsonPath().getString("dateiname")).as("Feld dateiname").contains(teil);
+        assertThat(geoeffnet.get(3).asString()).as("vorsignierte Adresse").doesNotContain(teil);
     }
 
     /** Typ aus {@link Testdateien}, {@code wie:<name>} für dieselben Bytes oder {@code pdf:<MB>} für eine Grösse. */

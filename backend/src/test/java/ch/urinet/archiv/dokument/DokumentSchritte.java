@@ -65,6 +65,9 @@ public class DokumentSchritte {
                     Testanmeldung.sub(zeile.get("erfasser")), person == null ? null : Testanmeldung.sub(person),
                     zeile.get("status")));
             dokumente.put(zeile.get("name"), new Ort(mandant, id));
+            if (zeile.get("dateiname") != null) {
+                dateinameSetzen(mandant, id, UploadSchritte.name(zeile.get("dateiname")));
+            }
         }
     }
 
@@ -86,6 +89,37 @@ public class DokumentSchritte {
                 assertThat(ProblemDetails.pruefen(antwort, status)).as(fall).isEqualTo("NICHT_GEFUNDEN");
             }
         }
+    }
+
+    /** Req 3.11: Spalte {@code dateiname} ({@code null} heisst fehlend oder JSON-null) bzw. 404 nach der Sichtregel. */
+    @Dann("sehen die Benutzer den Dateinamen so:")
+    public void dateinamenSichtbarkeit(DataTable tabelle) {
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            lesen(zeile.get("benutzer"), zeile.get("dokument"));
+            String fall = zeile.get("benutzer") + " → " + zeile.get("dokument");
+            int status = Integer.parseInt(zeile.get("status"));
+            if (status == 200) {
+                assertThat(antwort.statusCode()).as(fall).isEqualTo(200);
+                assertThat(antwort.<String>path("dateiname")).as(fall).isEqualTo(zeile.get("dateiname"));
+            } else {
+                assertThat(ProblemDetails.pruefen(antwort, status)).as(fall).isEqualTo("NICHT_GEFUNDEN");
+                assertThat(antwort.asString()).as(fall).doesNotContain(".pdf");
+            }
+        }
+    }
+
+    @Dann("nennt der Eingangskorb beim Dokument «{word}» keinen Dateinamen")
+    public void eingangskorbOhneDateiname(String name) {
+        eingangskorbDateiname(name, null);
+    }
+
+    @Dann("nennt der Eingangskorb beim Dokument «{word}» den Dateinamen {string}")
+    public void eingangskorbDateiname(String name, String dateiname) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<Map<String, Object>> eintraege = antwort.jsonPath().getList("eintraege");
+        Map<String, Object> eintrag = eintraege.stream().filter(e -> id(name).toString().equals(e.get("id")))
+                .findFirst().orElseThrow(() -> new AssertionError("Dokument " + name + " fehlt im Eingangskorb"));
+        assertThat(eintrag.get("dateiname")).isEqualTo(dateiname);
     }
 
     @Wenn("«{word}» den Eingangskorb abruft")
@@ -192,6 +226,16 @@ public class DokumentSchritte {
                 anweisung.execute(sql);
             }
         }).isInstanceOf(SQLException.class).hasMessageContaining("dokument_version: nur Einfügen erlaubt");
+    }
+
+    private void dateinameSetzen(String mandant, UUID id, String dateiname) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement setzen = verbindung.prepareStatement("update " + new MandantCode(mandant).schema()
+                     + ".dokument set dateiname = ? where id = ?")) {
+            setzen.setString(1, dateiname);
+            setzen.setObject(2, id);
+            setzen.executeUpdate();
+        }
     }
 
     @Angenommen("das Dokument «{word}» hat das Original mit der Prüfsumme «{word}»")

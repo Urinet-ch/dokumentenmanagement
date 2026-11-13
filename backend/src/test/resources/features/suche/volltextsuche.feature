@@ -200,3 +200,25 @@ Funktionalität: Volltextsuche mit Filtern (Aufgabe 4.5)
   @req-14.5
   Szenario: Ohne Anmeldung gibt es keine Suche
     Dann antwortet die Suche ohne Anmeldung mit 401
+
+  @req-14.8 @req-14.9
+  Szenario: Die Suche findet ein Dokument ohne Titel und Volltext über die Wörter seines Dateinamens, nicht über die Endung
+    Angenommen im Mandanten «urinet» liegen diese Suchdokumente:
+      | name     | titel    | art | partner | tags | datum | betrag | richtung | belegnummer | vertraulichkeit | bestaetigt | erfasser           | person | status       | text | dateiname                  |
+      | U_SCAN   |          |     |         |      |       |        |          |             | NORMAL          | nein       | mitarbeiter-urinet |        | VERARBEITUNG |      | Scan_Rechnung-2026.pdf     |
+      | U_ZEBRA  | Beratung |     |         |      |       |        |          |             | INTERN          | ja         | inhaber-urinet     |        | ARCHIVIERT   |      | Zebrafink_Abschluss.pdf    |
+    Dann findet «inhaber-urinet» mit diesen Filtern diese Dokumente in dieser Reihenfolge:
+      | filter                         | treffer |
+      | q=Rechnung&status=VERARBEITUNG | U_SCAN  |
+      | q=Scan&status=VERARBEITUNG     | U_SCAN  |
+      | q=pdf                          |         |
+    Und finden die Benutzer mit dem Suchbegriff «Zebrafink» diese Dokumente:
+      | benutzer           | treffer | gesamt | grund                                           |
+      | inhaber-urinet     | U_ZEBRA | 1      | nur über den Dateinamen                         |
+      | mitarbeiter-urinet |         | 0      | INTERN bleibt unsichtbar, auch über den Namen   |
+      | inhaber-vhf-gsk    |         | 0      | anderer Mandant                                 |
+    Wenn «inhaber-urinet» sucht mit:
+      | q      | Rechnung     |
+      | status | VERARBEITUNG |
+    Dann zeigt der Auszug von «U_SCAN» «Rechnung» hervorgehoben
+    Und liefert der Treffer «U_SCAN» den Dateinamen «Scan_Rechnung-2026.pdf» und keinen Titel

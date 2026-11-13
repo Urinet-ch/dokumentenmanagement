@@ -40,6 +40,24 @@ export const DOKUMENTE = [
     tags: [],
     text: 'Flyer A5, 500 Stück, für das Vereinsfest.',
   },
+  // Ohne Titel (Aufgabe 4.10, Req 14.9, 14.10): Die PWA zeigt den Dateinamen als Platzhalter, nie als Titel.
+  {
+    id: '0b6f1d3e-0000-4000-8000-000000000003',
+    titel: null,
+    dateiname: 'Scan_Kassenzettel_Testladen_2026-11-13_Seite_01_bis_12_unbearbeitet.pdf',
+    status: 'VERARBEITUNG',
+    tags: [],
+    text: '',
+  },
+  {
+    id: '0b6f1d3e-0000-4000-8000-000000000004',
+    titel: null,
+    art: 'LIEFERANTENRECHNUNG',
+    dateiname: 'קבלה_<b>Fotobeleg</b>.pdf',
+    status: 'FEHLER',
+    tags: [],
+    text: '',
+  },
 ];
 
 function auszug(text, q) {
@@ -57,17 +75,20 @@ function auszug(text, q) {
   ].filter((t) => t.text);
 }
 
+const EINGANG = (d) => `${d.datum ?? '2026-11-13'}T08:00:00Z`;
+
 function treffer(d, q) {
   return {
     id: d.id,
     art: d.art,
     titel: d.titel,
+    dateiname: d.dateiname ?? null,
     datum: d.datum,
-    eingang: `${d.datum}T08:00:00Z`,
-    status: 'ARCHIVIERT',
+    eingang: EINGANG(d),
+    status: d.status ?? 'ARCHIVIERT',
     vertraulichkeit: 'NORMAL',
     tags: d.tags,
-    geschaeftsjahr: Number(d.datum.slice(0, 4)),
+    geschaeftsjahr: d.datum ? Number(d.datum.slice(0, 4)) : null,
     partnerId: d.partnerId,
     partnerName: d.partnerName,
     belegnummer: d.belegnummer,
@@ -82,21 +103,26 @@ function dokument(d, stand) {
   return {
     id: d.id,
     art: d.art,
-    titel: stand?.titel ?? d.titel,
+    titel: stand ? stand.titel : d.titel,
+    dateiname: d.dateiname ?? null,
     datum: d.datum,
-    eingang: `${d.datum}T08:00:00Z`,
+    eingang: EINGANG(d),
     quelle: 'UPLOAD',
     tags: d.tags,
     vertraulichkeit: 'NORMAL',
-    status: 'ARCHIVIERT',
-    bestaetigt: `${d.datum}T09:00:00Z`,
-    geschaeftsjahr: Number(d.datum.slice(0, 4)),
-    aufbewahrenBis: `${Number(d.datum.slice(0, 4)) + 11}-01-01`,
+    status: d.status ?? 'ARCHIVIERT',
+    ...(d.datum
+      ? {
+          bestaetigt: `${d.datum}T09:00:00Z`,
+          geschaeftsjahr: Number(d.datum.slice(0, 4)),
+          aufbewahrenBis: `${Number(d.datum.slice(0, 4)) + 11}-01-01`,
+          finanz: { belegnummer: d.belegnummer, richtung: d.richtung, betrag: d.betrag, waehrung: 'CHF' },
+        }
+      : {}),
     fristAbgelaufen: false,
     zusatz: {},
     partnerId: d.partnerId,
     partnerName: d.partnerName,
-    finanz: { belegnummer: d.belegnummer, richtung: d.richtung, betrag: d.betrag, waehrung: 'CHF' },
     seiten: 1,
     version: stand?.version ?? 2,
     warnungen: [],
@@ -155,7 +181,7 @@ export async function sucheAttrappe(welt) {
       const q = p.get('q') ?? '';
       const liste = DOKUMENTE.filter(
         (d) =>
-          (!q || `${d.titel} ${d.text} ${d.partnerName} ${d.belegnummer}`.toLowerCase().includes(q.toLowerCase())) &&
+          (!q || [d.titel, d.text, d.partnerName, d.belegnummer, d.dateiname].join(' ').toLowerCase().includes(q.toLowerCase())) &&
           (!p.get('belegnummer') || d.belegnummer === p.get('belegnummer')) &&
           (!p.get('art') || d.art === p.get('art')) &&
           (!p.get('partner') || d.partnerId === p.get('partner')) &&
@@ -196,11 +222,11 @@ export async function sucheAttrappe(welt) {
     if (ifMatch !== `"${bisher.version}"`) {
       return json(route, 412, { status: 412, title: 'Version veraltet', fehlercode: 'VERSION_KONFLIKT' });
     }
-    if (!body.grund) {
+    if (bisher.status === 'ARCHIVIERT' && !body.grund) {
       return json(route, 422, { status: 422, title: 'Pflichtfeld fehlt', fehlercode: 'PFLICHTFELD_FEHLT', felder: ['grund'] });
     }
-    const fassung = { version: bisher.version, zeit: new Date().toISOString(), geaendertVon: welt.keycloak.benutzer.id, grund: body.grund };
-    const stand = { titel: body.titel ?? bisher.titel, version: bisher.version + 1, versionen: [fassung, ...bisher.versionen] };
+    const fassung = { version: bisher.version, zeit: new Date().toISOString(), geaendertVon: welt.keycloak.benutzer.id, grund: body.grund ?? null };
+    const stand = { titel: 'titel' in body ? body.titel : bisher.titel, version: bisher.version + 1, versionen: [fassung, ...bisher.versionen] };
     zustand.stand.set(d.id, stand);
     return json(route, 200, dokument(d, stand));
   }

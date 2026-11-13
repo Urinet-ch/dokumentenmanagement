@@ -34,6 +34,7 @@ import {
   KontakteService,
 } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   AktionFehler,
@@ -64,7 +65,7 @@ const IM_FORMULAR: Record<string, string> = {
 /** Ein Dokument im Eingangskorb mit Vorschau, Vorschlag und den Aktionen nach Rechtematrix (Req 8.1, 8.5, 8.7). */
 @Component({
   selector: 'app-eingangskorb-karte',
-  imports: [MatButtonModule, RouterLink],
+  imports: [MatButtonModule, RouterLink, TitelAnzeige],
   templateUrl: './eingangskorb-karte.html',
   styleUrl: './eingangskorb-karte.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -103,9 +104,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   private readonly suche = new Subject<string>();
 
   protected readonly id = computed(() => this.dokument().id);
-  protected readonly titel = computed(
-    () => this.dokument().titel || this.entwurf().titel || this.texte.ohneTitel,
+  /** Titel, Vorschlag oder Dateiname als Platzhalter (Req 8.11); der Dateiname geht nie in `titel` des Entwurfs. */
+  protected readonly anzeige = computed(() =>
+    anzeigeTitel(this.dokument().titel, this.entwurf().titel, this.dokument().dateiname),
   );
+  protected readonly titel = computed(() => this.anzeige().text);
   protected readonly status = computed(() => this.dokument().status);
   protected readonly imKorb = computed(() => this.status() === 'EINGANGSKORB');
   protected readonly darfBestaetigen = computed(() => this.imKorb() && this.anmeldung.darf('A7'));

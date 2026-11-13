@@ -102,6 +102,7 @@ export async function archivAttrappe(welt) {
       aktion,
       id,
       titel: dokument.titel,
+      dateiname: dokument.dateiname,
       ifMatch: await anfrage.headerValue('if-match'),
       body: anfrage.postDataJSON(),
       abgelehnt: Boolean(archiv.ablehnung),
@@ -133,7 +134,8 @@ export function dokumentAus(zeile, index) {
   if (zeile.belegnummer) vorschlag.belegnummer = zeile.belegnummer;
   return {
     id: `d-${index + 1}`,
-    titel: zeile.titel,
+    titel: zeile.titel || null,
+    dateiname: zeile.dateiname || null,
     eingang: zeile.eingang ? `${zeile.eingang}T08:00:00Z` : '2026-11-08T08:00:00Z',
     quelle: 'UPLOAD',
     tags: [],

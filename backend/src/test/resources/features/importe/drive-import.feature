@@ -28,6 +28,18 @@ Funktionalität: Einmaliger Import des Google-Drive-Altbestands
       | Büro/Allgemein/scan.pdf                 | Drive-Import; Ordner: UriNet/Büro/Allgemein                                                              |
     Und enthält die Ausgabe des Drive-Imports das Token nicht
 
+  @req-12.9 @req-3.9
+  Szenario: Das Archiv speichert nur den Dateinamen ohne Ordner, der Ordnerpfad steht nur im Hinweis
+    Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:
+      | pfad                                          | typ |
+      | Kunden/FC Muster/Rechnungen/Rechnung_2026.pdf | pdf |
+    Und ein Token vom Scope «import» für «urinet» liegt in einer Datei mit Rechten 600
+    Wenn der Drive-Import den Ordner «UriNet» ins Archiv lädt
+    Dann endet der Drive-Import mit Exit-Code 0
+    Und hat das Archiv im Mandanten «urinet» diese Dateien mit Quelle «DRIVE» vom Import-Token angelegt:
+      | pfad                                          | dateiname         | hinweis                                                                                            |
+      | Kunden/FC Muster/Rechnungen/Rechnung_2026.pdf | Rechnung_2026.pdf | Drive-Import; Ordner: UriNet/Kunden/FC Muster/Rechnungen; Partner: FC Muster; Art: AUSGANGSRECHNUNG |
+
   @req-12.1
   Szenario: Ohne Token-Datei mit Rechten 600 oder mit falschem Scope überträgt das Werkzeug nichts
     Angenommen ein Ordner «UriNet» mit diesen synthetischen Dateien:

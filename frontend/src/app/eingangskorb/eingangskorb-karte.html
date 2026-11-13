@@ -14,7 +14,7 @@
     }
     <div class="angaben">
       <h2 [id]="'titel-' + d.id" class="titel">
-        {{ titel() }}
+        <app-titel-anzeige [anzeige]="anzeige()" />
         @if (!d.titel && e.titel && bittePruefen('titel')) {
           <span class="pruefen">{{ texte.bittePruefen }}</span>
         }

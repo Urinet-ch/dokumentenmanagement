@@ -22,7 +22,7 @@
   }
   @case ('ok') {
     @if (dokument(); as d) {
-      <h1 data-test="titel">{{ titel() }}</h1>
+      <h1 data-test="titel"><app-titel-anzeige [anzeige]="anzeige()" /></h1>
       @if (d.fristAbgelaufen) {
         <p class="hinweis">{{ texte.fristAbgelaufen }}</p>
       }
@@ -90,6 +90,10 @@
             }
             <dt>{{ texte.eingang }}</dt>
             <dd>{{ zeitpunkt(d.eingang) }}</dd>
+            @if (d.dateiname) {
+              <dt>{{ texte.dateiname }}</dt>
+              <dd data-test="dateiname"><bdi>{{ d.dateiname }}</bdi></dd>
+            }
             <dt>{{ texte.quelle }}</dt>
             <dd>{{ d.quelle }}</dd>
             <dt>{{ texte.status }}</dt>

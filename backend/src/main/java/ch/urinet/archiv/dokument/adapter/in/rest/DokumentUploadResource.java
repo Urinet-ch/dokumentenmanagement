@@ -114,6 +114,11 @@ public class DokumentUploadResource {
         List<UploadAnfrage.Seite> seiten = new ArrayList<>();
         for (int i = 0; i < originale.size(); i++) {
             FileUpload original = originale.get(i);
+            // ein Teil ohne Dateinamen und mit einem Typ ausserhalb von quarkus.http.body.multipart.file-content-types
+            // kommt als Text an, nicht als Datei
+            if (original.uploadedFile() == null || !arbeit.isEmpty() && arbeit.get(i).uploadedFile() == null) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
             Optional<java.nio.file.Path> fassung = arbeit.isEmpty()
                     ? Optional.empty() : Optional.of(arbeit.get(i).uploadedFile());
             seiten.add(new UploadAnfrage.Seite(original.uploadedFile(), original.fileName(), fassung));

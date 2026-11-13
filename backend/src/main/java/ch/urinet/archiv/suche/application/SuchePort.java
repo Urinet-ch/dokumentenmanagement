@@ -11,5 +11,10 @@ import ch.urinet.archiv.suche.domain.Suchergebnis;
  */
 public interface SuchePort {
 
-    Suchergebnis suchen(Suchanfrage anfrage, Sichtregel regel);
+    /**
+     * @param mitDateiname {@code true} nur für die PWA ({@code GET /dokumente}): Auszug und Treffer enthalten den
+     *                     Dateinamen. Werkzeuge anderer Sprachmodelle und die öffentliche Schnittstelle (Spec 02–04)
+     *                     nutzen {@code false}, dann fehlt er in Auszug und Treffer (Req 3.13, design.md «Dateiname»).
+     */
+    Suchergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname);
 }

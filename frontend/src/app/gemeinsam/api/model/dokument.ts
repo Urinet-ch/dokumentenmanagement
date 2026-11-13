@@ -76,6 +76,10 @@ export interface Dokument {
      * Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments
      */
     personBenutzer?: string | null;
+    /**
+     * Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, kein Titel (Req 3.9, 3.11, 14.9); null ohne Namen
+     */
+    dateiname?: string | null;
     finanz?: DokumentFinanz | null;
     vertrag?: DokumentVertrag | null;
     /**

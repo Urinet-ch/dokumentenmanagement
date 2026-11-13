@@ -127,6 +127,21 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(port.aufrufe).toEqual(['pdfa']);
   });
 
+  it('zeigt die Zeile «Dateiname» nur mit gespeichertem Namen (Req 14.10)', async () => {
+    await oeffnen();
+    expect(element.querySelector('[data-test=dateiname]')).toBeNull();
+    expect(element.textContent).not.toContain(TEXTE.dokument.dateiname);
+  });
+
+  it('setzt ohne Titel den Dateinamen als Platzhalter, in jedem Status (Req 14.10)', async () => {
+    port.dokument = of({ ...DOKUMENT, titel: null, status: 'VERARBEITUNG', dateiname: 'Scan_Rechnung-2026.pdf' });
+    await oeffnen();
+    const titel = element.querySelector('[data-test=titel]')!;
+    expect(titel.querySelector('bdi')!.textContent).toBe('Scan_Rechnung-2026.pdf');
+    expect(titel.querySelector('[data-test=titel-platzhalter]')!.getAttribute('title')).toBe('Scan_Rechnung-2026.pdf');
+    expect(element.querySelector('[data-test=dateiname]')!.textContent).toBe('Scan_Rechnung-2026.pdf');
+  });
+
   it('holt eine abgelaufene Adresse beim Klick neu', async () => {
     port.pdfa = of({ url: 'https://s3.example/alt', gueltigBis: new Date(Date.now() - 1000).toISOString() });
     await oeffnen();

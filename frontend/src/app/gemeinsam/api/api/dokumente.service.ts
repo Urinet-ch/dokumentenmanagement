@@ -346,7 +346,7 @@ export class DokumenteService extends BaseService {
 
     /**
      * Dokument bestätigen und archivieren
-     * Nur aus EINGANGSKORB (sonst 409 STATUS_KONFLIKT). Pflichtfelder der Art fehlen → 422 PFLICHTFELD_FEHLT mit felder; Partner unbekannt → 422 PARTNER_UNBEKANNT; Belegnummer einer eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN; Aufbewahrungsfrist abgelaufen ohne fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.
+     * Nur aus EINGANGSKORB (sonst 409 STATUS_KONFLIKT). Pflichtfelder der Art fehlen → 422 PFLICHTFELD_FEHLT mit felder; Partner unbekannt → 422 PARTNER_UNBEKANNT; Belegnummer einer eigenen Art schon vergeben → 409 BELEGNUMMER_VERGEBEN; Aufbewahrungsfrist abgelaufen ohne fristAbgelaufenAkzeptiert → 409 FRIST_ABGELAUFEN. Ein Feld dateiname → 400 ANFRAGE_UNGUELTIG (Req 3.14). Danach ARCHIVIERUNG und Auftrag ARCHIVIEREN.
      * @endpoint post /api/v1/dokumente/{id}/bestaetigen
      * @param id 
      * @param ifMatch 

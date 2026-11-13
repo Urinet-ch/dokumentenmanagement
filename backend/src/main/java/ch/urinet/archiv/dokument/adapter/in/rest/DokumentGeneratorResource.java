@@ -159,7 +159,7 @@ public class DokumentGeneratorResource {
         }
         // die Metadaten erst nach der Prüfsumme lesen (Regel 3)
         DokumentGenerator.Ergebnis ergebnis = generator.annehmen(principal, datei.uploadedFile(),
-                () -> anfrage(metadaten));
+                datei.fileName(), () -> anfrage(metadaten));
         GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name());
         if (!ergebnis.neu()) {
             return Response.ok(antwort).type(MediaType.APPLICATION_JSON_TYPE).build();

@@ -121,6 +121,10 @@ public class DokumentEintrag extends PanacheEntityBase {
     @Column(name = "hinweis")
     public String hinweis;
 
+    /** Nur beim Eingang gesetzt, nie geändert (Req 3.11, 3.14). */
+    @Column(name = "dateiname", updatable = false)
+    public String dateiname;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "zusatz", columnDefinition = "jsonb")
     public String zusatz;
