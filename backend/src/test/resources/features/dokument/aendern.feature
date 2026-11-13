@@ -56,6 +56,30 @@ Funktionalität: Metadaten ändern und Versionen
     Und hält die letzte Fassung von «Q» den Titel "Quittung" mit dem Grund "Titel präzisiert" von «inhaber-urinet» fest
 
   @req-10.1
+  Szenario: Die Dokumentansicht nennt die gesicherten Fassungen mit Zeit, Benutzer und Grund
+    Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und «inhaber-urinet» das Dokument «Q» so bestätigt:
+      | art      | QUITTUNG   |
+      | titel    | Quittung   |
+      | datum    | 2026-03-10 |
+      | richtung | AUSGABE    |
+      | betrag   | 12.00      |
+      | waehrung | CHF        |
+    Und der Worker die Archivierung ausführt
+    Wenn «inhaber-urinet» das Dokument «Q» mit Warnungen liest
+    Dann nennt die Antwort keine Versionen
+    Wenn «inhaber-urinet» das Dokument «Q» so ändert:
+      | titel | Quittung Werkstatt |
+      | grund | Titel präzisiert   |
+    Dann nennt die Antwort 1 Version, zuletzt mit dem Grund "Titel präzisiert" von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «Q» so ändert:
+      | titel | Quittung Werkzeug |
+      | grund | Zweite Korrektur  |
+    Dann nennt die Antwort 2 Versionen, zuletzt mit dem Grund "Zweite Korrektur" von «inhaber-urinet»
+    Wenn «treuhaender-urinet» das Dokument «Q» mit Warnungen liest
+    Dann nennt die Antwort 2 Versionen, zuletzt mit dem Grund "Zweite Korrektur" von «inhaber-urinet»
+
+  @req-10.1
   Szenario: Archiviert darf kein Pflichtfeld der Art und nicht das Geschäftsjahr neu fehlen
     Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Und «inhaber-urinet» das Dokument «Q» so bestätigt:

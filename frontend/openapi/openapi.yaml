@@ -209,6 +209,7 @@ components:
       - warnungen
       - pdfaFehlt
       - unsicher
+      - versionen
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -362,6 +363,12 @@ components:
           anyOf:
           - $ref: "#/components/schemas/DokumentVertrag"
           - type: "null"
+        versionen:
+          type: array
+          items:
+            $ref: "#/components/schemas/DokumentVersion"
+          description: "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim\
+            \ einzelnen Dokument (GET und PATCH), im Eingangskorb leer"
     DokumentAenderung:
       description: "Änderung der Metadaten (A6, Aufgabe 3.5). Nur die angegebenen\
         \ Felder ändern sich; null oder ein leerer Text leert ein Feld (tags: null\
@@ -533,6 +540,31 @@ components:
           - "null"
       required:
       - waehrung
+    DokumentVersion:
+      type: object
+      description: "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Zeit, Benutzer\
+        \ und Grund; die früheren Werte selbst liefert das Archiv nicht"
+      required:
+      - version
+      - zeit
+      - geaendertVon
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: "Version des Dokuments, die diese Fassung gesichert hat"
+        zeit:
+          description: Zeitpunkt der Änderung (UTC)
+          type: string
+          $ref: "#/components/schemas/Instant"
+        geaendertVon:
+          type: string
+          description: "Benutzer-ID (Keycloak-sub), die geändert hat"
+        grund:
+          type:
+          - string
+          - "null"
+          description: Grund der Änderung
     DokumentVertrag:
       type: object
       description: Gespeicherte Vertragsangaben; die Bestätigung ersetzt sie ganz

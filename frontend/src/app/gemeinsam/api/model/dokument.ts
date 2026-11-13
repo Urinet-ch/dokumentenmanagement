@@ -10,6 +10,7 @@
 import { DokumentFinanz } from './dokument-finanz';
 import { Warnung } from './warnung';
 import { DokumentVertrag } from './dokument-vertrag';
+import { DokumentVersion } from './dokument-version';
 
 
 /**
@@ -77,6 +78,10 @@ export interface Dokument {
     personBenutzer?: string | null;
     finanz?: DokumentFinanz | null;
     vertrag?: DokumentVertrag | null;
+    /**
+     * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET und PATCH), im Eingangskorb leer
+     */
+    versionen: Array<DokumentVersion>;
 }
 export namespace Dokument {
     export const QuelleEnum = {

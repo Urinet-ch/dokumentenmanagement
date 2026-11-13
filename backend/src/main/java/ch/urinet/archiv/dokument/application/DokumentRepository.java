@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,12 @@ public interface DokumentRepository {
     Optional<Dokument> finden(UUID id, Sichtregel regel);
 
     boolean sichtbar(UUID id, Sichtregel regel);
+
+    /**
+     * Gesicherte Fassungen eines Dokuments (Req 10.1), neueste zuerst, ohne Sichtregel: Der Aufrufer hat das Dokument
+     * vorher mit {@link #finden} für den Benutzer gelesen.
+     */
+    List<Fassung> fassungen(UUID id);
 
     /**
      * Pfad und Versions-ID einer Datei des sichtbaren, nicht verworfenen Dokuments (Req 14.6): {@code PDFA} aus dem

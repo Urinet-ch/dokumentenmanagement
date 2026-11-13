@@ -1039,7 +1039,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     (`frontend/e2e/hilfen/archiv-attrappe.mjs`), weil das Archiv der Browser-Szenarien ohne Datenbank läuft; die Regeln
     selbst belegen die Java-Szenarien (`features/dokument/eingangskorb.feature`, `bestaetigen.feature`). Die Attrappe
     beantwortet in jedem Browser-Szenario auch den Zähler.
-- Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026, teilweise):
+- Suche und Dokumentansicht (Aufgabe 4.6, 11.11.2026; Rest 13.11.2026):
   - Download-Adresse als JSON: Ein Browser folgt dem 302 von `GET /dokumente/{id}/datei` bei `fetch`/XHR selbst und
     schickt dabei den `Authorization`-Header nicht mit, die Antwort der Ablage wäre zudem eine Cross-Origin-Antwort.
     Darum liefert derselbe Endpunkt mit `Accept: application/json` 200 `{url, gueltigBis}` (`DownloadAdresseDto`,
@@ -1072,15 +1072,38 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     es nicht. Darum zeigt die Ansicht danach zusätzlich den Link «Datei jetzt öffnen» als eigene Geste; ist dessen
     Adresse abgelaufen, holt ein Klick eine neue (Review PR #71, K2). Der Ersatztext von `<object>` verweist auf den
     Download-Knopf (Android-Chrome zeigt PDFs dort nicht an).
-  - Offen aus 4.6: Metadaten bearbeiten mit Grund (A6, Req 10.1) braucht den Endpunkt aus 3.5; die Versionsliste
-    zeigt die Ansicht, sobald `GET /dokumente/{id}` die Versionen liefert, wie die Endpunkt-Tabelle es vorsieht
-    («Metadaten, Status, Versionen, Warnungen»). `DokumentDto` hat dafür noch kein Feld, und Einträge in
-    `dokument_version` entstehen erst mit 3.5 (PR #67); das Feld folgt mit oder direkt nach 3.5, danach die Liste in
-    der Ansicht. Die Vorschau als Bild der ersten Seite kommt mit der Vorschau-Erzeugung (PR #68).
+  - Rest von 4.6 (13.11.2026, PR #100), ersetzt den bisherigen Absatz «Offen aus 4.6»:
+    - Metadaten bearbeiten (A6, Req 10.1): Den Knopf «Metadaten bearbeiten» zeigt die Ansicht nur mit A6 und in einem
+      änderbaren Status (`EINGANGSKORB`, `FEHLER`, `ARCHIVIERT`, wie `PATCH` in «Umsetzung 3.5»). Das Formular
+      (`MetadatenFormular`, Logik in `aenderung.ts`) enthält Art, Titel, Datum, Geschäftsjahr, Partner (Suche über
+      `GET /kontakte?q=`), Projekt, Tags, die Finanz- bzw. Vertragsangaben nur, wenn die gewählte Art die Gruppe hat,
+      die Zusatzfelder aus dem `zusatzSchema` der Art (Text, Zahl, Ganzzahl, Ja/Nein, Datum; Werte mit Objekten oder
+      Listen sind nicht bearbeitbar und bleiben unverändert erhalten), die Vertraulichkeit nur mit A8 und den Grund.
+      `personBenutzer` steht nicht im Formular.
+    - Gesendet werden nur geänderte Felder (Merge-Semantik: `null` leert, `zusatz` ersetzt alle Zusatzwerte), mit
+      `If-Match` aus `version`; ohne Änderung keine Anfrage. Bei `ARCHIVIERT` ist der Grund Pflicht (höchstens 1'000
+      Zeichen), sonst freiwillig. Betrag, Währung, Geschäftsjahr, Daten und Zusatzwerte prüft schon die PWA, Beträge
+      gehen als Text (`'` und `,` als Eingabe), die API prüft trotzdem.
+    - Fehler: `PFLICHTFELD_FEHLT` markiert die genannten Felder; `VERSION_KONFLIKT`/412, `STATUS_KONFLIKT`/409 und
+      404 schliessen das Formular, die Ansicht lädt neu und sagt warum; fachliche Fehler (`BELEGNUMMER_VERGEBEN`,
+      `PARTNER_UNBEKANNT`, `ZUSATZ_UNGUELTIG`, 400) bleiben als Meldung im Formular, die Eingaben bleiben stehen.
+    - Versionen: `DokumentDto.versionen` (Schema `DokumentVersion`: `version`, `zeit`, `geaendertVon` = Kennung `sub`,
+      `grund`; neueste zuerst) aus `dokument_version`, in `GET` und `PATCH /dokumente/{id}`. Ein Eintrag ist die
+      gesicherte **vorherige** Fassung; er entsteht nur beim Ändern eines archivierten Dokuments (3.5). Das DTO nennt
+      bewusst keine früheren Werte, damit über die Versionen nichts sichtbar wird, was die Sichtregel nicht ohnehin
+      zeigt; wer das Dokument lesen darf, sieht die Liste. Der Eingangskorb liefert eine leere Liste. Die Ansicht zeigt
+      «Fassung n», Zeit, Änderer (die eigene Kennung als «Ihnen») und Grund.
+    - Vorschaubild: `GET /dokumente/{id}/vorschau?seite=1` (PR #68) als Blob mit Object-URL, freigegeben beim Wechsel
+      und beim Verlassen. Die Ansicht zeigt es auf schmalen Bildschirmen (< 960 px) statt des eingebetteten PDF und
+      immer, wenn die PDF/A-Fassung fehlt oder nicht lädt; nur mit `seiten` ≥ 1. In der Trefferliste gibt es kein
+      Bild: Jeder Abruf schreibt `ANZEIGEN` ins Protokoll, und `Suchtreffer` kennt `seiten` nicht.
   - Tests: Unit-Tests (Vitest) für Filter, Adapter, Suche und Dokumentansicht; Browser-Szenarien
     `features/suche/suche-pwa.feature` (`@req-14.1`, `@req-14.2`, `@req-14.4`, `@req-14.6`, `@req-14.7`) gegen eine
     API-Attrappe mit synthetischen Dokumenten (`frontend/e2e/hilfen/suche-attrappe.mjs`, darum `@attrappe`); den
-    Vertrag der echten API belegen `volltextsuche.feature` und `download.feature`.
+    Vertrag der echten API belegen `volltextsuche.feature` und `download.feature`. Zum Rest (PR #100): Vitest für
+    `aenderung.ts`, `MetadatenFormular`, Adapter und Ansicht; Browser-Szenarien `features/dokument/bearbeiten-pwa.feature`
+    (`@req-10.1` Bearbeiten mit Grund und If-Match, kein Knopf ohne A6; `@req-14.6` Vorschaubild auf dem Handy) gegen
+    dieselbe Attrappe; den Vertrag von `versionen` belegt `features/dokument/aendern.feature` (`@req-10.1`).
 
 ## Data Models
 

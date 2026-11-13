@@ -10,6 +10,7 @@ import ch.urinet.archiv.dokument.application.DokumentDatei;
 import ch.urinet.archiv.dokument.application.DokumentLesen;
 import ch.urinet.archiv.dokument.application.DokumentVerwerfen;
 import ch.urinet.archiv.dokument.application.DokumentWiederholen;
+import ch.urinet.archiv.dokument.application.Fassung;
 import ch.urinet.archiv.dokument.application.Warnung;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentFinanz;
@@ -200,6 +201,19 @@ public class DokumentResource {
     public record VerwerfenDto(@Schema(required = true, maxLength = 1000) String grund) {
     }
 
+    @Schema(name = "DokumentVersion", description = "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Zeit, "
+            + "Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht")
+    public record VersionDto(
+            @Schema(required = true, description = "Version des Dokuments, die diese Fassung gesichert hat") int version,
+            @Schema(required = true, description = "Zeitpunkt der Änderung (UTC)") Instant zeit,
+            @Schema(required = true, description = "Benutzer-ID (Keycloak-sub), die geändert hat") String geaendertVon,
+            @Schema(nullable = true, description = "Grund der Änderung") String grund) {
+
+        static VersionDto aus(Fassung f) {
+            return new VersionDto(f.version(), f.zeit(), f.geaendertVon(), f.grund());
+        }
+    }
+
     @Schema(name = "DokumentFinanz", description = "Gespeicherte Finanzangaben; die Bestätigung ersetzt sie ganz")
     public record FinanzDto(
             @Schema(nullable = true) String belegnummer,
@@ -269,7 +283,9 @@ public class DokumentResource {
             @Schema(nullable = true, description = "Zugeordnete Person (Benutzer-ID) eines PERSONAL-Dokuments")
             String personBenutzer,
             @Schema(nullable = true) FinanzDto finanz,
-            @Schema(nullable = true) VertragDto vertrag) {
+            @Schema(nullable = true) VertragDto vertrag,
+            @Schema(required = true, description = "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim "
+                    + "einzelnen Dokument (GET und PATCH), im Eingangskorb leer") List<VersionDto> versionen) {
     }
 
     @GET
@@ -287,7 +303,8 @@ public class DokumentResource {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer(identitaet);
         Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle()))
+        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
+                        lesen.fassungen(dokument)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -325,7 +342,8 @@ public class DokumentResource {
         int version = version(ifMatch);
         aendern.aendern(benutzer, id, version, () -> aenderung(knoten(inhalt)));
         Dokument dokument = lesen.lesen(benutzer, id);
-        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle()))
+        return Response.ok(dto(dokument, json, lesen.warnungen(benutzer, dokument), lesen.schwelle(),
+                        lesen.fassungen(dokument)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -596,7 +614,8 @@ public class DokumentResource {
                 Rolle.ausRealmRollen(identitaet.getRoles()).orElseThrow());
     }
 
-    static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle) {
+    static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle,
+                           List<Fassung> fassungen) {
         boolean eingangskorb = DokumentStatus.EINGANGSKORB_STATUS.contains(d.status());
         JsonNode vorschlag = eingangskorb ? lesenJson(d, d.kiVorschlag(), "ki_vorschlag", json) : null;
         List<String> unsicher = eingangskorb
@@ -607,7 +626,8 @@ public class DokumentResource {
                 d.sperreBis(), d.fristAbgelaufen(), lesenJson(d, d.zusatz(), "zusatz", json), d.version(),
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
                 d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(),
-                FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()));
+                FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()),
+                fassungen.stream().map(VersionDto::aus).toList());
     }
 
     // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst

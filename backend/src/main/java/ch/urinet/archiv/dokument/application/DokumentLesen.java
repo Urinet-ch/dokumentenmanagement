@@ -57,6 +57,11 @@ public class DokumentLesen {
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
     }
 
+    /** Versionsliste eines mit {@link #lesen} gelesenen, also sichtbaren Dokuments, neueste zuerst (Req 10.1). */
+    public List<Fassung> fassungen(Dokument dokument) {
+        return repository.fassungen(dokument.id());
+    }
+
     /**
      * Vorschaubild (PNG) einer Seite eines sichtbaren Dokuments (Req 8.1, design.md «REST-API»). Seite unter 1 → 400;
      * unsichtbares Dokument, Seite über der Seitenzahl oder fehlendes Bild → 404. Der Aufrufer schliesst den Datenstrom.

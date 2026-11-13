@@ -79,3 +79,50 @@ dd {
 .fehler {
   color: var(--urinet-fehler);
 }
+
+.meldung:empty {
+  display: none;
+}
+
+.meldung {
+  color: var(--urinet-gelb);
+}
+
+.aktionen.oben {
+  margin: 0 0 0.75rem;
+}
+
+.bild {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 8px;
+  background-color: var(--urinet-hell);
+}
+
+.versionen {
+  margin-top: 1rem;
+
+  ol {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    padding: 0.25rem 0;
+    overflow-wrap: anywhere;
+  }
+
+  .version {
+    font-weight: 600;
+  }
+
+  .grund {
+    flex-basis: 100%;
+    white-space: pre-line;
+  }
+}

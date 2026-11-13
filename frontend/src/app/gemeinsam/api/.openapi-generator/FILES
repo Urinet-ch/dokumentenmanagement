@@ -17,6 +17,7 @@ model/auszug-teil.ts
 model/bestaetigung.ts
 model/dokument-aenderung.ts
 model/dokument-finanz.ts
+model/dokument-version.ts
 model/dokument-vertrag.ts
 model/dokument.ts
 model/dokumentart-aenderung.ts

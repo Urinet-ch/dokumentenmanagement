@@ -331,11 +331,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 14.1–14.7_
   - Erledigt (PR #56): Suche und Download wie design.md «Suche», «Umsetzung (Aufgabe 4.5)»; Lastskript `tools/last/suche.py`. 14.3 lokal nur als Grössenordnung (10'000 Dokumente), der Nachweis folgt in 5.11
 
-- [ ] 4.6 Suche und Dokumentansicht [Frontend]
+- [x] 4.6 Suche und Dokumentansicht [Frontend]
   - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Richtung, Status, Tags, Geschäftsjahr, Belegnummer), Trefferliste mit Auszug
   - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
   - _Anforderungen: 10.1, 14.1, 14.2, 14.4, 14.7_
   - Teilweise erledigt (PR #71): Suche mit Filterleiste und Auszug, Dokumentansicht mit Metadaten, PDF/A-Vorschau und Download (dazu `GET /dokumente/{id}/datei` mit `Accept: application/json`, 14.6), design.md «Frontend», «Suche und Dokumentansicht (Aufgabe 4.6)». Offen: Metadaten bearbeiten mit Grund (A6, 10.1; braucht 3.5), Versionsliste (`GET /dokumente/{id}` liefert laut Endpunkt-Tabelle die Versionen, `DokumentDto` noch nicht; folgt mit oder nach 3.5, PR #67), Vorschaubild (PR #68)
+  - Erledigt (PR #100): Metadaten bearbeiten mit Grund und `If-Match` (A6, A8 für die Vertraulichkeit, 10.1), Versionsliste (`DokumentDto.versionen`), Vorschaubild der ersten Seite; design.md «Suche und Dokumentansicht (Aufgabe 4.6)», «Rest von 4.6»
 
 - [x] 4.7 Generator-Endpunkt und Python-Client [Backend]
   - `POST /api/v1/dokumente/generator` (Scope `generator`): Pflichtfelder der Art (422 `PFLICHTFELD_FEHLT`), unbekannte `crmId` (422); `vertraulichkeit` und `personBenutzer` Pflicht bei Standard `PERSONAL`, sonst Standard der Art
