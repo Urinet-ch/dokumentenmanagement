@@ -71,7 +71,8 @@ import java.util.UUID;
  * Interrupt-Flag gelöscht hat: Sie wird an der Ursache erkannt.
  * <p>
  * Endet ein Teil nach dem letzten Versuch in {@code FEHLER}, bleibt der Lauf an dieser Stelle stehen (der Monat ist
- * belegt) und der Inhaber erhält eine E-Mail nur mit Lauf-ID, Phase und Marke ({@link #nachLetztemFehlversuch}).
+ * belegt) und der Inhaber erhält eine E-Mail nur mit IDs: Lauf-ID, Phase, Marke, die Zähler und die ersten der schon
+ * festgehaltenen Abweichungen ({@link #nachLetztemFehlversuch}).
  * <p>
  * Idempotent: Ein Teil, den der Lauf schon festgehalten hat, endet ohne Wirkung; Verlängerungen sind ohnehin
  * wiederholbar (nie verkürzt).
@@ -178,7 +179,9 @@ public class PrueflaufHandler implements AuftragHandler {
 
     /**
      * Nach dem letzten Fehlversuch eines Teils (Auftrag in {@code FEHLER}): Der Lauf bleibt an seinem Stand stehen, der
-     * Inhaber erhält eine E-Mail nur mit IDs (Req 15.5, 16.7); in Stufe P keine E-Mail. Hat ein anderer Lauf des Teils
+     * Inhaber erhält eine E-Mail nur mit IDs (Req 15.5, 16.7) mit den Zählern und den ersten
+     * {@value #ABWEICHUNGEN_IN_MAIL} Abweichungen der schon festgehaltenen Teile, weil {@link #abschliessen} für diesen
+     * Lauf nie mehr läuft (Review PR #98); in Stufe P keine E-Mail. Hat ein anderer Lauf des Teils
      * ihn schon festgehalten oder ist der Lauf abgeschlossen, nichts. Idempotent bis auf eine zweite E-Mail, falls der
      * Aufräumer den Hook nach dem Versand wiederholt (Absturz zwischen Versand und Abschluss).
      */
@@ -197,8 +200,10 @@ public class PrueflaufHandler implements AuftragHandler {
         LOG.errorf("Prüflauf %s Teil %d nach %d Versuchen gescheitert, Lauf bleibt in Phase %s stehen (fehler-id=%s)",
                 id.get(), teil.getAsLong(), Wiederholung.MAX_VERSUCHE, lauf.get().stand().phase(), fehlerId);
         if (stufe != Stufe.P) {
+            Zaehler bisher = lauf.get().zaehler();
             benachrichtigung.prueflaufAbgebrochen(auftrag.mandant(), id.get(), Math.toIntExact(teil.getAsLong()),
-                    lauf.get().stand(), fehlerId);
+                    lauf.get().stand(), bisher, bisher.abweichungen() > 0
+                            ? speichern.abweichungen(id.get(), ABWEICHUNGEN_IN_MAIL) : List.of(), fehlerId);
         }
     }
 
@@ -332,6 +337,12 @@ public class PrueflaufHandler implements AuftragHandler {
      * der Ursache erkannt; das Flag wird neu gesetzt). Ausser im letzten Versuch bricht ein vorübergehender Fehler oder
      * die Grenze in Folge den Teil ab, damit die Auftragsschlange ihn wiederholt; sonst festhalten und weiterprüfen. Im
      * letzten Versuch gilt der Rest des Teils nur nach vorübergehenden Fehlern in Folge als ungeprüft.
+     * <p>
+     * Ein dauerhafter Fehler setzt die Folge vorübergehender Fehler bewusst zurück (Review PR #98, Kann 3): Wechseln
+     * sich beide Arten ab, greift das Überspringen nicht, und der Teil kann an der Zeitgrenze in {@code FEHLER} enden;
+     * dann meldet {@link #nachLetztemFehlversuch} die schon festgehaltenen Abweichungen. Zählte ein dauerhafter Fehler
+     * dagegen nur nicht mit, genügten wenige Störungen verstreut in einer Reihe unlesbarer Dateien, um eine lesbare Datei
+     * danach (z. B. mit {@code PRUEFSUMME}) nur noch als {@code PRUEFFEHLER} zu melden.
      */
     private void prueffehler(RuntimeException e, Optional<UUID> dokument, String schluessel,
                              Optional<String> version, Sammler s) {

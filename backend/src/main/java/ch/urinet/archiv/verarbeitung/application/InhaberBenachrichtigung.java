@@ -23,9 +23,13 @@ public interface InhaberBenachrichtigung {
 
     /**
      * Teil {@code teil} des Prüflaufs {@code laufId} ist nach dem letzten Versuch in {@code FEHLER} geendet (Req 15.5);
-     * der Lauf bleibt an {@code stand} stehen und wird in diesem Monat nicht fortgesetzt. Nur IDs: Phase, Dokument-ID
-     * und S3-Schlüssel der Marke, Fehler-ID (Req 16.7).
+     * der Lauf bleibt an {@code stand} stehen und wird in diesem Monat nicht fortgesetzt. {@code bisher} sind die Zähler
+     * der schon festgehaltenen Teile, {@code erste} die ersten der bis dahin festgehaltenen Abweichungen (leer ohne
+     * Abweichungen), damit der Inhaber sie auch ohne Abschluss des Laufs erfährt (Req 15.5). Nur IDs: Phase,
+     * Dokument-ID und S3-Schlüssel der Marke, Art, Dokument-ID, Schlüssel und Version je Abweichung, Fehler-ID
+     * (Req 16.7).
      */
     void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
+                              PrueflaufRegister.Zaehler bisher, List<PrueflaufRegister.Abweichung> erste,
                               UUID fehlerId);
 }
