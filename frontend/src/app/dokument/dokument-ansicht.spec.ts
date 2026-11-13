@@ -52,12 +52,13 @@ class DokumentAttrappe extends DokumentPort {
   bild: Observable<Blob> = of(new Blob(['png'], { type: 'image/png' }));
   geaendert: Observable<Dokument> = of(DOKUMENT);
   aenderungen: { version: number; aenderung: DokumentAenderung }[] = [];
+  arten: Dokumentart[] = [ART];
   lesen(): Observable<Dokument> {
     this.gelesen++;
     return this.dokument;
   }
   dokumentarten(): Observable<Dokumentart[]> {
-    return of([ART]);
+    return of(this.arten);
   }
   vorschau(_id: string, seite: number): Observable<Blob> {
     this.bilder.push(seite);
@@ -103,9 +104,12 @@ describe('DokumentAnsicht (Req 14.6)', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  async function oeffnen() {
+  async function oeffnen(art?: string) {
     fixture = TestBed.createComponent(DokumentAnsicht);
     fixture.componentRef.setInput('id', 'd1');
+    if (art) {
+      fixture.componentRef.setInput('art', art);
+    }
     element = fixture.nativeElement as HTMLElement;
     await fixture.whenStable();
   }
@@ -265,6 +269,65 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         TEXTE.dokument.bearbeiten.fehlercode['VERSION_KONFLIKT'],
       );
       expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+    });
+
+    describe('Art aus dem Eingangskorb (?art=, Review #106)', () => {
+      const LOHN: Dokumentart = {
+        ...ART,
+        code: 'LOHNABRECHNUNG',
+        name: 'Lohnabrechnung',
+        gruppen: [],
+        pflichtfelder: ['zusatz.periode'],
+        zusatzSchema: { type: 'object', properties: { periode: { type: 'string' } }, required: ['periode'] },
+        vertraulichkeit: 'PERSONAL',
+      };
+      const IM_KORB: Dokument = {
+        ...DOKUMENT,
+        art: null,
+        status: 'EINGANGSKORB',
+        zusatz: null,
+        vorschlag: { art: 'LOHNABRECHNUNG' },
+      };
+
+      it('öffnet das Formular mit der Art als Artwechsel und sendet sie mit den Zusatzfeldern', async () => {
+        port.arten = [ART, LOHN];
+        port.dokument = of(IM_KORB);
+        await oeffnen('LOHNABRECHNUNG');
+        expect(element.querySelector<HTMLSelectElement>('#bearbeiten-art')!.value).toBe('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=art-vorbelegt]')!.textContent).toBe(
+          TEXTE.dokument.bearbeiten.artVorbelegt('Lohnabrechnung'),
+        );
+        const periode = element.querySelector<HTMLInputElement>('#bearbeiten-zusatz-periode')!;
+        periode.value = '2026-10';
+        periode.dispatchEvent(new Event('input'));
+        element.querySelector<HTMLButtonElement>('[data-test=speichern]')!.click();
+        await fixture.whenStable();
+        expect(port.aenderungen).toEqual([
+          { version: 1, aenderung: { art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10' } } },
+        ]);
+      });
+
+      it('übernimmt nach «Abbrechen» die Art nicht mehr', async () => {
+        port.arten = [ART, LOHN];
+        port.dokument = of(IM_KORB);
+        await oeffnen('LOHNABRECHNUNG');
+        knopf(TEXTE.dokument.bearbeiten.abbrechen).click();
+        await fixture.whenStable();
+        bearbeiten()!.click();
+        await fixture.whenStable();
+        expect(element.querySelector<HTMLSelectElement>('#bearbeiten-art')!.value).toBe('');
+        expect(element.querySelector('[data-test=art-vorbelegt]')).toBeNull();
+      });
+
+      it('übergeht eine unbekannte oder inaktive Art und öffnet das Formular nicht', async () => {
+        port.arten = [ART, { ...LOHN, aktiv: false }];
+        port.dokument = of(IM_KORB);
+        await oeffnen('LOHNABRECHNUNG');
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+        fixture.destroy();
+        await oeffnen('GIBT_ES_NICHT');
+        expect(element.querySelector('[data-test=bearbeiten-formular]')).toBeNull();
+      });
     });
   });
 

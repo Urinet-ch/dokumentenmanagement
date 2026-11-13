@@ -242,7 +242,7 @@ export async function sucheAttrappe(welt) {
     return json(route, 200, { url: ziel, gueltigBis: new Date(Date.now() + 300_000).toISOString() });
   });
 
-  // Nur, was die Szenarien brauchen: Version, Grund bei ARCHIVIERT, Titel; die volle Prüfung belegt aendern.feature.
+  // Nur, was die Szenarien brauchen: Version, Grund bei ARCHIVIERT, Titel, Zusatz-Schlüssel; die volle Prüfung belegt aendern.feature.
   async function aenderungBeantworten(route, anfrage, pfad) {
     const d = DOKUMENTE.find((x) => pfad.endsWith(`/${x.id}`));
     if (!d) {
@@ -257,6 +257,15 @@ export async function sucheAttrappe(welt) {
     }
     if (bisher.status === 'ARCHIVIERT' && !body.grund) {
       return json(route, 422, { status: 422, title: 'Pflichtfeld fehlt', fehlercode: 'PFLICHTFELD_FEHLT', felder: ['grund'] });
+    }
+    // Wie das Archiv: Bei Artwechsel oder neuem Zusatz gilt das Schema der (neuen) Art, unbekannte Schlüssel → 422.
+    const art = ARTEN.find((a) => a.code === (body.art ?? bisher.art));
+    const zusatz = body.zusatz ?? bisher.zusatz;
+    if (zusatz && art?.zusatzSchema?.additionalProperties === false && ('zusatz' in body || (body.art && body.art !== bisher.art))) {
+      const bekannt = Object.keys(art.zusatzSchema.properties ?? {});
+      if (Object.keys(zusatz).some((k) => !bekannt.includes(k))) {
+        return json(route, 422, { status: 422, title: 'Zusatz ungültig', fehlercode: 'ZUSATZ_UNGUELTIG' });
+      }
     }
     const fassung = { version: bisher.version, zeit: new Date().toISOString(), geaendertVon: welt.keycloak.benutzer.id, grund: body.grund ?? null };
     const stand = { titel: 'titel' in body ? body.titel : bisher.titel, art: body.art ?? bisher.art, zusatz: body.zusatz ?? bisher.zusatz, version: bisher.version + 1, versionen: [fassung, ...bisher.versionen] };

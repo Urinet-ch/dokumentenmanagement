@@ -72,6 +72,8 @@ export class DokumentAnsicht {
   private readonly injector = inject(Injector);
 
   readonly id = input.required<string>();
+  /** Art aus dem Eingangskorb (`?art=`, Review #106): öffnet das Formular mit dieser Art als Artwechsel. */
+  readonly art = input<string | undefined>();
 
   protected readonly texte = TEXTE.dokument;
   protected readonly stati = TEXTE.suche.stati;
@@ -108,6 +110,18 @@ export class DokumentAnsicht {
     return !!d && AENDERBAR.has(d.status) && this.anmeldung.darf('A6');
   });
   protected readonly bearbeiten = signal(false);
+  /** Nur eine bekannte, aktive Art, die sich von der gespeicherten unterscheidet; sonst gilt `?art=` nicht. */
+  protected readonly artVorbelegung = computed(() => {
+    const code = this.art();
+    const d = this.dokument();
+    if (!code || !d || code === d.art) {
+      return null;
+    }
+    return this.arten().some((a) => a.code === code && a.aktiv) ? code : null;
+  });
+  /** Gilt nur für das automatisch geöffnete Formular; Abbrechen oder Speichern verwirft sie. */
+  protected readonly vorbelegung = signal<string | null>(null);
+  private vorbelegtFuer: string | null = null;
   protected readonly meldung = signal('');
   protected readonly ich = computed(() => this.anmeldung.benutzer()?.id ?? '');
 
@@ -161,6 +175,17 @@ export class DokumentAnsicht {
       untracked(() => this.oeffnen(id));
     });
     effect(() => {
+      const code = this.artVorbelegung();
+      const d = this.dokument();
+      if (code && d && this.darfBearbeiten() && this.vorbelegtFuer !== d.id) {
+        this.vorbelegtFuer = d.id;
+        untracked(() => {
+          this.vorbelegung.set(code);
+          this.bearbeitenOeffnen();
+        });
+      }
+    });
+    effect(() => {
       if (this.bildNoetig()) {
         untracked(() => this.bildLaden());
       }
@@ -173,12 +198,14 @@ export class DokumentAnsicht {
   }
 
   protected bearbeitenSchliessen(): void {
+    this.vorbelegung.set(null);
     this.bearbeiten.set(false);
     this.fokus('[data-test="bearbeiten"]');
   }
 
   protected gespeichert(dokument: Dokument): void {
     this.dokument.set(dokument);
+    this.vorbelegung.set(null);
     this.bearbeiten.set(false);
     this.melden(this.texte.gespeichert);
   }

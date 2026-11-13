@@ -31,15 +31,17 @@ import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
-import org.jboss.resteasy.reactive.server.core.CurrentRequestManager;
-import org.jboss.resteasy.reactive.server.core.multipart.FormData;
+import org.jboss.resteasy.reactive.server.multipart.FormValue;
+import org.jboss.resteasy.reactive.server.multipart.MultipartFormDataInput;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -112,9 +114,10 @@ public class DokumentUploadResource {
     public Response hochladen(@RestForm("dateien") List<FileUpload> dateien,
                               @RestForm("arbeitsfassungen") List<FileUpload> arbeitsfassungen,
                               @RestForm("zusammenfassen") boolean zusammenfassen,
-                              @RestForm("hinweis") String hinweis) {
+                              @RestForm("hinweis") String hinweis,
+                              @Parameter(hidden = true) MultipartFormDataInput formular) {
         List<UploadErgebnis> ergebnisse = new ArrayList<>(erfassen(dateien, arbeitsfassungen, zusammenfassen,
-                hinweis));
+                hinweis, formular));
         List<UploadErgebnisDto> antwort = ergebnisse.stream().map(DokumentUploadResource::dto).toList();
         if (ergebnisse.stream().allMatch(UploadErgebnis.Abgelehnt.class::isInstance)) {
             Fehlercode erster = ((UploadErgebnis.Abgelehnt) ergebnisse.getFirst()).fehler();
@@ -127,14 +130,15 @@ public class DokumentUploadResource {
      * Ein Teil {@code dateien} ohne Dateinamen mit einem Typ ausserhalb von
      * {@code quarkus.http.body.multipart.file-content-types} kommt bei Quarkus als Textfeld an, nicht in
      * {@code List<FileUpload>}. Er erhält an seiner Stelle ein eigenes Ergebnis 415 {@code DATEITYP_UNBEKANNT}, die
-     * Nachbarn werden angenommen (Req 3.3, 3.8); mit Arbeitsfassungen ist die Zuordnung nicht eindeutig (400).
+     * Nachbarn werden angenommen (Req 3.3, 3.8); mit Arbeitsfassungen ist die Zuordnung nicht eindeutig (400). Die
+     * Reihenfolge der Teile liest der Endpunkt über die öffentliche {@link MultipartFormDataInput}.
      */
     private List<UploadErgebnis> erfassen(List<FileUpload> dateien, List<FileUpload> arbeitsfassungen,
-                                          boolean zusammenfassen, String hinweis) {
+                                          boolean zusammenfassen, String hinweis, MultipartFormDataInput formular) {
         List<FileUpload> originale = dateien == null ? List.of() : dateien;
         List<FileUpload> arbeit = arbeitsfassungen == null ? List.of() : arbeitsfassungen;
-        List<Boolean> teile = dateiTeile("dateien", originale.size());
-        if (!arbeit.isEmpty() && (teile.contains(false) || dateiTeile("arbeitsfassungen", arbeit.size())
+        List<Boolean> teile = dateiTeile(formular, "dateien", originale.size());
+        if (!arbeit.isEmpty() && (teile.contains(false) || dateiTeile(formular, "arbeitsfassungen", arbeit.size())
                 .contains(false) || arbeit.size() != originale.size())) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -164,16 +168,23 @@ public class DokumentUploadResource {
         return alle;
     }
 
-    /** Je Teil des Formularfelds in der gesendeten Reihenfolge, ob er als Datei ankam. */
-    private static List<Boolean> dateiTeile(String name, int dateien) {
-        FormData formular = CurrentRequestManager.get().getFormData();
-        var teile = formular == null ? null : formular.get(name);
-        if (teile == null) {
+    /**
+     * Je Teil des Formularfelds in der gesendeten Reihenfolge, ob er als Datei ankam. Passt die Zahl der Datei-Teile
+     * nicht zu {@code dateien}, ist die Zuordnung nicht eindeutig: 400 {@code ANFRAGE_UNGUELTIG} statt eines 500.
+     */
+    static List<Boolean> dateiTeile(MultipartFormDataInput formular, String name, int dateien) {
+        Collection<FormValue> teile = formular == null ? null : formular.getValues().get(name);
+        if (teile == null || teile.isEmpty()) {
+            if (dateien != 0) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
             return Collections.nCopies(dateien, true);
         }
-        List<Boolean> arten = teile.stream().map(t -> t.isFileItem()).toList();
+        List<Boolean> arten = teile.stream().map(FormValue::isFileItem).toList();
         if (arten.stream().filter(t -> t).count() != dateien) {
-            throw new IllegalStateException("Teile und Dateien passen nicht zusammen");
+            LOG.warnf("Teile und Dateien passen nicht zusammen: feld=%s teile=%d dateien=%d", name, arten.size(),
+                    dateien);
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         return arten;
     }

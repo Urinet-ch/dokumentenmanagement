@@ -292,6 +292,40 @@ Funktionalität: Metadaten ändern und Versionen
     Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{}' ändert
     Dann meldet das Archiv Status 409 mit Fehlercode «STATUS_KONFLIKT»
 
+  @req-9.5 @req-10.1
+  Szenariogrundriss: Ein Artwechsel ohne «zusatz» prüft den gespeicherten Zusatz gegen die neue Art: <alt>
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "<alt>", "zusatz": <zusatz>}' ändert
+    Und meldet das Archiv Status 200
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "QUITTUNG"}' ändert
+    Dann meldet das Archiv Status 422 mit Fehlercode «ZUSATZ_UNGUELTIG»
+    Und hat das Dokument «K» diese Werte:
+      | art    | <alt>        |
+      | zusatz | <gespeichert> |
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "QUITTUNG", "zusatz": {}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» diese Werte:
+      | art    | QUITTUNG |
+      | zusatz | {}       |
+
+    Beispiele:
+      | alt            | zusatz                                           | gespeichert                                       |
+      | OFFERTE        | {"angebot_gueltig_bis": "2026-12-31"}            | {"angebot_gueltig_bis": "2026-12-31"}             |
+      | LOHNABRECHNUNG | {"periode": "2026-10", "person": "Person Probe"} | {"person": "Person Probe", "periode": "2026-10"}  |
+
+  @req-9.5 @req-10.1
+  Szenario: Ein Artwechsel nimmt nur Zusatzwerte der neuen Art an
+    Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Und «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "OFFERTE", "zusatz": {"angebot_gueltig_bis": "2026-12-31"}}' ändert
+    Und meldet das Archiv Status 200
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "LOHNABRECHNUNG", "zusatz": {"angebot_gueltig_bis": "2026-12-31", "periode": "2026-10"}}' ändert
+    Dann meldet das Archiv Status 422 mit Fehlercode «ZUSATZ_UNGUELTIG»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "LOHNABRECHNUNG", "zusatz": {"periode": "2026-10"}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» diese Werte:
+      | art    | LOHNABRECHNUNG        |
+      | zusatz | {"periode": "2026-10"} |
+
   Szenariogrundriss: Eine ungültige Änderung antwortet mit 400: <fall>
     Angenommen im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '<koerper>' ändert

@@ -146,6 +146,33 @@ describe('MetadatenFormular (Req 10.1)', () => {
     expect(abrufe).toEqual(['Mül', 'Mül']);
   });
 
+  it('zeigt nach Wählen bei laufender Suche und Entfernen keine veraltete Trefferliste (Review #106)', async () => {
+    await oeffnen();
+    const abrufe: string[] = [];
+    port.kontakte = (q?: string) => {
+      abrufe.push(q ?? '');
+      return of([{ id: 'p2', name: 'Müller' }] as Kontakt[]);
+    };
+    vi.useFakeTimers();
+    try {
+      eingeben('[data-test=partner-suche]', 'Mü');
+      await vi.advanceTimersByTimeAsync(400);
+      fixture.detectChanges();
+      eingeben('[data-test=partner-suche]', 'Mül');
+      element.querySelector<HTMLButtonElement>('[data-test=partner-treffer] button')!.click();
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(400);
+      element.querySelector<HTMLButtonElement>('[data-test=partner-gewaehlt]')!.click();
+      fixture.detectChanges();
+      await vi.advanceTimersByTimeAsync(400);
+      fixture.detectChanges();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(abrufe).toEqual(['Mü']);
+    expect(element.querySelector('[data-test=partner-treffer]')).toBeNull();
+  });
+
   it('sendet ohne Grund nichts und markiert das Feld', async () => {
     await oeffnen();
     eingeben('#bearbeiten-titel', 'Brief Gemeinde Seedorf');

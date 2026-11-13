@@ -32,6 +32,14 @@ Funktionalität: Datenmodell Dokument – Versionen, Zusatzfelder und Indizes (A
       | zeit          | gesetzt               |
 
   @req-10.1
+  Szenario: Die Versionsliste nennt nur Fassungen vor der gelesenen Version
+    Wenn «inhaber-urinet» die Zusatzfelder des Dokuments «ARCHIV» mit dem Grund "Tippfehler korrigiert" auf "{}" setzt
+    Dann nennt die Antwort die Fassungen "0"
+    Angenommen in dokument_version von «ARCHIV» steht schon eine Fassung mit der aktuellen Version
+    Wenn «inhaber-urinet» das Dokument «ARCHIV» liest
+    Dann nennt die Antwort die Fassungen "0"
+
+  @req-10.1
   Szenario: Vor der Archivierung entsteht keine Fassung
     Wenn «inhaber-urinet» die Zusatzfelder des Dokuments «KORB» auf "{}" setzt
     Dann antwortet der Dokument-Endpunkt mit Status 200

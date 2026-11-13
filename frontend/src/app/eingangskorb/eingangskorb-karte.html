@@ -56,7 +56,15 @@
   @if (darfBestaetigen() && zusatzFehlt().length > 0) {
     <p class="warnung" data-test="hinweis-zusatz">
       {{ texte.hinweisZusatz(zusatzNamen()) }}
-      <a [routerLink]="['/dokument', d.id]" data-test="zusatz-ergaenzen">{{ texte.zusatzErgaenzen }}</a>
+      @if (artUebernehmen(); as uebernehmen) {
+        {{ texte.zusatzErgaenzenArt(art()?.name ?? uebernehmen.art) }}
+      }
+      <a
+        [routerLink]="['/dokument', d.id]"
+        [queryParams]="artUebernehmen()"
+        data-test="zusatz-ergaenzen"
+        >{{ texte.zusatzErgaenzen }}</a
+      >
     </p>
   }
   @for (warnung of belegnummerWarnungen(); track $index) {

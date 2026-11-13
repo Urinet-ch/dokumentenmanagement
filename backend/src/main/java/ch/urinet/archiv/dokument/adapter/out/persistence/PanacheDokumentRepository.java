@@ -73,8 +73,9 @@ public class PanacheDokumentRepository implements DokumentRepository {
     }
 
     @Override
-    public List<Fassung> fassungen(UUID id) {
-        return DokumentVersionEintrag.<DokumentVersionEintrag>find("dokumentId", Sort.descending("version", "id"), id)
+    public List<Fassung> fassungen(UUID id, int bisVersion) {
+        return DokumentVersionEintrag.<DokumentVersionEintrag>find("dokumentId = ?1 and version < ?2",
+                        Sort.descending("version", "id"), id, bisVersion)
                 .stream().map(v -> new Fassung(v.version, v.zeit.toInstant(), v.geaendertVon, v.grund)).toList();
     }
 

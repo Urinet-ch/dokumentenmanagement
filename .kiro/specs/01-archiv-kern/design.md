@@ -222,7 +222,7 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | GET | `/dokumente/{id}/datei?variante=pdfa\|original\|arbeitsfassung&nr=` | 302 auf vorsignierte URL der gespeicherten Versions-ID (5 Min.); mit `Accept: application/json` 200 `{url, gueltigBis}` (Aufgabe 4.6) | A2–A4 |
 | GET | `/dokumente/{id}/vorschau?seite=1` | PNG-Vorschau (im Worker erzeugt) | A2–A4 |
 | PATCH | `/dokumente/{id}` | Metadaten ändern; bei `ARCHIVIERT` `grund` Pflicht; 412, 428, 422 `ZUSATZ_UNGUELTIG` | A6 (Vertraulichkeit A8) |
-| POST | `/dokumente/{id}/bestaetigen` | bestätigte Metadaten inkl. Vertraulichkeit → 202, Status `ARCHIVIERUNG`; 409 `STATUS_KONFLIKT` (nicht `EINGANGSKORB`), `BELEGNUMMER_VERGEBEN`, `FRIST_ABGELAUFEN`; 422 `PFLICHTFELD_FEHLT`; 412, 428 | A7 (+A8) |
+| POST | `/dokumente/{id}/bestaetigen` | bestätigte Metadaten inkl. Vertraulichkeit → 202 mit `DokumentDto` (ETag = `version`), Status `ARCHIVIERUNG`; 409 `STATUS_KONFLIKT` (nicht `EINGANGSKORB`), `BELEGNUMMER_VERGEBEN`, `FRIST_ABGELAUFEN`; 422 `PFLICHTFELD_FEHLT`; 412, 428 | A7 (+A8) |
 | POST | `/dokumente/{id}/verwerfen` | `{grund}` → 204; 409 bei `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`; 412, 428 | A9 |
 | POST | `/dokumente/{id}/wiederholen` | `FEHLER` → `NEU`, `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` → 202; sonst 409; 412, 428 | A10 |
 | GET | `/eingangskorb` | Status `EINGANGSKORB`, `FEHLER`, `ARCHIVIERUNG_FEHLER`, neueste zuerst | A5 |
@@ -315,7 +315,7 @@ Aufgaben 17.2 bis 17.7 und 18.2).
   - Changeset `015-dokument-dateiname` (012 belegt PR #91, 013 main mit `013-ki-verbrauch` und PR #87 mit `013-manifest`; 014 bleibt als Puffer frei).
   - Quarkus REST behandelt einen Multipart-Teil ohne `filename` als Formularfeld; damit `dateien` ohne Namen trotzdem als Datei ankommt, nennt `quarkus.http.body.multipart.file-content-types` die Typen der Erfassung (`application/pdf`, `image/jpeg`, `image/png`, `image/heic`, `image/heif`, `image/tiff`, `application/octet-stream`). Ein Teil ohne Namen mit anderem Typ fehlt in `List<FileUpload>`; `DokumentUploadResource` erkennt ihn über die Formulardaten und führt ihn an seiner Stelle als abgelehnte Datei mit 415 `DATEITYP_UNBEKANNT` (Req 3.3, 3.8), die Nachbarn werden angenommen; mit Arbeitsfassungen antwortet der Upload mit 400 `ANFRAGE_UNGUELTIG`, weil die Zuordnung nicht eindeutig ist (Szenarien `@req-3.8`, `@req-3.3` in `upload.feature`).
   - Bestätigen antwortet mit 202 und dem `DokumentDto` (inkl. `dateiname`, ETag = `version`), wie `GET` (Szenario `@req-14.9` in `bestaetigen.feature`).
-  - Suche ohne Dateinamen (Req 3.13): Trefferbedingung und Rang laufen über `ts_filter(volltext_tsv, '{a,b,c}')`, damit ein Begriff nur aus dem Namen weder trifft noch rangiert und eine Verneinung `-wort` kein Orakel über den Namen ist. Dieser Ausdruck nutzt den GIN-Index nicht; einen passenden Index (oder einen Vorfilter) legt der erste Konsument in Spec 02/03 an.
+  - Suche ohne Dateinamen (Req 3.13): Trefferbedingung und Rang laufen über `ts_filter(volltext_tsv, '{a,b,c}')`, damit ein Begriff nur aus dem Namen weder trifft noch rangiert und eine Verneinung `-wort` kein Orakel über den Namen ist. Dieser Ausdruck nutzt den GIN-Index nicht; einen passenden Index (oder einen Vorfilter) legt der erste Konsument in Spec 02/03 an (eingetragen in Spec 02, Aufgabe 7.1, und Spec 03, Aufgabe 11.2).
   - Rücksprung (Req 16.11): Szenario `@req-16.11` in `datenmodell.feature` führt den Insert und das Titel-Update des Vorgänger-Releases sowie dessen Trefferbedingung und Rang gegen das Schema mit 015 aus.
   - KI-Request (Req 3.12): Das Upload-Szenario `@req-3.12` prüft mit WireMock, dass kein Aufruf des Sprachmodells den Dateinamen enthält.
   - Ein NUL (U+0000) im Namen entfernt Quarkus, bevor `DateiName` prüft; er führt darum nicht zu 400 (beobachtet, ohne eigenes Szenario). Die übrigen Zeichen nach Req 3.10 lehnt `DateiName` ab (Szenario `@req-3.10` mit Cc, Cf, Zl, Zp).
@@ -1108,6 +1108,14 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     Dokument, zeigt die Karte einen Hinweis mit den fehlenden Feldern und dem Link «In der Dokumentansicht ergänzen»
     (`/dokument/{id}`); dort lassen sich die Zusatzfelder ergänzen (4.6). Bei 422 mit `zusatz.*` sagt die Meldung,
     dass das Dokument im Eingangskorb bleibt (verwerfen bleibt möglich).
+  - Art nur im KI-Vorschlag (Folge Review #106): Der KI-Vorschlag schreibt die Art nur in `ki_vorschlag`, die Spalte
+    `art` bleibt bis zum Bestätigen leer. Weicht die Art der Karte (Vorschlag oder ungespeicherte Wahl) von der
+    gespeicherten ab, trägt der Link `?art=<code>` und der Hinweis sagt, dass nur die Art mitgeht. Die Dokumentansicht
+    übernimmt `?art=` nur, wenn die Art bekannt und aktiv ist, sich von der gespeicherten unterscheidet und der Benutzer
+    A6 hat und der Status änderbar ist: Sie öffnet dann das Formular einmal mit dieser Art als Artwechsel (Hinweis
+    «… übernommen», gespeichert erst mit «Änderungen speichern»), sodass der PATCH `art` und `zusatz` der neuen Art
+    sendet. Nach «Abbrechen» oder dem Speichern gilt `?art=` nicht mehr; andere ungespeicherte Angaben der Karte gehen
+    nicht mit.
   - Antworten: 422 `PFLICHTFELD_FEHLT` öffnet das Formular und markiert die genannten Felder (`aria-invalid`), bei
     `["ohnePdfa"]` und bei 409 `FRIST_ABGELAUFEN` fragt die Karte zurück und sendet erneut mit `ohnePdfa` bzw.
     `fristAbgelaufenAkzeptiert` (Req 5.9, 9.8); 409 `STATUS_KONFLIKT`, 412, 404 laden den Eingangskorb mit Meldung neu.
@@ -1170,9 +1178,14 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       `properties` der neuen Art (sonst `{}`); Zusatzwerte der alten Art entfallen, weil die Schemas
       `additionalProperties: false` tragen. Ohne Artwechsel bleibt es bei «nur bei Änderung».
     - Die Partnersuche löst nach dem Entfernen eines Partners dieselbe Eingabe wieder aus (kein `distinctUntilChanged`;
-      `switchMap` verwirft veraltete Abrufe). Die Ansicht bestellt den Abruf des Vorschaubilds beim Verlassen ab.
-      `GET`/`PATCH /dokumente/{id}` lesen Dokument, Warnungen und Versionsliste in einer Transaktion
-      (`DokumentLesen.ansicht`).
+      `switchMap` verwirft veraltete Abrufe). Wählen und Entfernen setzen die Suche zurück (leerer Begriff), damit ein
+      noch laufender Debounce oder Abruf keine veraltete Trefferliste zeigt (Folge Review #106). Die Ansicht bestellt
+      den Abruf des Vorschaubilds beim Verlassen ab.
+      `GET`/`PATCH /dokumente/{id}` und `POST /bestaetigen` lesen Dokument, Warnungen und Versionsliste in einer
+      Transaktion (`DokumentLesen.ansicht`). Unter READ COMMITTED (PostgreSQL-Standard, keine eigene Isolationsstufe)
+      sieht jede Abfrage einen eigenen Stand; dass Version und Versionsliste zueinander passen, sichert darum die
+      Begrenzung der Liste auf Fassungen mit `version < dokument.version` (Folge Review #106). Eine Fassung, die ein
+      paralleler PATCH nach dem Lesen des Dokuments sichert, erscheint erst mit dessen neuer Version.
     - Fehler: `PFLICHTFELD_FEHLT` markiert die genannten Felder; `VERSION_KONFLIKT`/412, `STATUS_KONFLIKT`/409 und
       404 schliessen das Formular, die Ansicht lädt neu und sagt warum; fachliche Fehler (`BELEGNUMMER_VERGEBEN`,
       `PARTNER_UNBEKANNT`, `ZUSATZ_UNGUELTIG`, 400) bleiben als Meldung im Formular, die Eingaben bleiben stehen.

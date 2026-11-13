@@ -47,6 +47,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 11.2 Endpunkte `/public/v1` [Backend]
   - Liste, Suche (Hybrid), Details, Datei-Link (5 Min., Protokoll mit gekürzter IP)
+  - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); Index oder Vorfilter anlegen, falls Spec 02 (Aufgabe 7.1) ihn noch nicht angelegt hat
   - Spec 05 ergänzt: Liste filtert zusätzlich nach den Klassifikationen mit `oeffentlich_filter` (z. B. `?fachgebiet=bad`), gibt nur diese aus; fester Sicherheitsfilter unverändert davor; reservierte Parameter in Spec 05 design.md (Spec 05, Req 8.6)
   - _Anforderungen: 5.1, 5.4_
 

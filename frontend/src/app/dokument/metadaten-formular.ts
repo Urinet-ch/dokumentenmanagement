@@ -11,6 +11,7 @@ import {
   linkedSignal,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
@@ -78,6 +79,8 @@ export class MetadatenFormular {
 
   readonly dokument = input.required<Dokument>();
   readonly arten = input<readonly Dokumentart[]>([]);
+  /** Art aus dem Eingangskorb: startet als gewählte Art und geht beim Speichern als Artwechsel mit (Review #106). */
+  readonly artVorbelegung = input<string | null>(null);
   readonly gespeichert = output<Dokument>();
   readonly abgebrochen = output<void>();
   /** Das Dokument hat sich inzwischen geändert; die Ansicht lädt neu und zeigt die Meldung. */
@@ -94,7 +97,11 @@ export class MetadatenFormular {
   protected readonly feldText = feldText;
 
   private readonly start = computed(() => formularAus(this.dokument()));
-  protected readonly formular = linkedSignal<Formular>(() => this.start());
+  protected readonly formular = linkedSignal<Formular>(() => {
+    const start = this.start();
+    const art = untracked(this.artVorbelegung);
+    return art ? { ...start, art } : start;
+  });
   protected readonly laeuft = signal(false);
   protected readonly fehler = signal('');
   protected readonly fehlerFelder = signal<readonly string[]>([]);
@@ -109,6 +116,10 @@ export class MetadatenFormular {
     () => anzeigeTitel(this.dokument().titel, null, this.dokument().dateiname).text,
   );
   protected readonly art = computed(() => this.arten().find((a) => a.code === this.formular().art));
+  protected readonly vorbelegt = computed(() => {
+    const code = this.artVorbelegung();
+    return code && code === this.formular().art && code !== this.dokument().art ? (this.art()?.name ?? code) : null;
+  });
   protected readonly artenWahl = computed(() =>
     this.arten().filter((a) => a.aktiv || a.code === this.formular().art || a.code === this.dokument().art),
   );
@@ -178,12 +189,16 @@ export class MetadatenFormular {
   protected partnerWaehlen(kontakt: Kontakt): void {
     const name = [kontakt.vorname, kontakt.name].filter(Boolean).join(' ');
     this.formular.update((f) => ({ ...f, partnerId: kontakt.id ?? '', partnerName: name }));
+    this.suche.next('');
     this.treffer.set(null);
     this.fokus('[data-test="partner-gewaehlt"]');
   }
 
   protected partnerEntfernen(): void {
     this.formular.update((f) => ({ ...f, partnerId: '', partnerName: '' }));
+    // Verwirft einen noch laufenden Debounce oder Abruf, damit keine veraltete Trefferliste erscheint (Review #106).
+    this.suche.next('');
+    this.treffer.set(null);
     this.fokus('[data-test="partner-suche"]');
   }
 

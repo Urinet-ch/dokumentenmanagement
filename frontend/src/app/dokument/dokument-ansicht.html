@@ -33,6 +33,7 @@
             <app-metadaten-formular
               [dokument]="d"
               [arten]="arten()"
+              [artVorbelegung]="vorbelegung()"
               (gespeichert)="gespeichert($event)"
               (abgebrochen)="bearbeitenSchliessen()"
               (veraltet)="veraltet($event)"
