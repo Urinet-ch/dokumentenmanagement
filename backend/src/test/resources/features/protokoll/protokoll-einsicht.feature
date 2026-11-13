@@ -51,8 +51,8 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand abfragt
     Dann enthält die Einsicht genau diese Einträge:
       | benutzer           | name               | rolle       | aktion   | dokument | ip          |
-      | mitarbeiter-urinet | Mitarbeiter urinet | MITARBEITER | ANZEIGEN | NORMAL   |             |
-      | treuhaender-urinet | Treuhaender urinet | TREUHAENDER | ANZEIGEN | NORMAL   | 203.0.113.7 |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | NORMAL   |             |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | ANZEIGEN | NORMAL   | 203.0.113.7 |
 
   @req-10.5
   Szenario: Der Inhaber filtert nach Benutzer und Dokument
@@ -62,7 +62,7 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand für «treuhaender-urinet» und das Probe-Dokument «NORMAL» abfragt
     Dann enthält die Einsicht genau diese Einträge:
       | benutzer           | name               | rolle       | aktion   | dokument | ip          |
-      | treuhaender-urinet | Treuhaender urinet | TREUHAENDER | ANZEIGEN | NORMAL   | 203.0.113.7 |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | ANZEIGEN | NORMAL   | 203.0.113.7 |
 
   @req-10.5
   Szenario: Der Inhaber filtert nach Aktion
@@ -71,13 +71,30 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand mit Aktion «VERWEIGERT» abfragt
     Dann enthält die Einsicht genau diese Einträge:
       | benutzer           | name               | rolle       | aktion     | dokument | ip |
-      | mitarbeiter-urinet | Mitarbeiter urinet | MITARBEITER | VERWEIGERT |          |    |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | VERWEIGERT |          |    |
 
   @req-10.5
-  Szenario: Ein Zeitraum vor dem gemerkten Stand enthält die neuen Einträge nicht
+  Szenario: Ein Zeitraum enthält genau die Einträge ab «von» und vor «bis»
     Angenommen «mitarbeiter-urinet» das Probe-Dokument «NORMAL» liest
-    Wenn «inhaber-urinet» das Zugriffsprotokoll im Zeitraum vor dem gemerkten Stand abfragt
-    Dann enthält die Einsicht keinen Eintrag ab dem gemerkten Stand
+    Und ein zweiter Stand des Zugriffsprotokolls ist gemerkt
+    Und «treuhaender-urinet» das Probe-Dokument «NORMAL» liest
+    Wenn «inhaber-urinet» das Zugriffsprotokoll zwischen den gemerkten Ständen abfragt
+    Dann enthält die Einsicht genau diese Einträge:
+      | benutzer           | name               | rolle       | aktion   | dokument | ip |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | NORMAL   |    |
+
+  @req-10.5
+  Szenario: Die Einsicht blättert seitenweise und nennt die Zahl aller Treffer
+    Angenommen «mitarbeiter-urinet» das Probe-Dokument «NORMAL» liest
+    Und «treuhaender-urinet» das Probe-Dokument «NORMAL» liest
+    Und «inhaber-urinet» das Probe-Dokument «NORMAL» liest
+    Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand auf Seite 1 mit Grösse 1 abfragt
+    Dann enthält die Einsicht auf Seite 1 mit Grösse 1 von 3 Treffern genau diese Einträge:
+      | benutzer           | name               | rolle       | aktion   | dokument | ip |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | ANZEIGEN | NORMAL   |    |
+    Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand auf Seite 3 mit Grösse 1 abfragt
+    Dann enthält die Einsicht auf Seite 3 mit Grösse 1 von 3 Treffern genau diese Einträge:
+      | benutzer | name | rolle | aktion | dokument | ip |
 
   @req-10.5
   Szenario: Der Inhaber eines anderen Mandanten sieht die Einträge von «urinet» nicht
@@ -92,14 +109,16 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Dann antwortet das Archiv auf die Einsicht mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
     Beispiele:
-      | parameter | wert       |
-      | von       | 01.11.2026 |
-      | bis       | gestern    |
-      | dokument  | kein-uuid  |
-      | aktion    | LESEN      |
-      | seite     | -1         |
-      | groesse   | 101        |
-      | groesse   | 0          |
+      | parameter | wert                    |
+      | von       | 01.11.2026              |
+      | bis       | gestern                 |
+      | dokument  | kein-uuid               |
+      | aktion    | LESEN                   |
+      | seite     | -1                      |
+      | groesse   | 101                     |
+      | groesse   | 0                       |
+      | von       | +300000-01-01T00:00:00Z |
+      | bis       | 0000-12-31T23:59:59Z    |
 
   @req-10.10
   Szenario: Wechselt der Name oder die Rolle, entsteht eine neue Zeile; frühere Einträge behalten Name und Rolle von damals
@@ -109,12 +128,12 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Und «treuhaender-urinet» das Probe-Dokument «NORMAL» liest
     Dann hat das Benutzerverzeichnis von «urinet» genau diese neuen Zeilen:
       | benutzer           | name               | rolle       | anlass | beendet | erfasst_von |
-      | treuhaender-urinet | Treuhaender urinet | TREUHAENDER | AKTION | nein    |             |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | AKTION | nein    |             |
     Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand für «treuhaender-urinet» abfragt
     Dann enthält die Einsicht genau diese Einträge:
       | benutzer           | name               | rolle       | aktion   | dokument | ip |
-      | treuhaender-urinet | Treuhaender urinet | TREUHAENDER | ANZEIGEN | NORMAL   |    |
-      | treuhaender-urinet | Treuhaender urinet | TREUHAENDER | ANZEIGEN | NORMAL   |    |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | ANZEIGEN | NORMAL   |    |
+      | treuhaender-urinet | treuhaender-urinet | TREUHAENDER | ANZEIGEN | NORMAL   |    |
       | treuhaender-urinet | Früherer Name      | MITARBEITER | ANZEIGEN | NORMAL   |    |
 
   @req-10.10
@@ -125,12 +144,12 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Dann antwortet das Archiv auf die Einsicht mit Status 204
     Und hat das Benutzerverzeichnis von «urinet» genau diese neuen Zeilen:
       | benutzer           | name               | rolle       | anlass   | beendet | erfasst_von    |
-      | mitarbeiter-urinet | Mitarbeiter urinet | MITARBEITER | AUSTRITT | ja      | inhaber-urinet |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | AUSTRITT | ja      | inhaber-urinet |
     Und beginnt die Austritt-Zeile von «mitarbeiter-urinet» in «urinet» mit der Zeile davor
     Wenn «inhaber-urinet» den Austritt von «mitarbeiter-urinet» erfasst
     Dann antwortet das Archiv auf die Einsicht mit Status 409 und Fehlercode «STATUS_KONFLIKT»
     Wenn «inhaber-urinet» das Benutzerverzeichnis abfragt
-    Dann liefert das Benutzerverzeichnis für «mitarbeiter-urinet» als letzte Zeile «Mitarbeiter urinet» mit Rolle «MITARBEITER» und Anlass «AUSTRITT»
+    Dann liefert das Benutzerverzeichnis für «mitarbeiter-urinet» als letzte Zeile «mitarbeiter-urinet» mit Rolle «MITARBEITER» und Anlass «AUSTRITT»
     Und scheitert im Schema von «urinet» jeder Versuch, das Benutzerverzeichnis zu ändern, zu löschen oder zu leeren
 
   @req-10.10
@@ -141,7 +160,20 @@ Funktionalität: Einsicht ins Zugriffsprotokoll und Benutzerverzeichnis (Aufgabe
     Wenn «mitarbeiter-urinet» das Probe-Dokument «NORMAL» liest
     Dann hat das Benutzerverzeichnis von «urinet» genau diese neuen Zeilen:
       | benutzer           | name               | rolle       | anlass | beendet | erfasst_von |
-      | mitarbeiter-urinet | Mitarbeiter urinet | MITARBEITER | AKTION | nein    |             |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | AKTION | nein    |             |
+
+  @req-10.10
+  Szenario: Ein verweigerter Versuch nach dem Austritt öffnet die Zuordnung nicht wieder
+    Angenommen «mitarbeiter-urinet» das Probe-Dokument «NORMAL» liest
+    Und «inhaber-urinet» den Austritt von «mitarbeiter-urinet» erfasst
+    Und der Stand des Benutzerverzeichnisses von «urinet» ist gemerkt
+    Wenn «mitarbeiter-urinet» das Zugriffsprotokoll abfragt
+    Dann antwortet das Archiv auf die Einsicht mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und hat das Benutzerverzeichnis von «urinet» keine neue Zeile
+    Wenn «inhaber-urinet» das Zugriffsprotokoll seit dem gemerkten Stand für «mitarbeiter-urinet» abfragt
+    Dann enthält die Einsicht genau diese Einträge:
+      | benutzer           | name               | rolle       | aktion     | dokument | ip |
+      | mitarbeiter-urinet | mitarbeiter-urinet | MITARBEITER | VERWEIGERT |          |    |
 
   @req-10.10
   Szenariogrundriss: Eine unbekannte Kennung oder ein API-Token lässt sich nicht als Austritt erfassen

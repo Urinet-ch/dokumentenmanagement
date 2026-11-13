@@ -24,13 +24,38 @@ public class BenutzerVerzeichnisPflege {
         this.verzeichnis = verzeichnis;
     }
 
-    /** Zur Aktion einer Kennung im Mandanten der Anfrage; fügt nur ein, wenn sich etwas geändert hat. */
+    /**
+     * Zur Aktion einer Kennung im Mandanten der Anfrage; fügt nur ein, wenn sich etwas geändert hat. Die geteilte
+     * Sperre hält einen Austritt oder Widerruf derselben Kennung an, bis die Aktion festgeschrieben ist; nur wer
+     * einfügt, nimmt zusätzlich die exklusive Einfüge-Sperre und liest danach neu, damit gleichzeitige erste Aktionen
+     * genau eine Zeile schreiben.
+     * <p>
+     * Ein {@code VERWEIGERT} sperrt nicht: Er entsteht in einer eigenen Transaktion ({@code REQUIRES_NEW}), oft während
+     * die Transaktion der Anfrage derselben Kennung ausgesetzt ist und ihre Sperren hält (z. B. A8 bei
+     * {@code PATCH /dokumente/{id}}); auf sie zu warten, verklemmte die Anfrage, ohne dass PostgreSQL es erkennt. Die
+     * ausgesetzte Transaktion wird mit der Verweigerung zurückgerollt, ihre Zeile entfällt also. Übrig bleibt nur ein
+     * seltenes Duplikat, wenn eine erste Verweigerung gleichzeitig mit einer anderen ersten Aktion einfügt.
+     */
     @Transactional(Transactional.TxType.MANDATORY)
     public void nachfuehren(Benutzerangaben angaben) {
-        angaben.neueZeile(verzeichnis.letzter(Optional.empty(), angaben.benutzer()))
-                .ifPresent(zeile -> verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(
-                        angaben.benutzer(), zeile.name(), zeile.rolle(), Optional.empty(), false,
-                        VerzeichnisEintrag.Anlass.AKTION, Optional.empty())));
+        String benutzer = angaben.benutzer();
+        if (angaben.verweigert()) {
+            angaben.neueZeile(verzeichnis.letzter(Optional.empty(), benutzer)).ifPresent(zeile -> einfuegen(benutzer,
+                    zeile));
+            return;
+        }
+        verzeichnis.sperren(Optional.empty(), benutzer, BenutzerVerzeichnis.Sperre.AKTION);
+        if (angaben.neueZeile(verzeichnis.letzter(Optional.empty(), benutzer)).isEmpty()) {
+            return;
+        }
+        verzeichnis.sperren(Optional.empty(), benutzer, BenutzerVerzeichnis.Sperre.EINFUEGEN);
+        angaben.neueZeile(verzeichnis.letzter(Optional.empty(), benutzer)).ifPresent(zeile -> einfuegen(benutzer,
+                zeile));
+    }
+
+    private void einfuegen(String benutzer, Benutzerangaben.NeueZeile zeile) {
+        verzeichnis.einfuegen(Optional.empty(), new BenutzerVerzeichnis.Neu(benutzer, zeile.name(), zeile.rolle(),
+                Optional.empty(), false, VerzeichnisEintrag.Anlass.AKTION, Optional.empty()));
     }
 
     /**
@@ -41,6 +66,7 @@ public class BenutzerVerzeichnisPflege {
     public void tokenWiderrufen(MandantCode mandant, String benutzer, String name, Instant erstellt,
                                 Optional<String> erfasstVon) {
         Objects.requireNonNull(mandant, "mandant");
+        verzeichnis.sperren(Optional.of(mandant), benutzer, BenutzerVerzeichnis.Sperre.ABSCHLUSS);
         Optional<VerzeichnisEintrag> letzter = verzeichnis.letzter(Optional.of(mandant), benutzer);
         if (letzter.filter(VerzeichnisEintrag::beendet).isPresent()) {
             return;

@@ -48,6 +48,7 @@ public class ProtokollEinsichtSchritte {
 
     private final Map<String, Long> stand = new HashMap<>();
     private Instant start;
+    private Instant ende;
     private Response antwort;
 
     @Angenommen("der Stand des Benutzerverzeichnisses von «{word}» ist gemerkt")
@@ -119,10 +120,26 @@ public class ProtokollEinsichtSchritte {
         antwort = als(benutzer).queryParam("von", start.toString()).queryParam("aktion", aktion).when().get(PFAD);
     }
 
-    @Wenn("«{word}» das Zugriffsprotokoll im Zeitraum vor dem gemerkten Stand abfragt")
-    public void vorStand(String benutzer) {
-        antwort = als(benutzer).queryParam("von", start.minusSeconds(3600).toString())
-                .queryParam("bis", start.toString()).when().get(PFAD);
+    @Angenommen("ein zweiter Stand des Zugriffsprotokolls ist gemerkt")
+    public void zweiterStand() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement();
+             ResultSet zeile = befehl.executeQuery("select clock_timestamp()")) {
+            zeile.next();
+            ende = zeile.getObject(1, OffsetDateTime.class).toInstant();
+        }
+    }
+
+    @Wenn("«{word}» das Zugriffsprotokoll zwischen den gemerkten Ständen abfragt")
+    public void zwischenStaenden(String benutzer) {
+        antwort = als(benutzer).queryParam("von", start.toString())
+                .queryParam("bis", Objects.requireNonNull(ende, "zweiter Stand nicht gemerkt").toString())
+                .when().get(PFAD);
+    }
+
+    @Wenn("«{word}» das Zugriffsprotokoll seit dem gemerkten Stand auf Seite {int} mit Grösse {int} abfragt")
+    public void seitStandSeite(String benutzer, int seite, int groesse) {
+        antwort = als(benutzer).queryParam("von", start.toString()).queryParam("seite", seite)
+                .queryParam("groesse", groesse).when().get(PFAD);
     }
 
     @Wenn("«{word}» das Zugriffsprotokoll mit dem Parameter «{word}» = «{}» abfragt")
@@ -166,9 +183,22 @@ public class ProtokollEinsichtSchritte {
     @Dann("enthält die Einsicht genau diese Einträge:")
     public void eintraege(DataTable tabelle) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getLong("gesamt")).isEqualTo(tabelle.asMaps().size());
+        eintraegeDerSeite(tabelle);
+    }
+
+    @Dann("enthält die Einsicht auf Seite {int} mit Grösse {int} von {int} Treffern genau diese Einträge:")
+    public void seite(int seite, int groesse, int gesamt, DataTable tabelle) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getInt("seite")).isEqualTo(seite);
+        assertThat(antwort.jsonPath().getInt("groesse")).isEqualTo(groesse);
+        assertThat(antwort.jsonPath().getLong("gesamt")).isEqualTo(gesamt);
+        eintraegeDerSeite(tabelle);
+    }
+
+    private void eintraegeDerSeite(DataTable tabelle) {
         List<Map<String, Object>> eintraege = antwort.jsonPath().getList("eintraege");
         List<Map<String, String>> erwartet = tabelle.asMaps();
-        assertThat(antwort.jsonPath().getLong("gesamt")).isEqualTo(erwartet.size());
         assertThat(eintraege).hasSize(erwartet.size());
         for (int i = 0; i < erwartet.size(); i++) {
             Map<String, String> soll = erwartet.get(i);
@@ -181,13 +211,6 @@ public class ProtokollEinsichtSchritte {
                     : Testdokumente.NAMEN.get(soll.get("dokument")).toString());
             assertThat(ist.get("ip")).as("ip %d", i).isEqualTo(soll.get("ip"));
         }
-    }
-
-    @Dann("enthält die Einsicht keinen Eintrag ab dem gemerkten Stand")
-    public void keineNeuen() {
-        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
-        List<String> zeiten = antwort.jsonPath().getList("eintraege.zeit");
-        assertThat(zeiten).allSatisfy(zeit -> assertThat(Instant.parse(zeit)).isBefore(start));
     }
 
     /**

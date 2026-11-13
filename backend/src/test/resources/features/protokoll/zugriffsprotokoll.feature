@@ -1,17 +1,20 @@
 # language: de
 @spec-01
 Funktionalität: Zugriffsprotokoll (Grundlage aus Aufgabe 1.6)
-  Bis es fachliche Endpunkte gibt (2.x), prüfen Probe-Endpunkte unter src/test die Grundlage:
+  Probe-Endpunkte unter src/test prüfen die Grundlage (Interceptor, IP, Transaktion, Verweigerung):
   «GET /api/v1/probe/dokumente/{id}» ist mit «@Protokolliert(ANZEIGEN)» erklärt, «PATCH /api/v1/probe/dokumente/{id}»
-  (legt als Wirkung eine Dokumentart an) mit «@Protokolliert(AENDERN)». Die Nachweise je fachlicher Aktion folgen mit den Endpunkten ab Welle 2.
+  (legt als Wirkung eine Dokumentart an) mit «@Protokolliert(AENDERN)». Die Nachweise je fachlicher Aktion an den
+  echten Endpunkten (Req 10.2) stehen bei den Endpunkten: ERFASSEN in upload.feature und generator.feature, ANZEIGEN in
+  eingangskorb.feature («GET /dokumente/{id}» und Vorschau), HERUNTERLADEN in download.feature, AENDERN in
+  aendern.feature, BESTAETIGEN in bestaetigen.feature, VERWERFEN in verwerfen.feature, WIEDERHOLEN in
+  wiederholen.feature. EXPORTIEREN folgt mit dem Jahresexport (Spec 02).
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
     Und der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
 
   @req-10.2
-  # Teilnachweis: Anzeigen und Ändern über Probe-Endpunkte; Erfassen, Herunterladen, Bestätigen usw. folgen mit 2.x.
-  Szenario: Das Anzeigen eines Dokuments wird mit Benutzer-ID, Rolle, Aktion, Dokument und IP protokolliert (Teilnachweis)
+  Szenario: Das Anzeigen eines Dokuments wird mit Benutzer-ID, Rolle, Aktion, Dokument und IP protokolliert
     Wenn «treuhaender-urinet» das Probe-Dokument «NORMAL» über die IP «203.0.113.7» liest
     Dann antwortet das Archiv mit Status 200 und liefert das Probe-Dokument «NORMAL»
     Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:

@@ -29,6 +29,7 @@ export * from './import-zuordnung-bestaetigen';
 export * from './import-zuordnung-gespeichert';
 export * from './kontakt';
 export * from './kontakt-angaben';
+export * from './protokoll-aktion';
 export * from './protokoll-eintrag';
 export * from './protokoll-seite';
 export * from './suchergebnis';

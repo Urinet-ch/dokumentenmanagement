@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ProtokollAktion } from './protokoll-aktion';
 
 
 /**
@@ -24,7 +25,7 @@ export interface ProtokollEintrag {
      * INHABER, MITARBEITER, TREUHAENDER, GESCHAEFTSSTELLE oder API_TOKEN
      */
     rolle?: string | null;
-    aktion: ProtokollEintrag.AktionEnum;
+    aktion: ProtokollAktion;
     dokumentId?: string | null;
     ip?: string | null;
     /**
@@ -33,25 +34,6 @@ export interface ProtokollEintrag {
     details?: string | null;
 }
 export namespace ProtokollEintrag {
-    export const AktionEnum = {
-        Erfassen: 'ERFASSEN',
-        Anzeigen: 'ANZEIGEN',
-        Herunterladen: 'HERUNTERLADEN',
-        Aendern: 'AENDERN',
-        Bestaetigen: 'BESTAETIGEN',
-        Verwerfen: 'VERWERFEN',
-        Wiederholen: 'WIEDERHOLEN',
-        Exportieren: 'EXPORTIEREN',
-        Verweigert: 'VERWEIGERT',
-        SperreKonflikt: 'SPERRE_KONFLIKT',
-        RegelAendern: 'REGEL_AENDERN',
-        WissenAnzeigen: 'WISSEN_ANZEIGEN',
-        WissenAnnehmen: 'WISSEN_ANNEHMEN',
-        WissenVerwerfen: 'WISSEN_VERWERFEN',
-        WissenIngest: 'WISSEN_INGEST',
-        WissenLint: 'WISSEN_LINT',
-    } as const;
-    export type AktionEnum = typeof AktionEnum[keyof typeof AktionEnum];
 }
 
 

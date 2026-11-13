@@ -5,6 +5,7 @@ import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnisPflege;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.Benutzerangaben;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
+import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.VerzeichnisEintrag;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
@@ -60,7 +61,8 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         }
         eintrag.benutzer().ifPresent(benutzer -> verzeichnis.nachfuehren(new Benutzerangaben(benutzer,
                 namen.name(benutzer), VerzeichnisEintrag.istToken(benutzer)
-                        ? Optional.of(VerzeichnisEintrag.ROLLE_API_TOKEN) : eintrag.rolle())));
+                        ? Optional.of(VerzeichnisEintrag.ROLLE_API_TOKEN) : eintrag.rolle(),
+                eintrag.aktion() == ProtokollAktion.VERWEIGERT)));
         String sql = "insert into " + schema + ".zugriff_protokoll (benutzer, rolle, aktion, dokument_id, ip, details) "
                 + "values (?, ?, ?, ?, cast(? as inet), cast(? as jsonb))";
         try (Connection verbindung = datenquelle.get().getConnection();

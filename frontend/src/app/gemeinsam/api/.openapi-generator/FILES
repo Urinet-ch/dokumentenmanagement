@@ -42,6 +42,7 @@ model/import-zuordnung.ts
 model/kontakt-angaben.ts
 model/kontakt.ts
 model/models.ts
+model/protokoll-aktion.ts
 model/protokoll-eintrag.ts
 model/protokoll-seite.ts
 model/suchergebnis.ts

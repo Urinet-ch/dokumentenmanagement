@@ -44,6 +44,8 @@ public class ProtokollEinsicht {
         if (benutzer == null || benutzer.isBlank() || benutzer.length() > ProtokollFilter.MAX_BENUTZER_LAENGE) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
+        // vor dem Lesen: zwei Austritte nacheinander, eine laufende Aktion der Person zuerst festgeschrieben
+        verzeichnis.sperren(Optional.empty(), benutzer, BenutzerVerzeichnis.Sperre.ABSCHLUSS);
         VerzeichnisEintrag letzter = verzeichnis.letzter(Optional.empty(), benutzer)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (letzter.beendet() || VerzeichnisEintrag.istToken(benutzer)) {

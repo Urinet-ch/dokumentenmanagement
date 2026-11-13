@@ -42,6 +42,26 @@ class RealmExportTest {
         assertThat(export.path("identityProviders")).as("keine Identity Provider").isEmpty();
     }
 
+    /**
+     * Das Benutzerverzeichnis (Req 10.10) übernimmt den Benutzernamen als Name, weil nur der Admin ihn ändern darf
+     * (Review PR #88, S4); Vor- und Nachname darf der Benutzer selbst ändern.
+     */
+    @Test
+    void benutzernameAendertNurDerAdmin() throws IOException {
+        JsonNode export = JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
+        assertThat(export.path("editUsernameAllowed").asBoolean(true)).isFalse();
+        List<JsonNode> profile = export.findValues("kc.user.profile.config");
+        assertThat(profile).hasSize(1);
+        JsonNode attribute = JSON.readTree(profile.getFirst().get(0).asText()).path("attributes");
+        List<String> bearbeiten = new ArrayList<>();
+        for (JsonNode attribut : attribute) {
+            if ("username".equals(attribut.path("name").asText())) {
+                attribut.path("permissions").path("edit").forEach(r -> bearbeiten.add(r.asText()));
+            }
+        }
+        assertThat(bearbeiten).containsExactly("admin");
+    }
+
     @Test
     void testRealmIstExportPlusTestanteile() throws IOException {
         ObjectNode test = (ObjectNode) JSON.readTree(KEYCLOAK.resolve("realm-test.json").toFile());

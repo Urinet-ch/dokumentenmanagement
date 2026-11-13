@@ -31,6 +31,9 @@ public class JdbcBenutzerVerzeichnis implements BenutzerVerzeichnis {
 
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final String SPALTEN = "id, zeit, benutzer, name, rolle, gueltig_von, gueltig_bis, anlass, erfasst_von";
+    /** Namensräume der Sperren (erster Schlüssel), getrennt von {@code LiquibaseSitzungssperre} (0x4C42, 0x4C54). */
+    static final int NAMENSRAUM_ABSCHLUSS = 0x4256;
+    static final int NAMENSRAUM_EINFUEGEN = 0x4245;
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -95,6 +98,28 @@ public class JdbcBenutzerVerzeichnis implements BenutzerVerzeichnis {
             return liste;
         } catch (SQLException e) {
             throw new IllegalStateException("Benutzerverzeichnis nicht lesbar", e);
+        }
+    }
+
+    /**
+     * {@code pg_advisory_xact_lock} mit zwei Schlüsseln: Namensraum je Art der Sperre, dazu Schema und Kennung. Der
+     * Namensraum {@code AKTION}/{@code ABSCHLUSS} ist derselbe (geteilt gegen exklusiv), {@code EINFUEGEN} ein eigener,
+     * damit eine Aktion mit geteilter Sperre einfügen kann, ohne eine Sperre zu verschärfen (keine Verklemmung zwischen
+     * zwei ersten Aktionen). Eine Kollision von {@code hashtext} lässt höchstens unnötig warten.
+     */
+    @Override
+    public void sperren(Optional<MandantCode> mandant, String benutzer, Sperre sperre) {
+        String sql = switch (sperre) {
+            case AKTION -> "select pg_advisory_xact_lock_shared(?, hashtext(?))";
+            case EINFUEGEN, ABSCHLUSS -> "select pg_advisory_xact_lock(?, hashtext(?))";
+        };
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setInt(1, sperre == Sperre.EINFUEGEN ? NAMENSRAUM_EINFUEGEN : NAMENSRAUM_ABSCHLUSS);
+            abfrage.setString(2, schema(mandant) + ":" + benutzer);
+            abfrage.executeQuery().close();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Benutzerverzeichnis nicht sperrbar", e);
         }
     }
 

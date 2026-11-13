@@ -9,7 +9,7 @@ Funktionalität: Dokument bestätigen und archivieren
   Hintergrund:
     Angenommen die Archivierung ist bereit
 
-  @req-8.2 @req-6.3
+  @req-8.2 @req-6.3 @req-10.2
   Szenario: Eine bestätigte Quittung wird archiviert und gesperrt
     Angenommen im Mandanten «urinet» liegt das Dokument «Q» im Status «EINGANGSKORB», erfasst von «mitarbeiter-urinet»
     Wenn «inhaber-urinet» das Dokument «Q» so bestätigt:
@@ -20,6 +20,7 @@ Funktionalität: Dokument bestätigen und archivieren
       | betrag   | 1234.50         |
       | waehrung | CHF             |
     Dann meldet das Archiv Status 202
+    Und steht im Zugriffsprotokoll für «Q» 1 Mal «BESTAETIGEN» von «inhaber-urinet»
     Und trägt die Antwort das ETag der neuen Version von «Q»
     Und ist das Dokument «Q» im Status «ARCHIVIERUNG»
     Und ist für das Dokument «Q» ein Auftrag «ARCHIVIEREN» eingereiht

@@ -19,7 +19,7 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | name     | vertraulichkeit | bestaetigt | erfasser                 | person | status     | dateien |
       | V_NORMAL | NORMAL          | ja         | geschaeftsstelle-vhf-gsk |        | ARCHIVIERT | pdfa    |
 
-  @req-14.6
+  @req-14.6 @req-10.2
   Szenario: Öffnen liefert eine kurz gültige Adresse auf die gespeicherte Version der PDF/A-Fassung und wird protokolliert
     Angenommen unter dem Schlüssel des PDF/A von «D_NORMAL» liegt inzwischen eine neuere Version
     Wenn «mitarbeiter-urinet» die Datei von «D_NORMAL» öffnet

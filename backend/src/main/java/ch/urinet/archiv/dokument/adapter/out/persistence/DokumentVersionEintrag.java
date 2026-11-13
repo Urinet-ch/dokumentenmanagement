@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -15,9 +16,11 @@ import java.util.UUID;
 
 /**
  * Zeile in {@code dokument_version}: vorherige Fassung der Metadaten mit Benutzer, Zeit und Grund (Req 10.1). Nur
- * Einfügen (Req 10.3): Trigger und Rechte verhindern UPDATE, DELETE und TRUNCATE.
+ * Einfügen (Req 10.3): Trigger und Rechte verhindern UPDATE, DELETE und TRUNCATE; {@code @Immutable}, damit
+ * Hibernate eine geänderte Instanz nie per UPDATE schreibt ({@code KeinLoeschpfadTest}, Req 10.9).
  */
 @Entity
+@Immutable
 @Table(name = "dokument_version")
 public class DokumentVersionEintrag extends PanacheEntityBase {
 

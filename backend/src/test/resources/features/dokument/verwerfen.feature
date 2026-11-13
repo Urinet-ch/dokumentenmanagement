@@ -8,7 +8,7 @@ Funktionalität: Dokument verwerfen
   Hintergrund:
     Angenommen die Archivierung ist bereit
 
-  @req-6.6 @req-8.5
+  @req-6.6 @req-8.5 @req-10.2
   Szenario: Ein verworfenes Dokument verliert seine Dateien unter eingang/, das Protokoll hält Prüfsumme und Grund fest
     Angenommen im Mandanten «urinet» liegt das Dokument «D» im Status «EINGANGSKORB», erfasst von «mitarbeiter-urinet»
     Wenn «inhaber-urinet» das Dokument «D» mit dem Grund "Doppelt fotografiert" verwirft

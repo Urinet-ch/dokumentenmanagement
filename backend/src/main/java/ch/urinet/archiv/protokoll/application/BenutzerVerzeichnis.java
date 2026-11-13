@@ -24,6 +24,22 @@ public interface BenutzerVerzeichnis {
     List<VerzeichnisEintrag> liste();
 
     /**
+     * Sperren der Kennung bis zum Ende der laufenden Transaktion (Review PR #88, S2): Ohne sie können gleichzeitige
+     * Anfragen derselben Kennung doppelte Zeilen schreiben, und eine Aktion kann neben einem Austritt durchrutschen.
+     * Die Tabelle erlaubt nur Einfügen, eine doppelte Zeile bliebe für immer.
+     */
+    void sperren(Optional<MandantCode> mandant, String benutzer, Sperre sperre);
+
+    enum Sperre {
+        /** jede Aktion: geteilt, Aktionen warten nicht aufeinander, aber auf einen laufenden Austritt oder Widerruf */
+        AKTION,
+        /** Aktion, die eine Zeile einfügt: exklusiv unter den Aktionen, die einfügen */
+        EINFUEGEN,
+        /** Austritt oder Widerruf: exklusiv gegenüber allen Aktionen der Kennung */
+        ABSCHLUSS
+    }
+
+    /**
      * Eine neue Zeile. {@code gueltigVon} leer heisst «jetzt» (Zeit der Datenbank); {@code beenden} setzt
      * {@code gueltig_bis} auf «jetzt».
      */

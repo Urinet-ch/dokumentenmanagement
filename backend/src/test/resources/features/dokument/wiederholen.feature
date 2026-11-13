@@ -8,11 +8,12 @@ Funktionalität: Verarbeitung oder Archivierung wiederholen
   Hintergrund:
     Angenommen die Archivierung ist bereit
 
-  @req-6.13
+  @req-6.13 @req-10.2
   Szenario: Ein Dokument mit Verarbeitungsfehler wird neu verarbeitet
     Angenommen im Mandanten «urinet» liegt das Dokument «W» im Status «FEHLER», erfasst von «inhaber-urinet»
     Wenn «inhaber-urinet» für das Dokument «W» «wiederholen» wählt
     Dann meldet das Archiv Status 202
+    Und steht im Zugriffsprotokoll für «W» 1 Mal «WIEDERHOLEN» von «inhaber-urinet»
     Und trägt die Antwort das ETag der neuen Version von «W»
     Und ist das Dokument «W» im Status «NEU»
     Und ist für das Dokument «W» ein Auftrag «VERARBEITEN» eingereiht
