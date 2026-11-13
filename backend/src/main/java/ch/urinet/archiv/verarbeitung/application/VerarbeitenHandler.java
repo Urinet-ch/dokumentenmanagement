@@ -59,6 +59,8 @@ public class VerarbeitenHandler implements AuftragHandler {
     public static final String DOKUMENT_ID = "dokumentId";
     static final String OHNE_KI = "ohneKi";
     static final String QUELLE_GENERATOR = "GENERATOR";
+    /** Medientyp einer Nachricht als Original (Spec 02, Req 1.3). */
+    static final String MIME_EML = "message/rfc822";
 
     private static final Logger LOG = Logger.getLogger(VerarbeitenHandler.class);
     private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
@@ -162,14 +164,17 @@ public class VerarbeitenHandler implements AuftragHandler {
 
     /**
      * Quellen der Verarbeitung: die Arbeitsfassungen, wenn es welche gibt (Handy-Erfassung, Req 5.10), sonst die
-     * Originale, je nach Nummer. Der Schlüssel muss genau dem erwarteten unter {@code eingang/} entsprechen, und jede
-     * Datei braucht Versions-ID, SHA-256 und einen bekannten Typ; sonst bricht der Lauf ab, bevor er etwas ändert.
+     * Originale, je nach Nummer. Eine Nachricht ({@value #MIME_EML}, Mail ohne Anhang, Spec 02, Req 1.3) ist keine
+     * Quelle: Das PDF/A entsteht aus ihrem Text, der als PDF neben ihr liegt. Der Schlüssel muss genau dem erwarteten
+     * unter {@code eingang/} entsprechen, und jede Datei braucht Versions-ID, SHA-256 und einen bekannten Typ; sonst
+     * bricht der Lauf ab, bevor er etwas ändert.
      */
     private static List<Quelle> quellen(Verarbeitungsstand stand, int jahr) {
         boolean arbeitsfassung = stand.dateien().stream().anyMatch(d -> d.rolle() == DateiRolle.ARBEITSFASSUNG);
         DateiRolle rolle = arbeitsfassung ? DateiRolle.ARBEITSFASSUNG : DateiRolle.ORIGINAL;
         List<Quelle> quellen = stand.dateien().stream()
                 .filter(d -> d.rolle() == rolle)
+                .filter(d -> !MIME_EML.equals(d.mime()))
                 .sorted(Comparator.comparingInt(Datei::nr))
                 .map(d -> quelle(stand.id(), jahr, d))
                 .toList();

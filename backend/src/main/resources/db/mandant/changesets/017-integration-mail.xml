@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Postfach des Mail-Eingangs (Spec 02, Req 1.1, 1.4; design.md «E-Mail-Eingang», Aufgabe 6.1): höchstens eine
+        Zeile je Mandant. Host, Port und Benutzer sind Konfiguration, das Passwort nur verschlüsselt (AES-256-GCM mit
+        archiv_data_key, nie im Klartext). fehler_in_folge zählt gescheiterte Abrufe bis zur Benachrichtigung des
+        Inhabers (design.md «Error Handling»).
+    -->
+    <changeSet id="017-integration-mail" author="archiv">
+        <sql>
+            create table integration_mail (
+                id int not null default 1 constraint integration_mail_pk primary key
+                    constraint integration_mail_id_ck check (id = 1),
+                host text not null constraint integration_mail_host_ck check (char_length(host) between 1 and 253),
+                port int not null constraint integration_mail_port_ck check (port between 1 and 65535),
+                benutzer text not null constraint integration_mail_benutzer_ck
+                    check (char_length(benutzer) between 1 and 320),
+                passwort_verschluesselt bytea not null,
+                zugelassene_absender text[] not null default '{}',
+                aktiv boolean not null default true,
+                fehler_in_folge int not null default 0 constraint integration_mail_fehler_ck check (fehler_in_folge >= 0),
+                geaendert timestamptz not null default clock_timestamp()
+            )
+        </sql>
+    </changeSet>
+</databaseChangeLog>

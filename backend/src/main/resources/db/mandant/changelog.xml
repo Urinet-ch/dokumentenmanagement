@@ -21,4 +21,6 @@
     <include file="changesets/014-manifest.xml" relativeToChangelogFile="true"/>
     <include file="changesets/015-dokument-dateiname.xml" relativeToChangelogFile="true"/>
     <include file="changesets/016-ki-beispiel.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/017-integration-mail.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/018-mail-eingang.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

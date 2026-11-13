@@ -1,5 +1,6 @@
 package ch.urinet.archiv;
 
+import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
@@ -63,6 +64,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     ManifestKommando manifest;
+
+    @Inject
+    MailKommando mail;
 
     public static void main(String... argumente) {
         if (argumente.length == 0) {
@@ -133,8 +137,11 @@ public class ArchivMain implements QuarkusApplication {
                     : Optional.of(TokenKommando.AUFRUF);
             case "manifest" -> ManifestKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(ManifestKommando.AUFRUF);
+            case "mail" -> MailKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(MailKommando.AUFRUF);
             default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
-                    + TokenKommando.AUFRUF + System.lineSeparator() + ManifestKommando.AUFRUF);
+                    + TokenKommando.AUFRUF + System.lineSeparator() + ManifestKommando.AUFRUF
+                    + System.lineSeparator() + MailKommando.AUFRUF);
         };
     }
 
@@ -157,6 +164,7 @@ public class ArchivMain implements QuarkusApplication {
         return switch (liste.getFirst()) {
             case "token" -> token.ausfuehren(rest, ergebnis, System.err);
             case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
+            case "mail" -> mail.ausfuehren(rest, System.in, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
     }

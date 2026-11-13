@@ -236,5 +236,10 @@ class UeberwachungTest {
             }
             return zustellen;
         }
+
+        @Override
+        public boolean mailAbrufGestoert(MandantCode mandant, int fehlschlaege) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

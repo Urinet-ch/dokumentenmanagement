@@ -36,4 +36,10 @@ public interface InhaberBenachrichtigung {
 
     /** Alarm der Überwachung (Req 16.5); {@code true} nur, wenn die Mail zugestellt wurde. */
     boolean alarm(MandantCode mandant, Befund befund);
+
+    /**
+     * Der Abruf des Postfachs ist {@code fehlschlaege}-mal in Folge gescheitert (Spec 02, design.md «Error Handling»);
+     * {@code true} nur, wenn die Mail zugestellt wurde. Nur Mandant und Anzahl, keine Zugangsdaten (Req 16.7).
+     */
+    boolean mailAbrufGestoert(MandantCode mandant, int fehlschlaege);
 }
