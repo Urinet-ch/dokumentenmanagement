@@ -412,7 +412,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `backend/pom.xml`: `bcpkix-jdk18on` vom Scope `test` in den Compile-Scope (TSP-Anfrage und -Prüfung); WireMock-Stubs für beide Dienste
   - Ablage unter `manifest/` mit Object Lock im Modus COMPLIANCE (6.11, Option B) bis zum spätesten `aufbewahren_bis` der enthaltenen Dateien, Tabelle `manifest`
   - verpasste Läufe in Datumsreihenfolge nachholen, höchstens ein Manifest pro Datum; Tests für 29.03.2026 und 25.10.2026; Alarm bei fehlendem Manifest
-  - Port `ManifestUeberwachung` (5.6) umsetzen, ersetzt den Platzhalter `ManifestUeberwachungNichtAngebunden`; Szenario `@req-16.5` für ein fehlendes Manifest
+  - Port `ManifestUeberwachung` (5.6) umsetzen, ersetzt den Platzhalter `ManifestUeberwachungNichtAngebunden`; Szenario `@req-16.5` für ein fehlendes Manifest – umgesetzt (PR #114): `ManifestBefunde`, Frist `archiv.ueberwachung.manifest-frist`, die direkte Mail aus `ManifestErzeugen.nachLetztemFehlversuch` entfällt
   - Prüfwerkzeug `archiv manifest pruefen <datum>` (15.12): Signatur, Kette inkl. Erneuerung, jeder Zeitstempel; Lücke in der Kette ist ein Fehler, fehlender Stempel eines Dienstes und `genTime` später als `archiv.manifest.verspaetung-schwelle` nach `bis` werden gemeldet
   - Prüflauf: SHA-256 mit dem Manifest-Inhalt vergleichen (Rest von 5.3, Req 15.5): der `PRUEFLAUF` vergleicht die Prüfsumme jeder Datei zusätzlich mit ihrem Eintrag im Tages-Manifest; fehlt der Eintrag oder weicht er ab, ist das eine Abweichung im Bericht
   - Manifest ohne Dateinamen (Req 3.12, Aufgabe 4.10): Szenario `@req-3.12` prüft, dass der Dateiname eines Testdokuments im Manifest fehlt (ergänzt 13.11.2026, entschieden von Fabian)
@@ -460,7 +460,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
   - Health: öffentlich nur ein schlanker Pfad über Traefik; Detail-Health und Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb, Korrekturquote je Feld) nur intern
   - E-Mail an den Inhaber bei einem Dokument > 1 h in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER`, bei fehlgeschlagener Sicherung und fehlendem Manifest; Inhalte nur IDs
-  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; offen: Korrekturquote (mit 3.3), Anbindung Manifest (5.2) und Sicherung (5.5), SMTP-Zugang in prod, Teil Infra
+  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; Anbindung Manifest (5.2) mit PR #114; offen: Korrekturquote (mit 3.3), Anbindung Sicherung (5.5), SMTP-Zugang in prod, Teil Infra
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 

@@ -4,7 +4,6 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.domain.Befund;
 
 import java.util.List;
-import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -34,9 +33,6 @@ public interface InhaberBenachrichtigung {
     void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil, PrueflaufRegister.Fortsetzung stand,
                               PrueflaufRegister.Zaehler bisher, List<PrueflaufRegister.Abweichung> erste,
                               UUID fehlerId);
-
-    /** Für {@code datum} liegt nach dem letzten Versuch kein gültiges Manifest vor (Req 15.8, Aufgabe 5.2). */
-    void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId);
 
     /** Alarm der Überwachung (Req 16.5); {@code true} nur, wenn die Mail zugestellt wurde. */
     boolean alarm(MandantCode mandant, Befund befund);

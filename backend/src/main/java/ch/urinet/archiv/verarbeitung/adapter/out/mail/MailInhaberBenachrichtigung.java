@@ -10,7 +10,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.Config;
 import org.jboss.logging.Logger;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,11 +36,6 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
     @Override
     public void archivierungGescheitert(MandantCode mandant, UUID dokumentId, UUID fehlerId) {
         senden(mandant, betreff(dokumentId), text(dokumentId, fehlerId), "Dokument " + dokumentId, fehlerId);
-    }
-
-    @Override
-    public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
-        senden(mandant, betreffManifest(mandant, datum), textManifest(datum, fehlerId), "Manifest " + datum, fehlerId);
     }
 
     private void senden(MandantCode mandant, String betreff, String text, String bezug, UUID fehlerId) {
@@ -172,18 +166,6 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         };
     }
 
-    static String betreffManifest(MandantCode mandant, LocalDate datum) {
-        return "UriNet Archiv: Manifest " + datum + " für " + mandant.wert() + " fehlt";
-    }
-
-    static String textManifest(LocalDate datum, UUID fehlerId) {
-        return "Für den " + datum + " liegt nach dem letzten Versuch kein gültiges Manifest mit Zeitstempel vor. "
-                + "Der nächste tägliche Lauf um 03:30 holt es nach; bis dahin fehlt der Nachweis für diesen und alle "
-                + "folgenden Tage.\n\n"
-                + "Erreichbarkeit der Zeitstempeldienste und des Object Storage prüfen. Im Log nach der Fehler-ID "
-                + fehlerId + " suchen.\n";
-    }
-
     @Override
     public boolean alarm(MandantCode mandant, Befund befund) {
         Optional<String> empfaenger = empfaenger(mandant);
@@ -193,7 +175,7 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
             return false;
         }
         try {
-            mailer.send(Mail.withText(empfaenger.get(), betreff(befund), text(mandant, befund)));
+            mailer.send(Mail.withText(empfaenger.get(), betreff(mandant, befund), text(mandant, befund)));
             LOG.infof("Alarm %s (Mandant %s) an den Inhaber versandt", befund.schluessel(), mandant.wert());
             return true;
         } catch (RuntimeException e) {
@@ -203,10 +185,11 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
         }
     }
 
-    static String betreff(Befund befund) {
+    static String betreff(MandantCode mandant, Befund befund) {
         return switch (befund.quelle()) {
             case DOKUMENT -> "UriNet Archiv: Dokument " + befund.gegenstand() + " hängt in " + befund.status();
-            case MANIFEST -> "UriNet Archiv: Manifest " + befund.gegenstand() + " " + befund.status();
+            case MANIFEST -> "UriNet Archiv: Manifest " + befund.gegenstand() + " für " + mandant.wert() + " "
+                    + befund.status();
             case SICHERUNG -> "UriNet Archiv: Sicherung " + befund.gegenstand() + " " + befund.status();
         };
     }
@@ -216,8 +199,10 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
             case DOKUMENT -> "Das Dokument " + befund.gegenstand() + " steht länger als erlaubt (Standard 1 Stunde) im "
                     + "Status " + befund.status() + ".\n\nIm Eingangskorb prüfen und «Wiederholen» wählen; steht es in "
                     + "VERARBEITUNG, im Log nach der Dokument-ID suchen.";
-            case MANIFEST -> "Das Tages-Manifest " + befund.gegenstand() + " hat den Befund " + befund.status()
-                    + ".\n\nIm Log nach dem Datum suchen und den Auftrag MANIFEST prüfen.";
+            case MANIFEST -> "Das Tages-Manifest vom " + befund.gegenstand() + " fehlt (Befund " + befund.status()
+                    + "). Bis es nachgeholt ist, fehlt der Nachweis für diesen und alle folgenden Tage.\n\n"
+                    + "Erreichbarkeit der Zeitstempeldienste und des Object Storage prüfen, im Log nach dem Datum "
+                    + "suchen und den Auftrag MANIFEST prüfen. Der nächste tägliche Lauf holt fehlende Tage nach.";
             case SICHERUNG -> "Die Sicherung " + befund.gegenstand() + " hat den Befund " + befund.status()
                     + ".\n\nDen Sicherungs-Export auf dem Server und den Sicherungs-Workflow prüfen.";
         };

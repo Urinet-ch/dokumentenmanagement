@@ -74,6 +74,17 @@ public class Ueberwachung {
         }
     }
 
+    /**
+     * Prüft {@code archiv.ueberwachung.manifest-frist} (auch beim Start, {@code UeberwachungPruefung}): Nach dieser
+     * Dauer ohne Fortschritt gilt ein fälliges Manifest als fehlend (Req 15.8, 16.5).
+     */
+    public static Duration pruefeManifestFrist(Duration frist) {
+        if (frist == null || frist.isNegative() || frist.isZero()) {
+            throw new IllegalArgumentException("archiv.ueberwachung.manifest-frist muss grösser als 0 sein");
+        }
+        return frist;
+    }
+
     /** Ein Lauf über alle aktiven Mandanten; liefert die Anzahl zugestellter Mails. */
     public int pruefen() {
         List<MandantCode> mandanten = register.aktive().stream().map(Mandant::code).toList();

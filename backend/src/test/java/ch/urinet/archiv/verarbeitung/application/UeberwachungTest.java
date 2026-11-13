@@ -8,7 +8,6 @@ import ch.urinet.archiv.verarbeitung.domain.Befund;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -108,6 +107,16 @@ class UeberwachungTest {
                 Duration.ZERO, "urinet")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Ueberwachung.pruefeEinstellungen(Duration.ofSeconds(-1), "urinet"))
                 .hasMessageContaining("archiv.ueberwachung.grenze");
+    }
+
+    @Test
+    void manifestFristMussPositivSein() {
+        for (Duration frist : List.of(Duration.ZERO, Duration.ofMinutes(-1))) {
+            assertThatThrownBy(() -> Ueberwachung.pruefeManifestFrist(frist))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("archiv.ueberwachung.manifest-frist");
+        }
+        assertThat(Ueberwachung.pruefeManifestFrist(Duration.ofHours(6))).isEqualTo(Duration.ofHours(6));
     }
 
     @Test
@@ -216,11 +225,6 @@ class UeberwachungTest {
         public void prueflaufAbgebrochen(MandantCode mandant, UUID laufId, int teil,
                                          PrueflaufRegister.Fortsetzung stand, PrueflaufRegister.Zaehler bisher,
                                          List<PrueflaufRegister.Abweichung> erste, UUID fehlerId) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void manifestFehlt(MandantCode mandant, LocalDate datum, UUID fehlerId) {
             throw new UnsupportedOperationException();
         }
 
