@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -98,7 +99,7 @@ class KiVorschlagHandlerFristTest {
     @Test
     void andererLesefehlerDesSeitenbildsBleibtFehlversuch(@TempDir Path ordner) {
         KiVorschlagHandler handler = handler(ordner, "image/jpeg", seiten -> {
-            throw new IOException("PPM zu kurz");
+            throw new NoSuchFileException("seite-1.ppm");
         });
 
         assertThatThrownBy(() -> handler.ausfuehren(auftrag())).isInstanceOf(OcrFehlgeschlagen.class);
