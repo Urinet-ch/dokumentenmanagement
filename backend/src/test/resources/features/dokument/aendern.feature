@@ -392,6 +392,21 @@ Funktionalität: Metadaten ändern und Versionen
     Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 1e300
 
   @req-9.5
+  Szenario: Der grösste zulässige Wert im Zusatz (400 Stellen ohne Exponent) wird gespeichert und gelesen
+    Angenommen «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_GRENZE", "name": "Probe Grenze", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false, "zusatzSchema": {"type": "object"}}
+      """
+    Und antwortet die Dokumentart-Verwaltung mit Status 201
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» mit dem Körper '{"art": "PROBE_DA_GRENZE", "zusatz": {"x": 1.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001}}' ändert
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» im Zusatzfeld «x» die Zahl 1.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+    Wenn «inhaber-urinet» das Dokument «K» mit Warnungen liest
+    Dann meldet das Archiv Status 200
+
+  @req-9.5
   Szenariogrundriss: Zahlen im Zusatz gelten genau, nicht speicherbare ergeben 422 und das Dokument bleibt lesbar: <fall>
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:
       """
