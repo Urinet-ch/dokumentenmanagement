@@ -20,6 +20,9 @@ import java.util.Set;
  * Startprüfung der KI-Endpunkte (Req 16.21, 16.22; design.md «KI», Profil {@code lokal}; ADR-012): zulässig ist nur
  * HTTPS auf {@code api.infomaniak.com}, im Profil {@code lokal} zusätzlich HTTP auf {@code localhost}/{@code 127.0.0.1},
  * im Profil {@code test} nur mit dem Port der WireMock-Testressource (nie 1234). Die Meldung nennt nur Host und Profil.
+ * Zusätzlich prüft die Klasse die aktiven Profile: {@code lokal} zusammen mit {@code prod} bricht ab (Req 16.22), ebenso
+ * das reine Testprofil {@code ceph} der Ablage zusammen mit {@code prod} (design.md «Startprüfung
+ * {@code KiBasisUrlPruefung}» und «Teststrategie», Ceph RGW).
  */
 @ApplicationScoped
 public class KiBasisUrlPruefung {
@@ -64,11 +67,18 @@ public class KiBasisUrlPruefung {
         }
     }
 
-    /** Req 16.22: {@code lokal} zusammen mit {@code prod} bricht ab. */
+    /**
+     * Req 16.22: {@code lokal} zusammen mit {@code prod} bricht ab. Zusätzlich (design.md «Teststrategie», Ceph RGW):
+     * das reine Testprofil {@code ceph} zusammen mit {@code prod}.
+     */
     public static void pruefeProfile(List<String> profile) {
         if (profile.contains("lokal") && profile.contains("prod")) {
             throw new IllegalStateException("Profil «lokal» ist zusammen mit «prod» nicht zulässig (Req 16.22); "
                     + "aktive Profile: " + String.join(",", profile));
+        }
+        if (profile.contains("ceph") && profile.contains("prod")) {
+            throw new IllegalStateException("Profil «ceph» (nur Ablage-Tests gegen Ceph RGW) ist zusammen mit «prod» "
+                    + "nicht zulässig; aktive Profile: " + String.join(",", profile));
         }
     }
 

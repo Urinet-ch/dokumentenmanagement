@@ -132,6 +132,15 @@ class KiBasisUrlPruefungTest {
         assertThat(KiBasisUrlPruefung.wirksameProfile(LOKAL, LaunchMode.DEVELOPMENT)).isEqualTo(LOKAL);
     }
 
+    @Test
+    void cephZusammenMitProdBrichtAb() {
+        assertThatThrownBy(() -> KiBasisUrlPruefung.pruefeProfile(List.of("prod", "ceph")))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("ceph");
+        List<String> gepackt = KiBasisUrlPruefung.wirksameProfile(List.of("ceph"), LaunchMode.NORMAL);
+        assertThatThrownBy(() -> KiBasisUrlPruefung.pruefeProfile(gepackt)).isInstanceOf(IllegalStateException.class);
+        assertThatCode(() -> KiBasisUrlPruefung.pruefeProfile(List.of("test", "ceph"))).doesNotThrowAnyException();
+    }
+
     // zulässig
 
     @ParameterizedTest

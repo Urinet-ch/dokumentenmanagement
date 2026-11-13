@@ -404,7 +404,7 @@ stateDiagram-v2
   - Bypass-Header im Betrieb (Req 6.5): Der `ExecutionInterceptor` `BypassVerbot` hängt in allen Profilen am S3-Client (`quarkus.s3.interceptors`) und bricht jeden Aufruf mit Bypass-Header ab, bevor er gesendet wird (fail closed). `S3Ablage` prüft beim Anlegen, dass `BypassVerbot` am Client hängt; zusätzlich prüft `BypassVerbotPruefung` das beim Start am S3-Client der Anwendung, den auch `S3MandantBucket` nutzt, und bricht sonst den Start ab (Review PR #43, K1). `BypassVerbotTest` prüft das ohne Netz und stellt sicher, dass der Header-Text in `src/main` nur in `BypassVerbot` steht und kein Aufruf `bypassGovernanceRetention(` vorkommt.
   - Nachweis Req 6.5 in Tests: Der `ExecutionInterceptor` `KeinBypassInterceptor` (nur `%test`, vor `BypassVerbot`) hält jeden Aufruf mit Bypass-Header fest und lässt ihn nicht hinaus; ein Test prüft am Schluss, dass die Liste leer ist. Aufräumen und die COMPLIANCE-Gegenprobe laufen über einen eigenen Verwaltungs-Client ohne Interceptor.
   - Mandant-Codes mit `a-` am Anfang lehnt `MandantCode` ab: Auf Stufe B ergäbe ein Code `a-<x>` den Bucket `urinet-archiv-a-<x>`, also den Bucket der Stufe A von Mandant `<x>`.
-  - Teilnachweis: Die Tests laufen gegen MinIO. Der Lauf gegen Infomaniak mit dem Java SDK (Spike 0.2, «folgt in Aufgabe 2.3») steht aus; dafür gibt es den manuellen Smoke-Test `InfomaniakAblageSmokeIT` (Anleitung in `backend/README.md`, Open Points).
+  - Nachweis: Die Tests laufen in der Standard-CI gegen MinIO und zusätzlich nicht blockierend gegen Ceph RGW (Workflow `ceph.yml`, siehe «Teststrategie»). Der Lauf gegen Infomaniak mit dem Java SDK (Spike 0.2) ist der manuelle Smoke-Test `InfomaniakAblageSmokeIT`, von Fabian am 12.11.2026 bestanden (Anleitung in `backend/README.md`, Open Points).
 
 ### Dokumentart und Aufbewahrung (`dokumentart`)
 - `Aufbewahrung.berechne(art, belegdatum, eingang, geschaeftsjahr, gueltigBis, gjEnde)` ist reine Domain-Logik (JUnit-Tabellentests), Req 9.3:
@@ -668,6 +668,9 @@ Dev Services, Ablage und OCR laufen ebenfalls nur auf dem Entwicklerrechner (Req
 - Alles andere bricht den Start ab (Req 16.21); die Meldung nennt nur den abgelehnten Host und das
   aktive Profil.
 - `lokal` zusammen mit `prod` bricht den Start ab (Req 16.22).
+- Ebenso bricht `ceph` (reines Testprofil der Ablage für die Tests gegen Ceph RGW, siehe «Teststrategie») zusammen
+  mit `prod` den Start ab. Die Regel liegt hier, weil `KiBasisUrlPruefung` die Profile beim Start ohnehin prüft
+  (`pruefeProfile`); sie folgt nicht aus Req 16.22.
 - Die Prüflogik ist eine reine Funktion (Profilnamen und URI als Eingabe) und wird als Unit-Test ohne
   aktives Quarkus-Profil `lokal` geprüft; die CI aktiviert `lokal` nie.
 - `GoldenLauf` und `GoldenDatensatzIT` laufen nur per HTTPS gegen `api.infomaniak.com`, sonst Abbruch
@@ -1363,9 +1366,13 @@ von Fabian am 09.11.2026). MinIO veröffentlicht keine Images mehr auf Docker Hu
 MinIO verdeckt Eigenheiten von Ceph RGW (Fehlercodes, Deny-Policy gilt nicht für den Root-Zugang, Versions-ID bei
 `CopyObject`); die prüft gegen Infomaniak nur `InfomaniakAblageSmokeIT` von Hand. Zusätzlich laufen `S3AblageTest`, die
 Ablage-Szenarien und `InfomaniakAblageSmokeIT` nicht blockierend gegen einen Einzelcontainer mit Ceph RGW (Workflow
-`ceph.yml`, nächtlich und von Hand, Profil `ceph`; Anleitung in `backend/README.md`); die Standard-CI bleibt bei MinIO.
-Keine Testerwartung musste dafür geändert werden: Sie lassen die Fehlercodes beider Server zu oder prüfen nur Status und
-Wirkung. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
+`ceph.yml`, nächtlich, von Hand und bei PRs, die die Ceph-Einrichtung oder die Ablage ändern (Adapter, Tests, Szenarien), Profil `ceph`;
+Anleitung in `backend/README.md`); die Standard-CI bleibt bei MinIO. Ein roter Nachtlauf legt über `ci-fehler.yml` ein
+Issue an; in PR-Läufen bleibt der Job weich (`continue-on-error`). Das Profil `ceph` ist ein reines Testprofil: Zusammen mit
+`prod` bricht der Start ab (`KiBasisUrlPruefung.pruefeProfile`). Angepasst wurde nur `S3AblageTest`: Gesperrtes Löschen
+und Verkürzen muss mit `400 InvalidRequest` (MinIO) oder `403 AccessDenied` (Ceph/Infomaniak) abgelehnt werden, strenger
+als vorher (beliebige `S3Exception`); die übrigen Erwartungen lassen die Fehlercodes beider Server zu oder prüfen nur
+Status und Wirkung. Die Driven Ports `AblagePort`, `KiPort`, `OcrPort` (`verarbeitung`) und `IntegrationPort` (`integration`)
 haben je einen Dev-Stub unter `adapter/out/stub/`; `adapter/out/<Name>Auswahl` wählt zur Laufzeit nach
 `archiv.<port>.stub` (nur in `dev` an). Ohne Stub und ohne echten Adapter bricht die Auswahl ab; die Methoden und
 Adapter folgen mit 2.3, 2.6, 3.2 und Spec 02/03. Readiness meldet DOWN, wenn die Datenbank nicht erreichbar ist
