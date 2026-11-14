@@ -3,6 +3,9 @@ package ch.urinet.archiv.gemeinsam;
 import io.smallrye.config.SmallRyeConfig;
 import io.vertx.ext.mail.mailencoder.EmailAddress;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -15,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +36,7 @@ class DeployBenachrichtigungTest {
 
     private static final Path COMPOSE = GemeinsamSchritte.REPO.resolve("deploy/infomaniak/compose.yml");
     private static final Path WORKFLOW = GemeinsamSchritte.REPO.resolve(".github/workflows/infomaniak-deploy.yml");
+    private static final Path SCHREIBE_ENV = GemeinsamSchritte.REPO.resolve(".github/scripts/schreibe-env.sh");
     private static final String VARIABLE = "ARCHIV_ALARM_EMPFAENGER_URINET";
     private static final String EMPFAENGER = "archiv.benachrichtigung.empfaenger.urinet";
     /** Interpolation von Compose, soweit compose.yml sie nutzt: {@code ${NAME:-vorgabe}}. */
@@ -49,7 +54,6 @@ class DeployBenachrichtigungTest {
         SmallRyeConfig config = DeployStufeTest.prodConfig(umgebung(Map.of()));
 
         assertThat(config.getOptionalValue(EMPFAENGER, String.class)).isEmpty();
-        assertThat(config.getOptionalValue("quarkus.mailer.password", String.class)).isEmpty();
     }
 
     @Test
@@ -82,7 +86,39 @@ class DeployBenachrichtigungTest {
                 .contains("ARCHIV_SMTP_PASSWORT: ${{ secrets.ARCHIV_SMTP_PASSWORT }}")
                 .contains("schreibe archiv_smtp_passwort \"$ARCHIV_SMTP_PASSWORT\"")
                 .contains(VARIABLE + ": ${{ vars." + VARIABLE + " }}")
-                .contains("printf '" + VARIABLE + "=%s\\n' \"$" + VARIABLE + "\" > bundle/.env");
+                .contains("bash .github/scripts/schreibe-env.sh bundle/.env");
+    }
+
+    /** Die .env hat genau eine Zeile mit der Adresse; leer bleibt die Zeile ohne Wert (Compose: nur Log). */
+    @ParameterizedTest
+    @ValueSource(strings = {"inhaber@example.invalid", "vorname.nachname+alarm@sub.example.invalid", ""})
+    void envMitGenauEinerZeile(String wert, @TempDir Path ordner) throws Exception {
+        Path env = ordner.resolve(".env");
+
+        assertThat(schreibeEnv(wert, env)).isZero();
+        assertThat(Files.readAllLines(env, StandardCharsets.UTF_8)).containsExactly(VARIABLE + "=" + wert);
+    }
+
+    /** Injektionsschutz: keine weitere Zeile, keine Interpolation, keine zweite Adresse; ohne .env kein Deploy. */
+    @ParameterizedTest
+    @ValueSource(strings = {"inhaber@example.invalid\nQUARKUS_MAILER_PASSWORD=x", "inhaber@example.invalid ",
+            "a@example.invalid,b@example.invalid", "a$x@example.invalid", "a@example.invalid${X}",
+            "\"a\"@example.invalid", "'a'@example.invalid", "a b@example.invalid", "keine-adresse",
+            "inhaber@example", "inhaber@example.invalid\r"})
+    void ungueltigeVariableBrichtAb(String wert, @TempDir Path ordner) throws Exception {
+        Path env = ordner.resolve(".env");
+
+        assertThat(schreibeEnv(wert, env)).isEqualTo(1);
+        assertThat(env).doesNotExist();
+    }
+
+    private static int schreibeEnv(String wert, Path env) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder("bash", SCHREIBE_ENV.toString(), env.toString())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        pb.environment().put(VARIABLE, wert);
+        Process p = pb.start();
+        assertThat(p.waitFor(30, TimeUnit.SECONDS)).isTrue();
+        return p.exitValue();
     }
 
     /** Umgebung der API, wie Compose sie mit der {@code .env} des Bundles interpoliert. */

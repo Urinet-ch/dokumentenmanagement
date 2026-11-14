@@ -66,7 +66,10 @@ public class SecretDateienTest {
                 .isEqualTo("attrappe-manifest-schluessel");
     }
 
-    /** Aufgabe 5.6: Ohne Datei archiv_smtp_passwort und ohne Empfänger startet prod; Benachrichtigungen bleiben im Log. */
+    /**
+     * Aufgabe 5.6: Mit leerer Datei archiv_smtp_passwort (wie im Deploy ohne Secret) und ohne Empfänger startet prod,
+     * auch mit SmtpPasswortPruefung; Benachrichtigungen bleiben im Log.
+     */
     @Test
     void ohneSmtpPasswortUndEmpfaengerGestartet() {
         var config = ConfigProvider.getConfig();

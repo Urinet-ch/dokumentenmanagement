@@ -198,13 +198,20 @@ gh variable set ARCHIV_ALARM_EMPFAENGER_URINET -R Urinet-ch/dokumentenmanagement
 ```
 - Der nächste Deploy legt das Passwort als Secret-Datei `archiv_smtp_passwort` ab (tech.md Regel 7) und den Empfänger
   in die `.env` neben `compose.yml`; `compose.yml` reicht ihn als `ARCHIV_ALARM_EMPFAENGER_URINET` an die API weiter.
-  Ist die Variable keine einzelne Adresse, bricht der Deploy vor dem Bundle ab.
-- Fehlt einer der Werte, startet das Archiv trotzdem: Ohne Empfänger steht nur «… kein Empfänger konfiguriert» mit der
-  ID im Log, ohne Passwort scheitert der Versand mit «… nicht versandt (<Ausnahme>)». Einen Alarm versucht die
-  Überwachung im nächsten Takt (15 Minuten) wieder.
+  Ist die Variable keine einzelne Adresse, bricht der Deploy vor dem Bundle ab (`.github/scripts/schreibe-env.sh`).
+- Das Passwort kommt nur aus der Datei: Steht `ARCHIV_SMTP_PASSWORT` oder `QUARKUS_MAILER_PASSWORD` in der Umgebung
+  der API, bricht der Start ab (`SmtpPasswortPruefung`, wie beim Datenschlüssel).
+- Fehlt einer der Werte, startet das Archiv trotzdem: Ohne Passwort steht beim Start einmal «Mail-Versand:
+  Secret-Datei archiv_smtp_passwort leer oder nicht vorhanden …» im Log. Ohne Empfänger steht bei jeder Meldung nur
+  «… kein Empfänger konfiguriert» mit der ID im Log, ohne Passwort scheitert der Versand mit «… nicht versandt
+  (<Ausnahme>)». Einen Alarm versucht die Überwachung im nächsten Takt (15 Minuten) wieder.
 - Prüfen: Beim nächsten Alarm steht im Log der API «Alarm <schlüssel> (Mandant urinet) an den Inhaber versandt» (bzw.
-  «Inhaber benachrichtigt: …») statt einer der Warnungen oben, und die Mail kommt beim Empfänger an. Passwort
-  gewechselt: Secret neu setzen und neu deployen.
+  «Inhaber benachrichtigt: …») statt einer der Warnungen oben, und die Mail kommt beim Empfänger an.
+- **Passwort von `archiv@urinet.ch` gewechselt:** Versand und Mail-Eingang nutzen dasselbe Postfach, darum beides
+  nachführen: das Secret `ARCHIV_SMTP_PASSWORT` neu setzen und neu deployen (Versand) **und** das Postfach mit
+  `mail einrichten urinet …` neu einrichten (Eingang, Passwort verschlüsselt in der DB; siehe «Mail-Eingang
+  einrichten»). Bis beides nachgeführt ist, kann auch die Meldung «Mail-Eingang gestört» nicht ankommen, weil sie
+  über dasselbe Konto geht; dann steht der Ausfall nur im Log.
 
 ## Benutzer in Keycloak anlegen
 Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image

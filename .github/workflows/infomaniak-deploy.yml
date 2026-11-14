@@ -169,14 +169,9 @@ jobs:
           schreibe archiv_manifest_key "$ARCHIV_MANIFEST_KEY"
           schreibe archiv_data_key "$ARCHIV_DATA_KEY"
           schreibe archiv_smtp_passwort "$ARCHIV_SMTP_PASSWORT"
-          # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine Adresse ohne Leerraum,
-          # Anführungszeichen oder $, sonst entstünden weitere Zeilen oder Compose interpolierte weiter
-          if [ -n "$ARCHIV_ALARM_EMPFAENGER_URINET" ] \
-              && ! [[ "$ARCHIV_ALARM_EMPFAENGER_URINET" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
-            echo "::error::Variable ARCHIV_ALARM_EMPFAENGER_URINET ist keine einzelne E-Mail-Adresse; kein Deploy."
-            exit 1
-          fi
-          printf 'ARCHIV_ALARM_EMPFAENGER_URINET=%s\n' "$ARCHIV_ALARM_EMPFAENGER_URINET" > bundle/.env
+          # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine einzelne Adresse, sonst
+          # bricht das Skript ab (kein Deploy)
+          bash .github/scripts/schreibe-env.sh bundle/.env
           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
             python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"

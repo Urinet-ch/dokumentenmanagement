@@ -283,7 +283,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - `POST /api/v1/dokumente/{id}/wiederholen` (Recht A10): `FEHLER` → `NEU` (Verarbeitung neu), `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` (nur Archivierung, Metadaten unverändert), sonst 409
   - Dokument mit `pdfa_fehlt`: der Inhaber archiviert das Original allein oder verwirft
   - _Anforderungen: 2.13, 2.15, 2.16, 2.22, 5.9, 6.3, 6.4, 6.6, 6.7, 6.8, 6.13, 8.2, 8.3, 8.5, 8.8, 8.9, 8.10, 9.8_
-  - erledigt (PR #57): `DokumentBestaetigen`, `DokumentVerwerfen`, `DokumentWiederholen`, `ArchivierenHandler` mit Mail an den Inhaber (nur IDs); Szenarien `features/dokument/bestaetigen.feature`, `verwerfen.feature`, `wiederholen.feature`, `features/verarbeitung/archivieren.feature`; JUnit `DokumentBestaetigenTest`, `ArchivierenHandlerTest` (design.md «Umsetzung (Aufgabe 3.4, 11.11.2026)»). Offen: Empfänger und SMTP der Benachrichtigung in `prod`; `SPERRE_KONFLIKT` und Änderungen nach `ARCHIVIERT` folgen mit 3.5
+  - erledigt (PR #57): `DokumentBestaetigen`, `DokumentVerwerfen`, `DokumentWiederholen`, `ArchivierenHandler` mit Mail an den Inhaber (nur IDs); Szenarien `features/dokument/bestaetigen.feature`, `verwerfen.feature`, `wiederholen.feature`, `features/verarbeitung/archivieren.feature`; JUnit `DokumentBestaetigenTest`, `ArchivierenHandlerTest` (design.md «Umsetzung (Aufgabe 3.4, 11.11.2026)»). Empfänger und SMTP der Benachrichtigung in `prod`: umgesetzt mit Aufgabe 5.6 (Ergänzung 14.11.2026). Offen: `SPERRE_KONFLIKT` und Änderungen nach `ARCHIVIERT` folgen mit 3.5
 
 - [x] 3.5 Metadaten ändern und Versionen [Backend]
   - `PATCH /api/v1/dokumente/{id}` (Recht A6) mit `If-Match`: 412 `VERSION_KONFLIKT` bei Konflikt, 428 ohne Header; Grund Pflicht bei `ARCHIVIERT`, vorherige Fassung in `dokument_version`
