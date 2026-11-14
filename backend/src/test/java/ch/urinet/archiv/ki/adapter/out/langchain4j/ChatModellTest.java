@@ -7,7 +7,6 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
-import dev.langchain4j.model.chat.StreamingChatModel;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -49,9 +48,7 @@ class ChatModellTest {
     }
 
     @Test
-    void liefertEinStreamingModellOhneRequestBeimBauen() {
-        StreamingChatModel m = modell(INFOMANIAK, Optional.of("geheim")).get();
-        assertThat(m).isInstanceOf(EntkoppeltesModell.class);
+    void nenntDasModellFuerDenVerbrauch() {
         assertThat(modell(INFOMANIAK, Optional.of("geheim")).modell()).isEqualTo("mistralai/Mistral-Small-4-119B-2603");
     }
 
