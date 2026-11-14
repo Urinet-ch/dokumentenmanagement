@@ -1,4 +1,5 @@
-// Metadaten bearbeiten, Versionen und Vorschaubild der Dokumentansicht (Aufgabe 4.6) gegen hilfen/suche-attrappe.mjs.
+// Metadaten bearbeiten, Versionen und Vorschaubild der Dokumentansicht (Aufgabe 4.6) gegen hilfen/suche-attrappe.mjs;
+// die Änderung ohne Titel (Aufgabe 4.10) auch gegen das Archiv im Testmodus (weitergeleitete Anfragen).
 import { Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { DOKUMENTE } from '../hilfen/suche-attrappe.mjs';
@@ -99,11 +100,20 @@ When(/^ich die Tags auf «(.+)» ändere$/, async function (tags) {
 
 Then(/^hat die PWA die Änderung ohne Titel und ohne den Dateinamen «(.+)» gesendet$/, async function (name) {
   await formular(this.seite).waitFor({ state: 'detached' });
-  assert.equal(this.suche.aenderungen.length, 1);
-  const { body } = this.suche.aenderungen[0];
+  // An die Attrappe oder, weitergeleitet, an das echte Archiv (dort mit dessen Antwort)
+  const aenderungen = this.suche?.aenderungen ?? this.weiterleitung.anfragen.filter((a) => a.methode === 'PATCH');
+  assert.equal(aenderungen.length, 1);
+  const [{ body }] = aenderungen;
   assert.ok(!('titel' in body), JSON.stringify(body));
   assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
-  assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
+  if (this.suche) {
+    assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
+  } else {
+    for (let versuch = 0; versuch < 50 && aenderungen[0].antwort === undefined; versuch++) {
+      await this.seite.waitForTimeout(100);
+    }
+    assert.equal(aenderungen[0].status, 200, JSON.stringify(aenderungen[0].antwort));
+  }
 });
 
 Then(/^hat die PWA die Art «(.+)» mit den Zusatzwerten (.+) und dem Grund gesendet$/, async function (art, zusatz) {

@@ -27,7 +27,9 @@ final class WorkflowSecrets {
             // Aufgabe 5.2: privater Schlüssel des Tages-Manifests als Secret-Datei
             "ARCHIV_MANIFEST_KEY",
             // Spec 02, Aufgabe 6.1: Datenschlüssel für Zugangsdaten in der DB (Mail-Eingang), optional
-            "ARCHIV_DATA_KEY"));
+            "ARCHIV_DATA_KEY",
+            // Aufgabe 5.6 (Entscheid Fabian 14.11.2026): Passwort des Postfachs für Benachrichtigungen, optional
+            "ARCHIV_SMTP_PASSWORT"));
 
     private static final Pattern WORT = Pattern.compile("(?i)\\bsecrets\\b");
     private static final Pattern NAME = Pattern.compile("\\G\\s*\\.\\s*([A-Za-z0-9_-]+)\\b(?!\\s*[.\\[(])");
