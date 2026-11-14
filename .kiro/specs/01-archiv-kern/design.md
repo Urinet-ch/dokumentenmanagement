@@ -1201,7 +1201,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
   - Warteschlange (Req 4.4–4.8): ein Eintrag je Erfassung mit `aufgenommen` (Zeitpunkt der ersten Seite), Seiten
     (Original und Arbeitsfassung), `fehlversuche`, `zustand`, `meldung` sowie Benutzer (`sub`) und Mandant (Claim
     `mandant`) der Anmeldung; ohne Anmeldung bleiben beide leer, nach Ablauf der Sitzung gilt der zuletzt angemeldete
-    Benutzer weiter. Einträge ohne Benutzer übernimmt vor dem nächsten Lauf die erste Anmeldung mit Recht A1 samt
+    Benutzer weiter, aber nur bis zum Neuladen der PWA: `zuletzt` liegt nur im Arbeitsspeicher. Startet die PWA neu
+    (auf dem Handy oft, wenn das Betriebssystem sie beendet) oder lädt die Seite neu (z. B. durch die Weiterleitung zu
+    Keycloak beim Anmelden), fallen Aufnahmen bei abgelaufener Sitzung wieder ohne Benutzer und Mandant an, bis sich
+    jemand anmeldet. Einträge ohne Benutzer übernimmt vor dem nächsten Lauf die erste Anmeldung mit Recht A1 samt
     ihrem Mandanten. Sichtbar (Zähler «Wartet auf Upload», Liste «Nicht hochgeladen», «Erneut versuchen») sind nur die
     eigenen Einträge (gleicher Benutzer und Mandant) und die ohne Benutzer; Einträge anderer Benutzer oder Mandanten auf
     demselben Gerät bleiben verborgen und unberührt, bis sich deren Benutzer anmeldet. Hochgeladen wird nacheinander,
@@ -1220,7 +1223,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     den Zustand «fehler» (Zuschnitt fehlgeschlagen, z. B. zu wenig Speicher), legt die PWA nichts in die
     Warteschlange, markiert die Seite und meldet «Seite n ist nicht zugeschnitten. Bitte zuerst die markierten Seiten
     verwerfen oder neu aufnehmen.»; dasselbe gilt vor der Anmeldung, die die Seiten sonst sichert. Ein Rückfall auf das
-    ganze Bild ist nach Req 4.3 nur für fehlende Kanten vorgesehen und würde bei Speichermangel kaum helfen. Während
+    ganze Bild ist nach Req 4.3 nur für fehlende Kanten vorgesehen und würde bei Speichermangel kaum helfen. Scheitert
+    dagegen das Anpassen des Zuschnitts einer Seite, die schon eine Arbeitsfassung hat, bleibt diese samt Vorschau
+    erhalten; die Seite meldet «Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.» (Zustand
+    `anpassenFehler`) und hält das Abschliessen nicht auf (Nachprüfung PR #123). Während
     des Speicherns sind Abschliessen, Aufnehmen, Dateiwahl, Zuschnitt und Verwerfen gesperrt; ein zweiter Aufruf legt
     keinen zweiten Eintrag an. Danach entfernt die PWA nur die gespeicherten Seiten; eine Aufnahme, die während des
     Speicherns noch ankam, bleibt für die nächste Erfassung stehen.

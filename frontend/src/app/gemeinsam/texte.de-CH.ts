@@ -94,6 +94,7 @@ export const TEXTE = {
     angepasst: 'Zuschnitt angepasst.',
     ganzesBild: 'Ganzes Bild verwendet.',
     aufbereitenFehler: 'Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.',
+    anpassenFehler: 'Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.',
     anpassen: (nr: number) => `Zuschnitt Seite ${nr} anpassen`,
     verwerfen: (nr: number) => `Seite ${nr} verwerfen`,
     verwerfenKurz: 'Verwerfen',
