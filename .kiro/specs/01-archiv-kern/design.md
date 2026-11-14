@@ -1004,6 +1004,32 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
     `kontakte-pflegen.feature`, Grenze im Test 30 s).
   - Abweichungen: keine. `zusammengefuehrtAus` nennt höchstens die 50 neuesten ohne Hinweis auf weitere; die PWA zeigt die
     Zahl «inaktiv» der Vorschau erst mit 4.12 (der generierte Client kennt sie schon).
+- Umsetzung (Aufgabe 4.12, 14.11.2026; Auslegungen im PR unter «Auslegungen»):
+  - Routen und Navigation: `/kontakte` (`Kontakte`) und `/kontakte/:id` (`KontaktDetailSeite`), lazy geladen, `rechtGuard('A6')`;
+    Menüpunkt «Kontakte» nach «Suche» mit Recht A6 (`inhaber`, `geschaeftsstelle`). Ordner `frontend/src/app/kontakte/`:
+    `KontaktePort` mit `HttpKontakteService` (generierter Client; `If-Match` ist `"<version>"` aus dem Detail),
+    `kontakt-logik.ts` (Query-Parameter, Suchbegriff-Prüfung, Formularprüfung, Fehlerarten), `kontakte` (Liste),
+    `kontakt-detail`, `kontakt-dokumente`, `kontakt-bearbeiten`, `kontakt-zusammenfuehren-dialog`,
+    `kontakt-inaktiv-dialog` und der gemeinsame modale `kontakt-dialog` (Fokus im Dialog, Escape, Fokus zurück).
+  - Liste: Suchbegriff, Status, Herkunft, «nicht mehr im CRM-Export» und Seite stehen in den Query-Parametern der Adresse
+    (`q`, `status`, `quelle`, `nichtImExport`, `seite` ab 0; Standardwerte fehlen). Die Eingabe wartet 300 ms und ersetzt
+    den Eintrag des Verlaufs (`replaceUrl`), Filter und Blättern legen neue Einträge an, damit die Zurück-Taste aus dem
+    Detail zur selben Liste führt. Ein Begriff geht nur mit 1–200 Zeichen ohne Steuerzeichen als `q` mit, sonst ohne `q`
+    und mit Hinweis; `switchMap` verwirft veraltete Antworten. 25 Zeilen je Seite; ab 960 px Tabelle, darunter Karten.
+  - Detail: `GET /kontakte/{id}`; 404 → Seite «Kontakt nicht gefunden», 403 → nur die Meldung (nie Kontaktdaten). Die
+    Dokumente lädt `kontakt-dokumente` über `GET /dokumente?partner=<id>&sortierung=DATUM` (ohne `q`, 20 je Seite, Art
+    über `GET /dokumentarten`); die PWA filtert nichts und zeigt nur die Gesamtzahl der Antwort.
+  - Aktionen (A12, nur `inhaber`): «Bearbeiten», «Zusammenführen …» und «Als inaktiv markieren» nur bei aktiven,
+    «Wieder aktivieren» nur bei inaktiven ohne «zusammengeführt in». 412 und 428 laden das Detail neu und zeigen
+    «inzwischen geändert»; 409 und 400 erscheinen als Meldung beim Formular bzw. im Dialog. Zusammenführen und
+    Inaktivmarkieren fragen immer zurück (Dialog), das Absenden sperrt sich bis zur Antwort.
+  - Verknüpfungen: Import-Vorschau mit Zahl und Filter «inaktiv» (nur Kontakt-Import) und Links von getroffenen und
+    möglichen Kontakten; Dokumentansicht mit Link auf den Partner (A6); Zugriffsprotokoll mit den Beschriftungen der
+    drei Aktionen.
+  - Nachweise: Vitests je Komponente und Dienst (`kontakte/*.spec.ts`, Ergänzungen in `app.spec.ts`,
+    `import-lauf.spec.ts`, `dokument-ansicht.spec.ts`); Browser-Szenarien `features/kontakt/kontakte-pwa.feature` gegen das
+    echte Archiv im Testmodus (`@req-17.1`, `17.3`, `17.4`, `17.5`, `17.6`, `17.17`, Schritte `e2e/schritte/kontakte.mjs`).
+  - Abweichungen: Das durchgehende Browser-Szenario (`@req-17.1 @req-17.3 @req-17.4`) zeigt das INTERN-Dokument sichtbar (Gesamtzahl 2) statt eines ausgeblendeten vertraulichen: Die Rechtematrix erlaubt A3/A4 für `geschaeftsstelle`, `mitarbeiter` und `treuhaender` haben kein A6; nur verworfene Dokumente fehlen. Die Sichtbarkeit nach Rolle und Vertraulichkeit ist auf API-Ebene in `kontakte-pflegen.feature` (D3, D4) belegt. Eine Backend-Änderung war nicht nötig.
 
 Drive-Import (Req 12):
 - Umsetzung (Aufgabe 4.8): `tools/drive_import` ist ein eigenes Maven-Projekt (Java 25, Picocli, Jackson; JAR mit `maven-shade-plugin`, SpotBugs Stufe hoch) ohne Abhängigkeit zum Backend. Es ruft nur `POST /api/v1/dokumente` auf (eine Datei je Anfrage, Teil `hinweis` vor `dateien`); die Archivseite ist unverändert (`quelle=DRIVE` und `erstellt_von='token:<id>'` aus 2.4, Eingangskorb-Ablauf wie jeder Upload, Req 12.8).

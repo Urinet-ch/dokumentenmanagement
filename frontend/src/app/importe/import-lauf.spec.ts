@@ -34,6 +34,7 @@ const VORSCHAU: ImportLaufMitZeilen = {
     dubletten: 2,
     fehler: 0,
     uebersprungen: 0,
+    inaktiv: 1,
   },
   eintraege: [
     { nr: 1, ergebnis: 'NEU', felder: { name: 'Neue GmbH', plz: '6000' }, kandidaten: [] },
@@ -138,11 +139,34 @@ describe('Import-Lauf (Aufgabe 4.4)', () => {
         '2 mögliche Dublette',
         '0 fehlerhaft',
         '0 übersprungen',
+        '1 inaktiv',
       ]);
       chips[4].click();
       await fixture.whenStable();
       expect(service.apiV1ImporteIdGet).toHaveBeenLastCalledWith('l1', 'DUBLETTE', 50, 0);
       expect(chips[4].getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('verlinkt getroffene und mögliche Kontakte auf die Kontaktseite (Req 17.1, 17.13)', async () => {
+      await oeffnen({
+        ...VORSCHAU,
+        eintraege: [
+          { nr: 4, ergebnis: 'INAKTIV', meldung: 'Kontakt inaktiv', felder: { name: 'Alte AG' }, kontaktId: K1, kandidaten: [] },
+          ...(VORSCHAU.eintraege ?? []),
+        ],
+      });
+      const getroffen = element.querySelector<HTMLAnchorElement>('[data-test=kontakt-link]')!;
+      expect(getroffen.getAttribute('href')).toBe(`/kontakte/${K1}`);
+      const kandidaten = [...element.querySelectorAll<HTMLAnchorElement>('[data-test=kandidat-link]')];
+      expect(kandidaten.map((a) => a.getAttribute('href'))).toEqual([`/kontakte/${K1}`, `/kontakte/${K2}`]);
+    });
+
+    it('filtert die Zeilen auf «inaktiv» (Req 13.3)', async () => {
+      await oeffnen(VORSCHAU);
+      const chip = [...element.querySelectorAll<HTMLButtonElement>('.chip')].find((c) => c.dataset['ergebnis'] === 'INAKTIV')!;
+      chip.click();
+      await fixture.whenStable();
+      expect(service.apiV1ImporteIdGet).toHaveBeenLastCalledWith('l1', 'INAKTIV', 50, 0);
     });
 
     it('zeigt Kandidaten und übernimmt erst nach Bestätigung mit den Entscheiden', async () => {

@@ -417,7 +417,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 3.1, 3.5, 4.2, 4.5; mit 4.3 abstimmen (Übernahme `CsvUebernehmenSpeichern`, dieselben Dateien)_
   - erledigt (PR #146): Changeset 026, `KontaktResource` (Liste, Detail, Verweise, Zusammenführen, inaktiv, aktiv), `KontaktZusammenfuehren`, `KontaktVerweise`; Szenarien `features/kontakt/kontakte-pflegen.feature` und Ergänzungen in `kontakte.feature`, `dokument/generator.feature`, `aendern.feature`, `bestaetigen.feature`, `importe/vorschau-abgleich.feature`, `uebernahme.feature`; JUnit `KontaktVerweiseTest`, `KontaktAbgleichTest`, `JdbcKontaktRegisterTest`, `KontaktListeParameterTest` (design.md «Umsetzung (Aufgabe 4.11, 14.11.2026)»)
 
-- [ ] 4.12 Kontakte ansehen und pflegen: Oberfläche [Frontend]
+- [x] 4.12 Kontakte ansehen und pflegen: Oberfläche [Frontend]
   - Herkunft wie 4.11 (Req 17; design.md «Kontakte ansehen und pflegen», Abschnitt «Oberfläche»); parallel zu Spec 02, Welle 7, der Chat hat Vorrang
   - Routen `/kontakte` und `/kontakte/:id` (lazy, Guard auf A6), Eintrag «Kontakte» in der Navigation nur mit A6
   - Liste mit Suche, Filtern (Status, Herkunft, «nicht mehr im CRM-Export»), Blättern und Gesamtzahl; Detail mit Stammdaten, Kennzeichen und den sichtbaren Dokumenten (`GET /dokumente?partner=`, Platzhalter nach 8.11)
@@ -426,6 +426,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - 375 px ohne waagrechtes Scrollen; Vitests je Komponente, Szenarien für 17.5, 17.6 und 17.17
   - _Anforderungen: 13.3, 17.1–17.6, 17.17_
   - _Abhängig von: 4.11, 4.4, 4.6_
+  - erledigt (PR #149): Routen `/kontakte` und `/kontakte/:id`, Liste, Detail mit Dokumenten, Bearbeiten, Zusammenführen, Inaktiv und Aktivieren (nur `inhaber`), Verknüpfungen in Import, Dokumentansicht und Zugriffsprotokoll; Vitests unter `frontend/src/app/kontakte/`; Browser-Szenarien `features/kontakt/kontakte-pwa.feature` (`@req-17.1`, `17.3`–`17.6`, `17.17`) gegen das echte Archiv im Testmodus
 
 ## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1 (Voraussetzung: Entscheide aus 4.9)
 
