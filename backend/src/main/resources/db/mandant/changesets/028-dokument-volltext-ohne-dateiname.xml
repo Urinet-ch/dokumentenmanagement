@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Suche ohne Dateinamen (Spec 01, Req 3.13; Spec 02, Aufgabe 7.1a): Die Variante für Werkzeuge anderer
+        Sprachmodelle prüft ts_filter(volltext_tsv, '{a,b,c}') @@ q. Der GIN-Index auf volltext_tsv greift dafür nicht;
+        dieser Ausdrucksindex trägt genau den Ausdruck aus PanacheDokumentSuche (OHNE_DATEINAME). ts_filter ist
+        IMMUTABLE (pg_proc.provolatile = 'i'), der Index darum zulässig und für jede Anfrage gleich, auch mit
+        Verneinungen. Nur ein zusätzlicher Index: rückwärtskompatibel zum Vorgänger-Release (Req 16.11), Rollback
+        entfernt ihn ohne Datenverlust.
+    -->
+    <changeSet id="028-dokument-volltext-ohne-dateiname" author="archiv">
+        <sql>
+            create index dokument_volltext_ohne_dateiname_ix on dokument
+                using gin (ts_filter(volltext_tsv, cast('{a,b,c}' as "char"[])))
+        </sql>
+        <rollback>
+            <sql>drop index if exists dokument_volltext_ohne_dateiname_ix</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
