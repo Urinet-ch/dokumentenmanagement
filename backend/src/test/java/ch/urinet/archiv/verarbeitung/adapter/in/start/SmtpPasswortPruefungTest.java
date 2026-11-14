@@ -61,6 +61,22 @@ class SmtpPasswortPruefungTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageNotContaining(GEHEIM);
     }
 
+    /** Nachprüfung Review PR #133: Eine leere Umgebungsvariable überdeckte die gefüllte Datei sonst still. */
+    @Test
+    void leereUmgebungsvariableUeberDerDateiBrichtAb() throws IOException {
+        Files.writeString(secrets.resolve(SmtpPasswortPruefung.DATEI), GEHEIM);
+
+        SmallRyeConfig datei = prod(Map.of("ARCHIV_SMTP_PASSWORT", ""));
+        assertThatThrownBy(() -> SmtpPasswortPruefung.pruefen(datei::getConfigValue))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("archiv_smtp_passwort")
+                .hasMessageNotContaining(GEHEIM);
+
+        SmallRyeConfig zugang = prod(Map.of("QUARKUS_MAILER_PASSWORD", ""));
+        assertThatThrownBy(() -> SmtpPasswortPruefung.pruefen(zugang::getConfigValue))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("quarkus.mailer.password")
+                .hasMessageNotContaining(GEHEIM);
+    }
+
     @Test
     void zugangDirektAusDerUmgebungBrichtAb() throws IOException {
         Files.writeString(secrets.resolve(SmtpPasswortPruefung.DATEI), "aus-der-datei");

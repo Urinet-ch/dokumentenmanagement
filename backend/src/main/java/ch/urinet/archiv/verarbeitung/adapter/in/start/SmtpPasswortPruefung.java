@@ -38,23 +38,30 @@ public class SmtpPasswortPruefung {
     }
 
     /**
-     * Wirft, wenn Datei oder Zugang übersteuert sind; sonst {@code true}, wenn ein Passwort aus der Datei da ist.
+     * Wirft, wenn Datei oder Zugang übersteuert sind, auch mit leerem Wert (eine leere Umgebungsvariable überdeckte
+     * sonst still eine gefüllte Datei; Nachprüfung Review PR #133); sonst {@code true}, wenn ein Passwort aus der
+     * Datei da ist.
      */
     static boolean pruefen(Function<String, ConfigValue> lesen) {
         ConfigValue datei = lesen.apply(DATEI);
         boolean dateiWert = gesetzt(datei);
-        if (dateiWert && (datei.getSourceName() == null || !datei.getSourceName().startsWith(DATEI_QUELLE))) {
+        if (vorhanden(datei) && (datei.getSourceName() == null || !datei.getSourceName().startsWith(DATEI_QUELLE))) {
             throw new IllegalStateException(DATEI + " muss aus der Secret-Datei kommen (tech.md Regel 7); "
                     + "Umgebungsvariable ARCHIV_SMTP_PASSWORT bzw. Systemproperty entfernen und neu starten.");
         }
         ConfigValue zugang = lesen.apply(ZUGANG);
         String roh = zugang == null ? null : zugang.getRawValue() != null ? zugang.getRawValue() : zugang.getValue();
-        if (gesetzt(zugang) && !VERWEIS.equals(roh == null ? null : roh.trim())) {
+        if (roh != null && !VERWEIS.equals(roh.trim())) {
             throw new IllegalStateException(ZUGANG + " muss aus der Secret-Datei " + DATEI
                     + " kommen (tech.md Regel 7); Umgebungsvariable QUARKUS_MAILER_PASSWORD bzw. Systemproperty "
                     + "entfernen und neu starten.");
         }
         return dateiWert;
+    }
+
+    /** Eine Quelle liefert den Schlüssel, auch leer. */
+    private static boolean vorhanden(ConfigValue wert) {
+        return wert != null && (wert.getRawValue() != null || wert.getValue() != null || wert.getSourceName() != null);
     }
 
     private static boolean gesetzt(ConfigValue wert) {

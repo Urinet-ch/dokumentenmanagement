@@ -207,7 +207,7 @@ gh variable set ARCHIV_ALARM_EMPFAENGER_URINET -R Urinet-ch/dokumentenmanagement
   in die `.env` neben `compose.yml`; `compose.yml` reicht ihn als `ARCHIV_ALARM_EMPFAENGER_URINET` an die API weiter.
   Ist die Variable keine einzelne Adresse, bricht der Deploy vor dem Bundle ab (`.github/scripts/schreibe-env.sh`).
 - Das Passwort kommt nur aus der Datei: Steht `ARCHIV_SMTP_PASSWORT` oder `QUARKUS_MAILER_PASSWORD` in der Umgebung
-  der API, bricht der Start ab (`SmtpPasswortPruefung`, wie beim Datenschlüssel).
+  der API (auch leer), bricht der Start ab (`SmtpPasswortPruefung`, wie beim Datenschlüssel).
 - Fehlt einer der Werte, startet das Archiv trotzdem: Ohne Passwort steht beim Start einmal «Mail-Versand:
   Secret-Datei archiv_smtp_passwort leer oder nicht vorhanden …» im Log. Ohne Empfänger steht bei jeder Meldung nur
   «… kein Empfänger konfiguriert» mit der ID im Log, ohne Passwort scheitert der Versand mit «… nicht versandt
