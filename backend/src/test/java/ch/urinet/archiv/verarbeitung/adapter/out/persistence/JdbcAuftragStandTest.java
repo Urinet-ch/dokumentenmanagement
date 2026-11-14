@@ -73,6 +73,22 @@ class JdbcAuftragStandTest {
         assertThat(stand.letzterFehler(VHF, ANDERER)).isEmpty();
     }
 
+    @Test
+    void juengsterZaehltNurDenNeuestenAuftrag() throws SQLException {
+        assertThat(stand.juengster(URINET, TYP)).isEmpty();
+        Instant fehler = Instant.now().minus(1, ChronoUnit.HOURS).truncatedTo(ChronoUnit.MILLIS);
+        auftrag(URINET, TYP, "FEHLER", fehler);
+        assertThat(stand.juengster(URINET, TYP)).hasValueSatisfying(j -> {
+            assertThat(j.gescheitert()).isTrue();
+            assertThat(j.beendet()).contains(fehler);
+        });
+        auftrag(URINET, TYP, "FERTIG", Instant.now());
+        assertThat(stand.juengster(URINET, TYP)).hasValueSatisfying(j -> assertThat(j.gescheitert()).isFalse());
+        auftrag(URINET, TYP, "LAEUFT", null);
+        assertThat(stand.juengster(URINET, TYP)).hasValueSatisfying(j -> assertThat(j.offenOderLaeuft()).isTrue());
+        assertThat(stand.juengster(VHF, TYP)).isEmpty();
+    }
+
     private void auftrag(MandantCode mandant, AuftragTyp typ, String status, Instant beendet) throws SQLException {
         long id = hilfe.rohEinreihen(mandant.wert(), typ, "{}");
         hilfe.aendern(id, "status = '" + status + "', nachbearbeitet = now()"

@@ -22,7 +22,7 @@ import { betrag, datum } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { SucheZustand } from './suche-zustand';
 import { Suchanfrage, SuchePort } from './suche-port';
-import { Filterwerte, GROESSE, LEERE_FILTER, Pruefung, SEITE_MAX, aktiveFilter, pruefen } from './suchfilter';
+import { Filterwerte, GROESSE, HYBRID_MAX, LEERE_FILTER, Pruefung, SEITE_MAX, aktiveFilter, imModus, pruefen, wirksamerModus } from './suchfilter';
 
 const STATI = [
   'NEU',
@@ -83,6 +83,13 @@ export class Suche {
     const namen = new Map(this.arten().map((a) => [a.code, a.name]));
     return (code: string | null | undefined) => (code ? (namen.get(code) ?? code) : this.texte.ohneArt);
   });
+  /** Massgebend ist der Modus der gesendeten Anfrage, nicht die Antwort allein. */
+  protected readonly hybrid = computed(() => this.zustand.gesendet()?.modus === 'hybrid');
+  protected readonly angezeigt = computed(() => {
+    const e = this.ergebnis();
+    return e ? (this.hybrid() ? e.treffer.slice(0, HYBRID_MAX) : e.treffer) : [];
+  });
+  protected readonly volltextAn = computed(() => wirksamerModus(this.filter()) === 'volltext');
   protected readonly seiten = computed(() => {
     const e = this.ergebnis();
     return e ? Math.max(1, Math.min(Math.ceil(e.gesamt / (e.groesse || GROESSE)), SEITE_MAX + 1)) : 0;
@@ -121,6 +128,20 @@ export class Suche {
     this.filter.update((f) => ({ ...f, [feld]: wert }));
   }
 
+  /** Wer nach Datum sortiert, sucht im Volltext (Req 2.7); die Oberfläche zeigt den Modus, der gesendet wird. */
+  protected sortierungSetzen(sortierung: Filterwerte['sortierung']): void {
+    this.filter.update((f) => ({ ...f, sortierung, volltext: sortierung === 'DATUM' ? true : f.volltext }));
+  }
+
+  /** Sendet die zuletzt gesendete Anfrage im neuen Modus ab Seite 0; wer «Volltext» ausschaltet, sortiert nach Relevanz. */
+  protected volltextSetzen(an: boolean, fokus = false): void {
+    this.filter.update((f) => ({ ...f, volltext: an, sortierung: 'RELEVANZ' }));
+    const letzte = this.zustand.gesendet();
+    if (letzte?.q) {
+      this.senden(imModus(letzte, an), fokus);
+    }
+  }
+
   protected wert(ereignis: Event): string {
     return (ereignis.target as HTMLInputElement | HTMLSelectElement).value;
   }
@@ -135,7 +156,7 @@ export class Suche {
   }
 
   protected zuruecksetzen(): void {
-    this.filter.update((f) => ({ ...LEERE_FILTER, q: f.q, sortierung: f.sortierung }));
+    this.filter.update((f) => ({ ...LEERE_FILTER, q: f.q, sortierung: f.sortierung, volltext: f.volltext }));
     this.partnerEingabe.set('');
     this.partnerVorschlaege.set(null);
     this.suchen(0, true);
@@ -171,7 +192,7 @@ export class Suche {
       this.suchen(this.zustand.seite() + richtung, true);
       return;
     }
-    this.senden({ ...letzte, seite: Math.min(Math.max(letzte.seite + richtung, 0), SEITE_MAX) }, true);
+    this.senden({ ...letzte, seite: Math.min(Math.max((letzte.seite ?? 0) + richtung, 0), SEITE_MAX) }, true);
   }
 
   /** Ohne Titel der Dateiname als Platzhalter, auch in NEU, VERARBEITUNG und FEHLER (Req 14.9). */
@@ -196,7 +217,7 @@ export class Suche {
     this.laufend?.unsubscribe();
     this.laufend = this.port.suchen(anfrage).subscribe({
       next: (ergebnis) => {
-        this.zustand.seite.set(anfrage.seite);
+        this.zustand.seite.set(anfrage.seite ?? 0);
         this.zustand.gesendet.set(anfrage);
         this.ergebnis.set(ergebnis);
         this.laeuft.set(false);

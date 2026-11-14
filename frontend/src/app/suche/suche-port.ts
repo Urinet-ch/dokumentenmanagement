@@ -15,6 +15,7 @@ export type Status =
   | 'FEHLER'
   | 'VERWORFEN';
 export type Sortierung = 'RELEVANZ' | 'DATUM';
+export type Modus = 'hybrid' | 'volltext';
 
 /** Bereits geprüfte Anfrage; leere Felder fehlen. Die Grenzen prüft das Archiv nochmals (400 ANFRAGE_UNGUELTIG). */
 export interface Suchanfrage {
@@ -30,9 +31,11 @@ export interface Suchanfrage {
   tags?: string[];
   geschaeftsjahr?: number;
   belegnummer?: string;
+  /** Modus `hybrid`: nur Begriff und Filter, höchstens 30 Treffer; `sortierung`, `seite` und `groesse` fehlen dann (sonst 400). */
   sortierung?: Sortierung;
-  seite: number;
-  groesse: number;
+  modus: Modus;
+  seite?: number;
+  groesse?: number;
 }
 
 export abstract class SuchePort {

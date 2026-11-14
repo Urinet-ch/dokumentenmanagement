@@ -102,6 +102,38 @@ class BcZeitstempelAdapterTest {
     }
 
     @Test
+    void delegierterResponderMitAndererSchluessellaengeWirdAngenommen() throws Exception {
+        // 3072 Bit gegen den 2048-Bit-Schlüssel der CA: die JCA wirft dabei, statt false zu liefern
+        BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, false), PKI.tsa, PKI.ca,
+                Instant.now(), HOECHSTALTER);
+    }
+
+    @Test
+    void delegierterKleinerResponderBeiGrosserCaWirdAngenommen() throws Exception {
+        TsaTestPki grosseCa = TsaTestPki.neu("gross", 3072);
+        BcZeitstempelAdapter.ocspPruefen(grosseCa.delegierteOcsp(ocspAnfrage(grosseCa), 2048, true, false),
+                grosseCa.tsa, grosseCa.ca, Instant.now(), HOECHSTALTER);
+    }
+
+    @Test
+    void derHttpClientSprichHttp11() {
+        assertThat(adapter(new HashMap<>()).httpVersion()).isEqualTo(java.net.http.HttpClient.Version.HTTP_1_1);
+    }
+
+    @Test
+    void delegierterResponderOhneOcspEkuOderNichtVonDerCaWirdOhneRohAusnahmeAbgelehnt() throws Exception {
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, false, false),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 2048, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+    }
+
+    @Test
     void eineAlteOderVorDemStempelAbgelaufeneOcspAntwortWirdAbgelehnt() throws Exception {
         byte[] anfrage = ocspAnfrage();
         Instant genTime = Instant.now();
@@ -221,8 +253,12 @@ class BcZeitstempelAdapterTest {
     }
 
     private static byte[] ocspAnfrage() throws Exception {
+        return ocspAnfrage(PKI);
+    }
+
+    private static byte[] ocspAnfrage(TsaTestPki pki) throws Exception {
         CertificateID id = new CertificateID(new JcaDigestCalculatorProviderBuilder().build()
-                .get(CertificateID.HASH_SHA1), new JcaX509CertificateHolder(PKI.ca), PKI.tsa.getSerialNumber());
+                .get(CertificateID.HASH_SHA1), new JcaX509CertificateHolder(pki.ca), pki.tsa.getSerialNumber());
         return new OCSPReqBuilder().addRequest(id).build().getEncoded();
     }
 

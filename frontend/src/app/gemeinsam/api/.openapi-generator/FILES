@@ -2,6 +2,7 @@ api.base.service.ts
 api.module.ts
 api/api-tokens.service.ts
 api/api.ts
+api/chat.service.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
 api/exporte.service.ts
@@ -16,6 +17,11 @@ model/api-token-neu.ts
 model/api-token.ts
 model/auszug-teil.ts
 model/bestaetigung.ts
+model/chat-frage.ts
+model/chat-gespraech.ts
+model/chat-nachricht.ts
+model/chat-quelle.ts
+model/chat-verlauf.ts
 model/dokument-aenderung.ts
 model/dokument-finanz.ts
 model/dokument-version.ts

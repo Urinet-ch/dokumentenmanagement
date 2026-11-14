@@ -36,7 +36,8 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Ergänzt 14.11.2026 (entschieden von Fabian, Req 2.7, 2.8): Modus `hybrid` mit höchstens 30 Treffern ohne Gesamtzahl und ohne Blättern, Modus `volltext` unverändert, Rückfall in derselben Form mit `degradiert` (design.md «Hybrid als Standard in der Web-App»); `ki_verbrauch` mit Zweck `SUCHE` je Aufruf von Embedding-Modell und Reranker, kein Limit; Zweck im Kommentar zu `ki_verbrauch` in Spec 01 design.md nachtragen
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6, 2.7, 2.8_
 
-- [ ] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+- [x] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+  - Erledigt (PR #152): `wirksamerModus` und Modus in jeder Anfrage, Umschalter «Volltext», Hinweis bei `degradiert`, Anzeige ohne Gesamtzahl und Blättern; Attrappe nach dem Vertrag von 6.4, `BrowserBackendTest` mit Dev-Stubs für Embedding und Reranker; Browser-Szenarien `hybridsuche-pwa.feature` und `hybridsuche-attrappe-pwa.feature` (`@req-2.7`)
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 14.11.2026 («Hybrid wird Standard»); Nummer 6.6 als nächste freie der Welle 6
   - Suchseite `/suche` (Spec 01 design.md, Frontend): jede Suche mit Suchbegriff sendet `modus=hybrid` und zeigt höchstens 30 Treffer ohne Gesamtzahl und ohne Blättern; Umschalter «Volltext» als ausdrücklicher Modus mit dem bisherigen Verhalten (Sortierung, Blättern, Gesamtzahl); ohne Suchbegriff und bei Sortierung nach Datum Volltext; bei `degradiert` Hinweis «nur Volltext» mit Wechsel in den Modus Volltext
   - Browser-Szenarien `@req-2.7` (hybrid, Volltext, Rückfall bei Ausfall des Rerankers)
@@ -61,8 +62,9 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Prompt-Injection-Test mit präpariertem Dokument
   - _Anforderungen: 3.7, 4.2, 5.3_
 
-- [ ] 7.3 Chat-Schnittstelle [Backend]
+- [x] 7.3 Chat-Schnittstelle [Backend]
   - `POST /chat` als SSE (`werkzeug`, `text`, `quellen`, `fertig`, `fehler`), Speicherung `chat_gespraech`/`chat_nachricht`, Löschung nach 12 Monaten, Rate-Limit 100/h
+  - Erledigt 14.11.2026 gegen den Port `ChatAgentPort` mit Dev-Stub bzw. `ChatNichtVerfuegbar` (design.md «Umsetzung (Aufgabe 7.3, 14.11.2026)»); der echte Agent folgt mit 7.2 und ersetzt nur den Adapter. Nachweis 3.8 hier mit dem Streaming-Szenario, p95 ≤ 10 s mit echtem Modell in 9.1
   - _Anforderungen: 3.8, 4.1, 5.4, 5.5_
 
 - [ ] 7.4 Chat-Oberfläche [Frontend]
@@ -102,8 +104,9 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 9.1 Chat-Prüfliste [Fabian] [QA]
   - `chat-pruefliste.yaml` mit 7 Beispielfragen + ≥ 13 weiteren, erwartete Antworten und Quellen – nur unter `ARCHIV_GOLDEN_DIR`, nicht im Repo; im Repo nur Schema und Test `ChatPrueflisteIT`
   - Lauf manuell gegen den Produktivbestand, nie in der CI; Bericht in `docs/abnahme/phase2.md` nur mit Fragen-Nr. und Ergebnis, ohne Inhalte
+  - Messung Req 3.8: Zeit von der Anfrage bis zum ersten `text`-Ereignis (Server-Log oder Lauf der Prüfliste), p95 ≤ 10 s mit dem echten Modell; im Bericht nur das Ergebnis, ohne Inhalte
   - **Gate Phase 2:** alle 7 Beispielfragen und ≥ 18 von 20 richtig mit Quelle
-  - _Anforderungen: 13.1, 13.2_
+  - _Anforderungen: 3.8, 13.1, 13.2_
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.
