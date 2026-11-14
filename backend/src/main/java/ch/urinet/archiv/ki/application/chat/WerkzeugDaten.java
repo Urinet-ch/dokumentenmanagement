@@ -64,4 +64,76 @@ public interface WerkzeugDaten {
             fristen = List.copyOf(fristen);
         }
     }
+
+    /**
+     * Summe, Zeilen und Belege der Kennzahl: nur archivierte, bestätigte, sichtbare Belege in {@code CHF} der Richtung
+     * und der Arten; Fremdwährungsbelege im selben Filter werden nur gezählt.
+     */
+    KennzahlSeite kennzahl(KennzahlAnfrage anfrage, Sichtregel regel);
+
+    /**
+     * Archivierte, bestätigte, sichtbare Belege der Richtung und Arten mit Fälligkeit von {@code von} bis {@code bis}
+     * (beide einschliesslich), nach Fälligkeit sortiert, höchstens {@code hoechstens}; dazu die Gesamtzahl.
+     */
+    OffenePostenSeite offenePosten(Richtung richtung, List<ArtRegel> arten, LocalDate von, LocalDate bis,
+                                   Sichtregel regel, int hoechstens);
+
+    /** Richtung eines Finanzbelegs ({@code dokument_finanz.richtung}). */
+    enum Richtung {
+        EINNAHME, AUSGABE
+    }
+
+    /** Gruppierung der Kennzahl. */
+    enum Gruppierung {
+        JAHR, MONAT, PARTNER, ART, KEINE
+    }
+
+    /** Datum, nach dem die Kennzahl zeitlich einordnet. */
+    enum Basis {
+        BELEGDATUM, ZAHLUNGSDATUM
+    }
+
+    /**
+     * Eine Art, die zählt. {@code periodeFeld} (Zusatzfeld) ist {@code null} oder verlangt dort eine Monatsangabe
+     * {@code JJJJ-MM}; ohne sie zählt der Beleg nicht (z. B. ein Lohnausweis mit {@code JJJJ}).
+     */
+    record ArtRegel(String art, String periodeFeld) {
+    }
+
+    record KennzahlAnfrage(Richtung richtung, List<ArtRegel> arten, LocalDate von, LocalDate bis, Gruppierung gruppierung,
+                           Basis basis, int hoechstensBelege) {
+
+        public KennzahlAnfrage {
+            arten = List.copyOf(arten);
+        }
+    }
+
+    /** Eine Zeile der Kennzahl; {@code gruppe} ist {@code null} ohne Gruppierung oder ohne Partner. */
+    record KennzahlZeile(String gruppe, BigDecimal betrag, long anzahl) {
+    }
+
+    /**
+     * Ergebnis der Kennzahl: {@code summe} und {@code anzahl} über alle Belege in CHF (nicht nur die Zeilen),
+     * {@code belege} höchstens so viele IDs, {@code fremdwaehrung} die Zahl der ausgeschlossenen Belege.
+     */
+    record KennzahlSeite(List<KennzahlZeile> zeilen, BigDecimal summe, long anzahl, List<UUID> belege,
+                         long fremdwaehrung, boolean gekuerzt) {
+
+        public KennzahlSeite {
+            zeilen = List.copyOf(zeilen);
+            belege = List.copyOf(belege);
+        }
+    }
+
+    /** Ein offener Posten; {@code zahlstatus} ist die gespeicherte Angabe (kann {@code null} sein). */
+    record OffenerPosten(UUID id, String belegnummer, String partner, BigDecimal betrag, String waehrung,
+                         LocalDate faelligkeit, String zahlstatus) {
+    }
+
+    record OffenePostenSeite(List<OffenerPosten> posten, long gesamt) {
+
+        public OffenePostenSeite {
+            posten = List.copyOf(posten);
+        }
+    }
 }
