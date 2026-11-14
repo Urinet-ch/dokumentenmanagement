@@ -36,7 +36,7 @@ final class AgentWerkzeug implements ToolExecutor {
         this.runden = runden;
     }
 
-    /** Der Client hat die Verbindung geschlossen: keine weiteren Werkzeuge, keine weitere Runde. */
+    /** Der Client hat die Verbindung geschlossen oder der Durchgang ist beendet (auch durch die Gesamtfrist): keine weiteren Werkzeuge, keine weitere Runde. */
     static final class Abgebrochen extends RuntimeException {
         Abgebrochen() {
             super("abgebrochen", null, false, false);
@@ -45,7 +45,7 @@ final class AgentWerkzeug implements ToolExecutor {
 
     @Override
     public String execute(ToolExecutionRequest anfrage, Object memoryId) {
-        if (lauf.abgebrochen()) {
+        if (lauf.abgebrochen() || lauf.beendet()) {
             // Die Bibliothek macht aus der Ausnahme ein Fehlerergebnis und riefe das Modell trotzdem noch einmal auf; der
             // Marker auf diesem Thread verhindert den Aufruf (EntkoppeltesModell), damit keine Runde mehr bezahlt wird
             EntkoppeltesModell.naechstenAufrufVerhindern();

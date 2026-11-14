@@ -56,6 +56,10 @@ public class LangChain4jChatAgent implements ChatAgentPort {
                          @ConfigProperty(name = "archiv.ki.chat.runden") int runden,
                          @ConfigProperty(name = "archiv.ki.chat.fenster") int fenster,
                          @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze) {
+        if (runden < 1 || runden >= ArchivAgent.MAX_RUNDEN) {
+            throw new IllegalArgumentException("archiv.ki.chat.runden muss zwischen 1 und "
+                    + (ArchivAgent.MAX_RUNDEN - 1) + " liegen (Obergrenze der Bibliothek: " + ArchivAgent.MAX_RUNDEN + ")");
+        }
         this.agent = agent;
         this.modell = modell;
         this.laeufe = laeufe;
@@ -99,6 +103,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
     }
 
     private void starten(AgentLauf lauf, ChatAnfrage anfrage) {
+        LOG.infof("Chat-Durchgang mit Prompt %s", ChatSystemPrompt.kennung());
         String prompt = ChatSystemPrompt.system(anfrage.mandantenname(), uhr.instant());
         TokenStream strom = agent.antworten(lauf.id(), prompt, anfrage.frage());
         strom.onPartialResponseWithContext((teil, kontext) -> {
@@ -128,6 +133,10 @@ public class LangChain4jChatAgent implements ChatAgentPort {
      * Summe kleiner als die bisherigen Tokens, zählt sie als Wert des einzelnen Aufrufs.
      */
     private void modellaufruf(AgentLauf lauf, ChatResponse antwort, boolean schluss) {
+        if (lauf.beendet()) {
+            // Frist oder Abbruch: Nachzügler zählen nicht mehr und schreiben keine Verbrauchszeile
+            return;
+        }
         TokenUsage nutzung = antwort == null ? null : antwort.tokenUsage();
         long ein = nutzung == null || nutzung.inputTokenCount() == null ? 0 : nutzung.inputTokenCount();
         long aus = nutzung == null || nutzung.outputTokenCount() == null ? 0 : nutzung.outputTokenCount();

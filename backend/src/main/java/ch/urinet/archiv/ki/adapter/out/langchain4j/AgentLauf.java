@@ -123,11 +123,20 @@ final class AgentLauf {
 
     /** Der Agent kann nicht (weiter) antworten; {@code grund} ist ein Klassenname. */
     synchronized void ausfall(String grund) {
+        ausfall(grund, false);
+    }
+
+    /** Wie {@link #ausfall(String)}; mit {@code abbrechen} wird der laufende Modellaufruf zuerst beendet (Gesamtfrist). */
+    private synchronized void ausfall(String grund, boolean abbrechen) {
         if (beendet) {
             return;
         }
         if (!abbruch.gesetzt()) {
             ausgabe.accept(new ChatEreignis.Ausfall(grund));
+        }
+        if (abbrechen) {
+            // vor regulaer = true: sonst beendet beenden() den Stream nicht und die Callbacks laufen weiter
+            streamAbbrechen();
         }
         beendet = true;
         regulaer = true;
@@ -147,7 +156,7 @@ final class AgentLauf {
                     return;
                 }
                 if (System.nanoTime() - ende > 0) {
-                    ausfall("Zeitueberschreitung");
+                    ausfall("Zeitueberschreitung", true);
                     return;
                 }
                 try {
@@ -165,15 +174,26 @@ final class AgentLauf {
     synchronized void beenden() {
         boolean laeuft = !regulaer;
         beendet = true;
+        if (laeuft) {
+            streamAbbrechen();
+        }
+        fertig.complete(null);
+    }
+
+    /** Der Durchgang ist zu Ende (Antwort, Ausfall, Frist, Abbruch): keine weiteren Modellaufrufe und Werkzeuge. */
+    synchronized boolean beendet() {
+        return beendet;
+    }
+
+    private void streamAbbrechen() {
         StreamingHandle h = handle;
-        if (laeuft && h != null) {
+        if (h != null) {
             try {
                 h.cancel();
             } catch (RuntimeException e) {
                 // der Aufruf endet ohnehin
             }
         }
-        fertig.complete(null);
     }
 
     private static int clamp(long wert) {

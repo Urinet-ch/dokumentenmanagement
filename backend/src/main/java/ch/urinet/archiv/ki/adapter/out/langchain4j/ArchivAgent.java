@@ -23,8 +23,11 @@ import java.util.UUID;
         chatMemoryProviderSupplier = AgentSpeicher.class,
         toolProviderSupplier = ArchivToolProvider.class,
         toolHallucinationStrategy = UnbekanntesWerkzeug.class,
-        maxToolCallingRoundTrips = 10)
+        maxToolCallingRoundTrips = ArchivAgent.MAX_RUNDEN)
 public interface ArchivAgent {
+
+    /** Harte Obergrenze der Bibliothek; {@code archiv.ki.chat.runden} muss darunter liegen (Prüfung beim Start). */
+    int MAX_RUNDEN = 10;
 
     @SystemMessage("{systemPrompt}")
     @UserMessage("{frage}")

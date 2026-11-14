@@ -70,6 +70,7 @@ public class AgentSchritte {
             .connectTimeout(Duration.ofSeconds(10)).build();
     private List<Ereignis> ereignisse = List.of();
     private final Map<String, Long> zaehler = new LinkedHashMap<>();
+    private final Map<String, String> staende = new LinkedHashMap<>();
     private boolean benutzt;
     private List<ChatAntwort> folge = List.of();
     private String gespraech;
@@ -239,6 +240,7 @@ public class AgentSchritte {
         benutzt = true;
         String s = schema(mandant);
         zaehler.put("dokumente " + mandant, zahl("select count(*) from " + s + ".dokument"));
+        staende.put(mandant, dokumentHash(s));
         zaehler.put("protokoll " + mandant, zahl("select coalesce(max(id), 0) from " + s + ".zugriff_protokoll"));
     }
 
@@ -411,6 +413,7 @@ public class AgentSchritte {
     public void nichtsVeraendert(String mandant) throws SQLException {
         String s = schema(mandant);
         assertThat(zahl("select count(*) from " + s + ".dokument")).isEqualTo(zaehler.get("dokumente " + mandant));
+        assertThat(dokumentHash(s)).as("Inhalt der Dokumente von " + mandant).isEqualTo(staende.get(mandant));
         assertThat(texte("select aktion || ' ' || coalesce(details::text, '') from " + s + ".zugriff_protokoll where id > ? "
                 + "and aktion <> 'ANZEIGEN'", zaehler.get("protokoll " + mandant))).isEmpty();
     }
@@ -484,6 +487,12 @@ public class AgentSchritte {
             }
             p.executeUpdate();
         }
+    }
+
+    /** Hash über alle Spalten aller Dokumente (Status, Titel, Löschmarke …), nicht nur über deren Anzahl. */
+    private String dokumentHash(String schema) throws SQLException {
+        return texte("select md5(coalesce(string_agg(d::text, '|' order by d.id), '')) from " + schema + ".dokument d")
+                .getFirst();
     }
 
     private long zahl(String sql, Object... werte) throws SQLException {

@@ -109,4 +109,25 @@ class AgentLaufTest {
         assertThat(lauf.runde()).isEqualTo(2);
         assertThat(lauf.tokens()).containsExactly(0, 0);
     }
+
+    @Test
+    void nachDerGesamtfristWirdDerLaufendeModellaufrufBeendetUndDerDurchgangIstBeendet() throws Exception {
+        AgentLauf lauf = lauf(List.of(), 10);
+        java.util.concurrent.atomic.AtomicInteger abgebrochen = new java.util.concurrent.atomic.AtomicInteger();
+        lauf.handle(new dev.langchain4j.model.chat.response.StreamingHandle() {
+            @Override
+            public void cancel() {
+                abgebrochen.incrementAndGet();
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return abgebrochen.get() > 0;
+            }
+        });
+        lauf.warten(Duration.ofMillis(100));
+        assertThat(ereignisse).containsExactly(new ChatEreignis.Ausfall("Zeitueberschreitung"));
+        assertThat(abgebrochen.get()).isEqualTo(1);
+        assertThat(lauf.beendet()).isTrue();
+    }
 }
