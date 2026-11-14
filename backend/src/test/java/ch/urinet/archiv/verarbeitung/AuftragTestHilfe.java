@@ -123,6 +123,16 @@ public class AuftragTestHilfe {
         }
     }
 
+    /** Erster Wert einer beliebigen Abfrage. */
+    public Object wertAus(String abfrage) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anweisung = verbindung.prepareStatement(abfrage);
+             ResultSet z = anweisung.executeQuery()) {
+            z.next();
+            return z.getObject(1);
+        }
+    }
+
     /** Ändert einen Auftrag direkt, z. B. um einen abgestürzten Worker nachzustellen. */
     public void aendern(long id, String setzen) throws SQLException {
         ausfuehren("update public.auftrag set " + setzen + " where id = " + id);
