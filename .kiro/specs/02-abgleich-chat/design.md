@@ -84,6 +84,11 @@ flowchart LR
   5. Ausfall von 2 oder 4 → nur Volltext, Ergebnis mit `degradiert=true`.
   Volltext und Vektor verwenden denselben Sichtbarkeitsfilter wie die Volltextsuche (Spec 01, 2.3 und 2.6), angewendet vor der Verdichtung und dem Reranker.
 - REST: `GET /api/v1/dokumente?q=…&modus=hybrid` (Standard ab Phase 2: `hybrid`).
+- Hybrid als Standard in der Web-App (Req 2.7, 2.8; entschieden von Fabian am 14.11.2026; Backend in Aufgabe 6.4, PWA in Aufgabe 6.6):
+  - Modus `hybrid`: höchstens 30 Treffer (`k` = 30, die vom Reranker sortierten), Reihenfolge des Rerankers, ohne Gesamtzahl und ohne Blättern; Filter nach Spec 01, Req 14.2 gelten wie in der Volltextsuche, vor Verdichtung und Reranker. Ohne `q` und mit `sortierung=DATUM` gibt es keinen Modus `hybrid` (Req 2.7); die genaue Antwortform (z. B. `gesamt` leer, `seite`/`groesse` im Modus `hybrid` abgelehnt) legt Aufgabe 6.4 fest und führt OpenAPI und den generierten Client nach.
+  - Modus `volltext`: unverändert nach Spec 01 (`PanacheDokumentSuche`, Sortierung, Blättern, Gesamtzahl, Req 14.3). Die PWA sendet den Modus immer ausdrücklich; damit bleiben bestehende Clients und die Szenarien von Spec 01, Aufgabe 4.5 unberührt (Vorschlag 14.11.2026: ohne `modus` gilt in der API weiterhin `volltext`, bisher «Standard ab Phase 2: `hybrid`»; entschieden mit dem Merge dieses Spec-PR).
+  - Rückfall (Req 2.3): Fällt Embedding oder Reranker aus, liefert der Modus `hybrid` die besten 30 Volltexttreffer (`ts_rank_cd`) in derselben Form mit `degradiert=true`; die PWA zeigt den Hinweis «nur Volltext» und bietet den Wechsel in den Modus Volltext an.
+  - Verbrauch (Req 2.8): Jeder Aufruf von Embedding-Modell (Frage einbetten) und Reranker mit Antwort schreibt eine Zeile `ki_verbrauch` mit Zweck `SUCHE`, Modell und Tokens (beim Embedding `tokens_aus` 0, beim Reranker die Tokens, die die Antwort meldet, sonst 0), ohne Suchbegriff und ohne Dokument-IDs. Kein Limit, kein Budget, keine Sperre bei hohem Verbrauch. Ausgewiesen wird `SUCHE` überall, wo `ki_verbrauch` nach Zweck ausgewertet wird (Monatsbericht, Spec 03, Req 8.1). Die Volltextsuche ruft kein Modell auf und schreibt nichts.
 
 ### Chat-Agent (`ki/chat`)
 - `ArchivAgent` als `@RegisterAiService(tools = ArchivWerkzeuge.class)`, Systemprompt deutsch:
