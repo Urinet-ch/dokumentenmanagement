@@ -194,6 +194,122 @@ components:
           type: boolean
           description: Ablauf der Aufbewahrungsfrist ausdrücklich bestätigen (Req
             9.8)
+    ChatFrage:
+      type: object
+      required:
+      - frage
+      properties:
+        frage:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          description: "Frage, nach Trim 1 bis 2'000 Zeichen"
+        gespraechId:
+          description: Gespräch fortsetzen; ohne beginnt ein neues
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+    ChatGespraech:
+      type: object
+      required:
+      - id
+      - titel
+      - geaendert
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        titel:
+          type: string
+        geaendert:
+          type: string
+          $ref: "#/components/schemas/Instant"
+    ChatNachricht:
+      type: object
+      required:
+      - rolle
+      - inhalt
+      - quellen
+      - zeit
+      properties:
+        rolle:
+          type: string
+          enum:
+          - BENUTZER
+          - ASSISTENT
+        inhalt:
+          type: string
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatQuelle"
+        status:
+          type:
+          - string
+          - "null"
+          description: nur bei Antworten
+          enum:
+          - OK
+          - FEHLER
+          - ABGEBROCHEN
+        zeit:
+          type: string
+          $ref: "#/components/schemas/Instant"
+    ChatQuelle:
+      type: object
+      description: "Dokument (id, titel, link) oder Datenstand eines Zahlenwerkzeugs\
+        \ (werkzeug, datenstand, belege)"
+      properties:
+        id:
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        titel:
+          type:
+          - string
+          - "null"
+        link:
+          type:
+          - string
+          - "null"
+          description: relativer PWA-Pfad /dokument/<id>
+        werkzeug:
+          type:
+          - string
+          - "null"
+        datenstand:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        belege:
+          type:
+          - integer
+          - "null"
+          format: int32
+    ChatVerlauf:
+      type: object
+      required:
+      - id
+      - titel
+      - geaendert
+      - nachrichten
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        titel:
+          type: string
+        geaendert:
+          type: string
+          $ref: "#/components/schemas/Instant"
+        nachrichten:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatNachricht"
     Dokument:
       description: Metadaten eines sichtbaren Dokuments
       type: object
@@ -2020,6 +2136,7 @@ components:
 openapi: 3.1.0
 tags:
 - name: API-Tokens
+- name: Chat
 - name: Dokumentarten
 - name: Dokumente
 - name: Exporte
@@ -2097,6 +2214,104 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/chat:
+    post:
+      summary: Frage an den Chat
+      description: "Antwort als Server-Sent Events mit benannten Ereignissen, JSON\
+        \ in data: «werkzeug» {name} je Werkzeugaufruf, «text» {delta}, genau ein\
+        \ «quellen» [{id, titel, link} | {werkzeug, datenstand, belege}] vor «fertig»\
+        \ {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet\
+        \ den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN\
+        \ (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After\
+        \ (mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage). Nur\
+        \ beschreibend: der generierte Client liest den Stream nicht."
+      tags:
+      - Chat
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFrage"
+        required: true
+      responses:
+        "200":
+          description: Stream der Ereignisse
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "429":
+          description: Rate-Limit oder schon eine laufende Frage
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten Versuch
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/chat/gespraeche:
+    get:
+      summary: Eigene Gespräche
+      description: "Höchstens 20 eigene Gespräche, zuletzt geänderte zuerst."
+      tags:
+      - Chat
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatGespraech"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/chat/gespraeche/{id}:
+    get:
+      summary: Verlauf eines eigenen Gesprächs
+      description: "Nachrichten mit Rolle, Inhalt, Quellen, Status und Zeit; fremd\
+        \ oder unbekannt → 404 NICHT_GEFUNDEN."
+      tags:
+      - Chat
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatVerlauf"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
   /api/v1/dokumentarten:
     get:
       summary: Dokumentarten des Mandanten auflisten (aktive und inaktive)

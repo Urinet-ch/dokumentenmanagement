@@ -4,11 +4,14 @@ import ch.urinet.archiv.ablage.adapter.out.AblageAuswahl;
 import ch.urinet.archiv.ablage.adapter.out.stub.AblageStub;
 import ch.urinet.archiv.integration.adapter.out.IntegrationAuswahl;
 import ch.urinet.archiv.integration.adapter.out.stub.IntegrationStub;
+import ch.urinet.archiv.ki.adapter.out.ChatAuswahl;
 import ch.urinet.archiv.ki.adapter.out.EmbeddingAuswahl;
+import ch.urinet.archiv.ki.adapter.out.chat.ChatNichtVerfuegbar;
 import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
 import ch.urinet.archiv.ki.adapter.out.RerankerAuswahl;
 import ch.urinet.archiv.ki.adapter.out.reranker.InfomaniakReranker;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jEmbeddingAdapter;
+import ch.urinet.archiv.ki.adapter.out.stub.ChatAgentStub;
 import ch.urinet.archiv.ki.adapter.out.stub.EmbeddingStub;
 import ch.urinet.archiv.ki.adapter.out.stub.KiStub;
 import ch.urinet.archiv.ki.adapter.out.stub.RerankerStub;
@@ -49,7 +52,38 @@ class StubSchalterTest {
             assertThat(config.getValue("archiv." + port + ".stub", Boolean.class)).as(port).isEqualTo(erwartet);
         }
         assertThat(config.getValue("archiv.ki.embedding-stub", Boolean.class)).as("embedding").isEqualTo(erwartet);
+        assertThat(config.getValue("archiv.chat.stub", Boolean.class)).as("chat").isEqualTo(erwartet);
         assertThat(config.getValue("archiv.ki.reranker-stub", Boolean.class)).as("reranker").isEqualTo(erwartet);
+    }
+
+    /** Bis Aufgabe 7.2 gibt es keinen Chat-Agenten: im Profil lokal darum der Demo-Stub (Spec 02, Aufgabe 7.3). */
+    @Test
+    void chatStubAuchImProfilLokal() throws IOException {
+        SmallRyeConfig config = new SmallRyeConfigBuilder()
+                .withProfile("lokal")
+                .addDefaultInterceptors()
+                .withSources(new PropertiesConfigSource(
+                        getClass().getClassLoader().getResource("application.properties")))
+                .build();
+        assertThat(config.getValue("archiv.chat.stub", Boolean.class)).isTrue();
+        assertThat(config.getValue("archiv.ki.stub", Boolean.class)).isFalse();
+    }
+
+    /**
+     * Die echte Auswahl von {@link ChatAuswahl} (in den Quarkus-Tests ersetzt sie {@code TestChatAgent}): mit Schalter
+     * der Demo-Stub, sonst {@link ChatNichtVerfuegbar}; in prod nur eine Warnung, bis Aufgabe 7.2 den Agenten bringt.
+     */
+    @Test
+    void chatSchalterWaehltStubOderNichtVerfuegbar() {
+        ChatAgentStub stub = new ChatAgentStub();
+        ChatNichtVerfuegbar ohneAgent = new ChatNichtVerfuegbar();
+        assertThat(new ChatAuswahl().chat(true, stub, ohneAgent)).isSameAs(stub);
+        assertThat(new ChatAuswahl().chat(false, stub, ohneAgent)).isSameAs(ohneAgent);
+        PortAuswahl.Befund befund = PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(false)));
+        assertThat(befund.abbrueche()).isEmpty();
+        assertThat(befund.warnungen()).containsExactly("ChatAgentPort: kein Adapter, folgt mit Spec 02, Aufgabe 7.2");
+        assertThat(PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(true))).abbrueche())
+                .containsExactly("ChatAgentPort: Dev-Stub ist in prod nicht zulässig");
     }
 
     /** Wie beim Embedding: mit Schalter der Dev-Stub des Rerankers, ohne Schalter der REST-Adapter (Aufgabe 6.4). */

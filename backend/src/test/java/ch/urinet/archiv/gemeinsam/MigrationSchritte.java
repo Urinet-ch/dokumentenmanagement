@@ -65,7 +65,9 @@ public class MigrationSchritte {
             if (GEPRUEFT.containsKey(name) && GEPRUEFT.get(name).equals(sha256(changeset))) {
                 continue;
             }
-            String inhalt = Files.readString(changeset, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+            // <rollback> läuft beim Deploy nie (ein Rollback setzt nur die Images zurück), nur bei liquibase rollback
+            String inhalt = Files.readString(changeset, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "")
+                    .replaceAll("(?s)<rollback>.*?</rollback>", "");
             assertThat(LIQUIBASE_BRUCH.matcher(inhalt).find()).as("Liquibase-Änderung bricht Vorgänger in %s", name)
                     .isFalse();
             assertThat(SQL_BRUCH.matcher(inhalt).find()).as("SQL bricht Vorgänger in %s", name).isFalse();

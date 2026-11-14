@@ -1684,6 +1684,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
+| 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling») |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
 | 503 | `UEBERLASTET` | zu viele gleichzeitige Argon2-Rechnungen für API-Tokens (Prüfen und Anlegen, seit 2.1), mit `Retry-After: 1` (Aufgabe 1.5); kein Platz nach `archiv.api-token.wartezeit`, bei `0` ohne Warten |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
