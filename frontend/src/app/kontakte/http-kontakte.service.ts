@@ -56,6 +56,7 @@ export class HttpKontakteService extends KontaktePort {
       undefined,
       undefined,
       groesse,
+      undefined,
       id,
       undefined,
       undefined,

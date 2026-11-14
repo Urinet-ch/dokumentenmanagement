@@ -63,7 +63,11 @@ async function kontaktAnlegen(welt, rolle, mandant, felder) {
     }
   }
   const antwort = await api(rolle, mandant, 'POST', '/kontakte', { body: angaben });
-  assert.equal(antwort.status, 201, `Kontakt anlegen: ${antwort.status} ${JSON.stringify(antwort.json)}`);
+  assert.equal(
+    antwort.status,
+    201,
+    `Kontakt anlegen: ${antwort.status} ${JSON.stringify(antwort.json)}`,
+  );
   kontakte(welt).set(basis, { id: antwort.json.id, name, mandant, rolle });
 }
 
@@ -74,11 +78,14 @@ Given(
   },
 );
 
-Given(/^«([^»]+)» im Mandanten «([^»]+)» hat diese Kontakte angelegt:$/, async function (rolle, mandant, tabelle) {
-  for (const zeile of tabelle.hashes()) {
-    await kontaktAnlegen(this, rolle, mandant, zeile);
-  }
-});
+Given(
+  /^«([^»]+)» im Mandanten «([^»]+)» hat diese Kontakte angelegt:$/,
+  async function (rolle, mandant, tabelle) {
+    for (const zeile of tabelle.hashes()) {
+      await kontaktAnlegen(this, rolle, mandant, zeile);
+    }
+  },
+);
 
 Given(
   /^«([^»]+)» im Mandanten «([^»]+)» hat das Dokument «([^»]+)» dem Kontakt «([^»]+)» mit Vertraulichkeit «(NORMAL|INTERN|PERSONAL)» zugeordnet$/,
@@ -94,48 +101,67 @@ Given(
       ifMatch: `"${dokument.version}"`,
       body: { titel, partnerId: kontakt(this, basis).id, vertraulichkeit },
     });
-    assert.equal(antwort.status, 200, `Dokument zuordnen: ${antwort.status} ${JSON.stringify(antwort.json)}`);
+    assert.equal(
+      antwort.status,
+      200,
+      `Dokument zuordnen: ${antwort.status} ${JSON.stringify(antwort.json)}`,
+    );
     echteDokumente(this).set(datei, ergebnis.id);
     this.dokumentTitel ??= new Map();
     this.dokumentTitel.set(datei, titel);
   },
 );
 
-Given(/^«([^»]+)» im Mandanten «([^»]+)» hat das Dokument «([^»]+)» verworfen$/, async function (rolle, mandant, datei) {
-  const id = echteDokumente(this).get(datei);
-  assert.ok(id, `kein Dokument «${datei}»`);
-  const dokument = await direktLesen(rolle, mandant, id);
-  const antwort = await api(rolle, mandant, 'POST', `/dokumente/${id}/verwerfen`, {
-    ifMatch: `"${dokument.version}"`,
-    body: { grund: 'Testdokument verworfen' },
-  });
-  assert.equal(antwort.status, 204, `Dokument verwerfen: ${antwort.status} ${JSON.stringify(antwort.json)}`);
-});
+Given(
+  /^«([^»]+)» im Mandanten «([^»]+)» hat das Dokument «([^»]+)» verworfen$/,
+  async function (rolle, mandant, datei) {
+    const id = echteDokumente(this).get(datei);
+    assert.ok(id, `kein Dokument «${datei}»`);
+    const dokument = await direktLesen(rolle, mandant, id);
+    const antwort = await api(rolle, mandant, 'POST', `/dokumente/${id}/verwerfen`, {
+      ifMatch: `"${dokument.version}"`,
+      body: { grund: 'Testdokument verworfen' },
+    });
+    assert.equal(
+      antwort.status,
+      204,
+      `Dokument verwerfen: ${antwort.status} ${JSON.stringify(antwort.json)}`,
+    );
+  },
+);
 
 /**
  * Das Archiv sieht den Benutzer als andere Rolle: Die Anfragen an /kontakte tragen das Token von «<rolle>-<mandant>». So
  * zeigt die PWA Menüpunkt und Seite (Recht A6 nach dem Token der Anmeldung), das Archiv verweigert aber (Req 17.5).
  */
-Given(/^das Archiv hält mich bei den Kontakten für «([^»]+)» im Mandanten «([^»]+)»$/, async function (rolle, mandant) {
-  await this.seite.route(
-    (url) => url.pathname.startsWith('/api/v1/kontakte'),
-    (route) => anfrageWeiterleiten(route, { rollen: [rolle], mandant }),
-  );
-});
+Given(
+  /^das Archiv hält mich bei den Kontakten für «([^»]+)» im Mandanten «([^»]+)»$/,
+  async function (rolle, mandant) {
+    await this.seite.route(
+      (url) => url.pathname.startsWith('/api/v1/kontakte'),
+      (route) => anfrageWeiterleiten(route, { rollen: [rolle], mandant }),
+    );
+  },
+);
 
 When(/^ich die Kontakte über das Menü öffne$/, async function () {
   const oeffnen = this.seite.getByRole('button', { name: 'Menü öffnen', exact: true });
   if (await oeffnen.isVisible()) {
     await oeffnen.click();
   }
-  await this.seite.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Kontakte' }).click();
+  await this.seite
+    .getByRole('navigation', { name: 'Hauptnavigation' })
+    .getByRole('link', { name: 'Kontakte' })
+    .click();
   await this.seite.getByRole('heading', { name: 'Kontakte', level: 1 }).waitFor();
   await this.seite.locator('[data-test=anzahl], [data-test=fehler]').first().waitFor();
 });
 
 async function suchen(welt, begriff) {
   const antwort = welt.seite.waitForResponse(
-    (r) => new URL(r.url()).pathname === '/api/v1/kontakte/liste' && new URL(r.url()).searchParams.get('q') === begriff,
+    (r) =>
+      new URL(r.url()).pathname === '/api/v1/kontakte/liste' &&
+      new URL(r.url()).searchParams.get('q') === begriff,
   );
   await welt.seite.locator('[data-test=suche]').fill(begriff);
   await antwort;
@@ -155,7 +181,10 @@ const kontaktLink = (welt, basis) =>
 
 When(/^ich den Kontakt «([^»]+)» öffne$/, async function (basis) {
   await kontaktLink(this, basis).click();
-  await this.seite.locator('[data-test=kontakt-name], [data-test=nicht-gefunden]').first().waitFor();
+  await this.seite
+    .locator('[data-test=kontakt-name], [data-test=nicht-gefunden]')
+    .first()
+    .waitFor();
 });
 
 When(
@@ -166,7 +195,10 @@ When(
     await this.seite.goto(`${new URL(this.seite.url()).origin}/kontakte/${k.id}`);
     const anmelden = this.seite.getByRole('button', { name: 'Anmelden', exact: true });
     await anmelden.click();
-    await this.seite.locator('[data-test=kontakt-name], [data-test=nicht-gefunden]').first().waitFor();
+    await this.seite
+      .locator('[data-test=kontakt-name], [data-test=nicht-gefunden]')
+      .first()
+      .waitFor();
   },
 );
 
@@ -191,14 +223,21 @@ Then(/^sehe ich die Kontaktdetails von «([^»]+)»$/, async function (basis) {
 });
 
 Then(/^zeigen die Stammdaten bei «([^»]+)» den Wert «([^»]+)»$/, async function (feld, wert) {
-  const zeile = this.seite.locator('[data-test=stammdaten] > div').filter({ has: this.seite.getByText(feld, { exact: true }) });
+  const zeile = this.seite
+    .locator('[data-test=stammdaten] > div')
+    .filter({ has: this.seite.getByText(feld, { exact: true }) });
   assert.equal((await zeile.locator('dd').innerText()).trim(), wert);
 });
 
-Then(/^zeigen die Stammdaten bei «([^»]+)» den Namen des Kontakts «([^»]+)»$/, async function (feld, basis) {
-  const zeile = this.seite.locator('[data-test=stammdaten] > div').filter({ has: this.seite.getByText(feld, { exact: true }) });
-  assert.equal((await zeile.locator('dd').innerText()).trim(), kontakt(this, basis).name);
-});
+Then(
+  /^zeigen die Stammdaten bei «([^»]+)» den Namen des Kontakts «([^»]+)»$/,
+  async function (feld, basis) {
+    const zeile = this.seite
+      .locator('[data-test=stammdaten] > div')
+      .filter({ has: this.seite.getByText(feld, { exact: true }) });
+    assert.equal((await zeile.locator('dd').innerText()).trim(), kontakt(this, basis).name);
+  },
+);
 
 Then(/^zeigt die Seite «nicht gefunden» ohne Kontaktdaten$/, async function () {
   const seite = this.seite.locator('[data-test=nicht-gefunden]');
@@ -225,7 +264,11 @@ const AKTIONEN = {
 Then(/^sehe ich keinen der Knöpfe «(.+)»$/, async function (liste) {
   await this.seite.locator('[data-test=stammdaten]').waitFor();
   for (const knopf of liste.split('», «')) {
-    assert.equal(await this.seite.locator(`[data-test=${AKTIONEN[knopf]}]`).count(), 0, `Knopf «${knopf}» sichtbar`);
+    assert.equal(
+      await this.seite.locator(`[data-test=${AKTIONEN[knopf]}]`).count(),
+      0,
+      `Knopf «${knopf}» sichtbar`,
+    );
     assert.equal(await this.seite.getByRole('button', { name: knopf, exact: true }).count(), 0);
   }
 });
@@ -255,19 +298,24 @@ Then(/^meldet die Seite «([^»]+)»$/, async function (text) {
   await this.seite.locator('[data-test=erfolg]', { hasText: text }).waitFor();
 });
 
-Then(/^steht beim Kontakt «([^»]+)» im Archiv bei «([^»]+)» der Wert «([^»]+)»$/, async function (basis, feld, wert) {
-  const k = kontakt(this, basis);
-  const antwort = await api(k.rolle, k.mandant, 'GET', `/kontakte/${k.id}`);
-  assert.equal(antwort.status, 200);
-  assert.equal(antwort.json[feld], wert);
-});
+Then(
+  /^steht beim Kontakt «([^»]+)» im Archiv bei «([^»]+)» der Wert «([^»]+)»$/,
+  async function (basis, feld, wert) {
+    const k = kontakt(this, basis);
+    const antwort = await api(k.rolle, k.mandant, 'GET', `/kontakte/${k.id}`);
+    assert.equal(antwort.status, 200);
+    assert.equal(antwort.json[feld], wert);
+  },
+);
 
 // ---------------------------------------------------------------- Zusammenführen und Inaktivmarkieren
 
 When(/^ich den Kontakt «([^»]+)» als Ziel suche und wähle$/, async function (basis) {
   const k = kontakt(this, basis);
   const antwort = this.seite.waitForResponse(
-    (r) => new URL(r.url()).pathname === '/api/v1/kontakte' && new URL(r.url()).searchParams.get('q') === k.name,
+    (r) =>
+      new URL(r.url()).pathname === '/api/v1/kontakte' &&
+      new URL(r.url()).searchParams.get('q') === k.name,
   );
   await this.seite.locator('[data-test=ziel-suche]').fill(k.name);
   await antwort;
@@ -275,7 +323,9 @@ When(/^ich den Kontakt «([^»]+)» als Ziel suche und wähle$/, async function 
 });
 
 When(/^ich als Grund «([^»]+)» angebe$/, async function (grund) {
-  await this.seite.locator('[data-test=zusammenfuehren-grund], [data-test=inaktiv-grund]').fill(grund);
+  await this.seite
+    .locator('[data-test=zusammenfuehren-grund], [data-test=inaktiv-grund]')
+    .fill(grund);
 });
 
 When('ich im Dialog auf «Weiter» klicke', async function () {
@@ -283,15 +333,30 @@ When('ich im Dialog auf «Weiter» klicke', async function () {
   await this.seite.locator('[data-test=rueckfrage-text]').waitFor();
 });
 
-Then(/^fragt die Seite zurück, ob «([^»]+)» in «([^»]+)» zusammengeführt werden soll$/, async function (quelle, ziel) {
-  const text = await this.seite.locator('[data-test=rueckfrage-text]').innerText();
-  assert.ok(text.includes(`«${kontakt(this, quelle).name}»`) && text.includes(`«${kontakt(this, ziel).name}»`), text);
-  assert.ok((await this.seite.locator('[data-test=rueckfrage-zahlen]').innerText()).includes('Dokument'));
-  assert.ok((await this.seite.locator('[data-test=nicht-umkehrbar]').innerText()).includes('nicht umkehren'));
-});
+Then(
+  /^fragt die Seite zurück, ob «([^»]+)» in «([^»]+)» zusammengeführt werden soll$/,
+  async function (quelle, ziel) {
+    const text = await this.seite.locator('[data-test=rueckfrage-text]').innerText();
+    assert.ok(
+      text.includes(`«${kontakt(this, quelle).name}»`) &&
+        text.includes(`«${kontakt(this, ziel).name}»`),
+      text,
+    );
+    assert.ok(
+      (await this.seite.locator('[data-test=rueckfrage-zahlen]').innerText()).includes('Dokument'),
+    );
+    assert.ok(
+      (await this.seite.locator('[data-test=nicht-umkehrbar]').innerText()).includes(
+        'nicht umkehren',
+      ),
+    );
+  },
+);
 
 Then(/^hat die PWA noch nichts zu «(zusammenfuehren|inaktiv|aktiv)» gesendet$/, function (aktion) {
-  const gesendet = this.weiterleitung.anfragen.filter((a) => a.methode === 'POST' && a.pfad.endsWith(`/${aktion}`));
+  const gesendet = this.weiterleitung.anfragen.filter(
+    (a) => a.methode === 'POST' && a.pfad.endsWith(`/${aktion}`),
+  );
   assert.deepEqual(gesendet, []);
 });
 
@@ -312,15 +377,20 @@ When('ich die Rückfrage abbreche', async function () {
   await this.seite.locator('[data-test=dialog]').waitFor({ state: 'detached' });
 });
 
-Then(/^hat die PWA «(zusammenfuehren|inaktiv|aktiv)» mit «If-Match» und dem Grund «([^»]*)» gesendet$/, function (aktion, grund) {
-  const a = this.weiterleitung.anfragen.findLast((x) => x.methode === 'POST' && x.pfad.endsWith(`/${aktion}`));
-  assert.ok(a, `kein POST ${aktion}`);
-  assert.match(a.ifMatch, /^"\d+"$/);
-  assert.equal(a.status, aktion === 'zusammenfuehren' ? 200 : 200, `Status ${a.status}`);
-  if (grund) {
-    assert.equal(a.body.grund, grund);
-  }
-});
+Then(
+  /^hat die PWA «(zusammenfuehren|inaktiv|aktiv)» mit «If-Match» und dem Grund «([^»]*)» gesendet$/,
+  function (aktion, grund) {
+    const a = this.weiterleitung.anfragen.findLast(
+      (x) => x.methode === 'POST' && x.pfad.endsWith(`/${aktion}`),
+    );
+    assert.ok(a, `kein POST ${aktion}`);
+    assert.match(a.ifMatch, /^"\d+"$/);
+    assert.equal(a.status, aktion === 'zusammenfuehren' ? 200 : 200, `Status ${a.status}`);
+    if (grund) {
+      assert.equal(a.body.grund, grund);
+    }
+  },
+);
 
 Then(
   /^ist der Kontakt «([^»]+)» im Archiv inaktiv und in «([^»]+)» zusammengeführt$/,
@@ -344,12 +414,20 @@ Then(/^zeigt die Seite den Link auf den Zielkontakt «([^»]+)»$/, async functi
   assert.equal(await this.seite.locator('[data-test=in-link]').getAttribute('href'), href);
 });
 
-Then(/^erscheint der Kontakt «([^»]+)» in der Partnerauswahl des Archivs nicht mehr$/, async function (basis) {
-  const k = kontakt(this, basis);
-  const antwort = await api(k.rolle, k.mandant, 'GET', `/kontakte?q=${encodeURIComponent(k.name)}`);
-  assert.equal(antwort.status, 200);
-  assert.ok(!antwort.json.some((e) => e.id === k.id));
-});
+Then(
+  /^erscheint der Kontakt «([^»]+)» in der Partnerauswahl des Archivs nicht mehr$/,
+  async function (basis) {
+    const k = kontakt(this, basis);
+    const antwort = await api(
+      k.rolle,
+      k.mandant,
+      'GET',
+      `/kontakte?q=${encodeURIComponent(k.name)}`,
+    );
+    assert.equal(antwort.status, 200);
+    assert.ok(!antwort.json.some((e) => e.id === k.id));
+  },
+);
 
 // ---------------------------------------------------------------- Rechte und Protokoll (Req 17.5, 17.6)
 
@@ -366,13 +444,23 @@ Then(
   /^enthält das Zugriffsprotokoll von «([^»]+)» eine neue Verweigerung «VERWEIGERT» für die Rolle «([A-Z_]+)» mit dem Grund «([A-Z0-9]+)»$/,
   async function (mandant, rolle, grund) {
     // das Protokoll liest der Inhaber des Mandanten (A13); die Zeit der PWA-Anfrage liegt nach Szenariobeginn
-    const antwort = await api('inhaber', mandant, 'GET', '/protokoll?aktion=VERWEIGERT&groesse=100');
+    const antwort = await api(
+      'inhaber',
+      mandant,
+      'GET',
+      '/protokoll?aktion=VERWEIGERT&groesse=100',
+    );
     assert.equal(antwort.status, 200, JSON.stringify(antwort.json));
     const treffer = antwort.json.eintraege.filter((e) => {
       const details = e.details ? JSON.parse(e.details) : {};
-      return e.rolle === rolle && details.grund === grund && Date.parse(e.zeit) >= this.szenarioStart;
+      return (
+        e.rolle === rolle && details.grund === grund && Date.parse(e.zeit) >= this.szenarioStart
+      );
     });
-    assert.ok(treffer.length >= 1, `kein Eintrag VERWEIGERT/${rolle}/${grund}: ${JSON.stringify(antwort.json.eintraege.slice(0, 3))}`);
+    assert.ok(
+      treffer.length >= 1,
+      `kein Eintrag VERWEIGERT/${rolle}/${grund}: ${JSON.stringify(antwort.json.eintraege.slice(0, 3))}`,
+    );
   },
 );
 
@@ -384,11 +472,18 @@ Then(
   /^sieht «([^»]+)» im Mandanten «([^»]+)» bei der Suche nach «([^»]+)» dieselben Kontakte wie die Liste$/,
   async function (rolle, mandant, basis) {
     const k = kontakt(this, basis);
-    const antwort = await api(rolle, mandant, 'GET', `/kontakte/liste?q=${encodeURIComponent(k.name)}&status=AKTIV`);
+    const antwort = await api(
+      rolle,
+      mandant,
+      'GET',
+      `/kontakte/liste?q=${encodeURIComponent(k.name)}&status=AKTIV`,
+    );
     assert.equal(antwort.status, 200);
     const imArchiv = antwort.json.eintraege.map((e) => e.id).sort();
     const gezeigt = (
-      await this.seite.locator('[data-test=kontakt] a[href^="/kontakte/"]').evaluateAll((l) => l.map((a) => a.getAttribute('href')))
+      await this.seite
+        .locator('[data-test=kontakt] a[href^="/kontakte/"]')
+        .evaluateAll((l) => l.map((a) => a.getAttribute('href')))
     )
       .map((h) => h.replace('/kontakte/', ''))
       .sort();
@@ -400,34 +495,49 @@ Then(
 // ---------------------------------------------------------------- Dokumente des Kontakts (Req 17.3, 17.4)
 
 Then(/^zeigt die Dokumentliste genau «(.*)»$/, async function (liste) {
-  await this.seite.locator('[data-test=dokumente-anzahl], [data-test=dokumente-keine]').first().waitFor();
+  await this.seite
+    .locator('[data-test=dokumente-anzahl], [data-test=dokumente-keine]')
+    .first()
+    .waitFor();
   const soll = liste
     .split('», «')
     .filter(Boolean)
     .map((datei) => `/dokument/${echteDokumente(this).get(datei)}`);
-  const ist = await this.seite.locator('[data-test=dokument] a').evaluateAll((l) => l.map((a) => a.getAttribute('href')));
+  const ist = await this.seite
+    .locator('[data-test=dokument] a')
+    .evaluateAll((l) => l.map((a) => a.getAttribute('href')));
   assert.deepEqual([...ist].sort(), [...soll].sort());
 });
 
-Then(/^nennt die Dokumentliste die Gesamtzahl (\d+) wie die Antwort des Archivs$/, async function (zahl) {
-  const anzeige = await this.seite.locator('[data-test=dokumente-anzahl]').innerText();
-  assert.ok(anzeige.includes(`${zahl} Dokument`), anzeige);
-  const antwort = this.weiterleitung.anfragen.findLast((a) => a.pfad === '/api/v1/dokumente' && a.status === 200);
-  assert.equal(antwort.antwort.gesamt, Number(zahl));
-});
+Then(
+  /^nennt die Dokumentliste die Gesamtzahl (\d+) wie die Antwort des Archivs$/,
+  async function (zahl) {
+    const anzeige = await this.seite.locator('[data-test=dokumente-anzahl]').innerText();
+    assert.ok(anzeige.includes(`${zahl} Dokument`), anzeige);
+    const antwort = this.weiterleitung.anfragen.findLast(
+      (a) => a.pfad === '/api/v1/dokumente' && a.status === 200,
+    );
+    assert.equal(antwort.antwort.gesamt, Number(zahl));
+  },
+);
 
-Then(/^hat die PWA die Dokumente des Kontakts «([^»]+)» nach Datum ohne Suchbegriff angefragt$/, function (basis) {
-  const a = this.weiterleitung.anfragen.findLast((x) => x.pfad === '/api/v1/dokumente');
-  assert.ok(a, 'keine Dokumentabfrage');
-  assert.equal(a.query.get('partner'), kontakt(this, basis).id);
-  assert.equal(a.query.get('sortierung'), 'DATUM');
-  assert.equal(a.query.has('q'), false);
-  assert.equal(a.query.get('seite'), '0');
-});
+Then(
+  /^hat die PWA die Dokumente des Kontakts «([^»]+)» nach Datum ohne Suchbegriff angefragt$/,
+  function (basis) {
+    const a = this.weiterleitung.anfragen.findLast((x) => x.pfad === '/api/v1/dokumente');
+    assert.ok(a, 'keine Dokumentabfrage');
+    assert.equal(a.query.get('partner'), kontakt(this, basis).id);
+    assert.equal(a.query.get('sortierung'), 'DATUM');
+    assert.equal(a.query.has('q'), false);
+    assert.equal(a.query.get('seite'), '0');
+  },
+);
 
 Then(/^zeigt die Dokumentliste den Titel von «([^»]+)»$/, async function (datei) {
   const titel = this.dokumentTitel.get(datei);
-  const link = this.seite.locator(`[data-test=dokument] a[href="/dokument/${echteDokumente(this).get(datei)}"]`);
+  const link = this.seite.locator(
+    `[data-test=dokument] a[href="/dokument/${echteDokumente(this).get(datei)}"]`,
+  );
   assert.ok((await link.innerText()).includes(titel), await link.innerText());
 });
 
@@ -446,7 +556,13 @@ Then('liegt der Dialog innerhalb des Bildschirms', async function () {
   await dialog.waitFor();
   const masse = await dialog.evaluate((e) => {
     const r = e.getBoundingClientRect();
-    return { links: r.left, rechts: r.right, breite: window.innerWidth, inhalt: e.scrollWidth, sichtbar: e.clientWidth };
+    return {
+      links: r.left,
+      rechts: r.right,
+      breite: window.innerWidth,
+      inhalt: e.scrollWidth,
+      sichtbar: e.clientWidth,
+    };
   });
   assert.ok(masse.links >= 0 && masse.rechts <= masse.breite, JSON.stringify(masse));
   assert.ok(masse.inhalt <= masse.sichtbar, JSON.stringify(masse));
@@ -456,16 +572,22 @@ Then(/^zeigt die Seite die Nutzer-Texte von «([^»]+)» nur als Text$/, async f
   const k = kontakt(this, basis);
   const kopf = await this.seite.locator('[data-test=kontakt-name]').innerText();
   assert.ok(kopf.includes(k.name), kopf);
-  assert.equal(await this.seite.locator('[data-test=kontakt-name] b, [data-test=stammdaten] b').count(), 0);
+  assert.equal(
+    await this.seite.locator('[data-test=kontakt-name] b, [data-test=stammdaten] b').count(),
+    0,
+  );
 });
 
-Then(/^zeigt die Liste den Kontakt «([^»]+)» mit dem Namen als reinem Text$/, async function (basis) {
-  const k = kontakt(this, basis);
-  const link = kontaktLink(this, basis);
-  await link.waitFor();
-  assert.ok((await link.innerText()).includes(k.name), await link.innerText());
-  assert.equal(await this.seite.locator('[data-test=kontakt] b').count(), 0);
-});
+Then(
+  /^zeigt die Liste den Kontakt «([^»]+)» mit dem Namen als reinem Text$/,
+  async function (basis) {
+    const k = kontakt(this, basis);
+    const link = kontaktLink(this, basis);
+    await link.waitFor();
+    assert.ok((await link.innerText()).includes(k.name), await link.innerText());
+    assert.equal(await this.seite.locator('[data-test=kontakt] b').count(), 0);
+  },
+);
 
 Then('hat die PWA die Kontakte-Schnittstelle nicht aufgerufen', async function () {
   await this.seite.waitForLoadState('networkidle');
