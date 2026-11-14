@@ -144,6 +144,11 @@ jobs:
           # Datenschlüssel für Zugangsdaten in der DB (Spec 02, Mail-Eingang); optional: ohne ihn ist die Datei leer
           # und der Mail-Eingang ruht
           ARCHIV_DATA_KEY: ${{ secrets.ARCHIV_DATA_KEY }}
+          # Passwort des Postfachs archiv@urinet.ch für Benachrichtigungen (Aufgabe 5.6, Entscheid Fabian 14.11.2026);
+          # optional: ohne es ist die Datei leer, das Archiv startet, und jede Benachrichtigung bleibt beim Log
+          ARCHIV_SMTP_PASSWORT: ${{ secrets.ARCHIV_SMTP_PASSWORT }}
+          # Empfänger der Benachrichtigungen je Mandant (kein Geheimnis, GitHub-Variable); optional, leer heisst nur Log
+          ARCHIV_ALARM_EMPFAENGER_URINET: ${{ vars.ARCHIV_ALARM_EMPFAENGER_URINET }}
         run: |
           umask 077
           mkdir -p bundle/secrets
@@ -163,6 +168,10 @@ jobs:
           schreibe infomaniak_ai_token "$INFOMANIAK_AI_TOKEN"
           schreibe archiv_manifest_key "$ARCHIV_MANIFEST_KEY"
           schreibe archiv_data_key "$ARCHIV_DATA_KEY"
+          schreibe archiv_smtp_passwort "$ARCHIV_SMTP_PASSWORT"
+          # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine einzelne Adresse, sonst
+          # bricht das Skript ab (kein Deploy)
+          bash .github/scripts/schreibe-env.sh bundle/.env
           # Die Datenbank sieht nur SCRAM-Verifier, nie die Passwörter der Rollen
           for rolle in archiv_db_owner archiv_db_app keycloak_db; do
             python3 .github/scripts/scram-verifier.py "$rolle" < "bundle/secrets/$rolle" > "bundle/secrets/${rolle}_scram"

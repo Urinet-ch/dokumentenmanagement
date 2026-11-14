@@ -1,4 +1,5 @@
-// Suche und Dokumentansicht der PWA (Aufgabe 4.6) gegen die Attrappe aus hilfen/suche-attrappe.mjs.
+// Suche und Dokumentansicht der PWA (Aufgabe 4.6) gegen die Attrappe aus hilfen/suche-attrappe.mjs; mit weitergeleiteten
+// Anfragen (hilfen/echtes-backend.mjs, Aufgabe 4.10) dieselben Schritte gegen das Archiv im Testmodus.
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { DOKUMENTE, S3_PFAD, sucheAttrappe } from '../hilfen/suche-attrappe.mjs';
@@ -18,11 +19,22 @@ const FELDER = {
   Belegnummer: 'belegnummer',
 };
 
-const dokumentId = (titel) => {
+const dokumentId = (welt, titel) => {
+  const echt = welt.echteDokumente?.get(titel);
+  if (echt) {
+    return echt;
+  }
   // Ohne Titel nennt das Szenario den Dateinamen (Platzhalter, Req 14.9)
   const d = DOKUMENTE.find((x) => x.titel === titel || (!x.titel && x.dateiname === titel));
   assert.ok(d, `kein synthetisches Dokument «${titel}»`);
   return d.id;
+};
+
+// Treffer-Link eines Dokuments: Hat das Szenario es im echten Archiv angelegt, über seine ID (wie karten() in
+// eingangskorb.mjs), damit ein weiterer Lauf gegen dasselbe Archiv nicht gleichnamige Treffer früherer Läufe trifft.
+const trefferLink = (welt, name, sonst) => {
+  const id = welt.echteDokumente?.get(name);
+  return id ? welt.seite.locator(`[data-test=treffer] a.titel[href="/dokument/${id}"]`) : sonst;
 };
 
 async function filterOeffnen(seite) {
@@ -32,11 +44,18 @@ async function filterOeffnen(seite) {
   }
 }
 
+/** Parameter der Suchanfragen: an die Attrappe oder, weitergeleitet, die beantworteten an das echte Archiv. */
+const suchanfragen = (welt) =>
+  welt.suche?.anfragen ??
+  welt.weiterleitung.anfragen
+    .filter((a) => a.methode === 'GET' && a.pfad === '/api/v1/dokumente' && a.status !== undefined)
+    .map((a) => a.query);
+
 async function letzteAnfrage(welt, anzahl) {
-  for (let versuch = 0; versuch < 100 && welt.suche.anfragen.length < anzahl; versuch++) {
+  for (let versuch = 0; versuch < 100 && suchanfragen(welt).length < anzahl; versuch++) {
     await welt.seite.waitForTimeout(50);
   }
-  return welt.suche.anfragen.at(-1);
+  return suchanfragen(welt).at(-1);
 }
 
 Given('das Archiv liefert synthetische Suchtreffer', async function () {
@@ -58,7 +77,7 @@ When('ich die Suche über das Menü öffne', async function () {
 });
 
 When(/^ich nach «(.+)» suche$/, async function (begriff) {
-  const vorher = this.suche.anfragen.length;
+  const vorher = suchanfragen(this).length;
   await this.seite.getByRole('searchbox', { name: 'Suchbegriff' }).fill(begriff);
   await this.seite.getByRole('searchbox', { name: 'Suchbegriff' }).press('Enter');
   await letzteAnfrage(this, vorher + 1);
@@ -80,7 +99,7 @@ When('ich die Filter setze und suche:', async function (tabelle) {
 });
 
 When(/^ich den Treffer «(.+)» öffne$/, async function (titel) {
-  await this.seite.locator('[data-test=treffer]').getByRole('link', { name: titel }).click();
+  await trefferLink(this, titel, this.seite.locator('[data-test=treffer]').getByRole('link', { name: titel })).click();
 });
 
 When(/^ich den Link «(.+)» wähle$/, async function (link) {
@@ -134,7 +153,7 @@ Then('lässt sich die Seite nicht waagrecht scrollen', async function () {
 });
 
 Then(/^sehe ich die Dokumentansicht von «(.+)»$/, async function (titel) {
-  await this.seite.waitForURL((url) => url.pathname === `/dokument/${dokumentId(titel)}`);
+  await this.seite.waitForURL((url) => url.pathname === `/dokument/${dokumentId(this, titel)}`);
   await this.seite.getByRole('heading', { name: titel, level: 1 }).waitFor();
 });
 
@@ -145,7 +164,7 @@ Then(/^zeigt die Dokumentansicht «(.+)» mit «(.+)»$/, async function (angabe
 
 Then(/^hat die PWA die PDF\/A-Adresse von «(.+)» als JSON angefragt$/, async function (titel) {
   await this.seite.locator('[data-test=download]').waitFor();
-  assert.deepEqual(this.suche.downloads, [{ id: dokumentId(titel), variante: 'pdfa', accept: 'application/json' }]);
+  assert.deepEqual(this.suche.downloads, [{ id: dokumentId(this, titel), variante: 'pdfa', accept: 'application/json' }]);
   assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
 });
 
@@ -173,9 +192,13 @@ Then(/^steht im Suchfeld «(.+)»$/, async function (begriff) {
 });
 
 Then(/^zeigt der Treffer «(.+)» den Dateinamen als Platzhalter statt eines Titels$/, async function (name) {
-  const link = this.seite.locator('[data-test=treffer] a.titel', { has: this.seite.locator(`[title="${name}"]`) });
+  const link = trefferLink(
+    this,
+    name,
+    this.seite.locator('[data-test=treffer] a.titel', { has: this.seite.locator(`[title="${name}"]`) }),
+  );
   await platzhalterPruefen(link, name);
-  await this.seite.getByRole('link', { name: `Ohne Titel, Dateiname ${name}`, exact: true }).waitFor();
+  await link.and(this.seite.getByRole('link', { name: `Ohne Titel, Dateiname ${name}`, exact: true })).waitFor();
 });
 
 Then(/^zeigt die Dokumentansicht den Dateinamen «(.+)» als Platzhalter und in der Zeile «Dateiname»$/, async function (name) {
