@@ -1,7 +1,8 @@
 # language: de
 # Suche und Dokumentansicht der PWA (Aufgabe 4.6). Die API beantwortet eine Attrappe mit synthetischen Dokumenten
 # (frontend/e2e/hilfen/suche-attrappe.mjs); den Vertrag der echten Suche und des Downloads belegen die Java-Szenarien
-# suche/volltextsuche.feature und dokument/download.feature. Darum Teilnachweis (@attrappe).
+# suche/volltextsuche.feature und dokument/download.feature. Darum Teilnachweis (@attrappe). Den Platzhalter für Dokumente
+# ohne Titel (Req 14.9, 14.10) weist dokument/dateiname-pwa.feature zusätzlich gegen das echte Archiv im Testmodus nach.
 @spec-01 @browser @attrappe
 Funktionalität: Suche und Dokumentansicht im Browser
 
