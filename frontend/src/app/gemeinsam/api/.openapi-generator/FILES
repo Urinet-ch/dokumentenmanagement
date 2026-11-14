@@ -27,6 +27,7 @@ model/download-adresse.ts
 model/eingangskorb-seite.ts
 model/export-anfrage.ts
 model/export.ts
+model/fundstelle.ts
 model/generator-antwort.ts
 model/generator-finanz.ts
 model/generator-metadaten.ts

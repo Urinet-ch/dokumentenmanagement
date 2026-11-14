@@ -1582,7 +1582,9 @@ ki_beispiel(id bigserial pk, partner_id uuid null, art text, eingabe_auszug text
 ki_verbrauch(id bigserial pk, zweck text, modell text, tokens_ein int, tokens_aus int, zeit timestamptz)
   -- zweck: Spec 04 ergänzt WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING (Monatsbericht nach Zweck, Spec 03, 8.1;
   -- Monatsbudget der Wissensbasis, Spec 04, 13.6); Spec 02, Aufgabe 6.3 ergänzt EMBEDDING (Embeddings der Abschnitte
-  -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0)
+  -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0); Spec 02, Aufgabe 6.4 ergänzt
+  -- SUCHE (Hybridsuche, Spec 02, Req 2.8, entschieden von Fabian am 14.11.2026: eine Zeile je Aufruf von
+  -- Embedding-Modell und Reranker mit Antwort, ohne Suchbegriff und ohne Inhalte, kein Limit)
 
 import_zuordnung(art text pk, spalten jsonb, kopf_hash text, geaendert timestamptz)
 import_lauf(id uuid pk, art text, vollexport bool, dateiname text, sha256 text, zeichensatz text,
