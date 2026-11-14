@@ -48,11 +48,16 @@ export interface GespeicherteNachricht {
 export type ChatFehlerArt =
   'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN';
 
+/** Grund eines 429 aus dem Feld `grund` der Problem Details, sofern das Backend ihn mitschickt. */
+export type ZuVieleGrund = 'STUNDENLIMIT' | 'LAEUFT';
+
 export class ChatFehler extends Error {
   constructor(
     readonly art: ChatFehlerArt,
     /** Nur bei `ZU_VIELE`: Sekunden aus `Retry-After`, `null` ohne lesbaren Wert. */
     readonly sekunden: number | null = null,
+    /** Nur bei `ZU_VIELE`: `grund` der Problem Details, `null` ohne lesbaren Wert. */
+    readonly grund: ZuVieleGrund | null = null,
   ) {
     super(art);
     this.name = 'ChatFehler';

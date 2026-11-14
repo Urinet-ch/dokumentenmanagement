@@ -77,17 +77,10 @@ function quelle(wert: unknown): Quelle | null {
   if (typeof wert['titel'] === 'string' && typeof wert['link'] === 'string') {
     return { titel: wert['titel'], link: wert['link'] };
   }
+  // Datenstand der zählenden Werkzeuge in der Form von 7.3 (`ChatJson`): `{werkzeug, datenstand: <ISO>, belege}`
   const stand = wert['datenstand'];
-  if (
-    objekt(stand) &&
-    typeof stand['zeitpunkt'] === 'string' &&
-    typeof stand['anzahl'] === 'number'
-  ) {
-    return { datenstand: { zeitpunkt: stand['zeitpunkt'], anzahl: stand['anzahl'] } };
-  }
-  // flache Form `{datenstand: <Zeitpunkt>, anzahl}`, solange 7.3 die Form nicht festlegt
-  if (typeof stand === 'string' && typeof wert['anzahl'] === 'number') {
-    return { datenstand: { zeitpunkt: stand, anzahl: wert['anzahl'] } };
+  if (typeof stand === 'string' && typeof wert['belege'] === 'number') {
+    return { datenstand: { zeitpunkt: stand, anzahl: wert['belege'] } };
   }
   // andere Formen (z. B. Wissensseiten aus Spec 04) zeigt diese Fassung noch nicht
   return null;

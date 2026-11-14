@@ -1,6 +1,4 @@
 import { Route, Routes } from '@angular/router';
-import { ChatPort } from './chat/chat-port';
-import { HttpChatService } from './chat/http-chat.service';
 import { DokumentPort } from './dokument/dokument-port';
 import { HttpDokumentService } from './dokument/http-dokument.service';
 import { HttpUploadService } from './erfassen/http-upload.service';
@@ -75,9 +73,8 @@ export const routes: Routes = [
   // schaltet Aufgabe 7.4b ein, sobald das Backend (7.2, 7.3) gemergt ist
   {
     path: 'chat',
-    loadComponent: () => import('./chat/chat').then((m) => m.Chat),
+    loadChildren: () => import('./chat/chat.routes').then((m) => m.CHAT_ROUTES),
     canActivate: [rechtGuard('A2')],
-    providers: [{ provide: ChatPort, useClass: HttpChatService }],
     title: titel(TEXTE.chat.titel),
   },
   {

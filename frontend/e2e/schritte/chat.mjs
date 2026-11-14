@@ -147,7 +147,7 @@ Then('sehe ich die Meldung, dass es in 20 Minuten weitergeht', async function ()
       timeZone: 'Europe/Zurich',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(ms);
+    }).format(Math.ceil(ms / 60_000) * 60_000);
   const vorher = uhr(Date.now() + 1200 * 1000);
   const meldung = this.seite
     .getByRole('alert')
@@ -180,6 +180,10 @@ Then('hat die PWA die Anfrage abgebrochen', async function () {
     .getByRole('button', { name: 'Abbrechen', exact: true })
     .waitFor({ state: 'detached' });
   await letzteAntwort(this.seite).getByText('Abgebrochen.', { exact: true }).waitFor();
+});
+
+Then(/^steht unter dem Gespräch «(.+)»$/, async function (text) {
+  await this.seite.getByText(text, { exact: true }).waitFor();
 });
 
 Then(/^bin ich auf der Seite des Dokuments «(.+)»$/, async function (titel) {

@@ -83,6 +83,11 @@ export class Chat {
   protected readonly hinweis = signal<string | null>(null);
   protected readonly eingabe = signal('');
   protected readonly fehler = signal<string | null>(null);
+  /**
+   * Die Ansicht zeigt Nachrichten, zu denen die Seite keine `gespraechId` kennt (erste Frage ohne `fertig` oder `fehler`
+   * beendet, 404): Die nächste Frage beginnt beim Archiv ein neues Gespräch, darum leert die Seite dann die Ansicht.
+   */
+  protected readonly neuBeginnen = signal(false);
 
   protected readonly sendenMoeglich = computed(() => {
     const frage = this.eingabe().trim();
@@ -141,6 +146,10 @@ export class Chat {
     this.feldSetzen('');
     this.fehler.set(null);
     this.hinweis.set(null);
+    if (this.neuBeginnen()) {
+      this.neuBeginnen.set(false);
+      this.nachrichten.set([]);
+    }
     this.nachrichten.update((liste) => [
       ...liste,
       { rolle: 'BENUTZER', inhalt: frage, quellen: [], status: null, fehler: null },
@@ -175,6 +184,7 @@ export class Chat {
     this.laedt.set(false);
     this.gespraechId.set(null);
     this.nachrichten.set([]);
+    this.neuBeginnen.set(false);
     this.fehler.set(null);
     this.mobilSchliessen();
   }
@@ -190,6 +200,7 @@ export class Chat {
     this.laden = this.port.gespraech(kopf.id).subscribe({
       next: (liste) => {
         this.gespraechId.set(kopf.id);
+        this.neuBeginnen.set(false);
         this.nachrichten.set(
           liste.map((n) => ({
             rolle: n.rolle,
@@ -267,6 +278,7 @@ export class Chat {
   private beenden(): void {
     this.frage = undefined;
     this.hinweis.set(null);
+    this.neuBeginnen.set(this.gespraechId() === null && this.nachrichten().length > 0);
     if (this.laeuft()) {
       this.laeuft.set(false);
       this.listeLaden();

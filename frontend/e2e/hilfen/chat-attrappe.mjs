@@ -59,7 +59,7 @@ function ablauf(frage, gespraechId) {
               sse('text', { delta: '- 2026-007 Testverein Bauen, CHF 980.00' }) +
               sse('quellen', [
                 quelle(SEEDORF),
-                { datenstand: { zeitpunkt: DATENSTAND, anzahl: 2 } },
+                { werkzeug: 'kennzahl', datenstand: DATENSTAND, belege: 2 },
               ]) +
               fertig(),
           ),
@@ -94,7 +94,7 @@ function ablauf(frage, gespraechId) {
                 titel: `${i % 2 ? SEEDORF.titel : DRUCKEREI.titel} ${LANG_WORT}`,
                 link: `/dokument/${(i % 2 ? SEEDORF : DRUCKEREI).id}`,
               })),
-              { datenstand: { zeitpunkt: DATENSTAND, anzahl: 12345 } },
+              { werkzeug: 'kennzahl', datenstand: DATENSTAND, belege: 12345 },
             ]) +
             fertig(),
           [41, 7, 113],
@@ -178,7 +178,7 @@ export async function chatAttrappe(welt) {
       inhalt: 'Im Dezember läuft eine Frist ab:\n- Offerte Testdruckerei AG, gültig bis 31.12.2026',
       quellen: [
         quelle(DRUCKEREI),
-        { datenstand: { zeitpunkt: '2026-11-02T09:14:00Z', anzahl: 1 } },
+        { werkzeug: 'kennzahl', datenstand: '2026-11-02T09:14:00Z', belege: 1 },
       ],
       status: 'OK',
       zeit: '2026-11-02T09:15:00Z',

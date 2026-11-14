@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Chat } from './chat';
+import { fehlerText } from './chat-logik';
 import {
   ChatEreignis,
   ChatFehler,
@@ -256,6 +257,62 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(antworten()).toEqual(['Angefangen']);
     expect(element.querySelector('[data-test=antwort]')!.textContent).toContain(t.abgebrochen);
     expect(knopf(t.abbrechen)).toBeUndefined();
+  });
+
+  it('unterscheidet die 429 nach grund, sonst nach Retry-After bis 5 s, und rundet die Uhrzeit auf', () => {
+    const jetzt = new Date('2026-11-14T08:00:40Z');
+    const text = (sekunden: number | null, grund: 'STUNDENLIMIT' | 'LAEUFT' | null = null) =>
+      fehlerText(new ChatFehler('ZU_VIELE', sekunden, grund), jetzt);
+    // rollendes Stundenlimit kurz vor Ablauf: 30 s sind kein Zeichen einer laufenden Frage
+    expect(text(30)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 09:02 geht es weiter.');
+    expect(text(5)).toBe(t.laufend);
+    expect(text(90, 'LAEUFT')).toBe(t.laufend);
+    expect(text(3, 'STUNDENLIMIT')).toBe(
+      'Du hast in dieser Stunde 100 Fragen gestellt. Ab 09:01 geht es weiter.',
+    );
+    // 09:00:40 in Zürich + 3'561 s = 10:00:01: angezeigt wird die erste Minute, in der es sicher weitergeht
+    expect(text(3561)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.');
+    expect(text(null)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.');
+  });
+
+  it('beginnt nach dem Abbruch der ersten Frage ein neues Gespräch auch in der Ansicht', async () => {
+    await senden('Frage A');
+    await ereignis({ typ: 'werkzeug', name: 'kennzahl' });
+    await ereignis({ typ: 'text', delta: 'Es sind 3 …' });
+    knopf(t.abbrechen)!.click();
+    await fixture.whenStable();
+    expect(antworten()).toEqual(['Es sind 3 …']);
+    expect(element.querySelector('[data-test=neu-beginnen]')!.textContent).toBe(t.neuBeginnen);
+    const b = await senden('Und welche davon ist die grösste?');
+    expect(b.gespraechId).toBeNull();
+    expect([...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent)).toEqual([
+      'Und welche davon ist die grösste?',
+    ]);
+    expect(element.querySelector('[data-test=neu-beginnen]')).toBeNull();
+    await ereignis({ typ: 'fertig', gespraechId: 'g9' });
+    port.fragen_.at(-1)!.strom.complete();
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=neu-beginnen]')).toBeNull();
+    expect((await senden('Danke')).gespraechId).toBe('g9');
+    expect(element.querySelectorAll('[data-test=frage]')).toHaveLength(2);
+  });
+
+  it('beginnt nach einer 404 im laufenden Gespräch mit der nächsten Frage eine leere Ansicht', async () => {
+    await senden('Erste');
+    await ereignis({ typ: 'fertig', gespraechId: 'g7' });
+    port.fragen_.at(-1)!.strom.complete();
+    await fixture.whenStable();
+    await senden('Zweite');
+    port.fragen_.at(-1)!.strom.error(new ChatFehler('NICHT_GEFUNDEN'));
+    await fixture.whenStable();
+    expect(element.querySelectorAll('[data-test=frage]')).toHaveLength(1);
+    expect(element.querySelector('[data-test=neu-beginnen]')).not.toBeNull();
+    expect(feld().value).toBe('Zweite');
+    const neu = await senden('Zweite');
+    expect(neu.gespraechId).toBeNull();
+    expect([...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent)).toEqual([
+      'Zweite',
+    ]);
   });
 
   it('bricht beim Verlassen der Seite ab', async () => {

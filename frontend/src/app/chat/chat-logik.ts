@@ -6,10 +6,11 @@ import { ChatFehler, DatenstandQuelle, Quelle } from './chat-port';
 // Fachlogik der Seite «Chat» ohne Angular (Spec 02, Aufgabe 7.4; Req 4.3, 6.1–6.3)
 
 /**
- * Ein 429 mit höchstens so vielen Sekunden in `Retry-After` gilt als «schon eine Frage in Arbeit» (höchstens eine
- * laufende Frage je Benutzer); längere Wartezeiten kommen vom Stundenlimit (Req 5.5, rollend über 60 Minuten).
+ * Ohne `grund` in den Problem Details gilt ein 429 mit höchstens so vielen Sekunden in `Retry-After` als «schon eine
+ * Frage in Arbeit»: 7.3 sendet dafür fest `Retry-After: 5`. Das Stundenlimit zählt rollend über 60 Minuten (Req 5.5)
+ * und kann 1–3'600 Sekunden melden; nur in seinen letzten 5 Sekunden zeigt die Seite darum den falschen Text.
  */
-export const LAUFEND_BIS_SEKUNDEN = 60;
+export const LAUFEND_BIS_SEKUNDEN = 5;
 
 /** Längste Frage nach dem Trimmen (Vertrag Welle 7, `frage` 1–2'000 Zeichen). */
 export const FRAGE_MAX = 2000;
@@ -66,11 +67,16 @@ export function datenstandText(quelle: DatenstandQuelle): string {
 /** Meldung zu einem Fehler vor oder während des Stroms. */
 export function fehlerText(fehler: ChatFehler, jetzt: Date): string {
   if (fehler.art === 'ZU_VIELE') {
-    if (fehler.sekunden !== null && fehler.sekunden <= LAUFEND_BIS_SEKUNDEN) {
+    const laeuft =
+      fehler.grund !== null
+        ? fehler.grund === 'LAEUFT'
+        : fehler.sekunden !== null && fehler.sekunden <= LAUFEND_BIS_SEKUNDEN;
+    if (laeuft) {
       return TEXTE.chat.laufend;
     }
-    const ab = new Date(jetzt.getTime() + (fehler.sekunden ?? STUNDE_SEKUNDEN) * 1000);
-    return TEXTE.chat.zuViele(uhrzeit(ab));
+    // auf die volle Minute aufgerundet: Wer zur angezeigten Uhrzeit fragt, ist sicher wieder dran
+    const ende = jetzt.getTime() + (fehler.sekunden ?? STUNDE_SEKUNDEN) * 1000;
+    return TEXTE.chat.zuViele(uhrzeit(new Date(Math.ceil(ende / 60_000) * 60_000)));
   }
   return TEXTE.chat.fehler[fehler.art] ?? TEXTE.chat.fehler['ALLGEMEIN'];
 }

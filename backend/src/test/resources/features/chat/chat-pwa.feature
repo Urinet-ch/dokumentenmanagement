@@ -125,3 +125,4 @@ Funktionalität: Chat in der PWA
     Dann sehe ich den Anfang der Antwort «Ich suche noch», während sie noch läuft
     Wenn ich auf «Abbrechen» klicke
     Dann hat die PWA die Anfrage abgebrochen
+    Und steht unter dem Gespräch «Die nächste Frage beginnt ein neues Gespräch ohne den Verlauf oben.»

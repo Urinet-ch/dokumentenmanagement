@@ -642,6 +642,7 @@ export const TEXTE = {
     werkzeugUnbekannt: 'arbeite …',
     abgebrochen: 'Abgebrochen.',
     unvollstaendig: 'Diese Antwort wurde nicht fertig.',
+    neuBeginnen: 'Die nächste Frage beginnt ein neues Gespräch ohne den Verlauf oben.',
     zuViele: (uhrzeit: string) =>
       `Du hast in dieser Stunde 100 Fragen gestellt. Ab ${uhrzeit} geht es weiter.`,
     laufend:

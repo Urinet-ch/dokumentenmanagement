@@ -14,7 +14,7 @@ import { TestBed } from '@angular/core/testing';
 import { anmeldungInterceptor } from '../gemeinsam/anmeldung/anmeldung.interceptor';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { ChatEreignis, ChatFehler } from './chat-port';
-import { HttpChatService, sekundenAus } from './http-chat.service';
+import { HttpChatService, grundAus, sekundenAus } from './http-chat.service';
 
 describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
   let dienst: HttpChatService;
@@ -161,6 +161,24 @@ describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
     expect(ende.fehler?.sekunden).toBe(1200);
   });
 
+  it('liest bei 429 den grund der Problem Details, sofern das Backend ihn schickt', async () => {
+    const mit = await fragen();
+    mit.anfrage.flush(
+      { fehlercode: 'ZU_VIELE_ANFRAGEN', grund: 'LAEUFT' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '90' } },
+    );
+    expect(mit.ende.fehler?.grund).toBe('LAEUFT');
+    const ohne = await fragen();
+    ohne.anfrage.flush(
+      { fehlercode: 'ZU_VIELE_ANFRAGEN', grund: 'ANDERES' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '30' } },
+    );
+    expect(ohne.ende.fehler?.grund).toBeNull();
+    expect(ohne.ende.fehler?.sekunden).toBe(30);
+    expect(grundAus('kein JSON')).toBeNull();
+    expect(grundAus({ grund: 'STUNDENLIMIT' })).toBe('STUNDENLIMIT');
+  });
+
   it('meldet 400 als ungültige Frage und Status 0 als fehlende Verbindung', async () => {
     const erste = await fragen();
     erste.anfrage.flush(
@@ -245,5 +263,8 @@ describe('HttpChatService (Spec 02, Aufgabe 7.4)', () => {
     expect(sekundenAus('bald')).toBeNull();
     const jetzt = Date.parse('2026-11-14T08:00:00Z');
     expect(sekundenAus('Sat, 14 Nov 2026 08:10:00 GMT', jetzt)).toBe(600);
+    // übergrosse oder vergangene Werte: höchstens das Stundenlimit, nie negativ
+    expect(sekundenAus('99999999999999')).toBe(3600);
+    expect(sekundenAus('Sat, 14 Nov 2026 07:00:00 GMT', jetzt)).toBe(0);
   });
 });

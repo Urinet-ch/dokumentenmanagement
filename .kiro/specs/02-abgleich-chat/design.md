@@ -164,17 +164,24 @@ flowchart LR
     Ereignisse je Stück, `\n`, `\r\n` und `\r` (ein `\r` am Stückende wartet auf das nächste Stück), Kommentarzeilen und
     andere Felder fallen weg, unbekannte Ereignisse werden übergangen, ungültiges JSON oder fehlende Felder sind ein
     Fehler der Antwort. Eine Antwort ohne `fertig` oder `fehler` gilt als unvollständig.
-  - Quellen: `{titel, link}` und der Datenstand als `{datenstand: {zeitpunkt, anzahl}}` (auch flach
-    `{datenstand: <Zeitpunkt>, anzahl}` gelesen, solange 7.3 die Form nicht festlegt); andere Formen (z. B. Wissensseiten
-    aus Spec 04) zeigt die Seite noch nicht. Linkregel: Nur `link` der Form `/dokument/<id>` (ID aus Buchstaben, Ziffern,
+  - Quellen in der Form von 7.3 (`ChatJson`, Strom und Verlauf): Dokument `{id, titel, link}` und Datenstand
+    `{werkzeug, datenstand: <ISO-Zeitpunkt>, belege}` (Folge Review #147); andere Formen (z. B. Wissensseiten aus
+    Spec 04) zeigt die Seite noch nicht. Linkregel: Nur `link` der Form `/dokument/<id>` (ID aus Buchstaben, Ziffern,
     `-`) wird zum `routerLink`, alles andere und der Datenstand bleiben Chips ohne Link.
   - Antwort als reiner Text (Interpolation, `white-space: pre-wrap`, nie `innerHTML`, kein Markdown); lange Wörter, Beträge
     und Chips brechen um (Requirement 6.3). Werkzeug-Hinweise mit festen Texten je Werkzeugname in `texte.de-CH.ts`
     (unbekannt «arbeite …»); der Hinweis verschwindet mit dem ersten Text danach.
-  - 429: Ein `Retry-After` bis 60 Sekunden gilt als «schon eine Frage in Arbeit» (eigener Text), längere als Stundenlimit
-    («Ab <Uhrzeit> geht es weiter.», ohne lesbaren Wert eine Stunde). Bei Fehlern vor dem Strom kommt die Frage zurück ins
-    Eingabefeld; bricht ein Strom mit Text ab, bleibt der Teil mit der Meldung stehen. `fertig` und `fehler` übernehmen
-    die `gespraechId`; eine 404 zu einem Gespräch beginnt mit der nächsten Frage ein neues.
+  - 429 (Folge Review #147): Beide Fälle kommen als `ZU_VIELE_ANFRAGEN`. Schickt das Backend in den Problem Details ein
+    Feld `grund` (`STUNDENLIMIT` oder `LAEUFT`), entscheidet es; sonst gilt ein `Retry-After` bis 5 Sekunden als «schon
+    eine Frage in Arbeit» (eigener Text), weil 7.3 dafür fest 5 Sekunden sendet, längere als Stundenlimit («Ab <Uhrzeit>
+    geht es weiter.», Uhrzeit auf die volle Minute aufgerundet, ohne lesbaren Wert eine Stunde). Ohne `grund` zeigt die
+    Seite in den letzten 5 Sekunden des rollenden Stundenlimits den Text der laufenden Frage. `Retry-After` wird auf
+    0–3'600 Sekunden begrenzt.
+  - Bei Fehlern vor dem Strom kommt die Frage zurück ins Eingabefeld; bricht ein Strom mit Text ab, bleibt der Teil mit
+    der Meldung stehen. `fertig` und `fehler` übernehmen die `gespraechId`. Endet eine Frage ohne bekannte `gespraechId`
+    (erste Frage abgebrochen oder abgerissen, 404 zu einem Gespräch), zeigt die Seite «Die nächste Frage beginnt ein neues
+    Gespräch ohne den Verlauf oben.» und leert die Ansicht mit der nächsten Frage, weil das Archiv dann ein neues
+    Gespräch ohne den bisherigen Verlauf beginnt (Folge Review #147).
   - Gesprächsliste: die letzten 20 eigenen Gespräche (Titel, Datum `TT.MM.JJJJ` in Europe/Zurich), öffnen und
     fortsetzen, «Neues Gespräch»; unter 960 px über dem Gespräch und einklappbar, sonst links daneben. Nach jeder
     beendeten Frage lädt die Seite die Liste neu. Während einer Antwort sind Liste und «Neues Gespräch» gesperrt.

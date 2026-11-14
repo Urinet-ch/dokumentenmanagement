@@ -96,7 +96,7 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
       chatEreignis({
         name: 'quellen',
         daten:
-          '[{"titel":"Rechnung 2026-004","link":"/dokument/d1"},{"datenstand":{"zeitpunkt":"2026-11-14T08:00:00Z","anzahl":12}}]',
+          '[{"titel":"Rechnung 2026-004","link":"/dokument/d1"},{"werkzeug":"kennzahl","datenstand":"2026-11-14T08:00:00Z","belege":12}]',
       }),
     ).toEqual({
       typ: 'quellen',
@@ -124,15 +124,21 @@ describe('SSE-Leser (Spec 02, Aufgabe 7.4)', () => {
     }
   });
 
-  it('lässt Quellen in unbekannter Form weg und liest den Datenstand auch flach', () => {
+  it('liest Dokumente mit id und den Datenstand in der Form von 7.3, andere Formen fallen weg', () => {
     expect(
       quellenAus([
+        { id: 'd1', titel: 'Rechnung 2026-004', link: '/dokument/d1' },
+        { werkzeug: 'kennzahl', datenstand: '2026-11-14T08:00:00Z', belege: 3 },
         { wissen: { titel: 'Seite', link: '/wissen/x', stand: '2026-11-01' }, dokumente: [] },
+        { datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 3 } },
         { datenstand: '2026-11-14T08:00:00Z', anzahl: 3 },
         'Text',
         null,
       ]),
-    ).toEqual([{ datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 3 } }]);
+    ).toEqual([
+      { titel: 'Rechnung 2026-004', link: '/dokument/d1' },
+      { datenstand: { zeitpunkt: '2026-11-14T08:00:00Z', anzahl: 3 } },
+    ]);
     expect(quellenAus('kein Array')).toEqual([]);
   });
 });

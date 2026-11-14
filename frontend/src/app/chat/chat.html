@@ -117,6 +117,9 @@
     @if (fehler()) {
       <p class="fehler" role="alert">{{ fehler() }}</p>
     }
+    @if (neuBeginnen()) {
+      <p class="gedaempft" data-test="neu-beginnen">{{ texte.neuBeginnen }}</p>
+    }
 
     <form class="eingabe" (submit)="$event.preventDefault(); senden()">
       <label class="feld">

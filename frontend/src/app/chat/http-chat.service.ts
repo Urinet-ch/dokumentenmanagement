@@ -7,21 +7,38 @@ import {
   ChatPort,
   GespeicherteNachricht,
   GespraechKopf,
+  ZuVieleGrund,
 } from './chat-port';
 import { SSE_START, SseZustand, chatEreignis, quellenAus, sseLesen } from './sse-leser';
 
 const PFAD = '/api/v1/chat';
 
-/** `Retry-After` in Sekunden oder als HTTP-Datum; `null` ohne lesbaren Wert. */
+/** Längste Wartezeit eines 429: das Stundenlimit (Req 5.5); grössere Werte werden darauf begrenzt. */
+const RETRY_AFTER_MAX = 3600;
+
+/** `Retry-After` in Sekunden oder als HTTP-Datum, begrenzt auf 0–3'600; `null` ohne lesbaren Wert. */
 export function sekundenAus(wert: string | null, jetzt = Date.now()): number | null {
   if (wert === null || wert.trim() === '') {
     return null;
   }
-  if (/^\d+$/.test(wert.trim())) {
-    return Number(wert.trim());
+  const sekunden = /^\d+$/.test(wert.trim())
+    ? Number(wert.trim())
+    : Math.ceil((Date.parse(wert) - jetzt) / 1000);
+  return Number.isNaN(sekunden) ? null : Math.min(RETRY_AFTER_MAX, Math.max(0, sekunden));
+}
+
+/** Feld `grund` der Problem Details eines 429 (als Text bei `responseType: 'text'`, sonst als Objekt). */
+export function grundAus(body: unknown): ZuVieleGrund | null {
+  let wert = body;
+  if (typeof wert === 'string') {
+    try {
+      wert = JSON.parse(wert);
+    } catch {
+      return null;
+    }
   }
-  const zeit = Date.parse(wert);
-  return Number.isNaN(zeit) ? null : Math.max(0, Math.ceil((zeit - jetzt) / 1000));
+  const grund = typeof wert === 'object' && wert !== null ? (wert as { grund?: unknown }).grund : null;
+  return grund === 'STUNDENLIMIT' || grund === 'LAEUFT' ? grund : null;
 }
 
 export function chatFehlerAus(fehler: unknown): ChatFehler {
@@ -42,6 +59,7 @@ export function chatFehlerAus(fehler: unknown): ChatFehler {
       return new ChatFehler(
         'ZU_VIELE',
         sekundenAus((fehler as HttpErrorResponse).headers.get('Retry-After')),
+        grundAus((fehler as HttpErrorResponse).error),
       );
     default:
       return new ChatFehler('ALLGEMEIN');
