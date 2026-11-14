@@ -8,6 +8,45 @@ Funktionalität: Monatlicher Prüflauf (PRUEFLAUF)
   Hintergrund:
     Angenommen der Prüflauf ist bereit
 
+  @req-15.5
+  Szenario: Unveränderter Bestand mit Tages-Manifest hat keine Manifest-Abweichung
+    Angenommen ein eigener Mandant «pl-manifest-a» für den Manifest-Prüflauf
+    Und im Testmandanten ist das Dokument «A» am «10.01.2026» um «09:15» archiviert
+    Wenn für den Testmandanten das Tages-Manifest bis «10.01.2026» erzeugt wird
+    Und der Prüflauf für den Testmandanten läuft
+    Dann ist der Prüflauf im Testmandanten abgeschlossen
+    Und meldet der Prüflauf im Testmandanten für «A» keine Manifest-Abweichung
+
+  @req-15.5
+  Szenario: Abweichende Prüfsumme gegenüber Datenbank und Manifest wird gemeldet
+    Angenommen ein eigener Mandant «pl-manifest-b» für den Manifest-Prüflauf
+    Und im Testmandanten ist das Dokument «A» am «10.01.2026» um «09:15» archiviert
+    Und die gespeicherte Prüfsumme des Testdokuments «A» wird verfälscht
+    Wenn für den Testmandanten das Tages-Manifest bis «10.01.2026» erzeugt wird
+    Und der Prüflauf für den Testmandanten läuft
+    Dann ist der Prüflauf im Testmandanten abgeschlossen
+    Und meldet der Prüflauf im Testmandanten für «A» «PRUEFSUMME» und «MANIFEST_PRUEFSUMME»
+    Und hat der Inhaber eine Mail zum Test-Prüflauf erhalten, die nur IDs nennt
+
+  @req-15.5
+  Szenario: Datei ohne Eintrag im zuständigen Tages-Manifest wird gemeldet
+    Angenommen ein eigener Mandant «pl-manifest-c» für den Manifest-Prüflauf
+    Und im Testmandanten liegt das Dokument «A» ohne Archivierungszeitpunkt
+    Wenn für den Testmandanten das Tages-Manifest bis «10.01.2026» erzeugt wird
+    Und der Archivierungszeitpunkt des Testdokuments «A» wird auf «10.01.2026» um «09:15» gesetzt
+    Und der Prüflauf für den Testmandanten läuft
+    Dann ist der Prüflauf im Testmandanten abgeschlossen
+    Und meldet der Prüflauf im Testmandanten für «A» nur «MANIFEST_EINTRAG_FEHLT»
+
+  @req-15.5
+  Szenario: Datei nach dem jüngsten Manifest wird noch nicht verglichen
+    Angenommen ein eigener Mandant «pl-manifest-d» für den Manifest-Prüflauf
+    Und im Testmandanten ist das Dokument «A» am «10.01.2026» um «09:15» archiviert
+    Wenn für den Testmandanten das Tages-Manifest bis «09.01.2026» erzeugt wird
+    Und der Prüflauf für den Testmandanten läuft
+    Dann ist der Prüflauf im Testmandanten abgeschlossen
+    Und meldet der Prüflauf im Testmandanten für «A» keine Manifest-Abweichung
+
   @req-15.5 @req-15.10
   Szenario: Abweichende Prüfsumme, fremde Version und Löschmarke stehen im Bericht, der Inhaber erhält eine Mail mit IDs
     Angenommen im Mandanten «urinet» ist das unbefristete Dokument «A» archiviert, gesperrt für 2 Stunden

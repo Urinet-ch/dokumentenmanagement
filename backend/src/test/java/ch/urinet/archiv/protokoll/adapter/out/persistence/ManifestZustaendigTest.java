@@ -15,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code manifest} nur Einfügen erlaubt und andere Tests die Kette des Mandanten lesen.
  */
 @QuarkusTest
+@Tag("start-1")
 class ManifestZustaendigTest {
 
     private static final MandantCode MANDANT = new MandantCode("urinet");
