@@ -53,6 +53,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 7.1 Werkzeuge [Backend]
   - Teil erledigt (PR #145): Kontext, Auswahl, `dokumente_suchen` (Volltext), `dokument_zeigen`, `fristen`, Index 028
+  - Teil erledigt (7.1b, 14.11.2026): `kennzahl` (Req 3.2, 3.3, 5.2), `offene_posten` (Req 3.4), `Funktionen.finanzVerfuegbar()` minimal, Arten je Mandant (E1); offen: `vollstaendigkeit` (7.1c). Haken erst, wenn 7.1c da ist und `ReqAbdeckungTest` für alle `_Anforderungen_` grün ist
   - `ArchivWerkzeuge` mit `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`; Mandant/Benutzer aus Kontext; Sichtbarkeitsfilter nach Rechtematrix (Spec 01, 2.6) auch in Summen, Anzahlen und Lücken
   - je Werkzeug Szenarien mit zwei Mandanten und den Rollen `inhaber`, `mitarbeiter`, `treuhaender`
   - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); `dokumente_suchen` ist der erste Konsument dieser Variante

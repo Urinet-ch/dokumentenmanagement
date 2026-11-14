@@ -21,7 +21,7 @@ class WerkzeugAuswahlTest {
 
     @Test
     void alleRollenErhaltenSuchenZeigenUndFristen() {
-        WerkzeugAuswahl auswahl = new WerkzeugAuswahl();
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> false);
         for (Rolle rolle : Rolle.values()) {
             WerkzeugKontext kontext = WerkzeugKontext.fuer(URINET, new Benutzer("b", rolle), null);
             assertThat(auswahl.angeboten(kontext)).as(rolle.name())
@@ -29,6 +29,30 @@ class WerkzeugAuswahlTest {
             assertThat(auswahl.erlaubt(kontext, "kennzahl")).as(rolle.name()).isFalse();
             assertThat(auswahl.erlaubt(kontext, "vollstaendigkeit")).as(rolle.name()).isFalse();
         }
+    }
+
+    /** Req 3.1 und Spec 05, Req 8.8: kennzahl und offene_posten nur mit Finanzfunktionen des Mandanten. */
+    @Test
+    void finanzwerkzeugeNurMitFinanzfunktionen() {
+        MandantCode ohne = new MandantCode("ohne-finanz");
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> URINET.equals(m));
+        for (Rolle rolle : Rolle.values()) {
+            assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, new Benutzer("b", rolle), null))).as(rolle.name())
+                    .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl", "offene_posten");
+            WerkzeugKontext fremd = WerkzeugKontext.fuer(ohne, new Benutzer("b", rolle), null);
+            assertThat(auswahl.angeboten(fremd)).as(rolle.name()).doesNotContain("kennzahl", "offene_posten");
+            assertThat(auswahl.erlaubt(fremd, "kennzahl")).isFalse();
+            assertThat(auswahl.erlaubt(fremd, "offene_posten")).isFalse();
+        }
+    }
+
+    @Test
+    void scheitertDieFrageNachFinanzfunktionenGibtEsDieWerkzeugeNicht() {
+        WerkzeugAuswahl auswahl = new WerkzeugAuswahl(m -> {
+            throw new IllegalStateException("Datenbank weg");
+        });
+        assertThat(auswahl.angeboten(WerkzeugKontext.fuer(URINET, new Benutzer("b", Rolle.INHABER), null)))
+                .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen");
     }
 
     /** Erweiterungspunkt 7.1c: nur Rollen, die A3 und A4 uneingeschränkt sehen (Spec 05, Req 5.4). */

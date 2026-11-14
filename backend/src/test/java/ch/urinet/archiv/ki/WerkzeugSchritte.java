@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.gemeinsam.domain.Normalisierer;
 import ch.urinet.archiv.ki.adapter.in.werkzeug.ArchivWerkzeuge;
+import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontextRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -71,6 +72,9 @@ public class WerkzeugSchritte {
     @Inject
     WerkzeugKontextRegister register;
 
+    @Inject
+    WerkzeugAuswahl auswahl;
+
     private final String lauf = "chat-" + UUID.randomUUID();
     private final UUID unbekannt = UUID.randomUUID();
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
@@ -78,11 +82,16 @@ public class WerkzeugSchritte {
     private final Map<String, Ort> kontakte = new HashMap<>();
     private final Set<String> laeufe = new HashSet<>();
     private final Map<String, Long> stand = new HashMap<>();
+    private final Map<String, List<String>> deaktivierteArten = new HashMap<>();
     private JsonNode antwort;
     private String antwortText;
+    private String letzteMessgroesse;
+    private String letztesVon;
+    private String letztesBis;
 
     @After
     public void aufraeumen() throws SQLException {
+        artenWiederAktivieren();
         laeufe.forEach(register::entfernen);
         laeufe.clear();
         Map<String, List<UUID>> jeMandant = new HashMap<>();
@@ -201,8 +210,14 @@ public class WerkzeugSchritte {
                 bestaetigt ? "probe" : null, datum == null ? null : datum.getYear(), z.get("text"), z.get("dateiname"));
         if (z.get("betrag") != null || z.get("belegnummer") != null) {
             ausfuehren(verbindung, "insert into " + schema + ".dokument_finanz (dokument_id, belegnummer, richtung, "
-                    + "betrag, waehrung) values (?, ?, 'EINNAHME', ?, 'CHF')", id, z.get("belegnummer"),
-                    z.get("betrag") == null ? null : new BigDecimal(z.get("betrag")));
+                    + "betrag, waehrung, faelligkeit, zahlstatus, bezahlt_am) values (?, ?, ?, ?, ?, ?, ?, ?)", id,
+                    z.get("belegnummer"), z.getOrDefault("richtung", "EINNAHME"),
+                    z.get("betrag") == null ? null : new BigDecimal(z.get("betrag")), z.getOrDefault("waehrung", "CHF"),
+                    datum(z.get("faelligkeit")), z.get("zahlstatus"), datum(z.get("bezahlt_am")));
+        }
+        if (z.get("periode") != null) {
+            ausfuehren(verbindung, "update " + schema + ".dokument set zusatz = cast(? as jsonb) where id = ?",
+                    JSON.createObjectNode().put("periode", z.get("periode")).toString(), id);
         }
         dokumente.put(z.get("name"), new Ort(mandant, id));
         namen.put(id, z.get("name"));
@@ -537,6 +552,191 @@ public class WerkzeugSchritte {
                 assertThat(wert).as(fall + " " + feld).isEqualTo(e.get(feld));
             }
         }
+    }
+
+    // --- Finanzwerkzeuge (Aufgabe 7.1b) -------------------------------------------------------------------------------
+
+    @Angenommen("im Mandanten «{word}» liegen diese Finanzbelege:")
+    public void finanzbelegeAnlegen(String mandant, DataTable tabelle) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (Map<String, String> zeile : tabelle.asMaps()) {
+                Map<String, String> werte = new HashMap<>();
+                zeile.forEach((k, v) -> {
+                    if (v != null) {
+                        werte.put(k, v);
+                    }
+                });
+                werte.putIfAbsent("titel", "Beleg " + werte.get("name"));
+                werte.putIfAbsent("erfasser", "inhaber-" + mandant);
+                dokumentEinfuegen(verbindung, mandant, werte);
+            }
+        }
+    }
+
+    @Angenommen("im Mandanten «{word}» sind alle Arten der Gruppe finanz inaktiv")
+    public void finanzartenInaktiv(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement lesen = verbindung.prepareStatement("select code from " + schema(mandant)
+                     + ".dokumentart where aktiv and 'finanz' = any(gruppen)")) {
+            List<String> codes = new ArrayList<>();
+            try (ResultSet zeilen = lesen.executeQuery()) {
+                while (zeilen.next()) {
+                    codes.add(zeilen.getString(1));
+                }
+            }
+            deaktivierteArten.put(mandant, codes);
+            ausfuehren(verbindung, "update " + schema(mandant) + ".dokumentart set aktiv = false where code = any(?)",
+                    (Object) verbindung.createArrayOf("text", codes.toArray()));
+        }
+    }
+
+    private void artenWiederAktivieren() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (Map.Entry<String, List<String>> e : deaktivierteArten.entrySet()) {
+                ausfuehren(verbindung, "update " + schema(e.getKey()) + ".dokumentart set aktiv = true "
+                        + "where code = any(?)", (Object) verbindung.createArrayOf("text", e.getValue().toArray()));
+            }
+        }
+        deaktivierteArten.clear();
+    }
+
+    @Wenn("«{word}» im Chat die Kennzahl «{word}» von «{word}» bis «{word}» nach «{word}» auf Basis «{word}» abfragt")
+    public void kennzahlAbfragen(String benutzer, String messgroesse, String von, String bis, String gruppierung,
+                                 String basis) {
+        String id = kontext(benutzer);
+        letzteMessgroesse = messgroesse;
+        letztesVon = von;
+        letztesBis = bis;
+        lesen(imFremdenThread(() -> werkzeuge.kennzahl(id, messgroesse, von, bis, gruppierung, basis)));
+    }
+
+    @Wenn("«{word}» im Chat die offenen Posten zum Stichtag «{word}» für «{word}» abfragt")
+    public void offenePostenAbfragen(String benutzer, String stichtag, String richtung) {
+        String id = kontext(benutzer);
+        lesen(imFremdenThread(() -> werkzeuge.offenePosten(id, stichtag, richtung)));
+    }
+
+    @Dann("lauten die Zeilen der Kennzahl der Reihe nach:")
+    public void kennzahlZeilen(DataTable tabelle) {
+        List<Map<String, String>> erwartet = tabelle.asMaps();
+        JsonNode zeilen = antwort.path("zeilen");
+        assertThat(zeilen.size()).as(antwortText).isEqualTo(erwartet.size());
+        for (int i = 0; i < erwartet.size(); i++) {
+            String fall = "Zeile " + (i + 1) + ": " + zeilen.get(i);
+            assertThat(zeilen.get(i).path("gruppe").asText()).as(fall).isEqualTo(erwartet.get(i).get("gruppe"));
+            assertThat(zeilen.get(i).path("betrag").asText()).as(fall).isEqualTo(erwartet.get(i).get("betrag"));
+            assertThat(zeilen.get(i).path("anzahl").asInt()).as(fall)
+                    .isEqualTo(Integer.parseInt(erwartet.get(i).get("anzahl")));
+        }
+    }
+
+    @Dann("ist die Summe der Kennzahl «{}» bei {int} Belegen und der Datenstand lautet «{}»")
+    public void kennzahlSumme(String summe, int belege, String basis) {
+        assertThat(antwort.path("summe").asText()).as(antwortText).isEqualTo(summe);
+        assertThat(antwort.path("datenstand").path("anzahl").asInt()).as(antwortText).isEqualTo(belege);
+        assertThat(antwort.path("datenstand").path("basis").asText()).as(antwortText).isEqualTo(basis);
+        assertThat(antwort.path("datenstand").path("zeitpunkt").asText()).matches("\\d{2}\\.\\d{2}\\.\\d{4} \\d{2}:\\d{2}");
+    }
+
+    @Dann("die Kennzahl nennt {int} ausgeschlossene Fremdwährungsbelege und die Belege «{}»")
+    public void kennzahlBelege(int fremd, String namenText) {
+        assertThat(antwort.path("fremdwaehrungAusgeschlossen").asInt()).as(antwortText).isEqualTo(fremd);
+        Set<String> ids = new HashSet<>();
+        antwort.path("belegIds").forEach(n -> ids.add(n.asText()));
+        Set<String> erwartet = new HashSet<>();
+        liste(namenText).forEach(n -> erwartet.add(dokumente.get(n).id().toString()));
+        assertThat(ids).as(antwortText).isEqualTo(erwartet);
+    }
+
+    @Dann("hat die Antwort den Hinweis «{}»")
+    public void antwortHinweis(String hinweis) {
+        List<String> hinweise = new ArrayList<>();
+        antwort.path("hinweise").forEach(n -> hinweise.add(n.asText()));
+        assertThat(hinweise).as(antwortText).contains(hinweis);
+    }
+
+    @Dann("hat die Antwort den Hinweis «{}» nicht")
+    public void antwortOhneHinweis(String hinweis) {
+        List<String> hinweise = new ArrayList<>();
+        antwort.path("hinweise").forEach(n -> hinweise.add(n.asText()));
+        assertThat(hinweise).as(antwortText).doesNotContain(hinweis);
+    }
+
+    @Dann("hat die Antwort keine Summe, keine Zeilen und keine Belege")
+    public void antwortOhneZahlen() {
+        assertThat(antwort.has("summe")).as(antwortText).isFalse();
+        assertThat(antwort.path("zeilen").size()).as(antwortText).isZero();
+        assertThat(antwort.path("belegIds").size()).as(antwortText).isZero();
+        assertThat(antwort.has("datenstand")).as(antwortText).isFalse();
+    }
+
+    @Dann("entspricht die Summe der Kennzahl der direkt in SQL gerechneten Summe der Arten «{}» im Mandanten «{word}»")
+    public void kennzahlGegenSql(String arten, String mandant) throws SQLException {
+        String richtung = "EINNAHMEN".equals(letzteMessgroesse) ? "EINNAHME" : "AUSGABE";
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select coalesce(sum(f.betrag), 0), count(*) from "
+                     + schema(mandant) + ".dokument_finanz f, " + schema(mandant) + ".dokument d where d.id = f.dokument_id "
+                     + "and d.art = any(?) and f.richtung = ? and f.waehrung = 'CHF' and d.status = 'ARCHIVIERT' "
+                     + "and d.bestaetigt is not null and d.datum between ? and ?")) {
+            abfrage.setArray(1, verbindung.createArrayOf("text", liste(arten).toArray()));
+            abfrage.setString(2, richtung);
+            abfrage.setObject(3, LocalDate.parse(letztesVon), Types.DATE);
+            abfrage.setObject(4, LocalDate.parse(letztesBis), Types.DATE);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                String erwartet = ch.urinet.archiv.ki.domain.Werteformat.chf(zeile.getBigDecimal(1));
+                assertThat(antwort.path("summe").asText()).as(antwortText).isEqualTo(erwartet);
+                assertThat(antwort.path("datenstand").path("anzahl").asLong()).as(antwortText).isEqualTo(zeile.getLong(2));
+            }
+        }
+    }
+
+    @Dann("lauten die offenen Posten der Reihe nach:")
+    public void offenePostenReihenfolge(DataTable tabelle) {
+        List<Map<String, String>> erwartet = tabelle.asMaps();
+        JsonNode liste = antwort.path("posten");
+        assertThat(liste.size()).as(antwortText).isEqualTo(erwartet.size());
+        for (int i = 0; i < erwartet.size(); i++) {
+            Map<String, String> e = erwartet.get(i);
+            JsonNode p = liste.get(i);
+            String fall = "Posten " + (i + 1) + ": " + p;
+            assertThat(p.path("id").asText()).as(fall).isEqualTo(dokumente.get(e.get("dokument")).id().toString());
+            assertThat(p.path("belegnummer").asText()).as(fall).isEqualTo(e.get("belegnummer"));
+            assertThat(p.path("partner").asText()).as(fall).isEqualTo(e.get("partner"));
+            assertThat(p.path("betrag").asText()).as(fall).isEqualTo(e.get("betrag"));
+            assertThat(p.path("faelligkeit").asText()).as(fall).isEqualTo(e.get("faelligkeit"));
+            assertThat(p.path("ueberfaellig").asBoolean()).as(fall).isEqualTo("ja".equals(e.get("ueberfaellig")));
+            assertThat(p.path("zahlstatus").asText()).as(fall).isEqualTo(e.get("zahlstatus"));
+        }
+    }
+
+    @Dann("die offenen Posten haben die Gesamtzahl {int} und das Fenster von «{}» bis «{}»")
+    public void offenePostenGesamt(int gesamt, String von, String bis) {
+        assertThat(antwort.path("gesamt").asInt()).as(antwortText).isEqualTo(gesamt);
+        assertThat(antwort.path("datenstand").path("anzahl").asInt()).as(antwortText).isEqualTo(gesamt);
+        assertThat(antwort.path("fenster").path("von").asText()).as(antwortText).isEqualTo(von);
+        assertThat(antwort.path("fenster").path("bis").asText()).as(antwortText).isEqualTo(bis);
+    }
+
+    @Dann("enthält die Antwort {int} offene Posten bei der Gesamtzahl {int}")
+    public void offenePostenBegrenzt(int anzahl, int gesamt) {
+        assertThat(antwort.path("posten").size()).as(antwortText).isEqualTo(anzahl);
+        assertThat(antwort.path("gesamt").asInt()).as(antwortText).isEqualTo(gesamt);
+    }
+
+    @Dann("bietet das Archiv «{word}» diese Werkzeuge an: «{}»")
+    public void werkzeugeAngeboten(String benutzer, String namen) {
+        String id = kontext(benutzer);
+        WerkzeugKontext kontext = register.finden(id).orElseThrow();
+        assertThat(imFremdenThread(() -> String.join(",", auswahl.angeboten(kontext)))).isEqualTo(namen);
+    }
+
+    @Dann("antwortet kennzahl und offene_posten für «{word}» mit «{}»")
+    public void finanzwerkzeugeAbgelehnt(String benutzer, String erwartet) {
+        String id = kontext(benutzer);
+        assertThat(imFremdenThread(() -> werkzeuge.kennzahl(id, "EINNAHMEN", "2075-01-01", "2075-12-31", null, null)))
+                .isEqualTo(erwartet);
+        assertThat(imFremdenThread(() -> werkzeuge.offenePosten(id, "2075-07-01", null))).isEqualTo(erwartet);
     }
 
     // --- Hilfen -------------------------------------------------------------------------------------------------------
