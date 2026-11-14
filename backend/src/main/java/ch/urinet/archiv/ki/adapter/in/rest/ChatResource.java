@@ -22,7 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.subscription.BackPressureStrategy;
+import io.smallrye.mutiny.operators.multi.processors.UnicastProcessor;
 import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.inject.Instance;
@@ -142,15 +142,17 @@ public class ChatResource {
         Eingabe eingabe = eingabe(body);
         ChatFragen.Annahme annahme = fragen.annehmen(benutzer(), mandant, ip(), eingabe.frage(), eingabe.gespraechId());
         ChatAbbruch abbruch = new ChatAbbruch();
-        return Multi.createFrom().<OutboundSseEvent>emitter(emitter -> fragen.starten(annahme, ausgabe -> {
-                    emitter.emit(sse.newEventBuilder().name(ausgabe.name()).mediaType(MediaType.TEXT_PLAIN_TYPE)
-                            .data(String.class, ChatJson.daten(ausgabe)).build());
-                    if (ausgabe.letzte()) {
-                        emitter.complete();
-                    }
-                }, abbruch), BackPressureStrategy.BUFFER)
-                // Client hat den Stream geschlossen (Abmeldung des Abonnenten)
-                .onCancellation().invoke(abbruch::setzen);
+        // sofort starten und puffern, bis Quarkus abonniert: der Platz wird auch frei, wenn nie jemand abonniert
+        UnicastProcessor<OutboundSseEvent> strom = UnicastProcessor.create();
+        fragen.starten(annahme, ausgabe -> {
+            strom.onNext(sse.newEventBuilder().name(ausgabe.name()).mediaType(MediaType.TEXT_PLAIN_TYPE)
+                    .data(String.class, ChatJson.daten(ausgabe)).build());
+            if (ausgabe.letzte()) {
+                strom.onComplete();
+            }
+        }, abbruch);
+        // Client hat den Stream geschlossen (Abmeldung des Abonnenten)
+        return strom.onCancellation().invoke(abbruch::setzen);
     }
 
     @GET
