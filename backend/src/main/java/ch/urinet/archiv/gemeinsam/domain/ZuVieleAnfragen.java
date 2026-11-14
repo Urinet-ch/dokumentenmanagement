@@ -2,18 +2,32 @@ package ch.urinet.archiv.gemeinsam.domain;
 
 /**
  * 429 {@link Fehlercode#ZU_VIELE_ANFRAGEN} mit {@code Retry-After} in Sekunden (design.md «Error Handling»); die
- * REST-Schicht setzt den Header aus {@link #wartezeitSekunden()}.
+ * REST-Schicht setzt den Header aus {@link #wartezeitSekunden()} und die Erweiterung {@code grund} aus {@link #grund()}.
  */
 public class ZuVieleAnfragen extends FachFehler {
 
+    /** Warum abgelehnt wird; die Oberfläche unterscheidet beide Fälle am Feld {@code grund} der Problem Details. */
+    public enum Grund {
+        /** Stundenlimit der Gespräche erreicht. */
+        STUNDENLIMIT,
+        /** Ein Gespräch des Benutzers (oder die Höchstzahl der Instanz) läuft noch. */
+        LAEUFT
+    }
+
+    private final Grund grund;
     private final long wartezeitSekunden;
 
-    public ZuVieleAnfragen(long wartezeitSekunden) {
+    public ZuVieleAnfragen(Grund grund, long wartezeitSekunden) {
         super(Fehlercode.ZU_VIELE_ANFRAGEN, Fehlercode.ZU_VIELE_ANFRAGEN.name());
         if (wartezeitSekunden < 1) {
             throw new IllegalArgumentException("Wartezeit unter 1 Sekunde");
         }
+        this.grund = java.util.Objects.requireNonNull(grund);
         this.wartezeitSekunden = wartezeitSekunden;
+    }
+
+    public Grund grund() {
+        return grund;
     }
 
     public long wartezeitSekunden() {
