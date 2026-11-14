@@ -8,10 +8,13 @@ import ch.urinet.archiv.ki.adapter.out.ChatAuswahl;
 import ch.urinet.archiv.ki.adapter.out.EmbeddingAuswahl;
 import ch.urinet.archiv.ki.adapter.out.chat.ChatNichtVerfuegbar;
 import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
+import ch.urinet.archiv.ki.adapter.out.RerankerAuswahl;
+import ch.urinet.archiv.ki.adapter.out.reranker.InfomaniakReranker;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jEmbeddingAdapter;
 import ch.urinet.archiv.ki.adapter.out.stub.ChatAgentStub;
 import ch.urinet.archiv.ki.adapter.out.stub.EmbeddingStub;
 import ch.urinet.archiv.ki.adapter.out.stub.KiStub;
+import ch.urinet.archiv.ki.adapter.out.stub.RerankerStub;
 import ch.urinet.archiv.verarbeitung.adapter.out.OcrAuswahl;
 import ch.urinet.archiv.verarbeitung.adapter.out.stub.OcrStub;
 import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
@@ -50,6 +53,7 @@ class StubSchalterTest {
         }
         assertThat(config.getValue("archiv.ki.embedding-stub", Boolean.class)).as("embedding").isEqualTo(erwartet);
         assertThat(config.getValue("archiv.chat.stub", Boolean.class)).as("chat").isEqualTo(erwartet);
+        assertThat(config.getValue("archiv.ki.reranker-stub", Boolean.class)).as("reranker").isEqualTo(erwartet);
     }
 
     /** Bis Aufgabe 7.2 gibt es keinen Chat-Agenten: im Profil lokal darum der Demo-Stub (Spec 02, Aufgabe 7.3). */
@@ -80,6 +84,19 @@ class StubSchalterTest {
         assertThat(befund.warnungen()).containsExactly("ChatAgentPort: kein Adapter, folgt mit Spec 02, Aufgabe 7.2");
         assertThat(PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(true))).abbrueche())
                 .containsExactly("ChatAgentPort: Dev-Stub ist in prod nicht zulässig");
+    }
+
+    /** Wie beim Embedding: mit Schalter der Dev-Stub des Rerankers, ohne Schalter der REST-Adapter (Aufgabe 6.4). */
+    @Test
+    void rerankerSchalterWaehltStubOderAdapter() {
+        RerankerStub stub = new RerankerStub();
+        InfomaniakReranker adapter = new InfomaniakReranker(null, null, Optional.empty(), "m", null);
+        assertThat(new RerankerAuswahl().reranker(true, stub, instanz(adapter))).isSameAs(stub);
+        assertThat(new RerankerAuswahl().reranker(false, stub, instanz(adapter))).isSameAs(adapter);
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(false))).abbrueche()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(false))).warnungen()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(true))).abbrueche())
+                .containsExactly("RerankerPort: Dev-Stub ist in prod nicht zulässig");
     }
 
     /**

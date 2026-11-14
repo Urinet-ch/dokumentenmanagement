@@ -73,7 +73,9 @@ public final class ZeilenPruefung {
         NEU,
         GEAENDERT,
         UNVERAENDERT,
-        DUBLETTE;
+        DUBLETTE,
+        /** Der Kontakt der Zeile ist inaktiv (Req 17.13): weder übernommen noch neu angelegt. */
+        INAKTIV;
 
         /** Zeilen, die der Abgleich bewertet; {@code FEHLER} und {@code UEBERSPRUNGEN} bleiben, wie sie sind. */
         public boolean abzugleichen() {

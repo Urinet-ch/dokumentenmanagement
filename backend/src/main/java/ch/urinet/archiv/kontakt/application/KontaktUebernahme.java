@@ -7,6 +7,7 @@ import ch.urinet.archiv.kontakt.domain.Verkaufschance;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,7 +19,7 @@ public interface KontaktUebernahme {
     /** Quelle eines aus dem CSV-Import angelegten Kontakts. */
     String QUELLE_CSV_IMPORT = "CSV_IMPORT";
 
-    /** Sperrt den Kontakt bis zum Ende der Transaktion; leer, wenn es ihn nicht gibt. */
+    /** Sperrt den Kontakt bis zum Ende der Transaktion; leer, wenn es ihn nicht gibt (auch inaktive). */
     Optional<Kontakt> sperren(UUID id);
 
     /**
@@ -34,13 +35,19 @@ public interface KontaktUebernahme {
     void aktualisieren(UUID id, String crmId, KontaktAngaben angaben, String nameNormalisiert);
 
     /**
-     * Vollexport (Req 13.7): Kennzeichnet jeden Kontakt mit {@code crm_id}, die nicht unter {@code imExport} ist, als
-     * «nicht mehr im CRM-Export» und hebt die Kennzeichnung für die übrigen auf. Liefert die Anzahl neu gekennzeichneter
-     * Kontakte.
+     * Vollexport (Req 13.7): Kennzeichnet jeden aktiven Kontakt mit {@code crm_id}, die nicht unter {@code imExport}
+     * ist, als «nicht mehr im CRM-Export» und hebt die Kennzeichnung für die übrigen aktiven auf; inaktive bleiben, wie
+     * sie sind (Req 17.14). Liefert die Anzahl neu gekennzeichneter Kontakte.
      */
     int exportAbgleichen(Collection<String> imExport);
 
-    /** Kontakt-IDs je {@code crm_id}; IDs ohne Kontakt fehlen. */
+    /** Die inaktiven unter den Kontakten mit diesen IDs (Req 17.14). */
+    Set<UUID> inaktive(Collection<UUID> ids);
+
+    /**
+     * Kontakt-IDs der aktiven Kontakte je {@code crm_id} (Verkaufschancen, Req 13.9); IDs ohne aktiven Kontakt fehlen,
+     * weil ein inaktiver kein Ziel neuer Zuordnungen ist (Req 17.12).
+     */
     Map<String, UUID> kontakteMitCrmId(Collection<String> crmIds);
 
     /** Verkaufschancen je {@code crm_id}; IDs ohne Verkaufschance fehlen. */

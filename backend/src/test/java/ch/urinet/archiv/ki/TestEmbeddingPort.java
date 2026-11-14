@@ -15,7 +15,8 @@ import java.util.List;
 /**
  * {@link EmbeddingPort} für die Tests: ohne Eingriff wie {@link EmbeddingAuswahl} (Stub oder LangChain4j-Adapter gegen
  * den WireMock); die Szenarien zum Pfad ohne Vektoren schalten auf die Antwort des Dev-Stubs ({@code OhneVektoren})
- * oder auf «kein Token» ({@code OhneZugang}) und setzen danach zurück ({@code EmbeddingSchritte}).
+ * oder auf «kein Token» ({@code OhneZugang}) und setzen danach zurück ({@code EmbeddingSchritte},
+ * {@code HybridSchritte}).
  */
 @Mock
 @ApplicationScoped
@@ -45,6 +46,18 @@ public class TestEmbeddingPort implements EmbeddingPort {
             return new OhneZugang();
         }
         return stub ? dev.einbetten(texte) : echt.get().einbetten(texte);
+    }
+
+    @Override
+    public Antwort einbettenFrage(String frage) {
+        Ersatz wert = ersatz;
+        if (wert == Ersatz.STUB) {
+            return dev.einbettenFrage(frage);
+        }
+        if (wert == Ersatz.OHNE_ZUGANG) {
+            return new OhneZugang();
+        }
+        return stub ? dev.einbettenFrage(frage) : echt.get().einbettenFrage(frage);
     }
 
     public void setzen(Ersatz wert) {
