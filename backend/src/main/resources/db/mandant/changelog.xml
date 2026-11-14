@@ -26,4 +26,5 @@
     <include file="changesets/019-export.xml" relativeToChangelogFile="true"/>
     <include file="changesets/021-chunk.xml" relativeToChangelogFile="true"/>
     <include file="changesets/022-dokument-ki-partner-nachtrag.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/025-prueflauf-manifest.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
