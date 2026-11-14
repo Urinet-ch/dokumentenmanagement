@@ -49,7 +49,9 @@ public class PanacheDokumentSuche implements SuchePort {
     private static final String AUSZUG_DATEINAME = "nullif(archiv_dateiname_text(d.dateiname), ''), ";
     /*
      * Ohne Dateinamen (Req 3.13) treffen und ranken nur die Teile A–C. Bewusst ohne zusätzliches
-     * "volltext_tsv @@ q" für den GIN-Index: Bei einer Negation («-Wort») entschiede sonst der Dateiname mit.
+     * "volltext_tsv @@ q" als Vorfilter: Bei einer Negation («-Wort») entschiede sonst der Dateiname mit. Den Ausdruck
+     * trägt der GIN-Index dokument_volltext_ohne_dateiname_ix (Changeset 028, Spec 02, Aufgabe 7.1a); er muss
+     * wörtlich gleich bleiben, sonst greift der Index nicht.
      */
     private static final String OHNE_DATEINAME = "ts_filter(d.volltext_tsv, '{a,b,c}')";
     private static final String AUSZUG = "ts_headline('german', translate(concat_ws(' ', d.titel, d.partner_name, "
