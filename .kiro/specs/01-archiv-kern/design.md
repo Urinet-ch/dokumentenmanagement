@@ -179,6 +179,7 @@ den Auftrags-Poller ein. Aus einem Build entstehen zwei Images: `archiv` (API mi
     - Ein Token läuft nicht ab, es gilt bis zum Widerruf (`aktiv = false`, die Zeile bleibt für das Protokoll; entschieden von Fabian am 10.11.2026). Ungenutzte Tokens nach `zuletzt` anzeigen und ein optionales `gueltig_bis` stehen als Option O.7 in tasks.md. Ein deaktivierter Mandant sperrt seine Tokens sofort (403 `MANDANT_FEHLT` aus 1.4). Spec 03 ergänzt (Spec 03, Req 12.4; umgesetzt in Spec 03, Aufgabe 11.7; vorgeschlagen 13.11.2026, entschieden mit dem Merge des Spec-PR von Spec 03, weil es den Entscheid vom 10.11.2026 berührt): Webseiten-Schlüssel erhalten nach einer Rotation `gueltig_bis` (Ende der Überlappung, höchstens 30 Tage) und gelten danach als ungültig (401); die Spalte `gueltig_bis` nimmt O.7 teilweise vorweg. Für `generator` und `import` gilt weiter kein Ablauf.
     - Verwaltung `/api/v1/api-tokens` (A14, nur `inhaber`): `GET` Liste des eigenen Mandanten ohne Geheimnis und Hash; `POST` → 201 mit dem Token genau einmal und `Cache-Control: no-store`; `DELETE /{tokenId}` → 204, fremde oder unbekannte ID → 404. Kommando `archiv token erstellen <mandant> <name> <scope>`: Token nur auf stdout, ID, Mandant und Scope auf stderr; im Kommando-Modus gehen das Log (`quarkus.log.console.stderr=true`) und alles andere, was auf `System.out` schreibt (Konsolenausgabe von Liquibase), auf stderr, die Meldungen der Liquibase-Migration ins Log (`LoggerUIService`; seit 2.1 auch für die public-Migration beim Start über den Wurzel-Scope in `ArchivMain`, die Zusammenfassung über `liquibase.command.showSummaryOutput=log`, abgesichert in `TokenKommandoStartTest`; den Wurzel-Scope setzt `ArchivMain` auch im Dienst-Modus, Review PR #40); Exit 0/1/2/3 wie `mandant anlegen`. Logs nennen nur ID, Mandant und Scope.
     - Bis 2.4 und 3.x die fachlichen Endpunkte bringen, stehen Probe-Endpunkte unter src/test (`ProbeTokenResource`, `POST /dokumente` und `POST /dokumente/generator`); die echten Endpunkte übernehmen `@ErlaubtScope` und die Rollen. Seit 4.7 gibt es beide echten Endpunkte; `ProbeTokenResource` ist entfernt, und `api-tokens.feature` prüft die Scope-Bindung an `DokumentUploadResource` und `DokumentGeneratorResource`.
+    - Umsetzung (Option O.7): Übersicht und Widerruf in der PWA sind in PR #155 umgesetzt; das optionale `gueltig_bis` bleibt offen.
 - Lokale Clients (`tools/archiv_client.py`, `tools/drive_import`) lesen das Token aus einer Datei mit Rechten 600: Standard `~/.config/urinet-archiv/token`, anderer Pfad über `ARCHIV_TOKEN_DATEI`; nie das Token selbst aus einer Umgebungsvariable (tech.md Regel 7).
 - `Berechtigung` (application) setzt die Rechtematrix (Req 2.6) um. Reihenfolge bei Endpunkten mit `{id}`:
   1. Dokument über `VertraulichkeitFilter` laden; fremder Mandant oder unsichtbar → 404 `NICHT_GEFUNDEN` (Req 1.4, 2.3).
@@ -1240,7 +1241,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 - Anleitung `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Req 16.3, Nachweis manuell). Sie schreibt vor, nur Snapshots einzuspielen, deren SHA-256 ein Manifest unter `sicherung` belegt, und die Sperren aus dem Inventar ohne Kappung neu zu setzen (Req 16.27).
 
 ### Frontend
-- Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`.
+- Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`, `/verwaltung/api-tokens`.
 - Dokumentansicht `/dokument/:id` (Spec 04 ergänzt): Abschnitt «In der Wissensbasis verwendet» (Spec 04, Req 15.4) und Routenparameter `/dokument/:id?seite=n`, der das Dokument auf PDF-Seite n öffnet (Spec 04, Req 16.2). Dazu
   `/dokument/:id?art=<code>` aus dem Eingangskorb: öffnet das Formular einmal mit dieser Art als Artwechsel (Abschnitt
   «Art nur im KI-Vorschlag (Folge Review #106)» unter «Umsetzung (Aufgabe 3.6, Eingangskorb-Oberfläche)»).
@@ -1274,8 +1275,12 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     (entschieden von Fabian am 11.11.2026).
   - Rückruf: `state` muss passen; liefert Keycloak den Parameter `iss` (RFC 9207), muss er dem Aussteller entsprechen,
     sonst wird der Rückruf abgelehnt.
-  - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A13); ohne Mandant oder ohne
+  - Menüpunkte aus Rolle und Mandant im Token nach der Rechtematrix (A1, A2, A5, A11–A14); ohne Mandant oder ohne
     Archiv-Rolle kein Menü. Die Oberfläche blendet nur aus, die API prüft.
+  - Umsetzung (Option O.7, Übersicht): `/verwaltung/api-tokens` ist nur mit A14 erreichbar. Die Liste sortiert aktive
+    Tokens vor widerrufenen, innerhalb nach `zuletzt` aufsteigend (fehlendes `zuletzt` zuerst) und bei Gleichstand nach
+    `erstellt`; es gibt keine Schwelle für «ungenutzt». Widerruf braucht eine zweite Bestätigung; unbekannte Scopes
+    erscheinen als Code.
   - Eingangskorb-Zähler hinter einem Port (`EingangskorbZaehler`); bis 3.6 ohne Endpunkt und ohne Anzeige (seit 3.6
     `HttpEingangskorbZaehler`, siehe «Umsetzung (Aufgabe 3.6)»).
   - Upload hinter dem Port `UploadPort` mit HTTP-Adapter (Multipart, das Feld `dateien[]` aus «Upload» als wiederholter

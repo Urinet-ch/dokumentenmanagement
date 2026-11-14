@@ -19,6 +19,7 @@ export const TEXTE = {
     importe: 'Importe',
     dokumentarten: 'Dokumentarten',
     protokoll: 'Zugriffsprotokoll',
+    apiTokens: 'API-Tokens',
     export: 'Jahresexport',
     kontakte: 'Kontakte',
   },
@@ -28,7 +29,8 @@ export const TEXTE = {
     anmelden: 'Anmelden',
     abmelden: 'Abmelden',
     hinweis: 'Bitte melden Sie sich an, um das Archiv zu verwenden.',
-    angemeldetAls: (name: string, mandant: string) => `Angemeldet als ${name} (Mandant «${mandant}»)`,
+    angemeldetAls: (name: string, mandant: string) =>
+      `Angemeldet als ${name} (Mandant «${mandant}»)`,
     laeuft: 'Anmeldung läuft …',
     abgelaufen: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     abgemeldet: 'Sie haben sich abgemeldet.',
@@ -67,9 +69,12 @@ export const TEXTE = {
       DATEI_ZU_GROSS: 'Die Datei ist grösser als 50 MB. Bitte verkleinern oder aufteilen.',
       DATEI_UNGUELTIG: 'Die Datei ist leer oder beschädigt. Bitte prüfen und erneut hochladen.',
     } as Record<string, string>,
-    fehlerUnbekannt: 'Die Datei konnte nicht angenommen werden. Bitte versuchen Sie es später erneut.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
-    fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an und laden Sie die Dateien neu hoch.',
+    fehlerUnbekannt:
+      'Die Datei konnte nicht angenommen werden. Bitte versuchen Sie es später erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerSitzung:
+      'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an und laden Sie die Dateien neu hoch.',
     fehlerAnfrageZuGross:
       'Die Dateien sind zusammen zu gross für einen Upload. Bitte in mehreren Schritten mit weniger Dateien hochladen.',
     fehlerAllgemein: 'Der Upload ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
@@ -84,7 +89,8 @@ export const TEXTE = {
     kameraLaeuft: 'Kamera wird geöffnet …',
     kamera: 'Kamerabild',
     aufnehmen: 'Seite aufnehmen',
-    keineKamera: 'Die Kamera ist nicht verfügbar. Sie können stattdessen ein Foto aufnehmen oder auswählen.',
+    keineKamera:
+      'Die Kamera ist nicht verfügbar. Sie können stattdessen ein Foto aufnehmen oder auswählen.',
     fotoWaehlen: 'Foto aufnehmen oder auswählen',
     seiten: 'Aufgenommene Seiten',
     seite: (nr: number) => `Seite ${nr}`,
@@ -94,13 +100,15 @@ export const TEXTE = {
     keineKanten: 'Keine Kanten erkannt, das ganze Bild wird verwendet.',
     angepasst: 'Zuschnitt angepasst.',
     ganzesBild: 'Ganzes Bild verwendet.',
-    aufbereitenFehler: 'Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.',
+    aufbereitenFehler:
+      'Die Seite konnte nicht zugeschnitten werden. Bitte verwerfen und neu aufnehmen.',
     anpassenFehler: 'Der Zuschnitt konnte nicht angepasst werden. Der bisherige Zuschnitt bleibt.',
     anpassen: (nr: number) => `Zuschnitt Seite ${nr} anpassen`,
     verwerfen: (nr: number) => `Seite ${nr} verwerfen`,
     verwerfenKurz: 'Verwerfen',
     zuschnitt: 'Zuschnitt anpassen',
-    zuschnittHinweis: 'Ziehen Sie die Ecken auf die Ecken des Blatts, oder wählen Sie eine Ecke und verschieben Sie sie mit den Pfeiltasten.',
+    zuschnittHinweis:
+      'Ziehen Sie die Ecken auf die Ecken des Blatts, oder wählen Sie eine Ecke und verschieben Sie sie mit den Pfeiltasten.',
     ecke: {
       obenLinks: 'Ecke oben links',
       obenRechts: 'Ecke oben rechts',
@@ -120,7 +128,8 @@ export const TEXTE = {
       'Die Erfassung konnte auf diesem Gerät nicht gespeichert werden (z. B. im privaten Modus). Bitte erneut versuchen.',
     wartet: (anzahl: number) => `Wartet auf Upload: ${anzahl}`,
     fehlerhaft: 'Nicht hochgeladen',
-    erfassung: (zeit: string, seiten: number) => `${zeit}, ${seiten === 1 ? '1 Seite' : `${seiten} Seiten`}`,
+    erfassung: (zeit: string, seiten: number) =>
+      `${zeit}, ${seiten === 1 ? '1 Seite' : `${seiten} Seiten`}`,
     erneutVersuchen: 'Erneut versuchen',
     fehlerUnbekannt: 'Das Archiv hat die Erfassung abgelehnt. Bitte prüfen und erneut versuchen.',
     fehlerWiederholt:
@@ -135,7 +144,8 @@ export const TEXTE = {
     anzahl: (gezeigt: number, gesamt: number) => `${gezeigt} von ${gesamt} Dokumenten`,
     mehr: 'Weitere laden',
     neuLaden: 'Neu laden',
-    fehlerLaden: 'Der Eingangskorb konnte nicht geladen werden. Bitte prüfen Sie die Verbindung und laden Sie neu.',
+    fehlerLaden:
+      'Der Eingangskorb konnte nicht geladen werden. Bitte prüfen Sie die Verbindung und laden Sie neu.',
     vorschau: (titel: string) => `Vorschau der ersten Seite von «${titel}»`,
     ohneVorschau: 'Keine Vorschau',
     ohneTitel: 'Ohne Titel',
@@ -174,9 +184,11 @@ export const TEXTE = {
     bittePruefen: 'bitte prüfen',
     vorgeschlagen: 'Vorschlag',
     partnerVorschlag: (name: string) => `erkannt: «${name}», noch keinem Kontakt zugeordnet`,
-    hinweisPdfa: 'Keine PDF/A-Fassung möglich: Es werden nur Original und Arbeitsfassung archiviert.',
+    hinweisPdfa:
+      'Keine PDF/A-Fassung möglich: Es werden nur Original und Arbeitsfassung archiviert.',
     hinweisFrist: 'Frist abgelaufen: Die Aufbewahrungsfrist dieses Dokuments ist schon vorbei.',
-    warnungBelegnummer: 'Ein Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art ist schon im Archiv.',
+    warnungBelegnummer:
+      'Ein Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art ist schon im Archiv.',
     zumVorhandenen: 'Vorhandenes Dokument öffnen',
     bestaetigen: 'Bestätigen',
     bestaetigenLaeuft: 'Wird bestätigt …',
@@ -194,12 +206,16 @@ export const TEXTE = {
     partnerGewaehlt: (name: string) => `Partner «${name}» gewählt`,
     artWaehlen: 'Bitte Art wählen',
     betragHinweis: 'z. B. 1234.50',
-    betragUngueltig: 'Bitte einen Betrag mit höchstens zwei Nachkommastellen angeben, z. B. 1234.50.',
-    rueckfragePdfa: 'Für dieses Dokument gibt es keine PDF/A-Fassung. Trotzdem nur mit Original und Arbeitsfassung archivieren?',
+    betragUngueltig:
+      'Bitte einen Betrag mit höchstens zwei Nachkommastellen angeben, z. B. 1234.50.',
+    rueckfragePdfa:
+      'Für dieses Dokument gibt es keine PDF/A-Fassung. Trotzdem nur mit Original und Arbeitsfassung archivieren?',
     rueckfragePdfaJa: 'Ohne PDF/A bestätigen',
-    rueckfrageFrist: 'Die Aufbewahrungsfrist ist schon abgelaufen. Trotzdem archivieren? Sonst können Sie es verwerfen.',
+    rueckfrageFrist:
+      'Die Aufbewahrungsfrist ist schon abgelaufen. Trotzdem archivieren? Sonst können Sie es verwerfen.',
     rueckfrageFristJa: 'Trotzdem archivieren',
-    rueckfrageVerwerfen: 'Dokument verwerfen? Die Dateien werden gelöscht, das Protokoll nennt den Grund.',
+    rueckfrageVerwerfen:
+      'Dokument verwerfen? Die Dateien werden gelöscht, das Protokoll nennt den Grund.',
     grund: 'Grund',
     grundHinweis: 'Pflicht, höchstens 1000 Zeichen.',
     grundFehlt: 'Bitte einen Grund angeben.',
@@ -228,11 +244,13 @@ export const TEXTE = {
       NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr. Der Eingangskorb wurde neu geladen.',
       BELEGNUMMER_VERGEBEN:
         'Diese Belegnummer ist für diese Art schon vergeben. Bitte die Belegnummer prüfen und korrigieren.',
-      PARTNER_UNBEKANNT: 'Der gewählte Partner ist nicht mehr bekannt. Bitte einen anderen Partner wählen.',
+      PARTNER_UNBEKANNT:
+        'Der gewählte Partner ist nicht mehr bekannt. Bitte einen anderen Partner wählen.',
       ANFRAGE_UNGUELTIG: 'Eine Angabe ist ungültig. Bitte die Angaben prüfen.',
       NICHT_ERLAUBT: 'Für diese Aktion fehlt Ihnen das Recht.',
     } as Record<string, string>,
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerAllgemein: 'Die Aktion ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
   },
@@ -278,14 +296,19 @@ export const TEXTE = {
     belegnummer: 'Belegnummer',
     belegnummerHinweis: 'Exakt, z. B. 2026-003.',
     sortierung: 'Sortierung',
-    sortierungen: { RELEVANZ: 'Relevanz', DATUM: 'Belegdatum, neueste zuerst' } as Record<string, string>,
+    sortierungen: { RELEVANZ: 'Relevanz', DATUM: 'Belegdatum, neueste zuerst' } as Record<
+      string,
+      string
+    >,
     treffer: 'Treffer',
     volltext: 'Volltext',
-    volltextHinweis: 'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',
+    volltextHinweis:
+      'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',
     besteTreffer: 'Die besten Treffer',
     nurVolltext: 'Nur im Volltext gesucht: Die semantische Suche ist gerade nicht verfügbar.',
     alleImVolltext: 'Alle Treffer im Volltext zeigen',
-    anzahl: (gesamt: number) => (gesamt === 1 ? '1 Treffer' : `${gesamt.toLocaleString('de-CH')} Treffer`),
+    anzahl: (gesamt: number) =>
+      gesamt === 1 ? '1 Treffer' : `${gesamt.toLocaleString('de-CH')} Treffer`,
     keineTreffer: 'Keine Dokumente gefunden. Bitte Suchbegriff oder Filter anpassen.',
     laeuft: 'Suche läuft …',
     ohneTitel: 'Ohne Titel',
@@ -302,7 +325,8 @@ export const TEXTE = {
       belegnummer: 'Die Belegnummer darf höchstens 50 Zeichen lang sein.',
     } as Record<string, string>,
     fehlerAnfrage: 'Die Suche enthält ungültige Angaben. Bitte Suchbegriff und Filter prüfen.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
     fehlerAllgemein: 'Die Suche ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
   },
   dokument: {
@@ -317,7 +341,10 @@ export const TEXTE = {
     quelle: 'Quelle',
     status: 'Status',
     vertraulichkeit: 'Vertraulichkeit',
-    vertraulichkeiten: { NORMAL: 'Normal', INTERN: 'Intern', PERSONAL: 'Personal' } as Record<string, string>,
+    vertraulichkeiten: { NORMAL: 'Normal', INTERN: 'Intern', PERSONAL: 'Personal' } as Record<
+      string,
+      string
+    >,
     bestaetigt: 'Bestätigt',
     nichtBestaetigt: 'noch nicht bestätigt',
     geschaeftsjahr: 'Geschäftsjahr',
@@ -338,10 +365,13 @@ export const TEXTE = {
     originalHerunterladen: 'Original herunterladen',
     oeffnenHinweis: 'Öffnet sich keine neue Seite, etwa wegen eines Popup-Blockers?',
     jetztOeffnen: 'Datei jetzt öffnen',
-    downloadHinweis: 'Der Download-Link gilt höchstens 5 Minuten und wird bei Bedarf neu angefordert.',
-    fehlerDatei: 'Die Datei ist nicht verfügbar. Bitte laden Sie die Seite neu oder versuchen Sie es später erneut.',
+    downloadHinweis:
+      'Der Download-Link gilt höchstens 5 Minuten und wird bei Bedarf neu angefordert.',
+    fehlerDatei:
+      'Die Datei ist nicht verfügbar. Bitte laden Sie die Seite neu oder versuchen Sie es später erneut.',
     nichtGefunden: 'Dieses Dokument gibt es nicht oder Sie dürfen es nicht sehen.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und laden Sie die Seite neu.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und laden Sie die Seite neu.',
     fehlerAllgemein: 'Das Dokument konnte nicht geladen werden. Bitte versuchen Sie es erneut.',
     partner: 'Partner',
     projekt: 'Projekt',
@@ -353,8 +383,10 @@ export const TEXTE = {
     gueltigBis: 'Gültig bis',
     bild: (titel: string) => `Vorschau der ersten Seite von «${titel}»`,
     versionen: 'Versionen',
-    versionenLeer: 'Keine früheren Fassungen. Fassungen entstehen, wenn ein archiviertes Dokument geändert wird.',
-    versionenHinweis: 'Gesichert ist jeweils die Fassung vor der Änderung, mit Zeit, Benutzer und Grund.',
+    versionenLeer:
+      'Keine früheren Fassungen. Fassungen entstehen, wenn ein archiviertes Dokument geändert wird.',
+    versionenHinweis:
+      'Gesichert ist jeweils die Fassung vor der Änderung, mit Zeit, Benutzer und Grund.',
     version: (nr: number) => `Fassung ${nr}`,
     geaendertVon: 'geändert von',
     sie: 'Ihnen',
@@ -392,14 +424,17 @@ export const TEXTE = {
         partnerId: 'Partner',
       } as Record<string, string>,
       fehlercode: {
-        STATUS_KONFLIKT: 'Das Dokument lässt sich in seinem jetzigen Zustand nicht ändern. Die Ansicht wurde neu geladen.',
+        STATUS_KONFLIKT:
+          'Das Dokument lässt sich in seinem jetzigen Zustand nicht ändern. Die Ansicht wurde neu geladen.',
         VERSION_KONFLIKT:
           'Das Dokument wurde inzwischen von jemand anderem geändert. Die Ansicht wurde neu geladen; bitte Ihre Änderung erneut eingeben.',
-        VERSION_FEHLT: 'Die Version des Dokuments fehlt. Bitte laden Sie die Seite neu und versuchen Sie es erneut.',
+        VERSION_FEHLT:
+          'Die Version des Dokuments fehlt. Bitte laden Sie die Seite neu und versuchen Sie es erneut.',
         NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr oder Sie dürfen es nicht mehr sehen.',
         BELEGNUMMER_VERGEBEN:
           'Diese Belegnummer ist für diese Art schon vergeben. Bitte die Belegnummer prüfen und korrigieren.',
-        PARTNER_UNBEKANNT: 'Der gewählte Partner ist nicht mehr bekannt. Bitte einen anderen Partner wählen.',
+        PARTNER_UNBEKANNT:
+          'Der gewählte Partner ist nicht mehr bekannt. Bitte einen anderen Partner wählen.',
         ZUSATZ_UNGUELTIG: 'Ein Zusatzfeld passt nicht zur Art. Bitte die Zusatzfelder prüfen.',
         ANFRAGE_UNGUELTIG: 'Eine Angabe ist ungültig. Bitte die Angaben prüfen.',
         NICHT_ERLAUBT: 'Für diese Änderung fehlt Ihnen das Recht.',
@@ -431,7 +466,8 @@ export const TEXTE = {
     laeufe: 'Bisherige Importe',
     keineLaeufe: 'Noch keine Importe.',
     ohneDateiname: 'ohne Dateiname',
-    laufZeile: (zeilen: string, erstellt: string) => `${zeilen} Datenzeilen · hochgeladen ${erstellt}`,
+    laufZeile: (zeilen: string, erstellt: string) =>
+      `${zeilen} Datenzeilen · hochgeladen ${erstellt}`,
     status: {
       VORSCHAU_AUSSTEHEND: 'Vorschau wird berechnet',
       ZUORDNUNG_NOETIG: 'Zuordnung nötig',
@@ -450,18 +486,25 @@ export const TEXTE = {
       'Die Kopfzeile ist neu oder weicht von der gespeicherten Zuordnung ab. Ordnen Sie jeder Spalte ein Feld zu ' +
       '(jedes Feld höchstens einmal). Die Zuordnung gilt danach für weitere Dateien dieser Importart.',
     profil: 'Profil «21.CRM» verwenden',
-    profilHinweis: 'Das Profil ordnet die Spalten des 21.CRM-Exports zu. Entfernen Sie ein Feld, gilt das Profil nicht mehr.',
+    profilHinweis:
+      'Das Profil ordnet die Spalten des 21.CRM-Exports zu. Entfernen Sie ein Feld, gilt das Profil nicht mehr.',
     spalte: (nr: number, name: string) => `Spalte ${nr}: «${name}»`,
     beispiel: (wert: string) => `Beispiel: ${wert}`,
     nichtZuordnen: '– nicht zuordnen –',
     pflichtKontakt: 'Ordnen Sie «Name» oder «Organisation» einer Spalte zu.',
     pflichtVerkaufschance: 'Ordnen Sie «Titel» einer Spalte zu.',
-    zugeordnet: (anzahl: number) => (anzahl === 1 ? '1 Feld zugeordnet' : `${anzahl} Felder zugeordnet`),
+    zugeordnet: (anzahl: number) =>
+      anzahl === 1 ? '1 Feld zugeordnet' : `${anzahl} Felder zugeordnet`,
     zuordnungBestaetigen: 'Zuordnung bestätigen',
     // Vorschau (Req 13.3, 13.5)
     ausstehend: 'Das Archiv gleicht die Zeilen ab. Die Vorschau erscheint hier automatisch.',
     // Ansage am Ende von Vorschau und Übernahme (WCAG 4.1.3)
-    vorschauBereit: (z: Record<'zeilen' | 'neu' | 'geaendert' | 'unveraendert' | 'dubletten' | 'fehler' | 'uebersprungen', string>) =>
+    vorschauBereit: (
+      z: Record<
+        'zeilen' | 'neu' | 'geaendert' | 'unveraendert' | 'dubletten' | 'fehler' | 'uebersprungen',
+        string
+      >,
+    ) =>
       `Vorschau bereit: ${z.zeilen} Zeilen – ${z.neu} neu, ${z.geaendert} geändert, ${z.unveraendert} unverändert, ` +
       `${z.dubletten} mögliche Dubletten, ${z.fehler} fehlerhaft, ${z.uebersprungen} übersprungen.`,
     uebernommenAnsage: (bilanz: string) => `Übernommen: ${bilanz}.`,
@@ -474,9 +517,11 @@ export const TEXTE = {
       'Die Übernahme dauert ungewöhnlich lange, vermutlich ist sie gescheitert. Solange der Status nicht «Übernommen» ' +
       'zeigt, ist nichts übernommen. Prüfen Sie den Stand erneut oder lösen Sie die Übernahme noch einmal aus.',
     erneutPruefen: 'Stand erneut prüfen',
-    abfrageGestoert: 'Die Verbindung zum Archiv ist unterbrochen. Die Seite fragt den Stand weiter ab.',
+    abfrageGestoert:
+      'Die Verbindung zum Archiv ist unterbrochen. Die Seite fragt den Stand weiter ab.',
     vorschauTitel: 'Vorschau',
-    vorschauEinleitung: 'Noch ist nichts übernommen. Prüfen Sie die Zeilen und übernehmen Sie danach den Import.',
+    vorschauEinleitung:
+      'Noch ist nichts übernommen. Prüfen Sie die Zeilen und übernehmen Sie danach den Import.',
     zaehler: {
       alle: 'Alle',
       NEU: 'neu',
@@ -534,7 +579,8 @@ export const TEXTE = {
     dublettenHinweis:
       'Mögliche Dubletten übernimmt das Archiv nur nach Ihrem Entscheid. Ohne Entscheid wird die Zeile ausgelassen.',
     dublettenVerkaufschance: 'Doppelte Verkaufschancen in der Datei werden ausgelassen.',
-    entschieden: (entschieden: string, gesamt: string) => `${entschieden} von ${gesamt} möglichen Dubletten entschieden`,
+    entschieden: (entschieden: string, gesamt: string) =>
+      `${entschieden} von ${gesamt} möglichen Dubletten entschieden`,
     // Übernahme (Req 13.6, 13.7)
     uebernehmen: 'Übernehmen …',
     erneutUebernehmen: 'Erneut übernehmen …',
@@ -566,12 +612,14 @@ export const TEXTE = {
     fehlercode: {
       DATEI_ZU_GROSS: 'Die Datei ist grösser als 5 MiB. Bitte in 21.CRM kleiner exportieren.',
       CSV_LEER: 'Die Datei enthält keine Datenzeilen. Bitte exportieren Sie sie erneut aus 21.CRM.',
-      STATUS_KONFLIKT: 'Der Import hat sich inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand.',
+      STATUS_KONFLIKT:
+        'Der Import hat sich inzwischen geändert. Die Seite zeigt jetzt den aktuellen Stand.',
       NICHT_GEFUNDEN: 'Diesen Import gibt es nicht. Bitte wählen Sie ihn in der Liste der Importe.',
       NICHT_ERLAUBT: 'Für Importe fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
     } as Record<string, string>,
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
   // Kontakte ansehen und pflegen (Aufgabe 4.12; Req 17; Rechte A6 ansehen, A12 ändern)
@@ -582,7 +630,8 @@ export const TEXTE = {
       'gelöscht wird nie.',
     suchen: 'Suche',
     suchHinweis: 'Name, Vorname, Ort, E-Mail, PLZ oder Kontakt-ID aus 21.CRM',
-    suchUngueltig: 'Der Suchbegriff ist ungültig (1 bis 200 Zeichen, keine Steuerzeichen). Die Liste zeigt alle Kontakte.',
+    suchUngueltig:
+      'Der Suchbegriff ist ungültig (1 bis 200 Zeichen, keine Steuerzeichen). Die Liste zeigt alle Kontakte.',
     filter: 'Filter',
     filterAnzahl: (anzahl: number) => (anzahl === 0 ? 'Filter' : `Filter (${anzahl})`),
     status: 'Status',
@@ -617,7 +666,8 @@ export const TEXTE = {
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerVerboten: 'Für die Kontakte fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
     fehlerAnfrage: 'Das Archiv hat die Anfrage nicht angenommen. Bitte prüfen Sie die Eingaben.',
-    fehlerAllgemein: 'Das Archiv antwortet nicht wie erwartet. Bitte versuchen Sie es später erneut.',
+    fehlerAllgemein:
+      'Das Archiv antwortet nicht wie erwartet. Bitte versuchen Sie es später erneut.',
     nichtGefunden: 'Dieser Kontakt existiert nicht (mehr) in diesem Archiv.',
     erneutVersuchen: 'Erneut versuchen',
     // Detail
@@ -647,8 +697,10 @@ export const TEXTE = {
     zusammengefuehrtIn: 'zusammengeführt in',
     zusammengefuehrtAus: 'zusammengeführt aus',
     leer: '–',
-    inaktivHinweis: 'Dieser Kontakt ist inaktiv. Er erscheint nicht in der Partnerauswahl und lässt sich nicht bearbeiten.',
-    veraltet: 'Der Kontakt wurde inzwischen geändert. Die Seite zeigt den neuen Stand; bitte prüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
+    inaktivHinweis:
+      'Dieser Kontakt ist inaktiv. Er erscheint nicht in der Partnerauswahl und lässt sich nicht bearbeiten.',
+    veraltet:
+      'Der Kontakt wurde inzwischen geändert. Die Seite zeigt den neuen Stand; bitte prüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
     // Dokumente des Kontakts
     dokumente: 'Dokumente',
     dokumenteBeschreibung: 'Sichtbare Dokumente dieses Kontakts, neueste zuerst',
@@ -683,14 +735,17 @@ export const TEXTE = {
     },
     // Rückmeldungen der Aktionen
     konflikt: {
-      aendern: 'Der Kontakt ist inaktiv oder wurde zusammengeführt und lässt sich nicht bearbeiten.',
-      zusammenfuehren: 'Zusammenführen ist nicht möglich: Ein Kontakt ist inzwischen inaktiv oder schon zusammengeführt.',
+      aendern:
+        'Der Kontakt ist inaktiv oder wurde zusammengeführt und lässt sich nicht bearbeiten.',
+      zusammenfuehren:
+        'Zusammenführen ist nicht möglich: Ein Kontakt ist inzwischen inaktiv oder schon zusammengeführt.',
       inaktiv: 'Der Kontakt ist schon inaktiv.',
       aktiv: 'Der Kontakt lässt sich nicht wieder aktivieren (nicht inaktiv oder zusammengeführt).',
     },
     anfrage: {
       aendern: 'Das Archiv hat die Angaben nicht angenommen. Bitte prüfen Sie die Felder.',
-      zusammenfuehren: 'Das Archiv hat die Angaben nicht angenommen: Das Ziel ist ungültig, inaktiv oder dieser Kontakt selbst.',
+      zusammenfuehren:
+        'Das Archiv hat die Angaben nicht angenommen: Das Ziel ist ungültig, inaktiv oder dieser Kontakt selbst.',
       inaktiv: 'Das Archiv hat den Grund nicht angenommen.',
       aktiv: 'Das Archiv hat die Anfrage nicht angenommen.',
     },
@@ -771,8 +826,38 @@ export const TEXTE = {
       NICHT_GEFUNDEN: 'Diesen Export gibt es nicht mehr. Bitte laden Sie die Seite neu.',
     } as Record<string, string>,
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+  },
+  apiTokens: {
+    titel: 'API-Tokens',
+    einleitung:
+      'API-Tokens dieses Mandanten und ihre letzte Nutzung. Ein Token-Geheimnis wird hier nie angezeigt.',
+    laden: 'API-Tokens werden geladen …',
+    keine: 'Es gibt keine API-Tokens.',
+    name: 'Name',
+    scope: 'Scope',
+    erstellt: 'Erstellt',
+    zuletzt: 'Zuletzt genutzt',
+    nieGenutzt: 'Nie genutzt',
+    status: 'Status',
+    aktiv: 'Aktiv',
+    widerrufenStatus: 'Widerrufen',
+    widerrufen: 'Token widerrufen',
+    widerrufFrage:
+      'Möchten Sie dieses API-Token widerrufen? Es kann danach nicht mehr verwendet werden.',
+    widerrufBestaetigen: 'Widerruf bestätigen',
+    abbrechen: 'Abbrechen',
+    widerrufErfolgreich: 'Das API-Token wurde widerrufen.',
+    nichtMehrVorhanden: 'Das API-Token ist nicht mehr vorhanden. Die Liste wurde neu geladen.',
+    fehlerRecht: 'Für diese Aktion fehlt Ihnen das Recht.',
+    fehlerLaden:
+      'Die API-Tokens konnten nicht geladen werden. Bitte prüfen Sie die Verbindung und laden Sie neu.',
+    fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerAllgemein: 'Der Widerruf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
   },
   protokoll: {
     titel: 'Zugriffsprotokoll',
@@ -790,7 +875,8 @@ export const TEXTE = {
     anzeigen: 'Anzeigen',
     zuruecksetzen: 'Filter zurücksetzen',
     vonNachBis: '«Von» liegt nach «Bis». Bitte wählen Sie einen gültigen Zeitraum.',
-    dokumentUngueltig: 'Die Dokument-ID ist ungültig. Kopieren Sie sie aus der Adresse der Dokumentansicht.',
+    dokumentUngueltig:
+      'Die Dokument-ID ist ungültig. Kopieren Sie sie aus der Adresse der Dokumentansicht.',
     eintraege: 'Einträge',
     keineEintraege: 'Keine Einträge für diese Filter.',
     laden: 'Wird geladen …',
@@ -837,7 +923,8 @@ export const TEXTE = {
       'Ordnet jede Kennung des Protokolls einer Person oder einem API-Token zu, auch wenn Keycloak neu aufgebaut wird. ' +
       'Das Verzeichnis wird nur ergänzt: Eine Änderung oder ein Austritt ist eine neue Zeile.',
     keinVerzeichnis: 'Noch keine Einträge im Benutzerverzeichnis.',
-    gueltig: (von: string, bis: string | null) => (bis ? `gültig ${von} bis ${bis}` : `gültig ab ${von}`),
+    gueltig: (von: string, bis: string | null) =>
+      bis ? `gültig ${von} bis ${bis}` : `gültig ab ${von}`,
     anlaesse: {
       AKTION: 'Aktion',
       AUSTRITT: 'Austritt',
@@ -852,12 +939,15 @@ export const TEXTE = {
     austrittErfasst: (name: string) => `Austritt von «${name}» erfasst.`,
     fehlercode: {
       ANFRAGE_UNGUELTIG: 'Die Filter sind ungültig. Bitte prüfen Sie Zeitraum und Dokument-ID.',
-      NICHT_ERLAUBT: 'Für das Zugriffsprotokoll fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
-      NICHT_GEFUNDEN: 'Diese Kennung steht nicht im Benutzerverzeichnis. Bitte laden Sie die Seite neu.',
+      NICHT_ERLAUBT:
+        'Für das Zugriffsprotokoll fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
+      NICHT_GEFUNDEN:
+        'Diese Kennung steht nicht im Benutzerverzeichnis. Bitte laden Sie die Seite neu.',
       STATUS_KONFLIKT: 'Der Austritt ist schon erfasst. Die Seite zeigt jetzt den aktuellen Stand.',
     } as Record<string, string>,
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
-    fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerVerbindung:
+      'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
 } as const;

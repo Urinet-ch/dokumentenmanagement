@@ -11,7 +11,7 @@ Funktionalität: Navigation der PWA nach Rolle
 
     Beispiele:
       | rolle            | menü                                                                       |
-      | inhaber          | Erfassen, Eingangskorb, Suche, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, Jahresexport |
+      | inhaber          | Erfassen, Eingangskorb, Suche, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, API-Tokens, Jahresexport |
       | mitarbeiter      | Erfassen, Eingangskorb, Suche                                              |
       | treuhaender      | Suche, Jahresexport                                                                      |
       | geschaeftsstelle | Erfassen, Eingangskorb, Suche, Kontakte                                    |
