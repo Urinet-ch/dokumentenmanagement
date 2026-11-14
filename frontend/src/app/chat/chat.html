@@ -1,0 +1,151 @@
+<h1>{{ texte.titel }}</h1>
+<p class="einleitung">{{ texte.einleitung }}</p>
+
+<div class="layout" [class.mobil]="mobil()">
+  <aside class="gespraeche" aria-labelledby="gespraeche-titel">
+    <div class="kopf">
+      <h2 id="gespraeche-titel">{{ texte.gespraeche }}</h2>
+      @if (mobil()) {
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="listeUmschalten()"
+          [attr.aria-expanded]="listeOffen()"
+          aria-controls="gespraech-liste"
+        >
+          {{ listeOffen() ? texte.gespraecheVerbergen : texte.gespraecheZeigen }}
+        </button>
+      }
+    </div>
+    <button
+      mat-flat-button
+      type="button"
+      class="neu"
+      (click)="neuesGespraech()"
+      [disabled]="laeuft()"
+    >
+      {{ texte.neuesGespraech }}
+    </button>
+    <div id="gespraech-liste" [hidden]="!listeOffen()">
+      @if (listeFehler()) {
+        <p class="fehler" role="alert">{{ texte.fehlerListe }}</p>
+      }
+      @if (gespraeche() === null) {
+        <p class="gedaempft">{{ texte.gespraecheLaden }}</p>
+      } @else if (gespraeche()!.length === 0) {
+        @if (!listeFehler()) {
+          <p class="gedaempft">{{ texte.keineGespraeche }}</p>
+        }
+      } @else {
+        <ul class="liste">
+          @for (kopf of gespraeche(); track kopf.id) {
+            <li>
+              <button
+                type="button"
+                class="eintrag"
+                data-test="gespraech"
+                (click)="oeffnen(kopf)"
+                [disabled]="laeuft()"
+                [attr.aria-current]="kopf.id === gespraechId() ? 'true' : null"
+              >
+                <span class="titel">{{ kopf.titel }}</span>
+                <span class="datum">{{ tag(kopf.geaendert) }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </aside>
+
+  <section class="gespraech" aria-labelledby="verlauf-titel">
+    <h2 id="verlauf-titel" class="nur-screenreader">{{ texte.verlauf }}</h2>
+    @if (laedt()) {
+      <p class="gedaempft" role="status">{{ texte.gespraechLaden }}</p>
+    } @else if (nachrichten().length === 0) {
+      <p class="gedaempft">{{ texte.leer }}</p>
+    }
+    <ol class="verlauf">
+      @for (n of nachrichten(); track $index) {
+        <li
+          class="nachricht karte"
+          [class.frage]="n.rolle === 'BENUTZER'"
+          [attr.data-test]="n.rolle === 'BENUTZER' ? 'frage' : 'antwort'"
+        >
+          <span class="nur-screenreader"
+            >{{ n.rolle === 'BENUTZER' ? texte.frage : texte.antwort }}:</span
+          >
+          <!-- reiner Text: Interpolation, nie innerHTML; Zeilenumbrüche über white-space -->
+          <p class="inhalt">{{ n.inhalt }}</p>
+          @if (n.quellen.length > 0) {
+            <div class="quellen" data-test="quellen">
+              <span class="nur-screenreader">{{ texte.quellen }}:</span>
+              <ul>
+                @for (chip of chips(n.quellen); track $index) {
+                  <li>
+                    @if (chip.link) {
+                      <a class="chip link" [routerLink]="chip.link" data-test="quelle">{{
+                        chip.text
+                      }}</a>
+                    } @else {
+                      <span class="chip" data-test="quelle">{{ chip.text }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          @if (n.status === 'ABGEBROCHEN') {
+            <p class="gedaempft">{{ texte.abgebrochen }}</p>
+          } @else if (n.fehler) {
+            <p class="fehler" role="alert">{{ n.fehler }}</p>
+          } @else if (n.status === 'FEHLER') {
+            <p class="gedaempft">{{ texte.unvollstaendig }}</p>
+          }
+        </li>
+      }
+    </ol>
+
+    <p class="hinweis" role="status" aria-live="polite" data-test="hinweis">
+      @if (hinweis()) {
+        {{ hinweis() }}
+      } @else if (wartet()) {
+        {{ texte.wartet }}
+      }
+    </p>
+
+    @if (fehler()) {
+      <p class="fehler" role="alert">{{ fehler() }}</p>
+    }
+    @if (neuBeginnen()) {
+      <p class="gedaempft" data-test="neu-beginnen">{{ texte.neuBeginnen }}</p>
+    }
+
+    <form class="eingabe" (submit)="$event.preventDefault(); senden()">
+      <label class="feld">
+        <span>{{ texte.frage }}</span>
+        <textarea
+          #feld
+          name="frage"
+          rows="3"
+          [maxLength]="frageMax"
+          [value]="eingabe()"
+          (input)="eingeben($any($event.target).value)"
+          (keydown)="taste($event)"
+          aria-describedby="frage-hinweis"
+        ></textarea>
+      </label>
+      <p id="frage-hinweis" class="gedaempft">{{ texte.frageHinweis }}</p>
+      <div class="knoepfe">
+        <button mat-flat-button type="submit" [disabled]="!sendenMoeglich()">
+          {{ texte.senden }}
+        </button>
+        @if (laeuft()) {
+          <button mat-stroked-button type="button" (click)="abbrechen()">
+            {{ texte.abbrechen }}
+          </button>
+        }
+      </div>
+    </form>
+  </section>
+</div>

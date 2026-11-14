@@ -149,6 +149,46 @@ flowchart LR
   - Verlauf (7.3, 7.4): `GET /api/v1/chat/gespraeche` liefert höchstens 20 eigene Gespräche, neueste `geaendert` zuerst, als `{id, titel, geaendert}`; `GET /api/v1/chat/gespraeche/{id}` die Nachrichten mit Rolle, Inhalt, Quellen und Zeit, ein fremdes Gespräch 404 `NICHT_GEFUNDEN`. Titel = die erste Frage, auf 80 Zeichen gekürzt, ohne KI-Aufruf.
   - Speicherung (7.3): `chat_nachricht.werkzeuge` enthält je Aufruf `{name, parameter, dokumentIds, datenstand?}`, ohne Dokumentinhalte; zusätzlich Spalte `status` (`OK`, `FEHLER`, `ABGEBROCHEN`) für Antworten.
   - Löschung (7.3, Requirement 5.4): je Nachricht 12 Monate nach `zeit`, danach Gespräche ohne Nachrichten; ein täglicher Lauf je Mandant. Vermerk: In den Datenbank-Sicherungen (Spec 01, Req 16.2) bleiben gelöschte Gespräche bis zum Ablauf der jeweiligen Sicherung erhalten; das gehört in die Verfahrensbeschreibung und den Datenschutzhinweis.
+- Umsetzung (Aufgabe 7.4, 14.11.2026; Seite gegen eine Attrappe, das Backend 7.2 und 7.3 entsteht parallel):
+  - Route `/chat` (lazy, `rechtGuard('A2')`, alle vier Rollen nach E3), ohne Eintrag in `MENUE`: Den Menüpunkt und den
+    Nachweis von Requirement 4.3 (Protokoll beim Öffnen einer Quelle) bringt Aufgabe 7.4b, sobald 7.2 und 7.3 gemergt
+    sind, damit ein Deploy keine tote Seite zeigt. Eine eigene Aktion in `rechte.ts` braucht es nicht.
+  - Client ohne `EventSource` (kann keinen Header senden, das Token liegt nur im Arbeitsspeicher): `ChatPort` mit
+    `HttpChatService`, POST über `HttpClient` mit `observe: 'events'`, `reportProgress: true`, `responseType: 'text'`,
+    damit der Interceptor das Token anhängt und 401 die Sitzung beendet («Sitzung abgelaufen»). Angular 22 nutzt ohne
+    `withXhr()` den `FetchBackend`; er liest den Body stückweise und meldet je Stück `partialText` (geprüft im Quelltext
+    von `@angular/common` 22.2.5 und im Browser-Szenario mit zerteilten Stücken und Haltepunkten). Abbruch über das Ende
+    des Abos (Taste «Abbrechen», Seite verlassen), das die Anfrage beendet. Die GETs sind von Hand geschrieben, bis 7.3
+    den generierten Client bringt.
+  - Leser `sse-leser.ts` als reine Funktion: Zeilen `event:`/`data:` nach WHATWG, Ereignisse über Stückgrenzen, mehrere
+    Ereignisse je Stück, `\n`, `\r\n` und `\r` (ein `\r` am Stückende wartet auf das nächste Stück), Kommentarzeilen und
+    andere Felder fallen weg, unbekannte Ereignisse werden übergangen, ungültiges JSON oder fehlende Felder sind ein
+    Fehler der Antwort. Eine Antwort ohne `fertig` oder `fehler` gilt als unvollständig.
+  - Quellen in der Form von 7.3 (`ChatJson`, Strom und Verlauf): Dokument `{id, titel, link}` und Datenstand
+    `{werkzeug, datenstand: <ISO-Zeitpunkt>, belege}` (Folge Review #147); andere Formen (z. B. Wissensseiten aus
+    Spec 04) zeigt die Seite noch nicht. Linkregel: Nur `link` der Form `/dokument/<id>` (ID aus Buchstaben, Ziffern,
+    `-`) wird zum `routerLink`, alles andere und der Datenstand bleiben Chips ohne Link.
+  - Antwort als reiner Text (Interpolation, `white-space: pre-wrap`, nie `innerHTML`, kein Markdown); lange Wörter, Beträge
+    und Chips brechen um (Requirement 6.3). Werkzeug-Hinweise mit festen Texten je Werkzeugname in `texte.de-CH.ts`
+    (unbekannt «arbeite …»); der Hinweis verschwindet mit dem ersten Text danach.
+  - 429 (Folge Review #147): Beide Fälle kommen als `ZU_VIELE_ANFRAGEN`. Schickt das Backend in den Problem Details ein
+    Feld `grund` (`STUNDENLIMIT` oder `LAEUFT`), entscheidet es; sonst gilt ein `Retry-After` bis 5 Sekunden als «schon
+    eine Frage in Arbeit» (eigener Text), weil 7.3 dafür fest 5 Sekunden sendet, längere als Stundenlimit («Ab <Uhrzeit>
+    geht es weiter.», Uhrzeit auf die volle Minute aufgerundet, ohne lesbaren Wert eine Stunde). Ohne `grund` zeigt die
+    Seite in den letzten 5 Sekunden des rollenden Stundenlimits den Text der laufenden Frage. `Retry-After` wird auf
+    0–3'600 Sekunden begrenzt.
+  - Bei Fehlern vor dem Strom kommt die Frage zurück ins Eingabefeld; bricht ein Strom mit Text ab, bleibt der Teil mit
+    der Meldung stehen. `fertig` und `fehler` übernehmen die `gespraechId`. Endet eine Frage ohne bekannte `gespraechId`
+    (erste Frage abgebrochen oder abgerissen, 404 zu einem Gespräch), zeigt die Seite «Die nächste Frage beginnt ein neues
+    Gespräch ohne den Verlauf oben.» und leert die Ansicht mit der nächsten Frage, weil das Archiv dann ein neues
+    Gespräch ohne den bisherigen Verlauf beginnt (Folge Review #147).
+  - Gesprächsliste: die letzten 20 eigenen Gespräche (Titel, Datum `TT.MM.JJJJ` in Europe/Zurich), öffnen und
+    fortsetzen, «Neues Gespräch»; unter 960 px über dem Gespräch und einklappbar, sonst links daneben. Nach jeder
+    beendeten Frage lädt die Seite die Liste neu. Während einer Antwort sind Liste und «Neues Gespräch» gesperrt.
+  - Tests: Vitest `sse-leser.spec.ts`, `http-chat.service.spec.ts`, `chat.spec.ts`; Browser-Szenarien
+    `features/chat/chat-pwa.feature` (`@spec-02 @browser @attrappe`, 375 und 1280 px) gegen
+    `frontend/e2e/hilfen/chat-attrappe.mjs`: ein kleiner HTTP-Server liefert den Strom Stück für Stück, Playwright leitet
+    `POST /api/v1/chat` dorthin um (`route.fulfill` kann nicht streamen). Sie belegen nur die Oberfläche.
 
 ### Jahresexport (`export`)
 - `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).

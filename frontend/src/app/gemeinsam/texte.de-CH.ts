@@ -606,6 +606,58 @@ export const TEXTE = {
     fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
+  /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); den Menüpunkt schaltet Aufgabe 7.4b ein. */
+  chat: {
+    titel: 'Chat',
+    einleitung:
+      'Fragen zu den Belegen im Archiv. Jede Antwort nennt ihre Quellen; sichtbar ist nur, was Sie auch in der ' +
+      'Suche sehen.',
+    gespraeche: 'Letzte Gespräche',
+    gespraecheZeigen: 'Letzte Gespräche zeigen',
+    gespraecheVerbergen: 'Letzte Gespräche verbergen',
+    neuesGespraech: 'Neues Gespräch',
+    keineGespraeche: 'Noch keine Gespräche.',
+    gespraecheLaden: 'Gespräche werden geladen …',
+    gespraechLaden: 'Gespräch wird geladen …',
+    verlauf: 'Gesprächsverlauf',
+    leer: 'Stellen Sie eine Frage, zum Beispiel: «Welche Rechnungen sind noch offen?»',
+    frage: 'Frage',
+    antwort: 'Antwort',
+    frageHinweis: 'Enter sendet, Umschalt+Enter beginnt eine neue Zeile.',
+    senden: 'Senden',
+    abbrechen: 'Abbrechen',
+    wartet: 'Antwort wird vorbereitet …',
+    quellen: 'Quellen',
+    datenstand: (zeitpunkt: string, anzahl: string) =>
+      `Datenstand: ${zeitpunkt}, ${anzahl} ${anzahl === '1' ? 'Beleg' : 'Belege'}`,
+    /** Hinweis während eines Werkzeugaufrufs (Req 6.2), fest je Werkzeug. */
+    werkzeuge: {
+      dokumente_suchen: 'suche Dokumente …',
+      dokument_zeigen: 'lese Dokument …',
+      kennzahl: 'zähle Belege …',
+      offene_posten: 'prüfe offene Rechnungen …',
+      fristen: 'suche Fristen …',
+      vollstaendigkeit: 'prüfe Vollständigkeit …',
+    } as Record<string, string>,
+    werkzeugUnbekannt: 'arbeite …',
+    abgebrochen: 'Abgebrochen.',
+    unvollstaendig: 'Diese Antwort wurde nicht fertig.',
+    neuBeginnen: 'Die nächste Frage beginnt ein neues Gespräch ohne den Verlauf oben.',
+    zuViele: (uhrzeit: string) =>
+      `Du hast in dieser Stunde 100 Fragen gestellt. Ab ${uhrzeit} geht es weiter.`,
+    laufend:
+      'Es läuft noch eine andere Frage. Bitte warten Sie, bis sie beantwortet ist, und senden Sie dann erneut.',
+    fehler: {
+      UNGUELTIG: "Die Frage muss 1 bis 2'000 Zeichen lang sein.",
+      NICHT_GEFUNDEN: 'Dieses Gespräch gibt es nicht mehr. Bitte beginnen Sie ein neues Gespräch.',
+      SITZUNG: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+      VERBINDUNG:
+        'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+      ANTWORT: 'Die Antwort ist unvollständig angekommen. Bitte stellen Sie die Frage erneut.',
+      ALLGEMEIN: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
+    } as Record<string, string>,
+    fehlerListe: 'Die letzten Gespräche konnten nicht geladen werden.',
+  },
   protokoll: {
     titel: 'Zugriffsprotokoll',
     einleitung:
