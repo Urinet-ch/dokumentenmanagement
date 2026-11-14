@@ -45,6 +45,7 @@ Funktionalität: Vertrag der Webseiten-Schnittstelle unter /public/v1 (Vorstufe,
       | inhaber-urinet | GET     | /public/v1/probe/fehler/VERTRAULICH-4711 | 500    |
       | inhaber-urinet | GET     | /public/v9/probe                         | 404    |
       | inhaber-urinet | GET     | /public                                  | 404    |
+      | inhaber-urinet | GET     | /public/v1;x=1/probe                     | 404    |
 
   @req-15.4
   Szenario: Auch die Grenze der Anfrage vor der Resource antwortet mit Problem Details und no-store
@@ -65,13 +66,21 @@ Funktionalität: Vertrag der Webseiten-Schnittstelle unter /public/v1 (Vorstufe,
       | /public/v1/probe         | 200    |
       | /public/v1/gibt-es-nicht | 404    |
 
-  # Doppelte Schrägstriche und kodierte Zeichen im internen Pfad prüft WebseitenRouteTest mit rohen Pfaden.
+  # Doppelte Schrägstriche und kodierte Zeichen im internen Pfad prüft WebseitenRouteTest mit rohen Pfaden; Matrix-
+  # Parameter (;…) prüft dieses Szenario, weil nur die echte App sie vor der Zuordnung entfernt (Review PR #140).
   Szenariogrundriss: Der interne Pfad der Webseiten-Schnittstelle ist von aussen nicht erreichbar
     Wenn «<benutzer>» GET «<pfad>» aufruft
     Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
     Beispiele:
-      | benutzer       | pfad                       |
-      | inhaber-urinet | /api/v1/public/v1/probe    |
-      | niemand        | /api/v1/public/v1/probe    |
-      | inhaber-urinet | /api/v1/public             |
+      | benutzer       | pfad                          |
+      | inhaber-urinet | /api/v1/public/v1/probe       |
+      | niemand        | /api/v1/public/v1/probe       |
+      | inhaber-urinet | /api/v1/public                |
+      | inhaber-urinet | /api/v1/public;x=1/v1/probe   |
+      | niemand        | /api/v1/public;x=1/v1/probe   |
+      | inhaber-urinet | /api/v1/public/v1;x=1/probe   |
+      | inhaber-urinet | /api/v1/public%3Bx=1/v1/probe |
+      | inhaber-urinet | /api/v1/public%2Fv1/probe     |
+      | inhaber-urinet | /public/v1;x=1/probe          |
+      | niemand        | /public;x/v1/probe            |

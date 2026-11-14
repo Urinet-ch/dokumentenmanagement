@@ -82,7 +82,8 @@ class WebseitenRouteTest {
     void internerPfadIstVonAussenGesperrt() throws Exception {
         int port = starten(Map.of(1, V1));
         for (String pfad : List.of("/api/v1/public/v1/ok", "/api/v1//public/v1/ok", "/api/v1/public",
-                "/api/v1/%70ublic/v1/ok")) {
+                "/api/v1/%70ublic/v1/ok", "/api/v1/public;x=1/v1/ok", "/api/v1;x/public/v1/ok",
+                "/api/v1/public/v1;x=1/ok")) {
             HttpResponse<String> antwort = abrufen(port, pfad);
             assertThat(antwort.statusCode()).as(pfad).isEqualTo(404);
             assertThat(antwort.headers().firstValue("content-type")).as(pfad).contains("application/problem+json");
@@ -91,6 +92,31 @@ class WebseitenRouteTest {
         HttpResponse<String> andere = abrufen(port, "/api/v1/anderes");
         assertThat(andere.body()).isEqualTo("app");
         assertThat(andere.headers().map().keySet()).doesNotContain("cache-control", "deprecation");
+    }
+
+    /** Quarkus REST entfernt Matrix-Parameter vor der Zuordnung; unter /public/ weist die Route sie ab (Review PR #140). */
+    @Test
+    void matrixParameterUnterPublicErgeben404MitDenHeadern() throws Exception {
+        int port = starten(Map.of(1, V1));
+        for (String pfad : List.of("/public/v1;x=1/ok", "/public;x/v1/ok", "/public/v1/ok;x", "/public/v1/ok;")) {
+            HttpResponse<String> antwort = abrufen(port, pfad);
+            assertThat(antwort.statusCode()).as(pfad).isEqualTo(404);
+            assertThat(antwort.body()).as(pfad).contains("\"fehlercode\":\"NICHT_GEFUNDEN\"").doesNotContain("intern");
+            assertThat(antwort.headers().allValues("cache-control")).as(pfad).containsExactly("no-store");
+            assertThat(antwort.headers().allValues("deprecation")).as(pfad).containsExactly("@1798761600");
+            assertThat(antwort.headers().allValues("sunset")).as(pfad).containsExactly("Thu, 01 Jul 2027 00:00:00 GMT");
+            assertThat(antwort.headers().allValues("link")).as(pfad).hasSize(1);
+        }
+    }
+
+    @Test
+    void sperreNachDerZuordnungNurFuerPublicOhneReroute() {
+        assertThat(WebseitenSperre.gesperrt("/public/v1/probe", false)).isTrue();
+        assertThat(WebseitenSperre.gesperrt("public/v1/probe", false)).isTrue();
+        assertThat(WebseitenSperre.gesperrt("/public", false)).isTrue();
+        assertThat(WebseitenSperre.gesperrt("/public/v1/probe", true)).isFalse();
+        assertThat(WebseitenSperre.gesperrt("/publicx/v1", false)).isFalse();
+        assertThat(WebseitenSperre.gesperrt("/dokumente", false)).isFalse();
     }
 
     @Test
@@ -124,7 +150,7 @@ class WebseitenRouteTest {
         router.get("/api/v1/public/v2/ok").handler(k -> k.response().end("v2"));
         router.get("/api/v1/public/v1/fehler").handler(k -> k.fail(new IllegalStateException("Probe")));
         router.get("/api/v1/anderes").handler(k -> k.response().end("app"));
-        HttpServer server = vertx.createHttpServer().requestHandler(router).listen(0)
+        HttpServer server = vertx.createHttpServer().requestHandler(router).listen(0, "127.0.0.1")
                 .toCompletionStage().toCompletableFuture().get(10, TimeUnit.SECONDS);
         return server.actualPort();
     }

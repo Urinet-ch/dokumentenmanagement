@@ -31,7 +31,10 @@ import java.util.regex.Pattern;
  * internen Pfad {@code /api/v1/public/…} um; die Resources tragen {@code @Path("/public/v1/…")}. Nach dem Reroute
  * gelten dort Anmeldung, HTTP-Rechte ({@code /api/*}), {@code ProblemAnmeldung}, {@code ProblemFehlerRoute} und
  * {@code ProblemAbbildung} wie für die App. Der interne Pfad ist von aussen gesperrt: ohne vorherigen Reroute 404
- * {@code NICHT_GEFUNDEN}, vor der Anmeldung, damit er sich nicht durch 401 verrät.
+ * {@code NICHT_GEFUNDEN}, vor der Anmeldung, damit er sich nicht durch 401 verrät. Geprüft wird der Pfad ohne
+ * Matrix-Parameter ({@code ;…}), weil Quarkus REST sie vor der Zuordnung entfernt; unter {@code /public/} weist die
+ * Route Pfade mit Matrix-Parametern ebenfalls mit 404 ab (Review PR #140). Was trotzdem ohne Reroute eine Resource
+ * unter {@code /public/} erreicht, weist {@link WebseitenSperre} nach der Zuordnung ab.
  * <p>
  * Jede Antwort unter {@code /public/} trägt {@code Cache-Control: no-store} (Req 15.4), auch Fehler vor der Resource;
  * ist die Hauptversion abgekündigt ({@code archiv.webseite.v<n>.sunset}), zusätzlich {@code Deprecation}, {@code Sunset}
@@ -102,23 +105,33 @@ public class WebseitenRoute {
     }
 
     void behandeln(RoutingContext kontext) {
-        String pfad = ohneDoppelteSchraegstriche(kontext.normalizedPath());
+        String roh = kontext.normalizedPath();
+        // Quarkus REST entfernt Matrix-Parameter (;…) je Segment vor der Zuordnung; geprüft wird darum ohne sie
+        String pfad = ohneDoppelteSchraegstriche(ohneMatrixParameter(roh));
         String aeusserer = kontext.get(AEUSSERER_PFAD);
         if (aeusserer != null) {
             // zweiter Durchlauf nach dem Reroute: der Reroute verwirft Header und Handler des ersten
             kontext.addHeadersEndHandler(ende -> kopfzeilen(kontext.response(), aeusserer));
             kontext.next();
+        } else if (unter(pfad, intern + Hauptversion.PRAEFIX)) {
+            nichtGefunden(kontext);
+        } else if (unter(pfad, Hauptversion.PRAEFIX) && roh.indexOf(';') >= 0) {
+            // Matrix-Parameter gehören nicht zum Vertrag; abgewiesen statt umgeleitet, mit den Headern unter /public/
+            kopfzeilen(kontext.response(), pfad);
+            nichtGefunden(kontext);
         } else if (unter(pfad, Hauptversion.PRAEFIX)) {
             kontext.put(AEUSSERER_PFAD, pfad);
             String abfrage = kontext.request().query();
             kontext.reroute(intern + pfad + (abfrage == null ? "" : "?" + abfrage));
-        } else if (unter(pfad, intern + Hauptversion.PRAEFIX)) {
-            ProblemAntwort problem = ProblemAntwort.fuer(Fehlercode.NICHT_GEFUNDEN);
-            kontext.response().setStatusCode(problem.status())
-                    .putHeader(HttpHeaders.CONTENT_TYPE, ProblemAntwort.MEDIENTYP).end(problem.json());
         } else {
             kontext.next();
         }
+    }
+
+    private static void nichtGefunden(RoutingContext kontext) {
+        ProblemAntwort problem = ProblemAntwort.fuer(Fehlercode.NICHT_GEFUNDEN);
+        kontext.response().setStatusCode(problem.status())
+                .putHeader(HttpHeaders.CONTENT_TYPE, ProblemAntwort.MEDIENTYP).end(problem.json());
     }
 
     /** Header jeder Antwort unter {@code /public/}: {@code no-store}, bei abgekündigter Version die drei Header. */
@@ -133,6 +146,10 @@ public class WebseitenRoute {
 
     private static boolean unter(String pfad, String praefix) {
         return pfad.equals(praefix) || pfad.startsWith(praefix + "/");
+    }
+
+    private static String ohneMatrixParameter(String pfad) {
+        return pfad.indexOf(';') < 0 ? pfad : pfad.replaceAll(";[^/]*", "");
     }
 
     private static String ohneDoppelteSchraegstriche(String pfad) {

@@ -3,14 +3,29 @@
 # Nur die Standardbibliothek (Psych/YAML), keine Gems: Ruby liegt auf ubuntu-24.04 (GitHub-Runner) und auf macOS bei.
 # Eigenes Skript statt eines Werkzeugs wie oasdiff, weil «x-erweiterbar: true» eine Konvention dieses Vertrags ist.
 # Exit 0 = nur additiv, 1 = nicht additiv, 2 = nicht prüfbar (Datei fehlt oder ist kein lesbares YAML/OpenAPI).
+require 'date'
+require 'time'
 require 'yaml'
 
 VERBEN = %w[get put post delete options head patch trace].freeze
 KOMPONENTEN = %w[schemas responses parameters headers requestBodies securitySchemes].freeze
 
+# Unquotierte Daten (z. B. «example: 2027-07-01») liest Psych als Date/Time. Erlaubt und als ISO-Text verglichen, wie
+# JSON und der Java-Test (Jackson) sie lesen; sonst gälte ein gültiger Vertrag als nicht prüfbar (Review PR #140).
+def als_text(wert)
+  case wert
+  when Hash then wert.to_h { |k, v| [als_text(k), als_text(v)] }
+  when Array then wert.map { |v| als_text(v) }
+  when Time then wert.iso8601
+  when Date then wert.iso8601
+  else wert
+  end
+end
+
 def laden(datei)
-  inhalt = YAML.safe_load(File.read(datei, encoding: 'UTF-8'), permitted_classes: [], permitted_symbols: [],
-                                                               aliases: false, filename: datei)
+  inhalt = als_text(YAML.safe_load(File.read(datei, encoding: 'UTF-8'), permitted_classes: [Date, Time],
+                                                                        permitted_symbols: [], aliases: false,
+                                                                        filename: datei))
   unless inhalt.is_a?(Hash) && inhalt['openapi'].is_a?(String) && inhalt['openapi'].start_with?('3.')
     warn "Kein OpenAPI-Dokument: #{datei}"
     exit 2

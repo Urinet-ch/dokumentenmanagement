@@ -242,7 +242,10 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
     den Filtern der Anmeldung bei -200) per Vert.x-Reroute auf den internen Pfad `/api/v1/public/…` um; die Resources
     tragen `@Path("/public/v1/…")`. Danach gelten Anmeldung, HTTP-Rechte (`/api/*`), `ProblemAnmeldung`,
     `ProblemFehlerRoute` und `ProblemAbbildung` wie für die App, ohne Änderung der bestehenden Pfade. Der interne Pfad
-    antwortet von aussen 404 `NICHT_GEFUNDEN`, schon vor der Anmeldung. `Cache-Control: no-store` und die Header der
+    antwortet von aussen 404 `NICHT_GEFUNDEN`, schon vor der Anmeldung. Geprüft wird ohne Matrix-Parameter (`;…`),
+    weil Quarkus REST sie vor der Zuordnung entfernt; unter `/public/` weist die Route Pfade mit `;` mit 404 ab, und ein
+    Filter nach der Zuordnung (`WebseitenSperre`) weist jede Resource unter `/public/` ohne vorherigen Reroute ab
+    (Review PR #140). `Cache-Control: no-store` und die Header der
     Abkündigung setzt derselbe Handler am Router für jede Antwort unter `/public/`, auch für Fehler vor der Resource.
     `quarkus.http.auth.permission` und `ProblemAnmeldung` nennen `/public/` zusätzlich, Quinoa ignoriert `/public`.
   - Paket: Die Regel der Schichten in `ArchitekturTest` verlangt `<fachbereich>.(domain|application|adapter)`; die

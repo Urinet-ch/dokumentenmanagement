@@ -115,6 +115,8 @@ aendern '        id:\n          type: string' '        id:\n          type: stri
 erwarte 0 "neues Antwortfeld" "$basis"
 aendern 'enum: [NEU, SICHTBAR]' 'enum: [NEU, SICHTBAR, VERBORGEN]'
 erwarte 0 "neuer Wert bei x-erweiterbar: true" "$basis"
+aendern '        id:\n          type: string' '        id:\n          type: string\n        datum:\n          type: string\n          format: date\n          example: 2027-07-01\n        zeit:\n          type: string\n          format: date-time\n          example: 2027-07-01T08:00:00Z'
+erwarte 0 "neues Feld mit unquotiertem Datum im Beispiel" "$basis"
 aendern '        "401":' '        "429":\n          description: zu viele\n        "401":'
 erwarte 0 "neuer Statuscode" "$basis"
 aendern 'paths:' 'paths:\n  /public/v1/filter:\n    get:\n      responses:\n        "200":\n          description: Filter'

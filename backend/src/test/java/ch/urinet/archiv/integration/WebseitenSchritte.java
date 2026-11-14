@@ -88,7 +88,8 @@ public class WebseitenSchritte {
 
     @Wenn("«{word}» {word} «{}» aufruft")
     public void aufrufen(String benutzer, String methode, String pfad) {
-        antwort = anmelden(benutzer).when().request(methode, pfad);
+        // ohne Kodierung durch REST-assured, damit «;» und «%» so ankommen, wie sie im Szenario stehen
+        antwort = anmelden(benutzer).urlEncodingEnabled(false).when().request(methode, pfad);
     }
 
     @Wenn("«{word}» an «{}» {int} MB sendet")
