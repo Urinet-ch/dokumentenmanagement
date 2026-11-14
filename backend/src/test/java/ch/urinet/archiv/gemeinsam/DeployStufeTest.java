@@ -107,7 +107,7 @@ class DeployStufeTest {
         return abweichungen;
     }
 
-    private static SmallRyeConfig prodConfig(Map<String, String> umgebung) throws IOException {
+    static SmallRyeConfig prodConfig(Map<String, String> umgebung) throws IOException {
         return new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
                 .withSources(new PropertiesConfigSource(DeployStufeTest.class.getClassLoader()
                         .getResource("application.properties")))
@@ -120,7 +120,7 @@ class DeployStufeTest {
         return frist.filter(f -> f.compareTo(Stufenregel.HOECHSTFRIST_STUFE_A) <= 0).isPresent();
     }
 
-    private static Map<String, String> apiUmgebung() throws IOException {
+    static Map<String, String> apiUmgebung() throws IOException {
         return archivDienste().get("api");
     }
 
