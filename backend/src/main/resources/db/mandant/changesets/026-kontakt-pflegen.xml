@@ -11,8 +11,9 @@
            aussteht, wie die übrigen Zähler).
          - zugriff_protokoll.aktion zusätzlich KONTAKT_ZUSAMMENFUEHREN, KONTAKT_INAKTIV, KONTAKT_AKTIV; der Check
            enthält alle Werte aus 004 (Stand origin/main beim Anlegen).
-         - Index für die Liste ohne Suchbegriff (Status, Sortierung nach name_normalisiert, vorname, id) und für die
-           Kette «zusammengeführt aus».
+         - Index nur für die Kette «zusammengeführt aus» (partiell). Für die Liste kein eigener Index: Mit Suchbegriff
+           trägt kontakt_name_trgm_ix, ohne genügen Seq Scan und Sortierung bei einigen tausend Kontakten; ein B-Baum
+           auf name_normalisiert verdrängte zudem den GIN-Index aus Plänen mit «%» (PartnerAbgleichLeistungTest).
          Rückwärtskompatibel (tech.md Regel 11): nur neue Spalten mit Standardwert bzw. null und weitere erlaubte
          Werte; das Vorgänger-Release liest und schreibt weiter. -->
     <changeSet id="026-kontakt-pflegen" author="archiv">
@@ -33,7 +34,6 @@
             alter table kontakt add constraint kontakt_zusammengefuehrt_ck
                 check (zusammengefuehrt_in is null or not aktiv);
             alter table kontakt add constraint kontakt_zusammengefuehrt_selbst_ck check (zusammengefuehrt_in &lt;&gt; id);
-            create index kontakt_liste_ix on kontakt (aktiv, name_normalisiert, vorname, id);
             create index kontakt_zusammengefuehrt_in_ix on kontakt (zusammengefuehrt_in)
                 where zusammengefuehrt_in is not null;
 

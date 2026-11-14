@@ -975,9 +975,11 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
   synthetische Kontaktdaten), die Ergänzungen von 7.4, 11.7, 13.3, 13.4 und 13.7 in den bestehenden Features;
   `KontaktVerweiseTest`; PWA mit Vitests und den Szenarien für 17.5, 17.6 und 17.17.
 - Umsetzung (Aufgabe 4.11, 14.11.2026; Auslegungen im PR unter «Auslegungen»):
-  - Schema: Changeset `db/mandant` 026 (`026-kontakt-pflegen`): Spalten und Checks wie unter «Data Models», Index
-    `kontakt_liste_ix (aktiv, name_normalisiert, vorname, id)` für die Liste ohne Suchbegriff und ein partieller Index auf
-    `zusammengefuehrt_in`; `zugriff_protokoll_aktion_ck` mit allen Werten aus 004 und den drei Aktionen `KONTAKT_*`.
+  - Schema: Changeset `db/mandant` 026 (`026-kontakt-pflegen`): Spalten und Checks wie unter «Data Models», ein
+    partieller Index auf `zusammengefuehrt_in`; `zugriff_protokoll_aktion_ck` mit allen Werten aus 004 und den drei
+    Aktionen `KONTAKT_*`. Kein eigener Index für die Liste: Mit Suchbegriff trägt `kontakt_name_trgm_ix`, ohne genügen
+    Seq Scan und Sortierung; ein B-Baum mit `name_normalisiert` verdrängte im Plan mit `%` den GIN-Index
+    (`PartnerAbgleichLeistungTest`, Bitmap-Scan über den ganzen B-Baum bei `enable_seqscan = off`).
   - Sperren: `KontaktRegister.sperren` sperrt in der Reihenfolge der IDs (`order by id for update`) mit
     `lock_timeout` = `archiv.import.sperre-wartezeit` nur für diese Anweisung; `55P03` → 409 `STATUS_KONFLIKT`. Auch
     `PATCH /kontakte/{id}`, `inaktiv` und `aktiv` sperren so. Prüfreihenfolge nach dem Sperren: 404 → 400 (Ziel) → 409 →
