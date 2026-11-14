@@ -3143,8 +3143,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
     post:
       summary: Kontakt anlegen
@@ -3245,8 +3243,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
   /api/v1/kontakte/{kontaktId}:
     get:
@@ -3280,8 +3276,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
     patch:
       summary: Kontakt ändern

@@ -13,6 +13,7 @@ import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.kontakt.domain.KontaktTyp;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -225,7 +226,8 @@ public class KontaktResource {
 
     @GET
     @ErfordertAktion(Aktion.A6)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @NichtDokumentbezogen
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Operation(summary = "Kontakte suchen (Partnerauswahl)",
             description = "Ähnliche oder enthaltene Namen, die besten zuerst; höchstens 20 Treffer; nur aktive "
                     + "Kontakte (Req 17.12).")
@@ -237,7 +239,8 @@ public class KontaktResource {
     @GET
     @Path("/liste")
     @ErfordertAktion(Aktion.A6)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @NichtDokumentbezogen
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Operation(summary = "Kontakte auflisten (Req 17.1, 17.2)", description = "Mit q: Name enthalten oder ähnlich, "
             + "Vorname oder Ort enthalten (ohne Gross-/Kleinschreibung), E-Mail enthalten, PLZ oder Kontakt-ID aus "
             + "21.CRM gleich; exakte Kontakt-ID und E-Mail zuerst, dann Ähnlichkeit, dann Name. Ohne q nach Name, "
@@ -276,7 +279,8 @@ public class KontaktResource {
     @GET
     @Path("/{kontaktId}")
     @ErfordertAktion(Aktion.A6)
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @NichtDokumentbezogen
+    @RolesAllowed({"inhaber", "geschaeftsstelle"})
     @Operation(summary = "Kontakt ansehen (Req 17.3)", description = "Auch inaktive Kontakte. " + ALLE_ROLLEN_A6
             + "; unbekannt oder anderer Mandant → 404 NICHT_GEFUNDEN.")
     @APIResponse(responseCode = "200", description = "Kontakt",

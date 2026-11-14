@@ -3453,7 +3453,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       },
       "post" : {
@@ -3577,7 +3577,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },
@@ -3621,7 +3621,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       },
       "patch" : {
