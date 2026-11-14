@@ -98,7 +98,10 @@ describe('App (Req 2.6, 8.6)', () => {
       ],
     ],
     ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche]],
-    ['geschaeftsstelle', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.kontakte]],
+    [
+      'geschaeftsstelle',
+      [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.kontakte],
+    ],
     ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);

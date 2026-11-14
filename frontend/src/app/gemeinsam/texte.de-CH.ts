@@ -630,7 +630,8 @@ export const TEXTE = {
       'gelöscht wird nie.',
     suchen: 'Suche',
     suchHinweis: 'Name, Vorname, Ort, E-Mail, PLZ oder Kontakt-ID aus 21.CRM',
-    suchUngueltig: 'Der Suchbegriff ist ungültig (1 bis 200 Zeichen, keine Steuerzeichen). Die Liste zeigt alle Kontakte.',
+    suchUngueltig:
+      'Der Suchbegriff ist ungültig (1 bis 200 Zeichen, keine Steuerzeichen). Die Liste zeigt alle Kontakte.',
     filter: 'Filter',
     filterAnzahl: (anzahl: number) => (anzahl === 0 ? 'Filter' : `Filter (${anzahl})`),
     status: 'Status',
@@ -665,7 +666,8 @@ export const TEXTE = {
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerVerboten: 'Für die Kontakte fehlt Ihnen das Recht. Bitte wenden Sie sich an den Inhaber.',
     fehlerAnfrage: 'Das Archiv hat die Anfrage nicht angenommen. Bitte prüfen Sie die Eingaben.',
-    fehlerAllgemein: 'Das Archiv antwortet nicht wie erwartet. Bitte versuchen Sie es später erneut.',
+    fehlerAllgemein:
+      'Das Archiv antwortet nicht wie erwartet. Bitte versuchen Sie es später erneut.',
     nichtGefunden: 'Dieser Kontakt existiert nicht (mehr) in diesem Archiv.',
     erneutVersuchen: 'Erneut versuchen',
     // Detail
@@ -695,8 +697,10 @@ export const TEXTE = {
     zusammengefuehrtIn: 'zusammengeführt in',
     zusammengefuehrtAus: 'zusammengeführt aus',
     leer: '–',
-    inaktivHinweis: 'Dieser Kontakt ist inaktiv. Er erscheint nicht in der Partnerauswahl und lässt sich nicht bearbeiten.',
-    veraltet: 'Der Kontakt wurde inzwischen geändert. Die Seite zeigt den neuen Stand; bitte prüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
+    inaktivHinweis:
+      'Dieser Kontakt ist inaktiv. Er erscheint nicht in der Partnerauswahl und lässt sich nicht bearbeiten.',
+    veraltet:
+      'Der Kontakt wurde inzwischen geändert. Die Seite zeigt den neuen Stand; bitte prüfen Sie Ihre Eingabe und versuchen Sie es erneut.',
     // Dokumente des Kontakts
     dokumente: 'Dokumente',
     dokumenteBeschreibung: 'Sichtbare Dokumente dieses Kontakts, neueste zuerst',
@@ -731,14 +735,17 @@ export const TEXTE = {
     },
     // Rückmeldungen der Aktionen
     konflikt: {
-      aendern: 'Der Kontakt ist inaktiv oder wurde zusammengeführt und lässt sich nicht bearbeiten.',
-      zusammenfuehren: 'Zusammenführen ist nicht möglich: Ein Kontakt ist inzwischen inaktiv oder schon zusammengeführt.',
+      aendern:
+        'Der Kontakt ist inaktiv oder wurde zusammengeführt und lässt sich nicht bearbeiten.',
+      zusammenfuehren:
+        'Zusammenführen ist nicht möglich: Ein Kontakt ist inzwischen inaktiv oder schon zusammengeführt.',
       inaktiv: 'Der Kontakt ist schon inaktiv.',
       aktiv: 'Der Kontakt lässt sich nicht wieder aktivieren (nicht inaktiv oder zusammengeführt).',
     },
     anfrage: {
       aendern: 'Das Archiv hat die Angaben nicht angenommen. Bitte prüfen Sie die Felder.',
-      zusammenfuehren: 'Das Archiv hat die Angaben nicht angenommen: Das Ziel ist ungültig, inaktiv oder dieser Kontakt selbst.',
+      zusammenfuehren:
+        'Das Archiv hat die Angaben nicht angenommen: Das Ziel ist ungültig, inaktiv oder dieser Kontakt selbst.',
       inaktiv: 'Das Archiv hat den Grund nicht angenommen.',
       aktiv: 'Das Archiv hat die Anfrage nicht angenommen.',
     },
