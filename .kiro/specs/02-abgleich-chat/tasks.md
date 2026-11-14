@@ -102,6 +102,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 ## Welle 9 — Abnahme Phase 2
 
 - [ ] 9.1 Chat-Prüfliste [Fabian] [QA]
+  - Gerüst erledigt (PR #156, 14.11.2026): Schema `abnahme/chat-pruefliste.schema.json` mit Schematest, `ChatPrueflisteIT` (Handlauf, nie in der CI) mit Fake-Server-Test, Vorlage `docs/abnahme/phase2.md`, Anleitung in `backend/README.md`; offen bleiben `chat-pruefliste.yaml` mit den 20 Fragen und der Lauf (Req 13.1, 13.2) bei Fabian
   - `chat-pruefliste.yaml` mit 7 Beispielfragen + ≥ 13 weiteren, erwartete Antworten und Quellen – nur unter `ARCHIV_GOLDEN_DIR`, nicht im Repo; im Repo nur Schema und Test `ChatPrueflisteIT`
   - Lauf manuell gegen den Produktivbestand, nie in der CI; Bericht in `docs/abnahme/phase2.md` nur mit Fragen-Nr. und Ergebnis, ohne Inhalte
   - Messung Req 3.8: Zeit von der Anfrage bis zum ersten `text`-Ereignis (Server-Log oder Lauf der Prüfliste), p95 ≤ 10 s mit dem echten Modell; im Bericht nur das Ergebnis, ohne Inhalte
