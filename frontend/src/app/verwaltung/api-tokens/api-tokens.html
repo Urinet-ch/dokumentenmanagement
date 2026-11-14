@@ -1,0 +1,86 @@
+<h1>{{ texte.titel }}</h1>
+<p>{{ texte.einleitung }}</p>
+<p class="meldung" role="status" aria-live="polite">{{ meldung() }}</p>
+@if (fehler()) {
+  <p class="fehler" role="alert">{{ fehler() }}</p>
+}
+@if (tokens() === null) {
+  @if (!fehler()) {
+    <p>{{ texte.laden }}</p>
+  }
+} @else if (tokens()!.length === 0) {
+  <p role="status">{{ texte.keine }}</p>
+} @else {
+  <ul class="liste" aria-label="API-Tokens">
+    @for (token of tokens(); track $index) {
+      <li class="karte token" data-test="token">
+        <div class="angaben">
+          <span class="feld">
+            <span class="label">{{ texte.name }}</span>
+            <bdi class="wert">{{ token.name }}</bdi>
+          </span>
+          <span class="feld">
+            <span class="label">{{ texte.scope }}</span>
+            <code class="wert">{{ scopeText(token.scope) }}</code>
+          </span>
+          <span class="feld">
+            <span class="label">{{ texte.erstellt }}</span>
+            <time class="wert" [attr.datetime]="token.erstellt ?? null">{{
+              zeitpunkt(token.erstellt)
+            }}</time>
+          </span>
+          <span class="feld">
+            <span class="label">{{ texte.zuletzt }}</span>
+            @if (token.zuletzt) {
+              <time class="wert" [attr.datetime]="token.zuletzt">{{
+                zeitpunkt(token.zuletzt)
+              }}</time>
+            } @else {
+              <span class="wert">{{ texte.nieGenutzt }}</span>
+            }
+          </span>
+          <span class="feld">
+            <span class="label">{{ texte.status }}</span>
+            <span class="wert" [attr.data-status]="tokenStatus(token)">{{
+              statusText(token)
+            }}</span>
+          </span>
+        </div>
+        @if (token.aktiv === true) {
+          @if (bestaetigung() === token.id) {
+            <div class="bestaetigung">
+              <span>{{ texte.widerrufFrage }}</span>
+              <div class="knoepfe">
+                <button
+                  mat-flat-button
+                  type="button"
+                  [disabled]="widerrufLaeuft() !== null"
+                  (click)="widerrufen(token)"
+                >
+                  {{ texte.widerrufBestaetigen }}
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="widerrufLaeuft() !== null"
+                  (click)="abbrechen()"
+                >
+                  {{ texte.abbrechen }}
+                </button>
+              </div>
+            </div>
+          } @else {
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="widerrufLaeuft() !== null || !token.id"
+              (click)="bestaetigungAnzeigen(token)"
+            >
+              {{ texte.widerrufen }}
+            </button>
+          }
+        }
+      </li>
+    }
+  </ul>
+}

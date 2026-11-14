@@ -25,7 +25,10 @@ export function backend() {
     return adressen;
   }
   const datei = existsSync(BEREIT) ? JSON.parse(readFileSync(BEREIT, 'utf8')) : {};
-  adressen = { api: process.env.ARCHIV_API_URL ?? datei.api, keycloak: process.env.ARCHIV_KEYCLOAK_URL ?? datei.keycloak };
+  adressen = {
+    api: process.env.ARCHIV_API_URL ?? datei.api,
+    keycloak: process.env.ARCHIV_KEYCLOAK_URL ?? datei.keycloak,
+  };
   if (!adressen.api || !adressen.keycloak) {
     throw new Error(
       'Kein echtes Backend: zuerst «mvn -f backend/pom.xml test -Dtest=BrowserBackendTest -Darchiv.browser-backend=true» starten',
@@ -60,7 +63,10 @@ export async function echtesToken(rolle, mandant) {
     return vorhanden.wert;
   }
   if (!abrufe.has(name)) {
-    abrufe.set(name, tokenHolen(name).finally(() => abrufe.delete(name)));
+    abrufe.set(
+      name,
+      tokenHolen(name).finally(() => abrufe.delete(name)),
+    );
   }
   return abrufe.get(name);
 }
@@ -86,7 +92,10 @@ async function tokenHolen(name) {
     throw new Error(`Anmeldung von ${name} am Test-Realm fehlgeschlagen: ${antwort.status}`);
   }
   const inhalt = await antwort.json();
-  tokens.set(name, { wert: inhalt.access_token, gueltigBis: Date.now() + inhalt.expires_in * 1000 });
+  tokens.set(name, {
+    wert: inhalt.access_token,
+    gueltigBis: Date.now() + inhalt.expires_in * 1000,
+  });
   return inhalt.access_token;
 }
 
@@ -107,13 +116,19 @@ export async function direktHochladen(rolle, mandant, dateien) {
     const grenze = `----archiv-e2e-${zufall()}`;
     const [datei] = dateien;
     body = Buffer.concat([
-      Buffer.from(`--${grenze}\r\nContent-Disposition: form-data; name="dateien"\r\nContent-Type: ${datei.mimeType}\r\n\r\n`),
+      Buffer.from(
+        `--${grenze}\r\nContent-Disposition: form-data; name="dateien"\r\nContent-Type: ${datei.mimeType}\r\n\r\n`,
+      ),
       datei.buffer,
       Buffer.from(`\r\n--${grenze}--\r\n`),
     ]);
     headers['content-type'] = `multipart/form-data; boundary=${grenze}`;
   }
-  const antwort = await fetch(`${backend().api}/api/v1/dokumente`, { method: 'POST', headers, body });
+  const antwort = await fetch(`${backend().api}/api/v1/dokumente`, {
+    method: 'POST',
+    headers,
+    body,
+  });
   if (antwort.status !== 202) {
     throw new Error(`Upload über die API: Status ${antwort.status}`);
   }
@@ -127,6 +142,31 @@ export async function direktLesen(rolle, mandant, id) {
   });
   assert.equal(antwort.status, 200, `GET /dokumente/${id}`);
   return antwort.json();
+}
+
+export async function apiTokenAnlegen(rolle, mandant, name, scope) {
+  const antwort = await fetch(`${backend().api}/api/v1/api-tokens`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${await echtesToken(rolle, mandant)}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ name, scope }),
+  });
+  assert.equal(antwort.status, 201, `API-Token anlegen: Status ${antwort.status}`);
+  return antwort.json();
+}
+
+export async function apiTokenVerwenden(token) {
+  const name = `api-token-${zufall()}.pdf`;
+  const body = new FormData();
+  body.append('dateien', new Blob([inhalt(name)], { type: 'application/pdf' }), name);
+  const antwort = await fetch(`${backend().api}/api/v1/dokumente`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body,
+  });
+  return antwort.status;
 }
 
 /** Dokumente, die ein Szenario im echten Archiv angelegt hat: Dateiname (oder Bezeichnung) → ID. */
@@ -146,7 +186,7 @@ export async function statusSetzen(mandant, id, status) {
   const antwort = new URL(`${name}.antwort.json`, ANFRAGEN);
   writeFileSync(entwurf, JSON.stringify({ mandant, dokument: id, status }));
   renameSync(entwurf, new URL(`${name}.json`, ANFRAGEN));
-  for (const ende = Date.now() + 30_000; Date.now() < ende; ) {
+  for (const ende = Date.now() + 30_000; Date.now() < ende;) {
     if (existsSync(antwort)) {
       const ergebnis = JSON.parse(readFileSync(antwort, 'utf8'));
       rmSync(antwort);
@@ -155,7 +195,9 @@ export async function statusSetzen(mandant, id, status) {
     }
     await new Promise((weiter) => setTimeout(weiter, 100));
   }
-  throw new Error('Die Testhilfe für den Status antwortet nicht: läuft BrowserBackendTest mit diesem Stand?');
+  throw new Error(
+    'Die Testhilfe für den Status antwortet nicht: läuft BrowserBackendTest mit diesem Stand?',
+  );
 }
 
 /**
@@ -201,7 +243,9 @@ export async function weiterleiten(welt, { passt = () => true, merken = async ()
     if (eintrag) {
       eintrag.status = antwort.status();
       eintrag.headers = antwort.headers();
-      eintrag.antwort = istJson(eintrag.headers['content-type']) ? await antwort.json().catch(() => null) : null;
+      eintrag.antwort = istJson(eintrag.headers['content-type'])
+        ? await antwort.json().catch(() => null)
+        : null;
     }
   });
   const origin = new URL(basisUrl).origin;
@@ -226,8 +270,13 @@ export async function weiterleiten(welt, { passt = () => true, merken = async ()
         zustand.anfragen.push(eintrag);
         eintraege.set(anfrage, eintrag);
         // Die PWA muss das Token der Anmeldung senden; getauscht wird nur dieses.
-        assert.equal(await anfrage.headerValue('authorization'), `Bearer ${welt.keycloak.accessToken}`);
-        await anfrageWeiterleiten(route, welt.keycloak.benutzer, { tokenTauschen: !zustand.sitzungAbgelaufen });
+        assert.equal(
+          await anfrage.headerValue('authorization'),
+          `Bearer ${welt.keycloak.accessToken}`,
+        );
+        await anfrageWeiterleiten(route, welt.keycloak.benutzer, {
+          tokenTauschen: !zustand.sitzungAbgelaufen,
+        });
       } catch (fehler) {
         zustand.fehler ??= fehler;
         return route.abort('failed');
@@ -244,7 +293,11 @@ function pdf(groesse) {
   const kopf = Buffer.from(`%PDF-1.4\n% Testdokument ${zufall()}\n`, 'ascii');
   const ende = Buffer.from('\n%%EOF\n', 'ascii');
   if (!groesse) {
-    return Buffer.concat([kopf, Buffer.from('1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>', 'ascii'), ende]);
+    return Buffer.concat([
+      kopf,
+      Buffer.from('1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>', 'ascii'),
+      ende,
+    ]);
   }
   const inhalt = Buffer.alloc(groesse, ' ');
   kopf.copy(inhalt, 0);
@@ -256,7 +309,10 @@ function pdf(groesse) {
 function jpeg() {
   const kommentar = Buffer.from(zufall(), 'ascii');
   return Buffer.concat([
-    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00]),
+    Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00,
+      0x01, 0x00, 0x01, 0x00, 0x00,
+    ]),
     Buffer.from([0xff, 0xfe, 0x00, kommentar.length + 2]),
     kommentar,
     Buffer.from([0xff, 0xd9]),
@@ -333,7 +389,10 @@ export function inhalt(name, art) {
     case 'leer':
       return Buffer.alloc(0);
     case 'abgeschnitten':
-      return Buffer.from(`%PDF-1.4\n% Testdokument ${zufall()}\n1 0 obj << /Type /Catalog >> endobj\ntrai`, 'ascii');
+      return Buffer.from(
+        `%PDF-1.4\n% Testdokument ${zufall()}\n1 0 obj << /Type /Catalog >> endobj\ntrai`,
+        'ascii',
+      );
     case 'grösser als 50 MB':
       return pdf(50 * 1024 * 1024 + 1);
     case undefined:
