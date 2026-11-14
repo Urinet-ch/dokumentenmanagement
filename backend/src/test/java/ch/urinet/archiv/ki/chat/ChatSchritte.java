@@ -343,6 +343,11 @@ public class ChatSchritte {
                 w -> assertThat(Integer.parseInt(w)).isBetween(von, bis));
     }
 
+    @Dann("nennt die Ablehnung den Grund «{word}»")
+    public void grund(String grund) throws IOException {
+        assertThat(JSON.readTree(antwort.rumpf()).path("grund").asText()).isEqualTo(grund);
+    }
+
     @Dann("im Mandanten «{word}» hat «{word}» kein Gespräch")
     public void keinGespraech(String mandant, String benutzer) throws SQLException {
         assertThat(zahl("select count(*) from " + schema(mandant) + ".chat_gespraech where benutzer = ?",

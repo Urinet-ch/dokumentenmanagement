@@ -130,12 +130,13 @@ public class ChatResource {
                     + "datenstand, belege}] vor «fertig» {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, "
                     + "gespraechId} beendet den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 "
                     + "NICHT_GEFUNDEN (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After "
-                    + "(mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage). Nur beschreibend: der "
+                    + "und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen in 60 Minuten; "
+                    + "LAEUFT: schon eine laufende Frage, Retry-After höchstens 5 s). Nur beschreibend: der "
                     + "generierte Client liest den Stream nicht.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = ChatFrageDto.class)))
     @APIResponse(responseCode = "200", description = "Stream der Ereignisse",
             content = @Content(mediaType = MediaType.SERVER_SENT_EVENTS, schema = @Schema(type = SchemaType.STRING)))
-    @APIResponse(responseCode = "429", description = "Rate-Limit oder schon eine laufende Frage",
+    @APIResponse(responseCode = "429", description = "Rate-Limit (grund STUNDENLIMIT) oder schon eine laufende Frage (grund LAEUFT)",
             headers = @Header(name = "Retry-After", description = "Sekunden bis zum nächsten Versuch"))
     public Multi<OutboundSseEvent> fragen(String body, @Context Sse sse) {
         MandantCode mandant = aufloesung.pruefen();

@@ -66,6 +66,7 @@ Funktionalität: Chat-Schnittstelle (Aufgabe 7.3)
     Wenn «inhaber-urinet» die Frage «Noch eine Frage?» stellt
     Dann lehnt das Archiv die Anfrage mit 429 «ZU_VIELE_ANFRAGEN» ab
     Und nennt die Ablehnung Retry-After von 50 bis 61 Sekunden
+    Und nennt die Ablehnung den Grund «STUNDENLIMIT»
     Und hat «inhaber-urinet» im Mandanten «urinet» 100 Fragen in der letzten Stunde
     Wenn «mitarbeiter-urinet» die Frage «Noch eine Frage?» stellt
     Dann endet der Stream mit «fertig»
@@ -120,6 +121,7 @@ Funktionalität: Chat-Schnittstelle (Aufgabe 7.3)
     Und «inhaber-urinet» die Frage «Zweite Frage» stellt
     Dann lehnt das Archiv die Anfrage mit 429 «ZU_VIELE_ANFRAGEN» ab
     Und nennt die Ablehnung Retry-After von 1 bis 10 Sekunden
+    Und nennt die Ablehnung den Grund «LAEUFT»
     Wenn der Testagent die Antwort freigibt
     Dann endet der offene Stream mit «fertig»
     Wenn «inhaber-urinet» die Frage «Dritte Frage» stellt
