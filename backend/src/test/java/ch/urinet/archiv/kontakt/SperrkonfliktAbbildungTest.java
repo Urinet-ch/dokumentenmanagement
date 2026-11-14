@@ -7,6 +7,8 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.AfterEach;
@@ -28,8 +30,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Reproduziert den Deadlock zwischen Zusammenführen (Kontakt, dann Dokument) und Bestätigen (Dokument, dann Kontakt). */
 @Tag("start-1")
+@TestProfile(SperrkonfliktAbbildungTest.SperrtestProfil.class)
 @QuarkusTest
 class SperrkonfliktAbbildungTest {
+
+    public static class SperrtestProfil implements QuarkusTestProfile {
+    }
 
     private static final MandantCode URINET = new MandantCode("urinet");
     private static final ProblemAbbildung ABBILDUNG = new ProblemAbbildung();
