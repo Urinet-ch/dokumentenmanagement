@@ -33,6 +33,10 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
  * Embedding-Modell (Spec 02, Aufgabe 6.3): Der Standard-Stub {@link #standardEmbedding()} liefert je Eingabe einen
  * Vektor mit {@link #DIMENSION} Werten, abgeleitet aus dem Text ({@link #vektor}), und {@link #TOKENS_JE_TEXT} Tokens je
  * Eingabe. So läuft jeder Auftrag {@code EMBEDDING} nach einer Archivierung ohne Fehlversuch.
+ * <p>
+ * Reranker (Spec 02, Aufgabe 6.4): Der Standard-Stub {@link #standardReranker()} ordnet die Texte in umgekehrter
+ * Reihenfolge (der letzte gesendete zuerst), liefert genau {@code top_n} Ergebnisse und meldet
+ * {@link #RERANKER_TOKENS_JE_TEXT} Tokens je Text. So unterscheidet sich seine Reihenfolge von der des RRF.
  */
 @WithTestResource(value = KiWireMock.class, scope = TestResourceScope.GLOBAL)
 public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
@@ -40,16 +44,21 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static final int DIMENSION = 3584;
     public static final int TOKENS_JE_TEXT = 10;
     static final String EMBEDDING_ANTWORT = "embedding-antwort";
+    public static final String RERANKER_PFAD = "/cohere/v2/rerank";
+    public static final String RERANKER_MODELL = "BAAI/bge-reranker-v2-m3";
+    public static final int RERANKER_TOKENS_JE_TEXT = 5;
+    static final String RERANKER_ANTWORT = "reranker-antwort";
 
     private WireMockServer server;
 
     @Override
     public Map<String, String> start() {
         server = new WireMockServer(options().dynamicPort().bindAddress("localhost")
-                .extensions(new EmbeddingAntwort()));
+                .extensions(new EmbeddingAntwort(), new RerankerAntwort()));
         server.start();
         server.stubFor(standard());
         server.stubFor(standardEmbedding());
+        server.stubFor(standardReranker());
         return Map.of("archiv.ki.wiremock-port", String.valueOf(server.port()));
     }
 
@@ -75,6 +84,12 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
                 .willReturn(ResponseDefinitionBuilder.responseDefinition().withTransformers(EMBEDDING_ANTWORT));
     }
 
+    /** Standard-Stub des Rerankers mit Priorität 10: umgekehrte Reihenfolge ({@link RerankerAntwort}). */
+    public static MappingBuilder standardReranker() {
+        return post(urlPathEqualTo(RERANKER_PFAD)).atPriority(10)
+                .willReturn(ResponseDefinitionBuilder.responseDefinition().withTransformers(RERANKER_ANTWORT));
+    }
+
     /** Vektor zum Text: deterministisch, nicht normiert, nie der Nullvektor. */
     public static float[] vektor(String text) {
         float[] vektor = new float[DIMENSION];
@@ -93,6 +108,7 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
         modell.resetScenarios();
         modell.register(standard());
         modell.register(standardEmbedding());
+        modell.register(standardReranker());
         return modell;
     }
 
@@ -137,6 +153,49 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
         @Override
         public String getName() {
             return EMBEDDING_ANTWORT;
+        }
+    }
+
+    /** Antwort im Format von {@code POST /cohere/v2/rerank} (Spike 0.3): umgekehrte Reihenfolge, {@code top_n} Stück. */
+    static final class RerankerAntwort implements ResponseDefinitionTransformerV2 {
+
+        private static final ObjectMapper JSON = new ObjectMapper();
+
+        @Override
+        public ResponseDefinition transform(ServeEvent ereignis) {
+            try {
+                JsonNode anfrage = JSON.readTree(ereignis.getRequest().getBodyAsString());
+                int texte = anfrage.path("documents").size();
+                int topN = anfrage.path("top_n").asInt(texte);
+                StringBuilder ergebnisse = new StringBuilder();
+                for (int i = 0; i < Math.min(topN, texte); i++) {
+                    if (i > 0) {
+                        ergebnisse.append(',');
+                    }
+                    ergebnisse.append("{\"index\":").append(texte - 1 - i).append(",\"relevance_score\":")
+                            .append(1.0 - i / 100.0).append('}');
+                }
+                int tokens = RERANKER_TOKENS_JE_TEXT * texte;
+                String koerper = "{\"id\":\"score-test\",\"model\":\"" + RERANKER_MODELL + "\",\"usage\":"
+                        + "{\"prompt_tokens\":" + tokens + ",\"total_tokens\":" + tokens + "},\"results\":["
+                        + ergebnisse + "]}";
+                // eine Verzögerung des Stubs bleibt erhalten (Szenarien zur Zeitgrenze)
+                return ResponseDefinitionBuilder.responseDefinition().withStatus(200)
+                        .withHeader("Content-Type", "application/json").withBody(koerper)
+                        .withFixedDelay(ereignis.getResponseDefinition().getFixedDelayMilliseconds()).build();
+            } catch (IOException e) {
+                return ResponseDefinitionBuilder.responseDefinition().withStatus(400).build();
+            }
+        }
+
+        @Override
+        public boolean applyGlobally() {
+            return false;
+        }
+
+        @Override
+        public String getName() {
+            return RERANKER_ANTWORT;
         }
     }
 }

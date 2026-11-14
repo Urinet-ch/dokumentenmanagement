@@ -138,6 +138,8 @@ export class ImportLaufSeite {
       DUBLETTE: lauf.dubletten ?? 0,
       FEHLER: lauf.fehler ?? 0,
       UEBERSPRUNGEN: lauf.uebersprungen ?? 0,
+      // Anzeige der Zahl «inaktiv» folgt mit Aufgabe 4.12 (ERGEBNISSE)
+      INAKTIV: lauf.inaktiv ?? 0,
     };
     return [{ ergebnis: null, anzahl: lauf.zeilen ?? 0 }, ...ERGEBNISSE.map((e) => ({ ergebnis: e, anzahl: anzahl[e] }))];
   });

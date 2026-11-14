@@ -26,5 +26,7 @@
     <include file="changesets/019-export.xml" relativeToChangelogFile="true"/>
     <include file="changesets/021-chunk.xml" relativeToChangelogFile="true"/>
     <include file="changesets/022-dokument-ki-partner-nachtrag.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/026-kontakt-pflegen.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/027-chat.xml" relativeToChangelogFile="true"/>
     <include file="changesets/028-dokument-volltext-ohne-dateiname.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

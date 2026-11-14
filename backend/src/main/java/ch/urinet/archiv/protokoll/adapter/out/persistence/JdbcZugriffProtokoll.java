@@ -21,8 +21,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -52,6 +56,12 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
 
     @Override
     public void schreiben(ZugriffEintrag eintrag) {
+        schreiben(List.of(eintrag));
+    }
+
+    /** Alle Einträge per Batch in der laufenden Transaktion (Req 10.8); scheitert einer, wirft er für alle. */
+    @Override
+    public void schreiben(List<ZugriffEintrag> eintraege) {
         if (!QuarkusTransaction.isActive()) {
             throw new IllegalStateException("Zugriffsprotokoll nur in einer Transaktion");
         }
@@ -59,21 +69,30 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         if (!SCHEMA.matcher(schema).matches()) {
             throw new IllegalStateException("Zugriffsprotokoll ohne Mandanten-Schema");
         }
-        eintrag.benutzer().ifPresent(benutzer -> verzeichnis.nachfuehren(new Benutzerangaben(benutzer,
-                namen.name(benutzer), VerzeichnisEintrag.istToken(benutzer)
-                        ? Optional.of(VerzeichnisEintrag.ROLLE_API_TOKEN) : eintrag.rolle(),
-                eintrag.aktion() == ProtokollAktion.VERWEIGERT)));
+        if (eintraege.isEmpty()) {
+            return;
+        }
+        Set<String> nachgefuehrt = new HashSet<>();
+        for (ZugriffEintrag eintrag : eintraege) {
+            eintrag.benutzer().filter(nachgefuehrt::add).ifPresent(benutzer -> verzeichnis.nachfuehren(
+                    new Benutzerangaben(benutzer, namen.name(benutzer), VerzeichnisEintrag.istToken(benutzer)
+                            ? Optional.of(VerzeichnisEintrag.ROLLE_API_TOKEN) : eintrag.rolle(),
+                            eintrag.aktion() == ProtokollAktion.VERWEIGERT)));
+        }
         String sql = "insert into " + schema + ".zugriff_protokoll (benutzer, rolle, aktion, dokument_id, ip, details) "
                 + "values (?, ?, ?, ?, cast(? as inet), cast(? as jsonb))";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
-            einfuegen.setString(1, eintrag.benutzer().orElse(null));
-            einfuegen.setString(2, eintrag.rolle().orElse(null));
-            einfuegen.setString(3, eintrag.aktion().name());
-            einfuegen.setObject(4, eintrag.dokumentId().orElse(null), Types.OTHER);
-            einfuegen.setString(5, eintrag.ip().map(IpAdresse::text).orElse(null));
-            einfuegen.setString(6, json(eintrag.details()));
-            einfuegen.executeUpdate();
+            for (ZugriffEintrag eintrag : eintraege) {
+                einfuegen.setString(1, eintrag.benutzer().orElse(null));
+                einfuegen.setString(2, eintrag.rolle().orElse(null));
+                einfuegen.setString(3, eintrag.aktion().name());
+                einfuegen.setObject(4, eintrag.dokumentId().orElse(null), Types.OTHER);
+                einfuegen.setString(5, eintrag.ip().map(IpAdresse::text).orElse(null));
+                einfuegen.setString(6, json(eintrag.details()));
+                einfuegen.addBatch();
+            }
+            einfuegen.executeBatch();
         } catch (SQLException e) {
             throw new IllegalStateException("Zugriffsprotokoll nicht geschrieben", e);
         }
@@ -107,10 +126,31 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             frist.put("bisher", Objects.toString(details.fristKonflikt().bisher(), null));
             frist.put("neu", Objects.toString(details.fristKonflikt().neu(), null));
         }
+        ProtokollDetails.Kontakte kontakte = details.kontakte();
+        if (kontakte != null) {
+            uuid(knoten, "quelle", kontakte.quelle());
+            uuid(knoten, "ziel", kontakte.ziel());
+            uuid(knoten, "kontakt", kontakte.kontakt());
+            zahl(knoten, "dokumente", kontakte.dokumente());
+            zahl(knoten, "verkaufschancen", kontakte.verkaufschancen());
+            zahl(knoten, "korrekturbeispiele", kontakte.korrekturbeispiele());
+        }
         try {
             return JSON.writeValueAsString(knoten);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Details nicht serialisierbar", e);
+        }
+    }
+
+    private static void uuid(ObjectNode knoten, String name, UUID wert) {
+        if (wert != null) {
+            knoten.put(name, wert.toString());
+        }
+    }
+
+    private static void zahl(ObjectNode knoten, String name, Integer wert) {
+        if (wert != null) {
+            knoten.put(name, wert);
         }
     }
 

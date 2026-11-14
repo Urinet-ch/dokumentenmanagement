@@ -23,10 +23,7 @@ export interface Kontakt {
     uid?: string | null;
     iban?: string | null;
     kategorie?: string | null;
-    /**
-     * MANUELL oder CRM_CSV
-     */
-    quelle?: string;
+    quelle?: Kontakt.QuelleEnum;
     nichtImExport?: boolean;
     erstellt?: string;
     geaendert?: string;
@@ -34,6 +31,18 @@ export interface Kontakt {
      * Version für If-Match (auch als ETag)
      */
     version?: number;
+    /**
+     * false: inaktiv markiert oder zusammengeführt (Req 17.11)
+     */
+    aktiv?: boolean;
+    /**
+     * seit wann inaktiv (UTC)
+     */
+    inaktivSeit?: string | null;
+    /**
+     * Kontakt, in den dieser zusammengeführt wurde
+     */
+    zusammengefuehrtIn?: string | null;
 }
 export namespace Kontakt {
     export const TypEnum = {
@@ -41,6 +50,11 @@ export namespace Kontakt {
         Person: 'PERSON',
     } as const;
     export type TypEnum = typeof TypEnum[keyof typeof TypEnum];
+    export const QuelleEnum = {
+        Manuell: 'MANUELL',
+        CsvImport: 'CSV_IMPORT',
+    } as const;
+    export type QuelleEnum = typeof QuelleEnum[keyof typeof QuelleEnum];
 }
 
 

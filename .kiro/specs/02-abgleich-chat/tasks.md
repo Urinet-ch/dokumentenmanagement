@@ -27,15 +27,17 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Der Embedding-Port wählt Adapter oder Stub über den Schalter `archiv.ki.embedding-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
   - _Anforderungen: 2.1, 2.4_
 
-- [ ] 6.4 Hybridsuche [Backend]
+- [x] 6.4 Hybridsuche [Backend]
+  - Erledigt (PR #139): `HybridSuche` mit `RerankerPort` (Adapter `InfomaniakReranker`, Stub über `archiv.ki.reranker-stub`), `EmbeddingPort.einbettenFrage` und `VektorSuchePort` (`PanacheVektorSuche`, `hnsw.ef_search` 100, `iterative_scan`); Zeitgrenzen `archiv.suche.embedding-zeitgrenze` 1 s und `archiv.suche.reranker-zeitgrenze` 1.5 s; Modus `hybrid` in `GET /dokumente`, ohne `modus` Volltext; `ki_verbrauch` Zweck `SUCHE`; lokal p95 110 ms für die Datenbankteile mit 5'000 Dokumenten, Messung auf Stufe B offen; kein Changeset
   - `HybridSuche` (Volltext + Vektor + RRF + Reranker), Rückfall auf Volltext mit `degradiert`, Modus `hybrid` in `GET /dokumente`
   - Spec 03 ergänzt: `HybridSuche` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Reranker-Port wählt Adapter oder Stub über den Schalter `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
-  - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); Lasttest p95 ≤ 2 s
+  - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); lokaler Teil-Lasttest p95 ≤ 2 s mit 5'000 synthetischen Dokumenten, der 50'000-Dokumente-Nachweis mit echten Modellen erfolgt auf Stufe B in Aufgabe 5.11 über `tools/last/suche.py --modus hybrid --grenze 2`
   - Ergänzt 14.11.2026 (entschieden von Fabian, Req 2.7, 2.8): Modus `hybrid` mit höchstens 30 Treffern ohne Gesamtzahl und ohne Blättern, Modus `volltext` unverändert, Rückfall in derselben Form mit `degradiert` (design.md «Hybrid als Standard in der Web-App»); `ki_verbrauch` mit Zweck `SUCHE` je Aufruf von Embedding-Modell und Reranker, kein Limit; Zweck im Kommentar zu `ki_verbrauch` in Spec 01 design.md nachtragen
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6, 2.7, 2.8_
 
-- [ ] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+- [x] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+  - Erledigt (PR #152): `wirksamerModus` und Modus in jeder Anfrage, Umschalter «Volltext», Hinweis bei `degradiert`, Anzeige ohne Gesamtzahl und Blättern; Attrappe nach dem Vertrag von 6.4, `BrowserBackendTest` mit Dev-Stubs für Embedding und Reranker; Browser-Szenarien `hybridsuche-pwa.feature` und `hybridsuche-attrappe-pwa.feature` (`@req-2.7`)
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 14.11.2026 («Hybrid wird Standard»); Nummer 6.6 als nächste freie der Welle 6
   - Suchseite `/suche` (Spec 01 design.md, Frontend): jede Suche mit Suchbegriff sendet `modus=hybrid` und zeigt höchstens 30 Treffer ohne Gesamtzahl und ohne Blättern; Umschalter «Volltext» als ausdrücklicher Modus mit dem bisherigen Verhalten (Sortierung, Blättern, Gesamtzahl); ohne Suchbegriff und bei Sortierung nach Datum Volltext; bei `degradiert` Hinweis «nur Volltext» mit Wechsel in den Modus Volltext
   - Browser-Szenarien `@req-2.7` (hybrid, Volltext, Rückfall bei Ausfall des Rerankers)
@@ -61,8 +63,9 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Prompt-Injection-Test mit präpariertem Dokument
   - _Anforderungen: 3.7, 4.2, 5.3_
 
-- [ ] 7.3 Chat-Schnittstelle [Backend]
+- [x] 7.3 Chat-Schnittstelle [Backend]
   - `POST /chat` als SSE (`werkzeug`, `text`, `quellen`, `fertig`, `fehler`), Speicherung `chat_gespraech`/`chat_nachricht`, Löschung nach 12 Monaten, Rate-Limit 100/h
+  - Erledigt 14.11.2026 gegen den Port `ChatAgentPort` mit Dev-Stub bzw. `ChatNichtVerfuegbar` (design.md «Umsetzung (Aufgabe 7.3, 14.11.2026)»); der echte Agent folgt mit 7.2 und ersetzt nur den Adapter. Nachweis 3.8 hier mit dem Streaming-Szenario, p95 ≤ 10 s mit echtem Modell in 9.1
   - _Anforderungen: 3.8, 4.1, 5.4, 5.5_
 
 - [ ] 7.4 Chat-Oberfläche [Frontend]
@@ -102,8 +105,9 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 9.1 Chat-Prüfliste [Fabian] [QA]
   - `chat-pruefliste.yaml` mit 7 Beispielfragen + ≥ 13 weiteren, erwartete Antworten und Quellen – nur unter `ARCHIV_GOLDEN_DIR`, nicht im Repo; im Repo nur Schema und Test `ChatPrueflisteIT`
   - Lauf manuell gegen den Produktivbestand, nie in der CI; Bericht in `docs/abnahme/phase2.md` nur mit Fragen-Nr. und Ergebnis, ohne Inhalte
+  - Messung Req 3.8: Zeit von der Anfrage bis zum ersten `text`-Ereignis (Server-Log oder Lauf der Prüfliste), p95 ≤ 10 s mit dem echten Modell; im Bericht nur das Ergebnis, ohne Inhalte
   - **Gate Phase 2:** alle 7 Beispielfragen und ≥ 18 von 20 richtig mit Quelle
-  - _Anforderungen: 13.1, 13.2_
+  - _Anforderungen: 3.8, 13.1, 13.2_
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.

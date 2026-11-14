@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { AuszugTeil } from './auszug-teil';
+import { Fundstelle } from './fundstelle';
 
 
 /**
@@ -43,6 +44,10 @@ export interface Suchtreffer {
      * Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, kein Titel (Req 14.9); null ohne Namen
      */
     dateiname?: string | null;
+    /**
+     * Nur im Modus hybrid: bester Abschnitt aus dem Vektor-Teil; fehlt bei Treffern nur aus dem Volltext und im Rückfall
+     */
+    fundstelle?: Fundstelle | null;
 }
 export namespace Suchtreffer {
     export const StatusEnum = {

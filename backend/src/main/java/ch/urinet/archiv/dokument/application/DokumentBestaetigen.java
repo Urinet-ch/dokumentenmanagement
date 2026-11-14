@@ -106,8 +106,7 @@ public class DokumentBestaetigen {
             throw new PflichtfelderFehlen(List.of("ohnePdfa"));
         }
         werte(b);
-        String partnerName = b.partnerId() == null ? null : kontakte.finden(b.partnerId()).map(Kontakt::name)
-                .orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
+        String partnerName = b.partnerId() == null ? null : partnerName(kontakte, b.partnerId(), dokument.partnerId());
 
         MandantCode mandantCode = aufloesung.pruefen();
         MandantEinstellungen.Werte mandant = einstellungen.lesen(mandantCode);
@@ -236,5 +235,18 @@ public class DokumentBestaetigen {
                 || b.betrag() != null && (b.betrag().scale() > 2 || b.betrag().precision() - b.betrag().scale() > 10)) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
+    }
+
+    /**
+     * Name des Partners {@code neu}; unbekannt → 422 {@code PARTNER_UNBEKANNT}. Ein inaktiver Kontakt ist kein Ziel einer
+     * neuen Zuordnung (Req 17.12): weicht er vom gespeicherten Partner {@code bisher} ab → 400
+     * {@code ANFRAGE_UNGUELTIG} wie eine inaktive Art; derselbe Partner bleibt erlaubt. Auch für {@link DokumentAendern}.
+     */
+    static String partnerName(KontaktRegister kontakte, UUID neu, UUID bisher) {
+        Kontakt kontakt = kontakte.fuerZuordnung(neu).orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
+        if (!kontakt.aktiv() && !neu.equals(bisher)) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        return kontakt.name();
     }
 }

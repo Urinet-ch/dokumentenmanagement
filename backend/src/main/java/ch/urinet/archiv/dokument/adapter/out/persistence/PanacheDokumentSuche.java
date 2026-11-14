@@ -43,8 +43,12 @@ public class PanacheDokumentSuche implements SuchePort {
     /** Höchstens so viele Zeichen des Volltexts gehen in {@code ts_headline} (Kosten der Textstelle). */
     static final int AUSZUG_ZEICHEN = 20_000;
 
-    private static final String TSQ = "websearch_to_tsquery('german', :begriff)";
-    private static final String MARKEN = "chr(2) || chr(3) || chr(31)";
+    static final String TSQ = "websearch_to_tsquery('german', :begriff)";
+    /** Steuerzeichen der Markierung; die Abfrage entfernt sie vorher aus dem Text ({@link Auszug}). */
+    static final String MARKEN = "chr(2) || chr(3) || chr(31)";
+    /** Optionen von {@code ts_headline} (Req 14.4), auch für den Auszug reiner Vektortreffer der Hybridsuche. */
+    static final String AUSZUG_OPTIONEN = "'StartSel=' || chr(2) || ', StopSel=' || chr(3) || ', FragmentDelimiter=' "
+            + "|| chr(31) || ', MaxFragments=2, MaxWords=20, MinWords=8'";
     // der Dateiname in der Form des Index, sonst bildete ts_headline andere Wörter (Req 14.8)
     private static final String AUSZUG_DATEINAME = "nullif(archiv_dateiname_text(d.dateiname), ''), ";
     /*
@@ -56,8 +60,7 @@ public class PanacheDokumentSuche implements SuchePort {
     private static final String OHNE_DATEINAME = "ts_filter(d.volltext_tsv, '{a,b,c}')";
     private static final String AUSZUG = "ts_headline('german', translate(concat_ws(' ', d.titel, d.partner_name, "
             + "archiv_tags_text(d.tags), %sleft(d.volltext, " + AUSZUG_ZEICHEN + ")), " + MARKEN + ", ''), " + TSQ
-            + ", 'StartSel=' || chr(2) || ', StopSel=' || chr(3) || ', FragmentDelimiter=' || chr(31) "
-            + "|| ', MaxFragments=2, MaxWords=20, MinWords=8')";
+            + ", " + AUSZUG_OPTIONEN + ")";
     private static final String RELEVANZ = "belegtreffer desc, rang desc, eingang desc, id desc";
     private static final String DATUM = "datum desc nulls last, eingang desc, id desc";
     private static final TypeReference<List<String>> TEXTE = new TypeReference<>() {
@@ -95,40 +98,14 @@ public class PanacheDokumentSuche implements SuchePort {
 
     /** Baut das SQL aus festen Stücken und legt die Werte in {@code parameter} ab. */
     static String sql(Suchanfrage a, Sichtregel regel, boolean mitDateiname, Map<String, Object> parameter) {
-        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
-        parameter.putAll(sicht.parameter());
-        List<String> bedingungen = new ArrayList<>();
-        bedingungen.add(sicht.bedingung());
+        List<String> bedingungen = SuchFilter.bedingungen(a, regel, parameter);
         boolean mitBegriff = a.begriff() != null;
         String vektor = mitDateiname ? "d.volltext_tsv" : OHNE_DATEINAME;
         if (mitBegriff) {
-            // exakte Belegnummer zählt als Treffer, auch ohne Volltext (Req 14.7)
-            bedingungen.add("(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
+            // exakte Belegnummer zählt als Treffer, auch ohne Volltext (Req 14.7); nach der Sicht wie bisher
+            bedingungen.add(1, "(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
                     + "from dokument_finanz b where b.belegnummer = :begriff)))");
             parameter.put("begriff", a.begriff());
-        }
-        filter(bedingungen, parameter, "d.art = :art", "art", a.art());
-        filter(bedingungen, parameter, "d.partner_id = :partner", "partner", a.partner());
-        filter(bedingungen, parameter, "d.datum >= :datumVon", "datumVon", a.datumVon());
-        filter(bedingungen, parameter, "d.datum <= :datumBis", "datumBis", a.datumBis());
-        filter(bedingungen, parameter, "f.betrag >= :betragVon", "betragVon", a.betragVon());
-        filter(bedingungen, parameter, "f.betrag <= :betragBis", "betragBis", a.betragBis());
-        filter(bedingungen, parameter, "f.richtung = :richtung", "richtung",
-                a.richtung() == null ? null : a.richtung().name());
-        filter(bedingungen, parameter, "d.geschaeftsjahr = :geschaeftsjahr", "geschaeftsjahr", a.geschaeftsjahr());
-        filter(bedingungen, parameter, "f.belegnummer = :belegnummer", "belegnummer", a.belegnummer());
-        if (a.status() == null) {
-            bedingungen.add("d.status <> 'VERWORFEN'");
-        } else {
-            filter(bedingungen, parameter, "d.status = :status", "status", a.status());
-        }
-        if (!a.tags().isEmpty()) {
-            List<String> namen = new ArrayList<>();
-            for (int i = 0; i < a.tags().size(); i++) {
-                namen.add(":tag" + i);
-                parameter.put("tag" + i, a.tags().get(i));
-            }
-            bedingungen.add("d.tags @> cast(array[" + String.join(", ", namen) + "] as text[])");
         }
         parameter.put("groesse", a.groesse());
         parameter.put("start", a.seite() * a.groesse());
@@ -164,22 +141,24 @@ public class PanacheDokumentSuche implements SuchePort {
                 ordnung.replaceAll("(^|, )", "$1s."));
     }
 
-    private static void filter(List<String> bedingungen, Map<String, Object> parameter, String bedingung, String name,
-                               Object wert) {
-        if (wert != null) {
-            bedingungen.add(bedingung);
-            parameter.put(name, wert);
-        }
-    }
-
     private Suchtreffer treffer(Object[] z) {
-        return new Suchtreffer((UUID) z[1], (String) z[2], (String) z[3], datum(z[4]), zeitpunkt(z[5]), (String) z[6],
-                (String) z[7], texte((String) z[8]), z[9] == null ? null : ((Number) z[9]).intValue(), (UUID) z[10],
-                (String) z[11], (String) z[12], (BigDecimal) z[13], (String) z[14], (String) z[15],
-                Auszug.zerlegen((String) z[16]), (String) z[17]);
+        return treffer(z, 1, json);
     }
 
-    private List<String> texte(String jsonText) {
+    /**
+     * Treffer aus einer Zeile ab Spalte {@code ab}: id, art, titel, datum, eingang, status, vertraulichkeit, tags (JSON),
+     * geschaeftsjahr, partner_id, partner_name, belegnummer, betrag, waehrung, richtung, auszug, dateiname.
+     */
+    static Suchtreffer treffer(Object[] z, int ab, ObjectMapper json) {
+        int i = ab;
+        return new Suchtreffer((UUID) z[i], (String) z[i + 1], (String) z[i + 2], datum(z[i + 3]),
+                zeitpunkt(z[i + 4]), (String) z[i + 5], (String) z[i + 6], texte((String) z[i + 7], json),
+                z[i + 8] == null ? null : ((Number) z[i + 8]).intValue(), (UUID) z[i + 9], (String) z[i + 10],
+                (String) z[i + 11], (BigDecimal) z[i + 12], (String) z[i + 13], (String) z[i + 14],
+                Auszug.zerlegen((String) z[i + 15]), (String) z[i + 16]);
+    }
+
+    private static List<String> texte(String jsonText, ObjectMapper json) {
         try {
             return jsonText == null ? List.of() : json.readValue(jsonText, TEXTE);
         } catch (JsonProcessingException e) {

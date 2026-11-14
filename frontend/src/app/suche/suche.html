@@ -19,6 +19,22 @@
     <button mat-flat-button type="submit" [disabled]="laeuft()">{{ texte.suchen }}</button>
   </div>
 
+  @if (filter().q.trim()) {
+    <div class="modus">
+      <label>
+        <input
+          type="checkbox"
+          name="volltext"
+          aria-describedby="volltext-hinweis"
+          [checked]="volltextAn()"
+          (change)="volltextSetzen($any($event.target).checked)"
+        />
+        <span>{{ texte.volltext }}</span>
+      </label>
+      <small id="volltext-hinweis">{{ texte.volltextHinweis }}</small>
+    </div>
+  }
+
   <button
     mat-button
     type="button"
@@ -179,7 +195,7 @@
     @if (filter().q.trim()) {
       <label class="feld">
         <span>{{ texte.sortierung }}</span>
-        <select name="sortierung" (change)="setzen('sortierung', $any(wert($event)))">
+        <select name="sortierung" (change)="sortierungSetzen($any(wert($event)))">
           <option value="RELEVANZ" [selected]="filter().sortierung === 'RELEVANZ'">{{ texte.sortierungen['RELEVANZ'] }}</option>
           <option value="DATUM" [selected]="filter().sortierung === 'DATUM'">{{ texte.sortierungen['DATUM'] }}</option>
         </select>
@@ -206,22 +222,33 @@
   <h2 id="treffer-titel" tabindex="-1" #trefferUeberschrift>
     {{ texte.treffer }}
     @if (ergebnis(); as e) {
-      <span class="anzahl" data-test="anzahl">· {{ texte.anzahl(e.gesamt) }}</span>
+      @if (!hybrid()) {
+        <span class="anzahl" data-test="anzahl">· {{ texte.anzahl(e.gesamt) }}</span>
+      } @else if (angezeigt().length > 0) {
+        <span class="anzahl" data-test="anzahl">· {{ texte.besteTreffer }}</span>
+      }
     }
   </h2>
   @if (laeuft()) {
     <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laeuft" />
   }
   <p class="nur-screenreader" aria-live="polite">
-    {{ laeuft() ? texte.laeuft : ergebnis() ? texte.anzahl(ergebnis()!.gesamt) : '' }}
+    {{ laeuft() ? texte.laeuft : ergebnis() ? (hybrid() ? (angezeigt().length > 0 ? texte.besteTreffer : '') : texte.anzahl(ergebnis()!.gesamt)) : '' }}
   </p>
+
+  @if (hybrid() && ergebnis()?.degradiert) {
+    <div class="rueckfall karte" role="status" data-test="nur-volltext">
+      <p>{{ texte.nurVolltext }}</p>
+      <button mat-button type="button" [disabled]="laeuft()" (click)="volltextSetzen(true, true)">{{ texte.alleImVolltext }}</button>
+    </div>
+  }
 
   @if (ergebnis(); as e) {
     @if (e.treffer.length === 0) {
       <p data-test="keine-treffer">{{ texte.keineTreffer }}</p>
     } @else {
       <ol class="liste">
-        @for (t of e.treffer; track t.id) {
+        @for (t of angezeigt(); track t.id) {
           <li class="karte eintrag" data-test="treffer">
             <a class="titel" [routerLink]="['/dokument', t.id]"><app-titel-anzeige [anzeige]="titel(t)" /></a>
             <p class="angaben">
@@ -268,7 +295,7 @@
           </li>
         }
       </ol>
-      @if (seiten() > 1) {
+      @if (!hybrid() && seiten() > 1) {
         <nav class="blaettern" [attr.aria-label]="texte.seite(e.seite + 1, seiten())">
           <button mat-button type="button" [disabled]="laeuft() || e.seite === 0" (click)="blaettern(-1)">
             {{ texte.vorherige }}

@@ -16,6 +16,8 @@ import ch.urinet.archiv.importe.domain.ImportZeile;
 import ch.urinet.archiv.importe.domain.LaufStatus;
 import ch.urinet.archiv.importe.domain.ZeilenPruefung;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
+import ch.urinet.archiv.kontakt.application.KontaktSeite;
+import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.application.KontaktTreffer;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
@@ -265,7 +267,7 @@ class CsvImportSpeicherTest {
             try (JsonRepository repository = new JsonRepository(json, Path.of(args[1]).resolve("zeilen.jsonl"))) {
                 CsvImport csvImport = new CsvImport(new CommonsCsvLeser(), repository,
                         new ImportEinstellungen(MAX_GROESSE, FELD_GRENZE), laufId -> { },
-                        (laufId, datei) -> pruefsumme(datei), laufId -> { });
+                        (laufId, datei) -> pruefsumme(datei), laufId -> { }, ids -> Set.of());
                 CsvImport.Hochgeladen hochgeladen = csvImport.hochladen(ImportArt.KONTAKT, false, "messung.csv",
                         Path.of(args[0]), "inhaber");
                 String antwort = json.writeValueAsString(Map.of("kopf", hochgeladen.lauf().kopf().namen(),
@@ -395,6 +397,26 @@ class CsvImportSpeicherTest {
 
         @Override
         public Optional<Kontakt> finden(UUID id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public KontaktSeite liste(KontaktSuche suche) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Kontakt> zusammengefuehrtAus(UUID ziel, int anzahl) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Kontakt> sperren(Collection<UUID> ids) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Kontakt statusSetzen(UUID id, boolean aktiv, UUID zusammengefuehrtIn) {
             throw new UnsupportedOperationException();
         }
 

@@ -17,7 +17,10 @@ Funktionalität: Dateiname als Platzhalter im Browser gegen das echte Archiv
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne
     Wenn ich nach «Kassenzettel» suche
-    Dann zeigt der Treffer «Scan_Kassenzettel_Testlauf_2026.pdf» den Dateinamen als Platzhalter statt eines Titels
+    Dann hat die PWA die Suche mit diesen Parametern angefragt:
+      | parameter | wert   |
+      | modus     | hybrid |
+    Und zeigt der Treffer «Scan_Kassenzettel_Testlauf_2026.pdf» den Dateinamen als Platzhalter statt eines Titels
     Und lässt sich die Seite nicht waagrecht scrollen
     Wenn ich den Treffer «Scan_Kassenzettel_Testlauf_2026.pdf» öffne
     Dann sehe ich die Dokumentansicht von «Scan_Kassenzettel_Testlauf_2026.pdf»
@@ -32,7 +35,10 @@ Funktionalität: Dateiname als Platzhalter im Browser gegen das echte Archiv
     Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne
     Wenn ich nach «Fotobeleg» suche
-    Und ich den Treffer «קבלה_<b>Fotobeleg.pdf» öffne
+    Dann hat die PWA die Suche mit diesen Parametern angefragt:
+      | parameter | wert   |
+      | modus     | hybrid |
+    Wenn ich den Treffer «קבלה_<b>Fotobeleg.pdf» öffne
     Dann sehe ich die Dokumentansicht von «קבלה_<b>Fotobeleg.pdf»
     Und zeigt die Dokumentansicht den Dateinamen «קבלה_<b>Fotobeleg.pdf» als Platzhalter und in der Zeile «Dateiname»
     Wenn ich den Knopf «Metadaten bearbeiten» wähle

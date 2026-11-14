@@ -974,6 +974,36 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
 - Nachweise: Szenarien `features/kontakt/kontakte-pflegen.feature` (`@req-17.1`–`@req-17.16`, Rollen je Recht, nur
   synthetische Kontaktdaten), die Ergänzungen von 7.4, 11.7, 13.3, 13.4 und 13.7 in den bestehenden Features;
   `KontaktVerweiseTest`; PWA mit Vitests und den Szenarien für 17.5, 17.6 und 17.17.
+- Umsetzung (Aufgabe 4.11, 14.11.2026; Auslegungen im PR unter «Auslegungen»):
+  - Schema: Changeset `db/mandant` 026 (`026-kontakt-pflegen`): Spalten und Checks wie unter «Data Models», ein
+    partieller Index auf `zusammengefuehrt_in`; `zugriff_protokoll_aktion_ck` mit allen Werten aus 004 und den drei
+    Aktionen `KONTAKT_*`. Kein eigener Index für die Liste: Mit Suchbegriff trägt `kontakt_name_trgm_ix`, ohne genügen
+    Seq Scan und Sortierung; ein B-Baum mit `name_normalisiert` verdrängte im Plan mit `%` den GIN-Index
+    (`PartnerAbgleichLeistungTest`, Bitmap-Scan über den ganzen B-Baum bei `enable_seqscan = off`).
+  - Sperren: `KontaktRegister.sperren` sperrt in der Reihenfolge der IDs (`order by id for update`) mit
+    `lock_timeout` = `archiv.import.sperre-wartezeit` nur für diese Anweisung; `55P03` → 409 `STATUS_KONFLIKT`. Auch
+    `PATCH /kontakte/{id}`, `inaktiv` und `aktiv` sperren so. Prüfreihenfolge nach dem Sperren: 404 → 400 (Ziel) → 409 →
+    412; Format von `If-Match` (428/412) und Körper (400, streng gelesen) vorher in der REST-Schicht.
+  - Gemeinsamer Code mit `DokumentAendern`: `DokumentAenderungPort.partnerUmhaengen` sperrt die Dokumente der Quelle
+    (`order by id for update`), sichert die Fassung archivierter Dokumente mit derselben Anweisung wie `versionSichern`
+    (gemeinsames SQL in `PanacheDokumentAenderung`) und setzt `partner_id`, `version + 1`, `geaendert`; die Prüfung eines
+    neuen Partners (inaktiv → 400, derselbe gespeicherte bleibt) teilen Ändern und Bestätigen in
+    `DokumentBestaetigen.partnerName`. `dokument.ki_partner_id` hängt `KontaktVerweise` ohne neue Version um (kein Feld
+    des Eingangskorbs, wie Changeset 022).
+  - Protokoll: `ZugriffProtokoll.schreiben(List)` schreibt per JDBC-Batch, zuerst je Dokument, zuletzt den Eintrag ohne
+    Dokument; scheitert einer, rollt das ganze Zusammenführen zurück (Szenario mit einem Trigger im Test).
+  - Eingangskorb-Filter: `ki_vorschlag` speichert keine Kandidaten, nur Name, E-Mail, UID und IBAN des Partners; der
+    Eingangskorb liefert darum keine, es gibt nichts zu filtern. Weitere Lesepfade mit Kontakten als Zuordnungsziel gibt
+    es nicht (`git grep`); der Verkaufschancen-Import löst die Kontakt-ID aus 21.CRM nur unter aktiven auf (sonst «Kontakt
+    aus 21.CRM nicht gefunden»).
+  - CSV-Import: Eine Zeile `INAKTIV` hat keine Fingerabdrücke und wird darum nie «doppelt in der Datei»; der Dubletten-
+    Entscheid `ZUSAMMENFUEHREN:<id>` prüft beim Auslösen (`InaktiveKontakte`), die Übernahme prüft erneut am gesperrten
+    Kontakt.
+  - Laufzeit (synthetisch, PostgreSQL 17 als Dev Service auf einem Entwicklerrechner): Zusammenführen von 1'000
+    archivierten Dokumenten samt 1'000 Fassungen und 1'001 Protokolleinträgen 64 ms (Szenario in
+    `kontakte-pflegen.feature`, Grenze im Test 30 s).
+  - Abweichungen: keine. `zusammengefuehrtAus` nennt höchstens die 50 neuesten ohne Hinweis auf weitere; die PWA zeigt die
+    Zahl «inaktiv» der Vorschau erst mit 4.12 (der generierte Client kennt sie schon).
 
 Drive-Import (Req 12):
 - Umsetzung (Aufgabe 4.8): `tools/drive_import` ist ein eigenes Maven-Projekt (Java 25, Picocli, Jackson; JAR mit `maven-shade-plugin`, SpotBugs Stufe hoch) ohne Abhängigkeit zum Backend. Es ruft nur `POST /api/v1/dokumente` auf (eine Datei je Anfrage, Teil `hinweis` vor `dateien`); die Archivseite ist unverändert (`quelle=DRIVE` und `erstellt_von='token:<id>'` aus 2.4, Eingangskorb-Ablauf wie jeder Upload, Req 12.8).
@@ -1436,6 +1466,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       und beim Verlassen. Die Ansicht zeigt es auf schmalen Bildschirmen (< 960 px) statt des eingebetteten PDF und
       immer, wenn die PDF/A-Fassung fehlt oder nicht lädt; nur mit `seiten` ≥ 1. In der Trefferliste gibt es kein
       Bild: Jeder Abruf schreibt `ANZEIGEN` ins Protokoll, und `Suchtreffer` kennt `seiten` nicht.
+  - Modus hybrid als Standard und Umschalter «Volltext»: Spec 02, Aufgabe 6.6 (design.md, «Umsetzung (Aufgabe 6.6, 14.11.2026)»).
   - Tests: Unit-Tests (Vitest) für Filter, Adapter, Suche und Dokumentansicht; Browser-Szenarien
     `features/suche/suche-pwa.feature` (`@req-14.1`, `@req-14.2`, `@req-14.4`, `@req-14.6`, `@req-14.7`) gegen eine
     API-Attrappe mit synthetischen Dokumenten (`frontend/e2e/hilfen/suche-attrappe.mjs`, darum `@attrappe`); den
@@ -1443,6 +1474,9 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     `aenderung.ts`, `MetadatenFormular`, Adapter und Ansicht; Browser-Szenarien `features/dokument/bearbeiten-pwa.feature`
     (`@req-10.1` Bearbeiten mit Grund und If-Match, kein Knopf ohne A6; `@req-14.6` Vorschaubild auf dem Handy) gegen
     dieselbe Attrappe; den Vertrag von `versionen` belegt `features/dokument/aendern.feature` (`@req-10.1`).
+    Seit Spec 02, Aufgabe 6.6 sendet jede Suche mit Suchbegriff `modus=hybrid` (ohne `sortierung`, `seite`, `groesse`),
+    jede andere `modus=volltext`: `suche-pwa.feature` erwartet `modus=hybrid` bei den Anzeige-Szenarien (14.6, 14.9, 14.10), `modus=volltext`
+    bei der Filter-Suche ohne Suchbegriff und schaltet für die Parameter `sortierung` und `seite` (14.1, 14.4) den Umschalter «Volltext» ein.
 
 ## Data Models
 
@@ -1557,7 +1591,9 @@ ki_beispiel(id bigserial pk, partner_id uuid null, art text, eingabe_auszug text
 ki_verbrauch(id bigserial pk, zweck text, modell text, tokens_ein int, tokens_aus int, zeit timestamptz)
   -- zweck: Spec 04 ergänzt WISSEN_INGEST, WISSEN_LINT, WISSEN_EMBEDDING (Monatsbericht nach Zweck, Spec 03, 8.1;
   -- Monatsbudget der Wissensbasis, Spec 04, 13.6); Spec 02, Aufgabe 6.3 ergänzt EMBEDDING (Embeddings der Abschnitte
-  -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0)
+  -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0); Spec 02, Aufgabe 6.4 ergänzt
+  -- SUCHE (Hybridsuche, Spec 02, Req 2.8, entschieden von Fabian am 14.11.2026: eine Zeile je Aufruf von
+  -- Embedding-Modell und Reranker mit Antwort, ohne Suchbegriff und ohne Inhalte, kein Limit)
 
 import_zuordnung(art text pk, spalten jsonb, kopf_hash text, geaendert timestamptz)
 import_lauf(id uuid pk, art text, vollexport bool, dateiname text, sha256 text, zeichensatz text,
@@ -1653,6 +1689,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
 | 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
+| 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling») |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
 | 503 | `UEBERLASTET` | zu viele gleichzeitige Argon2-Rechnungen für API-Tokens (Prüfen und Anlegen, seit 2.1), mit `Retry-After: 1` (Aufgabe 1.5); kein Platz nach `archiv.api-token.wartezeit`, bei `0` ohne Warten |
 | 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |

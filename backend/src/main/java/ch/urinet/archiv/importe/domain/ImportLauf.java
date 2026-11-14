@@ -55,8 +55,22 @@ public record ImportLauf(UUID id, ImportArt art, boolean vollexport, String date
                 zaehler, uebernahme);
     }
 
-    /** Zahlen der Vorschau (Req 13.3): neu, geändert, unverändert, mögliche Dublette, fehlerhaft, übersprungen. */
-    public record Zaehler(int neu, int geaendert, int unveraendert, int dubletten, int fehler, int uebersprungen) {
+    /**
+     * Zahlen der Vorschau (Req 13.3): neu, geändert, unverändert, mögliche Dublette, fehlerhaft, übersprungen und
+     * inaktiv (Req 17.13).
+     */
+    public record Zaehler(int neu, int geaendert, int unveraendert, int dubletten, int fehler, int uebersprungen,
+                          int inaktiv) {
+
+        /** Ohne inaktive Zeilen (Verkaufschancen, Läufe vor Req 17). */
+        public Zaehler(int neu, int geaendert, int unveraendert, int dubletten, int fehler, int uebersprungen) {
+            this(neu, geaendert, unveraendert, dubletten, fehler, uebersprungen, 0);
+        }
+
+        /** Alle bewerteten Zeilen. */
+        public int bewertet() {
+            return neu + geaendert + unveraendert + dubletten + fehler + uebersprungen + inaktiv;
+        }
     }
 
     /**
