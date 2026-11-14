@@ -176,6 +176,7 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 | Mindestversionen der Handys (Aufgabe 2.8, Req 4.1) | **entschieden von Fabian am 13.11.2026**: nur die aktuelle Hauptversion von iOS (Safari) und das aktuelle Chrome auf Android; ältere Versionen werden nicht unterstützt und nicht geprüft. |
 | Spec 02 Welle 6 vor Gate Phase 1 | **entschieden von Fabian am 13.11.2026**: Fokus auf Funktionen für die Benutzer – Welle 6 (E-Mail-Eingang 6.1, Embeddings 6.3, Hybridsuche 6.4, Jahresexport 6.5) wird vor Gate Phase 1 entwickelt; Gate Phase 1 bleibt Bedingung für den produktiven Betrieb, Welle 7 (Chat) folgt nach Plan. Betriebsaufgaben (5.2-Rest, 5.5, 5.11) werden dafür zurückgestellt. |
 | Postfach des E-Mail-Eingangs (Spec 02, 6.2) | **entschieden von Fabian am 13.11.2026**: `archiv@urinet.ch` liegt bei Hostpoint statt bei Infomaniak (Schweizer Anbieter, Daten bleiben in der Schweiz). |
+| Mail-Versand und Alarm-Empfänger in prod (Spec 01, 5.6) | **entschieden von Fabian am 14.11.2026**: Versand über Hostpoint mit dem Postfach `archiv@urinet.ch` (`asmtp.mail.hostpoint.ch`, Port 587, STARTTLS, Anmeldung); Passwort als GitHub-Secret `ARCHIV_SMTP_PASSWORT`, Empfänger je Mandant als GitHub-Variable (`ARCHIV_ALARM_EMPFAENGER_URINET`), nicht im Repo. |
 
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
