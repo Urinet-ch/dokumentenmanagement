@@ -2761,6 +2761,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokument"
+        "409":
+          description: Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)
         "412":
           description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
         "428":
@@ -2814,6 +2816,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokument"
+        "409":
+          description: Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)
         "412":
           description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
         "428":
