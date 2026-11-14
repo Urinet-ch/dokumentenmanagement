@@ -281,3 +281,16 @@ Funktionalität: Dokument bestätigen und archivieren
       | titel     | Quittung           |
       | dateiname | Quittung_Probe.pdf |
     Und trägt die Antwort das ETag der neuen Version von «Q»
+
+  @req-17.12
+  Szenario: Bestätigen mit einem inaktiven Kontakt als neuem Partner lehnt das Archiv ab
+    Angenommen im Mandanten «urinet» gibt es den Kontakt «Partner_Ruhend»
+    Und der Kontakt «Partner_Ruhend» im Mandanten «urinet» ist inaktiv
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» so bestätigt:
+      | art     | KORRESPONDENZ |
+      | titel   | Anfrage Probe |
+      | datum   | 2026-03-10    |
+      | partner | Partner_Ruhend |
+    Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
+    Und ist das Dokument «K» im Status «EINGANGSKORB»

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Kontakte ansehen und pflegen (Spec 01, Req 17, Aufgabe 4.11; design.md «Kontakte ansehen und pflegen»):
+         - kontakt.aktiv / inaktiv_seit / zusammengefuehrt_in: inaktiv markiert oder in einen anderen Kontakt
+           zusammengeführt (Req 17.7, 17.11); nie gelöscht. Bestehende Kontakte bleiben aktiv (Standard true).
+         - import_zeile.ergebnis zusätzlich INAKTIV, import_lauf.inaktiv (Req 17.13; null, solange die Vorschau
+           aussteht, wie die übrigen Zähler).
+         - zugriff_protokoll.aktion zusätzlich KONTAKT_ZUSAMMENFUEHREN, KONTAKT_INAKTIV, KONTAKT_AKTIV; der Check
+           enthält alle Werte aus 004 (Stand origin/main beim Anlegen).
+         - Index für die Liste ohne Suchbegriff (Status, Sortierung nach name_normalisiert, vorname, id) und für die
+           Kette «zusammengeführt aus».
+         Rückwärtskompatibel (tech.md Regel 11): nur neue Spalten mit Standardwert bzw. null und weitere erlaubte
+         Werte; das Vorgänger-Release liest und schreibt weiter. -->
+    <changeSet id="026-kontakt-pflegen" author="archiv">
+        <addColumn tableName="kontakt">
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="inaktiv_seit" type="timestamptz"/>
+            <column name="zusammengefuehrt_in" type="uuid">
+                <constraints foreignKeyName="kontakt_zusammengefuehrt_in_fk" references="kontakt(id)"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="import_lauf">
+            <column name="inaktiv" type="int"/>
+        </addColumn>
+        <sql>
+            alter table kontakt add constraint kontakt_aktiv_ck check (aktiv = (inaktiv_seit is null));
+            alter table kontakt add constraint kontakt_zusammengefuehrt_ck
+                check (zusammengefuehrt_in is null or not aktiv);
+            alter table kontakt add constraint kontakt_zusammengefuehrt_selbst_ck check (zusammengefuehrt_in &lt;&gt; id);
+            create index kontakt_liste_ix on kontakt (aktiv, name_normalisiert, vorname, id);
+            create index kontakt_zusammengefuehrt_in_ix on kontakt (zusammengefuehrt_in)
+                where zusammengefuehrt_in is not null;
+
+            alter table import_zeile drop constraint import_zeile_ergebnis_ck;
+            alter table import_zeile add constraint import_zeile_ergebnis_ck
+                check (ergebnis is null or ergebnis in ('NEU', 'GEAENDERT', 'UNVERAENDERT', 'DUBLETTE', 'FEHLER',
+                    'UEBERSPRUNGEN', 'INAKTIV'));
+
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN', 'VERWERFEN',
+                    'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT', 'REGEL_AENDERN', 'WISSEN_ANZEIGEN',
+                    'WISSEN_ANNEHMEN', 'WISSEN_VERWERFEN', 'WISSEN_INGEST', 'WISSEN_LINT', 'KONTAKT_ZUSAMMENFUEHREN',
+                    'KONTAKT_INAKTIV', 'KONTAKT_AKTIV'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

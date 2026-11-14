@@ -128,7 +128,8 @@ public class JdbcImportRepository implements ImportRepository {
     @Override
     public void laufAktualisieren(ImportLauf lauf) {
         String sql = "update " + schema() + ".import_lauf set status = ?, zeilen = ?, fehler = ?, "
-                + "zuordnung = cast(? as jsonb), neu = ?, geaendert = ?, unveraendert = ?, dubletten = ? where id = ?";
+                + "zuordnung = cast(? as jsonb), neu = ?, geaendert = ?, unveraendert = ?, dubletten = ?, inaktiv = ? "
+                + "where id = ?";
         ImportLauf.Zaehler vorschau = lauf.vorschau();
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement aendern = verbindung.prepareStatement(sql)) {
@@ -140,7 +141,8 @@ public class JdbcImportRepository implements ImportRepository {
             aendern.setObject(6, vorschau == null ? null : vorschau.geaendert(), Types.INTEGER);
             aendern.setObject(7, vorschau == null ? null : vorschau.unveraendert(), Types.INTEGER);
             aendern.setObject(8, vorschau == null ? null : vorschau.dubletten(), Types.INTEGER);
-            aendern.setObject(9, lauf.id(), Types.OTHER);
+            aendern.setObject(9, vorschau == null ? null : vorschau.inaktiv(), Types.INTEGER);
+            aendern.setObject(10, lauf.id(), Types.OTHER);
             aendern.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("Import-Lauf nicht gespeichert", e);
@@ -249,7 +251,7 @@ public class JdbcImportRepository implements ImportRepository {
     private static String laufAbfrage(String schema) {
         return "select l.id, l.art, l.vollexport, l.dateiname, l.sha256, l.zeichensatz, l.trennzeichen, "
                 + "l.kopfzeile::text, l.zeilen, l.fehler, l.status, l.benutzer, l.erstellt, l.zuordnung::text, "
-                + "l.neu, l.geaendert, l.unveraendert, l.dubletten, l.uebernommen, l.uebernommen_von, l.angelegt, "
+                + "l.neu, l.geaendert, l.unveraendert, l.dubletten, l.inaktiv, l.uebernommen, l.uebernommen_von, l.angelegt, "
                 + "l.aktualisiert, l.ausgelassen, l.gekennzeichnet, "
                 + "(select count(*) from " + schema + ".import_zeile z where z.lauf_id = l.id "
                 + "and z.ergebnis = 'UEBERSPRUNGEN') as uebersprungen "
@@ -265,7 +267,7 @@ public class JdbcImportRepository implements ImportRepository {
         int uebersprungen = ergebnis.getInt("uebersprungen");
         ImportLauf.Zaehler vorschau = neu == null ? null : new ImportLauf.Zaehler(neu,
                 ergebnis.getInt("geaendert"), ergebnis.getInt("unveraendert"), ergebnis.getInt("dubletten"),
-                fehler, uebersprungen);
+                fehler, uebersprungen, ergebnis.getInt("inaktiv"));
         String von = ergebnis.getString("uebernommen_von");
         Timestamp zeit = ergebnis.getTimestamp("uebernommen");
         Integer angelegt = ergebnis.getObject("angelegt", Integer.class);
@@ -538,7 +540,8 @@ public class JdbcImportRepository implements ImportRepository {
         }
         return new ImportLauf.Zaehler(anzahl.getOrDefault("NEU", 0), anzahl.getOrDefault("GEAENDERT", 0),
                 anzahl.getOrDefault("UNVERAENDERT", 0), anzahl.getOrDefault("DUBLETTE", 0),
-                anzahl.getOrDefault("FEHLER", 0), anzahl.getOrDefault("UEBERSPRUNGEN", 0));
+                anzahl.getOrDefault("FEHLER", 0), anzahl.getOrDefault("UEBERSPRUNGEN", 0),
+                anzahl.getOrDefault("INAKTIV", 0));
     }
 
     @Override

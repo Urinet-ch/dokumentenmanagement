@@ -17,8 +17,10 @@ import java.sql.Types;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -105,9 +107,10 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement kennzeichnen = verbindung.prepareStatement("update " + tabelle
                      + " set nicht_im_export = true, geaendert = now() "
-                     + "where crm_id is not null and not nicht_im_export and not (crm_id = any(?))");
+                     + "where aktiv and crm_id is not null and not nicht_im_export and not (crm_id = any(?))");
              PreparedStatement zuruecksetzen = verbindung.prepareStatement("update " + tabelle
-                     + " set nicht_im_export = false, geaendert = now() where nicht_im_export and crm_id = any(?)")) {
+                     + " set nicht_im_export = false, geaendert = now() where aktiv and nicht_im_export "
+                     + "and crm_id = any(?)")) {
             var ids = verbindung.createArrayOf("text", imExport.toArray());
             kennzeichnen.setArray(1, ids);
             int gekennzeichnet = kennzeichnen.executeUpdate();
@@ -120,13 +123,35 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
     }
 
     @Override
+    public Set<UUID> inaktive(Collection<UUID> ids) {
+        Set<UUID> ergebnis = new HashSet<>();
+        if (ids.isEmpty()) {
+            return ergebnis;
+        }
+        JdbcKontaktRegister.transaktionPruefen();
+        String sql = "select id from " + schema() + ".kontakt where not aktiv and id = any(?)";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setArray(1, verbindung.createArrayOf("uuid", ids.toArray()));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    ergebnis.add(zeile.getObject(1, UUID.class));
+                }
+            }
+            return ergebnis;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakte nicht lesbar", e);
+        }
+    }
+
+    @Override
     public Map<String, UUID> kontakteMitCrmId(Collection<String> crmIds) {
         Map<String, UUID> ergebnis = new HashMap<>();
         if (crmIds.isEmpty()) {
             return ergebnis;
         }
         JdbcKontaktRegister.transaktionPruefen();
-        String sql = "select crm_id, id from " + schema() + ".kontakt where crm_id = any(?)";
+        String sql = "select crm_id, id from " + schema() + ".kontakt where aktiv and crm_id = any(?)";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setArray(1, verbindung.createArrayOf("text", crmIds.toArray()));

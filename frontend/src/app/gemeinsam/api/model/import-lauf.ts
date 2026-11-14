@@ -48,6 +48,10 @@ export interface ImportLauf {
      */
     dubletten?: number | null;
     /**
+     * Vorschau: Zeilen, deren Kontakt inaktiv ist (Req 17.13); werden nicht übernommen
+     */
+    inaktiv?: number | null;
+    /**
      * Benutzer, der die Übernahme ausgelöst hat
      */
     uebernommenVon?: string | null;
