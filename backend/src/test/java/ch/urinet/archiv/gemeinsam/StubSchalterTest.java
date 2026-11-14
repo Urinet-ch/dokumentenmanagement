@@ -6,9 +6,12 @@ import ch.urinet.archiv.integration.adapter.out.IntegrationAuswahl;
 import ch.urinet.archiv.integration.adapter.out.stub.IntegrationStub;
 import ch.urinet.archiv.ki.adapter.out.EmbeddingAuswahl;
 import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
+import ch.urinet.archiv.ki.adapter.out.RerankerAuswahl;
+import ch.urinet.archiv.ki.adapter.out.reranker.InfomaniakReranker;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jEmbeddingAdapter;
 import ch.urinet.archiv.ki.adapter.out.stub.EmbeddingStub;
 import ch.urinet.archiv.ki.adapter.out.stub.KiStub;
+import ch.urinet.archiv.ki.adapter.out.stub.RerankerStub;
 import ch.urinet.archiv.verarbeitung.adapter.out.OcrAuswahl;
 import ch.urinet.archiv.verarbeitung.adapter.out.stub.OcrStub;
 import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
@@ -46,6 +49,20 @@ class StubSchalterTest {
             assertThat(config.getValue("archiv." + port + ".stub", Boolean.class)).as(port).isEqualTo(erwartet);
         }
         assertThat(config.getValue("archiv.ki.embedding-stub", Boolean.class)).as("embedding").isEqualTo(erwartet);
+        assertThat(config.getValue("archiv.ki.reranker-stub", Boolean.class)).as("reranker").isEqualTo(erwartet);
+    }
+
+    /** Wie beim Embedding: mit Schalter der Dev-Stub des Rerankers, ohne Schalter der REST-Adapter (Aufgabe 6.4). */
+    @Test
+    void rerankerSchalterWaehltStubOderAdapter() {
+        RerankerStub stub = new RerankerStub();
+        InfomaniakReranker adapter = new InfomaniakReranker(null, null, Optional.empty(), "m", null);
+        assertThat(new RerankerAuswahl().reranker(true, stub, instanz(adapter))).isSameAs(stub);
+        assertThat(new RerankerAuswahl().reranker(false, stub, instanz(adapter))).isSameAs(adapter);
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(false))).abbrueche()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(false))).warnungen()).isEmpty();
+        assertThat(PortAuswahl.pruefe(List.of(new RerankerAuswahl().auswahl(true))).abbrueche())
+                .containsExactly("RerankerPort: Dev-Stub ist in prod nicht zulässig");
     }
 
     /**

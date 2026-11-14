@@ -27,7 +27,8 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Der Embedding-Port wählt Adapter oder Stub über den Schalter `archiv.ki.embedding-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
   - _Anforderungen: 2.1, 2.4_
 
-- [ ] 6.4 Hybridsuche [Backend]
+- [x] 6.4 Hybridsuche [Backend]
+  - Erledigt (PR #139): `HybridSuche` mit `RerankerPort` (Adapter `InfomaniakReranker`, Stub über `archiv.ki.reranker-stub`), `EmbeddingPort.einbettenFrage` und `VektorSuchePort` (`PanacheVektorSuche`, `hnsw.ef_search` 100, `iterative_scan`); Zeitgrenzen `archiv.suche.embedding-zeitgrenze` 1 s und `archiv.suche.reranker-zeitgrenze` 1.5 s; Modus `hybrid` in `GET /dokumente`, ohne `modus` Volltext; `ki_verbrauch` Zweck `SUCHE`; lokal p95 110 ms für die Datenbankteile mit 5'000 Dokumenten, Messung auf Stufe B offen; kein Changeset
   - `HybridSuche` (Volltext + Vektor + RRF + Reranker), Rückfall auf Volltext mit `degradiert`, Modus `hybrid` in `GET /dokumente`
   - Spec 03 ergänzt: `HybridSuche` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Reranker-Port wählt Adapter oder Stub über den Schalter `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
