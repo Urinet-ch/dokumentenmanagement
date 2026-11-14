@@ -1,5 +1,6 @@
 package ch.urinet.archiv.protokoll.application;
 
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
@@ -40,8 +41,8 @@ public class ManifestPlanen {
                         new Nutzlast(Map.of(ManifestErzeugen.BIS_TAG, gestern.toEpochDay()))));
                 LOG.infof("Manifest bis %s für Mandant %s eingereiht (Auftrag %d)", gestern, mandant.code().wert(), id);
             } catch (RuntimeException e) {
-                LOG.errorf("Manifest für Mandant %s nicht eingereiht: %s", mandant.code().wert(),
-                        e.getClass().getSimpleName());
+                LOG.errorf("Manifest für Mandant %s nicht eingereiht, ursache=%s", mandant.code().wert(),
+                        Ursachen.ketteMitMeldung(e));
             }
         }
     }

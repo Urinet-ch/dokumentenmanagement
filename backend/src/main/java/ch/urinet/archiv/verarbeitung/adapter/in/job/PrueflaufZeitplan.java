@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufStarten;
+import ch.urinet.archiv.gemeinsam.adapter.in.job.TaktThread;
 import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,7 +21,9 @@ import java.util.Optional;
  * Startet den monatlichen Prüflauf jedes aktiven Mandanten (Req 15.5), nur mit der Rolle {@code worker}. Der Takt
  * ({@code archiv.prueflauf.zeitplan}, Cron in Europe/Zurich, Standard täglich um 04:00) löst täglich aus; weil
  * {@code prueflauf.monat} eindeutig ist, legt nur der erste Start eines Monats einen Lauf an. So holt der nächste Tag
- * einen verpassten (Worker zum Zeitpunkt nicht aktiv) oder gescheiterten Start nach.
+ * einen verpassten (Worker zum Zeitpunkt nicht aktiv) oder gescheiterten Start nach. Gestartet wird in einem eigenen
+ * Thread ohne den Request-Kontext des Schedulers ({@link TaktThread}), sonst verweigert {@code MandantKontext.mit} den
+ * Mandanten.
  */
 @ApplicationScoped
 public class PrueflaufZeitplan {
@@ -53,15 +56,19 @@ public class PrueflaufZeitplan {
         if (!worker) {
             return;
         }
+        TaktThread.ausfuehren("prueflauf", this::alleStarten);
+    }
+
+    private void alleStarten() {
         YearMonth monat = YearMonth.now(uhr.withZone(ZUERICH));
         for (Mandant mandant : mandanten.aktive()) {
             try {
                 starten.starten(mandant.code(), Optional.of(monat))
                         .ifPresent(id -> LOG.infof("Prüflauf %s für Mandant %s gestartet", id, mandant.code().wert()));
             } catch (RuntimeException e) {
-                // der nächste tägliche Takt versucht es wieder; nur Klassennamen (Req 16.7)
+                // der nächste tägliche Takt versucht es wieder; Klassennamen, feste Meldungen (Req 16.7)
                 LOG.warnf("Prüflauf für Mandant %s nicht gestartet, ursache=%s", mandant.code().wert(),
-                        Ursachen.kette(e));
+                        Ursachen.ketteMitMeldung(e));
             }
         }
     }

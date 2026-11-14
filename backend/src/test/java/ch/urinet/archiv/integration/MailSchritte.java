@@ -3,9 +3,13 @@ package ch.urinet.archiv.integration;
 import ch.urinet.archiv.dokument.Testdateien;
 import ch.urinet.archiv.ablage.S3Stoerung;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
+import ch.urinet.archiv.gemeinsam.SchedulerTakt;
+import ch.urinet.archiv.integration.adapter.in.job.MailTakt;
+import ch.urinet.archiv.integration.adapter.in.job.MailTaktAusloesen;
 import ch.urinet.archiv.integration.application.mail.MailEingang;
 import ch.urinet.archiv.integration.application.mail.MailEinrichten;
 import ch.urinet.archiv.integration.domain.mail.MailKopf;
+import ch.urinet.archiv.mandant.application.MandantAusAnmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.VerarbeitungTestHilfe;
 import io.agroal.api.AgroalDataSource;
@@ -15,6 +19,7 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Und;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.scheduler.Scheduler;
 import jakarta.activation.DataHandler;
 import jakarta.inject.Inject;
 import jakarta.enterprise.inject.Instance;
@@ -25,6 +30,8 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.mail.util.ByteArrayDataSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Connection;
@@ -36,6 +43,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -51,8 +59,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Schritte zu Spec 02, Req 1.1–1.6 (Aufgabe 6.1): Postfach in GreenMail ({@link TestPostfach}), Abruf über
- * {@link MailEingang} wie im Takt, eingerichtet über {@link MailEinrichten} wie mit dem Kommando {@code mail einrichten}.
- * Nur synthetische Nachrichten und Dateien (Req 16.15).
+ * {@link MailEingang} in einem eigenen Thread oder über den {@link MailTakt} im Scheduler wie im Betrieb, eingerichtet
+ * über {@link MailEinrichten} wie mit dem Kommando {@code mail einrichten}. Nur synthetische Nachrichten und Dateien
+ * (Req 16.15).
  */
 public class MailSchritte {
 
@@ -64,6 +73,15 @@ public class MailSchritte {
 
     @Inject
     MailEingang eingang;
+
+    @Inject
+    MailTakt takt;
+
+    @Inject
+    Scheduler scheduler;
+
+    @Inject
+    MandantAusAnmeldung anmeldung;
 
     @Inject
     VerarbeitungTestHilfe verarbeitung;
@@ -163,8 +181,49 @@ public class MailSchritte {
     @Angenommen("der Mail-Eingang hat das Postfach von «{word}» abgerufen")
     @Wenn("der Mail-Eingang das Postfach von «{word}» abruft")
     public void abrufen(String mandant) throws Exception {
-        // eigener Thread wie im Takt des Schedulers: ohne Request-Kontext und Anmeldung des Testlaufs
+        // eigener Thread ohne Request-Kontext und Anmeldung, wie ihn der Takt über TaktThread öffnet; den Weg über
+        // den Scheduler selbst (mit Request-Kontext) prüft der Schritt «der Takt des Workers ruft … im Scheduler ab»
         CompletableFuture.runAsync(() -> eingang.abrufen(new MandantCode(mandant))).get(2, TimeUnit.MINUTES);
+    }
+
+    /**
+     * Wie im Betrieb: Ein Job des Quarkus-Schedulers ruft einmal {@link MailTakt} auf, im Thread des Schedulers mit dem
+     * Request-Kontext und ohne Anmeldung ({@link SchedulerTakt}; Befund prod 13.11.2026). Der Takt in
+     * der Konfiguration ist im Profil {@code test} aus ({@code archiv.mail.intervall=off}).
+     */
+    @Wenn("der Takt des Workers das Postfach im Scheduler abruft")
+    public void imTakt() throws Exception {
+        SchedulerTakt.ausloesen(scheduler, anmeldung, "mail-eingang", () -> MailTaktAusloesen.abrufen(takt));
+    }
+
+    @Angenommen("im Postfach liegt eine Mail aus Gmail von «{}» mit einem PDF «{}»")
+    public void mailAusGmail(String von, String name) throws Exception {
+        letztesPdf = Testdateien.pdf();
+        String messageId = "<CAH" + UUID.randomUUID().toString().replace("-", "") + "@mail.gmail.com>";
+        String vorlage;
+        try (InputStream ein = MailSchritte.class.getResourceAsStream("/mail/gmail-mit-pdf.eml")) {
+            vorlage = new String(ein.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        String roh = vorlage.replace("{{absender}}", von).replace("{{message-id}}", messageId)
+                .replace("{{dateiname}}", name)
+                .replace("{{pdf}}", Base64.getMimeEncoder(76, new byte[]{'\n'}).encodeToString(letztesPdf))
+                .replace("\r\n", "\n").replace("\n", "\r\n");
+        // unverändert zustellen (ohne saveChanges), damit Kopf und Aufbau wie von Gmail bleiben
+        MimeMessage nachricht = new MimeMessage(Session.getInstance(new Properties()),
+                new ByteArrayInputStream(roh.getBytes(StandardCharsets.UTF_8)));
+        postfaecher.get("urinet").zustellen(nachricht);
+        nachrichten.add(messageId);
+        letzteNachricht = nachricht;
+    }
+
+    @Dann("das Dokument der Mail ist das PDF «{}» aus dem Anhang")
+    public void istPdfAusAnhang(String name) throws SQLException {
+        UUID id = dokument("urinet");
+        Map<String, Object> dok = zeile("select art, dateiname from " + schema("urinet") + ".dokument where id = ?", id);
+        assertThat(dok.get("art")).isNull();
+        assertThat(dok).containsEntry("dateiname", name);
+        assertThat(zeile("select mime from " + schema("urinet") + ".dokument_datei where dokument_id = ? and nr = 1",
+                id)).containsEntry("mime", "application/pdf");
     }
 
     @Wenn("der Mail-Eingang das Postfach von «{word}» zweimal abruft")
@@ -438,6 +497,13 @@ public class MailSchritte {
         Map<String, Object> zeile = zeile("select status, betreff from " + schema(mandant)
                 + ".mail_eingang where message_id = ?", id);
         assertThat(zeile).containsEntry("status", status).containsEntry("betreff", "Rechnung X Y");
+    }
+
+    @Dann("das Log meldet keine Nachricht als nicht verarbeitet")
+    public void keineNichtVerarbeitet() {
+        assertThat(mailEintraege().stream().map(log::nachricht))
+                .noneMatch(n -> n.startsWith("Mail-Eingang: Nachricht nicht verarbeitet"))
+                .noneMatch(n -> n.startsWith("Mail-Eingang fehlgeschlagen"));
     }
 
     @Dann("das Log meldet zur Mail kein neues Dokument")
