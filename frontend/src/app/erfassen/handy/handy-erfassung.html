@@ -79,7 +79,7 @@
           }
           <div>
             <strong>{{ texte.seite(i + 1) }}</strong>
-            <p role="status" [class.fehler]="seite.hinweis === 'fehler'">{{ hinweisText(seite.hinweis) }}</p>
+            <p role="status" [class.fehler]="seite.hinweis === 'fehler' || seite.hinweis === 'anpassenFehler'">{{ hinweisText(seite.hinweis) }}</p>
             <button
               mat-stroked-button
               type="button"
