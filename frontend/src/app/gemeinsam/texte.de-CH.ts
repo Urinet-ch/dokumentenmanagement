@@ -302,11 +302,13 @@ export const TEXTE = {
     >,
     treffer: 'Treffer',
     volltext: 'Volltext',
-    volltextHinweis: 'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',
+    volltextHinweis:
+      'Aus: die besten Treffer nach Wortlaut und Bedeutung. Ein: alle Treffer im Volltext, mit Gesamtzahl und Blättern.',
     besteTreffer: 'Die besten Treffer',
     nurVolltext: 'Nur im Volltext gesucht: Die semantische Suche ist gerade nicht verfügbar.',
     alleImVolltext: 'Alle Treffer im Volltext zeigen',
-    anzahl: (gesamt: number) => (gesamt === 1 ? '1 Treffer' : `${gesamt.toLocaleString('de-CH')} Treffer`),
+    anzahl: (gesamt: number) =>
+      gesamt === 1 ? '1 Treffer' : `${gesamt.toLocaleString('de-CH')} Treffer`,
     keineTreffer: 'Keine Dokumente gefunden. Bitte Suchbegriff oder Filter anpassen.',
     laeuft: 'Suche läuft …',
     ohneTitel: 'Ohne Titel',
