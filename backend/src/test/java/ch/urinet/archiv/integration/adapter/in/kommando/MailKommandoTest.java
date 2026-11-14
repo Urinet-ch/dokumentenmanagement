@@ -1,6 +1,11 @@
 package ch.urinet.archiv.integration.adapter.in.kommando;
 
 import ch.urinet.archiv.integration.application.mail.MailEinrichten;
+import ch.urinet.archiv.mandant.application.MandantRegister;
+import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
+import ch.urinet.archiv.mandant.domain.Mandant;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.application.Verschluesselung;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -8,8 +13,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,37 +65,85 @@ class MailKommandoTest {
 
     @Test
     void halterLiestNurDieErsteZeileUndGibtSieGenauEinmalHeraus() throws IOException {
-        assertThat(MailPasswortEingabe.vorabLesen(new ByteArrayInputStream(
-                "s3hr-gehéim\r\nrest\n".getBytes(StandardCharsets.UTF_8)))).isTrue();
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe("s3hr-gehéim\r\nrest\n"))).isEmpty();
         assertThat(MailPasswortEingabe.nehmen()).containsExactly("s3hr-gehéim".toCharArray());
         assertThat(MailPasswortEingabe.nehmen()).as("danach leer").isEmpty();
 
-        assertThat(MailPasswortEingabe.vorabLesen(new ByteArrayInputStream(new byte[0]))).isFalse();
-        assertThat(MailPasswortEingabe.vorabLesen(new ByteArrayInputStream("\nrest\n".getBytes(StandardCharsets.UTF_8))))
-                .isFalse();
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe(""))).contains(MailPasswortEingabe.FEHLT);
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe("\nrest\n"))).contains(MailPasswortEingabe.FEHLT);
         assertThat(MailPasswortEingabe.nehmen()).isEmpty();
-        // länger als der Anfangspuffer, ohne Zeilenende
-        String lang = "x".repeat(200);
-        assertThat(MailPasswortEingabe.vorabLesen(new ByteArrayInputStream(lang.getBytes(StandardCharsets.UTF_8))))
-                .isTrue();
-        assertThat(new String(MailPasswortEingabe.nehmen())).isEqualTo(lang);
+        // Leerzeichen am Rand gehören zum Passwort
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe("  pw x  \n"))).isEmpty();
+        assertThat(new String(MailPasswortEingabe.nehmen())).isEqualTo("  pw x  ");
     }
 
     @Test
-    void leeresPasswortIstFachlicherFehler() {
-        MailKommando kommando = new MailKommando(new MailEinrichten(null, null, null) {
+    void zuLangeZeileIstFachlicherFehlerUndBleibtNichtImHalter() throws IOException {
+        String genau = "x".repeat(MailPasswortEingabe.HOECHSTENS);
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe(genau + "\r\n"))).isEmpty();
+        assertThat(new String(MailPasswortEingabe.nehmen())).isEqualTo(genau);
+        // ohne Zeilenende wie eine versehentlich umgeleitete Datei
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe(genau))).isEmpty();
+        assertThat(MailPasswortEingabe.nehmen()).hasSize(MailPasswortEingabe.HOECHSTENS);
+
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe(genau + "y\n"))).contains(MailPasswortEingabe.ZU_LANG);
+        assertThat(MailPasswortEingabe.vorabLesen(eingabe("z".repeat(100_000)))).contains(MailPasswortEingabe.ZU_LANG);
+        assertThat(MailPasswortEingabe.nehmen()).isEmpty();
+    }
+
+    @Test
+    void leeresPasswortLehntDieEchtePruefungInMailEinrichtenAb() {
+        MandantCode urinet = new MandantCode("urinet");
+        MandantRegister register = new MandantRegister() {
             @Override
-            public void einrichten(String code, String host, int port, String benutzer, String passwort,
-                                   List<String> absender) {
-                if (passwort.isEmpty()) {
-                    throw new Fehler(MailPasswortEingabe.FEHLT);
-                }
+            public boolean existiert(MandantCode code) {
+                return code.equals(urinet);
             }
-        });
+
+            @Override
+            public void eintragen(Mandant mandant) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public List<Mandant> aktive() {
+                return List.of(new Mandant(urinet, "UriNet", urinet.schema(), "b", Geschaeftsjahresende.STANDARD,
+                        true));
+            }
+
+            @Override
+            public Optional<Instant> erstellt(MandantCode code) {
+                return Optional.empty();
+            }
+        };
+        Verschluesselung schluessel = new Verschluesselung() {
+            @Override
+            public boolean verfuegbar() {
+                return true;
+            }
+
+            @Override
+            public byte[] verschluesseln(byte[] klartext, String bezug) {
+                throw new AssertionError("ohne Passwort wird nichts verschlüsselt");
+            }
+
+            @Override
+            public byte[] entschluesseln(byte[] chiffrat, String bezug) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        // Konfiguration null: ohne Passwort darf nichts gespeichert werden
+        MailKommando kommando = new MailKommando(new MailEinrichten(register, null, schluessel));
         ByteArrayOutputStream fehler = new ByteArrayOutputStream();
-        assertThat(kommando.ausfuehren(List.of("einrichten", "urinet", "h", "993", "b", "a@example.invalid"),
-                () -> new char[0], new PrintStream(fehler, true, StandardCharsets.UTF_8))).isEqualTo(1);
-        assertThat(fehler.toString(StandardCharsets.UTF_8)).contains("Passwort fehlt");
+
+        assertThat(kommando.ausfuehren(List.of("einrichten", "urinet", "imap.example.invalid", "993",
+                        "archiv@example.invalid", "a@example.invalid"), () -> new char[0],
+                new PrintStream(fehler, true, StandardCharsets.UTF_8))).isEqualTo(1);
+        assertThat(fehler.toString(StandardCharsets.UTF_8)).contains(MailPasswortEingabe.FEHLT);
+    }
+
+    private static ByteArrayInputStream eingabe(String inhalt) {
+        return new ByteArrayInputStream(inhalt.getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

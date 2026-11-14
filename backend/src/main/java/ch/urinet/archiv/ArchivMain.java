@@ -166,15 +166,14 @@ public class ArchivMain implements QuarkusApplication {
     /**
      * {@code mail einrichten}: das Passwort (erste Zeile der Standardeingabe) lesen, bevor Quarkus startet. Im Befund
      * von Stufe A (13.11.2026) kam die Eingabe im Wegwerf-Container nicht mehr an, wenn sie erst nach dem Start (rund
-     * 50 s) gelesen wurde (Spec 02, design.md «Umsetzung (Aufgabe 6.1)»). Ohne Passwort endet das Kommando sofort.
+     * 50 s) gelesen wurde (Spec 02, design.md «Umsetzung (Aufgabe 6.1)»). Ohne oder mit zu langem Passwort endet das
+     * Kommando sofort mit 1, ist die Standardeingabe nicht lesbar mit 3 (nur die Klasse des Fehlers, nie seine Meldung).
      */
     static int mailPasswortVorabLesen(InputStream ein) {
         try {
-            if (MailPasswortEingabe.vorabLesen(ein)) {
-                return 0;
-            }
-            System.err.println(MailPasswortEingabe.FEHLT);
-            return FACHLICHER_FEHLER;
+            Optional<String> fehler = MailPasswortEingabe.vorabLesen(ein);
+            fehler.ifPresent(System.err::println);
+            return fehler.isPresent() ? FACHLICHER_FEHLER : 0;
         } catch (IOException e) {
             System.err.println("Technischer Fehler: Standardeingabe nicht lesbar (" + e.getClass().getSimpleName() + ")");
             return TECHNISCHER_FEHLER;
