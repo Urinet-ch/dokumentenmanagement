@@ -7,14 +7,18 @@ import java.util.regex.Pattern;
 
 /**
  * Inhalt der Spalte {@code details} (jsonb): nur Grund, SHA-256, Fehlercode, bei {@code REGEL_AENDERN} die alte und
- * neue Regel einer Dokumentart, bei {@code SPERRE_KONFLIKT} die bisherige und die neu berechnete Frist und bei den
- * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}), nie Dokumentinhalte oder Kontaktdaten
- * (Req 9.7, 9.10, 10.2, 16.7, 17.8). Jedes Feld darf fehlen ({@code null}).
+ * neue Regel einer Dokumentart, bei {@code SPERRE_KONFLIKT} die bisherige und die neu berechnete Frist, bei den
+ * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}) und der Kanal eines Auslösers ohne
+ * eigenen Endpunkt ({@code kanal}, z. B. {@value #KANAL_CHAT} für das Chat-Werkzeug {@code dokument_zeigen},
+ * Spec 02, Aufgabe 7.1a), nie Dokumentinhalte oder Kontaktdaten (Req 9.7, 9.10, 10.2, 16.7, 17.8). Jedes Feld darf
+ * fehlen ({@code null}); ohne {@code kanal} ist der Eintrag an einem REST-Endpunkt entstanden.
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
-                               FristKonflikt fristKonflikt, Kontakte kontakte) {
+                               FristKonflikt fristKonflikt, Kontakte kontakte, String kanal) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
+    /** Chat-Werkzeug (Spec 02, design.md «Vertrag Welle 7», E4). */
+    public static final String KANAL_CHAT = "CHAT";
 
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-f]{64}$");
     /** Fehlercode, Code einer Dokumentart oder Wert eines Enums */
@@ -33,19 +37,23 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         if (grund != null && grund.isBlank()) {
             grund = null;
         }
+        if (kanal != null && !CODE.matcher(kanal).matches()) {
+            throw new IllegalArgumentException("kanal ist kein Code");
+        }
     }
 
+
     public ProtokollDetails(String grund, String sha256, String fehlercode) {
-        this(grund, sha256, fehlercode, null, null);
+        this(grund, sha256, fehlercode, null, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung) {
-        this(grund, sha256, fehlercode, regelAenderung, null, null);
+        this(grund, sha256, fehlercode, regelAenderung, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                             FristKonflikt fristKonflikt) {
-        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null);
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null, null);
     }
 
     public static ProtokollDetails fehlercode(String fehlercode) {
@@ -62,12 +70,17 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
 
     /** Details eines Eintrags {@code KONTAKT_*} mit Grund (Req 17.8, 17.11, 17.15). */
     public static ProtokollDetails kontakte(String grund, Kontakte kontakte) {
-        return new ProtokollDetails(grund, null, null, null, null, kontakte);
+        return new ProtokollDetails(grund, null, null, null, null, kontakte, null);
     }
 
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
-                && fristKonflikt == null && kontakte == null;
+                && fristKonflikt == null && kontakte == null && kanal == null;
+    }
+
+    /** Dieselben Details mit dem Kanal {@code kanal}. */
+    public ProtokollDetails mitKanal(String kanal) {
+        return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, kanal);
     }
 
     /**
