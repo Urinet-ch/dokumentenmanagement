@@ -628,7 +628,8 @@ export const TEXTE = {
     abbrechen: 'Abbrechen',
     wartet: 'Antwort wird vorbereitet …',
     quellen: 'Quellen',
-    datenstand: (zeitpunkt: string, anzahl: string) => `Datenstand: ${zeitpunkt}, ${anzahl} Belege`,
+    datenstand: (zeitpunkt: string, anzahl: string) =>
+      `Datenstand: ${zeitpunkt}, ${anzahl} ${anzahl === '1' ? 'Beleg' : 'Belege'}`,
     /** Hinweis während eines Werkzeugaufrufs (Req 6.2), fest je Werkzeug. */
     werkzeuge: {
       dokumente_suchen: 'suche Dokumente …',

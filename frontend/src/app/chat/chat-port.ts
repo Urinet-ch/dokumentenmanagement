@@ -46,13 +46,7 @@ export interface GespeicherteNachricht {
  * (429 mit `Retry-After` in Sekunden), Frage ungültig (400), keine Verbindung, unlesbare oder abgebrochene Antwort.
  */
 export type ChatFehlerArt =
-  | 'SITZUNG'
-  | 'NICHT_GEFUNDEN'
-  | 'ZU_VIELE'
-  | 'UNGUELTIG'
-  | 'VERBINDUNG'
-  | 'ANTWORT'
-  | 'ALLGEMEIN';
+  'SITZUNG' | 'NICHT_GEFUNDEN' | 'ZU_VIELE' | 'UNGUELTIG' | 'VERBINDUNG' | 'ANTWORT' | 'ALLGEMEIN';
 
 export class ChatFehler extends Error {
   constructor(

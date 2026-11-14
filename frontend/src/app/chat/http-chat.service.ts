@@ -129,12 +129,13 @@ export class HttpChatService extends ChatPort {
 
 /** Nachrichten als Liste oder als `{nachrichten: [...]}`; Quellen nur in lesbarer Form. */
 export function nachrichtenAus(wert: unknown): GespeicherteNachricht[] {
-  const liste =
-    Array.isArray(wert)
-      ? wert
-      : typeof wert === 'object' && wert !== null && Array.isArray((wert as { nachrichten?: unknown }).nachrichten)
-        ? (wert as { nachrichten: unknown[] }).nachrichten
-        : null;
+  const liste = Array.isArray(wert)
+    ? wert
+    : typeof wert === 'object' &&
+        wert !== null &&
+        Array.isArray((wert as { nachrichten?: unknown }).nachrichten)
+      ? (wert as { nachrichten: unknown[] }).nachrichten
+      : null;
   if (liste === null) {
     throw new ChatFehler('ANTWORT');
   }

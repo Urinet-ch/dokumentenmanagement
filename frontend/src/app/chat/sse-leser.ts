@@ -78,7 +78,11 @@ function quelle(wert: unknown): Quelle | null {
     return { titel: wert['titel'], link: wert['link'] };
   }
   const stand = wert['datenstand'];
-  if (objekt(stand) && typeof stand['zeitpunkt'] === 'string' && typeof stand['anzahl'] === 'number') {
+  if (
+    objekt(stand) &&
+    typeof stand['zeitpunkt'] === 'string' &&
+    typeof stand['anzahl'] === 'number'
+  ) {
     return { datenstand: { zeitpunkt: stand['zeitpunkt'], anzahl: stand['anzahl'] } };
   }
   // flache Form `{datenstand: <Zeitpunkt>, anzahl}`, solange 7.3 die Form nicht festlegt
@@ -133,7 +137,11 @@ export function chatEreignis(sse: SseEreignis): ChatEreignis | null {
       default:
         return text('meldung') === null
           ? null
-          : { typ: 'fehler', meldung: text('meldung')!, gespraechId: text('gespraechId') ?? undefined };
+          : {
+              typ: 'fehler',
+              meldung: text('meldung')!,
+              gespraechId: text('gespraechId') ?? undefined,
+            };
     }
   })();
   if (ereignis === null) {

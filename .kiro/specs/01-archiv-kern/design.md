@@ -1181,7 +1181,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
 - Anleitung `docs/wiederherstellung.md`, einmal vollständig in einer Testumgebung durchgespielt (Req 16.3, Nachweis manuell). Sie schreibt vor, nur Snapshots einzuspielen, deren SHA-256 ein Manifest unter `sicherung` belegt, und die Sperren aus dem Inventar ohne Kappung neu zu setzen (Req 16.27).
 
 ### Frontend
-- Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`.
+- Routen: `/erfassen`, `/eingangskorb`, `/suche`, `/dokument/:id`, `/importe`, `/importe/:id`, `/verwaltung/dokumentarten`, `/verwaltung/protokoll`; Spec 02 ergänzt `/chat` (Spec 02, Aufgabe 7.4; Recht wie A2, Menüpunkt erst mit Aufgabe 7.4b).
 - Dokumentansicht `/dokument/:id` (Spec 04 ergänzt): Abschnitt «In der Wissensbasis verwendet» (Spec 04, Req 15.4) und Routenparameter `/dokument/:id?seite=n`, der das Dokument auf PDF-Seite n öffnet (Spec 04, Req 16.2). Dazu
   `/dokument/:id?art=<code>` aus dem Eingangskorb: öffnet das Formular einmal mit dieser Art als Artwechsel (Abschnitt
   «Art nur im KI-Vorschlag (Folge Review #106)» unter «Umsetzung (Aufgabe 3.6, Eingangskorb-Oberfläche)»).

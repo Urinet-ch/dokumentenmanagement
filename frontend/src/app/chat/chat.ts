@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver } from '@angular/cdk/layout';
@@ -12,7 +14,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { Subscription, map } from 'rxjs';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { ChatEreignis, ChatFehler, ChatPort, GespraechKopf, NachrichtStatus, Quelle } from './chat-port';
+import {
+  ChatEreignis,
+  ChatFehler,
+  ChatPort,
+  GespraechKopf,
+  NachrichtStatus,
+  Quelle,
+} from './chat-port';
 import {
   FRAGE_MAX,
   datenstandText,
@@ -81,9 +90,11 @@ export class Chat {
   });
   /** Noch kein Text und kein Werkzeug-Hinweis: «Antwort wird vorbereitet …». */
   protected readonly wartet = computed(
-    () => this.laeuft() && this.hinweis() === null && (this.nachrichten().at(-1)?.inhalt ?? '') === '',
+    () =>
+      this.laeuft() && this.hinweis() === null && (this.nachrichten().at(-1)?.inhalt ?? '') === '',
   );
 
+  private readonly feld = viewChild<ElementRef<HTMLTextAreaElement>>('feld');
   private frage?: Subscription;
   private laden?: Subscription;
   private liste?: Subscription;
@@ -100,7 +111,9 @@ export class Chat {
 
   protected chips(quellen: readonly Quelle[]): Chip[] {
     return quellen.map((q) =>
-      istDatenstand(q) ? { text: datenstandText(q), link: null } : { text: q.titel, link: dokumentLink(q.link) },
+      istDatenstand(q)
+        ? { text: datenstandText(q), link: null }
+        : { text: q.titel, link: dokumentLink(q.link) },
     );
   }
 
@@ -125,7 +138,7 @@ export class Chat {
       return;
     }
     const frage = this.eingabe().trim();
-    this.eingabe.set('');
+    this.feldSetzen('');
     this.fehler.set(null);
     this.hinweis.set(null);
     this.nachrichten.update((liste) => [
@@ -137,7 +150,10 @@ export class Chat {
     this.frage = this.port.fragen(frage, this.gespraechId()).subscribe({
       next: (ereignis) => this.verarbeiten(ereignis),
       error: (fehler: unknown) =>
-        this.gescheitert(frage, fehler instanceof ChatFehler ? fehler : new ChatFehler('ALLGEMEIN')),
+        this.gescheitert(
+          frage,
+          fehler instanceof ChatFehler ? fehler : new ChatFehler('ALLGEMEIN'),
+        ),
       complete: () => this.beenden(),
     });
   }
@@ -175,13 +191,24 @@ export class Chat {
       next: (liste) => {
         this.gespraechId.set(kopf.id);
         this.nachrichten.set(
-          liste.map((n) => ({ rolle: n.rolle, inhalt: n.inhalt, quellen: n.quellen, status: n.status, fehler: null })),
+          liste.map((n) => ({
+            rolle: n.rolle,
+            inhalt: n.inhalt,
+            quellen: n.quellen,
+            status: n.status,
+            fehler: null,
+          })),
         );
         this.laedt.set(false);
       },
       error: (fehler: unknown) => {
         this.laedt.set(false);
-        this.fehler.set(fehlerText(fehler instanceof ChatFehler ? fehler : new ChatFehler('ALLGEMEIN'), new Date()));
+        this.fehler.set(
+          fehlerText(
+            fehler instanceof ChatFehler ? fehler : new ChatFehler('ALLGEMEIN'),
+            new Date(),
+          ),
+        );
         if (fehler instanceof ChatFehler && fehler.art === 'NICHT_GEFUNDEN') {
           this.listeLaden();
         }
@@ -225,7 +252,7 @@ export class Chat {
     if (antwort && antwort.inhalt === '' && antwort.quellen.length === 0) {
       this.nachrichten.update((liste) => liste.slice(0, -2));
       if (this.eingabe() === '') {
-        this.eingabe.set(frage);
+        this.feldSetzen(frage);
       }
       this.fehler.set(text);
     } else {
@@ -251,6 +278,18 @@ export class Chat {
       const letzte = liste.at(-1);
       return letzte?.rolle === 'ASSISTENT' ? [...liste.slice(0, -1), aendern(letzte)] : liste;
     });
+  }
+
+  /**
+   * Setzt Signal und Feld zusammen: Lief zwischen Eingabe und Senden keine Änderungserkennung, kennt die Bindung `[value]`
+   * noch den alten Wert und liesse den gesendeten Text sonst im Feld stehen.
+   */
+  private feldSetzen(text: string): void {
+    this.eingabe.set(text);
+    const feld = this.feld()?.nativeElement;
+    if (feld) {
+      feld.value = text;
+    }
   }
 
   private mobilSchliessen(): void {

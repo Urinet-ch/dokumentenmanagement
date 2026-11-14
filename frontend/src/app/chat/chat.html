@@ -67,8 +67,14 @@
     }
     <ol class="verlauf">
       @for (n of nachrichten(); track $index) {
-        <li class="nachricht karte" [class.frage]="n.rolle === 'BENUTZER'" [attr.data-test]="n.rolle === 'BENUTZER' ? 'frage' : 'antwort'">
-          <span class="nur-screenreader">{{ n.rolle === 'BENUTZER' ? texte.frage : texte.antwort }}:</span>
+        <li
+          class="nachricht karte"
+          [class.frage]="n.rolle === 'BENUTZER'"
+          [attr.data-test]="n.rolle === 'BENUTZER' ? 'frage' : 'antwort'"
+        >
+          <span class="nur-screenreader"
+            >{{ n.rolle === 'BENUTZER' ? texte.frage : texte.antwort }}:</span
+          >
           <!-- reiner Text: Interpolation, nie innerHTML; Zeilenumbrüche über white-space -->
           <p class="inhalt">{{ n.inhalt }}</p>
           @if (n.quellen.length > 0) {
@@ -78,7 +84,9 @@
                 @for (chip of chips(n.quellen); track $index) {
                   <li>
                     @if (chip.link) {
-                      <a class="chip link" [routerLink]="chip.link" data-test="quelle">{{ chip.text }}</a>
+                      <a class="chip link" [routerLink]="chip.link" data-test="quelle">{{
+                        chip.text
+                      }}</a>
                     } @else {
                       <span class="chip" data-test="quelle">{{ chip.text }}</span>
                     }
@@ -114,6 +122,7 @@
       <label class="feld">
         <span>{{ texte.frage }}</span>
         <textarea
+          #feld
           name="frage"
           rows="3"
           [maxLength]="frageMax"
@@ -125,9 +134,13 @@
       </label>
       <p id="frage-hinweis" class="gedaempft">{{ texte.frageHinweis }}</p>
       <div class="knoepfe">
-        <button mat-flat-button type="submit" [disabled]="!sendenMoeglich()">{{ texte.senden }}</button>
+        <button mat-flat-button type="submit" [disabled]="!sendenMoeglich()">
+          {{ texte.senden }}
+        </button>
         @if (laeuft()) {
-          <button mat-stroked-button type="button" (click)="abbrechen()">{{ texte.abbrechen }}</button>
+          <button mat-stroked-button type="button" (click)="abbrechen()">
+            {{ texte.abbrechen }}
+          </button>
         }
       </div>
     </form>

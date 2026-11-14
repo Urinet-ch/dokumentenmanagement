@@ -66,6 +66,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 7.4 Chat-Oberfläche [Frontend]
   - Chat-Seite mit Streaming, Werkzeug-Hinweis, Quellen-Chips (öffnen Dokument), letzte 20 Gespräche; 375 px
+  - Teil erledigt (PR #147): Seite gegen Attrappe; Menüpunkt und 4.3 folgen mit 7.4b
   - _Anforderungen: 4.3, 6.1–6.3_
 
 ## Welle 8 — AbaNinja (nur bei E1 = ja)
