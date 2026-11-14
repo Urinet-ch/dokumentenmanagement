@@ -1,7 +1,7 @@
 // Vorbereitung im Archiv im Testmodus (Aufgabe 4.10): Die PWA spricht über weitergeleitete Anfragen mit dem echten
 // Archiv (hilfen/echtes-backend.mjs); Dokumente kommen direkt über die API, den Status setzt die Testhilfe von
 // BrowserBackendTest (im Testmodus läuft kein Worker). Alles synthetisch, keine echten Belege.
-import { Given, Then } from '@cucumber/cucumber';
+import { After, Given, Then } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import {
   backend,
@@ -18,6 +18,14 @@ const OHNE_NAMEN = 'ohne Namen';
 
 Given('die PWA spricht mit dem Archiv im Testmodus', async function () {
   await weiterleiten(this);
+});
+
+// Eine gescheiterte Weiterleitung bricht die Anfrage nur ab (hilfen/echtes-backend.mjs); ihre Ursache soll im Ergebnis
+// stehen statt eines blossen Timeouts eines späteren Schritts.
+After(function () {
+  if (this.weiterleitung?.fehler) {
+    throw this.weiterleitung.fehler;
+  }
 });
 
 Given(/^«(.+)» im Mandanten «(.+)» hat eine Datei ohne Namen hochgeladen$/, async function (rolle, mandant) {

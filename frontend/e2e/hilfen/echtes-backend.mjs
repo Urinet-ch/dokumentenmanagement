@@ -44,6 +44,9 @@ function totp(schritt) {
 }
 
 const tokens = new Map();
+// Laufende Abrufe je Benutzer: Parallele Anfragen der PWA warten auf denselben Abruf, statt einen weiteren
+// TOTP-Zeitschritt anzufordern (und bis zum nächsten Schritt zu warten).
+const abrufe = new Map();
 
 function letzteSchritte() {
   return existsSync(SCHRITTE) ? JSON.parse(readFileSync(SCHRITTE, 'utf8')) : {};
@@ -56,6 +59,13 @@ export async function echtesToken(rolle, mandant) {
   if (vorhanden && vorhanden.gueltigBis > Date.now() + 30_000) {
     return vorhanden.wert;
   }
+  if (!abrufe.has(name)) {
+    abrufe.set(name, tokenHolen(name).finally(() => abrufe.delete(name)));
+  }
+  return abrufe.get(name);
+}
+
+async function tokenHolen(name) {
   let schritt = Math.floor(Date.now() / 30_000);
   if ((letzteSchritte()[name] ?? -1) >= schritt) {
     await new Promise((weiter) => setTimeout(weiter, (schritt + 1) * 30_000 - Date.now() + 100));

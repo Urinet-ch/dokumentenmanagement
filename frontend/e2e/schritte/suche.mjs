@@ -30,6 +30,13 @@ const dokumentId = (welt, titel) => {
   return d.id;
 };
 
+// Treffer-Link eines Dokuments: Hat das Szenario es im echten Archiv angelegt, über seine ID (wie karten() in
+// eingangskorb.mjs), damit ein weiterer Lauf gegen dasselbe Archiv nicht gleichnamige Treffer früherer Läufe trifft.
+const trefferLink = (welt, name, sonst) => {
+  const id = welt.echteDokumente?.get(name);
+  return id ? welt.seite.locator(`[data-test=treffer] a.titel[href="/dokument/${id}"]`) : sonst;
+};
+
 async function filterOeffnen(seite) {
   const schalter = seite.locator('.filter-schalter');
   if ((await schalter.getAttribute('aria-expanded')) !== 'true') {
@@ -92,7 +99,7 @@ When('ich die Filter setze und suche:', async function (tabelle) {
 });
 
 When(/^ich den Treffer «(.+)» öffne$/, async function (titel) {
-  await this.seite.locator('[data-test=treffer]').getByRole('link', { name: titel }).click();
+  await trefferLink(this, titel, this.seite.locator('[data-test=treffer]').getByRole('link', { name: titel })).click();
 });
 
 When(/^ich den Link «(.+)» wähle$/, async function (link) {
@@ -185,9 +192,13 @@ Then(/^steht im Suchfeld «(.+)»$/, async function (begriff) {
 });
 
 Then(/^zeigt der Treffer «(.+)» den Dateinamen als Platzhalter statt eines Titels$/, async function (name) {
-  const link = this.seite.locator('[data-test=treffer] a.titel', { has: this.seite.locator(`[title="${name}"]`) });
+  const link = trefferLink(
+    this,
+    name,
+    this.seite.locator('[data-test=treffer] a.titel', { has: this.seite.locator(`[title="${name}"]`) }),
+  );
   await platzhalterPruefen(link, name);
-  await this.seite.getByRole('link', { name: `Ohne Titel, Dateiname ${name}`, exact: true }).waitFor();
+  await link.and(this.seite.getByRole('link', { name: `Ohne Titel, Dateiname ${name}`, exact: true })).waitFor();
 });
 
 Then(/^zeigt die Dokumentansicht den Dateinamen «(.+)» als Platzhalter und in der Zeile «Dateiname»$/, async function (name) {
