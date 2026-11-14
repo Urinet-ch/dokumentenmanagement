@@ -130,6 +130,24 @@ Funktionalität: E-Mail-Eingang
     Und im Postfach liegt eine Mail von «fremd@example.invalid» mit dem Betreff «Werbung» und einem PDF «flyer.pdf»
     Wenn der Mail-Eingang das Postfach von «urinet» abruft
     Dann gibt es im Postfach die Ordner «Archiviert» und «Quarantaene» mit je einer Mail
+    Und die Ordner «Archiviert» und «Quarantaene» sind abonniert
+
+  @req-1.5
+  Szenario: Ein vorhandener, nicht abonnierter Zielordner wird abonniert
+    Angenommen der vorhandene Ordner «Archiviert» ist nicht abonniert
+    Und im Postfach liegt eine Mail von «inhaber@example.invalid» mit dem Betreff «Vorhandener Ordner» und einem PDF «beleg.pdf»
+    Wenn der Mail-Eingang das Postfach von «urinet» abruft
+    Dann liegt die Mail im Ordner «Archiviert» und der Posteingang ist leer
+    Und der Ordner «Archiviert» ist abonniert
+
+  @req-1.5
+  Szenario: Scheitert das Abonnieren, wird die Mail trotzdem verschoben
+    Angenommen das Log des Mail-Eingangs wird mitgeschnitten
+    Und das Abonnieren von «Archiviert» schlägt fehl
+    Und im Postfach liegt eine Mail von «inhaber@example.invalid» mit dem Betreff «Abonnieren fehlgeschlagen» und einem PDF «beleg.pdf»
+    Wenn der Mail-Eingang das Postfach von «urinet» abruft
+    Dann liegt die Mail im Ordner «Archiviert» und der Posteingang ist leer
+    Und das Abonnieren von «Archiviert» wird nur als Warnung protokolliert
 
   @req-1.5
   Szenario: Dieselbe Message-ID erfasst das Archiv nie zweimal
