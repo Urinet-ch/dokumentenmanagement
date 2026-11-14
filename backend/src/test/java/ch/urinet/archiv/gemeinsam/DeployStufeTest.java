@@ -94,6 +94,8 @@ class DeployStufeTest {
 
         assertThat(config.getValues("archiv.tsa.dienst.sgpki.policies", String.class))
                 .contains("2.16.756.1.17.3.5.2.4", "2.16.756.1.17.3.5.2.10");
+        assertThat(config.getValues("archiv.tsa.dienst.freetsa.policies", String.class))
+                .containsExactly("1.2.3.4.1");
         assertThat(config.getValue("archiv.tsa.dienst.freetsa.pruefdaten-hoechstalter", Duration.class))
                 .isGreaterThan(Duration.ofDays(365));
         assertThat(config.getOptionalValue("archiv.tsa.dienst.sgpki.pruefdaten-hoechstalter", Duration.class))
