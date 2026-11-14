@@ -265,7 +265,8 @@ FEHLER …`). Scheitert die CRL eines Diensts am Höchstalter (z. B. FreeTSA mit
 Höchstalter dieses Diensts nach den ausgegebenen Werten gesetzt (nicht das globale), danach den Test wiederholen.
 `archiv.tsa.dienste` steht nicht in `application.properties` (es kommt aus `deploy/infomaniak/compose.yml`) und wird
 darum wie dort mit `-D` gesetzt; ebenso lässt sich ein Höchstalter vorher ausprobieren, z. B.
-`-Darchiv.tsa.dienst.freetsa.pruefdaten-hoechstalter=P30D`.
+`-Darchiv.tsa.dienst.freetsa.pruefdaten-hoechstalter=P370D`
+(die FreeTSA-CRL erscheint nur jährlich, daher gilt für freetsa mehr als ein Jahr).
 
 ```bash
 mvn -ntp test -Dtest=TsaSmokeIT -Dsurefire.failIfNoSpecifiedTests=false -Darchiv.smoke.tsa=ja \
