@@ -62,6 +62,9 @@ public enum Fehlercode {
             "Aus diesem Gespräch kann kein Analyse-Vorschlag entstehen."),
     VERSION_FEHLT(428, "Version fehlt",
             "Für Änderungen ist die Version des Dokuments nötig (If-Match). Bitte laden Sie das Dokument neu."),
+    ZU_VIELE_ANFRAGEN(429, "Zu viele Anfragen",
+            "Sie haben in kurzer Zeit zu viele Anfragen gestellt. Bitte warten Sie die angegebene Zeit "
+                    + "(Retry-After) und versuchen Sie es dann erneut."),
     INTERNER_FEHLER(500, "Interner Fehler",
             "Im Archiv ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut und "
                     + "nennen Sie bei Rückfragen die Fehler-ID."),

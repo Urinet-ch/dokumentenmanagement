@@ -60,8 +60,9 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Prompt-Injection-Test mit präpariertem Dokument
   - _Anforderungen: 3.7, 4.2, 5.3_
 
-- [ ] 7.3 Chat-Schnittstelle [Backend]
+- [x] 7.3 Chat-Schnittstelle [Backend]
   - `POST /chat` als SSE (`werkzeug`, `text`, `quellen`, `fertig`, `fehler`), Speicherung `chat_gespraech`/`chat_nachricht`, Löschung nach 12 Monaten, Rate-Limit 100/h
+  - Erledigt 14.11.2026 gegen den Port `ChatAgentPort` mit Dev-Stub bzw. `ChatNichtVerfuegbar` (design.md «Umsetzung (Aufgabe 7.3, 14.11.2026)»); der echte Agent folgt mit 7.2 und ersetzt nur den Adapter. Nachweis 3.8 hier mit dem Streaming-Szenario, p95 ≤ 10 s mit echtem Modell in 9.1
   - _Anforderungen: 3.8, 4.1, 5.4, 5.5_
 
 - [ ] 7.4 Chat-Oberfläche [Frontend]
