@@ -1,8 +1,15 @@
 package ch.urinet.archiv.integration;
 
+import com.icegreen.greenmail.Managers;
+import com.icegreen.greenmail.imap.ImapHostManager;
+import com.icegreen.greenmail.imap.ImapHostManagerImpl;
+import com.icegreen.greenmail.smtp.SmtpManager;
+import com.icegreen.greenmail.server.AbstractServer;
+import com.icegreen.greenmail.store.FolderException;
 import com.icegreen.greenmail.store.MailFolder;
 import com.icegreen.greenmail.store.StoredMessage;
 import com.icegreen.greenmail.user.GreenMailUser;
+import com.icegreen.greenmail.user.UserManager;
 import com.icegreen.greenmail.util.GreenMail;
 import com.icegreen.greenmail.util.ServerSetup;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -30,6 +37,9 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * GreenMail als IMAP-Server über TLS für die Szenarien des Mail-Eingangs (Spec 02, design.md «Testing Strategy»): einmal
@@ -42,7 +52,9 @@ public final class TestPostfach {
     public static final String HOST = "localhost";
     static final Path VERZEICHNIS = Path.of(System.getProperty("user.dir"), "target", "greenmail");
     private static final SecureRandom ZUFALL = new SecureRandom();
+    private static final Set<String> ABONNIEREN_FEHLER = ConcurrentHashMap.newKeySet();
     private static GreenMail server;
+    private static ImapHostManager imapHostManager;
 
     private final GreenMailUser benutzer;
     private final String login;
@@ -94,6 +106,20 @@ public final class TestPostfach {
         server.getManagers().getImapHostManager().createMailbox(benutzer, name);
     }
 
+    public void abonnierenFehlschlagen(String name) {
+        ABONNIEREN_FEHLER.add(benutzer.getLogin() + "|" + name);
+    }
+
+    public void abbestellen(String name) throws Exception {
+        imapHostManager.unsubscribe(benutzer, name);
+    }
+
+    public boolean ordnerAbonniert(String name) throws Exception {
+        return imapHostManager.listSubscribedMailboxes(benutzer, "*")
+                .stream().anyMatch(ordner -> ordner.getFullName().equals(name)
+                        || ordner.getFullName().endsWith("." + name));
+    }
+
     private static String messageId(StoredMessage nachricht) {
         try {
             return nachricht.getMimeMessage().getMessageID();
@@ -125,8 +151,45 @@ public final class TestPostfach {
         System.setProperty("greenmail.tls.keystore.file", p12.toString());
         System.setProperty("greenmail.tls.keystore.password", new String(kennwort));
         System.setProperty("greenmail.tls.key.password", new String(kennwort));
-        TestPostfach.server = new GreenMail(new ServerSetup(0, HOST, ServerSetup.PROTOCOL_IMAPS));
+        TestPostfach.server = new TestGreenMail(new ServerSetup(0, HOST, ServerSetup.PROTOCOL_IMAPS));
         TestPostfach.server.start();
+    }
+
+    private static final class TestGreenMail extends GreenMail {
+        TestGreenMail(ServerSetup setup) {
+            super(setup);
+        }
+
+        @Override
+        protected Map<String, AbstractServer> createServices(ServerSetup[] setups, Managers managers) {
+            imapHostManager = new ImapHostManagerImpl(managers.getImapHostManager().getStore()) {
+                @Override
+                public void subscribe(GreenMailUser user, String mailboxName) throws FolderException {
+                    if (ABONNIEREN_FEHLER.contains(user.getLogin() + "|" + mailboxName)) {
+                        throw new FolderException("Synthetic subscription failure");
+                    }
+                    super.subscribe(user, mailboxName);
+                }
+            };
+            ImapHostManager testImapHostManager = imapHostManager;
+            Managers testManagers = new Managers() {
+                @Override
+                public ImapHostManager getImapHostManager() {
+                    return testImapHostManager;
+                }
+
+                @Override
+                public UserManager getUserManager() {
+                    return managers.getUserManager();
+                }
+
+                @Override
+                public SmtpManager getSmtpManager() {
+                    return managers.getSmtpManager();
+                }
+            };
+            return super.createServices(setups, testManagers);
+        }
     }
 
     private static X509Certificate zertifikat(String name, KeyPair paar, String aussteller, KeyPair ausstellerPaar,

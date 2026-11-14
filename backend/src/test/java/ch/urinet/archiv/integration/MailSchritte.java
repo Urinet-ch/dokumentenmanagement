@@ -125,6 +125,17 @@ public class MailSchritte {
         postfachEinrichten(mandant, false);
     }
 
+    @Angenommen("das Abonnieren von «{word}» schlägt fehl")
+    public void abonnierenSchlaegtFehl(String ordner) {
+        postfaecher.get("urinet").abonnierenFehlschlagen(ordner);
+    }
+
+    @Angenommen("der vorhandene Ordner «{word}» ist nicht abonniert")
+    public void nichtAbonniert(String ordner) throws Exception {
+        postfaecher.get("urinet").abbestellen(ordner);
+        assertThat(postfaecher.get("urinet").ordnerAbonniert(ordner)).isFalse();
+    }
+
     @Angenommen("das Passwort des Postfachs von «{word}» ist falsch eingerichtet")
     public void falschesPasswort(String mandant) {
         TestPostfach postfach = postfaecher.get(mandant);
@@ -252,6 +263,29 @@ public class MailSchritte {
         assertThat(postfach.ordner(a)).containsExactly(nachrichten.get(0));
         assertThat(postfach.ordner(b)).containsExactly(nachrichten.get(1));
         assertThat(postfach.ordner("INBOX")).isEmpty();
+    }
+
+    @Dann("die Ordner «{word}» und «{word}» sind abonniert")
+    public void ordnerAbonniert(String a, String b) throws Exception {
+        TestPostfach postfach = postfaecher.get("urinet");
+        assertThat(postfach.ordnerAbonniert(a)).isTrue();
+        assertThat(postfach.ordnerAbonniert(b)).isTrue();
+    }
+
+    @Dann("der Ordner «{word}» ist abonniert")
+    public void einzelnerOrdnerAbonniert(String name) throws Exception {
+        assertThat(postfaecher.get("urinet").ordnerAbonniert(name)).isTrue();
+    }
+
+    @Dann("das Abonnieren von «{word}» wird nur als Warnung protokolliert")
+    public void abonnierenWarnung(String name) {
+        List<LogRecord> warnungen = mailEintraege().stream()
+                .filter(e -> log.nachricht(e).contains("IMAP-Ordner " + name + " konnte nicht abonniert werden"))
+                .toList();
+        assertThat(warnungen).hasSize(1);
+        assertThat(warnungen.getFirst().getLevel()).isEqualTo(Level.WARNING);
+        assertThat(log.nachricht(warnungen.getFirst())).contains("ursache=");
+        assertThat(mailEintraege()).noneMatch(e -> e.getLevel().intValue() >= Level.SEVERE.intValue());
     }
 
     @Dann("das Passwort steht in «integration_mail» von «{word}» nur verschlüsselt")

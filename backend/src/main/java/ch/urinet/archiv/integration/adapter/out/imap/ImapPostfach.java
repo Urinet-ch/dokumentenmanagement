@@ -62,7 +62,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * des Servers wird mit Hostname geprüft, gegen die Zertifizierungsstellen des JDK oder, nur wenn
  * {@code archiv.mail.ca-datei} gesetzt ist, gegen die Zertifikate dieser PEM-Datei (Tests mit GreenMail). Die Ordner
  * {@code archiv.mail.ordner-archiviert} und {@code archiv.mail.ordner-quarantaene} legt das Archiv an, wenn sie fehlen
- * (bei Servern mit Präfix des persönlichen Namensraums, z. B. {@code INBOX.}, darunter). Verschoben wird mit
+ * (bei Servern mit Präfix des persönlichen Namensraums, z. B. {@code INBOX.}, darunter) und abonniert sie, wenn sie
+ * noch nicht abonniert sind. Eine Ablehnung oder fehlende Bestätigung wird nur als Warnung protokolliert.
+ * Verschoben wird mit
  * {@code MOVE} (RFC 6851), sonst mit Kopie, Löschmarke und {@code EXPUNGE} beim Schliessen. Je Abruf versucht das
  * Archiv höchstens {@code max} Nachrichten; eine Nachricht, die scheitert, bleibt im Posteingang und wird für
  * {@code archiv.mail.zurueckstellen} übersprungen, damit Nachrichten, die immer scheitern (zu gross, unlesbar), die
@@ -283,13 +285,13 @@ public class ImapPostfach implements PostfachPort {
     private static Folder ordner(Store store, String name) throws MessagingException {
         Folder ordner = store.getFolder(name);
         if (ordner.exists()) {
-            return ordner;
+            return abonnieren(ordner, name);
         }
         Folder[] namensraum = store.getPersonalNamespaces();
         if (namensraum.length > 0 && !namensraum[0].getFullName().isEmpty()) {
             Folder darunter = store.getFolder(namensraum[0].getFullName() + namensraum[0].getSeparator() + name);
             if (darunter.exists()) {
-                return darunter;
+                return abonnieren(darunter, name);
             }
             ordner = darunter;
         }
@@ -297,6 +299,21 @@ public class ImapPostfach implements PostfachPort {
             throw new MessagingException("Ordner nicht angelegt");
         }
         LOG.infof("Mail-Eingang: IMAP-Ordner %s angelegt", name);
+        return abonnieren(ordner, name);
+    }
+
+    private static Folder abonnieren(Folder ordner, String name) {
+        try {
+            if (!ordner.isSubscribed()) {
+                ordner.setSubscribed(true);
+                if (!ordner.isSubscribed()) {
+                    throw new MessagingException("IMAP-Abonnement nicht bestätigt");
+                }
+            }
+        } catch (MessagingException e) {
+            LOG.warnf("Mail-Eingang: IMAP-Ordner %s konnte nicht abonniert werden, ursache=%s", name,
+                    Ursachen.ketteMitMeldung(e));
+        }
         return ordner;
     }
 
