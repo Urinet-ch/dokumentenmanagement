@@ -145,7 +145,7 @@ public class ChatFragen {
         if (gespraechId.isEmpty()) {
             speicher.gespraechAnlegen(id, benutzer.id(), Gespraechstitel.aus(text), jetzt);
         }
-        List<VerlaufEintrag> verlauf = speicher.verlauf(id, VERLAUF);
+        List<VerlaufEintrag> verlauf = VerlaufEintrag.normalisieren(speicher.verlauf(id, VERLAUF));
         speicher.frageSpeichern(id, text, jetzt);
         ChatAnfrage anfrage = new ChatAnfrage(mandant, benutzer, Sichtregel.fuer(benutzer), ip,
                 einstellungen.lesen(mandant).name(), text, verlauf);
@@ -206,13 +206,18 @@ public class ChatFragen {
         }
         // die Frage läuft nicht mehr, sobald die Antwort gespeichert ist: eine Folgefrage nach «fertig» ist erlaubt
         annahme.platz().freigeben();
-        switch (antwort.status()) {
-            case OK -> {
-                strom.accept(new ChatAusgabe.Quellen(antwort.quellen()));
-                strom.accept(new ChatAusgabe.Fertig(id, antwort.tokens().orElseThrow()));
+        // gespeichert ist gespeichert: Ausnahmen beim Senden ändern den Status nicht und lösen kein «fehler» mehr aus
+        try {
+            switch (antwort.status()) {
+                case OK -> {
+                    strom.accept(new ChatAusgabe.Quellen(antwort.quellen()));
+                    strom.accept(new ChatAusgabe.Fertig(id, antwort.tokens().orElseThrow()));
+                }
+                case FEHLER -> strom.accept(new ChatAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+                case ABGEBROCHEN -> LOG.infof("Chat-Gespräch %s: Frage vom Client abgebrochen", id);
             }
-            case FEHLER -> strom.accept(new ChatAusgabe.Fehler(NICHT_VERFUEGBAR, id));
-            case ABGEBROCHEN -> LOG.infof("Chat-Gespräch %s: Frage vom Client abgebrochen", id);
+        } catch (RuntimeException e) {
+            LOG.warnf("Chat-Gespräch %s: Ausgabe nach dem Speichern gescheitert, ursache=%s", id, Ursachen.kette(e));
         }
     }
 
