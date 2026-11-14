@@ -36,7 +36,8 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Ergänzt 14.11.2026 (entschieden von Fabian, Req 2.7, 2.8): Modus `hybrid` mit höchstens 30 Treffern ohne Gesamtzahl und ohne Blättern, Modus `volltext` unverändert, Rückfall in derselben Form mit `degradiert` (design.md «Hybrid als Standard in der Web-App»); `ki_verbrauch` mit Zweck `SUCHE` je Aufruf von Embedding-Modell und Reranker, kein Limit; Zweck im Kommentar zu `ki_verbrauch` in Spec 01 design.md nachtragen
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6, 2.7, 2.8_
 
-- [ ] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+- [x] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+  - Erledigt (PR #152): `wirksamerModus` und Modus in jeder Anfrage, Umschalter «Volltext», Hinweis bei `degradiert`, Anzeige ohne Gesamtzahl und Blättern; Attrappe nach dem Vertrag von 6.4, `BrowserBackendTest` mit Dev-Stubs für Embedding und Reranker; Browser-Szenarien `hybridsuche-pwa.feature` und `hybridsuche-attrappe-pwa.feature` (`@req-2.7`)
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 14.11.2026 («Hybrid wird Standard»); Nummer 6.6 als nächste freie der Welle 6
   - Suchseite `/suche` (Spec 01 design.md, Frontend): jede Suche mit Suchbegriff sendet `modus=hybrid` und zeigt höchstens 30 Treffer ohne Gesamtzahl und ohne Blättern; Umschalter «Volltext» als ausdrücklicher Modus mit dem bisherigen Verhalten (Sortierung, Blättern, Gesamtzahl); ohne Suchbegriff und bei Sortierung nach Datum Volltext; bei `degradiert` Hinweis «nur Volltext» mit Wechsel in den Modus Volltext
   - Browser-Szenarien `@req-2.7` (hybrid, Volltext, Rückfall bei Ausfall des Rerankers)
