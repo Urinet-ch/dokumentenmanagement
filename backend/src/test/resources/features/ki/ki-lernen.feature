@@ -119,6 +119,15 @@ Funktionalität: Lernen aus Korrekturen
     Wenn der Worker die Aufträge bearbeitet
     Dann der Aufruf des Sprachmodells für den Beleg «B» enthält kein Korrekturbeispiel
 
+  @req-7.9
+  Szenario: Die eigene UID mit Zusatz und weiteren Ziffern zählt nicht als Merkmal, die fremde bleibt
+    Angenommen der Mandant «urinet» hat die UID «CHE-123.456.789 MWST, HR 2020»
+    Und die Korrekturbeispiele im Prompt sind ausgeschaltet
+    Und der Beleg «A» als digitales PDF mit «Muster Buerobedarf AG» und «An CHE-123.456.789 MWST von CHE-987.654.321 MWST»
+    Und der Worker die Aufträge bearbeitet
+    Wenn «inhaber-urinet» den Beleg «A» mit dem Titel «Lernprobe Bueromaterial» und der Vertraulichkeit «NORMAL» bestätigt
+    Dann «ki_beispiel» enthält für den Beleg «A» nur die UID «CHE-987.654.321»
+
   @req-7.9 @req-7.10
   Szenariogrundriss: Auch UID und E-Mail-Adresse bringen das Beispiel in den Prompt
     Angenommen die Korrekturbeispiele im Prompt sind eingeschaltet

@@ -23,8 +23,12 @@ import java.util.regex.Pattern;
  * die ein Wort des Belegs treffen. Werte normalisiert (IBAN gross ohne Leerzeichen, E-Mail klein, Muster als Text des
  * regulären Ausdrucks), je Typ höchstens {@value #MAX_JE_TYP} in der Reihenfolge des Vorkommens. Die eigenen Kennungen
  * des Mandanten zählen nicht, sie stehen auf fast jedem Beleg; die eigene UID wird nur über ihre 9 Ziffern verglichen
- * (Schreibweise und Zusatz wie «MWST» egal). Alle Ausdrücke laufen in linearer Zeit zur Textlänge: Die E-Mail beginnt
- * nur am Anfang einer Folge von Zeichen des lokalen Teils und liest diese possessiv.
+ * (Schreibweise und Zusatz wie «MWST» egal). Diese 9 Ziffern löst das Muster {@code CHE} mit drei Dreiergruppen
+ * (Gross/Klein egal, Trenner {@code -}, {@code .} oder Leerzeichen) aus {@code kennungen.uid}, auch wenn dort weitere
+ * Ziffern stehen (z. B. «CHE-123.456.789 MWST, HR 2020»); ohne Treffer zählen alle Ziffern des Werts und nur genau 9
+ * ergeben eine eigene UID (Nachprüfung PR #109). Alle Ausdrücke laufen in linearer Zeit zur Textlänge: Die E-Mail
+ * beginnt nur am Anfang einer Folge von Zeichen des lokalen Teils und liest diese possessiv; das UID-Muster hat nur
+ * Quantoren fester Länge und optionale Einzelzeichen, also keine Rückverfolgung über mehr als 15 Zeichen.
  */
 public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, Set<String> muster) {
 
@@ -33,6 +37,8 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     private static final Pattern IBAN = Pattern.compile("\\b[A-Z]{2}\\d{2}(?: ?[A-Z0-9]){11,30}");
     private static final Pattern UID = Pattern.compile("CHE-\\d{3}\\.\\d{3}\\.\\d{3}");
+    /** Eigene UID in {@code kennungen.uid}: Schreibweise frei, weitere Ziffern danach (z. B. Handelsregister) egal. */
+    private static final Pattern UID_EIGEN = Pattern.compile("(?i)CHE[-. ]?(\\d{3})[. ]?(\\d{3})[. ]?(\\d{3})");
     private static final Pattern EMAIL = Pattern.compile(
             "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]++@[A-Za-z0-9-]++(?:\\.[A-Za-z0-9-]++)*+(?<=\\.[A-Za-z]{2,63})");
     private static final Pattern WORT = Pattern.compile("[\\s,;:()]+");
@@ -165,9 +171,19 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         }
     }
 
-    /** Die 9 Ziffern einer UID; leer, wenn es nicht genau 9 sind. */
+    /**
+     * Die 9 Ziffern einer UID: aus dem ersten Treffer von {@link #UID_EIGEN}, sonst alle Ziffern des Werts, wenn es
+     * genau 9 sind; sonst leer.
+     */
     private static String ziffern(String uid) {
-        String z = uid == null ? "" : uid.replaceAll("\\D", "");
+        if (uid == null) {
+            return "";
+        }
+        Matcher m = UID_EIGEN.matcher(uid);
+        if (m.find()) {
+            return m.group(1) + m.group(2) + m.group(3);
+        }
+        String z = uid.replaceAll("\\D", "");
         return z.length() == 9 ? z : "";
     }
 

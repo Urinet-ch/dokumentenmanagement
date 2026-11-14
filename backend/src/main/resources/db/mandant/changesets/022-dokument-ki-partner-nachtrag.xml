@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Übergang ki_partner_id (Nachprüfung PR #109, Spec 01 design.md «Umsetzung (Aufgabe 3.3)», Nachtrag): Dokumente,
+        deren KI-Vorschlag vor der Spalte entstand (Changeset 016-dokument-ki-partner) und die noch nicht bestätigt
+        sind, bekommen den verknüpften Partner als Stand des Abgleichs. Sonst gälte beim Bestätigen jeder Partner als
+        korrigiert (Req 7.7).
+
+        Nur Dokumente, die vor der Ausführung von 016 eingegangen sind: Seit 016 schreibt die Verarbeitung ki_partner_id
+        selbst; ist die Spalte bei einem späteren Dokument leer, hatte der Abgleich keinen Treffer, und ein Partner
+        stammt aus dem Eingangskorb (PATCH). Er gilt nicht als übernommen.
+
+        Zeitvergleich: eingang ist timestamptz, databasechangelog.dateexecuted ein timestamp ohne Zone, den Liquibase
+        mit now() in der Zeitzone der Sitzung schreibt (TimeZone der JDBC-Verbindung, die JVM-Zeitzone des Containers).
+        Darum wird dateexecuted ausdrücklich mit «at time zone current_setting('TimeZone')» in derselben Sitzung
+        zurückgerechnet, statt den impliziten Cast dem Leser zu überlassen. Fehlt die Zeile von 016, liefert min() null,
+        der Vergleich ist nie wahr und das Changeset ändert nichts.
+
+        Nur DML, ändert weder version noch geaendert (ki_partner_id ist kein Feld des Eingangskorbs) und ist für das
+        Vorgänger-Release unsichtbar (tech.md Regel 11).
+    -->
+    <changeSet id="022-dokument-ki-partner-nachtrag" author="archiv">
+        <sql>
+            update dokument d
+               set ki_partner_id = d.partner_id
+             where d.ki_vorschlag is not null
+               and d.bestaetigt is null
+               and d.ki_partner_id is null
+               and d.partner_id is not null
+               and d.eingang &lt; (select min(c.dateexecuted) at time zone current_setting('TimeZone')
+                                    from databasechangelog c
+                                   where c.id = '016-dokument-ki-partner' and c.author = 'archiv')
+        </sql>
+    </changeSet>
+</databaseChangeLog>
