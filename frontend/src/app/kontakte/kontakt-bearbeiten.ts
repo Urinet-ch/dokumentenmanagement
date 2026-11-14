@@ -50,12 +50,15 @@ export class KontaktBearbeiten {
   protected readonly texte = TEXTE.kontakte;
   protected readonly felder = FELDER;
   protected readonly max = MAX;
-  protected readonly werte = signal<FormularWerte | null>(null);
+  /** Nur die vom Benutzer angefassten Felder; alle übrigen kommen immer aus dem aktuellen Detail. */
+  protected readonly eingaben = signal<Partial<FormularWerte>>({});
   protected readonly gezeigteFehler = signal<Fehlerliste>({});
   protected readonly sendet = signal(false);
   protected readonly meldung = signal<string | null>(null);
   protected readonly typen: readonly Typ[] = ['PERSON', 'ORGANISATION'];
-  protected readonly aktuell = computed(() => this.werte() ?? formularAusDetail(this.kontakt()));
+  protected readonly aktuell = computed(
+    () => ({ ...formularAusDetail(this.kontakt()), ...this.eingaben() }) as FormularWerte,
+  );
   private readonly titel = viewChild<ElementRef<HTMLElement>>('titel');
   private laufend?: Subscription;
 
@@ -64,7 +67,12 @@ export class KontaktBearbeiten {
   }
 
   protected setzen(feld: Feld | 'typ', wert: string): void {
-    this.werte.set({ ...this.aktuell(), [feld]: wert } as FormularWerte);
+    const neu = { ...this.eingaben(), [feld]: wert };
+    // zurückgetippt auf den Stand des Details: nicht mehr als Eingabe führen
+    if (wert === formularAusDetail(this.kontakt())[feld]) {
+      delete neu[feld];
+    }
+    this.eingaben.set(neu);
   }
 
   protected pruefText(feld: Feld | 'typ'): string {

@@ -152,6 +152,16 @@ describe('Kontakte: Zusammenführen-Dialog (Req 17.6, 17.7, 17.17)', () => {
     ]);
   });
 
+  it('verhindert doppeltes Absenden', async () => {
+    port.aktionAntwort = () => new Subject();
+    await zielWaehlen();
+    await eingeben('zusammenfuehren-grund', 'Grund');
+    await klick('weiter');
+    await klick('zusammenfuehren-ausfuehren');
+    await klick('zusammenfuehren-ausfuehren');
+    expect(port.aktionen).toHaveLength(1);
+  });
+
   it.each([
     [409, T.konflikt.zusammenfuehren],
     [400, T.anfrage.zusammenfuehren],

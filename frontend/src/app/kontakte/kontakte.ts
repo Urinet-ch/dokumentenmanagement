@@ -152,7 +152,6 @@ export class Kontakte {
       .pipe(
         map((q) => q.trim()),
         debounceTime(VERZOEGERUNG_MS),
-        distinctUntilChanged(),
       )
       .subscribe((q) => {
         if (q !== this.filter().q.trim()) {

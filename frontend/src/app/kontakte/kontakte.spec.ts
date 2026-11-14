@@ -194,6 +194,27 @@ describe('Kontakte: Liste (Req 17.1, 17.2)', () => {
     expect(url()).toBe('/kontakte');
   });
 
+  it('übernimmt dieselbe Eingabe nach der Zurück-Taste erneut (Feld und Liste stimmen überein)', async () => {
+    await oeffnen('/kontakte?q=mueller');
+    await antworten(liste(0));
+    const feld = () => element.querySelector<HTMLInputElement>('[data-test=suche]')!;
+    const tippen = async (text: string) => {
+      feld().value = text;
+      feld().dispatchEvent(new Event('input'));
+      await warten(350);
+      await harness.fixture.whenStable();
+    };
+    await tippen('');
+    expect(url()).toBe('/kontakte');
+    await harness.navigateByUrl('/kontakte?q=mueller'); // wie die Zurück-Taste
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    expect(feld().value).toBe('mueller');
+    await tippen('');
+    expect(url()).toBe('/kontakte');
+    expect(port.listeAnfragen.at(-1)!.q).toBeUndefined();
+  });
+
   it('sendet einen ungültigen Begriff (Steuerzeichen, über 200 Zeichen) nie als q und sagt es', async () => {
     await oeffnen(`/kontakte?q=${encodeURIComponent('a\u0001b')}`);
     expect(port.listeAnfragen[0].q).toBeUndefined();

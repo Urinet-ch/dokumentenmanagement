@@ -278,6 +278,30 @@ describe('Kontakte: Detail (Req 17.3, 17.4, 17.6)', () => {
       expect(element.querySelector<HTMLInputElement>('[data-test=feld-ort]')!.value).toBe('Luzern');
     });
 
+    it('schreibt nach 412 keine fremd geänderten Felder mit dem alten Wert zurück', async () => {
+      let n = 0;
+      port.aktionAntwort = () =>
+        n++ === 0 ? throwError(() => new HttpErrorResponse({ status: 412 })) : of(DETAIL);
+      await oeffnen();
+      await laden({ ...DETAIL, telefon: '', version: 3 });
+      await klick('bearbeiten');
+      const ort = element.querySelector<HTMLInputElement>('[data-test=feld-ort]')!;
+      ort.value = 'Luzern';
+      ort.dispatchEvent(new Event('input'));
+      await klick('speichern');
+      await laden({ ...DETAIL, telefon: '041 111 11 11', version: 4 });
+      expect(element.querySelector<HTMLInputElement>('[data-test=feld-telefon]')!.value).toBe(
+        '041 111 11 11',
+      );
+      await klick('speichern');
+      expect(port.aktionen[1]).toEqual({
+        art: 'aendern',
+        id: 'k1',
+        version: 4,
+        daten: { ort: 'Luzern' },
+      });
+    });
+
     it('fragt vor dem Inaktivmarkieren zurück und sendet erst nach der Bestätigung', async () => {
       await oeffnen();
       await laden(DETAIL);

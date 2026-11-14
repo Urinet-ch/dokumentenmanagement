@@ -1029,7 +1029,7 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
   - Nachweise: Vitests je Komponente und Dienst (`kontakte/*.spec.ts`, Ergänzungen in `app.spec.ts`,
     `import-lauf.spec.ts`, `dokument-ansicht.spec.ts`); Browser-Szenarien `features/kontakt/kontakte-pwa.feature` gegen das
     echte Archiv im Testmodus (`@req-17.1`, `17.3`, `17.4`, `17.5`, `17.6`, `17.17`, Schritte `e2e/schritte/kontakte.mjs`).
-  - Abweichungen: keine. Eine Backend-Änderung war nicht nötig.
+  - Abweichungen: Das durchgehende Browser-Szenario (`@req-17.1 @req-17.3 @req-17.4`) zeigt das INTERN-Dokument sichtbar (Gesamtzahl 2) statt eines ausgeblendeten vertraulichen: Die Rechtematrix erlaubt A3/A4 für `geschaeftsstelle`, `mitarbeiter` und `treuhaender` haben kein A6; nur verworfene Dokumente fehlen. Die Sichtbarkeit nach Rolle und Vertraulichkeit ist auf API-Ebene in `kontakte-pflegen.feature` (D3, D4) belegt. Eine Backend-Änderung war nicht nötig.
 
 Drive-Import (Req 12):
 - Umsetzung (Aufgabe 4.8): `tools/drive_import` ist ein eigenes Maven-Projekt (Java 25, Picocli, Jackson; JAR mit `maven-shade-plugin`, SpotBugs Stufe hoch) ohne Abhängigkeit zum Backend. Es ruft nur `POST /api/v1/dokumente` auf (eine Datei je Anfrage, Teil `hinweis` vor `dateien`); die Archivseite ist unverändert (`quelle=DRIVE` und `erstellt_von='token:<id>'` aus 2.4, Eingangskorb-Ablauf wie jeder Upload, Req 12.8).
