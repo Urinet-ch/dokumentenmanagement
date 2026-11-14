@@ -101,6 +101,11 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                 .followRedirects(HttpClient.Redirect.NEVER).build();
     }
 
+    /** Für Tests: die HTTP-Version der Abrufe. */
+    HttpClient.Version httpVersion() {
+        return client.version();
+    }
+
     @Override
     public List<String> dienste() {
         return TsaDienst.kennungen(config);
@@ -335,8 +340,8 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         }
         JcaX509CertificateConverter umwandler = new JcaX509CertificateConverter();
         for (X509CertificateHolder holder : basic.getCerts()) {
-            X509Certificate responder = umwandler.getCertificate(holder);
             try {
+                X509Certificate responder = umwandler.getCertificate(holder);
                 responder.verify(ca.getPublicKey());
                 responder.checkValidity(basic.getProducedAt());
                 List<String> zwecke = responder.getExtendedKeyUsage();

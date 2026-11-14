@@ -68,8 +68,13 @@ public final class TsaTestPki {
 
     /** CA und TSA-Zertifikat mit dem Namen {@code name}; gültig ab gestern für 10 Jahre. */
     public static TsaTestPki neu(String name) {
+        return neu(name, 2048);
+    }
+
+    /** Wie {@link #neu(String)}, die CA mit einem RSA-Schlüssel von {@code caBits} Bit. */
+    public static TsaTestPki neu(String name, int caBits) {
         try {
-            KeyPair caSchluessel = rsa();
+            KeyPair caSchluessel = rsa(caBits);
             X500Name caName = new X500Name("CN=Test-CA " + name + ",O=Synthetisch");
             Instant ab = Instant.now().minus(Duration.ofDays(1));
             Instant bis = ab.plus(Duration.ofDays(3650));
@@ -221,8 +226,12 @@ public final class TsaTestPki {
     }
 
     private static KeyPair rsa() throws Exception {
+        return rsa(2048);
+    }
+
+    private static KeyPair rsa(int bits) throws Exception {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-        generator.initialize(2048, ZUFALL);
+        generator.initialize(bits, ZUFALL);
         return generator.generateKeyPair();
     }
 

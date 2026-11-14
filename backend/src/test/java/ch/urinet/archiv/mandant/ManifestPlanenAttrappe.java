@@ -24,7 +24,7 @@ public class ManifestPlanenAttrappe extends ManifestPlanen {
     SchemaBereitschaft bereitschaft;
 
     public ManifestPlanenAttrappe() {
-        super(null, null, null, null, null);
+        super(null, null, null);
     }
 
     @Override

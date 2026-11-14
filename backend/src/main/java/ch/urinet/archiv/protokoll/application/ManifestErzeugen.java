@@ -252,9 +252,12 @@ public class ManifestErzeugen implements AuftragHandler {
             for (String dienst : dienste) {
                 laeufe.put(dienst, ausfuehrung.submit(() -> stempeln(mandant, datum, dienst, imprint, sperre)));
             }
+            // eine gemeinsame Frist für alle Dienste (sie laufen gleichzeitig), nicht je Dienst nacheinander
+            long frist = System.nanoTime() + dienstFrist.toNanos();
             for (Map.Entry<String, Future<Zeitstempel>> lauf : laeufe.entrySet()) {
                 try {
-                    gestempelt.put(lauf.getKey(), lauf.getValue().get(dienstFrist.toMillis(), TimeUnit.MILLISECONDS));
+                    gestempelt.put(lauf.getKey(), lauf.getValue().get(Math.max(0, frist - System.nanoTime()),
+                            TimeUnit.NANOSECONDS));
                 } catch (ExecutionException e) {
                     fehlend.add(lauf.getKey());
                     dienstFehler.add(e.getCause());
@@ -263,6 +266,7 @@ public class ManifestErzeugen implements AuftragHandler {
                 } catch (TimeoutException e) {
                     lauf.getValue().cancel(true);
                     fehlend.add(lauf.getKey());
+                    dienstFehler.add(e);
                     LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel innert %s (archiv.manifest.dienst-frist)",
                             datum, lauf.getKey(), dienstFrist);
                 } catch (InterruptedException e) {
@@ -272,13 +276,7 @@ public class ManifestErzeugen implements AuftragHandler {
             }
         }
         if (gestempelt.isEmpty()) {
-            // die Fehler der Dienste bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit auch der
-            // Auftragsfehler mehr als «IllegalStateException» zeigt (Req 16.7: nur Klassennamen)
-            IllegalStateException keiner = new IllegalStateException(
-                    "Manifest " + datum + ": kein Zeitstempel von " + fehlend,
-                    dienstFehler.isEmpty() ? null : dienstFehler.get(0));
-            dienstFehler.stream().skip(1).forEach(keiner::addSuppressed);
-            throw keiner;
+            throw keinZeitstempel(datum, fehlend, dienstFehler);
         }
         if (!fehlend.isEmpty()) {
             if (auftrag.versuche() < Wiederholung.MAX_VERSUCHE - 1) {
@@ -333,6 +331,17 @@ public class ManifestErzeugen implements AuftragHandler {
                         z.pruefdaten().stream().map(Pruefdatei::sha256).toList()))
                 .toList();
         return new Vorher(sigSha256, verweise);
+    }
+
+    /**
+     * Die Fehler der Dienste bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit auch der
+     * Auftragsfehler mehr als «IllegalStateException» zeigt (Req 16.7: nur Klassennamen).
+     */
+    static IllegalStateException keinZeitstempel(LocalDate datum, List<String> fehlend, List<Throwable> dienstFehler) {
+        IllegalStateException keiner = new IllegalStateException("Manifest " + datum + ": kein Zeitstempel von " + fehlend,
+                dienstFehler.isEmpty() ? null : dienstFehler.get(0));
+        dienstFehler.stream().skip(1).forEach(keiner::addSuppressed);
+        return keiner;
     }
 
     /**

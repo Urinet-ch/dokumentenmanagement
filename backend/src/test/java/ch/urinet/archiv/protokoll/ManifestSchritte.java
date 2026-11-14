@@ -11,14 +11,13 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.job.ManifestPlaner;
 import ch.urinet.archiv.protokoll.adapter.in.job.ManifestPlanerAusloesen;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
+import ch.urinet.archiv.protokoll.application.ManifestEinreihen;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.protokoll.application.ManifestPlanen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
-import ch.urinet.archiv.verarbeitung.application.AuftragService;
-import ch.urinet.archiv.verarbeitung.application.AuftragStand;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -111,10 +110,7 @@ public class ManifestSchritte {
     MandantKontext kontext;
 
     @Inject
-    AuftragService auftragService;
-
-    @Inject
-    AuftragStand auftragStand;
+    ManifestEinreihen einreihen;
 
     @Inject
     Scheduler scheduler;
@@ -406,9 +402,7 @@ public class ManifestSchritte {
                 return register.erstellt(c);
             }
         };
-        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, auftragService, auftragStand,
-                java.time.Duration.ofHours(1)), "worker",
-                false);
+        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, einreihen), "worker", false);
         planerGestern = ManifestFenster.tag(Instant.now()).minusDays(1);
         SchedulerTakt.ausloesen(scheduler, anmeldung, "manifest-planer", () -> ManifestPlanerAusloesen.planen(planer));
     }

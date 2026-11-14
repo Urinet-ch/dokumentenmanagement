@@ -84,6 +84,38 @@ class ManifestPlanenTest {
         assertThat(anzahl()).isEqualTo(1);
     }
 
+    @Test
+    void einAelterOffenerAuftragHinterEinemNeuerenFehlerVerhindertDasEinreihen() throws SQLException {
+        auftrag("OFFEN", null);
+        auftrag("FEHLER", Instant.now().minus(2, ChronoUnit.HOURS));
+        TaktThread.ausfuehren("manifest-planer-test", () -> planen.planen(Instant.now()));
+        TaktThread.ausfuehren("manifest-planer-test", () -> planen.planenBeimStart(Instant.now()));
+        assertThat(anzahl()).isEqualTo(2);
+    }
+
+    @Test
+    void gleichzeitigePlanerReihenNurEinmalEin() throws Exception {
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var planer = new Thread[4];
+        for (int i = 0; i < planer.length; i++) {
+            planer[i] = new Thread(() -> {
+                try {
+                    start.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                TaktThread.ausfuehren("manifest-planer-test", () -> planen.planen(Instant.now()));
+            });
+            planer[i].start();
+        }
+        start.countDown();
+        for (Thread t : planer) {
+            t.join();
+        }
+        assertThat(anzahl()).isEqualTo(1);
+    }
+
     private void auftrag(String status, Instant beendet) throws SQLException {
         long id = hilfe.rohEinreihen(mandant, ManifestErzeugen.TYP, "{}");
         hilfe.aendern(id, "status = '" + status + "'" + (status.equals("OFFEN") ? ""
