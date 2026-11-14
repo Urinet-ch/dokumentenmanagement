@@ -122,7 +122,7 @@ Funktionalität: KI-Vorschlag der Metadaten (KI_VORSCHLAG)
     Und das Dokument hat den Titel «Titel des Benutzers»
     Und der Auftrag «KI_VORSCHLAG» des Belegs ist «FERTIG»
 
-  @req-7.1 @req-5.9
+  @req-7.1
   Szenario: Ein Auftrag ohne Version in der Nutzlast läuft wie bisher
     Angenommen ein Beleg als digitales PDF mit «Muster Buerobedarf AG» und «Rechnung 2026-132»
     Und das Sprachmodell antwortet mit HTTP 500

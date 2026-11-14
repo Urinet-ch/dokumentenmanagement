@@ -37,22 +37,16 @@ class KiVorschlagHandlerVersionTest {
     private final List<Integer> gespeichertMit = new ArrayList<>();
     private int ohneVorschlag;
 
-    @Test
-    void abweichendeVersionRuftDasModellNichtAufUndSpeichertNichts(@TempDir Path ordner) throws Exception {
-        handler(ordner, stand(DokumentStatus.EINGANGSKORB, 5)).ausfuehren(auftrag(4L));
+    @ParameterizedTest
+    @EnumSource(value = DokumentStatus.class, names = {"EINGANGSKORB", "VERARBEITUNG"})
+    void abweichendeVersionRuftDasModellNichtAufUndSpeichertNichts(DokumentStatus status, @TempDir Path ordner)
+            throws Exception {
+        handler(ordner, stand(status, 5)).ausfuehren(auftrag(4L));
 
         assertThat(eingaben).isEmpty();
         assertThat(gespeichertMit).isEmpty();
-        assertThat(ohneVorschlag).as("geht aus VERARBEITUNG weiter, sonst wirkungslos").isEqualTo(1);
-    }
-
-    @Test
-    void abweichendeVersionInVerarbeitungGehtOhneVorschlagWeiter(@TempDir Path ordner) throws Exception {
-        handler(ordner, stand(DokumentStatus.VERARBEITUNG, 5)).ausfuehren(auftrag(4L));
-
-        assertThat(eingaben).isEmpty();
-        assertThat(gespeichertMit).isEmpty();
-        assertThat(ohneVorschlag).isEqualTo(1);
+        assertThat(ohneVorschlag).as("der Handler übergibt an ohneVorschlagWeiter; ob das wirkt, entscheidet die "
+                + "Datenbank (Szenario in ki-vorschlag.feature)").isEqualTo(1);
     }
 
     @Test
