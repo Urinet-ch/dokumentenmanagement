@@ -41,6 +41,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * kein {@code ki_partner_id} haben, bekommen den Partner als Stand des Abgleichs; danach gilt dieser Partner beim
  * Bestätigen als übernommen. Die Ausführungszeit von 016 setzt der Test auf einen festen Zeitpunkt, die Dokumente liegen
  * eine Minute davor oder danach; eine falsch gerechnete Zeitzone (in Europe/Zurich mindestens eine Stunde) fiele auf.
+ * Das gilt nur, wenn die JVM des Tests nicht in UTC läuft (z. B. lokal): In UTC liefern {@code at time zone
+ * current_setting('TimeZone')}, {@code at time zone 'UTC'} und der implizite Cast denselben Wert, die CI prüft den
+ * Zeitvergleich also nicht.
  */
 @QuarkusTest
 class KiPartnerNachtragTest {
