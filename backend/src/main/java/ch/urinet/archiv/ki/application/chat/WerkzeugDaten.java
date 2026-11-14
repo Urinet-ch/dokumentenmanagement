@@ -4,6 +4,7 @@ import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +18,11 @@ import java.util.UUID;
  * Vektorsuche in Aufgabe 6.4). Nur in einer Transaktion.
  */
 public interface WerkzeugDaten {
+
+    /** {@link Monatsquelle#bezug()}: das Belegdatum ({@code dokument.datum}). */
+    String BELEGDATUM = "BELEGDATUM";
+    /** {@link Monatsquelle#gruppe()}: der Partner des Dokuments. */
+    String PARTNER = "PARTNER";
 
     /** Macht die laufende Transaktion nur lesend (Req 5.3: die Werkzeuge haben keine Nebenwirkungen). */
     void nurLesend();
@@ -32,6 +38,35 @@ public interface WerkzeugDaten {
      * nach Datum, Quelle und Dokument sortiert, höchstens {@code hoechstens}; dazu Gesamtzahl und Zahl der Dokumente.
      */
     Fristseite fristen(LocalDate von, LocalDate bis, Sichtregel regel, List<Zusatzfrist> zusatz, int hoechstens);
+
+    /**
+     * Belegnummern ({@code dokument_finanz.belegnummer}) der bestätigten, archivierten Dokumente der Art {@code art} im
+     * Geschäftsjahr, unter der Sichtregel; ohne leere Nummern.
+     */
+    List<String> belegnummern(String art, int geschaeftsjahr, Sichtregel regel);
+
+    /**
+     * Wie ein Dokument einer Monatsreihe zugeordnet wird: {@code bezug} ist {@code BELEGDATUM} oder
+     * {@code zusatz.<feld>} (Datum {@code JJJJ-MM-TT}); {@code gruppe} ist {@code null} (keine Gruppierung),
+     * {@code PARTNER} oder {@code zusatz.<feld>}; {@code nurMonat} ist {@code null} oder ein Zusatzfeld, das im Format
+     * {@code JJJJ-MM} stehen muss (andere Dokumente zählen nicht). Die Feldnamen prüft der Aufrufer gegen
+     * {@code [a-z][a-z0-9_]*}.
+     */
+    record Monatsquelle(String art, String bezug, String gruppe, String nurMonat) {
+    }
+
+    /**
+     * Ein Monat einer Gruppe mit mindestens einem Dokument; {@code gruppe} ist der Anzeigewert, {@code ""} ohne
+     * Gruppierung und {@code null} für Dokumente ohne Wert im Gruppierungsfeld.
+     */
+    record Monatszeile(String gruppe, YearMonth monat, long belege) {
+    }
+
+    /** Die Monate mit Dokumenten (alle Jahre) der bestätigten, archivierten Dokumente der Art, unter der Sichtregel. */
+    List<Monatszeile> monate(Monatsquelle quelle, Sichtregel regel);
+
+    /** Zahl der bestätigten, archivierten Dokumente der Arten unter der Sichtregel. */
+    long belege(Collection<String> arten, Sichtregel regel);
 
     /** Gültigkeit aus dem Zusatzfeld {@code feld} der Dokumente der Art {@code art} (Datum {@code JJJJ-MM-TT}). */
     record Zusatzfrist(String art, String feld) {

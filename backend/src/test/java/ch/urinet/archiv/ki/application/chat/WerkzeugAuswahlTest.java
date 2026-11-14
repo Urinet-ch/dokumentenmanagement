@@ -1,7 +1,10 @@
 package ch.urinet.archiv.ki.application.chat;
 
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Ergebnis;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import org.junit.jupiter.api.Test;
@@ -10,6 +13,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,18 +24,22 @@ class WerkzeugAuswahlTest {
     private static final MandantCode URINET = new MandantCode("urinet");
 
     @Test
-    void alleRollenErhaltenSuchenZeigenUndFristen() {
+    void vollstaendigkeitFehltFuerRollenOhneA3UndA4() {
         WerkzeugAuswahl auswahl = new WerkzeugAuswahl();
         for (Rolle rolle : Rolle.values()) {
             WerkzeugKontext kontext = WerkzeugKontext.fuer(URINET, new Benutzer("b", rolle), null);
-            assertThat(auswahl.angeboten(kontext)).as(rolle.name())
-                    .containsExactly("dokumente_suchen", "dokument_zeigen", "fristen");
+            // aus der Rechtematrix: A3 und A4 ohne Einschränkung auf eigene Dokumente
+            boolean a3A4 = java.util.stream.Stream.of(Aktion.A3, Aktion.A4)
+                    .allMatch(a -> Set.of(Ergebnis.ERLAUBT, Ergebnis.NUR_LESEND).contains(Rechtematrix.ergebnis(rolle, a)));
+            assertThat(auswahl.angeboten(kontext)).as(rolle.name()).startsWith("dokumente_suchen", "dokument_zeigen",
+                    "fristen");
+            assertThat(auswahl.erlaubt(kontext, "vollstaendigkeit")).as(rolle.name()).isEqualTo(a3A4);
+            assertThat(auswahl.angeboten(kontext)).as(rolle.name()).hasSize(a3A4 ? 4 : 3);
             assertThat(auswahl.erlaubt(kontext, "kennzahl")).as(rolle.name()).isFalse();
-            assertThat(auswahl.erlaubt(kontext, "vollstaendigkeit")).as(rolle.name()).isFalse();
         }
     }
 
-    /** Erweiterungspunkt 7.1c: nur Rollen, die A3 und A4 uneingeschränkt sehen (Spec 05, Req 5.4). */
+    /** Spec 05, Req 5.4: nur Rollen, die A3 und A4 uneingeschränkt sehen. */
     @Test
     void vollstaendigkeitNurMitA3UndA4Uneingeschraenkt() {
         assertThat(WerkzeugAuswahl.vollstaendigkeitErlaubt(sicht(Rolle.INHABER))).isTrue();

@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.adapter.in.werkzeug;
 import ch.urinet.archiv.ki.application.chat.DokumentZeigen;
 import ch.urinet.archiv.ki.application.chat.DokumenteSuchen;
 import ch.urinet.archiv.ki.application.chat.FristenAbfrage;
+import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontextRegister;
@@ -46,7 +47,7 @@ class ArchivWerkzeugeTest {
         List<Method> werkzeuge = Arrays.stream(ArchivWerkzeuge.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(Tool.class)).toList();
         assertThat(werkzeuge).extracting(m -> m.getAnnotation(Tool.class).name())
-                .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen");
+                .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen", "vollstaendigkeit");
         for (Method methode : werkzeuge) {
             int memoryIds = 0;
             for (Parameter parameter : methode.getParameters()) {
@@ -76,6 +77,7 @@ class ArchivWerkzeugeTest {
                 .isEqualTo("{\"fehler\":\"kein Kontext\"}");
         assertThat(werkzeuge.fristen("lauf", "2026-01-01", "2026-12-31")).isEqualTo("{\"fehler\":\"kein Kontext\"}");
         assertThat(werkzeuge.fristen(null, "2026-01-01", "2026-12-31")).isEqualTo("{\"fehler\":\"kein Kontext\"}");
+        assertThat(werkzeuge.vollstaendigkeit("lauf", 2026)).isEqualTo("{\"fehler\":\"kein Kontext\"}");
         register.festhalten("lauf", kontext());
         register.entfernen("lauf");
         assertThat(werkzeuge.fristen("lauf", "2026-01-01", "2026-12-31")).isEqualTo("{\"fehler\":\"kein Kontext\"}");
@@ -107,6 +109,11 @@ class ArchivWerkzeugeTest {
         assertThat(werkzeuge.fristen("lauf", "2026-12-31", "2026-01-01")).isEqualTo(fehler("von"));
         assertThat(werkzeuge.fristen("lauf", "2026-01-01", "2029-01-02")).as("mehr als 3 Jahre")
                 .isEqualTo(fehler("bis"));
+        assertThat(werkzeuge.vollstaendigkeit("lauf", null)).isEqualTo(fehler("geschaeftsjahr"));
+        assertThat(werkzeuge.vollstaendigkeit("lauf", 1999)).isEqualTo(fehler("geschaeftsjahr"));
+        assertThat(werkzeuge.vollstaendigkeit("lauf", 20260)).isEqualTo(fehler("geschaeftsjahr"));
+        assertThat(werkzeuge.vollstaendigkeit("lauf", java.time.Year.now().getValue() + 2))
+                .isEqualTo(fehler("geschaeftsjahr"));
     }
 
     @Test
@@ -135,6 +142,7 @@ class ArchivWerkzeugeTest {
         };
         Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(), mandanten);
         return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, new BigDecimal("0.6")),
-                new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null), new ObjectMapper());
+                new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null),
+                new VollstaendigkeitAbfrage(null, null, null), new ObjectMapper());
     }
 }

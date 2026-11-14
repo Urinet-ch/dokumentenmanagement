@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.adapter.in.werkzeug;
 import ch.urinet.archiv.ki.application.chat.DokumentZeigen;
 import ch.urinet.archiv.ki.application.chat.DokumenteSuchen;
 import ch.urinet.archiv.ki.application.chat.FristenAbfrage;
+import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugFehler;
 import ch.urinet.archiv.ki.application.chat.Werkzeuglauf;
@@ -34,14 +35,16 @@ public class ArchivWerkzeuge {
     private final DokumenteSuchen suchen;
     private final DokumentZeigen zeigen;
     private final FristenAbfrage fristen;
+    private final VollstaendigkeitAbfrage vollstaendigkeit;
     private final ObjectMapper json;
 
     public ArchivWerkzeuge(Werkzeuglauf lauf, DokumenteSuchen suchen, DokumentZeigen zeigen, FristenAbfrage fristen,
-                           ObjectMapper json) {
+                           VollstaendigkeitAbfrage vollstaendigkeit, ObjectMapper json) {
         this.lauf = lauf;
         this.suchen = suchen;
         this.zeigen = zeigen;
         this.fristen = fristen;
+        this.vollstaendigkeit = vollstaendigkeit;
         this.json = json.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
@@ -84,6 +87,19 @@ public class ArchivWerkzeuge {
             @P("Ende des Zeitraums, JJJJ-MM-TT") String bis) {
         return antworten(WerkzeugAuswahl.FRISTEN, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.FRISTEN,
                 k -> fristen.fristen(k, von, bis)));
+    }
+
+    @Tool(name = WerkzeugAuswahl.VOLLSTAENDIGKEIT, value = """
+            Meldet Lücken für ein Geschäftsjahr, je Kategorie: fehlende Nummern in Belegnummern-Folgen (z. B. \
+            Ausgangsrechnungen) und Monate ohne Dokument (z. B. Lohnabrechnungen je Person, Kontoauszüge je Partner), \
+            jeweils ab dem ersten Beleg und nur bis zum letzten abgeschlossenen Monat. Monate stehen als JJJJ-MM. \
+            Dazu der Datenstand und unter nichtGeprueft, was dieses Werkzeug nicht prüfen kann. Eine Reihe ohne \
+            fehlende Einträge ist vollständig. Nur für Rollen mit Einsicht in interne und Personal-Dokumente.""")
+    public String vollstaendigkeit(
+            @ToolMemoryId Object laufId,
+            @P("Geschäftsjahr, vierstellig, z. B. 2026") Integer geschaeftsjahr) {
+        return antworten(WerkzeugAuswahl.VOLLSTAENDIGKEIT, () -> lauf.ausfuehren(laufId,
+                WerkzeugAuswahl.VOLLSTAENDIGKEIT, k -> vollstaendigkeit.vollstaendigkeit(k, geschaeftsjahr)));
     }
 
     private String antworten(String werkzeug, Supplier<Object> arbeit) {
