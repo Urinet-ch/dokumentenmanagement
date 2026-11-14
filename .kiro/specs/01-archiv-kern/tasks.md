@@ -405,6 +405,26 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 4.9, 8.11, 11.12, 12.9, 14.8, 14.9, 14.10, 16.11_
   - _Abhängig von: 2.4, 3.2, 3.6, 3.7, 4.5, 4.6, 4.7, 4.8_
 
+- [ ] 4.11 Kontakte ansehen und pflegen: Schnittstelle [Backend]
+  - Herkunft: Spec-Erweiterung, entschieden von Fabian am 14.11.2026 nach dem ersten CSV-Import mit Adressen (Req 17; design.md «Kontakte ansehen und pflegen»); Auslegungen vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR. Nummern 4.11 und 4.12 als nächste freie der Welle 4. Läuft parallel zu Spec 02, Welle 7 (Chat); der Chat hat Vorrang (entschieden von Fabian am 14.11.2026)
+  - Liquibase `db/mandant`, nächste freie Nummer ab 026 (vor dem Push auf `origin/main` prüfen), bestehende Changesets unverändert: `kontakt.aktiv`, `inaktiv_seit`, `zusammengefuehrt_in` mit den Checks aus «Data Models»; `import_zeile.ergebnis` um `INAKTIV`, `import_lauf.inaktiv`
+  - REST mit OpenAPI: `GET /kontakte/liste`, `GET /kontakte/{id}`, `GET /kontakte/{id}/verweise`, `POST /kontakte/{id}/zusammenfuehren`, `POST /kontakte/{id}/inaktiv`, `POST /kontakte/{id}/aktiv`; `PATCH /kontakte/{id}` auf inaktive → 409; `GET /kontakte?q=` nur aktive
+  - Zusammenführen in einer Transaktion (`KontaktZusammenfuehren`, `KontaktVerweise`): Verweise umhängen, Dokumente mit neuer Version und `dokument_version` wie `DokumentAendern`, Quelle inaktiv mit `zusammengefuehrt_in`; Protokoll `KONTAKT_ZUSAMMENFUEHREN` (Lauf und je Dokument), `KONTAKT_INAKTIV`, `KONTAKT_AKTIV`; `KontaktVerweiseTest` gegen `information_schema`
+  - Inaktive kein Ziel neuer Zuordnungen: `PartnerAbgleich`, Kandidaten im Eingangskorb, `PATCH /dokumente/{id}` und Bestätigen, Generator (`KontaktRegister.mitCrmId`); CSV-Import: Ergebnis `INAKTIV`, Kandidaten und Dubletten-Entscheide nur aktive, Übernahme lässt inaktive aus, «nicht mehr im CRM-Export» nur für aktive
+  - Szenarien (Java, gegen das echte Backend) in `features/kontakt/kontakte-pflegen.feature` und Ergänzungen der bestehenden Features für 7.4, 11.7, 13.3, 13.4 und 13.7; Rollen je Recht (2.6) inkl. `VERWEIGERT`; nur synthetische Kontaktdaten
+  - _Anforderungen: 2.18, 7.4, 11.7, 13.3, 13.4, 13.7, 17.1–17.16_
+  - _Abhängig von: 3.1, 3.5, 4.2, 4.5; mit 4.3 abstimmen (Übernahme `CsvUebernehmenSpeichern`, dieselben Dateien)_
+
+- [ ] 4.12 Kontakte ansehen und pflegen: Oberfläche [Frontend]
+  - Herkunft wie 4.11 (Req 17; design.md «Kontakte ansehen und pflegen», Abschnitt «Oberfläche»); parallel zu Spec 02, Welle 7, der Chat hat Vorrang
+  - Routen `/kontakte` und `/kontakte/:id` (lazy, Guard auf A6), Eintrag «Kontakte» in der Navigation nur mit A6
+  - Liste mit Suche, Filtern (Status, Herkunft, «nicht mehr im CRM-Export»), Blättern und Gesamtzahl; Detail mit Stammdaten, Kennzeichen und den sichtbaren Dokumenten (`GET /dokumente?partner=`, Platzhalter nach 8.11)
+  - Mit A12: Bearbeiten (`PATCH`, `If-Match`, 412 → neu laden), Zusammenführen (Ziel suchen, Grund Pflicht, Rückfrage mit den Zahlen aus `/verweise`), als inaktiv markieren, wieder aktivieren
+  - Import-Oberfläche (4.4): Zahl und Filter «inaktiv», Zeilen mit Kontakt verlinkt; Dokumentansicht (4.6): Partner verlinkt mit A6; Zugriffsprotokoll (5.1): neue Aktionen im Filter
+  - 375 px ohne waagrechtes Scrollen; Vitests je Komponente, Szenarien für 17.5, 17.6 und 17.17
+  - _Anforderungen: 13.3, 17.1–17.6, 17.17_
+  - _Abhängig von: 4.11, 4.4, 4.6_
+
 ## Welle 5 — GeBüV, Betrieb, Abnahme Phase 1 (Voraussetzung: Entscheide aus 4.9)
 
 - [x] 5.1 Zugriffsprotokoll vollständig [Backend] [Frontend]
