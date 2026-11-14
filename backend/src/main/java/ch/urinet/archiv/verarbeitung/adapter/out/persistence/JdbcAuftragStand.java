@@ -40,4 +40,23 @@ public class JdbcAuftragStand implements AuftragStand {
             throw JdbcAuftragSchlange.fehler("Stand der Aufträge nicht gelesen", e);
         }
     }
+
+    @Override
+    public Optional<Juengster> juengster(MandantCode mandant, AuftragTyp typ) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select status, beendet from public.auftrag where mandant = ? and typ = ? "
+                        + "order by id desc limit 1")) {
+            abfrage.setString(1, mandant.wert());
+            abfrage.setString(2, typ.wert());
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                if (!zeile.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new Juengster(zeile.getString(1), Optional
+                        .ofNullable(zeile.getObject(2, OffsetDateTime.class)).map(OffsetDateTime::toInstant)));
+            }
+        } catch (SQLException e) {
+            throw JdbcAuftragSchlange.fehler("Stand der Aufträge nicht gelesen", e);
+        }
+    }
 }

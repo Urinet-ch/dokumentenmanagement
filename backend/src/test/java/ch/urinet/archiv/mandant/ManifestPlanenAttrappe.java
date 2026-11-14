@@ -24,12 +24,17 @@ public class ManifestPlanenAttrappe extends ManifestPlanen {
     SchemaBereitschaft bereitschaft;
 
     public ManifestPlanenAttrappe() {
-        super(null, null, null);
+        super(null, null, null, null, null);
     }
 
     @Override
     public void planen(Instant jetzt) {
         aufrufe.add(bereitschaft.bereit());
+    }
+
+    @Override
+    public void planenBeimStart(Instant jetzt) {
+        planen(jetzt);
     }
 
     /** Je Aufruf, ob das Signal schon gemeldet war. */

@@ -18,6 +18,7 @@ import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
+import ch.urinet.archiv.verarbeitung.application.AuftragStand;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -111,6 +112,9 @@ public class ManifestSchritte {
 
     @Inject
     AuftragService auftragService;
+
+    @Inject
+    AuftragStand auftragStand;
 
     @Inject
     Scheduler scheduler;
@@ -402,7 +406,8 @@ public class ManifestSchritte {
                 return register.erstellt(c);
             }
         };
-        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, auftragService), "worker",
+        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, auftragService, auftragStand,
+                java.time.Duration.ofHours(1)), "worker",
                 false);
         planerGestern = ManifestFenster.tag(Instant.now()).minusDays(1);
         SchedulerTakt.ausloesen(scheduler, anmeldung, "manifest-planer", () -> ManifestPlanerAusloesen.planen(planer));

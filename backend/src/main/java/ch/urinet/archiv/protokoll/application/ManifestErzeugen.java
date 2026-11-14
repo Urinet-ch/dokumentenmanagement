@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -245,6 +246,7 @@ public class ManifestErzeugen implements AuftragHandler {
         }
         Map<String, Zeitstempel> gestempelt = new LinkedHashMap<>();
         List<String> fehlend = new ArrayList<>();
+        List<Throwable> dienstFehler = new ArrayList<>();
         try (ExecutorService ausfuehrung = Executors.newVirtualThreadPerTaskExecutor()) {
             Map<String, Future<Zeitstempel>> laeufe = new LinkedHashMap<>();
             for (String dienst : dienste) {
@@ -255,8 +257,9 @@ public class ManifestErzeugen implements AuftragHandler {
                     gestempelt.put(lauf.getKey(), lauf.getValue().get(dienstFrist.toMillis(), TimeUnit.MILLISECONDS));
                 } catch (ExecutionException e) {
                     fehlend.add(lauf.getKey());
-                    LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel (%s)", datum, lauf.getKey(),
-                            e.getCause().getClass().getSimpleName());
+                    dienstFehler.add(e.getCause());
+                    LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel, ursache=%s", datum, lauf.getKey(),
+                            zeitstempelUrsache(e.getCause()));
                 } catch (TimeoutException e) {
                     lauf.getValue().cancel(true);
                     fehlend.add(lauf.getKey());
@@ -269,7 +272,13 @@ public class ManifestErzeugen implements AuftragHandler {
             }
         }
         if (gestempelt.isEmpty()) {
-            throw new IllegalStateException("Manifest " + datum + ": kein Zeitstempel von " + fehlend);
+            // die Fehler der Dienste bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit auch der
+            // Auftragsfehler mehr als «IllegalStateException» zeigt (Req 16.7: nur Klassennamen)
+            IllegalStateException keiner = new IllegalStateException(
+                    "Manifest " + datum + ": kein Zeitstempel von " + fehlend,
+                    dienstFehler.isEmpty() ? null : dienstFehler.get(0));
+            dienstFehler.stream().skip(1).forEach(keiner::addSuppressed);
+            throw keiner;
         }
         if (!fehlend.isEmpty()) {
             if (auftrag.versuche() < Wiederholung.MAX_VERSUCHE - 1) {
@@ -324,6 +333,22 @@ public class ManifestErzeugen implements AuftragHandler {
                         z.pruefdaten().stream().map(Pruefdatei::sha256).toList()))
                 .toList();
         return new Vorher(sigSha256, verweise);
+    }
+
+    /**
+     * Ursache eines gescheiterten Zeitstempels fürs Log (Req 16.7): Klassennamen der Kette und die Meldungen der
+     * {@link ZeitstempelPort.ZeitstempelFehler}. Deren Meldungen sind feste Texte mit Dienstkennung (Konfiguration) oder
+     * Status und enthalten keine Beleg-, Token- oder Netzwerkwerte.
+     */
+    static String zeitstempelUrsache(Throwable fehler) {
+        StringBuilder s = new StringBuilder(Ursachen.kette(fehler));
+        int n = 0;
+        for (Throwable t = fehler; t != null && n < 10; t = t.getCause(), n++) {
+            if (t instanceof ZeitstempelPort.ZeitstempelFehler z && z.getMessage() != null) {
+                s.append(" [meldung=\"").append(z.getMessage()).append("\"]");
+            }
+        }
+        return s.toString();
     }
 
     /** Je Dienst: {@code .tsr} zuerst (wiederverwendet, falls schon abgelegt), dann Kette und OCSP- bzw. CRL-Antwort. */

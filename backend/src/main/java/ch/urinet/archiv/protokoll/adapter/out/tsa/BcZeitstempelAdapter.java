@@ -17,6 +17,7 @@ import org.bouncycastle.cert.ocsp.OCSPResp;
 import org.bouncycastle.cert.ocsp.SingleResp;
 import org.bouncycastle.cms.SignerInformationVerifier;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
+import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.DigestCalculatorProvider;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
@@ -96,7 +97,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         this.config = config;
         this.zeitgrenze = zeitgrenze;
         this.hoechstalter = hoechstalter;
-        this.client = HttpClient.newBuilder().connectTimeout(zeitgrenze)
+        this.client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(zeitgrenze)
                 .followRedirects(HttpClient.Redirect.NEVER).build();
     }
 
@@ -328,8 +329,8 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
     }
 
     private static boolean ocspSignaturGueltig(BasicOCSPResp basic, X509Certificate ca)
-            throws OperatorCreationException, OCSPException, CertificateException {
-        if (basic.isSignatureValid(new JcaContentVerifierProviderBuilder().build(ca.getPublicKey()))) {
+            throws OperatorCreationException, CertificateException {
+        if (signiertMit(basic, new JcaContentVerifierProviderBuilder().build(ca.getPublicKey()))) {
             return true;
         }
         JcaX509CertificateConverter umwandler = new JcaX509CertificateConverter();
@@ -340,7 +341,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                 responder.checkValidity(basic.getProducedAt());
                 List<String> zwecke = responder.getExtendedKeyUsage();
                 if (zwecke != null && zwecke.contains(KeyPurposeId.id_kp_OCSPSigning.getId())
-                        && basic.isSignatureValid(new JcaContentVerifierProviderBuilder().build(holder))) {
+                        && signiertMit(basic, new JcaContentVerifierProviderBuilder().build(holder))) {
                     return true;
                 }
             } catch (GeneralSecurityException e) {
@@ -348,6 +349,18 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             }
         }
         return false;
+    }
+
+    /**
+     * Eine Signatur mit einem Schlüssel anderer Länge oder Art (delegierter Responder) meldet die JCA nicht als
+     * {@code false}, sondern als Ausnahme; das heisst hier «nicht mit diesem Schlüssel signiert».
+     */
+    private static boolean signiertMit(BasicOCSPResp basic, ContentVerifierProvider pruefer) {
+        try {
+            return basic.isSignatureValid(pruefer);
+        } catch (OCSPException e) {
+            return false;
+        }
     }
 
     /** Sperrliste der CA ohne das TSA-Zertifikat, aktuell zu {@code genTime}. */

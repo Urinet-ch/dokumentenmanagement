@@ -102,6 +102,26 @@ class BcZeitstempelAdapterTest {
     }
 
     @Test
+    void delegierterResponderMitAndererSchluessellaengeWirdAngenommen() throws Exception {
+        // 3072 Bit gegen den 2048-Bit-Schlüssel der CA: die JCA wirft dabei, statt false zu liefern
+        BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, false), PKI.tsa, PKI.ca,
+                Instant.now(), HOECHSTALTER);
+    }
+
+    @Test
+    void delegierterResponderOhneOcspEkuOderNichtVonDerCaWirdOhneRohAusnahmeAbgelehnt() throws Exception {
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, false, false),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 2048, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+    }
+
+    @Test
     void eineAlteOderVorDemStempelAbgelaufeneOcspAntwortWirdAbgelehnt() throws Exception {
         byte[] anfrage = ocspAnfrage();
         Instant genTime = Instant.now();

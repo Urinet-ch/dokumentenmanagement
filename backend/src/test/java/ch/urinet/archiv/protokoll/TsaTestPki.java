@@ -136,6 +136,41 @@ public final class TsaTestPki {
         }
     }
 
+    /**
+     * OCSP-Antwort eines delegierten Responders mit eigenem RSA-Schlüssel von {@code bits} Bit (anders lang als der
+     * CA-Schlüssel, wie bei den Schweizer Diensten). Das Responder-Zertifikat trägt EKU OCSPSigning, falls
+     * {@code ocspEku}, und ist von der CA ausgestellt, ausser {@code fremdAusgestellt}.
+     */
+    public byte[] delegierteOcsp(byte[] anfrage, int bits, boolean ocspEku, boolean fremdAusgestellt) {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(bits, ZUFALL);
+            KeyPair responder = generator.generateKeyPair();
+            KeyPair aussteller = fremdAusgestellt ? rsa() : caSchluessel;
+            Instant jetzt = Instant.now();
+            X509v3CertificateBuilder bau = new JcaX509v3CertificateBuilder(
+                    new JcaX509CertificateHolder(ca).getSubject(), new BigInteger(64, ZUFALL),
+                    Date.from(jetzt.minus(Duration.ofDays(1))), Date.from(jetzt.plus(Duration.ofDays(30))),
+                    new X500Name("CN=Test OCSP-Responder"), responder.getPublic());
+            if (ocspEku) {
+                bau.addExtension(Extension.extendedKeyUsage, false, new ExtendedKeyUsage(KeyPurposeId.id_kp_OCSPSigning));
+            }
+            X509Certificate zert = zertifikat(bau, aussteller);
+            OCSPReq req = new OCSPReq(anfrage);
+            var antwort = new JcaBasicOCSPRespBuilder(responder.getPublic(),
+                    new JcaDigestCalculatorProviderBuilder().build().get(org.bouncycastle.cert.ocsp.CertificateID.HASH_SHA1));
+            for (Req einzel : req.getRequestList()) {
+                antwort.addResponse(einzel.getCertID(), CertificateStatus.GOOD, Date.from(jetzt), null, null);
+            }
+            BasicOCSPResp basic = antwort.build(signer(responder),
+                    new org.bouncycastle.cert.X509CertificateHolder[] {new JcaX509CertificateHolder(zert)},
+                    Date.from(jetzt));
+            return new OCSPRespBuilder().build(OCSPResp.SUCCESSFUL, basic).getEncoded();
+        } catch (Exception e) {
+            throw new IllegalStateException("OCSP-Antwort nicht erzeugt", e);
+        }
+    }
+
     /** Sperrliste der CA; mit {@code gesperrt} steht das TSA-Zertifikat darauf. */
     public byte[] crl(boolean gesperrt) {
         Instant jetzt = Instant.now();
