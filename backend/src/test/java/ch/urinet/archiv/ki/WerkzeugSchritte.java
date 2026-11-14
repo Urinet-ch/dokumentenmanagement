@@ -83,6 +83,7 @@ public class WerkzeugSchritte {
     private final Set<String> laeufe = new HashSet<>();
     private final Map<String, Long> stand = new HashMap<>();
     private final Map<String, List<String>> deaktivierteArten = new HashMap<>();
+    private final Map<String, List<String>> angelegteArten = new HashMap<>();
     private JsonNode antwort;
     private String antwortText;
     private String letzteMessgroesse;
@@ -100,6 +101,11 @@ public class WerkzeugSchritte {
             Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), eintrag.getValue());
         }
         try (Connection verbindung = datenbank.get().getConnection()) {
+            for (Map.Entry<String, List<String>> e : angelegteArten.entrySet()) {
+                ausfuehren(verbindung, "delete from " + schema(e.getKey()) + ".dokumentart where code = any(?)",
+                        (Object) verbindung.createArrayOf("text", e.getValue().toArray()));
+            }
+            angelegteArten.clear();
             for (Ort kontakt : kontakte.values()) {
                 try (PreparedStatement loeschen = verbindung.prepareStatement(
                         "delete from " + schema(kontakt.mandant()) + ".kontakt where id = ?")) {
@@ -559,6 +565,21 @@ public class WerkzeugSchritte {
     @Angenommen("im Mandanten «{word}» liegen diese Finanzbelege:")
     public void finanzbelegeAnlegen(String mandant, DataTable tabelle) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection()) {
+            // Der Test-Seed von vhf-gsk kennt keine Finanzarten; fehlende Arten samt Gruppe finanz nachlegen.
+            for (Map<String, String> zeile : tabelle.asMaps()) {
+                String art = zeile.get("art");
+                if (art != null && !art.isBlank()) {
+                    try (PreparedStatement neu = verbindung.prepareStatement("insert into " + schema(mandant)
+                            + ".dokumentart (code, name, vertraulichkeit, gesetzliche_pflicht, aktiv, gruppen) "
+                            + "values (?, ?, 'NORMAL', false, true, array['finanz']) on conflict do nothing")) {
+                        neu.setString(1, art);
+                        neu.setString(2, art);
+                        if (neu.executeUpdate() > 0) {
+                            angelegteArten.computeIfAbsent(mandant, m -> new ArrayList<>()).add(art);
+                        }
+                    }
+                }
+            }
             for (Map<String, String> zeile : tabelle.asMaps()) {
                 Map<String, String> werte = new HashMap<>();
                 zeile.forEach((k, v) -> {
