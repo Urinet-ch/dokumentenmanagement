@@ -1,6 +1,7 @@
 package ch.urinet.archiv;
 
 import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
+import ch.urinet.archiv.integration.adapter.in.kommando.MailPasswortEingabe;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
@@ -13,6 +14,8 @@ import jakarta.inject.Inject;
 import liquibase.Scope;
 import liquibase.ui.LoggerUIService;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +55,7 @@ public class ArchivMain implements QuarkusApplication {
             "quarkus.liquibase.migrate-at-start", "false",
             "archiv.db.url-pflicht", "false");
 
+    static final int FACHLICHER_FEHLER = 1;
     static final int FALSCHER_AUFRUF = 2;
     static final int TECHNISCHER_FEHLER = 3;
 
@@ -87,6 +91,13 @@ public class ArchivMain implements QuarkusApplication {
             System.err.println(fehler.get());
             beenden.accept(FALSCHER_AUFRUF, null);
             return;
+        }
+        if (argumente[0].equals("mail") && argumente[1].equals("einrichten")) {
+            int code = mailPasswortVorabLesen(System.in);
+            if (code != 0) {
+                beenden.accept(code, null);
+                return;
+            }
         }
         KOMMANDO.forEach(System::setProperty);
         if (argumente[0].equals("manifest") && List.of(argumente).contains(ManifestKommando.OHNE_DATENBANK)) {
@@ -152,6 +163,23 @@ public class ArchivMain implements QuarkusApplication {
         };
     }
 
+    /**
+     * {@code mail einrichten}: das Passwort (erste Zeile der Standardeingabe) lesen, bevor Quarkus startet. Im Befund
+     * von Stufe A (13.11.2026) kam die Eingabe im Wegwerf-Container nicht mehr an, wenn sie erst nach dem Start (rund
+     * 50 s) gelesen wurde (Spec 02, design.md «Umsetzung (Aufgabe 6.1)»). Ohne oder mit zu langem Passwort endet das
+     * Kommando sofort mit 1, ist die Standardeingabe nicht lesbar mit 3 (nur die Klasse des Fehlers, nie seine Meldung).
+     */
+    static int mailPasswortVorabLesen(InputStream ein) {
+        try {
+            Optional<String> fehler = MailPasswortEingabe.vorabLesen(ein);
+            fehler.ifPresent(System.err::println);
+            return fehler.isPresent() ? FACHLICHER_FEHLER : 0;
+        } catch (IOException e) {
+            System.err.println("Technischer Fehler: Standardeingabe nicht lesbar (" + e.getClass().getSimpleName() + ")");
+            return TECHNISCHER_FEHLER;
+        }
+    }
+
     private static Throwable grundursache(Throwable fehler) {
         Throwable ursache = fehler;
         while (ursache.getCause() != null && ursache.getCause() != ursache) {
@@ -171,7 +199,7 @@ public class ArchivMain implements QuarkusApplication {
         return switch (liste.getFirst()) {
             case "token" -> token.ausfuehren(rest, ergebnis, System.err);
             case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
-            case "mail" -> mail.ausfuehren(rest, System.in, System.err);
+            case "mail" -> mail.ausfuehren(rest, MailPasswortEingabe::nehmen, System.err);
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
