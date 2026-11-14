@@ -175,6 +175,16 @@ public class KontaktSchritte {
         antwort = given().header("Authorization", "Bearer " + token).queryParam("q", text).when().get(KONTAKTE);
     }
 
+    /** Liste, Detail, Zusammenführen und Markieren (Req 17.5, 17.6) mit dem API-Token; {@code id} beliebig. */
+    @Wenn("das API-Token die Kontakte über «{word} {}» erreichen will")
+    public void tokenPflegen(String methode, String pfad) {
+        String ziel = KONTAKTE + pfad.replace("{id}", UUID.randomUUID().toString());
+        RequestSpecification anfrage = given().header("Authorization", "Bearer " + token).header("If-Match", "\"0\"")
+                .contentType(ContentType.JSON);
+        antwort = "GET".equals(methode) ? anfrage.when().get(ziel)
+                : anfrage.body(Map.of("grund", "Probe")).when().post(ziel);
+    }
+
     @Wenn("der Abgleich in «{word}» den Partner «{}» mit E-Mail «{}», UID «{}» und IBAN «{}» sucht")
     public void abgleichen(String mandant, String name, String email, String uid, String iban) throws Exception {
         PartnerAngaben angaben = new PartnerAngaben(name, email, uid, iban);

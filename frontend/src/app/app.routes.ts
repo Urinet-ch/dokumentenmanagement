@@ -3,6 +3,8 @@ import { DokumentPort } from './dokument/dokument-port';
 import { HttpDokumentService } from './dokument/http-dokument.service';
 import { HttpUploadService } from './erfassen/http-upload.service';
 import { UploadPort } from './erfassen/upload-port';
+import { HttpKontakteService } from './kontakte/http-kontakte.service';
+import { KontaktePort } from './kontakte/kontakte-port';
 import { Folgt } from './folgt/folgt';
 import { erfassenGuard } from './gemeinsam/anmeldung/erfassen.guard';
 import { rechtGuard } from './gemeinsam/anmeldung/recht.guard';
@@ -49,6 +51,20 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A2')],
     providers: [{ provide: DokumentPort, useClass: HttpDokumentService }],
     title: titel(TEXTE.dokument.titel),
+  },
+  {
+    path: 'kontakte',
+    loadComponent: () => import('./kontakte/kontakte').then((m) => m.Kontakte),
+    canActivate: [rechtGuard('A6')],
+    providers: [{ provide: KontaktePort, useClass: HttpKontakteService }],
+    title: titel(TEXTE.menue.kontakte),
+  },
+  {
+    path: 'kontakte/:id',
+    loadComponent: () => import('./kontakte/kontakt-detail').then((m) => m.KontaktDetailSeite),
+    canActivate: [rechtGuard('A6')],
+    providers: [{ provide: KontaktePort, useClass: HttpKontakteService }],
+    title: titel(TEXTE.menue.kontakte),
   },
   {
     path: 'importe',

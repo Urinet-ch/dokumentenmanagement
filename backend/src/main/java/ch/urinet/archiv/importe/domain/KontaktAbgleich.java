@@ -15,9 +15,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 /**
  * Abgleich einer Kontaktzeile gegen die bestehenden Kontakte (Aufgabe 4.2; Req 13.4, 13.5; design.md «Kontakt und
@@ -32,6 +34,11 @@ import java.util.function.UnaryOperator;
  *   (vorsichtigere Auslegung: die Zeile gehört zu einem anderen CRM-Eintrag);</li>
  *   <li>kein exakter Treffer, aber Namensähnlichkeit ab der Schwelle → {@code DUBLETTE}; sonst {@code NEU}.</li>
  * </ul>
+ * Inaktive Kontakte (Req 17.13): Trifft {@code crm_id} einen inaktiven, ist das Ergebnis immer {@code INAKTIV} (die
+ * Kontakt-ID ist der stärkste Schlüssel, sonst käme die Zeile nach jedem Zusammenführen als Dublette wieder). Sonst
+ * zählen inaktive Treffer auf E-Mail und Name + PLZ nicht, sobald ein aktiver Kontakt eine Stufe trifft; treffen nur
+ * inaktive, ist das Ergebnis {@code INAKTIV} mit dem ersten getroffenen (E-Mail vor Name + PLZ). Ähnliche Kontakte
+ * liefert der Aufrufer nur aktive.
  * Rein: Die Treffer liefert der Aufrufer. Meldungen nennen nie Werte.
  */
 public final class KontaktAbgleich {
@@ -43,6 +50,8 @@ public final class KontaktAbgleich {
     static final String WIDERSPRUCH = "Kontakt-ID, E-Mail bzw. Name und PLZ zeigen auf verschiedene Kontakte";
     static final String ANDERE_CRM_ID = "Treffer über %s mit anderer Kontakt-ID aus 21.CRM";
     static final String AEHNLICH = "ähnlicher Name";
+    /** Meldung einer Zeile, deren Kontakt inaktiv ist (Req 17.13). */
+    public static final String INAKTIV = "Kontakt inaktiv";
     /** Meldung für Zeilen, die in der Datei schon vorkommen; {@code {}} steht für die Nummer der früheren Zeile. */
     public static final String IN_DER_DATEI = "doppelt in der Datei (Zeile {})";
 
@@ -111,8 +120,24 @@ public final class KontaktAbgleich {
     public static Befund pruefen(Map<String, String> vergleichswerte, Bestaende bestaende, List<UUID> aehnliche) {
         Schluessel schluessel = schluessel(vergleichswerte);
         List<Bestand> ueberCrmId = bestaende.ueberCrmId(schluessel);
+        Optional<Bestand> crmIdInaktiv = ueberCrmId.stream().filter(b -> !b.aktiv()).findFirst();
+        if (crmIdInaktiv.isPresent()) {
+            return Befund.inaktiv(crmIdInaktiv.get().id());
+        }
         List<Bestand> ueberEmail = bestaende.ueberEmail(schluessel);
         List<Bestand> ueberNamePlz = bestaende.ueberNamePlz(schluessel);
+        boolean aktiverTreffer = !ueberCrmId.isEmpty() || ueberEmail.stream().anyMatch(Bestand::aktiv)
+                || ueberNamePlz.stream().anyMatch(Bestand::aktiv);
+        if (!aktiverTreffer) {
+            Optional<Bestand> inaktiv = Stream.concat(ueberEmail.stream(), ueberNamePlz.stream())
+                    .findFirst();
+            if (inaktiv.isPresent()) {
+                return Befund.inaktiv(inaktiv.get().id());
+            }
+        } else {
+            ueberEmail = ueberEmail.stream().filter(Bestand::aktiv).toList();
+            ueberNamePlz = ueberNamePlz.stream().filter(Bestand::aktiv).toList();
+        }
         Set<UUID> alle = new LinkedHashSet<>();
         List<String> mehrfach = new ArrayList<>();
         stufe(ueberCrmId, "gleicher Kontakt-ID", alle, mehrfach);
@@ -143,8 +168,14 @@ public final class KontaktAbgleich {
     /**
      * 64-Bit-Fingerabdrücke (SHA-256, die ersten 8 Byte) der gefüllten Schlüssel und des getroffenen Kontakts, je mit
      * der Stufe als Präfix. Zwei Zeilen derselben Datei mit einem gemeinsamen Fingerabdruck sind doppelt (die spätere
-     * wird {@code DUBLETTE}); so muss der Abgleich die Schlüssel nicht im Heap sammeln.
+     * wird {@code DUBLETTE}); so muss der Abgleich die Schlüssel nicht im Heap sammeln. Eine Zeile {@code INAKTIV}
+     * hat keine: Sie wird nie übernommen, auch nicht doppelt (Req 17.13).
      */
+    public static long[] fingerabdruecke(Befund befund, Schluessel schluessel) {
+        return befund.ergebnis() == Ergebnis.INAKTIV ? new long[0] : fingerabdruecke(schluessel, befund.kontaktId());
+    }
+
+    /** Wie {@link #fingerabdruecke(Befund, Schluessel)}, für eine Zeile mit Treffer {@code kontaktId} oder ohne. */
     public static long[] fingerabdruecke(Schluessel schluessel, UUID kontaktId) {
         List<String> teile = new ArrayList<>(4);
         if (!schluessel.crmId().isEmpty()) {
@@ -197,14 +228,20 @@ public final class KontaktAbgleich {
     /**
      * Ein bestehender Kontakt: {@code felder} wie in {@code kontakt} gespeichert (Schlüssel wie {@link ImportFeld},
      * {@code typ} als {@code ORGANISATION}/{@code PERSON}); sie werden wie die Zeile mit {@link #vergleichswerte}
-     * normalisiert, leere fallen weg. {@code nameNormalisiert} wie {@code kontakt.name_normalisiert}.
+     * normalisiert, leere fallen weg. {@code nameNormalisiert} wie {@code kontakt.name_normalisiert}; {@code aktiv}
+     * wie {@code kontakt.aktiv} (Req 17.13).
      */
-    public record Bestand(UUID id, String nameNormalisiert, Map<String, String> felder) {
+    public record Bestand(UUID id, String nameNormalisiert, Map<String, String> felder, boolean aktiv) {
 
         public Bestand {
             Objects.requireNonNull(id, "id");
             nameNormalisiert = nameNormalisiert == null ? "" : nameNormalisiert;
             felder = Map.copyOf(vergleichswerte(felder));
+        }
+
+        /** Ein aktiver Kontakt. */
+        public Bestand(UUID id, String nameNormalisiert, Map<String, String> felder) {
+            this(id, nameNormalisiert, felder, true);
         }
 
         public String crmId() {
@@ -252,7 +289,10 @@ public final class KontaktAbgleich {
         }
     }
 
-    /** Ergebnis einer Zeile; {@code kontaktId} nur bei einem Treffer, {@code kandidaten} nur bei einer Dublette. */
+    /**
+     * Ergebnis einer Zeile; {@code kontaktId} nur bei einem Treffer oder {@code INAKTIV}, {@code kandidaten} nur bei
+     * einer Dublette.
+     */
     public record Befund(Ergebnis ergebnis, String meldung, UUID kontaktId, List<UUID> kandidaten) {
 
         public static final Befund NEU = new Befund(Ergebnis.NEU, null, null, List.of());
@@ -264,6 +304,10 @@ public final class KontaktAbgleich {
 
         static Befund dublette(String meldung, List<UUID> kandidaten) {
             return new Befund(Ergebnis.DUBLETTE, meldung, null, kandidaten);
+        }
+
+        static Befund inaktiv(UUID kontaktId) {
+            return new Befund(Ergebnis.INAKTIV, INAKTIV, kontaktId, List.of());
         }
 
     }

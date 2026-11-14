@@ -75,10 +75,13 @@ public class CsvImport {
     private final VorschauAuftraege vorschau;
     private final ImportAblage ablage;
     private final UebernahmeAuftraege uebernahme;
+    private final InaktiveKontakte inaktive;
 
     public CsvImport(CsvLeser leser, ImportRepository repository, ImportEinstellungen einstellungen,
-                     VorschauAuftraege vorschau, ImportAblage ablage, UebernahmeAuftraege uebernahme) {
+                     VorschauAuftraege vorschau, ImportAblage ablage, UebernahmeAuftraege uebernahme,
+                     InaktiveKontakte inaktive) {
         this.leser = leser;
+        this.inaktive = inaktive;
         this.repository = repository;
         this.einstellungen = einstellungen;
         this.vorschau = vorschau;
@@ -244,6 +247,7 @@ public class CsvImport {
             case DUBLETTE -> zaehler.dubletten();
             case FEHLER -> zaehler.fehler();
             case UEBERSPRUNGEN -> zaehler.uebersprungen();
+            case INAKTIV -> zaehler.inaktiv();
             case OFFEN -> throw new IllegalArgumentException("OFFEN");
         };
     }
@@ -320,7 +324,8 @@ public class CsvImport {
      * {@code ZUSAMMENFUEHREN} nur mit einem ihrer Kandidaten; Dubletten ohne Entscheid werden übersprungen. Ein erneuter
      * Aufruf, solange der Lauf in {@code VORSCHAU} steht, ersetzt die Entscheide. Fehler: Lauf unbekannt →
      * {@code NICHT_GEFUNDEN}; anderer Status oder Lauf gesperrt (Übernahme läuft) → {@code STATUS_KONFLIKT}; Entscheid
-     * ungültig, für eine andere Zeile oder bei Verkaufschancen → {@code ANFRAGE_UNGUELTIG}.
+     * ungültig, für eine andere Zeile, mit einem inaktiven Kontakt (Req 17.13) oder bei Verkaufschancen →
+     * {@code ANFRAGE_UNGUELTIG}.
      */
     @Transactional
     public ImportLauf uebernehmen(UUID laufId, Map<Integer, String> entscheide, String benutzer) {
@@ -340,6 +345,12 @@ public class CsvImport {
             List<ImportZeile> zeilen = repository.zeilenMitNr(laufId, gelesen.keySet());
             if (zeilen.size() != gelesen.size()
                     || zeilen.stream().anyMatch(z -> !gelesen.get(z.nr()).passt(z))) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            // Ziel eines Dubletten-Entscheids ist nur ein aktiver Kontakt (Req 17.13)
+            List<UUID> ziele = gelesen.values().stream().map(DublettenEntscheid::kontaktId).filter(Objects::nonNull)
+                    .toList();
+            if (!ziele.isEmpty() && !inaktive.unter(ziele).isEmpty()) {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
         }

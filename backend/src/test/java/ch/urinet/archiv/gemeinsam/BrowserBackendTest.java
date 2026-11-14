@@ -4,6 +4,8 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ki.TestEmbeddingPort;
+import ch.urinet.archiv.ki.TestRerankerPort;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -46,6 +48,12 @@ import java.util.stream.Stream;
  * wie die Java-Szenarien diese Status herstellen, und quittiert jede mit {@code <uuid>.antwort.json}. Kein eigener
  * HTTP-Endpunkt; das Dokument bleibt ohne Titel und ohne Vorschlag.
  * <p>
+ * Hybridsuche (Spec 02, Aufgabe 6.6): Im Testmodus zeigen Embedding und Reranker sonst auf den WireMock von
+ * {@code localhost:8089} (dort laufen auf einer Entwicklermaschine fremde WireMocks) oder verlangen das Token aus der
+ * Secret-Datei. Der Test schaltet beide auf die Antwort der Dev-Stubs ({@code TestEmbeddingPort}, {@code
+ * TestRerankerPort}): Die Suche im Modus {@code hybrid} fällt damit deterministisch auf den Volltext zurück
+ * ({@code degradiert}), ohne einen Request an Port 8089 oder ins Internet.
+ * <p>
  * Nur mit {@code -Darchiv.browser-backend=true}; in {@code mvn verify} läuft er nicht.
  */
 @QuarkusTest
@@ -72,8 +80,16 @@ class BrowserBackendTest {
     @Inject
     ObjectMapper json;
 
+    @Inject
+    TestEmbeddingPort embedding;
+
+    @Inject
+    TestRerankerPort reranker;
+
     @Test
     void bereitstellen() throws Exception {
+        embedding.setzen(TestEmbeddingPort.Ersatz.STUB);
+        reranker.setzen(TestRerankerPort.Ersatz.STUB);
         for (String code : List.of("urinet", "vhf-gsk")) {
             if (!imRegister(code)) {
                 provisionierung.anlegen(code, null, null);
@@ -91,6 +107,8 @@ class BrowserBackendTest {
                 Thread.sleep(200);
             }
         } finally {
+            embedding.setzen(null);
+            reranker.setzen(null);
             Files.deleteIfExists(BEREIT);
             Files.deleteIfExists(STOPP);
         }

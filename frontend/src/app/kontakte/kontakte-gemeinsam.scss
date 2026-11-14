@@ -1,0 +1,103 @@
+// Gemeinsame Gestaltung der Kontakte-Seiten (4.12): 375 px ohne waagrechtes Scrollen, lange Texte brechen um.
+:host {
+  display: block;
+  max-width: 64rem;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+}
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+
+  > span {
+    font: var(--mat-sys-label-large);
+  }
+
+  small {
+    color: var(--urinet-gedaempft);
+  }
+}
+
+input,
+select,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 8px;
+  background-color: var(--urinet-dunkel);
+  color: var(--urinet-hell);
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.hinweis {
+  color: var(--urinet-gedaempft);
+  margin: 0;
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+}
+
+.erfolg {
+  color: var(--urinet-erfolg);
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.text {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.marken {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    border: 1px solid var(--urinet-linie);
+    border-radius: 1rem;
+    padding: 0 0.5rem;
+    font: var(--mat-sys-label-medium);
+    overflow-wrap: anywhere;
+  }
+
+  .inaktiv {
+    border-color: var(--urinet-gelb);
+    color: var(--urinet-gelb);
+  }
+}
+
+.blaettern {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}

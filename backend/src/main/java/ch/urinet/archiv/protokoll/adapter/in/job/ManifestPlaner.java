@@ -43,8 +43,12 @@ public class ManifestPlaner {
     }
 
     void start(@Observes SchemasBereit ereignis) {
-        if (beimStart) {
-            planen();
+        if (beimStart && worker) {
+            try {
+                TaktThread.ausfuehren("manifest-planer", () -> planen.planenBeimStart(Instant.now()));
+            } catch (RuntimeException e) {
+                gescheitert(e);
+            }
         }
     }
 
@@ -56,9 +60,13 @@ public class ManifestPlaner {
             try {
                 TaktThread.ausfuehren("manifest-planer", () -> planen.planen(Instant.now()));
             } catch (RuntimeException e) {
-                // nächster Lauf (spätestens morgen, sonst beim Start) holt nach; Klassennamen, feste Meldungen (Req 16.7)
-                LOG.errorf("Manifest-Planung fehlgeschlagen, ursache=%s", Ursachen.ketteMitMeldung(e));
+                gescheitert(e);
             }
         }
+    }
+
+    // nächster Lauf (spätestens morgen, sonst beim Start) holt nach; Klassennamen, feste Meldungen (Req 16.7)
+    private static void gescheitert(RuntimeException e) {
+        LOG.errorf("Manifest-Planung fehlgeschlagen, ursache=%s", Ursachen.ketteMitMeldung(e));
     }
 }

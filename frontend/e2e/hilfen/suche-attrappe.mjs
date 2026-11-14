@@ -92,6 +92,34 @@ export const DOKUMENTE = [
   },
 ];
 
+// Hybridsuche (Spec 02, Aufgabe 6.6): 45 Dokumente mit einem gemeinsamen Wort. Die Reihenfolge der Antwort im Modus
+// hybrid ist die des Rerankers; sie ist absichtlich weder nach Datum noch nach Titel geordnet, damit die PWA nicht
+// selbst sortieren kann. Im Volltext liefert die Attrappe die Dokumente in der Reihenfolge ihrer Nummer.
+export const SAMMEL_BEGRIFF = 'Sammelbeleg';
+export const SAMMEL_ANZAHL = 45;
+const sammelNummer = (i) => ((i * 17) % SAMMEL_ANZAHL) + 1;
+const nummerText = (n) => String(n).padStart(2, '0');
+export const sammelTitel = (n) => `${SAMMEL_BEGRIFF} ${nummerText(n)}`;
+export const SAMMEL_DOKUMENTE = Array.from({ length: SAMMEL_ANZAHL }, (_, i) => {
+  const n = i + 1;
+  return {
+    id: `0b6f1d3e-0000-4000-8000-0000000001${nummerText(n)}`,
+    titel: sammelTitel(n),
+    art: 'QUITTUNG',
+    // Datum nicht in der Reihenfolge der Nummer
+    datum: `2026-${nummerText(((n * 5) % 12) + 1)}-${nummerText(((n * 3) % 27) + 1)}`,
+    tags: [],
+    text: `Gemeinsames Wort ${SAMMEL_BEGRIFF}, Nummer ${n}.`,
+    sammel: true,
+  };
+});
+/** Titel der ersten 30 Treffer im Modus hybrid in der Reihenfolge des Rerankers. */
+export const HYBRID_REIHENFOLGE = Array.from({ length: SAMMEL_ANZAHL }, (_, i) => sammelTitel(sammelNummer(i))).slice(0, 30);
+
+const HYBRID_RANG = new Map(
+  Array.from({ length: SAMMEL_ANZAHL }, (_, i) => [sammelTitel(sammelNummer(i)), i]),
+);
+
 function auszug(text, q) {
   if (!q) {
     return [];
@@ -181,11 +209,14 @@ export async function sucheAttrappe(welt) {
   if (welt.suche) {
     return welt.suche;
   }
-  const zustand = { anfragen: [], downloads: [], abgelehnt: 0, dateiAbrufe: [], aenderungen: [], bilder: [], stand: new Map() };
+  const zustand = { rerankerAusfall: false, anfragen: [], downloads: [], abgelehnt: 0, dateiAbrufe: [], aenderungen: [], bilder: [], stand: new Map() };
   welt.suche = zustand;
   const json = (route, status, body) =>
     route.fulfill({ status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }, body: JSON.stringify(body) });
 
+  const ungueltig = (route, was) => json(route, 400, { status: 400, title: 'Anfrage ungültig', fehlercode: 'ANFRAGE_UNGUELTIG', detail: was });
+  // Rang im Modus hybrid: erst die Sammeldokumente in der Reihenfolge des Rerankers, dann die übrigen in Listenreihenfolge
+  const rangHybrid = (d) => (d.sammel ? HYBRID_RANG.get(d.titel) : 1000 + DOKUMENTE.indexOf(d));
   await welt.seite.route(`${origin}/api/v1/**`, async (route) => {
     const anfrage = route.request();
     const url = new URL(anfrage.url());
@@ -211,16 +242,43 @@ export async function sucheAttrappe(welt) {
       zustand.anfragen.push(url.searchParams);
       const p = url.searchParams;
       const q = p.get('q') ?? '';
-      const liste = DOKUMENTE.filter(
-        (d) =>
-          (!d.nurMitSuchbegriff || q) &&
-          (!q || [d.titel, d.text, d.partnerName, d.belegnummer, d.dateiname].join(' ').toLowerCase().includes(q.toLowerCase())) &&
-          (!p.get('belegnummer') || d.belegnummer === p.get('belegnummer')) &&
-          (!p.get('art') || d.art === p.get('art')) &&
-          (!p.get('partner') || d.partnerId === p.get('partner')) &&
-          (!p.get('richtung') || d.richtung === p.get('richtung')),
-      );
-      return json(route, 200, { treffer: liste.map((d) => treffer(d, q)), gesamt: liste.length, seite: Number(p.get('seite') ?? 0), groesse: Number(p.get('groesse') ?? 20) });
+      const modus = p.get('modus');
+      if (modus !== null && !['volltext', 'hybrid'].includes(modus)) {
+        return ungueltig(route, `modus ${modus}`);
+      }
+      if (modus === 'hybrid' && (!q.trim() || p.get('sortierung') === 'DATUM' || p.has('seite') || p.has('groesse'))) {
+        return ungueltig(route, `hybrid mit ${p}`);
+      }
+      const gefunden = (d) =>
+        (!d.nurMitSuchbegriff || q) &&
+        (!q || [d.titel, d.text, d.partnerName, d.belegnummer, d.dateiname].join(' ').toLowerCase().includes(q.toLowerCase())) &&
+        (!p.get('belegnummer') || d.belegnummer === p.get('belegnummer')) &&
+        (!p.get('art') || d.art === p.get('art')) &&
+        (!p.get('partner') || d.partnerId === p.get('partner')) &&
+        (!p.get('richtung') || d.richtung === p.get('richtung'));
+      const liste = [...DOKUMENTE, ...(q.toLowerCase().includes(SAMMEL_BEGRIFF.toLowerCase()) ? SAMMEL_DOKUMENTE : [])].filter(gefunden);
+      if (modus === 'hybrid') {
+        // Vertrag von Aufgabe 6.4: höchstens 30 Treffer in der Reihenfolge des Rerankers, gesamt = gelieferte Treffer
+        const degradiert = zustand.rerankerAusfall;
+        const geordnet = degradiert ? liste : [...liste].sort((a, b) => rangHybrid(a) - rangHybrid(b));
+        const beste = geordnet.slice(0, 30);
+        return json(route, 200, {
+          treffer: beste.map((d, i) => ({ ...treffer(d, q), ...(!degradiert && i === 0 ? { fundstelle: { abschnitt: 1, seiteVon: 1, seiteBis: 1 } } : {}) })),
+          gesamt: beste.length,
+          seite: 0,
+          groesse: 30,
+          modus: 'hybrid',
+          degradiert,
+        });
+      }
+      const groesse = Number(p.get('groesse') ?? 20);
+      const seite = Number(p.get('seite') ?? 0);
+      return json(route, 200, {
+        treffer: liste.slice(seite * groesse, (seite + 1) * groesse).map((d) => treffer(d, q)),
+        gesamt: liste.length,
+        seite,
+        groesse,
+      });
     }
     const datei = /^\/api\/v1\/dokumente\/([^/]+)\/datei$/.exec(pfad);
     const einzel = /^\/api\/v1\/dokumente\/([^/]+)$/.exec(pfad);

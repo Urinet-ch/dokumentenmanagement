@@ -1,5 +1,7 @@
 package ch.urinet.archiv.kontakt.adapter.out.persistence;
 
+import ch.urinet.archiv.gemeinsam.domain.Normalisierer;
+import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
 import ch.urinet.archiv.kontakt.domain.KontaktTyp;
@@ -14,6 +16,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -89,10 +92,65 @@ class JdbcKontaktRegisterTest {
         assertThat(im(ZWEITER, () -> register.finden(List.of(eigener)))).isEmpty();
     }
 
+    /** Liste, Partnerauswahl, Generator-crmId und Sperren je nur im eigenen Mandanten; inaktive nur in der Liste. */
+    @Test
+    void listeSucheUndSperrenNurImEigenenMandanten() throws SQLException {
+        mandantenAnlegen();
+        UUID eigener = anlegen(URINET, "Seeblick Probe AG");
+        UUID ruhend = anlegen(URINET, "Seeblick Ruhend AG");
+        UUID fremder = anlegen(ZWEITER, "Seeblick Fremd AG");
+        im(URINET, () -> register.statusSetzen(ruhend, false, null));
+        KontaktSuche suche = new KontaktSuche("seeblick", "seeblick", "seeblick", "", "seeblick",
+                new BigDecimal("0.6"), KontaktSuche.Status.ALLE, null, null, 0, 50);
+
+        assertThat(im(URINET, () -> register.liste(suche)).eintraege()).extracting(Kontakt::id)
+                .containsExactlyInAnyOrder(eigener, ruhend);
+        assertThat(im(ZWEITER, () -> register.liste(suche)).gesamt()).isEqualTo(1);
+        assertThat(im(URINET, () -> register.suchen("seeblick", 20))).extracting(Kontakt::id)
+                .containsExactly(eigener);
+        assertThat(im(URINET, () -> register.sperren(List.of(eigener, fremder)))).extracting(Kontakt::id)
+                .containsExactly(eigener);
+        assertThat(im(ZWEITER, () -> register.sperren(List.of(eigener, ruhend)))).isEmpty();
+        Kontakt inaktiv = im(URINET, () -> register.finden(ruhend)).orElseThrow();
+        assertThat(inaktiv.aktiv()).isFalse();
+        assertThat(inaktiv.inaktivSeit()).isNotNull();
+        assertThat(inaktiv.version()).isEqualTo(1);
+    }
+
+    @Test
+    void mitCrmIdUndAbgleichNurAktive() throws SQLException {
+        mandantenAnlegen();
+        UUID ruhend = anlegen(URINET, "Seeblick Ruhend AG");
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update " + URINET.schema() + ".kontakt set crm_id = 'K-RUHEND-1' "
+                        + "where id = ?")) {
+            aendern.setObject(1, ruhend);
+            aendern.executeUpdate();
+        }
+        assertThat(im(URINET, () -> register.mitCrmId("K-RUHEND-1"))).isPresent();
+        assertThat(im(URINET, () -> register.mitEmail("info@beispiel.invalid"))).contains(ruhend);
+
+        im(URINET, () -> register.statusSetzen(ruhend, false, null));
+
+        assertThat(im(URINET, () -> register.mitCrmId("K-RUHEND-1"))).isEmpty();
+        assertThat(im(URINET, () -> register.mitEmail("info@beispiel.invalid"))).doesNotContain(ruhend);
+        assertThat(im(URINET, () -> register.aehnlichste("seeblick ruhend", new BigDecimal("0.5"), 5)))
+                .noneMatch(k -> k.kontaktId().equals(ruhend));
+        assertThat(im(URINET, () -> register.finden(ruhend))).isPresent();
+    }
+
+    private void mandantenAnlegen() throws SQLException {
+        for (MandantCode code : List.of(URINET, ZWEITER)) {
+            if (!vorhanden(code)) {
+                provisionierung.anlegen(code.wert(), null, null);
+            }
+        }
+    }
+
     private UUID anlegen(MandantCode mandant, String name) {
         KontaktAngaben angaben = new KontaktAngaben(KontaktTyp.ORGANISATION, name, null, null, "6000", "Musterort",
                 "info@beispiel.invalid", null, null, null, null);
-        UUID id = im(mandant, () -> register.anlegen(angaben, name.toLowerCase(), "TEST")).id();
+        UUID id = im(mandant, () -> register.anlegen(angaben, Normalisierer.name(name), "TEST")).id();
         angelegt.add(new Angelegt(mandant, id));
         return id;
     }

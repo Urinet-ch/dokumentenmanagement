@@ -6,8 +6,9 @@ import { ChatFehler, DatenstandQuelle, Quelle } from './chat-port';
 // Fachlogik der Seite «Chat» ohne Angular (Spec 02, Aufgabe 7.4; Req 4.3, 6.1–6.3)
 
 /**
- * Ohne `grund` in den Problem Details gilt ein 429 mit höchstens so vielen Sekunden in `Retry-After` als «schon eine
- * Frage in Arbeit»: 7.3 sendet dafür fest `Retry-After: 5`. Das Stundenlimit zählt rollend über 60 Minuten (Req 5.5)
+ * Massgebend ist das Feld `grund` der Problem Details (`STUNDENLIMIT` oder `LAEUFT`, im Vertrag seit PR #163). Nur
+ * wenn es fehlt (älteres Backend, unbekannter Wert), gilt als Rückfall ein 429 mit höchstens so vielen Sekunden in
+ * `Retry-After` als «schon eine Frage in Arbeit»: 7.3 sendet dafür fest `Retry-After: 5`. Das Stundenlimit zählt rollend über 60 Minuten (Req 5.5)
  * und kann 1–3'600 Sekunden melden; nur in seinen letzten 5 Sekunden zeigt die Seite darum den falschen Text.
  */
 export const LAUFEND_BIS_SEKUNDEN = 5;

@@ -61,6 +61,38 @@ Funktionalität: CSV-Import aus 21.CRM – Vorschau und Abgleich (Aufgabe 4.2)
       | 14 | DUBLETTE     | Treffer über E-Mail mit anderer Kontakt-ID aus 21.CRM                 |         | K1         |
     Und enthält das Log keinen der Werte «Probe» und «druck@andere.test»
 
+  @req-13.3 @req-13.4 @req-17.13
+  Szenario: Inaktive Kontakte ergeben «inaktiv» oder zählen neben aktiven nicht
+    Angenommen im Mandanten «urinet» gibt es diese Kontakte für den Abgleich:
+      | kontakt | typ          | crm_id  | vorname | name                | plz  | email                      | aktiv |
+      | I1      | ORGANISATION | CRM-T21 |         | Ruhende Probe AG    | 6021 | ruhend@probe.example.org   | false |
+      | I2      | ORGANISATION |         |         | Stille Probe GmbH   | 6022 | still@probe.example.org    | false |
+      | I3      | ORGANISATION |         |         | Dritte Garage       | 6031 | zweite@garage.test         | false |
+      | I4      | ORGANISATION |         |         | Schlummer Werkstatt | 6023 |                            | false |
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      ID;Name;Vorname;PLZ;E-Mail;Ort
+      CRM-T21;Ganz Anders AG;;6099;info@probe-holz.test;
+      ;Stille Probe GmbH;;6022;still@probe.example.org;
+      ;Neuer Name AG;;6030;zweite@garage.test;
+      ;Schlummer Werkstatt;;6040;;
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann steht der Lauf auf «VORSCHAU_AUSSTEHEND» ohne Zähler der Vorschau
+    Wenn der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zeigt die Vorschau 1 neu, 1 geändert, 0 unverändert, 0 mögliche Dubletten, 0 fehlerhaft und 0 übersprungen
+    Und zählt die Vorschau 2 inaktiv
+    Und zeigt die Vorschau diese Zeilen:
+      | nr | ergebnis | meldung         | kontakt | kandidaten |
+      | 2  | INAKTIV  | Kontakt inaktiv | I1      |            |
+      | 3  | INAKTIV  | Kontakt inaktiv | I2      |            |
+      | 4  | GEAENDERT |                | K4      |            |
+      | 5  | NEU      |                 |         |            |
+    Wenn «inhaber-urinet» die Zeilen mit dem Ergebnis «INAKTIV» abfragt
+    Dann enthält die Seite 0 von 2 Zeilen die Zeilen 2 bis 3
+
   @req-13.4
   Szenario: Ein abweichendes Feld macht den getroffenen Kontakt zu «geändert»
     Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:

@@ -18,7 +18,6 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
-import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -134,8 +133,7 @@ public class DokumentAendern {
         boolean artGewechselt = !Objects.equals(artCode, alt.art());
         gruppenPruefen(a, neueArt);
         String partnerName = !a.hat(Aenderung.PARTNER) ? alt.partnerName() : a.partnerId() == null ? null
-                : kontakte.finden(a.partnerId()).map(Kontakt::name)
-                        .orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
+                : DokumentBestaetigen.partnerName(kontakte, a.partnerId(), alt.partnerId());
 
         String zusatz = a.hat(Aenderung.ZUSATZ) ? a.zusatz() : alt.zusatz();
         if (zusatz != null && (a.hat(Aenderung.ZUSATZ) || artGewechselt)) {

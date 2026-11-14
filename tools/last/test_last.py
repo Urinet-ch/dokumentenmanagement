@@ -13,6 +13,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 HIER = Path(__file__).resolve().parent
 sys.path.insert(0, str(HIER))
@@ -146,6 +147,16 @@ class SkriptTest(unittest.TestCase):
         bericht = json.loads(lauf.stdout)
         self.assertEqual((bericht["beantwortet"], bericht["aufwaermen"]), (6, 4))
         self.assertEqual(len(Server.anfragen), 1 + 4 + 6)  # Probe, Aufwärmen, Messung
+        self.assertEqual(bericht["modus"], "volltext")
+
+    def test_hybridsuche_sendet_begriffe_und_verwendet_p95_grenze_zwei(self):
+        lauf = self.starten("suche.py", "--url", self.url, "--anzahl", "8", "--parallel", "2", "--modus", "hybrid",
+                            "--json")
+        self.assertEqual(lauf.returncode, 0, lauf.stderr)
+        bericht = json.loads(lauf.stdout)
+        self.assertEqual((bericht["modus"], bericht["grenze_s"], bericht["beantwortet"]), ("hybrid", 2.0, 8))
+        messanfragen = [parse_qs(urlsplit(path).query) for _, path, _ in Server.anfragen[1:]]
+        self.assertTrue(all(q.get("modus") == ["hybrid"] and "q" in q for q in messanfragen))
 
     def test_foto_heic_mit_aufwaermen(self):
         foto = Path(self.ordner.name) / "foto.heic"

@@ -267,6 +267,7 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(text(30)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 09:02 geht es weiter.');
     expect(text(5)).toBe(t.laufend);
     expect(text(90, 'LAEUFT')).toBe(t.laufend);
+    expect(text(null, 'LAEUFT')).toBe(t.laufend);
     expect(text(3, 'STUNDENLIMIT')).toBe(
       'Du hast in dieser Stunde 100 Fragen gestellt. Ab 09:01 geht es weiter.',
     );

@@ -32,6 +32,11 @@ public class ManifestPlanenAttrappe extends ManifestPlanen {
         aufrufe.add(bereitschaft.bereit());
     }
 
+    @Override
+    public void planenBeimStart(Instant jetzt) {
+        planen(jetzt);
+    }
+
     /** Je Aufruf, ob das Signal schon gemeldet war. */
     public List<Boolean> aufrufe() {
         return List.copyOf(aufrufe);

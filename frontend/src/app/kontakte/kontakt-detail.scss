@@ -1,0 +1,37 @@
+.zurueck {
+  margin: 0 0 0.5rem;
+}
+
+.aktionen {
+  margin: 0.75rem 0;
+}
+
+.meldungen p {
+  margin: 0.5rem 0;
+}
+
+.stammdaten {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+
+  > div {
+    min-width: 0;
+  }
+
+  dt {
+    color: var(--urinet-gedaempft);
+    font: var(--mat-sys-label-medium);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.verweise {
+  margin: 0;
+  padding-left: 1.25rem;
+}

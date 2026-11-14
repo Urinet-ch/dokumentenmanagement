@@ -123,8 +123,9 @@ public class CsvImportSchritte {
         benutzt = true;
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement einfuegen =
                 verbindung.prepareStatement("insert into " + new MandantCode(mandant).schema() + ".kontakt (id, crm_id, "
-                        + "typ, name, vorname, name_normalisiert, plz, email, quelle, nicht_im_export) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?, 'MANUELL', ?)")) {
+                        + "typ, name, vorname, name_normalisiert, plz, email, quelle, nicht_im_export, aktiv, "
+                        + "inaktiv_seit) values (?, ?, ?, ?, ?, ?, ?, ?, 'MANUELL', ?, ?, "
+                        + "case when ? then null else now() end)")) {
             for (Map<String, String> zeile : tabelle.asMaps()) {
                 UUID id = UUID.randomUUID();
                 boolean person = "PERSON".equals(zeile.get("typ"));
@@ -138,6 +139,10 @@ public class CsvImportSchritte {
                 einfuegen.setString(7, zeile.get("plz"));
                 einfuegen.setString(8, zeile.get("email"));
                 einfuegen.setBoolean(9, Boolean.parseBoolean(zeile.get("nicht_im_export")));
+                // Spalte «aktiv» optional (Req 17.13), Standard aktiv
+                boolean aktiv = !"false".equals(zeile.get("aktiv"));
+                einfuegen.setBoolean(10, aktiv);
+                einfuegen.setBoolean(11, aktiv);
                 einfuegen.executeUpdate();
                 kontakte.put(zeile.get("kontakt"), id);
             }
@@ -159,8 +164,40 @@ public class CsvImportSchritte {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         String pfad = antwort.<Object>path("lauf") == null ? "" : "lauf.";
         assertThat(antwort.<String>path(pfad + "status")).isEqualTo(status);
-        assertThat(List.of("neu", "geaendert", "unveraendert", "dubletten"))
+        assertThat(List.of("neu", "geaendert", "unveraendert", "dubletten", "inaktiv"))
                 .allSatisfy(feld -> assertThat(antwort.<Object>path(pfad + feld)).as(feld).isNull());
+    }
+
+    @Dann("zählt die Vorschau {int} inaktiv")
+    public void vorschauInaktiv(int inaktiv) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<Integer>path("lauf.inaktiv")).isEqualTo(inaktiv);
+    }
+
+    /** Wie {@code POST /kontakte/{id}/inaktiv} (Req 17.11), direkt in der Datenbank, z. B. nach der Vorschau. */
+    @Angenommen("wird der Kontakt {word} im Mandanten «{word}» inaktiv markiert")
+    public void inaktivMarkieren(String kontakt, String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update " + new MandantCode(mandant).schema() + ".kontakt set aktiv = false, "
+                        + "inaktiv_seit = now(), version = version + 1 where id = ?")) {
+            aendern.setObject(1, Objects.requireNonNull(kontakte.get(kontakt), kontakt));
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Dann("hat der Kontakt {word} im Mandanten «{word}» die Version {int} und «nicht mehr im CRM-Export» {word}")
+    public void kontaktUnveraendert(String kontakt, String mandant, int version, String nichtImExport)
+            throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select version, nicht_im_export, aktiv from "
+                        + new MandantCode(mandant).schema() + ".kontakt where id = ?")) {
+            abfrage.setObject(1, Objects.requireNonNull(kontakte.get(kontakt), kontakt));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).as(kontakt).isTrue();
+                assertThat(List.of(zeile.getInt(1), zeile.getBoolean(2))).as(kontakt)
+                        .containsExactly(version, Boolean.parseBoolean(nichtImExport));
+            }
+        }
     }
 
     @Dann("sind für den Lauf {int} Aufträge «{word}» eingereiht")

@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { VerzeichnisEintrag } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
-import { LEERER_FILTER, austrittMoeglich, fehlerText, filterFehler, parameter, tagesbeginn, wer } from './protokoll-logik';
+import { AKTIONEN, LEERER_FILTER, austrittMoeglich, fehlerText, filterFehler, parameter, tagesbeginn, wer } from './protokoll-logik';
 
 describe('Zugriffsprotokoll: Logik (Aufgabe 5.1)', () => {
   it('rechnet den Tagesbeginn in Europe/Zurich nach UTC um, auch an der Zeitumstellung', () => {
@@ -68,5 +68,12 @@ describe('Zugriffsprotokoll: Logik (Aufgabe 5.1)', () => {
     expect(fehlerText(fehler(401))).toBe(TEXTE.protokoll.fehlerSitzung);
     expect(fehlerText(fehler(0))).toBe(TEXTE.protokoll.fehlerVerbindung);
     expect(fehlerText(fehler(500))).toBe(TEXTE.protokoll.fehlerAllgemein);
+  });
+
+  it('führt die Kontakt-Aktionen im Aktionsfilter, mit Beschriftung', () => {
+    for (const a of ['KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV'] as const) {
+      expect(AKTIONEN).toContain(a);
+      expect(TEXTE.protokoll.aktionen[a]).toBeTruthy();
+    }
   });
 });

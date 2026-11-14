@@ -1,5 +1,7 @@
 package ch.urinet.archiv.kontakt.adapter.out.persistence;
 
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.kontakt.application.KontaktUebernahme;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
@@ -8,17 +10,21 @@ import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -33,24 +39,54 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final String sperreWartezeit;
 
-    public JdbcKontaktUebernahme(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung) {
+    public JdbcKontaktUebernahme(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                                 @ConfigProperty(name = "archiv.import.sperre-wartezeit") Duration sperre) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.sperreWartezeit = Math.max(1, sperre.toMillis()) + "ms";
     }
 
+    /**
+     * Wartet höchstens {@code archiv.import.sperre-wartezeit} (Zusammenführen sperrt nach ID geordnet, die Übernahme in
+     * CSV-Reihenfolge); belegt oder verklemmt → {@code STATUS_KONFLIKT}, der Block bleibt wiederholbar.
+     */
     @Override
     public Optional<Kontakt> sperren(UUID id) {
         JdbcKontaktRegister.transaktionPruefen();
         String sql = "select " + JdbcKontaktRegister.SPALTEN + " from " + schema() + ".kontakt where id = ? for update";
-        try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setObject(1, id);
-            try (ResultSet zeile = abfrage.executeQuery()) {
-                return zeile.next() ? Optional.of(JdbcKontaktRegister.kontakt(zeile)) : Optional.empty();
+        try (Connection verbindung = datenquelle.get().getConnection()) {
+            String vorher;
+            try (PreparedStatement abfrage = verbindung.prepareStatement("select current_setting('lock_timeout')");
+                 ResultSet ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                vorher = ergebnis.getString(1);
             }
+            einstellen(verbindung, sperreWartezeit);
+            Optional<Kontakt> kontakt;
+            try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+                abfrage.setObject(1, id);
+                try (ResultSet zeile = abfrage.executeQuery()) {
+                    kontakt = zeile.next() ? Optional.of(JdbcKontaktRegister.kontakt(zeile)) : Optional.empty();
+                }
+            } catch (SQLException e) {
+                if ("55P03".equals(e.getSQLState()) || "40P01".equals(e.getSQLState())) {
+                    throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                }
+                throw e;
+            }
+            einstellen(verbindung, vorher);
+            return kontakt;
         } catch (SQLException e) {
             throw new IllegalStateException("Kontakt nicht gesperrt", e);
+        }
+    }
+
+    private static void einstellen(Connection verbindung, String wert) throws SQLException {
+        try (PreparedStatement einstellen = verbindung.prepareStatement("select set_config('lock_timeout', ?, true)")) {
+            einstellen.setString(1, wert);
+            einstellen.executeQuery().close();
         }
     }
 
@@ -105,9 +141,10 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement kennzeichnen = verbindung.prepareStatement("update " + tabelle
                      + " set nicht_im_export = true, geaendert = now() "
-                     + "where crm_id is not null and not nicht_im_export and not (crm_id = any(?))");
+                     + "where aktiv and crm_id is not null and not nicht_im_export and not (crm_id = any(?))");
              PreparedStatement zuruecksetzen = verbindung.prepareStatement("update " + tabelle
-                     + " set nicht_im_export = false, geaendert = now() where nicht_im_export and crm_id = any(?)")) {
+                     + " set nicht_im_export = false, geaendert = now() where aktiv and nicht_im_export "
+                     + "and crm_id = any(?)")) {
             var ids = verbindung.createArrayOf("text", imExport.toArray());
             kennzeichnen.setArray(1, ids);
             int gekennzeichnet = kennzeichnen.executeUpdate();
@@ -120,13 +157,35 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
     }
 
     @Override
+    public Set<UUID> inaktive(Collection<UUID> ids) {
+        Set<UUID> ergebnis = new HashSet<>();
+        if (ids.isEmpty()) {
+            return ergebnis;
+        }
+        JdbcKontaktRegister.transaktionPruefen();
+        String sql = "select id from " + schema() + ".kontakt where not aktiv and id = any(?)";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setArray(1, verbindung.createArrayOf("uuid", ids.toArray()));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    ergebnis.add(zeile.getObject(1, UUID.class));
+                }
+            }
+            return ergebnis;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakte nicht lesbar", e);
+        }
+    }
+
+    @Override
     public Map<String, UUID> kontakteMitCrmId(Collection<String> crmIds) {
         Map<String, UUID> ergebnis = new HashMap<>();
         if (crmIds.isEmpty()) {
             return ergebnis;
         }
         JdbcKontaktRegister.transaktionPruefen();
-        String sql = "select crm_id, id from " + schema() + ".kontakt where crm_id = any(?)";
+        String sql = "select crm_id, id from " + schema() + ".kontakt where aktiv and crm_id = any(?)";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
             abfrage.setArray(1, verbindung.createArrayOf("text", crmIds.toArray()));

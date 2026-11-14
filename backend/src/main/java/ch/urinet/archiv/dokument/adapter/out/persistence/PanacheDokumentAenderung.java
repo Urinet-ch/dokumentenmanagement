@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
+import ch.urinet.archiv.dokument.application.DokumentAendern;
 import ch.urinet.archiv.dokument.application.DokumentAenderungPort;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Finanz;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Vertrag;
@@ -27,15 +28,22 @@ import java.util.UUID;
 @Transactional(Transactional.TxType.MANDATORY)
 public class PanacheDokumentAenderung implements DokumentAenderungPort {
 
-    /** Vorherige Fassung der Metadaten als JSON (Req 10.1); Volltext und Suchvektor sind keine Metadaten. */
-    private static final String VERSION_SICHERN = """
+    /**
+     * Vorherige Fassung der Metadaten als JSON (Req 10.1); Volltext und Suchvektor sind keine Metadaten. Gemeinsam für
+     * eine Änderung ({@link #VERSION_SICHERN}) und das Umhängen beim Zusammenführen von Kontakten (Req 17.8).
+     */
+    private static final String FASSUNG_SICHERN = """
             insert into dokument_version (dokument_id, version, daten, geaendert_von, grund)
             select d.id, d.version, jsonb_build_object(
                 'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
                 'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
                 'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
                 :benutzer, :grund
-            from dokument d where d.id = :id""";
+            from dokument d""";
+    private static final String VERSION_SICHERN = FASSUNG_SICHERN + " where d.id = :id";
+    /** Wie {@link DokumentAendern} beim Ändern des Partners: eine Fassung nur bei archivierten Dokumenten. */
+    private static final String VERSIONEN_SICHERN_PARTNER = FASSUNG_SICHERN
+            + " where d.partner_id = :quelle and d.status = 'ARCHIVIERT'";
 
     @Override
     public Optional<Metadaten> ladenUndSperren(UUID id) {
@@ -65,6 +73,28 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
     public void versionSichern(UUID id, String benutzer, String grund) {
         em().createNativeQuery(VERSION_SICHERN).setParameter("id", id).setParameter("benutzer", benutzer)
                 .setParameter("grund", grund).executeUpdate();
+    }
+
+    /**
+     * Sperrt die Dokumente des Partners {@code quelle} in der Reihenfolge ihrer IDs, sichert bei archivierten die
+     * Fassung wie {@link #versionSichern} und hängt sie mit {@code version + 1} und {@code geaendert} an {@code ziel};
+     * {@code partner_name}, Volltext und Abschnitte bleiben (design.md «Kontakte ansehen und pflegen», Schritt 5).
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<UUID> partnerUmhaengen(UUID quelle, UUID ziel, String benutzer, String grund) {
+        List<UUID> gesperrt = em().createNativeQuery(
+                        "select id from dokument where partner_id = :quelle order by id for update", UUID.class)
+                .setParameter("quelle", quelle).getResultList();
+        if (gesperrt.isEmpty()) {
+            return List.of();
+        }
+        em().createNativeQuery(VERSIONEN_SICHERN_PARTNER).setParameter("quelle", quelle)
+                .setParameter("benutzer", benutzer).setParameter("grund", grund).executeUpdate();
+        em().createNativeQuery("update dokument set partner_id = :ziel, version = version + 1, geaendert = now() "
+                        + "where partner_id = :quelle")
+                .setParameter("ziel", ziel).setParameter("quelle", quelle).executeUpdate();
+        return List.copyOf(gesperrt);
     }
 
     @Override

@@ -37,7 +37,7 @@ const trefferLink = (welt, name, sonst) => {
   return id ? welt.seite.locator(`[data-test=treffer] a.titel[href="/dokument/${id}"]`) : sonst;
 };
 
-async function filterOeffnen(seite) {
+export async function filterOeffnen(seite) {
   const schalter = seite.locator('.filter-schalter');
   if ((await schalter.getAttribute('aria-expanded')) !== 'true') {
     await schalter.click();
@@ -45,13 +45,13 @@ async function filterOeffnen(seite) {
 }
 
 /** Parameter der Suchanfragen: an die Attrappe oder, weitergeleitet, die beantworteten an das echte Archiv. */
-const suchanfragen = (welt) =>
+export const suchanfragen = (welt) =>
   welt.suche?.anfragen ??
   welt.weiterleitung.anfragen
     .filter((a) => a.methode === 'GET' && a.pfad === '/api/v1/dokumente' && a.status !== undefined)
     .map((a) => a.query);
 
-async function letzteAnfrage(welt, anzahl) {
+export async function letzteAnfrage(welt, anzahl) {
   for (let versuch = 0; versuch < 100 && suchanfragen(welt).length < anzahl; versuch++) {
     await welt.seite.waitForTimeout(50);
   }
@@ -107,7 +107,7 @@ When(/^ich den Link «(.+)» wähle$/, async function (link) {
 });
 
 Then('hat die PWA die Suche mit diesen Parametern angefragt:', function (tabelle) {
-  const p = this.suche.anfragen.at(-1);
+  const p = suchanfragen(this).at(-1);
   assert.ok(p, 'keine Suchanfrage');
   for (const { parameter, wert } of tabelle.hashes()) {
     assert.deepEqual(p.getAll(parameter), wert.split('|'), `${parameter} in ${p}`);
@@ -115,7 +115,7 @@ Then('hat die PWA die Suche mit diesen Parametern angefragt:', function (tabelle
 });
 
 Then(/^sendet die PWA keinen Parameter «(.+)»$/, function (liste) {
-  const p = this.suche.anfragen.at(-1);
+  const p = suchanfragen(this).at(-1);
   for (const name of liste.split(', ')) {
     assert.equal(p.has(name), false, `${name} in ${p}`);
   }

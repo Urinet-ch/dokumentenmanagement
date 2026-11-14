@@ -2,6 +2,7 @@ api.base.service.ts
 api.module.ts
 api/api-tokens.service.ts
 api/api.ts
+api/chat.service.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
 api/exporte.service.ts
@@ -16,6 +17,11 @@ model/api-token-neu.ts
 model/api-token.ts
 model/auszug-teil.ts
 model/bestaetigung.ts
+model/chat-frage.ts
+model/chat-gespraech.ts
+model/chat-nachricht.ts
+model/chat-quelle.ts
+model/chat-verlauf.ts
 model/dokument-aenderung.ts
 model/dokument-finanz.ts
 model/dokument-version.ts
@@ -27,6 +33,7 @@ model/download-adresse.ts
 model/eingangskorb-seite.ts
 model/export-anfrage.ts
 model/export.ts
+model/fundstelle.ts
 model/generator-antwort.ts
 model/generator-finanz.ts
 model/generator-metadaten.ts
@@ -44,6 +51,14 @@ model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
 model/kontakt-angaben.ts
+model/kontakt-detail.ts
+model/kontakt-eintrag.ts
+model/kontakt-inaktiv.ts
+model/kontakt-liste.ts
+model/kontakt-verweis.ts
+model/kontakt-verweise.ts
+model/kontakt-zusammenfuehren.ts
+model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/models.ts
 model/protokoll-aktion.ts
