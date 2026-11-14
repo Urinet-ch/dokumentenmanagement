@@ -298,6 +298,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Aktionen nur nach Rechtematrix sichtbar
   - Playwright im 375-px-Viewport
   - _Anforderungen: 2.11, 2.24, 8.1–8.10_
+  - Nachtrag (PR #128, Review zu #117): Partnersuche der Karte nach dem Muster aus 4.6, Vitests in `eingangskorb-karte.spec.ts` (verzögerter Abruf, laufende Wartezeit, gleiche Eingabe nach Entfernen)
 
 - [ ] 3.7 Handy-Erfassung (PWA) [Frontend] [Fabian]
   - Kamera mehrseitig, jscanify im Web Worker (Kanten, Zuschnitt, Entzerrung), ohne erkannte Kanten das ganze Bild, Vorschau anpassen/verwerfen, JPEG 2'480 px

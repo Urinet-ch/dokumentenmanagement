@@ -17,15 +17,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import {
-  Observable,
-  Subject,
-  debounceTime,
-  distinctUntilChanged,
-  of,
-  switchMap,
-  catchError,
-} from 'rxjs';
+import { Observable, Subject, catchError, of, switchMap, timer } from 'rxjs';
 import {
   Dokument,
   Dokumentart,
@@ -206,12 +198,14 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   constructor() {
     this.suche
       .pipe(
-        debounceTime(300),
-        distinctUntilChanged(),
+        // Gleiches Muster wie im Bearbeiten-Formular (design.md «Umsetzung 4.6»): Abbruch vor dem Warten, damit jeder
+        // neue Begriff (auch '' nach «Wählen»/«Entfernen») eine laufende Wartezeit oder einen Abruf verwirft (Review #117).
         switchMap((q): Observable<readonly Kontakt[] | null> =>
           q.length < 2
             ? of(null)
-            : this.kontakte.apiV1KontakteGet(q).pipe(catchError(() => of([]))),
+            : timer(300).pipe(
+                switchMap(() => this.kontakte.apiV1KontakteGet(q).pipe(catchError(() => of([])))),
+              ),
         ),
         takeUntilDestroyed(),
       )
@@ -292,12 +286,15 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected partnerWaehlen(kontakt: Kontakt): void {
     const name = [kontakt.vorname, kontakt.name].filter(Boolean).join(' ');
     this.entwurf.update((e) => ({ ...e, partnerId: kontakt.id ?? '', partnerName: name }));
+    this.suche.next('');
     this.treffer.set(null);
     this.fokus('[data-test="partner-gewaehlt"]');
   }
 
   protected partnerEntfernen(): void {
     this.entwurf.update((e) => ({ ...e, partnerId: '', partnerName: '' }));
+    this.suche.next('');
+    this.treffer.set(null);
     this.fokus('[data-test="partner-suche"]');
   }
 

@@ -1135,8 +1135,10 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     Partner und Hinweise `pdfaFehlt`, «Frist abgelaufen», `BELEGNUMMER_BEKANNT` mit Link auf `/dokument/<id>`.
   - Aktionen nur nach Rechtematrix: «Bestätigen» (A7) sendet den Vorschlag unverändert, also ein Tipp für ein korrekt
     vorgeschlagenes Dokument (Req 8.4); «Angaben ändern» (A6 und A7) öffnet das Formular in der Karte mit Partnersuche
-    (`GET /kontakte?q=`, ab 2 Zeichen, 300 ms Verzögerung) und Vertraulichkeit nur mit A8 (leer = Standard der Art,
-    Req 2.22); «Verwerfen» (A9, `EINGANGSKORB` und `FEHLER`) mit Rückfrage und Pflichtgrund in der Karte; «Erneut
+    (`GET /kontakte?q=`, ab 2 Zeichen, 300 ms Verzögerung; die Suche folgt demselben Muster wie das
+    Bearbeiten-Formular (siehe «Umsetzung 4.6»: kein `distinctUntilChanged`, Wartezeit als `timer` im inneren Strom,
+    Wählen und Entfernen setzen die Suche zurück), damit nach Wählen und Entfernen keine veraltete Trefferliste
+    erscheint (Folge Review #117)) und Vertraulichkeit nur mit A8 (leer = Standard der Art, Req 2.22); «Verwerfen» (A9, `EINGANGSKORB` und `FEHLER`) mit Rückfrage und Pflichtgrund in der Karte; «Erneut
     verarbeiten» bzw. «Archivierung wiederholen» (A10). Ohne Aktion steht ein Hinweis.
   - Der Body der Bestätigung ersetzt die Grundfelder ganz (3.4): Projekt, `personBenutzer` und Geschäftsjahr des
     Dokuments gehen unverändert mit; `vertraulichkeit` nur, wenn gewählt oder vorgeschlagen. Finanz- und Vertragsfelder

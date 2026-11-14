@@ -419,4 +419,112 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     await waehlen(art, 'LOHNABRECHNUNG');
     expect(vertraulichkeit().value).toBe('NORMAL');
   });
+
+  describe('Partnersuche (Req 8, Folge Review #117)', () => {
+    const MUELLER = [{ id: 'p2', name: 'Müller' }];
+    const istKontaktAbruf = (r: { url: string }) => r.url === '/api/v1/kontakte';
+    const trefferliste = () => element.querySelector('[data-test=partner-treffer]');
+
+    async function oeffnen() {
+      // Ohne `seiten`, damit kein Vorschau-Abruf läuft.
+      await zeigen(dokument());
+      await klicken(T.aendern);
+    }
+
+    function eingeben(wert: string) {
+      const feld = element.querySelector<HTMLInputElement>('[data-test=partner-suche]')!;
+      feld.value = wert;
+      feld.dispatchEvent(new Event('input'));
+    }
+
+    function tippen(selektor: string) {
+      element.querySelector<HTMLButtonElement>(selektor)!.click();
+      fixture.detectChanges();
+    }
+
+    function abruf(q: string) {
+      const anfrage = http.expectOne(istKontaktAbruf);
+      // Der generierte Client kodiert den Parameter schon beim Setzen.
+      expect(decodeURIComponent(anfrage.request.params.get('q') ?? '')).toBe(q);
+      return anfrage;
+    }
+
+    it('zeigt nach Wählen und Entfernen keine Antwort eines noch laufenden Abrufs (wie Review #107)', async () => {
+      await oeffnen();
+      vi.useFakeTimers();
+      try {
+        eingeben('Mü');
+        await vi.advanceTimersByTimeAsync(400);
+        abruf('Mü').flush(MUELLER);
+        fixture.detectChanges();
+        expect(trefferliste()).not.toBeNull();
+        eingeben('Mül');
+        await vi.advanceTimersByTimeAsync(350);
+        const offen = abruf('Mül');
+        tippen('[data-test=partner-treffer] button');
+        tippen('[data-test=partner-gewaehlt]');
+        expect(offen.cancelled).toBe(true);
+        expect(trefferliste()).toBeNull();
+        await vi.advanceTimersByTimeAsync(1000);
+        fixture.detectChanges();
+        expect(trefferliste()).toBeNull();
+        http.expectNone(istKontaktAbruf);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('schickt nach Wählen während der Wartezeit und Entfernen keinen Abruf (wie Review #106)', async () => {
+      await oeffnen();
+      vi.useFakeTimers();
+      try {
+        eingeben('Mü');
+        await vi.advanceTimersByTimeAsync(400);
+        abruf('Mü').flush(MUELLER);
+        fixture.detectChanges();
+        eingeben('Mül');
+        tippen('[data-test=partner-treffer] button');
+        tippen('[data-test=partner-gewaehlt]');
+        await vi.advanceTimersByTimeAsync(400);
+        fixture.detectChanges();
+        http.expectNone(istKontaktAbruf);
+        expect(trefferliste()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('sucht nach dem Entfernen mit derselben Eingabe erneut', async () => {
+      await oeffnen();
+      vi.useFakeTimers();
+      try {
+        for (let i = 0; i < 2; i++) {
+          eingeben('Mül');
+          await vi.advanceTimersByTimeAsync(400);
+          abruf('Mül').flush(MUELLER);
+          fixture.detectChanges();
+          expect(trefferliste()).not.toBeNull();
+          tippen('[data-test=partner-treffer] button');
+          tippen('[data-test=partner-gewaehlt]');
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('sucht unter 2 Zeichen nicht', async () => {
+      await oeffnen();
+      vi.useFakeTimers();
+      try {
+        eingeben('M');
+        await vi.advanceTimersByTimeAsync(400);
+        fixture.detectChanges();
+        http.expectNone(istKontaktAbruf);
+        expect(trefferliste()).toBeNull();
+        expect(element.textContent).not.toContain(T.partnerKeine);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });
