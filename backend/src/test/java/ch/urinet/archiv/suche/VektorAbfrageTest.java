@@ -86,6 +86,9 @@ class VektorAbfrageTest {
         try (Connection verbindung = datenbank.get().getConnection();
              java.sql.Statement anweisung = verbindung.createStatement()) {
             anweisung.executeUpdate("delete from " + new MandantCode(MANDANT).schema() + ".chunk");
+            // Tote Index-Einträge gelöschter Abschnitte (frühere Tests) lassen HNSW gefilterte Zeilen verfehlen; Autovacuum
+            // räumt sie erst später auf. Gemessen: ohne vacuum schlug der Test ab dem 11. Lauf in Folge fehl.
+            anweisung.execute("vacuum " + new MandantCode(MANDANT).schema() + ".chunk");
         }
     }
 
@@ -206,20 +209,26 @@ class VektorAbfrageTest {
         }
     }
 
+    /** Anzahl der Dimensionen, in denen die Testvektoren streuen (siehe {@link #vektor}). */
+    private static final int STREUUNG = 32;
+
     /**
      * {@code e0 + t·n} mit einer zufälligen Richtung {@code n} senkrecht zu {@code e0} (Länge 1): Der Kosinus-Abstand zur
-     * Frage {@code e0} wächst streng mit {@code t ≥ 0}. Die zufälligen Richtungen halten den HNSW-Graphen verbunden wie
-     * bei echten Embeddings; Punkte auf einer Linie erreichte die Suche im Graphen nicht alle.
+     * Frage {@code e0} wächst streng mit {@code t ≥ 0}. {@code n} liegt nur in den ersten {@value #STREUUNG} Dimensionen
+     * nach {@code e0}. Gemessen: Richtungen im vollen Raum (3584 Dimensionen) sind fast paarweise senkrecht, alle Punkte
+     * sind dann fast gleich weit voneinander entfernt, und der HNSW-Graph zerfällt, sodass die Suche nur einen Teil der
+     * Zeilen erreicht (bei Seed 66 nur 38 von 70, ausserdem abhängig von toten Index-Einträgen früherer Tests). Wenige
+     * Streuungsdimensionen halten den Graphen verbunden, wie die niedrige intrinsische Dimension echter Embeddings.
      */
     static float[] vektor(double t, Random zufall) {
         float[] v = new float[EmbeddingPort.DIMENSION];
         double laenge = 0;
-        for (int i = 1; i < v.length; i++) {
+        for (int i = 1; i <= STREUUNG; i++) {
             v[i] = (float) zufall.nextGaussian();
             laenge += v[i] * v[i];
         }
         double faktor = t / Math.sqrt(laenge);
-        for (int i = 1; i < v.length; i++) {
+        for (int i = 1; i <= STREUUNG; i++) {
             v[i] = (float) (v[i] * faktor);
         }
         v[0] = 1f;
