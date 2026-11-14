@@ -5,14 +5,15 @@ import java.util.concurrent.FutureTask;
 
 /**
  * Führt die Arbeit eines {@code @Scheduled}-Takts in einem eigenen Thread ohne Request-Kontext und ohne Anmeldung aus
- * und wartet auf ihr Ende (design.md «Mandant»). Quarkus aktiviert für jede {@code @Scheduled}-Methode einen
- * Request-Kontext; darin verweigert {@code MandantKontext.mit} ohne passende Anmeldung den Mandanten (fail closed), denn
- * eine schon offene Hibernate-Session könnte einen anderen Mandanten tragen. Im eigenen Thread öffnet {@code mit} einen
- * frischen Request-Kontext mit dem Mandanten, wie im {@code AuftragArbeiter}.
+ * und wartet auf das Ende des Threads (design.md «Mandant»). Quarkus aktiviert für jede {@code @Scheduled}-Methode
+ * einen Request-Kontext; darin verweigert {@code MandantKontext.mit} ohne passende Anmeldung den Mandanten (fail
+ * closed), denn eine schon offene Hibernate-Session könnte einen anderen Mandanten tragen. Im eigenen Thread öffnet
+ * {@code mit} einen frischen Request-Kontext mit dem Mandanten, wie im {@code AuftragArbeiter}.
  * <p>
- * Der Takt wartet, damit {@code ConcurrentExecution.SKIP} weiter wirkt. Eine Ausnahme der Arbeit kommt unverändert beim
- * Takt an. Wird der Takt beim Warten unterbrochen (Stopp), unterbricht er die Arbeit und kehrt mit gesetztem
- * Interrupt-Flag zurück.
+ * Der Takt wartet, damit {@code ConcurrentExecution.SKIP} weiter wirkt, und zwar auf das Ende des Threads: Das
+ * Ergebnis der {@code FutureTask} steht schon fest, bevor der Thread endet. Die Arbeit hat keine Zeitgrenze, darum
+ * auch das Warten nicht. Eine Ausnahme der Arbeit kommt unverändert beim Takt an. Wird der Takt beim Warten
+ * unterbrochen (Stopp), unterbricht er die Arbeit und kehrt mit gesetztem Interrupt-Flag zurück.
  */
 public final class TaktThread {
 
@@ -23,9 +24,10 @@ public final class TaktThread {
         FutureTask<Void> aufgabe = new FutureTask<>(arbeit, null);
         // erbt den Context-ClassLoader der Anwendung (ServiceLoader, z. B. TLS); der Request-Kontext von Quarkus und
         // die JTA-Transaktion hängen an gewöhnlichen ThreadLocals und gehen nicht mit
-        Thread.ofPlatform().name(name).daemon().start(aufgabe);
+        Thread thread = Thread.ofPlatform().name(name).daemon().start(aufgabe);
         try {
-            aufgabe.get();
+            thread.join();
+            aufgabe.get(); // schon fertig, liefert nur noch das Ergebnis
         } catch (InterruptedException e) {
             aufgabe.cancel(true);
             Thread.currentThread().interrupt();
