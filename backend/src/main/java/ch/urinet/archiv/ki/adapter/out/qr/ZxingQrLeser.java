@@ -64,8 +64,8 @@ public class ZxingQrLeser implements QrLeserPort {
             try {
                 Optional<BufferedImage> bild = bild(seiten.get(i));
                 if (bild.isEmpty()) {
-                    LOG.warnf("Swiss QR Code: Seite %d von Dokument %s über %d Pixeln, ausgelassen", i + 1, dokument,
-                            pixelMax);
+                    LOG.warnf("Swiss QR Code: %s von Dokument %s über %d Pixeln, ausgelassen", seitenangabe(seiten, i),
+                            dokument, pixelMax);
                     continue;
                 }
                 Optional<QrDaten> qr = lesen(bild.get());
@@ -78,6 +78,16 @@ public class ZxingQrLeser implements QrLeserPort {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Angabe einer Seite für das Log: Dateiname und Stelle in der Liste, z. B. «seite-12.ppm (gerenderte Seite 2 von
+     * 2)». Bewusst keine Seitennummer des PDF: Die Liste kann Seiten auslassen oder bei mehr als
+     * {@code archiv.ki.render-seiten-max} Seiten die letzte anhängen (Review PR #124), und das Dateimuster kennt nur
+     * der Render-Adapter. Ohne Pfad und ohne Inhalt (Req 16.7).
+     */
+    static String seitenangabe(List<Path> seiten, int i) {
+        return seiten.get(i).getFileName() + " (gerenderte Seite " + (i + 1) + " von " + seiten.size() + ")";
     }
 
     /**

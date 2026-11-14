@@ -99,4 +99,11 @@ class ZxingQrLeserTest {
         assertThat(new ZxingQrLeser(2480L * 3508 - 1).lesen(DOKUMENT, List.of(seite))).isEmpty();
         assertThat(new ZxingQrLeser(2480L * 3508).lesen(DOKUMENT, List.of(seite))).isPresent();
     }
+
+    @Test
+    void seitenangabeNenntDateinameUndStelleStattPdfSeite() {
+        List<Path> seiten = List.of(Path.of("/arbeit/lauf-1/seite-01.ppm"), Path.of("/arbeit/lauf-1/seite-12.ppm"));
+
+        assertThat(ZxingQrLeser.seitenangabe(seiten, 1)).contains("seite-12.ppm", "2 von 2").doesNotContain("/arbeit");
+    }
 }
