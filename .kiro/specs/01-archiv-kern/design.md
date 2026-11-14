@@ -798,8 +798,14 @@ sequenceDiagram
 | GET | `/importe/{id}` | Lauf mit Zählern und Zeilen (paginiert) | A12 |
 | POST | `/importe/{id}/uebernehmen` | `{dublettenEntscheide: {zeile: "NEU"\|"ZUSAMMENFUEHREN:<kontaktId>"\|"UEBERSPRINGEN"}}` | A12 |
 | GET | `/importe` | Liste der Läufe | A12 |
-| GET | `/kontakte?q=` | Kontakte suchen (Partnerauswahl) | A6 |
-| POST/PATCH | `/kontakte` | Kontakt manuell anlegen/ändern | A12 |
+| GET | `/kontakte?q=` | Kontakte suchen (Partnerauswahl), nur aktive (Req 17.12) | A6 |
+| POST/PATCH | `/kontakte` | Kontakt manuell anlegen/ändern; inaktiver Kontakt → 409 `STATUS_KONFLIKT` (Req 17.16) | A12 |
+| GET | `/kontakte/liste?q=&status=&quelle=&nichtImExport=&seite=&groesse=` | Liste der Kontakte mit Gesamtzahl (Req 17.1, 17.2) | A6 |
+| GET | `/kontakte/{id}` | Stammdaten, Status, Zusammenführung, `ETag` (Req 17.3) | A6 |
+| GET | `/kontakte/{id}/verweise` | Zahl der Verweise für die Rückfrage (Req 17.17) | A12 |
+| POST | `/kontakte/{id}/zusammenfuehren` | `{ziel, grund}`, `If-Match` der Quelle (Req 17.7–17.10) | A12 |
+| POST | `/kontakte/{id}/inaktiv` | `{grund}` (optional), `If-Match` (Req 17.11) | A12 |
+| POST | `/kontakte/{id}/aktiv` | wieder aktivieren, nur nicht zusammengeführte, `If-Match` (Req 17.15) | A12 |
 
 Regeln des Abgleichs (Req 13), Normalisierung siehe «KI»:
 - Kopfzeile: Hash der normalisierten Spaltennamen gegen `import_zuordnung.kopf_hash`; neu oder abweichend → Status `ZUORDNUNG_NOETIG` und Zuordnungsdialog (Req 13.2).
@@ -815,7 +821,7 @@ Profil «21.CRM» (K4, `docs/spikes/21crm-export.md`): Erkennt das Archiv die Ko
 
 - Umsetzung (Aufgabe 3.1, 11.11.2026):
   - Schema: `pg_trgm` legt `db/public` (Changeset 008) mit dem Owner im Schema `public` an (`create extension if not exists … with schema public`); die Mandanten-Schemas sprechen es qualifiziert an (`public.gin_trgm_ops`, `public.similarity`, `operator(public.%)`), weil der `search_path` nur das Mandanten-Schema enthält. `kontakt` (Changeset `db/mandant` 006) hat zusätzlich `version int` (optimistisches Locking für `PATCH`) und Indizes auf `uid` und `iban`; `typ IN ('ORGANISATION','PERSON')`. `verkaufschance` hat zusätzlich `waehrung text not null default 'CHF'` (tech.md, Regel 9). E-Mail, UID, IBAN und PLZ werden normalisiert gespeichert, damit der exakte Abgleich ohne Funktionen auf der Spalte auskommt.
-  - REST: `GET /kontakte?q=` (A6, höchstens 20 Treffer, nach `public.similarity` sortiert, ohne Zugriffsprotokoll wie die Suche), `POST /kontakte` (A12, 201 mit `ETag "<version>"`, Quelle `MANUELL`), `PATCH /kontakte/{id}` (A12, `If-Match` Pflicht: fehlt → 428 `VERSION_FEHLT`; es passt nur ein starkes ETag `"<version>"` (RFC 9110), `*`, schwache ETags `W/"…"`, Werte ohne Anführungszeichen oder veraltete Versionen → 412 `VERSION_KONFLIKT`; `null` lässt ein Feld unverändert, `""` leert es; Name und Typ bleiben Pflicht → 422 `PFLICHTFELD_FEHLT`). `POST` und `PATCH` prüfen die Höchstlängen aus OpenAPI (Zeichen ohne Leerraum am Rand; Name, Vorname, Strasse, Ort, E-Mail 200, PLZ 20, Telefon 50, UID 30, IBAN 40, Kategorie 100) → sonst 400 `ANFRAGE_UNGUELTIG` wie bei den Dokumentarten; die Prüfung sitzt in der REST-Eingabe (DTO), nicht in `KontaktAngaben`. Ein `GET /kontakte/{id}` gibt es nicht. API-Tokens erreichen die Kontakte nicht (403). Logs nennen nur Kontakt-IDs.
+  - REST: `GET /kontakte?q=` (A6, höchstens 20 Treffer, nach `public.similarity` sortiert, ohne Zugriffsprotokoll wie die Suche), `POST /kontakte` (A12, 201 mit `ETag "<version>"`, Quelle `MANUELL`), `PATCH /kontakte/{id}` (A12, `If-Match` Pflicht: fehlt → 428 `VERSION_FEHLT`; es passt nur ein starkes ETag `"<version>"` (RFC 9110), `*`, schwache ETags `W/"…"`, Werte ohne Anführungszeichen oder veraltete Versionen → 412 `VERSION_KONFLIKT`; `null` lässt ein Feld unverändert, `""` leert es; Name und Typ bleiben Pflicht → 422 `PFLICHTFELD_FEHLT`). `POST` und `PATCH` prüfen die Höchstlängen aus OpenAPI (Zeichen ohne Leerraum am Rand; Name, Vorname, Strasse, Ort, E-Mail 200, PLZ 20, Telefon 50, UID 30, IBAN 40, Kategorie 100) → sonst 400 `ANFRAGE_UNGUELTIG` wie bei den Dokumentarten; die Prüfung sitzt in der REST-Eingabe (DTO), nicht in `KontaktAngaben`. Ein `GET /kontakte/{id}` gibt es nicht (Stand 3.1; mit Aufgabe 4.11 kommt er dazu, siehe «Kontakte ansehen und pflegen»). API-Tokens erreichen die Kontakte nicht (403). Logs nennen nur Kontakt-IDs.
   - `PartnerAbgleich` (application, `@Transactional`, für den Worker in 3.2): Stufen E-Mail → UID → IBAN, leere Felder werden übersprungen. Mehrere Treffer auf einer Stufe oder Stufen, die auf verschiedene Kontakte zeigen, ergeben «unsicher» mit allen Kandidaten (wie die «mögliche Dublette» beim CSV-Import). Ohne exakten Treffer rechnet die Datenbank die Ähnlichkeit (`set_config('pg_trgm.similarity_threshold', …, true)`, dann `%` mit dem GIN-Index und `similarity`, auf 4 Stellen gerundet, weil `real` sonst z. B. 0.7 − 0.6 knapp unter 0.1 rechnet). Abgefragt wird ab `archiv.abgleich.aehnlichkeit − 0.1`: Der Beste muss die Schwelle erreichen; liegt der Zweite weniger als 0.1 dahinter, ist das Ergebnis «unsicher», auch wenn der Zweite selbst unter der Schwelle liegt. Ein Name, der nach der Normalisierung leer ist (z. B. nur «AG»), ergibt «neuer Partner». Nachweise: `AbgleichRegelTest` (Gleichstand, Abstand genau 0.1, leere Felder), Szenarien `features/kontakt/kontakte.feature` (`@req-7.4`, mit gemessenen `pg_trgm`-Werten, auch kurze Namen).
   - Laufzeit (`PartnerAbgleichLeistungTest`, 10'000 synthetische Kontakte, PostgreSQL 17 als Dev Service auf einem Entwicklerrechner): Median 20 ms, p95 24 ms je Abgleich. Bei dieser Grösse wählt der Planer einen Seq Scan; der GIN-Index ist für `%` nutzbar (geprüft mit `enable_seqscan = off`) und greift bei mehr Zeilen.
   - Die Verknüpfung `dokument.partner_id` und der Aufruf aus der Erfassung folgen mit Aufgabe 3.2 (umgesetzt: nur ein eindeutiger Treffer wird verknüpft, «unsicher» und «neuer Partner» lassen `partner_id` leer; siehe «Umsetzung (Aufgabe 3.2)»).
@@ -871,6 +877,103 @@ Zuordnungsvorschlag für andere CSV-Dateien: Spaltenüberschriften gegen Synonym
     - Abfrage bei Störung (K2): Status 0, 502, 503 oder 504 während des Wartens beendet die Abfrage nicht; die Seite fragt nach `ABFRAGE_STOERUNG_MS` = 10 s erneut und zeigt einen Hinweis, bis eine Abfrage gelingt.
     - Mandantentrennung von `KontaktRegister.finden(Collection<UUID>)` mit zwei Mandanten: `JdbcKontaktRegisterTest` (S4).
 
+Kontakte ansehen und pflegen (Req 17, Aufgaben 4.11 und 4.12; Entscheide von Fabian vom 14.11.2026, Auslegungen
+vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
+- Rechte: Liste, Detail und Dokumente des Kontakts mit A6 (`inhaber`, `geschaeftsstelle`), alles Schreibende mit A12
+  (nur `inhaber`); sonst 403 `NICHT_ERLAUBT` mit Eintrag `VERWEIGERT` (Req 10.7, 17.5, 17.6). API-Tokens erreichen die
+  Kontakte weiterhin nicht. Logs nennen nur Kontakt-IDs.
+- Liste `GET /kontakte/liste` (Req 17.1, 17.2): `q` 1–200 Zeichen ohne Steuerzeichen; Treffer sind Kontakte, deren
+  `name_normalisiert` den normalisierten Suchbegriff enthält oder ihm nach `public.similarity` ab
+  `archiv.abgleich.aehnlichkeit` gleicht, deren Vorname oder Ort ihn ohne Gross-/Kleinschreibung enthält, deren E-Mail
+  ihn enthält, deren PLZ ihm gleicht oder deren `crm_id` ihm exakt entspricht. Sortierung mit `q`: exakte Treffer auf
+  `crm_id` und E-Mail zuerst, dann Ähnlichkeit, dann Name; ohne `q`: `name_normalisiert`, `vorname`, `id`. `status`
+  `AKTIV` (Standard) | `INAKTIV` | `ALLE`, `quelle` `CSV_IMPORT` | `MANUELL`, `nichtImExport` `true` | `false`; `seite`
+  ab 0, `groesse` 1–100 (Standard 50); sonst 400 `ANFRAGE_UNGUELTIG` ohne den Wert in Antwort oder Log. Antwort
+  `{gesamt, seite, groesse, eintraege: [{id, typ, name, vorname, plz, ort, email, quelle, aktiv, nichtImExport}]}`.
+  Ohne Zugriffsprotokoll wie die Partnerauswahl und die Suche ohne Dokumentbezug (Abschnitt «Protokoll und
+  Manifest»). Neben der Partnerauswahl ein eigener Pfad, damit `GET /kontakte?q=` (höchstens 20, ohne Blättern)
+  unverändert bleibt.
+- Detail `GET /kontakte/{id}` (Req 17.3): die Felder, die `PATCH` kennt (Name, Vorname, Typ, Strasse, PLZ, Ort,
+  E-Mail, Telefon, UID, IBAN, Kategorie), dazu `crmId`, `quelle`, `nichtImExport`, `aktiv`, `inaktivSeit`,
+  `zusammengefuehrtIn` (`{id, name}` oder `null`), `zusammengefuehrtAus` (höchstens 50 `{id, name}`, neueste zuerst),
+  `erstellt`, `geaendert` und `ETag "<version>"`; auch inaktive Kontakte sind lesbar. Unbekannt oder fremder Mandant →
+  404 `NICHT_GEFUNDEN`. Die Antwort enthält keine Zahl der Dokumente, damit sie nichts über unsichtbare verrät.
+- Dokumente des Kontakts (Req 17.4): kein neuer Endpunkt. Die PWA ruft `GET /dokumente?partner=<id>&sortierung=DATUM`
+  mit `seite`/`groesse` ohne Suchbegriff auf, also im Modus Volltext (Spec 02, 2.7 gilt nur mit Suchbegriff); Sichtbarkeit,
+  Gesamtzahl und Blättern kommen aus `VertraulichkeitFilter` (Req 14.5), verworfene Dokumente sind ohne `status`
+  ausgeblendet («Umsetzung (Aufgabe 4.5)»). Nach einem Zusammenführen ist die Liste der Quelle leer.
+- Verweise `GET /kontakte/{id}/verweise` (Req 17.17): `{dokumente, verkaufschancen, korrekturbeispiele}` über alle
+  Dokumente des Mandanten, nur A12; das ist nur der `inhaber`, der nach A2 bis A4 jedes Dokument sieht, darum verrät
+  die Zahl nichts (Req 2.3). Die PWA nennt die Zahlen in der Rückfrage zum Zusammenführen.
+- Zusammenführen `POST /kontakte/{id}/zusammenfuehren` (Anwendungsfall `KontaktZusammenfuehren`, Req 17.7–17.10), eine
+  Transaktion:
+  1. `If-Match` der Quelle wie bei `PATCH` (fehlt → 428 `VERSION_FEHLT`, sonst nur starkes ETag, → 412
+     `VERSION_KONFLIKT`); Body `{ziel: uuid, grund: 1–1000 Zeichen}`, unbekannte Felder, fehlender oder leerer Grund →
+     400 `ANFRAGE_UNGUELTIG`.
+  2. Sperren: beide Kontakte mit `SELECT … FOR UPDATE` in der Reihenfolge ihrer IDs (kein Deadlock bei zwei
+     gegenläufigen Aufrufen), `lock_timeout` = `archiv.import.sperre-wartezeit`; läuft gerade eine Übernahme
+     (`CSV_UEBERNEHMEN`) mit diesen Kontakten, endet das Warten mit 409 `STATUS_KONFLIKT`.
+  3. Prüfen: Quelle unbekannt → 404 `NICHT_GEFUNDEN`; Ziel gleich Quelle oder unbekannt → 400 `ANFRAGE_UNGUELTIG`;
+     Quelle oder Ziel inaktiv → 409 `STATUS_KONFLIKT`. Weil das Ziel aktiv sein muss und die Quelle danach inaktiv ist,
+     entstehen keine Kreise; eine Kette (A in B, später B in C) bleibt als Kette sichtbar.
+  4. Umhängen (`KontaktVerweise`, je Spalte eine Mengenanweisung `update … set … = :ziel where … = :quelle`):
+     `dokument.partner_id`, `dokument.ki_partner_id` (sonst zählte das Bestätigen nach dem Zusammenführen als
+     Korrektur, «Umsetzung (Aufgabe 3.3)»), `verkaufschance.kontakt_id`, `ki_beispiel.partner_id`; mit Spec 02,
+     Aufgabe 8.3 auch `abaninja_beleg.kontakt_id`. Nicht umgehängt: `import_zeile.kontakt_id` und
+     `import_zeile.entscheid_kontakt` (Verlauf eines Laufs; die Übernahme behandelt sie nach Req 17.14),
+     `zugriff_protokoll` und `dokument_version` (nur Einfügen). `KontaktVerweiseTest` (JUnit, gegen PostgreSQL) liest
+     aus `information_schema.columns` des Mandanten-Schemas jede Spalte vom Typ `uuid` mit dem Namen `partner_id`,
+     `kontakt_id` oder der Endung `_partner_id` bzw. `_kontakt` und verlangt, dass sie umgehängt oder hier ausdrücklich
+     ausgenommen ist; eine neue Spalte (z. B. aus Spec 02) fällt so auf.
+  5. Dokumente: je umgehängtes Dokument `version + 1` und `geaendert`; eine Fassung in `dokument_version` mit Benutzer,
+     Zeit und Grund «Kontakt zusammengeführt: <grund>» überall dort, wo `DokumentAendern` (Aufgabe 3.5) beim Ändern
+     des Partners eine schreibt (Req 10.1, 17.8). Ein gleichzeitiges `PATCH` mit der alten Version erhält 412.
+     `dokument.partner_name` bleibt wie beim Umbenennen eines Kontakts unverändert (Spec 02 design.md, Embeddings),
+     darum ändern sich weder `volltext_tsv` noch die Abschnitte, und es entsteht kein Auftrag `EMBEDDING`.
+  6. Quelle: `aktiv = false`, `inaktiv_seit = now()`, `zusammengefuehrt_in = ziel`, `version + 1`; Stammdaten und
+     `crm_id` bleiben (Req 17.9). Das Ziel bleibt unverändert, auch seine Version.
+  7. Protokoll: ein Eintrag `KONTAKT_ZUSAMMENFUEHREN` ohne Dokument-ID mit
+     `details {quelle, ziel, grund, dokumente, verkaufschancen, korrekturbeispiele}` und je umgehängtes Dokument ein
+     Eintrag `KONTAKT_ZUSAMMENFUEHREN` mit Dokument-ID und `details {quelle, ziel}` (Req 17.8; Aufbewahrung nach
+     Req 10.9 wie jeder Eintrag mit Dokument); geschrieben per Batch in derselben Transaktion (Req 10.8).
+  8. Antwort 200 `{ziel, dokumente, verkaufschancen, korrekturbeispiele}` mit dem neuen `ETag` der Quelle.
+- Inaktiv und wieder aktiv (Req 17.11, 17.15): `POST /kontakte/{id}/inaktiv` mit optionalem `{grund}` (höchstens
+  1000 Zeichen) und `If-Match` setzt `aktiv = false`, `inaktiv_seit`, `version + 1`; Zuordnungen bleiben. Schon inaktiv →
+  409 `STATUS_KONFLIKT`. `POST /kontakte/{id}/aktiv` mit `If-Match` setzt `aktiv = true`, `inaktiv_seit = null`; schon
+  aktiv oder `zusammengefuehrt_in` gesetzt → 409 `STATUS_KONFLIKT`. Protokoll `KONTAKT_INAKTIV` bzw. `KONTAKT_AKTIV`
+  ohne Dokument-ID mit `details {kontakt, grund}`. `PATCH /kontakte/{id}` auf einen inaktiven Kontakt → 409 (Req 17.16).
+- Kein Ziel neuer Zuordnungen (Req 17.12): `GET /kontakte?q=` und `PartnerAbgleich` (alle Stufen und die Ähnlichkeit)
+  lesen nur `aktiv`; Kandidaten im gespeicherten `ki_vorschlag`, die inzwischen auf einen inaktiven Kontakt zeigen,
+  liefert der Eingangskorb nicht mehr (beim Lesen gefiltert, das JSON bleibt). `PATCH /dokumente/{id}` und das
+  Bestätigen lehnen einen `partnerId` eines inaktiven Kontakts ab, wenn er vom gespeicherten `partner_id` abweicht
+  (400 `ANFRAGE_UNGUELTIG`, wie eine inaktive Art); derselbe Partner bleibt erlaubt. `KontaktRegister.mitCrmId` liefert
+  nur aktive Kontakte, der Generator erhält für einen inaktiven 422 `PARTNER_UNBEKANNT` (Req 11.7).
+- CSV-Import (Req 17.13, 17.14), Ergänzung zu «Umsetzung (Aufgabe 4.2)» und «(Aufgabe 4.3)»: `KontaktAbgleich` sieht
+  alle Kontakte mit `aktiv`. Trifft `crm_id` einen inaktiven Kontakt, ist das Ergebnis `INAKTIV` (unabhängig von den
+  anderen Stufen, weil die Kontakt-ID der stärkste Schlüssel ist und die Zeile sonst nach jedem Zusammenführen als
+  Dublette wiederkäme). Sonst zählen inaktive Treffer auf E-Mail und Name + PLZ nicht, sobald ein aktiver trifft;
+  treffen nur inaktive, ist das Ergebnis `INAKTIV`. Ähnlichkeitskandidaten und Kandidaten einer Dublette sind nur
+  aktive Kontakte; `ZUSAMMENFUEHREN:<id>` auf einen inaktiven → 400 `ANFRAGE_UNGUELTIG`. `INAKTIV` speichert
+  `kontakt_id` (für den Link in der Oberfläche) und die Meldung «Kontakt inaktiv»; der Lauf zählt sie in `inaktiv`
+  (`null`, solange die Vorschau aussteht, wie die übrigen Zähler). Die Übernahme ändert nie einen inaktiven Kontakt:
+  `INAKTIV` und Zeilen, deren Kontakt seit der Vorschau inaktiv wurde (auch über einen Dubletten-Entscheid), zählen
+  als ausgelassen; «nicht mehr im CRM-Export» setzt und löscht sie nur bei aktiven Kontakten. Für den Abgleich mit
+  AbaNinja (Spec 02, Req 9) gilt dieselbe Regel; festgelegt wird sie dort mit Aufgabe 8.3.
+- Oberfläche (Aufgabe 4.12): Routen `/kontakte` und `/kontakte/:id` (lazy geladen, Guard auf A6), Eintrag «Kontakte»
+  in der Navigation nur mit A6. Liste mit Suchfeld (300 ms Verzögerung, verwirft veraltete Antworten wie die
+  Partnersuche), Filtern, Blättern und Gesamtzahl; mobil (< 960 px) als Karten, ohne waagrechtes Scrollen (Req 17.17).
+  Detail mit den Stammdaten, Kennzeichen «inaktiv», «zusammengeführt in …» (Link), «nicht mehr im CRM-Export» und
+  Herkunft «Import» bzw. «manuell», darunter die Dokumente (Titel bzw. Platzhalter nach Req 8.11, Art, Datum, Link
+  zur Dokumentansicht, Blättern). Mit A12: «Bearbeiten» (Formular mit den Feldern von `PATCH`, `If-Match`; 412 → neu
+  laden mit Hinweis), «Zusammenführen …» (Ziel über die Suche unter den aktiven Kontakten ohne die Quelle, Grund
+  Pflicht, Rückfrage mit dem Ziel und den Zahlen aus `/verweise`), «Als inaktiv markieren» (Rückfrage, Grund
+  optional), «Wieder aktivieren» (nur ohne Zusammenführung). Import-Oberfläche (4.4): Zahl und Filter «inaktiv» in der
+  Vorschau, Zeilen mit Kontakt verlinken auf `/kontakte/:id`. Dokumentansicht (4.6): der Partner verlinkt mit A6 auf
+  `/kontakte/:id`. Zugriffsprotokoll (5.1): die neuen Aktionen im Filter.
+- Nachweise: Szenarien `features/kontakt/kontakte-pflegen.feature` (`@req-17.1`–`@req-17.16`, Rollen je Recht, nur
+  synthetische Kontaktdaten), die Ergänzungen von 7.4, 11.7, 13.3, 13.4 und 13.7 in den bestehenden Features;
+  `KontaktVerweiseTest`; PWA mit Vitests und den Szenarien für 17.5, 17.6 und 17.17.
+
 Drive-Import (Req 12):
 - Umsetzung (Aufgabe 4.8): `tools/drive_import` ist ein eigenes Maven-Projekt (Java 25, Picocli, Jackson; JAR mit `maven-shade-plugin`, SpotBugs Stufe hoch) ohne Abhängigkeit zum Backend. Es ruft nur `POST /api/v1/dokumente` auf (eine Datei je Anfrage, Teil `hinweis` vor `dateien`); die Archivseite ist unverändert (`quelle=DRIVE` und `erstellt_von='token:<id>'` aus 2.4, Eingangskorb-Ablauf wie jeder Upload, Req 12.8).
   - Token nur aus Datei (`--token-datei`, sonst `ARCHIV_TOKEN_DATEI`, sonst `~/.config/urinet-archiv/token`): reguläre Datei ohne Symlink (auch beim Lesen mit `NOFOLLOW_LINKS`), Eigentümer der aktuelle Benutzer, nur Lesen und Schreiben für den Eigentümer (600 oder 400; Review PR #64, K5), Format `ua_<id>_<geheimnis>`; sonst Exit 2 mit Hinweis «chmod 600 <pfad>», ohne Inhalt. Der Trockenlauf liest kein Token. `--archiv` erlaubt `http` nur für `localhost`, `127.0.0.1` und `[::1]`, keine Weiterleitungen.
@@ -914,6 +1017,8 @@ Drive-Import (Req 12):
 | `EXPORTIEREN` | Jahresexport (`02-abgleich-chat`); OKF-Export der Wissensbasis (Spec 04, mit Export-ID und SHA-256) |
 | `VERWEIGERT` | jede 403 oder 404 nach Req 1.4, 2.3 oder 2.6 an den obigen Endpunkten, an A11–A14 und an den Endpunkten der Wissensbasis (Spec 04), mit Fehlercode |
 | `SPERRE_KONFLIKT` | Systemaktion bei Req 9.7 (altes und neues Datum) |
+| `KONTAKT_ZUSAMMENFUEHREN` | `POST /kontakte/{id}/zusammenfuehren` (Req 17.7, 17.8): ein Eintrag ohne Dokument-ID mit Quelle, Ziel, Grund und Zahlen, dazu je umgehängtes Dokument ein Eintrag mit Dokument-ID (vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR) |
+| `KONTAKT_INAKTIV`, `KONTAKT_AKTIV` | `POST /kontakte/{id}/inaktiv` bzw. `/aktiv` (Req 17.11, 17.15), ohne Dokument-ID, mit Kontakt-ID und Grund |
 | `REGEL_AENDERN` | `PATCH /dokumentarten/{code}`, wenn sich Jahre oder «ab» (Req 9.10, entschieden von Fabian am 10.11.2026) oder `gesetzliche_pflicht` (entschieden von Fabian am 11.11.2026) ändern, auch beim Senken einer pflichtigen Art; ohne Dokument-ID, mit Code der Art und alter und neuer Regel |
 | `KONFIGURATION_AENDERN` | jede Änderung der Konfiguration eines Mandanten (Spec 05 ergänzt, Spec 05, Req 1.3; design.md «Data Models»), mit `{version, aenderungen: [{pfad, alt, neu}]}`; **zusätzlich** zu `REGEL_AENDERN`, das bei Jahren, «ab» oder `gesetzliche_pflicht` einer Art weiter geschrieben wird, mit Verweis auf die Version (umgesetzt in Spec 05, Aufgabe 17.2) |
 | `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`, `WISSEN_INGEST`, `WISSEN_LINT` | Endpunkte der Wissensbasis (Spec 04, design.md, «Zugriffsprotokoll»); `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN` mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, `WISSEN_INGEST` mit Dokument-ID |
@@ -1372,6 +1477,10 @@ kontakt(id uuid pk, crm_id text unique null, typ text, name text, vorname text,
         uid text, iban text, kategorie text, quelle text, nicht_im_export bool,
         abaninja_uuid text null, erstellt timestamptz, geaendert timestamptz, version int)
   index gin (name_normalisiert public.gin_trgm_ops), index (lower(email)), index (uid), index (iban)
+-- Req 17 ergänzt (Aufgabe 4.11, Changeset db/mandant ab 026, nächste freie Nummer vor dem Push prüfen):
+--   aktiv bool not null default true, inaktiv_seit timestamptz null, zusammengefuehrt_in uuid null fk kontakt(id);
+--   check (aktiv = (inaktiv_seit is null)), check (zusammengefuehrt_in is null or not aktiv),
+--   check (zusammengefuehrt_in <> id); import_zeile.ergebnis zusätzlich INAKTIV, import_lauf.inaktiv int null
 
 verkaufschance(id uuid pk, crm_id text unique, kontakt_id uuid fk, titel text, phase text,
                betrag numeric(12,2), waehrung text default 'CHF', datum date, import_lauf uuid)
