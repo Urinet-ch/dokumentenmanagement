@@ -244,6 +244,9 @@ abaninja_beleg(abaninja_uuid text pk, art text, belegnummer text, kontakt_id uui
 - IMAP-Ausfall: Auftrag nicht wiederholen, nächster Lauf in 10 Min.; nach 6 Fehlschlägen in Folge E-Mail an Inhaber.
 - AbaNinja: Backoff 1/2/4/8/16 Min.; 401 → Verbindung als `ungueltig` markieren, Inhaber benachrichtigen.
 
+- Umsetzung (Aufgabe 9.1, Gerüst, 14.11.2026; Auslegungen): Im Repo liegen nur Schema, Test und Vorlage, keine echten Fragen.
+  `ChatPrueflisteIT` (`@EnabledIfSystemProperty archiv.chat-pruefliste=true`, Name `*IT`, in keinem Workflow) liest `chat-pruefliste.yaml` aus `$ARCHIV_GOLDEN_DIR`, ruft je Frage `POST /api/v1/chat` per HTTPS (Basis-URL und Token eines `inhaber` aus Umgebungsvariablen, nie in Ausgabe oder Bericht), schlägt «richtig/falsch» (alle Kernwerte in der Antwort, Strom endet mit `fertig`) und «Quelle ja/nein» (alle erwarteten Dokument-IDs bzw. Datenstand-Werkzeuge in `quellen`) vor und schreibt den vollständigen Bericht nur nach `$ARCHIV_GOLDEN_DIR`; auf der Konsole steht nur der Repo-Teil (Nr., Vorschlag, p95 der Zeit bis zum ersten `text`, Req 3.8). Fabian bestätigt jede Antwort. Die Logik (`ChatPrueflauf`, `Pruefliste`) prüft die CI gegen einen lokalen Fake-Server; ein 401 bricht den Lauf ab (Access-Token laufen kurz), Fortsetzung mit `ARCHIV_PRUEFLISTE_AB`. Die Prüfliste verlangt mindestens 20 Fragen, die Nummern 1 bis 7 sind genau die Beispielfragen. Die Schema-Felder entsprechen Req 13.1; `quellen` darf leer sein (Antwort ohne Quelle).
+
 ## Testing Strategy
 Jedes Kriterium ohne Nachweis-Vermerk hat ein Cucumber-Szenario mit Tag `@req-<x.y>` (Features unter
 `backend/src/test/resources/features/<fachbereich>/`, Chat-Oberfläche mit Cucumber.js + Playwright).
