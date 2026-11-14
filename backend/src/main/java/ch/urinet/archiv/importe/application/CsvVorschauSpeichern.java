@@ -133,8 +133,8 @@ public class CsvVorschauSpeichern {
             if (befund.ergebnis() == Ergebnis.NEU && !kandidaten.isEmpty()) {
                 befund = KontaktAbgleich.pruefen(werte.get(i), bestaende, kandidaten);
             }
-            zeilen.add(new Abgeglichen(offen.get(i).mit(befund),
-                    KontaktAbgleich.fingerabdruecke(schluessel.get(i), befund.kontaktId())));
+            zeilen.add(new Abgeglichen(offen.get(i).mit(befund), KontaktAbgleich.fingerabdruecke(befund,
+                    schluessel.get(i))));
         }
         return new Block(zeilen, gelesen.getLast().nr());
     }
@@ -208,7 +208,7 @@ public class CsvVorschauSpeichern {
         }
         repository.doppelteMarkieren(lauf.id(), KontaktAbgleich.IN_DER_DATEI);
         ImportLauf.Zaehler z = repository.zaehlen(lauf.id());
-        int bewertet = z.neu() + z.geaendert() + z.unveraendert() + z.dubletten() + z.fehler() + z.uebersprungen();
+        int bewertet = z.bewertet();
         if (bewertet != aktuell.get().zeilen()) {
             throw new OffeneZeilen(lauf.id(), aktuell.get().zeilen() - bewertet);
         }
@@ -238,7 +238,7 @@ public class CsvVorschauSpeichern {
         felder.put("iban", k.iban());
         felder.put("kategorie", k.kategorie());
         felder.values().removeIf(Objects::isNull);
-        return new Bestand(k.id(), treffer.nameNormalisiert(), felder);
+        return new Bestand(k.id(), treffer.nameNormalisiert(), felder, k.aktiv());
     }
 
     /** Nach dem Abgleich sind Zeilen eines unveränderten Laufs offen geblieben; die Meldung nennt nur IDs und Zahlen. */

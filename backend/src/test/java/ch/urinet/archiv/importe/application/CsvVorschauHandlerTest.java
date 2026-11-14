@@ -11,6 +11,8 @@ import ch.urinet.archiv.importe.domain.LaufStatus;
 import ch.urinet.archiv.importe.domain.ZeilenPruefung.Ergebnis;
 import ch.urinet.archiv.importe.domain.Zuordnung;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
+import ch.urinet.archiv.kontakt.application.KontaktSeite;
+import ch.urinet.archiv.kontakt.application.KontaktSuche;
 import ch.urinet.archiv.kontakt.application.KontaktTreffer;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
@@ -264,6 +266,26 @@ class CsvVorschauHandlerTest {
 
         @Override
         public Optional<Kontakt> finden(UUID id) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public KontaktSeite liste(KontaktSuche suche) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Kontakt> zusammengefuehrtAus(UUID ziel, int anzahl) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Kontakt> sperren(Collection<UUID> ids) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Kontakt statusSetzen(UUID id, boolean aktiv, UUID zusammengefuehrtIn) {
             throw new UnsupportedOperationException();
         }
 

@@ -974,6 +974,36 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
 - Nachweise: Szenarien `features/kontakt/kontakte-pflegen.feature` (`@req-17.1`–`@req-17.16`, Rollen je Recht, nur
   synthetische Kontaktdaten), die Ergänzungen von 7.4, 11.7, 13.3, 13.4 und 13.7 in den bestehenden Features;
   `KontaktVerweiseTest`; PWA mit Vitests und den Szenarien für 17.5, 17.6 und 17.17.
+- Umsetzung (Aufgabe 4.11, 14.11.2026; Auslegungen im PR unter «Auslegungen»):
+  - Schema: Changeset `db/mandant` 026 (`026-kontakt-pflegen`): Spalten und Checks wie unter «Data Models», ein
+    partieller Index auf `zusammengefuehrt_in`; `zugriff_protokoll_aktion_ck` mit allen Werten aus 004 und den drei
+    Aktionen `KONTAKT_*`. Kein eigener Index für die Liste: Mit Suchbegriff trägt `kontakt_name_trgm_ix`, ohne genügen
+    Seq Scan und Sortierung; ein B-Baum mit `name_normalisiert` verdrängte im Plan mit `%` den GIN-Index
+    (`PartnerAbgleichLeistungTest`, Bitmap-Scan über den ganzen B-Baum bei `enable_seqscan = off`).
+  - Sperren: `KontaktRegister.sperren` sperrt in der Reihenfolge der IDs (`order by id for update`) mit
+    `lock_timeout` = `archiv.import.sperre-wartezeit` nur für diese Anweisung; `55P03` → 409 `STATUS_KONFLIKT`. Auch
+    `PATCH /kontakte/{id}`, `inaktiv` und `aktiv` sperren so. Prüfreihenfolge nach dem Sperren: 404 → 400 (Ziel) → 409 →
+    412; Format von `If-Match` (428/412) und Körper (400, streng gelesen) vorher in der REST-Schicht.
+  - Gemeinsamer Code mit `DokumentAendern`: `DokumentAenderungPort.partnerUmhaengen` sperrt die Dokumente der Quelle
+    (`order by id for update`), sichert die Fassung archivierter Dokumente mit derselben Anweisung wie `versionSichern`
+    (gemeinsames SQL in `PanacheDokumentAenderung`) und setzt `partner_id`, `version + 1`, `geaendert`; die Prüfung eines
+    neuen Partners (inaktiv → 400, derselbe gespeicherte bleibt) teilen Ändern und Bestätigen in
+    `DokumentBestaetigen.partnerName`. `dokument.ki_partner_id` hängt `KontaktVerweise` ohne neue Version um (kein Feld
+    des Eingangskorbs, wie Changeset 022).
+  - Protokoll: `ZugriffProtokoll.schreiben(List)` schreibt per JDBC-Batch, zuerst je Dokument, zuletzt den Eintrag ohne
+    Dokument; scheitert einer, rollt das ganze Zusammenführen zurück (Szenario mit einem Trigger im Test).
+  - Eingangskorb-Filter: `ki_vorschlag` speichert keine Kandidaten, nur Name, E-Mail, UID und IBAN des Partners; der
+    Eingangskorb liefert darum keine, es gibt nichts zu filtern. Weitere Lesepfade mit Kontakten als Zuordnungsziel gibt
+    es nicht (`git grep`); der Verkaufschancen-Import löst die Kontakt-ID aus 21.CRM nur unter aktiven auf (sonst «Kontakt
+    aus 21.CRM nicht gefunden»).
+  - CSV-Import: Eine Zeile `INAKTIV` hat keine Fingerabdrücke und wird darum nie «doppelt in der Datei»; der Dubletten-
+    Entscheid `ZUSAMMENFUEHREN:<id>` prüft beim Auslösen (`InaktiveKontakte`), die Übernahme prüft erneut am gesperrten
+    Kontakt.
+  - Laufzeit (synthetisch, PostgreSQL 17 als Dev Service auf einem Entwicklerrechner): Zusammenführen von 1'000
+    archivierten Dokumenten samt 1'000 Fassungen und 1'001 Protokolleinträgen 64 ms (Szenario in
+    `kontakte-pflegen.feature`, Grenze im Test 30 s).
+  - Abweichungen: keine. `zusammengefuehrtAus` nennt höchstens die 50 neuesten ohne Hinweis auf weitere; die PWA zeigt die
+    Zahl «inaktiv» der Vorschau erst mit 4.12 (der generierte Client kennt sie schon).
 
 Drive-Import (Req 12):
 - Umsetzung (Aufgabe 4.8): `tools/drive_import` ist ein eigenes Maven-Projekt (Java 25, Picocli, Jackson; JAR mit `maven-shade-plugin`, SpotBugs Stufe hoch) ohne Abhängigkeit zum Backend. Es ruft nur `POST /api/v1/dokumente` auf (eine Datei je Anfrage, Teil `hinweis` vor `dateien`); die Archivseite ist unverändert (`quelle=DRIVE` und `erstellt_von='token:<id>'` aus 2.4, Eingangskorb-Ablauf wie jeder Upload, Req 12.8).

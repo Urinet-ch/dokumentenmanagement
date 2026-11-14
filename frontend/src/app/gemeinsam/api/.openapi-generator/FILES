@@ -44,6 +44,14 @@ model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
 model/kontakt-angaben.ts
+model/kontakt-detail.ts
+model/kontakt-eintrag.ts
+model/kontakt-inaktiv.ts
+model/kontakt-liste.ts
+model/kontakt-verweis.ts
+model/kontakt-verweise.ts
+model/kontakt-zusammenfuehren.ts
+model/kontakt-zusammengefuehrt.ts
 model/kontakt.ts
 model/models.ts
 model/protokoll-aktion.ts

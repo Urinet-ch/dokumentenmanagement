@@ -2,15 +2,17 @@ package ch.urinet.archiv.protokoll.domain;
 
 import java.time.LocalDate;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * Inhalt der Spalte {@code details} (jsonb): nur Grund, SHA-256, Fehlercode, bei {@code REGEL_AENDERN} die alte und
- * neue Regel einer Dokumentart und bei {@code SPERRE_KONFLIKT} die bisherige und die neu berechnete Frist, nie
- * Dokumentinhalte (Req 9.7, 9.10, 10.2, 16.7). Jedes Feld darf fehlen ({@code null}).
+ * neue Regel einer Dokumentart, bei {@code SPERRE_KONFLIKT} die bisherige und die neu berechnete Frist und bei den
+ * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}), nie Dokumentinhalte oder Kontaktdaten
+ * (Req 9.7, 9.10, 10.2, 16.7, 17.8). Jedes Feld darf fehlen ({@code null}).
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
-                               FristKonflikt fristKonflikt) {
+                               FristKonflikt fristKonflikt, Kontakte kontakte) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
 
@@ -38,7 +40,12 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung) {
-        this(grund, sha256, fehlercode, regelAenderung, null);
+        this(grund, sha256, fehlercode, regelAenderung, null, null);
+    }
+
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null);
     }
 
     public static ProtokollDetails fehlercode(String fehlercode) {
@@ -53,9 +60,14 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         return new ProtokollDetails(null, null, null, null, konflikt);
     }
 
+    /** Details eines Eintrags {@code KONTAKT_*} mit Grund (Req 17.8, 17.11, 17.15). */
+    public static ProtokollDetails kontakte(String grund, Kontakte kontakte) {
+        return new ProtokollDetails(grund, null, null, null, null, kontakte);
+    }
+
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
-                && fristKonflikt == null;
+                && fristKonflikt == null && kontakte == null;
     }
 
     /**
@@ -89,5 +101,22 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
      * berechnete, die nicht übernommen wurde; {@code null} heisst unbefristet.
      */
     public record FristKonflikt(LocalDate bisher, LocalDate neu) {
+    }
+
+    /**
+     * Kontakt-IDs und Zahlen der Aktionen {@code KONTAKT_*}: beim Zusammenführen {@code quelle} und {@code ziel} (im
+     * Eintrag ohne Dokument auch die Zahlen der umgehängten Verweise), beim Markieren {@code kontakt}. Nur IDs und
+     * Zahlen, keine Kontaktdaten.
+     */
+    public record Kontakte(UUID quelle, UUID ziel, UUID kontakt, Integer dokumente, Integer verkaufschancen,
+                           Integer korrekturbeispiele) {
+
+        public static Kontakte zusammenfuehren(UUID quelle, UUID ziel) {
+            return new Kontakte(quelle, ziel, null, null, null, null);
+        }
+
+        public static Kontakte markieren(UUID kontakt) {
+            return new Kontakte(null, null, kontakt, null, null, null);
+        }
     }
 }

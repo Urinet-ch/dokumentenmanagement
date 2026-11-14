@@ -73,8 +73,8 @@ public class CsvVorschauHandler implements AuftragHandler {
         }
         ImportLauf.Zaehler z = fertig.get().vorschau();
         LOG.infof("CSV-Vorschau fertig: lauf=%s bloecke=%d neu=%d geaendert=%d unveraendert=%d dubletten=%d "
-                        + "fehler=%d uebersprungen=%d", laufId, bloecke, z.neu(), z.geaendert(), z.unveraendert(),
-                z.dubletten(), z.fehler(), z.uebersprungen());
+                        + "fehler=%d uebersprungen=%d inaktiv=%d", laufId, bloecke, z.neu(), z.geaendert(),
+                z.unveraendert(), z.dubletten(), z.fehler(), z.uebersprungen(), z.inaktiv());
     }
 
     static boolean offen(ImportLauf lauf) {

@@ -1063,6 +1063,13 @@ components:
           - "null"
           format: int32
           description: "Vorschau: mögliche Dubletten"
+        inaktiv:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "Vorschau: Zeilen, deren Kontakt inaktiv ist (Req 17.13); werden\
+            \ nicht übernommen"
         uebernommenVon:
           type:
           - string
@@ -1182,12 +1189,14 @@ components:
           - DUBLETTE
           - FEHLER
           - UEBERSPRUNGEN
+          - INAKTIV
         meldung:
           type:
           - string
           - "null"
         kontaktId:
-          description: getroffener Kontakt bei GEAENDERT und UNVERAENDERT
+          description: "getroffener Kontakt bei GEAENDERT und UNVERAENDERT, der inaktive\
+            \ Kontakt bei INAKTIV"
           type:
           - string
           - "null"
@@ -1338,7 +1347,9 @@ components:
           - "null"
         quelle:
           type: string
-          description: MANUELL oder CRM_CSV
+          enum:
+          - MANUELL
+          - CSV_IMPORT
         nichtImExport:
           type: boolean
         erstellt:
@@ -1349,6 +1360,22 @@ components:
           type: integer
           format: int32
           description: Version für If-Match (auch als ETag)
+        aktiv:
+          type: boolean
+          description: "false: inaktiv markiert oder zusammengeführt (Req 17.11)"
+        inaktivSeit:
+          description: seit wann inaktiv (UTC)
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        zusammengefuehrtIn:
+          type:
+          - string
+          - "null"
+          description: "Kontakt, in den dieser zusammengeführt wurde"
     KontaktAngaben:
       description: "Bei PATCH bleibt ein fehlendes Feld unverändert, ein leerer Text\
         \ löscht es; Name und Typ lassen sich nicht leeren. Ein Wert über der Höchstlä\
@@ -1393,6 +1420,216 @@ components:
         kategorie:
           type: string
           maxLength: 100
+    KontaktDetail:
+      description: "Stammdaten und Status eines Kontakts (Req 17.3), ohne Zahl der\
+        \ Dokumente; die Dokumente liefert GET /dokumente?partner=<id>&sortierung=DATUM"
+      type: object
+      properties:
+        id:
+          type: string
+        crmId:
+          type:
+          - string
+          - "null"
+        typ:
+          type: string
+          enum:
+          - ORGANISATION
+          - PERSON
+        name:
+          type: string
+        vorname:
+          type:
+          - string
+          - "null"
+        strasse:
+          type:
+          - string
+          - "null"
+        plz:
+          type:
+          - string
+          - "null"
+        ort:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        telefon:
+          type:
+          - string
+          - "null"
+        uid:
+          type:
+          - string
+          - "null"
+        iban:
+          type:
+          - string
+          - "null"
+        kategorie:
+          type:
+          - string
+          - "null"
+        quelle:
+          type: string
+          enum:
+          - MANUELL
+          - CSV_IMPORT
+        nichtImExport:
+          type: boolean
+          description: «nicht mehr im CRM-Export» (Req 13.7)
+        aktiv:
+          type: boolean
+        inaktivSeit:
+          description: seit wann inaktiv (UTC)
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        zusammengefuehrtIn:
+          description: "Ziel, falls dieser Kontakt zusammengeführt wurde"
+          type:
+          - object
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/KontaktVerweis"
+          - type: "null"
+        zusammengefuehrtAus:
+          type: array
+          items:
+            $ref: "#/components/schemas/KontaktVerweis"
+          description: "Kontakte, die in diesen zusammengeführt wurden; höchstens\
+            \ 50, die neuesten zuerst"
+        erstellt:
+          $ref: "#/components/schemas/Instant"
+        geaendert:
+          $ref: "#/components/schemas/Instant"
+        version:
+          type: integer
+          format: int32
+          description: Version für If-Match (auch als ETag)
+    KontaktEintrag:
+      description: Ein Kontakt in der Liste (Req 17.1)
+      type: object
+      properties:
+        id:
+          type: string
+        typ:
+          type: string
+          enum:
+          - ORGANISATION
+          - PERSON
+        name:
+          type: string
+        vorname:
+          type:
+          - string
+          - "null"
+        plz:
+          type:
+          - string
+          - "null"
+        ort:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+        quelle:
+          type: string
+          enum:
+          - MANUELL
+          - CSV_IMPORT
+        aktiv:
+          type: boolean
+        nichtImExport:
+          type: boolean
+    KontaktInaktiv:
+      description: Grund (optional); unbekannte Felder → 400
+      type: object
+      properties:
+        grund:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    KontaktListe:
+      description: Eine Seite der Kontaktliste mit der Gesamtzahl der Treffer
+      type: object
+      properties:
+        gesamt:
+          type: integer
+          format: int64
+        seite:
+          type: integer
+          format: int32
+        groesse:
+          type: integer
+          format: int32
+        eintraege:
+          type: array
+          items:
+            $ref: "#/components/schemas/KontaktEintrag"
+    KontaktVerweis:
+      type: object
+      description: ID und Name eines anderen Kontakts
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    KontaktVerweise:
+      description: Zahl der Verweise über alle Dokumente des Mandanten (Req 17.17)
+      type: object
+      properties:
+        dokumente:
+          type: integer
+          format: int32
+        verkaufschancen:
+          type: integer
+          format: int32
+        korrekturbeispiele:
+          type: integer
+          format: int32
+    KontaktZusammenfuehren:
+      description: Ziel und Grund; unbekannte Felder → 400
+      type: object
+      required:
+      - ziel
+      - grund
+      properties:
+        ziel:
+          description: "aktiver Kontakt, in den die Quelle wandert"
+          type: string
+          $ref: "#/components/schemas/UUID"
+        grund:
+          type: string
+          maxLength: 1000
+          minLength: 1
+          description: Pflicht (Req 17.8)
+    KontaktZusammengefuehrt:
+      description: Ziel und Zahl der umgehängten Verweise (Req 17.7)
+      type: object
+      properties:
+        ziel:
+          type: string
+        dokumente:
+          type: integer
+          format: int32
+        verkaufschancen:
+          type: integer
+          format: int32
+        korrekturbeispiele:
+          type: integer
+          format: int32
     LocalDate:
       type: string
       format: date
@@ -1417,6 +1654,9 @@ components:
       - WISSEN_VERWERFEN
       - WISSEN_INGEST
       - WISSEN_LINT
+      - KONTAKT_ZUSAMMENFUEHREN
+      - KONTAKT_INAKTIV
+      - KONTAKT_AKTIV
     ProtokollEintrag:
       description: Eintrag des Zugriffsprotokolls; Name und Rolle aus dem Benutzerverzeichnis
         zur Zeit des Eintrags (Req 10.10)
@@ -2796,6 +3036,7 @@ paths:
           - DUBLETTE
           - FEHLER
           - UEBERSPRUNGEN
+          - INAKTIV
       - name: groesse
         in: query
         schema:
@@ -2877,7 +3118,7 @@ paths:
     get:
       summary: Kontakte suchen (Partnerauswahl)
       description: "Ähnliche oder enthaltene Namen, die besten zuerst; höchstens 20\
-        \ Treffer."
+        \ Treffer; nur aktive Kontakte (Req 17.12)."
       tags:
       - Kontakte
       parameters:
@@ -2902,8 +3143,6 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
         - geschaeftsstelle
     post:
       summary: Kontakt anlegen
@@ -2934,11 +3173,115 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/kontakte/liste:
+    get:
+      summary: "Kontakte auflisten (Req 17.1, 17.2)"
+      description: "Mit q: Name enthalten oder ähnlich, Vorname oder Ort enthalten\
+        \ (ohne Gross-/Kleinschreibung), E-Mail enthalten, PLZ oder Kontakt-ID aus\
+        \ 21.CRM gleich; exakte Kontakt-ID und E-Mail zuerst, dann Ähnlichkeit, dann\
+        \ Name. Ohne q nach Name, Vorname. Recht A6 (inhaber, geschaeftsstelle); sonst\
+        \ 403 NICHT_ERLAUBT. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG."
+      tags:
+      - Kontakte
+      parameters:
+      - description: 1–100
+        schema:
+          maximum: 100
+          minimum: 1
+          format: int32
+          type: integer
+          default: 50
+        name: groesse
+        in: query
+      - schema:
+          type: boolean
+        name: nichtImExport
+        in: query
+      - description: "Suchbegriff, 1–200 Zeichen ohne Steuerzeichen"
+        name: q
+        in: query
+        schema:
+          type: string
+      - schema:
+          type: string
+          enum:
+          - CSV_IMPORT
+          - MANUELL
+        name: quelle
+        in: query
+      - description: ab 0
+        schema:
+          minimum: 0
+          format: int32
+          type: integer
+          default: 0
+        name: seite
+        in: query
+      - description: Standard AKTIV
+        schema:
+          type: string
+          enum:
+          - AKTIV
+          - INAKTIV
+          - ALLE
+        name: status
+        in: query
+      responses:
+        "200":
+          description: Eine Seite
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KontaktListe"
+        "400":
+          description: "ANFRAGE_UNGUELTIG: q, status, quelle, nichtImExport, seite\
+            \ oder groesse ungültig"
+        "403":
+          description: "NICHT_ERLAUBT: ohne Recht A6"
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
   /api/v1/kontakte/{kontaktId}:
+    get:
+      summary: Kontakt ansehen (Req 17.3)
+      description: "Auch inaktive Kontakte. Recht A6 (inhaber, geschaeftsstelle);\
+        \ sonst 403 NICHT_ERLAUBT; unbekannt oder anderer Mandant → 404 NICHT_GEFUNDEN."
+      tags:
+      - Kontakte
+      parameters:
+      - name: kontaktId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Kontakt
+          headers:
+            ETag:
+              description: Version des Kontakts für If-Match
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KontaktDetail"
+        "403":
+          description: "NICHT_ERLAUBT: ohne Recht A6"
+        "404":
+          description: NICHT_GEFUNDEN
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+        - geschaeftsstelle
     patch:
       summary: Kontakt ändern
       description: "Optimistisches Locking über If-Match; fremde oder unbekannte IDs\
-        \ → 404, fehlendes If-Match → 428, veraltete Version → 412."
+        \ → 404, fehlendes If-Match → 428, inaktiver Kontakt → 409 STATUS_KONFLIKT\
+        \ (Req 17.16), veraltete Version → 412."
       tags:
       - Kontakte
       parameters:
@@ -2968,10 +3311,201 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Kontakt"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "404":
+          description: "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
+        "409":
+          description: "STATUS_KONFLIKT: inaktiver Kontakt (Req 17.16)"
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/kontakte/{kontaktId}/aktiv:
+    post:
+      summary: Kontakt wieder aktivieren (Req 17.15)
+      description: "Nur ein inaktiv markierter, nicht zusammengeführter Kontakt; sonst\
+        \ 409. Protokoll KONTAKT_AKTIV. If-Match wie bei PATCH (428/412)."
+      tags:
+      - Kontakte
+      parameters:
+      - name: kontaktId
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Wieder aktiv
+          headers:
+            ETag:
+              description: Neue Version des Kontakts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kontakt"
+        "404":
+          description: "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
+        "409":
+          description: "STATUS_KONFLIKT: aktiv oder zusammengeführt"
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/kontakte/{kontaktId}/inaktiv:
+    post:
+      summary: Kontakt als inaktiv markieren (Req 17.11)
+      description: Stammdaten und Zuordnungen bleiben; der Kontakt ist kein Ziel neuer
+        Zuordnungen mehr (Req 17.12). Protokoll KONTAKT_INAKTIV. If-Match wie bei
+        PATCH (428/412); schon inaktiv → 409; Körper ungültig → 400.
+      tags:
+      - Kontakte
+      parameters:
+      - name: kontaktId
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KontaktInaktiv"
+        required: true
+      responses:
+        "200":
+          description: Inaktiv
+          headers:
+            ETag:
+              description: Neue Version des Kontakts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Kontakt"
+        "404":
+          description: "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
+        "409":
+          description: "STATUS_KONFLIKT: schon inaktiv"
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/kontakte/{kontaktId}/verweise:
+    get:
+      summary: Verweise auf einen Kontakt zählen (Req 17.17)
+      description: "Über alle Dokumente des Mandanten; nur Recht A12 (inhaber), sonst\
+        \ 403. Unbekannt → 404."
+      tags:
+      - Kontakte
+      parameters:
+      - name: kontaktId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Zahlen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KontaktVerweise"
+        "403":
+          description: "NICHT_ERLAUBT: ohne Recht A12"
+        "404":
+          description: NICHT_GEFUNDEN
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/kontakte/{kontaktId}/zusammenfuehren:
+    post:
+      summary: Kontakt in einen anderen zusammenführen (Req 17.7–17.10)
+      description: "Eine Transaktion: Dokumente (neue Version, bei archivierten eine\
+        \ Fassung in dokument_version), Partner des KI-Vorschlags, Verkaufschancen\
+        \ und Korrekturbeispiele wandern zum Ziel, die Quelle wird inaktiv mit Verweis\
+        \ auf das Ziel; Protokoll KONTAKT_ZUSAMMENFUEHREN. Nicht umkehrbar. If-Match\
+        \ der Quelle: fehlt → 428, nur ein starkes ETag passt, sonst oder veraltet\
+        \ → 412. Körper ungültig, Ziel gleich Quelle oder unbekannt → 400; Quelle\
+        \ unbekannt → 404; Quelle oder Ziel inaktiv, oder eine laufende Übernahme\
+        \ hält einen der Kontakte → 409. In allen Fehlerfällen ändert sich nichts."
+      tags:
+      - Kontakte
+      parameters:
+      - name: kontaktId
+        in: path
+        required: true
+        schema:
+          type: string
+      - required: true
+        name: If-Match
+        in: header
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KontaktZusammenfuehren"
+        required: true
+      responses:
+        "200":
+          description: Zusammengeführt
+          headers:
+            ETag:
+              description: Neue Version der Quelle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KontaktZusammengefuehrt"
+        "400":
+          description: ANFRAGE_UNGUELTIG
+        "403":
+          description: "NICHT_ERLAUBT: ohne Recht A12"
+        "404":
+          description: "NICHT_GEFUNDEN: Quelle unbekannt"
+        "409":
+          description: STATUS_KONFLIKT
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
+        "401":
+          description: Not Authorized
       security:
       - SecurityScheme:
         - inhaber
