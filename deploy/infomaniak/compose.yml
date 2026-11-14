@@ -50,6 +50,9 @@ services:
       # PKI), dann der zweite Dienst; Endpunkte, Policy-OIDs und CAs stehen in application.properties. Ohne Dienst
       # startet prod nicht, mit nur einem warnt der Start (TsaStartpruefung); DeployStufeTest prüft die zwei Dienste.
       ARCHIV_TSA_DIENSTE: sgpki,freetsa
+      # Empfänger der Benachrichtigungen an den Inhaber (Aufgabe 5.6, Entscheid Fabian 14.11.2026): keine Geheimnisse, aus
+      # der .env des Bundles (der Deploy schreibt sie aus der GitHub-Variable gleichen Namens); leer heisst nur Log
+      ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
@@ -64,6 +67,8 @@ services:
       - archiv_manifest_key
       # Spec 02 (Mail-Eingang): leer, solange das Geheimnis ARCHIV_DATA_KEY fehlt; dann ruht der Mail-Eingang
       - archiv_data_key
+      # Aufgabe 5.6: Passwort des Postfachs archiv@urinet.ch für den Versand; leer, solange ARCHIV_SMTP_PASSWORT fehlt
+      - archiv_smtp_passwort
     networks:
       intern: {}
       web: {}
@@ -258,6 +263,8 @@ secrets:
     file: ./secrets/archiv_manifest_key
   archiv_data_key:
     file: ./secrets/archiv_data_key
+  archiv_smtp_passwort:
+    file: ./secrets/archiv_smtp_passwort
   archiv_db_postgres:
     file: ./secrets/archiv_db_postgres
   archiv_db_owner_scram:
