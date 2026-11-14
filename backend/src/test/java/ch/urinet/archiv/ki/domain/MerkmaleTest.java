@@ -91,4 +91,33 @@ class MerkmaleTest {
         assertThat(Merkmale.erkennen(text, Optional.empty(), null, List.of(), List.of(), OHNE_GRENZE).merkmale()
                 .emails()).isEmpty();
     }
+
+    /** Nachprüfung PR #109: die eigene UID per Muster aus {@code kennungen.uid}, auch mit weiteren Ziffern. */
+    @Test
+    void eigeneUidMitZusatzUndWeiterenZiffernZaehltNichtFremdeBleibt() {
+        Merkmale m = Merkmale.erkennen("Von CHE-123.456.789 MWST an CHE-987.654.321", Optional.empty(),
+                "CHE-123.456.789 MWST, HR 2020", List.of(), List.of(), OHNE_GRENZE).merkmale();
+
+        assertThat(m.uids()).containsExactly("CHE-987.654.321");
+    }
+
+    @Test
+    void eigeneUidOhnePraefixGiltNurMitGenauNeunZiffern() {
+        String text = "CHE-123.456.789 und CHE-987.654.321";
+
+        assertThat(Merkmale.erkennen(text, Optional.empty(), "123 456 789", List.of(), List.of(), OHNE_GRENZE)
+                .merkmale().uids()).containsExactly("CHE-987.654.321");
+        assertThat(Merkmale.erkennen(text, Optional.empty(), "123.456.789, HR 2020", List.of(), List.of(),
+                OHNE_GRENZE).merkmale().uids()).containsExactlyInAnyOrder("CHE-123.456.789", "CHE-987.654.321");
+    }
+
+    /** Das Muster der eigenen UID hat keine Rückverfolgung: viele beinahe passende Anläufe bleiben linear. */
+    @Test
+    @org.junit.jupiter.api.Timeout(5)
+    void langeEigeneUidLaeuftLinear() {
+        String eigene = "che-12.".repeat(200_000) + "CHE 123 456 789";
+
+        assertThat(Merkmale.erkennen("CHE-123.456.789 " + "che-1 ".repeat(200_000), Optional.empty(), eigene,
+                List.of(), List.of(), OHNE_GRENZE).merkmale().uids()).isEmpty();
+    }
 }
