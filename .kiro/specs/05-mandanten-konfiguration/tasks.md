@@ -52,6 +52,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Abhängig von: 17.3; Spec 01: 4.7_
 
 - [ ] 17.6 Regeln und Lückenbericht [Backend]
+  - Übergangsquelle in Spec 02, 7.1c (Port `Lueckenbericht`, Adapter `KonfigurierteLuecken` aus der Konfiguration); 17.6 ersetzt den Adapter hinter demselben Port, das Werkzeug `vollstaendigkeit` ändert sich nicht
   - Changeset `<nnn>-regel`, Regeltypen, `RegelPruefung` in Bestätigen, Ändern, Generator und Drive-Import,
     bestehende Verletzungen als Warnung, `Lueckenbericht` mit Recht nach 5.4, Meldung betroffener Dokumente,
     Regeln von `urinet` per Changeset (Version mit Quelle `MIGRATION`).
