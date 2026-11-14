@@ -131,6 +131,21 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(port.aufrufe).toEqual(['pdfa']);
   });
 
+  it('verlinkt den Partner nur mit A6 auf die Kontaktseite (Req 17.1)', async () => {
+    port.dokument = of({ ...DOKUMENT, partnerId: 'k1', partnerName: 'Muster Garage AG' });
+    await oeffnen();
+    expect(element.querySelector('[data-test=partner-link]')!.getAttribute('href')).toBe('/kontakte/k1');
+    expect(element.querySelector('[data-test=partner]')!.textContent).toContain('Muster Garage AG');
+  });
+
+  it('zeigt den Partner ohne A6 nur als Text', async () => {
+    rolle.set('mitarbeiter');
+    port.dokument = of({ ...DOKUMENT, partnerId: 'k1', partnerName: 'Muster Garage AG' });
+    await oeffnen();
+    expect(element.querySelector('[data-test=partner-link]')).toBeNull();
+    expect(element.querySelector('[data-test=partner]')!.textContent).toContain('Muster Garage AG');
+  });
+
   it('zeigt die Zeile «Dateiname» nur mit gespeichertem Namen (Req 14.10)', async () => {
     await oeffnen();
     expect(element.querySelector('[data-test=dateiname]')).toBeNull();

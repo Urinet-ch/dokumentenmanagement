@@ -1,0 +1,62 @@
+<section aria-labelledby="dokumente-titel" [attr.aria-busy]="laedt()" data-test="dokumente">
+  <h2 id="dokumente-titel">
+    {{ texte.dokumente }}
+    @if (ergebnis(); as e) {
+      <span class="anzahl" data-test="dokumente-anzahl"
+        >· {{ texte.dokumenteAnzahl(e.gesamt) }}</span
+      >
+    }
+  </h2>
+  @if (laedt()) {
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.dokumenteLaedt" />
+  }
+  @if (fehler()) {
+    <div role="alert" class="fehler" data-test="dokumente-fehler">
+      <p>{{ texte.dokumenteFehler }}</p>
+      <button mat-button type="button" (click)="neuLaden()">{{ texte.erneutVersuchen }}</button>
+    </div>
+  } @else if (ergebnis(); as e) {
+    @if (e.treffer.length === 0) {
+      <p data-test="dokumente-keine">{{ texte.dokumenteKeine }}</p>
+    } @else {
+      <ol class="dokumente" [attr.aria-label]="texte.dokumenteBeschreibung">
+        @for (t of e.treffer; track t.id) {
+          <li class="karte eintrag" data-test="dokument">
+            <a class="titel" [routerLink]="['/dokument', t.id]"
+              ><app-titel-anzeige [anzeige]="titel(t)"
+            /></a>
+            <p class="angaben">
+              <span>{{ artName(t.art) }}</span>
+              @if (t.datum) {
+                <span>{{ datum(t.datum) }}</span>
+              }
+            </p>
+          </li>
+        }
+      </ol>
+      @if (seiten() > 1) {
+        <nav class="blaettern" [attr.aria-label]="texte.seite(seite() + 1, seiten())">
+          <button
+            mat-button
+            type="button"
+            data-test="dokumente-vorherige"
+            [disabled]="laedt() || seite() === 0"
+            (click)="blaettern(-1)"
+          >
+            {{ texte.vorherige }}
+          </button>
+          <span>{{ texte.seite(seite() + 1, seiten()) }}</span>
+          <button
+            mat-button
+            type="button"
+            data-test="dokumente-naechste"
+            [disabled]="laedt() || seite() + 1 >= seiten()"
+            (click)="blaettern(1)"
+          >
+            {{ texte.naechste }}
+          </button>
+        </nav>
+      }
+    }
+  }
+</section>

@@ -138,10 +138,11 @@ export class ImportLaufSeite {
       DUBLETTE: lauf.dubletten ?? 0,
       FEHLER: lauf.fehler ?? 0,
       UEBERSPRUNGEN: lauf.uebersprungen ?? 0,
-      // Anzeige der Zahl «inaktiv» folgt mit Aufgabe 4.12 (ERGEBNISSE)
       INAKTIV: lauf.inaktiv ?? 0,
     };
-    return [{ ergebnis: null, anzahl: lauf.zeilen ?? 0 }, ...ERGEBNISSE.map((e) => ({ ergebnis: e, anzahl: anzahl[e] }))];
+    // «inaktiv» (Req 13.3, 17.13) gibt es nur beim Kontakt-Import
+    const gezeigt = this.art() === 'kontakt' ? [...ERGEBNISSE, 'INAKTIV' as const] : ERGEBNISSE;
+    return [{ ergebnis: null, anzahl: lauf.zeilen ?? 0 }, ...gezeigt.map((e) => ({ ergebnis: e, anzahl: anzahl[e] }))];
   });
   protected readonly entscheideAnzahl = computed(() => entscheideZaehlen(this.entscheide()));
   protected readonly dublettenOffen = computed(() => Math.max(0, (this.lauf()?.dubletten ?? 0) - this.entscheide().size));

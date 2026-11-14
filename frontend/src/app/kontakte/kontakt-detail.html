@@ -1,0 +1,209 @@
+<p class="zurueck">
+  <button mat-button type="button" data-test="zurueck" (click)="zurueck()">
+    ← {{ texte.zurueckZurListe }}
+  </button>
+</p>
+
+@if (laedt() && !kontakt()) {
+  <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laedt" />
+}
+
+@if (fehler(); as f) {
+  @if (nichtGefunden()) {
+    <section data-test="nicht-gefunden">
+      <h1 tabindex="-1" #ueberschrift>{{ texte.nichtGefundenTitel }}</h1>
+      <p>{{ texte.nichtGefunden }}</p>
+      <a mat-button routerLink="/kontakte">{{ texte.titel }}</a>
+    </section>
+  } @else {
+    <div role="alert" class="fehler" data-test="fehler">
+      <p>{{ f.text }}</p>
+      @if (f.art === 'verbindung' || f.art === 'sonst') {
+        <button mat-button type="button" data-test="erneut" (click)="laden(true)">
+          {{ texte.erneutVersuchen }}
+        </button>
+      }
+    </div>
+  }
+}
+
+@if (kontakt(); as k) {
+  <h1 tabindex="-1" #ueberschrift data-test="kontakt-name">{{ name() }}</h1>
+
+  <ul class="marken" data-test="kennzeichen">
+    @if (k.aktiv === false) {
+      <li class="inaktiv">
+        {{ texte.inaktivSeit(k.inaktivSeit ? zeitpunkt(k.inaktivSeit) : '') }}
+      </li>
+    }
+    <li>{{ k.quelle === 'CSV_IMPORT' ? texte.herkunftImport : texte.herkunftManuell }}</li>
+    @if (k.nichtImExport) {
+      <li>{{ texte.nichtImExport }}</li>
+    }
+  </ul>
+
+  <div role="status" class="meldungen">
+    @if (erfolg(); as e) {
+      <p class="erfolg" data-test="erfolg">
+        {{ e.text }}
+        @if (e.ziel; as z) {
+          <a [routerLink]="['/kontakte', z.id]" data-test="ziel-link">{{ texte.zumZiel }}</a>
+        }
+      </p>
+    }
+    @if (hinweis()) {
+      <p class="fehler" data-test="veraltet">{{ texte.veraltet }}</p>
+    }
+  </div>
+  @if (aktionFehler(); as text) {
+    <p class="fehler" role="alert" data-test="aktion-fehler">{{ text }}</p>
+  }
+
+  @if (k.aktiv === false) {
+    <p class="hinweis" data-test="inaktiv-hinweis">{{ texte.inaktivHinweis }}</p>
+  }
+
+  @if (darfAendern()) {
+    <div
+      class="knoepfe aktionen"
+      role="group"
+      [attr.aria-label]="texte.aktionen"
+      data-test="aktionen"
+    >
+      @if (aktiv()) {
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="bearbeiten"
+          [disabled]="bearbeiten()"
+          (click)="bearbeitenOeffnen()"
+        >
+          {{ texte.bearbeiten }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="zusammenfuehren"
+          (click)="dialogOeffnen('zusammenfuehren')"
+        >
+          {{ texte.zusammenfuehren }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="inaktiv"
+          (click)="dialogOeffnen('inaktiv')"
+        >
+          {{ texte.inaktivMarkieren }}
+        </button>
+      }
+      @if (darfWiederAktivieren()) {
+        <button
+          mat-stroked-button
+          type="button"
+          data-test="wieder-aktivieren"
+          [disabled]="sendet()"
+          (click)="wiederAktivieren()"
+        >
+          {{ texte.wiederAktivieren }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (bearbeiten() && darfAendern() && aktiv()) {
+    <app-kontakt-bearbeiten
+      [kontakt]="k"
+      (gespeichert)="gespeichert()"
+      (veraltet)="veraltet()"
+      (abgebrochen)="bearbeiten.set(false)"
+    />
+  }
+
+  <section aria-labelledby="stammdaten-titel">
+    <h2 id="stammdaten-titel">{{ texte.stammdaten }}</h2>
+    <dl class="stammdaten" data-test="stammdaten">
+      <div>
+        <dt>{{ texte.felder.name }}</dt>
+        <dd data-test="wert-name">{{ k.name }}</dd>
+      </div>
+      <div>
+        <dt>{{ texte.felder.vorname }}</dt>
+        <dd data-test="wert-vorname">{{ k.vorname || texte.leer }}</dd>
+      </div>
+      <div>
+        <dt>{{ texte.felder.typ }}</dt>
+        <dd data-test="wert-typ">{{ texte.typen[k.typ ?? ''] }}</dd>
+      </div>
+      @for (f of felder; track f) {
+        <div>
+          <dt>{{ texte.felder[f] }}</dt>
+          <dd [attr.data-test]="'wert-' + f">{{ k[f] || texte.leer }}</dd>
+        </div>
+      }
+      <div>
+        <dt>{{ texte.crmId }}</dt>
+        <dd data-test="wert-crmId">{{ k.crmId || texte.leer }}</dd>
+      </div>
+      <div>
+        <dt>{{ texte.herkunftZeile }}</dt>
+        <dd data-test="wert-herkunft">
+          {{ k.quelle === 'CSV_IMPORT' ? texte.herkunftImport : texte.herkunftManuell }}
+        </dd>
+      </div>
+      <div>
+        <dt>{{ texte.nichtImExport }}</dt>
+        <dd data-test="wert-export">{{ k.nichtImExport ? texte.nichtImExportJa : texte.leer }}</dd>
+      </div>
+      @if (k.aktiv === false) {
+        <div>
+          <dt>{{ texte.inaktivSeit('').trim() }}</dt>
+          <dd data-test="wert-inaktiv">
+            {{ k.inaktivSeit ? zeitpunkt(k.inaktivSeit) : texte.leer }}
+          </dd>
+        </div>
+      }
+      @if (k.zusammengefuehrtIn; as ziel) {
+        <div>
+          <dt>{{ texte.zusammengefuehrtIn }}</dt>
+          <dd>
+            <a [routerLink]="['/kontakte', ziel.id]" data-test="in-link">{{ ziel.name }}</a>
+          </dd>
+        </div>
+      }
+      @if (k.zusammengefuehrtAus?.length) {
+        <div>
+          <dt>{{ texte.zusammengefuehrtAus }}</dt>
+          <dd>
+            <ul class="verweise" data-test="aus-liste">
+              @for (a of k.zusammengefuehrtAus; track a.id) {
+                <li>
+                  <a [routerLink]="['/kontakte', a.id]" data-test="aus-link">{{ a.name }}</a>
+                </li>
+              }
+            </ul>
+          </dd>
+        </div>
+      }
+    </dl>
+  </section>
+
+  <app-kontakt-dokumente [kontaktId]="k.id ?? ''" />
+
+  @if (dialog() === 'zusammenfuehren') {
+    <app-kontakt-zusammenfuehren-dialog
+      [kontakt]="k"
+      (erledigt)="zusammengefuehrt($event)"
+      (veraltet)="veraltet()"
+      (geschlossen)="dialogSchliessen()"
+    />
+  }
+  @if (dialog() === 'inaktiv') {
+    <app-kontakt-inaktiv-dialog
+      [kontakt]="k"
+      (erledigt)="inaktivMarkiert()"
+      (veraltet)="veraltet()"
+      (geschlossen)="dialogSchliessen()"
+    />
+  }
+}
