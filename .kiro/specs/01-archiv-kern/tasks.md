@@ -378,7 +378,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Bei «Anforderungen» stehen nur Kriterien mit Nachweis «manuell», die der Entscheid selbst festlegt; die übrigen geänderten Kriterien stehen bei den umsetzenden Aufgaben 5.1, 5.2, 5.5, 5.7 und 5.11, damit der Haken von 4.9 keine noch nicht umgesetzten Kriterien als nachgewiesen zählt
   - _Anforderungen: 16.1, 16.2, 16.3, 16.18, 16.23, 16.25, 16.26_
 
-- [ ] 4.10 Dateiname des Uploads speichern, anzeigen und durchsuchen [Backend] [Frontend]
+- [x] 4.10 Dateiname des Uploads speichern, anzeigen und durchsuchen [Backend] [Frontend]
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026: Dokumente in Verarbeitung oder ohne Vorschlag zeigen mindestens den Dateinamen; gespeichert, angezeigt und durchsuchbar, nur Ersatzanzeige, der Titel wird nicht vorbelegt (design.md «Dateiname», «Suche», «Frontend»); Nummer 4.10 als nächste freie der Welle 4
   - Liquibase `db/mandant`, nächste freie Nummer (z. B. `012-dokument-dateiname`), bestehende Changesets unverändert: Spalte `dokument.dateiname text null` mit Check 1–255 Zeichen, Funktion `archiv_dateiname_text` (`IMMUTABLE`, ASCII-Ausdruck aus design.md «Suche»), `volltext_tsv` per `alter column … set expression` um den Teil `D` erweitern; rückwärtskompatibel zum Vorgänger-Release (16.11), Bestand bleibt ohne Namen; vor der Übernahme 5.8 in Betrieb nehmen, sonst Dauer der Sperre vorher auf einer Kopie messen
   - `DateiName`: speicherbaren Namen als eigenen Wert (`speicherbar()`, leer beim Ersatz `datei` oder ungültigem Namen), Zl und Zp (U+2028, U+2029) zusätzlich ablehnen (Req 3.10); Javadoc («nie in … die Datenbank») nachführen

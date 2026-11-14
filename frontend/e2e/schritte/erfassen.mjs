@@ -1,14 +1,15 @@
 // Handy-Erfassung der PWA (Aufgabe 3.7, Req 4.2–4.9): Chromium mit Fake-Kamera (synthetisches Y4M aus
 // hilfen/testbild.mjs), mobilem Kontext und Offline-Schalter von Playwright. Der Scanner (OpenCV.js und jscanify im Web
-// Worker) läuft echt. Erfolgreiche Uploads leitet Playwright wie upload.mjs an das Archiv im Testmodus weiter; Dublette,
-// 5xx, 4xx und 401 beantwortet es auf Wunsch des Szenarios selbst. Alle Bilder sind synthetisch, keine echten Belege.
+// Worker) läuft echt. Erfolgreiche Uploads leitet Playwright mit anfrageWeiterleiten() aus hilfen/echtes-backend.mjs an
+// das Archiv im Testmodus weiter; Dublette, 5xx, 4xx und 401 beantwortet es auf Wunsch des Szenarios selbst. Alle
+// Bilder sind synthetisch, keine echten Belege.
 import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { randomInt } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { archivAttrappe } from '../hilfen/archiv-attrappe.mjs';
-import { backend, echtesToken } from '../hilfen/echtes-backend.mjs';
+import { anfrageWeiterleiten, direktLesen } from '../hilfen/echtes-backend.mjs';
 import { basisUrl } from '../hilfen/keycloak-attrappe.mjs';
 import { BREITE, HOEHE, kameraVideo, png } from '../hilfen/testbild.mjs';
 
@@ -133,15 +134,7 @@ async function uploadsBeantworten(welt) {
           body: JSON.stringify(vorgabe.body),
         });
       }
-      const {
-        rollen: [rolle],
-        mandant,
-      } = welt.keycloak.benutzer;
-      const headers = {
-        ...anfrage.headers(),
-        authorization: `Bearer ${await echtesToken(rolle, mandant)}`,
-      };
-      await route.continue({ url: `${backend().api}/api/v1/dokumente`, headers });
+      await anfrageWeiterleiten(route, welt.keycloak.benutzer);
     } catch (fehler) {
       welt.handy.fehler = fehler;
       return route.abort('failed');
@@ -471,11 +464,7 @@ Then(/^speichert das Archiv den Dateinamen «(.+)»$/, async function (name) {
     rollen: [rolle],
     mandant,
   } = this.keycloak.benutzer;
-  const antwort = await fetch(`${backend().api}/api/v1/dokumente/${id}`, {
-    headers: { authorization: `Bearer ${await echtesToken(rolle, mandant)}` },
-  });
-  assert.equal(antwort.status, 200);
-  assert.equal((await antwort.json()).dateiname, name);
+  assert.equal((await direktLesen(rolle, mandant, id)).dateiname, name);
 });
 
 Then('sind die Originale die unbearbeiteten Aufnahmen', function () {

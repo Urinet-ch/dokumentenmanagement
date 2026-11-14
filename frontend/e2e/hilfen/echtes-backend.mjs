@@ -1,10 +1,13 @@
-// Echtes Backend für die Upload-Szenarien (Aufgabe 2.4): Die PWA meldet sich weiter bei der Keycloak-Attrappe an, ihre
-// Uploads leitet upload.mjs aber an das Archiv im Testmodus weiter (BrowserBackendTest: PostgreSQL, Keycloak mit
-// Test-Realm, MinIO). Das unsignierte Token der Attrappe wird dabei gegen ein echtes Token desselben Testbenutzers aus
-// dem Test-Realm getauscht (Passwort und TOTP mit dem bekannten Test-Secret, nur lokal und in Tests).
-// Adressen aus ARCHIV_API_URL und ARCHIV_KEYCLOAK_URL, sonst aus ../backend/target/browser-backend.json.
-import { createHmac, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+// Echtes Backend für die Browser-Szenarien (Aufgabe 2.4, verallgemeinert mit 4.10): Die PWA meldet sich weiter bei der
+// Keycloak-Attrappe an, ihre Anfragen an /api/v1/** leitet weiterleiten() aber an das Archiv im Testmodus weiter
+// (BrowserBackendTest: PostgreSQL, Keycloak mit Test-Realm, MinIO). Das unsignierte Token der Attrappe wird dabei gegen
+// ein echtes Token desselben Testbenutzers aus dem Test-Realm getauscht (Passwort und TOTP mit dem bekannten
+// Test-Secret, nur lokal und in Tests). Adressen aus ARCHIV_API_URL und ARCHIV_KEYCLOAK_URL, sonst aus
+// ../backend/target/browser-backend.json.
+import assert from 'node:assert/strict';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basisUrl } from './keycloak-attrappe.mjs';
 
 const PASSWORT = 'Test-Passwort-1';
 const OTP_SECRET = 'urinet-archiv-test-otp-nur-lokal';
@@ -12,6 +15,8 @@ const BEREIT = new URL('../../../backend/target/browser-backend.json', import.me
 // Keycloak nimmt denselben TOTP-Code je Benutzer nur einmal an, auch über mehrere Läufe hinweg: Der zuletzt
 // verwendete Zeitschritt je Benutzer steht darum in einer Datei neben der Bereit-Datei.
 const SCHRITTE = new URL('../../../backend/target/browser-backend-totp.json', import.meta.url);
+// Testhilfe für den Status (BrowserBackendTest): Anfrage- und Antwortdateien, nur unter target/
+const ANFRAGEN = new URL('../../../backend/target/browser-backend-anfragen/', import.meta.url);
 
 let adressen;
 
@@ -75,21 +80,151 @@ export async function echtesToken(rolle, mandant) {
   return inhalt.access_token;
 }
 
-/** Lädt Dateien direkt über die API hoch (ohne Browser), z. B. um eine Dublette vorzubereiten. */
+/**
+ * Lädt Dateien direkt über die API hoch (ohne Browser), z. B. um eine Dublette vorzubereiten. Eine Datei mit
+ * `name: null` geht als Teil ohne `filename` (wie ein Client ohne Dateinamen); FormData kennt das nicht.
+ */
 export async function direktHochladen(rolle, mandant, dateien) {
-  const formular = new FormData();
-  for (const datei of dateien) {
-    formular.append('dateien', new Blob([datei.buffer], { type: datei.mimeType }), datei.name);
+  let body;
+  const headers = { authorization: `Bearer ${await echtesToken(rolle, mandant)}` };
+  if (dateien.every((datei) => datei.name !== null)) {
+    body = new FormData();
+    for (const datei of dateien) {
+      body.append('dateien', new Blob([datei.buffer], { type: datei.mimeType }), datei.name);
+    }
+  } else {
+    assert.equal(dateien.length, 1, 'ohne Namen nur eine Datei je Upload');
+    const grenze = `----archiv-e2e-${zufall()}`;
+    const [datei] = dateien;
+    body = Buffer.concat([
+      Buffer.from(`--${grenze}\r\nContent-Disposition: form-data; name="dateien"\r\nContent-Type: ${datei.mimeType}\r\n\r\n`),
+      datei.buffer,
+      Buffer.from(`\r\n--${grenze}--\r\n`),
+    ]);
+    headers['content-type'] = `multipart/form-data; boundary=${grenze}`;
   }
-  const antwort = await fetch(`${backend().api}/api/v1/dokumente`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${await echtesToken(rolle, mandant)}` },
-    body: formular,
-  });
+  const antwort = await fetch(`${backend().api}/api/v1/dokumente`, { method: 'POST', headers, body });
   if (antwort.status !== 202) {
     throw new Error(`Upload über die API: Status ${antwort.status}`);
   }
   return antwort.json();
+}
+
+/** Dokument direkt über die API lesen (ohne Browser), z. B. um den gespeicherten Titel zu prüfen. */
+export async function direktLesen(rolle, mandant, id) {
+  const antwort = await fetch(`${backend().api}/api/v1/dokumente/${id}`, {
+    headers: { authorization: `Bearer ${await echtesToken(rolle, mandant)}` },
+  });
+  assert.equal(antwort.status, 200, `GET /dokumente/${id}`);
+  return antwort.json();
+}
+
+/** Dokumente, die ein Szenario im echten Archiv angelegt hat: Dateiname (oder Bezeichnung) → ID. */
+export function echteDokumente(welt) {
+  welt.echteDokumente ??= new Map();
+  return welt.echteDokumente;
+}
+
+/**
+ * Testhilfe für den Status (Aufgabe 4.10): Im Testmodus läuft kein Worker, ein hochgeladenes Dokument bleibt in NEU.
+ * BrowserBackendTest setzt es auf Anfrage per SQL auf EINGANGSKORB oder FEHLER, ohne Titel und ohne Vorschlag.
+ */
+export async function statusSetzen(mandant, id, status) {
+  mkdirSync(ANFRAGEN, { recursive: true });
+  const name = randomUUID();
+  const entwurf = new URL(`${name}.tmp`, ANFRAGEN);
+  const antwort = new URL(`${name}.antwort.json`, ANFRAGEN);
+  writeFileSync(entwurf, JSON.stringify({ mandant, dokument: id, status }));
+  renameSync(entwurf, new URL(`${name}.json`, ANFRAGEN));
+  for (const ende = Date.now() + 30_000; Date.now() < ende; ) {
+    if (existsSync(antwort)) {
+      const ergebnis = JSON.parse(readFileSync(antwort, 'utf8'));
+      rmSync(antwort);
+      assert.ok(ergebnis.ok, `Testhilfe für den Status: ${ergebnis.fehler}`);
+      return;
+    }
+    await new Promise((weiter) => setTimeout(weiter, 100));
+  }
+  throw new Error('Die Testhilfe für den Status antwortet nicht: läuft BrowserBackendTest mit diesem Stand?');
+}
+
+/**
+ * Sendet eine abgefangene Anfrage der PWA an das Archiv im Testmodus: Methode, Körper, Query und Header (auch
+ * If-Match) bleiben, nur die Adresse und das Token ändern sich. Getauscht wird das Token der Keycloak-Attrappe gegen
+ * ein echtes Token desselben Testbenutzers; mit `tokenTauschen: false` bleibt es, und das Archiv lehnt es mit 401 ab.
+ * continue statt fetch: Den Körper (auch Dateien) sendet der Browser selbst, und die Antwort erreicht die PWA samt
+ * Headern (ETag, Location) unverändert.
+ */
+export async function anfrageWeiterleiten(route, benutzer, { tokenTauschen = true } = {}) {
+  const url = new URL(route.request().url());
+  const headers = { ...route.request().headers() };
+  if (tokenTauschen) {
+    const {
+      rollen: [rolle],
+      mandant,
+    } = benutzer;
+    headers.authorization = `Bearer ${await echtesToken(rolle, mandant)}`;
+  }
+  await route.continue({ url: `${backend().api}${url.pathname}${url.search}`, headers });
+}
+
+const istJson = (typ) => /[/+]json\b/.test(typ ?? '');
+
+/**
+ * Leitet die Anfragen der PWA an /api/v1/** an das Archiv im Testmodus weiter (einmal je Szenario, vor der Anmeldung
+ * oder vor der ersten Anfrage). `passt(anfrage)` wählt aus, Standard alle; die übrigen gehen mit route.fallback() an die
+ * Routen dahinter (Attrappen). Jede weitergeleitete Anfrage steht in welt.weiterleitung.anfragen mit Methode, Pfad,
+ * Query, If-Match, JSON-Körper und, sobald da, Status, Headern und JSON der Antwort; `merken(anfrage)` ergänzt den
+ * Eintrag (z. B. die Felder eines FormData, die Chromium nicht herausgibt). Scheitert die Weiterleitung, bricht die
+ * Anfrage ab und der Fehler steht in welt.weiterleitung.fehler. Mit welt.weiterleitung.sitzungAbgelaufen bleibt das
+ * Token der Attrappe.
+ */
+export async function weiterleiten(welt, { passt = () => true, merken = async () => ({}) } = {}) {
+  if (welt.weiterleitung) {
+    return welt.weiterleitung;
+  }
+  const zustand = { anfragen: [], fehler: null, sitzungAbgelaufen: false };
+  welt.weiterleitung = zustand;
+  const eintraege = new Map();
+  welt.seite.on('response', async (antwort) => {
+    const eintrag = eintraege.get(antwort.request());
+    if (eintrag) {
+      eintrag.status = antwort.status();
+      eintrag.headers = antwort.headers();
+      eintrag.antwort = istJson(eintrag.headers['content-type']) ? await antwort.json().catch(() => null) : null;
+    }
+  });
+  const origin = new URL(basisUrl).origin;
+  await welt.seite.route(
+    (url) => url.origin === origin && url.pathname.startsWith('/api/v1/'),
+    async (route) => {
+      const anfrage = route.request();
+      if (!passt(anfrage)) {
+        return route.fallback();
+      }
+      try {
+        const url = new URL(anfrage.url());
+        const json = istJson(await anfrage.headerValue('content-type'));
+        const eintrag = {
+          methode: anfrage.method(),
+          pfad: url.pathname,
+          query: url.searchParams,
+          ifMatch: await anfrage.headerValue('if-match'),
+          body: json ? anfrage.postDataJSON() : null,
+          ...(await merken(anfrage)),
+        };
+        zustand.anfragen.push(eintrag);
+        eintraege.set(anfrage, eintrag);
+        // Die PWA muss das Token der Anmeldung senden; getauscht wird nur dieses.
+        assert.equal(await anfrage.headerValue('authorization'), `Bearer ${welt.keycloak.accessToken}`);
+        await anfrageWeiterleiten(route, welt.keycloak.benutzer, { tokenTauschen: !zustand.sitzungAbgelaufen });
+      } catch (fehler) {
+        zustand.fehler ??= fehler;
+        return route.abort('failed');
+      }
+    },
+  );
+  return zustand;
 }
 
 // Synthetische Testdateien wie Testdateien.java im Backend: jede mit Zufall, damit keine ungewollten Dubletten entstehen.

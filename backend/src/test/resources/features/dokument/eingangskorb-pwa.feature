@@ -1,8 +1,10 @@
 # language: de
 # Eingangskorb in der PWA (Aufgabe 3.6), im Handy-Viewport von 375 px. Die API ist eine Attrappe im Browser-Test
 # (frontend/e2e/hilfen/archiv-attrappe.mjs); Rechte, Sichtbarkeit, Pflichtfelder und Status prüft das Backend selbst
-# (dokument/eingangskorb.feature, dokument/bestaetigen.feature, sicherheit/rechtematrix). Alle Daten sind synthetisch.
-@spec-01 @browser
+# (dokument/eingangskorb.feature, dokument/bestaetigen.feature, sicherheit/rechtematrix). Darum Teilnachweis (@attrappe);
+# den Platzhalter (Req 8.11) weist dokument/dateiname-pwa.feature zusätzlich gegen das echte Archiv im Testmodus nach.
+# Alle Daten sind synthetisch.
+@spec-01 @browser @attrappe
 Funktionalität: Eingangskorb in der PWA
 
   Grundlage:
