@@ -39,9 +39,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * {@link HybridSuche} mit Fake-Ports (Spec 02, Aufgabe 6.4; Req 2.2, 2.3, 2.8): Ablauf und Reihenfolge des Rerankers,
- * Belegnummer zuerst, Rückfall bei jeder Ursache, kein Reranker ohne Kandidaten, Zeilen {@code ki_verbrauch}, nie ein
- * Dateiname an den Reranker. Die Fakes der Modelle prüfen bei jedem Aufruf, dass keine Transaktion offen ist, die Fakes
- * der Datenbank, dass eine offen ist.
+ * Belegnummer zuerst, Rückfall bei Modellausfällen, Datenbankfehler bleiben Fehler, kein Reranker ohne Kandidaten,
+ * Zeilen {@code ki_verbrauch}, nie ein Dateiname an den Reranker. Die Fakes der Modelle prüfen bei jedem Aufruf, dass
+ * keine Transaktion offen ist, die Fakes der Datenbank, dass eine offen ist.
  */
 class HybridSucheTest {
 
@@ -112,25 +112,24 @@ class HybridSucheTest {
         KiPort.Verbrauch ohne = new KiPort.Verbrauch("m", 0, 0);
         RerankerPort.Antwort gut = null;
         return Stream.of(
-                Arguments.of("Embedding Ausfall", new EmbeddingPort.Ausfall("HttpException", ohne), gut, false, 0),
-                Arguments.of("Embedding Zeit", new EmbeddingPort.Ausfall("HttpTimeoutException", ohne), gut, false, 0),
+                Arguments.of("Embedding Ausfall", new EmbeddingPort.Ausfall("HttpException", ohne), gut, 0),
+                Arguments.of("Embedding Zeit", new EmbeddingPort.Ausfall("HttpTimeoutException", ohne), gut, 0),
                 Arguments.of("Embedding ungültig mit Tokens",
-                        new EmbeddingPort.Ausfall("falsche Dimension", EMBEDDING), gut, false, 1),
-                Arguments.of("Embedding ohne Zugang", new EmbeddingPort.OhneZugang(), gut, false, 0),
-                Arguments.of("Embedding Stub", new EmbeddingPort.OhneVektoren(), gut, false, 0),
-                Arguments.of("Reranker Ausfall", null, new RerankerPort.Ausfall("HTTP-Status 500", ohne), false, 1),
-                Arguments.of("Reranker Zeit", null, new RerankerPort.Ausfall("HttpTimeoutException", ohne), false, 1),
+                        new EmbeddingPort.Ausfall("falsche Dimension", EMBEDDING), gut, 1),
+                Arguments.of("Embedding ohne Zugang", new EmbeddingPort.OhneZugang(), gut, 0),
+                Arguments.of("Embedding Stub", new EmbeddingPort.OhneVektoren(), gut, 0),
+                Arguments.of("Reranker Ausfall", null, new RerankerPort.Ausfall("HTTP-Status 500", ohne), 1),
+                Arguments.of("Reranker Zeit", null, new RerankerPort.Ausfall("HttpTimeoutException", ohne), 1),
                 Arguments.of("Reranker ungültig", null,
-                        new RerankerPort.Ausfall("ungültige Indizes", new KiPort.Verbrauch("r", 7, 0)), false, 2),
-                Arguments.of("Reranker ohne Zugang", null, new RerankerPort.OhneZugang(), false, 1),
-                Arguments.of("Reranker Stub", null, new RerankerPort.OhneSortierung(), false, 1),
-                Arguments.of("Datenbank im Vektor-Teil", null, gut, true, 1));
+                        new RerankerPort.Ausfall("ungültige Indizes", new KiPort.Verbrauch("r", 7, 0)), 2),
+                Arguments.of("Reranker ohne Zugang", null, new RerankerPort.OhneZugang(), 1),
+                Arguments.of("Reranker Stub", null, new RerankerPort.OhneSortierung(), 1));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource
     void rueckfall(String fall, EmbeddingPort.Antwort embeddingAntwort, RerankerPort.Antwort rerankerAntwort,
-                   boolean datenbankFehler, int zeilen) {
+                   int zeilen) {
         List<Suchtreffer> treffer = IntStream.range(0, 40).mapToObj(i -> treffer(dokument("V" + i), null)).toList();
         volltext.treffer = treffer;
         vektor.abschnitte = List.of(abschnitt(dokument("A"), 1, 1, 1));
@@ -138,8 +137,6 @@ class HybridSucheTest {
             embedding.antwort = embeddingAntwort;
         }
         reranker.antwort = rerankerAntwort;
-        vektor.fehler = datenbankFehler;
-
         Hybridergebnis ergebnis = suche.suchen(anfrage("Versicherung"), REGEL, true, 30);
 
         assertThat(ergebnis.degradiert()).as(fall).isTrue();
@@ -220,6 +217,36 @@ class HybridSucheTest {
     }
 
     @Test
+    void einFehlerImVektorteilBleibtEinFehler() {
+        vektor.fehler = true;
+
+        assertThatThrownBy(() -> suche.suchen(anfrage("Versicherung"), REGEL, true, 30))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(embedding.aufrufe).isEqualTo(1);
+        assertThat(reranker.aufrufe).isZero();
+    }
+
+    @Test
+    void einFehlerBeimLadenDerVolltexttexteBleibtEinFehler() {
+        volltext.treffer = List.of(treffer(dokument("Volltext"), null));
+        vektor.textFehler = true;
+
+        assertThatThrownBy(() -> suche.suchen(anfrage("Versicherung"), REGEL, true, 30))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(reranker.aufrufe).isZero();
+    }
+
+    @Test
+    void einFehlerBeimLadenDerVektordetailsBleibtEinFehler() {
+        vektor.abschnitte = List.of(abschnitt(dokument("Vektor"), 1, 1, 1));
+        vektor.detailsFehler = true;
+
+        assertThatThrownBy(() -> suche.suchen(anfrage("Versicherung"), REGEL, true, 30))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(reranker.aufrufe).isEqualTo(1);
+    }
+
+    @Test
     void ohneSuchbegriffUngueltig() {
         assertThatThrownBy(() -> suche.suchen(anfrage(" "), REGEL, true, 30)).isInstanceOf(FachFehler.class);
         assertThatThrownBy(() -> suche.suchen(anfrage("x"), REGEL, true, 31))
@@ -292,6 +319,8 @@ class HybridSucheTest {
         List<UUID> nachgeladen = List.of();
         int anzahl;
         boolean fehler;
+        boolean textFehler;
+        boolean detailsFehler;
 
         @Override
         public List<Abschnitttreffer> naechste(float[] v, Suchanfrage a, Sichtregel regel, int n) {
@@ -307,6 +336,9 @@ class HybridSucheTest {
         @Override
         public Map<UUID, String> texte(Collection<UUID> ids, Suchanfrage a, Sichtregel regel, int zeichen) {
             assertThat(transaktion.offen).isTrue();
+            if (textFehler) {
+                throw new IllegalStateException("Texte");
+            }
             assertThat(zeichen).isEqualTo(3000);
             Map<UUID, String> texte = new LinkedHashMap<>();
             ids.forEach(id -> texte.put(id, titel.get(id) + "\n\nVolltext"));
@@ -317,6 +349,9 @@ class HybridSucheTest {
         public List<Suchtreffer> details(List<Abschnitttreffer> liste, Suchanfrage a, Sichtregel regel,
                                          boolean mitDateiname) {
             assertThat(transaktion.offen).isTrue();
+            if (detailsFehler) {
+                throw new IllegalStateException("Details");
+            }
             nachgeladen = liste.stream().map(Abschnitttreffer::dokumentId).toList();
             return liste.stream().map(x -> new Suchtreffer(x.dokumentId(), null, titel.get(x.dokumentId()), null,
                     Instant.EPOCH, "ARCHIVIERT", "NORMAL", List.of(), null, null, null, null, null, null, null,

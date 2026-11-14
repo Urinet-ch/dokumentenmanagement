@@ -32,7 +32,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - `HybridSuche` (Volltext + Vektor + RRF + Reranker), Rückfall auf Volltext mit `degradiert`, Modus `hybrid` in `GET /dokumente`
   - Spec 03 ergänzt: `HybridSuche` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Reranker-Port wählt Adapter oder Stub über den Schalter `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
-  - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); Lasttest p95 ≤ 2 s
+  - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); lokaler Teil-Lasttest p95 ≤ 2 s mit 5'000 synthetischen Dokumenten, der 50'000-Dokumente-Nachweis mit echten Modellen erfolgt auf Stufe B in Aufgabe 5.11 über `tools/last/suche.py --modus hybrid --grenze 2`
   - Ergänzt 14.11.2026 (entschieden von Fabian, Req 2.7, 2.8): Modus `hybrid` mit höchstens 30 Treffern ohne Gesamtzahl und ohne Blättern, Modus `volltext` unverändert, Rückfall in derselben Form mit `degradiert` (design.md «Hybrid als Standard in der Web-App»); `ki_verbrauch` mit Zweck `SUCHE` je Aufruf von Embedding-Modell und Reranker, kein Limit; Zweck im Kommentar zu `ki_verbrauch` in Spec 01 design.md nachtragen
   - _Anforderungen: 2.2, 2.3, 2.5, 2.6, 2.7, 2.8_
 

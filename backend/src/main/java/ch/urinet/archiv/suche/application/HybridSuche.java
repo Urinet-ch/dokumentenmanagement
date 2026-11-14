@@ -39,9 +39,9 @@ import java.util.stream.Collectors;
  * Belegnummern bleiben zuerst stehen und gehen nicht an den Reranker.
  * <p>
  * Rückfall (Req 2.3): Liefern Embedding oder Reranker nichts Brauchbares (Ausfall, Zeitüberschreitung, kein Token,
- * Dev-Stub) oder scheitert ein Datenbankteil nach dem Volltext, sind es die besten {@code k} Volltexttreffer ohne
- * Fundstelle mit {@code degradiert}; ein Fehler im Volltext bleibt ein Fehler. Jeder Rückfall ist ein Log-Eintrag mit
- * Teil und Klassennamen, nie mit Suchbegriff oder Texten (Req 16.7).
+ * Dev-Stub), sind es die besten {@code k} Volltexttreffer ohne Fundstelle mit {@code degradiert}. Fehler in den
+ * Datenbankteilen bleiben Fehler und werden nicht als erfolgreiche Suche verborgen. Jeder Rückfall ist ein Log-Eintrag
+ * mit Teil und Klassennamen, nie mit Suchbegriff oder Texten (Req 16.7).
  * <p>
  * Die Modelle laufen ausserhalb jeder Transaktion ({@code NEVER}), die Datenbankteile in kurzen eigenen
  * ({@link SucheTransaktion}). Jeder Aufruf eines Modells mit Antwort ist eine Zeile {@code ki_verbrauch} mit Zweck
@@ -116,12 +116,8 @@ public class HybridSuche {
         if (frage.isEmpty()) {
             return Optional.empty();
         }
-        List<Abschnitttreffer> abschnitte;
-        try {
-            abschnitte = transaktion.ausfuehren(() -> vektor.naechste(frage.get(), anfrage, regel, VEKTOR));
-        } catch (RuntimeException e) {
-            return rueckfall("Vektor-Abfrage", grund(e));
-        }
+        List<Abschnitttreffer> abschnitte = transaktion.ausfuehren(
+                () -> vektor.naechste(frage.get(), anfrage, regel, VEKTOR));
         Map<UUID, Suchtreffer> ausVolltext = volltextTreffer.stream()
                 .collect(Collectors.toMap(Suchtreffer::id, Function.identity(), (a, b) -> a, LinkedHashMap::new));
         Map<UUID, Abschnitttreffer> ausVektor = abschnitte.stream()
@@ -135,13 +131,8 @@ public class HybridSuche {
                 List.copyOf(ausVektor.keySet())), belegnummern, RERANKER);
 
         List<UUID> nurVolltext = kandidaten.stream().filter(id -> !ausVektor.containsKey(id)).toList();
-        Map<UUID, String> volltextTexte;
-        try {
-            volltextTexte = nurVolltext.isEmpty() ? Map.of()
-                    : transaktion.ausfuehren(() -> vektor.texte(nurVolltext, anfrage, regel, TEXT_ZEICHEN));
-        } catch (RuntimeException e) {
-            return rueckfall("Texte für den Reranker", grund(e));
-        }
+        Map<UUID, String> volltextTexte = nurVolltext.isEmpty() ? Map.of()
+                : transaktion.ausfuehren(() -> vektor.texte(nurVolltext, anfrage, regel, TEXT_ZEICHEN));
         List<UUID> gesendet = new ArrayList<>();
         List<String> texte = new ArrayList<>();
         for (UUID id : kandidaten) {
@@ -165,12 +156,8 @@ public class HybridSuche {
                 .map(ausVektor::get).toList();
         Map<UUID, Suchtreffer> details = new HashMap<>();
         if (!nachladen.isEmpty()) {
-            try {
-                transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
-                        .forEach(t -> details.put(t.id(), t));
-            } catch (RuntimeException e) {
-                return rueckfall("Details der Vektortreffer", grund(e));
-            }
+            transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
+                    .forEach(t -> details.put(t.id(), t));
         }
         List<Hybridtreffer> ergebnis = new ArrayList<>();
         for (UUID id : beste) {
@@ -225,16 +212,6 @@ public class HybridSuche {
     private static <T> Optional<T> ohne(String teil, String grund) {
         LOG.infof("Hybridsuche nur im Volltext (degradiert): %s ohne Ergebnis (%s)", teil, grund);
         return Optional.empty();
-    }
-
-    /** Nur Klassennamen, nie die Meldung (sie kann Teile der Abfrage enthalten, Req 16.7). */
-    private static String grund(Throwable t) {
-        Throwable wurzel = t;
-        while (wurzel.getCause() != null && wurzel.getCause() != wurzel) {
-            wurzel = wurzel.getCause();
-        }
-        return wurzel == t ? t.getClass().getSimpleName()
-                : t.getClass().getSimpleName() + " (" + wurzel.getClass().getSimpleName() + ")";
     }
 
     /** Ungültige Antwort mit Tokens: eine Zeile; ohne Antwort (Zeitüberschreitung, Verbindung) keine. */
