@@ -197,8 +197,11 @@ public class ChatResource {
      */
     static Eingabe eingabe(String body) {
         try {
-            JsonNode wurzel = body == null || body.isBlank() ? null : JSON.readTree(body);
-            JsonNode frage = wurzel == null || !wurzel.isObject() ? null : wurzel.get("frage");
+            if (body == null || body.isBlank()) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            JsonNode wurzel = JSON.readTree(body);
+            JsonNode frage = wurzel.isObject() ? wurzel.get("frage") : null;
             if (frage == null || !frage.isTextual()) {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
