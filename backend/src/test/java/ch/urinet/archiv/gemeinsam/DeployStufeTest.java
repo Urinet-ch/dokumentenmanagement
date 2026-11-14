@@ -87,6 +87,23 @@ class DeployStufeTest {
         }
     }
 
+    /** Prod-Befund 14.11.2026: sgpki stempelt mit Policy .2.10 (neues TSA-Zertifikat), freetsa-CRL erscheint jährlich. */
+    @Test
+    void zeitstempeldiensteKennenDiePolicyUndDasHoechstalterAusDerProduktion() throws IOException {
+        SmallRyeConfig config = prodConfig(apiUmgebung());
+
+        assertThat(config.getValues("archiv.tsa.dienst.sgpki.policies", String.class))
+                .contains("2.16.756.1.17.3.5.2.4", "2.16.756.1.17.3.5.2.10");
+        assertThat(config.getValues("archiv.tsa.dienst.freetsa.policies", String.class))
+                .containsExactly("1.2.3.4.1");
+        assertThat(config.getValue("archiv.tsa.dienst.freetsa.pruefdaten-hoechstalter", Duration.class))
+                .isGreaterThan(Duration.ofDays(365));
+        assertThat(config.getOptionalValue("archiv.tsa.dienst.sgpki.pruefdaten-hoechstalter", Duration.class))
+                .isEmpty();
+        assertThat(config.getValue("archiv.tsa.pruefdaten-hoechstalter", Duration.class))
+                .isEqualTo(Duration.ofDays(7));
+    }
+
     /** Abweichungen als Schlüssel der Konfiguration; leer, wenn die Umgebung zur Stufe passt. */
     static List<String> pruefen(Map<String, String> umgebung) throws IOException {
         SmallRyeConfig config = prodConfig(umgebung);
@@ -107,7 +124,7 @@ class DeployStufeTest {
         return abweichungen;
     }
 
-    private static SmallRyeConfig prodConfig(Map<String, String> umgebung) throws IOException {
+    static SmallRyeConfig prodConfig(Map<String, String> umgebung) throws IOException {
         return new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
                 .withSources(new PropertiesConfigSource(DeployStufeTest.class.getClassLoader()
                         .getResource("application.properties")))
@@ -120,7 +137,7 @@ class DeployStufeTest {
         return frist.filter(f -> f.compareTo(Stufenregel.HOECHSTFRIST_STUFE_A) <= 0).isPresent();
     }
 
-    private static Map<String, String> apiUmgebung() throws IOException {
+    static Map<String, String> apiUmgebung() throws IOException {
         return archivDienste().get("api");
     }
 

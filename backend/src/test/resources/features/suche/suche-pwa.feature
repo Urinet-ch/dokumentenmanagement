@@ -1,7 +1,8 @@
 # language: de
 # Suche und Dokumentansicht der PWA (Aufgabe 4.6). Die API beantwortet eine Attrappe mit synthetischen Dokumenten
 # (frontend/e2e/hilfen/suche-attrappe.mjs); den Vertrag der echten Suche und des Downloads belegen die Java-Szenarien
-# suche/volltextsuche.feature und dokument/download.feature. Darum Teilnachweis (@attrappe).
+# suche/volltextsuche.feature und dokument/download.feature. Darum Teilnachweis (@attrappe). Den Platzhalter für Dokumente
+# ohne Titel (Req 14.9, 14.10) weist dokument/dateiname-pwa.feature zusätzlich gegen das echte Archiv im Testmodus nach.
 @spec-01 @browser @attrappe
 Funktionalität: Suche und Dokumentansicht im Browser
 
@@ -12,9 +13,11 @@ Funktionalität: Suche und Dokumentansicht im Browser
   Szenario: Treffer zeigen die Textstelle mit hervorgehobenem Suchbegriff
     Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne
-    Wenn ich nach «Seedorf» suche
+    # Sortierung und Seite sind Parameter des Volltexts: Der Umschalter «Volltext» ist dafür vorher ein (Spec 02, 6.6)
+    Wenn ich nach «Seedorf» im Volltext suche
     Dann hat die PWA die Suche mit diesen Parametern angefragt:
       | parameter  | wert     |
+      | modus      | volltext |
       | q          | Seedorf  |
       | sortierung | RELEVANZ |
       | seite      | 0        |
@@ -49,6 +52,7 @@ Funktionalität: Suche und Dokumentansicht im Browser
       | status         | ARCHIVIERT       |
       | tag            | verein\|fest     |
       | geschaeftsjahr | 2026             |
+      | modus          | volltext         |
     Und sendet die PWA keinen Parameter «q, sortierung, partner, belegnummer»
     Und sehe ich genau die Treffer «Rechnung Vereinsfest Seedorf»
 
@@ -80,7 +84,10 @@ Funktionalität: Suche und Dokumentansicht im Browser
     Angenommen ich bin als «inhaber» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne
     Wenn ich nach «Seedorf» suche
-    Und ich den Treffer «Rechnung Vereinsfest Seedorf» öffne
+    Dann hat die PWA die Suche mit diesen Parametern angefragt:
+      | parameter | wert   |
+      | modus     | hybrid |
+    Wenn ich den Treffer «Rechnung Vereinsfest Seedorf» öffne
     Dann sehe ich die Dokumentansicht von «Rechnung Vereinsfest Seedorf»
     Und zeigt die Dokumentansicht «Dokumentart» mit «Ausgangsrechnung»
     Und zeigt die Dokumentansicht «Belegdatum» mit «14.03.2026»

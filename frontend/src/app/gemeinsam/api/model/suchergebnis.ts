@@ -13,10 +13,26 @@ import { Suchtreffer } from './suchtreffer';
 export interface Suchergebnis { 
     treffer: Array<Suchtreffer>;
     /**
-     * Zahl aller sichtbaren Treffer
+     * Modus volltext: Zahl aller sichtbaren Treffer. Modus hybrid: Zahl der gelieferten Treffer (höchstens 30), keine Gesamtzahl
      */
     gesamt: number;
     seite: number;
     groesse: number;
+    /**
+     * Nur im Modus hybrid gesetzt
+     */
+    modus?: Suchergebnis.ModusEnum;
+    /**
+     * Nur im Modus hybrid: true, wenn nur im Volltext gesucht wurde (Rückfall, Spec 02, Req 2.3)
+     */
+    degradiert?: boolean;
 }
+export namespace Suchergebnis {
+    export const ModusEnum = {
+        Volltext: 'volltext',
+        Hybrid: 'hybrid',
+    } as const;
+    export type ModusEnum = typeof ModusEnum[keyof typeof ModusEnum];
+}
+
 

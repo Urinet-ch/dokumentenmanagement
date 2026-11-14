@@ -20,6 +20,18 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 import { Kontakt } from '../model/kontakt';
 // @ts-ignore
 import { KontaktAngaben } from '../model/kontakt-angaben';
+// @ts-ignore
+import { KontaktDetail } from '../model/kontakt-detail';
+// @ts-ignore
+import { KontaktInaktiv } from '../model/kontakt-inaktiv';
+// @ts-ignore
+import { KontaktListe } from '../model/kontakt-liste';
+// @ts-ignore
+import { KontaktVerweise } from '../model/kontakt-verweise';
+// @ts-ignore
+import { KontaktZusammenfuehren } from '../model/kontakt-zusammenfuehren';
+// @ts-ignore
+import { KontaktZusammengefuehrt } from '../model/kontakt-zusammengefuehrt';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -39,7 +51,7 @@ export class KontakteService extends BaseService {
 
     /**
      * Kontakte suchen (Partnerauswahl)
-     * Ähnliche oder enthaltene Namen, die besten zuerst; höchstens 20 Treffer.
+     * Ähnliche oder enthaltene Namen, die besten zuerst; höchstens 20 Treffer; nur aktive Kontakte (Req 17.12).
      * @endpoint get /api/v1/kontakte
      * @param q Suchtext (Name)
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
@@ -107,8 +119,216 @@ export class KontakteService extends BaseService {
     }
 
     /**
+     * Kontakt wieder aktivieren (Req 17.15)
+     * Nur ein inaktiv markierter, nicht zusammengeführter Kontakt; sonst 409. Protokoll KONTAKT_AKTIV. If-Match wie bei PATCH (428/412).
+     * @endpoint post /api/v1/kontakte/{kontaktId}/aktiv
+     * @param kontaktId 
+     * @param ifMatch 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteKontaktIdAktivPost(kontaktId: string, ifMatch: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Kontakt>;
+    public apiV1KontakteKontaktIdAktivPost(kontaktId: string, ifMatch: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Kontakt>>;
+    public apiV1KontakteKontaktIdAktivPost(kontaktId: string, ifMatch: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Kontakt>>;
+    public apiV1KontakteKontaktIdAktivPost(kontaktId: string, ifMatch: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (kontaktId === null || kontaktId === undefined) {
+            throw new Error('Required parameter kontaktId was null or undefined when calling apiV1KontakteKontaktIdAktivPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1KontakteKontaktIdAktivPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/${this.configuration.encodeParam({name: "kontaktId", value: kontaktId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/aktiv`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Kontakt>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Kontakt ansehen (Req 17.3)
+     * Auch inaktive Kontakte. Recht A6 (inhaber, geschaeftsstelle); sonst 403 NICHT_ERLAUBT; unbekannt oder anderer Mandant → 404 NICHT_GEFUNDEN.
+     * @endpoint get /api/v1/kontakte/{kontaktId}
+     * @param kontaktId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteKontaktIdGet(kontaktId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KontaktDetail>;
+    public apiV1KontakteKontaktIdGet(kontaktId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KontaktDetail>>;
+    public apiV1KontakteKontaktIdGet(kontaktId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KontaktDetail>>;
+    public apiV1KontakteKontaktIdGet(kontaktId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (kontaktId === null || kontaktId === undefined) {
+            throw new Error('Required parameter kontaktId was null or undefined when calling apiV1KontakteKontaktIdGet.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/${this.configuration.encodeParam({name: "kontaktId", value: kontaktId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KontaktDetail>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Kontakt als inaktiv markieren (Req 17.11)
+     * Stammdaten und Zuordnungen bleiben; der Kontakt ist kein Ziel neuer Zuordnungen mehr (Req 17.12). Protokoll KONTAKT_INAKTIV. If-Match wie bei PATCH (428/412); schon inaktiv → 409; Körper ungültig → 400.
+     * @endpoint post /api/v1/kontakte/{kontaktId}/inaktiv
+     * @param kontaktId 
+     * @param ifMatch 
+     * @param kontaktInaktiv 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteKontaktIdInaktivPost(kontaktId: string, ifMatch: string, kontaktInaktiv: KontaktInaktiv, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Kontakt>;
+    public apiV1KontakteKontaktIdInaktivPost(kontaktId: string, ifMatch: string, kontaktInaktiv: KontaktInaktiv, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Kontakt>>;
+    public apiV1KontakteKontaktIdInaktivPost(kontaktId: string, ifMatch: string, kontaktInaktiv: KontaktInaktiv, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Kontakt>>;
+    public apiV1KontakteKontaktIdInaktivPost(kontaktId: string, ifMatch: string, kontaktInaktiv: KontaktInaktiv, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (kontaktId === null || kontaktId === undefined) {
+            throw new Error('Required parameter kontaktId was null or undefined when calling apiV1KontakteKontaktIdInaktivPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1KontakteKontaktIdInaktivPost.');
+        }
+        if (kontaktInaktiv === null || kontaktInaktiv === undefined) {
+            throw new Error('Required parameter kontaktInaktiv was null or undefined when calling apiV1KontakteKontaktIdInaktivPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/${this.configuration.encodeParam({name: "kontaktId", value: kontaktId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/inaktiv`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Kontakt>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: kontaktInaktiv,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Kontakt ändern
-     * Optimistisches Locking über If-Match; fremde oder unbekannte IDs → 404, fehlendes If-Match → 428, veraltete Version → 412.
+     * Optimistisches Locking über If-Match; fremde oder unbekannte IDs → 404, fehlendes If-Match → 428, inaktiver Kontakt → 409 STATUS_KONFLIKT (Req 17.16), veraltete Version → 412.
      * @endpoint patch /api/v1/kontakte/{kontaktId}
      * @param kontaktId 
      * @param ifMatch 
@@ -177,6 +397,266 @@ export class KontakteService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: kontaktAngaben,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Verweise auf einen Kontakt zählen (Req 17.17)
+     * Über alle Dokumente des Mandanten; nur Recht A12 (inhaber), sonst 403. Unbekannt → 404.
+     * @endpoint get /api/v1/kontakte/{kontaktId}/verweise
+     * @param kontaktId 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteKontaktIdVerweiseGet(kontaktId: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KontaktVerweise>;
+    public apiV1KontakteKontaktIdVerweiseGet(kontaktId: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KontaktVerweise>>;
+    public apiV1KontakteKontaktIdVerweiseGet(kontaktId: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KontaktVerweise>>;
+    public apiV1KontakteKontaktIdVerweiseGet(kontaktId: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (kontaktId === null || kontaktId === undefined) {
+            throw new Error('Required parameter kontaktId was null or undefined when calling apiV1KontakteKontaktIdVerweiseGet.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/${this.configuration.encodeParam({name: "kontaktId", value: kontaktId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/verweise`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KontaktVerweise>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Kontakt in einen anderen zusammenführen (Req 17.7–17.10)
+     * Eine Transaktion: Dokumente (neue Version, bei archivierten eine Fassung in dokument_version), Partner des KI-Vorschlags, Verkaufschancen und Korrekturbeispiele wandern zum Ziel, die Quelle wird inaktiv mit Verweis auf das Ziel; Protokoll KONTAKT_ZUSAMMENFUEHREN. Nicht umkehrbar. If-Match der Quelle: fehlt → 428, nur ein starkes ETag passt, sonst oder veraltet → 412. Körper ungültig, Ziel gleich Quelle oder unbekannt → 400; Quelle unbekannt → 404; Quelle oder Ziel inaktiv, oder eine laufende Übernahme hält einen der Kontakte → 409. In allen Fehlerfällen ändert sich nichts.
+     * @endpoint post /api/v1/kontakte/{kontaktId}/zusammenfuehren
+     * @param kontaktId 
+     * @param ifMatch 
+     * @param kontaktZusammenfuehren 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteKontaktIdZusammenfuehrenPost(kontaktId: string, ifMatch: string, kontaktZusammenfuehren: KontaktZusammenfuehren, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KontaktZusammengefuehrt>;
+    public apiV1KontakteKontaktIdZusammenfuehrenPost(kontaktId: string, ifMatch: string, kontaktZusammenfuehren: KontaktZusammenfuehren, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KontaktZusammengefuehrt>>;
+    public apiV1KontakteKontaktIdZusammenfuehrenPost(kontaktId: string, ifMatch: string, kontaktZusammenfuehren: KontaktZusammenfuehren, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KontaktZusammengefuehrt>>;
+    public apiV1KontakteKontaktIdZusammenfuehrenPost(kontaktId: string, ifMatch: string, kontaktZusammenfuehren: KontaktZusammenfuehren, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (kontaktId === null || kontaktId === undefined) {
+            throw new Error('Required parameter kontaktId was null or undefined when calling apiV1KontakteKontaktIdZusammenfuehrenPost.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1KontakteKontaktIdZusammenfuehrenPost.');
+        }
+        if (kontaktZusammenfuehren === null || kontaktZusammenfuehren === undefined) {
+            throw new Error('Required parameter kontaktZusammenfuehren was null or undefined when calling apiV1KontakteKontaktIdZusammenfuehrenPost.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/${this.configuration.encodeParam({name: "kontaktId", value: kontaktId, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/zusammenfuehren`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KontaktZusammengefuehrt>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: kontaktZusammenfuehren,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Kontakte auflisten (Req 17.1, 17.2)
+     * Mit q: Name enthalten oder ähnlich, Vorname oder Ort enthalten (ohne Gross-/Kleinschreibung), E-Mail enthalten, PLZ oder Kontakt-ID aus 21.CRM gleich; exakte Kontakt-ID und E-Mail zuerst, dann Ähnlichkeit, dann Name. Ohne q nach Name, Vorname. Recht A6 (inhaber, geschaeftsstelle); sonst 403 NICHT_ERLAUBT. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.
+     * @endpoint get /api/v1/kontakte/liste
+     * @param groesse 1–100
+     * @param nichtImExport 
+     * @param q Suchbegriff, 1–200 Zeichen ohne Steuerzeichen
+     * @param quelle 
+     * @param seite ab 0
+     * @param status Standard AKTIV
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public apiV1KontakteListeGet(groesse?: number, nichtImExport?: boolean, q?: string, quelle?: 'CSV_IMPORT' | 'MANUELL', seite?: number, status?: 'AKTIV' | 'INAKTIV' | 'ALLE', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KontaktListe>;
+    public apiV1KontakteListeGet(groesse?: number, nichtImExport?: boolean, q?: string, quelle?: 'CSV_IMPORT' | 'MANUELL', seite?: number, status?: 'AKTIV' | 'INAKTIV' | 'ALLE', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KontaktListe>>;
+    public apiV1KontakteListeGet(groesse?: number, nichtImExport?: boolean, q?: string, quelle?: 'CSV_IMPORT' | 'MANUELL', seite?: number, status?: 'AKTIV' | 'INAKTIV' | 'ALLE', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KontaktListe>>;
+    public apiV1KontakteListeGet(groesse?: number, nichtImExport?: boolean, q?: string, quelle?: 'CSV_IMPORT' | 'MANUELL', seite?: number, status?: 'AKTIV' | 'INAKTIV' | 'ALLE', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'groesse',
+            <any>groesse,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'nichtImExport',
+            <any>nichtImExport,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'q',
+            <any>q,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'quelle',
+            <any>quelle,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'seite',
+            <any>seite,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'status',
+            <any>status,
+            QueryParamStyle.Form,
+            true,
+        );
+
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (SecurityScheme) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/kontakte/liste`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KontaktListe>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters.toHttpParams(),
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.oidc.OIDCException;
@@ -34,6 +35,9 @@ public class ProblemAbbildung {
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
         if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
+        }
+        if (fehler instanceof ZuVieleAnfragen zuViele) {
+            antwort.header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden()));
         }
         return antwort.build();
     }

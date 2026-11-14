@@ -5,6 +5,7 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
+import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
@@ -122,6 +123,7 @@ class EndpunktWaechterTest {
         assertThat(verstoesse(AendernOhneIdOhneProtokoll.class)).singleElement().asString()
                 .contains("A6 verlangt @Protokolliert(AENDERN) statt keiner");
         assertThat(verstoesse(Korrekt.class)).isEmpty();
+        assertThat(verstoesse(KorrektNichtDokumentbezogen.class)).isEmpty();
         assertThat(verstoesse(KorrektMitScope.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
     }
@@ -176,7 +178,8 @@ class EndpunktWaechterTest {
                 }
                 continue;
             }
-            boolean dokumentbezogen = aktion != null && aktion.value().dokumentbezogen();
+            boolean dokumentbezogen = aktion != null && aktion.value().dokumentbezogen()
+                    && !methode.isAnnotationPresent(NichtDokumentbezogen.class);
             if (dokumentbezogen && PARAMETER.matcher(pfad).find() && !DOKUMENT_ID.matcher(pfad).find()) {
                 verstoesse.add(name + ": dokumentbezogene Aktion " + aktion.value() + " führt das Dokument nicht als {id} ("
                         + pfad + ")");
@@ -473,6 +476,16 @@ class EndpunktWaechterTest {
         }
 
         public void keinEndpunkt() {
+        }
+    }
+
+    static class KorrektNichtDokumentbezogen {
+        @GET
+        @Path("/kontakte/{kontaktId}")
+        @ErfordertAktion(Aktion.A6)
+        @NichtDokumentbezogen
+        @RolesAllowed({"inhaber", "geschaeftsstelle"})
+        public void kontaktDetail() {
         }
     }
 

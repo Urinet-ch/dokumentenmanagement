@@ -20,7 +20,7 @@ Funktionalität: CSV-Import in der PWA
     Dann ist «Profil «21.CRM» verwenden» nicht mehr ausgewählt
     Wenn ich auf «Zuordnung bestätigen» klicke
     Dann hat das Archiv die Zuordnung ohne Profil mit den Feldern «organisation, vorname, name, plz, ort» erhalten
-    Und sehe ich die Vorschau mit «4 Alle, 1 neu, 1 geändert, 1 unverändert, 1 mögliche Dublette, 0 fehlerhaft, 0 übersprungen»
+    Und sehe ich die Vorschau mit «4 Alle, 1 neu, 1 geändert, 1 unverändert, 1 mögliche Dublette, 0 fehlerhaft, 0 übersprungen, 0 inaktiv»
     Und ragt nichts über den Bildschirm hinaus
 
     Beispiele:
@@ -36,7 +36,7 @@ Funktionalität: CSV-Import in der PWA
     Und ich im Menü «Importe» wähle
     Wenn ich die Kontakt-Datei «kontakte.csv» mit der Kopfzeile «Organisation;Vorname;Name;PLZ;Ort;E-Mail» hochlade
     Dann sehe ich die Meldung «Das Archiv gleicht die Zeilen ab. Die Vorschau erscheint hier automatisch.»
-    Und sehe ich die Vorschau mit «4 Alle, 1 neu, 1 geändert, 1 unverändert, 1 mögliche Dublette, 0 fehlerhaft, 0 übersprungen»
+    Und sehe ich die Vorschau mit «4 Alle, 1 neu, 1 geändert, 1 unverändert, 1 mögliche Dublette, 0 fehlerhaft, 0 übersprungen, 0 inaktiv»
     Wenn ich den Filter «mögliche Dublette» wähle
     Dann hat das Archiv die Zeilen mit dem Ergebnis «DUBLETTE» abgefragt
     Und sehe ich nur die Zeile 3 mit den möglichen Kontakten «Muster Garage AG», «Muster Garage GmbH»

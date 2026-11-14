@@ -42,6 +42,16 @@ public interface DokumentAenderungPort {
     void versionSichern(UUID id, String benutzer, String grund);
 
     /**
+     * Zusammenführen von Kontakten (Req 17.8): hängt jedes Dokument mit Partner {@code quelle} an {@code ziel} wie eine
+     * Änderung des Partners durch {@link DokumentAendern}: neue Version, bei archivierten die vorherige Fassung mit
+     * Benutzer, Zeit und {@code grund} in {@code dokument_version}. Der Name des Partners bleibt. In der Transaktion des
+     * Aufrufers.
+     *
+     * @return die umgehängten Dokumente
+     */
+    List<UUID> partnerUmhaengen(UUID quelle, UUID ziel, String benutzer, String grund);
+
+    /**
      * Schreibt die geänderten Metadaten; {@code status}, {@code version} und {@code eingang} bleiben. Leeres
      * {@code finanz} bzw. {@code vertrag} lässt eine bestehende Zeile unverändert; Zahlstatus und AbaNinja-Felder ändert
      * der Adapter nie (Regel 8).

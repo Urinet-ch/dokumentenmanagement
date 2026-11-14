@@ -138,6 +138,39 @@ Funktionalität: Kontakte und Partner-Abgleich
     Wenn das API-Token Kontakte mit «Musterfirma» sucht
     Dann antwortet die Kontakt-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
 
+  @req-17.5 @req-17.6 @req-2.5
+  Szenariogrundriss: Ein API-Token erreicht weder Liste noch Detail noch die Pflege der Kontakte
+    Angenommen für «urinet» gibt es ein API-Token mit Scope «<scope>»
+    Wenn das API-Token die Kontakte über «<methode> <pfad>» erreichen will
+    Dann antwortet die Kontakt-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+
+    Beispiele:
+      | scope     | methode | pfad                    |
+      | import    | GET     | /liste                  |
+      | generator | GET     | /{id}                   |
+      | import    | GET     | /{id}/verweise          |
+      | import    | POST    | /{id}/zusammenfuehren   |
+      | import    | POST    | /{id}/inaktiv           |
+      | generator | POST    | /{id}/aktiv             |
+
+  @req-7.4 @req-17.12
+  Szenario: Inaktive Kontakte sind weder Treffer noch Kandidat des Abgleichs und fehlen in der Partnerauswahl
+    Angenommen im Mandanten «urinet» gibt es die Kontakte:
+      | name                    | typ          | email                     | uid                  | iban |
+      | Sportclub Seeblick      | ORGANISATION | sekretariat@sc.example.org | CHE-100.200.300 MWST |      |
+      | Sportclub Seeblick Nord | ORGANISATION |                           |                      |      |
+    Und der Kontakt «Sportclub Seeblick» im Mandanten «urinet» ist inaktiv
+    Wenn der Abgleich in «urinet» den Partner «» mit E-Mail «sekretariat@sc.example.org», UID «» und IBAN «» sucht
+    Dann ergibt der Abgleich «neuer Partner»
+    Wenn der Abgleich in «urinet» den Partner «» mit E-Mail «», UID «CHE-100.200.300» und IBAN «» sucht
+    Dann ergibt der Abgleich «neuer Partner»
+    # aktiv wäre «sportclub seeblick» mit 1.0 der Beste; inaktiv bleibt «… nord» mit 0.78 allein
+    Wenn der Abgleich in «urinet» den Partner «Sportclub Seeblick» mit E-Mail «», UID «» und IBAN «» sucht
+    Dann ergibt der Abgleich «verknüpft: Sportclub Seeblick Nord»
+    Wenn «inhaber-urinet» Kontakte mit «Sportclub» sucht
+    Dann enthält die Trefferliste den Kontakt «Sportclub Seeblick Nord»
+    Und enthält die Trefferliste den Kontakt «Sportclub Seeblick» nicht
+
   @req-1.2
   Szenario: Kontakte bleiben im eigenen Mandanten
     Angenommen «inhaber-urinet» hat den Kontakt «Musterfirma Probe AG» angelegt

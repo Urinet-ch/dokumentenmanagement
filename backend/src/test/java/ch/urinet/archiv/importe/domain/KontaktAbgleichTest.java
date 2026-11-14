@@ -32,6 +32,12 @@ class KontaktAbgleichTest {
         return new Bestand(id, Normalisierer.name(name), felder);
     }
 
+    private static final UUID C = UUID.fromString("00000000-0000-4000-8000-00000000000c");
+
+    private static Bestand inaktiv(Bestand b) {
+        return new Bestand(b.id(), b.nameNormalisiert(), b.felder(), false);
+    }
+
     private static Map<String, String> zeile(String... paare) {
         Map<String, String> werte = new HashMap<>();
         for (int i = 0; i < paare.length; i += 2) {
@@ -149,5 +155,79 @@ class KontaktAbgleichTest {
         assertThat(KontaktAbgleich.fingerabdruecke(KontaktAbgleich.schluessel(zeile("email", "A@B.test")), null))
                 .containsExactly(KontaktAbgleich.fingerabdruecke(
                         KontaktAbgleich.schluessel(zeile("email", "a@b.test")), null));
+    }
+
+    // Req 17.13: inaktive Kontakte im Abgleich
+
+    @Test
+    void crmIdAufEinenInaktivenIstImmerInaktiv() {
+        Befund befund = pruefen(zeile("crm_id", "K-1", "name", "Anders AG", "email", "info@beispiel.example.org"),
+                inaktiv(org(A, "K-1", "Beispiel AG", "6000", null)),
+                org(B, null, "Beispiel AG", "6000", "info@beispiel.example.org"));
+
+        assertThat(befund).isEqualTo(new Befund(Ergebnis.INAKTIV, KontaktAbgleich.INAKTIV, A, List.of()));
+    }
+
+    @Test
+    void nurInaktiveTrefferUeberEmailUndNamePlzSindInaktiv() {
+        Befund ueberEmail = pruefen(zeile("name", "Neu AG", "email", "info@beispiel.example.org"),
+                inaktiv(org(A, null, "Beispiel AG", "6000", "info@beispiel.example.org")));
+        Befund ueberNamePlz = pruefen(zeile("name", "Beispiel AG", "plz", "6000"),
+                inaktiv(org(B, null, "Beispiel GmbH", "6000", null)));
+
+        assertThat(ueberEmail.ergebnis()).isEqualTo(Ergebnis.INAKTIV);
+        assertThat(ueberEmail.kontaktId()).isEqualTo(A);
+        assertThat(ueberEmail.meldung()).isEqualTo("Kontakt inaktiv");
+        assertThat(ueberNamePlz.ergebnis()).isEqualTo(Ergebnis.INAKTIV);
+        assertThat(ueberNamePlz.kontaktId()).isEqualTo(B);
+    }
+
+    @Test
+    void mehrereInaktiveNennenDenErstenUeberEmail() {
+        Befund befund = pruefen(zeile("name", "Beispiel AG", "plz", "6000", "email", "info@beispiel.example.org"),
+                inaktiv(org(B, null, "Beispiel AG", "6000", null)),
+                inaktiv(org(A, null, "Andere AG", "6100", "info@beispiel.example.org")));
+
+        assertThat(befund.ergebnis()).isEqualTo(Ergebnis.INAKTIV);
+        assertThat(befund.kontaktId()).isEqualTo(A);
+    }
+
+    @Test
+    void nebenEinemAktivenZaehlenInaktiveTrefferNicht() {
+        // ohne die Regel: «mehrere Kontakte mit gleicher E-Mail» bzw. Widerspruch der Stufen
+        Befund gleicheEmail = pruefen(zeile("name", "Beispiel Neu AG", "email", "info@beispiel.example.org"),
+                inaktiv(org(A, null, "Beispiel AG", "6000", "info@beispiel.example.org")),
+                org(B, null, "Beispiel AG", "6100", "info@beispiel.example.org"));
+        Befund andereStufe = pruefen(zeile("name", "Beispiel AG", "plz", "6000", "email", "neu@beispiel.example.org"),
+                inaktiv(org(A, null, "Beispiel AG", "6000", null)),
+                org(C, null, "Andere AG", "6200", "neu@beispiel.example.org"));
+        Befund ueberCrmId = pruefen(zeile("crm_id", "K-3", "name", "Beispiel AG", "plz", "6000"),
+                org(C, "K-3", "Beispiel AG", "6000", null), inaktiv(org(A, null, "Beispiel AG", "6000", null)));
+
+        assertThat(gleicheEmail.ergebnis()).isEqualTo(Ergebnis.GEAENDERT);
+        assertThat(gleicheEmail.kontaktId()).isEqualTo(B);
+        assertThat(andereStufe.ergebnis()).isEqualTo(Ergebnis.GEAENDERT);
+        assertThat(andereStufe.kontaktId()).isEqualTo(C);
+        assertThat(ueberCrmId.ergebnis()).isEqualTo(Ergebnis.UNVERAENDERT);
+        assertThat(ueberCrmId.kontaktId()).isEqualTo(C);
+    }
+
+    @Test
+    void zweiAktiveNebenEinemInaktivenBleibenEineDublette() {
+        Befund befund = pruefen(zeile("name", "Beispiel AG", "plz", "6000"),
+                org(A, null, "Beispiel AG", "6000", null), org(B, null, "Beispiel GmbH", "6000", null),
+                inaktiv(org(C, null, "Beispiel", "6000", null)));
+
+        assertThat(befund.ergebnis()).isEqualTo(Ergebnis.DUBLETTE);
+        assertThat(befund.kandidaten()).containsExactly(A, B);
+    }
+
+    @Test
+    void eineInaktiveZeileHatKeineFingerabdruecke() {
+        Map<String, String> werte = zeile("crm_id", "K-1", "name", "Beispiel AG");
+        Befund befund = pruefen(werte, inaktiv(org(A, "K-1", "Beispiel AG", "6000", null)));
+
+        assertThat(KontaktAbgleich.fingerabdruecke(befund, KontaktAbgleich.schluessel(werte))).isEmpty();
+        assertThat(KontaktAbgleich.fingerabdruecke(Befund.NEU, KontaktAbgleich.schluessel(werte))).isNotEmpty();
     }
 }

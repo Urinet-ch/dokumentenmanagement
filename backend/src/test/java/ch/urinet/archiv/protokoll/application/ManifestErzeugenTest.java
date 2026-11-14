@@ -110,4 +110,28 @@ class ManifestErzeugenTest {
         return new ManifestEintrag(UUID.nameUUIDFromBytes(zeichen.getBytes(StandardCharsets.UTF_8)), "original", 1,
                 zeichen.repeat(64), "v1");
     }
+
+    @Test
+    void dieZeitstempelUrsacheNenntKlassenUndFesteMeldungenAberKeineFremdenMeldungen() {
+        var ursache = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel von haupt nicht erhalten oder ungültig",
+                new java.io.IOException("geheim.example:443 Token abc"));
+
+        String text = ManifestErzeugen.zeitstempelUrsache(ursache);
+
+        assertThat(text).contains("ZeitstempelFehler <- java.io.IOException")
+                .contains("[meldung=\"Zeitstempel von haupt nicht erhalten oder ungültig\"]")
+                .doesNotContain("geheim").doesNotContain("abc");
+    }
+
+    @Test
+    void keinZeitstempelTraegtDenErstenDienstfehlerAlsUrsacheUndDieUebrigenAlsSuppressed() {
+        var erster = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel von a nicht erhalten oder ungültig", null);
+        var zweiter = new java.util.concurrent.TimeoutException();
+
+        IllegalStateException e = ManifestErzeugen.keinZeitstempel(DATUM, List.of("a", "b"), List.of(erster, zweiter));
+
+        assertThat(e).hasMessageContaining("kein Zeitstempel von [a, b]").hasCause(erster);
+        assertThat(e.getSuppressed()).containsExactly(zweiter);
+        assertThat(ManifestErzeugen.keinZeitstempel(DATUM, List.of("a"), List.of()).getCause()).isNull();
+    }
 }

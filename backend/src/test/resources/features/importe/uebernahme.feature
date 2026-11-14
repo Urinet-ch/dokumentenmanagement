@@ -208,6 +208,80 @@ Funktionalität: CSV-Import aus 21.CRM – Übernahme und Protokoll (Aufgabe 4.3
       | kontakt | crm_id  | name          | plz  | ort | email           | quelle  | nicht_im_export |
       | F1      | CRM-T05 | Fremd Verband | 6000 |     | info@fremd.test | MANUELL | false           |
 
+  @req-13.7 @req-17.14
+  Szenario: Ein Vollexport ändert inaktive Kontakte nie, auch nicht ihre Kennzeichnung
+    Angenommen im Mandanten «urinet» gibt es diese Kontakte für den Abgleich:
+      | kontakt | typ          | crm_id  | vorname | name             | plz  | email | nicht_im_export | aktiv |
+      | K7      | ORGANISATION | CRM-T07 |         | Ruhende Probe AG | 6007 |       | false           | false |
+      | K8      | ORGANISATION | CRM-T08 |         | Stille Probe AG  | 6008 |       | true            | false |
+    Wenn «inhaber-urinet» diese Kontakt-CSV als Vollexport hochlädt:
+      """
+      ID;Name;PLZ;Ist gelöscht
+      CRM-T01;Probe Holz AG;6000;false
+      CRM-T05;Alte Schreinerei;6005;false
+      CRM-T06;Wieder Da AG;6006;false
+      CRM-T08;Stille Probe AG Neu;6008;false
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zählt die Vorschau 1 inaktiv
+    Wenn «inhaber-urinet» den Lauf übernimmt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann ist der Lauf von «inhaber-urinet» übernommen mit 0 angelegt, 0 aktualisiert, 1 ausgelassen und 0 gekennzeichnet
+    Und hat der Mandant «urinet» diese Kontakte:
+      | kontakt | crm_id  | name             | plz  | ort | email | quelle  | nicht_im_export |
+      | K6      | CRM-T06 | Wieder Da AG     | 6006 |     |       | MANUELL | false           |
+      | K7      | CRM-T07 | Ruhende Probe AG | 6007 |     |       | MANUELL | false           |
+      | K8      | CRM-T08 | Stille Probe AG  | 6008 |     |       | MANUELL | true            |
+    Und hat der Kontakt K7 im Mandanten «urinet» die Version 0 und «nicht mehr im CRM-Export» false
+    Und hat der Kontakt K8 im Mandanten «urinet» die Version 0 und «nicht mehr im CRM-Export» true
+
+  @req-17.14
+  Szenario: Wird ein Kontakt nach der Vorschau inaktiv, lässt die Übernahme seine Zeile aus
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      ID;Name;PLZ;Ort
+      CRM-T01;Probe Holz AG;6000;Luzern
+      CRM-T05;Alte Schreinerei;6005;
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zeigt die Vorschau 0 neu, 1 geändert, 1 unverändert, 0 mögliche Dubletten, 0 fehlerhaft und 0 übersprungen
+    Angenommen wird der Kontakt K1 im Mandanten «urinet» inaktiv markiert
+    Und wird der Kontakt K5 im Mandanten «urinet» inaktiv markiert
+    Wenn «inhaber-urinet» den Lauf übernimmt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann ist der Lauf von «inhaber-urinet» übernommen mit 0 angelegt, 0 aktualisiert, 2 ausgelassen und 0 gekennzeichnet
+    Und hat der Mandant «urinet» diese Kontakte:
+      | kontakt | crm_id  | name          | plz  | ort | email                | quelle  | nicht_im_export |
+      | K1      | CRM-T01 | Probe Holz AG | 6000 |     | info@probe-holz.test | MANUELL | false           |
+    Und hat der Kontakt K1 im Mandanten «urinet» die Version 1 und «nicht mehr im CRM-Export» false
+
+  @req-17.13
+  Szenario: Ein Dubletten-Entscheid mit einem inaktiven Kontakt wird abgelehnt
+    Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:
+      """
+      ID;Name;PLZ
+      ;Muster Garage;6460
+      """
+    Und «inhaber-urinet» den Vorschlag für den Lauf bestätigt
+    Und der Worker alle fälligen Aufträge bearbeitet
+    Und «inhaber-urinet» den Lauf abfragt
+    Dann zeigt die Vorschau 0 neu, 0 geändert, 0 unverändert, 1 mögliche Dubletten, 0 fehlerhaft und 0 übersprungen
+    Angenommen wird der Kontakt K2 im Mandanten «urinet» inaktiv markiert
+    Wenn «inhaber-urinet» den Lauf mit diesen Dubletten-Entscheiden übernimmt:
+      | zeile | entscheid          |
+      | 2     | ZUSAMMENFUEHREN:K2 |
+    Dann lehnt der CSV-Import mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+    Wenn «inhaber-urinet» den Lauf mit diesen Dubletten-Entscheiden übernimmt:
+      | zeile | entscheid          |
+      | 2     | ZUSAMMENFUEHREN:K4 |
+    Dann nimmt der CSV-Import die Übernahme mit Status 202 an
+
   @req-13.7
   Szenario: Ohne Vollexport kennzeichnet die Übernahme nichts
     Wenn «inhaber-urinet» diese Kontakt-CSV hochlädt:

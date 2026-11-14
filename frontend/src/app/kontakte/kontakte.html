@@ -1,0 +1,190 @@
+<h1>{{ texte.titel }}</h1>
+<p class="hinweis">{{ texte.einleitung }}</p>
+
+<form class="suchzeile" role="search" (submit)="$event.preventDefault()" novalidate>
+  <label class="feld">
+    <span>{{ texte.suchen }}</span>
+    <input
+      type="search"
+      name="q"
+      maxlength="200"
+      autocomplete="off"
+      enterkeyhint="search"
+      data-test="suche"
+      [value]="eingabe()"
+      (input)="tippen(wert($event))"
+      aria-describedby="such-hinweis"
+    />
+    <small id="such-hinweis">{{ texte.suchHinweis }}</small>
+  </label>
+  @if (!suchbegriffOk()) {
+    <p class="fehler" role="alert" data-test="such-ungueltig">{{ texte.suchUngueltig }}</p>
+  }
+</form>
+
+<button
+  mat-button
+  type="button"
+  class="filter-schalter"
+  [attr.aria-expanded]="filterOffen()"
+  aria-controls="filterleiste"
+  (click)="filterUmschalten()"
+>
+  {{ texte.filterAnzahl(anzahlFilter()) }} {{ filterOffen() ? '▲' : '▼' }}
+</button>
+
+<fieldset id="filterleiste" class="filterleiste karte" [hidden]="!filterOffen()">
+  <legend class="nur-screenreader">{{ texte.filter }}</legend>
+  <label class="feld">
+    <span>{{ texte.status }}</span>
+    <select
+      name="status"
+      data-test="filter-status"
+      (change)="aendern({ status: $any(wert($event)), seite: 0 })"
+    >
+      @for (s of stati; track s) {
+        <option [value]="s" [selected]="filter().status === s">{{ texte.stati[s] }}</option>
+      }
+    </select>
+  </label>
+  <label class="feld">
+    <span>{{ texte.herkunft }}</span>
+    <select
+      name="quelle"
+      data-test="filter-quelle"
+      (change)="aendern({ quelle: $any(wert($event)), seite: 0 })"
+    >
+      @for (h of herkuenfte; track h) {
+        <option [value]="h" [selected]="filter().quelle === h">{{ texte.herkuenfte[h] }}</option>
+      }
+    </select>
+  </label>
+  <label class="haken">
+    <input
+      type="checkbox"
+      name="nichtImExport"
+      data-test="filter-export"
+      [checked]="filter().nichtImExport"
+      (change)="aendern({ nichtImExport: $any($event.target).checked, seite: 0 })"
+    />
+    <span>{{ texte.nichtImExportFilter }}</span>
+  </label>
+  <div class="knoepfe">
+    <button mat-button type="button" data-test="zuruecksetzen" (click)="zuruecksetzen()">
+      {{ texte.zuruecksetzen }}
+    </button>
+  </div>
+</fieldset>
+
+<section aria-labelledby="treffer-titel" [attr.aria-busy]="laedt()">
+  <h2 id="treffer-titel" tabindex="-1" #ueberschrift>
+    {{ texte.treffer }}
+    @if (ergebnis(); as e) {
+      <span class="anzahl" data-test="anzahl">· {{ texte.anzahl(e.gesamt ?? 0) }}</span>
+    }
+  </h2>
+  @if (laedt()) {
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="texte.laedt" />
+  }
+  <p class="nur-screenreader" aria-live="polite">{{ laedt() ? texte.laedt : '' }}</p>
+
+  @if (fehler(); as text) {
+    <div role="alert" class="fehler" data-test="fehler">
+      <p>{{ text }}</p>
+      @if (wiederholbar()) {
+        <button mat-button type="button" data-test="erneut" (click)="neuLaden()">
+          {{ texte.erneutVersuchen }}
+        </button>
+      }
+    </div>
+  } @else if (ergebnis(); as e) {
+    @if (zeilen().length === 0) {
+      <p data-test="keine">{{ texte.keine }}</p>
+    } @else if (mobil()) {
+      <ol class="karten" [attr.aria-label]="texte.listeBeschreibung">
+        @for (k of zeilen(); track k.id) {
+          <li class="karte kontakt" data-test="kontakt">
+            <a
+              class="name"
+              [routerLink]="['/kontakte', k.id]"
+              [attr.aria-label]="texte.oeffnen(name(k))"
+              >{{ name(k) }}</a
+            >
+            <p class="hinweis">
+              {{ texte.typen[k.typ ?? ''] }}
+              @if (ort(k)) {
+                · {{ ort(k) }}
+              }
+            </p>
+            @if (k.email) {
+              <p data-test="email">{{ k.email }}</p>
+            }
+            <ul class="marken">
+              @for (m of marken(k); track m.text) {
+                <li [class.inaktiv]="m.inaktiv">{{ m.text }}</li>
+              }
+            </ul>
+          </li>
+        }
+      </ol>
+    } @else {
+      <table class="tabelle" [attr.aria-label]="texte.listeBeschreibung">
+        <thead>
+          <tr>
+            <th scope="col">{{ texte.spalteName }}</th>
+            <th scope="col">{{ texte.spalteVorname }}</th>
+            <th scope="col">{{ texte.spalteTyp }}</th>
+            <th scope="col">{{ texte.spalteOrt }}</th>
+            <th scope="col">{{ texte.spalteEmail }}</th>
+            <th scope="col">{{ texte.spalteKennzeichen }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (k of zeilen(); track k.id) {
+            <tr data-test="kontakt">
+              <td>
+                <a [routerLink]="['/kontakte', k.id]" [attr.aria-label]="texte.oeffnen(name(k))">{{
+                  k.name
+                }}</a>
+              </td>
+              <td>{{ k.vorname }}</td>
+              <td>{{ texte.typen[k.typ ?? ''] }}</td>
+              <td>{{ ort(k) }}</td>
+              <td data-test="email">{{ k.email }}</td>
+              <td>
+                <ul class="marken">
+                  @for (m of marken(k); track m.text) {
+                    <li [class.inaktiv]="m.inaktiv">{{ m.text }}</li>
+                  }
+                </ul>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+    @if (seiten() > 1) {
+      <nav class="blaettern" [attr.aria-label]="texte.seite(filter().seite + 1, seiten())">
+        <button
+          mat-button
+          type="button"
+          data-test="vorherige"
+          [disabled]="laedt() || filter().seite === 0"
+          (click)="blaettern(-1)"
+        >
+          {{ texte.vorherige }}
+        </button>
+        <span>{{ texte.seite(filter().seite + 1, seiten()) }}</span>
+        <button
+          mat-button
+          type="button"
+          data-test="naechste"
+          [disabled]="laedt() || filter().seite + 1 >= seiten()"
+          (click)="blaettern(1)"
+        >
+          {{ texte.naechste }}
+        </button>
+      </nav>
+    }
+  }
+</section>

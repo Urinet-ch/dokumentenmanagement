@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Chat-Gespräche (Spec 02, Aufgabe 7.3, Req 5.4, 5.5; design.md «Data Models», «Vertrag Welle 7»). benutzer ist die
+         Benutzer-ID (Claim sub) wie in zugriff_protokoll. status nur bei Antworten. Gelöscht wird je Nachricht nach
+         12 Monaten (zeit), danach das leere Gespräch (ChatAufraeumer). -->
+    <changeSet id="027-chat" author="archiv">
+        <sql>
+            create table chat_gespraech (
+                id uuid not null constraint chat_gespraech_pk primary key,
+                benutzer text not null,
+                titel text not null,
+                erstellt timestamptz not null,
+                geaendert timestamptz not null
+            );
+            create index chat_gespraech_benutzer_ix on chat_gespraech (benutzer, geaendert desc);
+            create table chat_nachricht (
+                id bigserial constraint chat_nachricht_pk primary key,
+                gespraech_id uuid not null constraint chat_nachricht_gespraech_fk references chat_gespraech (id)
+                    on delete cascade,
+                rolle text not null constraint chat_nachricht_rolle_ck check (rolle in ('BENUTZER', 'ASSISTENT')),
+                inhalt text not null,
+                werkzeuge jsonb,
+                quellen jsonb,
+                tokens_ein int constraint chat_nachricht_tokens_ein_ck check (tokens_ein &gt;= 0),
+                tokens_aus int constraint chat_nachricht_tokens_aus_ck check (tokens_aus &gt;= 0),
+                status text constraint chat_nachricht_status_ck check (status in ('OK', 'FEHLER', 'ABGEBROCHEN')),
+                zeit timestamptz not null,
+                constraint chat_nachricht_status_rolle_ck check ((rolle = 'BENUTZER') = (status is null))
+            );
+            create index chat_nachricht_gespraech_ix on chat_nachricht (gespraech_id, id);
+            create index chat_nachricht_zeit_ix on chat_nachricht (zeit);
+            -- Rate-Limit (Req 5.5): Fragen eines Gesprächs nach Zeit, nur Fragen
+            create index chat_nachricht_frage_ix on chat_nachricht (gespraech_id, zeit) where rolle = 'BENUTZER';
+        </sql>
+        <rollback>
+            <sql>
+                drop table chat_nachricht;
+                drop table chat_gespraech;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

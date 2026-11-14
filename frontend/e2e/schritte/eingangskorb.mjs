@@ -1,15 +1,24 @@
-// Eingangskorb-Seite im Browser (Aufgabe 3.6) gegen die Attrappe der Archiv-API (hilfen/archiv-attrappe.mjs).
+// Eingangskorb-Seite im Browser (Aufgabe 3.6) gegen die Attrappe der Archiv-API (hilfen/archiv-attrappe.mjs); mit
+// weitergeleiteten Anfragen (hilfen/echtes-backend.mjs, Aufgabe 4.10) dieselben Schritte gegen das Archiv im Testmodus.
 // Getippt wird mit click(); jeder Tipp zählt für Req 8.4 («Bestätigen in höchstens zwei Tipps»).
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { basisUrl, benutzer, keycloakAttrappe } from '../hilfen/keycloak-attrappe.mjs';
 import { dokumentAus } from '../hilfen/archiv-attrappe.mjs';
+import { echteDokumente } from '../hilfen/echtes-backend.mjs';
 import { platzhalterPruefen } from '../hilfen/platzhalter.mjs';
 
+// Karten der Dokumente, die das Szenario im echten Archiv angelegt hat (über ihre ID, damit ein weiterer Lauf gegen
+// dasselbe Archiv nicht die Karten früherer Läufe mit demselben Namen trifft); sonst alle Karten.
+const karten = (welt) => {
+  const ids = [...(welt.echteDokumente?.values() ?? [])];
+  return welt.seite.locator(
+    ids.length ? ids.map((id) => `[data-test=eintrag][aria-labelledby="titel-${id}"]`).join(', ') : '[data-test=eintrag]',
+  );
+};
+
 const eintrag = (welt, titel) =>
-  welt.seite
-    .locator('[data-test=eintrag]')
-    .filter({ has: welt.seite.getByRole('heading', { name: titel }) });
+  karten(welt).filter({ has: welt.seite.getByRole('heading', { name: titel }) });
 
 async function tippen(welt, ziel) {
   await ziel.click();
@@ -225,7 +234,10 @@ Then(/^habe ich dafür höchstens (\d+) Mal getippt$/, function (anzahl) {
 Then(
   /^ist beim Eintrag «([^»]+)» das Feld «([^»]+)» als ungültig markiert$/,
   async function (titel, feld) {
-    const element = eintrag(this, titel).getByLabel(feld);
+    // nur Eingabefelder: Das Formular selbst heisst «Angaben zu «Ohne Titel · …»» und enthielte «Titel»
+    const element = eintrag(this, titel)
+      .getByLabel(feld)
+      .and(this.seite.locator('input, select, textarea'));
     await warten(
       async () => (await element.getAttribute('aria-invalid')) === 'true',
       `«${feld}» nicht ungültig`,
@@ -273,7 +285,7 @@ Then(
 Then(
   /^zeigt der Eintrag mit dem Fehlertext «([^»]+)» den Titel «([^»]+)» ohne Platzhalter$/,
   async function (fehler, titel) {
-    const karte = this.seite.locator('[data-test=eintrag]').filter({ hasText: fehler });
+    const karte = karten(this).filter({ hasText: fehler });
     assert.equal((await karte.locator('h2').innerText()).trim(), titel);
     assert.equal(await karte.locator('[data-test=titel-platzhalter]').count(), 0);
   },
@@ -283,13 +295,24 @@ Then(/^ist beim Eintrag «([^»]+)» das Feld «([^»]+)» leer$/, async functio
   assert.equal(await eintrag(this, titel).getByLabel(feld, { exact: true }).inputValue(), '');
 });
 
+/** Weitergeleitete Bestätigungen des Dokuments mit diesem Dateinamen an das echte Archiv. */
+const bestaetigungen = (welt, name) =>
+  welt.weiterleitung.anfragen.filter(
+    (a) =>
+      a.methode === 'POST' &&
+      a.pfad === `/api/v1/dokumente/${echteDokumente(welt).get(name)}/bestaetigen` &&
+      a.status !== undefined,
+  );
+
 Then(
   /^hat das Archiv den Eintrag mit dem Dateinamen «([^»]+)» ohne Titel bestätigt$/,
   async function (name) {
     const treffer = () =>
-      this.archiv.aktionen.find(
-        (a) => a.dateiname === name && a.aktion === 'bestaetigen' && !a.abgelehnt,
-      );
+      this.weiterleitung
+        ? bestaetigungen(this, name).find((a) => a.status === 202)
+        : this.archiv.aktionen.find(
+            (a) => a.dateiname === name && a.aktion === 'bestaetigen' && !a.abgelehnt,
+          );
     await warten(() => Boolean(treffer()), `«${name}» nicht bestätigt`);
     const { body } = treffer();
     assert.equal(body.titel ?? null, null, JSON.stringify(body));
@@ -304,3 +327,25 @@ Then(/^sehe ich die Meldung «(.+)» mit isoliertem Dateinamen$/, async function
   assert.notEqual(erwartet, text, 'kein Dateiname im Platzhalter');
   await this.seite.getByText(erwartet, { exact: true }).waitFor();
 });
+
+When(/^ich beim Eintrag «([^»]+)» die Art «([^»]+)» wähle$/, async function (titel, art) {
+  // Das Pflichtfeld trägt « *» im Label; ein Label «Art» ohne exact träfe auch «Partner suchen»
+  await eintrag(this, titel).getByLabel(/^Art( \*)?$/).selectOption({ label: art });
+});
+
+// Req 8.3: Der Platzhalter füllt kein Pflichtfeld; die PWA sendet weder Titel noch Dateinamen, das Archiv lehnt ab.
+Then(
+  /^hat das Archiv das Bestätigen von «([^»]+)» ohne Titel abgelehnt, weil «([^»]+)» fehlt$/,
+  async function (name, feld) {
+    await warten(
+      () => bestaetigungen(this, name).some((a) => a.antwort !== undefined),
+      `«${name}» nicht beantwortet`,
+    );
+    const [{ status, body, antwort }] = bestaetigungen(this, name);
+    assert.equal(status, 422, JSON.stringify(antwort));
+    assert.equal(antwort.fehlercode, 'PFLICHTFELD_FEHLT', JSON.stringify(antwort));
+    assert.ok(antwort.felder.includes(feld), JSON.stringify(antwort));
+    assert.equal(body.titel ?? null, null, JSON.stringify(body));
+    assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
+  },
+);

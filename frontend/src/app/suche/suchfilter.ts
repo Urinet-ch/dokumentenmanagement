@@ -1,4 +1,4 @@
-import { Suchanfrage, Richtung, Sortierung, Status } from './suche-port';
+import { Modus, Suchanfrage, Richtung, Sortierung, Status } from './suche-port';
 
 // Eingaben der Filterleiste als Text, wie sie im Formular stehen; `pruefen` macht daraus eine Suchanfrage nach den
 // Grenzen des Archivs (design.md «Suche», Umsetzung 4.5), damit eine Tippfehler-Anfrage nicht erst als 400 zurückkommt.
@@ -18,6 +18,8 @@ export interface Filterwerte {
   geschaeftsjahr: string;
   belegnummer: string;
   sortierung: Sortierung;
+  /** Umschalter «Volltext»: ein = ausdrücklich Volltext statt Hybrid (Spec 02, Req 2.7). */
+  volltext: boolean;
 }
 
 export const LEERE_FILTER: Filterwerte = {
@@ -35,10 +37,13 @@ export const LEERE_FILTER: Filterwerte = {
   geschaeftsjahr: '',
   belegnummer: '',
   sortierung: 'RELEVANZ',
+  volltext: false,
 };
 
 export const GROESSE = 20;
 export const SEITE_MAX = 9_999;
+/** Höchstzahl der Treffer im Modus hybrid (Spec 02, Req 2.7). */
+export const HYBRID_MAX = 30;
 const BEGRIFF_MAX = 200;
 const TAGS_MAX = 10;
 const TAG_MAX = 100;
@@ -68,9 +73,37 @@ export function aktiveFilter(f: Filterwerte): number {
   ].filter(Boolean).length;
 }
 
+/**
+ * Der einzige Ort, der den Modus bestimmt (Spec 02, Req 2.7): Hybrid genau mit Suchbegriff, ausgeschaltetem
+ * Umschalter «Volltext» und Sortierung nach Relevanz; sonst Volltext.
+ */
+export function wirksamerModus(f: Pick<Filterwerte, 'q' | 'volltext' | 'sortierung'>): Modus {
+  return f.q.trim() && !f.volltext && f.sortierung !== 'DATUM' ? 'hybrid' : 'volltext';
+}
+
+/** Dieselbe Anfrage im anderen Modus ab Seite 0; im Volltext mit Relevanz, im Hybrid ohne Sortierung und Seite. */
+export function imModus(a: Suchanfrage, volltext: boolean): Suchanfrage {
+  const neu: Suchanfrage = { ...a, modus: volltext ? 'volltext' : 'hybrid' };
+  delete neu.seite;
+  delete neu.groesse;
+  delete neu.sortierung;
+  if (volltext) {
+    neu.seite = 0;
+    neu.groesse = GROESSE;
+    if (neu.q) {
+      neu.sortierung = 'RELEVANZ';
+    }
+  }
+  return neu;
+}
+
 export function pruefen(f: Filterwerte, seite: number): Ergebnis {
   const fehler = new Set<Pruefung>();
-  const anfrage: Suchanfrage = { seite: Math.min(Math.max(seite, 0), SEITE_MAX), groesse: GROESSE };
+  const modus = wirksamerModus(f);
+  const anfrage: Suchanfrage =
+    modus === 'hybrid'
+      ? { modus }
+      : { modus, seite: Math.min(Math.max(seite, 0), SEITE_MAX), groesse: GROESSE };
 
   const q = f.q.trim();
   if (q) {
@@ -78,7 +111,9 @@ export function pruefen(f: Filterwerte, seite: number): Ergebnis {
       fehler.add('begriff');
     }
     anfrage.q = q;
-    anfrage.sortierung = f.sortierung;
+    if (modus === 'volltext') {
+      anfrage.sortierung = f.sortierung;
+    }
   }
   if (f.art) {
     anfrage.art = f.art;

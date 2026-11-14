@@ -102,6 +102,38 @@ class BcZeitstempelAdapterTest {
     }
 
     @Test
+    void delegierterResponderMitAndererSchluessellaengeWirdAngenommen() throws Exception {
+        // 3072 Bit gegen den 2048-Bit-Schlüssel der CA: die JCA wirft dabei, statt false zu liefern
+        BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, false), PKI.tsa, PKI.ca,
+                Instant.now(), HOECHSTALTER);
+    }
+
+    @Test
+    void delegierterKleinerResponderBeiGrosserCaWirdAngenommen() throws Exception {
+        TsaTestPki grosseCa = TsaTestPki.neu("gross", 3072);
+        BcZeitstempelAdapter.ocspPruefen(grosseCa.delegierteOcsp(ocspAnfrage(grosseCa), 2048, true, false),
+                grosseCa.tsa, grosseCa.ca, Instant.now(), HOECHSTALTER);
+    }
+
+    @Test
+    void derHttpClientSprichHttp11() {
+        assertThat(adapter(new HashMap<>()).httpVersion()).isEqualTo(java.net.http.HttpClient.Version.HTTP_1_1);
+    }
+
+    @Test
+    void delegierterResponderOhneOcspEkuOderNichtVonDerCaWirdOhneRohAusnahmeAbgelehnt() throws Exception {
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, false, false),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 2048, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+        assertThatThrownBy(() -> BcZeitstempelAdapter.ocspPruefen(PKI.delegierteOcsp(ocspAnfrage(), 3072, true, true),
+                PKI.tsa, PKI.ca, Instant.now(), HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("nicht von der CA signiert");
+    }
+
+    @Test
     void eineAlteOderVorDemStempelAbgelaufeneOcspAntwortWirdAbgelehnt() throws Exception {
         byte[] anfrage = ocspAnfrage();
         Instant genTime = Instant.now();
@@ -204,6 +236,58 @@ class BcZeitstempelAdapterTest {
                 .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("Policy");
     }
 
+    @Test
+    void mehrerePoliciesJeDienstWerdenErlaubtUnbekannteAbgelehnt(@TempDir Path ordner) throws Exception {
+        Map<String, String> werte = new HashMap<>();
+        werte.put("archiv.tsa.dienste", "a");
+        block(werte, ordner, "a", PKI, "1.3.6.1.4.1.99999.4,1.3.6.1.4.1.99999.10");
+        String kette = TsaTestPki.pem(PKI.tsa) + TsaTestPki.pem(PKI.ca);
+        Pruefdaten crl = new Pruefdaten(Pruefdaten.Art.CRL, PKI.crl(false));
+
+        for (String policy : List.of("1.3.6.1.4.1.99999.4", "1.3.6.1.4.1.99999.10")) {
+            assertThat(adapter(werte).pruefenAbgelegt("a", PKI.tsr(anfrage(IMPRINT), policy), IMPRINT, kette, crl))
+                    .isNotNull();
+        }
+        assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("a",
+                PKI.tsr(anfrage(IMPRINT), "1.3.6.1.4.1.99999.11"), IMPRINT, kette, crl))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("Policy");
+    }
+
+    @Test
+    void eineJaehrlicheCrlGiltNurMitDemLaengerenHoechstalterDesDiensts() {
+        Instant jetzt = Instant.now();
+        byte[] crl = PKI.crl(false, jetzt.minus(Duration.ofDays(60)), jetzt.plus(Duration.ofDays(305)));
+
+        BcZeitstempelAdapter.crlPruefen(crl, PKI.tsa, PKI.ca, jetzt, Duration.ofDays(370));
+        assertThatThrownBy(() -> BcZeitstempelAdapter.crlPruefen(crl, PKI.tsa, PKI.ca, jetzt, HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("zu alt");
+        // innerhalb des Höchstalters, aber vor dem Stempel abgelaufen: scheitert am nextUpdate, nicht am Alter
+        byte[] abgelaufen = PKI.crl(false, jetzt.minus(Duration.ofDays(100)), jetzt.minus(Duration.ofDays(1)));
+        assertThatThrownBy(() -> BcZeitstempelAdapter.crlPruefen(abgelaufen, PKI.tsa, PKI.ca, jetzt,
+                Duration.ofDays(370)))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("abgelaufen")
+                .hasMessageNotContaining("zu alt");
+        byte[] gesperrt = PKI.crl(true, jetzt.minus(Duration.ofDays(60)), jetzt.plus(Duration.ofDays(305)));
+        assertThatThrownBy(() -> BcZeitstempelAdapter.crlPruefen(gesperrt, PKI.tsa, PKI.ca, jetzt,
+                Duration.ofDays(370)))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("gesperrt");
+    }
+
+    @Test
+    void jederDienstPrueftNurSeineEigenenPolicies(@TempDir Path ordner) throws Exception {
+        Map<String, String> werte = new HashMap<>();
+        werte.put("archiv.tsa.dienste", "a,b");
+        block(werte, ordner, "a", PKI, "1.3.6.1.4.1.99999.4,1.3.6.1.4.1.99999.10");
+        block(werte, ordner, "b", PKI, "1.3.6.1.4.1.99999.4");
+        String kette = TsaTestPki.pem(PKI.tsa) + TsaTestPki.pem(PKI.ca);
+        Pruefdaten crl = new Pruefdaten(Pruefdaten.Art.CRL, PKI.crl(false));
+        byte[] tsr = PKI.tsr(anfrage(IMPRINT), "1.3.6.1.4.1.99999.10");
+
+        assertThat(adapter(werte).pruefenAbgelegt("a", tsr, IMPRINT, kette, crl)).isNotNull();
+        assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("b", tsr, IMPRINT, kette, crl))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("Policy");
+    }
+
     private static void block(Map<String, String> werte, Path ordner, String kennung, TsaTestPki pki, String policy)
             throws Exception {
         Path ca = Files.writeString(ordner.resolve(kennung + "-ca.pem"), pki.caPem());
@@ -221,8 +305,12 @@ class BcZeitstempelAdapterTest {
     }
 
     private static byte[] ocspAnfrage() throws Exception {
+        return ocspAnfrage(PKI);
+    }
+
+    private static byte[] ocspAnfrage(TsaTestPki pki) throws Exception {
         CertificateID id = new CertificateID(new JcaDigestCalculatorProviderBuilder().build()
-                .get(CertificateID.HASH_SHA1), new JcaX509CertificateHolder(PKI.ca), PKI.tsa.getSerialNumber());
+                .get(CertificateID.HASH_SHA1), new JcaX509CertificateHolder(pki.ca), pki.tsa.getSerialNumber());
         return new OCSPReqBuilder().addRequest(id).build().getEncoded();
     }
 

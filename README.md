@@ -191,6 +191,35 @@ im Log.
   Mailprogramm zurück in den Posteingang schieben; der nächste Abruf erfasst sie.
 - Auf Stufe A gilt die Datenregel aus `tech.md`: nur Testmails mit synthetischen Belegen, echte Belege erst ab Stufe B.
 
+## Benachrichtigungen per Mail (Spec 01, Aufgabe 5.6)
+Alarme der Überwachung (Dokument hängt, Manifest fehlt, Sicherung), gescheiterte Archivierung, Prüflauf, gestörter
+Mail-Eingang und fertiger Jahresexport gehen per Mail an den Inhaber des Mandanten; Betreff und Text nennen nur IDs
+(Req 16.7). Versandt wird über Hostpoint mit dem Postfach `archiv@urinet.ch` (`asmtp.mail.hostpoint.ch`, Port 587,
+STARTTLS, Anmeldung; Entscheid Fabian 14.11.2026). Host, Benutzer und Absender stehen in `application.properties`;
+Fabian setzt nur zwei Werte in den Einstellungen des Repos (Secrets and variables → Actions), nie im Repo selbst:
+```sh
+# Passwort des Postfachs archiv@urinet.ch (dasselbe wie bei der Anmeldung am Postfach); gh fragt verdeckt danach
+gh secret set ARCHIV_SMTP_PASSWORT -R Urinet-ch/dokumentenmanagement
+# Empfänger der Benachrichtigungen für den Mandanten urinet: genau eine Adresse
+gh variable set ARCHIV_ALARM_EMPFAENGER_URINET -R Urinet-ch/dokumentenmanagement --body '<adresse>'
+```
+- Der nächste Deploy legt das Passwort als Secret-Datei `archiv_smtp_passwort` ab (tech.md Regel 7) und den Empfänger
+  in die `.env` neben `compose.yml`; `compose.yml` reicht ihn als `ARCHIV_ALARM_EMPFAENGER_URINET` an die API weiter.
+  Ist die Variable keine einzelne Adresse, bricht der Deploy vor dem Bundle ab (`.github/scripts/schreibe-env.sh`).
+- Das Passwort kommt nur aus der Datei: Steht `ARCHIV_SMTP_PASSWORT` oder `QUARKUS_MAILER_PASSWORD` in der Umgebung
+  der API (auch leer), bricht der Start ab (`SmtpPasswortPruefung`, wie beim Datenschlüssel).
+- Fehlt einer der Werte, startet das Archiv trotzdem: Ohne Passwort steht beim Start einmal «Mail-Versand:
+  Secret-Datei archiv_smtp_passwort leer oder nicht vorhanden …» im Log. Ohne Empfänger steht bei jeder Meldung nur
+  «… kein Empfänger konfiguriert» mit der ID im Log, ohne Passwort scheitert der Versand mit «… nicht versandt
+  (<Ausnahme>)». Einen Alarm versucht die Überwachung im nächsten Takt (15 Minuten) wieder.
+- Prüfen: Beim nächsten Alarm steht im Log der API «Alarm <schlüssel> (Mandant urinet) an den Inhaber versandt» (bzw.
+  «Inhaber benachrichtigt: …») statt einer der Warnungen oben, und die Mail kommt beim Empfänger an.
+- **Passwort von `archiv@urinet.ch` gewechselt:** Versand und Mail-Eingang nutzen dasselbe Postfach, darum beides
+  nachführen: das Secret `ARCHIV_SMTP_PASSWORT` neu setzen und neu deployen (Versand) **und** das Postfach mit
+  `mail einrichten urinet …` neu einrichten (Eingang, Passwort verschlüsselt in der DB; siehe «Mail-Eingang
+  einrichten»). Bis beides nachgeführt ist, kann auch die Meldung «Mail-Eingang gestört» nicht ankommen, weil sie
+  über dasselbe Konto geht; dann steht der Ausfall nur im Log.
+
 ## Benutzer in Keycloak anlegen
 Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image
 an, nie per `docker exec` im laufenden `kc` (siehe «Admin-Kommandos auf der VPS»). Der Container hängt nur im internen

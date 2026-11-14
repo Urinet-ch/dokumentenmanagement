@@ -4,6 +4,7 @@ import ch.urinet.archiv.ki.application.EmbeddingPort;
 import ch.urinet.archiv.ki.application.KiPort;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +17,8 @@ import java.util.List;
  * Adapter des {@link EmbeddingPort} mit LangChain4j gegen Infomaniak AI Services (Spec 02, Req 2.1): genau ein Request
  * je {@link #einbetten}. Falsche Anzahl oder Dimension der Vektoren, Werte ausserhalb von {@code halfvec} und jeder
  * Fehler sind ein {@link Ausfall}, die Gründe nennen nur Klassennamen (Req 16.7). Ohne Token kein Request
- * ({@link OhneZugang}). Nur über {@code EmbeddingAuswahl} wählbar.
+ * ({@link OhneZugang}). Die Frage der Hybridsuche ({@link #einbettenFrage}) geht mit derselben Prüfung über das Modell
+ * mit der kurzen Zeitgrenze ({@link EmbeddingModell#suche()}). Nur über {@code EmbeddingAuswahl} wählbar.
  */
 @ApplicationScoped
 @Typed(LangChain4jEmbeddingAdapter.class)
@@ -36,11 +38,21 @@ public class LangChain4jEmbeddingAdapter implements EmbeddingPort {
         if (texte.isEmpty() || texte.size() > BATCH) {
             throw new IllegalArgumentException("1 bis " + BATCH + " Texte je Aufruf");
         }
+        return einbetten(texte, false);
+    }
+
+    @Override
+    public Antwort einbettenFrage(String frage) {
+        return einbetten(List.of(frage), true);
+    }
+
+    private Antwort einbetten(List<String> texte, boolean suche) {
         if (!modell.bereit()) {
             return new OhneZugang();
         }
         try {
-            Response<List<Embedding>> antwort = modell.get().embedAll(texte.stream().map(TextSegment::from).toList());
+            EmbeddingModel embeddingModel = suche ? modell.suche() : modell.get();
+            Response<List<Embedding>> antwort = embeddingModel.embedAll(texte.stream().map(TextSegment::from).toList());
             KiPort.Verbrauch verbrauch = verbrauch(antwort.tokenUsage());
             List<Embedding> embeddings = antwort.content();
             if (embeddings == null || embeddings.size() != texte.size()) {

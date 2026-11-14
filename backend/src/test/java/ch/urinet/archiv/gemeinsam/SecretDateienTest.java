@@ -65,4 +65,16 @@ public class SecretDateienTest {
         assertThat(config.getValue("archiv.manifest.schluessel", String.class))
                 .isEqualTo("attrappe-manifest-schluessel");
     }
+
+    /**
+     * Aufgabe 5.6: Mit leerer Datei archiv_smtp_passwort (wie im Deploy ohne Secret) und ohne Empfänger startet prod,
+     * auch mit SmtpPasswortPruefung; Benachrichtigungen bleiben im Log.
+     */
+    @Test
+    void ohneSmtpPasswortUndEmpfaengerGestartet() {
+        var config = ConfigProvider.getConfig();
+        assertThat(config.getValue("quarkus.mailer.host", String.class)).isEqualTo("asmtp.mail.hostpoint.ch");
+        assertThat(config.getOptionalValue("quarkus.mailer.password", String.class)).isEmpty();
+        assertThat(config.getOptionalValue("archiv.benachrichtigung.empfaenger.urinet", String.class)).isEmpty();
+    }
 }

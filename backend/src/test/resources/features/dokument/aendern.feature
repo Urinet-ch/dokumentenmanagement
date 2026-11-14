@@ -431,3 +431,23 @@ Funktionalität: Metadaten ändern und Versionen
       | Unterlauf                           | {"x": 1e-400}                 |
       | zu viele Stellen ohne Exponent      | {"x": 1e-1200}                |
       | ausserhalb von numeric              | {"x": 1e-20000}               |
+
+  @req-17.12
+  Szenario: Einen inaktiven Kontakt neu als Partner zu setzen lehnt das Archiv ab, der gespeicherte bleibt erlaubt
+    Angenommen im Mandanten «urinet» gibt es den Kontakt «Partner_Bisher»
+    Und im Mandanten «urinet» gibt es den Kontakt «Partner_Ruhend»
+    Und im Mandanten «urinet» liegt das Dokument «K» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
+    Wenn «inhaber-urinet» das Dokument «K» so ändert:
+      | partner | Partner_Bisher |
+    Dann meldet das Archiv Status 200
+    Angenommen der Kontakt «Partner_Bisher» im Mandanten «urinet» ist inaktiv
+    Und der Kontakt «Partner_Ruhend» im Mandanten «urinet» ist inaktiv
+    Wenn «inhaber-urinet» das Dokument «K» so ändert:
+      | partner | Partner_Ruhend |
+    Dann meldet das Archiv Status 400 mit Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» das Dokument «K» so ändert:
+      | partner | Partner_Bisher |
+      | titel   | Titel Probe    |
+    Dann meldet das Archiv Status 200
+    Und hat das Dokument «K» diese Werte:
+      | titel | Titel Probe |

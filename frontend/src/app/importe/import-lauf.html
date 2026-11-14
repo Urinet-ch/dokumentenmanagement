@@ -160,14 +160,17 @@
               <p class="hinweis" data-test="werte-verworfen">{{ texte.werteVerworfen }}</p>
             }
             @if (zeile.kontaktId) {
-              <p class="kontakt"><span class="hinweis">{{ texte.trifft }}:</span> {{ kontaktText(zeile.kontaktId) }}</p>
+              <p class="kontakt">
+                <span class="hinweis">{{ texte.trifft }}:</span>
+                <a [routerLink]="['/kontakte', zeile.kontaktId]" data-test="kontakt-link">{{ kontaktText(zeile.kontaktId) }}</a>
+              </p>
             }
             @if (zeile.kandidaten?.length) {
               <div class="kandidaten">
                 <span class="hinweis">{{ texte.kandidaten }}:</span>
                 <ul>
                   @for (kandidat of zeile.kandidaten; track kandidat) {
-                    <li>{{ kontaktText(kandidat) }}</li>
+                    <li><a [routerLink]="['/kontakte', kandidat]" data-test="kandidat-link">{{ kontaktText(kandidat) }}</a></li>
                   }
                 </ul>
               </div>

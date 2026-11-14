@@ -16,6 +16,13 @@ public interface EmbeddingPort {
     /** @param texte 1 bis {@link #BATCH} Texte */
     Antwort einbetten(List<String> texte);
 
+    /**
+     * Frage der Hybridsuche einbetten (Spec 02, Aufgabe 6.4): ein Text, genau ein Request mit der kurzen Zeitgrenze
+     * {@code archiv.suche.embedding-zeitgrenze} statt {@code archiv.ki.timeout}; Antwort wie {@link #einbetten}
+     * mit genau einem Vektor.
+     */
+    Antwort einbettenFrage(String frage);
+
     /** Ergebnis eines Aufrufs. */
     sealed interface Antwort permits Vektoren, OhneVektoren, Ausfall, OhneZugang {
     }

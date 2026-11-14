@@ -14,4 +14,24 @@ public interface AuftragStand {
      * {@code OFFEN}, {@code LAEUFT} oder {@code FERTIG}; leer, wenn kein Auftrag gescheitert ist.
      */
     Optional<Instant> letzterFehler(MandantCode mandant, AuftragTyp typ);
+
+    /**
+     * Stand des jüngsten Auftrags (höchste id) des Typs für den Mandanten; leer, wenn es keinen gibt. Anders als
+     * {@link #letzterFehler} zählt nur dieser eine Auftrag, ein älterer Fehlschlag mit späterem Erfolg bleibt ohne Wirkung.
+     *
+     * @param status {@code OFFEN}, {@code LAEUFT}, {@code FERTIG} oder {@code FEHLER}
+     * @param beendet Ende des Auftrags; leer, solange er offen ist oder läuft
+     */
+    Optional<Juengster> juengster(MandantCode mandant, AuftragTyp typ);
+
+    record Juengster(String status, Optional<Instant> beendet) {
+
+        public boolean offenOderLaeuft() {
+            return "OFFEN".equals(status) || "LAEUFT".equals(status);
+        }
+
+        public boolean gescheitert() {
+            return "FEHLER".equals(status);
+        }
+    }
 }

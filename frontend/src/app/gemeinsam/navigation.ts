@@ -13,6 +13,7 @@ export const MENUE: readonly Menuepunkt[] = [
   { pfad: '/erfassen', text: TEXTE.menue.erfassen, aktion: 'A1' },
   { pfad: '/eingangskorb', text: TEXTE.menue.eingangskorb, aktion: 'A5', eingangskorbZaehler: true },
   { pfad: '/suche', text: TEXTE.menue.suche, aktion: 'A2' },
+  { pfad: '/kontakte', text: TEXTE.menue.kontakte, aktion: 'A6' },
   { pfad: '/importe', text: TEXTE.menue.importe, aktion: 'A12' },
   { pfad: '/verwaltung/dokumentarten', text: TEXTE.menue.dokumentarten, aktion: 'A11' },
   { pfad: '/verwaltung/protokoll', text: TEXTE.menue.protokoll, aktion: 'A13' },

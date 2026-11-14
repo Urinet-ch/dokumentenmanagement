@@ -20,7 +20,7 @@ export interface ImportZeile {
     ergebnis?: ImportZeile.ErgebnisEnum | null;
     meldung?: string | null;
     /**
-     * getroffener Kontakt bei GEAENDERT und UNVERAENDERT
+     * getroffener Kontakt bei GEAENDERT und UNVERAENDERT, der inaktive Kontakt bei INAKTIV
      */
     kontaktId?: string | null;
     /**
@@ -44,6 +44,7 @@ export namespace ImportZeile {
         Dublette: 'DUBLETTE',
         Fehler: 'FEHLER',
         Uebersprungen: 'UEBERSPRUNGEN',
+        Inaktiv: 'INAKTIV',
     } as const;
     export type ErgebnisEnum = typeof ErgebnisEnum[keyof typeof ErgebnisEnum];
 }

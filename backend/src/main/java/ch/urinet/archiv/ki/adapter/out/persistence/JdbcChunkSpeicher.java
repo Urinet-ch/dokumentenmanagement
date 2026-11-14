@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.adapter.out.persistence;
 import ch.urinet.archiv.ki.application.ChunkPort;
 import ch.urinet.archiv.ki.domain.Chunk;
 import ch.urinet.archiv.ki.domain.Chunker;
+import ch.urinet.archiv.ki.domain.Vektortext;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,7 +26,7 @@ import java.util.regex.Pattern;
  * JTA-Transaktion ein). {@link #ersetzen} nimmt zuerst eine Sperre je Dokument bis zum Commit
  * ({@code pg_advisory_xact_lock}), damit zwei Aufträge für dasselbe Dokument nacheinander ersetzen, ohne die Zeile des
  * Dokuments zu sperren, und fügt in Teilen zu {@link #EINFUEGEN_JE_BATCH} Zeilen mit je eigener Zeitgrenze ein.
- * Vektoren gehen als Text ({@code [x,y,…]}) an PostgreSQL.
+ * Vektoren gehen als Text ({@link Vektortext}) an PostgreSQL.
  * Fehlermeldungen ohne Inhalte.
  */
 @ApplicationScoped
@@ -131,7 +132,7 @@ public class JdbcChunkSpeicher implements ChunkPort {
                         if (eingebettet.vektor() == null) {
                             einfuegen.setNull(6, Types.VARCHAR);
                         } else {
-                            einfuegen.setString(6, text(eingebettet.vektor()));
+                            einfuegen.setString(6, Vektortext.text(eingebettet.vektor()));
                         }
                         einfuegen.addBatch();
                     }
@@ -171,17 +172,6 @@ public class JdbcChunkSpeicher implements ChunkPort {
         } catch (SQLException e) {
             throw new IllegalStateException("Dokumente zur Nachberechnung nicht gelesen", e);
         }
-    }
-
-    static String text(float[] vektor) {
-        StringBuilder text = new StringBuilder(vektor.length * 12).append('[');
-        for (int i = 0; i < vektor.length; i++) {
-            if (i > 0) {
-                text.append(',');
-            }
-            text.append(vektor[i]);
-        }
-        return text.append(']').toString();
     }
 
     private static void setzeZahl(PreparedStatement anweisung, int index, Integer wert) throws SQLException {

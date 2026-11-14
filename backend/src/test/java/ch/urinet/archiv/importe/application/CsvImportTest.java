@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -41,7 +42,7 @@ class CsvImportTest {
     private final ZaehlenderLeser leser = new ZaehlenderLeser();
     private final MerkendesRepository repository = new MerkendesRepository();
     private final CsvImport csvImport = new CsvImport(leser, repository, new ImportEinstellungen(GRENZE, 10_000),
-            laufId -> { }, (laufId, datei) -> pruefsumme(datei), laufId -> { });
+            laufId -> { }, (laufId, datei) -> pruefsumme(datei), laufId -> { }, ids -> Set.of());
 
     @Test
     void dateiUeberDerGrenzeWirdOhneParserAbgelehnt() throws IOException {

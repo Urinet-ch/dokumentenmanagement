@@ -6,6 +6,7 @@ import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
+import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -23,7 +24,8 @@ import java.util.UUID;
 /**
  * Prüft jede Anfrage an einen Endpunkt, bevor Daten gelesen werden (Req 1.3, 2.2, 2.6): gültiger, aktiver Mandant aus
  * dem Token, eine Archiv-Rolle (die stärkste gilt) und – bei {@link ErfordertAktion} – das Recht der Aktion nach der
- * Rechtematrix. Bei dokumentbezogenen Aktionen (A2–A10) mit Pfad-Parameter {@code id} gilt 404 vor 403
+ * Rechtematrix. Bei dokumentbezogenen Aktionen (A2–A10), ausser bei {@link NichtDokumentbezogen}, mit Pfad-Parameter
+ * {@code id} gilt 404 vor 403
  * ({@link Berechtigung#dokumentAktion}); {@code @RolesAllowed} lässt dort alle Archiv-Rollen zu. Ein Endpunkt ohne
  * Erklärung ({@link ErfordertAktion}, {@link AlleArchivRollen}, {@link Oeffentlich}) antwortet 403 (fail closed);
  * {@code EndpunktWaechterTest} verlangt die Erklärung schon im Build. Ohne gültigen Mandanten antwortet er 403
@@ -74,7 +76,8 @@ public class ZugangFilter {
         }
         if (aktion.isPresent()) {
             aktion(new Benutzer(benutzerId.get(), rolle.get()), aktion.get(),
-                    anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
+                    methode.isAnnotationPresent(NichtDokumentbezogen.class) ? null
+                            : anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
         }

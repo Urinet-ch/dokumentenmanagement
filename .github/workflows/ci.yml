@@ -315,7 +315,7 @@ jobs:
           ARCHIV_TSA_DIENSTE: sgpki,freetsa
         # Secret-Dateien wie in prod, nur mit Platzhaltern, keine echten Zugangsdaten: ohne eine der Dateien
         # bricht der Start ab (design.md, Abschnitt zu Konfiguration und Geheimnissen). Dieses Archiv liefert nur die
-        # PWA aus; die Uploads leiten die Szenarien an das echte Archiv im Testmodus weiter (frontend/e2e/schritte/upload.mjs)
+        # PWA aus; Anfragen an /api/v1 leiten die Szenarien an das echte Archiv im Testmodus weiter (frontend/e2e/hilfen/echtes-backend.mjs)
         run: |
           DATEIEN="$RUNNER_TEMP/secret-dateien"
           mkdir -p "$DATEIEN"

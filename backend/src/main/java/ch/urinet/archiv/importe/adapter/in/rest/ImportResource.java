@@ -86,6 +86,8 @@ public class ImportResource {
             @Schema(nullable = true, description = "Vorschau: geänderte Kontakte") Integer geaendert,
             @Schema(nullable = true, description = "Vorschau: unveränderte Kontakte") Integer unveraendert,
             @Schema(nullable = true, description = "Vorschau: mögliche Dubletten") Integer dubletten,
+            @Schema(nullable = true, description = "Vorschau: Zeilen, deren Kontakt inaktiv ist (Req 17.13); werden "
+                    + "nicht übernommen") Integer inaktiv,
             @Schema(nullable = true, description = "Benutzer, der die Übernahme ausgelöst hat") String uebernommenVon,
             @Schema(nullable = true, description = "Ende der Übernahme; erst ab Status UEBERNOMMEN") Instant uebernommen,
             @Schema(nullable = true, description = "Übernahme: angelegte Kontakte bzw. Verkaufschancen") Integer angelegt,
@@ -104,7 +106,7 @@ public class ImportResource {
                     lauf.zeichensatz(), String.valueOf(lauf.trennzeichen()), lauf.zeilen(), lauf.fehler(),
                     lauf.uebersprungen(), lauf.status().name(), lauf.erstellt(), v == null ? null : v.neu(),
                     v == null ? null : v.geaendert(), v == null ? null : v.unveraendert(),
-                    v == null ? null : v.dubletten(), u == null ? null : u.von(), u == null ? null : u.zeit(),
+                    v == null ? null : v.dubletten(), v == null ? null : v.inaktiv(), u == null ? null : u.von(), u == null ? null : u.zeit(),
                     b == null ? null : b.angelegt(), b == null ? null : b.aktualisiert(),
                     b == null ? null : b.ausgelassen(), b == null ? null : b.gekennzeichnet());
         }
@@ -113,9 +115,10 @@ public class ImportResource {
     @Schema(name = "ImportZeile")
     public record ZeileDto(@Schema(description = "Zeile in der Datei (Kopfzeile = 1)") int nr,
             @Schema(nullable = true, enumeration = {"NEU", "GEAENDERT", "UNVERAENDERT", "DUBLETTE", "FEHLER",
-                    "UEBERSPRUNGEN"}, description = "null: wartet auf Zuordnung oder Vorschau") String ergebnis,
+                    "UEBERSPRUNGEN", "INAKTIV"}, description = "null: wartet auf Zuordnung oder Vorschau") String ergebnis,
             @Schema(nullable = true) String meldung,
-            @Schema(nullable = true, description = "getroffener Kontakt bei GEAENDERT und UNVERAENDERT") UUID kontaktId,
+            @Schema(nullable = true, description = "getroffener Kontakt bei GEAENDERT und UNVERAENDERT, der inaktive "
+                    + "Kontakt bei INAKTIV") UUID kontaktId,
             @Schema(description = "Kandidaten einer möglichen Dublette") List<UUID> kandidaten,
             @Schema(nullable = true, description = "Rohwerte in Spaltenreihenfolge; fehlen bei zu langen Feldern")
             List<String> werte,
@@ -290,7 +293,7 @@ public class ImportResource {
     public LaufSeiteDto lauf(@PathParam("id") String id, @QueryParam("seite") @DefaultValue("0") int seite,
                              @QueryParam("groesse") @DefaultValue("50") int groesse,
                              @QueryParam("ergebnis") @Schema(enumeration = {"NEU", "GEAENDERT", "UNVERAENDERT",
-                                     "DUBLETTE", "FEHLER", "UEBERSPRUNGEN"}) String ergebnis) {
+                                     "DUBLETTE", "FEHLER", "UEBERSPRUNGEN", "INAKTIV"}) String ergebnis) {
         aufloesung.pruefen();
         UUID laufId;
         try {

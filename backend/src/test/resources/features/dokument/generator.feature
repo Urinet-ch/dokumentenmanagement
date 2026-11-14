@@ -112,6 +112,19 @@ Funktionalität: Generator-Schnittstelle für Skripte
     Dann antwortet der Generator mit Status 422 und Fehlercode «PARTNER_UNBEKANNT»
     Und gibt es im Mandanten «urinet» kein Dokument zur PDF «P1»
 
+  @req-11.7 @req-17.12
+  Szenario: Die crmId eines inaktiven Kontakts gilt als unbekannt, nichts wird angelegt
+    Angenommen im Mandanten «urinet» gibt es den CRM-Kontakt «Ruhende Probe AG» mit der crmId «K-INAKTIV-4713»
+    Und der Kontakt «Ruhende Probe AG» im Mandanten «urinet» ist inaktiv
+    Wenn der Generator die PDF «P3» mit diesen Metadaten sendet:
+      """
+      { "art": "AUSGANGSRECHNUNG", "titel": "Probe-Rechnung", "datum": "2026-03-10",
+        "partner": {"crmId": "K-INAKTIV-4713"},
+        "finanz": {"belegnummer": "2026-907", "richtung": "EINNAHME", "betrag": "50.00", "waehrung": "CHF"} }
+      """
+    Dann antwortet der Generator mit Status 422 und Fehlercode «PARTNER_UNBEKANNT»
+    Und gibt es im Mandanten «urinet» kein Dokument zur PDF «P3»
+
   @req-11.7
   Szenario: Eine crmId aus einem anderen Mandanten gilt als unbekannt, nichts wird angelegt
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt

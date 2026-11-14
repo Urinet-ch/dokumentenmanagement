@@ -1,0 +1,38 @@
+openapi: 3.1.0
+info:
+  title: Gegenprobe zu PublicVertragTest
+  version: "1"
+paths:
+  /public/v1/gegenprobe/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stufe
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Eintrag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Eintrag"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+components:
+  schemas:
+    Eintrag:
+      type: object
+      properties:
+        id:
+          type: string
+        titel:
+          type: string
+  responses:
+    NichtGefunden:
+      description: Nicht gefunden
