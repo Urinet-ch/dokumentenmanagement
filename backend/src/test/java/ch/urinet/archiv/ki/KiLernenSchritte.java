@@ -196,6 +196,13 @@ public class KiLernenSchritte {
                 .containsEntry("partner_id", partner == null ? null : UUID.fromString((String) partner));
     }
 
+    @Dann("«ki_beispiel» enthält für den Beleg «{word}» nur die UID «{word}»")
+    public void beispielUid(String name, String uid) throws Exception {
+        List<Map<String, Object>> zeilen = beispiele(belege.get(name));
+        assertThat(zeilen).hasSize(1);
+        assertThat((String[]) zeilen.getFirst().get("uid")).containsExactly(uid);
+    }
+
     @Dann("«ki_beispiel» enthält keine Zeile für den Beleg «{word}»")
     public void keinBeispiel(String name) throws Exception {
         assertThat(beispiele(belege.get(name))).isEmpty();
@@ -256,7 +263,7 @@ public class KiLernenSchritte {
         List<Map<String, Object>> zeilen = new ArrayList<>();
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement("select art, korrektur::text as korrektur, iban, "
-                     + "partner_id from " + new MandantCode(MANDANT).schema()
+                     + "uid, partner_id from " + new MandantCode(MANDANT).schema()
                      + ".ki_beispiel where dokument_id = ?")) {
             abfrage.setObject(1, dokument);
             try (ResultSet z = abfrage.executeQuery()) {
@@ -265,6 +272,7 @@ public class KiLernenSchritte {
                     zeile.put("art", z.getString("art"));
                     zeile.put("korrektur", z.getString("korrektur"));
                     zeile.put("iban", (String[]) z.getArray("iban").getArray());
+                    zeile.put("uid", (String[]) z.getArray("uid").getArray());
                     zeile.put("partner_id", z.getObject("partner_id", UUID.class));
                     zeilen.add(zeile);
                 }

@@ -1,6 +1,11 @@
 # Implementation Plan — 03 Zweiter Mandant VHF/GSK
 
-Voraussetzungen: Gate Phase 2, Zuschlag VHF/GSK, Konzept-Entscheid E4, Spec 03 auf `main` gemergt.
+Voraussetzungen: Gate Phase 2, Zuschlag VHF/GSK, Konzept-Entscheid E4, Spec 03 auf `main` gemergt. Ausnahme: Die
+mandantenneutralen Vorstufen 11.6 (Vertrag und Versionierung `/public/v1`) und 11.7 (Webseiten-Schlüssel) werden vor
+Gate Phase 2 und vor dem Zuschlag entwickelt (entschieden von Fabian am 14.11.2026, «Neutrale Vorstufen jetzt»), ohne
+VHF-spezifisches: keine Domain VHF/GSK, kein Seed `vhf-gsk`, keine Dateiauslieferung (11.8), kein Feed (11.9), keine
+Erfassung (11.10). Alle übrigen Aufgaben (Welle 10, 11.1–11.5, 11.8–11.13, Welle 12) bleiben an Gate Phase 2,
+Zuschlag und E4 gebunden.
 Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
 Jede Aufgabe liefert für ihre Anforderungen Cucumber-Szenarien mit `@req-<x.y>` (ausser bei Nachweis-Vermerk)
 und erfüllt die Definition of Done aus `tech.md`.
@@ -82,6 +87,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026 (E-B, neutrale Server-API); Nummer 11.6 als nächste freie der Welle 11
   - `docs/schnittstelle/public-v1.yaml` (OpenAPI 3.1) für Lesen und Erfassung; Pfade unter `/public/` über `mp.openapi.scan.exclude.packages` nicht in `frontend/openapi/` und nicht im Angular-Client, Vertrag in eigenem Lauf erzeugen (Weg wählen); `PublicVertragTest` (Code = Datei); CI-Schritt im Build-Job mit vollständiger Historie: nur additive Änderungen gegenüber `origin/main` (Werkzeug wählen); Header `Deprecation`, `Sunset`, `Link` über `archiv.webseite.v<n>.sunset`; Problem Details auch unter `/public/` (`ProblemAnmeldung`), `Cache-Control: no-store`
   - Traefik: eigener Router für `/public/` mit eigener Drosselung je IP (Labels in `deploy/infomaniak/compose.yml`, nur über den Deploy-Workflow)
+  - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; getestet mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Der Vertrag enthält, was es bei der Umsetzung gibt (Problem Details, Header, Versionierung); die Endpunkte kommen additiv mit 11.2 und 11.10 dazu
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
 - [ ] 11.7 Webseiten-Schlüssel [Backend]
@@ -91,6 +97,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Prüf-Cache für Webseiten-Schlüssel (HMAC des Geheimnisses je Schlüssel-ID, `PT5M`, Zeile in `api_client` bei jeder Anfrage gelesen); Szenario: fremde `ua_…`-Anfragen belegen die `HashSperre`, die Webseite wird trotzdem bedient; Widerruf wirkt trotz Cache sofort
   - Leistung messen: Trefferquote des Prüf-Caches und Wartezeiten der `HashSperre` unter Last mit fremden Anfragen (Open Points in design.md)
   - Spec 01 ergänzt: Scopes in Spec 01, 2.5 und design.md «Umsetzung (Aufgabe 1.5)»; `gueltig_bis` nach Rotation und Prüf-Cache in Spec 01 design.md «Sicherheit» (Spec 01, Req 2.5)
+  - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; Schlüssel und Szenarien mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Das Changeset `db/public` nimmt die nächste freie Nummer (009 ist durch Spec 02, Aufgabe 6.3 belegt)
   - _Anforderungen: 12.1–12.8, 15.3_
 
 - [ ] 11.8 Dateiauslieferung gemischt [Backend]

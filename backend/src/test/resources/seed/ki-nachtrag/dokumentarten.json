@@ -1,0 +1,1 @@
+{"_zweck":"Synthetischer Seed nur für Tests (Nachprüfung PR #109, Changeset 022)","dokumentarten":[{"aktiv":true,"aufbewahrung_ab":"GESCHAEFTSJAHR","aufbewahrung_jahre":10,"code":"KI_PROBE","gesetzliche_pflicht":false,"gruppen":[],"name":"KI-Probe","pflichtfelder":["titel"],"vertraulichkeit":"NORMAL","zusatz_schema":{"additionalProperties":false,"type":"object"}}]}

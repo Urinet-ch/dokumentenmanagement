@@ -21,7 +21,8 @@ const MELDUNGEN: Meldungen = {
  * und nach dem Erfassen. Die Tokens liegen nur im Arbeitsspeicher (AnmeldungService), darum kein Background Sync.
  *
  * Mandantentrennung: Jeder Eintrag gehört einem Benutzer in einem Mandanten. Nur dieser sieht ihn (Zähler, Liste) und
- * lädt ihn hoch. Ist die Sitzung abgelaufen, gilt bis zur nächsten Anmeldung weiter der zuletzt angemeldete Benutzer.
+ * lädt ihn hoch. Ist die Sitzung abgelaufen, gilt bis zur nächsten Anmeldung weiter der zuletzt angemeldete Benutzer,
+ * aber nur bis zum Neuladen der PWA (`zuletzt` liegt nur im Arbeitsspeicher); danach entstehen Einträge ohne Benutzer.
  * Einträge ohne Anmeldung erfasst gehören niemandem; die nächste Anmeldung mit Recht A1 übernimmt sie.
  */
 @Injectable({ providedIn: 'root' })
