@@ -24,6 +24,12 @@ public interface ManifestDaten {
     /** Das festgehaltene Manifest des Datums mit seinen Zeitstempeln aus {@code manifest_zeitstempel}, sonst leer. */
     Optional<ManifestStand> stand(LocalDate datum);
 
+    /**
+     * Das festgehaltene Manifest, in dessen Fenster {@code [von, bis)} der Zeitpunkt liegt ({@code von = null} heisst
+     * ohne untere Grenze); leer, wenn keines (Prüflauf, Req 15.5).
+     */
+    Optional<Zustaendig> zustaendig(Instant zeitpunkt);
+
     /** Dateien der Dokumente mit {@code archiviert} in {@code [von, bis)}; {@code von = null} heisst ohne untere Grenze. */
     List<ManifestEintrag> eintraege(Instant von, Instant bis);
 
@@ -54,6 +60,16 @@ public interface ManifestDaten {
             Objects.requireNonNull(bis, "bis");
             Objects.requireNonNull(sha256, "sha256");
             Objects.requireNonNull(verweis, "verweis");
+        }
+    }
+
+    /** Datum, Fenster und SHA-256 eines Manifests aus der Tabelle {@code manifest}; {@code von} leer beim ersten. */
+    record Zustaendig(LocalDate datum, Optional<Instant> von, Instant bis, String sha256) {
+        public Zustaendig {
+            Objects.requireNonNull(datum, "datum");
+            Objects.requireNonNull(von, "von");
+            Objects.requireNonNull(bis, "bis");
+            Objects.requireNonNull(sha256, "sha256");
         }
     }
 
