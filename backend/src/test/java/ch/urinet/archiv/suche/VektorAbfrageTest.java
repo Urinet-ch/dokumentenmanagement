@@ -82,6 +82,11 @@ class VektorAbfrageTest {
                 }
             }
         }
+        // Abschnitte anderer Testklassen im selben Mandanten (z. B. aus den Szenarien) würden die Nachbarn verdrängen
+        try (Connection verbindung = datenbank.get().getConnection();
+             java.sql.Statement anweisung = verbindung.createStatement()) {
+            anweisung.executeUpdate("delete from " + new MandantCode(MANDANT).schema() + ".chunk");
+        }
     }
 
     @AfterEach
