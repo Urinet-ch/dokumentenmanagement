@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.langchain4j.service.output.OutputParsingException;
 
 /** Req 7.3: nur Parse- und Schemafehler lösen eine Nachfrage aus; andere Fehler (Timeout, HTTP) sind ein Ausfall. */
-final class KiFehler {
+public final class KiFehler {
 
     private KiFehler() {
     }
@@ -19,7 +19,7 @@ final class KiFehler {
     }
 
     /** Nur Klassennamen, keine Meldung (sie kann Antwort- oder Belegtext enthalten, Req 16.7). */
-    static String grund(Throwable t) {
+    public static String grund(Throwable t) {
         Throwable wurzel = t;
         while (wurzel.getCause() != null && wurzel.getCause() != wurzel) {
             wurzel = wurzel.getCause();

@@ -6,8 +6,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -16,7 +18,7 @@ import java.util.UUID;
  * eigenen Mandanten; Werte werden nie geloggt.
  */
 @ApplicationScoped
-public class ImportKontakte {
+public class ImportKontakte implements InaktiveKontakte {
 
     private final KontaktRegister register;
 
@@ -31,5 +33,17 @@ public class ImportKontakte {
             kontakte.put(kontakt.id(), kontakt);
         }
         return kontakte;
+    }
+
+    @Override
+    @Transactional
+    public Set<UUID> unter(Collection<UUID> ids) {
+        Set<UUID> inaktiv = new HashSet<>();
+        for (Kontakt kontakt : register.finden(ids)) {
+            if (!kontakt.aktiv()) {
+                inaktiv.add(kontakt.id());
+            }
+        }
+        return inaktiv;
     }
 }

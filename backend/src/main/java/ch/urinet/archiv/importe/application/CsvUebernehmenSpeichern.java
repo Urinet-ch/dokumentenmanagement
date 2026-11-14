@@ -78,8 +78,12 @@ public class CsvUebernehmenSpeichern {
         while (!(block = repository.zeilen(laufId, nachNr, stapel, CsvImport.STAPEL_ZEICHEN)).isEmpty()) {
             unterbrochen();
             if (lauf.art() == ImportArt.KONTAKT) {
+                Set<UUID> inaktiv = kontakte.inaktive(block.stream()
+                        .filter(z -> z.ergebnis() == Ergebnis.UNVERAENDERT && z.kontaktId() != null)
+                        .map(ImportZeile::kontaktId).toList());
                 for (ImportZeile zeile : block) {
-                    zaehlung.zaehlen(kontakt(zeile, zuordnung, entscheide.get(zeile.nr())));
+                    zaehlung.zaehlen(inaktiv.contains(zeile.kontaktId()) && zeile.ergebnis() == Ergebnis.UNVERAENDERT
+                            ? Ausgang.AUSGELASSEN : kontakt(zeile, zuordnung, entscheide.get(zeile.nr())));
                     if (zeile.werte() == null) {
                         ohneWerte = true;
                     } else if (zeile.ergebnis() != Ergebnis.UEBERSPRUNGEN) {
@@ -112,7 +116,10 @@ public class CsvUebernehmenSpeichern {
         return Optional.of(bilanz);
     }
 
-    /** Eine Kontakt-Zeile nach ihrem Ergebnis aus der Vorschau und, bei einer Dublette, nach dem Entscheid. */
+    /**
+     * Eine Kontakt-Zeile nach ihrem Ergebnis aus der Vorschau und, bei einer Dublette, nach dem Entscheid. {@code INAKTIV}
+     * und Zeilen, deren Kontakt seit der Vorschau inaktiv wurde, sind ausgelassen (Req 17.14).
+     */
     private Ausgang kontakt(ImportZeile zeile, Zuordnung zuordnung, DublettenEntscheid entscheid) {
         if (zeile.werte() == null) {
             return Ausgang.AUSGELASSEN;
@@ -148,13 +155,16 @@ public class CsvUebernehmenSpeichern {
                 ? Ausgang.ANGELEGT : Ausgang.AUSGELASSEN;
     }
 
-    /** CSV gewinnt; leere Zellen fehlen in {@code werte} und überschreiben nichts (Req 13.6). */
+    /**
+     * CSV gewinnt; leere Zellen fehlen in {@code werte} und überschreiben nichts (Req 13.6). Ein inaktiver Kontakt
+     * bleibt unverändert (Req 17.14): Die Sperre ordnet die Übernahme gegenüber einem Zusammenführen.
+     */
     private Ausgang aktualisieren(UUID kontaktId, Map<String, String> werte) {
         if (kontaktId == null) {
             return Ausgang.AUSGELASSEN;
         }
         Optional<Kontakt> bestehend = kontakte.sperren(kontaktId);
-        if (bestehend.isEmpty()) {
+        if (bestehend.isEmpty() || !bestehend.get().aktiv()) {
             return Ausgang.AUSGELASSEN;
         }
         KontaktAngaben angaben;
