@@ -33,9 +33,11 @@ import java.util.UUID;
  * <p>
  * Vektor-Abfrage: Kosinus ({@code <=>} aus {@code public}, HNSW {@code halfvec_cosine_ops}) mit Sicht und Filtern in
  * derselben Abfrage vor der Grenze. pgvector 0.8 liefert über HNSW höchstens {@code hnsw.ef_search} Zeilen (Standard
- * 40) und mit Filter oft weniger; darum setzt die Transaktion {@code hnsw.ef_search} auf {@value #EF_SEARCH} und
- * {@code hnsw.iterative_scan = relaxed_order} (die Suche im Index läuft weiter, bis die Grenze erreicht ist), und die
- * äussere Abfrage sortiert erneut nach Abstand, weil {@code relaxed_order} leicht ungeordnet liefern darf.
+ * 40) und mit Filter oft weniger; darum setzt die Transaktion {@code hnsw.ef_search} auf {@value #EF_SEARCH},
+ * {@code hnsw.iterative_scan = relaxed_order}, {@code hnsw.max_scan_tuples} auf {@value #MAX_SCAN_TUPLES} und
+ * {@code hnsw.scan_mem_multiplier} auf 2. Die Suche läuft damit bei selektiven Filtern weiter, bis genug Treffer
+ * gefunden sind oder die Obergrenze erreicht ist. Die äussere Abfrage sortiert erneut nach Abstand, weil
+ * {@code relaxed_order} leicht ungeordnet liefern darf.
  * {@code statement_timeout} aus {@code archiv.suche.zeitgrenze} wie in der Volltextsuche.
  */
 @ApplicationScoped
@@ -44,6 +46,7 @@ public class PanacheVektorSuche implements VektorSuchePort {
 
     /** Kandidatenliste von HNSW; mindestens die Grenze von 50 Abschnitten plus Reserve für Filter. */
     static final int EF_SEARCH = 100;
+    static final int MAX_SCAN_TUPLES = 100_000;
 
     private final Duration zeitgrenze;
     private final ObjectMapper json;
@@ -87,6 +90,9 @@ public class PanacheVektorSuche implements VektorSuchePort {
         em.createNativeQuery("select set_config('hnsw.ef_search', :wert, true)")
                 .setParameter("wert", Integer.toString(EF_SEARCH)).getSingleResult();
         em.createNativeQuery("select set_config('hnsw.iterative_scan', 'relaxed_order', true)").getSingleResult();
+        em.createNativeQuery("select set_config('hnsw.max_scan_tuples', :wert, true)")
+                .setParameter("wert", Integer.toString(MAX_SCAN_TUPLES)).getSingleResult();
+        em.createNativeQuery("select set_config('hnsw.scan_mem_multiplier', '2', true)").getSingleResult();
         List<Object[]> zeilen = zeilen(em, sql, parameter);
         List<Abschnitttreffer> treffer = new ArrayList<>(zeilen.size());
         for (Object[] z : zeilen) {
