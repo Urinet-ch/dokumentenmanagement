@@ -43,8 +43,20 @@ Funktionalität: Chat-Agent und Systemprompt (Aufgabe 7.2)
       | antwort | art  | inhalt        | argumente | tokens |
       | 1       | text | Guten Tag.    |           | 5/2    |
     Wenn «treuhaender-urinet» dem Agenten die Frage «Hallo?» stellt
-    Dann bietet die erste Anfrage dem Sprachmodell genau die Werkzeuge «dokumente_suchen, dokument_zeigen, fristen»
+    Dann bietet die erste Anfrage dem Sprachmodell genau die Werkzeuge «dokumente_suchen, dokument_zeigen, fristen, kennzahl, offene_posten»
     Und verlangt der Systemprompt der ersten Anfrage «nur lesende Werkzeuge»
+
+  @req-3.2
+  Szenario: Die Zahl aus «kennzahl» steht unverändert in der Antwort, und das Werkzeugergebnis ist die Quelle
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt                                                                                         | argumente                                                                                                    | tokens |
+      | 1       | werkzeug | kennzahl                                                                                       | {"messgroesse":"EINNAHMEN","von":"2071-01-01","bis":"2071-03-31","gruppierung":"KEINE","basis":"BELEGDATUM"} | 90/15  |
+      | 2       | text     | Die Einnahmen im ersten Quartal 2071 betragen CHF 1'234.50 (nach Rechnungsdatum, 1 Rechnung).  |                                                                                                              | 140/30 |
+    Wenn «inhaber-urinet» dem Agenten die Frage «Wie hoch waren die Einnahmen im ersten Quartal 2071?» stellt
+    Dann enthält ein Werkzeugergebnis der Anfrage 2 «CHF 1'234.50 | nach Rechnungsdatum»
+    Und lautet der gestreamte Text «Die Einnahmen im ersten Quartal 2071 betragen CHF 1'234.50 (nach Rechnungsdatum, 1 Rechnung).»
+    Und nennen die Quellen im Stream den Datenstand von «kennzahl» mit 1 Belegen
+    Und zeigt «werkzeug» im Stream zuerst «kennzahl»
 
   @req-4.2
   Szenario: Liefert das Werkzeug nichts, geht das leere Ergebnis ans Modell, die Regel «kein Beleg gefunden» steht im Prompt und die Quellen sind leer

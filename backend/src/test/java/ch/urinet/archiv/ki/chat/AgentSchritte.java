@@ -295,6 +295,20 @@ public class AgentSchritte {
         assertThat(da).containsExactlyInAnyOrderElementsOf(erwartet);
     }
 
+    @Dann("nennen die Quellen im Stream den Datenstand von «{word}» mit {int} Belegen")
+    public void quellenDatenstand(String werkzeug, int belege) {
+        List<JsonNode> staende = new ArrayList<>();
+        ereignis("quellen").forEach(q -> {
+            if (werkzeug.equals(q.path("werkzeug").asText())) {
+                staende.add(q);
+            }
+        });
+        assertThat(staende).singleElement().satisfies(q -> {
+            assertThat(q.path("belege").asInt()).isEqualTo(belege);
+            assertThat(q.path("datenstand").asText()).isNotBlank();
+        });
+    }
+
     @Dann("zeigt «werkzeug» im Stream zuerst «{word}»")
     public void erstesWerkzeug(String name) {
         assertThat(ereignisse.stream().filter(e -> e.name().equals("werkzeug")).findFirst().orElseThrow().daten()

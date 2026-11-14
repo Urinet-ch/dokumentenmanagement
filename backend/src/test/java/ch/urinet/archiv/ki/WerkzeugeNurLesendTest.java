@@ -1,7 +1,6 @@
 package ch.urinet.archiv.ki;
 
 import ch.urinet.archiv.ki.adapter.in.werkzeug.SchreibenderZugriffGegenprobe;
-import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -44,6 +43,8 @@ class WerkzeugeNurLesendTest {
             "ch.urinet.archiv.dokumentart.application.DokumentartRepository", Set.of("alle"),
             "ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell"),
             "ch.urinet.archiv.mandant.application.MandantEinstellungen", Set.of("lesen"),
+            // Angebot von kennzahl und offene_posten (7.1b, Spec 05, Req 8.8)
+            "ch.urinet.archiv.dokumentart.application.Funktionen", Set.of("finanzVerfuegbar"),
             // E4: das Zugriffsprotokoll ist der einzige schreibende Port (Anzeige und Verweigerung mit Kanal Chat)
             "ch.urinet.archiv.protokoll.application.ZugriffProtokoll", Set.of("schreiben"));
 
@@ -81,7 +82,8 @@ class WerkzeugeNurLesendTest {
             .should(new ArchCondition<>("von den Ports nur lesende Methoden aufrufen") {
                 @Override
                 public void check(JavaClass klasse, ConditionEvents ereignisse) {
-                    for (JavaMethodCall aufruf : klasse.getMethodCallsFromSelf()) {
+                    // Aufrufe und Methodenreferenzen (funktionen::finanzVerfuegbar)
+                    for (var aufruf : klasse.getCodeUnitAccessesFromSelf()) {
                         String eigentuemer = aufruf.getTargetOwner().getName();
                         // Zugriffsmethoden verschachtelter Wertetypen eines Ports (z. B. Werte.name()) lesen nur
                         Set<String> erlaubt = eigentuemer.contains("$") ? null : LESENDE_PORTS.get(eigentuemer);
