@@ -48,6 +48,20 @@ final class Werkzeugparameter {
         }
     }
 
+    /** Aufzählungswert ohne Rücksicht auf Gross- und Kleinschreibung; leer gilt als {@code standard} (sonst Pflicht). */
+    static <E extends Enum<E>> E wert(String name, String wert, Class<E> typ, E standard) {
+        String text = text(name, wert, 40, standard == null);
+        if (text == null) {
+            return standard;
+        }
+        for (E kandidat : typ.getEnumConstants()) {
+            if (kandidat.name().equalsIgnoreCase(text)) {
+                return kandidat;
+            }
+        }
+        throw WerkzeugFehler.ungueltig(name);
+    }
+
     /** Ganzzahl von {@code min} bis {@code max}, ohne Angabe {@code standard}. */
     static int zahl(String name, Integer wert, int min, int max, int standard) {
         if (wert == null) {
