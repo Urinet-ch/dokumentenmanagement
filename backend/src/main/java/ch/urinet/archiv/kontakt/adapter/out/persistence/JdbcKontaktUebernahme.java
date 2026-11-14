@@ -1,5 +1,7 @@
 package ch.urinet.archiv.kontakt.adapter.out.persistence;
 
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.kontakt.application.KontaktUebernahme;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.kontakt.domain.KontaktAngaben;
@@ -8,12 +10,14 @@ import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
@@ -35,24 +39,54 @@ public class JdbcKontaktUebernahme implements KontaktUebernahme {
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
+    private final String sperreWartezeit;
 
-    public JdbcKontaktUebernahme(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung) {
+    public JdbcKontaktUebernahme(Instance<AgroalDataSource> datenquelle, MandantAufloesung aufloesung,
+                                 @ConfigProperty(name = "archiv.import.sperre-wartezeit") Duration sperre) {
         this.datenquelle = datenquelle;
         this.aufloesung = aufloesung;
+        this.sperreWartezeit = Math.max(1, sperre.toMillis()) + "ms";
     }
 
+    /**
+     * Wartet höchstens {@code archiv.import.sperre-wartezeit} (Zusammenführen sperrt nach ID geordnet, die Übernahme in
+     * CSV-Reihenfolge); belegt oder verklemmt → {@code STATUS_KONFLIKT}, der Block bleibt wiederholbar.
+     */
     @Override
     public Optional<Kontakt> sperren(UUID id) {
         JdbcKontaktRegister.transaktionPruefen();
         String sql = "select " + JdbcKontaktRegister.SPALTEN + " from " + schema() + ".kontakt where id = ? for update";
-        try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setObject(1, id);
-            try (ResultSet zeile = abfrage.executeQuery()) {
-                return zeile.next() ? Optional.of(JdbcKontaktRegister.kontakt(zeile)) : Optional.empty();
+        try (Connection verbindung = datenquelle.get().getConnection()) {
+            String vorher;
+            try (PreparedStatement abfrage = verbindung.prepareStatement("select current_setting('lock_timeout')");
+                 ResultSet ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                vorher = ergebnis.getString(1);
             }
+            einstellen(verbindung, sperreWartezeit);
+            Optional<Kontakt> kontakt;
+            try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+                abfrage.setObject(1, id);
+                try (ResultSet zeile = abfrage.executeQuery()) {
+                    kontakt = zeile.next() ? Optional.of(JdbcKontaktRegister.kontakt(zeile)) : Optional.empty();
+                }
+            } catch (SQLException e) {
+                if ("55P03".equals(e.getSQLState()) || "40P01".equals(e.getSQLState())) {
+                    throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                }
+                throw e;
+            }
+            einstellen(verbindung, vorher);
+            return kontakt;
         } catch (SQLException e) {
             throw new IllegalStateException("Kontakt nicht gesperrt", e);
+        }
+    }
+
+    private static void einstellen(Connection verbindung, String wert) throws SQLException {
+        try (PreparedStatement einstellen = verbindung.prepareStatement("select set_config('lock_timeout', ?, true)")) {
+            einstellen.setString(1, wert);
+            einstellen.executeQuery().close();
         }
     }
 

@@ -53,6 +53,8 @@ public class JdbcKontaktRegister implements KontaktRegister {
 
     /** lock_not_available: {@code lock_timeout} abgelaufen. */
     private static final String SPERRE_BELEGT = "55P03";
+    /** deadlock_detected: PostgreSQL hat diese Transaktion als Opfer eines Zyklus abgebrochen. */
+    private static final String VERKLEMMT = "40P01";
     private static final String EINSTELLEN = "select set_config(?, ?, true)";
 
     private final Instance<AgroalDataSource> datenquelle;
@@ -242,7 +244,7 @@ public class JdbcKontaktRegister implements KontaktRegister {
                     }
                 }
             } catch (SQLException e) {
-                if (SPERRE_BELEGT.equals(e.getSQLState())) {
+                if (SPERRE_BELEGT.equals(e.getSQLState()) || VERKLEMMT.equals(e.getSQLState())) {
                     throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
                 }
                 throw e;
@@ -251,6 +253,41 @@ public class JdbcKontaktRegister implements KontaktRegister {
             return kontakte;
         } catch (SQLException e) {
             throw new IllegalStateException("Kontakte nicht gesperrt", e);
+        }
+    }
+
+    /**
+     * Liest den Kontakt unter {@code for share}, damit ein paralleles Zusammenführen (das die Zeile {@code for update}
+     * hält) vor oder nach dem Setzen eines Partners läuft, nie dazwischen (Req 17.12).
+     */
+    @Override
+    public Optional<Kontakt> fuerZuordnung(UUID id) {
+        transaktionPruefen();
+        String sql = "select " + SPALTEN + " from " + tabelle() + " where id = ? for share";
+        try (Connection verbindung = datenquelle.get().getConnection()) {
+            String vorher;
+            try (PreparedStatement abfrage = verbindung.prepareStatement("select current_setting('lock_timeout')");
+                 ResultSet ergebnis = abfrage.executeQuery()) {
+                ergebnis.next();
+                vorher = ergebnis.getString(1);
+            }
+            einstellen(verbindung, "lock_timeout", sperreWartezeit);
+            Optional<Kontakt> kontakt;
+            try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+                abfrage.setObject(1, id);
+                try (ResultSet zeile = abfrage.executeQuery()) {
+                    kontakt = zeile.next() ? Optional.of(kontakt(zeile)) : Optional.empty();
+                }
+            } catch (SQLException e) {
+                if (SPERRE_BELEGT.equals(e.getSQLState()) || VERKLEMMT.equals(e.getSQLState())) {
+                    throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+                }
+                throw e;
+            }
+            einstellen(verbindung, "lock_timeout", vorher);
+            return kontakt;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakt nicht gesperrt", e);
         }
     }
 

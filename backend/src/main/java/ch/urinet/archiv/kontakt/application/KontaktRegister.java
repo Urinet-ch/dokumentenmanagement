@@ -31,6 +31,16 @@ public interface KontaktRegister {
     Optional<Kontakt> finden(UUID id);
 
     /**
+     * Wie {@link #finden(UUID)}, aber für das Setzen eines Partners an einem Dokument: hält die Zeile bis zum Ende der
+     * Transaktion unter {@code for share}, damit ein paralleles Zusammenführen den Kontakt nicht zwischen Prüfung und
+     * Schreiben inaktiv setzt (Req 17.12). Wartet höchstens {@code archiv.import.sperre-wartezeit}, sonst
+     * {@code STATUS_KONFLIKT}. Ohne Sperrmöglichkeit gilt {@link #finden(UUID)}.
+     */
+    default Optional<Kontakt> fuerZuordnung(UUID id) {
+        return finden(id);
+    }
+
+    /**
      * Aktiver Kontakt mit der ID aus 21.CRM ({@code crm_id} ist eindeutig), für die Generator-Metadaten (Req 11.7);
      * die ID eines inaktiven gilt als unbekannt (Req 17.12).
      */

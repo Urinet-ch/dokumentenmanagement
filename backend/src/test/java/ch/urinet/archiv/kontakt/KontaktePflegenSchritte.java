@@ -438,6 +438,13 @@ public class KontaktePflegenSchritte {
                 .patch("/api/v1/dokumente/" + dokument(dokument).id());
     }
 
+    @Wenn("«{word}» das Dokument {word} mit der gemerkten Version dem Partner {word} zuordnet")
+    public void partnerZuordnen(String benutzer, String dokument, String kontakt) {
+        antwort = anfrage(benutzer).header("If-Match", "\"" + gemerkteVersionen.get(dokument) + "\"")
+                .body(Map.of("partnerId", kontakt(kontakt).id().toString(), "grund", "Probe")).when()
+                .patch("/api/v1/dokumente/" + dokument(dokument).id());
+    }
+
     @Dann("antwortet die Kontaktpflege mit Status {int}")
     public void status(int status) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);

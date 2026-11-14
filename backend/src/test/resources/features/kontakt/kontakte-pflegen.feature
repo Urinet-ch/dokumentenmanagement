@@ -427,7 +427,7 @@ Funktionalität: Kontakte ansehen und pflegen (Aufgabe 4.11)
     Und sind Kontakte und Dokumente unverändert
 
   @req-17.8 @req-10.4
-  Szenario: Ein Ändern des Dokuments mit der Version vor dem Zusammenführen scheitert mit 412
+  Szenario: Die Version des Dokuments ist nach dem Zusammenführen veraltet, Ändern scheitert mit 412
     Angenommen im Mandanten «urinet» gibt es diese Dokumente zu Kontakten:
       | dokument | partner | status     | vertraulichkeit | datum      |
       | D1       | K1      | ARCHIVIERT | NORMAL          | 2026-03-01 |
@@ -451,6 +451,19 @@ Funktionalität: Kontakte ansehen und pflegen (Aufgabe 4.11)
       {"ziel": "<K2>", "grund": "Probe"}
       """
     Dann antwortet die Kontaktpflege nach höchstens 5 Sekunden mit Status 409 und Fehlercode «STATUS_KONFLIKT»
+    Wenn die andere Transaktion die Sperre des Kontakts freigibt
+    Dann sind Kontakte und Dokumente unverändert
+
+  @req-17.12 @req-17.7
+  Szenario: Hält ein Zusammenführen den Zielkontakt, wartet das Zuordnen eines Partners höchstens 5 Sekunden und endet mit 409
+    Angenommen im Mandanten «urinet» gibt es diese Dokumente zu Kontakten:
+      | dokument | partner | status     | vertraulichkeit | datum      |
+      | D1       | K1      | ARCHIVIERT | NORMAL          | 2026-03-01 |
+    Und die Version des Dokuments D1 ist gemerkt
+    Und der Stand der Kontakte und Dokumente ist gemerkt
+    Und eine andere Transaktion den Kontakt K2 sperrt, wie es eine laufende Übernahme tut
+    Wenn «inhaber-urinet» das Dokument D1 mit der gemerkten Version dem Partner K2 zuordnet
+    Dann antwortet das Ändern des Dokuments mit Status 409 und Fehlercode «STATUS_KONFLIKT»
     Wenn die andere Transaktion die Sperre des Kontakts freigibt
     Dann sind Kontakte und Dokumente unverändert
 

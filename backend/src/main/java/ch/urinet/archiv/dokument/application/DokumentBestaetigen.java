@@ -243,7 +243,7 @@ public class DokumentBestaetigen {
      * {@code ANFRAGE_UNGUELTIG} wie eine inaktive Art; derselbe Partner bleibt erlaubt. Auch für {@link DokumentAendern}.
      */
     static String partnerName(KontaktRegister kontakte, UUID neu, UUID bisher) {
-        Kontakt kontakt = kontakte.finden(neu).orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
+        Kontakt kontakt = kontakte.fuerZuordnung(neu).orElseThrow(() -> new FachFehler(Fehlercode.PARTNER_UNBEKANNT));
         if (!kontakt.aktiv() && !neu.equals(bisher)) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }

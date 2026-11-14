@@ -366,6 +366,7 @@ public class KontaktResource {
     @APIResponse(responseCode = "200", description = "Inaktiv",
             headers = @Header(name = "ETag", description = "Neue Version des Kontakts"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = KontaktDto.class)))
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: unbekannt oder fremder Mandant")
     @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: schon inaktiv")
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
@@ -389,6 +390,7 @@ public class KontaktResource {
     @APIResponse(responseCode = "200", description = "Wieder aktiv",
             headers = @Header(name = "ETag", description = "Neue Version des Kontakts"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = KontaktDto.class)))
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: unbekannt oder fremder Mandant")
     @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: aktiv oder zusammengeführt")
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
@@ -426,6 +428,11 @@ public class KontaktResource {
     @APIResponse(responseCode = "200", description = "Geändert",
             headers = @Header(name = "ETag", description = "Neue Version des Kontakts"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = KontaktDto.class)))
+    @APIResponse(responseCode = "400", description = "ANFRAGE_UNGUELTIG")
+    @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN: unbekannt oder fremder Mandant")
+    @APIResponse(responseCode = "409", description = "STATUS_KONFLIKT: inaktiver Kontakt (Req 17.16)")
+    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
+    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
     public Response aendern(@PathParam("kontaktId") String kontaktId,
                             @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                             KontaktAngabenDto aenderung) {
@@ -508,7 +515,7 @@ public class KontaktResource {
         }
     }
 
-    /** Bereinigter Grund; Pflicht: fehlt oder leer → 400; über 1000 Zeichen → 400. Ohne Pflicht: leer → {@code null}. */
+    /** Bereinigter Grund; Pflicht: fehlt oder leer → 400; über 1000 Zeichen oder mit Steuerzeichen (auch NUL) → 400. Ohne Pflicht: leer → {@code null}. */
     static String grund(String grund, boolean pflicht) {
         String bereinigt = grund == null ? "" : grund.strip();
         if (bereinigt.isEmpty()) {
@@ -517,7 +524,8 @@ public class KontaktResource {
             }
             return null;
         }
-        if (bereinigt.codePointCount(0, bereinigt.length()) > GRUND_MAX) {
+        if (bereinigt.codePointCount(0, bereinigt.length()) > GRUND_MAX
+                || bereinigt.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL)) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         return bereinigt;

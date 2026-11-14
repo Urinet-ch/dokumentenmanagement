@@ -3669,6 +3669,21 @@
               }
             }
           },
+          "400" : {
+            "description" : "ANFRAGE_UNGUELTIG"
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
+          },
+          "409" : {
+            "description" : "STATUS_KONFLIKT: inaktiver Kontakt (Req 17.16)"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
           "401" : {
             "description" : "Not Authorized"
           },
@@ -3716,6 +3731,9 @@
                 }
               }
             }
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
           },
           "409" : {
             "description" : "STATUS_KONFLIKT: aktiv oder zusammengeführt"
@@ -3783,6 +3801,9 @@
                 }
               }
             }
+          },
+          "404" : {
+            "description" : "NICHT_GEFUNDEN: unbekannt oder fremder Mandant"
           },
           "409" : {
             "description" : "STATUS_KONFLIKT: schon inaktiv"
