@@ -20,6 +20,7 @@ export class HttpSucheService extends SuchePort {
       a.datumVon,
       a.geschaeftsjahr,
       a.groesse,
+      undefined,
       a.partner,
       a.q,
       a.richtung,

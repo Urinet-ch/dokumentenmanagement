@@ -800,6 +800,28 @@
           }
         }
       },
+      "Fundstelle" : {
+        "description" : "Bester Abschnitt des Dokuments aus dem Vektor-Teil der Hybridsuche (Spec 02, Req 2.2; Spec 03, Req 5.7)",
+        "type" : "object",
+        "required" : [ "abschnitt" ],
+        "properties" : {
+          "abschnitt" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "Nummer des Abschnitts, ab 1"
+          },
+          "seiteVon" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "erste Seite; null ohne Seitentrenner"
+          },
+          "seiteBis" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "description" : "letzte Seite; null ohne Seitentrenner"
+          }
+        }
+      },
       "GeneratorAntwort" : {
         "type" : "object",
         "required" : [ "id", "status" ],
@@ -1766,7 +1788,7 @@
           "gesamt" : {
             "type" : "integer",
             "format" : "int64",
-            "description" : "Zahl aller sichtbaren Treffer"
+            "description" : "Modus volltext: Zahl aller sichtbaren Treffer. Modus hybrid: Zahl der gelieferten Treffer (höchstens 30), keine Gesamtzahl"
           },
           "seite" : {
             "type" : "integer",
@@ -1775,6 +1797,15 @@
           "groesse" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "modus" : {
+            "type" : "string",
+            "description" : "Nur im Modus hybrid gesetzt",
+            "enum" : [ "volltext", "hybrid" ]
+          },
+          "degradiert" : {
+            "type" : "boolean",
+            "description" : "Nur im Modus hybrid: true, wenn nur im Volltext gesucht wurde (Rückfall, Spec 02, Req 2.3)"
           }
         }
       },
@@ -1857,6 +1888,15 @@
           "dateiname" : {
             "type" : [ "string", "null" ],
             "description" : "Name der empfangenen Datei ohne Pfad, nur lesend; Herkunftsangabe, kein Titel (Req 14.9); null ohne Namen"
+          },
+          "fundstelle" : {
+            "description" : "Nur im Modus hybrid: bester Abschnitt aus dem Vektor-Teil; fehlt bei Treffern nur aus dem Volltext und im Rückfall",
+            "type" : [ "object", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Fundstelle"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       },
@@ -2342,7 +2382,7 @@
       },
       "get" : {
         "summary" : "Dokumente suchen",
-        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "description" : "Code der Dokumentart",
@@ -2403,6 +2443,14 @@
             "default" : 20
           },
           "name" : "groesse",
+          "in" : "query"
+        }, {
+          "description" : "Standard volltext; hybrid nur mit q, ohne sortierung=DATUM, seite und groesse (Spec 02, Req 2.7)",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "volltext", "hybrid" ]
+          },
+          "name" : "modus",
           "in" : "query"
         }, {
           "description" : "ID des Partners",

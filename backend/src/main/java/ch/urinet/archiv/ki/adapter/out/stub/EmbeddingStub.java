@@ -18,4 +18,9 @@ public class EmbeddingStub implements EmbeddingPort {
     public Antwort einbetten(List<String> texte) {
         return new OhneVektoren();
     }
+
+    @Override
+    public Antwort einbettenFrage(String frage) {
+        return new OhneVektoren();
+    }
 }
