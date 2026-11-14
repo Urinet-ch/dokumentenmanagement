@@ -173,3 +173,45 @@ select {
   gap: 0.5rem;
   margin: 1rem 0;
 }
+
+.modus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0.5rem;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    font: var(--mat-sys-label-large);
+  }
+
+  input {
+    width: 1.5rem;
+    min-height: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    margin: 0;
+  }
+
+  small {
+    color: var(--urinet-gedaempft);
+  }
+}
+
+.rueckfall {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 1rem;
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+
+  p {
+    margin: 0;
+    flex: 1 1 14rem;
+  }
+}

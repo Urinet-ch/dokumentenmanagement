@@ -1461,6 +1461,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
       und beim Verlassen. Die Ansicht zeigt es auf schmalen Bildschirmen (< 960 px) statt des eingebetteten PDF und
       immer, wenn die PDF/A-Fassung fehlt oder nicht lädt; nur mit `seiten` ≥ 1. In der Trefferliste gibt es kein
       Bild: Jeder Abruf schreibt `ANZEIGEN` ins Protokoll, und `Suchtreffer` kennt `seiten` nicht.
+  - Modus hybrid als Standard und Umschalter «Volltext»: Spec 02, Aufgabe 6.6 (design.md, «Umsetzung (Aufgabe 6.6, 14.11.2026)»).
   - Tests: Unit-Tests (Vitest) für Filter, Adapter, Suche und Dokumentansicht; Browser-Szenarien
     `features/suche/suche-pwa.feature` (`@req-14.1`, `@req-14.2`, `@req-14.4`, `@req-14.6`, `@req-14.7`) gegen eine
     API-Attrappe mit synthetischen Dokumenten (`frontend/e2e/hilfen/suche-attrappe.mjs`, darum `@attrappe`); den
@@ -1468,6 +1469,9 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     `aenderung.ts`, `MetadatenFormular`, Adapter und Ansicht; Browser-Szenarien `features/dokument/bearbeiten-pwa.feature`
     (`@req-10.1` Bearbeiten mit Grund und If-Match, kein Knopf ohne A6; `@req-14.6` Vorschaubild auf dem Handy) gegen
     dieselbe Attrappe; den Vertrag von `versionen` belegt `features/dokument/aendern.feature` (`@req-10.1`).
+    Seit Spec 02, Aufgabe 6.6 sendet jede Suche mit Suchbegriff `modus=hybrid` (ohne `sortierung`, `seite`, `groesse`),
+    jede andere `modus=volltext`: `suche-pwa.feature` erwartet `modus=hybrid` bei den Anzeige-Szenarien (14.6, 14.9, 14.10), `modus=volltext`
+    bei der Filter-Suche ohne Suchbegriff und schaltet für die Parameter `sortierung` und `seite` (14.1, 14.4) den Umschalter «Volltext» ein.
 
 ## Data Models
 
