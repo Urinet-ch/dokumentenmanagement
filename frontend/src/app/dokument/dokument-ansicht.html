@@ -55,7 +55,13 @@
             }
             @if (d.partnerId || d.partnerName) {
               <dt>{{ texte.partner }}</dt>
-              <dd data-test="partner">{{ d.partnerName || d.partnerId }}</dd>
+              <dd data-test="partner">
+                @if (darfKontakt() && d.partnerId) {
+                  <a [routerLink]="['/kontakte', d.partnerId]" data-test="partner-link">{{ d.partnerName || d.partnerId }}</a>
+                } @else {
+                  {{ d.partnerName || d.partnerId }}
+                }
+              </dd>
             }
             @if (d.projekt) {
               <dt>{{ texte.projekt }}</dt>

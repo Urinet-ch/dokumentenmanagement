@@ -1,0 +1,67 @@
+<form
+  class="karte formular"
+  (submit)="speichern($event)"
+  novalidate
+  aria-labelledby="bearbeiten-titel"
+  data-test="bearbeiten-formular"
+>
+  <h2 id="bearbeiten-titel" tabindex="-1" #titel>{{ texte.bearbeitenTitel }}</h2>
+
+  <label class="feld">
+    <span>{{ texte.felder.typ }} · {{ texte.pflicht }}</span>
+    <select
+      name="typ"
+      data-test="feld-typ"
+      [attr.aria-invalid]="pruefText('typ') ? 'true' : null"
+      aria-describedby="fehler-typ"
+      (change)="setzen('typ', $any($event.target).value)"
+    >
+      <option value="" [selected]="aktuell().typ === ''">{{ texte.typWaehlen }}</option>
+      @for (t of typen; track t) {
+        <option [value]="t" [selected]="aktuell().typ === t">{{ texte.typen[t] }}</option>
+      }
+    </select>
+    <small id="fehler-typ" class="fehler" data-test="fehler-typ">{{ pruefText('typ') }}</small>
+  </label>
+
+  @for (f of felder; track f) {
+    <label class="feld">
+      <span
+        >{{ texte.felder[f] }}
+        @if (f === 'name') {
+          · {{ texte.pflicht }}
+        }
+      </span>
+      <input
+        type="text"
+        [name]="f"
+        autocomplete="off"
+        [attr.data-test]="'feld-' + f"
+        [value]="aktuell()[f]"
+        [attr.aria-invalid]="pruefText(f) ? 'true' : null"
+        [attr.aria-describedby]="'fehler-' + f"
+        (input)="setzen(f, $any($event.target).value)"
+      />
+      <small [id]="'fehler-' + f" class="fehler" [attr.data-test]="'fehler-' + f">{{
+        pruefText(f)
+      }}</small>
+    </label>
+  }
+
+  <p class="fehler" role="alert" data-test="formular-meldung">{{ meldung() }}</p>
+
+  <div class="knoepfe">
+    <button mat-flat-button type="submit" data-test="speichern" [disabled]="sendet()">
+      {{ sendet() ? texte.sendet : texte.speichern }}
+    </button>
+    <button
+      mat-button
+      type="button"
+      data-test="bearbeiten-abbrechen"
+      [disabled]="sendet()"
+      (click)="abgebrochen.emit()"
+    >
+      {{ texte.abbrechen }}
+    </button>
+  </div>
+</form>

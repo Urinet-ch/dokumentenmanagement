@@ -105,6 +105,8 @@ export class DokumentAnsicht {
     return code ? (this.arten().find((a) => a.code === code)?.name ?? code) : TEXTE.suche.ohneArt;
   });
   /** Knopf nur mit A6 und in einem änderbaren Status; das Archiv prüft trotzdem selbst (Req 2.6). */
+  /** Der Partner verlinkt auf den Kontakt nur mit A6 (Req 17.1). */
+  protected readonly darfKontakt = computed(() => this.anmeldung.darf('A6'));
   protected readonly darfBearbeiten = computed(() => {
     const d = this.dokument();
     return !!d && AENDERBAR.has(d.status) && this.anmeldung.darf('A6');
