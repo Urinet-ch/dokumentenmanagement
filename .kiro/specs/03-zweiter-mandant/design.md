@@ -236,6 +236,40 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
   `Deprecation`, `Sunset` und `Link` (Requirement 11.5). Parallelbetrieb mindestens 6 Monate (Requirement 11.4).
 - Traefik: `/public/` läuft über einen eigenen Router mit eigener Drosselung je IP, damit die Seitenaufrufe einer
   Webseite (ein Server, eine IP) nicht unter die Grenze der App fallen; der Wert steht in `deploy/`, nicht hier.
+- Umsetzung (Aufgabe 11.6, Vorstufe 14.11.2026; Entscheid Fabian vom 14.11.2026 «Neutrale Vorstufen jetzt»):
+  - Weg für `/public/v1`: Quarkus REST registriert am Router nur `quarkus.rest.path` (`/api/v1`). `WebseitenRoute`
+    (`integration/adapter/in/rest/webseite`) leitet jede Anfrage unter `/public/` vor der Anmeldung (Order -250, vor
+    den Filtern der Anmeldung bei -200) per Vert.x-Reroute auf den internen Pfad `/api/v1/public/…` um; die Resources
+    tragen `@Path("/public/v1/…")`. Danach gelten Anmeldung, HTTP-Rechte (`/api/*`), `ProblemAnmeldung`,
+    `ProblemFehlerRoute` und `ProblemAbbildung` wie für die App, ohne Änderung der bestehenden Pfade. Der interne Pfad
+    antwortet von aussen 404 `NICHT_GEFUNDEN`, schon vor der Anmeldung. Geprüft wird ohne Matrix-Parameter (`;…`),
+    weil Quarkus REST sie vor der Zuordnung entfernt; unter `/public/` weist die Route Pfade mit `;` mit 404 ab, und ein
+    Filter nach der Zuordnung (`WebseitenSperre`) weist jede Resource unter `/public/` ohne vorherigen Reroute ab
+    (Review PR #140). `Cache-Control: no-store` und die Header der
+    Abkündigung setzt derselbe Handler am Router für jede Antwort unter `/public/`, auch für Fehler vor der Resource.
+    `quarkus.http.auth.permission` und `ProblemAnmeldung` nennen `/public/` zusätzlich, Quinoa ignoriert `/public`.
+  - Paket: Die Regel der Schichten in `ArchitekturTest` verlangt `<fachbereich>.(domain|application|adapter)`; die
+    Webseiten-Schnittstelle liegt darum wie `integration.domain.mail` unter `integration.domain.webseite` und
+    `integration.adapter.in.rest.webseite`. `mp.openapi.scan.exclude.packages` schliesst beide Präfixe aus
+    (`ch.urinet.archiv.integration.webseite` und `ch.urinet.archiv.integration.adapter.in.rest.webseite`, Unterpakete
+    inbegriffen; `OpenApiAusschlussTest`).
+  - Vertrag: `PublicVertragTest` beschreibt den Code mit dem Scanner von smallrye-open-api (`smallrye-open-api-jaxrs`
+    als Testabhängigkeit, Version aus der Quarkus-BOM) auf einem Jandex-Index aller Klassen aus `src/main`, mit den
+    Einstellungen `mp.openapi.*` der App ohne Ausschluss, ohne Quarkus-Start; die Datei liest derselbe Parser.
+    Verglichen werden die Pfade unter `/public/` normalisiert (Parameter, Pflicht, Anfrage-Inhalt, Statuscodes, Schemas
+    mit aufgelösten Referenzen; Antworten mit `$ref` über den Namen). Dazu Mindestprüfungen als OpenAPI 3.1 und jede
+    Referenz `$ref` lokal und auflösbar. Die Fassung dieser Aufgabe hat `paths: {}`.
+  - Nur additiv: eigenes Skript `.github/scripts/pruefe-vertrag.sh` mit `pruefe-vertrag.rb` (Ruby-Standardbibliothek,
+    auf ubuntu-24.04 und macOS vorhanden; Python hat kein YAML in der Standardbibliothek), weil `x-erweiterbar` eine
+    eigene Konvention ist. Fehlende oder unbekannte Basis und unlesbare Dateien → Exit 2, gelöschte Datei → Exit 1,
+    Datei ohne Stand auf der Basis = erste Fassung. Selbsttest `pruefe-vertrag-test.sh` über `VertragPruefungTest`.
+  - Abkündigung: `archiv.webseite.v<n>.sunset` (ISO-Datum; ungültig → Start bricht ab). `Sunset` = Tagesbeginn UTC als
+    HTTP-Datum (RFC 8594), `Deprecation` = Sunset minus 6 Monate als `@<Unix-Sekunden>` (RFC 9745; Wahl dieser Aufgabe,
+    die Spec nennt keinen Zeitpunkt), `Link: </public/v<n+1>>; rel="successor-version"`. Nach dem Sunset liefert das
+    Archiv weiter aus (Abschalten ist ein Betriebsentscheid).
+  - Offen: CI-Schritt «Vertrag nur additiv» im Build-Job (`.github/workflows/` nicht in dieser Aufgabe), Router für
+    `/public/` mit eigener Drosselung in Traefik (`deploy/infomaniak/compose.yml`, Wert betrieblich); bis dahin läuft
+    `/public/` über den Router der App.
 
 ### Grenzen
 Startwerte (Requirement 15.1; vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR), konfigurierbar unter

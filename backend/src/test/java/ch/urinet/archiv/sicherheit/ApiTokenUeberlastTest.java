@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Ohne Anmeldung lässt sich der Heap nicht über Argon2 erschöpfen (Req 2.5, Review PR #37, Muss 1): Höchstens
  * {@code archiv.api-token.parallele-pruefungen} (2) Vergleiche laufen gleichzeitig, auch für unbekannte IDs; wer keinen
- * Platz erhält, bekommt sofort 503 {@code UEBERLASTET} mit {@code Retry-After}. Health-Check und OIDC bleiben erreichbar.
+ * Platz erhält, bekommt sofort 503 {@code UEBERLASTET} mit {@code Retry-After}, unter {@code /public/} zusätzlich mit
+ * {@code Cache-Control: no-store} (Spec 03, Req 15.2 und 15.4). Health-Check und OIDC bleiben erreichbar.
  * Den Höchststand zählt {@link ZaehlenderHasher}.
  */
 @QuarkusTest
@@ -119,6 +120,7 @@ class ApiTokenUeberlastTest {
         Duration dauer = Duration.ofNanos(System.nanoTime() - beginn);
         HttpResponse<String> gesundheitMitToken = senden(anfrage("/q/health/live", ApiToken.neu(zufall).text()).GET());
         HttpResponse<String> gesundheit = senden(HttpRequest.newBuilder(basis.resolve("/q/health/live")).GET());
+        HttpResponse<String> webseite = senden(anfrage("/public/v1/probe", ApiToken.neu(zufall).text()).GET());
         HttpResponse<String> benutzer = senden(anfrage("/api/v1/probe/ich", oidc).GET());
 
         assertThat(abgewiesen.statusCode()).as(abgewiesen.body()).isEqualTo(503);
@@ -132,6 +134,13 @@ class ApiTokenUeberlastTest {
         assertThat(gesundheitMitToken.headers().firstValue("Retry-After")).contains("1");
         assertThat(gesundheit.statusCode()).isEqualTo(200);
         assertThat(benutzer.statusCode()).isEqualTo(200);
+        // Webseiten-Schnittstelle (Spec 03, Muss 5 und 6 der Aufgabe 11.6, Review PR #140): dieselbe 503 mit no-store
+        assertThat(webseite.statusCode()).as(webseite.body()).isEqualTo(503);
+        assertThat(webseite.headers().firstValue("Retry-After")).contains("1");
+        assertThat(webseite.headers().allValues("Cache-Control")).containsExactly("no-store");
+        assertThat(webseite.headers().firstValue("Content-Type")).contains("application/problem+json");
+        assertThat(webseite.body()).contains("\"fehlercode\":\"UEBERLASTET\"");
+        assertThat(ZaehlenderHasher.LAUFEND.get()).isEqualTo(PARALLELE_PRUEFUNGEN);
 
         ZaehlenderHasher.freigeben();
         for (CompletableFuture<HttpResponse<String>> antwort : belegt) {

@@ -203,6 +203,13 @@ class NurSpecTest {
             "GemeinsamSchritte", "ReqAbdeckungTest");
 
     /**
+     * Testklassen, die unter docs/ nur Nicht-Markdown lesen: Eine Änderung daran ist nie «nur Spec», der volle Lauf führt
+     * sie aus; darum brauchen sie keinen Eintrag in SPEC_TESTS (Spec 03, Aufgabe 11.6). Ihre Quelle nennt keine .md-Datei.
+     */
+    private static final java.util.Map<String, String> OHNE_MARKDOWN = java.util.Map.of(
+            "PublicVertragTest", "docs/schnittstelle/public-v1.yaml (Vertrag der Webseiten-Schnittstelle)");
+
+    /**
      * Jede Testklasse mit einem Pfad nach .kiro/ oder docs/ steht in SPEC_TESTS; ist sie keine Testklasse (Hilfstyp wie
      * StammdatenTabelle, ReqAbdeckung), dann jeder ihrer Nutzer, ausser er steht mit Gegenstück in NUTZER_AUSSERHALB.
      * Sonst liefe ein neuer Spec-Test bei reinen Spec-Anpassungen nie (Review 13.11.2026).
@@ -227,6 +234,11 @@ class NurSpecTest {
                 "FehlercodeSpecTest", "RechtematrixSpecTest");
         for (String klasse : leser) {
             if (specTests.contains(klasse)) {
+                continue;
+            }
+            if (OHNE_MARKDOWN.containsKey(klasse)) {
+                assertThat(quellen.get(klasse)).as(klasse + " liest nur " + OHNE_MARKDOWN.get(klasse))
+                        .doesNotContain(".md\"", ".kiro");
                 continue;
             }
             assertThat(klasse).as(klasse + " liest .kiro/ oder docs/, ist aber nicht in SPEC_TESTS").doesNotEndWith("Test");

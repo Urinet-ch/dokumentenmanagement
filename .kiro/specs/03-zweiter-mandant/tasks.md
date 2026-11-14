@@ -88,6 +88,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - `docs/schnittstelle/public-v1.yaml` (OpenAPI 3.1) für Lesen und Erfassung; Pfade unter `/public/` über `mp.openapi.scan.exclude.packages` nicht in `frontend/openapi/` und nicht im Angular-Client, Vertrag in eigenem Lauf erzeugen (Weg wählen); `PublicVertragTest` (Code = Datei); CI-Schritt im Build-Job mit vollständiger Historie: nur additive Änderungen gegenüber `origin/main` (Werkzeug wählen); Header `Deprecation`, `Sunset`, `Link` über `archiv.webseite.v<n>.sunset`; Problem Details auch unter `/public/` (`ProblemAnmeldung`), `Cache-Control: no-store`
   - Traefik: eigener Router für `/public/` mit eigener Drosselung je IP (Labels in `deploy/infomaniak/compose.yml`, nur über den Deploy-Workflow)
   - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; getestet mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Der Vertrag enthält, was es bei der Umsetzung gibt (Problem Details, Header, Versionierung); die Endpunkte kommen additiv mit 11.2 und 11.10 dazu
+  - Umsetzung Teil 1 (PR #140): Vertrag `docs/schnittstelle/public-v1.yaml` ohne Endpunkte, Reroute `/public/` → interner Pfad (`WebseitenRoute`), `PublicVertragTest`, Ausschluss aus der App-OpenAPI, Problem Details und `Cache-Control: no-store` unter `/public/`, Abkündigung über `archiv.webseite.v<n>.sunset`, Skript `pruefe-vertrag.sh` mit Selbsttest; offen: CI-Schritt, Traefik-Router
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
 - [ ] 11.7 Webseiten-Schlüssel [Backend]
