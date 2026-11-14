@@ -3,7 +3,8 @@
 Funktionalität: E-Mail-Eingang
   Das Archiv ruft das Postfach jedes Mandanten per IMAP über TLS ab, erfasst Anhänge zugelassener Absender wie einen
   Upload und legt Mails ohne Anhang als Korrespondenz ab. Die Szenarien laufen gegen GreenMail (IMAP über TLS mit
-  Test-CA) mit synthetischen Nachrichten, keine echten Mails oder Belege. Abgerufen wird direkt, nicht im Takt.
+  Test-CA) mit synthetischen Nachrichten, keine echten Mails oder Belege. Abgerufen wird direkt in einem eigenen Thread;
+  ein Szenario ruft wie im Betrieb über den Takt im Thread des Schedulers ab.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -149,3 +150,15 @@ Funktionalität: E-Mail-Eingang
     Dann hat das Archiv im Mandanten «urinet» zur zweiten Mail kein Dokument angelegt, auch keine Korrespondenz
     Und «mail_eingang» von «urinet» führt die zweite Mail als «ERFASST» ohne Dokument
     Und das Log meldet zur Mail kein neues Dokument
+
+  # Der Takt ruft alle Mandanten ab und meldet dabei einmal, dass der Eingang für «vhf-gsk» ruht; darum zuletzt.
+  @req-1.1 @req-1.2
+  Szenario: Im Takt des Schedulers erfasst das Archiv eine Mail aus Gmail mit PDF-Anhang wie im Betrieb
+    Angenommen das Log des Mail-Eingangs wird mitgeschnitten
+    Und im Postfach liegt eine Mail aus Gmail von «inhaber@example.invalid» mit einem PDF «Testbeleg 2026-11.pdf»
+    Wenn der Takt des Workers das Postfach im Scheduler abruft
+    Dann hat das Archiv im Mandanten «urinet» zur Mail genau ein Dokument angelegt
+    Und das Dokument der Mail ist das PDF «Testbeleg 2026-11.pdf» aus dem Anhang
+    Und «mail_eingang» von «urinet» führt die Mail als «ERFASST» mit diesem Dokument
+    Und liegt die Mail im Ordner «Archiviert» und der Posteingang ist leer
+    Und das Log meldet keine Nachricht als nicht verarbeitet

@@ -179,7 +179,7 @@ public class ImapPostfach implements PostfachPort {
                     gescheitert++;
                     zurueckgestellt.put(schluessel, jetzt.plus(zurueckstellen));
                     LOG.warnf("Mail-Eingang: Nachricht nicht verarbeitet, bleibt im Posteingang und wird zurückgestellt, "
-                            + "ursache=%s", Ursachen.kette(e));
+                            + "ursache=%s", Ursachen.ketteMitMeldung(e));
                     continue;
                 }
                 try {
@@ -192,7 +192,7 @@ public class ImapPostfach implements PostfachPort {
                 } catch (MessagingException e) {
                     gescheitert++;
                     LOG.warnf("Mail-Eingang: Nachricht erfasst, aber nicht verschoben, der nächste Takt holt es nach, "
-                            + "ursache=%s", Ursachen.kette(e));
+                            + "ursache=%s", Ursachen.ketteMitMeldung(e));
                 }
             }
             if (wartend > 0) {

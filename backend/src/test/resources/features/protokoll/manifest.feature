@@ -3,7 +3,8 @@
 Funktionalität: Tages-Manifest (Aufgabe 5.2)
   Der Auftrag MANIFEST erzeugt je Mandant und Tag ein signiertes Manifest mit Hash-Kette, stempelt es bei zwei
   synthetischen Zeitstempeldiensten «haupt» (OCSP) und «zweit» (Sperrliste) über WireMock und legt alles gesperrt unter
-  «manifest/» ab. Jedes Szenario nutzt einen eigenen Mandanten; die Tests reihen den Auftrag selbst ein (kein Planer in test).
+  «manifest/» ab. Jedes Szenario nutzt einen eigenen Mandanten; die Tests reihen den Auftrag selbst ein (kein Planer in test);
+  nur das Szenario zum Takt löst den Planer einmal über den Scheduler aus.
 
   @req-15.1 @req-15.2 @req-15.3 @req-15.11 @req-15.12
   Szenario: Drei Tage ergeben eine signierte und doppelt gestempelte Hash-Kette, die das Prüfwerkzeug als gültig meldet
@@ -121,6 +122,14 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und das Manifest «10.01.2026» von «mf-trenn-b» nennt nur den eigenen Mandanten und genau seine Dokumente
     Und das Manifest «10.01.2026» von «mf-trenn-a» enthält den Hash von 0 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
     Und das Manifest «10.01.2026» von «mf-trenn-b» enthält den Hash von 1 Zeile(n) aus «zugriff_protokoll» und 0 Zeile(n) aus «dokument_version»
+
+  @req-15.1
+  Szenario: Der Takt des Planers reiht im Scheduler den Manifest-Auftrag bis gestern ein wie im Betrieb
+    Angenommen der Mandant «mf-takt» ist eben angelegt
+    Wenn der Takt des Manifest-Planers für «mf-takt» im Scheduler auslöst
+    Dann ist für «mf-takt» genau ein Manifest-Auftrag bis gestern eingereiht
+    Wenn die übrigen Aufträge abgearbeitet sind
+    Dann «mf-takt» hat kein Manifest
 
   @req-15.11 @req-15.12
   Szenario: Fehlen nach dem letzten Versuch nur die Prüfdaten des zweiten Diensts, gilt das Manifest mit dem Hauptdienst

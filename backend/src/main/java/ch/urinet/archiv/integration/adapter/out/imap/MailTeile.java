@@ -125,7 +125,7 @@ final class MailTeile {
             }
         } catch (MessagingException | IOException | RuntimeException e) {
             LOG.infof("Mail-Eingang: ein Teil der Nachricht ist nicht lesbar und fällt weg, ursache=%s",
-                    Ursachen.kette(e));
+                    Ursachen.ketteMitMeldung(e));
         }
     }
 

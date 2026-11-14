@@ -1,5 +1,6 @@
 package ch.urinet.archiv.integration.adapter.in.job;
 
+import ch.urinet.archiv.gemeinsam.adapter.in.job.TaktThread;
 import ch.urinet.archiv.gemeinsam.adapter.in.job.VorMigrationUeberspringen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.integration.application.mail.MailEingang;
@@ -10,7 +11,11 @@ import org.jboss.logging.Logger;
 
 import java.util.Arrays;
 
-/** Ruft alle {@code archiv.mail.intervall} (Standard 10 Minuten) die Postfächer ab (Spec 02, Req 1.1), nur als Worker. */
+/**
+ * Ruft alle {@code archiv.mail.intervall} (Standard 10 Minuten) die Postfächer ab (Spec 02, Req 1.1), nur als Worker.
+ * Der Abruf läuft in einem eigenen Thread ohne den Request-Kontext des Schedulers ({@link TaktThread}), sonst verweigert
+ * {@code MandantKontext.mit} den Mandanten jeder Nachricht.
+ */
 @ApplicationScoped
 public class MailTakt {
 
@@ -30,10 +35,10 @@ public class MailTakt {
     void abrufen() {
         if (worker) {
             try {
-                eingang.abrufen();
+                TaktThread.ausfuehren("mail-eingang", eingang::abrufen);
             } catch (RuntimeException e) {
-                // nächster Takt versucht es wieder; nur Klassennamen (Req 16.7)
-                LOG.warnf("Mail-Eingang fehlgeschlagen, ursache=%s", Ursachen.kette(e));
+                // nächster Takt versucht es wieder; Klassennamen, feste Meldungen eigener Ausnahmen (Req 16.7)
+                LOG.warnf("Mail-Eingang fehlgeschlagen, ursache=%s", Ursachen.ketteMitMeldung(e));
             }
         }
     }

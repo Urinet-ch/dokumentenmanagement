@@ -1,6 +1,8 @@
 package ch.urinet.archiv.verarbeitung;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.gemeinsam.SchedulerTakt;
+import ch.urinet.archiv.mandant.application.MandantAusAnmeldung;
 import ch.urinet.archiv.mandant.application.MandantBucket;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
@@ -13,6 +15,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.quarkus.scheduler.Scheduler;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -84,6 +87,12 @@ public class PrueflaufSchritte {
 
     @Inject
     S3Client s3;
+
+    @Inject
+    Scheduler scheduler;
+
+    @Inject
+    MandantAusAnmeldung anmeldung;
 
     @ConfigProperty(name = "archiv.ablage.bucket-praefix")
     String bucketPraefix;
@@ -174,6 +183,10 @@ public class PrueflaufSchritte {
         zweiterStart.ifPresent(laeufe::add);
     }
 
+    /**
+     * Wie im Betrieb über einen Job des Quarkus-Schedulers mit Request-Kontext und ohne Anmeldung ({@link SchedulerTakt};
+     * Review PR #130); der Zeitplan in der Konfiguration ist im Profil {@code test} aus.
+     */
     @Wenn("der Takt des Zeitplans am {word} um 04:00 auslöst")
     public void takt(String datum) throws Exception {
         Clock uhr = Clock.fixed(LocalDate.parse(datum, DATUM).atTime(4, 0).atZone(ZUERICH).toInstant(), ZUERICH);
@@ -201,7 +214,7 @@ public class PrueflaufSchritte {
         };
         PrueflaufZeitplan zeitplan = new PrueflaufZeitplan(nurUrinet, starten, "api,worker", uhr);
         List<UUID> vorher = laeufeIm("2999-01");
-        threads.submit(zeitplan::starten).get(30, TimeUnit.SECONDS);
+        SchedulerTakt.ausloesen(scheduler, anmeldung, "prueflauf", zeitplan::starten);
         List<UUID> neu = laeufeIm("2999-01").stream().filter(id -> !vorher.contains(id)).toList();
         if (laeufe.isEmpty()) {
             assertThat(neu).as("der erste Takt holt den Lauf des Monats nach").hasSize(1);
