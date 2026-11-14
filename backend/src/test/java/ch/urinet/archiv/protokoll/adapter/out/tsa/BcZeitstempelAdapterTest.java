@@ -204,6 +204,36 @@ class BcZeitstempelAdapterTest {
                 .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("Policy");
     }
 
+    @Test
+    void mehrerePoliciesJeDienstWerdenErlaubtUnbekannteAbgelehnt(@TempDir Path ordner) throws Exception {
+        Map<String, String> werte = new HashMap<>();
+        werte.put("archiv.tsa.dienste", "a");
+        block(werte, ordner, "a", PKI, "1.3.6.1.4.1.99999.4,1.3.6.1.4.1.99999.10");
+        String kette = TsaTestPki.pem(PKI.tsa) + TsaTestPki.pem(PKI.ca);
+        Pruefdaten crl = new Pruefdaten(Pruefdaten.Art.CRL, PKI.crl(false));
+
+        for (String policy : List.of("1.3.6.1.4.1.99999.4", "1.3.6.1.4.1.99999.10")) {
+            assertThat(adapter(werte).pruefenAbgelegt("a", PKI.tsr(anfrage(IMPRINT), policy), IMPRINT, kette, crl))
+                    .isNotNull();
+        }
+        assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("a",
+                PKI.tsr(anfrage(IMPRINT), "1.3.6.1.4.1.99999.11"), IMPRINT, kette, crl))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("Policy");
+    }
+
+    @Test
+    void eineJaehrlicheCrlGiltNurMitDemLaengerenHoechstalterDesDiensts() {
+        Instant jetzt = Instant.now();
+        byte[] crl = PKI.crl(false, jetzt.minus(Duration.ofDays(60)), jetzt.plus(Duration.ofDays(305)));
+
+        BcZeitstempelAdapter.crlPruefen(crl, PKI.tsa, PKI.ca, jetzt, Duration.ofDays(370));
+        assertThatThrownBy(() -> BcZeitstempelAdapter.crlPruefen(crl, PKI.tsa, PKI.ca, jetzt, HOECHSTALTER))
+                .isInstanceOf(ZeitstempelFehler.class).hasMessageContaining("zu alt");
+        byte[] abgelaufen = PKI.crl(false, jetzt.minus(Duration.ofDays(400)), jetzt.minus(Duration.ofDays(35)));
+        assertThatThrownBy(() -> BcZeitstempelAdapter.crlPruefen(abgelaufen, PKI.tsa, PKI.ca, jetzt,
+                Duration.ofDays(370))).isInstanceOf(ZeitstempelFehler.class);
+    }
+
     private static void block(Map<String, String> werte, Path ordner, String kennung, TsaTestPki pki, String policy)
             throws Exception {
         Path ca = Files.writeString(ordner.resolve(kennung + "-ca.pem"), pki.caPem());

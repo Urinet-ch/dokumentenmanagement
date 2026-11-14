@@ -87,6 +87,21 @@ class DeployStufeTest {
         }
     }
 
+    /** Prod-Befund 14.11.2026: sgpki stempelt mit Policy .2.10 (neues TSA-Zertifikat), freetsa-CRL erscheint jährlich. */
+    @Test
+    void zeitstempeldiensteKennenDiePolicyUndDasHoechstalterAusDerProduktion() throws IOException {
+        SmallRyeConfig config = prodConfig(apiUmgebung());
+
+        assertThat(config.getValues("archiv.tsa.dienst.sgpki.policies", String.class))
+                .contains("2.16.756.1.17.3.5.2.4", "2.16.756.1.17.3.5.2.10");
+        assertThat(config.getValue("archiv.tsa.dienst.freetsa.pruefdaten-hoechstalter", Duration.class))
+                .isGreaterThan(Duration.ofDays(365));
+        assertThat(config.getOptionalValue("archiv.tsa.dienst.sgpki.pruefdaten-hoechstalter", Duration.class))
+                .isEmpty();
+        assertThat(config.getValue("archiv.tsa.pruefdaten-hoechstalter", Duration.class))
+                .isEqualTo(Duration.ofDays(7));
+    }
+
     /** Abweichungen als Schlüssel der Konfiguration; leer, wenn die Umgebung zur Stufe passt. */
     static List<String> pruefen(Map<String, String> umgebung) throws IOException {
         SmallRyeConfig config = prodConfig(umgebung);
