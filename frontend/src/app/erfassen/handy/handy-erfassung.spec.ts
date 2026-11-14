@@ -197,6 +197,28 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(anmeldung.anmelden).toHaveBeenCalledWith('/erfassen');
   });
 
+  it('behält die bisherige Arbeitsfassung, wenn das Anpassen des Zuschnitts scheitert', async () => {
+    await zeigen();
+    await fotoWaehlen();
+    scanner.fehler = true;
+    knopf(TEXTE.handy.anpassen(1))!.click();
+    await fixture.whenStable();
+    knopf(TEXTE.handy.ganzesBildVerwenden)!.click();
+    await fixture.whenStable();
+    expect(scanner.auftraege).toEqual([undefined, null]);
+    expect(hinweise()).toEqual(['anpassenFehler']);
+    expect(element.textContent).toContain(TEXTE.handy.anpassenFehler);
+    expect(element.querySelector('.mit-fehler')).toBeNull();
+    expect(element.querySelector('[data-test=seite] img')).not.toBeNull();
+    expect(knopf(TEXTE.handy.anpassen(1))!.disabled).toBe(false);
+
+    knopf(TEXTE.handy.abschliessen)!.click();
+    await fixture.whenStable();
+    const [eintrag] = [...speicher.inhalt.values()];
+    expect(eintrag.seiten).toHaveLength(1);
+    expect(await eintrag.seiten[0].arbeitsfassung.text()).toBe('zuschnitt');
+  });
+
   it('speichert bei Doppeltipp nur einmal, sperrt die Aufnahme und behält währenddessen aufgenommene Seiten', async () => {
     let freigeben!: () => void;
     const gesperrt = new Promise<void>((weiter) => (freigeben = weiter));

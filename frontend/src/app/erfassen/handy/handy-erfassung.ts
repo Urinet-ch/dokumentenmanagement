@@ -20,7 +20,8 @@ import { ScannerPort } from './scanner/scanner.service';
 import { WarteschlangeService } from './warteschlange/warteschlange.service';
 import { Zuschnitt } from './zuschnitt';
 
-type Hinweis = 'laeuft' | 'kantenErkannt' | 'keineKanten' | 'angepasst' | 'ganzesBild' | 'fehler';
+/** `fehler`: keine Arbeitsfassung, die Seite hält das Abschliessen auf; `anpassenFehler`: die bisherige bleibt. */
+type Hinweis = 'laeuft' | 'kantenErkannt' | 'keineKanten' | 'angepasst' | 'ganzesBild' | 'anpassenFehler' | 'fehler';
 
 interface Aufnahme {
   nr: number;
@@ -271,7 +272,11 @@ export class HandyErfassung {
           hinweis,
         });
       })
-      .catch(() => this.aendern(nr, { hinweis: 'fehler', arbeitsfassung: undefined }))
+      .catch(() => {
+        // Scheitert das Anpassen, bleibt die zuvor gültige Arbeitsfassung samt Vorschau erhalten.
+        const aktuell = this.seiten().find((s) => s.nr === nr);
+        this.aendern(nr, { hinweis: aktuell?.arbeitsfassung ? 'anpassenFehler' : 'fehler' });
+      })
       .finally(() => this.laufend.delete(lauf));
     this.laufend.add(lauf);
   }

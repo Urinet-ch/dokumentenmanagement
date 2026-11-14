@@ -1,6 +1,6 @@
 # Implementation Plan — 02 Abgleich und Chat
 
-Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.5) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 folgt nach Plan. Wellen, Rollen und Gates wie in
+Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.6; 6.6 ergänzt 14.11.2026) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 folgt nach Plan. Wellen, Rollen und Gates wie in
 `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
 Welle 8 (AbaNinja) läuft **nur**, wenn der Konzept-Entscheid E1 = ja; sonst wird sie übersprungen und die
 Werkzeuge melden «Zahlstatus unbekannt». Optionale Aufgaben sind mit `*` markiert.
@@ -32,7 +32,15 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 03 ergänzt: `HybridSuche` gibt je Dokument den besten Chunk (Nummer und Seitenbereich) mit (Spec 03, Req 5.7; Aufgabe 11.13)
   - Der Reranker-Port wählt Adapter oder Stub über den Schalter `archiv.ki.reranker-stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` `true`; Spec 01, Aufgabe 1.11)
   - Vertraulichkeits- und Mandantenszenarien nach der Rechtematrix (Spec 01, 2.6); Lasttest p95 ≤ 2 s
-  - _Anforderungen: 2.2, 2.3, 2.5, 2.6_
+  - Ergänzt 14.11.2026 (entschieden von Fabian, Req 2.7, 2.8): Modus `hybrid` mit höchstens 30 Treffern ohne Gesamtzahl und ohne Blättern, Modus `volltext` unverändert, Rückfall in derselben Form mit `degradiert` (design.md «Hybrid als Standard in der Web-App»); `ki_verbrauch` mit Zweck `SUCHE` je Aufruf von Embedding-Modell und Reranker, kein Limit; Zweck im Kommentar zu `ki_verbrauch` in Spec 01 design.md nachtragen
+  - _Anforderungen: 2.2, 2.3, 2.5, 2.6, 2.7, 2.8_
+
+- [ ] 6.6 Hybridsuche als Standard in der Web-App [Frontend]
+  - Herkunft: Spec-Erweiterung, entschieden von Fabian am 14.11.2026 («Hybrid wird Standard»); Nummer 6.6 als nächste freie der Welle 6
+  - Suchseite `/suche` (Spec 01 design.md, Frontend): jede Suche mit Suchbegriff sendet `modus=hybrid` und zeigt höchstens 30 Treffer ohne Gesamtzahl und ohne Blättern; Umschalter «Volltext» als ausdrücklicher Modus mit dem bisherigen Verhalten (Sortierung, Blättern, Gesamtzahl); ohne Suchbegriff und bei Sortierung nach Datum Volltext; bei `degradiert` Hinweis «nur Volltext» mit Wechsel in den Modus Volltext
+  - Browser-Szenarien `@req-2.7` (hybrid, Volltext, Rückfall bei Ausfall des Rerankers)
+  - _Anforderungen: 2.7_
+  - _Abhängig von: 6.4; Spec 01: 4.10 (Suchseite und Browser-Szenarien der Suche)_
 
 - [x] 6.5 Jahresexport [Backend] [Frontend]
   - Auftrag `EXPORT_JAHR`, ZIP stromweise (nur `ARCHIVIERT`, `pdfa_fehlt` mit Original), `belegliste.csv`, `pruefsummen.sha256`, Manifeste, Dateinamensmuster, Protokoll, E-Mail ohne Inhalte; S3-Lebenszyklus 7 Tage
