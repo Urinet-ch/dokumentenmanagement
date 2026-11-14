@@ -1,7 +1,7 @@
 package ch.urinet.archiv.ki.chat;
 
 import ch.urinet.archiv.ki.adapter.out.ChatAuswahl;
-import ch.urinet.archiv.ki.adapter.out.chat.ChatNichtVerfuegbar;
+import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jChatAgent;
 import ch.urinet.archiv.ki.adapter.out.stub.ChatAgentStub;
 import ch.urinet.archiv.ki.application.chat.ChatAbbruch;
 import ch.urinet.archiv.ki.application.chat.ChatAgentPort;
@@ -39,7 +39,10 @@ public class TestChatAgent implements ChatAgentPort {
 
     public enum Verhalten {
         STUB,
+        /** Wie der Adapter ohne Agenten vor Aufgabe 7.2: sofort {@code Ausfall}, ohne Request. */
         NICHT_VERFUEGBAR,
+        /** Der echte Adapter (Aufgabe 7.2) gegen das simulierte Sprachmodell (WireMock), die Werkzeuge laufen echt. */
+        ECHT,
         FOLGE,
         /** Text, dann Warten, bis der Client den ersten Text gemeldet hat, dann weiterer Text und Ende. */
         ERSTER_TEXT_WARTET,
@@ -58,7 +61,7 @@ public class TestChatAgent implements ChatAgentPort {
     ChatAgentStub stub;
 
     @Inject
-    ChatNichtVerfuegbar ohneAgent;
+    LangChain4jChatAgent echt;
 
     @Inject
     MandantKontext mandantKontext;
@@ -92,7 +95,8 @@ public class TestChatAgent implements ChatAgentPort {
         try {
             switch (verhalten) {
                 case STUB -> stub.beantworten(anfrage, ausgabe, abbruch);
-                case NICHT_VERFUEGBAR -> ohneAgent.beantworten(anfrage, ausgabe, abbruch);
+                case NICHT_VERFUEGBAR -> ausgabe.accept(new ChatEreignis.Ausfall("ChatNichtVerfuegbar"));
+                case ECHT -> echt.beantworten(anfrage, ausgabe, abbruch);
                 case FOLGE -> folge.forEach(ausgabe);
                 case ERSTER_TEXT_WARTET -> {
                     ausgabe.accept(new ChatEreignis.Text(text));

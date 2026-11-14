@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 
 /**
  * Dev-Stub des {@link ChatAgentPort} ({@code archiv.chat.stub=true}, Profile {@code dev} und {@code lokal}): eine feste
- * Demo-Folge ohne Sprachmodell und ohne Request, ohne die Frage zu lesen. Der echte Agent folgt mit Aufgabe 7.2.
+ * Demo-Folge ohne Sprachmodell und ohne Request, ohne die Frage zu lesen. Der echte Agent (Aufgabe 7.2) braucht ein Sprachmodell und läuft nur mit {@code archiv.chat.stub=false}.
  */
 @ApplicationScoped
 @Typed(ChatAgentStub.class)
@@ -24,7 +24,7 @@ public class ChatAgentStub implements ChatAgentPort {
             new ChatEreignis.WerkzeugStart("dokumente_suchen"),
             new ChatEreignis.WerkzeugErgebnis("dokumente_suchen", Map.of("frage", "Demo"), List.of(), Optional.empty()),
             new ChatEreignis.Text("Das ist eine Demo-Antwort ohne Sprachmodell. "),
-            new ChatEreignis.Text("Der Chat-Agent folgt mit Aufgabe 7.2."),
+            new ChatEreignis.Text("Echte Antworten gibt der Agent mit Sprachmodell."),
             new ChatEreignis.Ende(0, 0));
 
     @Override
