@@ -72,6 +72,35 @@ public class JdbcKontaktRegister implements KontaktRegister {
     }
 
     @Override
+    public List<Kontakt> mitWortanfaengen(String nameNormalisiert, List<String> woerter, int anzahl) {
+        if (woerter.isEmpty()) {
+            return List.of();
+        }
+        String bedingung = woerter.stream().map(w -> "(' ' || name_normalisiert) like ? escape '\\'")
+                .collect(java.util.stream.Collectors.joining(" and "));
+        String sql = "select " + SPALTEN + " from " + tabelle() + " where aktiv and " + bedingung
+                + " order by (name_normalisiert = ?) desc, name_normalisiert, id limit ?";
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            int i = 1;
+            for (String wort : woerter) {
+                abfrage.setString(i++, "% " + enthaelt(wort).substring(1));
+            }
+            abfrage.setString(i++, nameNormalisiert);
+            abfrage.setInt(i, anzahl);
+            List<Kontakt> kontakte = new ArrayList<>();
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                while (zeile.next()) {
+                    kontakte.add(kontakt(zeile));
+                }
+            }
+            return kontakte;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Kontakte nicht lesbar", e);
+        }
+    }
+
+    @Override
     public List<Kontakt> suchen(String nameNormalisiert, int anzahl) {
         String tabelle = tabelle();
         boolean ohneText = nameNormalisiert.isEmpty();

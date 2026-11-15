@@ -30,6 +30,21 @@ class ChatSystemPromptTest {
     }
 
     @Test
+    void trenntPartnerEinzelbelegUndDatenbasisAusdruecklich() {
+        String prompt = ChatSystemPrompt.system("X", MITTAG);
+        assertThat(prompt)
+                .contains("«partner» eines Werkzeugs ist nur der Name einer Firma oder Person, nie ein Produkt")
+                .contains("bei Unsicherheit lässt du ihn weg")
+                .contains("«letzte Quittung», «was kostet X bei Y») beantwortest du mit dokumente_suchen")
+                .contains("kennzahl und offene_posten nur für Summen und Listen über mehrere Belege")
+                .contains("Datenbasis und Datenstand stammen nur aus dem Ergebnis des Werkzeugs, das du für diese Frage "
+                        + "aufgerufen hast, nie aus früheren Antworten des Gesprächs")
+                .contains("dokument_zeigen nimmt nur eine ID aus einem früheren Ergebnis; ohne ID rufst du zuerst "
+                        + "dokumente_suchen auf")
+                .contains("Meldet ein Werkzeug «Partner nicht eindeutig»");
+    }
+
+    @Test
     void verlangtDeutschSchweizBetragsformatDatumsformatUndReinenText() {
         String prompt = ChatSystemPrompt.system("UriNet Aschwanden", MITTAG);
         assertThat(prompt).contains("Deutsch (Schweiz)").contains("«ss» statt «ß»").contains("CHF 1'234.50")

@@ -25,6 +25,14 @@ public class Werkzeuglauf {
         this.mandanten = mandanten;
     }
 
+    public void gesehen(Object lauf, java.util.Collection<java.util.UUID> ids) {
+        register.gesehen(lauf, ids);
+    }
+
+    public java.util.Set<java.util.UUID> gesehene(Object lauf) {
+        return register.gesehene(lauf);
+    }
+
     public <T> T ausfuehren(Object lauf, String werkzeug, Function<WerkzeugKontext, T> arbeit) {
         WerkzeugKontext kontext = register.finden(lauf)
                 .orElseThrow(() -> new WerkzeugFehler(WerkzeugFehler.KEIN_KONTEXT));
