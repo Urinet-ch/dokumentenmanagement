@@ -95,6 +95,12 @@ public final class Ursachen {
         return liste(fehler).stream().anyMatch(typ::isInstance);
     }
 
+    /** {@code true}, wenn eine {@link SQLException} in der Kette den angegebenen SQLState trägt. */
+    public static boolean enthaeltSqlState(Throwable fehler, String sqlState) {
+        return liste(fehler).stream()
+                .anyMatch(t -> t instanceof SQLException sql && sqlState.equals(sql.getSQLState()));
+    }
+
     // SocketTimeoutException und z. B. ConnectTimeoutException von Apache erben von InterruptedIOException
     private static boolean zeitueberschreitung(Throwable t) {
         return t instanceof SocketTimeoutException || t.getClass().getSimpleName().endsWith("TimeoutException");

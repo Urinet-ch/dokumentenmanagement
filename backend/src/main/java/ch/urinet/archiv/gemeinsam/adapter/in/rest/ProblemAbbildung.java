@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -99,6 +100,9 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response unerwartet(Throwable fehler) {
+        if (Ursachen.enthaeltSqlState(fehler, "40P01") || Ursachen.enthaeltSqlState(fehler, "55P03")) {
+            return antwort(ProblemAntwort.fuer(Fehlercode.STATUS_KONFLIKT, fehler));
+        }
         return antwort(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER, fehler));
     }
 
