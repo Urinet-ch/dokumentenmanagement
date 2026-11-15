@@ -38,6 +38,14 @@ export interface Export {
      * vorsignierte Adresse des ZIP, nur bei GET /exporte/{id} für einen fertigen, nicht abgelaufenen Export
      */
     url?: string | null;
+    /**
+     * nur bei FEHLER: Fehler-ID des letzten Fehlversuchs, im Log des Archivs nachzuschlagen (keine Werte); fehlt bei älteren Fehlern
+     */
+    fehlerId?: string | null;
+    /**
+     * nur bei FEHLER: VERWAIST = der Export wurde unterbrochen (z. B. Neustart des Archivs), ZEITGRENZE = er dauerte zu lange, FEHLGESCHLAGEN = anderer Fehler; fehlt bei älteren Fehlern
+     */
+    fehlerArt?: Export.FehlerArtEnum | null;
 }
 export namespace Export {
     export const StatusEnum = {
@@ -47,6 +55,12 @@ export namespace Export {
         Fehler: 'FEHLER',
     } as const;
     export type StatusEnum = typeof StatusEnum[keyof typeof StatusEnum];
+    export const FehlerArtEnum = {
+        Verwaist: 'VERWAIST',
+        Zeitgrenze: 'ZEITGRENZE',
+        Fehlgeschlagen: 'FEHLGESCHLAGEN',
+    } as const;
+    export type FehlerArtEnum = typeof FehlerArtEnum[keyof typeof FehlerArtEnum];
 }
 
 

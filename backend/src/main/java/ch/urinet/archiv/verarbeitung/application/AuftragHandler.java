@@ -1,5 +1,6 @@
 package ch.urinet.archiv.verarbeitung.application;
 
+import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 
 import java.util.UUID;
@@ -36,5 +37,14 @@ public interface AuftragHandler {
      * ein Handler und gehorcht denselben Pflichten. Standard: nichts.
      */
     default void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
+    }
+
+    /**
+     * Wie {@link #nachLetztemFehlversuch(Auftrag, UUID)}, aber mit der Art des Fehlversuchs ({@code fehlgeschlagen},
+     * {@code zeitgrenze}, {@code verwaist}); der Worker ruft diese Form auf. Ein Handler, dem die Art nichts sagt,
+     * überschreibt sie nicht, dann gilt die Form mit der Fehler-ID allein.
+     */
+    default void nachLetztemFehlversuch(Auftrag auftrag, AuftragFehler fehler) {
+        nachLetztemFehlversuch(auftrag, fehler.fehlerId());
     }
 }

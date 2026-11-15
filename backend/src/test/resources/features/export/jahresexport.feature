@@ -157,3 +157,39 @@ Funktionalität: Jahresexport für den Treuhänder (Aufgabe 6.5)
     Und der Worker die Aufträge abarbeitet
     Dann liegt das ZIP ohne Sperre unter «exporte/<id>.zip» im Bucket von «urinet»
     Und der Bucket von «urinet» entfernt alles unter «exporte/» nach 7 Tagen
+
+  @req-7.1
+  Szenario: Ein Export, dessen Worker mitten im Lauf abstürzt, wird nach der Zeitgrenze wieder aufgenommen
+    Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
+    Und der Worker mitten im Export abstürzt und seit 31 Minuten kein Lebenszeichen mehr gab
+    Und das Archiv verwaiste Aufträge aufräumt
+    Dann steht der Export «OFFEN» ohne Fehler-ID in der Liste
+    Wenn die Wartezeit des Auftrags abgelaufen ist
+    Und der Worker die Aufträge abarbeitet
+    Dann ist der Export «FERTIG» mit 3 Belegen
+
+  @req-7.1
+  Szenario: Ein Export, dessen Worker wiederholt abstürzt, endet mit Fehler-ID und lässt sich erneut anfordern
+    Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
+    Und der Worker mitten im Export abstürzt und seit 31 Minuten kein Lebenszeichen mehr gab
+    Und das Archiv verwaiste Aufträge aufräumt
+    Und die Wartezeit des Auftrags abgelaufen ist
+    Und der Worker mitten im Export abstürzt und seit 31 Minuten kein Lebenszeichen mehr gab
+    Und das Archiv verwaiste Aufträge aufräumt
+    Und die Wartezeit des Auftrags abgelaufen ist
+    Und der Worker mitten im Export abstürzt und seit 31 Minuten kein Lebenszeichen mehr gab
+    Und das Archiv verwaiste Aufträge aufräumt
+    Dann steht der Export «FEHLER» mit der Fehlerart «VERWAIST» und der Fehler-ID des Auftrags in der Liste
+    Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
+    Dann antwortet das Archiv auf die Anforderung mit 202 und Status «OFFEN»
+    Wenn der Worker die Aufträge abarbeitet
+    Dann ist der Export «FERTIG» mit 3 Belegen
+
+  @req-7.1
+  Szenario: Ein Export, dessen Worker noch ein Lebenszeichen gibt, bleibt unangetastet
+    Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
+    Und der Worker mitten im Export abstürzt und seit 5 Minuten kein Lebenszeichen mehr gab
+    Und das Archiv verwaiste Aufträge aufräumt
+    Dann steht der Export «OFFEN» ohne Fehler-ID in der Liste
+    Und der Auftrag «EXPORT_JAHR» läuft weiter
+

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Art des letzten Fehlversuchs eines gescheiterten Exports (Spec 02, Aufgabe 6.5): Die PWA unterscheidet
+         «unterbrochen» (VERWAIST: JVM oder Worker endete mitten im Export) von den übrigen Fehlern. Ältere
+         FEHLER-Zeilen haben keine Art. -->
+    <changeSet id="029-export-fehlerart" author="archiv">
+        <sql>
+            alter table export add column fehler_art text
+                constraint export_fehler_art_ck check (fehler_art in ('VERWAIST', 'ZEITGRENZE', 'FEHLGESCHLAGEN'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>
