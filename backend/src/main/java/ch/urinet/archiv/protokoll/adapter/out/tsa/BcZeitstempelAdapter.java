@@ -113,7 +113,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
 
     private TsaDienst dienst(String kennung) {
         if (!dienste().contains(kennung)) {
-            throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " ist nicht konfiguriert");
+            throw new ZeitstempelFehler("Zeitstempeldienst ist nicht konfiguriert");
         }
         return konfiguriert(kennung);
     }
@@ -125,12 +125,12 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
      */
     private TsaDienst konfiguriert(String kennung) {
         if (!TsaDienst.vorhanden(config, kennung)) {
-            throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " nicht mehr konfiguriert");
+            throw new ZeitstempelFehler("Zeitstempeldienst ist nicht mehr konfiguriert");
         }
         try {
             return dienste.computeIfAbsent(kennung, k -> TsaDienst.laden(config, k));
         } catch (IllegalStateException e) {
-            throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " ist falsch konfiguriert", e);
+            throw new ZeitstempelFehler("Zeitstempeldienst ist falsch konfiguriert", e);
         }
     }
 
@@ -146,7 +146,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             resp.validate(anfrage);
             return geprueft(kennung, Allowlist.von(d), antwort, imprint, List.of());
         } catch (TSPException | IOException e) {
-            throw new ZeitstempelFehler("Zeitstempel von " + kennung + " nicht erhalten oder ungültig", e);
+            throw new ZeitstempelFehler("Zeitstempel nicht erhalten oder ungültig", e);
         }
     }
 
@@ -183,7 +183,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             }
             return new Pruefdaten(Pruefdaten.Art.CRL, holen(d.crl().orElseThrow(), MAX_CRL));
         } catch (OCSPException | IOException e) {
-            throw new ZeitstempelFehler("Prüfdaten für " + kennung + " nicht erhalten", e);
+            throw new ZeitstempelFehler("Prüfdaten nicht erhalten", e);
         }
     }
 
@@ -195,7 +195,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
         Stempel stempel = geprueft(kennung, erlaubt, tsr, imprint, kette);
         List<X509Certificate> geprueft = kette(stempel.kettePem());
         if (!gleich(geprueft.get(0), kette.get(0)) || !gleich(geprueft.get(1), kette.get(1))) {
-            throw new ZeitstempelFehler("Abgelegte Zertifikatskette passt nicht zum Zeitstempel von " + kennung);
+            throw new ZeitstempelFehler("Abgelegte Zertifikatskette passt nicht zum Zeitstempel");
         }
         pruefdatenPruefen(pruefdaten, kette, stempel.genTime(), d);
         return stempel.genTime();
@@ -248,32 +248,31 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             TimeStampResponse resp = antwort(roh);
             int status = resp.getStatus();
             if (status != 0 && status != 1) {
-                throw new ZeitstempelFehler("Zeitstempeldienst " + kennung + " hat abgelehnt (Status " + status + ")");
+                throw new ZeitstempelFehler("Zeitstempeldienst hat abgelehnt");
             }
             TimeStampToken token = resp.getTimeStampToken();
             if (token == null) {
-                throw new ZeitstempelFehler("Antwort von " + kennung + " enthält kein Token");
+                throw new ZeitstempelFehler("Antwort enthält kein Token");
             }
             TimeStampTokenInfo info = token.getTimeStampInfo();
             if (!TSPAlgorithms.SHA256.equals(info.getMessageImprintAlgOID())
                     || !Arrays.equals(info.getMessageImprintDigest(), imprint)) {
-                throw new ZeitstempelFehler("Zeitstempel von " + kennung + " gehört nicht zu diesem Manifest");
+                throw new ZeitstempelFehler("Zeitstempel gehört nicht zu diesem Manifest");
             }
             if (!erlaubt.policies().contains(info.getPolicy().getId())) {
-                throw new ZeitstempelFehler("Policy des Zeitstempels von " + kennung + " ist nicht erlaubt");
+                throw new ZeitstempelFehler("Policy des Zeitstempels ist nicht erlaubt");
             }
             X509CertificateHolder tsaHolder = tsaZertifikat(token, zusatz)
-                    .orElseThrow(() -> new ZeitstempelFehler("Zeitstempel von " + kennung + " ohne TSA-Zertifikat"));
+                    .orElseThrow(() -> new ZeitstempelFehler("Zeitstempel ohne TSA-Zertifikat"));
             SignerInformationVerifier verifier = new JcaSimpleSignerInfoVerifierBuilder().build(tsaHolder);
             token.validate(verifier);
             X509Certificate tsa = new JcaX509CertificateConverter().getCertificate(tsaHolder);
             Instant genTime = info.getGenTime().toInstant();
             X509Certificate ca = aussteller(tsa, erlaubt.cas(), genTime)
-                    .orElseThrow(() -> new ZeitstempelFehler("TSA-Zertifikat von " + kennung
-                            + " stammt nicht von einer erlaubten CA"));
+                    .orElseThrow(() -> new ZeitstempelFehler("TSA-Zertifikat stammt nicht von einer erlaubten CA"));
             return new Stempel(kennung, roh.clone(), genTime, pem(tsa) + pem(ca));
         } catch (TSPException | OperatorCreationException | CertificateException e) {
-            throw new ZeitstempelFehler("Zeitstempel von " + kennung + " ist ungültig", e);
+            throw new ZeitstempelFehler("Zeitstempel ist ungültig", e);
         }
     }
 
@@ -313,7 +312,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             if (!ocspSignaturGueltig(basic, ca)) {
                 throw new ZeitstempelFehler("OCSP-Antwort ist nicht von der CA signiert");
             }
-            aktuell("OCSP-Antwort", basic.getProducedAt(), null, genTime, hoechstalter);
+            aktuell(basic.getProducedAt(), null, genTime, hoechstalter);
             CertificateID id = zertifikatId(tsa, ca);
             boolean gefunden = false;
             for (SingleResp einzel : basic.getResponses()) {
@@ -322,7 +321,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
                     if (einzel.getCertStatus() != null) {
                         throw new ZeitstempelFehler("TSA-Zertifikat ist laut OCSP gesperrt oder unbekannt");
                     }
-                    aktuell("OCSP-Antwort", einzel.getThisUpdate(), einzel.getNextUpdate(), genTime, hoechstalter);
+                    aktuell(einzel.getThisUpdate(), einzel.getNextUpdate(), genTime, hoechstalter);
                 }
             }
             if (!gefunden) {
@@ -381,7 +380,7 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
             if (crl.isRevoked(tsa)) {
                 throw new ZeitstempelFehler("TSA-Zertifikat ist laut Sperrliste gesperrt");
             }
-            aktuell("Sperrliste", crl.getThisUpdate(), crl.getNextUpdate(), genTime, hoechstalter);
+            aktuell(crl.getThisUpdate(), crl.getNextUpdate(), genTime, hoechstalter);
         } catch (CRLException | CertificateException e) {
             throw new ZeitstempelFehler("Sperrliste ist ungültig", e);
         } catch (GeneralSecurityException e) {
@@ -394,12 +393,12 @@ public class BcZeitstempelAdapter implements ZeitstempelPort {
      * nächstes Update angegeben ist, nicht vor dem Stempel abgelaufen. Später ausgestellte Prüfdaten sind zulässig,
      * weil eine Sperrung nicht rückgängig gemacht wird.
      */
-    static void aktuell(String was, Date ausgestellt, Date naechstes, Instant genTime, Duration hoechstalter) {
+    static void aktuell(Date ausgestellt, Date naechstes, Instant genTime, Duration hoechstalter) {
         if (ausgestellt == null || ausgestellt.toInstant().isBefore(genTime.minus(hoechstalter))) {
-            throw new ZeitstempelFehler(was + " ist zu alt für den Zeitstempel (pruefdaten-hoechstalter des Diensts)");
+            throw new ZeitstempelFehler("Prüfdaten sind zu alt für den Zeitstempel");
         }
         if (naechstes != null && naechstes.toInstant().isBefore(genTime)) {
-            throw new ZeitstempelFehler(was + " war zur Zeit des Zeitstempels abgelaufen");
+            throw new ZeitstempelFehler("Prüfdaten waren zum Zeitstempel abgelaufen");
         }
     }
 

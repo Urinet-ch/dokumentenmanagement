@@ -100,10 +100,25 @@ class ManifestErzeugenTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("nicht kanonisch");
     }
 
+    @Test
+    void einAbgelegtesManifestWirdAuchBeiAbweichenderSicherungslisteWiederverwendet() {
+        ManifestInhalt abgelegt = inhalt(List.of(eintrag("a")));
+        ManifestInhalt neu = inhalt(List.of(eintrag("a")), List.of("b".repeat(64)));
+
+        ManifestInhalt wiederverwendet = ManifestErzeugen.wiederverwenden(new JacksonJsonLeser(), DATUM,
+                abgelegt.kanonisch(), neu);
+
+        assertThat(wiederverwendet.sicherung()).isEmpty();
+    }
+
     private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege) {
+        return inhalt(eintraege, List.of());
+    }
+
+    private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege, List<String> sicherungen) {
         ManifestFenster fenster = ManifestFenster.fuer(DATUM, null);
         return new ManifestInhalt("probe", DATUM, null, fenster.bis(), null, null, eintraege, new TreeMap<>(),
-                List.of());
+                sicherungen);
     }
 
     private static ManifestEintrag eintrag(String zeichen) {
@@ -112,15 +127,15 @@ class ManifestErzeugenTest {
     }
 
     @Test
-    void dieZeitstempelUrsacheNenntKlassenUndFesteMeldungenAberKeineFremdenMeldungen() {
-        var ursache = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel von haupt nicht erhalten oder ungültig",
-                new java.io.IOException("geheim.example:443 Token abc"));
+    void dieZeitstempelUrsacheNenntDieFesteMeldungAberKeineFremdenMeldungen() {
+        var ursache = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel nicht erhalten oder ungültig",
+                new java.io.IOException("https://tsa.invalid/endpoint 0123456789abcdef antwortinhalt"));
 
-        String text = ManifestErzeugen.zeitstempelUrsache(ursache);
+        String text = ch.urinet.archiv.gemeinsam.domain.Ursachen.ketteMitMeldung(ursache);
 
-        assertThat(text).contains("ZeitstempelFehler <- java.io.IOException")
-                .contains("[meldung=\"Zeitstempel von haupt nicht erhalten oder ungültig\"]")
-                .doesNotContain("geheim").doesNotContain("abc");
+        assertThat(text).contains("ZeitstempelPort$ZeitstempelFehler").contains("<- java.io.IOException")
+                .contains("[meldung=\"Zeitstempel nicht erhalten oder ungültig\"]")
+                .doesNotContain("tsa.invalid").doesNotContain("0123456789abcdef").doesNotContain("antwortinhalt");
     }
 
     @Test

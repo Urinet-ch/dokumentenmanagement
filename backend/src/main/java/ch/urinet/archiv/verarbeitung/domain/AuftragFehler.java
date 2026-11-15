@@ -6,14 +6,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Inhalt von {@code auftrag.fehler} (Req 16.7, design.md «Verarbeitung»): nur Art und Fehler-ID, nie eine Meldung,
- * z. B. {@code fehlgeschlagen fehler-id=<uuid>}. Die Details stehen nur im Log unter derselben Fehler-ID.
+ * Inhalt von {@code auftrag.fehler} (Req 16.7, design.md «Verarbeitung»): Art und Fehler-ID, bei einer ausdrücklich
+ * wertefreien Ursache zusätzlich deren sichere Fehlerkette, z. B. {@code fehlgeschlagen fehler-id=<uuid>}.
  */
-public record AuftragFehler(String art, UUID fehlerId) {
+public record AuftragFehler(String art, UUID fehlerId, String ursache) {
 
     private static final Pattern ART = Pattern.compile("^[a-z]{1,30}$");
     private static final Pattern TEXT = Pattern.compile(
-            "^([a-z]{1,30}) fehler-id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$");
+            "^([a-z]{1,30}) fehler-id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+                    + "(?: ursache=(.{1,2048}))?$");
 
     public AuftragFehler {
         if (art == null || !ART.matcher(art).matches()) {
@@ -22,24 +23,32 @@ public record AuftragFehler(String art, UUID fehlerId) {
         if (fehlerId == null) {
             throw new IllegalArgumentException("Fehler-ID fehlt");
         }
+        if (ursache != null && (ursache.isBlank() || ursache.length() > 2048
+                || ursache.indexOf('\r') >= 0 || ursache.indexOf('\n') >= 0)) {
+            throw new IllegalArgumentException("Ungültige Fehlerursache");
+        }
     }
 
     public static AuftragFehler neu(String art) {
-        return new AuftragFehler(art, UUID.randomUUID());
+        return neu(art, null);
     }
 
-    /** Leer, wenn der Text nicht die Form {@code <art> fehler-id=<uuid>} hat. */
+    public static AuftragFehler neu(String art, String ursache) {
+        return new AuftragFehler(art, UUID.randomUUID(), ursache);
+    }
+
+    /** Leer, wenn der Text nicht die Form {@code <art> fehler-id=<uuid> [ursache=<sicherer Text>]} hat. */
     public static Optional<AuftragFehler> lesen(String text) {
         if (text == null) {
             return Optional.empty();
         }
         Matcher treffer = TEXT.matcher(text);
         return treffer.matches()
-                ? Optional.of(new AuftragFehler(treffer.group(1), UUID.fromString(treffer.group(2))))
+                ? Optional.of(new AuftragFehler(treffer.group(1), UUID.fromString(treffer.group(2)), treffer.group(3)))
                 : Optional.empty();
     }
 
     public String text() {
-        return art + " fehler-id=" + fehlerId;
+        return art + " fehler-id=" + fehlerId + (ursache == null ? "" : " ursache=" + ursache);
     }
 }

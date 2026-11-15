@@ -220,12 +220,12 @@ public class ManifestErzeugen implements AuftragHandler {
     private Erzeugt erzeugen(Auftrag auftrag, LocalDate datum, Optional<ManifestStand> vorgaenger) {
         MandantCode mandant = auftrag.mandant();
         ManifestFenster fenster = ManifestFenster.fuer(datum, vorgaenger.map(ManifestStand::bis).orElse(null));
-        ManifestSpeichern.Sammlung sammlung = speichern.sammeln(fenster);
+        ManifestSpeichern.Sammlung sammlung = speichern.sammeln(mandant, fenster);
         Map<String, ProtokollHash> protokolle = new TreeMap<>();
         sammlung.blaetter().forEach((tabelle, blaetter) -> protokolle.put(tabelle, ProtokollHash.aus(bytes(blaetter))));
         ManifestInhalt inhalt = new ManifestInhalt(mandant.wert(), datum, fenster.von(), fenster.bis(),
                 vorgaenger.map(ManifestStand::sha256).orElse(null), vorgaenger.map(ManifestStand::verweis).orElse(null),
-                sammlung.eintraege(), new TreeMap<>(protokolle), List.of());
+                sammlung.eintraege(), new TreeMap<>(protokolle), sammlung.sicherungen());
         Optional<LocalDate> sperre = sperre(sammlung.fristen(), ManifestFenster.tag(Instant.now()), datum,
                 einstellungen.lesen(mandant).geschaeftsjahresende().monatTag());
 
@@ -262,7 +262,7 @@ public class ManifestErzeugen implements AuftragHandler {
                     fehlend.add(lauf.getKey());
                     dienstFehler.add(e.getCause());
                     LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel, ursache=%s", datum, lauf.getKey(),
-                            zeitstempelUrsache(e.getCause()));
+                            Ursachen.ketteMitMeldung(e.getCause()));
                 } catch (TimeoutException e) {
                     lauf.getValue().cancel(true);
                     fehlend.add(lauf.getKey());
@@ -319,6 +319,10 @@ public class ManifestErzeugen implements AuftragHandler {
             throw new IllegalStateException("Manifest " + datum + ": das abgelegte Manifest weicht von den gesammelten "
                     + "Einträgen oder Protokoll-Hashes ab (verspätet festgeschriebene Zeile?)");
         }
+        if (!frueher.sicherung().equals(neu.sicherung())) {
+            LOG.warnf("Manifest %s: abgelegte Sicherungsliste weicht ab (abgelegt=%d, neu=%d)", datum,
+                    frueher.sicherung().size(), neu.sicherung().size());
+        }
         LOG.infof("Manifest %s: abgelegtes Manifest aus einem früheren Versuch wiederverwendet", datum);
         return frueher;
     }
@@ -334,30 +338,14 @@ public class ManifestErzeugen implements AuftragHandler {
     }
 
     /**
-     * Die Fehler der Dienste bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit auch der
-     * Auftragsfehler mehr als «IllegalStateException» zeigt (Req 16.7: nur Klassennamen).
+     * Die Dienstfehler bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit der Auftragsfehler auch
+     * die feste Meldung einer wertefreien Zeitstempel-Ausnahme enthält.
      */
     static IllegalStateException keinZeitstempel(LocalDate datum, List<String> fehlend, List<Throwable> dienstFehler) {
         IllegalStateException keiner = new IllegalStateException("Manifest " + datum + ": kein Zeitstempel von " + fehlend,
                 dienstFehler.isEmpty() ? null : dienstFehler.get(0));
         dienstFehler.stream().skip(1).forEach(keiner::addSuppressed);
         return keiner;
-    }
-
-    /**
-     * Ursache eines gescheiterten Zeitstempels fürs Log (Req 16.7): Klassennamen der Kette und die Meldungen der
-     * {@link ZeitstempelPort.ZeitstempelFehler}. Deren Meldungen sind feste Texte mit Dienstkennung (Konfiguration) oder
-     * Status und enthalten keine Beleg-, Token- oder Netzwerkwerte.
-     */
-    static String zeitstempelUrsache(Throwable fehler) {
-        StringBuilder s = new StringBuilder(Ursachen.kette(fehler));
-        int n = 0;
-        for (Throwable t = fehler; t != null && n < 10; t = t.getCause(), n++) {
-            if (t instanceof ZeitstempelPort.ZeitstempelFehler z && z.getMessage() != null) {
-                s.append(" [meldung=\"").append(z.getMessage()).append("\"]");
-            }
-        }
-        return s.toString();
     }
 
     /** Je Dienst: {@code .tsr} zuerst (wiederverwendet, falls schon abgelegt), dann Kette und OCSP- bzw. CRL-Antwort. */

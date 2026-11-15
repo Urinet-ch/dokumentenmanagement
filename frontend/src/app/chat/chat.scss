@@ -1,0 +1,207 @@
+:host {
+  display: block;
+  max-width: 72rem;
+  min-width: 0;
+}
+
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin-top: 0;
+}
+
+h2 {
+  font: var(--mat-sys-title-medium);
+  margin: 0;
+}
+
+.einleitung,
+.gedaempft {
+  color: var(--urinet-gedaempft);
+}
+
+.fehler {
+  color: var(--urinet-fehler);
+  overflow-wrap: anywhere;
+}
+
+// Handy: Liste über dem Gespräch (einklappbar); ab 960 px links daneben
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+
+  &.mobil {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}
+
+.gespraeche {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+
+  .kopf {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .neu {
+    justify-self: start;
+  }
+}
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.eintrag {
+  display: grid;
+  gap: 0.125rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 8px;
+  background-color: var(--urinet-karte);
+  color: var(--urinet-hell);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &[aria-current='true'] {
+    border-color: var(--urinet-gelb);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  .titel {
+    overflow-wrap: anywhere;
+  }
+
+  .datum {
+    color: var(--urinet-gedaempft);
+    font: var(--mat-sys-body-small);
+  }
+}
+
+.gespraech {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.verlauf {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.nachricht {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+
+  &.frage {
+    border-color: var(--urinet-gelb);
+    justify-self: end;
+    max-width: min(100%, 40rem);
+  }
+}
+
+// reiner Text mit Zeilenumbrüchen; lange Wörter und Beträge brechen um (Req 6.3)
+.inhalt {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.quellen ul {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.quellen li {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--urinet-linie);
+  border-radius: 1rem;
+  color: var(--urinet-gedaempft);
+  overflow-wrap: anywhere;
+
+  &.link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    border-color: var(--urinet-gelb);
+    color: var(--urinet-hell);
+  }
+}
+
+.hinweis {
+  margin: 0;
+  min-height: 1.5em;
+  color: var(--urinet-gelb);
+  font-style: italic;
+}
+
+.eingabe {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+
+  .feld {
+    display: grid;
+    gap: 0.25rem;
+
+    > span {
+      font: var(--mat-sys-label-large);
+    }
+  }
+
+  textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--urinet-linie);
+    border-radius: 8px;
+    background-color: var(--urinet-dunkel);
+    color: var(--urinet-hell);
+    font: inherit;
+    resize: vertical;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .knoepfe {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

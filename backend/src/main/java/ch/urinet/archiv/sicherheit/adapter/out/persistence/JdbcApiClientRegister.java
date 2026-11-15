@@ -26,7 +26,8 @@ import java.util.Optional;
 @ApplicationScoped
 public class JdbcApiClientRegister implements ApiClientRegister {
 
-    private static final String SPALTEN = "id, mandant, name, scope, aktiv, erstellt, zuletzt";
+    private static final String SPALTEN = "id, mandant, name, scope, aktiv, erstellt, zuletzt, webseite, "
+            + "hoechste_stufe, gueltig_bis, absender_pruefen";
 
     // lazy: ohne Datasource (z. B. Bereitschaftsprüfung) ist die Bean inaktiv
     private final Instance<AgroalDataSource> datenquelle;
@@ -53,7 +54,8 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     public void anlegen(ApiClient client, String hash) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement einfuegen =
                 verbindung.prepareStatement("insert into public.api_client (id, mandant, name, scope, geheimnis_hash, "
-                        + "aktiv, erstellt) values (?, ?, ?, ?, ?, ?, ?)")) {
+                        + "aktiv, erstellt, webseite, hoechste_stufe, gueltig_bis, absender_pruefen) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             einfuegen.setString(1, client.id());
             einfuegen.setString(2, client.mandant());
             einfuegen.setString(3, client.name());
@@ -61,6 +63,10 @@ public class JdbcApiClientRegister implements ApiClientRegister {
             einfuegen.setString(5, hash);
             einfuegen.setBoolean(6, client.aktiv());
             einfuegen.setObject(7, utc(client.erstellt()));
+            einfuegen.setString(8, client.webseite().orElse(null));
+            einfuegen.setString(9, client.hoechsteStufe().orElse(null));
+            einfuegen.setObject(10, client.gueltigBis().map(JdbcApiClientRegister::utc).orElse(null));
+            einfuegen.setBoolean(11, client.absenderPruefen());
             einfuegen.executeUpdate();
         } catch (SQLException e) {
             // ohne Ursache: die Meldung von PostgreSQL kann die ganze Zeile samt Hash enthalten
@@ -99,6 +105,20 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     }
 
     @Override
+    public boolean gueltigBisSetzen(String mandant, String id, Instant zeit) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update public.api_client set gueltig_bis = ? "
+                        + "where id = ? and mandant = ? and scope like 'webseite-%' and aktiv and gueltig_bis is null")) {
+            aendern.setObject(1, utc(zeit));
+            aendern.setString(2, id);
+            aendern.setString(3, mandant);
+            return aendern.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Ablauf des Webseiten-Schlüssels nicht nachgeführt", e);
+        }
+    }
+
+    @Override
     public void zuletztSetzen(String id, Instant zeit) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
                 verbindung.prepareStatement("update public.api_client set zuletzt = ? where id = ?")) {
@@ -113,10 +133,14 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     private static ApiClient client(ResultSet zeile) throws SQLException {
         String scope = zeile.getString("scope");
         OffsetDateTime zuletzt = zeile.getObject("zuletzt", OffsetDateTime.class);
+        OffsetDateTime gueltigBis = zeile.getObject("gueltig_bis", OffsetDateTime.class);
         return new ApiClient(zeile.getString("id"), zeile.getString("mandant"), zeile.getString("name"),
                 ApiTokenScope.ausCode(scope).orElseThrow(() -> new IllegalStateException("Scope unbekannt")),
                 zeile.getBoolean("aktiv"), zeile.getObject("erstellt", OffsetDateTime.class).toInstant(),
-                Optional.ofNullable(zuletzt).map(OffsetDateTime::toInstant));
+                Optional.ofNullable(zuletzt).map(OffsetDateTime::toInstant),
+                Optional.ofNullable(zeile.getString("webseite")), Optional.ofNullable(zeile.getString("hoechste_stufe")),
+                Optional.ofNullable(gueltigBis).map(OffsetDateTime::toInstant),
+                zeile.getBoolean("absender_pruefen"));
     }
 
     private static OffsetDateTime utc(Instant zeit) {

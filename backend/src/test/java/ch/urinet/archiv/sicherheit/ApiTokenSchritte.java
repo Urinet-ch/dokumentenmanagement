@@ -252,8 +252,11 @@ public class ApiTokenSchritte {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
         List<Map<String, Object>> liste = antwort.jsonPath().getList("");
         Map<String, Object> eintrag = liste.stream().filter(e -> id.equals(e.get("id"))).findFirst().orElseThrow();
-        assertThat(eintrag).containsOnlyKeys("id", "name", "scope", "aktiv", "erstellt", "zuletzt")
-                .containsEntry("name", "Probe " + name).containsEntry("aktiv", Boolean.parseBoolean(aktiv));
+        assertThat(eintrag).containsOnlyKeys("id", "name", "scope", "aktiv", "erstellt", "zuletzt", "webseite",
+                "hoechsteStufe", "gueltigBis", "absenderPruefen").containsEntry("name", "Probe " + name)
+                .containsEntry("aktiv", Boolean.parseBoolean(aktiv)).containsEntry("webseite", null)
+                .containsEntry("hoechsteStufe", null).containsEntry("gueltigBis", null)
+                .containsEntry("absenderPruefen", false);
         assertThat(eintrag.get("erstellt")).isNotNull();
         assertThat(antwort.asString()).doesNotContain("argon2");
         geheimnisseFehlenIn(antwort.asString());

@@ -91,6 +91,14 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A13')],
     title: titel(TEXTE.menue.protokoll),
   },
+  // Chat (Spec 02, Aufgabe 7.4): alle vier Rollen mit dem Recht wie A2 (Entscheid Fabian 14.11.2026); Menüpunkt «Chat»
+  // seit Aufgabe 7.4b (Backend 7.2, 7.3 gemergt)
+  {
+    path: 'chat',
+    loadChildren: () => import('./chat/chat.routes').then((m) => m.CHAT_ROUTES),
+    canActivate: [rechtGuard('A2')],
+    title: titel(TEXTE.chat.titel),
+  },
   {
     path: 'verwaltung/api-tokens',
     loadComponent: () => import('./verwaltung/api-tokens/api-tokens').then((m) => m.ApiTokens),

@@ -52,14 +52,19 @@ und erfüllt die Definition of Done aus `tech.md`.
 ## Welle 7 — Chat-Agent
 
 - [ ] 7.1 Werkzeuge [Backend]
+  - Teil erledigt (PR #145): Kontext, Auswahl, `dokumente_suchen` (Volltext), `dokument_zeigen`, `fristen`, Index 028
+  - Teil erledigt (7.1b, 14.11.2026): `kennzahl` (Req 3.2, 3.3, 5.2), `offene_posten` (Req 3.4), `Funktionen.finanzVerfuegbar()` minimal, Arten je Mandant (E1); Haken erst, wenn alle Teile (7.1c) da sind und `ReqAbdeckungTest` für alle Anforderungszeilen grün ist
+  - Teil erledigt (7.1d, 15.11.2026): `dokumente_suchen` über die Hybridsuche (Req 3.1, 2.3, 2.5, 2.8; Spec 01, Req 3.13), Rückfall Volltext mit Hinweis «nur Volltext», `seiten` als Fundstelle; Umsetzungsvermerk in design.md «Umsetzung 7.1a»
+  - Teil erledigt (PR #161): `vollstaendigkeit` mit Port `Lueckenbericht` und Übergangsquelle aus der Konfiguration (design.md «Umsetzung (Aufgabe 7.1c, 14.11.2026)»); mit 7.1a, 7.1b und 7.1d sind alle Teile von 7.1 da, der Haken folgt, wenn `ReqAbdeckungTest` für alle Anforderungszeilen grün ist
   - `ArchivWerkzeuge` mit `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`; Mandant/Benutzer aus Kontext; Sichtbarkeitsfilter nach Rechtematrix (Spec 01, 2.6) auch in Summen, Anzahlen und Lücken
   - je Werkzeug Szenarien mit zwei Mandanten und den Rollen `inhaber`, `mitarbeiter`, `treuhaender`
   - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); `dokumente_suchen` ist der erste Konsument dieser Variante
   - _Anforderungen: 3.1–3.6, 5.1, 5.2_
 
-- [ ] 7.2 Agent und Systemprompt [Backend]
+- [x] 7.2 Agent und Systemprompt [Backend]
   - `ArchivAgent` (LangChain4j, Tools, Gesprächsspeicher 10 Nachrichten), Systemprompt gemäss design.md, Betragsformat, Datenbasis, «kein Beleg gefunden»
   - Prompt-Injection-Test mit präpariertem Dokument
+  - Erledigt 14.11.2026 (PR #160; design.md «Umsetzung (Aufgabe 7.2, 14.11.2026)»): `ChatModell` (streamend, `archiv.ki.chat.*`), `ArchivAgent` mit `ToolProvider` je Anfrage, `ChatSystemPrompt`, Kennzeichnung der Dokumenttexte, Verbrauch `CHAT` je Modellaufruf, `LangChain4jChatAgent` statt `ChatNichtVerfuegbar`. Streaming-Weg: durchgehendes Streaming mit Tool-Calls (gegen WireMock belegt). Nicht automatisiert prüfbar und vor 9.1 manuell nachzuweisen (Fabian): Verhalten des echten Modells (Streaming mit Tool-Calls bei Mistral-Small-4, `usage` im Stream, Zeit bis zum ersten Text, Injection-Frage, Betragsformat). Das Szenario `@req-3.2` (Zahl aus `kennzahl`) ist mit dem Stand von 7.1b dabei; die Spec-05-Ergänzung von 4.2 (`vollstaendigkeit`) folgt mit 7.1c
   - _Anforderungen: 3.7, 4.2, 5.3_
 
 - [x] 7.3 Chat-Schnittstelle [Backend]
@@ -67,8 +72,9 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Erledigt 14.11.2026 gegen den Port `ChatAgentPort` mit Dev-Stub bzw. `ChatNichtVerfuegbar` (design.md «Umsetzung (Aufgabe 7.3, 14.11.2026)»); der echte Agent folgt mit 7.2 und ersetzt nur den Adapter. Nachweis 3.8 hier mit dem Streaming-Szenario, p95 ≤ 10 s mit echtem Modell in 9.1
   - _Anforderungen: 3.8, 4.1, 5.4, 5.5_
 
-- [ ] 7.4 Chat-Oberfläche [Frontend]
+- [x] 7.4 Chat-Oberfläche [Frontend]
   - Chat-Seite mit Streaming, Werkzeug-Hinweis, Quellen-Chips (öffnen Dokument), letzte 20 Gespräche; 375 px
+  - Erledigt 14./15.11.2026 (PR #147 Seite gegen Attrappe, PR #172 Menüpunkt «Chat» und Durchstich gegen das echte Archiv mit WireMock als Sprachmodell; design.md «Umsetzung (Aufgabe 7.4b, 15.11.2026)»). Offen bleibt der Nachweis mit dem echten Modell in 9.1 (Gate Phase 1)
   - _Anforderungen: 4.3, 6.1–6.3_
 
 ## Welle 8 — AbaNinja (nur bei E1 = ja)
@@ -102,6 +108,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 ## Welle 9 — Abnahme Phase 2
 
 - [ ] 9.1 Chat-Prüfliste [Fabian] [QA]
+  - Gerüst erledigt (PR #156, 14.11.2026): Schema `abnahme/chat-pruefliste.schema.json` mit Schematest, `ChatPrueflisteIT` (Handlauf, nie in der CI) mit Fake-Server-Test, Vorlage `docs/abnahme/phase2.md`, Anleitung in `backend/README.md`; offen bleiben `chat-pruefliste.yaml` mit den 20 Fragen und der Lauf (Req 13.1, 13.2) bei Fabian
   - `chat-pruefliste.yaml` mit 7 Beispielfragen + ≥ 13 weiteren, erwartete Antworten und Quellen – nur unter `ARCHIV_GOLDEN_DIR`, nicht im Repo; im Repo nur Schema und Test `ChatPrueflisteIT`
   - Lauf manuell gegen den Produktivbestand, nie in der CI; Bericht in `docs/abnahme/phase2.md` nur mit Fragen-Nr. und Ergebnis, ohne Inhalte
   - Messung Req 3.8: Zeit von der Anfrage bis zum ersten `text`-Ereignis (Server-Log oder Lauf der Prüfliste), p95 ≤ 10 s mit dem echten Modell; im Bericht nur das Ergebnis, ohne Inhalte

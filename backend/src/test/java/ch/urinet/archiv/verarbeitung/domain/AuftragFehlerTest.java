@@ -18,6 +18,15 @@ class AuftragFehlerTest {
     }
 
     @Test
+    void sichereUrsacheWirdMitDemFehlertextHinUndZurueckGelesen() {
+        AuftragFehler fehler = AuftragFehler.neu("fehlgeschlagen",
+                "ZeitstempelFehler[meldung=\"Zeitstempeldienst nicht erreichbar\"]");
+
+        assertThat(fehler.text()).contains("ursache=ZeitstempelFehler[meldung=\"Zeitstempeldienst nicht erreichbar\"]");
+        assertThat(AuftragFehler.lesen(fehler.text())).contains(fehler);
+    }
+
+    @Test
     void andereTexteSindNichtLesbar() {
         UUID id = UUID.randomUUID();
         assertThat(AuftragFehler.lesen(null)).isEmpty();

@@ -242,6 +242,35 @@ class MandantEigentuemerTest {
         }
     }
 
+    @Test
+    void sicherungsexportNurEinfuegen() throws SQLException {
+        String tabelle = "public.sicherung_export";
+        String sha256 = "a".repeat(64);
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'INSERT')")).isTrue();
+            assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', 'SELECT')")).isTrue();
+            for (String recht : List.of("UPDATE", "DELETE", "TRUNCATE")) {
+                assertThat(wahr(befehl, "has_table_privilege('" + tabelle + "', '" + recht + "')")).as(recht).isFalse();
+            }
+            befehl.execute("insert into " + tabelle + " (art, sha256) values ('db', '" + sha256 + "')");
+            assertThat(wert(befehl, "select count(*) from " + tabelle + " where sha256 = '" + sha256 + "'"))
+                    .isNotEqualTo("0");
+            verweigert(befehl, "update " + tabelle + " set sha256 = '" + "b".repeat(64)
+                    + "' where sha256 = '" + sha256 + "'");
+            verweigert(befehl, "delete from " + tabelle + " where sha256 = '" + sha256 + "'");
+            verweigert(befehl, "truncate " + tabelle);
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String sql : List.of("update " + tabelle + " set sha256 = '" + "c".repeat(64)
+                            + "' where sha256 = '" + sha256 + "'",
+                    "delete from " + tabelle + " where sha256 = '" + sha256 + "'", "truncate " + tabelle)) {
+                assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("nur Einfügen erlaubt");
+            }
+        }
+    }
+
     /**
      * {@code berechtigen()} ist atomar (Review PR #29): Scheitert das REVOKE auf {@code databasechangelog*} nach den GRANTs,
      * bleibt kein Recht der App-Rolle zurück – weder auf die Changelog-Tabellen noch auf die übrigen Tabellen.

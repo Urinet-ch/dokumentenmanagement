@@ -7,12 +7,14 @@ import ch.urinet.archiv.protokoll.application.ManifestDaten.NeuesManifest;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ProtokollHash;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,15 +48,21 @@ public class ManifestSpeichern {
         return daten.stand(datum);
     }
 
-    /** Einträge, Fristen und Blätter des Fensters. */
+    /** Das für den Zeitpunkt zuständige Manifest (Prüflauf, Req 15.5). */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public Sammlung sammeln(ManifestFenster fenster) {
+    public Optional<ManifestDaten.Zustaendig> zustaendig(Instant zeitpunkt) {
+        return daten.zustaendig(zeitpunkt);
+    }
+
+    /** Einträge, Fristen, Blätter und Sicherungsnachweise des Fensters. */
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public Sammlung sammeln(MandantCode mandant, ManifestFenster fenster) {
         Map<String, List<Blatt>> blaetter = new LinkedHashMap<>();
         for (String tabelle : PROTOKOLLE) {
             blaetter.put(tabelle, daten.blaetter(tabelle, fenster.von(), fenster.bis()));
         }
         return new Sammlung(daten.eintraege(fenster.von(), fenster.bis()), daten.fristen(fenster.von(), fenster.bis()),
-                blaetter);
+                blaetter, daten.sicherungen(mandant, fenster.von(), fenster.bis()));
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
@@ -71,10 +79,12 @@ public class ManifestSpeichern {
                 bisTag.toEpochDay())));
     }
 
-    public record Sammlung(List<ManifestEintrag> eintraege, Fristen fristen, Map<String, List<Blatt>> blaetter) {
+    public record Sammlung(List<ManifestEintrag> eintraege, Fristen fristen, Map<String, List<Blatt>> blaetter,
+                           List<String> sicherungen) {
         public Sammlung {
             eintraege = List.copyOf(eintraege);
             blaetter = Map.copyOf(blaetter);
+            sicherungen = List.copyOf(sicherungen);
         }
     }
 }

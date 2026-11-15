@@ -125,10 +125,10 @@ public class ChatFragen {
         Instant jetzt = uhr.instant();
         Optional<Instant> grenze = speicher.grenzFrage(benutzer.id(), jetzt.minus(Fragegrenze.FENSTER), fragenJeStunde);
         if (grenze.isPresent()) {
-            throw new ZuVieleAnfragen(Fragegrenze.wartezeitSekunden(grenze.get(), jetzt));
+            throw new ZuVieleAnfragen(ZuVieleAnfragen.Grund.STUNDENLIMIT, Fragegrenze.wartezeitSekunden(grenze.get(), jetzt));
         }
         ChatGrenzen.Platz platz = grenzen.belegen(mandant, benutzer.id())
-                .orElseThrow(() -> new ZuVieleAnfragen(LAEUFT_SCHON_SEKUNDEN));
+                .orElseThrow(() -> new ZuVieleAnfragen(ZuVieleAnfragen.Grund.LAEUFT, LAEUFT_SCHON_SEKUNDEN));
         transaktionen.registerInterposedSynchronization(new Synchronization() {
             @Override
             public void beforeCompletion() {

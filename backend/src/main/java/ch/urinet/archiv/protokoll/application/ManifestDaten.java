@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
 import ch.urinet.archiv.protokoll.domain.Vorher;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,6 +25,12 @@ public interface ManifestDaten {
     /** Das festgehaltene Manifest des Datums mit seinen Zeitstempeln aus {@code manifest_zeitstempel}, sonst leer. */
     Optional<ManifestStand> stand(LocalDate datum);
 
+    /**
+     * Das festgehaltene Manifest, in dessen Fenster {@code [von, bis)} der Zeitpunkt liegt ({@code von = null} heisst
+     * ohne untere Grenze); leer, wenn keines (Prüflauf, Req 15.5).
+     */
+    Optional<Zustaendig> zustaendig(Instant zeitpunkt);
+
     /** Dateien der Dokumente mit {@code archiviert} in {@code [von, bis)}; {@code von = null} heisst ohne untere Grenze. */
     List<ManifestEintrag> eintraege(Instant von, Instant bis);
 
@@ -32,6 +39,9 @@ public interface ManifestDaten {
 
     /** Blätter der Zeilen von {@code tabelle} mit {@code zeit} in {@code [von, bis)}, nach {@code id}. */
     List<Blatt> blaetter(String tabelle, Instant von, Instant bis);
+
+    /** SHA-256 der globalen und mandanteneigenen Sicherungsexporte im Manifest-Fenster, sortiert und ohne Duplikate. */
+    List<String> sicherungen(MandantCode mandant, Instant von, Instant bis);
 
     /** Hält Manifest, Zeitstempel und Blätter fest (nur Einfügen). */
     void festhalten(NeuesManifest manifest);
@@ -54,6 +64,16 @@ public interface ManifestDaten {
             Objects.requireNonNull(bis, "bis");
             Objects.requireNonNull(sha256, "sha256");
             Objects.requireNonNull(verweis, "verweis");
+        }
+    }
+
+    /** Datum, Fenster und SHA-256 eines Manifests aus der Tabelle {@code manifest}; {@code von} leer beim ersten. */
+    record Zustaendig(LocalDate datum, Optional<Instant> von, Instant bis, String sha256) {
+        public Zustaendig {
+            Objects.requireNonNull(datum, "datum");
+            Objects.requireNonNull(von, "von");
+            Objects.requireNonNull(bis, "bis");
+            Objects.requireNonNull(sha256, "sha256");
         }
     }
 

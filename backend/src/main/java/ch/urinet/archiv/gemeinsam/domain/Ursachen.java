@@ -31,11 +31,11 @@ public final class Ursachen {
     /**
      * Wie {@link #kette}, dazu bei eigenen Ausnahmen die Meldung, wenn sie sicher keine Werte enthält (Spec 02,
      * design.md «Umsetzung (Aufgabe 6.1)»): bei einem {@link FachFehler} Fehlercode und Meldung (nach seinem Vertrag ein
-     * fester Text), bei {@link IllegalStateException} und {@link IllegalArgumentException} (genau diese Klassen) aus
-     * Code unter {@value #EIGENER_CODE} nur, wenn die Meldung als String-Konstante in der Klasse steht, die die Ausnahme
-     * erzeugt hat. Eine zusammengesetzte Meldung («…: » + Wert) steht dort nie und bleibt draussen, ebenso jede Meldung
-     * fremder Ausnahmen und ihrer Unterklassen. So gelangen keine Mail-Inhalte, Adressen, Betreffe oder Dateinamen ins
-     * Log (Req 16.7).
+     * fester Text), bei {@link WertefreieMeldung} deren feste Meldung und bei {@link IllegalStateException} und
+     * {@link IllegalArgumentException} (genau diese Klassen) aus Code unter {@value #EIGENER_CODE} nur, wenn die Meldung
+     * als String-Konstante in der Klasse steht, die die Ausnahme erzeugt hat. Zusammengesetzte Meldungen und Meldungen
+     * fremder Ausnahmen bleiben draussen. So gelangen keine Mail-Inhalte, Adressen, Betreffe oder Dateinamen ins Log
+     * (Req 16.7).
      */
     public static String ketteMitMeldung(Throwable fehler) {
         return kette(fehler, true);
@@ -64,6 +64,9 @@ public final class Ursachen {
                     ? "[code=" + fach.code().name() + "]"
                     : "[code=" + fach.code().name() + ", meldung=\"" + meldung + "\"]";
         }
+        if (t instanceof WertefreieMeldung) {
+            return meldung == null || meldung.isEmpty() ? "" : "[meldung=\"" + meldung + "\"]";
+        }
         boolean eigeneKlasse = t.getClass() == IllegalStateException.class
                 || t.getClass() == IllegalArgumentException.class;
         StackTraceElement[] stapel = t.getStackTrace();
@@ -90,9 +93,15 @@ public final class Ursachen {
         return false;
     }
 
-    /** {@code true}, wenn {@code fehler} oder eine seiner Ursachen vom Typ {@code typ} ist. */
-    public static boolean enthaelt(Throwable fehler, Class<? extends Throwable> typ) {
+    /** {@code true}, wenn {@code fehler} oder eine seiner Ursachen ein Exemplar von {@code typ} ist. */
+    public static boolean enthaelt(Throwable fehler, Class<?> typ) {
         return liste(fehler).stream().anyMatch(typ::isInstance);
+    }
+
+    /** {@code true}, wenn eine {@link SQLException} in der Kette den angegebenen SQLState trägt. */
+    public static boolean enthaeltSqlState(Throwable fehler, String sqlState) {
+        return liste(fehler).stream()
+                .anyMatch(t -> t instanceof SQLException sql && sqlState.equals(sql.getSQLState()));
     }
 
     // SocketTimeoutException und z. B. ConnectTimeoutException von Apache erben von InterruptedIOException

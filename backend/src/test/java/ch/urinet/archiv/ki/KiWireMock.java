@@ -6,6 +6,8 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import com.github.tomakehurst.wiremock.extension.ResponseDefinitionTransformerV2;
 import com.github.tomakehurst.wiremock.http.ResponseDefinition;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
@@ -15,8 +17,12 @@ import io.quarkus.test.common.WithTestResource;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
@@ -37,6 +43,12 @@ import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
  * Reranker (Spec 02, Aufgabe 6.4): Der Standard-Stub {@link #standardReranker()} ordnet die Texte in umgekehrter
  * Reihenfolge (der letzte gesendete zuerst), liefert genau {@code top_n} Ergebnisse und meldet
  * {@link #RERANKER_TOKENS_JE_TEXT} Tokens je Text. So unterscheidet sich seine Reihenfolge von der des RRF.
+ * <p>
+ * Chat-Modell (Spec 02, Aufgabe 7.2): gestreamte Antworten im Format von {@code POST /chat/completions} mit
+ * {@code "stream": true} ({@link #chatStrom}: Text-Chunks, {@code tool_calls} über mehrere Chunks, mehrere Werkzeuge in
+ * einer Antwort, {@code usage} am Ende). {@link #chatFolge} liefert sie der Reihe nach, {@link #chatFehler} einen
+ * HTTP-Fehler, {@link #chatVerzoegert} eine Antwort nach einer Verzögerung. Die Stubs gelten nur für Anfragen mit
+ * {@code stream: true} (Priorität 5); der Standard-Stub der Erfassung bleibt unberührt.
  */
 @WithTestResource(value = KiWireMock.class, scope = TestResourceScope.GLOBAL)
 public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
@@ -88,6 +100,143 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static MappingBuilder standardReranker() {
         return post(urlPathEqualTo(RERANKER_PFAD)).atPriority(10)
                 .willReturn(ResponseDefinitionBuilder.responseDefinition().withTransformers(RERANKER_ANTWORT));
+    }
+
+    // ---- Chat-Modell (gestreamt) -------------------------------------------------------------------------------
+
+    public static final String CHAT_PFAD = "/v1/chat/completions";
+    public static final String CHAT_MODELL = "mistralai/Mistral-Small-4-119B-2603";
+    private static final String CHAT_SZENARIO = "chat-modell";
+
+    /** Ein Werkzeugaufruf des simulierten Modells: Name und Argumente als JSON-Text. */
+    public record ChatAufruf(String name, String argumente) {
+    }
+
+    /**
+     * Eine simulierte Modellantwort: Text und/oder Werkzeugaufrufe (mehrere in einer Antwort sind möglich) und die
+     * Tokens am Ende ({@code usage}); {@code ein < 0} lässt {@code usage} weg.
+     */
+    public record ChatAntwort(String text, List<ChatAufruf> aufrufe, int ein, int aus) {
+        public ChatAntwort {
+            aufrufe = List.copyOf(aufrufe);
+        }
+
+        public static ChatAntwort text(String text, int ein, int aus) {
+            return new ChatAntwort(text, List.of(), ein, aus);
+        }
+
+        public static ChatAntwort werkzeuge(int ein, int aus, ChatAufruf... aufrufe) {
+            return new ChatAntwort(null, List.of(aufrufe), ein, aus);
+        }
+    }
+
+    /** Antwort im Format von {@code chat.completion.chunk} (Server-Sent Events), wie die OpenAI-Schnittstelle sie streamt. */
+    public static String chatStrom(ChatAntwort antwort) {
+        StringBuilder sb = new StringBuilder();
+        chunk(sb, "{\"role\":\"assistant\",\"content\":\"\"}", "null");
+        if (antwort.text() != null) {
+            for (String stueck : stuecke(antwort.text(), 12)) {
+                chunk(sb, "{\"content\":" + jsonText(stueck) + "}", "null");
+            }
+        }
+        for (int i = 0; i < antwort.aufrufe().size(); i++) {
+            ChatAufruf aufruf = antwort.aufrufe().get(i);
+            chunk(sb, "{\"tool_calls\":[{\"index\":" + i + ",\"id\":\"call_" + i + "\",\"type\":\"function\","
+                    + "\"function\":{\"name\":" + jsonText(aufruf.name()) + ",\"arguments\":\"\"}}]}", "null");
+            for (String stueck : stuecke(aufruf.argumente(), 9)) {
+                chunk(sb, "{\"tool_calls\":[{\"index\":" + i + ",\"function\":{\"arguments\":" + jsonText(stueck)
+                        + "}}]}", "null");
+            }
+        }
+        chunk(sb, "{}", antwort.aufrufe().isEmpty() ? "\"stop\"" : "\"tool_calls\"");
+        if (antwort.ein() >= 0) {
+            sb.append("data: {\"id\":\"chatcmpl-test\",\"object\":\"chat.completion.chunk\",\"created\":1773565200,"
+                    + "\"model\":\"").append(CHAT_MODELL).append("\",\"choices\":[],\"usage\":{\"prompt_tokens\":")
+                    .append(antwort.ein()).append(",\"completion_tokens\":").append(antwort.aus())
+                    .append(",\"total_tokens\":").append(antwort.ein() + antwort.aus()).append("}}\n\n");
+        }
+        sb.append("data: [DONE]\n\n");
+        return sb.toString();
+    }
+
+    private static void chunk(StringBuilder sb, String delta, String ende) {
+        sb.append("data: {\"id\":\"chatcmpl-test\",\"object\":\"chat.completion.chunk\",\"created\":1773565200,"
+                + "\"model\":\"").append(CHAT_MODELL).append("\",\"choices\":[{\"index\":0,\"delta\":").append(delta)
+                .append(",\"finish_reason\":").append(ende).append("}]}\n\n");
+    }
+
+    private static List<String> stuecke(String text, int laenge) {
+        List<String> liste = new ArrayList<>();
+        for (int i = 0; i < text.length(); i += laenge) {
+            liste.add(text.substring(i, Math.min(text.length(), i + laenge)));
+        }
+        return liste;
+    }
+
+    private static String jsonText(String text) {
+        try {
+            return new ObjectMapper().writeValueAsString(text);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static ResponseDefinitionBuilder strom(ChatAntwort antwort) {
+        return ResponseDefinitionBuilder.responseDefinition().withStatus(200)
+                .withHeader("Content-Type", "text/event-stream; charset=utf-8").withBody(chatStrom(antwort));
+    }
+
+    private static MappingBuilder gestreamt() {
+        return post(urlPathEqualTo(CHAT_PFAD)).withRequestBody(matchingJsonPath("$.stream", equalTo("true")))
+                .atPriority(5);
+    }
+
+    /**
+     * Das simulierte Chat-Modell antwortet der Reihe nach mit {@code antworten} (eine je gestreamter Anfrage); jede weitere
+     * Anfrage erhält die letzte Antwort noch einmal, damit eine Endlosschleife von Werkzeugaufrufen möglich ist.
+     */
+    public static void chatFolge(List<ChatAntwort> antworten) {
+        chatFolge(antworten, 0);
+    }
+
+    /** Wie {@link #chatFolge(List)}; die erste Antwort kommt über {@code erstePortionenMillis} ms verteilt (0: sofort). */
+    public static void chatFolge(List<ChatAntwort> antworten, int erstePortionenMillis) {
+        WireMock modell = client();
+        for (int i = 0; i < antworten.size(); i++) {
+            boolean letzte = i == antworten.size() - 1;
+            var stub = gestreamt().inScenario(CHAT_SZENARIO)
+                    .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
+                            : "antwort-" + i)
+                    .willReturn(i == 0 && erstePortionenMillis > 0
+                            ? strom(antworten.get(i)).withChunkedDribbleDelay(20, erstePortionenMillis)
+                            : strom(antworten.get(i)));
+            if (!letzte) {
+                stub.willSetStateTo("antwort-" + (i + 1));
+            }
+            modell.register(stub);
+        }
+    }
+
+    /** Das simulierte Chat-Modell antwortet mit einem HTTP-Fehler. */
+    public static void chatFehler(int status) {
+        client().register(gestreamt().willReturn(ResponseDefinitionBuilder.responseDefinition().withStatus(status)
+                .withHeader("Content-Type", "application/json").withBody("{\"error\":{\"message\":\"simuliert\"}}")));
+    }
+
+    /** Das simulierte Chat-Modell antwortet erst nach {@code millis} ms (über der Zeitgrenze des Agenten). */
+    public static void chatVerzoegert(ChatAntwort antwort, int millis) {
+        client().register(gestreamt().willReturn(strom(antwort).withFixedDelay(millis)));
+    }
+
+    /** Gestreamte Anfragen an das Chat-Modell im Journal, älteste zuerst, als JSON-Text. */
+    public static List<String> chatAnfragen() {
+        List<String> koerper = new ArrayList<>();
+        for (LoggedRequest anfrage : client().find(
+                RequestPatternBuilder.newRequestPattern(com.github.tomakehurst.wiremock.http.RequestMethod.POST,
+                        urlPathEqualTo(CHAT_PFAD)).withRequestBody(matchingJsonPath("$.stream", equalTo("true"))))) {
+            koerper.add(anfrage.getBodyAsString());
+        }
+        return koerper;
     }
 
     /** Vektor zum Text: deterministisch, nicht normiert, nie der Nullvektor. */

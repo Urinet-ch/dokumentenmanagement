@@ -1,0 +1,17 @@
+{
+  "_zweck": "Synthetischer Seed für Req 15.5 Prüflauf-Manifest-Tests",
+  "dokumentarten": [
+    {
+      "code": "QUITTUNG",
+      "name": "Testquittung",
+      "gruppen": ["finanz"],
+      "pflichtfelder": ["titel", "datum"],
+      "zusatz_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung_jahre": 10,
+      "aufbewahrung_ab": "GESCHAEFTSJAHR",
+      "gesetzliche_pflicht": true,
+      "aktiv": true
+    }
+  ]
+}

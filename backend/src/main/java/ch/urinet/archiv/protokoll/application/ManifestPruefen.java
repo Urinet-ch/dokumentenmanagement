@@ -5,7 +5,6 @@ import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.ManifestStand;
-import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
 import ch.urinet.archiv.protokoll.domain.ManifestSignatur;
 import ch.urinet.archiv.protokoll.domain.Pruefbericht;
@@ -22,7 +21,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -305,15 +303,8 @@ public class ManifestPruefen {
         }
         byte[] bytes = datei.get().inhalt();
         byte[] sig = teil(lauf, datum, ManifestTeil.SIG).map(ManifestDatei::inhalt).orElse(null);
-        try {
-            Map<String, Object> baum = json.objekt(bytes);
-            if (!Arrays.equals(Jcs.utf8(baum), bytes)) {
-                return Optional.of(new Gelesen(bytes, sig, null, "Manifest ist nicht in kanonischer Form (RFC 8785)"));
-            }
-            return Optional.of(new Gelesen(bytes, sig, ManifestInhalt.aus(baum), null));
-        } catch (IllegalArgumentException e) {
-            return Optional.of(new Gelesen(bytes, sig, null, "Manifest ist ungültig: " + e.getMessage()));
-        }
+        ManifestLesen.Lesung lesung = ManifestLesen.lesen(json, bytes);
+        return Optional.of(new Gelesen(bytes, sig, lesung.inhalt(), lesung.fehler()));
     }
 
     private record Lauf(MandantCode mandant, boolean mitDatenbank, Pruefbericht bericht, Set<String> gemeldet) {

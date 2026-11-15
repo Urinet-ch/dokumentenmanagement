@@ -13,6 +13,8 @@ components:
           enum:
           - generator
           - import
+          - webseite-lesen
+          - webseite-erfassung
         aktiv:
           type: boolean
         erstellt:
@@ -24,6 +26,23 @@ components:
           anyOf:
           - $ref: "#/components/schemas/Instant"
           - type: "null"
+        webseite:
+          type:
+          - string
+          - "null"
+        hoechsteStufe:
+          type:
+          - string
+          - "null"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        absenderPruefen:
+          type: boolean
     ApiTokenErstellt:
       type: object
       properties:
@@ -2223,8 +2242,9 @@ paths:
         \ {gespraechId, tokens: {ein, aus}}; «fehler» {meldung, gespraechId} beendet\
         \ den Stream ohne «fertig». Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 404 NICHT_GEFUNDEN\
         \ (fremdes oder unbekanntes Gespräch), 429 ZU_VIELE_ANFRAGEN mit Retry-After\
-        \ (mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage). Nur\
-        \ beschreibend: der generierte Client liest den Stream nicht."
+        \ und dem Feld grund der Problem Details (STUNDENLIMIT: mehr als 100 Fragen\
+        \ in 60 Minuten; LAEUFT: schon eine laufende Frage, Retry-After höchstens\
+        \ 5 s). Nur beschreibend: der generierte Client liest den Stream nicht."
       tags:
       - Chat
       requestBody:
@@ -2241,7 +2261,8 @@ paths:
               schema:
                 type: string
         "429":
-          description: Rate-Limit oder schon eine laufende Frage
+          description: Rate-Limit (grund STUNDENLIMIT) oder schon eine laufende Frage
+            (grund LAEUFT)
           headers:
             Retry-After:
               description: Sekunden bis zum nächsten Versuch
@@ -2759,6 +2780,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokument"
+        "409":
+          description: Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)
         "412":
           description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
         "428":
@@ -2812,6 +2835,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokument"
+        "409":
+          description: Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)
         "412":
           description: If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)
         "428":

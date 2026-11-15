@@ -14,8 +14,8 @@ import java.util.UUID;
 
 /**
  * Inhalt des Tages-Manifests (Req 15.1, 15.2; design.md «Manifest»). {@link #kanonisch()} liefert die signierte Form
- * nach RFC 8785; {@link #aus(Map)} liest sie zurück (Prüfwerkzeug). {@code sicherung} bleibt leer, bis Aufgabe 5.5 die
- * Exporte von {@code archiv-sicherung} anbindet.
+ * nach RFC 8785; {@link #aus(Map)} liest sie zurück (Prüfwerkzeug). {@code sicherung} enthält die festgehaltenen
+ * SHA-256 der Sicherungsexporte im Manifest-Fenster (Aufgabe 5.5).
  */
 public record ManifestInhalt(String mandant, LocalDate datum, Instant von, Instant bis, String vorherSha256,
                              Vorher vorher, List<ManifestEintrag> eintraege, SortedMap<String, ProtokollHash> protokolle,

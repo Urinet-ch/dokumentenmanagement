@@ -1,17 +1,23 @@
 package ch.urinet.archiv.suche;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.dokument.adapter.out.persistence.SucheSql;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.application.DokumentSuche;
+import ch.urinet.archiv.suche.application.SuchePort;
 import ch.urinet.archiv.suche.domain.Richtung;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 import ch.urinet.archiv.suche.domain.Suchergebnis;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
@@ -29,7 +35,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -43,7 +51,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Anwendungsfall mit Sichtregel, Rang, Auszug und Zähler, ohne HTTP. Jedes Dokument trägt einen synthetischen
  * Dateinamen, ein Teil der Suchbegriffe steht nur dort (Aufgabe 4.10, Req 14.8). Die Grenze ist locker (Stufe A und lokale Rechner
  * sind klein, tech.md: Leistungsziele erst auf Stufe B mit 50'000 Dokumenten, Aufgabe 5.11); der Messwert steht in
- * der Ausgabe und in design.md.
+ * der Ausgabe und in design.md. Die Variante ohne Dateinamen (Werkzeuge anderer Sprachmodelle, Spec 01, Req 3.13) misst
+ * dieselben Suchen über den {@link SuchePort} und belegt mit {@code EXPLAIN}, dass der Ausdrucksindex aus Changeset 028
+ * greift (Spec 02, Aufgabe 7.1a).
  */
 @QuarkusTest
 class SucheLeistungTest {
@@ -66,6 +76,12 @@ class SucheLeistungTest {
 
     @Inject
     DokumentSuche suche;
+
+    @Inject
+    SuchePort port;
+
+    @Inject
+    EntityManager em;
 
     @Inject
     MandantKontext kontext;
@@ -158,19 +174,7 @@ class SucheLeistungTest {
     void sucheMitZehntausendDokumenten() throws Exception {
         List<Benutzer> benutzer = List.of(new Benutzer("fabian", Rolle.INHABER), new Benutzer("joel", Rolle.MITARBEITER),
                 new Benutzer("treuhand", Rolle.TREUHAENDER));
-        List<Suchanfrage> anfragen = new ArrayList<>();
-        for (int i = 0; i < SUCHEN; i++) {
-            // jede zehnte Suche nach einem Wort, das nur in Dateinamen steht
-            String begriff = i % 10 == 9 ? DATEIWOERTER[i % DATEIWOERTER.length] : wort();
-            anfragen.add(switch (i % 5) {
-                case 0 -> anfrage(begriff, null, null, null, null);
-                case 1 -> anfrage(begriff + " " + wort(), null, null, null, null);
-                case 2 -> anfrage(begriff, ARTEN[i % ARTEN.length], LocalDate.of(2024, 1, 1), Richtung.EINNAHME, null);
-                case 3 -> anfrage("\"" + begriff + " " + wort() + "\" -" + wort(), null, null, null, null);
-                default -> anfrage(null, ARTEN[i % ARTEN.length], LocalDate.of(2023, 1, 1), null,
-                        String.format("%d-%03d", 2023 + i % 3, i * 3 % 1000));
-            });
-        }
+        List<Suchanfrage> anfragen = anfragen();
         ExecutorService worker = Executors.newSingleThreadExecutor();
         long[] dauer = new long[SUCHEN];
         long treffer = 0;
@@ -195,6 +199,77 @@ class SucheLeistungTest {
                 + "im Mittel %d Treffer)%n", DOKUMENTE, median, p95, max, SUCHEN, treffer / SUCHEN);
         assertThat(treffer).as("die Suchen finden Dokumente").isPositive();
         assertThat(p95).as("p95 in ms").isLessThan(1_000);
+    }
+
+    @Test
+    void sucheOhneDateinameMitZehntausendDokumenten() throws Exception {
+        List<Benutzer> benutzer = List.of(new Benutzer("fabian", Rolle.INHABER), new Benutzer("joel", Rolle.MITARBEITER),
+                new Benutzer("treuhand", Rolle.TREUHAENDER));
+        List<Suchanfrage> anfragen = anfragen();
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        long[] dauer = new long[SUCHEN];
+        long treffer = 0;
+        String plan;
+        try {
+            for (int i = 0; i < 10; i++) {
+                ohneDateiname(worker, benutzer.get(i % benutzer.size()), anfragen.get(i));
+            }
+            for (int i = 0; i < SUCHEN; i++) {
+                long start = System.nanoTime();
+                treffer += ohneDateiname(worker, benutzer.get(i % benutzer.size()), anfragen.get(i)).gesamt();
+                dauer[i] = System.nanoTime() - start;
+            }
+            // ein seltener Begriff (Nummer im Titel genau eines Dokuments), damit der Planer den Index wählen kann
+            plan = plan(worker, benutzer.get(1), anfrage("4711", null, null, null, null));
+        } finally {
+            worker.shutdown();
+        }
+        Arrays.sort(dauer);
+        long median = dauer[SUCHEN / 2] / 1_000_000;
+        long p95 = dauer[SUCHEN * 95 / 100] / 1_000_000;
+        long max = dauer[SUCHEN - 1] / 1_000_000;
+        System.out.printf("Volltextsuche ohne Dateinamen mit %d Dokumenten: Median %d ms, p95 %d ms, Max %d ms "
+                + "(%d Suchen, im Mittel %d Treffer)%n", DOKUMENTE, median, p95, max, SUCHEN, treffer / SUCHEN);
+        assertThat(plan).as("EXPLAIN der Suche ohne Dateinamen").contains("dokument_volltext_ohne_dateiname_ix");
+        assertThat(treffer).as("die Suchen finden Dokumente").isPositive();
+        assertThat(p95).as("p95 in ms").isLessThan(1_000);
+    }
+
+    private Suchergebnis ohneDateiname(ExecutorService worker, Benutzer benutzer, Suchanfrage anfrage)
+            throws Exception {
+        return worker.submit(() -> kontext.mit(new MandantCode(MANDANT), () -> QuarkusTransaction.requiringNew()
+                .call(() -> port.suchen(anfrage, Sichtregel.fuer(benutzer), false)))).get(30, TimeUnit.SECONDS);
+    }
+
+    /** {@code EXPLAIN} des SQL, das {@code PanacheDokumentSuche} für die Variante ohne Dateinamen ausführt. */
+    private String plan(ExecutorService worker, Benutzer benutzer, Suchanfrage anfrage) throws Exception {
+        return worker.submit(() -> kontext.mit(new MandantCode(MANDANT), () -> QuarkusTransaction.requiringNew()
+                .call(() -> {
+                    Map<String, Object> parameter = new HashMap<>();
+                    Query abfrage = em.createNativeQuery("explain " + SucheSql.sql(anfrage, Sichtregel.fuer(benutzer),
+                            false, parameter));
+                    parameter.forEach(abfrage::setParameter);
+                    @SuppressWarnings("unchecked")
+                    List<String> zeilen = abfrage.getResultList();
+                    return String.join("\n", zeilen);
+                }))).get(30, TimeUnit.SECONDS);
+    }
+
+    /** Dieselben 100 Suchen je Lauf; jede zehnte nach einem Wort, das nur in Dateinamen steht. */
+    private List<Suchanfrage> anfragen() {
+        List<Suchanfrage> anfragen = new ArrayList<>();
+        for (int i = 0; i < SUCHEN; i++) {
+            String begriff = i % 10 == 9 ? DATEIWOERTER[i % DATEIWOERTER.length] : wort();
+            anfragen.add(switch (i % 5) {
+                case 0 -> anfrage(begriff, null, null, null, null);
+                case 1 -> anfrage(begriff + " " + wort(), null, null, null, null);
+                case 2 -> anfrage(begriff, ARTEN[i % ARTEN.length], LocalDate.of(2024, 1, 1), Richtung.EINNAHME, null);
+                case 3 -> anfrage("\"" + begriff + " " + wort() + "\" -" + wort(), null, null, null, null);
+                default -> anfrage(null, ARTEN[i % ARTEN.length], LocalDate.of(2023, 1, 1), null,
+                        String.format("%d-%03d", 2023 + i % 3, i * 3 % 1000));
+            });
+        }
+        return anfragen;
     }
 
     private static Suchanfrage anfrage(String begriff, String art, LocalDate datumVon, Richtung richtung,

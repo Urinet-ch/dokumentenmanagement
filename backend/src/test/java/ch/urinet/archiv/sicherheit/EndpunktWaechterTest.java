@@ -7,6 +7,7 @@ import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
@@ -15,6 +16,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import io.quarkus.arc.properties.IfBuildProperty;
+import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.DELETE;
@@ -126,6 +128,10 @@ class EndpunktWaechterTest {
         assertThat(verstoesse(KorrektNichtDokumentbezogen.class)).isEmpty();
         assertThat(verstoesse(KorrektMitScope.class)).isEmpty();
         assertThat(verstoesse(KorrektUeberInterface.class)).isEmpty();
+        assertThat(verstoesse(WebseiteOhneWebseitenZugang.class)).singleElement().asString()
+                .contains("jede Methode unter /public/ verlangt @WebseitenZugang");
+        assertThat(verstoesse(WebseitenZugangAusserhalbPublic.class)).singleElement().asString()
+                .contains("@WebseitenZugang nur unter /public/");
     }
 
     @Test
@@ -159,6 +165,30 @@ class EndpunktWaechterTest {
             }
             String pfad = klassenPfad + "/" + deklarationen.stream().map(m -> m.getAnnotation(Path.class))
                     .filter(Objects::nonNull).map(Path::value).findFirst().orElse("");
+            boolean unterPublic = normalisiert(klassenPfad).equals("/public")
+                    || normalisiert(klassenPfad).startsWith("/public/");
+            WebseitenZugang webseitenZugang = methode.getAnnotation(WebseitenZugang.class);
+            if (webseitenZugang != null) {
+                if (!unterPublic) {
+                    verstoesse.add(name + ": @WebseitenZugang nur unter /public/");
+                }
+                if (methode.isAnnotationPresent(ErfordertAktion.class)
+                        || methode.isAnnotationPresent(AlleArchivRollen.class)
+                        || methode.isAnnotationPresent(Oeffentlich.class)
+                        || methode.isAnnotationPresent(ErlaubtScope.class)
+                        || methode.isAnnotationPresent(RolesAllowed.class)
+                        || methode.isAnnotationPresent(PermitAll.class)) {
+                    verstoesse.add(name + ": @WebseitenZugang darf nicht mit anderen Zugangserklärungen kombiniert werden");
+                }
+                if (!methode.isAnnotationPresent(Authenticated.class)) {
+                    verstoesse.add(name + ": @WebseitenZugang verlangt @Authenticated");
+                }
+                continue;
+            }
+            if (unterPublic) {
+                verstoesse.add(name + ": jede Methode unter /public/ verlangt @WebseitenZugang");
+                continue;
+            }
             ErfordertAktion aktion = methode.getAnnotation(ErfordertAktion.class);
             boolean alle = methode.isAnnotationPresent(AlleArchivRollen.class);
             boolean oeffentlich = methode.isAnnotationPresent(Oeffentlich.class);
@@ -544,6 +574,26 @@ class EndpunktWaechterTest {
         @RolesAllowed({"inhaber", "mitarbeiter", "geschaeftsstelle", ApiTokenScope.ROLLE_IMPORT})
         @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
         public void erfassen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/public/v1/probe")
+    static class WebseiteOhneWebseitenZugang {
+        @GET
+        @AlleArchivRollen
+        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        public void lesen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/api/v1/probe")
+    static class WebseitenZugangAusserhalbPublic {
+        @GET
+        @Authenticated
+        @WebseitenZugang(WebseitenZugang.Art.LESEN)
+        public void lesen() {
         }
     }
 

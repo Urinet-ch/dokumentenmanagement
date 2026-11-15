@@ -1,6 +1,7 @@
 package ch.urinet.archiv.protokoll.adapter.out.persistence;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ManifestDaten;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
@@ -126,6 +127,27 @@ public class JdbcManifestDaten implements ManifestDaten {
     }
 
     @Override
+    public Optional<Zustaendig> zustaendig(Instant zeitpunkt) {
+        java.util.Objects.requireNonNull(zeitpunkt, "zeitpunkt");
+        String sql = "select datum, von, bis, sha256 from " + schema() + ".manifest where (von is null or von <= ?) "
+                + "and bis > ? order by datum limit 1";
+        try (Connection v = verbindung(); PreparedStatement p = v.prepareStatement(sql)) {
+            p.setObject(1, zeit(zeitpunkt), Types.TIMESTAMP_WITH_TIMEZONE);
+            p.setObject(2, zeit(zeitpunkt), Types.TIMESTAMP_WITH_TIMEZONE);
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new Zustaendig(r.getObject(1, LocalDate.class),
+                        Optional.ofNullable(r.getObject(2, OffsetDateTime.class)).map(OffsetDateTime::toInstant),
+                        r.getObject(3, OffsetDateTime.class).toInstant(), r.getString(4)));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Zuständiges Manifest nicht gelesen", e);
+        }
+    }
+
+    @Override
     public List<ManifestEintrag> eintraege(Instant von, Instant bis) {
         String s = schema();
         String sql = "select d.id, lower(f.rolle), f.nr, f.sha256, f.s3_version from " + s + ".dokument d join " + s
@@ -193,6 +215,25 @@ public class JdbcManifestDaten implements ManifestDaten {
             return liste;
         } catch (SQLException | JsonProcessingException e) {
             throw new IllegalStateException("Protokollzeilen nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public List<String> sicherungen(MandantCode mandant, Instant von, Instant bis) {
+        String sql = "select distinct sha256 from public.sicherung_export where (mandant is null or mandant = ?) "
+                + "and " + fenster("erstellt") + " order by sha256";
+        try (Connection v = verbindung(); PreparedStatement p = v.prepareStatement(sql)) {
+            p.setString(1, mandant.wert());
+            fensterSetzen(p, 2, von, bis);
+            List<String> liste = new ArrayList<>();
+            try (ResultSet r = p.executeQuery()) {
+                while (r.next()) {
+                    liste.add(r.getString(1));
+                }
+            }
+            return liste;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Sicherungsexporte des Manifests nicht gelesen", e);
         }
     }
 

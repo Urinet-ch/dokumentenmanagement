@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
+import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -32,12 +33,13 @@ public class ProblemAbbildung {
         if (fehler instanceof PflichtfelderFehlen fehlen) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "felder", fehlen.felder())).build();
         }
+        if (fehler instanceof ZuVieleAnfragen zuViele) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "grund", zuViele.grund().name()))
+                    .header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden())).build();
+        }
         Response.ResponseBuilder antwort = builder(ProblemAntwort.fuer(fehler.code()));
         if (fehler.code() == Fehlercode.SPEICHER_NICHT_ERREICHBAR) {
             antwort.header(HttpHeaders.RETRY_AFTER, SPEICHER_NOCHMALS_NACH_SEKUNDEN);
-        }
-        if (fehler instanceof ZuVieleAnfragen zuViele) {
-            antwort.header(HttpHeaders.RETRY_AFTER, Long.toString(zuViele.wartezeitSekunden()));
         }
         return antwort.build();
     }
@@ -98,6 +100,9 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response unerwartet(Throwable fehler) {
+        if (Ursachen.enthaeltSqlState(fehler, "40P01") || Ursachen.enthaeltSqlState(fehler, "55P03")) {
+            return antwort(ProblemAntwort.fuer(Fehlercode.STATUS_KONFLIKT, fehler));
+        }
         return antwort(ProblemAntwort.fuer(Fehlercode.INTERNER_FEHLER, fehler));
     }
 
