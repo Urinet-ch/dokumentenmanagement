@@ -65,7 +65,16 @@ public class DokumenteSuchen {
      * Treffern nur aus dem Volltext und ohne Seitentrenner.
      */
     public record Treffer(String id, String titel, String art, String datum, String partner, String betrag,
-                          String auszug, boolean bestaetigt, String link, String seiten) {
+                          String auszug, boolean bestaetigt, String link, String seiten, Integer nummer) {
+
+        public Treffer(String id, String titel, String art, String datum, String partner, String betrag,
+                       String auszug, boolean bestaetigt, String link, String seiten) {
+            this(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, null);
+        }
+
+        public Treffer mitNummer(int nummer) {
+            return new Treffer(id, titel, art, datum, partner, betrag, auszug, bestaetigt, link, seiten, nummer);
+        }
     }
 
     /**

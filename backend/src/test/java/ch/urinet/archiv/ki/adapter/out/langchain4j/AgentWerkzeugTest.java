@@ -10,9 +10,11 @@ import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.service.tool.ToolExecutor;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -98,10 +100,28 @@ class AgentWerkzeugTest {
         AgentLauf lauf = lauf();
         lauf.rundeBeginnt();
         abbruch.setzen();
-        assertThatThrownBy(() -> new AgentWerkzeug("dokumente_suchen", echt, lauf, JSON, 5).execute(anfrage(), lauf.id()))
-                .isInstanceOf(AgentWerkzeug.Abgebrochen.class);
-        assertThat(aufrufe).isEmpty();
-        assertThat(ereignisse).isEmpty();
+        try {
+            assertThatThrownBy(() -> new AgentWerkzeug("dokumente_suchen", echt, lauf, JSON, 5)
+                    .execute(anfrage(), lauf.id())).isInstanceOf(AgentWerkzeug.Abgebrochen.class);
+            assertThat(aufrufe).isEmpty();
+            assertThat(ereignisse).isEmpty();
+        } finally {
+            EntkoppeltesModell.verhinderungZuruecksetzen();
+        }
+    }
+
+    @Test
+    void nachEndeDesGespraechsWirdKeinWeiteresWerkzeugAusgefuehrt() {
+        AgentLauf lauf = lauf();
+        lauf.beenden();
+        try {
+            assertThatThrownBy(() -> new AgentWerkzeug("dokumente_suchen", echt, lauf, JSON, 5)
+                    .execute(anfrage(), lauf.id())).isInstanceOf(AgentWerkzeug.Abgebrochen.class);
+            assertThat(aufrufe).isEmpty();
+            assertThat(ereignisse).isEmpty();
+        } finally {
+            EntkoppeltesModell.verhinderungZuruecksetzen();
+        }
     }
 
     @Test
