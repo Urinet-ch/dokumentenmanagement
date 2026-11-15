@@ -9,6 +9,7 @@ import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -31,13 +32,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ApiTokenPruefungTest {
 
     private static final Instant START = Instant.parse("2026-11-10T08:00:00Z");
+    private static final PruefCacheSignierer SIGNIERER =
+            geheimnis -> geheimnis.getBytes(StandardCharsets.UTF_8);
 
     private final SecureRandom zufall = new SecureRandom();
     private final ZaehlenderHasher hasher = new ZaehlenderHasher();
     private final FakeRegister register = new FakeRegister();
     private final StellbareUhr uhr = new StellbareUhr();
     private final ApiTokenPruefung pruefung = new ApiTokenPruefung(register, hasher, uhr,
-            new HashSperre(2, Duration.ofMillis(200)));
+            new HashSperre(2, Duration.ofMillis(200)), SIGNIERER);
 
     @Test
     void unbekannteIdVergleichtTrotzdemEinmalGegenDieAttrappe() {
@@ -70,7 +73,8 @@ class ApiTokenPruefungTest {
             drin.countDown();
             warten(los);
         };
-        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, new HashSperre(1, Duration.ofMillis(50)));
+        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr,
+                new HashSperre(1, Duration.ofMillis(50)), SIGNIERER);
         ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
         CompletableFuture<Optional<ApiClient>> erste = CompletableFuture.supplyAsync(() -> eng.pruefen(bekannt));
         assertThat(drin.await(5, TimeUnit.SECONDS)).isTrue();
@@ -95,7 +99,7 @@ class ApiTokenPruefungTest {
             warten(los);
         };
         HashSperre sperre = new HashSperre(1, Duration.ofMillis(50));
-        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, sperre);
+        ApiTokenPruefung eng = new ApiTokenPruefung(register, hasher, uhr, sperre, SIGNIERER);
         ApiTokenVerwaltung verwaltung = new ApiTokenVerwaltung(register, hasher,
                 code -> Optional.of("m_" + code.wert()), sperre, new BenutzerVerzeichnisPflege(null));
         ApiToken bekannt = register.anlegen(ApiToken.neu(zufall), true);
@@ -184,7 +188,7 @@ class ApiTokenPruefungTest {
     void abgelaufenerPruefCacheRechnetArgon2Erneut() {
         ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
         ApiTokenPruefung kurzerCache = new ApiTokenPruefung(register, hasher, uhr,
-                new HashSperre(2, Duration.ofMillis(200)), Duration.ofSeconds(10));
+                new HashSperre(2, Duration.ofMillis(200)), Duration.ofSeconds(10), SIGNIERER);
 
         assertThat(kurzerCache.pruefen(token)).isPresent();
         uhr.weiter(Duration.ofSeconds(11));
@@ -197,7 +201,7 @@ class ApiTokenPruefungTest {
         CountDownLatch imHash = new CountDownLatch(2);
         CountDownLatch loslassen = new CountDownLatch(1);
         HashSperre sperre = new HashSperre(2, Duration.ofMillis(100));
-        ApiTokenPruefung unterLast = new ApiTokenPruefung(register, hasher, uhr, sperre);
+        ApiTokenPruefung unterLast = new ApiTokenPruefung(register, hasher, uhr, sperre, SIGNIERER);
         ApiToken website = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
         assertThat(unterLast.pruefen(website)).isPresent();
         hasher.bremse = () -> {
