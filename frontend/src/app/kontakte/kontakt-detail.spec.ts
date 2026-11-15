@@ -302,6 +302,31 @@ describe('Kontakte: Detail (Req 17.3, 17.4, 17.6)', () => {
       });
     });
 
+    it('behält nach 412 angefasste Werte und nutzt die neue Version beim erneuten Speichern', async () => {
+      let n = 0;
+      port.aktionAntwort = () =>
+        n++ === 0 ? throwError(() => new HttpErrorResponse({ status: 412 })) : of(DETAIL);
+      await oeffnen();
+      await laden(DETAIL);
+      await klick('bearbeiten');
+      const telefon = element.querySelector<HTMLInputElement>('[data-test=feld-telefon]')!;
+      telefon.value = '041 222 22 22';
+      telefon.dispatchEvent(new Event('input'));
+      await klick('speichern');
+      await laden({ ...DETAIL, telefon: '041 111 11 11', ort: 'Luzern', version: 4 });
+      expect(element.querySelector<HTMLInputElement>('[data-test=feld-telefon]')!.value).toBe(
+        '041 222 22 22',
+      );
+      expect(element.querySelector<HTMLInputElement>('[data-test=feld-ort]')!.value).toBe('Luzern');
+      await klick('speichern');
+      expect(port.aktionen[1]).toEqual({
+        art: 'aendern',
+        id: 'k1',
+        version: 4,
+        daten: { telefon: '041 222 22 22' },
+      });
+    });
+
     it('fragt vor dem Inaktivmarkieren zurück und sendet erst nach der Bestätigung', async () => {
       await oeffnen();
       await laden(DETAIL);

@@ -1021,8 +1021,10 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
     über `GET /dokumentarten`); die PWA filtert nichts und zeigt nur die Gesamtzahl der Antwort.
   - Aktionen (A12, nur `inhaber`): «Bearbeiten», «Zusammenführen …» und «Als inaktiv markieren» nur bei aktiven,
     «Wieder aktivieren» nur bei inaktiven ohne «zusammengeführt in». 412 und 428 laden das Detail neu und zeigen
-    «inzwischen geändert»; 409 und 400 erscheinen als Meldung beim Formular bzw. im Dialog. Zusammenführen und
-    Inaktivmarkieren fragen immer zurück (Dialog), das Absenden sperrt sich bis zur Antwort.
+    «inzwischen geändert»; 409 und 400 erscheinen als Meldung beim Formular bzw. im Dialog. Nach 412 bleiben angefasste
+    Felder im Formular beim Wert des Benutzers, nicht angefasste kommen aus dem neuen Detail; das ist beabsichtigt und
+    in `kontakt-detail.spec.ts` getestet. Zusammenführen und Inaktivmarkieren fragen immer zurück (Dialog), das Absenden
+    sperrt sich bis zur Antwort.
   - Verknüpfungen: Import-Vorschau mit Zahl und Filter «inaktiv» (nur Kontakt-Import) und Links von getroffenen und
     möglichen Kontakten; Dokumentansicht mit Link auf den Partner (A6); Zugriffsprotokoll mit den Beschriftungen der
     drei Aktionen.
