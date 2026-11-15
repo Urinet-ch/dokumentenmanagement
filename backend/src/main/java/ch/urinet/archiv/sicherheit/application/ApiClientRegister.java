@@ -20,7 +20,10 @@ public interface ApiClientRegister {
     /** Setzt {@code aktiv = false}, nur im eigenen Mandanten; {@code false}, wenn es die ID dort nicht gibt. */
     boolean widerrufen(String mandant, String id);
 
-    /** Setzt das Ablaufdatum eines Schlüssels, nur im eigenen Mandanten. */
+    /**
+     * Setzt das Ablaufdatum eines aktiven Webseiten-Schlüssels ohne Ablauf, nur im eigenen Mandanten; {@code false},
+     * wenn es keinen solchen gibt. Ein vorhandener Ablauf wird nie verschoben (atomar, auch bei gleichzeitigen Aufrufen).
+     */
     boolean gueltigBisSetzen(String mandant, String id, Instant zeit);
 
     void zuletztSetzen(String id, Instant zeit);

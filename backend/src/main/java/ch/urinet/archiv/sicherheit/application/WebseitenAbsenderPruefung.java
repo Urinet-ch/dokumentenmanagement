@@ -29,6 +29,7 @@ public class WebseitenAbsenderPruefung {
 
     private final Path datei;
     private volatile byte[] letzteDatei;
+    private String letzterFehler;
     private volatile Map<String, List<WebseitenNetz>> netze = Map.of();
 
     public WebseitenAbsenderPruefung(
@@ -56,6 +57,7 @@ public class WebseitenAbsenderPruefung {
                     netze = Map.of();
                     letzteDatei = null;
                 }
+                letzterFehler = null;
                 return;
             }
             try (InputStream eingabe = Files.newInputStream(datei)) {
@@ -84,11 +86,17 @@ public class WebseitenAbsenderPruefung {
                 geladen.put(webseite, eintrag);
             }
             netze = Map.copyOf(geladen);
+            letzterFehler = null;
         } catch (IOException | IllegalArgumentException e) {
             netze = Map.of();
             letzteDatei = inhalt;
-            LOG.errorf("Absenderkonfiguration für Webseiten-Schlüssel nicht lesbar: ursache=%s",
-                    e.getClass().getSimpleName());
+            // Nur beim Wechsel loggen: Eine dauerhaft unlesbare Datei darf das Log nicht pro Anfrage fluten.
+            // Geschlossen wird immer (Req 12.6); ERROR, weil nicht bekannt ist, ob ein Schlüssel auf die Datei zählt.
+            String fehler = e.getClass().getSimpleName();
+            if (!fehler.equals(letzterFehler)) {
+                LOG.errorf("Absenderkonfiguration für Webseiten-Schlüssel nicht lesbar: ursache=%s", fehler);
+                letzterFehler = fehler;
+            }
         }
     }
 }

@@ -162,6 +162,13 @@ public class WebseitenSchritte {
         absenderToken = erstellen(webseite, "oeffentlich", true);
     }
 
+    @Angenommen("es gibt einen Webseiten-Lese-Schlüssel für den Mandanten «{word}»")
+    public void leseSchluesselImMandanten(String mandant) {
+        String text = webseitenVerwaltung.erstellen(mandant, "probe", "lesen", "oeffentlich", false).token().text();
+        tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
+        webseitenToken = text;
+    }
+
     @Angenommen("es gibt einen aktiven Webseiten-Lese-Schlüssel")
     public void aktiverLeseSchluessel() {
         webseitenToken = erstellen("probe", "oeffentlich", false);

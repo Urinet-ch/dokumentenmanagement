@@ -104,6 +104,9 @@ public class WebseitenSchluesselKommando {
         }
         String mandant = argumente.get(1);
         String webseite = argumente.get(2);
+        if (!WebseitenSchluesselVerwaltung.gueltigeKennung(webseite)) {
+            return Optional.empty();
+        }
         String art = argumente.get(3);
         String stufe = null;
         boolean absenderPruefen = false;

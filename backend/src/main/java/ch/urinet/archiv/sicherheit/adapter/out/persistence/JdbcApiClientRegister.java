@@ -108,7 +108,7 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     public boolean gueltigBisSetzen(String mandant, String id, Instant zeit) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
                 verbindung.prepareStatement("update public.api_client set gueltig_bis = ? "
-                        + "where id = ? and mandant = ? and scope like 'webseite-%'")) {
+                        + "where id = ? and mandant = ? and scope like 'webseite-%' and aktiv and gueltig_bis is null")) {
             aendern.setObject(1, utc(zeit));
             aendern.setString(2, id);
             aendern.setString(3, mandant);

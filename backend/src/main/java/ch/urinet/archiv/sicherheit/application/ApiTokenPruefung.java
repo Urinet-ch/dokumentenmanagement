@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ApplicationScoped
 public class ApiTokenPruefung {
 
+    static final int CACHE_MAX = 1000;
     static final Duration DROSSEL = Duration.ofMinutes(1);
     private static final SecureRandom ZUFALL = new SecureRandom();
     private static final Logger LOG = Logger.getLogger(ApiTokenPruefung.class);
@@ -91,6 +92,7 @@ public class ApiTokenPruefung {
         }
         ApiClient client = zugang.get().client();
         boolean passt = cacheTreffer(client, token.geheimnis());
+        boolean ausCache = passt;
         if (!passt) {
             passt = sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), zugang.get().hash()));
         }
@@ -98,12 +100,25 @@ public class ApiTokenPruefung {
         if (!passt || !client.aktiv() || client.gueltigBis().filter(bis -> !bis.isAfter(jetzt)).isPresent()) {
             return Optional.empty();
         }
-        if (client.scope().webseitenSchluessel()) {
-            pruefCache.put(client.id(),
-                    new CacheEintrag(cacheSignierer.signieren(token.geheimnis()), jetzt.plus(cacheDauer)));
+        // Nur nach echtem Argon2id-Vergleich einschreiben: Der Ablauf ist absolut, nicht gleitend (sonst käme ein
+        // Schlüssel mit stetigem Verkehr nie mehr zum Re-Verify).
+        if (!ausCache && client.scope().webseitenSchluessel()) {
+            cacheEinschreiben(client.id(), new CacheEintrag(cacheSignierer.signieren(token.geheimnis()),
+                    jetzt.plus(cacheDauer)), jetzt);
         }
         zuletztNachfuehren(client.id());
         return Optional.of(client);
+    }
+
+    /** Höchstens {@value #CACHE_MAX} Einträge: Ist der Cache voll, fliegen die abgelaufenen raus, sonst wird nicht gecacht. */
+    private void cacheEinschreiben(String id, CacheEintrag eintrag, Instant jetzt) {
+        if (pruefCache.size() >= CACHE_MAX && !pruefCache.containsKey(id)) {
+            pruefCache.values().removeIf(e -> !e.ablauf().isAfter(jetzt));
+            if (pruefCache.size() >= CACHE_MAX) {
+                return;
+            }
+        }
+        pruefCache.put(id, eintrag);
     }
 
     private boolean cacheTreffer(ApiClient client, String geheimnis) {

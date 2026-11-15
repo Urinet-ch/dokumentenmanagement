@@ -197,6 +197,41 @@ class ApiTokenPruefungTest {
     }
 
     @Test
+    void pruefCacheLaeuftAbsolutAbAuchBeiStetigemVerkehr() {
+        ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+
+        assertThat(pruefung.pruefen(token)).isPresent();
+        uhr.weiter(Duration.ofMinutes(4));
+        assertThat(pruefung.pruefen(token)).isPresent();
+        uhr.weiter(Duration.ofMinutes(4));
+        assertThat(pruefung.pruefen(token)).isPresent();
+
+        // Standard 5 Minuten: der Treffer nach 4 Minuten verlängert den Eintrag nicht, der Re-Verify folgt nach 8
+        assertThat(hasher.vergleiche).isEqualTo(2);
+    }
+
+    @Test
+    void pruefCacheHatEineObergrenzeUndCachtDarueberHinausNicht() {
+        List<ApiToken> tokens = new ArrayList<>();
+        for (int i = 0; i <= ApiTokenPruefung.CACHE_MAX; i++) {
+            ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+            tokens.add(token);
+            assertThat(pruefung.pruefen(token)).isPresent();
+        }
+        int vergleiche = hasher.vergleiche;
+
+        assertThat(pruefung.pruefen(tokens.getFirst())).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(vergleiche);
+        assertThat(pruefung.pruefen(tokens.getLast())).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(vergleiche + 1);
+
+        uhr.weiter(Duration.ofMinutes(6));
+        assertThat(pruefung.pruefen(tokens.getLast())).isPresent();
+        assertThat(pruefung.pruefen(tokens.getLast())).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(vergleiche + 2);
+    }
+
+    @Test
     void gueltigerWebseitenSchluesselWartetBeiAusgelasteterHashSperreNicht() throws Exception {
         CountDownLatch imHash = new CountDownLatch(2);
         CountDownLatch loslassen = new CountDownLatch(1);

@@ -47,7 +47,7 @@ public class WebseitenSchluesselVerwaltung {
     public Erstellt erstellen(String mandant, String webseite, String art, String stufe, boolean absenderPruefen) {
         MandantCode code = aktiverMandant(mandant);
         String kennung = webseite == null ? "" : webseite.strip();
-        if (kennung.isEmpty() || kennung.length() > 100 || kennung.chars().anyMatch(Character::isISOControl)) {
+        if (!gueltigeKennung(kennung)) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         ApiTokenScope scope = switch (art == null ? "" : art) {
@@ -79,8 +79,11 @@ public class WebseitenSchluesselVerwaltung {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         ApiClient alt = webseitenSchluessel(id);
-        Instant gueltigBis = Instant.now().plus(ueberlappung);
-        if (!register.gueltigBisSetzen(alt.mandant(), alt.id(), gueltigBis)) {
+        Instant jetzt = Instant.now();
+        // Nur ein Schlüssel ohne Ablauf lässt sich rotieren: Ein abgelaufener lebt nicht wieder auf, ein bereits
+        // rotierter wird nicht verlängert, und zwei gleichzeitige Rotationen erzeugen keinen zweiten Nachfolger.
+        if (alt.gueltigBis().isPresent()
+                || !register.gueltigBisSetzen(alt.mandant(), alt.id(), jetzt.plus(ueberlappung))) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
         Erstellt erstellt = anlegen(alt.mandant(), alt.webseite().orElseThrow(), alt.scope(),
@@ -93,7 +96,11 @@ public class WebseitenSchluesselVerwaltung {
 
     @Transactional
     public ApiClient widerrufen(String id) {
-        ApiClient client = webseitenSchluessel(id);
+        ApiClient client = webseitenSchluessel(id, true);
+        if (!client.aktiv()) {
+            // idempotent: Das Ziel (Schlüssel unwirksam) ist erreicht, ein Wiederholen im Betriebsskript scheitert nicht
+            return client;
+        }
         tokenVerwaltung.widerrufen(new MandantCode(client.mandant()), id, Optional.empty());
         LOG.infof("Webseiten-Schlüssel widerrufen: id=%s mandant=%s webseite=%s scope=%s", client.id(),
                 client.mandant(), client.webseite().orElseThrow(), client.scope().code());
@@ -110,13 +117,26 @@ public class WebseitenSchluesselVerwaltung {
         return new Erstellt(client, token);
     }
 
+    /**
+     * Die Kennung steht in der Absenderdatei (Properties-Format) und im Log: Leerraum, Steuerzeichen und die
+     * Trennzeichen {@code : = # ! \\} sind darum ausgeschlossen.
+     */
+    public static boolean gueltigeKennung(String kennung) {
+        return !kennung.isEmpty() && kennung.length() <= 100 && kennung.chars().noneMatch(
+                c -> Character.isISOControl(c) || Character.isWhitespace(c) || ":=#!\\".indexOf(c) >= 0);
+    }
+
     private ApiClient webseitenSchluessel(String id) {
+        return webseitenSchluessel(id, false);
+    }
+
+    private ApiClient webseitenSchluessel(String id, boolean auchInaktiv) {
         if (!ApiToken.gueltigeId(id)) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
         ApiClient client = register.finden(id).map(ApiClientRegister.Zugang::client)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
-        if (!client.scope().webseitenSchluessel() || !client.aktiv()) {
+        if (!client.scope().webseitenSchluessel() || !auchInaktiv && !client.aktiv()) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
         return client;

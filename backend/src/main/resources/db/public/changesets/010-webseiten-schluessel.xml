@@ -20,10 +20,11 @@
             alter table api_client add constraint api_client_webseite_ck check (
                 (scope = 'webseite-lesen'
                     and webseite is not null and length(btrim(webseite)) > 0
+                    and hoechste_stufe is not null
                     and hoechste_stufe in ('oeffentlich', 'mitglieder', 'vorstand'))
                 or (scope = 'webseite-erfassung'
                     and webseite is not null and length(btrim(webseite)) > 0
-                    and hoechste_stufe = 'vorstand')
+                    and hoechste_stufe is not null and hoechste_stufe = 'vorstand')
                 or (scope in ('generator', 'import')
                     and webseite is null and hoechste_stufe is null
                     and gueltig_bis is null and not absender_pruefen)

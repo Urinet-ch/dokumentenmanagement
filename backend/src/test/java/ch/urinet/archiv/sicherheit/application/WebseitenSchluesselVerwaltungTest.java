@@ -1,6 +1,9 @@
 package ch.urinet.archiv.sicherheit.application;
 
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnis;
 import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnisPflege;
+import ch.urinet.archiv.protokoll.domain.VerzeichnisEintrag;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKommando;
@@ -28,7 +31,7 @@ class WebseitenSchluesselVerwaltungTest {
     private final HashSperre sperre = new HashSperre(1, Duration.ZERO);
     private final WebseitenSchluesselVerwaltung verwaltung = new WebseitenSchluesselVerwaltung(register,
             new ApiTokenVerwaltung(register, new Hasher(), code -> Optional.of("m_" + code.wert()), sperre,
-                    new BenutzerVerzeichnisPflege(null)),
+                    new BenutzerVerzeichnisPflege(new LeeresVerzeichnis())),
             new Hasher(), code -> Optional.of("m_" + code.wert()), sperre);
 
     @Test
@@ -87,6 +90,45 @@ class WebseitenSchluesselVerwaltungTest {
     }
 
     @Test
+    void abgelaufenerOderSchonRotierterSchluesselLaesstSichNichtRotieren() {
+        WebseitenSchluesselVerwaltung.Erstellt erstellt = verwaltung.erstellen("urinet", "wordpress", "lesen",
+                "oeffentlich", false);
+        String id = erstellt.client().id();
+        verwaltung.rotieren(id, Duration.ZERO);
+        Optional<Instant> ablauf = register.eintraege.get(id).client().gueltigBis();
+        int anzahl = register.eintraege.size();
+
+        // zweite Rotation, auch mit längerer Überlappung: weder verlängert noch ein weiterer Nachfolger
+        assertThatThrownBy(() -> verwaltung.rotieren(id, Duration.ofDays(30)))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+        assertThat(register.eintraege.get(id).client().gueltigBis()).isEqualTo(ablauf);
+        assertThat(register.eintraege).hasSize(anzahl);
+    }
+
+    @Test
+    void widerrufIstIdempotent() {
+        String id = verwaltung.erstellen("urinet", "wordpress", "lesen", "oeffentlich", false).client().id();
+
+        assertThat(verwaltung.widerrufen(id).aktiv()).isTrue();
+        assertThat(verwaltung.widerrufen(id).aktiv()).isFalse();
+        assertThat(register.eintraege.get(id).client().aktiv()).isFalse();
+    }
+
+    @Test
+    void kennungMitLeerraumOderPropertiesTrennzeichenWirdAbgelehnt() {
+        for (String kennung : List.of("vhf gsk", "vhf=gsk", "vhf:gsk", "#vhf", "vhf\\gsk", "", "a".repeat(101))) {
+            assertThatThrownBy(() -> verwaltung.erstellen("urinet", kennung, "lesen", "oeffentlich", false))
+                    .as(kennung).isInstanceOfSatisfying(FachFehler.class,
+                            fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.ANFRAGE_UNGUELTIG));
+        }
+        assertThat(WebseitenSchluesselKommando.lesen(List.of("erstellen", "urinet", "vhf gsk", "erfassung")))
+                .isEmpty();
+        assertThat(WebseitenSchluesselKommando.lesen(List.of("erstellen", "urinet", "vhf-gsk.de", "erfassung")))
+                .isPresent();
+    }
+
+    @Test
     void kommandoGibtGeheimnisNurEinmalAufStdoutAus() {
         WebseitenSchluesselKommando kommando = new WebseitenSchluesselKommando(verwaltung);
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -109,6 +151,26 @@ class WebseitenSchluesselVerwaltungTest {
         assertThat(WebseitenSchluesselKommando.lesen(List.of("rotieren", "abcdefgh1234", "--ueberlappung",
                 "P31D"))).isEmpty();
         assertThat(WebseitenSchluesselKommando.lesen(List.of("rotieren", "abcdefgh1234"))).isPresent();
+    }
+
+    private static final class LeeresVerzeichnis implements BenutzerVerzeichnis {
+        @Override
+        public Optional<VerzeichnisEintrag> letzter(Optional<MandantCode> mandant, String benutzer) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void einfuegen(Optional<MandantCode> mandant, Neu neu) {
+        }
+
+        @Override
+        public List<VerzeichnisEintrag> liste() {
+            return List.of();
+        }
+
+        @Override
+        public void sperren(Optional<MandantCode> mandant, String benutzer, Sperre sperre) {
+        }
     }
 
     private static final class Register implements ApiClientRegister {
@@ -145,7 +207,8 @@ class WebseitenSchluesselVerwaltungTest {
         @Override
         public boolean gueltigBisSetzen(String mandant, String id, Instant zeit) {
             Zugang zugang = eintraege.get(id);
-            if (zugang == null || !zugang.client().mandant().equals(mandant)) {
+            if (zugang == null || !zugang.client().mandant().equals(mandant) || !zugang.client().aktiv()
+                    || zugang.client().gueltigBis().isPresent()) {
                 return false;
             }
             ApiClient c = zugang.client();
