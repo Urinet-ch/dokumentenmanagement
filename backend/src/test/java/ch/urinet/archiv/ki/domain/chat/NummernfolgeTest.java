@@ -56,6 +56,15 @@ class NummernfolgeTest {
     }
 
     @Test
+    void ziffernbreiteRichtetSichNachDerKleinstenNummer() {
+        Pattern variabel = Pattern.compile("^(?<jahr>\\d{4})-(?<nr>\\d{1,3})$");
+        Nummernfolge.Ergebnis e = Nummernfolge.pruefen(variabel, 2026,
+                List.of("2026-02", "2026-100"), 3);
+
+        assertThat(e.fehlend()).containsExactly("2026-01", "2026-03", "2026-04");
+    }
+
+    @Test
     void listeIstBegrenztUndGesamtzahlStimmt() {
         Nummernfolge.Ergebnis e = Nummernfolge.pruefen(MUSTER, 2026, List.of("2026-999"), 5);
         assertThat(e.fehlend()).hasSize(5).startsWith("2026-001", "2026-002");
