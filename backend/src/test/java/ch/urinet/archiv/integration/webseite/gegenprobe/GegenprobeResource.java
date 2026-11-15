@@ -1,8 +1,8 @@
 package ch.urinet.archiv.integration.webseite.gegenprobe;
 
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import io.quarkus.security.Authenticated;
 import io.quarkus.arc.properties.IfBuildProperty;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -31,8 +31,8 @@ public class GegenprobeResource {
     @GET
     @Path("/{id}")
     @Produces(MediaType.APPLICATION_JSON)
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     @APIResponse(responseCode = "200", description = "Eintrag",
             content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = Eintrag.class)))
     @APIResponse(responseCode = "404", ref = "NichtGefunden")

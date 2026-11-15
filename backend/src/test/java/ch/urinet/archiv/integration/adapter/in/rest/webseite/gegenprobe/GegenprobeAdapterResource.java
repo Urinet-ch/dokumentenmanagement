@@ -1,9 +1,9 @@
 package ch.urinet.archiv.integration.adapter.in.rest.webseite.gegenprobe;
 
 import ch.urinet.archiv.integration.webseite.gegenprobe.GegenprobeResource;
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import io.quarkus.arc.properties.IfBuildProperty;
-import jakarta.annotation.security.RolesAllowed;
+import io.quarkus.security.Authenticated;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 
@@ -17,8 +17,8 @@ import jakarta.ws.rs.Path;
 public class GegenprobeAdapterResource {
 
     @GET
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public String lesen() {
         return "probe";
     }

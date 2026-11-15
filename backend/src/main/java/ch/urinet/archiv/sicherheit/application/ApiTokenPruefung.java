@@ -6,9 +6,11 @@ import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.security.SecureRandom;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -18,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Prüft ein API-Token bei jeder Anfrage, ohne Cache (Req 2.5): Lookup über die ID, dann der Argon2id-Vergleich.
+ * Prüft ein API-Token bei jeder Anfrage: Lookup über die ID, dann der Argon2id-Vergleich. Für Webseiten-Schlüssel
+ * darf ein pro Prozess zufällig geschlüsselter HMAC den Argon2id-Vergleich für eine begrenzte Zeit ersetzen (Req 12.8).
  * <p>
  * Invariante gegen Timing: Auch für eine unbekannte ID läuft genau ein Vergleich, gegen einen festen Attrappen-Hash.
  * Sonst verriete die Antwortzeit, welche IDs es gibt. Der Vergleich läuft immer vor der Prüfung von {@code aktiv}.
@@ -34,27 +37,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ApplicationScoped
 public class ApiTokenPruefung {
 
+    static final int CACHE_MAX = 1000;
     static final Duration DROSSEL = Duration.ofMinutes(1);
     private static final SecureRandom ZUFALL = new SecureRandom();
     private static final Logger LOG = Logger.getLogger(ApiTokenPruefung.class);
 
     private final ApiClientRegister register;
     private final GeheimnisHasher hasher;
+    private final PruefCacheSignierer cacheSignierer;
     private final Clock uhr;
     private final HashSperre sperre;
+    private final Duration cacheDauer;
+    private final Map<String, CacheEintrag> pruefCache = new ConcurrentHashMap<>();
     private final Map<String, Instant> zuletztGemeldet = new ConcurrentHashMap<>();
     private volatile String attrappe;
 
     @Inject
-    public ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, HashSperre sperre) {
-        this(register, hasher, Clock.systemUTC(), sperre);
+    public ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, HashSperre sperre,
+                           PruefCacheSignierer cacheSignierer,
+                           @ConfigProperty(name = "archiv.webseite.pruef-cache", defaultValue = "PT5M")
+                           Duration cacheDauer) {
+        this(register, hasher, Clock.systemUTC(), sperre, cacheDauer, cacheSignierer);
     }
 
-    ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre) {
+    ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
+                     PruefCacheSignierer cacheSignierer) {
+        this(register, hasher, uhr, sperre, Duration.ofMinutes(5), cacheSignierer);
+    }
+
+    ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
+                     Duration cacheDauer, PruefCacheSignierer cacheSignierer) {
         this.register = register;
         this.hasher = hasher;
+        this.cacheSignierer = cacheSignierer;
         this.uhr = uhr;
         this.sperre = sperre;
+        if (cacheDauer == null || cacheDauer.isNegative() || cacheDauer.isZero()) {
+            throw new IllegalArgumentException("archiv.webseite.pruef-cache muss grösser als null sein");
+        }
+        this.cacheDauer = cacheDauer;
     }
 
     /**
@@ -64,14 +85,55 @@ public class ApiTokenPruefung {
      */
     public Optional<ApiClient> pruefen(ApiToken token) {
         Optional<ApiClientRegister.Zugang> zugang = register.finden(token.id());
-        String hash = zugang.map(ApiClientRegister.Zugang::hash).orElseGet(this::attrappeBerechnen);
-        boolean passt = sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), hash));
-        if (zugang.isEmpty() || !passt || !zugang.get().client().aktiv()) {
+        if (zugang.isEmpty()) {
+            String attrappeHash = attrappeBerechnen();
+            sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), attrappeHash));
             return Optional.empty();
         }
         ApiClient client = zugang.get().client();
+        boolean passt = cacheTreffer(client, token.geheimnis());
+        boolean ausCache = passt;
+        if (!passt) {
+            passt = sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), zugang.get().hash()));
+        }
+        Instant jetzt = uhr.instant();
+        if (!passt || !client.aktiv() || client.gueltigBis().filter(bis -> !bis.isAfter(jetzt)).isPresent()) {
+            return Optional.empty();
+        }
+        // Nur nach echtem Argon2id-Vergleich einschreiben: Der Ablauf ist absolut, nicht gleitend (sonst käme ein
+        // Schlüssel mit stetigem Verkehr nie mehr zum Re-Verify).
+        if (!ausCache && client.scope().webseitenSchluessel()) {
+            cacheEinschreiben(client.id(), new CacheEintrag(cacheSignierer.signieren(token.geheimnis()),
+                    jetzt.plus(cacheDauer)), jetzt);
+        }
         zuletztNachfuehren(client.id());
         return Optional.of(client);
+    }
+
+    /** Höchstens {@value #CACHE_MAX} Einträge: Ist der Cache voll, fliegen die abgelaufenen raus, sonst wird nicht gecacht. */
+    private void cacheEinschreiben(String id, CacheEintrag eintrag, Instant jetzt) {
+        if (pruefCache.size() >= CACHE_MAX && !pruefCache.containsKey(id)) {
+            pruefCache.values().removeIf(e -> !e.ablauf().isAfter(jetzt));
+            if (pruefCache.size() >= CACHE_MAX) {
+                return;
+            }
+        }
+        pruefCache.put(id, eintrag);
+    }
+
+    private boolean cacheTreffer(ApiClient client, String geheimnis) {
+        if (!client.scope().webseitenSchluessel()) {
+            return false;
+        }
+        CacheEintrag eintrag = pruefCache.get(client.id());
+        if (eintrag == null) {
+            return false;
+        }
+        if (!eintrag.ablauf().isAfter(uhr.instant())) {
+            pruefCache.remove(client.id(), eintrag);
+            return false;
+        }
+        return MessageDigest.isEqual(eintrag.geheimnisHmac(), cacheSignierer.signieren(geheimnis));
     }
 
     private void zuletztNachfuehren(String id) {
@@ -112,5 +174,8 @@ public class ApiTokenPruefung {
             }
         }
         return wert;
+    }
+
+    private record CacheEintrag(byte[] geheimnisHmac, Instant ablauf) {
     }
 }
