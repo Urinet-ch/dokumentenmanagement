@@ -336,13 +336,17 @@ class ApiTokenPruefungTest {
 
         @Override
         public String hashen(String geheimnis) {
-            hashes++;
+            synchronized (this) {
+                hashes++;
+            }
             return "hash:" + geheimnis;
         }
 
         @Override
         public boolean pruefen(String geheimnis, String hash) {
-            vergleiche++;
+            synchronized (this) {
+                vergleiche++; // nicht atomar auf volatile: parallele Prüfungen verlieren sonst Zähler
+            }
             gepruefteHashes.add(hash);
             bremse.run();
             return hash.equals("hash:" + geheimnis);
