@@ -17,10 +17,17 @@ geheim() {
 
 # nur_lesend <befehl>: wahr, wenn jeder Teilbefehl git oder ein Lesewerkzeug ist und nichts in eine
 # Datei schreibt. Teilt an ; & | und Zeilenumbrüchen ausserhalb von Anführungszeichen. Im Zweifel
-# falsch: Befehlsersetzung, Umleitung in eine Datei, sed/perl -i, find -exec/-delete.
+# falsch: Backticks, Umleitung in eine Datei, sed/perl -i, find -exec/-delete; $(…) gilt, wenn sein Inhalt nur lesend ist.
 nur_lesend() {
-  local c="$1" teile=() t="" q="" z i
-  [[ "$c" == *'$('* || "$c" == *'`'* ]] && return 1
+  local c="$1" teile=() t="" q="" z i inner
+  [[ "$c" == *'`'* ]] && return 1
+  # Befehlsersetzung $(…): den innersten Teil rekursiv prüfen, dann durch ein Wort ersetzen; Verschachtelung geht von innen nach aussen
+  while [[ "$c" == *'$('* ]]; do
+    [[ "$c" =~ \$\(([^()]*)\) ]] || return 1
+    inner="${BASH_REMATCH[1]}"
+    nur_lesend "$inner" || return 1
+    c="${c/"${BASH_REMATCH[0]}"/X}"
+  done
   for ((i = 0; i < ${#c}; i++)); do
     z="${c:i:1}"
     if [[ -n "$q" ]]; then [[ "$z" == "$q" ]] && q=""; t+="$z"; continue; fi
@@ -45,7 +52,8 @@ nur_lesend() {
       esac
     done
     case "$w" in
-      ''|')'|'}'|done|fi|git|gh|ls|cat|head|tail|jq|grep|rg|wc|diff|stat|sort|uniq|cut|tr|echo|printf|cd|pwd|for|if|while|test|'['|'[['|true|basename|dirname|realpath|file) ;;
+      ''|')'|'}'|done|fi|git|gh|ls|cat|head|tail|jq|grep|rg|wc|diff|stat|sort|uniq|cut|tr|echo|printf|cd|pwd|for|if|while|test|'['|'[['|true|basename|dirname|realpath|file|which|command) ;;
+      gitleaks) [[ "$rest" =~ [[:space:]](-r|--report-path|--baseline-path) ]] && return 1 ;;
       sed|perl) [[ "$rest" =~ [[:space:]](-[A-Za-z]*i|--in-place) ]] && return 1 ;;
       find) [[ "$rest" =~ -(exec|execdir|delete|ok|fprint) ]] && return 1 ;;
       *) return 1 ;;
@@ -56,7 +64,8 @@ nur_lesend() {
 
 if [[ "$werkzeug" == "Bash" ]]; then
   cmd="$(jq -r '.tool_input.command // ""' <<<"$eingabe")"
-  bereinigt="$(sed -E 's/\.env\.(example|sample)//g' <<<"$cmd")"
+  # «\.env» mit Backslash ist ein Suchmuster (grep, rg, sed), kein Pfad
+  bereinigt="$(sed -E 's/\.env\.(example|sample)//g; s/\\+\.env//g' <<<"$cmd")"
   grep -Eq '(^|[^[:alnum:]_.-])\.env([^[:alnum:]_-]|$)|\.enc\.ya?ml' <<<"$bereinigt" \
     && entscheide ask "Harness: Befehl berührt Geheimnisse."
   # Leitplanken: lesen ist frei (Read-Werkzeug ebenso), schreiben fragt nach.
