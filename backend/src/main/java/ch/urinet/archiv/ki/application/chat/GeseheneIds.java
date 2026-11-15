@@ -42,11 +42,12 @@ public final class GeseheneIds {
     }
 
     private static Integer nummer(String id) {
-        if (id == null || !id.matches("[1-9][0-9]*")) {
+        String roh = id == null ? null : id.strip();
+        if (roh == null || !roh.matches("[1-9][0-9]*")) {
             return null;
         }
         try {
-            return Integer.valueOf(id);
+            return Integer.valueOf(roh);
         } catch (NumberFormatException e) {
             return null;
         }

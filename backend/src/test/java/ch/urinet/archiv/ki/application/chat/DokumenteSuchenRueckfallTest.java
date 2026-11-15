@@ -122,6 +122,10 @@ class DokumenteSuchenRueckfallTest {
                 + java.util.Arrays.toString(e.getParameters())).reduce("", (a, b) -> a + "\n" + b);
         assertThat(protokoll).contains("java.lang.IllegalStateException")
                 .doesNotContain("Unfallversicherung", "Datenbank nicht erreichbar");
+        assertThat(eintraege).as("keine Ausnahme (Stacktrace, Meldung) im Log").allSatisfy(e -> {
+            assertThat(e.getThrown()).isNull();
+            assertThat(e.getLevel()).isEqualTo(java.util.logging.Level.WARNING);
+        });
     }
 
     /** Unbekannter Partner und ausgefallene Hybridsuche: beide Hinweise bleiben, damit das Modell nichts Falsches schliesst. */

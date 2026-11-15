@@ -90,4 +90,12 @@ class GeseheneIdsTest {
         assertThat(register.nummerierte("gespraech2")).isEmpty();
         assertThat(register.gesehene("gespraech2")).isEmpty();
     }
+
+    @Test
+    void nummerMitLeerzeichenAmRandWirdZugeordnet() {
+        UUID zweite = UUID.fromString("c2d81843-f193-43f9-8675-cf16609e8a7e");
+        List<UUID> treffer = List.of(UUID.fromString(ECHT), zweite);
+        assertThat(GeseheneIds.zuordnen(" 2", Set.of(zweite), treffer)).isEqualTo(zweite.toString());
+        assertThat(GeseheneIds.zuordnen("2 ", Set.of(zweite), treffer)).isEqualTo(zweite.toString());
+    }
 }

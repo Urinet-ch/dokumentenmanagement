@@ -49,6 +49,11 @@ final class EntkoppeltesModell implements StreamingChatModel {
     }
 
     /** Der nächste Modellaufruf dieses Threads geht nicht mehr hinaus (Abbruch durch den Client). */
+    /** Nimmt eine gesetzte Verhinderung zurück (Tests räumen den ThreadLocal des Threads damit auf). */
+    static void verhinderungZuruecksetzen() {
+        NAECHSTER_AUFRUF_ABGEBROCHEN.remove();
+    }
+
     static void naechstenAufrufVerhindern() {
         NAECHSTER_AUFRUF_ABGEBROCHEN.set(Boolean.TRUE);
     }

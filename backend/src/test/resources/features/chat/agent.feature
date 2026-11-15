@@ -191,6 +191,29 @@ Funktionalität: Chat-Agent und Systemprompt (Aufgabe 7.2)
     Und «inhaber-urinet» dem Agenten im selben Gespräch die Frage «Zeige dieses Dokument.» stellt
     Dann enthält ein Werkzeugergebnis der Anfrage 4 «"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"»
 
+ @req-5.3
+ Szenario: Nummer und veränderte ID eines anderen Gesprächs werden nicht gefunden
+  Angenommen das simulierte Sprachmodell antwortet nacheinander:
+   | antwort | art | inhalt | argumente | tokens |
+   | 1 | werkzeug | dokumente_suchen | {"frage":"Revision Gondel Nord","art":"AUSGANGSRECHNUNG","von":"2071-03-10","bis":"2071-03-10","anzahl":1} | 10/1 |
+   | 2 | text | Ich habe die Rechnung gefunden. | | 20/2 |
+   | 3 | werkzeug | dokument_zeigen | {"id":"1"} | 30/3 |
+   | 4 | text | Dieses Dokument wurde nicht gefunden. | | 40/4 |
+   | 5 | werkzeug | dokument_zeigen | {"id":"{id~:Revision Gondel Nord}"} | 50/5 |
+   | 6 | text | Dieses Dokument wurde nicht gefunden. | | 60/6 |
+   | 7 | werkzeug | dokument_zeigen | {"id":"1"} | 70/7 |
+   | 8 | text | Dieses Dokument wurde nicht gefunden. | | 80/8 |
+  Wenn «inhaber-urinet» dem Agenten die Frage «Suche die Rechnung von 10.03.2071.» stellt
+  Und «inhaber-urinet» dem Agenten die Frage «Zeige Treffer 1.» stellt
+  Dann enthält ein Werkzeugergebnis der Anfrage 4 «"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"»
+  Und sind die Quellen im Stream leer
+  Wenn «inhaber-urinet» dem Agenten die Frage «Zeige die Rechnung.» stellt
+  Dann enthält ein Werkzeugergebnis der Anfrage 6 «"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"»
+  Und sind die Quellen im Stream leer
+  Wenn «mitarbeiter-urinet» dem Agenten die Frage «Zeige Treffer 1.» stellt
+  Dann enthält ein Werkzeugergebnis der Anfrage 8 «"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"»
+  Und sind die Quellen im Stream leer
+
   Szenario: Schliesst der Client den Stream, folgen weder ein Werkzeug noch eine weitere Runde beim Sprachmodell
     Angenommen das simulierte Sprachmodell antwortet nacheinander:
       | antwort | art      | inhalt              | argumente                  | tokens |
