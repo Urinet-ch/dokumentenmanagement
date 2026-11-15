@@ -42,7 +42,15 @@ public interface PrueflaufRegister {
         /** Nur Stufe B: verlangte Sperre fehlt oder ist abgelaufen (Req 6.9, 15.4). */
         SPERRE_FEHLT,
         /** Datei oder Manifest-Version nicht prüfbar oder Sperre nicht verlängert (S3- oder Lesefehler); weitergeprüft. */
-        PRUEFFEHLER
+        PRUEFFEHLER,
+        /**
+         * Das zuständige Tages-Manifest enthält keinen Eintrag für die Datei (Dokument, Variante, Nr.) oder ist
+         * unbrauchbar (fehlt in der Ablage, nicht eindeutig, nicht kanonisch, ungültig, SHA-256 oder Fenster passt nicht
+         * zur Tabelle {@code manifest}) (Req 15.5).
+         */
+        MANIFEST_EINTRAG_FEHLT,
+        /** Die neu berechnete SHA-256 der Datei weicht vom Eintrag im zuständigen Tages-Manifest ab (Req 15.5). */
+        MANIFEST_PRUEFSUMME
     }
 
     record Lauf(UUID id, Stufe stufe, int teil, Fortsetzung stand, Zaehler zaehler) {

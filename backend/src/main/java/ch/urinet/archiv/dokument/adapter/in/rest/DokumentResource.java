@@ -333,6 +333,7 @@ public class DokumentResource {
             headers = @Header(name = "ETag", description = "Neue Version des Dokuments"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = DokumentDto.class)))
+    @APIResponse(responseCode = "409", description = "Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)")
     @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
     @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response aendern(@PathParam("id") UUID id,
@@ -368,6 +369,7 @@ public class DokumentResource {
             headers = @Header(name = "ETag", description = "Neue Version des Dokuments"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = DokumentDto.class)))
+    @APIResponse(responseCode = "409", description = "Sperrkonflikt oder Statuskonflikt (STATUS_KONFLIKT)")
     @APIResponse(responseCode = "412", description = "If-Match passt nicht zur aktuellen Version (VERSION_KONFLIKT)")
     @APIResponse(responseCode = "428", description = "If-Match fehlt (VERSION_FEHLT)")
     public Response bestaetigen(@PathParam("id") UUID id,

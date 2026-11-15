@@ -13,6 +13,7 @@ import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,12 @@ public class ManifestSpeichern {
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public Optional<ManifestStand> stand(LocalDate datum) {
         return daten.stand(datum);
+    }
+
+    /** Das für den Zeitpunkt zuständige Manifest (Prüflauf, Req 15.5). */
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public Optional<ManifestDaten.Zustaendig> zustaendig(Instant zeitpunkt) {
+        return daten.zustaendig(zeitpunkt);
     }
 
     /** Einträge, Fristen und Blätter des Fensters. */

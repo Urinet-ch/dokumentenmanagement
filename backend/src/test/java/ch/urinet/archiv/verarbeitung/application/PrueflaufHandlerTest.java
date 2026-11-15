@@ -14,6 +14,11 @@ import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Datei;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Pruefdokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Eintraege;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Eintrag;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Fenster;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Manifest;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Unbrauchbar;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Abweichung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Art;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Fortsetzung;
@@ -30,6 +35,7 @@ import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,6 +66,11 @@ class PrueflaufHandlerTest {
     private static final Duration EIN_TAG = Duration.ofDays(1);
 
     private static final Instant BALD_ABGELAUFEN = JETZT.plus(Duration.ofHours(2));
+    /** Zeitpunkt der Archivierung der Testdokumente, im Fenster von {@link #MANIFEST_FENSTER}. */
+    private static final Instant ARCHIVIERT = Instant.parse("2026-11-30T10:00:00Z");
+    private static final LocalDate MANIFEST_DATUM = LocalDate.parse("2026-11-30");
+    private static final Fenster MANIFEST_FENSTER = new Fenster(MANIFEST_DATUM,
+            Optional.of(Instant.parse("2026-11-29T23:00:00Z")), Instant.parse("2026-11-30T23:00:00Z"), "c".repeat(64));
 
     private final List<String> verlaengert = new ArrayList<>();
     private final List<UUID> mails = new ArrayList<>();
@@ -79,6 +90,14 @@ class PrueflaufHandlerTest {
     private List<Objektversion> archivVersionen = List.of(new Objektversion(SCHLUESSEL, "v1", false),
             new Objektversion(SCHLUESSEL, "v0", false));
     private List<Objektversion> manifestVersionen = List.of(new Objektversion(MANIFEST, "m1", false));
+    /** Fenster der festgehaltenen Manifeste; ausserhalb davon gibt es kein zuständiges Manifest. */
+    private List<Fenster> manifestFenster = List.of(MANIFEST_FENSTER);
+    /** abweichender Inhalt je Datum; sonst enthält das Manifest jede Datei der Testdokumente mit {@link #SHA} */
+    private final Map<LocalDate, Manifest> manifestInhalt = new HashMap<>();
+    /** Ausnahme, die {@code lesen} für dieses Datum wirft. */
+    private final Map<LocalDate, RuntimeException> manifestFehler = new HashMap<>();
+    private final List<LocalDate> manifestGelesen = new ArrayList<>();
+    private final List<Instant> zustaendigGefragt = new ArrayList<>();
     private int dokumenteJeTeil = 100;
     private int versionenJeTeil = 500;
     private int abbruchNachFehlern = 5;
@@ -206,8 +225,10 @@ class PrueflaufHandlerTest {
         geprueft.clear();
         handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
         assertThat(geprueft).hasSize(4);
+        // die veränderte Datei weicht auch vom Manifest ab (Req 15.5)
         assertThat(speicher.abweichungen).extracting(Abweichung::art)
-                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME);
+                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME,
+                        Art.MANIFEST_PRUEFSUMME);
         assertThat(speicher.abweichungen.getLast().schluessel()).isEqualTo(verfaelscht);
     }
 
@@ -226,7 +247,8 @@ class PrueflaufHandlerTest {
 
         assertThat(geprueft).hasSize(4);
         assertThat(speicher.abweichungen).extracting(Abweichung::art)
-                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME);
+                .containsExactly(Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFFEHLER, Art.PRUEFSUMME,
+                        Art.MANIFEST_PRUEFSUMME);
     }
 
     @Test
@@ -387,9 +409,10 @@ class PrueflaufHandlerTest {
 
         assertThat(mails).as("abgeschlossen wird der Lauf nie").isEmpty();
         assertThat(abbrueche).hasSize(1);
-        assertThat(abbruchZaehler).containsExactly(new Zaehler(1, 0, 0, 1, 0, 1));
+        assertThat(abbruchZaehler).containsExactly(new Zaehler(1, 0, 0, 1, 0, 2));
         assertThat(abbruchAbweichungen).containsExactly(
-                new Abweichung(Art.PRUEFSUMME, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")));
+                new Abweichung(Art.PRUEFSUMME, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")),
+                new Abweichung(Art.MANIFEST_PRUEFSUMME, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")));
     }
 
     @Test
@@ -406,6 +429,172 @@ class PrueflaufHandlerTest {
         handler.nachLetztemFehlversuch(auftrag(speicher.lauf.id(), speicher.lauf.teil() + 1, 3), UUID.randomUUID());
 
         assertThat(abbrueche).isEmpty();
+    }
+
+    /** Req 15.5: Eintrag stimmt (Gross- und Kleinschreibung egal) → keine Abweichung; das Manifest wird gelesen. */
+    @Test
+    void manifestEintragStimmtKeineAbweichung() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        manifestInhalt.put(MANIFEST_DATUM, new Eintraege(MANIFEST_DATUM,
+                Map.of(new Eintrag(DOKUMENT, "original", 1), SHA.toUpperCase(java.util.Locale.ROOT))));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(speicher.abweichungen).isEmpty();
+        assertThat(zustaendigGefragt).containsExactly(ARCHIVIERT);
+        assertThat(manifestGelesen).containsExactly(MANIFEST_DATUM);
+    }
+
+    @Test
+    void manifestOhneEintragDerDateiIstManifestEintragFehlt() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        // Eintrag einer anderen Variante desselben Dokuments zählt nicht
+        manifestInhalt.put(MANIFEST_DATUM, new Eintraege(MANIFEST_DATUM,
+                Map.of(new Eintrag(DOKUMENT, "arbeitsfassung", 1), SHA)));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(speicher.abweichungen).containsExactly(new Abweichung(Art.MANIFEST_EINTRAG_FEHLT,
+                Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")));
+    }
+
+    @Test
+    void abweichendeSha256ImManifestIstManifestPruefsumme() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        manifestInhalt.put(MANIFEST_DATUM, new Eintraege(MANIFEST_DATUM,
+                Map.of(new Eintrag(DOKUMENT, "original", 1), "d".repeat(64))));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(speicher.abweichungen).extracting(Abweichung::art).containsExactly(Art.MANIFEST_PRUEFSUMME);
+    }
+
+    /** Datei im Object Storage verändert: weicht von Datenbank und Manifest ab, beides wird gemeldet. */
+    @Test
+    void veraenderteDateiIstPruefsummeUndManifestPruefsumme() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        pruefsummen.put(SCHLUESSEL, "b".repeat(64));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.PRUEFSUMME, Art.MANIFEST_PRUEFSUMME);
+        assertThat(speicher.abweichungen).extracting(Abweichung::schluessel).containsOnly(SCHLUESSEL);
+    }
+
+    /**
+     * Die Versions-ID ist Zusatz (Req 15.5): Der Prüflauf liest die Version aus der Datenbank (hier v7, z. B. nach einer
+     * Wiederherstellung neu erfasst); das Manifest liefert nur die SHA-256 und gilt weiter.
+     */
+    @Test
+    void nurAbweichendeVersionsIdIstKeineAbweichung() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        Pruefdokument d = speicher.dokumente.getFirst();
+        speicher.dokumente.set(0, new Pruefdokument(d.id(), d.status(), d.vorgabe(), d.archiviert(),
+                List.of(new Datei(SCHLUESSEL, Optional.of("v7"), Optional.of(SHA), "original", 1, true))));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(geprueft).containsExactly(SCHLUESSEL + "@v7");
+        assertThat(speicher.abweichungen).isEmpty();
+    }
+
+    /** Vor dem Manifest des Tages (oder ohne jedes Manifest) wird nicht verglichen und nichts gelesen (Req 15.8). */
+    @Test
+    void ohneZustaendigesManifestKeinVergleichUndKeinLesen() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        manifestFenster = List.of(new Fenster(MANIFEST_DATUM.minusDays(1), Optional.empty(),
+                MANIFEST_FENSTER.von().orElseThrow(), "c".repeat(64)));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+        manifestFenster = List.of();
+        Speicher ohne = new Speicher(Stufe.A);
+        handler(ohne).ausfuehren(auftrag(ohne.lauf.id(), 1));
+
+        assertThat(speicher.abweichungen).isEmpty();
+        assertThat(ohne.abweichungen).isEmpty();
+        assertThat(zustaendigGefragt).containsExactly(ARCHIVIERT, ARCHIVIERT);
+        assertThat(manifestGelesen).isEmpty();
+    }
+
+    /** Ohne {@code archiviert} (z. B. {@code ARCHIVIERUNG}) und für Dateien, die das Manifest nicht enthält, kein Vergleich. */
+    @Test
+    void ohneArchiviertOderNichtImManifestKeinVergleich() throws Exception {
+        manifestInhalt.put(MANIFEST_DATUM, new Eintraege(MANIFEST_DATUM, Map.of()));
+        Speicher speicher = new Speicher(Stufe.A, 2);
+        Pruefdokument erstes = speicher.dokumente.get(0);
+        speicher.dokumente.set(0, new Pruefdokument(erstes.id(), DokumentStatus.ARCHIVIERUNG, erstes.vorgabe(),
+                Optional.empty(), erstes.dateien()));
+        Pruefdokument zweites = speicher.dokumente.get(1);
+        Datei verworfen = zweites.dateien().getFirst();
+        speicher.dokumente.set(1, new Pruefdokument(zweites.id(), zweites.status(), zweites.vorgabe(),
+                zweites.archiviert(), List.of(new Datei(verworfen.schluessel(), verworfen.versionId(),
+                verworfen.sha256(), "original", 1, false))));
+        handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+        assertThat(geprueft).hasSize(2);
+        assertThat(speicher.abweichungen).isEmpty();
+        assertThat(zustaendigGefragt).isEmpty();
+        assertThat(manifestGelesen).isEmpty();
+    }
+
+    /** Ein unbrauchbares Manifest (fehlt, nicht kanonisch, SHA-256 ≠ Tabelle …) belegt keine Datei. */
+    @Test
+    void unbrauchbaresManifestIstManifestEintragFehlt() throws Exception {
+        for (String grund : List.of("JSON unter manifest/ fehlt", "Manifest ist nicht in kanonischer Form (RFC 8785)",
+                "SHA-256 passt nicht zur Tabelle manifest")) {
+            manifestInhalt.put(MANIFEST_DATUM, new Unbrauchbar(MANIFEST_DATUM, grund));
+            Speicher speicher = new Speicher(Stufe.B, 2);
+            handler(speicher).ausfuehren(auftrag(speicher.lauf.id(), 1));
+
+            assertThat(speicher.abweichungen).as(grund).extracting(Abweichung::art)
+                    .containsExactly(Art.MANIFEST_EINTRAG_FEHLT, Art.MANIFEST_EINTRAG_FEHLT);
+        }
+        assertThat(manifestGelesen).as("je Teil einmal").hasSize(3);
+    }
+
+    /** Vorübergehende Störung beim Lesen des Manifests: wie beim Prüfen einer Datei (Req 15.5, Review PR #97). */
+    @Test
+    void voruebergehenderFehlerBeimLesenDesManifestsWiederholtDenTeil() throws Exception {
+        Speicher speicher = new Speicher(Stufe.A);
+        manifestFehler.put(MANIFEST_DATUM, new AblageGestoert("manifest/2026-11-30.json", new RuntimeException("503")));
+        PrueflaufHandler handler = handler(speicher);
+
+        for (int versuche = 0; versuche < 2; versuche++) {
+            Auftrag auftrag = auftrag(speicher.lauf.id(), 1, versuche);
+            assertThatThrownBy(() -> handler.ausfuehren(auftrag)).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Teil wird wiederholt").hasRootCauseMessage("503");
+            assertThat(speicher.lauf.teil()).isZero();
+        }
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1, 2));
+
+        assertThat(speicher.lauf.teil()).isEqualTo(1);
+        assertThat(speicher.abweichungen).containsExactly(new Abweichung(Art.PRUEFFEHLER, Optional.of(DOKUMENT),
+                SCHLUESSEL, Optional.of("v1")));
+        assertThat(manifestGelesen).hasSize(3);
+    }
+
+    /** Der Vergleich liest nur und läuft auch in Stufe P (Restore-Probe). */
+    @Test
+    void stufePVergleichtAuch() throws Exception {
+        manifestInhalt.put(MANIFEST_DATUM, new Eintraege(MANIFEST_DATUM, Map.of()));
+        Speicher speicher = new Speicher(Stufe.P);
+        lauf(handler(speicher), speicher);
+
+        assertThat(speicher.abweichungen).extracting(Abweichung::art)
+                .containsExactly(Art.MANIFEST_EINTRAG_FEHLT, Art.FREMDE_VERSION);
+        assertThat(verlaengert).isEmpty();
+        assertThat(mails).isEmpty();
+    }
+
+    /** Zwischenspeicher je Teil: ein Manifest für mehrere Dateien wird im Teil einmal gelesen, im nächsten Teil neu. */
+    @Test
+    void einManifestWirdJeTeilNurEinmalGelesen() throws Exception {
+        dokumenteJeTeil = 2;
+        Speicher speicher = new Speicher(Stufe.A, 3);
+        PrueflaufHandler handler = handler(speicher);
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 1));
+        handler.ausfuehren(auftrag(speicher.lauf.id(), 2));
+
+        assertThat(speicher.lauf.zaehler().dateien()).isEqualTo(3);
+        assertThat(manifestGelesen).containsExactly(MANIFEST_DATUM, MANIFEST_DATUM);
+        // das bekannte Fenster genügt im Teil, die Tabelle wird je Teil einmal gefragt
+        assertThat(zustaendigGefragt).hasSize(2);
+        assertThat(speicher.abweichungen).isEmpty();
     }
 
     @Test
@@ -486,9 +675,28 @@ class PrueflaufHandlerTest {
                 throw new UnsupportedOperationException();
             }
         };
+        ManifestVergleich vergleich = new ManifestVergleich() {
+            @Override
+            public Optional<Fenster> zustaendig(MandantCode mandant, Instant archiviert) {
+                zustaendigGefragt.add(archiviert);
+                return manifestFenster.stream().filter(f -> f.enthaelt(archiviert)).findFirst();
+            }
+
+            @Override
+            public Manifest lesen(MandantCode mandant, Fenster fenster) {
+                manifestGelesen.add(fenster.datum());
+                if (manifestFehler.containsKey(fenster.datum())) {
+                    throw manifestFehler.get(fenster.datum());
+                }
+                return manifestInhalt.getOrDefault(fenster.datum(), new Eintraege(fenster.datum(),
+                        speicher.dokumente.stream().flatMap(d -> d.dateien().stream()
+                                        .map(f -> new Eintrag(d.id(), f.variante(), f.nr())))
+                                .collect(java.util.stream.Collectors.toMap(e -> e, e -> SHA))));
+            }
+        };
         Optional<Duration> frist = Optional.of(EIN_TAG);
-        return new PrueflaufHandler(speicher, ablage, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC), stufe,
-                frist, frist, dokumenteJeTeil, versionenJeTeil, abbruchNachFehlern);
+        return new PrueflaufHandler(speicher, ablage, vergleich, benachrichtigung, Clock.fixed(JETZT, ZoneOffset.UTC),
+                stufe, frist, frist, dokumenteJeTeil, versionenJeTeil, abbruchNachFehlern);
     }
 
     /** Seite wie S3: nach der Marke (Schlüssel und Versions-ID) höchstens {@code anzahl}, Marke = letzte Version. */
@@ -542,7 +750,8 @@ class PrueflaufHandlerTest {
                 UUID id = i == 0 ? DOKUMENT : new UUID(DOKUMENT.getMostSignificantBits(), i);
                 String schluessel = "archiv/2026/" + id + "/1-original.pdf";
                 dokumente.add(new Pruefdokument(id, DokumentStatus.ARCHIVIERT, Sperrvorgabe.unbefristet(),
-                        List.of(new Datei(schluessel, Optional.of("v1"), Optional.of(SHA)))));
+                        Optional.of(ARCHIVIERT),
+                        List.of(new Datei(schluessel, Optional.of("v1"), Optional.of(SHA), "original", 1, true))));
                 status.put(id, DokumentStatus.ARCHIVIERT);
                 bekannt.add(new Bekannt(schluessel, "v1"));
             }
