@@ -224,6 +224,15 @@ gh variable set ARCHIV_ALARM_EMPFAENGER_URINET -R Urinet-ch/dokumentenmanagement
   einrichten»). Bis beides nachgeführt ist, kann auch die Meldung «Mail-Eingang gestört» nicht ankommen, weil sie
   über dasselbe Konto geht; dann steht der Ausfall nur im Log.
 
+### Frühwarnung vor knappem Speicher
+Die API prüft alle fünf Minuten Metaspace, Compressed Class Space und den Heap (nach der letzten Garbage Collection).
+Über der Schwelle steht eine WARN-Zeile «Speicher … knapp» im Log, und der Inhaber erhält je Bereich und Stufe eine
+Mail (erneut erst, wenn der Wert wieder unter die Schwelle fiel); die Kennzahl heisst `archiv_jvm_speicher_prozent`.
+Ohne Maximum (kein `-XX:MaxMetaspaceSize`) gibt es keine Schwelle. Einstellungen (`application.properties`):
+- `archiv.ueberwachung.speicher.intervall` (Standard `PT5M`, `off` schaltet den Takt ab)
+- `archiv.ueberwachung.speicher.warn-prozent` (Standard 85) und `archiv.ueberwachung.speicher.kritisch-prozent`
+  (Standard 95); es gilt `0 < warn < kritisch <= 100`, sonst bricht der Start ab.
+
 ## Benutzer in Keycloak anlegen
 Benutzer des Realms `urinet-archiv` legt der Admin mit `kcadm.sh` in einem Wegwerf-Container aus dem Keycloak-Image
 an, nie per `docker exec` im laufenden `kc` (siehe «Admin-Kommandos auf der VPS»). Der Container hängt nur im internen
