@@ -3,7 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
 import { WarteschlangeService } from './erfassen/handy/warteschlange/warteschlange.service';
-import { AnmeldungService, Benutzer, Sitzungszustand } from './gemeinsam/anmeldung/anmeldung.service';
+import {
+  AnmeldungService,
+  Benutzer,
+  Sitzungszustand,
+} from './gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -63,7 +67,9 @@ describe('App (Req 2.6, 8.6)', () => {
   }
 
   const menue = (element: HTMLElement) =>
-    [...element.querySelectorAll('nav a')].map((a) => a.querySelector('.punkt')?.childNodes[0]?.textContent?.trim());
+    [...element.querySelectorAll('nav a')].map((a) =>
+      a.querySelector('.punkt')?.childNodes[0]?.textContent?.trim(),
+    );
 
   it('startet die Warteschlange der Handy-Erfassung mit der App (Req 4.5)', async () => {
     await zeigen();
@@ -89,11 +95,21 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.importe,
         TEXTE.menue.dokumentarten,
         TEXTE.menue.protokoll,
+        TEXTE.menue.apiTokens,
         TEXTE.menue.export,
       ],
     ],
     ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat]],
-    ['geschaeftsstelle', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.kontakte]],
+    [
+      'geschaeftsstelle',
+      [
+        TEXTE.menue.erfassen,
+        TEXTE.menue.eingangskorb,
+        TEXTE.menue.suche,
+        TEXTE.menue.chat,
+        TEXTE.menue.kontakte,
+      ],
+    ],
     ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
@@ -112,7 +128,9 @@ describe('App (Req 2.6, 8.6)', () => {
     zaehler.anzahl.set(3);
     const element = await zeigen();
     expect(element.querySelector('[data-test=eingangskorb-zaehler]')?.textContent).toBe('3');
-    expect(element.querySelector('nav .nur-screenreader')?.textContent).toContain(TEXTE.eingangskorbAnzahl(3));
+    expect(element.querySelector('nav .nur-screenreader')?.textContent).toContain(
+      TEXTE.eingangskorbAnzahl(3),
+    );
   });
 
   it('zeigt keinen Zähler und keinen Fehler, solange die Anzahl fehlt', async () => {
