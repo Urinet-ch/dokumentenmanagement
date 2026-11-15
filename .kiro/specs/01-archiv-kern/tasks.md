@@ -8,7 +8,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - Eine Sitzung, ein Branch (`feature/01-<aufgabe>-<stichwort>`), ein PR. Der PR nennt die erfüllten Kriterien als `@req-<x.y>` und hakt die Checkbox hier ab.
 - Szenarien und Tests zuerst bzw. mitliefern: Cucumber-Features mit `@req-<x.y>`, Domain-Logik zusätzlich mit JUnit. Es gilt die Definition of Done aus `tech.md`.
 - Kriterien mit «Nachweis: manuell [Fabian]», «Nachweis: Dokument» oder «Nachweis: JUnit» brauchen kein Cucumber-Szenario; der Nachweis wird im PR verlinkt.
-- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 1.7, 1.10, 2.8, 2.9, 4.9, 5.5, 5.11).
+- Steht ein Wert noch auf «[offen: …]», wird er nicht geraten; die Aufgabe wartet auf den Entscheid (Aufgaben 1.7, 1.10, 2.8, 4.9, 5.5, 5.11).
 - Aufgabennummern bleiben stabil; neue Aufgaben erhalten die nächste freie Nummer ihrer Welle.
 
 ## Welle 0 — Phase 0 Klären (Gate 0: ≥ 18/20 auf den zurückgehaltenen Belegen, höchstens 1 Fehler ab der Sicherheitsschwelle, Spikes dokumentiert; Stufe A aus 0.7 ist Voraussetzung für Welle 1, nicht für Gate 0)
@@ -231,7 +231,9 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 4.1_
 
 - [ ] 2.9 Ziel für echte Belege festlegen (Auflage A2 aus Gate 0) [Fabian]
-  - Zielwerte für die Realitätsprüfung vor der Übernahme, Aufteilung der echten Belege in Abstimmungs- und zurückgehaltenen Teil und Umgang mit Änderungen aus dem Abstimmen (Prompt, Regeln, Parameter: neuer Golden-Lauf nach Req 0.9 oder nur Regeln, die Sicherheiten senken wie A1) entscheiden: [offen: Zielwerte und Aufteilung der echten Belege, Umgang mit Änderungen aus dem Abstimmen – Entscheid vor Welle 3]; Ergebnis in `docs/umsetzungsplan.md`, Abschnitt 6, und per PR in Req 0.10 (alt → neu) nachtragen
+  - Zielwerte für die Realitätsprüfung vor der Übernahme, Aufteilung der echten Belege in Abstimmungs- und zurückgehaltenen Teil und Umgang mit Änderungen aus dem Abstimmen (Prompt, Regeln, Parameter: neuer Golden-Lauf nach Req 0.9 oder nur Regeln, die Sicherheiten senken wie A1) entscheiden; Ergebnis in `docs/umsetzungsplan.md`, Abschnitt 6, und per PR in Req 0.10 (alt → neu) nachtragen
+  - Stand 15.11.2026: entschieden von Fabian, vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR – (1) echte Belege 2026 je etwa zur Hälfte Abstimm-Teil und zurückgehaltener Prüfteil (Zufall mit festem Seed, stratifiziert nach Dokumentart, Zuordnung als ID-Liste ausserhalb des Repositorys bei Fabian); (2) nur Regeln, die Sicherheiten senken (wie A1), ohne neuen Golden-Lauf, Prompt oder Parameter nur mit neuem Lauf vor der Übernahme; (3) Zielwerte wie Gate 0 (Req 0.3, 0.9), gemessen auf dem zurückgehaltenen Teil, Lauf dort nach dem Abstimmen wiederholt (Req 0.10, `docs/umsetzungsplan.md`, Abschnitt 6)
+  - Offen [Fabian]: Anzahl der echten Belege 2026 und Grösse des Prüfteils (die Zielwerte nennen 20 Belege); der Haken folgt mit dieser Zahl
   - Der erneute Lauf vor der Übernahme ist Voraussetzung von 5.8
   - _Anforderungen: 0.10_
 
