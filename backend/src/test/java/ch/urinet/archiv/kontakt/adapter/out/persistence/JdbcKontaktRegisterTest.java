@@ -139,6 +139,34 @@ class JdbcKontaktRegisterTest {
         assertThat(im(URINET, () -> register.finden(ruhend))).isPresent();
     }
 
+    /** Wortanfänge: Mitte ja/nein, Mehrwort, inaktiv, Wildcards als Literal, exakter Name zuerst, Limit, Mandantengrenze. */
+    @Test
+    void mitWortanfaengenFindetNurAktiveWortanfaengeImEigenenMandanten() throws SQLException {
+        mandantenAnlegen();
+        String marke = "wortanf" + UUID.randomUUID().toString().substring(0, 6);
+        UUID lang = anlegen(URINET, "Confiseur " + marke + " Tribschen");
+        UUID exakt = anlegen(URINET, marke);
+        UUID prozent = anlegen(URINET, "Pr" + marke + "%x");
+        UUID ruhend = anlegen(URINET, "Ruhend " + marke);
+        UUID fremder = anlegen(ZWEITER, "Fremd " + marke);
+        im(URINET, () -> register.statusSetzen(ruhend, false, null));
+
+        assertThat(im(URINET, () -> register.mitWortanfaengen(marke, List.of(marke), 10))).extracting(Kontakt::id)
+                .as("exakter Name zuerst, inaktiv und fremder Mandant fehlen, Wortmitte («Pr...») fehlt")
+                .containsExactly(exakt, lang);
+        assertThat(im(URINET, () -> register.mitWortanfaengen(marke, List.of(marke.substring(2)), 10)))
+                .as("Wortmitte ist kein Wortanfang").isEmpty();
+        assertThat(im(URINET, () -> register.mitWortanfaengen("tribsch " + marke, List.of("tribsch", marke), 10)))
+                .extracting(Kontakt::id).as("Mehrwort in beliebiger Reihenfolge").containsExactly(lang);
+        assertThat(im(URINET, () -> register.mitWortanfaengen(marke, List.of(marke), 1))).as("Limit").hasSize(1);
+        assertThat(im(URINET, () -> register.mitWortanfaengen("%", List.of("%"), 10)))
+                .as("% ist ein Literal, kein Platzhalter").extracting(Kontakt::id).doesNotContain(lang, exakt);
+        assertThat(im(URINET, () -> register.mitWortanfaengen("_", List.of("_"), 10)))
+                .as("_ ist ein Literal").extracting(Kontakt::id).doesNotContain(lang, exakt);
+        assertThat(im(ZWEITER, () -> register.mitWortanfaengen(marke, List.of(marke), 10))).extracting(Kontakt::id)
+                .containsExactly(fremder);
+    }
+
     private void mandantenAnlegen() throws SQLException {
         for (MandantCode code : List.of(URINET, ZWEITER)) {
             if (!vorhanden(code)) {

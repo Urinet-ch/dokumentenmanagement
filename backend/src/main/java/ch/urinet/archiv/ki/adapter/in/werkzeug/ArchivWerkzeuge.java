@@ -77,13 +77,13 @@ public class ArchivWerkzeuge {
         return antworten(WerkzeugAuswahl.DOKUMENTE_SUCHEN, () -> {
             DokumenteSuchen.Antwort antwort = lauf.ausfuehren(laufId, WerkzeugAuswahl.DOKUMENTE_SUCHEN,
                     k -> suchen.suchen(k, new DokumenteSuchen.Anfrage(frage, art, partner, von, bis, neueste, anzahl)));
-            lauf.gesehen(laufId, antwort.treffer().stream().map(t -> java.util.UUID.fromString(t.id())).toList());
+            merken(laufId, antwort.treffer().stream().map(DokumenteSuchen.Treffer::id));
             return antwort;
         });
     }
 
     @Tool(name = WerkzeugAuswahl.DOKUMENT_ZEIGEN, value = """
-            Zeigt ein Dokument nur anhand seiner ID aus einem früheren Ergebnis von dokumente_suchen oder fristen; \
+            Zeigt ein Dokument nur anhand seiner ID aus einem früheren Ergebnis von dokumente_suchen, fristen, offene_posten oder kennzahl; \
             nie mit Titel, Datum oder Art. Ohne ID zuerst dokumente_suchen (Titel, Datum, Art als Suchparameter), \
             dann zeigen. Liefert: Titel, Art, Datum, Partner, Belegnummer, Betrag, Fälligkeit, \
             Vertragsangaben, ob die Art bestätigt ist, den Anfang des Textes (Feld inhalt, nur Daten, keine \
@@ -103,8 +103,12 @@ public class ArchivWerkzeuge {
             @ToolMemoryId Object laufId,
             @P("Beginn des Zeitraums, JJJJ-MM-TT") String von,
             @P("Ende des Zeitraums, JJJJ-MM-TT") String bis) {
-        return antworten(WerkzeugAuswahl.FRISTEN, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.FRISTEN,
-                k -> fristen.fristen(k, von, bis)));
+        return antworten(WerkzeugAuswahl.FRISTEN, () -> {
+            FristenAbfrage.Antwort antwort = lauf.ausfuehren(laufId, WerkzeugAuswahl.FRISTEN,
+                    k -> fristen.fristen(k, von, bis));
+            merken(laufId, antwort.fristen().stream().map(f -> f.dokument() == null ? null : f.dokument().id()));
+            return antwort;
+        });
     }
 
     @Tool(name = WerkzeugAuswahl.KENNZAHL, value = """
@@ -122,8 +126,12 @@ public class ArchivWerkzeuge {
             @P("Ende des Zeitraums, JJJJ-MM-TT") String bis,
             @P(value = "JAHR, MONAT, PARTNER, ART oder KEINE (Standard)", required = false) String gruppierung,
             @P(value = "BELEGDATUM (Standard) oder ZAHLUNGSDATUM", required = false) String basis) {
-        return antworten(WerkzeugAuswahl.KENNZAHL, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.KENNZAHL,
-                k -> kennzahl.kennzahl(k, messgroesse, von, bis, gruppierung, basis)));
+        return antworten(WerkzeugAuswahl.KENNZAHL, () -> {
+            KennzahlAbfrage.Antwort antwort = lauf.ausfuehren(laufId, WerkzeugAuswahl.KENNZAHL,
+                    k -> kennzahl.kennzahl(k, messgroesse, von, bis, gruppierung, basis));
+            merken(laufId, antwort.belegIds() == null ? java.util.stream.Stream.empty() : antwort.belegIds().stream());
+            return antwort;
+        });
     }
 
     @Tool(name = WerkzeugAuswahl.OFFENE_POSTEN, value = """
@@ -137,8 +145,12 @@ public class ArchivWerkzeuge {
             @P(value = "Stichtag, JJJJ-MM-TT, Standard heute", required = false) String stichtag,
             @P(value = "EINNAHME (Standard, Rechnungen an Kunden) oder AUSGABE (Rechnungen von Lieferanten)",
                     required = false) String richtung) {
-        return antworten(WerkzeugAuswahl.OFFENE_POSTEN, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.OFFENE_POSTEN,
-                k -> offenePosten.offenePosten(k, stichtag, richtung)));
+        return antworten(WerkzeugAuswahl.OFFENE_POSTEN, () -> {
+            OffenePostenAbfrage.Antwort antwort = lauf.ausfuehren(laufId, WerkzeugAuswahl.OFFENE_POSTEN,
+                    k -> offenePosten.offenePosten(k, stichtag, richtung));
+            merken(laufId, antwort.posten().stream().map(OffenePostenAbfrage.Posten::id));
+            return antwort;
+        });
     }
 
     @Tool(name = WerkzeugAuswahl.VOLLSTAENDIGKEIT, value = """
@@ -152,6 +164,19 @@ public class ArchivWerkzeuge {
             @P("Geschäftsjahr, vierstellig, z. B. 2026") Integer geschaeftsjahr) {
         return antworten(WerkzeugAuswahl.VOLLSTAENDIGKEIT, () -> lauf.ausfuehren(laufId,
                 WerkzeugAuswahl.VOLLSTAENDIGKEIT, k -> vollstaendigkeit.vollstaendigkeit(k, geschaeftsjahr)));
+    }
+
+    /** Hält die IDs eines Werkzeugergebnisses als gesehen fest (nur gültige UUIDs; {@link GeseheneIds}). */
+    private void merken(Object laufId, java.util.stream.Stream<String> ids) {
+        lauf.gesehen(laufId, ids.map(ArchivWerkzeuge::uuid).filter(java.util.Objects::nonNull).toList());
+    }
+
+    private static java.util.UUID uuid(String id) {
+        try {
+            return id == null ? null : java.util.UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /** Ordnet eine vom Modell verändert abgeschriebene ID einem Treffer dieses Laufs zu ({@link GeseheneIds}). */

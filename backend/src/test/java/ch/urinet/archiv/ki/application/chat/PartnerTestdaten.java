@@ -41,6 +41,8 @@ final class PartnerTestdaten {
                         yield treffer.stream().limit((int) args[2]).toList();
                     }
                     case "aehnlichste" -> aehnlich;
+                    case "finden" -> kontakte.stream()
+                            .filter(k -> ((java.util.Collection<?>) args[0]).contains(k.id())).toList();
                     default -> throw new UnsupportedOperationException(methode.getName());
                 });
     }

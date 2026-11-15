@@ -160,12 +160,17 @@ public class DokumenteSuchen {
     private record Vorbereitet(Suchanfrage anfrage, Antwort leer, boolean partnerImText) {
     }
 
-    /** Treffer der Textsuche mit dem Hinweis, dass der Partner nicht erkannt wurde; {@code degradiert} bleibt. */
+    /**
+     * Treffer der Textsuche mit dem Hinweis, dass der Partner nicht erkannt wurde; lief die Suche zudem nur im Volltext,
+     * bleibt auch dieser Hinweis erhalten (die Werkzeugbeschreibung knüpft daran an).
+     */
     private static Antwort ohnePartnerHinweis(Antwort a) {
-        return new Antwort(a.treffer(), a.gesamt(), PARTNER_TEXTSUCHE, a.degradiert(), null);
+        String hinweis = Boolean.TRUE.equals(a.degradiert()) ? PARTNER_TEXTSUCHE + "; " + NUR_VOLLTEXT
+                : PARTNER_TEXTSUCHE;
+        return new Antwort(a.treffer(), a.gesamt(), hinweis, a.degradiert(), null);
     }
 
-    /** Frage und Partnerwort als Suchtext, gekürzt auf {@link #FRAGE_MAX} an einer Wortgrenze. */
+    /** Frage und Partnerwort als Suchtext, ist der Text länger als {@link #FRAGE_MAX}, gilt nur die Frage (das Partnerwort entfällt). */
     private static String zusammen(String frage, String partner) {
         String text = frage + " " + partner.strip();
         return text.length() <= FRAGE_MAX ? text : frage;
