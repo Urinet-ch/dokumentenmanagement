@@ -19,7 +19,13 @@ const titel = (seite: string) => `${seite} · ${TEXTE.appTitel}`;
 
 // Seiten späterer Aufgaben: Route und Recht stehen, der Inhalt folgt (design.md «Frontend»)
 function folgt(path: string, seite: string, aktion: Aktion): Route {
-  return { path, component: Folgt, canActivate: [rechtGuard(aktion)], data: { titel: seite }, title: titel(seite) };
+  return {
+    path,
+    component: Folgt,
+    canActivate: [rechtGuard(aktion)],
+    data: { titel: seite },
+    title: titel(seite),
+  };
 }
 
 export const routes: Routes = [
@@ -92,6 +98,12 @@ export const routes: Routes = [
     loadChildren: () => import('./chat/chat.routes').then((m) => m.CHAT_ROUTES),
     canActivate: [rechtGuard('A2')],
     title: titel(TEXTE.chat.titel),
+  },
+  {
+    path: 'verwaltung/api-tokens',
+    loadComponent: () => import('./verwaltung/api-tokens/api-tokens').then((m) => m.ApiTokens),
+    canActivate: [rechtGuard('A14')],
+    title: titel(TEXTE.menue.apiTokens),
   },
   {
     path: 'export',
