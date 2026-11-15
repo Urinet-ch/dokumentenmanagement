@@ -16,11 +16,17 @@ export interface ApiToken {
     aktiv?: boolean;
     erstellt?: string;
     zuletzt?: string | null;
+    webseite?: string | null;
+    hoechsteStufe?: string | null;
+    gueltigBis?: string | null;
+    absenderPruefen?: boolean;
 }
 export namespace ApiToken {
     export const ScopeEnum = {
         Generator: 'generator',
         Import: 'import',
+        WebseiteLesen: 'webseite-lesen',
+        WebseiteErfassung: 'webseite-erfassung',
     } as const;
     export type ScopeEnum = typeof ScopeEnum[keyof typeof ScopeEnum];
 }

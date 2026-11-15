@@ -91,10 +91,10 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Umsetzung Teil 1 (PR #140): Vertrag `docs/schnittstelle/public-v1.yaml` ohne Endpunkte, Reroute `/public/` → interner Pfad (`WebseitenRoute`), `PublicVertragTest`, Ausschluss aus der App-OpenAPI, Problem Details und `Cache-Control: no-store` unter `/public/`, Abkündigung über `archiv.webseite.v<n>.sunset`, Skript `pruefe-vertrag.sh` mit Selbsttest; offen: CI-Schritt, Traefik-Router
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
-- [ ] 11.7 Webseiten-Schlüssel [Backend]
+- [x] 11.7 Webseiten-Schlüssel [Backend]
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026 (E-B); Trennung Lese-/Erfassungs-Schlüssel vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
   - Neues Changeset `db/public` (`api_client`: Scopes `webseite-lesen`, `webseite-erfassung`, Spalten `webseite`, `hoechste_stufe`, `gueltig_bis`, `absender_pruefen`); `ApiTokenScope` erweitern; Identität mit `webseite` und `hoechste-stufe`; `ZugangFilter` und `EndpunktWaechterTest` für `@WebseitenZugang`
-  - Kommandos `archiv webseite schluessel erstellen|rotieren|widerrufen` (Wert nur auf stdout); `/api/v1/api-tokens` listet und widerruft, legt nicht an; Absender-Einschränkung: `absender_pruefen` je Schlüssel, Netze je Webseite aus einer Datei der Betriebskonfiguration, geprüft nach der Schlüsselprüfung, fehlender Eintrag → ablehnen; Mandant deaktiviert → Schlüssel gesperrt (403 `MANDANT_FEHLT`)
+  - Kommandos `archiv webseite schluessel erstellen|rotieren|widerrufen` (Wert nur auf stdout); `/api/v1/api-tokens` listet und widerruft Webseiten-Schlüssel, legt sie nicht an; Absendernetze je Webseite aus UTF-8-Properties mit literalen CIDR-Werten in `archiv.webseite.absender-datei`, nach erfolgreicher Schlüsselprüfung ausgewertet, fehlender/ungültiger Eintrag → ablehnen; Mandant deaktiviert → Schlüssel gesperrt (403 `MANDANT_FEHLT`)
   - Prüf-Cache für Webseiten-Schlüssel (HMAC des Geheimnisses je Schlüssel-ID, `PT5M`, Zeile in `api_client` bei jeder Anfrage gelesen); Szenario: fremde `ua_…`-Anfragen belegen die `HashSperre`, die Webseite wird trotzdem bedient; Widerruf wirkt trotz Cache sofort
   - Leistung messen: Trefferquote des Prüf-Caches und Wartezeiten der `HashSperre` unter Last mit fremden Anfragen (Open Points in design.md)
   - Spec 01 ergänzt: Scopes in Spec 01, 2.5 und design.md «Umsetzung (Aufgabe 1.5)»; `gueltig_bis` nach Rotation und Prüf-Cache in Spec 01 design.md «Sicherheit» (Spec 01, Req 2.5)

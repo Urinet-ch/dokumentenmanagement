@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
+import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
@@ -33,13 +34,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Schritte zur Webseiten-Schnittstelle unter {@code /public/} (Spec 03, Aufgabe 11.6): Anmeldung, Problem Details und
- * Header gegen die Probe {@code /public/v1/probe} ({@code ch.urinet.archiv.probe.ProbeWebseiteResource}). Die Tokens
- * entstehen zur Laufzeit (Scope {@code generator}, bis 11.7 die Webseiten-Scopes bringt) und werden danach gelöscht.
+ * Header gegen die Probe {@code /public/v1/probe} ({@code ch.urinet.archiv.probe.ProbeWebseiteResource}). Webseiten-
+ * Schlüssel und gewöhnliche API-Tokens entstehen zur Laufzeit und werden danach gelöscht.
  */
 public class WebseitenSchritte {
 
     @Inject
     ApiTokenVerwaltung verwaltung;
+
+    @Inject
+    WebseitenSchluesselVerwaltung webseitenVerwaltung;
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -49,12 +53,14 @@ public class WebseitenSchritte {
     private final List<Response> abgelehnt = new ArrayList<>();
     private String aktiv;
     private String widerrufen;
+    private String webseitenToken;
+    private String erfassungsToken;
     private Response antwort;
 
-    @Angenommen("für «urinet» gibt es ein aktives und ein widerrufenes Token")
+    @Angenommen("für «urinet» gibt es einen aktiven und einen widerrufenen Webseiten-Lese-Schlüssel")
     public void tokens() {
-        aktiv = anlegen("aktiv");
-        widerrufen = anlegen("widerrufen");
+        aktiv = anlegen("aktiv", "lesen");
+        widerrufen = anlegen("widerrufen", "lesen");
         verwaltung.widerrufen(new MandantCode("urinet"), ApiToken.lesen(widerrufen).orElseThrow().id(),
                 Optional.empty());
     }
@@ -142,14 +148,30 @@ public class WebseitenSchritte {
         }
     }
 
-    private String anlegen(String name) {
-        String text = verwaltung.erstellen("urinet", "Probe Webseite " + name, "generator").token().text();
+    private String anlegen(String name, String art) {
+        String text = webseitenVerwaltung.erstellen("urinet", "probe", art,
+                "lesen".equals(art) ? "oeffentlich" : null, false).token().text();
         tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
         return text;
     }
 
-    private static RequestSpecification anmelden(String benutzer) {
-        return "niemand".equals(benutzer) ? given() : given().auth().oauth2(Testanmeldung.token(benutzer));
+    private RequestSpecification anmelden(String benutzer) {
+        if ("niemand".equals(benutzer)) {
+            return given();
+        }
+        if ("webseite".equals(benutzer)) {
+            if (webseitenToken == null) {
+                webseitenToken = anlegen("anfrage", "lesen");
+            }
+            return given().header("Authorization", "Bearer " + webseitenToken);
+        }
+        if ("webseite-erfassung".equals(benutzer)) {
+            if (erfassungsToken == null) {
+                erfassungsToken = anlegen("erfassung", "erfassung");
+            }
+            return given().header("Authorization", "Bearer " + erfassungsToken);
+        }
+        return given().auth().oauth2(Testanmeldung.token(benutzer));
     }
 
     private static Map<String, Object> ohneInstance(Response antwort) {

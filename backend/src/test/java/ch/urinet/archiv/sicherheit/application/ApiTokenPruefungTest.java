@@ -152,6 +152,97 @@ class ApiTokenPruefungTest {
     }
 
     @Test
+    void erfolgreicherWebseitenSchluesselNutztDenPruefCacheAberFalschesGeheimnisNicht() {
+        ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+
+        assertThat(pruefung.pruefen(token)).isPresent();
+        assertThat(pruefung.pruefen(token)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(1);
+
+        ApiToken falsch = ApiToken.lesen("ua_" + token.id() + "_" + ApiToken.neu(zufall).geheimnis()).orElseThrow();
+        assertThat(pruefung.pruefen(falsch)).isEmpty();
+        assertThat(pruefung.pruefen(token)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(2);
+    }
+
+    @Test
+    void widerrufUndAblaufWirkenTrotzPruefCacheSofort() {
+        ApiToken widerruf = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+        ApiToken ablauf = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.of(START.plusSeconds(30)));
+        assertThat(pruefung.pruefen(widerruf)).isPresent();
+        assertThat(pruefung.pruefen(ablauf)).isPresent();
+
+        register.aktivSetzen(widerruf.id(), false);
+        uhr.weiter(Duration.ofSeconds(30));
+
+        assertThat(pruefung.pruefen(widerruf)).isEmpty();
+        assertThat(pruefung.pruefen(ablauf)).isEmpty();
+        assertThat(hasher.vergleiche).isEqualTo(2);
+    }
+
+    @Test
+    void abgelaufenerPruefCacheRechnetArgon2Erneut() {
+        ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+        ApiTokenPruefung kurzerCache = new ApiTokenPruefung(register, hasher, uhr,
+                new HashSperre(2, Duration.ofMillis(200)), Duration.ofSeconds(10));
+
+        assertThat(kurzerCache.pruefen(token)).isPresent();
+        uhr.weiter(Duration.ofSeconds(11));
+        assertThat(kurzerCache.pruefen(token)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(2);
+    }
+
+    @Test
+    void gueltigerWebseitenSchluesselWartetBeiAusgelasteterHashSperreNicht() throws Exception {
+        CountDownLatch imHash = new CountDownLatch(2);
+        CountDownLatch loslassen = new CountDownLatch(1);
+        HashSperre sperre = new HashSperre(2, Duration.ofMillis(100));
+        ApiTokenPruefung unterLast = new ApiTokenPruefung(register, hasher, uhr, sperre);
+        ApiToken website = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+        assertThat(unterLast.pruefen(website)).isPresent();
+        hasher.bremse = () -> {
+            imHash.countDown();
+            warten(loslassen);
+        };
+        List<CompletableFuture<Optional<ApiClient>>> angriffe = List.of(
+                CompletableFuture.supplyAsync(() -> unterLast.pruefen(ApiToken.neu(zufall))),
+                CompletableFuture.supplyAsync(() -> unterLast.pruefen(ApiToken.neu(zufall))));
+        assertThat(imHash.await(5, TimeUnit.SECONDS)).isTrue();
+
+        long wartezeitMillis;
+        List<Long> cacheDauern = new ArrayList<>();
+        try {
+            long startWartezeit = System.nanoTime();
+            assertThatThrownBy(() -> unterLast.pruefen(ApiToken.neu(zufall)))
+                    .isInstanceOfSatisfying(FachFehler.class,
+                            f -> assertThat(f.code()).isEqualTo(Fehlercode.UEBERLASTET));
+            wartezeitMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startWartezeit);
+            assertThat(wartezeitMillis).as("Wartezeit bei belegten Hash-Plätzen").isLessThan(1_000);
+
+            for (int i = 0; i < 100; i++) {
+                long start = System.nanoTime();
+                assertThat(unterLast.pruefen(website)).isPresent();
+                cacheDauern.add(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
+            }
+        } finally {
+            loslassen.countDown();
+        }
+        cacheDauern.sort(Long::compareTo);
+        assertThat(hasher.vergleiche).as("Trefferquote des warmen Schlüssels: 100/100").isEqualTo(3);
+        System.out.printf("Prüf-Cache unter Last: Treffer=100/100, p95=%d ms, max=%d ms; "
+                        + "HashSperre: 2 Plätze belegt, Wartezeit bis UEBERLASTET=%d ms%n",
+                cacheDauern.get(94), cacheDauern.getLast(), wartezeitMillis);
+
+        assertThat(angriffe).allSatisfy(angriff -> {
+            try {
+                assertThat(angriff.get(5, TimeUnit.SECONDS)).isEmpty();
+            } catch (Exception e) {
+                throw new AssertionError(e);
+            }
+        });
+    }
+
+    @Test
     void falschesGeheimnisOderWiderrufenErgibtLeer() {
         ApiToken echt = register.anlegen(ApiToken.neu(zufall), true);
         ApiToken falsch = ApiToken.lesen("ua_" + echt.id() + "_" + ApiToken.neu(zufall).geheimnis()).orElseThrow();
@@ -231,6 +322,21 @@ class ApiTokenPruefungTest {
             return token;
         }
 
+        ApiToken anlegenWebseite(ApiToken token, boolean aktiv, Optional<Instant> gueltigBis) {
+            ApiClient client = new ApiClient(token.id(), "urinet", "Probe", ApiTokenScope.WEBSEITE_LESEN, aktiv,
+                    START, Optional.empty(), Optional.of("probe"), Optional.of("oeffentlich"), gueltigBis, false);
+            eintraege.put(token.id(), new Zugang(client, "hash:" + token.geheimnis()));
+            return token;
+        }
+
+        void aktivSetzen(String id, boolean aktiv) {
+            Zugang zugang = eintraege.get(id);
+            ApiClient client = zugang.client();
+            eintraege.put(id, new Zugang(new ApiClient(client.id(), client.mandant(), client.name(), client.scope(),
+                    aktiv, client.erstellt(), client.zuletzt(), client.webseite(), client.hoechsteStufe(),
+                    client.gueltigBis(), client.absenderPruefen()), zugang.hash()));
+        }
+
         @Override
         public Optional<Zugang> finden(String id) {
             return Optional.ofNullable(eintraege.get(id));
@@ -249,6 +355,19 @@ class ApiTokenPruefungTest {
         @Override
         public boolean widerrufen(String mandant, String id) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean gueltigBisSetzen(String mandant, String id, Instant zeit) {
+            Zugang zugang = eintraege.get(id);
+            if (zugang == null || !zugang.client().mandant().equals(mandant)) {
+                return false;
+            }
+            ApiClient client = zugang.client();
+            eintraege.put(id, new Zugang(new ApiClient(client.id(), client.mandant(), client.name(), client.scope(),
+                    client.aktiv(), client.erstellt(), client.zuletzt(), client.webseite(), client.hoechsteStufe(),
+                    Optional.of(zeit), client.absenderPruefen()), zugang.hash()));
+            return true;
         }
 
         @Override

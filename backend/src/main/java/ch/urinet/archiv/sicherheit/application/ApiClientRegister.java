@@ -20,6 +20,9 @@ public interface ApiClientRegister {
     /** Setzt {@code aktiv = false}, nur im eigenen Mandanten; {@code false}, wenn es die ID dort nicht gibt. */
     boolean widerrufen(String mandant, String id);
 
+    /** Setzt das Ablaufdatum eines Schlüssels, nur im eigenen Mandanten. */
+    boolean gueltigBisSetzen(String mandant, String id, Instant zeit);
+
     void zuletztSetzen(String id, Instant zeit);
 
     /** Eintrag mit dem gespeicherten Hash des Geheimnisses; verlässt die Anwendungsschicht nie. */

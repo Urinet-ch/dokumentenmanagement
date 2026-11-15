@@ -39,7 +39,8 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
         if (token.isEmpty()) {
             return Uni.createFrom().failure(new AuthenticationFailedException("API-Token ungültig"));
         }
-        ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get());
+        ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get(),
+                Optional.ofNullable(kontext.request().headers().get("X-Real-Ip")));
         HttpSecurityUtils.setRoutingContextAttribute(anfrage, kontext);
         return anbieter.authenticate(anfrage);
     }
