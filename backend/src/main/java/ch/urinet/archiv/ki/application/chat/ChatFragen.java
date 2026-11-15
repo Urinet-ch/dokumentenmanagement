@@ -146,9 +146,15 @@ public class ChatFragen {
             speicher.gespraechAnlegen(id, benutzer.id(), Gespraechstitel.aus(text), jetzt);
         }
         List<VerlaufEintrag> verlauf = VerlaufEintrag.normalisieren(speicher.verlauf(id, VERLAUF));
+        List<ChatWerkzeugDokument> werkzeugDokumente = speicher.werkzeugDokumente(id);
+        List<UUID> geseheneDokumente = werkzeugDokumente.stream()
+                .map(ChatWerkzeugDokument::dokumentId).distinct().toList();
+        List<UUID> nummerierteTreffer = werkzeugDokumente.stream()
+                .filter(w -> WerkzeugAuswahl.DOKUMENTE_SUCHEN.equals(w.werkzeug()))
+                .map(ChatWerkzeugDokument::dokumentId).distinct().toList();
         speicher.frageSpeichern(id, text, jetzt);
         ChatAnfrage anfrage = new ChatAnfrage(mandant, benutzer, Sichtregel.fuer(benutzer), ip,
-                einstellungen.lesen(mandant).name(), text, verlauf);
+                einstellungen.lesen(mandant).name(), text, verlauf, geseheneDokumente, nummerierteTreffer);
         return new Annahme(id, anfrage, platz);
     }
 

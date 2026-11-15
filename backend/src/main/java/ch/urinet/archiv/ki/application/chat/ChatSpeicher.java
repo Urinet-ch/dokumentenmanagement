@@ -34,6 +34,9 @@ public interface ChatSpeicher {
     /** Die letzten {@code anzahl} Fragen und Antworten mit Inhalt, älteste zuerst. */
     List<VerlaufEintrag> verlauf(UUID gespraech, int anzahl);
 
+    /** Werkzeugname und Dokument-IDs aus gespeicherten Ergebnissen, in Gesprächsreihenfolge. */
+    List<ChatWerkzeugDokument> werkzeugDokumente(UUID gespraech);
+
     /** Speichert die Frage und setzt {@code geaendert}. */
     void frageSpeichern(UUID gespraech, String frage, Instant zeit);
 

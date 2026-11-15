@@ -37,10 +37,13 @@ class WerkzeugBeschreibungTest {
     }
 
     @Test
-    void dokumentZeigenNimmtNurEineId() {
-        assertThat(beschreibung("dokumentZeigen")).contains("nur anhand seiner ID")
-                .contains("Ohne ID zuerst dokumente_suchen");
-        assertThat(parameter("dokumentZeigen", "id")).contains("kein Titel und kein Datum");
+    void dokumentZeigenBevorzugtDieGesprächsnummer() {
+        assertThat(beschreibung("dokumenteSuchen")).contains("fortlaufende Gesprächsnummer")
+                .contains("nur in diesem Gespräch gültig").contains("bevorzuge sie");
+        assertThat(beschreibung("dokumentZeigen")).contains("Gesprächsnummer oder ID")
+                .contains("bevorzuge die Nummer").contains("zuerst dokumente_suchen");
+        assertThat(parameter("dokumentZeigen", "id")).contains("Gesprächsnummer oder ID").contains("bevorzugt die Nummer")
+                .contains("kein Titel und kein Datum");
     }
 
     @Test

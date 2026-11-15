@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki.adapter.out.persistence;
 
 import ch.urinet.archiv.ki.adapter.json.ChatJson;
 import ch.urinet.archiv.ki.application.chat.ChatSpeicher;
+import ch.urinet.archiv.ki.application.chat.ChatWerkzeugDokument;
 import ch.urinet.archiv.ki.domain.chat.Aufgeraeumt;
 import ch.urinet.archiv.ki.domain.chat.ChatAntwort;
 import ch.urinet.archiv.ki.domain.chat.ChatNachricht;
@@ -87,6 +88,20 @@ public class JdbcChatSpeicher implements ChatSpeicher {
         List<VerlaufEintrag> verlauf = new ArrayList<>(neueste);
         Collections.reverse(verlauf);
         return verlauf;
+    }
+
+    @Override
+    public List<ChatWerkzeugDokument> werkzeugDokumente(UUID gespraech) {
+        String s = schema();
+        return abfragen("select aufruf.wert ->> 'name', dokument.id::uuid from " + s
+                        + ".chat_nachricht nachricht "
+                        + "cross join lateral jsonb_array_elements(nachricht.werkzeuge) with ordinality "
+                        + "as aufruf(wert, nr_aufruf) "
+                        + "cross join lateral jsonb_array_elements_text(aufruf.wert -> 'dokumentIds') "
+                        + "with ordinality as dokument(id, nr_dokument) "
+                        + "where nachricht.gespraech_id = ? and nachricht.rolle = 'ASSISTENT' "
+                        + "order by nachricht.id, aufruf.nr_aufruf, dokument.nr_dokument",
+                z -> new ChatWerkzeugDokument(z.getString(1), z.getObject(2, UUID.class)), gespraech);
     }
 
     @Override

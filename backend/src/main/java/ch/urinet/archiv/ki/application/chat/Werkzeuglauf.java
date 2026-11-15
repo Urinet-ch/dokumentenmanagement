@@ -3,6 +3,10 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 /**
@@ -31,6 +35,14 @@ public class Werkzeuglauf {
 
     public java.util.Set<java.util.UUID> gesehene(Object lauf) {
         return register.gesehene(lauf);
+    }
+
+    public Map<UUID, Integer> nummerieren(Object lauf, Collection<UUID> ids) {
+        return register.nummerieren(lauf, ids);
+    }
+
+    public List<UUID> nummerierte(Object lauf) {
+        return register.nummerierte(lauf);
     }
 
     public <T> T ausfuehren(Object lauf, String werkzeug, Function<WerkzeugKontext, T> arbeit) {
