@@ -25,7 +25,12 @@ export function backend() {
     return adressen;
   }
   const datei = existsSync(BEREIT) ? JSON.parse(readFileSync(BEREIT, 'utf8')) : {};
-  adressen = { api: process.env.ARCHIV_API_URL ?? datei.api, keycloak: process.env.ARCHIV_KEYCLOAK_URL ?? datei.keycloak };
+  adressen = {
+    api: process.env.ARCHIV_API_URL ?? datei.api,
+    keycloak: process.env.ARCHIV_KEYCLOAK_URL ?? datei.keycloak,
+    // WireMock mit dem simulierten Sprachmodell (Spec 02, 7.4b); steht nur in der Bereit-Datei
+    modell: datei.modell,
+  };
   if (!adressen.api || !adressen.keycloak) {
     throw new Error(
       'Kein echtes Backend: zuerst «mvn -f backend/pom.xml test -Dtest=BrowserBackendTest -Darchiv.browser-backend=true» starten',
@@ -137,14 +142,15 @@ export function echteDokumente(welt) {
 
 /**
  * Testhilfe für den Status (Aufgabe 4.10): Im Testmodus läuft kein Worker, ein hochgeladenes Dokument bleibt in NEU.
- * BrowserBackendTest setzt es auf Anfrage per SQL auf EINGANGSKORB oder FEHLER, ohne Titel und ohne Vorschlag.
+ * BrowserBackendTest setzt es auf Anfrage per SQL auf EINGANGSKORB oder FEHLER, ohne Vorschlag und ohne Titel; nur
+ * für EINGANGSKORB setzt der optionale `titel` einen Titel (Chat-Quellen tragen den Titel).
  */
-export async function statusSetzen(mandant, id, status) {
+export async function statusSetzen(mandant, id, status, titel = undefined) {
   mkdirSync(ANFRAGEN, { recursive: true });
   const name = randomUUID();
   const entwurf = new URL(`${name}.tmp`, ANFRAGEN);
   const antwort = new URL(`${name}.antwort.json`, ANFRAGEN);
-  writeFileSync(entwurf, JSON.stringify({ mandant, dokument: id, status }));
+  writeFileSync(entwurf, JSON.stringify({ mandant, dokument: id, status, ...(titel ? { titel } : {}) }));
   renameSync(entwurf, new URL(`${name}.json`, ANFRAGEN));
   for (const ende = Date.now() + 30_000; Date.now() < ende; ) {
     if (existsSync(antwort)) {

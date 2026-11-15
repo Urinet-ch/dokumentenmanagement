@@ -172,8 +172,8 @@ flowchart LR
   - Löschung (7.3, Requirement 5.4): je Nachricht 12 Monate nach `zeit`, danach Gespräche ohne Nachrichten; ein täglicher Lauf je Mandant. Vermerk: In den Datenbank-Sicherungen (Spec 01, Req 16.2) bleiben gelöschte Gespräche bis zum Ablauf der jeweiligen Sicherung erhalten; das gehört in die Verfahrensbeschreibung und den Datenschutzhinweis.
 - Umsetzung (Aufgabe 7.4, 14.11.2026; Seite gegen eine Attrappe, das Backend 7.2 und 7.3 entsteht parallel):
   - Route `/chat` (lazy, `rechtGuard('A2')`, alle vier Rollen nach E3), ohne Eintrag in `MENUE`: Den Menüpunkt und den
-    Nachweis von Requirement 4.3 (Protokoll beim Öffnen einer Quelle) bringt Aufgabe 7.4b, sobald 7.2 und 7.3 gemergt
-    sind, damit ein Deploy keine tote Seite zeigt. Eine eigene Aktion in `rechte.ts` braucht es nicht.
+    Nachweis von Requirement 4.3 (Protokoll beim Öffnen einer Quelle) brachte Aufgabe 7.4b (erledigt 15.11.2026), damit
+    ein Deploy keine tote Seite zeigt. Eine eigene Aktion in `rechte.ts` braucht es nicht.
   - Client ohne `EventSource` (kann keinen Header senden, das Token liegt nur im Arbeitsspeicher): `ChatPort` mit
     `HttpChatService`, POST über `HttpClient` mit `observe: 'events'`, `reportProgress: true`, `responseType: 'text'`,
     damit der Interceptor das Token anhängt und 401 die Sitzung beendet («Sitzung abgelaufen»). Angular 22 nutzt ohne
@@ -210,6 +210,23 @@ flowchart LR
     `features/chat/chat-pwa.feature` (`@spec-02 @browser @attrappe`, 375 und 1280 px) gegen
     `frontend/e2e/hilfen/chat-attrappe.mjs`: ein kleiner HTTP-Server liefert den Strom Stück für Stück, Playwright leitet
     `POST /api/v1/chat` dorthin um (`route.fulfill` kann nicht streamen). Sie belegen nur die Oberfläche.
+- Umsetzung (Aufgabe 7.4b, 15.11.2026; Menüpunkt und Durchstich gegen das echte Archiv):
+  - Menüpunkt «Chat» in `MENUE` (Recht `A2`, alle vier Rollen, Entscheid Fabian 14.11.2026) nach «Suche», weil beide
+    Wege zum Finden von Belegen sind und die Rechte übereinstimmen; «Kontakte» und die Verwaltung bleiben dahinter.
+    Reihenfolge: Erfassen, Eingangskorb, Suche, Chat, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, Jahresexport.
+    Ohne Änderung an Agent und Schnittstelle (eine Korrektur in den Werkzeug-Daten, siehe unten); kein Changeset, kein neues Secret.
+  - Durchstich `features/chat/chat-freischaltung-pwa.feature` (`@spec-02 @browser`, 375 und 1280 px) gegen das echte
+    Archiv: `BrowserBackendTest` schaltet `TestChatAgent` auf `ECHT` (echter `LangChain4jChatAgent`) und nennt die
+    Adresse des WireMock aus `KiWireMock` als `modell` in `browser-backend.json`. Das Szenario registriert über dessen
+    Admin-Schnittstelle zwei gestreamte Antworten (Szenario-Zustände): zuerst den Tool-Call `dokument_zeigen` auf ein
+    synthetisches Dokument im Eingangskorb, danach den Text, über zwei Sekunden verteilt. Belegt: Menüpunkt, Antwort
+    wächst fortlaufend, Quellen-Chip öffnet `/dokument/<id>`, kein horizontales Scrollen, Zugriffsprotokoll mit
+    `ANZEIGEN` mindestens einmal mit `kanal` `CHAT` (Werkzeug) und mindestens einmal ohne Kanal (GET der Ansicht), `@req-4.3`. Kein Rückfall
+    auf den Stub nötig: WireMock geht im Browser-Lauf (kein Request an Infomaniak).
+  - Testhilfe: Die Anfrage zum Status (4.10) nimmt für `EINGANGSKORB` einen optionalen `titel` (Quellen tragen den Titel).
+  - Fund beim Durchstich: `PanacheWerkzeugDaten.inhalt` scheiterte mit `NullPointerException` (`findFirst()` über eine
+    Zeile mit `null`), sobald ein Dokument keinen Volltext hat (z. B. im Eingangskorb); `dokument_zeigen` lieferte dann
+    den Fehler statt der Metadaten. Behoben (Zeilen ohne Wert fallen weg), Szenario in `werkzeuge.feature`.
 - Umsetzung (Aufgabe 7.3, 14.11.2026; Erkenntnisse und Auslegungen, gegen einen Port mit Stub):
   - Port: `ChatAgentPort` (`ki.application.chat`) nimmt eine `ChatAnfrage` (Mandant, Benutzer mit Rolle, `Sichtregel`, IP der Anfrage aus `X-Real-Ip`, Mandantenname aus `public.mandant`, Frage, die letzten 10 Fragen und Antworten mit Inhalt vor dieser Frage, älteste zuerst) und meldet blockierend versiegelte `ChatEreignis` (`ki.domain.chat`): `WerkzeugStart(name)`, `WerkzeugErgebnis(name, parameter, dokumente[{id, titel}], datenstand?)`, `Text(delta)`, `Ende(tokensEin, tokensAus)`, `Ausfall(grund)` mit dem einfachen Klassennamen. Das Abbruch-Signal `ChatAbbruch` prüft der Adapter vor jedem Modell- und Werkzeugaufruf. Eine Ausnahme des Adapters gilt als Ausfall mit ihrem Klassennamen, ein Ende ohne `Ende` ebenso (`KeinEnde`); Ereignisse nach `Ende`, `Ausfall` oder dem Abbruch zählen nicht.
   - Auswahl (`ChatAuswahl`, wie `EmbeddingAuswahl`): `archiv.chat.stub` (Standard `${archiv.ki.stub}`, im Profil `lokal` immer `true`, weil es dort bis 7.2 keinen Agenten gibt) wählt `ChatAgentStub` mit fester Demo-Folge ohne Request; sonst `ChatNichtVerfuegbar`, der sofort `Ausfall` meldet. `PortAuswahl("ChatAgentPort", …, folgtMit = "Spec 02, Aufgabe 7.2")`: in prod eine Warnung, kein Abbruch. Die Quarkus-Tests ersetzen den Port durch `TestChatAgent` (`@Mock`).

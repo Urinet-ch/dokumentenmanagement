@@ -62,7 +62,8 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
         sicht.parameter().forEach(abfrage::setParameter);
         @SuppressWarnings("unchecked")
         List<String> zeilen = abfrage.setParameter("id", id).setParameter("zeichen", zeichen).getResultList();
-        return zeilen.stream().findFirst().filter(t -> !t.isBlank());
+        // ein Dokument ohne Volltext (z. B. im Eingangskorb) liefert eine Zeile mit null: findFirst() würde daran scheitern
+        return zeilen.stream().filter(java.util.Objects::nonNull).findFirst().filter(t -> !t.isBlank());
     }
 
     @Override
