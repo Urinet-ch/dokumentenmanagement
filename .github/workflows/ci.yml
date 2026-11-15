@@ -113,7 +113,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Restore-Probe: Compose und Speicherbudget
+      - name: "Restore-Probe: Compose und Speicherbudget"
         run: |
           python3 -m unittest tools/test_pruefe_speicherbudget.py
           docker compose -f deploy/probe/compose.yml config --format json \
