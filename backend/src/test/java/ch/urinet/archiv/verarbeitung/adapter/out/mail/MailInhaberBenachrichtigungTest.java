@@ -71,6 +71,34 @@ class MailInhaberBenachrichtigungTest {
                 """.formatted(LAUF, SCHLUESSEL, DOKUMENT, FEHLER));
     }
 
+    /** Abweichungen aus dem Manifest-Vergleich (Req 15.5): Art, Dokument-ID, Schlüssel und Version, nie Prüfsummen. */
+    @Test
+    void berichtMitManifestAbweichungenNenntNurIds() {
+        Zaehler zaehler = new Zaehler(2, 1, 1, 0, 0, 2);
+        String text = MailInhaberBenachrichtigung.prueflaufText(LAUF, zaehler, List.of(
+                new Abweichung(Art.MANIFEST_EINTRAG_FEHLT, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1")),
+                new Abweichung(Art.MANIFEST_PRUEFSUMME, Optional.of(DOKUMENT), SCHLUESSEL, Optional.of("v1"))));
+
+        assertThat(text).isEqualTo("""
+                Der monatliche Prüflauf %1$s hat Abweichungen festgestellt.
+
+                Geprüfte Dateien: 2
+                Geprüfte Versionen unter archiv/: 1
+                Geprüfte Manifeste: 1
+                Verlängerte Sperren: 0
+                Abweichungen: 2
+
+                - MANIFEST_EINTRAG_FEHLT Dokument %3$s, %2$s, Version v1
+                - MANIFEST_PRUEFSUMME Dokument %3$s, %2$s, Version v1
+
+                Die betroffenen Dateien nicht ändern oder löschen und die Abweichungen klären; Details im Log unter \
+                der Lauf-ID.
+                """.formatted(LAUF, SCHLUESSEL, DOKUMENT));
+        assertThat(text).doesNotContainPattern("[0-9a-f]{64}");
+        assertThat(MailInhaberBenachrichtigung.prueflaufBetreff(LAUF, zaehler))
+                .isEqualTo("UriNet Archiv: Prüflauf " + LAUF + " mit 2 Abweichungen");
+    }
+
     @Test
     void abbruchOhneAbweichungenNenntKeineUndBittetNichtUmKlaerung() {
         Fortsetzung stand = new Fortsetzung(Phase.DATEIEN, Optional.of(DOKUMENT), Optional.empty());

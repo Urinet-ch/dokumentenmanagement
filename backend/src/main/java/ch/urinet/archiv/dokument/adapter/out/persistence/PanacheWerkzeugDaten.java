@@ -200,6 +200,51 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
         return new Fristseite(fristen, ((Number) erste[0]).longValue(), ((Number) erste[1]).longValue());
     }
 
+    @Override
+    public KennzahlSeite kennzahl(KennzahlAnfrage anfrage, Sichtregel regel) {
+        KennzahlSql sql = KennzahlSql.kennzahl(anfrage, regel);
+        List<Object[]> gruppen = abfragen(sql.zeilen(), sql.parameter());
+        List<KennzahlZeile> zeilen = new ArrayList<>();
+        for (Object[] z : gruppen) {
+            if (((Number) z[2]).longValue() > 0) {
+                zeilen.add(new KennzahlZeile((String) z[0], (BigDecimal) z[1], ((Number) z[2]).longValue()));
+            }
+        }
+        boolean gekuerzt = zeilen.size() > KennzahlSql.ZEILEN_MAX;
+        Object[] summe = abfragen(sql.summe(), sql.parameter()).getFirst();
+        List<UUID> belege = abfragen(sql.belege(), sql.parameter()).stream().map(r -> (UUID) r[0]).toList();
+        return new KennzahlSeite(gekuerzt ? zeilen.subList(0, KennzahlSql.ZEILEN_MAX) : zeilen, (BigDecimal) summe[0],
+                ((Number) summe[1]).longValue(), belege, ((Number) summe[2]).longValue(), gekuerzt);
+    }
+
+    @Override
+    public OffenePostenSeite offenePosten(Richtung richtung, List<ArtRegel> arten, LocalDate von, LocalDate bis,
+                                          Sichtregel regel, int hoechstens) {
+        KennzahlSql sql = KennzahlSql.offenePosten(richtung, arten, von, bis, regel);
+        Map<String, Object> parameter = new HashMap<>(sql.parameter());
+        parameter.put("hoechstens", hoechstens);
+        List<Object[]> zeilen = abfragen(sql.offen(), parameter);
+        List<OffenerPosten> posten = new ArrayList<>();
+        for (Object[] z : zeilen) {
+            posten.add(new OffenerPosten((UUID) z[2], (String) z[3], (String) z[4], (BigDecimal) z[5], (String) z[6],
+                    datum(z[1]), (String) z[7]));
+        }
+        return new OffenePostenSeite(posten, zeilen.isEmpty() ? 0 : ((Number) zeilen.getFirst()[0]).longValue());
+    }
+
+    private static LocalDate datum(Object wert) {
+        return wert instanceof java.sql.Date d ? d.toLocalDate() : (LocalDate) wert;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object[]> abfragen(String sql, Map<String, Object> parameter) {
+        Query abfrage = em().createNativeQuery(sql);
+        parameter.forEach(abfrage::setParameter);
+        List<?> zeilen = abfrage.getResultList();
+        return zeilen.isEmpty() || zeilen.getFirst() instanceof Object[] ? (List<Object[]>) zeilen
+                : zeilen.stream().map(w -> new Object[]{w}).toList();
+    }
+
     private static String quelle(String spalte, Quelle quelle, String verbindung, String basis) {
         return "select to_char(" + spalte + ", 'YYYY-MM-DD') as datum, " + quelle.ordinal() + " as quelle, d.id "
                 + "from dokument d " + verbindung + " where " + basis + " and " + spalte + " between :von and :bis";

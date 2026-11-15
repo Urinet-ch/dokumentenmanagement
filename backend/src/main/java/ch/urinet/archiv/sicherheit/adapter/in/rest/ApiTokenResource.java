@@ -53,12 +53,16 @@ public class ApiTokenResource {
     }
 
     @Schema(name = "ApiToken")
-    public record ApiTokenDto(String id, String name, @Schema(enumeration = {"generator", "import"}) String scope,
-            boolean aktiv, Instant erstellt, @Schema(nullable = true) Instant zuletzt) {
+    public record ApiTokenDto(String id, String name, @Schema(enumeration = {"generator", "import", "webseite-lesen",
+            "webseite-erfassung"}) String scope,
+            boolean aktiv, Instant erstellt, @Schema(nullable = true) Instant zuletzt,
+            @Schema(nullable = true) String webseite, @Schema(nullable = true) String hoechsteStufe,
+            @Schema(nullable = true) Instant gueltigBis, boolean absenderPruefen) {
 
         static ApiTokenDto aus(ApiClient client) {
             return new ApiTokenDto(client.id(), client.name(), client.scope().code(), client.aktiv(),
-                    client.erstellt(), client.zuletzt().orElse(null));
+                    client.erstellt(), client.zuletzt().orElse(null), client.webseite().orElse(null),
+                    client.hoechsteStufe().orElse(null), client.gueltigBis().orElse(null), client.absenderPruefen());
         }
     }
 

@@ -133,6 +133,8 @@ Funktionalität: API-Tokens für Skripte
       | name  | scope     | status | fehlercode        |
       | probe | wordpress | 400    | ANFRAGE_UNGUELTIG |
       | probe | admin     | 400    | ANFRAGE_UNGUELTIG |
+      | probe | webseite-lesen | 400 | ANFRAGE_UNGUELTIG |
+      | probe | webseite-erfassung | 400 | ANFRAGE_UNGUELTIG |
 
   @req-2.20
   Szenariogrundriss: Ohne Rolle «inhaber» verweigert das Archiv die Token-Verwaltung mit 403

@@ -3,6 +3,8 @@ package ch.urinet.archiv.ki.adapter.in.werkzeug;
 import ch.urinet.archiv.ki.application.chat.DokumentZeigen;
 import ch.urinet.archiv.ki.application.chat.DokumenteSuchen;
 import ch.urinet.archiv.ki.application.chat.FristenAbfrage;
+import ch.urinet.archiv.ki.application.chat.KennzahlAbfrage;
+import ch.urinet.archiv.ki.application.chat.OffenePostenAbfrage;
 import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
@@ -47,7 +49,8 @@ class ArchivWerkzeugeTest {
         List<Method> werkzeuge = Arrays.stream(ArchivWerkzeuge.class.getDeclaredMethods())
                 .filter(m -> m.isAnnotationPresent(Tool.class)).toList();
         assertThat(werkzeuge).extracting(m -> m.getAnnotation(Tool.class).name())
-                .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen", "vollstaendigkeit");
+                .containsExactlyInAnyOrder("dokumente_suchen", "dokument_zeigen", "fristen", "kennzahl", "offene_posten",
+                        "vollstaendigkeit");
         for (Method methode : werkzeuge) {
             int memoryIds = 0;
             for (Parameter parameter : methode.getParameters()) {
@@ -117,6 +120,27 @@ class ArchivWerkzeugeTest {
     }
 
     @Test
+    void ungueltigeFinanzparameterSindFehlerOhneWert() {
+        ArchivWerkzeuge werkzeuge = werkzeuge();
+        register.festhalten("lauf", kontext());
+        assertThat(werkzeuge.kennzahl("lauf", null, "2026-01-01", "2026-12-31", null, null))
+                .isEqualTo(fehler("messgroesse"));
+        assertThat(werkzeuge.kennzahl("lauf", "GEWINN", "2026-01-01", "2026-12-31", null, null))
+                .isEqualTo(fehler("messgroesse"));
+        assertThat(werkzeuge.kennzahl("lauf", "EINNAHMEN", null, "2026-12-31", null, null)).isEqualTo(fehler("von"));
+        assertThat(werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-12-31", "2026-01-01", null, null))
+                .isEqualTo(fehler("von"));
+        assertThat(werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-01-01", "2036-01-02", null, null))
+                .as("mehr als 10 Jahre").isEqualTo(fehler("bis"));
+        assertThat(werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-01-01", "2026-12-31", "WOCHE", null))
+                .isEqualTo(fehler("gruppierung"));
+        assertThat(werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-01-01", "2026-12-31", null, "ZAHLUNG"))
+                .isEqualTo(fehler("basis"));
+        assertThat(werkzeuge.offenePosten("lauf", "31.02.2026", null)).isEqualTo(fehler("stichtag"));
+        assertThat(werkzeuge.offenePosten("lauf", null, "BEIDE")).isEqualTo(fehler("richtung"));
+    }
+
+    @Test
     void unerwarteterFehlerKommtAlsFehlerOhneAusnahme() {
         ArchivWerkzeuge werkzeuge = werkzeuge();
         register.festhalten("lauf", kontext());
@@ -140,9 +164,10 @@ class ArchivWerkzeugeTest {
                 return arbeit.get();
             }
         };
-        Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(), mandanten);
-        return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, new BigDecimal("0.6")),
+        Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
+        return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, null, new BigDecimal("0.6")),
                 new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null),
+                new KennzahlAbfrage(null, null, null, null), new OffenePostenAbfrage(null, null, null, null),
                 new VollstaendigkeitAbfrage(null, null, null), new ObjectMapper());
     }
 }

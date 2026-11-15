@@ -9,6 +9,7 @@ import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
@@ -32,7 +33,8 @@ import java.util.UUID;
  * {@code MANDANT_FEHLT}; jede Verweigerung meldet {@link Berechtigung} (Zugriffsprotokoll, Req 10.7).
  * <p>
  * Ein API-Token (Attribut {@link TokenIdentitaet#SCOPE}, Req 2.5) hat keine Archiv-Rolle: Nach der Mandantenprüfung
- * zählt nur, ob die Methode mit {@link ErlaubtScope} genau seinen Scope erlaubt; sonst 403 {@code NICHT_ERLAUBT}.
+ * zählt nur, ob die Methode mit {@link ErlaubtScope} genau seinen Scope erlaubt; Webseiten-Schlüssel verwenden
+ * {@link WebseitenZugang}; sonst 403 {@code NICHT_ERLAUBT}.
  */
 public class ZugangFilter {
 
@@ -65,6 +67,14 @@ public class ZugangFilter {
         ErfordertAktion erklaerung = methode.getAnnotation(ErfordertAktion.class);
         Optional<Aktion> aktion = Optional.ofNullable(erklaerung).map(ErfordertAktion::value);
         Object scope = identitaet.getAttribute(TokenIdentitaet.SCOPE);
+        WebseitenZugang webseitenZugang = methode.getAnnotation(WebseitenZugang.class);
+        if (webseitenZugang != null) {
+            if (benutzerId.isEmpty() || !(scope instanceof ch.urinet.archiv.sicherheit.domain.ApiTokenScope tokenScope)
+                    || !webseitenScopePasst(webseitenZugang, tokenScope)) {
+                berechtigung.ohneZugang(benutzerId, Optional.empty(), aktion);
+            }
+            return;
+        }
         if (scope != null) {
             scopePruefen(methode, scope, benutzerId, aktion);
             return;
@@ -81,6 +91,13 @@ public class ZugangFilter {
         } else if (!methode.isAnnotationPresent(AlleArchivRollen.class)) {
             berechtigung.ohneZugang(benutzerId, rolle, aktion);
         }
+    }
+
+    private static boolean webseitenScopePasst(WebseitenZugang zugang,
+                                                ch.urinet.archiv.sicherheit.domain.ApiTokenScope scope) {
+        return zugang.value() == WebseitenZugang.Art.LESEN
+                ? scope == ch.urinet.archiv.sicherheit.domain.ApiTokenScope.WEBSEITE_LESEN
+                : scope == ch.urinet.archiv.sicherheit.domain.ApiTokenScope.WEBSEITE_ERFASSUNG;
     }
 
     /** API-Token (Req 2.5): nur der Endpunkt, der seinen Scope erlaubt; keine Archiv-Rolle, keine Rechtematrix. */

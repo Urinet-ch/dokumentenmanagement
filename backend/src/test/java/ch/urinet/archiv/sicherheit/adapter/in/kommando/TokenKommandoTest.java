@@ -97,6 +97,11 @@ class TokenKommandoTest {
         }
 
         @Override
+        public boolean gueltigBisSetzen(String mandant, String id, Instant zeit) {
+            return false;
+        }
+
+        @Override
         public void zuletztSetzen(String id, Instant zeit) {
             // nicht gebraucht
         }

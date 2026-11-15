@@ -65,6 +65,9 @@ public class ApiTokenVerwaltung {
         }
         ApiTokenScope gueltig = ApiTokenScope.ausCode(scope).orElseThrow(
                 () -> new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG));
+        if (gueltig.webseitenSchluessel()) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
         ApiToken token = ApiToken.neu(zufall);
         ApiClient client = new ApiClient(token.id(), code.wert(), bereinigt, gueltig, true, Instant.now(),
                 Optional.empty());

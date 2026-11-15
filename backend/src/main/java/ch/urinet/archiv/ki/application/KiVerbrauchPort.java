@@ -15,6 +15,12 @@ public interface KiVerbrauchPort {
      * Embedding-Modell (Frage einbetten) und Reranker mit Antwort, ohne Limit.
      */
     String SUCHE = "SUCHE";
+    /**
+     * Chat-Agent (Spec 02, Req 5.5; Aufgabe 7.2, entschieden von Fabian am 14.11.2026): eine Zeile je Aufruf des
+     * Sprachmodells, also je Werkzeug-Runde und für die Schlussantwort, mit Modell und Tokens, ohne Frage und Inhalte;
+     * nur protokollieren wie {@link #SUCHE}, kein Budget und keine Sperre.
+     */
+    String CHAT = "CHAT";
 
     void erfassen(String zweck, KiPort.Verbrauch verbrauch);
 }

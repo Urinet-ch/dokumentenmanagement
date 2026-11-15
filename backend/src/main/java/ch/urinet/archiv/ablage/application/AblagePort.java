@@ -93,7 +93,9 @@ public interface AblagePort {
     /**
      * Liest die älteste Version eines Manifest-Teils (Aufgabe 5.2: Wiederholung und Prüfwerkzeug); leer, wenn er fehlt
      * (auch wenn unter dem Schlüssel nur Löschmarken liegen). {@link ManifestDatei#weitere()} zählt weitere Versionen und
-     * Löschmarken. Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18).
+     * Löschmarken. Teile über {@link #MANIFEST_MAX_GROESSE} brechen ab, damit der Heap begrenzt bleibt (Req 16.18). Ist
+     * die älteste Version nicht eindeutig, bricht der Aufruf mit {@code MehrdeutigeVersion} ab; ist der Object Storage
+     * vorübergehend gestört, mit {@code AblageGestoert} (Prüflauf, Aufgabe 5.3).
      */
     Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil);
 

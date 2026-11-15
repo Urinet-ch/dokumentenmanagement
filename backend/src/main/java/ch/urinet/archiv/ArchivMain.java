@@ -5,6 +5,7 @@ import ch.urinet.archiv.integration.adapter.in.kommando.MailPasswortEingabe;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
+import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
@@ -67,6 +68,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     TokenKommando token;
+
+    @Inject
+    WebseitenSchluesselKommando webseitenSchluessel;
 
     @Inject
     ManifestKommando manifest;
@@ -151,6 +155,9 @@ public class ArchivMain implements QuarkusApplication {
                     : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
+            case "webseite" -> rest.size() >= 1 && rest.getFirst().equals("schluessel")
+                    && WebseitenSchluesselKommando.lesen(rest.subList(1, rest.size())).isPresent()
+                            ? Optional.empty() : Optional.of(WebseitenSchluesselKommando.AUFRUF);
             case "manifest" -> ManifestKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(ManifestKommando.AUFRUF);
             case "mail" -> MailKommando.lesen(rest).isPresent() ? Optional.empty()
@@ -158,7 +165,8 @@ public class ArchivMain implements QuarkusApplication {
             case "embedding" -> EmbeddingKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(EmbeddingKommando.AUFRUF);
             default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
-                    + TokenKommando.AUFRUF + System.lineSeparator() + ManifestKommando.AUFRUF
+                    + TokenKommando.AUFRUF + System.lineSeparator() + WebseitenSchluesselKommando.AUFRUF
+                    + System.lineSeparator() + ManifestKommando.AUFRUF
                     + System.lineSeparator() + MailKommando.AUFRUF + System.lineSeparator() + EmbeddingKommando.AUFRUF);
         };
     }
@@ -198,6 +206,7 @@ public class ArchivMain implements QuarkusApplication {
         List<String> rest = liste.subList(1, liste.size());
         return switch (liste.getFirst()) {
             case "token" -> token.ausfuehren(rest, ergebnis, System.err);
+            case "webseite" -> webseitenSchluessel.ausfuehren(rest.subList(1, rest.size()), ergebnis, System.err);
             case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
             case "mail" -> mail.ausfuehren(rest, MailPasswortEingabe::nehmen, System.err);
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);

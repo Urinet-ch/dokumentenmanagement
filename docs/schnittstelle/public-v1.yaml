@@ -1,0 +1,227 @@
+openapi: 3.1.0
+info:
+  title: UriNet Archiv – Webseiten-Schnittstelle
+  version: "1"
+  description: |
+    Vertrag der Webseiten-Schnittstelle unter `/public/v1` (Hauptversion 1), gleich für jede Webseite
+    (Spec 03, Requirement 11, ADR-014). Endpunkte kommen additiv mit den Aufgaben, die sie bauen; diese Fassung
+    beschreibt Anmeldung, Fehler, Header und Versionierung.
+
+    Regeln:
+    - **Nur serverseitig.** Nur der Server einer Webseite ruft die Schnittstelle auf. Das Archiv erlaubt kein CORS;
+      ein Schlüssel gehört nie in einen Browser, eine App oder ein Skript beim Besucher.
+    - **Innerhalb einer Hauptversion nur additiv.** Erlaubt sind neue Endpunkte, neue optionale Parameter, neue
+      Antwortfelder und neue Werte bei Feldern mit `x-erweiterbar: true`. Alles andere (Pfad, Feld oder Parameter
+      entfernen oder umbenennen, Typ ändern, neuer Pflichtparameter, Statuscode entfernen, neuer Wert eines nicht
+      erweiterbaren Felds) kommt nur unter einer neuen Hauptversion `/public/v<n+1>`.
+    - **Unbekanntes ignorieren.** Nutzer ignorieren Antwortfelder, die sie nicht kennen, und behandeln unbekannte
+      Werte erweiterbarer Felder wie einen allgemeinen Fall (bei `fehlercode` nach dem HTTP-Status).
+    - **Parallelbetrieb.** Kommt eine neue Hauptversion, läuft die alte mindestens 6 Monate ab Bereitstellung der neuen
+      weiter.
+    - **Abkündigung.** Ist eine Hauptversion abgekündigt, trägt jede ihrer Antworten, auch jede Fehlerantwort, die
+      Header `Deprecation` (RFC 9745), `Sunset` (RFC 8594, Datum der möglichen Abschaltung) und
+      `Link: </public/v<n+1>>; rel="successor-version"`. Ohne Abkündigung fehlen alle drei.
+    - **Nicht zwischenspeichern.** Jede Antwort trägt `Cache-Control: no-store`; zwischenspeichern darf nur der Server
+      der Webseite nach seinen eigenen Regeln.
+    - **Fehler als Problem Details** (RFC 9457, `application/problem+json`) mit stabilem `fehlercode`; `title` und
+      `detail` sind feste Texte ohne Eingabewerte. Massgebend für die Behandlung ist `fehlercode`, nie der Text.
+    - **`x-erweiterbar: true`** an einem Feld mit Aufzählung (`enum`) heisst: Innerhalb der Hauptversion können
+      neue Werte dazukommen; Nutzer müssen unbekannte Werte vertragen.
+paths: {}
+security:
+  - webseitenSchluessel: []
+components:
+  securitySchemes:
+    webseitenSchluessel:
+      type: http
+      scheme: bearer
+      description: |
+        Webseiten-Schlüssel `ua_<id>_<geheimnis>` im Header `Authorization: Bearer <schlüssel>`, je Webseite und
+        Mandant vom Betreiber ausgestellt. Die Scopes legt Aufgabe 11.7 fest. Ein fehlender, ungültiger, abgelaufener
+        oder widerrufener Schlüssel ergibt dieselbe Antwort 401 `NICHT_ANGEMELDET`.
+  schemas:
+    Problem:
+      type: object
+      description: Fehlerantwort nach RFC 9457 mit stabilem Fehlercode.
+      required: [type, title, status, detail, instance, fehlercode]
+      properties:
+        type:
+          type: string
+          description: "`urn:urinet:archiv:fehler:<fehlercode>`"
+        title:
+          type: string
+          description: Fester deutscher Titel je Fehlercode.
+        status:
+          type: integer
+          format: int32
+          description: HTTP-Status der Antwort.
+        detail:
+          type: string
+          description: Fester deutscher Text je Fehlercode, ohne Eingabewerte.
+        instance:
+          type: string
+          description: Fehler-ID `urn:uuid:<uuid>`; dieselbe ID steht im Log des Archivs.
+        fehlercode:
+          type: string
+          description: Stabiler Fehlercode; neue Codes sind additiv.
+          x-erweiterbar: true
+          enum:
+            - ANFRAGE_UNGUELTIG
+            - NICHT_ANGEMELDET
+            - MANDANT_FEHLT
+            - NICHT_ERLAUBT
+            - NICHT_GEFUNDEN
+            - DATEI_ZU_GROSS
+            - INTERNER_FEHLER
+            - UEBERLASTET
+  headers:
+    CacheControl:
+      description: Auf jeder Antwort; nicht zwischenspeichern.
+      required: true
+      schema:
+        type: string
+        enum: [no-store]
+    Deprecation:
+      description: |
+        Nur bei abgekündigter Hauptversion (RFC 9745): Zeitpunkt der Abkündigung als Structured-Field-Datum
+        `@<Unix-Sekunden>`.
+      schema:
+        type: string
+    Sunset:
+      description: |
+        Nur bei abgekündigter Hauptversion (RFC 8594): Zeitpunkt, ab dem die Hauptversion abgeschaltet werden kann,
+        als HTTP-Datum, z. B. `Thu, 01 Jul 2027 00:00:00 GMT`.
+      schema:
+        type: string
+    Link:
+      description: |
+        Nur bei abgekündigter Hauptversion: Nachfolgerin, z. B. `</public/v2>; rel="successor-version"`.
+      schema:
+        type: string
+    RetryAfter:
+      description: Sekunden bis zum nächsten Versuch.
+      required: true
+      schema:
+        type: integer
+        format: int32
+    WwwAuthenticate:
+      description: Verfahren der Anmeldung.
+      required: true
+      schema:
+        type: string
+        enum: [Bearer]
+  responses:
+    AnfrageUngueltig:
+      description: |
+        Anfrage formal ungültig (`ANFRAGE_UNGUELTIG`): Pfad, Parameter oder Inhalt, auch falsches Verb (405) oder
+        andere 4xx des Frameworks mit ihrem Status.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NichtAngemeldet:
+      description: |
+        Schlüssel fehlt, ist ungültig, abgelaufen oder widerrufen (`NICHT_ANGEMELDET`); die Antwort verrät nicht,
+        welcher Fall vorliegt.
+      headers:
+        WWW-Authenticate:
+          $ref: "#/components/headers/WwwAuthenticate"
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NichtErlaubt:
+      description: Schlüssel ohne Recht für den Endpunkt (`NICHT_ERLAUBT`) oder Mandant nicht aktiv (`MANDANT_FEHLT`).
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NichtGefunden:
+      description: Pfad unbekannt oder Dokument nicht sichtbar (`NICHT_GEFUNDEN`).
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ZuGross:
+      description: Anfrage über der Grenze des Archivs (`DATEI_ZU_GROSS`).
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    InternerFehler:
+      description: Unerwarteter Fehler (`INTERNER_FEHLER`); die Antwort nennt nur die Fehler-ID.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Ueberlastet:
+      description: |
+        Zu viele gleichzeitige Prüfungen von Schlüsseln (`UEBERLASTET`); nach `Retry-After` Sekunden erneut versuchen.
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"

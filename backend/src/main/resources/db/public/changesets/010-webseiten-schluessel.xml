@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="010-webseiten-schluessel" author="archiv">
+        <addColumn tableName="api_client">
+            <column name="webseite" type="text"/>
+            <column name="hoechste_stufe" type="text"/>
+            <column name="gueltig_bis" type="timestamptz"/>
+            <column name="absender_pruefen" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            alter table api_client drop constraint api_client_scope_ck;
+            alter table api_client add constraint api_client_scope_ck
+                check (scope in ('generator', 'import', 'webseite-lesen', 'webseite-erfassung'));
+            alter table api_client add constraint api_client_webseite_ck check (
+                (scope = 'webseite-lesen'
+                    and webseite is not null and length(btrim(webseite)) > 0
+                    and hoechste_stufe is not null
+                    and hoechste_stufe in ('oeffentlich', 'mitglieder', 'vorstand'))
+                or (scope = 'webseite-erfassung'
+                    and webseite is not null and length(btrim(webseite)) > 0
+                    and hoechste_stufe is not null and hoechste_stufe = 'vorstand')
+                or (scope in ('generator', 'import')
+                    and webseite is null and hoechste_stufe is null
+                    and gueltig_bis is null and not absender_pruefen)
+            );
+        </sql>
+        <rollback>
+            <sql>
+                alter table api_client drop constraint api_client_webseite_ck;
+                alter table api_client drop constraint api_client_scope_ck;
+                alter table api_client add constraint api_client_scope_ck
+                    check (scope in ('generator', 'import'));
+            </sql>
+            <dropColumn tableName="api_client" columnName="absender_pruefen"/>
+            <dropColumn tableName="api_client" columnName="gueltig_bis"/>
+            <dropColumn tableName="api_client" columnName="hoechste_stufe"/>
+            <dropColumn tableName="api_client" columnName="webseite"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

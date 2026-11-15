@@ -18,7 +18,8 @@ import java.util.UUID;
  * nicht in die Antwort (Req 16.7). {@code instance} ist eine neue Fehler-ID, die auch im Log steht; mit einer Ursache
  * dazu nur die Klassennamen der Ursachen-Kette und bei einer {@link SQLException} der SQLState, nie Meldungen (die
  * Werte wie «Key (code)=(…)» oder Token enthalten). Log-Stufe: 5xx {@code ERROR}, abgelehnte Anmeldung mit Ursache {@code INFO} (z. B. Keycloak
- * nicht erreichbar), sonst {@code DEBUG}.
+ * nicht erreichbar), Statuskonflikt mit Ursache {@code INFO} (Verklemmung oder abgelaufene Sperrzeit, damit Häufungen
+ * im Betrieb auffallen), sonst {@code DEBUG}.
  */
 public record ProblemAntwort(String fehlerId, int status, Fehlercode code, String json) {
 
@@ -64,7 +65,8 @@ public record ProblemAntwort(String fehlerId, int status, Fehlercode code, Strin
         String zusatz = ursache == null ? "" : " ursache=" + ursachen(ursache);
         if (status >= 500) {
             LOG.errorf("Fehler %s: status=%d fehlercode=%s%s", fehlerId, status, code.name(), zusatz);
-        } else if (ursache != null && code == Fehlercode.NICHT_ANGEMELDET) {
+        } else if (ursache != null
+                && (code == Fehlercode.NICHT_ANGEMELDET || code == Fehlercode.STATUS_KONFLIKT)) {
             LOG.infof("Fehler %s: status=%d fehlercode=%s%s", fehlerId, status, code.name(), zusatz);
         } else {
             LOG.debugf("Fehler %s: status=%d fehlercode=%s%s", fehlerId, status, code.name(), zusatz);

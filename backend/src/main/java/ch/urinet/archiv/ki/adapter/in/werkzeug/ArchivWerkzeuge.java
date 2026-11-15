@@ -3,6 +3,8 @@ package ch.urinet.archiv.ki.adapter.in.werkzeug;
 import ch.urinet.archiv.ki.application.chat.DokumentZeigen;
 import ch.urinet.archiv.ki.application.chat.DokumenteSuchen;
 import ch.urinet.archiv.ki.application.chat.FristenAbfrage;
+import ch.urinet.archiv.ki.application.chat.KennzahlAbfrage;
+import ch.urinet.archiv.ki.application.chat.OffenePostenAbfrage;
 import ch.urinet.archiv.ki.application.chat.VollstaendigkeitAbfrage;
 import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugFehler;
@@ -35,23 +37,30 @@ public class ArchivWerkzeuge {
     private final DokumenteSuchen suchen;
     private final DokumentZeigen zeigen;
     private final FristenAbfrage fristen;
+    private final KennzahlAbfrage kennzahl;
+    private final OffenePostenAbfrage offenePosten;
     private final VollstaendigkeitAbfrage vollstaendigkeit;
     private final ObjectMapper json;
 
     public ArchivWerkzeuge(Werkzeuglauf lauf, DokumenteSuchen suchen, DokumentZeigen zeigen, FristenAbfrage fristen,
+                           KennzahlAbfrage kennzahl, OffenePostenAbfrage offenePosten,
                            VollstaendigkeitAbfrage vollstaendigkeit, ObjectMapper json) {
         this.lauf = lauf;
         this.suchen = suchen;
         this.zeigen = zeigen;
         this.fristen = fristen;
+        this.kennzahl = kennzahl;
+        this.offenePosten = offenePosten;
         this.vollstaendigkeit = vollstaendigkeit;
         this.json = json.copy().setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     @Tool(name = WerkzeugAuswahl.DOKUMENTE_SUCHEN, value = """
-            Sucht Dokumente im Archiv nach Wörtern in Titel, Partner, Tags und Text. Liefert je Treffer ID, Titel, \
-            Art, Datum, Partner, Betrag, Auszug, ob die Art bestätigt ist, und den Link; dazu die Gesamtzahl der \
-            Treffer. Ohne passenden Partner ist das Ergebnis leer mit einem Hinweis.""")
+            Sucht Dokumente im Archiv nach Bedeutung und nach Wörtern in Titel, Partner, Tags und Text. Liefert je \
+            Treffer ID, Titel, Art, Datum, Partner, Betrag, Auszug, ob die Art bestätigt ist, den Link und, wenn \
+            bekannt, die Seiten der Fundstelle; dazu die Zahl der Treffer. Mit neueste=true gilt nur die Wortsuche. \
+            Steht im Ergebnis der Hinweis «nur Volltext», lief nur die Wortsuche: dann nicht auf sinngemässe Treffer \
+            schliessen. Ohne passenden Partner ist das Ergebnis leer mit einem Hinweis.""")
     public String dokumenteSuchen(
             @ToolMemoryId Object laufId,
             @P("Suchbegriffe, 1 bis 200 Zeichen") String frage,
@@ -87,6 +96,36 @@ public class ArchivWerkzeuge {
             @P("Ende des Zeitraums, JJJJ-MM-TT") String bis) {
         return antworten(WerkzeugAuswahl.FRISTEN, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.FRISTEN,
                 k -> fristen.fristen(k, von, bis)));
+    }
+
+    @Tool(name = WerkzeugAuswahl.KENNZAHL, value = """
+            Rechnet Einnahmen oder Ausgaben in CHF für einen Zeitraum aus den archivierten Belegen, optional gruppiert \
+            nach Jahr, Monat, Partner oder Art. Liefert Zeilen mit Gruppe, Betrag und Anzahl, die Summe, den \
+            Datenstand, bis zu 50 Beleg-IDs und die Zahl der nicht summierten Fremdwährungsbelege. Zahlen nie selbst \
+            rechnen oder runden, nur diese Werte verwenden. Der Zeitraum umfasst höchstens 10 Jahre.""")
+    public String kennzahl(
+            @ToolMemoryId Object laufId,
+            @P("EINNAHMEN oder AUSGABEN") String messgroesse,
+            @P("Beginn des Zeitraums, JJJJ-MM-TT") String von,
+            @P("Ende des Zeitraums, JJJJ-MM-TT") String bis,
+            @P(value = "JAHR, MONAT, PARTNER, ART oder KEINE (Standard)", required = false) String gruppierung,
+            @P(value = "BELEGDATUM (Standard) oder ZAHLUNGSDATUM", required = false) String basis) {
+        return antworten(WerkzeugAuswahl.KENNZAHL, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.KENNZAHL,
+                k -> kennzahl.kennzahl(k, messgroesse, von, bis, gruppierung, basis)));
+    }
+
+    @Tool(name = WerkzeugAuswahl.OFFENE_POSTEN, value = """
+            Listet Rechnungen mit Fälligkeit von 90 Tagen vor bis 30 Tage nach dem Stichtag, nach Fälligkeit \
+            sortiert, höchstens 50, dazu die Gesamtzahl und den Datenstand. Je Rechnung Belegnummer, Partner, \
+            Betrag, Fälligkeit, ob sie vor dem Stichtag fällig war und den Zahlstatus (UNBEKANNT, solange das \
+            Archiv keine Zahlungsdaten hat; dann nie als bezahlt oder offen darstellen).""")
+    public String offenePosten(
+            @ToolMemoryId Object laufId,
+            @P(value = "Stichtag, JJJJ-MM-TT, Standard heute", required = false) String stichtag,
+            @P(value = "EINNAHME (Standard, Rechnungen an Kunden) oder AUSGABE (Rechnungen von Lieferanten)",
+                    required = false) String richtung) {
+        return antworten(WerkzeugAuswahl.OFFENE_POSTEN, () -> lauf.ausfuehren(laufId, WerkzeugAuswahl.OFFENE_POSTEN,
+                k -> offenePosten.offenePosten(k, stichtag, richtung)));
     }
 
     @Tool(name = WerkzeugAuswahl.VOLLSTAENDIGKEIT, value = """

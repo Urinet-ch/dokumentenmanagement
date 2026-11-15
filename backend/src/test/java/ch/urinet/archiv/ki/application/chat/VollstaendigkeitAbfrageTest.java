@@ -41,7 +41,7 @@ class VollstaendigkeitAbfrageTest {
     @Test
     void jedeMethodePrueftDieRolleNochmals() {
         for (Rolle rolle : Rolle.values()) {
-            boolean erlaubt = new WerkzeugAuswahl().erlaubt(kontext(rolle), WerkzeugAuswahl.VOLLSTAENDIGKEIT);
+            boolean erlaubt = new WerkzeugAuswahl(m -> false).erlaubt(kontext(rolle), WerkzeugAuswahl.VOLLSTAENDIGKEIT);
             if (erlaubt) {
                 assertThat(abfrage().vollstaendigkeit(kontext(rolle), 2026)).as(rolle.name()).isNotNull();
             } else {
