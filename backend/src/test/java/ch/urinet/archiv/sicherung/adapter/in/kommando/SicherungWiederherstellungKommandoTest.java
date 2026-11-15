@@ -13,6 +13,7 @@ import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZiel;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZiel.Quittung;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsZielNichtGeeignet;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -115,11 +116,60 @@ class SicherungWiederherstellungKommandoTest {
         assertThat(ziel.geschriebene).isEmpty();
     }
 
+    @Test
+    void ablageStubBrichtVorDemLesenMitExitZweiAb(@org.junit.jupiter.api.io.TempDir Path temp) {
+        InMemoryZiel ziel = new InMemoryZiel("archiv-test-");
+        SicherungKommando kommando = kommando(ziel, true);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        Path inventar = temp.resolve("nicht-vorhandenes-inventar.jsonl");
+        Path strom = temp.resolve("nicht-vorhandener-strom.bin");
+
+        int exit = kommando.ausfuehren(List.of("wiederherstellen", "--mandant", "probe", "--inventar",
+                        inventar.toString(), "--strom", strom.toString()),
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).isEqualTo(2);
+        assertThat(stdout.toString(StandardCharsets.UTF_8)).contains("\"versionen\":0");
+        assertThat(stderr.toString(StandardCharsets.UTF_8)).contains("Ablage-Stub", "Mandant probe")
+                .doesNotContain(inventar.toString(), strom.toString(), "archiv-test-probe");
+        assertThat(ziel.geschriebene).isEmpty();
+    }
+
+    @Test
+    void ungeeignetesS3ZielGibtExitZweiOhneBucketOderDateiangaben(@org.junit.jupiter.api.io.TempDir Path temp)
+            throws Exception {
+        InMemoryZiel ziel = new InMemoryZiel("archiv-test-", true);
+        SicherungKommando kommando = kommando(ziel);
+        Path inventar = temp.resolve("inventar.jsonl");
+        Path strom = temp.resolve("strom.bin");
+        Files.writeString(inventar, "", StandardCharsets.UTF_8);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        int exit = kommando.ausfuehren(List.of("wiederherstellen", "--mandant", "probe", "--inventar",
+                        inventar.toString(), "--strom", strom.toString()),
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).isEqualTo(2);
+        assertThat(stdout.toString(StandardCharsets.UTF_8)).contains("\"versionen\":0");
+        assertThat(stderr.toString(StandardCharsets.UTF_8)).contains("Mandant probe")
+                .doesNotContain("archiv-test-probe", inventar.toString(), strom.toString());
+        assertThat(ziel.geschriebene).isEmpty();
+    }
+
     private static SicherungKommando kommando(InMemoryZiel ziel) {
+        return kommando(ziel, false);
+    }
+
+    private static SicherungKommando kommando(InMemoryZiel ziel, boolean ablageStub) {
         return new SicherungKommando(new SicherungBucketExport(ablage()),
                 new SicherungExportVerwaltung((SicherungExportSpeicher) (art, mandant, sha256) -> { },
                         mandantRegister()),
-                new ObjectMapper(), ziel, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+                new ObjectMapper(), ziel, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+                ablageStub);
     }
 
     private static MandantRegister mandantRegister() {
@@ -181,13 +231,19 @@ class SicherungWiederherstellungKommandoTest {
     private static final class InMemoryZiel implements WiederherstellungsZiel {
         private final List<String> geschriebene = new ArrayList<>();
         private final String praefix;
+        private final boolean nichtGeeignet;
 
         private InMemoryZiel() {
-            this("urinet-archiv-p-");
+            this("urinet-archiv-p-", false);
         }
 
         private InMemoryZiel(String praefix) {
+            this(praefix, false);
+        }
+
+        private InMemoryZiel(String praefix, boolean nichtGeeignet) {
             this.praefix = praefix;
+            this.nichtGeeignet = nichtGeeignet;
         }
 
         @Override
@@ -220,6 +276,9 @@ class SicherungWiederherstellungKommandoTest {
 
         @Override
         public boolean leer(MandantCode mandant) {
+            if (nichtGeeignet) {
+                throw new WiederherstellungsZielNichtGeeignet(mandant);
+            }
             return true;
         }
     }
