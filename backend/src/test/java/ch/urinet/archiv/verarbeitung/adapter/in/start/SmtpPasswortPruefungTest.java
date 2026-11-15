@@ -5,6 +5,7 @@ import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import io.smallrye.config.source.file.FileSystemConfigSource;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -38,6 +39,7 @@ class SmtpPasswortPruefungTest {
     }
 
     @Test
+    @Tag("req-16.24")
     void leereOderFehlendeDateiStartetOhnePasswort() throws IOException {
         assertThat(SmtpPasswortPruefung.pruefen(prod(Map.of())::getConfigValue)).isFalse();
 

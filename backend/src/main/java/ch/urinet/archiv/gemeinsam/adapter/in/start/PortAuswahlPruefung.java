@@ -1,5 +1,6 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.start;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
@@ -30,7 +31,8 @@ public class PortAuswahlPruefung {
         if (!prod(config.getProfiles(), LaunchMode.current())) {
             return;
         }
-        PortAuswahl.Befund befund = PortAuswahl.pruefe(auswahl.stream().toList());
+        Stufe stufe = Stufe.aus(config.getOptionalValue("archiv.stufe", String.class));
+        PortAuswahl.Befund befund = pruefe(auswahl.stream().toList(), stufe);
         befund.warnungen().forEach(LOG::warn);
         if (!befund.abbrueche().isEmpty()) {
             throw new IllegalStateException("Port-Auswahl in prod abgelehnt: " + String.join("; ", befund.abbrueche())
@@ -41,5 +43,17 @@ public class PortAuswahlPruefung {
     /** Ein gepacktes Artefakt (LaunchMode NORMAL) gilt immer als {@code prod} (wie {@code KiBasisUrlPruefung}). */
     static boolean prod(List<String> profile, LaunchMode modus) {
         return profile.contains("prod") || modus == LaunchMode.NORMAL;
+    }
+
+    static PortAuswahl.Befund pruefe(List<PortAuswahl> auswahl, Stufe stufe) {
+        if (stufe != Stufe.P) {
+            return PortAuswahl.pruefe(auswahl);
+        }
+        List<PortAuswahl> ohneKiStub = auswahl.stream()
+                .map(port -> port.port().equals("KiPort") && port.stub()
+                        ? new PortAuswahl(port.port(), false, port.adapterVorhanden(), port.folgtMit())
+                        : port)
+                .toList();
+        return PortAuswahl.pruefe(ohneKiStub);
     }
 }

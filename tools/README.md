@@ -4,6 +4,7 @@
 | --- | --- |
 | `archiv_client.py` | Client für den Generator-Endpunkt (Spec 01, Req 11.4, 11.5, 11.9; Aufgabe 4.7) |
 | `test_archiv_client.py` | Tests zum Client: `python3 -m unittest tools/test_archiv_client.py` |
+| `test_pruefe_speicherbudget.py` | Tests für das Deploy-Speicherbudget: `python3 -m unittest tools/test_pruefe_speicherbudget.py` |
 | `golden_synth/` | Generator für synthetische Golden-Belege (Req 0.10) |
 | `crm/` | synthetischer Beispiel-Export 21.CRM |
 | `last/` | Lastskripte (Stufe B, Aufgabe 5.11): Upload, Suche, Handy-Foto (JPEG oder HEIC); `--aufwaermen` für Anfragen, die nicht zählen; Tests in `test_last.py` |
