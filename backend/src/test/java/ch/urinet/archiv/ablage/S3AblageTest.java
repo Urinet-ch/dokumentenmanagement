@@ -406,7 +406,21 @@ class S3AblageTest {
         String roh = verwaltung.putObject(r -> r.bucket(bucket).key(original.pfad(Ablageort.ARCHIV)),
                 RequestBody.fromString("MZ")).versionId();
         var unbekannt = ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, original, roh, Ansicht.VORSCHAU);
+        // aktive Inhalte: auch mit Vorschau nie inline, sondern octet-stream und attachment
+        var aktiv = new java.util.LinkedHashMap<String, java.net.URI>();
+        for (String endung : List.of("html", "htm", "svg", "js", "xml")) {
+            var schluessel = DateiSchluessel.original(2026, docId, 2, endung);
+            String v = verwaltung.putObject(r -> r.bucket(bucket).key(schluessel.pfad(Ablageort.ARCHIV)),
+                    RequestBody.fromString("<script>1</script>")).versionId();
+            aktiv.put(endung, ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, schluessel, v, Ansicht.VORSCHAU).url());
+        }
         try (HttpClient http = HttpClient.newHttpClient()) {
+            for (var e : aktiv.entrySet()) {
+                var r = http.send(HttpRequest.newBuilder(e.getValue()).GET().build(), HttpResponse.BodyHandlers.ofString());
+                assertThat(r.headers().firstValue("Content-Type")).as(e.getKey()).hasValue("application/octet-stream");
+                assertThat(r.headers().firstValue("Content-Disposition").orElse("")).as(e.getKey())
+                        .startsWith("attachment;");
+            }
             var a = http.send(HttpRequest.newBuilder(vorschau.url()).GET().build(), HttpResponse.BodyHandlers.ofString());
             assertThat(a.statusCode()).isEqualTo(200);
             assertThat(a.headers().firstValue("Content-Type")).hasValue("application/pdf");
