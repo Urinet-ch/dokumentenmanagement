@@ -21,11 +21,10 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Und ich die Kontaktliste der Blätter-Kontakte suche
     Dann zeigt die Kontaktliste insgesamt 26 Kontakte
     Und zeigt die Kontaktliste auf dieser Seite 25 Einträge
-    Und zeigt die Liste den Kontakt «Blätter Test AG 01»
-    Und zeigt die Liste den Kontakt «Blätter Test AG 26» nicht
+    # Die Reihenfolge bei einer Suche folgt der Ähnlichkeit, welcher Kontakt auf Seite 2 landet, ist daher offen.
     Wenn ich zur nächsten Kontaktseite blättere
-    Dann zeigt die Liste den Kontakt «Blätter Test AG 26»
-    Und zeigt die Kontaktliste auf dieser Seite 1 Einträge
+    Dann zeigt die Kontaktliste auf dieser Seite 1 Einträge
+    Und zeigt die Kontaktliste insgesamt 26 Kontakte
     Wenn ich nach der Kennung des Kontakts «Blätter Test AG 26» suche
     Dann zeigt die Kontaktliste insgesamt 1 Kontakte
     Und zeigt die Liste den Kontakt «Blätter Test AG 26»
