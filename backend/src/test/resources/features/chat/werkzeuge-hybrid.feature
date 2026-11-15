@@ -54,6 +54,19 @@ Funktionalität: Hybridsuche im Chat-Werkzeug dokumente_suchen (Aufgabe 7.1d)
     Und erhielt der Reranker im Chat nur Texte von «C_PASST»
 
   @req-3.1
+  Szenario: Der Partner geht als Filter in alle Teile der Hybridsuche
+    Angenommen im Mandanten «urinet» gibt es im Hybrid-Chat die Kontakte «Bergbahn Quellwald AG» und «Seilerei Brunnmatt GmbH»
+    Und im Mandanten «urinet» liegen diese Hybrid-Chat-Dokumente:
+      | name      | titel     | art          | partner                 | datum      | text   | abschnitte |
+      | C_PARTNER | C_PARTNER | VERSICHERUNG | Bergbahn Quellwald AG   | 2072-03-01 | Garage | 0.2        |
+      | C_FREMD   | C_FREMD   | VERSICHERUNG | Seilerei Brunnmatt GmbH | 2072-03-01 | Garage | 0.1        |
+    Wenn «inhaber-urinet» im Chat mit dokumente_suchen sucht mit:
+      | frage   | Unfallversicherung    |
+      | partner | Bergbahn Quellwald AG |
+    Dann lauten die Treffer im Chat "C_PARTNER"
+    Und erhielt der Reranker im Chat nur Texte von «C_PARTNER»
+
+  @req-3.1
   Szenario: Mit «neueste» und mit der Anzahl 1 bleibt es bei der Volltextsuche beziehungsweise bei einem Treffer
     Angenommen im Mandanten «urinet» liegen diese Hybrid-Chat-Dokumente:
       | name   | titel  | art          | datum      | text                    | abschnitte |

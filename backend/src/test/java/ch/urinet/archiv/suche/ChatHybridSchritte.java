@@ -6,6 +6,7 @@ import ch.urinet.archiv.ki.KiWireMock;
 import ch.urinet.archiv.ki.TestEmbeddingPort;
 import ch.urinet.archiv.ki.TestRerankerPort;
 import ch.urinet.archiv.ki.adapter.in.werkzeug.ArchivWerkzeuge;
+import ch.urinet.archiv.gemeinsam.domain.Normalisierer;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontext;
 import ch.urinet.archiv.ki.application.chat.WerkzeugKontextRegister;
 import ch.urinet.archiv.ki.domain.Kopfzeile;
@@ -91,6 +92,7 @@ public class ChatHybridSchritte {
     private final String lauf = "chathybrid-" + UUID.randomUUID();
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
     private final Map<UUID, String> namen = new HashMap<>();
+    private final Map<String, Ort> kontakte = new LinkedHashMap<>();
     private final Map<String, String> dateinamen = new HashMap<>();
     private final Map<String, Long> verbrauchStand = new HashMap<>();
     private final List<String> laeufe = new ArrayList<>();
@@ -113,6 +115,16 @@ public class ChatHybridSchritte {
         for (Map.Entry<String, List<UUID>> eintrag : jeMandant.entrySet()) {
             Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), eintrag.getValue());
         }
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (Ort kontakt : kontakte.values()) {
+                try (PreparedStatement loeschen = verbindung.prepareStatement(
+                        "delete from " + new MandantCode(kontakt.mandant()).schema() + ".kontakt where id = ?")) {
+                    loeschen.setObject(1, kontakt.id());
+                    loeschen.executeUpdate();
+                }
+            }
+        }
+        kontakte.clear();
         dokumente.clear();
         namen.clear();
         KiWireMock.zuruecksetzen();
@@ -128,6 +140,24 @@ public class ChatHybridSchritte {
                 .willReturn(okJson(embeddingAntwort())));
         for (String mandant : List.of("urinet", "vhf-gsk")) {
             verbrauchStand.put(mandant, verarbeitung.kiVerbrauchStand(mandant));
+        }
+    }
+
+    @Angenommen("im Mandanten «{word}» gibt es im Hybrid-Chat die Kontakte «{}» und «{}»")
+    public void kontakteAnlegen(String mandant, String erster, String zweiter) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (String name : List.of(erster, zweiter)) {
+                UUID id = UUID.randomUUID();
+                try (PreparedStatement befehl = verbindung.prepareStatement("insert into "
+                        + new MandantCode(mandant).schema() + ".kontakt (id, typ, name, name_normalisiert, quelle) "
+                        + "values (?, 'ORGANISATION', ?, ?, 'TEST')")) {
+                    befehl.setObject(1, id);
+                    befehl.setString(2, name);
+                    befehl.setString(3, Normalisierer.name(name));
+                    befehl.executeUpdate();
+                }
+                kontakte.put(name, new Ort(mandant, id));
+            }
         }
     }
 
@@ -312,11 +342,13 @@ public class ChatHybridSchritte {
         UUID id = UUID.randomUUID();
         boolean bestaetigt = !"nein".equals(z.get("bestaetigt"));
         LocalDate datum = z.get("datum") == null || z.get("datum").isBlank() ? null : LocalDate.parse(z.get("datum"));
+        String partner = leer(z.get("partner"));
+        Ort kontakt = partner == null ? null : kontakte.get(partner);
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement befehl = verbindung
                 .prepareStatement("insert into " + schema + ".dokument (id, art, titel, datum, quelle, tags, "
                         + "vertraulichkeit, person_benutzer, erstellt_von, status, bestaetigt, bestaetigt_von, "
-                        + "geschaeftsjahr, volltext, dateiname) values (?, ?, ?, ?, 'UPLOAD', cast('{}' as text[]), "
-                        + "?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        + "geschaeftsjahr, volltext, dateiname, partner_id, partner_name) values (?, ?, ?, ?, "
+                        + "'UPLOAD', cast('{}' as text[]), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             befehl.setObject(1, id);
             befehl.setString(2, leer(z.get("art")));
             befehl.setString(3, z.get("name"));
@@ -330,6 +362,8 @@ public class ChatHybridSchritte {
             befehl.setObject(11, datum == null ? null : datum.getYear(), Types.INTEGER);
             befehl.setString(12, z.get("text"));
             befehl.setString(13, leer(z.get("dateiname")));
+            befehl.setObject(14, kontakt == null ? null : kontakt.id());
+            befehl.setString(15, partner);
             befehl.executeUpdate();
         }
         dokumente.put(z.get("name"), new Ort(mandant, id));
