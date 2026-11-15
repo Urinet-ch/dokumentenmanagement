@@ -24,6 +24,13 @@ public interface KontaktRegister {
      */
     List<Kontakt> suchen(String nameNormalisiert, int anzahl);
 
+    /**
+     * Partnerauflösung im Chat (Spec 02, Req 4): aktive Kontakte, in deren normalisiertem Namen jedes der {@code woerter}
+     * (bereits normalisiert, ohne Rechtsformen) als Wortanfang vorkommt; ein Kontakt mit genau dem Namen
+     * {@code nameNormalisiert} steht zuerst, sonst nach Name. Höchstens {@code anzahl}.
+     */
+    List<Kontakt> mitWortanfaengen(String nameNormalisiert, List<String> woerter, int anzahl);
+
     /** Liste der Kontakte mit Gesamtzahl (Req 17.1, 17.2); nur in einer Transaktion (Namensähnlichkeit). */
     KontaktSeite liste(KontaktSuche suche);
 

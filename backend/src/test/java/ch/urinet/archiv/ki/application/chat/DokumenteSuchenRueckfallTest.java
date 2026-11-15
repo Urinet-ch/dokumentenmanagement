@@ -79,4 +79,31 @@ class DokumenteSuchenRueckfallTest {
         assertThat(antwort.degradiert()).isTrue();
         assertThat(antwort.gesamt()).isEqualTo(1);
     }
+
+    /** Unbekannter Partner und ausgefallene Hybridsuche: beide Hinweise bleiben, damit das Modell nichts Falsches schliesst. */
+    @Test
+    void unbekannterPartnerUndHybridFehlerNennenBeideHinweise() {
+        SuchePort volltext = (anfrage, regel, mitDateiname) -> new Suchergebnis(List.of(), 0);
+        WerkzeugDaten daten = (WerkzeugDaten) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{WerkzeugDaten.class}, (proxy, methode, args) -> switch (methode.getName()) {
+                    case "bestaetigte" -> Set.of();
+                    case "nurLesend" -> null;
+                    default -> throw new UnsupportedOperationException(methode.getName());
+                });
+        WerkzeugTransaktion direkt = new WerkzeugTransaktion() {
+            @Override
+            public <T> T neu(Supplier<T> arbeit) {
+                return arbeit.get();
+            }
+        };
+        DokumenteSuchen suchen = new DokumenteSuchen(volltext, new WerfendeHybridsuche(),
+                PartnerTestdaten.register(List.of(), List.of()), null, daten, direkt, new BigDecimal("0.6"));
+        WerkzeugKontext kontext = WerkzeugKontext.fuer(URINET, new Benutzer("joel", Rolle.INHABER), null);
+
+        DokumenteSuchen.Antwort antwort = suchen.suchen(kontext,
+                new DokumenteSuchen.Anfrage("Rechnung", null, "Nixname", null, null, null, 10));
+
+        assertThat(antwort.hinweis()).contains("Partner nicht gefunden").contains("nur Volltext");
+        assertThat(antwort.degradiert()).isTrue();
+    }
 }

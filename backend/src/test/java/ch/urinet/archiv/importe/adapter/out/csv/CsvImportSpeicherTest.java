@@ -391,6 +391,11 @@ class CsvImportSpeicherTest {
         }
 
         @Override
+        public List<Kontakt> mitWortanfaengen(String nameNormalisiert, List<String> woerter, int anzahl) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<Kontakt> suchen(String nameNormalisiert, int anzahl) {
             throw new UnsupportedOperationException();
         }

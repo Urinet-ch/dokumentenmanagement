@@ -260,4 +260,172 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
     await ruhig();
     expect(upload.gesendet).toHaveLength(3);
   });
+  describe('Benutzerwechsel und fehlerhafte Einträge (Req 4.10, 4.11)', () => {
+    const fremd = (id: string, benutzer = 'u1', mandant = 'urinet', zustand: Eintrag['zustand'] = 'wartet'): Eintrag => ({
+      id,
+      aufgenommen: `2026-11-13T07:0${id.length}:00.000Z`,
+      seiten: [seite()],
+      fehlversuche: 0,
+      zustand,
+      benutzer,
+      mandant,
+    });
+
+    async function ablegen(...eintraege: Eintrag[]): Promise<void> {
+      for (const e of eintraege) {
+        speicher.inhalt.set(e.id, e);
+      }
+      await schlange['neuLaden']();
+    }
+
+    it('fragt beim Wechsel des Benutzers nach den wartenden Aufnahmen anderer Inhaber, ohne Namen', async () => {
+      await ablegen(fremd('a'), fremd('bb', 'u3'));
+      expect(schlange.fremdeFrage()).toBeNull();
+      anmeldung.als('u2');
+      await ruhig();
+      expect(schlange.fremdeFrage()).toEqual({
+        anzahl: 2,
+        aufgenommen: ['2026-11-13T07:01:00.000Z', '2026-11-13T07:02:00.000Z'],
+        ids: ['a', 'bb'],
+      });
+      expect(speicher.inhalt.size).toBe(2);
+    });
+
+    it('fragt auch beim Wechsel des Mandanten', async () => {
+      await ablegen(fremd('a', 'u1', 'urinet'));
+      anmeldung.als('u1', 'mitarbeiter', 'vhf-gsk');
+      await ruhig();
+      expect(schlange.fremdeFrage()?.anzahl).toBe(1);
+    });
+
+    it('fragt nicht ohne fremde, ohne wartende (fehlerhafte) und nicht für den eigenen Inhaber', async () => {
+      await ablegen(fremd('a', 'u2'), fremd('bb', 'u1', 'urinet', 'fehlerhaft'));
+      anmeldung.als('u2');
+      await ruhig();
+      expect(schlange.fremdeFrage()).toBeNull();
+    });
+
+    it('«Behalten» lässt die Einträge unverändert und fragt nur einmal, auch nach abgelaufener Sitzung', async () => {
+      await ablegen(fremd('a'));
+      anmeldung.als('u2');
+      await ruhig();
+      schlange.fremdeBehalten();
+      expect(schlange.fremdeFrage()).toBeNull();
+      expect(speicher.inhalt.get('a')).toMatchObject({ benutzer: 'u1', zustand: 'wartet' });
+      anmeldung.ende('abgelaufen');
+      anmeldung.als('u2');
+      await ruhig();
+      expect(schlange.fremdeFrage()).toBeNull();
+      expect(schlange.wartend()).toBe(0);
+      expect(upload.gesendet).toEqual([]);
+    });
+
+    it('«Löschen» entfernt nur die wartenden Einträge anderer Inhaber, eigene und fehlerhafte bleiben', async () => {
+      await ablegen(fremd('a'), fremd('bb', 'u3'), fremd('ccc', 'u1', 'urinet', 'fehlerhaft'), fremd('dddd', 'u2'));
+      anmeldung.als('u2');
+      await ruhig();
+      await schlange.fremdeLoeschen();
+      expect([...speicher.inhalt.keys()].sort()).toEqual(['ccc', 'dddd']);
+      expect(schlange.fremdeFrage()).toBeNull();
+      expect(schlange.wartend()).toBe(1);
+    });
+
+    it('löscht ohne offene Frage nichts', async () => {
+      await ablegen(fremd('a'));
+      await schlange.fremdeLoeschen();
+      expect(speicher.inhalt.size).toBe(1);
+    });
+
+    it('fragt nichts und löscht nichts bei Abmeldung und abgelaufener Sitzung', async () => {
+      await ablegen(fremd('a'));
+      anmeldung.als('u1');
+      await ruhig();
+      anmeldung.ende('abgelaufen');
+      await ruhig();
+      expect(schlange.fremdeFrage()).toBeNull();
+      anmeldung.ende();
+      await ruhig();
+      expect(schlange.fremdeFrage()).toBeNull();
+      expect(speicher.inhalt.size).toBe(1);
+    });
+
+    it('fragt nach dem Behalten wieder, wenn danach ein anderer Benutzer kommt', async () => {
+      await ablegen(fremd('a'));
+      anmeldung.als('u2');
+      await ruhig();
+      schlange.fremdeBehalten();
+      anmeldung.ende();
+      anmeldung.als('u3');
+      await ruhig();
+      expect(schlange.fremdeFrage()?.anzahl).toBe(1);
+    });
+
+    it('fragt wieder, wenn nach einem Zwischenwechsel derselbe Benutzer zurückkommt (u2 → u1 → u2)', async () => {
+      await ablegen(fremd('a'));
+      anmeldung.als('u2');
+      await ruhig();
+      schlange.fremdeBehalten();
+      expect(schlange.fremdeFrage()).toBeNull();
+      anmeldung.ende();
+      anmeldung.als('u1');
+      await ruhig();
+      anmeldung.ende();
+      anmeldung.als('u2');
+      await ruhig();
+      expect(schlange.fremdeFrage()?.anzahl).toBe(1);
+    });
+
+    it('«Löschen» löscht nur die gefragten Einträge und liefert deren Anzahl; Fehler werden weitergereicht', async () => {
+      await ablegen(fremd('a'), fremd('bb', 'u3'));
+      anmeldung.als('u2');
+      await ruhig();
+      vi.spyOn(speicher, 'loeschen').mockRejectedValueOnce(new Error('IndexedDB'));
+      await expect(schlange.fremdeLoeschen()).rejects.toThrow('IndexedDB');
+      expect(schlange.fremdeFrage()?.anzahl).toBe(2);
+      const ids = schlange.fremdeFrage()!.ids.filter((id) => id === 'a');
+      await ablegen(fremd('ccc', 'u3'));
+      expect(await schlange.fremdeLoeschen(ids)).toBe(1);
+      expect([...speicher.inhalt.keys()].sort()).toEqual(['bb', 'ccc']);
+    });
+
+    it('meldet, ob «loeschen» etwas gelöscht hat, und lädt bei einem Fehler trotzdem neu', async () => {
+      anmeldung.als('u1');
+      await ablegen(fremd('a', 'u1', 'urinet', 'fehlerhaft'));
+      await ruhig();
+      expect(await schlange.loeschen('gibtsnicht')).toBe(false);
+      vi.spyOn(speicher, 'loeschen').mockRejectedValueOnce(new Error('IndexedDB'));
+      await expect(schlange.loeschen('a')).rejects.toThrow('IndexedDB');
+      expect(await schlange.loeschen('a')).toBe(true);
+      expect(speicher.inhalt.size).toBe(0);
+    });
+
+    it('löscht einen fehlerhaften Eintrag des Inhabers samt Aufnahmen, nur diesen', async () => {
+      anmeldung.als('u1');
+      await ablegen(fremd('a', 'u1', 'urinet', 'fehlerhaft'), fremd('bb', 'u1', 'urinet', 'fehlerhaft'));
+      await ruhig();
+      await schlange.loeschen('a');
+      expect([...speicher.inhalt.keys()]).toEqual(['bb']);
+      expect(schlange.fehlerhaft().map((e) => e.id)).toEqual(['bb']);
+    });
+
+    it('löscht weder wartende noch fremde noch unbekannte Einträge über «Löschen» (kein stilles Löschen)', async () => {
+      anmeldung.als('u1');
+      await ablegen(fremd('a'), fremd('bb', 'u2', 'urinet', 'fehlerhaft'));
+      await ruhig();
+      await schlange.loeschen('a');
+      await schlange.loeschen('bb');
+      await schlange.loeschen('gibtsnicht');
+      expect([...speicher.inhalt.keys()].sort()).toEqual(['a', 'bb']);
+    });
+
+    it('behält fehlerhafte Einträge nach Wechsel, Abmeldung und «Löschen» der Frage', async () => {
+      await ablegen(fremd('a', 'u1', 'urinet', 'fehlerhaft'), fremd('bb', 'u1'));
+      anmeldung.als('u2');
+      await ruhig();
+      await schlange.fremdeLoeschen();
+      anmeldung.ende();
+      await ruhig();
+      expect(speicher.inhalt.get('a')).toMatchObject({ zustand: 'fehlerhaft' });
+    });
+  });
 });

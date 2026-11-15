@@ -6,13 +6,15 @@ import {
   ElementRef,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { AnmeldungService } from '../../gemeinsam/anmeldung/anmeldung.service';
-import { aufnahmeName } from '../../gemeinsam/aufnahme-name';
+import { aufnahmeName, aufnahmeZeit } from '../../gemeinsam/aufnahme-name';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { Upload } from '../upload';
 import { Ecken } from './scanner/ecken';
@@ -65,6 +67,11 @@ export class HandyErfassung {
   protected readonly seiten = signal<Aufnahme[]>([]);
   protected readonly bearbeitet = signal<number | null>(null);
   protected readonly meldung = signal<string | null>(null);
+  /** Id des fehlerhaften Eintrags, dessen Löschen gerade bestätigt wird (zweite Stufe, Req 4.11). */
+  protected readonly loeschenFuer = signal<string | null>(null);
+  /** Die zweite Bestätigung zur Frage nach Aufnahmen anderer Inhaber ist offen (Req 4.10). */
+  protected readonly fremdeBestaetigen = signal(false);
+  protected readonly zeitpunkte = (iso: string[]) => iso.map((z) => aufnahmeZeit(new Date(z))).join(', ');
   /** Die Erfassung wird gespeichert: Aufnehmen, Dateiwahl, Zuschnitt, Verwerfen und Abschliessen sind gesperrt. */
   protected readonly speichert = signal(false);
   private readonly fertig = computed(() => {
@@ -84,7 +91,14 @@ export class HandyErfassung {
   private speichern: Promise<boolean> | null = null;
   private readonly laufend = new Set<Promise<void>>();
 
+  /** Die gefragten Einträge als Schlüssel: ändert er sich (Frage weg, andere Menge), beginnt die Bestätigung von vorn. */
+  private readonly frageSchluessel = computed(() => this.warteschlange.fremdeFrage()?.ids.join(',') ?? null);
+
   constructor() {
+    effect(() => {
+      this.frageSchluessel();
+      untracked(() => this.fremdeBestaetigen.set(false));
+    });
     // Req 4.2: «Erfassen» öffnet auf dem Handy direkt die Rückkamera; am Computer erst auf Wunsch
     afterNextRender(() => {
       // Den Scanner laden, solange eine Verbindung besteht; offline kommt er aus dem Service Worker
@@ -99,6 +113,30 @@ export class HandyErfassung {
         this.freigeben(seite);
       }
     });
+  }
+
+  protected async eintragLoeschen(id: string): Promise<void> {
+    this.loeschenFuer.set(null);
+    try {
+      this.meldung.set((await this.warteschlange.loeschen(id)) ? this.texte.geloescht : null);
+    } catch {
+      this.meldung.set(this.texte.loeschenFehler);
+    }
+  }
+
+  protected fremdeBehalten(): void {
+    this.fremdeBestaetigen.set(false);
+    this.warteschlange.fremdeBehalten();
+    this.meldung.set(this.texte.fremdeBehaltenMeldung);
+  }
+
+  protected async fremdeLoeschen(ids: string[]): Promise<void> {
+    this.fremdeBestaetigen.set(false);
+    try {
+      this.meldung.set((await this.warteschlange.fremdeLoeschen(ids)) > 0 ? this.texte.fremdeGeloescht : null);
+    } catch {
+      this.meldung.set(this.texte.loeschenFehler);
+    }
   }
 
   async kameraStarten(): Promise<void> {

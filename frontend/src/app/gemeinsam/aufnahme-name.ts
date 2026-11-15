@@ -15,6 +15,11 @@ const AUFNAHME = new Intl.DateTimeFormat('de-CH', {
  * Warteschlange), nicht der Upload.
  */
 export function aufnahmeName(aufgenommen: Date): string {
+  return `Aufnahme ${aufnahmeZeit(aufgenommen)}`;
+}
+
+/** «TT.MM.JJJJ HH:MM» in Europe/Zurich, der Zeitteil von `aufnahmeName` (auch für Anzeigen ohne Namenspräfix). */
+export function aufnahmeZeit(aufgenommen: Date): string {
   const teil = Object.fromEntries(AUFNAHME.formatToParts(aufgenommen).map((t) => [t.type, t.value]));
-  return `Aufnahme ${teil['day']}.${teil['month']}.${teil['year']} ${teil['hour']}:${teil['minute']}`;
+  return `${teil['day']}.${teil['month']}.${teil['year']} ${teil['hour']}:${teil['minute']}`;
 }

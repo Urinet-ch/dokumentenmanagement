@@ -110,14 +110,16 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
             anzeige = "min(nullif(btrim(d.zusatz ->> :gruppe), ''))";
             parameter.put("gruppe", feld(quelle.gruppe()));
         }
-        Query abfrage = em().createNativeQuery("select " + anzeige + ", " + monat + " as monat, count(*) from dokument d "
-                + "where " + bedingung + " group by " + schluessel + ", 2 order by 2, 1");
+        Query abfrage = em().createNativeQuery("select " + schluessel + ", " + anzeige + ", " + monat + " as monat, "
+                + "count(*) from dokument d where " + bedingung + " group by 1, 3"
+                + " order by 3, 2, 1");
         parameter.forEach(abfrage::setParameter);
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = abfrage.getResultList();
         List<Monatszeile> ergebnis = new ArrayList<>();
         for (Object[] z : zeilen) {
-            ergebnis.add(new Monatszeile((String) z[0], YearMonth.parse((String) z[1]), ((Number) z[2]).longValue()));
+            ergebnis.add(new Monatszeile((String) z[0], (String) z[1], YearMonth.parse((String) z[2]),
+                    ((Number) z[3]).longValue()));
         }
         return ergebnis;
     }

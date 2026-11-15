@@ -103,12 +103,25 @@ Funktionalität: Werkzeuge des Chat-Agenten: Suche, Dokument, Fristen (Aufgabe 7
       | frage          | partner                  | art      | neueste | treffer                  | hinweis                |
       | Gondelrevision | Bergbahn Quelwald        |          | true    | U_INTERN, U_NORMAL, U_ALT |                        |
       | Gondelrevision | seilerei brunnmatt       | offerte  |         | U_OFFERTE                |                        |
-      | Gondelrevision | Zahnarztpraxis Nordlicht |          |         |                          | Partner nicht gefunden |
+      | Gondelrevision | Zahnarztpraxis Nordlicht |          |         |                          | Partner nicht gefunden, Suche über den Namen im Text |
     Und antwortet dokumente_suchen für «inhaber-urinet» mit der Art «PIZZA» mit dem Fehler «unbekannte Art» und den aktiven Codes, darunter «AUSGANGSRECHNUNG»
+
+  @req-4.1 @req-5.1
+  Szenario: dokumente_suchen löst auch Teilnamen auf, nennt bei Mehrdeutigkeit den Hinweis und sucht sonst im Text
+    Angenommen im Mandanten «urinet» gibt es die Kontakte «Bergbahn Talstation AG» und «Seilerei Hinterwald GmbH»
+    Dann findet «inhaber-urinet» mit dokumente_suchen diese Treffer:
+      | frage          | partner            | art | neueste | treffer                   | hinweis                                              |
+      | Gondelrevision | Quellwald          |     | true    | U_INTERN, U_NORMAL, U_ALT |                                                      |
+      | Gondelrevision | Brunnmatt AG       | offerte | true | U_OFFERTE                 |                                                      |
+      | Gondelrevision | bergbahn           |     |         |                           | Partner nicht eindeutig                              |
+      | Gondelrevision | Südbahn            |     | true    | U_ALT                     | Partner nicht gefunden, Suche über den Namen im Text |
+    Und findet «mitarbeiter-urinet» mit dokumente_suchen diese Treffer:
+      | frage          | partner   | art | neueste | treffer       | hinweis |
+      | Gondelrevision | Quellwald |     | true    | U_NORMAL, U_ALT |         |
 
   Szenario: Fremde, unsichtbare, unbekannte und ungültige IDs ergeben gleich «nicht gefunden» und werden verweigert protokolliert
     Angenommen der Stand des Chat-Protokolls von «urinet» ist gemerkt
-    Dann antwortet dokument_zeigen für «mitarbeiter-urinet» bei diesen IDs gleich mit «{"fehler":"nicht gefunden"}»:
+    Dann antwortet dokument_zeigen für «mitarbeiter-urinet» bei diesen IDs gleich mit «{"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"}»:
       | id           | grund                    |
       | V_NORMAL     | anderer Mandant          |
       | U_INTERN     | INTERN ohne A3           |

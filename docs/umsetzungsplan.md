@@ -67,7 +67,7 @@ flowchart LR
   W0[W0 Klären<br/>3 T] --> G0{Gate 0<br/>≥18/20}
   G0 --> W1[W1 Fundament<br/>3 T] --> W2[W2 Dokumente,<br/>Ablage, OCR<br/>4 T] --> W3[W3 KI, Eingangskorb,<br/>Handy<br/>4 T] --> W4[W4 CSV, Suche,<br/>Generatoren<br/>3 T] --> W5[W5 GeBüV,<br/>Betrieb<br/>2 T] --> G1{Gate 1<br/>Belege 2026}
   G1 --> W6[W6 Mail, Embeddings,<br/>Export<br/>3 T] --> W7[W7 Chat<br/>4 T] --> W9[W9 Abnahme<br/>1 T] --> G2{Gate 2<br/>7 Fragen}
-  W6 --> W8[W8 AbaNinja<br/>2 T · nur E1=ja] --> W9
+  W6 --> W8[W8 AbaNinja<br/>entfällt, E1 = nein] --> W9
   G2 --> W10[W10 Mandant VHF<br/>2 T] --> W11[W11 Schnittstelle,<br/>Plugin<br/>3 T] --> W12[W12 Abnahme<br/>1 T] --> G3{Gate 3<br/>online}
   G2 --> W13
   G3 --> W13[W13 Grundlagen<br/>Wissensbasis] --> W14[W14 Ingest,<br/>Freigabe] --> W15[W15 Suche, Chat,<br/>Lint, Export] --> W16[W16 Abnahme] --> G4{Gate 4<br/>47/50 · 14/15}
@@ -88,7 +88,7 @@ und Chat-Agent aus Spec 02 (Wellen 6–7) auf.
 | 5 | Wechsel auf Stufe B, Protokoll, Manifest, Prüflauf, Produktion, Sicherung, Überwachung und Monitoring-Anbindung, Verfahrensbeschreibung, Übernahme, Notfallunterlagen | 01: 5.1–5.11 | Backend ∥ Infra ∥ Fabian | 2 T |
 | 6 | E-Mail-Eingang, Embeddings, Hybridsuche, Jahresexport, Hybridsuche als Standard in der PWA | 02: 6.1–6.6 (6.6 nach 01: 4.10) | Backend ∥ Frontend ∥ Fabian | 3 T |
 | 7 | Werkzeuge, Agent, SSE, Chat-Oberfläche | 02: 7.1–7.4 (vor Gate Phase 1, Entscheid 14.11.2026; 9.1 bleibt an Gate Phase 1 gebunden) | Backend ∥ Frontend | 4 T |
-| 8 | AbaNinja (nur E1 = ja) | 02: 8.1–8.6 | Backend ∥ Frontend | 2 T |
+| 8 | AbaNinja – **entfällt** (E1 = nein, entschieden 15.11.2026) | 02: 8.1–8.6 (entfallen) | – | 0 T |
 | 9 | Chat-Prüfliste und Abnahme | 02: 9.1 | Fabian ∥ QA | 1 T |
 | 10 | AVV, Mandant VHF/GSK, Branding, Erfassung, Altbestand | 03: 10.1–10.6 | Backend ∥ Frontend ∥ Infra ∥ Fabian | 2 T |
 | 11 | Webseiten-Schnittstelle (Lesen, Erfassung, Schlüssel, Vertrag, Stream, Änderungs-Feed), Chatbot, WordPress-Plugin | 03: 11.1–11.13 (Reihenfolge nach «Abhängig von» in Spec 03 tasks.md: zuerst 11.7 und 11.6 (als neutrale Vorstufen schon vor Gate Phase 2, Entscheid 14.11.2026), dann 11.1, danach 11.2, 11.3, 11.8–11.11 und 11.4, zuletzt 11.13, 11.5 und 11.12) | Backend ∥ Frontend | 3 T (vor der Erweiterung vom 13.11.2026; 11.6–11.13 noch nicht geschätzt) |
@@ -131,9 +131,9 @@ noch klassisch).
 | E2 Eigenbau | Gate 0 | Eigenbau Quarkus/Angular bestätigen (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
 | E3 PWA | Gate 0 | Handy zuerst als PWA (Specs gehen davon aus) | **bestätigt von Fabian am 09.11.2026** |
 | K5 Server | vor Welle 5 (früher, falls 1.10 abbricht oder 16.18 später eintritt) | Grösse und Kosten der eigenen Infomaniak-VPS für Stufe B (P1) | **vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86:** VPS Lite 4 vCPU / 4 GB / 80 GB, CHF 9.00/Mt. bei Jahresbindung; Bestellung erst zu Beginn von 5.11 nach stundenweiser Lastmessung auf einer Public-Cloud-Instanz; verfehlt die Messung die Ziele, an Ort auf 4/8/160 aufrüsten (CHF 18.00, nicht umkehrbar) (ADR-010, Nachtrag 12.11.2026) |
-| E5 Papier | vor Welle 5 | Papieroriginale nach Scan vernichten? Verfahrensbeschreibung anpassen | [offen] |
+| E5 Papier | vor Welle 5 | Papieroriginale nach Scan vernichten? Verfahrensbeschreibung anpassen | **vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR (Fabian): Nein, die Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt; das Archiv ist eine Kopie.** Folgen: Die Verfahrensbeschreibung (Spec 01, Aufgabe 5.7) braucht keine Vernichtungskontrolle und hält den Grundsatz «Original bleibt, Archiv ist Kopie» fest; die Papierablage selbst ist nicht Gegenstand des Archivs |
 | Gate 1 | Ende Welle 5 | Belege 2026 im Archiv, Prüflauf ohne Abweichung | [offen] |
-| E1 AbaNinja Basic | vor Welle 8 | Abo Basic (CHF 21/Mt.)? Nein → Welle 8 entfällt | [offen] |
+| E1 AbaNinja Basic | vor Welle 8 | Abo Basic (CHF 21/Mt.)? Nein → Welle 8 entfällt | **vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR (Fabian): Nein, kein Abo; Welle 8 (Spec 02, Aufgaben 8.1–8.6) entfällt.** Folgen: Es gibt keine AbaNinja-Verbindung; Requirements 8–12 von Spec 02 bleiben als Text stehen, werden aber nicht umgesetzt (Vermerk dort); der Zahlstatus bleibt dauerhaft «unbekannt» (Spec 02, Req 3.4, Spec 05, 8.8); Kontakte kommen nur aus dem CSV-Export des 21.CRM (kein Abgleich «aus AbaNinja», Spec 01, Req 13); die Option O.1 (Rechnungen nach AbaNinja) und die Alias-Tabelle `belegnummer_alias` entfallen mit. Wer AbaNinja später doch anbindet, braucht einen neuen Entscheid und eine neue Spec-Änderung |
 | Gate 2 | Ende Welle 9 | 7 Beispielfragen + ≥ 18/20 | [offen] |
 | E4 VHF/GSK | nach 19.11.2026 | Archiv in Etappe 2 der Offerte O-2026-002 oder später | [offen] |
 | Gate 3 | Ende Welle 12 | Archiv online, Geschäftsstelle veröffentlicht selbständig | [offen] |
@@ -229,7 +229,7 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Zeitstempel nicht von Anfang an | Speicherzeitpunkt nicht belegbar, nicht nachholbar | Zeitstempeldienste vor Welle 5 gewählt (4.9-E1), kein produktives Archivieren ohne Zeitstempel |
 | Hauptdienst (TSA der Swiss Government PKI) fällt aus, wird für Private eingestellt oder kostenpflichtig; Nutzung ist nur geduldet, ohne Zusage und Support | Tage ohne qualifizierten Stempel; ein Stempel lässt sich nicht nachholen | Jedes Manifest zusätzlich beim zweiten Dienst gestempelt, der dann massgeblich wird (Req 15.3, 15.11); Ersatz in die Liste aufnehmen (Offerte SwissSign oder Swisscom); Alarm bei fehlendem Manifest (15.8) |
 | Zeitstempel veralten (Gültigkeit der TSA-Zertifikate, Algorithmen) | Speicherzeitpunkt nach Jahrzehnten nicht mehr belegbar | Erneuerung über die Hash-Kette mit `.sig`, `.tsr` und Prüfdaten des Vortags (Req 15.2, RFC 4998); Zertifikatskette und OCSP/CRL mitarchiviert; Lücken als Fehler im Prüfwerkzeug (15.12) |
-| Konto- oder Anbieterverlust | Totalverlust nach Papiervernichtung | Zweitkopie bei zweitem Schweizer Anbieter (Hostpoint, unabhängig von Infomaniak), Restore-Probe inkl. Dateien (P4) |
+| Konto- oder Anbieterverlust | Verlust des Archivs; die Papieroriginale bleiben nach E5 erhalten, die Wiedererfassung wäre aufwendig | Zweitkopie bei zweitem Schweizer Anbieter (Hostpoint, unabhängig von Infomaniak), Restore-Probe inkl. Dateien (P4) |
 | Hostpoint lehnt die Nutzung des Webspace für das Backup ab (AGB Ziff. 2.2.2) | keine Zweitkopie zum Preis von CHF 0 | schriftliche Zusage vor Welle 5 (4.9); sonst Rückfall cloudscale.ch Object Storage mit Object Lock (CHF 1–6/Mt.) |
 | Geleakter FTP-Zugang mit Vollzugriff, gestohlener Workflow-Schlüssel oder kompromittiertes Hostpoint-Konto (PHP der Websites, Deploy-Schlüssel, Control Panel) | Zweitkopie gelöscht bzw. Webspace durch Anhängen gefüllt; über das Konto lassen sich `authorized_keys` und rclone umschreiben und damit das Anhängen-only aufheben | Website-Deploys auf eigene FTP-Konten mit festem Verzeichnis (4.9); Zweitkopie bevorzugt in einem eigenen Konto ohne Websites und PHP, sonst ausserhalb des Webroots (4.9, Vorbedingung 5); täglicher Schlüssel nur anhängend (schützt nur gegen den gestohlenen Workflow-Schlüssel); Alarm beim Kontingent (5.6) und bei roter Restore-Probe (16.25); Hostpoint-eigene Sicherungen mit ihrer Frist als letztes Netz |
 | Privater Probe-Schlüssel auf der Stufe-B-VPS | Wer die VPS übernimmt, kann Exporte entschlüsseln | nur root, in keinen Container eingehängt, entschlüsselt nur über eine sudo-Regel für `probe-entschluesseln`; Historie ohne restic-Schlüssel nicht erreichbar; Gate nimmt nur Chiffrat mit bekannter SHA-256; Wechsel bei Verdacht mit neuem Vollexport (Req 16.23) |
@@ -242,7 +242,7 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Infomaniak ohne strukturierte Antworten / Tool Calling | Extraktor bzw. Chat aufwendiger | JSON-Modus + Validierung; Chat mit Apertus oder späterem Modell, Werkzeugauswahl per Klassifikation |
 | Embedding-Dimension > 4'000 | kein HNSW-Index | anderes Modell (Qwen3-Embedding-8B) oder Dimension reduzieren |
 | Zeitbudget im Nebenerwerb | Verzögerung | Wellen sind einzeln abschliessbar; Phase 2/3 verschiebbar ohne Folgen für Phase 1 |
-| AbaNinja-API ändert sich | Abgleich bricht | Adapter gekapselt, Vertragstests, Tagesabgleich holt nach |
+| AbaNinja-API ändert sich | Abgleich bricht | entfällt mit Welle 8 (E1 = nein, 15.11.2026) |
 
 ## 8. Laufende Kosten (Richtwerte)
 
@@ -255,4 +255,4 @@ Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.
 | Infomaniak AI Services | ca. CHF 1.50 pro 1'000 Chat-Fragen (Mistral), ca. CHF 0.40 pro 1'000 erfasste Dokumente (gemma-4-31B-it, Golden-Lauf 09.11.2026), exkl. MWST |
 | Zweitkopie Sicherung (zweiter Schweizer Anbieter) | CHF 0 (bestehendes Hostpoint-Webhosting; braucht es nach 4.9, Vorbedingung 5 ein eigenes Konto ohne Websites, kommen dessen Kosten dazu; Wiederherstellung aus den Hostpoint-eigenen Sicherungen kostenpflichtig); bei Absage von Hostpoint cloudscale.ch, ca. CHF 1–6/Mt. nach Verbrauch |
 | RFC-3161-Zeitstempel | CHF 0 (TSA der Swiss Government PKI und FreeTSA ohne Gebühr; Sectigo nur nach Prüfung der Bedingungen) |
-| AbaNinja Basic | CHF 21/Mt., nur bei E1 = ja |
+| AbaNinja Basic | entfällt (E1 = nein, 15.11.2026) |

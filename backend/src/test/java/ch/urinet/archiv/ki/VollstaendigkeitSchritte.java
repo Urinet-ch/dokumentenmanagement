@@ -173,6 +173,21 @@ public class VollstaendigkeitSchritte {
         }
     }
 
+    /** Derselbe Partner (gleiche Kontakt-ID), im Beleg aber unter einer Namensvariante gespeichert. */
+    @Angenommen("im Mandanten «{word}» liegen bestätigte Kontoauszüge unter dem Namen «{}» des Partners «{}» für die Monate «{}»")
+    public void kontoauszuegeUnterVariante(String mandant, String variante, String partner, String monate)
+            throws SQLException {
+        Kontakt original = kontakte.get(mandant + ":" + partner);
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            for (String monat : liste(monate)) {
+                YearMonth ym = YearMonth.parse(monat);
+                einfuegen(verbindung, mandant, "BANK", "INTERN", ym.atEndOfMonth().plusDays(3), null,
+                        new Kontakt(mandant, variante, original.id()), Map.of("periode_von", ym.atDay(1).toString(),
+                                "periode_bis", ym.atEndOfMonth().toString()), "ARCHIVIERT", true);
+            }
+        }
+    }
+
     @Angenommen("im Mandanten «{word}» liegen diese weiteren Dokumente für die Lückenprüfung:")
     public void weitere(String mandant, DataTable tabelle) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection()) {

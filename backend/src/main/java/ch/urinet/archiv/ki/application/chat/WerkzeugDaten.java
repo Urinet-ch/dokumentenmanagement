@@ -56,10 +56,11 @@ public interface WerkzeugDaten {
     }
 
     /**
-     * Ein Monat einer Gruppe mit mindestens einem Dokument; {@code gruppe} ist der Anzeigewert, {@code ""} ohne
-     * Gruppierung und {@code null} für Dokumente ohne Wert im Gruppierungsfeld.
+     * Ein Monat einer Gruppe mit mindestens einem Dokument; {@code schluessel} identifiziert die Gruppe stabil,
+     * {@code gruppe} ist der Anzeigewert, {@code ""} ohne Gruppierung und {@code null} für Dokumente ohne Wert im
+     * Gruppierungsfeld.
      */
-    record Monatszeile(String gruppe, YearMonth monat, long belege) {
+    record Monatszeile(String schluessel, String gruppe, YearMonth monat, long belege) {
     }
 
     /** Die Monate mit Dokumenten (alle Jahre) der bestätigten, archivierten Dokumente der Art, unter der Sichtregel. */

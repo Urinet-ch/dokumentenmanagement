@@ -149,6 +149,76 @@ class ArchivWerkzeugeTest {
                 .isEqualTo("{\"fehler\":\"Werkzeug nicht verfügbar\"}");
     }
 
+    /** Verdrahtung von {@code GeseheneIds}: Suche, Fristen, offene Posten und Kennzahl merken IDs; zeigen ordnet zu. */
+    @Test
+    void falschAbgeschriebeneIdWirdEinemGeseheneTrefferZugeordnet() {
+        java.util.UUID id = java.util.UUID.fromString("4f0c2a7e-1b3d-4c5e-8f60-123456789abc");
+        java.util.UUID ausFristen = java.util.UUID.fromString("a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d");
+        java.util.UUID ausPosten = java.util.UUID.fromString("7d8e9f0a-1b2c-4d3e-9f4a-5b6c7d8e9f01");
+        java.util.UUID ausKennzahl = java.util.UUID.fromString("e5f60718-293a-4b4c-a5d6-e7f8091a2b3c");
+        java.util.UUID fremd = java.util.UUID.fromString("99999999-8888-4777-8666-555555555555");
+        java.util.List<String> gezeigt = new java.util.ArrayList<>();
+        ArchivWerkzeuge werkzeuge = werkzeuge(
+                new DokumenteSuchen(null, null, null, null, null, null, new BigDecimal("0.6")) {
+                    @Override
+                    public Antwort suchen(WerkzeugKontext kontext, Anfrage a) {
+                        return new Antwort(List.of(new Treffer(id.toString(), "T", "A", null, null, null, null, true,
+                                "/dokument/" + id, null)), 1, null);
+                    }
+                },
+                new DokumentZeigen(null, null, null, null) {
+                    @Override
+                    public Ansicht zeigen(WerkzeugKontext kontext, String idText) {
+                        gezeigt.add(idText);
+                        return null;
+                    }
+                },
+                new FristenAbfrage(null, null, null) {
+                    @Override
+                    public Antwort fristen(WerkzeugKontext kontext, String von, String bis) {
+                        return new Antwort(List.of(new Frist("2026-12-01", "Kündigung", "VERTRAG",
+                                new Dokument(ausFristen.toString(), "V", "/dokument/" + ausFristen), null)), 1, null, null);
+                    }
+                },
+                new OffenePostenAbfrage(null, null, null, null) {
+                    @Override
+                    public Antwort offenePosten(WerkzeugKontext kontext, String stichtag, String richtung) {
+                        return new Antwort("2026-11-15", "EINNAHME", null, List.of(new Posten(ausPosten.toString(), "R1",
+                                "P", "CHF 1.00", "2026-11-20", false, "UNBEKANNT", "/dokument/" + ausPosten)), 1, null,
+                                null);
+                    }
+                },
+                new KennzahlAbfrage(null, null, null, null) {
+                    @Override
+                    public Antwort kennzahl(WerkzeugKontext kontext, String m, String von, String bis, String g,
+                                            String b) {
+                        return new Antwort("EINNAHMEN", von, bis, "KEINE", "BELEGDATUM", List.of(), null,
+                                null, List.of(ausKennzahl.toString()), 0L, null);
+                    }
+                });
+        register.festhalten("lauf", kontext());
+        werkzeuge.dokumenteSuchen("lauf", "Rechnung", null, null, null, null, null, null);
+        werkzeuge.fristen("lauf", "2026-01-01", "2026-12-31");
+        werkzeuge.offenePosten("lauf", null, null);
+        werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-01-01", "2026-12-31", null, null);
+
+        werkzeuge.dokumentZeigen("lauf", verfaelscht(id));
+        werkzeuge.dokumentZeigen("lauf", verfaelscht(ausFristen));
+        werkzeuge.dokumentZeigen("lauf", verfaelscht(ausPosten));
+        werkzeuge.dokumentZeigen("lauf", verfaelscht(ausKennzahl));
+        werkzeuge.dokumentZeigen("lauf", fremd.toString());
+        werkzeuge.dokumentZeigen("lauf", verfaelscht(fremd));
+
+        assertThat(gezeigt).containsExactly(id.toString(), ausFristen.toString(), ausPosten.toString(),
+                ausKennzahl.toString(), fremd.toString(), verfaelscht(fremd));
+    }
+
+    /** Ändert das letzte Zeichen. */
+    private static String verfaelscht(java.util.UUID id) {
+        String text = id.toString();
+        return text.substring(0, 35) + (text.charAt(35) == '0' ? '1' : '0');
+    }
+
     private static String fehler(String parameter) {
         return "{\"fehler\":\"ungültiger Parameter: " + parameter + "\"}";
     }
@@ -158,6 +228,13 @@ class ArchivWerkzeugeTest {
     }
 
     private ArchivWerkzeuge werkzeuge() {
+        return werkzeuge(new DokumenteSuchen(null, null, null, null, null, null, new BigDecimal("0.6")),
+                new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null),
+                new OffenePostenAbfrage(null, null, null, null), new KennzahlAbfrage(null, null, null, null));
+    }
+
+    private ArchivWerkzeuge werkzeuge(DokumenteSuchen suchen, DokumentZeigen zeigen, FristenAbfrage fristen,
+                                      OffenePostenAbfrage offenePosten, KennzahlAbfrage kennzahl) {
         MandantKontext mandanten = new MandantKontext(null, null, null) {
             @Override
             public <T> T mit(MandantCode code, Supplier<T> arbeit) {
@@ -165,9 +242,7 @@ class ArchivWerkzeugeTest {
             }
         };
         Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
-        return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, null, new BigDecimal("0.6")),
-                new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null),
-                new KennzahlAbfrage(null, null, null, null), new OffenePostenAbfrage(null, null, null, null),
+        return new ArchivWerkzeuge(lauf, suchen, zeigen, fristen, kennzahl, offenePosten,
                 new VollstaendigkeitAbfrage(null, null, null), new ObjectMapper());
     }
 }

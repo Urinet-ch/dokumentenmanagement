@@ -311,8 +311,18 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nach einem Neuladen der PWA meldet man sich neu an (Tokens nur im Arbeitsspeicher, aus 2.7). `/erfassen` ist darum offline auch ohne Anmeldung zugänglich und nimmt Aufnahmen in die Warteschlange; hochgeladen wird erst nach der Anmeldung (entschieden von Fabian am 11.11.2026, PR #44)
   - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
   - Stand Umsetzung (PR #123, 13.11.2026): Kamera, Scanner im Web Worker, Vorschau, Warteschlange und Upload sind umgesetzt, dazu Eintrag `aufgenommen` und Aufruf von `aufnahmeName` aus 4.10 (Req 4.9); Browser-Szenarien in `features/dokument/erfassen-handy-pwa.feature` (`@req-4.2` bis `@req-4.9`). Der Haken folgt erst nach dem Gerätetest [Fabian] (Req 4.1). Nachgebessert nach dem Review: Warteschlange mit Benutzer und Mandant (nur eigene Einträge sichtbar und hochgeladen), Meldung bei einer Seite mit Fehler statt gesperrtem Knopf, Sperre während des Speicherns, Zeitpunkt der ersten verbliebenen Seite, gemeinsames `uploadProblem` mit `fehlercode`
+  - Entscheid 15.11.2026 «Fragen, dann löschen» (vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR; Req 4.10, 4.11, design.md, Umsetzung 3.7 «Benutzerwechsel auf dem Gerät»): Umsetzung als eigene Aufgabe 3.9 (Folgeaufgabe zu 3.7; die Abdeckungsprüfung erlaubt nur Nummern der Form x.y), nicht Teil dieser Aufgabe
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_
+
+- [x] 3.9 Folge zu 3.7: Warteschlange: Frage beim Benutzerwechsel und Löschen fehlerhafter Einträge [Frontend]
+  - Folge aus dem Entscheid 15.11.2026 zu 3.7; heutiger Stand (`frontend/src/app/erfassen/handy/warteschlange/warteschlange.service.ts`): Einträge anderer Inhaber bleiben verborgen und unberührt, eine Frage gibt es nicht, und fehlerhafte Einträge bieten nur «Erneut versuchen», aber kein Löschen
+  - Beim Anmelden eines anderen Benutzers oder Mandanten (Anmelden, nicht abgelaufene Sitzung) mit wartenden Einträgen anderer Inhaber: Dialog mit Anzahl und Aufnahmezeitpunkten, ohne Benutzernamen und ohne Inhalte; «Löschen» (zweite Bestätigung, `speicher.loeschen`) oder «Behalten» (keine Änderung am Eintrag); gemerkt nur im Arbeitsspeicher bis zur nächsten Anmeldung, nichts davon geht an den Server
+  - Aktion «Löschen» (mit Bestätigung) für eigene fehlerhafte Einträge in der Liste «Nicht hochgeladen»; Abmelden und abgelaufene Sitzung löschen und fragen nichts
+  - Texte in `texte.de-CH.ts`; Vitest für `WarteschlangeService` (Wechsel, Mandantenwechsel, mehrere Fremdinhaber, Behalten, Löschen, fehlerhafte Einträge bleiben) und Browser-Szenarien `@req-4.10`, `@req-4.11` in `erfassen-handy-pwa.feature`
+  - Erledigt: PR #179 (15.11.2026): `WarteschlangeService.fremdeFrage`, `fremdeBehalten`, `fremdeLoeschen`, `loeschen`; Karte (statt «Dialog», siehe Auslegung) und Rückfragen auf der Seite «Erfassen»; Vitest für Service und Seite, vier Browser-Szenarien (`@req-4.10`, `@req-4.11`); Auslegung zum Zeitpunkt der Frage in design.md, «Umsetzung 3.7»
+  - _Anforderungen: 4.10, 4.11_
+  - _Abhängig von: 3.7_
 
 ## Welle 4 — CSV-Import, Suche, Generatoren, Altbestand
 
@@ -440,6 +450,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.19, 10.2, 10.3, 10.5, 10.7, 10.8, 10.9, 10.10_
   - _Abhängig von: 4.9_
   - Erledigt: Changeset `010-benutzer-verzeichnis` (nur Einfügen, Indizes für die Filter), `BenutzerVerzeichnisPflege` im Schreibweg von `JdbcZugriffProtokoll` und beim Widerruf eines Tokens, `ProtokollResource` (`GET /protokoll`, `GET /protokoll/benutzer`, `POST /protokoll/benutzer/{benutzer}/austritt`, A13), Seite `/verwaltung/protokoll`; Szenarien `features/protokoll/protokoll-einsicht.feature` (`@req-2.19`, `@req-10.5`, `@req-10.10`), bestehende Szenarien für `10.2`, `10.3`, `10.7`, `10.8`; `10.9` per JUnit (`KeinLoeschpfadTest`, `MandantEigentuemerTest`); Teilnachweis «Dokument» für 10.9 folgt mit 5.7 (design.md «Umsetzung (Aufgabe 5.1)»)
+  - Browser-Szenarien: `features/protokoll/protokoll-pwa.feature` (PR #167)
 
 - [x] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
@@ -506,7 +517,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
-  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
+  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 
@@ -556,6 +567,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - ungenutzte Tokens nach `zuletzt` in der Token-Verwaltung anzeigen
   - optionales `gueltig_bis` je Token, vor dem Wechsel auf Stufe B (5.11); ohne Wert gilt das Token weiter bis zum Widerruf
   - Spec 03 ergänzt: Die Spalte `gueltig_bis` legt Spec 03, Aufgabe 11.7 für Webseiten-Schlüssel nach einer Rotation an (Spec 03, Req 12.4); diese Option nutzt sie für `generator` und `import` mit
+  - Stand Umsetzung (PR #155): Übersicht und Widerruf in der PWA erledigt; offen: optionales `gueltig_bis` [Fabian]
   - _Anforderungen: 2.5_
 
 - [ ]* O.8 Anmeldung mit Google [Infra] [Backend] [Fabian]
