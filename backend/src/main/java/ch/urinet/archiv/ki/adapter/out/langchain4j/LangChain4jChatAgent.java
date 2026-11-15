@@ -85,7 +85,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         AgentLauf lauf = new AgentLauf(id, anfrage, ausgabe, abbruch, fenster);
         laeufe.festhalten(lauf);
         register.festhalten(id, new WerkzeugKontext(anfrage.mandant(), anfrage.benutzer(), anfrage.benutzer().rolle(),
-                anfrage.sichtregel(), anfrage.ip()));
+                anfrage.sichtregel(), anfrage.ip()), anfrage.geseheneDokumente(), anfrage.nummerierteTreffer());
         try {
             starten(lauf, anfrage);
             // Obergrenze: jede Runde und die Schlussantwort je höchstens eine Zeitgrenze, dazu Reserve für Werkzeuge
@@ -132,7 +132,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
      * {@code AgentSchritte} prüft das); ihr eigener Anteil ist die Summe minus die Tokens der Runden davor. Ist die
      * Summe kleiner als die bisherigen Tokens, zählt sie als Wert des einzelnen Aufrufs.
      */
-    private void modellaufruf(AgentLauf lauf, ChatResponse antwort, boolean schluss) {
+    void modellaufruf(AgentLauf lauf, ChatResponse antwort, boolean schluss) {
         if (lauf.beendet()) {
             // Frist oder Abbruch: Nachzügler zählen nicht mehr und schreiben keine Verbrauchszeile
             return;

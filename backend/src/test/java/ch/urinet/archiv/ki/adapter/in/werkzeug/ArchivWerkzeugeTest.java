@@ -197,7 +197,9 @@ class ArchivWerkzeugeTest {
                     }
                 });
         register.festhalten("lauf", kontext());
-        werkzeuge.dokumenteSuchen("lauf", "Rechnung", null, null, null, null, null, null);
+        String suchergebnis = werkzeuge.dokumenteSuchen("lauf", "Rechnung", null, null, null, null, null, null);
+        assertThat(suchergebnis).contains("\"nummer\":1");
+        werkzeuge.dokumentZeigen("lauf", "1");
         werkzeuge.fristen("lauf", "2026-01-01", "2026-12-31");
         werkzeuge.offenePosten("lauf", null, null);
         werkzeuge.kennzahl("lauf", "EINNAHMEN", "2026-01-01", "2026-12-31", null, null);
@@ -209,7 +211,7 @@ class ArchivWerkzeugeTest {
         werkzeuge.dokumentZeigen("lauf", fremd.toString());
         werkzeuge.dokumentZeigen("lauf", verfaelscht(fremd));
 
-        assertThat(gezeigt).containsExactly(id.toString(), ausFristen.toString(), ausPosten.toString(),
+        assertThat(gezeigt).containsExactly(id.toString(), id.toString(), ausFristen.toString(), ausPosten.toString(),
                 ausKennzahl.toString(), fremd.toString(), verfaelscht(fremd));
     }
 

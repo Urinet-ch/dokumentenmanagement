@@ -141,16 +141,55 @@ Funktionalität: Chat-Agent und Systemprompt (Aufgabe 7.2)
     Angenommen das simulierte Sprachmodell antwortet nacheinander:
       | antwort | art      | inhalt                                          | argumente                   | tokens |
       | 1       | werkzeug | dokumente_suchen                                | {"frage":"Revision Nord"}   | 10/1   |
-      | 2       | text     | Es gibt die Rechnung «Revision Gondel Nord».    |                             | 20/2   |
+      | 2       | text     | Es gibt die Rechnung «Revision Gondel Nord»; nach Rechnungsdatum, 1 Rechnung. | | 20/2 |
       | 3       | text     | Ja, es ist dieselbe.                            |                             | 30/3   |
     Wenn «inhaber-urinet» dem Agenten die Frage «Welche Rechnung gibt es zur Revision Nord?» stellt
     Und «inhaber-urinet» dem Agenten im selben Gespräch die Frage «Ist das dieselbe?» stellt
     Dann hat das simulierte Sprachmodell 3 Anfragen erhalten
     Und besteht die Anfrage 3 der Reihe nach aus den Nachrichten «system, user, assistant, user»
     Und enthält die Anfrage 3 die Nachricht «Welche Rechnung gibt es zur Revision Nord?»
-    Und enthält die Anfrage 3 die Nachricht «Es gibt die Rechnung «Revision Gondel Nord».»
+    Und enthält die Anfrage 3 die Nachricht «Es gibt die Rechnung «Revision Gondel Nord»; nach Rechnungsdatum, 1 Rechnung.»
     Und enthält die Anfrage 3 die Nachricht «Ist das dieselbe?»
     Und lautet der gestreamte Text «Ja, es ist dieselbe.»
+
+  @req-5.3
+  Szenario: Eine Gesprächsnummer zeigt einen Suchtreffer aus der vorherigen Frage
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt                           | argumente                                                                                                 | tokens |
+      | 1       | werkzeug | dokumente_suchen                 | {"frage":"Revision Gondel Nord","art":"AUSGANGSRECHNUNG","von":"2071-03-10","bis":"2071-03-10","anzahl":1} | 10/1 |
+      | 2       | text     | Ich habe die Rechnung gefunden.  |                                                                                                           | 20/2 |
+      | 3       | werkzeug | dokument_zeigen                  | {"id":"1"}                                                                                               | 30/3 |
+      | 4       | text     | Die Rechnung ist geöffnet.       |                                                                                                           | 40/4 |
+    Wenn «inhaber-urinet» dem Agenten die Frage «Suche die Rechnung von 10.03.2071.» stellt
+    Und «inhaber-urinet» dem Agenten im selben Gespräch die Frage «Zeige Treffer 1.» stellt
+    Dann enthält ein Werkzeugergebnis der Anfrage 2 «"nummer":1 | "titel":"Revision Gondel Nord"»
+    Und enthält ein Werkzeugergebnis der Anfrage 4 «"titel":"Revision Gondel Nord"»
+    Und zeigt eine Quelle des Agenten die echte ID von «Revision Gondel Nord»
+
+  @req-5.3
+  Szenario: Eine um ein Zeichen veränderte ID aus der vorherigen Frage zeigt den Treffer
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt                           | argumente                                                                                                 | tokens |
+      | 1       | werkzeug | dokumente_suchen                 | {"frage":"Revision Gondel Nord","art":"AUSGANGSRECHNUNG","von":"2071-03-10","bis":"2071-03-10","anzahl":1} | 10/1 |
+      | 2       | text     | Ich habe die Rechnung gefunden.  |                                                                                                           | 20/2 |
+      | 3       | werkzeug | dokument_zeigen                  | {"id":"{id~:Revision Gondel Nord}"}                                                                      | 30/3 |
+      | 4       | text     | Die Rechnung ist geöffnet.       |                                                                                                           | 40/4 |
+    Wenn «inhaber-urinet» dem Agenten die Frage «Suche die Rechnung von 10.03.2071.» stellt
+    Und «inhaber-urinet» dem Agenten im selben Gespräch die Frage «Zeige die Rechnung.» stellt
+    Dann enthält ein Werkzeugergebnis der Anfrage 4 «"titel":"Revision Gondel Nord"»
+    Und zeigt eine Quelle des Agenten die echte ID von «Revision Gondel Nord»
+
+  @req-5.3
+  Szenario: Eine ID aus keinem Treffer des Gesprächs wird nicht gefunden
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt                            | argumente                                                                                                 | tokens |
+      | 1       | werkzeug | dokumente_suchen                  | {"frage":"Revision Gondel Nord","art":"AUSGANGSRECHNUNG","von":"2071-03-10","bis":"2071-03-10","anzahl":1} | 10/1 |
+      | 2       | text     | Ich habe die Rechnung gefunden.   |                                                                                                           | 20/2 |
+      | 3       | werkzeug | dokument_zeigen                   | {"id":"00000000-0000-0000-0000-000000000001"}                                                            | 30/3 |
+      | 4       | text     | Dieses Dokument wurde nicht gefunden. |                                                                                                      | 40/4 |
+    Wenn «inhaber-urinet» dem Agenten die Frage «Suche die Rechnung von 10.03.2071.» stellt
+    Und «inhaber-urinet» dem Agenten im selben Gespräch die Frage «Zeige dieses Dokument.» stellt
+    Dann enthält ein Werkzeugergebnis der Anfrage 4 «"fehler":"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden"»
 
   Szenario: Schliesst der Client den Stream, folgen weder ein Werkzeug noch eine weitere Runde beim Sprachmodell
     Angenommen das simulierte Sprachmodell antwortet nacheinander:

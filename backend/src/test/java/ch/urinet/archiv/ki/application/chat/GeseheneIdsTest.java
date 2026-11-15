@@ -5,6 +5,7 @@ import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,6 +50,15 @@ class GeseheneIdsTest {
     }
 
     @Test
+    void nummernOrdnenNurNummerierteTrefferDesGespraechsZu() {
+        UUID zweite = UUID.fromString("c2d81843-f193-43f9-8675-cf16609e8a7e");
+        assertThat(GeseheneIds.zuordnen("2", Set.of(zweite), List.of(UUID.fromString(ECHT), zweite)))
+                .isEqualTo(zweite.toString());
+        assertThat(GeseheneIds.zuordnen("3", Set.of(zweite), List.of(UUID.fromString(ECHT), zweite))).isEqualTo("3");
+        assertThat(GeseheneIds.zuordnen("1", Set.of(), List.of())).isEqualTo("1");
+    }
+
+    @Test
     void registerHaeltGeseheneNurFuerDenLaufUndVergisstSieAmEnde() {
         WerkzeugKontextRegister register = new WerkzeugKontextRegister();
         WerkzeugKontext k = WerkzeugKontext.fuer(new MandantCode("urinet"), new Benutzer("a", Rolle.INHABER), null);
@@ -61,5 +71,23 @@ class GeseheneIdsTest {
         assertThat(register.gesehene("unbekannt")).isEmpty();
         register.entfernen("lauf1");
         assertThat(register.gesehene("lauf1")).isEmpty();
+    }
+
+    @Test
+    void registerUebernimmtGesprächstrefferUndVergibtNummernFortlaufend() {
+        WerkzeugKontextRegister register = new WerkzeugKontextRegister();
+        WerkzeugKontext k = WerkzeugKontext.fuer(new MandantCode("urinet"), new Benutzer("a", Rolle.INHABER), null);
+        UUID erste = UUID.fromString(ECHT);
+        UUID zweite = UUID.fromString("c2d81843-f193-43f9-8675-cf16609e8a7e");
+        UUID ausAnderemWerkzeug = UUID.fromString("a7b71aca-ddf0-477e-a5c9-840d3ac54444");
+        register.festhalten("gespraech1", k, List.of(erste, ausAnderemWerkzeug), List.of(erste));
+        register.festhalten("gespraech2", k, List.of(), List.of());
+
+        assertThat(register.nummerieren("gespraech1", List.of(erste, zweite)))
+                .containsEntry(erste, 1).containsEntry(zweite, 2);
+        assertThat(register.nummerierte("gespraech1")).containsExactly(erste, zweite);
+        assertThat(register.gesehene("gespraech1")).contains(erste, zweite, ausAnderemWerkzeug);
+        assertThat(register.nummerierte("gespraech2")).isEmpty();
+        assertThat(register.gesehene("gespraech2")).isEmpty();
     }
 }

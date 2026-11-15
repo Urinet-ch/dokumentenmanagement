@@ -6,6 +6,10 @@ import jakarta.inject.Inject;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,7 +33,8 @@ public class WerkzeugKontextRegister {
      */
     static final Duration ABLAUF = Duration.ofMinutes(10);
 
-    private record Eintrag(WerkzeugKontext kontext, Instant ablauf, Set<UUID> gesehen) {
+    private record Eintrag(WerkzeugKontext kontext, Instant ablauf, Set<UUID> gesehen,
+                           Map<UUID, Integer> nummern, List<UUID> nummerierte) {
     }
 
     private final Map<Object, Eintrag> eintraege = new ConcurrentHashMap<>();
@@ -46,11 +51,21 @@ public class WerkzeugKontextRegister {
 
     /** Hält den Kontext unter {@code lauf} fest; ein bestehender Eintrag unter derselben ID wird ersetzt. */
     public void festhalten(Object lauf, WerkzeugKontext kontext) {
+        festhalten(lauf, kontext, List.of(), List.of());
+    }
+
+    /** Hält zusätzlich die aus vorherigen Antworten desselben Gesprächs rekonstruierten IDs fest. */
+    public void festhalten(Object lauf, WerkzeugKontext kontext, Collection<UUID> gesehene,
+                           Collection<UUID> nummerierteTreffer) {
         Objects.requireNonNull(lauf, "lauf");
         Objects.requireNonNull(kontext, "kontext");
         Instant jetzt = uhr.instant();
         eintraege.values().removeIf(e -> !e.ablauf().isAfter(jetzt));
-        eintraege.put(lauf, new Eintrag(kontext, jetzt.plus(ABLAUF), ConcurrentHashMap.newKeySet()));
+        Set<UUID> ids = ConcurrentHashMap.newKeySet();
+        ids.addAll(gesehene);
+        Eintrag eintrag = new Eintrag(kontext, jetzt.plus(ABLAUF), ids, new LinkedHashMap<>(), new ArrayList<>());
+        nummerieren(eintrag, nummerierteTreffer);
+        eintraege.put(lauf, eintrag);
     }
 
     /** Kontext unter {@code lauf}; leer ohne ID, ohne Eintrag oder nach Ablauf. */
@@ -69,11 +84,7 @@ public class WerkzeugKontextRegister {
         return Optional.of(eintrag.kontext());
     }
 
-    /**
-     * Hält die Dokument-IDs fest, die {@code dokumente_suchen} in diesem Lauf geliefert hat (also dem Benutzer nach der
-     * Sichtregel schon gezeigt wurden), damit {@code dokument_zeigen} eine vom Modell beim Abschreiben veränderte ID
-     * dem Treffer zuordnen kann. Gilt nur für diesen Lauf; ohne Eintrag wirkungslos.
-     */
+    /** Hält weitere IDs aus Werkzeugergebnissen dieses Laufs fest; ohne Eintrag wirkungslos. */
     public void gesehen(Object lauf, java.util.Collection<UUID> ids) {
         Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
         if (eintrag != null) {
@@ -85,6 +96,44 @@ public class WerkzeugKontextRegister {
     public Set<UUID> gesehene(Object lauf) {
         Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
         return eintrag == null ? Set.of() : Set.copyOf(eintrag.gesehen());
+    }
+
+    /** Vergibt stabile Nummern für neue Suchtreffer und gibt deren Nummern zurück. */
+    public Map<UUID, Integer> nummerieren(Object lauf, Collection<UUID> ids) {
+        Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
+        if (eintrag == null) {
+            return Map.of();
+        }
+        synchronized (eintrag) {
+            return nummerieren(eintrag, ids);
+        }
+    }
+
+    /** Nummerierte Suchtreffer dieses Laufs, älteste zuerst. */
+    public List<UUID> nummerierte(Object lauf) {
+        Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
+        if (eintrag == null) {
+            return List.of();
+        }
+        synchronized (eintrag) {
+            return List.copyOf(eintrag.nummerierte());
+        }
+    }
+
+    private static Map<UUID, Integer> nummerieren(Eintrag eintrag, Collection<UUID> ids) {
+        Map<UUID, Integer> ergebnis = new LinkedHashMap<>();
+        for (UUID id : ids) {
+            Objects.requireNonNull(id, "id");
+            eintrag.gesehen().add(id);
+            Integer nummer = eintrag.nummern().get(id);
+            if (nummer == null) {
+                nummer = eintrag.nummerierte().size() + 1;
+                eintrag.nummern().put(id, nummer);
+                eintrag.nummerierte().add(id);
+            }
+            ergebnis.put(id, nummer);
+        }
+        return Map.copyOf(ergebnis);
     }
 
     /** Am Ende der Chat-Anfrage, auch bei Fehler oder Abbruch. */
