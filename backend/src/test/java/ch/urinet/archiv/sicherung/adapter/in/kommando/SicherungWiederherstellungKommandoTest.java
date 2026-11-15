@@ -66,7 +66,64 @@ class SicherungWiederherstellungKommandoTest {
                 false, inhalt.length, LAST_MODIFIED.toString(), "", null, null);
         Files.writeString(inventar, new ObjectMapper().writeValueAsString(zeile) + "\n", StandardCharsets.UTF_8);
         InMemoryZiel ziel = new InMemoryZiel();
-        MandantRegister register = new MandantRegister() {
+        SicherungKommando kommando = kommando(ziel);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        int exit = kommando.ausfuehren(List.of("wiederherstellen", "--mandant", "probe", "--inventar",
+                        inventar.toString(), "--strom", strom.toString()),
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).isZero();
+        JsonNode status = new ObjectMapper().readTree(stdout.toByteArray());
+        assertThat(status.size()).isEqualTo(6);
+        assertThat(status.path("versionen").asLong()).isEqualTo(1);
+        assertThat(status.path("fehlendInKette").asLong()).isZero();
+        assertThat(status.path("ueberzaehlig").asLong()).isZero();
+        assertThat(stdout.toString(StandardCharsets.UTF_8)).doesNotContain("archiv/a", strom.toString(),
+                inventar.toString());
+        assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(ziel.geschriebene).containsExactly("archiv/a@v1");
+    }
+
+    @Test
+    void kappungAusserhalbProbeWirdMitExitZweiUndOhneDateidatenAbgelehnt(
+            @org.junit.jupiter.api.io.TempDir Path temp) throws Exception {
+        String schluessel = "archiv/synthetische-geheimdatei.pdf";
+        Path inventar = temp.resolve("inventar-mit-synthetischem-schluessel.jsonl");
+        var zeile = new SicherungBucketExport.InventarZeile(SicherungBucketExport.INVENTAR_FORMAT, schluessel, "v1",
+                false, 1, LAST_MODIFIED.toString(), "", null, null);
+        Files.writeString(inventar, new ObjectMapper().writeValueAsString(zeile) + "\n", StandardCharsets.UTF_8);
+        Path strom = temp.resolve("synthetischer-strom-dateiname.bin");
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-a-probe");
+        SicherungKommando kommando = kommando(ziel);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+
+        int exit = kommando.ausfuehren(List.of("wiederherstellen", "--mandant", "probe", "--inventar",
+                        inventar.toString(), "--strom", strom.toString(), "--kappen"),
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8));
+
+        assertThat(exit).isEqualTo(2);
+        assertThat(stdout.toString(StandardCharsets.UTF_8)).doesNotContain(schluessel, inventar.toString(),
+                strom.toString());
+        assertThat(stderr.toString(StandardCharsets.UTF_8))
+                .contains("Wiederherstellung abgebrochen: Ziel nicht leer oder Kappung nicht zulässig.")
+                .doesNotContain(schluessel, inventar.toString(), strom.toString());
+        assertThat(ziel.geschriebene).isEmpty();
+    }
+
+    private static SicherungKommando kommando(InMemoryZiel ziel) {
+        return new SicherungKommando(new SicherungBucketExport(ablage()),
+                new SicherungExportVerwaltung((SicherungExportSpeicher) (art, mandant, sha256) -> { },
+                        mandantRegister()),
+                new ObjectMapper(), ziel, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
+    }
+
+    private static MandantRegister mandantRegister() {
+        return new MandantRegister() {
             @Override
             public boolean existiert(MandantCode code) {
                 return code.equals(CODE);
@@ -88,27 +145,6 @@ class SicherungWiederherstellungKommandoTest {
                 return Optional.empty();
             }
         };
-        SicherungKommando kommando = new SicherungKommando(new SicherungBucketExport(ablage()),
-                new SicherungExportVerwaltung((SicherungExportSpeicher) (art, mandant, sha256) -> { }, register),
-                new ObjectMapper(), ziel, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-
-        int exit = kommando.ausfuehren(List.of("wiederherstellen", "--mandant", "probe", "--inventar",
-                        inventar.toString(), "--strom", strom.toString()),
-                new PrintStream(stdout, true, StandardCharsets.UTF_8),
-                new PrintStream(stderr, true, StandardCharsets.UTF_8));
-
-        assertThat(exit).isZero();
-        JsonNode status = new ObjectMapper().readTree(stdout.toByteArray());
-        assertThat(status.size()).isEqualTo(6);
-        assertThat(status.path("versionen").asLong()).isEqualTo(1);
-        assertThat(status.path("fehlendInKette").asLong()).isZero();
-        assertThat(status.path("ueberzaehlig").asLong()).isZero();
-        assertThat(stdout.toString(StandardCharsets.UTF_8)).doesNotContain("archiv/a", strom.toString(),
-                inventar.toString());
-        assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
-        assertThat(ziel.geschriebene).containsExactly("archiv/a@v1");
     }
 
     private static AblagePort ablage() {
@@ -144,6 +180,15 @@ class SicherungWiederherstellungKommandoTest {
 
     private static final class InMemoryZiel implements WiederherstellungsZiel {
         private final List<String> geschriebene = new ArrayList<>();
+        private final String praefix;
+
+        private InMemoryZiel() {
+            this("urinet-archiv-p-");
+        }
+
+        private InMemoryZiel(String praefix) {
+            this.praefix = praefix;
+        }
 
         @Override
         public Quittung schreiben(String schluessel, String versionId, Instant lastModified, InputStream inhalt,
@@ -170,7 +215,7 @@ class SicherungWiederherstellungKommandoTest {
 
         @Override
         public String praefix() {
-            return "urinet-archiv-p-";
+            return praefix;
         }
 
         @Override
