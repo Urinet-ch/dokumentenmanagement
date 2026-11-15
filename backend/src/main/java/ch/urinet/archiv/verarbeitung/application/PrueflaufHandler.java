@@ -16,6 +16,11 @@ import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Pruefdokument
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Eintraege;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Eintrag;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Fenster;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Manifest;
+import ch.urinet.archiv.verarbeitung.application.ManifestVergleich.Unbrauchbar;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Abweichung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Art;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Fortsetzung;
@@ -32,7 +37,9 @@ import org.jboss.logging.Logger;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +53,8 @@ import java.util.UUID;
  * besteht aus Teilaufträgen, jeder prüft eine Seite und reiht den nächsten ein:
  * <ol>
  *     <li>{@code DATEIEN}: jede Datei unter {@code archiv/} über die gespeicherte Versions-ID stromweise lesen und die
- *     SHA-256 mit der Datenbank vergleichen; aktive Sperren unbefristeter Dokumente mit weniger als 12 Monaten Rest
- *     verlängern.</li>
+ *     SHA-256 mit der Datenbank und dem Eintrag im zuständigen Tages-Manifest vergleichen ({@link ManifestVergleich});
+ *     aktive Sperren unbefristeter Dokumente mit weniger als 12 Monaten Rest verlängern.</li>
  *     <li>{@code ARCHIV_VERSIONEN}: alle Versionen unter {@code archiv/} auflisten; Löschmarken und Versionen ohne Eintrag
  *     in der Datenbank sind Abweichungen.</li>
  *     <li>{@code MANIFEST_VERSIONEN}: Manifeste lesen und ihre Sperren wie oben pflegen; Löschmarken melden.</li>
@@ -91,6 +98,7 @@ public class PrueflaufHandler implements AuftragHandler {
 
     private final PrueflaufSpeichern speichern;
     private final AblagePort ablage;
+    private final ManifestVergleich manifest;
     private final InhaberBenachrichtigung benachrichtigung;
     private final Clock uhr;
     private final Stufe stufe;
@@ -101,7 +109,8 @@ public class PrueflaufHandler implements AuftragHandler {
     private final int abbruchNachFehlern;
 
     @Inject
-    public PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
+    public PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, ManifestVergleich manifest,
+                            InhaberBenachrichtigung benachrichtigung,
                             @ConfigProperty(name = "archiv.stufe") Optional<String> stufe,
                             @ConfigProperty(name = "archiv.ablage.max-sperrfrist") Optional<Duration> archivHoechstfrist,
                             @ConfigProperty(name = "archiv.ablage.manifest-max-sperrfrist")
@@ -112,12 +121,13 @@ public class PrueflaufHandler implements AuftragHandler {
                             int versionenJeTeil,
                             @ConfigProperty(name = "archiv.prueflauf.abbruch-nach-fehlern", defaultValue = "5")
                             int abbruchNachFehlern) {
-        this(speichern, ablage, benachrichtigung, Clock.systemUTC(), Stufe.aus(stufe), archivHoechstfrist,
+        this(speichern, ablage, manifest, benachrichtigung, Clock.systemUTC(), Stufe.aus(stufe), archivHoechstfrist,
                 manifestHoechstfrist, dokumenteJeTeil, versionenJeTeil, abbruchNachFehlern);
     }
 
-    PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, InhaberBenachrichtigung benachrichtigung,
-                     Clock uhr, Stufe stufe, Optional<Duration> archivHoechstfrist,
+    PrueflaufHandler(PrueflaufSpeichern speichern, AblagePort ablage, ManifestVergleich manifest,
+                     InhaberBenachrichtigung benachrichtigung, Clock uhr, Stufe stufe,
+                     Optional<Duration> archivHoechstfrist,
                      Optional<Duration> manifestHoechstfrist,
                      int dokumenteJeTeil, int versionenJeTeil, int abbruchNachFehlern) {
         if (dokumenteJeTeil < 1 || versionenJeTeil < 1 || versionenJeTeil > 1000 || abbruchNachFehlern < 1) {
@@ -127,6 +137,7 @@ public class PrueflaufHandler implements AuftragHandler {
         }
         this.speichern = speichern;
         this.ablage = ablage;
+        this.manifest = manifest;
         this.benachrichtigung = benachrichtigung;
         this.uhr = uhr;
         this.stufe = stufe;
@@ -225,6 +236,8 @@ public class PrueflaufHandler implements AuftragHandler {
                 }
             }
         }
+        LOG.infof("Prüflauf %s Teil %d: %d Datei(en) ohne zuständiges Manifest nicht mit einem Manifest verglichen",
+                s.lauf, s.teil, s.ohneManifest);
         Fortsetzung weiter = seite.size() < dokumenteJeTeil
                 ? Fortsetzung.beginn(Phase.ARCHIV_VERSIONEN)
                 : new Fortsetzung(Phase.DATEIEN, Optional.of(seite.getLast().id()), Optional.empty());
@@ -254,6 +267,49 @@ public class PrueflaufHandler implements AuftragHandler {
         }
         if (unbefristet(vorgabe)) {
             pflegen(mandant, datei.schluessel(), version, bisher, archivHoechstfrist, s);
+        }
+        mitManifestVergleichen(mandant, dokument, datei, pruefung.get(), s);
+    }
+
+    /**
+     * Vergleich mit dem Tages-Manifest (Req 15.5; design.md «Umsetzung (Manifest-Vergleich, Req 15.5)»), nur für eine
+     * gelesene Version eines archivierten Dokuments, die das Manifest nach seiner Regel enthält. Zuständig ist das
+     * Manifest, in dessen Fenster {@code archiviert} liegt; ohne ein solches (vor dem Manifest des Tages) wird nicht
+     * verglichen, weil die Überwachung fehlende Manifeste meldet (Req 15.8). Fehlt der Eintrag oder ist das Manifest
+     * unbrauchbar, ist das {@code MANIFEST_EINTRAG_FEHLT}, eine andere SHA-256 {@code MANIFEST_PRUEFSUMME}; die
+     * Versions-ID ist Zusatz und wird nicht verglichen, damit Manifeste nach einer Wiederherstellung gültig bleiben.
+     * Jedes Manifest wird je Teil höchstens einmal gelesen; ein vorübergehender Fehler beim Lesen läuft wie beim Prüfen
+     * der Datei über {@link #prueffehler}. Läuft in allen Stufen und liest nur.
+     */
+    private void mitManifestVergleichen(MandantCode mandant, Pruefdokument dokument, Datei datei,
+                                        Dateipruefung pruefung, Sammler s) {
+        if (dokument.archiviert().isEmpty() || !datei.imManifest()) {
+            return;
+        }
+        Instant archiviert = dokument.archiviert().get();
+        Optional<Fenster> fenster = s.fenster.stream().filter(f -> f.enthaelt(archiviert)).findFirst()
+                .or(() -> manifest.zustaendig(mandant, archiviert));
+        if (fenster.isEmpty()) {
+            s.ohneManifest++;
+            return;
+        }
+        Manifest gelesen = s.gelesen.get(fenster.get().datum());
+        if (gelesen == null) {
+            gelesen = manifest.lesen(mandant, fenster.get());
+            s.fenster.add(fenster.get());
+            s.gelesen.put(fenster.get().datum(), gelesen);
+            if (gelesen instanceof Unbrauchbar u) {
+                // nur Datum und Grund, keine Inhalte (Req 16.7)
+                LOG.warnf("Prüflauf %s Teil %d: Manifest %s unbrauchbar (%s)", s.lauf, s.teil, u.datum(), u.grund());
+            }
+        }
+        Optional<String> eintrag = gelesen instanceof Eintraege e
+                ? Optional.ofNullable(e.sha256().get(new Eintrag(dokument.id(), datei.variante(), datei.nr())))
+                : Optional.empty();
+        if (eintrag.isEmpty()) {
+            s.abweichung(Art.MANIFEST_EINTRAG_FEHLT, Optional.of(dokument.id()), datei.schluessel(), datei.versionId());
+        } else if (!eintrag.get().equalsIgnoreCase(pruefung.sha256())) {
+            s.abweichung(Art.MANIFEST_PRUEFSUMME, Optional.of(dokument.id()), datei.schluessel(), datei.versionId());
         }
     }
 
@@ -436,6 +492,10 @@ public class PrueflaufHandler implements AuftragHandler {
         private int manifeste;
         private int verlaengert;
         private int nurGezaehlt;
+        private int ohneManifest;
+        /** Zwischenspeicher nur innerhalb des Teils: bekannte Fenster und je Datum das gelesene Manifest. */
+        private final List<Fenster> fenster = new ArrayList<>();
+        private final Map<LocalDate, Manifest> gelesen = new HashMap<>();
         private final List<Abweichung> abweichungen = new ArrayList<>();
 
         Sammler(UUID lauf, int teil, boolean letzterVersuch) {

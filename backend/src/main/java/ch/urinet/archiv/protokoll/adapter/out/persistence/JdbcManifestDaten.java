@@ -126,6 +126,27 @@ public class JdbcManifestDaten implements ManifestDaten {
     }
 
     @Override
+    public Optional<Zustaendig> zustaendig(Instant zeitpunkt) {
+        java.util.Objects.requireNonNull(zeitpunkt, "zeitpunkt");
+        String sql = "select datum, von, bis, sha256 from " + schema() + ".manifest where (von is null or von <= ?) "
+                + "and bis > ? order by datum limit 1";
+        try (Connection v = verbindung(); PreparedStatement p = v.prepareStatement(sql)) {
+            p.setObject(1, zeit(zeitpunkt), Types.TIMESTAMP_WITH_TIMEZONE);
+            p.setObject(2, zeit(zeitpunkt), Types.TIMESTAMP_WITH_TIMEZONE);
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new Zustaendig(r.getObject(1, LocalDate.class),
+                        Optional.ofNullable(r.getObject(2, OffsetDateTime.class)).map(OffsetDateTime::toInstant),
+                        r.getObject(3, OffsetDateTime.class).toInstant(), r.getString(4)));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Zuständiges Manifest nicht gelesen", e);
+        }
+    }
+
+    @Override
     public List<ManifestEintrag> eintraege(Instant von, Instant bis) {
         String s = schema();
         String sql = "select d.id, lower(f.rolle), f.nr, f.sha256, f.s3_version from " + s + ".dokument d join " + s
