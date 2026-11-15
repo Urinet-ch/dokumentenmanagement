@@ -5,6 +5,7 @@ import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * eigene Prüfsumme und zählt nur seine Zeilen.
  */
 @QuarkusTest
+@Tag("start-1")
 class SicherungKommandoDbTest {
 
     private static final String AKTIV = "urinet";
