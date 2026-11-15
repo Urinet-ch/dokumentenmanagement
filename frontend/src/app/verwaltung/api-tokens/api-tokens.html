@@ -12,7 +12,7 @@
   <p role="status">{{ texte.keine }}</p>
 } @else {
   <ul class="liste" aria-label="API-Tokens">
-    @for (token of tokens(); track $index) {
+    @for (token of tokens(); track token.id ?? $index) {
       <li class="karte token" data-test="token">
         <div class="angaben">
           <span class="feld">
