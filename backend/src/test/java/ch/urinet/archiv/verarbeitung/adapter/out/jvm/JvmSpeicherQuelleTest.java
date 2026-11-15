@@ -28,13 +28,14 @@ class JvmSpeicherQuelleTest {
 
     @Test
     @Tag("req-16.5")
-    void heapZaehltNachGcUndSummiertDieBereiche() {
+    void heapZaehltNachGcUndNimmtDasMaximumAusDemGesamtheap() {
         JvmSpeicherQuelle quelle = new JvmSpeicherQuelle(() -> List.of(
-                bereich("G1 Eden Space", MemoryType.HEAP, new MemoryUsage(0, 900, 900, 1000), new MemoryUsage(0, 0, 0, 1000)),
-                bereich("G1 Old Gen", MemoryType.HEAP, new MemoryUsage(0, 800, 900, 1000), new MemoryUsage(0, 300, 300, 1000)),
+                bereich("G1 Eden Space", MemoryType.HEAP, new MemoryUsage(0, 900, 900, -1), new MemoryUsage(0, 0, 0, -1)),
+                bereich("G1 Survivor Space", MemoryType.HEAP, new MemoryUsage(0, 10, 10, -1), new MemoryUsage(0, 0, 0, -1)),
+                bereich("G1 Old Gen", MemoryType.HEAP, new MemoryUsage(0, 800, 900, 2000), new MemoryUsage(0, 300, 300, 2000)),
                 bereich("Code Cache", MemoryType.NON_HEAP, new MemoryUsage(0, 5, 5, 10), null),
                 bereich("Metaspace", MemoryType.NON_HEAP, new MemoryUsage(0, 150, 160, -1), null),
-                bereich("Compressed Class Space", MemoryType.NON_HEAP, new MemoryUsage(0, 20, 30, 100), null)));
+                bereich("Compressed Class Space", MemoryType.NON_HEAP, new MemoryUsage(0, 20, 30, 100), null)), () -> 2000);
 
         assertThat(quelle.messen()).containsExactlyInAnyOrder(
                 new SpeicherMessung("Metaspace", 150, -1),
@@ -46,7 +47,7 @@ class JvmSpeicherQuelleTest {
     @Tag("req-16.5")
     void heapOhneBekanntesMaximumHatKeines() {
         JvmSpeicherQuelle quelle = new JvmSpeicherQuelle(() -> List.of(
-                bereich("Heap", MemoryType.HEAP, new MemoryUsage(0, 5, 5, -1), null)));
+                bereich("Heap", MemoryType.HEAP, new MemoryUsage(0, 5, 5, -1), null)), () -> -1);
 
         assertThat(quelle.messen()).containsExactly(new SpeicherMessung("Heap", 0, -1));
     }
@@ -57,6 +58,8 @@ class JvmSpeicherQuelleTest {
         List<SpeicherMessung> messungen = new JvmSpeicherQuelle().messen();
 
         assertThat(messungen).extracting(SpeicherMessung::pool).contains("Metaspace", "Heap");
+        assertThat(messungen).filteredOn(m -> m.pool().equals("Heap")).singleElement()
+                .satisfies(m -> assertThat(m.begrenzt()).isTrue());
         assertThat(messungen).allSatisfy(m -> assertThat(m.benutzt()).isGreaterThanOrEqualTo(0));
     }
 }
