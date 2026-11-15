@@ -102,6 +102,7 @@ Funktionalität: Chat in der PWA
     Wenn ich auf die Quelle «Rechnung Vereinsfest Seedorf» tippe
     Dann bin ich auf der Seite des Dokuments «Rechnung Vereinsfest Seedorf»
 
+  @req-5.5
   Szenario: Mehr als 100 Fragen in der Stunde
     Angenommen Keycloak kennt mich als «inhaber» im Mandanten «urinet»
     Wenn ich die Seite «/chat» öffne
@@ -110,12 +111,14 @@ Funktionalität: Chat in der PWA
     Dann sehe ich die Meldung, dass es in 20 Minuten weitergeht
     Und steht «Frage 101» wieder im Eingabefeld
 
+  @req-6.1
   Szenario: Es läuft schon eine andere Frage
     Angenommen Keycloak kennt mich als «inhaber» im Mandanten «urinet»
     Wenn ich die Seite «/chat» öffne
     Und ich mich anmelde
     Und ich die Frage «Noch eine Frage» sende
     Dann sehe ich die Meldung «Es läuft noch eine andere Frage. Bitte warten Sie, bis sie beantwortet ist, und senden Sie dann erneut.»
+    Und sehe ich keine Meldung über Minuten
 
   Szenario: Fehler während der Antwort
     Angenommen Keycloak kennt mich als «inhaber» im Mandanten «urinet»
@@ -127,6 +130,7 @@ Funktionalität: Chat in der PWA
     Dann sehe ich die Antwort «Antwort auf «Nochmals».»
     Und hat die PWA die Frage im Gespräch «Gibt es Fristen?» gestellt
 
+  @req-6.1
   Szenario: Eine laufende Antwort abbrechen
     Angenommen Keycloak kennt mich als «inhaber» im Mandanten «urinet»
     Wenn ich die Seite «/chat» öffne

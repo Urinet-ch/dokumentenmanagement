@@ -185,6 +185,15 @@ Then('sehe ich die Meldung, dass es in 20 Minuten weitergeht', async function ()
   );
 });
 
+Then('sehe ich keine Meldung über Minuten', async function () {
+  const meldungen = await this.seite.getByRole('alert').allInnerTexts();
+  assert.ok(meldungen.length > 0, 'keine Meldung sichtbar');
+  assert.deepEqual(
+    meldungen.filter((t) => /Minuten|Stunde|geht es weiter/.test(t)),
+    [],
+  );
+});
+
 Then(/^steht «(.+)» wieder im Eingabefeld$/, async function (frage) {
   assert.equal(
     await this.seite.getByRole('textbox', { name: 'Frage', exact: true }).inputValue(),

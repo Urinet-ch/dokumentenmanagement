@@ -20,10 +20,12 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Wenn ich die Kontakte über das Menü öffne
     Und ich die Kontaktliste der Blätter-Kontakte suche
     Dann zeigt die Kontaktliste insgesamt 26 Kontakte
+    Und zeigt die Kontaktliste auf dieser Seite 25 Einträge
     Und zeigt die Liste den Kontakt «Blätter Test AG 01»
     Und zeigt die Liste den Kontakt «Blätter Test AG 26» nicht
     Wenn ich zur nächsten Kontaktseite blättere
     Dann zeigt die Liste den Kontakt «Blätter Test AG 26»
+    Und zeigt die Kontaktliste auf dieser Seite 1 Einträge
     Wenn ich nach der Kennung des Kontakts «Blätter Test AG 26» suche
     Dann zeigt die Kontaktliste insgesamt 1 Kontakte
     Und zeigt die Liste den Kontakt «Blätter Test AG 26»
@@ -117,7 +119,7 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
       | 375    |
       | 1280   |
 
-  @req-17.6
+  @req-2.18 @req-17.10
   Szenario: Eine gleichzeitige Änderung macht das Kontaktformular veraltet
     Angenommen «inhaber» im Mandanten «urinet» hat den Kontakt «Versionskonflikt Test AG» in «Luzern» angelegt
     Und das Browserfenster ist 1280 Pixel breit
@@ -130,6 +132,22 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Und eine gleichzeitige Änderung setzt beim Kontakt «Versionskonflikt Test AG» den Ort auf «Bürglen»
     Und ich das Formular speichere
     Dann erkennt die PWA den Versionskonflikt bei Kontakt «Versionskonflikt Test AG»
+
+  @req-17.8
+  Szenario: Das Zusammenführen verlangt einen Grund, ohne Grund geht nichts an das Archiv
+    Angenommen «inhaber» im Mandanten «urinet» hat den Kontakt «Ohne Grund Test AG» in «Altdorf» angelegt
+    Und «inhaber» im Mandanten «urinet» hat den Kontakt «Ziel Grund Test AG» in «Luzern» angelegt
+    Und das Browserfenster ist 1280 Pixel breit
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich die Kontakte über das Menü öffne
+    Und ich nach dem Kontakt «Ohne Grund Test AG» suche
+    Und ich den Kontakt «Ohne Grund Test AG» öffne
+    Und ich die Aktion «Zusammenführen …» wähle
+    Und ich den Kontakt «Ziel Grund Test AG» als Ziel suche und wähle
+    Und ich im Dialog ohne Grund auf «Weiter» klicke
+    Dann bleibt der Dialog offen mit dem Hinweis «Bitte einen Grund angeben.»
+    Und hat die PWA noch nichts zu «zusammenfuehren» gesendet
+    Und ist der Kontakt «Ohne Grund Test AG» im Archiv aktiv
 
   @req-17.6 @req-17.12
   Szenariogrundriss: Der Inhaber markiert einen Kontakt nach der Rückfrage als inaktiv und aktiviert ihn wieder (<breite> px)

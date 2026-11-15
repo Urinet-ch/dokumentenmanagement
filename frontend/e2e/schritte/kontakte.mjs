@@ -235,9 +235,20 @@ Then(/^zeigt die Liste den Kontakt «([^»]+)» nicht$/, async function (basis) 
 });
 
 Then(/^zeigt die Kontaktliste insgesamt (\d+) Kontakte$/, async function (anzahl) {
-  const text = await this.seite.locator('[data-test=anzahl]').innerText();
   const bezeichnung = Number(anzahl) === 1 ? 'Kontakt' : 'Kontakte';
-  assert.match(text, new RegExp(`\\b${anzahl}\\s+${bezeichnung}\\b`), text);
+  // Wartet auf den neuen Stand: Die Seite zeigt während des Ladens noch das alte Ergebnis.
+  await this.seite
+    .locator('[data-test=anzahl]', { hasText: new RegExp(`\\b${anzahl}\\s+${bezeichnung}\\b`) })
+    .waitFor();
+});
+
+Then(/^zeigt die Kontaktliste auf dieser Seite (\d+) Einträge$/, async function (anzahl) {
+  const zeilen = this.seite.locator('[data-test=kontakt]');
+  await this.seite.waitForFunction(
+    ([auswahl, soll]) => document.querySelectorAll(auswahl).length === soll,
+    ['[data-test=kontakt]', Number(anzahl)],
+  );
+  assert.equal(await zeilen.count(), Number(anzahl));
 });
 
 When('ich die Kontaktliste der Blätter-Kontakte suche', async function () {
@@ -395,6 +406,17 @@ When(/^ich als Grund «([^»]+)» angebe$/, async function (grund) {
   await this.seite
     .locator('[data-test=zusammenfuehren-grund], [data-test=inaktiv-grund]')
     .fill(grund);
+});
+
+Then(/^bleibt der Dialog offen mit dem Hinweis «([^»]+)»$/, async function (hinweis) {
+  const fehler = this.seite.locator('[data-test=dialog] [data-test=auswahl-fehler]');
+  await fehler.filter({ hasText: hinweis }).waitFor();
+  assert.equal((await fehler.innerText()).trim(), hinweis);
+  assert.equal(await this.seite.locator('[data-test=rueckfrage-text]').count(), 0);
+});
+
+When('ich im Dialog ohne Grund auf «Weiter» klicke', async function () {
+  await this.seite.locator('[data-test=weiter]').click();
 });
 
 When('ich im Dialog auf «Weiter» klicke', async function () {
