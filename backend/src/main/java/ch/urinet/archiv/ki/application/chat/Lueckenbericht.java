@@ -24,12 +24,13 @@ public interface Lueckenbericht {
 
     /**
      * Eine Regel mit ihrer Art. {@code je} nennt bei {@code ERWARTET} den Zeitraum ({@code MONAT}), sonst {@code null}.
+     * {@code hinweis} erklärt, weshalb bei {@code ERWARTET} keine vollen Monate geprüft werden konnten.
      * {@code belege}: Belege der Art, aus denen die Kategorie entsteht. {@code ohneZuordnung}: Belege ohne Wert im
      * Gruppierungsfeld, die keine Lücke begründen oder schliessen ({@code null}, wenn es keine gibt). {@code reihen}
      * sind höchstens {@value #REIHEN_MAX}; {@code reihenGesamt} zählt alle.
      */
-    record Kategorie(Regel regel, String art, String je, long belege, Long ohneZuordnung, long reihenGesamt,
-                     List<Reihe> reihen) {
+    record Kategorie(Regel regel, String art, String je, String hinweis, long belege, Long ohneZuordnung,
+                     long reihenGesamt, List<Reihe> reihen) {
 
         public static final int REIHEN_MAX = 50;
 

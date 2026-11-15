@@ -43,6 +43,7 @@ public final class Nummernfolge {
         int breite = 0;
         int von = 0;
         int bis = 0;
+        int minimum = Integer.MAX_VALUE;
         String hoechste = null;
         for (String belegnummer : belegnummern) {
             if (belegnummer == null || belegnummer.length() > LAENGE_MAX) {
@@ -64,7 +65,9 @@ public final class Nummernfolge {
                 hoechste = belegnummer;
             }
             nummern.add(wert);
-            if (beispiel == null || nr.length() > breite) {
+            if (wert < minimum || wert == minimum && (nr.length() < breite
+                    || nr.length() == breite && belegnummer.compareTo(beispiel) < 0)) {
+                minimum = wert;
                 beispiel = belegnummer;
                 breite = nr.length();
                 von = m.start("nr");

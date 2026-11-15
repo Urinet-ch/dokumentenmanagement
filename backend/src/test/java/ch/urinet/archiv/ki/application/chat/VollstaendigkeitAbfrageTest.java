@@ -72,7 +72,8 @@ class VollstaendigkeitAbfrageTest {
         assertThat(a.datenstand().zeitpunkt()).isEqualTo("14.11.2026 11:00");
         assertThat(a.hinweis()).as("ohne Kategorien nie «vollständig» behaupten").isEqualTo(
                 VollstaendigkeitAbfrage.KEINE_REGELN);
-        kategorien = List.of(new Lueckenbericht.Kategorie(Lueckenbericht.Regel.FOLGE, "X", null, 0, null, 0, List.of()));
+        kategorien = List.of(new Lueckenbericht.Kategorie(
+                Lueckenbericht.Regel.FOLGE, "X", null, null, 0, null, 0, List.of()));
         assertThat(abfrage().vollstaendigkeit(kontext(Rolle.INHABER), 2026).hinweis()).isNull();
     }
 }

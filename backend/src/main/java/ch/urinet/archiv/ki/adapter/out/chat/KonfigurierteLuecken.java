@@ -49,6 +49,8 @@ public class KonfigurierteLuecken implements Lueckenbericht {
     private static final Pattern ART = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
     private static final Pattern FELD = Pattern.compile("^zusatz\\.[a-z][a-z0-9_]{0,62}$");
     private static final ZoneId ZONE = ZoneId.of("Europe/Zurich");
+    private static final String KEINE_MONATE = "Für dieses Geschäftsjahr liegen keine abgeschlossenen vollen Monate vor; "
+            + "Monatslücken wurden nicht geprüft.";
 
     private record Folge(String art, Pattern muster) {
     }
@@ -102,26 +104,32 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                 Nummernfolge.hatGruppe(regel.muster(), "jahr") ? geschaeftsjahr : null, nummern, Reihe.FEHLEND_MAX);
         List<Reihe> reihen = e.vorhanden() == 0 ? List.of()
                 : List.of(new Reihe(null, null, e.hoechste(), e.vorhanden(), e.fehlendGesamt(), e.fehlend()));
-        return new Kategorie(Regel.FOLGE, regel.art(), null, nummern.size(), null, reihen.size(), reihen);
+        return new Kategorie(Regel.FOLGE, regel.art(), null, null, nummern.size(), null, reihen.size(), reihen);
     }
 
     private Kategorie monatlich(Monatlich regel, Monatsluecken.Spanne spanne, YearMonth letzter, Sichtregel sicht) {
         List<WerkzeugDaten.Monatszeile> zeilen = daten.monate(
                 new WerkzeugDaten.Monatsquelle(regel.art(), regel.bezug(), regel.gruppe(), regel.nurMonat()), sicht);
-        Map<String, Set<YearMonth>> jeGruppe = new LinkedHashMap<>();
+        Map<String, Set<YearMonth>> monateJeSchluessel = new LinkedHashMap<>();
+        Map<String, String> anzeigeJeSchluessel = new LinkedHashMap<>();
         long belege = 0;
         long ohneZuordnung = 0;
         for (WerkzeugDaten.Monatszeile z : zeilen) {
             belege += z.belege();
-            if (z.gruppe() == null) {
+            if (z.schluessel() == null) {
                 ohneZuordnung += z.belege();
             } else {
-                jeGruppe.computeIfAbsent(z.gruppe(), g -> new HashSet<>()).add(z.monat());
+                monateJeSchluessel.computeIfAbsent(z.schluessel(), g -> new HashSet<>()).add(z.monat());
+                if (z.gruppe() != null) {
+                    anzeigeJeSchluessel.merge(z.schluessel(), z.gruppe(),
+                            (vorhanden, neu) -> vorhanden.compareTo(neu) <= 0 ? vorhanden : neu);
+                }
             }
         }
         List<Reihe> reihen = new ArrayList<>();
-        if (spanne != null) {
-            for (Map.Entry<String, Set<YearMonth>> eintrag : jeGruppe.entrySet()) {
+        boolean monateZuPruefen = spanne != null && !letzter.isBefore(spanne.erster());
+        if (monateZuPruefen) {
+            for (Map.Entry<String, Set<YearMonth>> eintrag : monateJeSchluessel.entrySet()) {
                 Monatsluecken.Ergebnis e = Monatsluecken.pruefen(eintrag.getValue(), spanne, letzter);
                 if (e.erster().isAfter(spanne.letzter())) {
                     continue;
@@ -129,15 +137,16 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                 long vorhanden = eintrag.getValue().stream()
                         .filter(m -> !m.isBefore(spanne.erster()) && !m.isAfter(spanne.letzter())).count();
                 List<String> fehlend = e.fehlend().stream().limit(Reihe.FEHLEND_MAX).map(YearMonth::toString).toList();
-                reihen.add(new Reihe(eintrag.getKey().isEmpty() ? null : eintrag.getKey(), e.erster().toString(), null,
-                        vorhanden, e.fehlend().size(), fehlend));
+                String gruppe = anzeigeJeSchluessel.get(eintrag.getKey());
+                reihen.add(new Reihe(gruppe == null || gruppe.isEmpty() ? null : gruppe,
+                        e.erster().toString(), null, vorhanden, e.fehlend().size(), fehlend));
             }
         }
         reihen.sort(Comparator.comparingLong(Reihe::anzahlFehlend).reversed()
                 .thenComparing(r -> r.gruppe() == null ? "" : r.gruppe(), String.CASE_INSENSITIVE_ORDER));
         List<Reihe> sichtbar = reihen.size() > Kategorie.REIHEN_MAX ? reihen.subList(0, Kategorie.REIHEN_MAX) : reihen;
-        return new Kategorie(Regel.ERWARTET, regel.art(), "MONAT", belege, ohneZuordnung == 0 ? null : ohneZuordnung,
-                reihen.size(), sichtbar);
+        return new Kategorie(Regel.ERWARTET, regel.art(), "MONAT", monateZuPruefen ? null : KEINE_MONATE, belege,
+                ohneZuordnung == 0 ? null : ohneZuordnung, reihen.size(), sichtbar);
     }
 
     // --- Konfiguration ----------------------------------------------------------------------------------------------
