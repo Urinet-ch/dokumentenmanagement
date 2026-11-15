@@ -11,6 +11,16 @@ Funktionalität: Chat in der PWA
   Grundlage:
     Angenommen die Chat-Schnittstelle ist eine Attrappe
 
+  @req-6.1
+  Szenario: Eine leere Gesprächsliste zeigt die leere Anzeige
+    Angenommen der Chat hat keine Gespräche
+    Und ein Bildschirm mit 375 Pixel Breite
+    Und Keycloak kennt mich als «inhaber» im Mandanten «urinet»
+    Wenn ich die Seite «/chat» öffne
+    Und ich mich anmelde
+    Dann sehe ich keine letzten Gespräche
+    Und sehe ich die leere Chat-Aufforderung
+
   @req-6.1 @req-6.2 @req-6.3
   Szenariogrundriss: Frage stellen, Antwort fortlaufend mit Hinweis und Quellen (<breite> px)
     Angenommen ein Bildschirm mit <breite> Pixel Breite

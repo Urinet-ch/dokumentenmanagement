@@ -88,6 +88,24 @@ Given(
 );
 
 Given(
+  /^«([^»]+)» im Mandanten «([^»]+)» hat 26 Kontakte zur Liste angelegt$/,
+  async function (rolle, mandant) {
+    const praefix = `Blätter ${kennung()} Test AG`;
+    this.blaetterPraefix = praefix;
+    for (let i = 1; i <= 26; i++) {
+      const alias = `Blätter Test AG ${String(i).padStart(2, '0')}`;
+      const basis = `${praefix} ${String(i).padStart(2, '0')}`;
+      await kontaktAnlegen(this, rolle, mandant, {
+        name: basis,
+        plz: '6000',
+        ort: 'Luzern',
+      });
+      kontakte(this).set(alias, kontakte(this).get(basis));
+    }
+  },
+);
+
+Given(
   /^«([^»]+)» im Mandanten «([^»]+)» hat das Dokument «([^»]+)» dem Kontakt «([^»]+)» mit Vertraulichkeit «(NORMAL|INTERN|PERSONAL)» zugeordnet$/,
   async function (rolle, mandant, datei, basis, vertraulichkeit) {
     const [ergebnis] = await direktHochladen(rolle, mandant, [
@@ -211,6 +229,25 @@ Then(/^zeigt die Liste den Kontakt «([^»]+)» nicht$/, async function (basis) 
   assert.equal(await kontaktLink(this, basis).count(), 0);
 });
 
+Then(/^zeigt die Kontaktliste insgesamt (\d+) Kontakte$/, async function (anzahl) {
+  const text = await this.seite.locator('[data-test=anzahl]').innerText();
+  const bezeichnung = Number(anzahl) === 1 ? 'Kontakt' : 'Kontakte';
+  assert.match(text, new RegExp(`\\b${anzahl}\\s+${bezeichnung}\\b`), text);
+});
+
+When('ich die Kontaktliste der Blätter-Kontakte suche', async function () {
+  await suchen(this, this.blaetterPraefix);
+});
+
+When('ich zur nächsten Kontaktseite blättere', async function () {
+  const antwort = this.seite.waitForResponse((r) => {
+    const url = new URL(r.url());
+    return url.pathname === '/api/v1/kontakte/liste' && url.searchParams.get('seite') === '1';
+  });
+  await this.seite.locator('[data-test=naechste]').click();
+  await antwort;
+});
+
 Then(/^zeigt die Liste keine Kontakte$/, async function () {
   await this.seite.locator('[data-test=keine]').waitFor();
   assert.equal(await this.seite.locator('[data-test=kontakt]').count(), 0);
@@ -291,6 +328,33 @@ When(/^ich im Formular das Feld «([^»]+)» auf «([^»]+)» ändere$/, async f
 
 When('ich das Formular speichere', async function () {
   await this.seite.locator('[data-test=speichern]').click();
+});
+
+When(
+  /^eine gleichzeitige Änderung setzt beim Kontakt «([^»]+)» den Ort auf «([^»]+)»$/,
+  async function (basis, ort) {
+    const k = kontakt(this, basis);
+    const vorher = await api(k.rolle, k.mandant, 'GET', `/kontakte/${k.id}`);
+    assert.equal(vorher.status, 200);
+    assert.ok(vorher.etag, 'das Detail liefert kein ETag');
+    const aenderung = await api(k.rolle, k.mandant, 'PATCH', `/kontakte/${k.id}`, {
+      ifMatch: vorher.etag,
+      body: { ort },
+    });
+    assert.equal(aenderung.status, 200, `gleichzeitige Änderung: ${aenderung.status}`);
+  },
+);
+
+Then(/^erkennt die PWA den Versionskonflikt bei Kontakt «([^»]+)»$/, async function (basis) {
+  const k = kontakt(this, basis);
+  await this.seite.locator('[data-test=veraltet]').waitFor();
+  const aenderung = this.weiterleitung.anfragen.findLast(
+    (a) => a.methode === 'PATCH' && a.pfad === `/api/v1/kontakte/${k.id}`,
+  );
+  assert.ok(aenderung, 'die PWA hat keinen Kontakt geändert');
+  assert.equal(aenderung.status, 412);
+  const aktuell = await api(k.rolle, k.mandant, 'GET', `/kontakte/${k.id}`);
+  assert.equal(aktuell.json.ort, 'Bürglen');
 });
 
 // wartet auf die Meldung mit dem Text (eine ältere Meldung der Seite verschwindet erst mit der Antwort des Archivs)

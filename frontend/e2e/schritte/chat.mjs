@@ -29,6 +29,12 @@ Given('die Chat-Schnittstelle ist eine Attrappe', async function () {
   await chatAttrappe(this);
 });
 
+Given('der Chat hat keine Gespräche', function () {
+  const chat = attrappe(this);
+  chat.gespraeche = [];
+  chat.verlauf.clear();
+});
+
 When(/^ich die Frage «(.+)» sende$/, async function (frage) {
   const feld = this.seite.getByRole('textbox', { name: 'Frage', exact: true });
   await feld.fill(frage);
@@ -64,6 +70,19 @@ Then(/^sehe ich unter den letzten Gesprächen zuoberst «(.+)»$/, async functio
   await this.seite.locator('[data-test=gespraech]').first().filter({ hasText: titel }).waitFor();
 });
 
+Then('sehe ich keine letzten Gespräche', async function () {
+  await listeOeffnen(this.seite);
+  await this.seite.getByText('Noch keine Gespräche.', { exact: true }).waitFor();
+});
+
+Then('sehe ich die leere Chat-Aufforderung', async function () {
+  await this.seite
+    .getByText('Stellen Sie eine Frage, zum Beispiel: «Welche Rechnungen sind noch offen?»', {
+      exact: true,
+    })
+    .waitFor();
+});
+
 Then(/^sehe ich den Hinweis «(.+)»$/, async function (text) {
   await hinweis(this.seite).filter({ hasText: text }).waitFor();
   assert.equal(await letzteAntwort(this.seite).locator('.inhalt').innerText(), '');
@@ -77,7 +96,10 @@ Then(/^sehe ich den Anfang der Antwort «(.+)», während sie noch läuft$/, asy
 });
 
 Then('ist das Eingabefeld leer', async function () {
-  assert.equal(await this.seite.getByRole('textbox', { name: 'Frage', exact: true }).inputValue(), '');
+  assert.equal(
+    await this.seite.getByRole('textbox', { name: 'Frage', exact: true }).inputValue(),
+    '',
+  );
 });
 
 Then('ist der Hinweis verschwunden', async function () {

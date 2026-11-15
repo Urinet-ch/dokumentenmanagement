@@ -12,6 +12,22 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
   Hintergrund:
     Angenommen die PWA spricht mit dem Archiv im Testmodus
 
+  @req-17.1
+  Szenario: Die Kontaktliste lässt sich durchsuchen und blättern
+    Angenommen «inhaber» im Mandanten «urinet» hat 26 Kontakte zur Liste angelegt
+    Und das Browserfenster ist 1280 Pixel breit
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich die Kontakte über das Menü öffne
+    Und ich die Kontaktliste der Blätter-Kontakte suche
+    Dann zeigt die Kontaktliste insgesamt 26 Kontakte
+    Und zeigt die Liste den Kontakt «Blätter Test AG 01»
+    Und zeigt die Liste den Kontakt «Blätter Test AG 26» nicht
+    Wenn ich zur nächsten Kontaktseite blättere
+    Dann zeigt die Liste den Kontakt «Blätter Test AG 26»
+    Wenn ich nach dem Kontakt «Blätter Test AG 26» suche
+    Dann zeigt die Kontaktliste insgesamt 1 Kontakte
+    Und zeigt die Liste den Kontakt «Blätter Test AG 26»
+
   @req-17.5
   Szenariogrundriss: Ohne Recht A6 gibt es keinen Menüpunkt, der direkte Aufruf führt zur Startseite und das Archiv verweigert (<breite> px)
     Angenommen der Szenariobeginn ist gemerkt
@@ -100,6 +116,20 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
       | breite |
       | 375    |
       | 1280   |
+
+  @req-17.6
+  Szenario: Eine gleichzeitige Änderung macht das Kontaktformular veraltet
+    Angenommen «inhaber» im Mandanten «urinet» hat den Kontakt «Versionskonflikt Test AG» in «Luzern» angelegt
+    Und das Browserfenster ist 1280 Pixel breit
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich die Kontakte über das Menü öffne
+    Und ich nach dem Kontakt «Versionskonflikt Test AG» suche
+    Und ich den Kontakt «Versionskonflikt Test AG» öffne
+    Und ich die Aktion «Bearbeiten» wähle
+    Und ich im Formular das Feld «Ort» auf «Erstfeld» ändere
+    Und eine gleichzeitige Änderung setzt beim Kontakt «Versionskonflikt Test AG» den Ort auf «Bürglen»
+    Und ich das Formular speichere
+    Dann erkennt die PWA den Versionskonflikt bei Kontakt «Versionskonflikt Test AG»
 
   @req-17.6 @req-17.12
   Szenariogrundriss: Der Inhaber markiert einen Kontakt nach der Rückfrage als inaktiv und aktiviert ihn wieder (<breite> px)
