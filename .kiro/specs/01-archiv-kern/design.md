@@ -920,7 +920,7 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
   4. Umhängen (`KontaktVerweise`, je Spalte eine Mengenanweisung `update … set … = :ziel where … = :quelle`):
      `dokument.partner_id`, `dokument.ki_partner_id` (sonst zählte das Bestätigen nach dem Zusammenführen als
      Korrektur, «Umsetzung (Aufgabe 3.3)»), `verkaufschance.kontakt_id`, `ki_beispiel.partner_id`; mit Spec 02,
-     Aufgabe 8.3 auch `abaninja_beleg.kontakt_id`. Nicht umgehängt: `import_zeile.kontakt_id` und
+     Aufgabe 8.3 auch `abaninja_beleg.kontakt_id` (entfällt: Aufgabe 8.3 entfällt mit E1 = nein, 15.11.2026). Nicht umgehängt: `import_zeile.kontakt_id` und
      `import_zeile.entscheid_kontakt` (Verlauf eines Laufs; die Übernahme behandelt sie nach Req 17.14),
      `zugriff_protokoll` und `dokument_version` (nur Einfügen). `KontaktVerweiseTest` (JUnit, gegen PostgreSQL) liest
      aus `information_schema.columns` des Mandanten-Schemas jede Spalte vom Typ `uuid` mit dem Namen `partner_id`,
@@ -959,7 +959,7 @@ vorgeschlagen 14.11.2026, entschieden mit dem Merge des Spec-PR):
   (`null`, solange die Vorschau aussteht, wie die übrigen Zähler). Die Übernahme ändert nie einen inaktiven Kontakt:
   `INAKTIV` und Zeilen, deren Kontakt seit der Vorschau inaktiv wurde (auch über einen Dubletten-Entscheid), zählen
   als ausgelassen; «nicht mehr im CRM-Export» setzt und löscht sie nur bei aktiven Kontakten. Für den Abgleich mit
-  AbaNinja (Spec 02, Req 9) gilt dieselbe Regel; festgelegt wird sie dort mit Aufgabe 8.3.
+  AbaNinja (Spec 02, Req 9) gälte dieselbe Regel; entfällt, weil die Anbindung mit E1 = nein (15.11.2026) nicht gebaut wird.
 - Oberfläche (Aufgabe 4.12): Routen `/kontakte` und `/kontakte/:id` (lazy geladen, Guard auf A6), Eintrag «Kontakte»
   in der Navigation nur mit A6. Liste mit Suchfeld (300 ms Verzögerung, verwirft veraltete Antworten wie die
   Partnersuche), Filtern, Blättern und Gesamtzahl; mobil (< 960 px) als Karten, ohne waagrechtes Scrollen (Req 17.17).
@@ -1417,6 +1417,12 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
     des Speicherns sind Abschliessen, Aufnehmen, Dateiwahl, Zuschnitt und Verwerfen gesperrt; ein zweiter Aufruf legt
     keinen zweiten Eintrag an. Danach entfernt die PWA nur die gespeicherten Seiten; eine Aufnahme, die während des
     Speicherns noch ankam, bleibt für die nächste Erfassung stehen.
+  - Benutzerwechsel auf dem Gerät (Req 4.10, 4.11; entschieden von Fabian am 15.11.2026, vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR; Aufgabe 3.9, Stand Code: noch offen):
+    - Auslöser: Eine Anmeldung (nicht das blosse Erneuern oder der Ablauf der Sitzung) liefert einen Inhaber (`sub`, `mandant`), und `alleEintraege` enthält Einträge im Zustand `wartet` mit einem anderen Inhaber. Einträge ohne Benutzer gehören niemandem und lösen keine Frage aus (sie übernimmt wie bisher die erste Anmeldung mit Recht A1).
+    - Frage: ein Dialog vor dem ersten Lauf des neuen Inhabers, einmal je Anmeldung, mit der Gesamtzahl der fremden wartenden Aufnahmen und deren Aufnahmezeitpunkten, ohne Benutzernamen, Mandanten und Inhalte. «Löschen» verlangt eine zweite, ausdrückliche Bestätigung und entfernt die Einträge endgültig aus IndexedDB (`WarteschlangeSpeicher.loeschen`); «Behalten» ändert nichts: Die Einträge bleiben dem bisherigen Inhaber zugeordnet, bleiben für den neuen Benutzer verborgen und werden nie unter dem neuen Benutzer hochgeladen (Mandantentrennung, Req 4.4).
+    - Speicherort: Die Antwort wird nicht gespeichert und nicht an das Archiv gesendet. Gemerkt wird nur im Arbeitsspeicher, dass für diese Anmeldung schon gefragt wurde; beim nächsten Wechsel oder nach einem Neuladen mit neuer Anmeldung fragt die PWA erneut, solange fremde wartende Einträge da sind.
+    - Fehlerhafte Einträge (Zustand `fehlerhaft`, Req 4.6, 4.8) sind nie Gegenstand der Frage und werden nie automatisch gelöscht; sie bleiben, bis ihr Inhaber sie in der Liste «Nicht hochgeladen» ausdrücklich löscht (neue Aktion neben «Erneut versuchen», mit Bestätigung).
+    - Abmelden und abgelaufene Sitzung: keine Frage, kein Löschen; die Einträge des Abmeldenden bleiben ihm zugeordnet und gehen nach seiner nächsten Anmeldung hoch. Die Frage entsteht erst, wenn sich ein anderer Inhaber anmeldet.
   - Abweichung: kein Background Sync. Die Tokens liegen nur im Arbeitsspeicher der Seite, ein Service Worker könnte
     ohne Token nicht hochladen; die Warteschlange läuft, sobald die PWA offen ist.
   - Upload-Seite: Der Titel ist ein `h2` unter dem Seitentitel, damit «Handy-Erfassung» und «Datei hochladen» eine

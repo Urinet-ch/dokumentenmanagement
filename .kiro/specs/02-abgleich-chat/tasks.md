@@ -2,8 +2,8 @@
 
 Voraussetzung: Gate Phase 1 erfüllt, Spec 02 auf `main` gemergt. Ausnahme: Welle 6 (6.1, 6.3–6.6; 6.6 ergänzt 14.11.2026) wird vor Gate Phase 1 entwickelt (entschieden von Fabian am 13.11.2026, Fokus auf Funktionen für die Benutzer); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17), nicht für die Entwicklung. Welle 7 (7.1–7.4) wird ebenfalls vor Gate Phase 1 entwickelt (entschieden von Fabian am 14.11.2026, Priorität Chat-Funktionen); Gate Phase 1 bleibt Bedingung für den produktiven Betrieb mit echten Belegen (Spec 01, Req 16.17). 9.1 bleibt an Gate Phase 1 gebunden. Vertrag und Entscheide für 7.1–7.4: design.md, «Chat-Agent (`ki/chat`)», «Vertrag Welle 7». Wellen, Rollen und Gates wie in
 `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
-Welle 8 (AbaNinja) läuft **nur**, wenn der Konzept-Entscheid E1 = ja; sonst wird sie übersprungen und die
-Werkzeuge melden «Zahlstatus unbekannt». Optionale Aufgaben sind mit `*` markiert.
+Welle 8 (AbaNinja) **entfällt** (Konzept-Entscheid E1 = nein, vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR); die
+Werkzeuge melden dauerhaft «Zahlstatus unbekannt». Optionale Aufgaben sind mit `*` markiert.
 Jede Aufgabe liefert für ihre Anforderungen Cucumber-Szenarien mit `@req-<x.y>` (ausser bei Nachweis-Vermerk)
 und erfüllt die Definition of Done aus `tech.md`.
 
@@ -13,6 +13,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - `integration_mail`, `mail_eingang`; `MailPoller` (Angus Mail, IMAP TLS), Zulassungsliste, Ordner `Archiviert`/`Quarantaene`, Idempotenz über Message-ID
   - Mail ohne Anhang → `.eml` + PDF aus Text (PDFBox) → normale Verarbeitung bis in den Eingangskorb, Dublettenprüfung wie Upload
   - Szenarien `@req-1.x` mit GreenMail
+  - Schwelle `archiv.mail.eingebettet-ab` = 100 KiB (Startwert, bestätigt von Fabian am 15.11.2026: vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR; ein eingebettetes Bild ab dieser Grösse ist ein Anhang, kleinere gehören zum Text, siehe design.md «E-Mail-Eingang»)
   - _Anforderungen: 1.1–1.6_
 
 - [ ] 6.2 Postfach `archiv@urinet.ch` einrichten [Fabian]
@@ -77,31 +78,33 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Erledigt 14./15.11.2026 (PR #147 Seite gegen Attrappe, PR #172 Menüpunkt «Chat» und Durchstich gegen das echte Archiv mit WireMock als Sprachmodell; design.md «Umsetzung (Aufgabe 7.4b, 15.11.2026)»). Offen bleibt der Nachweis mit dem echten Modell in 9.1 (Gate Phase 1)
   - _Anforderungen: 4.3, 6.1–6.3_
 
-## Welle 8 — AbaNinja (nur bei E1 = ja)
+## Welle 8 — AbaNinja (entfällt, Entscheid 15.11.2026: kein Abo, E1 = nein)
+Alle Aufgaben dieser Welle bleiben stehen, damit die Nummern stabil sind und der Entscheid nachvollziehbar ist; sie werden nicht umgesetzt und nicht abgehakt. Die Requirements 8–12 gelten damit als nicht umgesetzt (Vermerk in `requirements.md`). Die Abdeckungsprüfung (Req 16.14) zählt nur abgehakte Aufgaben und bleibt davon unberührt.
 
-- [ ] 8.1 Entscheid E1 und Zugang [Fabian]
+- [ ] 8.1 Entscheid E1 und Zugang [Fabian] — **entfällt, Entscheid 15.11.2026**
+  - Entschieden von Fabian: Kein Abo «Basic», E1 = nein (vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR); es wird kein API-Token erstellt
   - Abo «Basic» abschliessen, API-Token mit minimalen Scopes erstellen (Adressen, Dokumente lesen, Webhooks), Konto-UUID notieren; Token nie ins Repo
   - _Anforderungen: 8.1_
 
-- [ ] 8.2 API-Spike und Client [Backend]
+- [ ] 8.2 API-Spike und Client [Backend] — **entfällt, Entscheid 15.11.2026**
   - Endpunkte, Paging, Webhook-Echtheitsprüfung und Rate-Limits aus docs.abaninja.ch in `docs/spikes/abaninja-api.md`
   - `AbaNinjaClient` hinter Driven Port mit Dev-Stub, `integration_abaninja` (AES-GCM, Schlüssel aus `/run/secrets/archiv_data_key`), Verbindungstest, Backoff
   - _Anforderungen: 8.2, 8.3, 8.4_
 
-- [ ] 8.3 Abgleich Kontakte [Backend]
+- [ ] 8.3 Abgleich Kontakte [Backend] — **entfällt, Entscheid 15.11.2026**
   - `AbaNinjaSync` Adressen → Kontakte (UUID → E-Mail → Name+PLZ), CSV-Felder erhalten, Liste «Kontakte prüfen»
   - _Anforderungen: 9.1–9.3_
 
-- [ ] 8.4 Rechnungen und Lieferantenbelege [Backend]
+- [ ] 8.4 Rechnungen und Lieferantenbelege [Backend] — **entfällt, Entscheid 15.11.2026**
   - `belegnummer_alias` mit Startwerten; Status/`bezahlt_am` übernehmen (Systemänderung, protokolliert); fehlende PDFs in den Eingangskorb; Lieferantenbelege verknüpfen oder erfassen
   - Test: das Archiv ruft nie schreibende Zahlungs-Endpunkte auf
   - _Anforderungen: 8.5, 10.1–10.3, 11.1, 11.2_
 
-- [ ] 8.5 Webhooks [Backend]
+- [ ] 8.5 Webhooks [Backend] — **entfällt, Entscheid 15.11.2026**
   - `POST /webhooks/abaninja/{mandant}`, Echtheitsprüfung, Idempotenz, 202 ≤ 1 s, Nachholen im Tagesabgleich
   - _Anforderungen: 12.1–12.4_
 
-- [ ] 8.6 Verwaltungsseite AbaNinja [Frontend]
+- [ ] 8.6 Verwaltungsseite AbaNinja [Frontend] — **entfällt, Entscheid 15.11.2026**
   - Verbindung erfassen/testen, letzter Abgleich, Fehler, Alias-Tabelle, Liste «Kontakte prüfen»
   - _Anforderungen: 8.3, 9.3, 10.1_
 
@@ -118,7 +121,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit den Aufgaben 10.x von Spec 03 kollidieren. Spec 04 belegt die Nummern O.4–O.6.
 
-- [ ]* O.1 Eigene Rechnungen nach AbaNinja importieren (I4) [Backend]
+- [ ]* O.1 Eigene Rechnungen nach AbaNinja importieren (I4) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus)
   - Generator-Dokumente der Art Ausgangsrechnung per PDF-Import an AbaNinja senden, AbaNinja-UUID speichern
 - [ ]* O.2 Bankbewegungen für «bezahlt am» (I5) [Backend]
 - [ ]* O.3 MCP-Server für Claude (C3) [Backend]

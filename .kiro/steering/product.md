@@ -43,7 +43,7 @@ Zeilen A15–A19 in Spec 04, Requirement 12.1).
 - Ein neuer Mandant ist Konfiguration, kein neues Projekt.
 
 ## Abgrenzung
-- AbaNinja bleibt führend für Buchhaltung und Zahlstatus. Das Archiv markiert **nie** eine Rechnung als bezahlt und schreibt keine Zahlungen nach AbaNinja.
+- AbaNinja bleibt führend für Buchhaltung und Zahlstatus (eine Anbindung ans Archiv entfällt, Entscheid E1 = nein vom 15.11.2026; der Zahlstatus bleibt im Archiv «unbekannt»). Das Archiv markiert **nie** eine Rechnung als bezahlt und schreibt keine Zahlungen nach AbaNinja.
 - 21.CRM bleibt führend für Kontakte und Akquise. Zum Start kommen Kontakte per CSV-Export ins Archiv.
 - Das Archiv ist weder Buchhaltung noch CRM noch Redaktionssystem (WordPress bleibt für VHF/GSK).
 
@@ -52,7 +52,7 @@ Zeilen A15–A19 in Spec 04, Requirement 12.1).
 | --- | --- | --- | --- |
 | 0 Klären | `01-archiv-kern`, Welle 0 | Spikes, Golden-Datensatz, Test-Export 21.CRM | ≥ 18 von 20 zurückgehaltenen Belegen richtig erkannt (30 zum Abstimmen), höchstens 1 Fehler unter den sicheren Feldern |
 | 1 Archiv-Kern | `01-archiv-kern`, Wellen 1–5 | Erfassung, OCR, KI-Vorschläge, Eingangskorb, Suche, GeBüV-Ablage, CRM-CSV-Import | Belege 2026 im Archiv, Prüflauf ohne Abweichung |
-| 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport, AbaNinja (nur mit Abo Basic) | 7 Beispielfragen richtig und mit Quelle |
+| 2 Abgleich und Chat | `02-abgleich-chat` | E-Mail-Eingang, semantische Suche, Chat-Agent, Jahresexport; AbaNinja entfällt (kein Abo, E1 = nein, 15.11.2026) | 7 Beispielfragen richtig und mit Quelle |
 | 3 Zweiter Mandant | `03-zweiter-mandant` | VHF/GSK: Mandant, Webseiten-Schnittstelle (Lesen und Erfassung, versionierter Vertrag), WordPress-Plugin, Chatbot | VHF/GSK-Archiv online |
 | 4 Wissensbasis | `04-wissensbasis` | Wissensbasis nach LLM-Wiki-Muster | Gate Phase 4: 5 Wissensquellen, ≥ 47 von 50 Fussnoten belegt, ≥ 14 von 15 Fragen mit Seite und Quelldokument richtig |
 

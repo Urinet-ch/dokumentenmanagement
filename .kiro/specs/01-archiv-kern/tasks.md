@@ -311,8 +311,17 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Nach einem Neuladen der PWA meldet man sich neu an (Tokens nur im Arbeitsspeicher, aus 2.7). `/erfassen` ist darum offline auch ohne Anmeldung zugänglich und nimmt Aufnahmen in die Warteschlange; hochgeladen wird erst nach der Anmeldung (entschieden von Fabian am 11.11.2026, PR #44)
   - [Fabian] Test auf echtem iPhone (Safari) und Android (Chrome) mit den Mindestversionen aus 2.8: Installation und 4.2 bis 4.8
   - Stand Umsetzung (PR #123, 13.11.2026): Kamera, Scanner im Web Worker, Vorschau, Warteschlange und Upload sind umgesetzt, dazu Eintrag `aufgenommen` und Aufruf von `aufnahmeName` aus 4.10 (Req 4.9); Browser-Szenarien in `features/dokument/erfassen-handy-pwa.feature` (`@req-4.2` bis `@req-4.9`). Der Haken folgt erst nach dem Gerätetest [Fabian] (Req 4.1). Nachgebessert nach dem Review: Warteschlange mit Benutzer und Mandant (nur eigene Einträge sichtbar und hochgeladen), Meldung bei einer Seite mit Fehler statt gesperrtem Knopf, Sperre während des Speicherns, Zeitpunkt der ersten verbliebenen Seite, gemeinsames `uploadProblem` mit `fehlercode`
+  - Entscheid 15.11.2026 «Fragen, dann löschen» (vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR; Req 4.10, 4.11, design.md, Umsetzung 3.7 «Benutzerwechsel auf dem Gerät»): Umsetzung als eigene Aufgabe 3.9 (Folgeaufgabe zu 3.7; die Abdeckungsprüfung erlaubt nur Nummern der Form x.y), nicht Teil dieser Aufgabe
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_
+
+- [ ] 3.9 Folge zu 3.7: Warteschlange: Frage beim Benutzerwechsel und Löschen fehlerhafter Einträge [Frontend]
+  - Folge aus dem Entscheid 15.11.2026 zu 3.7; heutiger Stand (`frontend/src/app/erfassen/handy/warteschlange/warteschlange.service.ts`): Einträge anderer Inhaber bleiben verborgen und unberührt, eine Frage gibt es nicht, und fehlerhafte Einträge bieten nur «Erneut versuchen», aber kein Löschen
+  - Beim Anmelden eines anderen Benutzers oder Mandanten (Anmelden, nicht abgelaufene Sitzung) mit wartenden Einträgen anderer Inhaber: Dialog mit Anzahl und Aufnahmezeitpunkten, ohne Benutzernamen und ohne Inhalte; «Löschen» (zweite Bestätigung, `speicher.loeschen`) oder «Behalten» (keine Änderung am Eintrag); gemerkt nur im Arbeitsspeicher bis zur nächsten Anmeldung, nichts davon geht an den Server
+  - Aktion «Löschen» (mit Bestätigung) für eigene fehlerhafte Einträge in der Liste «Nicht hochgeladen»; Abmelden und abgelaufene Sitzung löschen und fragen nichts
+  - Texte in `texte.de-CH.ts`; Vitest für `WarteschlangeService` (Wechsel, Mandantenwechsel, mehrere Fremdinhaber, Behalten, Löschen, fehlerhafte Einträge bleiben) und Browser-Szenarien `@req-4.10`, `@req-4.11` in `erfassen-handy-pwa.feature`
+  - _Anforderungen: 4.10, 4.11_
+  - _Abhängig von: 3.7_
 
 ## Welle 4 — CSV-Import, Suche, Generatoren, Altbestand
 
@@ -506,7 +515,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
-  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
+  - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 
