@@ -27,7 +27,6 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.SdkResponse;
 import software.amazon.awssdk.core.interceptor.Context;
@@ -72,7 +71,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Object Lock und Versionierung, ohne Bucket Policy.
  */
 @QuarkusTest
-@Tag("start-1")
 class S3AblageTest {
 
     private static final LocalDate IN_ZEHN_JAHREN = LocalDate.now().plusYears(10);
