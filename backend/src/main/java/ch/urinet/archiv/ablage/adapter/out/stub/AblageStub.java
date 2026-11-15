@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
@@ -150,7 +151,7 @@ public class AblageStub implements AblagePort {
 
     @Override
     public synchronized VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel,
-                                                        String versionId) {
+                                                        String versionId, Ansicht ansicht) {
         if (versionId == null || versionId.isBlank()) {
             throw new IllegalArgumentException("Vorsignierte URL nur mit Versions-ID");
         }

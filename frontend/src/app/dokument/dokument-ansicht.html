@@ -159,16 +159,9 @@
                 </object>
               }
               <div class="aktionen">
-                <a
-                  mat-flat-button
-                  data-test="download"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  [href]="pdfaUrl()"
-                  (click)="pdfaKlick($event)"
-                >
+                <button mat-flat-button type="button" data-test="download" (click)="pdfaHerunterladen()">
                   {{ texte.herunterladen }}
-                </a>
+                </button>
               </div>
               <p class="klein">{{ texte.downloadHinweis }}</p>
             }

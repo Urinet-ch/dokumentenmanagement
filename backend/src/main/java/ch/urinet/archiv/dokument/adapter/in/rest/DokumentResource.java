@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokument.adapter.in.rest;
 
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.dokument.application.Aenderung;
@@ -454,6 +455,9 @@ public class DokumentResource {
                     + "5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» "
                     + "(PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. "
                     + "variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). "
+                    + "ansicht download (Standard, Content-Disposition attachment mit sicherem Dateinamen) oder "
+                    + "vorschau (inline mit dem Typ der Datei, für die Anzeige in der Seite; nur für PDF und Bilder, "
+                    + "sonst attachment). "
                     + "Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.")
     @APIResponse(responseCode = "200", description = "Vorsignierte URL als JSON (nur mit Accept: application/json)",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
@@ -464,13 +468,16 @@ public class DokumentResource {
                           @QueryParam("variante") @Parameter(schema = @Schema(type = SchemaType.STRING,
                                   enumeration = {"pdfa", "original", "arbeitsfassung"}, defaultValue = "pdfa"))
                           String variante,
+                          @QueryParam("ansicht") @Parameter(schema = @Schema(type = SchemaType.STRING,
+                                  enumeration = {"download", "vorschau"}, defaultValue = "download")) String ansicht,
                           @QueryParam("nr") @Parameter(description = "Nummer der Datei (nur original und "
                                   + "arbeitsfassung)", schema = @Schema(type = SchemaType.INTEGER, format = "int32",
                                   minimum = "1", maximum = "9999")) String nr) {
         MandantCode mandant = aufloesung.pruefen();
         DateiRolle rolle = rolle(variante);
         int nummer = nummer(rolle, nr);
-        VorsignierteUrl url = datei.herunterladen(benutzer(identitaet), mandant, id, rolle, nummer);
+        VorsignierteUrl url = datei.herunterladen(benutzer(identitaet), mandant, id, rolle, nummer,
+                ansicht(ansicht));
         Response.ResponseBuilder antwort = alsJson(kopf)
                 ? Response.ok(new DownloadAdresseDto(url.url().toString(), url.gueltigBis()))
                 : Response.status(Response.Status.FOUND).location(url.url());
@@ -509,6 +516,14 @@ public class DokumentResource {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    private static Ansicht ansicht(String ansicht) {
+        return switch (ansicht == null || ansicht.isEmpty() ? "download" : ansicht) {
+            case "download" -> Ansicht.DOWNLOAD;
+            case "vorschau" -> Ansicht.VORSCHAU;
+            default -> throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        };
     }
 
     private static DateiRolle rolle(String variante) {

@@ -437,24 +437,34 @@ export class DokumenteService extends BaseService {
 
     /**
      * Datei eines Dokuments herunterladen
-     * Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.
+     * Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). ansicht download (Standard, Content-Disposition attachment mit sicherem Dateinamen) oder vorschau (inline mit dem Typ der Datei, für die Anzeige in der Seite; nur für PDF und Bilder, sonst attachment). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.
      * @endpoint get /api/v1/dokumente/{id}/datei
      * @param id 
+     * @param ansicht 
      * @param nr Nummer der Datei (nur original und arbeitsfassung)
      * @param variante 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<DownloadAdresse>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<DownloadAdresse>>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<DownloadAdresse>>;
-    public apiV1DokumenteIdDateiGet(id: string, nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumenteIdDateiGet(id: string, ansicht?: 'download' | 'vorschau', nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<DownloadAdresse>;
+    public apiV1DokumenteIdDateiGet(id: string, ansicht?: 'download' | 'vorschau', nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<DownloadAdresse>>;
+    public apiV1DokumenteIdDateiGet(id: string, ansicht?: 'download' | 'vorschau', nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<DownloadAdresse>>;
+    public apiV1DokumenteIdDateiGet(id: string, ansicht?: 'download' | 'vorschau', nr?: number, variante?: 'pdfa' | 'original' | 'arbeitsfassung', observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (id === null || id === undefined) {
             throw new Error('Required parameter id was null or undefined when calling apiV1DokumenteIdDateiGet.');
         }
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'ansicht',
+            <any>ansicht,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         localVarQueryParameters = this.addToHttpParams(
             localVarQueryParameters,

@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AblagePfad;
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -33,13 +34,14 @@ public class DokumentDatei {
     }
 
     /** {@code nr} gilt für Original und Arbeitsfassung (ab 1); für PDF/A ist sie 0. */
-    public VorsignierteUrl herunterladen(Benutzer benutzer, MandantCode mandant, UUID id, DateiRolle rolle, int nr) {
+    public VorsignierteUrl herunterladen(Benutzer benutzer, MandantCode mandant, UUID id, DateiRolle rolle, int nr,
+                                         Ansicht ansicht) {
         DateiFundstelle fundstelle = repository.dateiFinden(id, Sichtregel.fuer(benutzer), rolle, nr)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         AblagePfad pfad = AblagePfad.lesen(fundstelle.pfad());
         if (!pfad.schluessel().docId().equals(id) || pfad.schluessel().rolle() != rolle) {
             throw new IllegalStateException("Gespeicherter Pfad passt nicht zum Dokument " + id);
         }
-        return ablage.vorsignierteUrl(mandant, pfad.ort(), pfad.schluessel(), fundstelle.versionId());
+        return ablage.vorsignierteUrl(mandant, pfad.ort(), pfad.schluessel(), fundstelle.versionId(), ansicht);
     }
 }

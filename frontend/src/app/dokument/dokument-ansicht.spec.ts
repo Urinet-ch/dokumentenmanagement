@@ -8,7 +8,7 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentAnsicht, sichereAdresse } from './dokument-ansicht';
-import { DokumentPort, Variante } from './dokument-port';
+import { Ansicht, DokumentPort, Variante } from './dokument-port';
 
 const zukunft = () => new Date(Date.now() + 5 * 60_000).toISOString();
 
@@ -46,7 +46,10 @@ class DokumentAttrappe extends DokumentPort {
   dokument: Observable<Dokument> = of(DOKUMENT);
   pdfa: Observable<DownloadAdresse> = of({ url: 'https://s3.example/pdfa?sig=1', gueltigBis: zukunft() });
   original: () => DownloadAdresse = () => ({ url: 'https://s3.example/original', gueltigBis: zukunft() });
+  /** Adresse der PDF/A-Fassung für den Download (attachment), getrennt von der Vorschau (inline). */
+  pdfaDownload: () => DownloadAdresse = () => ({ url: 'https://s3.example/pdfa-dl?sig=2', gueltigBis: zukunft() });
   aufrufe: Variante[] = [];
+  ansichten: Ansicht[] = [];
   gelesen = 0;
   bilder: number[] = [];
   bild: Observable<Blob> = of(new Blob(['png'], { type: 'image/png' }));
@@ -71,9 +74,13 @@ class DokumentAttrappe extends DokumentPort {
   kontakte(): Observable<Kontakt[]> {
     return of([]);
   }
-  adresse(_id: string, variante: Variante): Observable<DownloadAdresse> {
+  adresse(_id: string, variante: Variante, ansicht: Ansicht): Observable<DownloadAdresse> {
     this.aufrufe.push(variante);
-    return variante === 'pdfa' ? this.pdfa : of(this.original());
+    this.ansichten.push(ansicht);
+    if (variante === 'pdfa') {
+      return ansicht === 'vorschau' ? this.pdfa : of(this.pdfaDownload());
+    }
+    return of(this.original());
   }
 }
 
@@ -125,10 +132,22 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(element.textContent).toContain('belegnummer');
     expect(element.textContent).not.toContain('ohneWert');
     expect(element.querySelector('[data-test=vorschau]')!.getAttribute('type')).toBe('application/pdf');
-    const link = element.querySelector<HTMLAnchorElement>('[data-test=download]')!;
-    expect(link.href).toBe('https://s3.example/pdfa?sig=1');
-    expect(link.rel).toBe('noopener noreferrer');
+    expect(element.querySelector<HTMLObjectElement>('[data-test=vorschau]')!.getAttribute('data')).toBe(
+      'https://s3.example/pdfa?sig=1',
+    );
+    expect(element.querySelector('[data-test=download]')).toBeTruthy();
+    // nur die Vorschau-Adresse (inline) ist geholt; der Download holt seine eigene erst beim Klick
     expect(port.aufrufe).toEqual(['pdfa']);
+    expect(port.ansichten).toEqual(['vorschau']);
+  });
+
+  it('lädt beim Klick auf Herunterladen eine eigene Download-Adresse (attachment), nicht die der Vorschau', async () => {
+    await oeffnen();
+    const offen = vi.spyOn(window, 'open').mockReturnValue(null);
+    element.querySelector<HTMLButtonElement>('[data-test=download]')!.click();
+    expect(port.ansichten).toEqual(['vorschau', 'download']);
+    expect(offen).toHaveBeenCalledWith('https://s3.example/pdfa-dl?sig=2', '_blank', 'noopener,noreferrer');
+    expect(offen).not.toHaveBeenCalledWith('https://s3.example/pdfa?sig=1', expect.anything(), expect.anything());
   });
 
   it('verlinkt den Partner nur mit A6 auf die Kontaktseite (Req 17.1)', async () => {
@@ -159,15 +178,6 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(titel.querySelector('bdi')!.textContent).toBe('Scan_Rechnung-2026.pdf');
     expect(titel.querySelector('[data-test=titel-platzhalter]')!.getAttribute('title')).toBe('Scan_Rechnung-2026.pdf');
     expect(element.querySelector('[data-test=dateiname]')!.textContent).toBe('Scan_Rechnung-2026.pdf');
-  });
-
-  it('holt eine abgelaufene Adresse beim Klick neu', async () => {
-    port.pdfa = of({ url: 'https://s3.example/alt', gueltigBis: new Date(Date.now() - 1000).toISOString() });
-    await oeffnen();
-    const offen = vi.spyOn(window, 'open').mockReturnValue(null);
-    element.querySelector<HTMLAnchorElement>('[data-test=download]')!.click();
-    expect(port.aufrufe).toEqual(['pdfa', 'pdfa']);
-    expect(offen).toHaveBeenCalledWith('https://s3.example/alt', '_blank', 'noopener,noreferrer');
   });
 
   it('bietet ohne PDF/A-Fassung das Original an', async () => {

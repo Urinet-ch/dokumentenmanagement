@@ -5,12 +5,14 @@ import { Dokument, DokumentAenderung, Dokumentart, DownloadAdresse, Kontakt } fr
 // HttpDokumentService setzt sie mit dem generierten OpenAPI-Client um (Aufgabe 4.6).
 
 export type Variante = 'pdfa' | 'original';
+/** `vorschau`: Adresse mit Content-Disposition inline (Anzeige in der Seite); `download`: attachment. */
+export type Ansicht = 'vorschau' | 'download';
 
 export abstract class DokumentPort {
   abstract lesen(id: string): Observable<Dokument>;
   abstract dokumentarten(): Observable<Dokumentart[]>;
   /** Vorsignierte Adresse (höchstens 5 Minuten gültig); jeder Abruf wird als HERUNTERLADEN protokolliert. */
-  abstract adresse(id: string, variante: Variante): Observable<DownloadAdresse>;
+  abstract adresse(id: string, variante: Variante, ansicht: Ansicht): Observable<DownloadAdresse>;
   /** PNG-Vorschau einer Seite (ab 1), mit Token geholt; wird als ANZEIGEN protokolliert. */
   abstract vorschau(id: string, seite: number): Observable<Blob>;
   /** `PATCH` mit `If-Match: "<version>"` (A6, Req 10.1); Antwort ist das geänderte Dokument. */

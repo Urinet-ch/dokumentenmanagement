@@ -164,7 +164,7 @@ Then(/^zeigt die Dokumentansicht «(.+)» mit «(.+)»$/, async function (angabe
 
 Then(/^hat die PWA die PDF\/A-Adresse von «(.+)» als JSON angefragt$/, async function (titel) {
   await this.seite.locator('[data-test=download]').waitFor();
-  assert.deepEqual(this.suche.downloads, [{ id: dokumentId(this, titel), variante: 'pdfa', accept: 'application/json' }]);
+  assert.deepEqual(this.suche.downloads, [{ id: dokumentId(this, titel), variante: 'pdfa', ansicht: 'vorschau', accept: 'application/json' }]);
   assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
 });
 
@@ -174,11 +174,21 @@ Then('zeigt die Vorschau die vorsignierte Adresse als PDF', async function () {
   assert.ok((await vorschau.getAttribute('data')).includes(S3_PFAD), await vorschau.getAttribute('data'));
 });
 
-Then(/^öffnet «(.+)» die vorsignierte Adresse in einem neuen Tab$/, async function (name) {
-  const link = this.seite.getByRole('link', { name, exact: true });
-  assert.ok((await link.getAttribute('href')).includes(`${S3_PFAD}`), await link.getAttribute('href'));
-  assert.equal(await link.getAttribute('target'), '_blank');
-  assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+// Der Knopf holt beim Klick eine eigene Adresse mit ansicht=download (attachment) und öffnet sie in einem neuen Tab;
+// die Vorschau-Adresse (ansicht=vorschau, inline) bleibt der Vorschau vorbehalten.
+Then(/^öffnet «(.+)» die vorsignierte Download-Adresse in einem neuen Tab$/, async function (name) {
+  await this.seite.evaluate(() => {
+    window.__geoeffnet = [];
+    window.open = (...args) => (window.__geoeffnet.push(args), null);
+  });
+  await this.seite.getByRole('button', { name, exact: true }).click();
+  await this.seite.waitForFunction(() => window.__geoeffnet.length > 0);
+  const [adresse, ziel, merkmale] = await this.seite.evaluate(() => window.__geoeffnet[0]);
+  assert.ok(adresse.includes(S3_PFAD), adresse);
+  assert.equal(ziel, '_blank');
+  assert.equal(merkmale, 'noopener,noreferrer');
+  const abrufe = this.suche.downloads.map((d) => d.ansicht);
+  assert.deepEqual(abrufe, ['vorschau', 'download']);
 });
 
 Then(/^steht «(.+)» weder in der Adresse noch im Browser-Speicher$/, async function (begriff) {

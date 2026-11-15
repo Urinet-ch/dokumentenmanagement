@@ -288,7 +288,7 @@ export class DokumentAnsicht {
 
   private vorschauLaden(id: string): void {
     this.abos.add(
-      this.port.adresse(id, 'pdfa').subscribe({
+      this.port.adresse(id, 'pdfa', 'vorschau').subscribe({
         next: (adresse) => {
           this.pdfa.set(adresse);
           this.vorschau.set(sichereAdresse(adresse.url) ? 'ok' : 'fehler');
@@ -298,13 +298,8 @@ export class DokumentAnsicht {
     );
   }
 
-  /** Abgelaufene Adressen holt der Klick neu (jeder Abruf wird protokolliert); sonst öffnet der Link direkt. */
-  protected pdfaKlick(ereignis: MouseEvent): void {
-    const adresse = this.pdfa();
-    if (adresse && gueltig(adresse)) {
-      return;
-    }
-    ereignis.preventDefault();
+  /** Die Vorschau-Adresse zeigt inline an; der Download holt eine eigene Adresse mit attachment (jeder Abruf wird protokolliert). */
+  protected pdfaHerunterladen(): void {
     this.holenUndOeffnen('pdfa');
   }
 
@@ -327,15 +322,12 @@ export class DokumentAnsicht {
     this.dateiFehler.set(false);
     this.geholt.set(null);
     this.abos.add(
-      this.port.adresse(this.id(), variante).subscribe({
+      this.port.adresse(this.id(), variante, 'download').subscribe({
         next: (adresse) => {
           const url = sichereAdresse(adresse.url);
           if (!url) {
             this.dateiFehler.set(true);
             return;
-          }
-          if (variante === 'pdfa') {
-            this.pdfa.set(adresse);
           }
           this.geholt.set({ adresse, variante });
           window.open(url, '_blank', 'noopener,noreferrer');

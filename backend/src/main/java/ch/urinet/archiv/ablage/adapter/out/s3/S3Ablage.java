@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.domain.AblageGestoert;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.application.Exportziel;
@@ -202,7 +203,11 @@ public class S3Ablage implements AblagePort {
     private String hochladen(String bucket, String key, Path datei) {
         String versionId;
         try {
-            versionId = s3.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromFile(datei)).versionId();
+            versionId = s3.putObject(b -> {
+                b.bucket(bucket).key(key);
+                // Typ aus der Endung des Schlüssels (nicht aus dem Namen der Nutzerdatei)
+                Ansicht.typVonSchluessel(key).ifPresent(b::contentType);
+            }, RequestBody.fromFile(datei)).versionId();
         } catch (SdkClientException e) {
             LOG.warnf("Object Storage nicht erreichbar: %s (%s)", key, e.getClass().getSimpleName());
             throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
@@ -265,19 +270,37 @@ public class S3Ablage implements AblagePort {
 
     @Override
     public VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel,
-                                           String versionId) {
+                                           String versionId, Ansicht ansicht) {
         if (versionId == null || versionId.isBlank()) {
             throw new IllegalArgumentException("Vorsignierte URL nur mit Versions-ID");
         }
         String bucket = bucket(mandant);
         String key = schluessel.pfad(ort);
         var signiert = presigner.presignGetObject(r -> r.signatureDuration(einstellungen.urlGueltigkeit())
-                .getObjectRequest(g -> g.bucket(bucket).key(key).versionId(versionId)));
+                .getObjectRequest(g -> {
+                    g.bucket(bucket).key(key).versionId(versionId);
+                    antwortkopf(g, schluessel, ansicht);
+                }));
         try {
             // die URL ist für ihre Dauer ein Zugangsschlüssel: nie loggen
             return new VorsignierteUrl(signiert.url().toURI(), signiert.expiration());
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Vorsignierte URL ungültig: " + key, e);
+        }
+    }
+
+    /**
+     * Typ und Disposition der Antwort kommen aus der Adresse, nicht vom Objekt (ohne Typ liefert S3 octet-stream,
+     * der Browser lädt dann herunter). Inline nur für sicher anzeigbare Typen; alles andere ist attachment.
+     */
+    private static void antwortkopf(software.amazon.awssdk.services.s3.model.GetObjectRequest.Builder g,
+                                    DateiSchluessel schluessel, Ansicht ansicht) {
+        var typ = Ansicht.anzeigbarerTyp(schluessel);
+        if (ansicht == Ansicht.VORSCHAU && typ.isPresent()) {
+            g.responseContentType(typ.get()).responseContentDisposition("inline");
+        } else {
+            g.responseContentType(typ.orElse("application/octet-stream"))
+                    .responseContentDisposition("attachment; filename=\"" + Ansicht.dateiname(schluessel) + "\"");
         }
     }
 

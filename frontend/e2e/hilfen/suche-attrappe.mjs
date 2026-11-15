@@ -295,7 +295,7 @@ export async function sucheAttrappe(welt) {
       return route.fulfill({ status: 200, headers: { 'content-type': 'image/png', 'cache-control': 'private, no-store' }, body: PNG });
     }
     const variante = url.searchParams.get('variante') ?? 'pdfa';
-    zustand.downloads.push({ id: d.id, variante, accept: await anfrage.headerValue('accept') });
+    zustand.downloads.push({ id: d.id, variante, ansicht: url.searchParams.get('ansicht'), accept: await anfrage.headerValue('accept') });
     const ziel = `${origin}${S3_PFAD}${d.id}/${variante}.pdf?X-Amz-Expires=300&X-Amz-Signature=attrappe`;
     return json(route, 200, { url: ziel, gueltigBis: new Date(Date.now() + 300_000).toISOString() });
   });
