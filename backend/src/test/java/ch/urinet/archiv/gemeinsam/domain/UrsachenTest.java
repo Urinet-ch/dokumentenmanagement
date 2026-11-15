@@ -18,6 +18,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class UrsachenTest {
 
+    private static final class WertefreieTestException extends RuntimeException implements WertefreieMeldung {
+        WertefreieTestException(String meldung) {
+            super(meldung);
+        }
+    }
+
     /** Wie {@code ConnectTimeoutException} von Apache: Zeitüberschreitung, erbt aber von InterruptedIOException. */
     private static final class VerbindungTimeoutException extends InterruptedIOException {
     }
@@ -106,6 +112,16 @@ class UrsachenTest {
         assertThat(Ursachen.ketteMitMeldung(new FremdeException())).isEqualTo(FremdeException.class.getName());
         assertThat(Ursachen.ketteMitMeldung(new RuntimeException("Fest, aber fremde Klasse")))
                 .isEqualTo("java.lang.RuntimeException");
+    }
+
+    @Test
+    void markerMeldungWirdAusgegebenUndNichtMarkerBleibenOhneMeldung() {
+        var marker = new WertefreieTestException("Zeitstempeldienst nicht erreichbar");
+        var nichtMarker = new RuntimeException("darf nicht erscheinen");
+
+        assertThat(Ursachen.ketteMitMeldung(marker)).isEqualTo(
+                WertefreieTestException.class.getName() + "[meldung=\"Zeitstempeldienst nicht erreichbar\"]");
+        assertThat(Ursachen.ketteMitMeldung(nichtMarker)).isEqualTo(RuntimeException.class.getName());
     }
 
     @Test

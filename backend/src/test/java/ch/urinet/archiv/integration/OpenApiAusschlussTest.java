@@ -4,10 +4,10 @@ import ch.urinet.archiv.ArchivMain;
 import ch.urinet.archiv.integration.adapter.in.rest.webseite.gegenprobe.GegenprobeAdapterResource;
 import ch.urinet.archiv.integration.webseite.gegenprobe.GegenprobeResource;
 import ch.urinet.archiv.probe.ProbeWebseiteResource;
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.quarkus.arc.properties.IfBuildProperty;
-import jakarta.annotation.security.RolesAllowed;
+import io.quarkus.security.Authenticated;
 import jakarta.ws.rs.GET;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +47,8 @@ class OpenApiAusschlussTest {
     @jakarta.ws.rs.Path("/public/v1/kontrolle")
     static class Kontrolle {
         @GET
-        @AlleArchivRollen
-        @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+        @Authenticated
+        @WebseitenZugang(WebseitenZugang.Art.LESEN)
         public String lesen() {
             return "kontrolle";
         }

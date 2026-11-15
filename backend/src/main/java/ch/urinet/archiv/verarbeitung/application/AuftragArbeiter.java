@@ -1,6 +1,7 @@
 package ch.urinet.archiv.verarbeitung.application;
 
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.gemeinsam.domain.WertefreieMeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
@@ -386,7 +387,9 @@ public class AuftragArbeiter {
     }
 
     private void fehlversuch(Auftrag auftrag, String art, Throwable ursache) {
-        AuftragFehler fehler = AuftragFehler.neu(art);
+        String wertefreieUrsache = ursache != null && Ursachen.enthaelt(ursache, WertefreieMeldung.class)
+                ? Ursachen.ketteMitMeldung(ursache) : null;
+        AuftragFehler fehler = AuftragFehler.neu(art, wertefreieUrsache);
         int versuch = auftrag.versuche() + 1;
         Optional<Duration> wartezeit = Wiederholung.nachFehlversuch(versuch);
         String ursachen = ursache == null ? "-" : Ursachen.kette(ursache);

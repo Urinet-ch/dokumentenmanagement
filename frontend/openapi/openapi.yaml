@@ -13,6 +13,8 @@ components:
           enum:
           - generator
           - import
+          - webseite-lesen
+          - webseite-erfassung
         aktiv:
           type: boolean
         erstellt:
@@ -24,6 +26,23 @@ components:
           anyOf:
           - $ref: "#/components/schemas/Instant"
           - type: "null"
+        webseite:
+          type:
+          - string
+          - "null"
+        hoechsteStufe:
+          type:
+          - string
+          - "null"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
+        absenderPruefen:
+          type: boolean
     ApiTokenErstellt:
       type: object
       properties:

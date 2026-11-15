@@ -185,6 +185,6 @@ Funktionalität: Werkzeuge des Chat-Agenten: Kennzahl und offene Posten (Aufgabe
 
   Szenario: Ein Mandant ohne Finanzarten erhält kennzahl und offene_posten nicht angeboten
     Angenommen im Mandanten «vhf-gsk» sind alle Arten der Gruppe finanz inaktiv
-    Dann bietet das Archiv «inhaber-vhf-gsk» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen»
+    Dann bietet das Archiv «inhaber-vhf-gsk» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen,vollstaendigkeit»
     Und antwortet kennzahl und offene_posten für «inhaber-vhf-gsk» mit «{"fehler":"Werkzeug nicht verfügbar"}»
-    Und bietet das Archiv «inhaber-urinet» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen,kennzahl,offene_posten»
+    Und bietet das Archiv «inhaber-urinet» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen,kennzahl,offene_posten,vollstaendigkeit»

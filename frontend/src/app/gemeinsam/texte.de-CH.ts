@@ -16,6 +16,7 @@ export const TEXTE = {
     erfassen: 'Erfassen',
     eingangskorb: 'Eingangskorb',
     suche: 'Suche',
+    chat: 'Chat',
     importe: 'Importe',
     dokumentarten: 'Dokumentarten',
     protokoll: 'Zugriffsprotokoll',
@@ -774,7 +775,7 @@ export const TEXTE = {
     fehlerVerbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
-  /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); den Menüpunkt schaltet Aufgabe 7.4b ein. */
+  /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); Menüpunkt seit Aufgabe 7.4b. */
   chat: {
     titel: 'Chat',
     einleitung:

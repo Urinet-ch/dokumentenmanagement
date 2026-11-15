@@ -14,10 +14,11 @@ import java.util.function.Predicate;
 
 /**
  * Welche Werkzeuge der Agent für eine Chat-Anfrage angeboten bekommt (Spec 02, Req 3.1, 4.2, 5.2; design.md «Chat-Agent»,
- * {@code ToolProvider} in Aufgabe 7.2). Heute immer {@value #DOKUMENTE_SUCHEN}, {@value #DOKUMENT_ZEIGEN} und
+ * {@code ToolProvider} in Aufgabe 7.2). Immer {@value #DOKUMENTE_SUCHEN}, {@value #DOKUMENT_ZEIGEN} und
  * {@value #FRISTEN}; dazu {@value #KENNZAHL} und {@value #OFFENE_POSTEN} nur mit
- * {@link Funktionen#finanzVerfuegbar()} des Mandanten (Aufgabe 7.1b, Spec 05, Req 8.8). Erweiterungspunkt:
- * {@code vollstaendigkeit} nur für Rollen, die A3 und A4 uneingeschränkt sehen (Aufgabe 7.1c, {@link #vollstaendigkeitErlaubt}). Jede
+ * {@link Funktionen#finanzVerfuegbar()} des Mandanten (Aufgabe 7.1b, Spec 05, Req 8.8); {@code vollstaendigkeit} nur für Rollen, die A3 und A4
+ * uneingeschränkt sehen (Aufgabe 7.1c, {@link #vollstaendigkeitErlaubt}; für andere fehlt es in der Liste, Spec 05,
+ * Req 5.4). Jede
  * Werkzeugmethode prüft die Auswahl beim Aufruf nochmals, ein nicht angebotenes Werkzeug antwortet nicht (fail closed).
  */
 @ApplicationScoped
@@ -26,6 +27,7 @@ public class WerkzeugAuswahl {
     public static final String DOKUMENTE_SUCHEN = "dokumente_suchen";
     public static final String DOKUMENT_ZEIGEN = "dokument_zeigen";
     public static final String FRISTEN = "fristen";
+    public static final String VOLLSTAENDIGKEIT = "vollstaendigkeit";
     public static final String KENNZAHL = "kennzahl";
     public static final String OFFENE_POSTEN = "offene_posten";
 
@@ -49,11 +51,13 @@ public class WerkzeugAuswahl {
 
     /** Namen der angebotenen Werkzeuge in fester Reihenfolge. */
     public List<String> angeboten(WerkzeugKontext kontext) {
-        // 7.1c ergänzt vollstaendigkeit, wenn vollstaendigkeitErlaubt(kontext.sicht())
         List<String> namen = new ArrayList<>(List.of(DOKUMENTE_SUCHEN, DOKUMENT_ZEIGEN, FRISTEN));
         if (finanz(kontext.mandant())) {
             namen.add(KENNZAHL);
             namen.add(OFFENE_POSTEN);
+        }
+        if (vollstaendigkeitErlaubt(kontext.sicht())) {
+            namen.add(VOLLSTAENDIGKEIT);
         }
         return List.copyOf(namen);
     }

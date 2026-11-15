@@ -12,7 +12,7 @@
           },
           "scope" : {
             "type" : "string",
-            "enum" : [ "generator", "import" ]
+            "enum" : [ "generator", "import", "webseite-lesen", "webseite-erfassung" ]
           },
           "aktiv" : {
             "type" : "boolean"
@@ -27,6 +27,23 @@
             }, {
               "type" : "null"
             } ]
+          },
+          "webseite" : {
+            "type" : [ "string", "null" ]
+          },
+          "hoechsteStufe" : {
+            "type" : [ "string", "null" ]
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "absenderPruefen" : {
+            "type" : "boolean"
           }
         }
       },

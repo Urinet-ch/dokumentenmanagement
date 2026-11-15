@@ -85,8 +85,8 @@ export const routes: Routes = [
     canActivate: [rechtGuard('A13')],
     title: titel(TEXTE.menue.protokoll),
   },
-  // Chat (Spec 02, Aufgabe 7.4): alle vier Rollen mit dem Recht wie A2 (Entscheid Fabian 14.11.2026); den Menüpunkt
-  // schaltet Aufgabe 7.4b ein, sobald das Backend (7.2, 7.3) gemergt ist
+  // Chat (Spec 02, Aufgabe 7.4): alle vier Rollen mit dem Recht wie A2 (Entscheid Fabian 14.11.2026); Menüpunkt «Chat»
+  // seit Aufgabe 7.4b (Backend 7.2, 7.3 gemergt)
   {
     path: 'chat',
     loadChildren: () => import('./chat/chat.routes').then((m) => m.CHAT_ROUTES),

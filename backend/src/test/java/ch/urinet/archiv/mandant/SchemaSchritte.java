@@ -51,10 +51,11 @@ public class SchemaSchritte {
                 .contains(a, b, c);
     }
 
-    @Und("das Schema «{word}» enthält nur die Tabellen «{word}», «{word}», «{word}», «{word}» und «{word}»")
-    public void nurTabellen(String schema, String a, String b, String c, String d, String e) throws SQLException {
+    @Und("das Schema «{word}» enthält nur die Tabellen «{word}», «{word}», «{word}», «{word}», «{word}» und «{word}»")
+    public void nurTabellen(String schema, String a, String b, String c, String d, String e, String f)
+            throws SQLException {
         assertThat(abfragen("select table_name from information_schema.tables where table_schema = ?", schema))
-                .containsExactlyInAnyOrder(a, b, c, d, e);
+                .containsExactlyInAnyOrder(a, b, c, d, e, f);
     }
 
     @Und("das Schema «{word}» enthält keine Sequenz ausser «{word}»")

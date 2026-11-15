@@ -2,8 +2,8 @@ package ch.urinet.archiv.probe;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
-import jakarta.annotation.security.RolesAllowed;
+import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import io.quarkus.security.Authenticated;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -20,26 +20,34 @@ import java.util.Map;
  * App-OpenAPI noch im Vertrag {@code public-v1.yaml}. Belegt Problem Details, {@code Cache-Control} und die Header der
  * Abkündigung, bevor es echte Endpunkte gibt.
  * <p>
- * Die Erklärung {@link AlleArchivRollen} mit allen Archiv-Rollen ist die, die {@code EndpunktWaechterTest} heute annimmt;
- * Aufgabe 11.7 stellt sie auf {@code @WebseitenZugang} um, sobald es Webseiten-Schlüssel gibt.
+ * Alle Endpunkte verlangen den passenden Scope; auch die Test-Resource lässt keine OIDC-Rolle zu.
  */
 @Path("/public/v1/probe")
 public class ProbeWebseiteResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public Map<String, String> lesen() {
         return Map.of("probe", "ok");
+    }
+
+    @POST
+    @Path("/erfassung")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    public Map<String, String> erfassen() {
+        return Map.of("probe", "erfasst");
     }
 
     /** Ungültiger Parameter → 400 {@code ANFRAGE_UNGUELTIG}, ohne den Wert zu nennen. */
     @GET
     @Path("/zahl")
     @Produces(MediaType.APPLICATION_JSON)
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public Map<String, Integer> zahl(@QueryParam("wert") String wert) {
         try {
             return Map.of("wert", Integer.parseInt(wert));
@@ -51,8 +59,8 @@ public class ProbeWebseiteResource {
     /** Unerwarteter Fehler mit dem Text in der Meldung: er darf nicht in der Antwort stehen. */
     @GET
     @Path("/fehler/{text}")
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public void fehler(@PathParam("text") String text) {
         throw new IllegalStateException("Probe " + text);
     }
@@ -60,8 +68,8 @@ public class ProbeWebseiteResource {
     /** Nimmt eine Anfrage mit Inhalt an; belegt 413 vor der Resource. */
     @POST
     @Path("/inhalt")
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public void inhalt(String inhalt) {
         // nur die Grenze der Anfrage zählt
     }

@@ -29,6 +29,14 @@ Funktionalität: Tages-Manifest (Aufgabe 5.2)
     Und das Prüfwerkzeug ohne Datenbank meldet für «mf-kette» vom «10.01.2026» bis «12.01.2026» «Ergebnis: gültig» mit Exit-Code 0
     Und die Ausgabe des Prüfwerkzeugs nennt «MELDUNG 2026-01-12: festgehaltene Zeitstempel ohne Datenbank nicht bestimmbar (kein Folgemanifest)»
 
+  @req-16.2 @req-16.8
+  Szenario: Ein festgehaltener globaler Export steht im signierten Tages-Manifest
+    Angenommen der Mandant «mf-sicherung» ist am «10.01.2026» angelegt
+    Und ein globaler Sicherungsexport mit SHA-256 «eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee» wurde am «10.01.2026» um «12:00» festgehalten
+    Wenn der Manifest-Lauf für «mf-sicherung» bis «10.01.2026» läuft
+    Dann enthält das Manifest «10.01.2026» von «mf-sicherung» die Sicherungs-SHA-256 «eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee»
+    Und das Prüfwerkzeug meldet für «mf-sicherung» vom «10.01.2026» bis «10.01.2026» «Ergebnis: gültig» mit Exit-Code 0
+
   @req-3.12
   Szenario: Das Manifest nennt den Dateinamen eines Dokuments nicht
     Angenommen der Mandant «mf-name» ist am «10.01.2026» angelegt

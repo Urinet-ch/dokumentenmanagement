@@ -4,7 +4,7 @@ Funktionalität: Chat-Schnittstelle (Aufgabe 7.3)
   «POST /api/v1/chat» nimmt eine Frage an und streamt die Antwort als Server-Sent Events («werkzeug», «text»,
   «quellen», «fertig» oder «fehler»). Gespräche und Nachrichten liegen im Schema des Mandanten, jeder sieht nur seine
   eigenen. Der Agent ist ein Testagent hinter dem ChatAgentPort (ohne Eingriff der Dev-Stub mit seiner Demo-Folge);
-  das Sprachmodell folgt mit Aufgabe 7.2. Alle Daten sind synthetisch.
+  der echte Agent mit dem Sprachmodell hat sein eigenes Feature («agent.feature», Aufgabe 7.2). Alle Daten sind synthetisch.
 
  Hintergrund:
   Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -113,7 +113,7 @@ Funktionalität: Chat-Schnittstelle (Aufgabe 7.3)
     Dann zeigt der Verlauf mit dem Titel «Meine eigene Frage» diese Nachrichten:
       | rolle     | inhalt                                                                       | status | quellen |
       | BENUTZER  | Meine eigene Frage                                                           |        |         |
-      | ASSISTENT | Das ist eine Demo-Antwort ohne Sprachmodell. Der Chat-Agent folgt mit Aufgabe 7.2. | OK     |         |
+      | ASSISTENT | Das ist eine Demo-Antwort ohne Sprachmodell. Echte Antworten gibt der Agent mit Sprachmodell. | OK     |         |
 
   Szenario: Eine zweite gleichzeitige Frage desselben Benutzers ergibt 429
     Angenommen der Testagent hält die Antwort nach dem ersten Text an

@@ -12,6 +12,7 @@ import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufHandler;
 import ch.urinet.archiv.verarbeitung.application.Verwaist;
+import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import io.agroal.api.AgroalDataSource;
@@ -173,6 +174,37 @@ class AuftragArbeiterTest {
                 hilfe.ausfuehren("delete from public.auftrag where id = " + id);
             }
         }
+    }
+
+    @Test
+    void speichertNurDieWertefreieZeitstempelUrsacheImAuftragsfehler() throws Exception {
+        TestHandler.TSA_FEHLER.set(true);
+        long id = hilfe.einreihen("urinet", TestHandler.FEHLER);
+        AuftragArbeiter worker = arbeiter(schlange, 1);
+
+        starten(worker, 1);
+        warten();
+
+        String text = hilfe.zeile(id).fehler();
+        assertThat(text).contains("ursache=")
+                .contains("ZeitstempelFehler[meldung=\"Zeitstempeldienst nicht erreichbar\"]")
+                .doesNotContain("tsa.invalid").doesNotContain("0123456789abcdef").doesNotContain("antwortinhalt");
+        AuftragFehler fehler = AuftragFehler.lesen(text).orElseThrow();
+        assertThat(fehler.ursache()).contains("Zeitstempeldienst nicht erreichbar");
+    }
+
+    @Test
+    void speichertKeineMeldungNichtMarkierterAusnahmen() throws Exception {
+        TestHandler.TSA_FEHLER.set(false);
+        long id = hilfe.einreihen("urinet", TestHandler.FEHLER);
+        AuftragArbeiter worker = arbeiter(schlange, 1);
+
+        starten(worker, 1);
+        warten();
+
+        String text = hilfe.zeile(id).fehler();
+        assertThat(text).matches("fehlgeschlagen " + FEHLER_ID)
+                .doesNotContain("ursache=", "Beleg", "nicht lesbar");
     }
 
     @Test
