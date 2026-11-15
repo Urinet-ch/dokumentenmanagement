@@ -345,6 +345,17 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
       expect(speicher.inhalt.get('a')).toMatchObject({ benutzer: 'u1', zustand: 'wartet' });
     });
 
+    it('zeigt bei einem Fehler im Speicher eine Fehlermeldung statt «gelöscht»', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'wartet'));
+      anmeldung.als('mitarbeiter', 'u2');
+      await zeigen();
+      vi.spyOn(speicher, 'loeschen').mockRejectedValueOnce(new Error('IndexedDB'));
+      await klick('fremde-loeschen');
+      await klick('fremde-loeschen-ja');
+      expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toContain(TEXTE.handy.loeschenFehler);
+      expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).not.toContain(TEXTE.handy.fremdeGeloescht);
+    });
+
     it('fragt nicht für eigene Aufnahmen', async () => {
       speicher.inhalt.set('a', eintrag('a', 'u1', 'wartet'));
       anmeldung.als('mitarbeiter', 'u1');

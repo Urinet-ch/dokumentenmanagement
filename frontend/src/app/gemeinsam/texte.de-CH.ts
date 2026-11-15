@@ -128,6 +128,7 @@ export const TEXTE = {
     loeschenBestaetigen: 'Endgültig löschen',
     loeschenAbbrechen: 'Abbrechen',
     geloescht: 'Erfassung gelöscht.',
+    loeschenFehler: 'Das Löschen ist fehlgeschlagen. Bitte erneut versuchen.',
     fremdeTitel: 'Aufnahmen anderer Benutzer auf diesem Gerät',
     fremdeFrage: (anzahl: number) =>
       `Auf diesem Gerät ${anzahl === 1 ? 'wartet 1 Aufnahme' : `warten ${anzahl} Aufnahmen`} einer anderen Anmeldung. ` +

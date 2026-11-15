@@ -80,7 +80,7 @@ export class WarteschlangeService {
     if (!inhaber || fremde.length === 0 || this.gefragtFuer() === schluessel(inhaber)) {
       return null;
     }
-    return { anzahl: fremde.length, aufgenommen: fremde.map((e) => e.aufgenommen) };
+    return { anzahl: fremde.length, aufgenommen: fremde.map((e) => e.aufgenommen), ids: fremde.map((e) => e.id) };
   });
   readonly geladen: Promise<void>;
 
@@ -99,7 +99,14 @@ export class WarteschlangeService {
     effect(() => {
       const angemeldet = this.angemeldet();
       if (angemeldet) {
-        untracked(() => this.zuletzt.set(angemeldet));
+        untracked(() => {
+          this.zuletzt.set(angemeldet);
+          // Neuer Wechsel (Req 4.10): Hat der Inhaber gewechselt, gilt die frühere Antwort nicht mehr. Abmelden und
+          // abgelaufene Sitzung (`angemeldet` ist dann null) lassen sie stehen.
+          if (this.gefragtFuer() !== null && this.gefragtFuer() !== schluessel(angemeldet)) {
+            this.gefragtFuer.set(null);
+          }
+        });
       }
     });
     // Nach der Anmeldung übernimmt der Lauf die Einträge ohne Benutzer und lädt sie hoch
@@ -144,29 +151,48 @@ export class WarteschlangeService {
     this.gefragtFuer.set(schluessel(this.angemeldet()));
   }
 
-  /** «Löschen» (nach der zweiten Bestätigung der Seite): entfernt die wartenden Einträge anderer Inhaber endgültig. */
-  async fremdeLoeschen(): Promise<void> {
-    if (!this.fremdeFrage()) {
-      return;
+  /**
+   * «Löschen» (nach der zweiten Bestätigung der Seite): entfernt die gefragten wartenden Einträge anderer Inhaber
+   * endgültig, ohne Angabe die aktuell offene Frage. Liefert die Anzahl gelöschter Einträge (0 ohne offene Frage).
+   * Schlägt das Löschen fehl, wird die Anzeige trotzdem neu geladen und der Fehler weitergereicht.
+   */
+  async fremdeLoeschen(ids?: string[]): Promise<number> {
+    const frage = this.fremdeFrage();
+    if (!frage) {
+      return 0;
     }
-    for (const eintrag of this.fremdeWartende()) {
-      await this.speicher.loeschen(eintrag.id);
+    const gefragt = new Set(ids ?? frage.ids);
+    let geloescht = 0;
+    try {
+      for (const eintrag of this.fremdeWartende()) {
+        if (gefragt.has(eintrag.id)) {
+          await this.speicher.loeschen(eintrag.id);
+          geloescht++;
+        }
+      }
+      this.gefragtFuer.set(schluessel(this.angemeldet()));
+    } finally {
+      await this.neuLaden();
     }
-    this.gefragtFuer.set(schluessel(this.angemeldet()));
-    await this.neuLaden();
+    return geloescht;
   }
 
   /**
-   * Löscht einen fehlerhaften Eintrag des angemeldeten Inhabers (Req 4.11) samt Aufnahmen. Die Seite fragt vorher zweistufig;
+   * Löscht einen fehlerhaften Eintrag des angemeldeten Inhabers (Req 4.11) samt Aufnahmen; `false`, wenn es ihn nicht (mehr) gibt. Die Seite fragt vorher zweistufig;
    * alles andere (wartende, fremde, unbekannte Einträge) bleibt unberührt.
    */
-  async loeschen(id: string): Promise<void> {
+  async loeschen(id: string): Promise<boolean> {
     const eintrag = this.fehlerhaft().find((e) => e.id === id);
-    if (eintrag) {
-      this.nichtVor.delete(id);
+    if (!eintrag) {
+      return false;
+    }
+    this.nichtVor.delete(id);
+    try {
       await this.speicher.loeschen(id);
+    } finally {
       await this.neuLaden();
     }
+    return true;
   }
 
   /**
@@ -270,6 +296,8 @@ interface Inhaber {
 export interface FremdeFrage {
   anzahl: number;
   aufgenommen: string[];
+  /** Ids der gefragten Einträge: «Löschen» betrifft nur diese, nie später dazugekommene. */
+  ids: string[];
 }
 
 const schluessel = (inhaber: Inhaber | null): string | null => (inhaber ? `${inhaber.mandant}/${inhaber.benutzer}` : null);

@@ -283,7 +283,11 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
       expect(schlange.fremdeFrage()).toBeNull();
       anmeldung.als('u2');
       await ruhig();
-      expect(schlange.fremdeFrage()).toEqual({ anzahl: 2, aufgenommen: ['2026-11-13T07:01:00.000Z', '2026-11-13T07:02:00.000Z'] });
+      expect(schlange.fremdeFrage()).toEqual({
+        anzahl: 2,
+        aufgenommen: ['2026-11-13T07:01:00.000Z', '2026-11-13T07:02:00.000Z'],
+        ids: ['a', 'bb'],
+      });
       expect(speicher.inhalt.size).toBe(2);
     });
 
@@ -354,6 +358,45 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
       anmeldung.als('u3');
       await ruhig();
       expect(schlange.fremdeFrage()?.anzahl).toBe(1);
+    });
+
+    it('fragt wieder, wenn nach einem Zwischenwechsel derselbe Benutzer zurückkommt (u2 → u1 → u2)', async () => {
+      await ablegen(fremd('a'));
+      anmeldung.als('u2');
+      await ruhig();
+      schlange.fremdeBehalten();
+      expect(schlange.fremdeFrage()).toBeNull();
+      anmeldung.ende();
+      anmeldung.als('u1');
+      await ruhig();
+      anmeldung.ende();
+      anmeldung.als('u2');
+      await ruhig();
+      expect(schlange.fremdeFrage()?.anzahl).toBe(1);
+    });
+
+    it('«Löschen» löscht nur die gefragten Einträge und liefert deren Anzahl; Fehler werden weitergereicht', async () => {
+      await ablegen(fremd('a'), fremd('bb', 'u3'));
+      anmeldung.als('u2');
+      await ruhig();
+      vi.spyOn(speicher, 'loeschen').mockRejectedValueOnce(new Error('IndexedDB'));
+      await expect(schlange.fremdeLoeschen()).rejects.toThrow('IndexedDB');
+      expect(schlange.fremdeFrage()?.anzahl).toBe(2);
+      const ids = schlange.fremdeFrage()!.ids.filter((id) => id === 'a');
+      await ablegen(fremd('ccc', 'u3'));
+      expect(await schlange.fremdeLoeschen(ids)).toBe(1);
+      expect([...speicher.inhalt.keys()].sort()).toEqual(['bb', 'ccc']);
+    });
+
+    it('meldet, ob «loeschen» etwas gelöscht hat, und lädt bei einem Fehler trotzdem neu', async () => {
+      anmeldung.als('u1');
+      await ablegen(fremd('a', 'u1', 'urinet', 'fehlerhaft'));
+      await ruhig();
+      expect(await schlange.loeschen('gibtsnicht')).toBe(false);
+      vi.spyOn(speicher, 'loeschen').mockRejectedValueOnce(new Error('IndexedDB'));
+      await expect(schlange.loeschen('a')).rejects.toThrow('IndexedDB');
+      expect(await schlange.loeschen('a')).toBe(true);
+      expect(speicher.inhalt.size).toBe(0);
     });
 
     it('löscht einen fehlerhaften Eintrag des Inhabers samt Aufnahmen, nur diesen', async () => {
