@@ -317,7 +317,7 @@ public class WerkzeugSchritte {
             }
             for (String name : liste(zeile.get("unsichtbar"))) {
                 zeigen(benutzer, name);
-                assertThat(antwortText).as(benutzer + " zeigt " + name).isEqualTo("{\"fehler\":\"nicht gefunden\"}");
+                assertThat(antwortText).as(benutzer + " zeigt " + name).isEqualTo("{\"fehler\":\"nicht gefunden: ID unbekannt, zuerst dokumente_suchen verwenden\"}");
             }
             JsonNode frist = fristen(benutzer, von, bis);
             assertThat(frist.path("gesamt").asLong()).as(benutzer + " Gesamtzahl der Fristen: " + frist)
@@ -465,7 +465,9 @@ public class WerkzeugSchritte {
                 assertThat(suche.has("hinweis")).as(fall).isFalse();
             } else {
                 assertThat(suche.path("hinweis").asText()).as(fall).isEqualTo(zeile.get("hinweis"));
-                assertThat(suche.path("gesamt").asLong()).as(fall).isZero();
+                if (liste(zeile.get("treffer")).isEmpty()) {
+                    assertThat(suche.path("gesamt").asLong()).as(fall).isZero();
+                }
             }
         }
     }

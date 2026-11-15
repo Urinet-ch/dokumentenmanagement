@@ -3,11 +3,10 @@ package ch.urinet.archiv.ki.application.chat;
 import ch.urinet.archiv.dokumentart.application.DokumentartRepository;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
-import ch.urinet.archiv.gemeinsam.domain.Normalisierer;
 import ch.urinet.archiv.ki.domain.Werteformat;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
-import ch.urinet.archiv.kontakt.domain.AbgleichErgebnis;
-import ch.urinet.archiv.kontakt.domain.AbgleichRegel;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.application.HybridSuche;
 import ch.urinet.archiv.suche.application.SuchePort;
@@ -35,9 +34,9 @@ import java.util.stream.Collectors;
  * {@code neueste} die {@link HybridSuche} (Aufgabe 7.1d, {@code k = anzahl}), mit {@code neueste} und bei einem Fehler im
  * Hybrid-Pfad die Volltextsuche über den {@link SuchePort}; beide ohne Dateinamen ({@code mitDateiname=false}), auch
  * nicht im Text an den Reranker. Sichtbar nach der {@link Sichtregel} des Kontexts, ohne Status alle
- * ausser {@code VERWORFEN} (wie die Suche der PWA). Ein Partnername wird über {@link KontaktRegister#aehnlichste} mit der
- * Regel des Partner-Abgleichs aufgelöst ({@code archiv.abgleich.aehnlichkeit}, {@link AbgleichRegel}); ohne eindeutigen
- * Kontakt ist das Ergebnis leer mit Hinweis, nie eine Vermutung. Treffer nennen nie den Dateinamen.
+ * ausser {@code VERWORFEN} (wie die Suche der PWA). Ein Partnername löst {@link PartnerAufloesung} auf (exakt, Teilwort, Ähnlichkeit);
+ * mehrere Kontakte ergeben «Partner nicht eindeutig» (mit Namen nur bei Recht A6), nie eine Vermutung. Ohne Kontakt
+ * sucht das Werkzeug ohne Partnerfilter mit dem Namen im Suchtext und sagt das im Hinweis. Treffer nennen nie den Dateinamen.
  */
 @ApplicationScoped
 public class DokumenteSuchen {
@@ -51,6 +50,7 @@ public class DokumenteSuchen {
     /** Hinweis an den Agenten, wenn die Suche nur im Volltext lief (Embedding oder Reranker ohne Ergebnis, Req 2.3). */
     static final String NUR_VOLLTEXT = "nur Volltext";
     static final String PARTNER_NICHT_GEFUNDEN = "Partner nicht gefunden";
+    static final String PARTNER_TEXTSUCHE = "Partner nicht gefunden, Suche über den Namen im Text";
     static final String PARTNER_NICHT_EINDEUTIG = "Partner nicht eindeutig";
 
     /** Parameter des Modells, ungeprüft. */
@@ -72,14 +72,20 @@ public class DokumenteSuchen {
      * {@code gesamt}: alle sichtbaren Treffer, bei der Hybridsuche die Zahl der gelieferten; {@code hinweis} z. B.
      * «Partner nicht gefunden» oder «nur Volltext»; {@code degradiert} nur bei {@code true} gesetzt.
      */
-    public record Antwort(List<Treffer> treffer, long gesamt, String hinweis, Boolean degradiert) {
+    public record Antwort(List<Treffer> treffer, long gesamt, String hinweis, Boolean degradiert,
+                          List<String> kandidaten) {
 
         public Antwort(List<Treffer> treffer, long gesamt, String hinweis) {
-            this(treffer, gesamt, hinweis, null);
+            this(treffer, gesamt, hinweis, null, null);
+        }
+
+        public Antwort(List<Treffer> treffer, long gesamt, String hinweis, Boolean degradiert) {
+            this(treffer, gesamt, hinweis, degradiert, null);
         }
 
         public Antwort {
             treffer = List.copyOf(treffer);
+            kandidaten = kandidaten == null || kandidaten.isEmpty() ? null : List.copyOf(kandidaten);
         }
     }
 
@@ -89,7 +95,7 @@ public class DokumenteSuchen {
     private final DokumentartRepository arten;
     private final WerkzeugDaten daten;
     private final WerkzeugTransaktion transaktion;
-    private final BigDecimal schwelle;
+    private final PartnerAufloesung partnerAufloesung;
 
     public DokumenteSuchen(SuchePort suche, HybridSuche hybrid, KontaktRegister kontakte, DokumentartRepository arten, WerkzeugDaten daten,
                            WerkzeugTransaktion transaktion,
@@ -100,7 +106,7 @@ public class DokumenteSuchen {
         this.arten = arten;
         this.daten = daten;
         this.transaktion = transaktion;
-        this.schwelle = schwelle;
+        this.partnerAufloesung = new PartnerAufloesung(kontakte, schwelle);
     }
 
     /**
@@ -109,6 +115,11 @@ public class DokumenteSuchen {
      * jeder Transaktion aufruft und ihre Datenbankteile selbst kurz hält.
      */
     public Antwort suchen(WerkzeugKontext kontext, Anfrage a) {
+        Antwort antwort = suchenInnen(kontext, a);
+        return antwort;
+    }
+
+    private Antwort suchenInnen(WerkzeugKontext kontext, Anfrage a) {
         String frage = Werkzeugparameter.text("frage", a.frage(), FRAGE_MAX, true);
         String art = Werkzeugparameter.text("art", a.art(), 40, false);
         String partner = Werkzeugparameter.text("partner", a.partner(), PARTNER_MAX, false);
@@ -119,9 +130,10 @@ public class DokumenteSuchen {
         }
         int anzahl = Werkzeugparameter.zahl("anzahl", a.anzahl(), 1, ANZAHL_MAX, ANZAHL_STANDARD);
         boolean neueste = Boolean.TRUE.equals(a.neueste());
+        boolean namenNennen = Rechtematrix.ergebnis(kontext.rolle(), Aktion.A6) == ch.urinet.archiv.sicherheit.domain.Ergebnis.ERLAUBT;
         Vorbereitet v = transaktion.neu(() -> {
             daten.nurLesend();
-            return vorbereiten(frage, art, partner, von, bis, neueste ? Sortierung.DATUM : null, anzahl);
+            return vorbereiten(frage, art, partner, von, bis, neueste ? Sortierung.DATUM : null, anzahl, namenNennen);
         });
         if (v.leer() != null) {
             return v.leer();
@@ -129,45 +141,55 @@ public class DokumenteSuchen {
         if (!neueste) {
             Hybridergebnis ergebnis = hybridSuchen(v.anfrage(), kontext.sicht(), anzahl);
             if (ergebnis != null) {
-                return transaktion.neu(() -> {
+                Antwort treffer = transaktion.neu(() -> {
                     daten.nurLesend();
                     return antwort(ergebnis);
                 });
+                return v.partnerImText() ? ohnePartnerHinweis(treffer) : treffer;
             }
         }
         boolean rueckfall = !neueste;
-        return transaktion.neu(() -> {
+        Antwort text = transaktion.neu(() -> {
             daten.nurLesend();
             return volltext(v.anfrage(), kontext.sicht(), rueckfall);
         });
+        return v.partnerImText() ? ohnePartnerHinweis(text) : text;
     }
 
     /** Geprüfte Anfrage oder, ohne eindeutigen Partner, die leere Antwort mit Hinweis. */
-    private record Vorbereitet(Suchanfrage anfrage, Antwort leer) {
+    private record Vorbereitet(Suchanfrage anfrage, Antwort leer, boolean partnerImText) {
+    }
+
+    /** Treffer der Textsuche mit dem Hinweis, dass der Partner nicht erkannt wurde; {@code degradiert} bleibt. */
+    private static Antwort ohnePartnerHinweis(Antwort a) {
+        return new Antwort(a.treffer(), a.gesamt(), PARTNER_TEXTSUCHE, a.degradiert(), null);
+    }
+
+    /** Frage und Partnerwort als Suchtext, gekürzt auf {@link #FRAGE_MAX} an einer Wortgrenze. */
+    private static String zusammen(String frage, String partner) {
+        String text = frage + " " + partner.strip();
+        return text.length() <= FRAGE_MAX ? text : frage;
     }
 
     private Vorbereitet vorbereiten(String frage, String art, String partner, LocalDate von, LocalDate bis,
-                                    Sortierung sortierung, int anzahl) {
+                                    Sortierung sortierung, int anzahl, boolean namenNennen) {
         String code = art == null ? null : artCode(art);
         UUID partnerId = null;
+        boolean ohnePartner = false;
         if (partner != null) {
-            String name = Normalisierer.name(partner);
-            AbgleichErgebnis ergebnis = name.isEmpty() ? new AbgleichErgebnis.NeuerPartner()
-                    : AbgleichRegel.aehnlich(kontakte.aehnlichste(name, AbgleichRegel.untergrenze(schwelle), 2),
-                    schwelle);
-            switch (ergebnis) {
-                case AbgleichErgebnis.Verknuepft v -> partnerId = v.kontaktId();
-                case AbgleichErgebnis.Unsicher u -> {
-                    return new Vorbereitet(null, new Antwort(List.of(), 0, PARTNER_NICHT_EINDEUTIG));
+            switch (partnerAufloesung.aufloesen(partner, namenNennen)) {
+                case PartnerAufloesung.Gefunden g -> partnerId = g.kontaktId();
+                case PartnerAufloesung.NichtEindeutig u -> {
+                    return new Vorbereitet(null, new Antwort(List.of(), 0, PARTNER_NICHT_EINDEUTIG, null,
+                            u.namen().isEmpty() ? null : u.namen()), false);
                 }
-                case AbgleichErgebnis.NeuerPartner n -> {
-                    return new Vorbereitet(null, new Antwort(List.of(), 0, PARTNER_NICHT_GEFUNDEN));
-                }
+                case PartnerAufloesung.NichtGefunden n -> ohnePartner = true;
             }
         }
+        String suchtext = ohnePartner ? zusammen(frage, partner) : frage;
         try {
-            return new Vorbereitet(new Suchanfrage(frage, code, partnerId, von, bis, null, null, null, null, null, null,
-                    null, sortierung, 0, anzahl), null);
+            return new Vorbereitet(new Suchanfrage(suchtext, code, partnerId, von, bis, null, null, null, null, null, null,
+                    null, sortierung, 0, anzahl), null, ohnePartner);
         } catch (FachFehler e) {
             throw WerkzeugFehler.ungueltig("frage");
         }

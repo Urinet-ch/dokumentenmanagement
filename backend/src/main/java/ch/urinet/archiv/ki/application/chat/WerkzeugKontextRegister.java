@@ -9,6 +9,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,7 +29,7 @@ public class WerkzeugKontextRegister {
      */
     static final Duration ABLAUF = Duration.ofMinutes(10);
 
-    private record Eintrag(WerkzeugKontext kontext, Instant ablauf) {
+    private record Eintrag(WerkzeugKontext kontext, Instant ablauf, Set<UUID> gesehen) {
     }
 
     private final Map<Object, Eintrag> eintraege = new ConcurrentHashMap<>();
@@ -48,7 +50,7 @@ public class WerkzeugKontextRegister {
         Objects.requireNonNull(kontext, "kontext");
         Instant jetzt = uhr.instant();
         eintraege.values().removeIf(e -> !e.ablauf().isAfter(jetzt));
-        eintraege.put(lauf, new Eintrag(kontext, jetzt.plus(ABLAUF)));
+        eintraege.put(lauf, new Eintrag(kontext, jetzt.plus(ABLAUF), ConcurrentHashMap.newKeySet()));
     }
 
     /** Kontext unter {@code lauf}; leer ohne ID, ohne Eintrag oder nach Ablauf. */
@@ -65,6 +67,24 @@ public class WerkzeugKontextRegister {
             return Optional.empty();
         }
         return Optional.of(eintrag.kontext());
+    }
+
+    /**
+     * Hält die Dokument-IDs fest, die {@code dokumente_suchen} in diesem Lauf geliefert hat (also dem Benutzer nach der
+     * Sichtregel schon gezeigt wurden), damit {@code dokument_zeigen} eine vom Modell beim Abschreiben veränderte ID
+     * dem Treffer zuordnen kann. Gilt nur für diesen Lauf; ohne Eintrag wirkungslos.
+     */
+    public void gesehen(Object lauf, java.util.Collection<UUID> ids) {
+        Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
+        if (eintrag != null) {
+            eintrag.gesehen().addAll(ids);
+        }
+    }
+
+    /** Die in diesem Lauf gelieferten Dokument-IDs; leer ohne Eintrag. */
+    public Set<UUID> gesehene(Object lauf) {
+        Eintrag eintrag = lauf == null ? null : eintraege.get(lauf);
+        return eintrag == null ? Set.of() : Set.copyOf(eintrag.gesehen());
     }
 
     /** Am Ende der Chat-Anfrage, auch bei Fehler oder Abbruch. */
