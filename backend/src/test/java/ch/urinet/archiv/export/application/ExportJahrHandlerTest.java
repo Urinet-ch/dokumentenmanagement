@@ -5,7 +5,9 @@ import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
 import ch.urinet.archiv.export.domain.ExportStatus;
+import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
@@ -132,15 +134,32 @@ class ExportJahrHandlerTest {
         Auftrag auftrag = auftrag(nutzlast(EXPORT_ID));
         try (LogMitschnitt log = LogMitschnitt.starten()) {
             assertThatCode(() -> handler(speichern, ziel(new ExportzielStub(false)).port, Stufe.B,
-                    new AtomicInteger()).nachLetztemFehlversuch(auftrag, FEHLER_ID))
+                    new AtomicInteger()).nachLetztemFehlversuch(auftrag, new AuftragFehler("verwaist", FEHLER_ID, null)))
                     .doesNotThrowAnyException();
 
             assertThat(speichern.fehlerExportId).isEqualTo(EXPORT_ID);
             assertThat(speichern.fehlerId).isEqualTo(FEHLER_ID);
+            assertThat(speichern.fehlerart).isEqualTo(ExportFehlerart.VERWAIST);
             assertThat(log.eintraege()).filteredOn(e -> ExportJahrHandler.class.getName().equals(e.getLoggerName()))
                     .singleElement().satisfies(e -> assertThat(log.nachricht(e))
-                            .isEqualTo("Export " + EXPORT_ID + " gescheitert (fehler-id=" + FEHLER_ID + ")"));
+                            .isEqualTo("Export " + EXPORT_ID + " gescheitert (fehler-id=" + FEHLER_ID + ", art=VERWAIST)"));
         }
+    }
+
+    @Test
+    void ohneArtGiltDerFehlerAlsGescheitertUndEineUnbekannteArtAuchNicht() {
+        SpeichernStub speichern = new SpeichernStub(Optional.empty());
+        ExportJahrHandler handler = handler(speichern, ziel(new ExportzielStub(false)).port, Stufe.B,
+                new AtomicInteger());
+
+        handler.nachLetztemFehlversuch(auftrag(nutzlast(EXPORT_ID)), FEHLER_ID);
+        assertThat(speichern.fehlerart).isEqualTo(ExportFehlerart.FEHLGESCHLAGEN);
+
+        handler.nachLetztemFehlversuch(auftrag(nutzlast(EXPORT_ID)), new AuftragFehler("zeitgrenze", FEHLER_ID, null));
+        assertThat(speichern.fehlerart).isEqualTo(ExportFehlerart.ZEITGRENZE);
+
+        handler.nachLetztemFehlversuch(auftrag(nutzlast(EXPORT_ID)), new AuftragFehler("unbekannt", FEHLER_ID, null));
+        assertThat(speichern.fehlerart).isEqualTo(ExportFehlerart.FEHLGESCHLAGEN);
     }
 
     @Test
@@ -219,7 +238,7 @@ class ExportJahrHandlerTest {
     private static Export export(ExportStatus status) {
         return new Export(EXPORT_ID, 2025, status, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), "SYNTHETISCHER_BENUTZER", "INHABER",
-                Instant.parse("2025-01-01T00:00:00Z"), Optional.empty());
+                Instant.parse("2025-01-01T00:00:00Z"), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private record AblageAufruf(AblagePort port, AtomicInteger lebenszyklusAufrufe) {
@@ -231,6 +250,7 @@ class ExportJahrHandlerTest {
         private boolean fertigErgebnis = true;
         private UUID fehlerExportId;
         private UUID fehlerId;
+        private ExportFehlerart fehlerart;
         private boolean fehlerErgebnis = true;
 
         private SpeichernStub(Optional<Export> export) {
@@ -250,7 +270,8 @@ class ExportJahrHandlerTest {
         }
 
         @Override
-        public boolean fehler(UUID id, UUID fehlerId) {
+        public boolean fehler(UUID id, UUID fehlerId, ExportFehlerart art) {
+            fehlerart = art;
             fehlerExportId = id;
             this.fehlerId = fehlerId;
             return fehlerErgebnis;

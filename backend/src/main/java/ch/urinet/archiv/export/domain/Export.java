@@ -8,12 +8,13 @@ import java.util.UUID;
 /**
  * Ein Jahresexport (Zeile in {@code export}, design.md «Jahresexport»). Ein fertiger Export trägt Schlüssel und
  * Versions-ID des ZIP unter {@code exporte/}, dessen SHA-256, Grösse und die Zahl der Belegdateien. {@code benutzer}
- * und {@code rolle} sind die der Anforderung (Protokoll beim Abschluss, Req 7.3).
+ * und {@code rolle} sind die der Anforderung (Protokoll beim Abschluss, Req 7.3). Ein gescheiterter Export trägt die
+ * Fehler-ID des letzten Fehlversuchs (zum Nachschlagen im Log) und, wenn bekannt, dessen Art.
  */
 public record Export(UUID id, int geschaeftsjahr, ExportStatus status, Optional<String> schluessel,
                      Optional<String> versionId, Optional<String> sha256, Optional<Long> groesse,
                      Optional<Integer> anzahl, String benutzer, String rolle, Instant erstellt,
-                     Optional<Instant> fertig) {
+                     Optional<Instant> fertig, Optional<UUID> fehlerId, Optional<ExportFehlerart> fehlerart) {
 
     public Export {
         Objects.requireNonNull(id, "id");
@@ -21,6 +22,8 @@ public record Export(UUID id, int geschaeftsjahr, ExportStatus status, Optional<
         Objects.requireNonNull(benutzer, "benutzer");
         Objects.requireNonNull(rolle, "rolle");
         Objects.requireNonNull(erstellt, "erstellt");
+        Objects.requireNonNull(fehlerId, "fehlerId");
+        Objects.requireNonNull(fehlerart, "fehlerart");
     }
 
     /** Fertig und der Download-Link noch nicht abgelaufen (Req 7.2). */

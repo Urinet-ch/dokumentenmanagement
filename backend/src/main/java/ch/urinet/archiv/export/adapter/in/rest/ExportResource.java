@@ -78,7 +78,13 @@ public class ExportResource {
             @Schema(nullable = true, description = "Grösse des ZIP in Byte") Long groesse,
             @Schema(nullable = true, description = "SHA-256 des ZIP (hex)") String sha256,
             @Schema(nullable = true, description = "vorsignierte Adresse des ZIP, nur bei GET /exporte/{id} für einen "
-                    + "fertigen, nicht abgelaufenen Export") String url) {
+                    + "fertigen, nicht abgelaufenen Export") String url,
+            @Schema(nullable = true, description = "nur bei FEHLER: Fehler-ID des letzten Fehlversuchs, im Log des "
+                    + "Archivs nachzuschlagen (keine Werte); fehlt bei älteren Fehlern") UUID fehlerId,
+            @Schema(nullable = true, enumeration = {"VERWAIST", "ZEITGRENZE", "FEHLGESCHLAGEN"},
+                    description = "nur bei FEHLER: VERWAIST = der Export wurde unterbrochen (z. B. Neustart des "
+                            + "Archivs), ZEITGRENZE = er dauerte zu lange, FEHLGESCHLAGEN = anderer Fehler; fehlt bei "
+                            + "älteren Fehlern") String fehlerArt) {
     }
 
     @POST
@@ -156,7 +162,8 @@ public class ExportResource {
                 : e.status().name();
         return new ExportDto(e.id(), e.geschaeftsjahr(), status, e.erstellt(), e.fertig().orElse(null),
                 e.gueltigBis().orElse(null), e.anzahl().orElse(null), e.groesse().orElse(null),
-                e.sha256().orElse(null), url);
+                e.sha256().orElse(null), url, e.fehlerId().orElse(null),
+                e.fehlerart().map(Enum::name).orElse(null));
     }
 
     /** Der ZugangFilter hat Rolle und Benutzer-ID schon geprüft (sonst 403). */
