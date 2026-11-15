@@ -145,7 +145,7 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Und ich die Aktion «Zusammenführen …» wähle
     Und ich den Kontakt «Ziel Grund Test AG» als Ziel suche und wähle
     Und ich im Dialog ohne Grund auf «Weiter» klicke
-    Dann bleibt der Dialog offen mit dem Hinweis «Bitte einen Grund angeben.»
+    Dann bleibt der Dialog offen mit dem Hinweis «Bitte geben Sie einen Grund an.»
     Und hat die PWA noch nichts zu «zusammenfuehren» gesendet
     Und ist der Kontakt «Ohne Grund Test AG» im Archiv aktiv
 
