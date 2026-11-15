@@ -112,15 +112,15 @@ class ManifestErzeugenTest {
     }
 
     @Test
-    void dieZeitstempelUrsacheNenntKlassenUndFesteMeldungenAberKeineFremdenMeldungen() {
-        var ursache = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel von haupt nicht erhalten oder ungültig",
-                new java.io.IOException("geheim.example:443 Token abc"));
+    void dieZeitstempelUrsacheNenntDieFesteMeldungAberKeineFremdenMeldungen() {
+        var ursache = new ZeitstempelPort.ZeitstempelFehler("Zeitstempel nicht erhalten oder ungültig",
+                new java.io.IOException("https://tsa.invalid/endpoint 0123456789abcdef antwortinhalt"));
 
-        String text = ManifestErzeugen.zeitstempelUrsache(ursache);
+        String text = ch.urinet.archiv.gemeinsam.domain.Ursachen.ketteMitMeldung(ursache);
 
-        assertThat(text).contains("ZeitstempelFehler <- java.io.IOException")
-                .contains("[meldung=\"Zeitstempel von haupt nicht erhalten oder ungültig\"]")
-                .doesNotContain("geheim").doesNotContain("abc");
+        assertThat(text).contains("ZeitstempelPort$ZeitstempelFehler").contains("<- java.io.IOException")
+                .contains("[meldung=\"Zeitstempel nicht erhalten oder ungültig\"]")
+                .doesNotContain("tsa.invalid").doesNotContain("0123456789abcdef").doesNotContain("antwortinhalt");
     }
 
     @Test

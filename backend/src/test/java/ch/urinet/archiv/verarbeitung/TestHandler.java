@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung;
 import ch.urinet.archiv.dokumentart.adapter.out.persistence.DokumentartEintrag;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ZeitstempelPort;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragHandler;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
@@ -13,6 +14,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.hibernate.Session;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +57,7 @@ public final class TestHandler {
     public static final AtomicInteger NACH_LETZTEM_AUFRUFE = new AtomicInteger();
     /** Lässt den nächsten Aufruf des Hooks scheitern (Absturz oder Fehler nach dem Speichern von FEHLER). */
     public static final AtomicBoolean HOOK_SCHEITERT = new AtomicBoolean();
+    public static final AtomicBoolean TSA_FEHLER = new AtomicBoolean();
     public static final Set<Long> UNTERBROCHEN = ConcurrentHashMap.newKeySet();
     /** Auftrags-ID → was der Handler in der Datenbank gesehen hat. */
     public static final Map<Long, Sicht> SICHTEN = new ConcurrentHashMap<>();
@@ -83,6 +86,7 @@ public final class TestHandler {
         NACH_LETZTEM_FEHLER.clear();
         NACH_LETZTEM_AUFRUFE.set(0);
         HOOK_SCHEITERT.set(false);
+        TSA_FEHLER.set(false);
         UNTERBROCHEN.clear();
         SICHTEN.clear();
         STUR_JETZT.clear();
@@ -141,6 +145,10 @@ public final class TestHandler {
 
         @Override
         public void ausfuehren(Auftrag auftrag) throws Exception {
+            if (TSA_FEHLER.getAndSet(false)) {
+                throw new ZeitstempelPort.ZeitstempelFehler("Zeitstempeldienst nicht erreichbar",
+                        new IOException("https://tsa.invalid/endpoint 0123456789abcdef antwortinhalt"));
+            }
             throw new Exception("Beleg " + GEHEIM + " nicht lesbar");
         }
 
