@@ -24,6 +24,11 @@ const MELDUNGEN: Meldungen = {
  * lädt ihn hoch. Ist die Sitzung abgelaufen, gilt bis zur nächsten Anmeldung weiter der zuletzt angemeldete Benutzer,
  * aber nur bis zum Neuladen der PWA (`zuletzt` liegt nur im Arbeitsspeicher); danach entstehen Einträge ohne Benutzer.
  * Einträge ohne Anmeldung erfasst gehören niemandem; die nächste Anmeldung mit Recht A1 übernimmt sie.
+ *
+ * Benutzerwechsel (Req 4.10): Meldet sich ein anderer Inhaber an und liegen wartende Einträge anderer Inhaber vor, hält
+ * `fremdeFrage` die Frage bereit («Löschen» oder «Behalten»). Gemerkt wird nur im Arbeitsspeicher, wem schon gefragt
+ * wurde; Abmelden und abgelaufene Sitzung fragen und löschen nichts. Fehlerhafte Einträge löscht nur ihr Inhaber
+ * ausdrücklich (Req 4.11), nie die Warteschlange selbst.
  */
 @Injectable({ providedIn: 'root' })
 export class WarteschlangeService {
@@ -59,6 +64,24 @@ export class WarteschlangeService {
   /** Zähler «wartet auf Upload» (Req 4.4). */
   readonly wartend = computed(() => this.eintraege().filter((e) => e.zustand === 'wartet').length);
   readonly fehlerhaft = computed(() => this.eintraege().filter((e) => e.zustand === 'fehlerhaft'));
+  /** Schlüssel des Inhabers, dem für die laufende Anmeldung schon gefragt wurde (nur Arbeitsspeicher). */
+  private readonly gefragtFuer = signal<string | null>(null);
+  /** Wartende Einträge anderer Inhaber, die nach Benutzer- oder Mandantenwechsel auf einen Entscheid warten (Req 4.10). */
+  private readonly fremdeWartende = computed(() => {
+    const inhaber = this.angemeldet();
+    return inhaber
+      ? this.alleEintraege().filter((e) => e.zustand === 'wartet' && !!e.benutzer && !gehoert(e, inhaber))
+      : [];
+  });
+  /** Offene Frage: nur Anzahl und Aufnahmezeitpunkte, ohne Benutzernamen und Inhalte; `null`, wenn nichts zu fragen ist. */
+  readonly fremdeFrage = computed<FremdeFrage | null>(() => {
+    const inhaber = this.angemeldet();
+    const fremde = this.fremdeWartende();
+    if (!inhaber || fremde.length === 0 || this.gefragtFuer() === schluessel(inhaber)) {
+      return null;
+    }
+    return { anzahl: fremde.length, aufgenommen: fremde.map((e) => e.aufgenommen) };
+  });
   readonly geladen: Promise<void>;
 
   constructor() {
@@ -113,6 +136,36 @@ export class WarteschlangeService {
       await this.speicher.speichern({ ...eintrag, zustand: 'wartet', fehlversuche: 0, meldung: undefined });
       await this.neuLaden();
       void this.verarbeiten();
+    }
+  }
+
+  /** «Behalten»: Die Einträge bleiben unverändert dem bisherigen Inhaber zugeordnet und verborgen; nicht mehr fragen. */
+  fremdeBehalten(): void {
+    this.gefragtFuer.set(schluessel(this.angemeldet()));
+  }
+
+  /** «Löschen» (nach der zweiten Bestätigung der Seite): entfernt die wartenden Einträge anderer Inhaber endgültig. */
+  async fremdeLoeschen(): Promise<void> {
+    if (!this.fremdeFrage()) {
+      return;
+    }
+    for (const eintrag of this.fremdeWartende()) {
+      await this.speicher.loeschen(eintrag.id);
+    }
+    this.gefragtFuer.set(schluessel(this.angemeldet()));
+    await this.neuLaden();
+  }
+
+  /**
+   * Löscht einen fehlerhaften Eintrag des angemeldeten Inhabers (Req 4.11) samt Aufnahmen. Die Seite fragt vorher zweistufig;
+   * alles andere (wartende, fremde, unbekannte Einträge) bleibt unberührt.
+   */
+  async loeschen(id: string): Promise<void> {
+    const eintrag = this.fehlerhaft().find((e) => e.id === id);
+    if (eintrag) {
+      this.nichtVor.delete(id);
+      await this.speicher.loeschen(id);
+      await this.neuLaden();
     }
   }
 
@@ -212,6 +265,14 @@ interface Inhaber {
   benutzer: string;
   mandant: string;
 }
+
+/** Frage nach Aufnahmen anderer Inhaber (Req 4.10): Anzahl und Zeitpunkte (ISO), sonst nichts. */
+export interface FremdeFrage {
+  anzahl: number;
+  aufgenommen: string[];
+}
+
+const schluessel = (inhaber: Inhaber | null): string | null => (inhaber ? `${inhaber.mandant}/${inhaber.benutzer}` : null);
 
 function gehoert(eintrag: Eintrag, inhaber: Inhaber): boolean {
   return eintrag.benutzer === inhaber.benutzer && eintrag.mandant === inhaber.mandant;

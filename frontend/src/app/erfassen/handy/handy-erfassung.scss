@@ -63,3 +63,14 @@ h3 {
 .seiten > li.mit-fehler {
   outline: 2px solid var(--urinet-fehler);
 }
+
+.frage {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

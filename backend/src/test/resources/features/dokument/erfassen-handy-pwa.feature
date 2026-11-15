@@ -152,3 +152,92 @@ Funktionalität: Handy-Erfassung
     Wenn ich mich anmelde
     Dann hat das Archiv eine Erfassung mit 1 Seite als ein Dokument angelegt
     Und zeigt der Zähler «Wartet auf Upload: 0»
+
+  # Aufgabe 3.9 (Req 4.10, 4.11): Das Gerät behält die Aufnahme eines anderen Inhabers (Archiv antwortet 503, sie wartet),
+  # bis der neue Benutzer entscheidet. Die Prüfung der Aufnahmen liest IndexedDB direkt (Anzahl, nie Inhalte).
+  @req-4.10
+  Szenario: Beim Wechsel des Benutzers fragt die App nach den Aufnahmen des Vorgängers; «Behalten» ändert nichts
+    Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und das Archiv antwortet auf den nächsten Upload mit Status 503
+    Wenn ich im Menü «Erfassen» wähle
+    Und ich 1 Seite aufnehme
+    Und ich die Erfassung abschliesse
+    Dann hat das Archiv einen Upload-Versuch erhalten
+    Und zeigt der Zähler «Wartet auf Upload: 1»
+    Wenn ich auf «Abmelden» klicke
+    Dann hat Keycloak die Abmeldung erhalten
+    Und liegen 1 Erfassung im lokalen Speicher
+    Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
+    Wenn ich mich anmelde
+    Und ich im Menü «Erfassen» wähle
+    Dann fragt die App nach den Aufnahmen anderer Benutzer: «wartet 1 Aufnahme»
+    Und zeigt der Zähler «Wartet auf Upload: 0»
+    Wenn ich auf «Behalten» klicke
+    Dann fragt die App nicht nach Aufnahmen anderer Benutzer
+    Und liegen 1 Erfassung im lokalen Speicher
+    Und hat das Archiv einen Upload-Versuch erhalten
+
+  @req-4.10
+  Szenario: «Löschen» der Aufnahmen des Vorgängers verlangt eine zweite Bestätigung
+    Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und das Archiv antwortet auf den nächsten Upload mit Status 503
+    Wenn ich im Menü «Erfassen» wähle
+    Und ich 1 Seite aufnehme
+    Und ich die Erfassung abschliesse
+    Dann hat das Archiv einen Upload-Versuch erhalten
+    Wenn ich auf «Abmelden» klicke
+    Dann hat Keycloak die Abmeldung erhalten
+    Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
+    Wenn ich mich anmelde
+    Und ich im Menü «Erfassen» wähle
+    Dann fragt die App nach den Aufnahmen anderer Benutzer: «wartet 1 Aufnahme»
+    Wenn ich auf «Löschen …» klicke
+    Dann sehe ich die Rückfrage «1 Aufnahme endgültig von diesem Gerät löschen? Sie wurden nicht hochgeladen und lassen sich nicht wiederherstellen.»
+    Und liegen 1 Erfassung im lokalen Speicher
+    Wenn ich auf «Abbrechen» klicke
+    Dann liegen 1 Erfassung im lokalen Speicher
+    Wenn ich auf «Löschen …» klicke
+    Und ich auf «Endgültig löschen» klicke
+    Dann fragt die App nicht nach Aufnahmen anderer Benutzer
+    Und liegen 0 Erfassungen im lokalen Speicher
+    Und sehe ich die Meldung «Die Aufnahmen wurden gelöscht.»
+
+  @req-4.10 @req-4.11
+  Szenario: Eine fehlerhafte Erfassung bleibt beim Wechsel des Benutzers, ohne Frage und ohne Anzeige
+    Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und das Archiv lehnt den nächsten Upload mit Status 400 und der Meldung «Die Anfrage ist ungültig.» ab
+    Wenn ich im Menü «Erfassen» wähle
+    Und ich 1 Seite aufnehme
+    Und ich die Erfassung abschliesse
+    Dann sehe ich die Erfassung unter «Nicht hochgeladen» mit der Meldung «Die Anfrage ist ungültig.»
+    Wenn ich auf «Abmelden» klicke
+    Dann hat Keycloak die Abmeldung erhalten
+    Angenommen Keycloak kennt mich als «mitarbeiter» im Mandanten «urinet»
+    Wenn ich mich anmelde
+    Und ich im Menü «Erfassen» wähle
+    Dann fragt die App nicht nach Aufnahmen anderer Benutzer
+    Und sehe ich nichts unter «Nicht hochgeladen»
+    Und liegen 1 Erfassung im lokalen Speicher
+
+  @req-4.11
+  Szenario: Eine fehlerhafte Erfassung löscht ihr Inhaber erst nach der zweiten Bestätigung
+    Angenommen ein Handy, dessen Rückkamera «ein Blatt» filmt
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und das Archiv lehnt den nächsten Upload mit Status 400 und der Meldung «Die Anfrage ist ungültig.» ab
+    Wenn ich im Menü «Erfassen» wähle
+    Und ich 1 Seite aufnehme
+    Und ich die Erfassung abschliesse
+    Dann sehe ich die Erfassung unter «Nicht hochgeladen» mit der Meldung «Die Anfrage ist ungültig.»
+    Wenn ich auf «Löschen» klicke
+    Dann sehe ich die Rückfrage «Diese Erfassung endgültig von diesem Gerät löschen? Sie wurde nicht hochgeladen und lässt sich nicht wiederherstellen.»
+    Und liegen 1 Erfassung im lokalen Speicher
+    Wenn ich auf «Abbrechen» klicke
+    Dann sehe ich die Erfassung unter «Nicht hochgeladen» mit der Meldung «Die Anfrage ist ungültig.»
+    Wenn ich auf «Löschen» klicke
+    Und ich auf «Endgültig löschen» klicke
+    Dann sehe ich nichts unter «Nicht hochgeladen»
+    Und liegen 0 Erfassungen im lokalen Speicher
+    Und sehe ich die Meldung «Erfassung gelöscht.»

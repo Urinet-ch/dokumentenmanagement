@@ -8,6 +8,7 @@ import { ONLINE } from '../../gemeinsam/online';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { UploadPort } from '../upload-port';
 import { HandyErfassung } from './handy-erfassung';
+import { Eintrag } from './warteschlange/eintrag';
 import { Ecken } from './scanner/ecken';
 import { Aufbereitet, ScannerPort } from './scanner/scanner.service';
 import { SpeicherImArbeitsspeicher, WarteschlangeSpeicher } from './warteschlange/speicher';
@@ -23,8 +24,8 @@ class AnmeldungAttrappe {
     const b = this.benutzer();
     return this.angemeldet() && !!b?.mandant && darf(b.rolle, aktion);
   }
-  als(rolle: Rolle) {
-    this.benutzer.set({ id: 'u1', name: 'Test', mandant: 'urinet', rolle });
+  als(rolle: Rolle, id = 'u1') {
+    this.benutzer.set({ id, name: 'Test', mandant: 'urinet', rolle });
     this.zustand.set('angemeldet');
   }
 }
@@ -294,5 +295,81 @@ describe('HandyErfassung (Req 4.2–4.4, 4.7)', () => {
     expect(element.textContent).not.toContain(TEXTE.handy.ohneAnmeldung);
     expect(element.querySelector('app-upload')).not.toBeNull();
     expect(element.querySelectorAll('h1')).toHaveLength(1);
+  });
+  describe('Benutzerwechsel und fehlerhafte Einträge (Req 4.10, 4.11)', () => {
+    const eintrag = (id: string, benutzer: string, zustand: 'wartet' | 'fehlerhaft'): Eintrag => ({
+      id,
+      aufgenommen: '2026-11-13T07:15:00.000Z',
+      seiten: [{ original: new Blob(['o']), arbeitsfassung: new Blob(['a']) }],
+      fehlversuche: 0,
+      zustand,
+      meldung: zustand === 'fehlerhaft' ? 'Abgelehnt.' : undefined,
+      benutzer,
+      mandant: 'urinet',
+    });
+    const frage = () => element.querySelector('[data-test=fremde-frage]');
+    const test = (name: string) => element.querySelector<HTMLButtonElement>(`[data-test=${name}]`)!;
+    const klick = async (name: string) => {
+      test(name).click();
+      await fixture.whenStable();
+    };
+
+    it('fragt nach fremden Aufnahmen mit Anzahl und Zeitpunkt; «Löschen» verlangt eine zweite Bestätigung', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'wartet'));
+      speicher.inhalt.set('b', eintrag('b', 'u3', 'wartet'));
+      anmeldung.als('mitarbeiter', 'u2');
+      await zeigen();
+      expect(frage()?.textContent).toContain(TEXTE.handy.fremdeFrage(2));
+      expect(frage()?.textContent).toContain('13.11.2026 08:15');
+      expect(frage()?.textContent).not.toContain('u1');
+      await klick('fremde-loeschen');
+      expect(speicher.inhalt.size).toBe(2);
+      expect(element.querySelector('[data-test=fremde-loeschen-frage]')?.textContent).toContain(TEXTE.handy.fremdeLoeschenFrage(2));
+      knopf(TEXTE.handy.loeschenAbbrechen)!.click();
+      await fixture.whenStable();
+      expect(frage()).not.toBeNull();
+      expect(speicher.inhalt.size).toBe(2);
+      await klick('fremde-loeschen');
+      await klick('fremde-loeschen-ja');
+      expect(speicher.inhalt.size).toBe(0);
+      expect(frage()).toBeNull();
+      expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toContain(TEXTE.handy.fremdeGeloescht);
+    });
+
+    it('«Behalten» schliesst die Frage und ändert nichts', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'wartet'));
+      anmeldung.als('mitarbeiter', 'u2');
+      await zeigen();
+      await klick('fremde-behalten');
+      expect(frage()).toBeNull();
+      expect(speicher.inhalt.get('a')).toMatchObject({ benutzer: 'u1', zustand: 'wartet' });
+    });
+
+    it('fragt nicht für eigene Aufnahmen', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'wartet'));
+      anmeldung.als('mitarbeiter', 'u1');
+      await zeigen();
+      expect(frage()).toBeNull();
+    });
+
+    it('löscht einen fehlerhaften Eintrag erst nach der zweiten Bestätigung und zeigt die Liste neu', async () => {
+      speicher.inhalt.set('a', eintrag('a', 'u1', 'fehlerhaft'));
+      speicher.inhalt.set('b', eintrag('b', 'u1', 'fehlerhaft'));
+      anmeldung.als('mitarbeiter', 'u1');
+      await zeigen();
+      expect(element.querySelectorAll('[data-test=fehlerhaft]')).toHaveLength(2);
+      expect(knopf(TEXTE.handy.erneutVersuchen)).toBeTruthy();
+      await klick('loeschen');
+      expect(element.querySelector('[data-test=loeschen-frage]')?.textContent).toContain(TEXTE.handy.loeschenFrage);
+      expect(speicher.inhalt.size).toBe(2);
+      knopf(TEXTE.handy.loeschenAbbrechen)!.click();
+      await fixture.whenStable();
+      expect(speicher.inhalt.size).toBe(2);
+      await klick('loeschen');
+      await klick('loeschen-ja');
+      expect([...speicher.inhalt.keys()]).toEqual(['b']);
+      expect(element.querySelectorAll('[data-test=fehlerhaft]')).toHaveLength(1);
+      expect(element.querySelector('[data-test=erfassung-meldung]')?.textContent).toContain(TEXTE.handy.geloescht);
+    });
   });
 });

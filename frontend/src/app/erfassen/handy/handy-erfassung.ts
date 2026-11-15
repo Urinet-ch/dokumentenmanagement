@@ -65,6 +65,11 @@ export class HandyErfassung {
   protected readonly seiten = signal<Aufnahme[]>([]);
   protected readonly bearbeitet = signal<number | null>(null);
   protected readonly meldung = signal<string | null>(null);
+  /** Id des fehlerhaften Eintrags, dessen Löschen gerade bestätigt wird (zweite Stufe, Req 4.11). */
+  protected readonly loeschenFuer = signal<string | null>(null);
+  /** Die zweite Bestätigung zur Frage nach Aufnahmen anderer Inhaber ist offen (Req 4.10). */
+  protected readonly fremdeBestaetigen = signal(false);
+  protected readonly zeitpunkte = (iso: string[]) => iso.map((z) => this.name(z).replace('Aufnahme ', '')).join(', ');
   /** Die Erfassung wird gespeichert: Aufnehmen, Dateiwahl, Zuschnitt, Verwerfen und Abschliessen sind gesperrt. */
   protected readonly speichert = signal(false);
   private readonly fertig = computed(() => {
@@ -99,6 +104,24 @@ export class HandyErfassung {
         this.freigeben(seite);
       }
     });
+  }
+
+  protected async eintragLoeschen(id: string): Promise<void> {
+    this.loeschenFuer.set(null);
+    await this.warteschlange.loeschen(id);
+    this.meldung.set(this.texte.geloescht);
+  }
+
+  protected fremdeBehalten(): void {
+    this.fremdeBestaetigen.set(false);
+    this.warteschlange.fremdeBehalten();
+    this.meldung.set(this.texte.fremdeBehaltenMeldung);
+  }
+
+  protected async fremdeLoeschen(): Promise<void> {
+    this.fremdeBestaetigen.set(false);
+    await this.warteschlange.fremdeLoeschen();
+    this.meldung.set(this.texte.fremdeGeloescht);
   }
 
   async kameraStarten(): Promise<void> {

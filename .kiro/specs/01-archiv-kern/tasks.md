@@ -315,11 +315,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 4.1–4.8_
   - _Abhängig von: 2.8_
 
-- [ ] 3.9 Folge zu 3.7: Warteschlange: Frage beim Benutzerwechsel und Löschen fehlerhafter Einträge [Frontend]
+- [x] 3.9 Folge zu 3.7: Warteschlange: Frage beim Benutzerwechsel und Löschen fehlerhafter Einträge [Frontend]
   - Folge aus dem Entscheid 15.11.2026 zu 3.7; heutiger Stand (`frontend/src/app/erfassen/handy/warteschlange/warteschlange.service.ts`): Einträge anderer Inhaber bleiben verborgen und unberührt, eine Frage gibt es nicht, und fehlerhafte Einträge bieten nur «Erneut versuchen», aber kein Löschen
   - Beim Anmelden eines anderen Benutzers oder Mandanten (Anmelden, nicht abgelaufene Sitzung) mit wartenden Einträgen anderer Inhaber: Dialog mit Anzahl und Aufnahmezeitpunkten, ohne Benutzernamen und ohne Inhalte; «Löschen» (zweite Bestätigung, `speicher.loeschen`) oder «Behalten» (keine Änderung am Eintrag); gemerkt nur im Arbeitsspeicher bis zur nächsten Anmeldung, nichts davon geht an den Server
   - Aktion «Löschen» (mit Bestätigung) für eigene fehlerhafte Einträge in der Liste «Nicht hochgeladen»; Abmelden und abgelaufene Sitzung löschen und fragen nichts
   - Texte in `texte.de-CH.ts`; Vitest für `WarteschlangeService` (Wechsel, Mandantenwechsel, mehrere Fremdinhaber, Behalten, Löschen, fehlerhafte Einträge bleiben) und Browser-Szenarien `@req-4.10`, `@req-4.11` in `erfassen-handy-pwa.feature`
+  - Erledigt: PR #PRNR (15.11.2026): `WarteschlangeService.fremdeFrage`, `fremdeBehalten`, `fremdeLoeschen`, `loeschen`; Karte und Rückfragen auf der Seite «Erfassen»; Vitest für Service und Seite, vier Browser-Szenarien (`@req-4.10`, `@req-4.11`); Auslegung zum Zeitpunkt der Frage in design.md, «Umsetzung 3.7»
   - _Anforderungen: 4.10, 4.11_
   - _Abhängig von: 3.7_
 
