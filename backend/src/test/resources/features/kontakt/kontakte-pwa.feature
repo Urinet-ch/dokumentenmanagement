@@ -24,7 +24,7 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Und zeigt die Liste den Kontakt «Blätter Test AG 26» nicht
     Wenn ich zur nächsten Kontaktseite blättere
     Dann zeigt die Liste den Kontakt «Blätter Test AG 26»
-    Wenn ich nach dem Kontakt «Blätter Test AG 26» suche
+    Wenn ich nach der Kennung des Kontakts «Blätter Test AG 26» suche
     Dann zeigt die Kontaktliste insgesamt 1 Kontakte
     Und zeigt die Liste den Kontakt «Blätter Test AG 26»
 

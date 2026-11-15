@@ -190,6 +190,11 @@ When(/^ich nach dem Kontakt «([^»]+)» suche$/, async function (basis) {
   await suchen(this, kontakt(this, basis).name);
 });
 
+When(/^ich nach der Kennung des Kontakts «([^»]+)» suche$/, async function (basis) {
+  const name = kontakt(this, basis).name;
+  await suchen(this, name.split(' ').at(-1));
+});
+
 When(/^ich nach «([^»]+)» suche, das es nicht gibt$/, async function (begriff) {
   await suchen(this, begriff);
 });
