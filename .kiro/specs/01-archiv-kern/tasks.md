@@ -338,10 +338,11 @@ Arbeitsweise je Aufgabe (Claude Code):
   - «mögliche Dublette» bei mehreren Kandidaten, sich widersprechenden Stufen oder nur Ähnlichkeit ab der Schwelle aus design.md
   - _Anforderungen: 13.3, 13.4, 13.5_
 
-- [ ] 4.3 Übernahme und Protokoll [Backend]
+- [x] 4.3 Übernahme und Protokoll [Backend]
   - Auftrag `CSV_UEBERNEHMEN` in einer Transaktion; leere Zellen überschreiben nichts; Dubletten-Entscheide; «nicht mehr im CRM-Export» nur bei Vollexport und nur für Kontakte mit `crm_id`, nie löschen; Originaldatei nach `importe/`
   - Verkaufschancen-Import (Importart `verkaufschance`) über die Kontakt-ID aus 21.CRM zuordnen (Profil «21.CRM»: `ACCOUNTGUID` → `kontakt.crm_id`, `GGUID` → `verkaufschance.crm_id`, design.md), bestehende über `crm_id` aktualisieren
   - _Anforderungen: 13.6, 13.7, 13.8, 13.9_
+  - Erledigt (PR #70): `CsvUebernehmenHandler`, `CsvUebernehmenSpeichern` und Verkaufschancen-Übernahme; Szenarien in `features/importe/uebernahme.feature` decken `@req-13.6` bis `@req-13.9` ab.
 
 - [x] 4.4 Import-Oberfläche [Frontend]
   - Upload mit Markierung «Vollexport», Zuordnungsdialog (Spalte → Feld mit Vorschlag; erkanntes Profil «21.CRM» vorausgewählt), Vorschau mit Zählern und Filter je Ergebnis, Dubletten entscheiden, Übernehmen, Liste der Läufe; nur mit Recht A12
@@ -511,7 +512,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 - [ ] 5.6 Überwachung und Benachrichtigung [Backend] [Infra]
   - Health: öffentlich nur ein schlanker Pfad über Traefik; Detail-Health und Micrometer-Kennzahlen (offene Aufträge, Fehler, Eingangskorb, Korrekturquote je Feld) nur intern
   - E-Mail an den Inhaber bei einem Dokument > 1 h in `VERARBEITUNG`, `FEHLER` oder `ARCHIVIERUNG_FEHLER`, bei fehlgeschlagener Sicherung und fehlendem Manifest; Inhalte nur IDs
-  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; Anbindung Manifest (5.2) mit PR #114, Folge zu den Reviews #113/#114: ein neuer Auftrag nach einem Fehlschlag hebt den Befund nicht auf (`AuftragStand.letzterFehler`), genau eine Mail (design.md «Überwachung»); offen: Korrekturquote (mit 3.3), Anbindung Sicherung (5.5), Teil Infra
+  - Teil Backend umgesetzt (PR #91): Überwachung mit Tabelle `alarm`, Alarm-Mail, Kennzahlen; Anbindung Manifest (5.2) mit PR #114, Folge zu den Reviews #113/#114: ein neuer Auftrag nach einem Fehlschlag hebt den Befund nicht auf (`AuftragStand.letzterFehler`), genau eine Mail (design.md «Überwachung»); Korrekturquoten-Zähler je Feld (`archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`) ergänzt mit 3.3 (PR #109); offen: Anbindung Sicherung (5.5), Teil Infra
   - Ergänzung 14.11.2026 (Entscheid Fabian): SMTP-Zugang und Empfänger in prod umgesetzt (PR «Betrieb: Mail-Versand und Alarm-Empfänger in prod»): Versand über Hostpoint mit `archiv@urinet.ch`, Passwort aus dem GitHub-Secret `ARCHIV_SMTP_PASSWORT` als Secret-Datei `archiv_smtp_passwort`, Empfänger aus der GitHub-Variable `ARCHIV_ALARM_EMPFAENGER_URINET`; ohne beide Werte startet prod weiter und loggt nur (design.md «Umsetzung 5.6»). Aktiv erst, wenn Fabian die zwei Werte gesetzt hat (README «Benachrichtigungen per Mail»)
   - [Infra] Restore-Probe (Req 16.25): Benachrichtigung des maintenance-Workflows (`notify`) bei rotem Lauf; Alarm beim Kontingent des Hostpoint-Webhostings (ein gestohlener Workflow-Schlüssel kann den Webspace durch Anhängen füllen), Schwelle im PR
   - _Anforderungen: 16.4, 16.5, 16.7, 16.25_
