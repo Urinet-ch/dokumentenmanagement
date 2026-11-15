@@ -9,12 +9,14 @@ import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
+import ch.urinet.archiv.ablage.domain.SicherungsSperre;
 import ch.urinet.archiv.ablage.domain.UnsichereFortsetzung;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
@@ -38,8 +40,10 @@ import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -542,10 +546,71 @@ class S3AblageTest {
         var erwartet = verwaltung.listObjectVersions(r -> r.bucket(bucket).prefix("archiv/"));
         assertThat(seiten).isGreaterThanOrEqualTo(4);
         assertThat(alle).doesNotHaveDuplicates().hasSize(4)
-                .containsAll(erwartet.versions().stream().map(v -> new Objektversion(v.key(), v.versionId(), false))
+                .containsAll(erwartet.versions().stream().map(v -> new Objektversion(v.key(), v.versionId(), false,
+                                v.lastModified(), v.size()))
                         .toList())
                 .containsAll(erwartet.deleteMarkers().stream()
-                        .map(m -> new Objektversion(m.key(), m.versionId(), true)).toList());
+                        .map(m -> new Objektversion(m.key(), m.versionId(), true, m.lastModified(), 0)).toList());
+    }
+
+    @Test
+    void sicherungsInventarLiefertSperrmodusFristUndDeleteMarker() {
+        String archivKey = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
+        String manifestKey = "manifest/" + UUID.randomUUID() + ".json";
+        String eingangKey = "eingang/2026/" + UUID.randomUUID() + "/original.pdf";
+        String markerKey = "archiv/2026/" + UUID.randomUUID() + "/geloescht.pdf";
+        String archivVersion = verwaltung.putObject(r -> r.bucket(bucket).key(archivKey),
+                RequestBody.fromString("Archiv")).versionId();
+        String manifestVersion = verwaltung.putObject(r -> r.bucket(bucket).key(manifestKey),
+                RequestBody.fromString("Manifest")).versionId();
+        String eingangVersion = verwaltung.putObject(r -> r.bucket(bucket).key(eingangKey),
+                RequestBody.fromString("Eingang")).versionId();
+        verwaltung.putObject(r -> r.bucket(bucket).key(markerKey), RequestBody.fromString("Wird gelöscht"));
+        verwaltung.deleteObject(r -> r.bucket(bucket).key(markerKey));
+        verwaltung.putObjectRetention(r -> r.bucket(bucket).key(archivKey).versionId(archivVersion).retention(s -> s
+                .mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(Instant.now().plus(Duration.ofHours(1)))));
+        verwaltung.putObjectRetention(r -> r.bucket(bucket).key(manifestKey).versionId(manifestVersion).retention(s -> s
+                .mode(ObjectLockRetentionMode.COMPLIANCE).retainUntilDate(Instant.now().plus(Duration.ofHours(1)))));
+
+        S3Ablage ablage = ablage();
+        List<Objektversion> archiv = ablage.versionen(mandant, "archiv/", Optional.empty(), 100).versionen();
+        List<Objektversion> manifest = ablage.versionen(mandant, "manifest/", Optional.empty(), 100).versionen();
+        List<Objektversion> eingang = ablage.versionen(mandant, "eingang/", Optional.empty(), 100).versionen();
+
+        Objektversion archivObjekt = archiv.stream().filter(v -> v.versionId().equals(archivVersion)).findFirst().orElseThrow();
+        SicherungsSperre archivSperre = ablage.sicherungsSperre(mandant, archivObjekt).orElseThrow();
+        assertThat(archivSperre.modus()).isEqualTo("GOVERNANCE");
+        assertThat(archivSperre.retainUntil()).isAfter(Instant.now());
+        assertThat(manifest).filteredOn(v -> v.versionId().equals(manifestVersion)).singleElement().satisfies(v -> {
+            SicherungsSperre sperre = ablage.sicherungsSperre(mandant, v).orElseThrow();
+            assertThat(sperre.modus()).isEqualTo("COMPLIANCE");
+            assertThat(sperre.retainUntil()).isAfter(Instant.now());
+        });
+        Objektversion loeschmarke = archiv.stream().filter(v -> v.schluessel().equals(markerKey) && v.loeschmarke())
+                .findFirst().orElseThrow();
+        assertThat(ablage.sicherungsSperre(mandant, loeschmarke)).isEmpty();
+        assertThat(eingang).filteredOn(v -> v.versionId().equals(eingangVersion)).singleElement()
+                .satisfies(v -> assertThat(ablage.sicherungsSperre(mandant, v)).isEmpty());
+    }
+
+    @Test
+    void sicherungsKopieLiestVersionenAusAllenBereichenUndBerechnetDiePruefsumme() {
+        S3Ablage ablage = ablage();
+        for (String praefix : List.of("archiv/", "eingang/", "manifest/")) {
+            String key = praefix + UUID.randomUUID() + ".bin";
+            byte[] daten = inhalt("synthetische Sicherungsdaten " + praefix);
+            String versionId = verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromBytes(daten))
+                    .versionId();
+            ByteArrayOutputStream kopie = new ByteArrayOutputStream();
+
+            Kopie ergebnis = ablage.sicherungsKopie(mandant, key, versionId, kopie);
+
+            assertThat(kopie.toByteArray()).isEqualTo(daten);
+            assertThat(ergebnis.sha256()).isEqualTo(Pruefsumme.von(daten));
+            assertThat(ergebnis.groesse()).isEqualTo(daten.length);
+        }
+        assertThatThrownBy(() -> ablage.sicherungsKopie(mandant, "vorschau/x.png", "v1",
+                OutputStream.nullOutputStream())).isInstanceOf(IllegalArgumentException.class);
     }
 
     /**

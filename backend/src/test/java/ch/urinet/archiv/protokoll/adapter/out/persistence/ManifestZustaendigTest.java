@@ -125,6 +125,24 @@ class ManifestZustaendigTest {
         assertThat(spaeter).isEmpty();
     }
 
+    @Test
+    void sicherungenNutzenHalboffenesFensterGlobaleUndMandanteneigeneZeilenSortiertOhneDuplikate() {
+        String fremd = "sicherung-" + UUID.randomUUID().toString().substring(0, 8);
+        List<List<String>> ergebnis = zurueckgerollt(() -> {
+            mandantEintragen(fremd);
+            sicherung("1".repeat(64), null, T1);
+            sicherung("2".repeat(64), MANDANT.wert(), T1.plusSeconds(1));
+            sicherung("1".repeat(64), MANDANT.wert(), T1.plusSeconds(2));
+            sicherung("3".repeat(64), fremd, T1.plusSeconds(3));
+            sicherung("4".repeat(64), null, T2);
+            sicherung("5".repeat(64), null, T1.minusSeconds(1));
+            return List.of(daten.sicherungen(MANDANT, T1, T2), daten.sicherungen(MANDANT, null, T2));
+        });
+
+        assertThat(ergebnis.getFirst()).containsExactly("1".repeat(64), "2".repeat(64));
+        assertThat(ergebnis.get(1)).containsExactly("1".repeat(64), "2".repeat(64), "5".repeat(64));
+    }
+
     /** Variante und Nr. wie im Manifest: Original, Arbeitsfassung und PDF/A; verworfene Datei nicht im Manifest. */
     @Test
     void varianteUndNrWieImManifest() {
@@ -193,6 +211,28 @@ class ManifestZustaendigTest {
             p.setString(4, sha());
             p.setString(5, "archiv/2001/" + id + "/" + nr + "-" + rolle.toLowerCase(java.util.Locale.ROOT) + ".pdf");
             p.setString(6, status);
+        });
+    }
+
+    private void sicherung(String sha256, String mandant, Instant erstellt) {
+        ausfuehren("insert into public.sicherung_export (art, mandant, sha256, erstellt) values (?, ?, ?, ?)", p -> {
+            p.setString(1, mandant == null ? "db" : "bucket");
+            if (mandant == null) {
+                p.setNull(2, java.sql.Types.VARCHAR);
+            } else {
+                p.setString(2, mandant);
+            }
+            p.setString(3, sha256);
+            p.setObject(4, erstellt.atOffset(ZoneOffset.UTC), java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
+        });
+    }
+
+    private void mandantEintragen(String code) {
+        ausfuehren("insert into public.mandant (code, name, schema_name, bucket) values (?, ?, ?, ?)", p -> {
+            p.setString(1, code);
+            p.setString(2, code);
+            p.setString(3, "m_" + code.replace('-', '_'));
+            p.setString(4, "urinet-archiv-test-" + code);
         });
     }
 
