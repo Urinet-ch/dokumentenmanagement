@@ -1158,6 +1158,9 @@ Chat (Req 10.2, 10.7; entschieden von Fabian am 14.11.2026, folgt mit Spec 02, 7
   - Seite `/verwaltung/protokoll` (A13): Filter (Datum in Europe/Zurich, «bis» einschliesslich), Liste mit Blättern,
     Benutzerverzeichnis mit «Austritt erfassen» (zweistufig bestätigt). Blättern gilt für den zuletzt mit «Anzeigen»
     übernommenen Filter, nicht für eingetippte Werte; eine neue Abfrage bricht die laufende ab (Review PR #88, S3).
+  - Browser-Nachweis: `features/protokoll/protokoll-pwa.feature` prüft Filter, Blättern, verspätete Antworten,
+    Anzeige ohne Dateinamen oder Inhalte, Berechtigung und bestätigten Austritt mit einer Attrappe, die gesendete
+    Anfragen festhält; die Java-Szenarien prüfen weiterhin die Serverregeln.
   - Aktionen in OpenAPI nur aus dem Enum `ProtokollAktion` (Schema `ProtokollAktion` für Antwort und Filter), damit
     Filter, Antwort und Check nicht auseinanderlaufen.
   - Nachweis Req 10.2 an den echten Endpunkten: je ein Schritt «steht im Zugriffsprotokoll …» in `upload.feature` und
