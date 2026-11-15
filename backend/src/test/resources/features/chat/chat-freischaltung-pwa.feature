@@ -7,6 +7,15 @@
 @spec-02 @browser
 Funktionalität: Chat im Menü, Frage, Quelle und Protokoll gegen das echte Archiv
 
+  @req-4.3
+  Szenario: Die Gesprächsliste zeigt nur Gespräche des angemeldeten Benutzers
+    Angenommen die PWA spricht mit dem Archiv im Testmodus
+    Und verschiedene Benutzer haben eigene echte Chat-Gespräche
+    Und ein Bildschirm mit 1280 Pixel Breite
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Wenn ich den Chat über das Menü öffne
+    Dann sehe ich im Chat nur meine eigenen Gespräche
+
   @req-4.3 @req-6.3
   Szenariogrundriss: Frage stellen, Antwort fortlaufend, Quelle öffnet das Dokument, Protokoll enthält ANZEIGEN (<breite> px)
     Angenommen die PWA spricht mit dem Archiv im Testmodus

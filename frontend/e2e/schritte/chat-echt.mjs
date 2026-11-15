@@ -3,7 +3,15 @@
 // browser-backend.json). Alles synthetisch.
 import { After, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
-import { backend, direktHochladen, echteDokumente, echtesToken, inhalt, statusSetzen } from '../hilfen/echtes-backend.mjs';
+import { randomUUID } from 'node:crypto';
+import {
+  backend,
+  direktHochladen,
+  echteDokumente,
+  echtesToken,
+  inhalt,
+  statusSetzen,
+} from '../hilfen/echtes-backend.mjs';
 
 const CHAT_PFAD = '/v1/chat/completions';
 const MODELL = 'e2e-chat';
@@ -18,7 +26,10 @@ const chunk = (delta, ende) =>
     choices: [{ index: 0, delta, finish_reason: ende }],
   })}\n\n`;
 
-const stuecke = (text, laenge) => Array.from({ length: Math.ceil(text.length / laenge) }, (_, i) => text.slice(i * laenge, (i + 1) * laenge));
+const stuecke = (text, laenge) =>
+  Array.from({ length: Math.ceil(text.length / laenge) }, (_, i) =>
+    text.slice(i * laenge, (i + 1) * laenge),
+  );
 
 /** Gestreamte Modellantwort im Format von chat.completion.chunk wie KiWireMock.chatStrom (Text und/oder Aufrufe). */
 function strom({ text, aufrufe = [] }) {
@@ -27,7 +38,19 @@ function strom({ text, aufrufe = [] }) {
     body += chunk({ content: stueck }, null);
   }
   aufrufe.forEach((aufruf, i) => {
-    body += chunk({ tool_calls: [{ index: i, id: `call_${i}`, type: 'function', function: { name: aufruf.name, arguments: '' } }] }, null);
+    body += chunk(
+      {
+        tool_calls: [
+          {
+            index: i,
+            id: `call_${i}`,
+            type: 'function',
+            function: { name: aufruf.name, arguments: '' },
+          },
+        ],
+      },
+      null,
+    );
     for (const stueck of stuecke(aufruf.argumente, 9)) {
       body += chunk({ tool_calls: [{ index: i, function: { arguments: stueck } }] }, null);
     }
@@ -41,7 +64,10 @@ function strom({ text, aufrufe = [] }) {
 
 async function admin(methode, pfad, koerper) {
   const { modell } = backend();
-  assert.ok(modell, 'Kein Sprachmodell-WireMock in browser-backend.json: läuft BrowserBackendTest mit diesem Stand?');
+  assert.ok(
+    modell,
+    'Kein Sprachmodell-WireMock in browser-backend.json: läuft BrowserBackendTest mit diesem Stand?',
+  );
   const antwort = await fetch(`${modell}/__admin${pfad}`, {
     method: methode,
     headers: { 'content-type': 'application/json' },
@@ -79,7 +105,9 @@ After(async function () {
 Given(
   /^«(.+)» im Mandanten «(.+)» hat das Dokument «(.+)» mit dem Titel «(.+)» im Eingangskorb$/,
   async function (rolle, mandant, name, titel) {
-    const [ergebnis] = await direktHochladen(rolle, mandant, [{ name: `${name}.pdf`, mimeType: 'application/pdf', buffer: inhalt('x.pdf') }]);
+    const [ergebnis] = await direktHochladen(rolle, mandant, [
+      { name: `${name}.pdf`, mimeType: 'application/pdf', buffer: inhalt('x.pdf') },
+    ]);
     assert.equal(ergebnis.status, 'NEU', JSON.stringify(ergebnis));
     await statusSetzen(mandant, ergebnis.id, 'EINGANGSKORB', titel);
     echteDokumente(this).set(name, ergebnis.id);
@@ -100,26 +128,85 @@ Given(
       // der Text kommt über zwei Sekunden verteilt, damit er in der PWA sichtbar fortlaufend wächst
       [{ text }, 'nach-werkzeug', undefined, { numberOfChunks: 20, totalDuration: 2000 }],
     ]) {
-      const angelegt = await admin('POST', '/mappings', abbildung(antwort, vorher, nachher, dribble));
+      const angelegt = await admin(
+        'POST',
+        '/mappings',
+        abbildung(antwort, vorher, nachher, dribble),
+      );
       this.modellAbbildungen.push(angelegt.id);
     }
   },
 );
+
+Given('verschiedene Benutzer haben eigene echte Chat-Gespräche', async function () {
+  await admin('POST', '/scenarios/reset');
+  this.modellAbbildungen = [];
+  const mapping = await admin('POST', '/mappings', {
+    priority: 5,
+    request: {
+      method: 'POST',
+      urlPath: CHAT_PFAD,
+      bodyPatterns: [{ matchesJsonPath: { expression: '$.stream', equalTo: 'true' } }],
+    },
+    response: {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+      body: strom({ text: 'Synthetische Testantwort.' }),
+    },
+  });
+  this.modellAbbildungen.push(mapping.id);
+  const lauf = randomUUID();
+  this.eigenesGespraech = `Eigenes Gespräch ${lauf}`;
+  this.fremdesGespraech = `Gespräch eines anderen Benutzers ${lauf}`;
+
+  for (const [rolle, titel] of [
+    ['mitarbeiter', this.fremdesGespraech],
+    ['inhaber', this.eigenesGespraech],
+  ]) {
+    const antwort = await fetch(`${backend().api}/api/v1/chat`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${await echtesToken(rolle, 'urinet')}`,
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+      },
+      body: JSON.stringify({ frage: titel }),
+    });
+    assert.equal(antwort.status, 200, `Gespräch für ${rolle}: ${antwort.status}`);
+    assert.ok(
+      (await antwort.text()).includes('fertig'),
+      `Gespräch für ${rolle} wurde nicht beendet`,
+    );
+  }
+});
 
 When('ich den Chat über das Menü öffne', async function () {
   const menue = this.seite.getByRole('button', { name: 'Menü öffnen' });
   if (await menue.isVisible()) {
     await menue.click();
   }
-  await this.seite.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Chat', exact: true }).click();
+  await this.seite
+    .getByRole('navigation', { name: 'Hauptnavigation' })
+    .getByRole('link', { name: 'Chat', exact: true })
+    .click();
   await this.seite.getByRole('heading', { name: 'Chat', level: 1 }).waitFor();
   await this.seite.getByRole('textbox', { name: 'Frage', exact: true }).waitFor();
+});
+
+Then('sehe ich im Chat nur meine eigenen Gespräche', async function () {
+  const zeigen = this.seite.getByRole('button', { name: 'Letzte Gespräche zeigen', exact: true });
+  if (await zeigen.isVisible()) {
+    await zeigen.click();
+  }
+  const gespraeche = this.seite.locator('[data-test=gespraech]');
+  await gespraeche.filter({ hasText: this.eigenesGespraech }).waitFor();
+  assert.equal(await gespraeche.filter({ hasText: this.fremdesGespraech }).count(), 0);
 });
 
 Then('sehe ich die Antwort fortlaufend, bis sie vollständig ist', async function () {
   const inhaltFeld = this.seite.locator('[data-test=antwort]').last().locator('.inhalt');
   const laengen = new Set();
-  for (const ende = Date.now() + 30_000; Date.now() < ende; ) {
+  for (const ende = Date.now() + 30_000; Date.now() < ende;) {
     const text = (await inhaltFeld.innerText()).trim();
     if (text.length > 0) {
       laengen.add(text.length);
@@ -148,8 +235,10 @@ Then(
     const kopf = { authorization: `Bearer ${await echtesToken('inhaber', mandant)}` };
     let tipps = [];
     // das GET der Dokumentansicht schreibt nach dem Laden der Seite; kurz warten
-    for (const ende = Date.now() + 15_000; Date.now() < ende; ) {
-      const antwort = await fetch(`${backend().api}/api/v1/protokoll?aktion=ANZEIGEN&groesse=100`, { headers: kopf });
+    for (const ende = Date.now() + 15_000; Date.now() < ende;) {
+      const antwort = await fetch(`${backend().api}/api/v1/protokoll?aktion=ANZEIGEN&groesse=100`, {
+        headers: kopf,
+      });
       assert.equal(antwort.status, 200);
       tipps = (await antwort.json()).eintraege
         .filter((e) => e.dokumentId === id && Date.parse(e.zeit) >= this.szenarioStart)
@@ -159,6 +248,8 @@ Then(
       }
       await new Promise((weiter) => setTimeout(weiter, 300));
     }
-    assert.fail(`ANZEIGEN für ${id} mit Kanal ${kanal} und ohne Kanal fehlt: ${JSON.stringify(tipps)}`);
+    assert.fail(
+      `ANZEIGEN für ${id} mit Kanal ${kanal} und ohne Kanal fehlt: ${JSON.stringify(tipps)}`,
+    );
   },
 );
