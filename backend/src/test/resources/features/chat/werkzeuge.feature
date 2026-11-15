@@ -154,6 +154,19 @@ Funktionalität: Werkzeuge des Chat-Agenten: Suche, Dokument, Fristen (Aufgabe 7
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_VERTRAG | 203.0.113.9 | CHAT  |
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_LANG    | 203.0.113.9 | CHAT  |
 
+  @req-3.1
+  Szenario: dokument_zeigen für ein Dokument ohne Volltext zeigt die Metadaten ohne Inhalt und schreibt ANZEIGEN
+    Angenommen im Mandanten «urinet» liegt das Chat-Dokument «U_OHNE_TEXT» ohne Text
+    Und der Stand des Chat-Protokolls von «urinet» ist gemerkt
+    Wenn «inhaber-urinet» im Chat das Dokument «U_OHNE_TEXT» zeigen lässt
+    Dann zeigt die Antwort diese Werte:
+      | feld  | wert               |
+      | titel | Rechnung ohne Text |
+    Und enthält die Antwort keinen Inhalt
+    Und das Chat-Protokoll von «urinet» hat diese neuen Einträge:
+      | benutzer       | rolle   | aktion   | dokument    | kanal |
+      | inhaber-urinet | INHABER | ANZEIGEN | U_OHNE_TEXT | CHAT  |
+
   Szenario: Scheitert der Protokolleintrag, liefert dokument_zeigen keinen Inhalt
     Angenommen im Schema von «urinet» scheitert jeder neue Eintrag ins Zugriffsprotokoll beim Festschreiben
     Wenn «inhaber-urinet» im Chat das Dokument «U_NORMAL» zeigen lässt

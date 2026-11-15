@@ -47,6 +47,7 @@ describe('App (Req 2.6, 8.6)', () => {
           { path: '', component: Leer },
           { path: 'erfassen', component: Leer },
           { path: 'suche', component: Leer },
+          { path: 'chat', component: Leer },
         ]),
         { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
@@ -83,6 +84,7 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.erfassen,
         TEXTE.menue.eingangskorb,
         TEXTE.menue.suche,
+        TEXTE.menue.chat,
         TEXTE.menue.kontakte,
         TEXTE.menue.importe,
         TEXTE.menue.dokumentarten,
@@ -90,9 +92,9 @@ describe('App (Req 2.6, 8.6)', () => {
         TEXTE.menue.export,
       ],
     ],
-    ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche]],
-    ['geschaeftsstelle', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.kontakte]],
-    ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.export]],
+    ['mitarbeiter', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat]],
+    ['geschaeftsstelle', [TEXTE.menue.erfassen, TEXTE.menue.eingangskorb, TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.kontakte]],
+    ['treuhaender', [TEXTE.menue.suche, TEXTE.menue.chat, TEXTE.menue.export]],
   ])('zeigt der Rolle %s nur die erlaubten Menüpunkte', async (rolle, erwartet) => {
     anmeldung.als(rolle);
     const element = await zeigen();

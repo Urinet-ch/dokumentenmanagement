@@ -72,9 +72,9 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Erledigt 14.11.2026 gegen den Port `ChatAgentPort` mit Dev-Stub bzw. `ChatNichtVerfuegbar` (design.md «Umsetzung (Aufgabe 7.3, 14.11.2026)»); der echte Agent folgt mit 7.2 und ersetzt nur den Adapter. Nachweis 3.8 hier mit dem Streaming-Szenario, p95 ≤ 10 s mit echtem Modell in 9.1
   - _Anforderungen: 3.8, 4.1, 5.4, 5.5_
 
-- [ ] 7.4 Chat-Oberfläche [Frontend]
+- [x] 7.4 Chat-Oberfläche [Frontend]
   - Chat-Seite mit Streaming, Werkzeug-Hinweis, Quellen-Chips (öffnen Dokument), letzte 20 Gespräche; 375 px
-  - Teil erledigt (PR #147): Seite gegen Attrappe; Menüpunkt und 4.3 folgen mit 7.4b
+  - Erledigt 14./15.11.2026 (PR #147 Seite gegen Attrappe, PR #172 Menüpunkt «Chat» und Durchstich gegen das echte Archiv mit WireMock als Sprachmodell; design.md «Umsetzung (Aufgabe 7.4b, 15.11.2026)»). Offen bleibt der Nachweis mit dem echten Modell in 9.1 (Gate Phase 1)
   - _Anforderungen: 4.3, 6.1–6.3_
 
 ## Welle 8 — AbaNinja (nur bei E1 = ja)
