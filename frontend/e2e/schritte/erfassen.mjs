@@ -530,7 +530,13 @@ Then(/^fragt die App nach den Aufnahmen anderer Benutzer: «(.+)»$/, async func
 
 Then('fragt die App nicht nach Aufnahmen anderer Benutzer', async function () {
   await this.seite.locator('[data-test=wartet]').waitFor();
-  assert.equal(await this.seite.locator('[data-test=fremde-frage]').count(), 0);
+  // Nach «Behalten» oder «Endgültig löschen» verschwindet die Karte erst nach dem nächsten Rendern
+  await warten(
+    this,
+    async () => (await this.seite.locator('[data-test=fremde-frage]').count()) === 0,
+    'keine Frage nach Aufnahmen anderer Benutzer',
+    15_000,
+  );
 });
 
 Then(/^sehe ich die Rückfrage «(.+)»$/, async function (text) {
