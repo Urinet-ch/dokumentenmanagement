@@ -52,9 +52,11 @@ public class ArchivWerkzeuge {
     }
 
     @Tool(name = WerkzeugAuswahl.DOKUMENTE_SUCHEN, value = """
-            Sucht Dokumente im Archiv nach Wörtern in Titel, Partner, Tags und Text. Liefert je Treffer ID, Titel, \
-            Art, Datum, Partner, Betrag, Auszug, ob die Art bestätigt ist, und den Link; dazu die Gesamtzahl der \
-            Treffer. Ohne passenden Partner ist das Ergebnis leer mit einem Hinweis.""")
+            Sucht Dokumente im Archiv nach Bedeutung und nach Wörtern in Titel, Partner, Tags und Text. Liefert je \
+            Treffer ID, Titel, Art, Datum, Partner, Betrag, Auszug, ob die Art bestätigt ist, den Link und, wenn \
+            bekannt, die Seiten der Fundstelle; dazu die Zahl der Treffer. Mit neueste=true gilt nur die Wortsuche. \
+            Steht im Ergebnis der Hinweis «nur Volltext», lief nur die Wortsuche: dann nicht auf sinngemässe Treffer \
+            schliessen. Ohne passenden Partner ist das Ergebnis leer mit einem Hinweis.""")
     public String dokumenteSuchen(
             @ToolMemoryId Object laufId,
             @P("Suchbegriffe, 1 bis 200 Zeichen") String frage,
