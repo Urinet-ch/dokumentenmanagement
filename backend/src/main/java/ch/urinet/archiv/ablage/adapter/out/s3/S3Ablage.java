@@ -736,9 +736,9 @@ public class S3Ablage implements AblagePort {
                 Objects.requireNonNull(v.size(), "S3 version size"))));
         antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true,
                 Objects.requireNonNull(m.lastModified(), "S3 delete marker lastModified"), 0)));
+        // stabil: bei gleichem Schlüssel und gleicher Zeit bleibt die Reihenfolge des Object Storage
         versionen.sort(Comparator.comparing(Objektversion::schluessel)
-                .thenComparing(Objektversion::lastModified, Comparator.reverseOrder())
-                .thenComparing(Objektversion::versionId));
+                .thenComparing(Objektversion::lastModified, Comparator.reverseOrder()));
         return new Versionsseite(versionen, Versionsseite.weiter(praefix, Boolean.TRUE.equals(antwort.isTruncated()),
                 antwort.nextKeyMarker(), antwort.nextVersionIdMarker()));
     }

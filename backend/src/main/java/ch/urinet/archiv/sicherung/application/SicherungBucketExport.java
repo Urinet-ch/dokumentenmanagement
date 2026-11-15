@@ -14,7 +14,6 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -31,9 +30,6 @@ public class SicherungBucketExport {
     private static final int SHA256 = 0x53484131;
     private static final int SEITENGROESSE = 1000;
     private static final List<String> PRAEFIXE = List.of("archiv/", "eingang/", "manifest/");
-    private static final Comparator<Objektversion> REIHENFOLGE = Comparator.comparing(Objektversion::schluessel)
-            .thenComparing(Objektversion::lastModified, Comparator.reverseOrder())
-            .thenComparing(Objektversion::versionId);
 
     private final AblagePort ablage;
 
@@ -93,13 +89,17 @@ public class SicherungBucketExport {
         }
     }
 
+    /**
+     * Ordnet nach Schlüssel, dann lastModified absteigend. Die Reihenfolge gleicher Zeitstempel liefert der Object
+     * Storage und ist über Seitengrenzen nicht gesichert; Versionen mit gleichem Schlüssel und gleicher Zeit gelten
+     * als eine Gruppe und werden über die Versions-ID zugeordnet.
+     */
     public static int vergleichen(Objektversion aktuell, InventarZeile vorher) {
         int schluessel = aktuell.schluessel().compareTo(vorher.schluessel());
         if (schluessel != 0) {
             return schluessel;
         }
-        int zeit = Instant.parse(vorher.lastModified()).compareTo(aktuell.lastModified());
-        return zeit != 0 ? zeit : aktuell.versionId().compareTo(vorher.versionId());
+        return Instant.parse(vorher.lastModified()).compareTo(aktuell.lastModified());
     }
 
     public static int vergleichen(InventarZeile vorher, InventarZeile nachher) {
@@ -107,8 +107,7 @@ public class SicherungBucketExport {
         if (schluessel != 0) {
             return schluessel;
         }
-        int zeit = Instant.parse(nachher.lastModified()).compareTo(Instant.parse(vorher.lastModified()));
-        return zeit != 0 ? zeit : vorher.versionId().compareTo(nachher.versionId());
+        return Instant.parse(nachher.lastModified()).compareTo(Instant.parse(vorher.lastModified()));
     }
 
     private void forEachVersion(MandantCode mandant, String praefix, Consumer<Objektversion> aktion) {

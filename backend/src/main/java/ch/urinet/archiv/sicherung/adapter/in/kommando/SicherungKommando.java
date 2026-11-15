@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
@@ -165,7 +166,37 @@ public class SicherungKommando {
         }
     }
 
-    private void zuwachs(Aufruf aufruf, PrintStream aus) {
+    /** Bricht beim ersten Schreibfehler ab; PrintStream meldet ihn sonst nur über checkError() am Ende. */
+    private static OutputStream pruefend(PrintStream aus) {
+        return new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                aus.write(b);
+                pruefen();
+            }
+
+            @Override
+            public void write(byte[] daten, int ab, int laenge) throws IOException {
+                aus.write(daten, ab, laenge);
+                pruefen();
+            }
+
+            @Override
+            public void flush() throws IOException {
+                aus.flush();
+                pruefen();
+            }
+
+            private void pruefen() throws IOException {
+                if (aus.checkError()) {
+                    throw new IOException("Ausgabestrom nicht schreibbar");
+                }
+            }
+        };
+    }
+
+    private void zuwachs(Aufruf aufruf, PrintStream stdout) {
+        OutputStream aus = pruefend(stdout);
         Optional<String> vorher = aufruf.inventarVorher();
         if (vorher.isEmpty()) {
             bucketExport.zuwachs(aufruf.mandant().orElseThrow(), version -> true, aus);

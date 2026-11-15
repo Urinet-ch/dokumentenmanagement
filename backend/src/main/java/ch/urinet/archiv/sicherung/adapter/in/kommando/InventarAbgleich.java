@@ -13,6 +13,8 @@ import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -26,6 +28,8 @@ final class InventarAbgleich implements Predicate<Objektversion> {
     private InventarZeile zeile;
     private InventarZeile letzteZeile;
     private boolean ende;
+    private InventarZeile gruppe;
+    private final Set<String> gruppenVersionen = new HashSet<>();
 
     InventarAbgleich(Reader vorher, ObjectMapper json) {
         this.vorher = vorher instanceof BufferedReader gepuffert ? gepuffert : new BufferedReader(vorher);
@@ -38,11 +42,16 @@ final class InventarAbgleich implements Predicate<Objektversion> {
         while (zeile != null && SicherungBucketExport.vergleichen(aktuell, zeile) > 0) {
             naechsteZeile();
         }
-        if (zeile == null || SicherungBucketExport.vergleichen(aktuell, zeile) < 0) {
-            return true;
+        if (gruppe == null || SicherungBucketExport.vergleichen(aktuell, gruppe) != 0) {
+            gruppenVersionen.clear();
+            gruppe = null;
+            while (zeile != null && SicherungBucketExport.vergleichen(aktuell, zeile) == 0) {
+                gruppe = zeile;
+                gruppenVersionen.add(zeile.versionId());
+                naechsteZeile();
+            }
         }
-        naechsteZeile();
-        return false;
+        return !gruppenVersionen.contains(aktuell.versionId());
     }
 
     void vollstaendigPruefen() {
@@ -86,7 +95,9 @@ final class InventarAbgleich implements Predicate<Objektversion> {
                 throw new InventarDateiFehler("Ungültige Inventarzeile");
             }
             Instant.parse(zeile.lastModified());
-            if (letzteZeile != null && SicherungBucketExport.vergleichen(letzteZeile, zeile) >= 0) {
+            if (letzteZeile != null && (SicherungBucketExport.vergleichen(letzteZeile, zeile) > 0
+                    || SicherungBucketExport.vergleichen(letzteZeile, zeile) == 0
+                    && letzteZeile.versionId().equals(zeile.versionId()))) {
                 throw new InventarDateiFehler("Vorheriges Inventar ist nicht streng sortiert");
             }
             letzteZeile = zeile;
