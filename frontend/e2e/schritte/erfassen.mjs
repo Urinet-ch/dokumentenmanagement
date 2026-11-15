@@ -537,7 +537,7 @@ Then(/^sehe ich die Rückfrage «(.+)»$/, async function (text) {
   await this.seite.getByRole('alert').filter({ hasText: text }).waitFor({ timeout: 30_000 });
 });
 
-Then(/^liegen (\d+) Erfassungen? im lokalen Speicher$/, { timeout: 60_000 }, async function (anzahl) {
+Then(/^liegen (\d+) Erfassung(?:en)? im lokalen Speicher$/, { timeout: 60_000 }, async function (anzahl) {
   const zaehlen = () =>
     this.seite.evaluate(
       () =>
