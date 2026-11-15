@@ -1,5 +1,6 @@
 package ch.urinet.archiv.verarbeitung.application;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.WertefreieMeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
@@ -62,7 +63,7 @@ public class AuftragArbeiter {
     static final String ZEITGRENZE = "zeitgrenze";
     static final String VERWAIST = "verwaist";
     static final int HAENGEND_NACH_ZEITGRENZEN = 2;
-    private static final AuftragTyp PRUEFLAUF = PrueflaufHandler.TYP;
+    static final AuftragTyp PRUEFLAUF = PrueflaufHandler.TYP;
 
     private static final Logger LOG = Logger.getLogger(AuftragArbeiter.class);
 
@@ -104,7 +105,7 @@ public class AuftragArbeiter {
         this.kontext = kontext;
         this.lebenszeichen = lebenszeichen;
         this.stoppFrist = stoppFrist;
-        this.nurPrueflauf = "P".equals(stufe);
+        this.nurPrueflauf = Stufe.aus(Optional.ofNullable(stufe)) == Stufe.P;
         this.plaetze = new Semaphore(parallel);
     }
 

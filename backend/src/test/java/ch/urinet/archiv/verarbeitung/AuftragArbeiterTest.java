@@ -177,6 +177,40 @@ class AuftragArbeiterTest {
     }
 
     @Test
+    @Tag("req-16.24")
+    void stufePErkenntSchreibweisenWieStufeAus() throws Exception {
+        for (String stufe : List.of("p", " P ")) {
+            StoerbareSchlange beobachtet = new StoerbareSchlange(schlange);
+            arbeiter(beobachtet, 1, stufe).abholen();
+            assertThat(beobachtet.zuletztGeholteTypen).as(stufe).isEqualTo(Set.of(PrueflaufHandler.TYP));
+        }
+    }
+
+    @Test
+    @Tag("req-16.24")
+    void stufePAufraeumerLaesstAuftraegeAndererTypenUnveraendert() throws Exception {
+        long id = hilfe.einreihen("urinet", TestHandler.OK);
+        try {
+            hilfe.aendern(id, "status = 'LAEUFT', gestartet = now() - interval '1 day', "
+                    + "lebenszeichen = now() - interval '1 day'");
+            AuftragAufraeumen probe = new AuftragAufraeumen(schlange, verzeichnis, arbeiter(schlange, 1, "P"), "P");
+
+            assertThat(probe.aufraeumen()).isZero();
+            AuftragTestHilfe.Zeile zeile = hilfe.zeile(id);
+            assertThat(zeile.status()).isEqualTo("LAEUFT");
+            assertThat(zeile.versuche()).isZero();
+            assertThat(zeile.fehler()).isNull();
+
+            // Gegenprobe: ausserhalb von P wird derselbe Auftrag als verwaist freigegeben
+            AuftragAufraeumen normal = new AuftragAufraeumen(schlange, verzeichnis, arbeiter(schlange, 1), "B");
+            assertThat(normal.aufraeumen()).isEqualTo(1);
+            assertThat(hilfe.zeile(id).versuche()).isEqualTo(1);
+        } finally {
+            hilfe.ausfuehren("delete from public.auftrag where id = " + id);
+        }
+    }
+
+    @Test
     void speichertNurDieWertefreieZeitstempelUrsacheImAuftragsfehler() throws Exception {
         TestHandler.TSA_FEHLER.set(true);
         long id = hilfe.einreihen("urinet", TestHandler.FEHLER);

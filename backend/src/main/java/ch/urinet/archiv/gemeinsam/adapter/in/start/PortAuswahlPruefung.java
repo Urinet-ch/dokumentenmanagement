@@ -44,12 +44,16 @@ public class PortAuswahlPruefung {
         return profile.contains("prod") || modus == LaunchMode.NORMAL;
     }
 
+    /** Ports, die {@code archiv.ki.stub} folgen; in Stufe P ohne KI-Token dürfen sie alle auf den Stub fallen. */
+    private static final java.util.Set<String> KI_PORTS =
+            java.util.Set.of("KiPort", "EmbeddingPort", "RerankerPort", "ChatAgentPort");
+
     static PortAuswahl.Befund pruefe(List<PortAuswahl> auswahl, String stufe) {
         if (!"P".equalsIgnoreCase(stufe.strip())) {
             return PortAuswahl.pruefe(auswahl);
         }
         List<PortAuswahl> ohneKiStub = auswahl.stream()
-                .map(port -> port.port().equals("KiPort") && port.stub()
+                .map(port -> KI_PORTS.contains(port.port()) && port.stub()
                         ? new PortAuswahl(port.port(), false, port.adapterVorhanden(), port.folgtMit())
                         : port)
                 .toList();

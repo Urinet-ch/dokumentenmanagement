@@ -22,6 +22,16 @@ class PortAuswahlPruefungTest {
     }
 
     @Test
+    @Tag("req-16.24")
+    void alleKiPortsDuerfenInStufePAufStubFallen() {
+        var ports = List.of("KiPort", "EmbeddingPort", "RerankerPort", "ChatAgentPort").stream()
+                .map(name -> new PortAuswahl(name, true, true, Optional.empty())).toList();
+
+        assertThat(PortAuswahlPruefung.pruefe(ports, "P").abbrueche()).isEmpty();
+        assertThat(PortAuswahlPruefung.pruefe(ports, "B").abbrueche()).hasSize(4);
+    }
+
+    @Test
     void andereStubsBleibenAuchInStufePUnzulaessig() {
         var ablage = new PortAuswahl("AblagePort", true, true, Optional.empty());
 
