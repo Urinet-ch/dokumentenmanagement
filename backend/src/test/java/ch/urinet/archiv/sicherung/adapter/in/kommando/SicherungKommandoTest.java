@@ -12,7 +12,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Proxy;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,7 +25,7 @@ class SicherungKommandoTest {
     @Test
     void festhaltenLehntUngueltigeAufrufeMitExitZweiOhneSchreibvorgangAb() {
         int[] festgehalten = {0};
-        SicherungExportSpeicher speicher = (art, mandant, sha256) -> festgehalten[0]++;
+        SicherungExportSpeicher speicher = speicher((art, mandant, sha256) -> festgehalten[0]++);
         MandantRegister register = new MandantRegister() {
             @Override
             public boolean existiert(ch.urinet.archiv.mandant.domain.MandantCode code) {
@@ -63,10 +65,10 @@ class SicherungKommandoTest {
     void sha256WirdKanonisiertUndEinGueltigerGlobalerExportFestgehalten() {
         int[] festgehalten = {0};
         String[] gespeicherteSha = {null};
-        SicherungExportSpeicher speicher = (art, mandant, sha256) -> {
+        SicherungExportSpeicher speicher = speicher((art, mandant, sha256) -> {
             festgehalten[0]++;
             gespeicherteSha[0] = sha256;
-        };
+        });
         MandantRegister register = new MandantRegister() {
             @Override
             public boolean existiert(ch.urinet.archiv.mandant.domain.MandantCode code) {
@@ -142,7 +144,7 @@ class SicherungKommandoTest {
             }
         };
         SicherungKommando kommando = new SicherungKommando(new SicherungBucketExport(ablage),
-                new SicherungExportVerwaltung((art, mandant, sha256) -> { }, register), new ObjectMapper());
+                new SicherungExportVerwaltung(speicher((art, mandant, sha256) -> { }), register), new ObjectMapper());
         PrintStream kaputt = new PrintStream(new java.io.OutputStream() {
             @Override
             public void write(int b) throws java.io.IOException {
@@ -168,5 +170,28 @@ class SicherungKommandoTest {
                 new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
                     throw new UnsupportedOperationException(methode.getName());
                 });
+    }
+
+    private static SicherungExportSpeicher speicher(Festhalten festhalten) {
+        return new SicherungExportSpeicher() {
+            @Override
+            public void festhalten(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                   java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant,
+                                   String sha256) {
+                festhalten.ausfuehren(art, mandant, sha256);
+            }
+
+            @Override
+            public Optional<Instant> juengsterEintrag(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                                      java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant) {
+                return Optional.empty();
+            }
+        };
+    }
+
+    @FunctionalInterface
+    private interface Festhalten {
+        void ausfuehren(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                        java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant, String sha256);
     }
 }
