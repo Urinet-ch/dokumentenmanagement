@@ -43,7 +43,7 @@ Funktionalität: Chat-Agent und Systemprompt (Aufgabe 7.2)
       | antwort | art  | inhalt        | argumente | tokens |
       | 1       | text | Guten Tag.    |           | 5/2    |
     Wenn «treuhaender-urinet» dem Agenten die Frage «Hallo?» stellt
-    Dann bietet die erste Anfrage dem Sprachmodell genau die Werkzeuge «dokumente_suchen, dokument_zeigen, fristen, kennzahl, offene_posten»
+    Dann bietet die erste Anfrage dem Sprachmodell genau die Werkzeuge «dokumente_suchen, dokument_zeigen, fristen, kennzahl, offene_posten, vollstaendigkeit»
     Und verlangt der Systemprompt der ersten Anfrage «nur lesende Werkzeuge»
 
   @req-3.2
