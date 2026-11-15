@@ -51,6 +51,32 @@ class ProblemAbbildungTest {
         pruefen(zyklus, 500, Fehlercode.INTERNER_FEHLER);
     }
 
+    @Test
+    void zyklischeUrsachenketteMitDeadlockIstEinStatuskonflikt() {
+        SQLException deadlock = new SQLException("synthetischer Deadlock", "40P01");
+        Throwable anfang = new RuntimeException("synthetischer Zyklus") {
+            @Override
+            public synchronized Throwable getCause() {
+                return deadlock;
+            }
+        };
+        deadlock.initCause(anfang);
+        pruefen(anfang, 409, Fehlercode.STATUS_KONFLIKT);
+    }
+
+    @Test
+    void zyklischeUrsachenketteMitFremdemSqlStateBleibtEinInternerFehler() {
+        SQLException fremd = new SQLException("synthetischer Constraint-Fehler", "23505");
+        Throwable anfang = new RuntimeException("synthetischer Zyklus") {
+            @Override
+            public synchronized Throwable getCause() {
+                return fremd;
+            }
+        };
+        fremd.initCause(anfang);
+        pruefen(anfang, 500, Fehlercode.INTERNER_FEHLER);
+    }
+
     private void pruefen(Throwable fehler, int status, Fehlercode code) {
         try (Response antwort = abbildung.unerwartet(fehler)) {
             assertThat(antwort.getStatus()).isEqualTo(status);

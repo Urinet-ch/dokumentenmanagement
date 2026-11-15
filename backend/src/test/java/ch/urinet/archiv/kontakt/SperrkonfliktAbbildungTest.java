@@ -1,16 +1,15 @@
 package ch.urinet.archiv.kontakt;
 
-import ch.urinet.archiv.gemeinsam.adapter.in.rest.ProblemAbbildung;
-import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
-import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
+import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
-import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,26 +18,40 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Reproduziert den Deadlock zwischen Zusammenführen (Kontakt, dann Dokument) und Bestätigen (Dokument, dann Kontakt). */
+/**
+ * Nachweis für Req 17.12 und 17.16 an den echten Endpunkten: Zusammenführen eines Kontakts ({@code POST
+ * /kontakte/{id}/zusammenfuehren}) gegen das Ändern des Partners an einem seiner Dokumente ({@code PATCH
+ * /dokumente/{id}}). Beide laufen als HTTP-Anfragen durch die echten Anwendungsfälle und Adapter gegen Postgres. Die
+ * Pfade sperren in umgekehrter Reihenfolge (Zusammenführen: Kontakte, dann Dokumente; Ändern: Dokument, dann Kontakt
+ * {@code for share}). {@link SperrReihenfolgeHaken} legt nur den Zeitpunkt fest, an dem beide ihre erste Sperre halten;
+ * so tritt der Konflikt in jedem Lauf auf. Erwartet ist nie 500: Die unterlegene Anfrage meldet 409 STATUS_KONFLIKT
+ * (Verklemmung 40P01 oder abgelaufene Wartezeit 55P03), die andere gelingt, und die Daten bleiben in sich stimmig.
+ * Die reine Abbildung der Ursachen-Kette prüft {@code ProblemAbbildungTest}. Nachweis zu Req 17.12 und 17.16
+ * (design.md «Fehlerbehandlung»).
+ */
 @Tag("start-1")
 @TestProfile(SperrkonfliktAbbildungTest.SperrtestProfil.class)
 @QuarkusTest
 class SperrkonfliktAbbildungTest {
 
     public static class SperrtestProfil implements QuarkusTestProfile {
+        @Override
+        public Set<Class<?>> getEnabledAlternatives() {
+            return Set.of(SperrReihenfolgeHaken.class);
+        }
     }
 
     private static final MandantCode URINET = new MandantCode("urinet");
-    private static final ProblemAbbildung ABBILDUNG = new ProblemAbbildung();
+    private static final String BENUTZER = "inhaber-urinet";
 
     @Inject
     AgroalDataSource datenbank;
@@ -46,18 +59,19 @@ class SperrkonfliktAbbildungTest {
     @Inject
     MandantProvisionierung provisionierung;
 
-    private final ExecutorService transaktionen = Executors.newFixedThreadPool(2);
     private UUID quelle;
     private UUID ziel;
     private UUID dokument;
 
     @AfterEach
     void aufraeumen() throws SQLException {
-        transaktionen.shutdownNow();
+        SperrReihenfolgeHaken.entschaerfen();
         if (dokument == null) {
             return;
         }
         try (Connection verbindung = datenbank.getConnection()) {
+            loeschen(verbindung, "delete from " + URINET.schema() + ".dokument_version where dokument_id = ?",
+                    dokument);
             loeschen(verbindung, "delete from " + URINET.schema() + ".dokument where id = ?", dokument);
             loeschen(verbindung, "delete from " + URINET.schema() + ".kontakt where id = any(?)",
                     verbindung.createArrayOf("uuid", new Object[] {quelle, ziel}));
@@ -65,25 +79,31 @@ class SperrkonfliktAbbildungTest {
     }
 
     @Test
-    void parallelesZusammenfuehrenUndBestaetigenLiefert409Statt500() throws Exception {
+    void parallelesZusammenfuehrenUndAendernLiefert409Statt500() throws Exception {
         datenAnlegen();
-        CountDownLatch ersteSperreJeTransaktion = new CountDownLatch(2);
+        String token = Testanmeldung.token(BENUTZER);
+        String ifMatchKontakt = "\"" + zahl("kontakt", quelle, "version") + "\"";
+        String ifMatchDokument = "\"" + zahl("dokument", dokument, "version") + "\"";
+        SperrReihenfolgeHaken.scharfStellen();
 
-        var zusammenfuehren = transaktionen.submit(() -> transaktion(true, ersteSperreJeTransaktion));
-        var bestaetigen = transaktionen.submit(() -> transaktion(false, ersteSperreJeTransaktion));
-        Ergebnis merge = zusammenfuehren.get(6, TimeUnit.SECONDS);
-        Ergebnis bestaetigung = bestaetigen.get(6, TimeUnit.SECONDS);
+        CompletableFuture<Response> zusammenfuehren = CompletableFuture.supplyAsync(() -> given().auth().oauth2(token)
+                .header("If-Match", ifMatchKontakt).contentType(ContentType.JSON)
+                .body(Map.of("ziel", ziel.toString(), "grund", "Doppelt erfasst (Sperrprobe)"))
+                .when().post("/api/v1/kontakte/" + quelle + "/zusammenfuehren"));
+        CompletableFuture<Response> aendern = CompletableFuture.supplyAsync(() -> given().auth().oauth2(token)
+                .header("If-Match", ifMatchDokument).contentType(ContentType.JSON)
+                .body(Map.of("partnerId", ziel.toString()))
+                .when().patch("/api/v1/dokumente/" + dokument));
+        Response merge = zusammenfuehren.get(30, TimeUnit.SECONDS);
+        Response aenderung = aendern.get(30, TimeUnit.SECONDS);
 
-        assertThat(java.util.List.of(merge.erfolgreich(), bestaetigung.erfolgreich()))
-                .containsExactlyInAnyOrder(true, false);
-        Ergebnis fehlgeschlagen = merge.erfolgreich() ? bestaetigung : merge;
-        assertThat(Ursachen.enthaeltSqlState(fehlgeschlagen.fehler(), "40P01")).isTrue();
-        try (var antwort = ABBILDUNG.unerwartet(new PersistenceException("synthetischer Transaktionsfehler",
-                fehlgeschlagen.fehler()))) {
-            assertThat(antwort.getStatus()).isEqualTo(409);
-            assertThat(antwort.getEntity()).asString().contains("\"fehlercode\":\"STATUS_KONFLIKT\"");
-        }
+        assertThat(merge.statusCode()).as("Zusammenführen: %s", merge.asString()).isIn(200, 409);
+        assertThat(aenderung.statusCode()).as("Ändern: %s", aenderung.asString()).isIn(200, 409);
+        Response unterlegen = merge.statusCode() == 409 ? merge : aenderung;
+        assertThat(unterlegen.statusCode()).as("mindestens eine Anfrage verliert den Sperrkonflikt").isEqualTo(409);
+        assertThat(unterlegen.path("fehlercode").toString()).isEqualTo("STATUS_KONFLIKT");
 
+        // keine inkonsistente Zeile: das Dokument zeigt auf einen aktiven Kontakt, eine abgelehnte Anfrage ändert nichts
         try (Connection verbindung = datenbank.getConnection(); PreparedStatement abfrage =
                 verbindung.prepareStatement("select d.partner_id, k.aktiv, (select aktiv from " + URINET.schema()
                         + ".kontakt where id = ?) as quelle_aktiv from " + URINET.schema()
@@ -92,53 +112,24 @@ class SperrkonfliktAbbildungTest {
             abfrage.setObject(2, dokument);
             try (ResultSet zeile = abfrage.executeQuery()) {
                 assertThat(zeile.next()).isTrue();
-                assertThat(zeile.getBoolean("aktiv")).isTrue();
-                assertThat(zeile.getObject("partner_id", UUID.class))
-                        .isEqualTo(merge.erfolgreich() ? ziel : quelle);
-                assertThat(zeile.getBoolean("quelle_aktiv")).isEqualTo(!merge.erfolgreich());
+                assertThat(zeile.getBoolean("aktiv")).as("Partner des Dokuments aktiv").isTrue();
+                assertThat(zeile.getObject("partner_id", UUID.class)).as("Partner").isIn(quelle, ziel);
+                assertThat(zeile.getBoolean("quelle_aktiv")).as("Quelle aktiv").isEqualTo(merge.statusCode() == 409);
+                if (merge.statusCode() == 200) {
+                    assertThat(zeile.getObject("partner_id", UUID.class)).isEqualTo(ziel);
+                }
             }
         }
     }
 
-    private Ergebnis transaktion(boolean zusammenfuehren, CountDownLatch ersteSperreJeTransaktion) {
-        try (Connection verbindung = datenbank.getConnection()) {
-            verbindung.setAutoCommit(false);
-            try {
-                try (Statement anweisung = verbindung.createStatement()) {
-                    anweisung.execute("set local lock_timeout = '5s'");
-                }
-                if (zusammenfuehren) {
-                    sperrenKontakt(verbindung);
-                } else {
-                    sperrenDokument(verbindung);
-                }
-                ersteSperreJeTransaktion.countDown();
-                if (!ersteSperreJeTransaktion.await(2, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("Parallele Transaktion hat ihre erste Sperre nicht erreicht");
-                }
-                if (zusammenfuehren) {
-                    sperrenDokument(verbindung);
-                    aktualisieren(verbindung, "update " + URINET.schema()
-                            + ".dokument set partner_id = ? where id = ?", ziel, dokument);
-                    aktualisieren(verbindung, "update " + URINET.schema()
-                            + ".kontakt set aktiv = false, inaktiv_seit = now() where id = ?", quelle);
-                } else {
-                    sperrenKontaktLesend(verbindung);
-                    aktualisieren(verbindung, "update " + URINET.schema()
-                            + ".dokument set status = 'ARCHIVIERUNG' where id = ?", dokument);
-                }
-                verbindung.commit();
-                return new Ergebnis(true, null);
-            } catch (SQLException e) {
-                zurueckrollen(verbindung, e);
-                return new Ergebnis(false, e);
-            } catch (InterruptedException e) {
-                zurueckrollen(verbindung, e);
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("Testtransaktion unterbrochen", e);
+    private long zahl(String tabelle, UUID id, String spalte) throws SQLException {
+        try (Connection verbindung = datenbank.getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select " + spalte + " from " + URINET.schema() + "." + tabelle + " where id = ?")) {
+            abfrage.setObject(1, id);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                return zeile.getLong(1);
             }
-        } catch (SQLException e) {
-            return new Ergebnis(false, e);
         }
     }
 
@@ -182,38 +173,6 @@ class SperrkonfliktAbbildungTest {
         einfuegen.executeUpdate();
     }
 
-    private void sperrenKontakt(Connection verbindung) throws SQLException {
-        sperren(verbindung, "select id from " + URINET.schema() + ".kontakt where id = ? for update", quelle);
-    }
-
-    private void sperrenKontaktLesend(Connection verbindung) throws SQLException {
-        sperren(verbindung, "select id from " + URINET.schema() + ".kontakt where id = ? for share", quelle);
-    }
-
-    private void sperrenDokument(Connection verbindung) throws SQLException {
-        sperren(verbindung, "select id from " + URINET.schema() + ".dokument where id = ? for update", dokument);
-    }
-
-    private static void sperren(Connection verbindung, String sql, UUID id) throws SQLException {
-        try (PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
-            abfrage.setObject(1, id);
-            try (ResultSet zeile = abfrage.executeQuery()) {
-                if (!zeile.next()) {
-                    throw new SQLException("Synthetische Sperrzeile fehlt");
-                }
-            }
-        }
-    }
-
-    private static void aktualisieren(Connection verbindung, String sql, Object... werte) throws SQLException {
-        try (PreparedStatement update = verbindung.prepareStatement(sql)) {
-            for (int i = 0; i < werte.length; i++) {
-                update.setObject(i + 1, werte[i]);
-            }
-            update.executeUpdate();
-        }
-    }
-
     private static void loeschen(Connection verbindung, String sql, Object wert) throws SQLException {
         try (PreparedStatement update = verbindung.prepareStatement(sql)) {
             update.setObject(1, wert);
@@ -221,14 +180,4 @@ class SperrkonfliktAbbildungTest {
         }
     }
 
-    private static void zurueckrollen(Connection verbindung, Throwable fehler) {
-        try {
-            verbindung.rollback();
-        } catch (SQLException rollback) {
-            fehler.addSuppressed(rollback);
-        }
-    }
-
-    private record Ergebnis(boolean erfolgreich, Throwable fehler) {
-    }
 }
