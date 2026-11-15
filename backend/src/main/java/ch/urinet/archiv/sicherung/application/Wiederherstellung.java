@@ -61,7 +61,7 @@ public final class Wiederherstellung {
                     return new Ergebnis(3, leer);
                 }
             }
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | java.time.DateTimeException | NullPointerException e) {
             return new Ergebnis(3, leer);
         }
 
@@ -110,6 +110,8 @@ public final class Wiederherstellung {
         long ohneSperre = 0;
         long gekappt = 0;
         Instant jetzt = uhr.instant();
+        Quittung ungesperrt = null;
+        long abweichend = 0;
         try (FileChannel kanal = FileChannel.open(strom, StandardOpenOption.READ)) {
             for (InventarZeile zeile : sortiert) {
                 if (zeile.loeschmarke()) {
@@ -125,11 +127,13 @@ public final class Wiederherstellung {
                         || !objekt.lastModified().equals(lastModified(zeile))) {
                     return new Ergebnis(3, new Zaehler(versionen, ohneSperre, gekappt, 1, 0, 0));
                 }
-                Quittung quittung = ziel.schreiben(objekt.schluessel(), objekt.versionId(), objekt.lastModified(),
+                Quittung quittung = ungesperrt = ziel.schreiben(objekt.schluessel(), objekt.versionId(), objekt.lastModified(),
                         objekt.inhalt(), objekt.groesse());
                 Pruefung pruefung = objekt.pruefsummePruefen();
-                if (!pruefung.bestaetigt() || !pruefung.sha256().equals(quittung.sha256())) {
+                if (!pruefung.bestaetigt() || !pruefung.sha256().equals(quittung.sha256())
+                        || !zeile.sha256().isEmpty() && !pruefung.sha256().equals(zeile.sha256())) {
                     ziel.verwerfen(quittung);
+                    ungesperrt = null;
                     return new Ergebnis(3, new Zaehler(versionen, ohneSperre, gekappt, 1, 0, 0));
                 }
                 List<Frame> weitereKopien = index.get(new Objektschluessel(zeile.schluessel(), zeile.versionId()));
@@ -141,6 +145,7 @@ public final class Wiederherstellung {
                     Pruefung duplikatPruefung = duplikatLeser.naechstes().orElseThrow().pruefsummePruefen();
                     if (!duplikatPruefung.bestaetigt() || !duplikatPruefung.sha256().equals(pruefung.sha256())) {
                         ziel.verwerfen(quittung);
+                        ungesperrt = null;
                         return new Ergebnis(3, new Zaehler(versionen, ohneSperre, gekappt, 1, 0, 0));
                     }
                 }
@@ -153,10 +158,19 @@ public final class Wiederherstellung {
                 } else {
                     ohneSperre++;
                 }
+                ungesperrt = null;
                 versionen++;
             }
-        } catch (IOException | SicherungExportFehler e) {
-            return new Ergebnis(3, new Zaehler(versionen, ohneSperre, gekappt, 0, 0, 0));
+        } catch (IOException | RuntimeException e) {
+            abweichend = 1;
+            if (ungesperrt != null) {
+                try {
+                    ziel.verwerfen(ungesperrt);
+                } catch (RuntimeException ignoriert) {
+                    // Der Zähler meldet den Abbruch; die ungesperrte Version bleibt löschbar.
+                }
+            }
+            return new Ergebnis(3, new Zaehler(versionen, ohneSperre, gekappt, abweichend, 0, 0));
         }
         return new Ergebnis(0, new Zaehler(versionen, ohneSperre, gekappt, 0, 0, 0));
     }

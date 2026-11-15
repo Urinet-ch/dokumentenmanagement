@@ -127,6 +127,53 @@ class WiederherstellungTest {
     }
 
     @Test
+    void fehlerBeimSperrenVerwirftDieUngesperrteVersionUndMeldetDenZwischenstand(@TempDir Path temp)
+            throws Exception {
+        Path datei = temp.resolve("sperre.bin");
+        Files.write(datei, frame("archiv/a", "v1", "inhalt".getBytes(StandardCharsets.UTF_8), JETZT));
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+        ziel.sperrFehler = true;
+
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+                .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(),
+                        "GOVERNANCE", "2036-11-15T12:00:00Z")), datei, false);
+
+        assertThat(ergebnis.exitCode()).isEqualTo(3);
+        assertThat(ergebnis.zaehler().abweichend()).isEqualTo(1);
+        assertThat(ziel.verworfen).isEqualTo(1);
+    }
+
+    @Test
+    void ungueltigesLastModifiedImInventarLiefertExit3StattAusnahme(@TempDir Path temp) throws Exception {
+        Path datei = temp.resolve("leer.bin");
+        Files.write(datei, new byte[0]);
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+
+        for (String wert : new String[]{"gestern", null}) {
+            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+                    .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, wert, null, null)),
+                            datei, false);
+            assertThat(ergebnis.exitCode()).isEqualTo(3);
+        }
+        assertThat(ziel.reihenfolge).isEmpty();
+    }
+
+    @Test
+    void abgelaufeneOriginalSperreWirdAlsOhneSperreGezaehltUndNichtGesetzt(@TempDir Path temp) throws Exception {
+        Path datei = temp.resolve("abgelaufen.bin");
+        Files.write(datei, frame("archiv/a", "v1", "inhalt".getBytes(StandardCharsets.UTF_8), JETZT));
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+                .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(),
+                        "GOVERNANCE", "2026-01-01T00:00:00Z")), datei, false);
+
+        assertThat(ergebnis.exitCode()).isZero();
+        assertThat(ergebnis.zaehler().ohneSperre()).isEqualTo(1);
+        assertThat(ziel.sperren).isEmpty();
+    }
+
+    @Test
     @Tag("req-16.27")
     void kappungIstNurImProbeBucketZulaessigUndVerwendetDenFrueherenTermin(@TempDir Path temp) throws Exception {
         Path datei = temp.resolve("kappen.bin");
@@ -290,6 +337,7 @@ class WiederherstellungTest {
         private final Map<String, byte[]> inhalt = new HashMap<>();
         private final Map<String, Sperrung> sperren = new HashMap<>();
         private int verworfen;
+        private boolean sperrFehler;
         private int groessterLeseaufruf;
 
         private InMemoryZiel(String praefix, boolean zielLeer) {
@@ -328,6 +376,9 @@ class WiederherstellungTest {
 
         @Override
         public void sperren(Quittung quittung, Sperrmodus modus, Instant bis) {
+            if (sperrFehler) {
+                throw new IllegalStateException("Sperre abgelehnt");
+            }
             sperren.put(quittung.versionId(), new Sperrung(modus, bis));
         }
 
