@@ -8,6 +8,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.verarbeitung.AuftragTestHilfe;
+import ch.urinet.archiv.verarbeitung.application.AuftragAufraeumen;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.After;
@@ -77,6 +78,9 @@ public class ExportSchritte {
 
     @Inject
     AuftragTestHilfe auftraege;
+
+    @Inject
+    AuftragAufraeumen aufraeumen;
 
     @ConfigProperty(name = "archiv.entwicklung.mailpit-port")
     Optional<Integer> mailpitPort;
@@ -241,6 +245,60 @@ public class ExportSchritte {
     @Wenn("der Worker die Aufträge abarbeitet")
     public void abarbeiten() throws Exception {
         auftraege.abarbeiten();
+    }
+
+    @Wenn("der Worker mitten im Export abstürzt und seit {int} Minuten kein Lebenszeichen mehr gab")
+    public void workerAbgestuerzt(int minuten) throws SQLException {
+        // wie nach einem Absturz der JVM (z. B. Metaspace-OOM): LAEUFT, Lebenszeichen bleibt stehen
+        auftraege.aendern(exportAuftrag(), "status = 'LAEUFT', gestartet = now() - interval '" + minuten
+                + " minutes', lebenszeichen = now() - interval '" + minuten + " minutes', nicht_vor = null");
+    }
+
+    @Wenn("das Archiv verwaiste Aufträge aufräumt")
+    public void verwaisteAufraeumen() {
+        aufraeumen.aufraeumen();
+    }
+
+    @Wenn("die Wartezeit des Auftrags abgelaufen ist")
+    public void wartezeitAbgelaufen() throws SQLException {
+        auftraege.aendern(exportAuftrag(), "nicht_vor = now() - interval '1 second'");
+    }
+
+    @Dann("steht der Export «{word}» ohne Fehler-ID in der Liste")
+    public void ohneFehlerId(String status) {
+        Response liste = exportListe();
+        String stelle = "find { it.id == '" + exportId + "' }.";
+        assertThat(liste.jsonPath().getString(stelle + "status")).isEqualTo(status);
+        assertThat(liste.jsonPath().getString(stelle + "fehlerId")).isNull();
+        assertThat(liste.jsonPath().getString(stelle + "fehlerArt")).isNull();
+    }
+
+    @Dann("steht der Export «{word}» mit der Fehlerart «{word}» und der Fehler-ID des Auftrags in der Liste")
+    public void mitFehlerId(String status, String art) throws SQLException {
+        Response liste = exportListe();
+        String stelle = "find { it.id == '" + exportId + "' }.";
+        assertThat(liste.jsonPath().getString(stelle + "status")).isEqualTo(status);
+        assertThat(liste.jsonPath().getString(stelle + "fehlerArt")).isEqualTo(art);
+        String auftragFehler = String.valueOf(auftraege.zeile(exportAuftrag()).fehler());
+        assertThat(auftragFehler).startsWith("verwaist fehler-id=");
+        assertThat(liste.jsonPath().getString(stelle + "fehlerId")).isEqualTo(auftraege.zeile(exportAuftrag()).fehlerId());
+    }
+
+    @Dann("der Auftrag «{word}» läuft weiter")
+    public void auftragLaeuft(String typ) throws SQLException {
+        assertThat(auftraege.zeile(exportAuftrag()).status()).isEqualTo("LAEUFT");
+        assertThat(auftraege.zeile(exportAuftrag()).versuche()).isZero();
+    }
+
+    private Response exportListe() {
+        Response liste = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when().get("/api/v1/exporte");
+        assertThat(liste.statusCode()).isEqualTo(200);
+        return liste;
+    }
+
+    private long exportAuftrag() throws SQLException {
+        Object id = auftraege.wertAus("select max(id) from public.auftrag where typ = 'EXPORT_JAHR'");
+        return ((Number) id).longValue();
     }
 
     @Dann("ist der Export «{word}» mit {int} Belegen")
