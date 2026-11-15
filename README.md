@@ -59,6 +59,9 @@ Die Szenario-Prüfung «Abdeckung» verlangt für jedes Kriterium unter `_Anford
 abgehakten Aufgabe ab Welle 1 ein Szenario `@req-x.y` oder einen Nachweis-Vermerk in `requirements.md`.
 
 ## Entwicklung lokal
+
+Für das Nachmessen des API-JVM-Speicherbudgets nach Quarkus- oder Abhängigkeitsupdates siehe [Speicherbudget und Metaspace-Messung](docs/speicherbudget.md).
+
 ```bash
 cd frontend && npm ci && cd ..
 cd backend && mvn quarkus:dev
