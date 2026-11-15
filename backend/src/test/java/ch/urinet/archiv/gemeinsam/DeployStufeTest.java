@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeployStufeTest {
 
     private static final Path COMPOSE = GemeinsamSchritte.REPO.resolve("deploy/infomaniak/compose.yml");
+    private static final Path PROBE = GemeinsamSchritte.REPO.resolve("deploy/probe/compose.yml");
 
     /** Alle Dienste des Archivs (siehe {@link #archivDienste()}), damit ein eigener Worker-Dienst nicht durchrutscht. */
     @Test
@@ -66,6 +68,69 @@ class DeployStufeTest {
         Map<String, String> ohneManifestFrist = apiUmgebung();
         ohneManifestFrist.remove("ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST");
         assertThat(pruefen(ohneManifestFrist)).containsExactly("archiv.ablage.manifest-max-sperrfrist");
+    }
+
+    @Test
+    void stufePIstInAllenInfomaniakComposeDateienVerboten() throws IOException {
+        List<Path> composeDateien;
+        try (Stream<Path> dateien = Files.walk(GemeinsamSchritte.REPO.resolve("deploy/infomaniak"))) {
+            composeDateien = dateien.filter(Files::isRegularFile)
+                    .filter(datei -> datei.getFileName().toString().startsWith("compose"))
+                    .filter(datei -> datei.getFileName().toString().endsWith(".yml"))
+                    .toList();
+        }
+        assertThat(composeDateien).isNotEmpty();
+        for (Path composeDatei : composeDateien) {
+            for (var dienst : archivDienste(composeDatei).entrySet()) {
+                Map<String, String> umgebung = new HashMap<>(dienst.getValue());
+                umgebung.put("ARCHIV_STUFE", "P");
+                umgebung.put("ARCHIV_ABLAGE_BUCKET_PRAEFIX", Stufenregel.PRAEFIX_STUFE_P);
+                umgebung.put("ARCHIV_ABLAGE_MAX_SPERRFRIST", "P1D");
+                umgebung.put("ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST", "P1D");
+                assertThat(pruefen(umgebung, false)).as("%s / %s", composeDatei, dienst.getKey())
+                        .contains("archiv.stufe");
+            }
+        }
+    }
+
+    @Test
+    void probeComposeIstAbgeschottetUndErfuelltDieStufenregel() throws IOException {
+        Map<String, Object> compose = compose(PROBE);
+        Map<String, Map<String, Object>> alleDienste = composeDienste(compose);
+        Map<String, Map<String, String>> dienste = archivDienste(PROBE);
+
+        assertThat(alleDienste.keySet()).contains("api", "worker", "db", "kc");
+        for (var dienst : alleDienste.entrySet()) {
+            assertThat(dienst.getValue()).as("Dienst %s", dienst.getKey())
+                    .doesNotContainKeys("labels", "ports");
+        }
+        for (var dienst : dienste.entrySet()) {
+            Map<String, String> umgebung = dienst.getValue();
+            assertThat(pruefen(umgebung, true)).as("Dienst %s", dienst.getKey()).isEmpty();
+            assertThat(umgebung).containsEntry("ARCHIV_STUFE", "P")
+                    .containsEntry("ARCHIV_ABLAGE_BUCKET_PRAEFIX", Stufenregel.PRAEFIX_STUFE_P)
+                    .containsEntry("ARCHIV_ABLAGE_MAX_SPERRFRIST", "P1D")
+                    .containsEntry("ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST", "P1D")
+                    .containsEntry("ARCHIV_ABLAGE_MANIFEST_SPERRMODUS", "COMPLIANCE")
+                    .containsEntry("ARCHIV_TSA_DIENSTE", "")
+                    .containsEntry("ARCHIV_MANIFEST_BEIM_START", "false")
+                    .containsEntry("ARCHIV_MANIFEST_ZEITPLAN", "off")
+                    .containsEntry("ARCHIV_SECRETS_PFLICHT",
+                            "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis")
+                    .containsEntry("ARCHIV_ALARM_EMPFAENGER_URINET", "");
+            assertThat(alleDienste.get(dienst.getKey()).get("secrets").toString())
+                    .doesNotContain("infomaniak_ai_token", "archiv_smtp_passwort", "archiv_manifest_key");
+        }
+        assertThat(dienste.get("api").toString())
+                .contains("QUARKUS_OIDC_AUTH_SERVER_URL", "probe-kc:8080")
+                .contains("ARCHIV_ALARM_EMPFAENGER_URINET");
+        assertThat(alleDienste.get("kc").get("environment").toString()).contains("KC_HOSTNAME")
+                .contains("probe-kc:8080");
+
+        Map<?, ?> netzwerke = (Map<?, ?>) compose.get("networks");
+        assertThat(netzwerke).hasSize(1);
+        assertThat(((Map<?, ?>) netzwerke.get("intern")).get("internal")).isEqualTo(true);
+        assertThat(compose).doesNotContainKey("ports");
     }
 
     /** Req 15.3, 15.11: zwei Zeitstempeldienste, je mit Endpunkt, Policy-OIDs, CA im Classpath und Prüfdaten-Adresse. */
@@ -106,6 +171,10 @@ class DeployStufeTest {
 
     /** Abweichungen als Schlüssel der Konfiguration; leer, wenn die Umgebung zur Stufe passt. */
     static List<String> pruefen(Map<String, String> umgebung) throws IOException {
+        return pruefen(umgebung, false);
+    }
+
+    private static List<String> pruefen(Map<String, String> umgebung, boolean probe) throws IOException {
         SmallRyeConfig config = prodConfig(umgebung);
         var einstellungen = new Stufenregel.Ablageeinstellungen(
                 config.getValue("archiv.ablage.manifest-sperrmodus", Sperrmodus.class),
@@ -115,6 +184,9 @@ class DeployStufeTest {
         Stufe stufe = Stufe.aus(config.getOptionalValue("archiv.stufe", String.class));
 
         List<String> abweichungen = new ArrayList<>(Stufenregel.verstoesse(stufe, einstellungen));
+        if (stufe == Stufe.P && !probe) {
+            abweichungen.add("archiv.stufe");
+        }
         if (stufe == Stufe.A) {
             abweichungen.addAll(Stufenregel.warnungen(stufe, einstellungen));
             if (!hoechstensEinTag(einstellungen.manifestHoechstfrist())) {
@@ -148,9 +220,11 @@ class DeployStufeTest {
      */
     @SuppressWarnings("unchecked")
     private static Map<String, Map<String, String>> archivDienste() throws IOException {
-        Map<String, Object> compose = new Yaml(new SafeConstructor(new LoaderOptions()))
-                .load(Files.readString(COMPOSE, StandardCharsets.UTF_8));
-        var dienste = (Map<String, Map<String, Object>>) compose.get("services");
+        return archivDienste(COMPOSE);
+    }
+
+    private static Map<String, Map<String, String>> archivDienste(Path datei) throws IOException {
+        var dienste = composeDienste(compose(datei));
         Object image = dienste.get("api").get("image");
         Map<String, Map<String, String>> ergebnis = new TreeMap<>();
         dienste.forEach((name, dienst) -> {
@@ -164,11 +238,26 @@ class DeployStufeTest {
             }
             assertThat(environment).as("environment des Dienstes %s in compose.yml als Abbildung (NAME: wert), nicht"
                     + " als Liste", name).isInstanceOf(Map.class);
-            Map<String, String> umgebung = new HashMap<>();
-            ((Map<String, Object>) environment).forEach((schluessel, wert) -> umgebung.put(schluessel,
-                    String.valueOf(wert)));
-            ergebnis.put(name, umgebung);
+            ergebnis.put(name, strings(environment));
         });
+        return ergebnis;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Map<String, Object>> composeDienste(Map<String, Object> compose) {
+        return (Map<String, Map<String, Object>>) compose.get("services");
+    }
+
+    private static Map<String, Object> compose(Path datei) throws IOException {
+        return new Yaml(new SafeConstructor(new LoaderOptions()))
+                .load(Files.readString(datei, StandardCharsets.UTF_8));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> strings(Object environment) {
+        Map<String, String> ergebnis = new HashMap<>();
+        ((Map<String, Object>) environment).forEach((schluessel, wert) -> ergebnis.put(schluessel,
+                String.valueOf(wert)));
         return ergebnis;
     }
 }

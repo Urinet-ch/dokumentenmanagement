@@ -72,7 +72,7 @@ class ManifestPlanerStartTest {
             }
         };
         ManifestPlaner planer = new ManifestPlaner(
-                new ManifestPlanen(register, kontext, einreihen), "api,worker", true);
+                new ManifestPlanen(register, kontext, einreihen), "api,worker", true, "B");
 
         planer.start(new SchemasBereit());
 

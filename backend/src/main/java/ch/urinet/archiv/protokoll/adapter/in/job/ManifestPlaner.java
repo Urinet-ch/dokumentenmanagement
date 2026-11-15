@@ -1,5 +1,6 @@
 package ch.urinet.archiv.protokoll.adapter.in.job;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.protokoll.application.ManifestPlanen;
 import ch.urinet.archiv.gemeinsam.adapter.in.job.TaktThread;
@@ -13,6 +14,7 @@ import org.jboss.logging.Logger;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * Täglicher Lauf des Tages-Manifests um 03:30 Europe/Zurich (Req 15.1, 15.7; {@code archiv.manifest.zeitplan}) und
@@ -34,16 +36,19 @@ public class ManifestPlaner {
     private final ManifestPlanen planen;
     private final boolean worker;
     private final boolean beimStart;
+    private final Stufe stufe;
 
     public ManifestPlaner(ManifestPlanen planen, @ConfigProperty(name = "archiv.rolle") String rolle,
-                          @ConfigProperty(name = "archiv.manifest.beim-start") boolean beimStart) {
+                          @ConfigProperty(name = "archiv.manifest.beim-start") boolean beimStart,
+                          @ConfigProperty(name = "archiv.stufe", defaultValue = "B") String stufe) {
         this.planen = planen;
         this.worker = rolle != null && Arrays.stream(rolle.split(",")).map(String::trim).anyMatch("worker"::equals);
         this.beimStart = beimStart;
+        this.stufe = Stufe.aus(Optional.ofNullable(stufe));
     }
 
     void start(@Observes SchemasBereit ereignis) {
-        if (beimStart && worker) {
+        if (beimStart && worker && stufe != Stufe.P) {
             try {
                 TaktThread.ausfuehren("manifest-planer", () -> planen.planenBeimStart(Instant.now()));
             } catch (RuntimeException e) {
@@ -56,7 +61,7 @@ public class ManifestPlaner {
             concurrentExecution = Scheduled.ConcurrentExecution.SKIP,
             skipExecutionIf = VorMigrationUeberspringen.class)
     void planen() {
-        if (worker) {
+        if (worker && stufe != Stufe.P) {
             try {
                 TaktThread.ausfuehren("manifest-planer", () -> planen.planen(Instant.now()));
             } catch (RuntimeException e) {

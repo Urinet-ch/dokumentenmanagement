@@ -1,12 +1,17 @@
 package ch.urinet.archiv.verarbeitung.application;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
+import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -23,6 +28,9 @@ import java.util.Optional;
  * dieser JVM noch ein Thread für den Auftrag lebt; scheitert er, folgt er mit Wartezeit (2^n Minuten) erneut, nach
  * {@link ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung#MAX_VERSUCHE} Fehlschlägen nicht mehr. Aufträge inaktiver
  * Mandanten pausieren, auch ihre Nachbearbeitung.
+ * <p>
+ * In Stufe P (Restore-Probe, Req 16.24) räumt er nur Aufträge des Typs {@code PRUEFLAUF} auf: Wiederhergestellte
+ * Aufträge anderer Typen bleiben unverändert liegen (kein Versuch gezählt, kein {@code FEHLER}, kein Hook).
  */
 @ApplicationScoped
 public class AuftragAufraeumen {
@@ -32,17 +40,37 @@ public class AuftragAufraeumen {
     private final AuftragSchlange schlange;
     private final AuftragHandlerVerzeichnis verzeichnis;
     private final AuftragArbeiter arbeiter;
+    private final boolean nurPrueflauf;
 
+    @Inject
     public AuftragAufraeumen(AuftragSchlange schlange, AuftragHandlerVerzeichnis verzeichnis,
-                             AuftragArbeiter arbeiter) {
+                             AuftragArbeiter arbeiter,
+                             @ConfigProperty(name = "archiv.stufe", defaultValue = "B") String stufe) {
         this.schlange = schlange;
         this.verzeichnis = verzeichnis;
         this.arbeiter = arbeiter;
+        this.nurPrueflauf = Stufe.aus(Optional.ofNullable(stufe)) == Stufe.P;
+    }
+
+    /** Ohne Stufenangabe wie Stufe B (alle Typen). */
+    public AuftragAufraeumen(AuftragSchlange schlange, AuftragHandlerVerzeichnis verzeichnis,
+                             AuftragArbeiter arbeiter) {
+        this(schlange, verzeichnis, arbeiter, "B");
+    }
+
+    /** Zeitgrenzen der aufzuräumenden Typen; in Stufe P nur {@code PRUEFLAUF}. */
+    private Map<AuftragTyp, Duration> zeitgrenzen() {
+        Map<AuftragTyp, Duration> alle = verzeichnis.zeitgrenzen();
+        if (!nurPrueflauf) {
+            return alle;
+        }
+        Duration grenze = alle.get(AuftragArbeiter.PRUEFLAUF);
+        return grenze == null ? Map.of() : Map.of(AuftragArbeiter.PRUEFLAUF, grenze);
     }
 
     /** Gibt verwaiste Aufträge frei und holt fehlende Nachbearbeitungen nach; liefert die Zahl freigegebener Aufträge. */
     public int aufraeumen() {
-        if (verzeichnis.typen().isEmpty()) {
+        if (zeitgrenzen().isEmpty()) {
             return 0;
         }
         int freigegeben = verwaisteFreigeben();
@@ -52,11 +80,11 @@ public class AuftragAufraeumen {
 
     /** Zahl der Aufträge, deren Hook nach dem letzten Fehlversuch jetzt erfolgreich nachgeholt wurde. */
     public int nachbearbeitungNachholen() {
-        if (verzeichnis.typen().isEmpty()) {
+        if (zeitgrenzen().isEmpty()) {
             return 0;
         }
         int nachgeholt = 0;
-        for (Fehlgeschlagen fehlgeschlagen : schlange.ohneNachbearbeitung(verzeichnis.zeitgrenzen())) {
+        for (Fehlgeschlagen fehlgeschlagen : schlange.ohneNachbearbeitung(zeitgrenzen())) {
             Auftrag auftrag = fehlgeschlagen.auftrag();
             LOG.infof("Auftrag %d (%s): Nachbearbeitung nach Fehler %s wird nachgeholt", auftrag.id(), auftrag.typ(),
                     fehlgeschlagen.fehler().fehlerId());
@@ -70,7 +98,7 @@ public class AuftragAufraeumen {
 
     private int verwaisteFreigeben() {
         int freigegeben = 0;
-        for (Verwaist verwaist : schlange.verwaiste(verzeichnis.zeitgrenzen())) {
+        for (Verwaist verwaist : schlange.verwaiste(zeitgrenzen())) {
             Auftrag auftrag = verwaist.auftrag();
             int versuch = auftrag.versuche() + 1;
             Optional<Duration> wartezeit = Wiederholung.nachFehlversuch(versuch);

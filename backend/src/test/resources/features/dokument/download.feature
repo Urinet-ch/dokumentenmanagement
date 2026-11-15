@@ -36,6 +36,18 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
     Dann leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird
     Und die Adresse liefert «Arbeitsfassung D_NORMAL»
 
+  @req-14.6 @req-10.2
+  Szenario: Vorschau und Download sind getrennte Ausstellungen mit eigener Anzeige und je einem Protokolleintrag
+    Wenn «mitarbeiter-urinet» die Datei von «D_NORMAL» mit «ansicht=vorschau» öffnet
+    Dann leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird
+    Und die Adresse verlangt die Anzeige «inline»
+    Und die Adresse liefert «PDF/A D_NORMAL»
+    Wenn «mitarbeiter-urinet» die Datei von «D_NORMAL» mit «ansicht=download» öffnet
+    Dann leitet das Archiv auf eine höchstens 5 Minuten gültige Adresse um, die nicht zwischengespeichert wird
+    Und die Adresse verlangt die Anzeige «attachment»
+    Und die Adresse liefert «PDF/A D_NORMAL»
+    Und das Zugriffsprotokoll von «urinet» enthält 2 HERUNTERLADEN von «mitarbeiter-urinet» für «D_NORMAL»
+
   @req-14.6
   Szenario: Mit «Accept: application/json» kommt dieselbe Adresse als JSON statt als Umleitung (PWA, Aufgabe 4.6)
     Wenn «treuhaender-urinet» die Download-Adresse von «D_NORMAL» als JSON anfragt
@@ -79,5 +91,8 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | inhaber-urinet           | D_NORMAL    | variante=pdfa&nr=1        | 400    | ANFRAGE_UNGUELTIG | PDF/A hat keine Nummer         |
       | inhaber-urinet           | D_NORMAL    | variante=original&nr=0    | 400    | ANFRAGE_UNGUELTIG | Nummer ab 1                    |
       | inhaber-urinet           | D_NORMAL    | variante=original&nr=eins | 400    | ANFRAGE_UNGUELTIG | keine Zahl                     |
+      | inhaber-urinet           | D_NORMAL    | ansicht=vorschau          | 302    |                   | Ansicht Vorschau |
+      | inhaber-urinet           | D_NORMAL    | ansicht=download          | 302    |                   | Ansicht Download |
+      | inhaber-urinet           | D_NORMAL    | ansicht=inline            | 400    | ANFRAGE_UNGUELTIG | unbekannte Ansicht |
     Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «mitarbeiter-urinet» für «D_INTERN»
     Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «inhaber-urinet» für «D_VERWORFEN»

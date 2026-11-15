@@ -19,19 +19,21 @@ describe('HttpDokumentService (Req 14.6)', () => {
   afterEach(() => http.verify());
 
   it('fragt die PDF/A-Adresse als JSON an, damit das Archiv nicht umleitet', () => {
-    dienst.adresse('d1', 'pdfa').subscribe();
+    dienst.adresse('d1', 'pdfa', 'vorschau').subscribe();
     const anfrage = http.expectOne((r) => r.url === '/api/v1/dokumente/d1/datei');
     expect(anfrage.request.headers.get('Accept')).toBe('application/json');
     expect(anfrage.request.params.get('variante')).toBe('pdfa');
+    expect(anfrage.request.params.get('ansicht')).toBe('vorschau');
     expect(anfrage.request.params.has('nr')).toBe(false);
     anfrage.flush({ url: 'https://s3.example/x', gueltigBis: '2026-11-08T10:05:00Z' });
   });
 
   it('holt beim Original die erste Datei', () => {
-    dienst.adresse('d1', 'original').subscribe();
+    dienst.adresse('d1', 'original', 'download').subscribe();
     const anfrage = http.expectOne((r) => r.url === '/api/v1/dokumente/d1/datei');
     expect(anfrage.request.params.get('variante')).toBe('original');
     expect(anfrage.request.params.get('nr')).toBe('1');
+    expect(anfrage.request.params.get('ansicht')).toBe('download');
     anfrage.flush({ url: 'https://s3.example/x', gueltigBis: '2026-11-08T10:05:00Z' });
   });
 

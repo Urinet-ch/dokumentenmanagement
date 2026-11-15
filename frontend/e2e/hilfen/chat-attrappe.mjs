@@ -122,9 +122,9 @@ function ablauf(frage, gespraechId) {
         ],
       };
     case 'Frage 101':
-      return { status: 429, retryAfter: '1200' };
+      return { status: 429, grund: 'STUNDENLIMIT', retryAfter: '1200' };
     case 'Noch eine Frage':
-      return { status: 429, retryAfter: '5' };
+      return { status: 429, grund: 'LAEUFT', retryAfter: '1200' };
     default:
       return {
         id,
@@ -288,7 +288,12 @@ export async function chatAttrappe(welt) {
         return json(
           route,
           429,
-          { status: 429, title: 'Zu viele Anfragen', fehlercode: 'ZU_VIELE_ANFRAGEN' },
+          {
+            status: 429,
+            title: 'Zu viele Anfragen',
+            fehlercode: 'ZU_VIELE_ANFRAGEN',
+            grund: plan.grund,
+          },
           { 'retry-after': plan.retryAfter },
         );
       }

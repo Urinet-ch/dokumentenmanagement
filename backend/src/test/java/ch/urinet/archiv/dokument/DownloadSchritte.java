@@ -208,6 +208,21 @@ public class DownloadSchritte {
         assertThat(heruntergeladen(mandant, benutzer, name)).isZero();
     }
 
+    @Und("das Zugriffsprotokoll von «{word}» enthält {int} HERUNTERLADEN von «{word}» für «{word}»")
+    public void protokollAnzahl(String mandant, int anzahl, String benutzer, String name) throws SQLException {
+        assertThat(heruntergeladen(mandant, benutzer, name)).isEqualTo(anzahl);
+    }
+
+    @Und("die Adresse verlangt die Anzeige «{word}»")
+    public void anzeige(String erwartet) {
+        String adresse = antwort.statusCode() == 200 ? antwort.jsonPath().getString("url")
+                : antwort.header("Location");
+        String disposition = Pattern.compile("[?&]response-content-disposition=([^&]*)").matcher(adresse)
+                .results().map(m -> java.net.URLDecoder.decode(m.group(1), StandardCharsets.UTF_8)).findFirst()
+                .orElse("");
+        assertThat(disposition).startsWith(erwartet);
+    }
+
     private long heruntergeladen(String mandant, String benutzer, String name) throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
                 verbindung.prepareStatement("select count(*) from " + new MandantCode(mandant).schema()
