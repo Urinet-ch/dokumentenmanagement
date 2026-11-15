@@ -2,6 +2,7 @@ package ch.urinet.archiv.export.application;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
 import ch.urinet.archiv.verarbeitung.application.Auftrag;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -45,7 +46,7 @@ public class ExportSpeichern {
     }
 
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean fehler(UUID id, UUID fehlerId) {
-        return repository.fehler(id, fehlerId);
+    public boolean fehler(UUID id, UUID fehlerId, ExportFehlerart art) {
+        return repository.fehler(id, fehlerId, art);
     }
 }

@@ -836,6 +836,17 @@ export const TEXTE = {
       `${anzahl} Belege · ${groesse} · Download bis ${bis}`,
     abgelaufenHinweis: 'Der Download-Link ist abgelaufen. Bitte fordern Sie einen neuen Export an.',
     fehlerHinweis: 'Der Export ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    /** Satz je Fehlerart des Exports (Feld fehlerArt); ohne Art gilt fehlerHinweis. */
+    fehlerArt: {
+      VERWAIST:
+        'Der Export wurde unterbrochen, zum Beispiel durch einen Neustart des Archivs. Bitte fordern Sie ihn erneut an.',
+      ZEITGRENZE:
+        'Der Export hat zu lange gedauert und wurde abgebrochen. Bitte fordern Sie ihn erneut an.',
+      FEHLGESCHLAGEN: 'Der Export ist gescheitert. Bitte fordern Sie ihn erneut an.',
+    } as Record<string, string>,
+    fehlerId: 'Fehler-ID',
+    erneutAnfordern: 'Erneut anfordern',
+    erneutAnfordernFuer: (jahr: number) => `Export ${jahr} erneut anfordern`,
     herunterladen: (jahr: number) => `Export ${jahr} herunterladen`,
     pruefsumme: 'SHA-256 des ZIP',
     fehlercode: {
@@ -847,6 +858,8 @@ export const TEXTE = {
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
+    fehlerNichtErreichbar:
+      'Das Archiv ist gerade nicht erreichbar, zum Beispiel wegen eines Neustarts. Bitte versuchen Sie es in einer Minute erneut.',
     fehlerAllgemein: 'Das hat nicht geklappt. Bitte versuchen Sie es erneut.',
   },
   apiTokens: {

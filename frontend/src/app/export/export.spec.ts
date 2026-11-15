@@ -129,7 +129,7 @@ describe('Export: Jahresexport anfordern und herunterladen (Spec 02, Aufgabe 6.5
     fixture.detectChanges();
     expect(service.apiV1ExporteGet).toHaveBeenCalledTimes(2);
     expect(element.querySelector('[role=alert]')!.textContent).toContain(
-      TEXTE.export.fehlerAllgemein,
+      TEXTE.export.fehlerNichtErreichbar,
     );
     expect(element.querySelector('[data-test=export]')!.textContent).toContain(
       TEXTE.export.status['OFFEN'],
@@ -162,7 +162,67 @@ describe('Export: Jahresexport anfordern und herunterladen (Spec 02, Aufgabe 6.5
     ]);
     expect(element.textContent).toContain(TEXTE.export.abgelaufenHinweis);
     expect(element.textContent).toContain(TEXTE.export.fehlerHinweis);
-    expect(element.querySelectorAll('[data-test=export] button')).toHaveLength(0);
+    expect(element.querySelectorAll('[data-test=export] button')).toHaveLength(1);
+    expect(element.querySelector('[data-test=fehler-id]')).toBeNull();
+  });
+
+  const FEHLER_ID = '14243b3c-19bd-4800-a82b-3db7506d7357';
+
+  it('zeigt bei einem unterbrochenen Export den Satz zur Unterbrechung und die Fehler-ID', async () => {
+    await starten([
+      { ...FERTIG, id: 'v', status: 'FEHLER', fehlerId: FEHLER_ID, fehlerArt: 'VERWAIST' },
+    ]);
+    expect(element.querySelector('[data-test=fehler-art]')!.textContent).toContain(
+      TEXTE.export.fehlerArt['VERWAIST'],
+    );
+    expect(TEXTE.export.fehlerArt['VERWAIST']).toContain('unterbrochen');
+    expect(element.querySelector('[data-test=fehler-id]')!.textContent).toBe(FEHLER_ID);
+    expect(element.textContent).toContain(`${TEXTE.export.fehlerId}: ${FEHLER_ID}`);
+  });
+
+  it('zeigt je Fehlerart einen eigenen Satz, ohne Art den allgemeinen Hinweis', async () => {
+    await starten([
+      { ...FERTIG, id: 'z', status: 'FEHLER', fehlerId: FEHLER_ID, fehlerArt: 'ZEITGRENZE' },
+      { ...FERTIG, id: 'g', status: 'FEHLER', fehlerId: FEHLER_ID, fehlerArt: 'FEHLGESCHLAGEN' },
+      { ...FERTIG, id: 'a', status: 'FEHLER' },
+    ]);
+    const saetze = [...element.querySelectorAll('[data-test=fehler-art]')].map((e) =>
+      e.textContent!.trim(),
+    );
+    expect(saetze).toEqual([
+      TEXTE.export.fehlerArt['ZEITGRENZE'],
+      TEXTE.export.fehlerArt['FEHLGESCHLAGEN'],
+      TEXTE.export.fehlerHinweis,
+    ]);
+    expect(element.querySelectorAll('[data-test=fehler-id]')).toHaveLength(2);
+  });
+
+  it('fordert einen gescheiterten Export mit «Erneut anfordern» für dasselbe Jahr neu an', async () => {
+    await starten([
+      {
+        ...FERTIG,
+        id: 'v',
+        geschaeftsjahr: 2026,
+        status: 'FEHLER',
+        fehlerId: FEHLER_ID,
+        fehlerArt: 'VERWAIST',
+      },
+    ]);
+    service.apiV1ExportePost.mockReturnValue(of({ ...FERTIG, id: 'neu', status: 'OFFEN' }));
+    const erneut = knopf(TEXTE.export.erneutAnfordern);
+    expect(erneut.getAttribute('aria-label')).toBe(TEXTE.export.erneutAnfordernFuer(2026));
+    erneut.click();
+    await fixture.whenStable();
+    expect(service.apiV1ExportePost).toHaveBeenCalledWith({ geschaeftsjahr: 2026 });
+    expect(element.textContent).toContain(TEXTE.export.angefordert);
+  });
+
+  it('zeigt eine Meldung, wenn das Archiv beim Neustart nicht erreichbar ist (502, 503, 504)', () => {
+    for (const status of [502, 503, 504]) {
+      expect(fehlerText(new HttpErrorResponse({ status }))).toBe(
+        TEXTE.export.fehlerNichtErreichbar,
+      );
+    }
   });
 
   it('Logik: Vorschlag, Grenzen, Abfrage und Fehlertexte', () => {

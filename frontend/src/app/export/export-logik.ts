@@ -31,6 +31,13 @@ export function weiterFragen(fehler: unknown): boolean {
   return status !== 401 && status !== 403;
 }
 
+/** Satz zu einem gescheiterten Export je Fehlerart; ohne bekannte Art der allgemeine Hinweis. */
+export function fehlerArtText(eintrag: Export): string {
+  return (
+    (eintrag.fehlerArt && TEXTE.export.fehlerArt[eintrag.fehlerArt]) || TEXTE.export.fehlerHinweis
+  );
+}
+
 export function fehlerText(fehler: unknown): string {
   const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
   if (status === 401) {
@@ -38,6 +45,9 @@ export function fehlerText(fehler: unknown): string {
   }
   if (status === 0) {
     return TEXTE.export.fehlerVerbindung;
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return TEXTE.export.fehlerNichtErreichbar;
   }
   const body = fehler instanceof HttpErrorResponse ? fehler.error : null;
   const code =
