@@ -1,6 +1,5 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.start;
 
-import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
@@ -31,7 +30,7 @@ public class PortAuswahlPruefung {
         if (!prod(config.getProfiles(), LaunchMode.current())) {
             return;
         }
-        Stufe stufe = Stufe.aus(config.getOptionalValue("archiv.stufe", String.class));
+        String stufe = config.getOptionalValue("archiv.stufe", String.class).orElse("B");
         PortAuswahl.Befund befund = pruefe(auswahl.stream().toList(), stufe);
         befund.warnungen().forEach(LOG::warn);
         if (!befund.abbrueche().isEmpty()) {
@@ -45,8 +44,8 @@ public class PortAuswahlPruefung {
         return profile.contains("prod") || modus == LaunchMode.NORMAL;
     }
 
-    static PortAuswahl.Befund pruefe(List<PortAuswahl> auswahl, Stufe stufe) {
-        if (stufe != Stufe.P) {
+    static PortAuswahl.Befund pruefe(List<PortAuswahl> auswahl, String stufe) {
+        if (!"P".equalsIgnoreCase(stufe.strip())) {
             return PortAuswahl.pruefe(auswahl);
         }
         List<PortAuswahl> ohneKiStub = auswahl.stream()

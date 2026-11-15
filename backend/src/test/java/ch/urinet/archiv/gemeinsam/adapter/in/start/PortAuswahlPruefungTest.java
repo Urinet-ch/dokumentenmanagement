@@ -1,6 +1,5 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.start;
 
-import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.PortAuswahl;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,8 +16,8 @@ class PortAuswahlPruefungTest {
     void kiStubIstNurInStufePErlaubt() {
         var ki = new PortAuswahl("KiPort", true, true, Optional.empty());
 
-        assertThat(PortAuswahlPruefung.pruefe(List.of(ki), Stufe.P).abbrueche()).isEmpty();
-        assertThat(PortAuswahlPruefung.pruefe(List.of(ki), Stufe.B).abbrueche())
+        assertThat(PortAuswahlPruefung.pruefe(List.of(ki), "P").abbrueche()).isEmpty();
+        assertThat(PortAuswahlPruefung.pruefe(List.of(ki), "B").abbrueche())
                 .containsExactly("KiPort: Dev-Stub ist in prod nicht zulässig");
     }
 
@@ -26,7 +25,7 @@ class PortAuswahlPruefungTest {
     void andereStubsBleibenAuchInStufePUnzulaessig() {
         var ablage = new PortAuswahl("AblagePort", true, true, Optional.empty());
 
-        assertThat(PortAuswahlPruefung.pruefe(List.of(ablage), Stufe.P).abbrueche())
+        assertThat(PortAuswahlPruefung.pruefe(List.of(ablage), "P").abbrueche())
                 .containsExactly("AblagePort: Dev-Stub ist in prod nicht zulässig");
     }
 }
