@@ -5,7 +5,7 @@
 @spec-01 @browser @attrappe
 Funktionalität: Zugriffsprotokoll in der PWA
 
-  @req-10.5 @req-16.7
+  @req-10.5 @req-16.7 @req-3.12
   Szenariogrundriss: Der Inhaber sieht neueste Einträge mit den erlaubten Angaben (<breite> px)
     Angenommen ein Bildschirm mit <breite> Pixel Breite
     Und die Protokoll-Schnittstelle ist eine Attrappe

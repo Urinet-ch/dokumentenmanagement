@@ -53,6 +53,14 @@ function protokollAbfragen(welt) {
   return protokoll(welt).anfragen.filter((a) => a.pfad === PFAD && a.methode === 'GET');
 }
 
+async function aufAbfrage(welt, bedingung, beschreibung) {
+  const frist = Date.now() + 10_000;
+  while (!protokollAbfragen(welt).some(bedingung)) {
+    assert.ok(Date.now() < frist, `Die PWA hat nicht rechtzeitig abgefragt: ${beschreibung}`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
 function filterfeld(welt, feld) {
   return welt.seite.locator(`form [data-test=${feld}]`);
 }
@@ -62,8 +70,8 @@ function filtert(eintrag, parameter) {
     (!parameter.get('aktion') || eintrag.aktion === parameter.get('aktion')) &&
     (!parameter.get('benutzer') || eintrag.benutzer === parameter.get('benutzer')) &&
     (!parameter.get('dokument') || eintrag.dokumentId === parameter.get('dokument')) &&
-    (!parameter.get('von') || eintrag.zeit >= parameter.get('von')) &&
-    (!parameter.get('bis') || eintrag.zeit < parameter.get('bis'))
+    (!parameter.get('von') || Date.parse(eintrag.zeit) >= Date.parse(parameter.get('von'))) &&
+    (!parameter.get('bis') || Date.parse(eintrag.zeit) < Date.parse(parameter.get('bis')))
   );
 }
 
@@ -245,7 +253,25 @@ Given(
       'ANZEIGEN',
       p.filterDokument,
     );
-    p.eintraege = [p.bisTag, p.folgetag, p.falscherBenutzer];
+    p.andereAktion = eintrag(
+      24,
+      '2026-03-29T21:58:00Z',
+      p.filterBenutzer,
+      'Eintrag mit anderer Aktion',
+      'MITARBEITER',
+      'VERWEIGERT',
+      p.filterDokument,
+    );
+    p.anderesDokument = eintrag(
+      25,
+      '2026-03-29T21:57:00Z',
+      p.filterBenutzer,
+      'Eintrag zu anderem Dokument',
+      'MITARBEITER',
+      'ANZEIGEN',
+      randomUUID(),
+    );
+    p.eintraege = [p.bisTag, p.folgetag, p.falscherBenutzer, p.andereAktion, p.anderesDokument];
   },
 );
 
@@ -261,6 +287,20 @@ Given('das Zugriffsprotokoll enthält 101 Einträge für eine synthetische Kennu
       'MITARBEITER',
       'ANZEIGEN',
       randomUUID(),
+    ),
+  );
+  // Neueste Einträge mit anderer Aktion: nur ein wirksamer Aktionsfilter ergibt 101 Treffer.
+  p.eintraege.push(
+    ...[1, 2, 3].map((n) =>
+      eintrag(
+        200 + n,
+        new Date(Date.UTC(2026, 2, 30) + n * 1000).toISOString(),
+        p.filterBenutzer,
+        `Verweigert ${n}`,
+        'MITARBEITER',
+        'VERWEIGERT',
+        randomUUID(),
+      ),
     ),
   );
 });
@@ -312,7 +352,8 @@ When('ich die vorbereiteten Protokollfilter eintrage', async function () {
   await filterfeld(this, 'aktion').selectOption('ANZEIGEN');
 });
 
-Then('hat die PWA noch keinen Filter gesendet', function () {
+Then('hat die PWA noch keinen Filter gesendet', async function () {
+  await aufAbfrage(this, () => true, 'Ladeanfrage');
   const anfragen = protokollAbfragen(this);
   assert.equal(anfragen.length, 1, 'die PWA hat vor «Anzeigen» erneut abgefragt');
   assert.ok(
@@ -320,7 +361,8 @@ Then('hat die PWA noch keinen Filter gesendet', function () {
   );
 });
 
-Then(/^hat die PWA den Protokollfilter in Europe\/Zurich gesendet$/, function () {
+Then(/^hat die PWA den Protokollfilter in Europe\/Zurich gesendet$/, async function () {
+  await aufAbfrage(this, (a) => a.parameter.has('aktion'), 'gefilterte Anfrage');
   const anfrage = protokollAbfragen(this).at(-1);
   assert.deepEqual(Object.fromEntries(anfrage.parameter), {
     aktion: 'ANZEIGEN',
@@ -335,7 +377,10 @@ Then(/^hat die PWA den Protokollfilter in Europe\/Zurich gesendet$/, function ()
 
 Then('ist der Eintrag am «Bis»-Tag sichtbar, aber der am Folgetag nicht', async function () {
   const eintraege = this.seite.locator('[data-test=eintrag]');
-  await eintraege.filter({ hasText: protokoll(this).folgetag.name }).waitFor({ state: 'detached' });
+  const p = protokoll(this);
+  for (const ausgeblendet of [p.folgetag, p.andereAktion, p.anderesDokument]) {
+    await eintraege.filter({ hasText: ausgeblendet.name }).waitFor({ state: 'detached' });
+  }
   assert.equal(await eintraege.count(), 1);
   assert.ok((await eintraege.first().innerText()).includes(protokoll(this).bisTag.name));
   assert.ok(
@@ -358,7 +403,16 @@ When('ich die Protokollfilter zurücksetze', async function () {
 When('ich die vorbereitete Protokoll-Kennung und Aktion filtere', async function () {
   await filterfeld(this, 'benutzer').fill(protokoll(this).filterBenutzer);
   await filterfeld(this, 'aktion').selectOption('ANZEIGEN');
+  const gefiltert = this.seite.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname === PFAD &&
+      url.searchParams.get('benutzer') === protokoll(this).filterBenutzer &&
+      url.searchParams.get('aktion') === 'ANZEIGEN'
+    );
+  });
   await anzeigen(this);
+  await gefiltert;
   await this.seite.getByText('1–50 von 101', { exact: true }).waitFor();
 });
 
