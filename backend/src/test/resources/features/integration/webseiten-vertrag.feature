@@ -8,7 +8,7 @@ Funktionalität: Vertrag der Webseiten-Schnittstelle unter /public/v1 (Vorstufe,
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
 
-  @req-15.3
+  @req-15.3 @req-12.5
   Szenario: Fehlender, ungültiger, falscher und widerrufener Schlüssel ergeben dieselbe Antwort 401
     Angenommen für «urinet» gibt es einen aktiven und einen widerrufenen Webseiten-Lese-Schlüssel
     Wenn «/public/v1/probe» ohne Anmeldung, mit «ua_kaputt», mit falschem Geheimnis und mit dem widerrufenen Token abgefragt wird
@@ -77,6 +77,63 @@ Funktionalität: Vertrag der Webseiten-Schnittstelle unter /public/v1 (Vorstufe,
   @req-12.1
   Szenario: Ein Erfassungs-Schlüssel erreicht einen Erfassungs-Endpunkt
     Wenn «webseite-erfassung» POST «/public/v1/probe/erfassung» aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+
+  @req-12.2
+  Szenario: Ein Webseiten-Schlüssel ist an Webseite und höchste Zugriffsstufe gebunden
+    Angenommen es gibt einen Webseiten-Lese-Schlüssel für «probe» mit höchster Stufe «mitglieder»
+    Wenn «inhaber-urinet» die API-Tokens auflistet
+    Dann enthält die Liste den Webseiten-Schlüssel «probe» mit höchster Stufe «mitglieder»
+
+  @req-12.3 @req-12.7
+  Szenario: Das Kommando gibt einen Webseiten-Schlüssel nur einmal aus und die API verwaltet ihn
+    Wenn das Webseiten-Schlüssel-Kommando einen Lese-Schlüssel für «probe» erstellt
+    Dann steht das Geheimnis nur einmal auf stdout und weder in stderr noch im Log
+    Und steht in der Datenbank nur der Hash des Webseiten-Schlüssels
+    Wenn «inhaber-urinet» die API-Tokens auflistet
+    Dann enthält die Liste den Webseiten-Schlüssel «probe» mit höchster Stufe «oeffentlich»
+    Wenn «inhaber-urinet» über die API einen Webseiten-Schlüssel anlegen will
+    Dann lehnt die API das mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG» ab
+    Wenn «inhaber-urinet» den Webseiten-Schlüssel widerruft
+    Dann antwortet die Token-Verwaltung mit Status 204
+
+  @req-12.4
+  Szenario: Bei einer Rotation bleiben beide Schlüssel während der Überlappung gültig
+    Angenommen es gibt einen Webseiten-Lese-Schlüssel für «probe» mit höchster Stufe «oeffentlich»
+    Wenn der Webseiten-Schlüssel mit einer Überlappung von 30 Sekunden rotiert wird
+    Dann erreicht der alte und der neue Webseiten-Schlüssel die Probe
+
+  @req-12.4
+  Szenario: Ohne Überlappung wird der alte Schlüssel sofort ungültig
+    Angenommen es gibt einen Webseiten-Lese-Schlüssel für «probe» mit höchster Stufe «oeffentlich»
+    Wenn der Webseiten-Schlüssel ohne Überlappung rotiert wird
+    Dann erhält der alte Webseiten-Schlüssel Status 401 und der neue erreicht die Probe
+
+  @req-12.6
+  Szenario: Ein Webseiten-Schlüssel mit Absenderprüfung akzeptiert nur konfigurierte Netze
+    Angenommen es gibt einen Webseiten-Lese-Schlüssel mit Absenderprüfung für «probe»
+    Und die Betriebskonfiguration erlaubt für «probe» das Netz «198.51.100.0/24»
+    Wenn die Webseite mit Absender «198.51.100.42» die Probe aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Wenn die Webseite mit Absender «203.0.113.42» die Probe aufruft
+    Dann ist die Antwort 401 «NICHT_ANGEMELDET» mit «WWW-Authenticate: Bearer»
+
+  @req-12.6
+  Szenario: Ein Webseiten-Schlüssel mit Absenderprüfung wird ohne Konfiguration abgelehnt
+    Angenommen es gibt einen Webseiten-Lese-Schlüssel mit Absenderprüfung für «probe»
+    Und die Betriebskonfiguration enthält keine Absendernetze
+    Wenn die Webseite mit Absender «198.51.100.42» die Probe aufruft
+    Dann ist die Antwort 401 «NICHT_ANGEMELDET» mit «WWW-Authenticate: Bearer»
+
+  @req-12.8
+  Szenario: Ein warmer Schlüssel bleibt erreichbar, wenn die HashSperre ausgelastet ist
+    Angenommen es gibt einen aktiven Webseiten-Lese-Schlüssel
+    Wenn die Webseite den Schlüssel erstmals an der Probe verwendet
+    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Wenn alle Plätze der HashSperre belegt sind
+    Und ein ungültiger Webseiten-Schlüssel die Probe aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 503 und Fehlercode «UEBERLASTET»
+    Wenn die Webseite den warmen Schlüssel erneut an der Probe verwendet
     Dann antwortet die Webseiten-Schnittstelle mit Status 200
 
   # Doppelte Schrägstriche und kodierte Zeichen im internen Pfad prüft WebseitenRouteTest mit rohen Pfaden; Matrix-
