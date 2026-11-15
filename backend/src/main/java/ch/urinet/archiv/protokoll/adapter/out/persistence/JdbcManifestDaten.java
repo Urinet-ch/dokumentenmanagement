@@ -1,6 +1,7 @@
 package ch.urinet.archiv.protokoll.adapter.out.persistence;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ManifestDaten;
 import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.protokoll.domain.Jcs;
@@ -214,6 +215,25 @@ public class JdbcManifestDaten implements ManifestDaten {
             return liste;
         } catch (SQLException | JsonProcessingException e) {
             throw new IllegalStateException("Protokollzeilen nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public List<String> sicherungen(MandantCode mandant, Instant von, Instant bis) {
+        String sql = "select distinct sha256 from public.sicherung_export where (mandant is null or mandant = ?) "
+                + "and " + fenster("erstellt") + " order by sha256";
+        try (Connection v = verbindung(); PreparedStatement p = v.prepareStatement(sql)) {
+            p.setString(1, mandant.wert());
+            fensterSetzen(p, 2, von, bis);
+            List<String> liste = new ArrayList<>();
+            try (ResultSet r = p.executeQuery()) {
+                while (r.next()) {
+                    liste.add(r.getString(1));
+                }
+            }
+            return liste;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Sicherungsexporte des Manifests nicht gelesen", e);
         }
     }
 

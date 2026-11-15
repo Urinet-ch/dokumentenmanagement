@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
 import ch.urinet.archiv.protokoll.domain.Vorher;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -38,6 +39,9 @@ public interface ManifestDaten {
 
     /** Blätter der Zeilen von {@code tabelle} mit {@code zeit} in {@code [von, bis)}, nach {@code id}. */
     List<Blatt> blaetter(String tabelle, Instant von, Instant bis);
+
+    /** SHA-256 der globalen und mandanteneigenen Sicherungsexporte im Manifest-Fenster, sortiert und ohne Duplikate. */
+    List<String> sicherungen(MandantCode mandant, Instant von, Instant bis);
 
     /** Hält Manifest, Zeitstempel und Blätter fest (nur Einfügen). */
     void festhalten(NeuesManifest manifest);

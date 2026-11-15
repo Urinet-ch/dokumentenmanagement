@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Aufgabe 5.5b (Req 16.2, 16.8): Nachweise der Sicherungsexporte append-only festhalten. -->
+    <changeSet id="011-sicherung-export" author="archiv">
+        <createTable tableName="sicherung_export">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" primaryKeyName="sicherung_export_pk"/>
+            </column>
+            <column name="art" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="mandant" type="text"/>
+            <column name="sha256" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="erstellt" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table public.sicherung_export
+                add constraint sicherung_export_art_ck
+                    check (art in ('db', 'keycloak', 'realm', 'schluessel', 'bucket', 'inventar')),
+                add constraint sicherung_export_mandant_fk
+                    foreign key (mandant) references public.mandant(code),
+                add constraint sicherung_export_mandant_ck
+                    check ((art in ('bucket', 'inventar') and mandant is not null)
+                        or (art not in ('bucket', 'inventar') and mandant is null)),
+                add constraint sicherung_export_sha256_ck
+                    check (sha256 ~ '^[0-9a-f]{64}$');
+
+            create index sicherung_export_fenster_idx on public.sicherung_export (erstellt, mandant);
+
+        </sql>
+        <sql splitStatements="false">
+            create function public.sicherung_export_nur_einfuegen() returns trigger
+                language plpgsql as $$
+                begin
+                    raise exception 'sicherung_export: nur Einfügen erlaubt (% verweigert)', tg_op;
+                end
+                $$;
+        </sql>
+        <sql>
+            create trigger sicherung_export_nur_aendern
+                before update or delete on public.sicherung_export
+                for each row execute function public.sicherung_export_nur_einfuegen();
+            create trigger sicherung_export_nicht_leeren
+                before truncate on public.sicherung_export
+                for each statement execute function public.sicherung_export_nur_einfuegen();
+
+            revoke all on public.sicherung_export from public;
+        </sql>
+        <sql splitStatements="false">
+            do $$
+            begin
+                if exists (select 1 from pg_roles where rolname = 'archiv_app') then
+                    execute 'revoke all on public.sicherung_export from archiv_app';
+                    execute 'grant select, insert on public.sicherung_export to archiv_app';
+                end if;
+            end
+            $$;
+        </sql>
+    </changeSet>
+</databaseChangeLog>
