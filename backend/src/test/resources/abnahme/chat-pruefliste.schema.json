@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archiv.apps.urinet.ch/schema/chat-pruefliste.schema.json",
+  "title": "Chat-Prüfliste (Spec 02, Req 13.1)",
+  "description": "Schema der Datei chat-pruefliste.yaml unter ARCHIV_GOLDEN_DIR: eine Liste von Fragen mit erwarteten Kernwerten und Quellen. Die Datei mit den echten Werten liegt nie im Repository.",
+  "type": "array",
+  "minItems": 1,
+  "items": { "$ref": "#/$defs/frage" },
+  "$defs": {
+    "frage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nr", "frage", "beispielfrage", "erwartet"],
+      "properties": {
+        "nr": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Laufnummer; die Nummern 1 bis 7 sind die Beispielfragen aus product.md"
+        },
+        "frage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "Die Frage wörtlich, höchstens 2'000 Zeichen wie im Chat (Req 5)"
+        },
+        "beispielfrage": {
+          "type": "boolean",
+          "description": "true für die 7 Beispielfragen aus product.md, die alle richtig sein müssen"
+        },
+        "erwartet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kernwerte", "quellen"],
+          "properties": {
+            "kernwerte": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Zeichenfolgen, die in der Antwort vorkommen müssen (Betrag, Name, Datum); Gross-/Kleinschreibung, Tausenderapostroph und Leerzeichen zählen nicht"
+            },
+            "quellen": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["dokument"],
+                    "properties": {
+                      "dokument": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID des Dokuments, das die Quellen des Chats nennen müssen"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["datenstand"],
+                    "properties": {
+                      "datenstand": {
+                        "type": "string",
+                        "pattern": "^[a-z_]+$",
+                        "description": "Name des Zahlenwerkzeugs, dessen Datenstand die Quellen nennen müssen (z. B. kennzahl)"
+                      }
+                    }
+                  }
+                ]
+              },
+              "description": "Erwartete Quellen: Dokument-ID oder Datenstand eines Zahlenwerkzeugs; leer, wenn die Antwort keine Quelle braucht"
+            }
+          }
+        },
+        "hinweis": {
+          "type": "string",
+          "description": "Freitext für Fabians Bewertung, zum Beispiel was bei fehlender Anbindung als richtig gilt; kommt in den Bericht"
+        }
+      }
+    }
+  }
+}

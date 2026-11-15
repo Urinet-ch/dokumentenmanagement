@@ -1,0 +1,144 @@
+# Synthetisches Beispiel nur für den Schematest (PrueflisteSchemaTest). Keine echten Fragen, Beträge, Namen oder IDs.
+# Die echte Prüfliste liegt als chat-pruefliste.yaml unter ARCHIV_GOLDEN_DIR und nie im Repository.
+- nr: 1
+  frage: "Beispielfrage 1 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 1", "CHF 1.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000001"
+- nr: 2
+  frage: "Beispielfrage 2 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 2", "CHF 2.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000002"
+- nr: 3
+  frage: "Beispielfrage 3 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 3", "CHF 3.00"]
+    quellen: []
+  hinweis: "Erfundener Hinweis für die Bewertung."
+- nr: 4
+  frage: "Beispielfrage 4 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 4", "CHF 4.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000004"
+- nr: 5
+  frage: "Beispielfrage 5 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 5", "CHF 5.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000005"
+- nr: 6
+  frage: "Beispielfrage 6 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 6", "CHF 6.00"]
+    quellen: []
+- nr: 7
+  frage: "Beispielfrage 7 mit erfundenem Inhalt?"
+  beispielfrage: true
+  erwartet:
+    kernwerte: ["Testfirma 7", "CHF 7.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000007"
+- nr: 8
+  frage: "Beispielfrage 8 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 8", "CHF 8.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000008"
+- nr: 9
+  frage: "Beispielfrage 9 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 9", "CHF 9.00"]
+    quellen: []
+- nr: 10
+  frage: "Beispielfrage 10 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 10", "CHF 10.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000010"
+- nr: 11
+  frage: "Beispielfrage 11 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 11", "CHF 11.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000011"
+- nr: 12
+  frage: "Beispielfrage 12 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 12", "CHF 12.00"]
+    quellen: []
+- nr: 13
+  frage: "Beispielfrage 13 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 13", "CHF 13.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000013"
+- nr: 14
+  frage: "Beispielfrage 14 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 14", "CHF 14.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000014"
+- nr: 15
+  frage: "Beispielfrage 15 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 15", "CHF 15.00"]
+    quellen: []
+- nr: 16
+  frage: "Beispielfrage 16 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 16", "CHF 16.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000016"
+- nr: 17
+  frage: "Beispielfrage 17 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 17", "CHF 17.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000017"
+- nr: 18
+  frage: "Beispielfrage 18 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 18", "CHF 18.00"]
+    quellen: []
+- nr: 19
+  frage: "Beispielfrage 19 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 19", "CHF 19.00"]
+    quellen:
+      - dokument: "00000000-0000-4000-8000-000000000019"
+- nr: 20
+  frage: "Beispielfrage 20 mit erfundenem Inhalt?"
+  beispielfrage: false
+  erwartet:
+    kernwerte: ["Testfirma 20", "CHF 20.00"]
+    quellen:
+      - datenstand: kennzahl
+      - dokument: "00000000-0000-4000-8000-000000000020"
