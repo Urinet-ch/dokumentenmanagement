@@ -10,6 +10,7 @@ import ch.urinet.archiv.verarbeitung.application.AuftragHandlerVerzeichnis;
 import ch.urinet.archiv.verarbeitung.application.AuftragSchlange;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.application.Fehlgeschlagen;
+import ch.urinet.archiv.verarbeitung.application.PrueflaufHandler;
 import ch.urinet.archiv.verarbeitung.application.Verwaist;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
@@ -19,6 +20,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -141,6 +143,36 @@ class AuftragArbeiterTest {
         laeufe.addAll(worker.abholen());
         warten();
         assertThat(hilfe.zeile(ok).status()).isEqualTo("FERTIG");
+    }
+
+    @Test
+    @Tag("req-16.24")
+    void stufePBeanspruchtNurPrueflaufUndLaesstAndereAuftraegeUnveraendert() throws Exception {
+        StoerbareSchlange beobachtet = new StoerbareSchlange(schlange);
+        AuftragArbeiter worker = arbeiter(beobachtet, 1, "P");
+        List<AuftragTyp> typen = List.of(new AuftragTyp("KI_VORSCHLAG"), new AuftragTyp("ARCHIVIEREN"),
+                new AuftragTyp("VERARBEITEN"), new AuftragTyp("CSV_UEBERNEHMEN"));
+        List<Long> ids = new ArrayList<>();
+        try {
+            for (AuftragTyp typ : typen) {
+                ids.add(hilfe.rohEinreihen("urinet", typ, "{}"));
+            }
+
+            assertThat(worker.abholen()).isEmpty();
+            assertThat(beobachtet.zuletztGeholteTypen).isEqualTo(Set.of(PrueflaufHandler.TYP));
+            for (long id : ids) {
+                AuftragTestHilfe.Zeile zeile = hilfe.zeile(id);
+                assertThat(zeile.status()).isEqualTo("OFFEN");
+                assertThat(zeile.versuche()).isZero();
+                assertThat(zeile.fehler()).isNull();
+                assertThat(zeile.lebenszeichenNachStart()).isFalse();
+                assertThat(zeile.lebenszeichenAlterMs()).isNull();
+            }
+        } finally {
+            for (long id : ids) {
+                hilfe.ausfuehren("delete from public.auftrag where id = " + id);
+            }
+        }
     }
 
     @Test
@@ -625,7 +657,7 @@ class AuftragArbeiterTest {
     @Test
     void herunterfahrenLaesstEinenNichtEndendenHandlerAufLaeuft() throws Exception {
         AuftragArbeiter worker = new AuftragArbeiter(schlange, verzeichnis, kontext, 1, LEBENSZEICHEN,
-                Duration.ofMillis(300));
+                Duration.ofMillis(300), "A");
         arbeiter.add(worker);
         long id = hilfe.einreihen("urinet", TestHandler.STUR);
         starten(worker, 1);
@@ -681,8 +713,12 @@ class AuftragArbeiterTest {
     }
 
     private AuftragArbeiter arbeiter(AuftragSchlange mit, int parallel) {
+        return arbeiter(mit, parallel, "A");
+    }
+
+    private AuftragArbeiter arbeiter(AuftragSchlange mit, int parallel, String stufe) {
         AuftragArbeiter neu = new AuftragArbeiter(mit, verzeichnis, kontext, parallel, LEBENSZEICHEN,
-                Duration.ofSeconds(1));
+                Duration.ofSeconds(1), stufe);
         arbeiter.add(neu);
         return neu;
     }
@@ -705,6 +741,7 @@ class AuftragArbeiterTest {
         private final AuftragSchlange echt;
         volatile boolean fehlversuchScheitert;
         final AtomicInteger abschlussScheitert = new AtomicInteger();
+        volatile Set<AuftragTyp> zuletztGeholteTypen = Set.of();
 
         StoerbareSchlange(AuftragSchlange echt) {
             this.echt = echt;
@@ -717,6 +754,7 @@ class AuftragArbeiterTest {
 
         @Override
         public List<Auftrag> holen(Set<AuftragTyp> typen, int anzahl) {
+            zuletztGeholteTypen = Set.copyOf(typen);
             return echt.holen(typen, anzahl);
         }
 
