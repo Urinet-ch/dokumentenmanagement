@@ -71,7 +71,11 @@ class KonfigurierteLueckenTest {
     }
 
     private static WerkzeugDaten.Monatszeile zeile(String gruppe, int jahr, int monat) {
-        return new WerkzeugDaten.Monatszeile(gruppe, YearMonth.of(jahr, monat), 1);
+        return zeile(gruppe, gruppe, jahr, monat);
+    }
+
+    private static WerkzeugDaten.Monatszeile zeile(String schluessel, String gruppe, int jahr, int monat) {
+        return new WerkzeugDaten.Monatszeile(schluessel, gruppe, YearMonth.of(jahr, monat), 1);
     }
 
     @Test
@@ -102,6 +106,7 @@ class KonfigurierteLueckenTest {
         });
         Lueckenbericht.Kategorie lohnKategorie = b.kategorien().get(1);
         assertThat(lohnKategorie.ohneZuordnung()).isEqualTo(1);
+        assertThat(lohnKategorie.hinweis()).isNull();
         assertThat(lohnKategorie.reihen()).extracting(Lueckenbericht.Reihe::gruppe).containsExactly("Anna", "Beat");
         assertThat(lohnKategorie.reihen().get(0).fehlend()).containsExactly("2026-03", "2026-05", "2026-06",
                 "2026-07", "2026-08", "2026-09", "2026-10");
@@ -117,6 +122,33 @@ class KonfigurierteLueckenTest {
         assertThat(abfragen).contains("belegnummern:RECHNUNG:2026",
                 "monate:Monatsquelle[art=LOHN, bezug=BELEGDATUM, gruppe=zusatz.person, nurMonat=zusatz.periode]",
                 "monate:Monatsquelle[art=BANK, bezug=zusatz.periode_bis, gruppe=PARTNER, nurMonat=null]");
+    }
+
+    @Test
+    void namensvariantenDesPartnersBildenEineDurchgehendeReihe() {
+        regeln();
+        bank = List.of(zeile("partner-1", "Zeta Bank", 2026, 8),
+                zeile("partner-1", "Alpha Bank", 2026, 9));
+
+        Lueckenbericht.Kategorie kategorie = luecken().erstellen(URINET, 2026, SICHT).kategorien().get(2);
+
+        assertThat(kategorie.reihen()).singleElement().satisfies(reihe -> {
+            assertThat(reihe.gruppe()).isEqualTo("Alpha Bank");
+            assertThat(reihe.vorhanden()).isEqualTo(2);
+            assertThat(reihe.fehlend()).containsExactly("2026-10");
+        });
+    }
+
+    @Test
+    void geschaeftsjahrOhneAbgeschlosseneVolleMonateNenntDenHinweis() {
+        regeln();
+
+        Lueckenbericht.Kategorie kategorie = luecken().erstellen(URINET, 2027, SICHT).kategorien().get(1);
+
+        assertThat(kategorie.regel()).isEqualTo(Lueckenbericht.Regel.ERWARTET);
+        assertThat(kategorie.hinweis()).isEqualTo(
+                "Für dieses Geschäftsjahr liegen keine abgeschlossenen vollen Monate vor; Monatslücken wurden nicht geprüft.");
+        assertThat(kategorie.reihen()).isEmpty();
     }
 
     @Test
