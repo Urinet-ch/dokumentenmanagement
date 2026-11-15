@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ki.TestEmbeddingPort;
+import ch.urinet.archiv.ki.chat.TestChatAgent;
 import ch.urinet.archiv.ki.TestRerankerPort;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -46,7 +47,12 @@ import java.util.stream.Stream;
  * {@code NEU}. Während des Wartens führt er Anfragedateien {@code target/browser-backend-anfragen/<uuid>.json}
  * ({@code {"mandant": …, "dokument": …, "status": "EINGANGSKORB" | "FEHLER"}}) per SQL im Schema des Mandanten aus,
  * wie die Java-Szenarien diese Status herstellen, und quittiert jede mit {@code <uuid>.antwort.json}. Kein eigener
- * HTTP-Endpunkt; das Dokument bleibt ohne Titel und ohne Vorschlag.
+ * HTTP-Endpunkt; das Dokument bleibt ohne Vorschlag und, ausser mit dem optionalen Feld {@code titel} (nur
+ * {@code EINGANGSKORB}), ohne Titel.
+ * <p>
+ * Chat (Spec 02, Aufgabe 7.4b): Der Test schaltet den Chat auf den echten Agenten ({@code TestChatAgent.Verhalten.ECHT});
+ * das Sprachmodell ist der WireMock von {@code KiWireMock}, dessen Adresse als {@code modell} in der Bereit-Datei steht.
+ * Die Szenarien registrieren die gestreamten Antworten über die Admin-Schnittstelle des WireMock.
  * <p>
  * Hybridsuche (Spec 02, Aufgabe 6.6): Im Testmodus zeigen Embedding und Reranker sonst auf den WireMock von
  * {@code localhost:8089} (dort laufen auf einer Entwicklermaschine fremde WireMocks) oder verlangen das Token aus der
@@ -86,10 +92,14 @@ class BrowserBackendTest {
     @Inject
     TestRerankerPort reranker;
 
+    @Inject
+    TestChatAgent chat;
+
     @Test
     void bereitstellen() throws Exception {
         embedding.setzen(TestEmbeddingPort.Ersatz.STUB);
         reranker.setzen(TestRerankerPort.Ersatz.STUB);
+        chat.verhalten(TestChatAgent.Verhalten.ECHT, "");
         for (String code : List.of("urinet", "vhf-gsk")) {
             if (!imRegister(code)) {
                 provisionierung.anlegen(code, null, null);
@@ -99,7 +109,9 @@ class BrowserBackendTest {
         String api = "http://localhost:" + config.getValue("quarkus.http.test-port", Integer.class);
         String keycloak = config.getValue("quarkus.oidc.auth-server-url", String.class);
         Files.deleteIfExists(STOPP);
-        Files.writeString(BEREIT, "{\"api\":\"" + api + "\",\"keycloak\":\"" + keycloak + "\"}\n");
+        String modell = "http://localhost:" + config.getValue("archiv.ki.wiremock-port", Integer.class);
+        Files.writeString(BEREIT, "{\"api\":\"" + api + "\",\"keycloak\":\"" + keycloak + "\",\"modell\":\""
+                + modell + "\"}\n");
         try {
             Instant ende = Instant.now().plus(Duration.ofMinutes(60));
             while (!Files.exists(STOPP) && Instant.now().isBefore(ende)) {
@@ -109,6 +121,7 @@ class BrowserBackendTest {
         } finally {
             embedding.setzen(null);
             reranker.setzen(null);
+            chat.zuruecksetzen();
             Files.deleteIfExists(BEREIT);
             Files.deleteIfExists(STOPP);
         }
@@ -159,6 +172,10 @@ class BrowserBackendTest {
         String mandant = anfrage.path("mandant").asText();
         String dokument = anfrage.path("dokument").asText();
         String status = anfrage.path("status").asText();
+        String titel = anfrage.hasNonNull("titel") ? anfrage.path("titel").asText() : null;
+        if (titel != null && (titel.isBlank() || titel.length() > 200)) {
+            throw new IllegalArgumentException("Titel nicht zulässig");
+        }
         if (!MANDANTEN.contains(mandant)) {
             throw new IllegalArgumentException("Mandant nicht zulässig");
         }
@@ -195,12 +212,13 @@ class BrowserBackendTest {
                 AbgelegteDatei abgelegt = ablage.ablegenEingang(code, schluessel, new ByteArrayInputStream(pdfa),
                         pdfa.length);
                 aendern = verbindung.prepareStatement("update " + schema + ".dokument set status = 'EINGANGSKORB', "
-                        + "titel = null, ki_vorschlag = null, sha256_pdfa = ?, s3_pdfa = ?, s3_version_pdfa = ?, "
+                        + "titel = ?, ki_vorschlag = null, sha256_pdfa = ?, s3_pdfa = ?, s3_version_pdfa = ?, "
                         + "seiten = 1 where id = ? and status = 'NEU'");
-                aendern.setString(1, abgelegt.sha256());
-                aendern.setString(2, schluessel.pfad(Ablageort.EINGANG));
-                aendern.setString(3, abgelegt.versionId());
-                aendern.setObject(4, id);
+                aendern.setString(1, titel);
+                aendern.setString(2, abgelegt.sha256());
+                aendern.setString(3, schluessel.pfad(Ablageort.EINGANG));
+                aendern.setString(4, abgelegt.versionId());
+                aendern.setObject(5, id);
             } else {
                 aendern = verbindung.prepareStatement("update " + schema + ".dokument set status = 'FEHLER', "
                         + "titel = null, ki_vorschlag = null, fehler = 'Probe: Verarbeitung gescheitert' "

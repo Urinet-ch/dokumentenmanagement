@@ -199,6 +199,15 @@ public class WerkzeugSchritte {
         }
     }
 
+    @Angenommen("im Mandanten «{word}» liegt das Chat-Dokument «{word}» ohne Text")
+    public void dokumentOhneText(String mandant, String name) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            dokumentEinfuegen(verbindung, mandant, Map.of("name", name, "titel", "Rechnung ohne Text", "art",
+                    "LIEFERANTENBELEG", "vertraulichkeit", "NORMAL", "bestaetigt", "nein", "erfasser",
+                    "inhaber-" + mandant, "status", "EINGANGSKORB"));
+        }
+    }
+
     private void dokumentEinfuegen(Connection verbindung, String mandant, Map<String, String> z) throws SQLException {
         UUID id = UUID.randomUUID();
         String schema = schema(mandant);
@@ -498,6 +507,12 @@ public class WerkzeugSchritte {
     @Dann("ist der Inhalt der Antwort {int} Zeichen lang")
     public void inhaltLaenge(int zeichen) {
         assertThat(antwort.path("inhalt").asText()).hasSize(zeichen);
+    }
+
+    @Dann("enthält die Antwort keinen Inhalt")
+    public void keinInhalt() {
+        assertThat(antwort.has("fehler")).as(antwortText).isFalse();
+        assertThat(antwort.has("inhalt")).as(antwortText).isFalse();
     }
 
     @Dann("ist die Antwort ein Fehler ohne Inhalt")
