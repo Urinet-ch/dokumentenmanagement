@@ -5,6 +5,7 @@ import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -16,16 +17,16 @@ import java.util.Optional;
 @ApplicationScoped
 public class JdbcSicherungExportSpeicher implements SicherungExportSpeicher {
 
-    private final AgroalDataSource datenquelle;
+    private final Instance<AgroalDataSource> datenquelle;
 
-    public JdbcSicherungExportSpeicher(AgroalDataSource datenquelle) {
+    public JdbcSicherungExportSpeicher(Instance<AgroalDataSource> datenquelle) {
         this.datenquelle = datenquelle;
     }
 
     @Override
     public void festhalten(SicherungsArt art, Optional<MandantCode> mandant, String sha256) {
         String sql = "insert into public.sicherung_export (art, mandant, sha256) values (?, ?, ?)";
-        try (Connection verbindung = datenquelle.getConnection();
+        try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
             einfuegen.setString(1, art.code());
             if (mandant.isPresent()) {
