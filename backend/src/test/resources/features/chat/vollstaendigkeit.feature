@@ -71,3 +71,18 @@ Funktionalität: Werkzeug vollstaendigkeit: Lücken in Nummernfolgen und Monaten
     Und nennt der Datenstand die Zahl der bestätigten Belege der Arten «AUSGANGSRECHNUNG, LOHNABRECHNUNG, BANK» im Mandanten «urinet»
     Wenn «inhaber-vhf-gsk» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
     Dann hat die Antwort keine Kategorien und den Hinweis «Für diesen Mandanten sind keine Regeln für Lücken eingerichtet»
+
+  @req-3.6
+  Szenario: Namens- und Schreibvarianten desselben Partners und derselben Person ergeben eine durchgehende Reihe
+    Angenommen im Mandanten «urinet» liegen bestätigte Kontoauszüge des Partners «Kantonalbank Eichenau» für die Monate «2003-01, 2003-02, 2003-05, 2003-06, 2003-07, 2003-08, 2003-09, 2003-10, 2003-11, 2003-12»
+    Und im Mandanten «urinet» liegen bestätigte Kontoauszüge unter dem Namen «Kantonalbank Eichenau AG» des Partners «Kantonalbank Eichenau» für die Monate «2003-03, 2003-04»
+    Und im Mandanten «urinet» liegen bestätigte Lohnabrechnungen der Person «Anna Weidmatt» für die Monate «2003-01, 2003-02, 2003-05, 2003-06, 2003-07, 2003-08, 2003-09, 2003-10, 2003-11, 2003-12»
+    Und im Mandanten «urinet» liegen diese weiteren Dokumente für die Lückenprüfung:
+      | art            | vertraulichkeit | datum      | belegnummer | periode | person          | status     | bestaetigt |
+      | LOHNABRECHNUNG | PERSONAL        | 2003-03-31 |             | 2003-03 | anna weidmatt   | ARCHIVIERT | ja         |
+      | LOHNABRECHNUNG | PERSONAL        | 2003-04-30 |             | 2003-04 | Anna Weidmatt   | ARCHIVIERT | ja         |
+    Wenn «inhaber-urinet» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
+    Dann hat die Art «BANK» für «Kantonalbank Eichenau» keine fehlenden Monate
+    Und beginnt die Reihe der Art «BANK» für «Kantonalbank Eichenau» mit dem Monat «2003-01»
+    Und hat die Art «LOHNABRECHNUNG» für «Anna Weidmatt» keine fehlenden Monate
+    Und beginnt die Reihe der Art «LOHNABRECHNUNG» für «Anna Weidmatt» mit dem Monat «2003-01»
