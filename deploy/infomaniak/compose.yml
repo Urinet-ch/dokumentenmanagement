@@ -54,9 +54,12 @@ services:
       # der .env des Bundles (der Deploy schreibt sie aus der GitHub-Variable gleichen Namens); leer heisst nur Log
       ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
+      # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
+      # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die
+      # JVM beim ersten Export mit OutOfMemoryError: Metaspace, 128m liess nur 10 MiB Luft für alles, was in Betrieb dazukommt
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
-        -Xmx112m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m
+        -Xmx112m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
         -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
     secrets:
       - archiv_db_app
