@@ -5,7 +5,9 @@ import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
 import ch.urinet.archiv.export.domain.ExportStatus;
+import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
 import ch.urinet.archiv.export.domain.Geschaeftsjahr;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -103,9 +105,15 @@ public class ExportJahrHandler implements AuftragHandler {
 
     @Override
     public void nachLetztemFehlversuch(Auftrag auftrag, UUID fehlerId) {
+        nachLetztemFehlversuch(auftrag, new AuftragFehler("fehlgeschlagen", fehlerId, null));
+    }
+
+    @Override
+    public void nachLetztemFehlversuch(Auftrag auftrag, AuftragFehler fehler) {
+        ExportFehlerart art = ExportFehlerart.aus(fehler.art());
         auftrag.nutzlast().uuid(EXPORT_ID).ifPresent(id -> {
-            if (speichern.fehler(id, fehlerId)) {
-                LOG.errorf("Export %s gescheitert (fehler-id=%s)", id, fehlerId);
+            if (speichern.fehler(id, fehler.fehlerId(), art)) {
+                LOG.errorf("Export %s gescheitert (fehler-id=%s, art=%s)", id, fehler.fehlerId(), art);
             }
         });
     }

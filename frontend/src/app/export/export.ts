@@ -14,6 +14,7 @@ import {
   ABFRAGE_MS,
   JAHR_MAX,
   JAHR_MIN,
+  fehlerArtText,
   fehlerText,
   inArbeit,
   jahrGueltig,
@@ -40,6 +41,7 @@ export class Export implements OnInit {
   protected readonly texte = TEXTE.export;
   protected readonly zahl = zahl;
   protected readonly zeit = zeit;
+  protected readonly fehlerArtText = fehlerArtText;
   protected readonly groesse = groesse;
   protected readonly min = JAHR_MIN;
   protected readonly max = JAHR_MAX;
@@ -91,6 +93,12 @@ export class Export implements OnInit {
         this.fehler.set(fehlerText(fehler));
       },
     });
+  }
+
+  /** Fordert das Geschäftsjahr eines gescheiterten Exports erneut an. */
+  protected erneutAnfordern(eintrag: ExportEintrag): void {
+    this.jahr.set(eintrag.geschaeftsjahr);
+    this.anfordern();
   }
 
   protected herunterladen(eintrag: ExportEintrag): void {

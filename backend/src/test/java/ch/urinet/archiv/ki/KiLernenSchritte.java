@@ -2,6 +2,7 @@ package ch.urinet.archiv.ki;
 
 import ch.urinet.archiv.ablage.domain.DateiRolle;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.BenutzerVerzeichnis;
 import ch.urinet.archiv.protokoll.domain.VerzeichnisEintrag;
@@ -214,6 +215,27 @@ public class KiLernenSchritte {
                 .as("bestätigt %s", feld).isEqualTo(bestaetigt);
         assertThat(zaehler("archiv.ki.feld.korrigiert", feld) - zaehlerVorher.get("archiv.ki.feld.korrigiert/" + feld))
                 .as("korrigiert %s", feld).isEqualTo(korrigiert);
+    }
+
+    @Dann("nennt «\\/q\\/metrics» die Korrekturquote für «{word}» zu jedem Feld des Vorschlags")
+    public void quoteInMetriken(String mandant) {
+        String metriken = given().when().get("/q/metrics").then().statusCode(200).extract().asString();
+        for (Feld feld : Feld.values()) {
+            assertThat(metriken).as("Reihe für %s", feld.schluessel())
+                    .containsPattern("(?m)^archiv_ki_feld_korrekturquote\\{(?=[^}]*feld=\"" + feld.schluessel()
+                            + "\")(?=[^}]*mandant=\"" + mandant + "\")[^}]*\\} [0-9.]+$");
+        }
+    }
+
+    @Dann("trägt die Korrekturquote in «\\/q\\/metrics» nur die Tags «{word}» und «{word}»")
+    public void quoteTags(String a, String b) {
+        String metriken = given().when().get("/q/metrics").then().statusCode(200).extract().asString();
+        List<String> reihen = metriken.lines().filter(z -> z.startsWith("archiv_ki_feld_")).toList();
+        assertThat(reihen).isNotEmpty();
+        for (String reihe : reihen) {
+            String tags = reihe.substring(reihe.indexOf('{') + 1, reihe.indexOf('}'));
+            assertThat(tags.split(",")).allSatisfy(t -> assertThat(t.substring(0, t.indexOf('='))).isIn(a, b));
+        }
     }
 
     @Dann("der Aufruf des Sprachmodells für den Beleg «{word}» enthält das Korrekturbeispiel {string}")

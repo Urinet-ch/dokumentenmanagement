@@ -15,8 +15,8 @@ import java.util.Map;
 
 /**
  * Kennzahlen je aktiven Mandanten (Req 16.4): offene, laufende und fehlgeschlagene Aufträge, Dokumente je Status ausser
- * den Endzuständen und die Grösse des Eingangskorbs. Nur Zähler, keine Inhalte. Die Korrekturquote je Feld folgt mit
- * den Korrekturen der KI-Vorschläge (Aufgabe 3.3).
+ * den Endzuständen und die Grösse des Eingangskorbs. Nur Zähler, keine Inhalte. Die Korrekturquote je Feld wird beim
+ * Bestätigen eines KI-Vorschlags fortgeschrieben (Aufgabe 3.3).
  */
 @ApplicationScoped
 public class Kennzahlen {

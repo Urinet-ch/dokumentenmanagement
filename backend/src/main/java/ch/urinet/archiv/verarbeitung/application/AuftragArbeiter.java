@@ -408,17 +408,18 @@ public class AuftragArbeiter {
         LOG.errorf("Auftrag %d (%s, Mandant %s): Versuch %d von %d %s, Fehler %s, Status FEHLER, ursache=%s",
                 auftrag.id(), auftrag.typ(), auftrag.mandant().wert(), versuch, Wiederholung.MAX_VERSUCHE, art,
                 fehler.fehlerId(), ursachen);
-        nachbearbeitenImPlatz(auftrag, fehler.fehlerId());
+        nachbearbeitenImPlatz(auftrag, fehler);
     }
 
     /**
      * Hook nach dem letzten Fehlversuch im Platz und unter der ID des eben beendeten Handlers: Der Platz bleibt belegt,
      * bis auch der Hook-Thread endet.
      */
-    private void nachbearbeitenImPlatz(Auftrag auftrag, UUID fehlerId) {
+    private void nachbearbeitenImPlatz(Auftrag auftrag, AuftragFehler fehler) {
+        UUID fehlerId = fehler.fehlerId();
         Lauf hook;
         try {
-            hook = starten(auftrag, () -> verzeichnis.handler(auftrag.typ()).nachLetztemFehlversuch(auftrag, fehlerId));
+            hook = starten(auftrag, () -> verzeichnis.handler(auftrag.typ()).nachLetztemFehlversuch(auftrag, fehler));
         } catch (RejectedExecutionException e) {
             LOG.warnf("Auftrag %d (%s): Nachbearbeitung nach Fehler %s beim Herunterfahren nicht gestartet, folgt "
                     + "beim Aufräumen", auftrag.id(), auftrag.typ(), fehlerId);
@@ -441,6 +442,12 @@ public class AuftragArbeiter {
      * @return {@code true}, wenn der Hook erfolgreich war
      */
     public boolean nachbearbeiten(Auftrag auftrag, UUID fehlerId, int bisher) {
+        return nachbearbeiten(auftrag, new AuftragFehler(FEHLGESCHLAGEN, fehlerId, null), bisher);
+    }
+
+    /** Wie {@link #nachbearbeiten(Auftrag, UUID, int)}, der Hook erfährt dazu die Art des Fehlversuchs. */
+    public boolean nachbearbeiten(Auftrag auftrag, AuftragFehler fehler, int bisher) {
+        UUID fehlerId = fehler.fehlerId();
         if (herunterfahren.get() || !plaetze.tryAcquire()) {
             LOG.infof("Auftrag %d (%s): kein Platz frei, Nachbearbeitung folgt beim nächsten Aufräumen", auftrag.id(),
                     auftrag.typ());
@@ -458,7 +465,7 @@ public class AuftragArbeiter {
         }
         Lauf hook;
         try {
-            hook = starten(auftrag, () -> verzeichnis.handler(auftrag.typ()).nachLetztemFehlversuch(auftrag, fehlerId));
+            hook = starten(auftrag, () -> verzeichnis.handler(auftrag.typ()).nachLetztemFehlversuch(auftrag, fehler));
         } catch (RejectedExecutionException e) {
             idFreigeben(auftrag.id());
             plaetze.release();

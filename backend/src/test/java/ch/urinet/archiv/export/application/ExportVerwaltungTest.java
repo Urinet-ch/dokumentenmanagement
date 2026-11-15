@@ -29,7 +29,7 @@ class ExportVerwaltungTest {
             neuesteZuerst.add(new Export(new UUID(0, i + 1), 2025 - i, ExportStatus.FERTIG,
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     "synthetischer-benutzer", "INHABER", Instant.parse("2025-12-31T23:59:59Z").minusSeconds(i),
-                    Optional.empty()));
+                    Optional.empty(), Optional.empty(), Optional.empty()));
         }
         List<Integer> angeforderteGrenzen = new ArrayList<>();
         ExportRepository repository = new ExportRepository() {
@@ -55,7 +55,7 @@ class ExportVerwaltungTest {
             }
 
             @Override
-            public boolean fehler(UUID id, UUID fehlerId) {
+            public boolean fehler(UUID id, UUID fehlerId, ch.urinet.archiv.export.domain.ExportFehlerart art) {
                 throw new AssertionError("Unerwarteter Aufruf");
             }
         };

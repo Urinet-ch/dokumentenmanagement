@@ -2,6 +2,7 @@ package ch.urinet.archiv.export.application;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +25,6 @@ public interface ExportRepository {
     /** {@code OFFEN} → {@code FERTIG} mit dem abgelegten ZIP; {@code false}, wenn der Export nicht mehr offen ist. */
     boolean fertig(UUID id, AbgelegteDatei zip, int anzahl);
 
-    /** {@code OFFEN} → {@code FEHLER} mit Fehler-ID; {@code false}, wenn der Export nicht mehr offen ist. */
-    boolean fehler(UUID id, UUID fehlerId);
+    /** {@code OFFEN} → {@code FEHLER} mit Fehler-ID und Art; {@code false}, wenn der Export nicht mehr offen ist. */
+    boolean fehler(UUID id, UUID fehlerId, ExportFehlerart art);
 }

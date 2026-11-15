@@ -88,7 +88,7 @@ public class AuftragAufraeumen {
             Auftrag auftrag = fehlgeschlagen.auftrag();
             LOG.infof("Auftrag %d (%s): Nachbearbeitung nach Fehler %s wird nachgeholt", auftrag.id(), auftrag.typ(),
                     fehlgeschlagen.fehler().fehlerId());
-            if (arbeiter.nachbearbeiten(auftrag, fehlgeschlagen.fehler().fehlerId(),
+            if (arbeiter.nachbearbeiten(auftrag, fehlgeschlagen.fehler(),
                     fehlgeschlagen.nachbearbeitungVersuche())) {
                 nachgeholt++;
             }
@@ -124,7 +124,7 @@ public class AuftragAufraeumen {
                         auftrag.id(), auftrag.typ(), auftrag.mandant().wert(), versuch, Wiederholung.MAX_VERSUCHE,
                         fehler.fehlerId());
                 if (verwaist.mandantAktiv()) {
-                    arbeiter.nachbearbeiten(auftrag, fehler.fehlerId(), 0);
+                    arbeiter.nachbearbeiten(auftrag, fehler, 0);
                 }
             }
         }

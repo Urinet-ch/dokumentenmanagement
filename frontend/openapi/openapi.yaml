@@ -945,6 +945,26 @@ components:
           - "null"
           description: "vorsignierte Adresse des ZIP, nur bei GET /exporte/{id} fü\
             r einen fertigen, nicht abgelaufenen Export"
+        fehlerId:
+          description: "nur bei FEHLER: Fehler-ID des letzten Fehlversuchs, im Log\
+            \ des Archivs nachzuschlagen (keine Werte); fehlt bei älteren Fehlern"
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/UUID"
+          - type: "null"
+        fehlerArt:
+          type:
+          - string
+          - "null"
+          description: "nur bei FEHLER: VERWAIST = der Export wurde unterbrochen (z.\
+            \ B. Neustart des Archivs), ZEITGRENZE = er dauerte zu lange, FEHLGESCHLAGEN\
+            \ = anderer Fehler; fehlt bei älteren Fehlern"
+          enum:
+          - VERWAIST
+          - ZEITGRENZE
+          - FEHLGESCHLAGEN
     ExportAnfrage:
       type: object
       required:
