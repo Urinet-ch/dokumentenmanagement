@@ -73,6 +73,9 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | inhaber-urinet           | D_OHNE_PDFA | variante=arbeitsfassung   | 404    | NICHT_GEFUNDEN    | keine Arbeitsfassung           |
       | inhaber-urinet           | D_NORMAL    | variante=original&nr=2    | 404    | NICHT_GEFUNDEN    | keine zweite Datei             |
       | inhaber-urinet           | D_VERWORFEN |                           | 404    | NICHT_GEFUNDEN    | verworfen                      |
+      | inhaber-urinet           | D_NORMAL    | ansicht=vorschau          | 302    |                   | Ansicht Vorschau |
+      | inhaber-urinet           | D_NORMAL    | ansicht=download          | 302    |                   | Ansicht Download |
+      | inhaber-urinet           | D_NORMAL    | ansicht=inline            | 400    | ANFRAGE_UNGUELTIG | unbekannte Ansicht |
       | inhaber-urinet           | D_VERWORFEN | variante=original         | 404    | NICHT_GEFUNDEN    | verworfen                      |
       | inhaber-urinet           | UNBEKANNT   |                           | 404    | NICHT_GEFUNDEN    | gibt es nicht                  |
       | inhaber-urinet           | D_NORMAL    | variante=vorschau         | 400    | ANFRAGE_UNGUELTIG | unbekannte Variante            |
