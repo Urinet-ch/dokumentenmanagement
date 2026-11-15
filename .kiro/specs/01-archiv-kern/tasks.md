@@ -450,6 +450,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Anforderungen: 2.19, 10.2, 10.3, 10.5, 10.7, 10.8, 10.9, 10.10_
   - _Abhängig von: 4.9_
   - Erledigt: Changeset `010-benutzer-verzeichnis` (nur Einfügen, Indizes für die Filter), `BenutzerVerzeichnisPflege` im Schreibweg von `JdbcZugriffProtokoll` und beim Widerruf eines Tokens, `ProtokollResource` (`GET /protokoll`, `GET /protokoll/benutzer`, `POST /protokoll/benutzer/{benutzer}/austritt`, A13), Seite `/verwaltung/protokoll`; Szenarien `features/protokoll/protokoll-einsicht.feature` (`@req-2.19`, `@req-10.5`, `@req-10.10`), bestehende Szenarien für `10.2`, `10.3`, `10.7`, `10.8`; `10.9` per JUnit (`KeinLoeschpfadTest`, `MandantEigentuemerTest`); Teilnachweis «Dokument» für 10.9 folgt mit 5.7 (design.md «Umsetzung (Aufgabe 5.1)»)
+  - Browser-Szenarien: `features/protokoll/protokoll-pwa.feature` (PR #167)
 
 - [x] 5.2 Tages-Manifest [Backend]
   - Auftrag `MANIFEST` täglich 03:30 Europe/Zurich: alle Dateien seit dem letzten Manifest nach Zeitpunkt der gesetzten Sperre (ohne gesetzliche Pflicht: Wechsel auf `ARCHIVIERT`), je Datei Dokument-ID, Variante, SHA-256 und als Zusatz die Versions-ID; Hash der Zeilen von `zugriff_protokoll` und `dokument_version` des Vortags
