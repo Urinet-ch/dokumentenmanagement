@@ -3,9 +3,11 @@
 ## Introduction
 Diese Spec erweitert den Archiv-Kern (`01-archiv-kern`) um den E-Mail-Eingang, die
 semantische Suche, den Chat-Agenten mit festen Werkzeugen, den Jahresexport für den
-Treuhänder und – nur wenn der Konzept-Entscheid E1 «AbaNinja Basic» positiv ausfällt
-(`docs/umsetzungsplan.md`, Abschnitt 6) – die Anbindung an AbaNinja (Kontakte, Rechnungen mit
-Status, Lieferantenbelege, Webhooks).
+Treuhänder. Die Anbindung an AbaNinja (Kontakte, Rechnungen mit Status, Lieferantenbelege,
+Webhooks; Requirements 8–12) **entfällt**: Der Konzept-Entscheid E1 «AbaNinja Basic» ist negativ
+ausgefallen (vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR; `docs/umsetzungsplan.md`,
+Abschnitt 6). Der Text der Requirements 8–12 bleibt zur Nachvollziehbarkeit und wegen stabiler Nummern
+stehen, wird aber nicht umgesetzt.
 
 Voraussetzung: Gate Phase 1 erfüllt. Schreibweise der Akzeptanzkriterien, Nachweis (Cucumber-Szenario
 mit Tag `@req-<x.y>`, Ausnahmen mit Vermerk «Nachweis: manuell [Fabian]», «Nachweis: Dokument» bzw. «Nachweis: JUnit»),
@@ -17,7 +19,7 @@ Rechtematrix in Spec 01, Requirement 2.6.
 - **Hybridsuche** – Kombination aus Volltext- und Vektorsuche, zusammengeführt per Reciprocal Rank Fusion (RRF) und neu sortiert durch den Reranker.
 - **Werkzeug** – fest programmierte, getestete Java-Methode, die der Chat-Agent aufrufen darf.
 - **Quelle** – Dokument oder Datenstand, auf den sich eine Antwort stützt (mit Link).
-- **AbaNinja-Verbindung** – pro Mandant hinterlegtes API-Token und Konto-UUID.
+- **AbaNinja-Verbindung** – pro Mandant hinterlegtes API-Token und Konto-UUID (entfällt mit E1 = nein, 15.11.2026).
 
 ---
 
@@ -102,7 +104,7 @@ damit der Abschluss ohne Zusammensuchen möglich ist.
 5. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `geschaeftsstelle` einen Jahresexport anfordert oder abruft, DANN SOLL das Archiv mit HTTP 403 antworten und keinen Auftrag einreihen.
 6. Die E-Mail aus 7.2 SOLL nur den Link und die Export-ID enthalten, keine Dokumentinhalte (Spec 01, Requirement 16.7).
 
-### Requirement 8: AbaNinja-Verbindung (I3, nur bei Entscheid E1 = ja)
+### Requirement 8: AbaNinja-Verbindung (I3) — **entfällt (Entscheid 15.11.2026, E1 = nein; nicht umsetzen)**
 **User Story:** Als Inhaber möchte ich AbaNinja einmal verbinden,
 damit Kontakte, Rechnungen und Belege automatisch abgeglichen werden.
 
@@ -113,24 +115,24 @@ damit Kontakte, Rechnungen und Belege automatisch abgeglichen werden.
 4. FALLS AbaNinja mit HTTP 429 oder 5xx antwortet, DANN SOLL das Archiv mit exponentiellem Backoff wiederholen und nach 5 Fehlversuchen den Inhaber benachrichtigen.
 5. Das Archiv SOLL nie Zahlungen in AbaNinja erfassen oder Rechnungen als bezahlt markieren.
 
-### Requirement 9: Kontakte aus AbaNinja
+### Requirement 9: Kontakte aus AbaNinja — **entfällt (Entscheid 15.11.2026, E1 = nein; nicht umsetzen)**
 #### Acceptance Criteria
 1. WENN der tägliche Abgleich läuft, DANN SOLL das Archiv Firmen- und Personenadressen aus AbaNinja lesen und mit den Kontakten im Archiv abgleichen (AbaNinja-UUID, sonst E-Mail, sonst Name + PLZ).
 2. Das Archiv SOLL Felder aus dem CSV-Import, die AbaNinja nicht kennt, beim Abgleich unverändert lassen.
 3. FALLS ein Kontakt in beiden Quellen widersprüchliche Adressen hat, DANN SOLL das Archiv den AbaNinja-Wert übernehmen und die Abweichung in einer Liste «Kontakte prüfen» zeigen.
 
-### Requirement 10: Ausgangsrechnungen mit Status aus AbaNinja
+### Requirement 10: Ausgangsrechnungen mit Status aus AbaNinja — **entfällt (Entscheid 15.11.2026, E1 = nein; nicht umsetzen)**
 #### Acceptance Criteria
 1. Das Archiv SOLL Rechnungen aus AbaNinja über die Belegnummer mit archivierten Ausgangsrechnungen verknüpfen; Aliasnummern (z. B. `R0001` = `2026-001`) SOLLEN in einer Alias-Tabelle gepflegt werden können.
 2. WENN sich Status, Zahlungsdatum oder offener Betrag einer Rechnung in AbaNinja ändert, DANN SOLL das Archiv `zahlstatus` und `bezahlt_am` aktualisieren, ohne eine Metadaten-Version mit Grund zu verlangen (Systemänderung, protokolliert).
 3. FALLS eine AbaNinja-Rechnung kein Archivdokument hat, DANN SOLL das Archiv das PDF aus AbaNinja holen und als Dokument (Quelle `ABANINJA`) in den Eingangskorb legen.
 
-### Requirement 11: Lieferantenbelege aus AbaNinja
+### Requirement 11: Lieferantenbelege aus AbaNinja — **entfällt (Entscheid 15.11.2026, E1 = nein; nicht umsetzen)**
 #### Acceptance Criteria
 1. WENN in AbaNinja ein Lieferantenbeleg erstellt oder geändert wird, DANN SOLL das Archiv Belegnummer (`F0001` …), Lieferant, Betrag, Fälligkeit und Status übernehmen.
 2. WENN zum Beleg ein PDF existiert und im Archiv noch kein nicht verworfenes Dokument mit gleicher Prüfsumme (Spec 01, 3.4) oder Belegnummer vorhanden ist, DANN SOLL das Archiv das PDF als Dokument in den Eingangskorb legen; sonst SOLL es nur verknüpfen.
 
-### Requirement 12: Webhooks von AbaNinja
+### Requirement 12: Webhooks von AbaNinja — **entfällt (Entscheid 15.11.2026, E1 = nein; nicht umsetzen)**
 #### Acceptance Criteria
 1. Das Archiv SOLL einen Webhook-Endpunkt pro Mandant anbieten und die Echtheit jeder Meldung gemäss AbaNinja-Dokumentation prüfen.
 2. FALLS die Echtheit nicht bestätigt werden kann, DANN SOLL das Archiv mit HTTP 401 antworten und nichts verarbeiten.
