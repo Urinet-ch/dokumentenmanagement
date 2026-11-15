@@ -9,6 +9,32 @@
   </div>
 }
 
+@if (warteschlange.fremdeFrage(); as frage) {
+  <section class="karte frage" aria-labelledby="fremde-titel" data-test="fremde-frage">
+    <h2 id="fremde-titel">{{ texte.fremdeTitel }}</h2>
+    <p>{{ texte.fremdeFrage(frage.anzahl) }}</p>
+    <p data-test="fremde-zeitpunkte">{{ texte.fremdeZeitpunkte }} {{ zeitpunkte(frage.aufgenommen) }}</p>
+    @if (fremdeBestaetigen()) {
+      <p role="alert" data-test="fremde-loeschen-frage">{{ texte.fremdeLoeschenFrage(frage.anzahl) }}</p>
+      <div class="aktionen">
+        <button mat-flat-button type="button" data-test="fremde-loeschen-ja" (click)="fremdeLoeschen(frage.ids)">
+          {{ texte.fremdeLoeschenBestaetigen }}
+        </button>
+        <button mat-button type="button" (click)="fremdeBestaetigen.set(false)">{{ texte.loeschenAbbrechen }}</button>
+      </div>
+    } @else {
+      <div class="aktionen">
+        <button mat-flat-button type="button" data-test="fremde-behalten" (click)="fremdeBehalten()">
+          {{ texte.fremdeBehalten }}
+        </button>
+        <button mat-stroked-button type="button" data-test="fremde-loeschen" (click)="fremdeBestaetigen.set(true)">
+          {{ texte.fremdeLoeschen }}
+        </button>
+      </div>
+    }
+  </section>
+}
+
 <p class="zaehler" role="status" data-test="wartet">{{ texte.wartet(warteschlange.wartend()) }}</p>
 
 @if (warteschlange.fehlerhaft().length > 0) {
@@ -18,9 +44,24 @@
       <li class="karte" data-test="fehlerhaft">
         <strong>{{ texte.erfassung(name(eintrag.aufgenommen), eintrag.seiten.length) }}</strong>
         <p class="fehler" data-test="meldung">{{ eintrag.meldung }}</p>
-        <button mat-stroked-button type="button" (click)="warteschlange.wiederholen(eintrag.id)">
-          {{ texte.erneutVersuchen }}
-        </button>
+        @if (loeschenFuer() === eintrag.id) {
+          <p role="alert" data-test="loeschen-frage">{{ texte.loeschenFrage }}</p>
+          <div class="aktionen">
+            <button mat-flat-button type="button" data-test="loeschen-ja" (click)="eintragLoeschen(eintrag.id)">
+              {{ texte.loeschenBestaetigen }}
+            </button>
+            <button mat-button type="button" (click)="loeschenFuer.set(null)">{{ texte.loeschenAbbrechen }}</button>
+          </div>
+        } @else {
+          <div class="aktionen">
+            <button mat-stroked-button type="button" (click)="warteschlange.wiederholen(eintrag.id)">
+              {{ texte.erneutVersuchen }}
+            </button>
+            <button mat-button type="button" data-test="loeschen" (click)="meldung.set(null); loeschenFuer.set(eintrag.id)">
+              {{ texte.loeschen }}
+            </button>
+          </div>
+        }
       </li>
     }
   </ul>

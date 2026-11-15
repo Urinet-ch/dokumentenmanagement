@@ -132,6 +132,24 @@ export const TEXTE = {
     erfassung: (zeit: string, seiten: number) =>
       `${zeit}, ${seiten === 1 ? '1 Seite' : `${seiten} Seiten`}`,
     erneutVersuchen: 'Erneut versuchen',
+    loeschen: 'Löschen',
+    loeschenFrage: 'Diese Erfassung endgültig von diesem Gerät löschen? Sie wurde nicht hochgeladen und lässt sich nicht wiederherstellen.',
+    loeschenBestaetigen: 'Endgültig löschen',
+    loeschenAbbrechen: 'Abbrechen',
+    geloescht: 'Erfassung gelöscht.',
+    loeschenFehler: 'Das Löschen ist fehlgeschlagen. Bitte erneut versuchen.',
+    fremdeTitel: 'Aufnahmen anderer Benutzer auf diesem Gerät',
+    fremdeFrage: (anzahl: number) =>
+      `Auf diesem Gerät ${anzahl === 1 ? 'wartet 1 Aufnahme' : `warten ${anzahl} Aufnahmen`} einer anderen Anmeldung. ` +
+      'Sie werden unter Ihrem Konto weder angezeigt noch hochgeladen. Was soll damit geschehen?',
+    fremdeZeitpunkte: 'Aufgenommen:',
+    fremdeBehalten: 'Behalten',
+    fremdeLoeschen: 'Löschen …',
+    fremdeLoeschenFrage: (anzahl: number) =>
+      `${anzahl === 1 ? '1 Aufnahme' : `${anzahl} Aufnahmen`} endgültig von diesem Gerät löschen? Sie wurden nicht hochgeladen und lassen sich nicht wiederherstellen.`,
+    fremdeLoeschenBestaetigen: 'Endgültig löschen',
+    fremdeGeloescht: 'Die Aufnahmen wurden gelöscht.',
+    fremdeBehaltenMeldung: 'Die Aufnahmen bleiben auf diesem Gerät und gehen erst nach der Anmeldung ihres Inhabers hoch.',
     fehlerUnbekannt: 'Das Archiv hat die Erfassung abgelehnt. Bitte prüfen und erneut versuchen.',
     fehlerWiederholt:
       'Der Upload ist dreimal fehlgeschlagen (Verbindung oder Archiv). Bitte später erneut versuchen.',

@@ -518,3 +518,53 @@ Then(/^zeigt der Zähler «(.+)»$/, { timeout: 120_000 }, async function (text)
     110_000,
   );
 });
+
+Then(/^fragt die App nach den Aufnahmen anderer Benutzer: «(.+)»$/, async function (text) {
+  const frage = this.seite.locator('[data-test=fremde-frage]');
+  await frage.waitFor({ timeout: 30_000 });
+  assert.ok((await frage.innerText()).includes(text), await frage.innerText());
+  // Anzahl und Zeitpunkt, aber weder Benutzernamen noch Inhalte
+  assert.equal(await frage.locator('img').count(), 0);
+  assert.match(await frage.locator('[data-test=fremde-zeitpunkte]').innerText(), /\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}/);
+});
+
+Then('fragt die App nicht nach Aufnahmen anderer Benutzer', async function () {
+  await this.seite.locator('[data-test=wartet]').waitFor();
+  // Nach «Behalten» oder «Endgültig löschen» verschwindet die Karte erst nach dem nächsten Rendern
+  await warten(
+    this,
+    async () => (await this.seite.locator('[data-test=fremde-frage]').count()) === 0,
+    'keine Frage nach Aufnahmen anderer Benutzer',
+    15_000,
+  );
+});
+
+Then(/^sehe ich die Rückfrage «(.+)»$/, async function (text) {
+  await this.seite.getByRole('alert').filter({ hasText: text }).waitFor({ timeout: 30_000 });
+});
+
+Then(/^liegen (\d+) Erfassung(?:en)? im lokalen Speicher$/, { timeout: 60_000 }, async function (anzahl) {
+  const zaehlen = () =>
+    this.seite.evaluate(
+      () =>
+        new Promise((fertig, fehler) => {
+          const offen = indexedDB.open('urinet-archiv');
+          offen.onerror = () => fehler(offen.error);
+          offen.onsuccess = () => {
+            const db = offen.result;
+            if (!db.objectStoreNames.contains('warteschlange')) {
+              db.close();
+              fertig(0);
+              return;
+            }
+            const zaehler = db.transaction('warteschlange').objectStore('warteschlange').count();
+            zaehler.onsuccess = () => {
+              db.close();
+              fertig(zaehler.result);
+            };
+            zaehler.onerror = () => fehler(zaehler.error);
+          };
+        }),
+    );
+  await warten(this, async () => (await zaehlen()) === Number(anzahl), `${anzahl} Erfassungen im Speicher`, 30_000);
+});
