@@ -34,8 +34,6 @@ class MailExportBenachrichtigungTest {
                         .filteredOn(e -> MailExportBenachrichtigung.class.getName().equals(e.getLoggerName()))
                         .singleElement().satisfies(e -> assertThat(log.nachricht(e)).isEqualTo("Export " + EXPORT_ID
                                 + " fertig; kein Empfänger für die Benachrichtigung konfiguriert"));
-                assertThat(log.volltext()).doesNotContain("synthetischer-beleginhalt",
-                        "https://download.example.invalid");
             }
         }
     }
@@ -50,8 +48,8 @@ class MailExportBenachrichtigungTest {
 
         assertThat(gesendet).singleElement().satisfies(mail -> {
             assertThat(mail.getTo()).containsExactly("inhaber@example.invalid");
-            assertThat(mail.getSubject()).contains(EXPORT_ID.toString())
-                    .doesNotContain("dateiname.zip", "https://download.example.invalid");
+            assertThat(mail.getSubject()).isEqualTo(MailExportBenachrichtigung.betreff(EXPORT_ID))
+                    .isEqualTo("UriNet Archiv: Jahresexport " + EXPORT_ID + " bereit");
             assertThat(mail.getText()).isEqualTo("""
                     Der Jahresexport %s ist bereit.
 

@@ -14,10 +14,16 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Reihenfolge und Begrenzung der Liste liegen im SQL von {@code JdbcExportRepository.neueste}; sie prüft
+ * {@code JdbcExportRepositoryTest}. Fehlerfälle von {@code anfordern} und {@code abrufen} belegen
+ * {@code jahresexport.feature} (Jahr 1899, laufender Export, fremder Mandant, nach 25 Stunden) und
+ * {@code GeschaeftsjahrTest} (Jahr 2999/3000, 24-Stunden-Grenze).
+ */
 class ExportVerwaltungTest {
 
     @Test
-    void listeFordertHöchstensLISTEExporteAnUndÜbernimmtDieNeuesteZuerst() {
+    void listeReichtLISTEAlsGrenzeAnDasRepositoryDurch() {
         List<Export> neuesteZuerst = new ArrayList<>();
         for (int i = 0; i < ExportVerwaltung.LISTE; i++) {
             neuesteZuerst.add(new Export(new UUID(0, i + 1), 2025 - i, ExportStatus.FERTIG,
@@ -58,7 +64,6 @@ class ExportVerwaltungTest {
                 .liste(new Benutzer("synthetischer-benutzer", Rolle.INHABER));
 
         assertThat(angeforderteGrenzen).containsExactly(ExportVerwaltung.LISTE);
-        assertThat(ergebnis).hasSize(ExportVerwaltung.LISTE).containsExactlyElementsOf(neuesteZuerst);
-        assertThat(ergebnis).isSortedAccordingTo((a, b) -> b.erstellt().compareTo(a.erstellt()));
+        assertThat(ergebnis).isSameAs(neuesteZuerst);
     }
 }

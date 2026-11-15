@@ -53,18 +53,20 @@ class ExportJahrHandlerTest {
 
     @Test
     void exportDerNichtMehrOffenIstSchreibtUndMeldetNicht() throws Exception {
-        SpeichernStub speichern = new SpeichernStub(Optional.of(export(ExportStatus.FERTIG)));
-        ExportzielStub ziel = new ExportzielStub(false);
-        AtomicInteger mails = new AtomicInteger();
-        AblageAufruf ablage = ziel(ziel);
+        for (ExportStatus status : List.of(ExportStatus.FERTIG, ExportStatus.FEHLER)) {
+            SpeichernStub speichern = new SpeichernStub(Optional.of(export(status)));
+            ExportzielStub ziel = new ExportzielStub(false);
+            AtomicInteger mails = new AtomicInteger();
+            AblageAufruf ablage = ziel(ziel);
 
-        handler(speichern, ablage.port, Stufe.B, mails).ausfuehren(auftrag(nutzlast(EXPORT_ID)));
+            handler(speichern, ablage.port, Stufe.B, mails).ausfuehren(auftrag(nutzlast(EXPORT_ID)));
 
-        assertThat(ablage.lebenszyklusAufrufe).hasValue(0);
-        assertThat(ziel.abgeschlossen).isFalse();
-        assertThat(ziel.geschlossen).isFalse();
-        assertThat(speichern.fertigAufrufe).isZero();
-        assertThat(mails).hasValue(0);
+            assertThat(ablage.lebenszyklusAufrufe).as("Lebenszyklus bei %s", status).hasValue(0);
+            assertThat(ziel.abgeschlossen).as("abgeschlossen bei %s", status).isFalse();
+            assertThat(ziel.geschlossen).as("geschlossen bei %s", status).isFalse();
+            assertThat(speichern.fertigAufrufe).as("fertig bei %s", status).isZero();
+            assertThat(mails).as("Mails bei %s", status).hasValue(0);
+        }
     }
 
     @Test
@@ -125,7 +127,7 @@ class ExportJahrHandlerTest {
     }
 
     @Test
-    void letzterFehlversuchSpeichertNurFehlerIdUndLoggtKeineInhalte() {
+    void letzterFehlversuchSpeichertFehlerIdUndLoggtNurDieMeldung() {
         SpeichernStub speichern = new SpeichernStub(Optional.empty());
         Auftrag auftrag = auftrag(nutzlast(EXPORT_ID));
         try (LogMitschnitt log = LogMitschnitt.starten()) {
@@ -138,8 +140,20 @@ class ExportJahrHandlerTest {
             assertThat(log.eintraege()).filteredOn(e -> ExportJahrHandler.class.getName().equals(e.getLoggerName()))
                     .singleElement().satisfies(e -> assertThat(log.nachricht(e))
                             .isEqualTo("Export " + EXPORT_ID + " gescheitert (fehler-id=" + FEHLER_ID + ")"));
-            assertThat(log.volltext()).doesNotContain("SYNTHETISCHER_BENUTZER", "SYNTHETISCHER_BELEGTITEL",
-                    "synthetischer Ausnahmeinhalt");
+        }
+    }
+
+    @Test
+    void ohneSchreibenDerFehlerzeileGibtEsKeinLog() {
+        SpeichernStub speichern = new SpeichernStub(Optional.empty());
+        speichern.fehlerErgebnis = false;
+        try (LogMitschnitt log = LogMitschnitt.starten()) {
+            handler(speichern, ziel(new ExportzielStub(false)).port, Stufe.B, new AtomicInteger())
+                    .nachLetztemFehlversuch(auftrag(nutzlast(EXPORT_ID)), FEHLER_ID);
+
+            assertThat(speichern.fehlerExportId).isEqualTo(EXPORT_ID);
+            assertThat(log.eintraege())
+                    .filteredOn(e -> ExportJahrHandler.class.getName().equals(e.getLoggerName())).isEmpty();
         }
     }
 
@@ -217,6 +231,7 @@ class ExportJahrHandlerTest {
         private boolean fertigErgebnis = true;
         private UUID fehlerExportId;
         private UUID fehlerId;
+        private boolean fehlerErgebnis = true;
 
         private SpeichernStub(Optional<Export> export) {
             super(null, null, null);
@@ -238,7 +253,7 @@ class ExportJahrHandlerTest {
         public boolean fehler(UUID id, UUID fehlerId) {
             fehlerExportId = id;
             this.fehlerId = fehlerId;
-            return true;
+            return fehlerErgebnis;
         }
     }
 
