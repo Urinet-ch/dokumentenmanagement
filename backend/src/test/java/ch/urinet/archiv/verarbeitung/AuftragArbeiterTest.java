@@ -162,6 +162,20 @@ class AuftragArbeiterTest {
     }
 
     @Test
+    void speichertKeineMeldungNichtMarkierterAusnahmen() throws Exception {
+        TestHandler.TSA_FEHLER.set(false);
+        long id = hilfe.einreihen("urinet", TestHandler.FEHLER);
+        AuftragArbeiter worker = arbeiter(schlange, 1);
+
+        starten(worker, 1);
+        warten();
+
+        String text = hilfe.zeile(id).fehler();
+        assertThat(text).matches("fehlgeschlagen " + FEHLER_ID)
+                .doesNotContain("ursache=", "Beleg", "nicht lesbar");
+    }
+
+    @Test
     void fehlerBeimSpeichernGibtDenPlatzNichtFrei() throws Exception {
         StoerbareSchlange stoerbar = new StoerbareSchlange(schlange);
         stoerbar.fehlversuchScheitert = true;
