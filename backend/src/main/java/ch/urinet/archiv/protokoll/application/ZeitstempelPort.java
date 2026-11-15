@@ -1,5 +1,6 @@
 package ch.urinet.archiv.protokoll.application;
 
+import ch.urinet.archiv.gemeinsam.domain.WertefreieMeldung;
 import ch.urinet.archiv.protokoll.domain.Pruefdaten;
 import ch.urinet.archiv.protokoll.domain.Stempel;
 
@@ -38,7 +39,7 @@ public interface ZeitstempelPort {
     Instant pruefenAbgelegt(String dienst, byte[] tsr, byte[] imprint, String kettePem, Pruefdaten pruefdaten);
 
     /** Ein Dienst antwortet nicht oder seine Antwort besteht die Prüfung nicht. */
-    final class ZeitstempelFehler extends RuntimeException {
+    final class ZeitstempelFehler extends RuntimeException implements WertefreieMeldung {
         public ZeitstempelFehler(String meldung) {
             super(meldung);
         }

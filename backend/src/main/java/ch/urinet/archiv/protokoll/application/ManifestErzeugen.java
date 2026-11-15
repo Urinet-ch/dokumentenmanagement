@@ -262,7 +262,7 @@ public class ManifestErzeugen implements AuftragHandler {
                     fehlend.add(lauf.getKey());
                     dienstFehler.add(e.getCause());
                     LOG.warnf("Manifest %s, Dienst %s: kein Zeitstempel, ursache=%s", datum, lauf.getKey(),
-                            zeitstempelUrsache(e.getCause()));
+                            Ursachen.ketteMitMeldung(e.getCause()));
                 } catch (TimeoutException e) {
                     lauf.getValue().cancel(true);
                     fehlend.add(lauf.getKey());
@@ -334,30 +334,14 @@ public class ManifestErzeugen implements AuftragHandler {
     }
 
     /**
-     * Die Fehler der Dienste bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit auch der
-     * Auftragsfehler mehr als «IllegalStateException» zeigt (Req 16.7: nur Klassennamen).
+     * Die Dienstfehler bleiben in der Kette (erster als Ursache, weitere unterdrückt), damit der Auftragsfehler auch
+     * die feste Meldung einer wertefreien Zeitstempel-Ausnahme enthält.
      */
     static IllegalStateException keinZeitstempel(LocalDate datum, List<String> fehlend, List<Throwable> dienstFehler) {
         IllegalStateException keiner = new IllegalStateException("Manifest " + datum + ": kein Zeitstempel von " + fehlend,
                 dienstFehler.isEmpty() ? null : dienstFehler.get(0));
         dienstFehler.stream().skip(1).forEach(keiner::addSuppressed);
         return keiner;
-    }
-
-    /**
-     * Ursache eines gescheiterten Zeitstempels fürs Log (Req 16.7): Klassennamen der Kette und die Meldungen der
-     * {@link ZeitstempelPort.ZeitstempelFehler}. Deren Meldungen sind feste Texte mit Dienstkennung (Konfiguration) oder
-     * Status und enthalten keine Beleg-, Token- oder Netzwerkwerte.
-     */
-    static String zeitstempelUrsache(Throwable fehler) {
-        StringBuilder s = new StringBuilder(Ursachen.kette(fehler));
-        int n = 0;
-        for (Throwable t = fehler; t != null && n < 10; t = t.getCause(), n++) {
-            if (t instanceof ZeitstempelPort.ZeitstempelFehler z && z.getMessage() != null) {
-                s.append(" [meldung=\"").append(z.getMessage()).append("\"]");
-            }
-        }
-        return s.toString();
     }
 
     /** Je Dienst: {@code .tsr} zuerst (wiederverwendet, falls schon abgelegt), dann Kette und OCSP- bzw. CRL-Antwort. */

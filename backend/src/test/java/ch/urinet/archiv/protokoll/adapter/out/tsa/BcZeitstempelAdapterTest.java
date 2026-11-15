@@ -186,7 +186,7 @@ class BcZeitstempelAdapterTest {
 
         werte.keySet().removeIf(k -> k.startsWith("archiv.tsa.dienst.b."));
         assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("b", tsrB, IMPRINT, ketteB, crlB))
-                .isInstanceOf(ZeitstempelFehler.class).hasMessage("Zeitstempeldienst b nicht mehr konfiguriert");
+                .isInstanceOf(ZeitstempelFehler.class).hasMessage("Zeitstempeldienst ist nicht mehr konfiguriert");
     }
 
     @Test
@@ -218,7 +218,7 @@ class BcZeitstempelAdapterTest {
         werte.put("archiv.tsa.dienst.b.pruefdaten-hoechstalter", "7 Tage");
         assertThatThrownBy(() -> adapter(werte).pruefenAbgelegt("b", tsrB, IMPRINT,
                 TsaTestPki.pem(b.tsa) + TsaTestPki.pem(b.ca), crlB))
-                .isInstanceOf(ZeitstempelFehler.class).hasMessage("Zeitstempeldienst b ist falsch konfiguriert");
+                .isInstanceOf(ZeitstempelFehler.class).hasMessage("Zeitstempeldienst ist falsch konfiguriert");
     }
 
     @Test
