@@ -1624,7 +1624,10 @@ ki_verbrauch(id bigserial pk, zweck text, modell text, tokens_ein int, tokens_au
   -- Monatsbudget der Wissensbasis, Spec 04, 13.6); Spec 02, Aufgabe 6.3 ergänzt EMBEDDING (Embeddings der Abschnitte
   -- archivierter Dokumente, eine Zeile je Request an das Embedding-Modell, tokens_aus 0); Spec 02, Aufgabe 6.4 ergänzt
   -- SUCHE (Hybridsuche, Spec 02, Req 2.8, entschieden von Fabian am 14.11.2026: eine Zeile je Aufruf von
-  -- Embedding-Modell und Reranker mit Antwort, ohne Suchbegriff und ohne Inhalte, kein Limit)
+  -- Embedding-Modell und Reranker mit Antwort, ohne Suchbegriff und ohne Inhalte, kein Limit); Spec 02, Aufgabe 7.2
+  -- ergänzt CHAT (Chat-Agent, Spec 02, Req 5.5, entschieden von Fabian am 14.11.2026: eine Zeile je Aufruf des
+  -- Sprachmodells, also je Werkzeug-Runde und für die Schlussantwort, mit Modell und Tokens, ohne Frage und Inhalte,
+  -- nur protokollieren, kein Budget und keine Sperre); kein Check auf zweck, darum kein Changeset
 
 import_zuordnung(art text pk, spalten jsonb, kopf_hash text, geaendert timestamptz)
 import_lauf(id uuid pk, art text, vollexport bool, dateiname text, sha256 text, zeichensatz text,

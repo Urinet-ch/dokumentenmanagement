@@ -6,10 +6,10 @@ import ch.urinet.archiv.integration.adapter.out.IntegrationAuswahl;
 import ch.urinet.archiv.integration.adapter.out.stub.IntegrationStub;
 import ch.urinet.archiv.ki.adapter.out.ChatAuswahl;
 import ch.urinet.archiv.ki.adapter.out.EmbeddingAuswahl;
-import ch.urinet.archiv.ki.adapter.out.chat.ChatNichtVerfuegbar;
 import ch.urinet.archiv.ki.adapter.out.KiAuswahl;
 import ch.urinet.archiv.ki.adapter.out.RerankerAuswahl;
 import ch.urinet.archiv.ki.adapter.out.reranker.InfomaniakReranker;
+import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jChatAgent;
 import ch.urinet.archiv.ki.adapter.out.langchain4j.LangChain4jEmbeddingAdapter;
 import ch.urinet.archiv.ki.adapter.out.stub.ChatAgentStub;
 import ch.urinet.archiv.ki.adapter.out.stub.EmbeddingStub;
@@ -56,7 +56,10 @@ class StubSchalterTest {
         assertThat(config.getValue("archiv.ki.reranker-stub", Boolean.class)).as("reranker").isEqualTo(erwartet);
     }
 
-    /** Bis Aufgabe 7.2 gibt es keinen Chat-Agenten: im Profil lokal darum der Demo-Stub (Spec 02, Aufgabe 7.3). */
+    /**
+     * Im Profil lokal bleibt es beim Demo-Stub, auch seit Aufgabe 7.2: Das lokale Modell ist für Werkzeuge nicht belegt
+     * (ADR-012, backend/README.md); wer es ausprobieren will, setzt {@code archiv.chat.stub=false}.
+     */
     @Test
     void chatStubAuchImProfilLokal() throws IOException {
         SmallRyeConfig config = new SmallRyeConfigBuilder()
@@ -71,17 +74,18 @@ class StubSchalterTest {
 
     /**
      * Die echte Auswahl von {@link ChatAuswahl} (in den Quarkus-Tests ersetzt sie {@code TestChatAgent}): mit Schalter
-     * der Demo-Stub, sonst {@link ChatNichtVerfuegbar}; in prod nur eine Warnung, bis Aufgabe 7.2 den Agenten bringt.
+     * der Demo-Stub, sonst der Agent mit LangChain4j (Aufgabe 7.2); in prod ist nur der Stub ein Abbruch.
      */
     @Test
-    void chatSchalterWaehltStubOderNichtVerfuegbar() {
+    void chatSchalterWaehltStubOderAgent() {
         ChatAgentStub stub = new ChatAgentStub();
-        ChatNichtVerfuegbar ohneAgent = new ChatNichtVerfuegbar();
-        assertThat(new ChatAuswahl().chat(true, stub, ohneAgent)).isSameAs(stub);
-        assertThat(new ChatAuswahl().chat(false, stub, ohneAgent)).isSameAs(ohneAgent);
+        LangChain4jChatAgent agent = new LangChain4jChatAgent(null, null, null, null, null, null, 5, 10,
+                java.time.Duration.ofSeconds(20));
+        assertThat(new ChatAuswahl().chat(true, stub, instanz(agent))).isSameAs(stub);
+        assertThat(new ChatAuswahl().chat(false, stub, instanz(agent))).isSameAs(agent);
         PortAuswahl.Befund befund = PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(false)));
         assertThat(befund.abbrueche()).isEmpty();
-        assertThat(befund.warnungen()).containsExactly("ChatAgentPort: kein Adapter, folgt mit Spec 02, Aufgabe 7.2");
+        assertThat(befund.warnungen()).isEmpty();
         assertThat(PortAuswahl.pruefe(List.of(new ChatAuswahl().auswahl(true))).abbrueche())
                 .containsExactly("ChatAgentPort: Dev-Stub ist in prod nicht zulässig");
     }

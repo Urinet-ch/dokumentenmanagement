@@ -81,6 +81,8 @@ WireMock.
    mvn quarkus:dev -Dquarkus.profile=lokal
    ```
 
+**Chat im Profil `lokal`:** bleibt beim Demo-Stub (`archiv.chat.stub=true`). Der Chat-Agent (Spec 02, Aufgabe 7.2) braucht ein Modell, das Werkzeuge (Tool Calling) über die OpenAI-Schnittstelle aufruft; für das lokale Modell in LM Studio ist das nicht belegt (ADR-012). Wer es ausprobieren will, startet mit `-Darchiv.chat.stub=false`; die Fragen gehen dann an `archiv-lokal` (`archiv.ki.chat-modell`). Ergebnisse gelten nicht als Nachweis für Infomaniak.
+
 ### Verboten
 - **Nie** `--bind 0.0.0.0`, **nie** `LMS_SERVER_HOST`, **nie** «Serve on Local Network» in der App – jede Bindung
   ausser `127.0.0.1` macht den Server über den Rechner hinaus erreichbar.
