@@ -6,7 +6,7 @@ import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import java.time.Instant;
 import java.util.Optional;
 
-/** Driven Port für die nur anfügenden Einträge in {@code public.sicherung_export}. */
+/** Driven Port für das nur anfügende Register {@code public.sicherung_export} und seine Zeitstempel-Abfrage. */
 public interface SicherungExportSpeicher {
 
     void festhalten(SicherungsArt art, Optional<MandantCode> mandant, String sha256);
