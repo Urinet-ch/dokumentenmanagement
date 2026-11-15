@@ -7,8 +7,11 @@ const basisUrl = process.env.ARCHIV_URL ?? 'http://localhost:8080';
 
 setDefaultTimeout(30_000);
 
-Before(async function () {
-  this.browser = await chromium.launch();
+Before(async function ({ pickle }) {
+  // Der Standard (chromium-headless-shell) hat keinen PDF-Viewer und lädt ein <object type=application/pdf> nie; Szenarien
+  // mit @pdf-viewer laufen im neuen Headless-Modus des vollen Chromium, der PDFs wie ein Browser einbettet.
+  const mitPdfViewer = pickle.tags.some((tag) => tag.name === '@pdf-viewer');
+  this.browser = await chromium.launch(mitPdfViewer ? { channel: 'chromium' } : {});
   // Service Worker aus: Seine Anfragen liefen an den Attrappen (page.route) vorbei
   this.kontext = await this.browser.newContext({ locale: 'de-CH', serviceWorkers: 'block' });
   this.seite = await this.kontext.newPage();

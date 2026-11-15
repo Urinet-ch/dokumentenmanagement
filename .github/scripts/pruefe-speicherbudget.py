@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Speicherbudget der Stufe A vor dem Deploy prüfen (Req 16.18, tech.md «Speicherbudget Stufe A»).
+"""Speicherbudget des Zielhosts vor dem Deploy prüfen (Req 16.18, tech.md «Plattform und Betrieb»).
 
 Liest `docker compose config --format json` auf stdin. Jeder Dienst braucht mem_limit und cpus; liegt die Summe
 über dem Budget, bricht der Deploy ab, bevor ein Bundle gebaut wird. Aufruf:
@@ -25,8 +25,8 @@ def main() -> int:
         print(f"{name}: {mib:.0f} MiB, {cpus} CPU")
     print(f"Summe: {summe_mib:.0f} MiB (Budget {budget_mib}), {summe_cpus} CPU (Budget {budget_cpus})")
     if summe_mib > budget_mib or summe_cpus > budget_cpus:
-        fehler.append("Summe über dem Speicherbudget der Stufe A: Req 16.18 tritt ein (Abbruchkriterium 1.10). "
-                      "Kein Deploy auf Stufe A; Fabian informieren, K5 und Wechsel auf Stufe B (5.11) vorziehen.")
+        fehler.append("Summe über dem Speicherbudget des Zielhosts: Req 16.18 tritt ein. Deploy abbrechen und Budget "
+                      "anpassen.")
     for f in fehler:
         print(f"::error::{f}")
     return 1 if fehler else 0

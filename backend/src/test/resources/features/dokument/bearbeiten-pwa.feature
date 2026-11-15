@@ -71,5 +71,5 @@ Funktionalität: Metadaten bearbeiten und Versionen in der Dokumentansicht
     Und ich den Treffer «Rechnung Vereinsfest Seedorf» öffne
     Dann sehe ich die Dokumentansicht von «Rechnung Vereinsfest Seedorf»
     Und zeigt die Dokumentansicht das Vorschaubild der Seite 1 von «Rechnung Vereinsfest Seedorf»
-    Und öffnet «PDF/A herunterladen» die vorsignierte Adresse in einem neuen Tab
+    Und öffnet «PDF/A herunterladen» die vorsignierte Download-Adresse in einem neuen Tab
     Und lässt sich die Seite nicht waagrecht scrollen

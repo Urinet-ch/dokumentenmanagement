@@ -6,6 +6,7 @@ import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
 import ch.urinet.archiv.ablage.application.AblageService;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
@@ -389,6 +390,53 @@ class S3AblageTest {
                 .hasSize(2);
         assertThat(verwaltung.listObjectVersions(r -> r.bucket(bucket).prefix(fremd.schluessel().pfad(Ablageort.EINGANG)))
                 .versions()).hasSize(1);
+    }
+
+    @Test
+    void vorschauAdresseZeigtInlineMitTypDownloadAdresseLaedtHerunter() throws Exception {
+        S3Ablage ablage = ablage();
+        UUID docId = UUID.randomUUID();
+        var pdfa = DateiSchluessel.pdfa(2026, docId);
+        // wie im Betrieb: Objekt ohne Typ (S3-Vorgabe octet-stream)
+        String versionId = verwaltung.putObject(r -> r.bucket(bucket).key(pdfa.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("%PDF-1.7 Test")).versionId();
+        var vorschau = ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, pdfa, versionId, Ansicht.VORSCHAU);
+        var download = ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, pdfa, versionId, Ansicht.DOWNLOAD);
+        var original = DateiSchluessel.original(2026, docId, 1, "exe");
+        String roh = verwaltung.putObject(r -> r.bucket(bucket).key(original.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("MZ")).versionId();
+        var unbekannt = ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, original, roh, Ansicht.VORSCHAU);
+        // aktive Inhalte: auch mit Vorschau nie inline, sondern octet-stream und attachment
+        var aktiv = new java.util.LinkedHashMap<String, java.net.URI>();
+        for (String endung : List.of("html", "htm", "svg", "js", "xml")) {
+            var schluessel = DateiSchluessel.original(2026, docId, 2, endung);
+            String v = verwaltung.putObject(r -> r.bucket(bucket).key(schluessel.pfad(Ablageort.ARCHIV)),
+                    RequestBody.fromString("<script>1</script>")).versionId();
+            aktiv.put(endung, ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, schluessel, v, Ansicht.VORSCHAU).url());
+        }
+        try (HttpClient http = HttpClient.newHttpClient()) {
+            for (var e : aktiv.entrySet()) {
+                var r = http.send(HttpRequest.newBuilder(e.getValue()).GET().build(), HttpResponse.BodyHandlers.ofString());
+                assertThat(r.headers().firstValue("Content-Type")).as(e.getKey()).hasValue("application/octet-stream");
+                assertThat(r.headers().firstValue("Content-Disposition").orElse("")).as(e.getKey())
+                        .startsWith("attachment;");
+            }
+            var a = http.send(HttpRequest.newBuilder(vorschau.url()).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(a.statusCode()).isEqualTo(200);
+            assertThat(a.headers().firstValue("Content-Type")).hasValue("application/pdf");
+            assertThat(a.headers().firstValue("Content-Disposition")).hasValue("inline");
+            assertThat(a.body()).isEqualTo("%PDF-1.7 Test");
+            var b = http.send(HttpRequest.newBuilder(download.url()).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(b.statusCode()).isEqualTo(200);
+            assertThat(b.headers().firstValue("Content-Type")).hasValue("application/pdf");
+            assertThat(b.headers().firstValue("Content-Disposition")).hasValue("attachment; filename=\"" + docId + "-pdfa.pdf\"");
+            // kein sicher anzeigbarer Typ: auch die Vorschau-Adresse lädt herunter
+            var c = http.send(HttpRequest.newBuilder(unbekannt.url()).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(c.headers().firstValue("Content-Type")).hasValue("application/octet-stream");
+            assertThat(c.headers().firstValue("Content-Disposition").orElse("")).startsWith("attachment;");
+        }
+        assertThatThrownBy(() -> ablage.vorsignierteUrl(mandant, Ablageort.ARCHIV, pdfa, "", Ansicht.VORSCHAU))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

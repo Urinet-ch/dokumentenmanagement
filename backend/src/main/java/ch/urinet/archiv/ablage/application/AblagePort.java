@@ -2,6 +2,7 @@ package ch.urinet.archiv.ablage.application;
 
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.Ablageort;
+import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
@@ -80,8 +81,19 @@ public interface AblagePort {
     /** Löscht alle Versionen und Löschmarken unter {@code eingang/<jahr>/<docId>/}; nichts ausserhalb von {@code eingang/}. */
     void loeschenEingang(MandantCode mandant, int jahr, UUID docId);
 
-    /** Download-Adresse nur für GET auf genau diese Versions-ID, höchstens 5 Minuten gültig (Req 14.6). */
-    VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel, String versionId);
+    /**
+     * Adresse nur für GET auf genau diese Versions-ID, höchstens 5 Minuten gültig (Req 14.6). {@code VORSCHAU} setzt
+     * Content-Type (aus der Endung) und {@code inline}, damit der Browser die Datei anzeigt; {@code DOWNLOAD} setzt
+     * {@code attachment} mit sicherem Dateinamen.
+     */
+    VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel, String versionId,
+                                    Ansicht ansicht);
+
+    /** Wie {@link #vorsignierteUrl(MandantCode, Ablageort, DateiSchluessel, String, Ansicht)} als Download. */
+    default VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel,
+                                            String versionId) {
+        return vorsignierteUrl(mandant, ort, schluessel, versionId, Ansicht.DOWNLOAD);
+    }
 
     /**
      * Legt einen Teil des Tages-Manifests unter {@code manifest/} ab, gesperrt im konfigurierten Modus (Standard und ab

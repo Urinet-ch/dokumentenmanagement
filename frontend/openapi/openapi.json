@@ -3055,7 +3055,7 @@
     "/api/v1/dokumente/{id}/datei" : {
       "get" : {
         "summary" : "Datei eines Dokuments herunterladen",
-        "description" : "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.",
+        "description" : "Antwortet mit 302 auf eine vorsignierte URL für genau die gespeicherte Version, höchstens 5 Minuten gültig (Req 14.6). Verlangt die Anfrage ausdrücklich «Accept: application/json» (PWA), kommt dieselbe Adresse stattdessen als JSON mit 200; Prüfung und Protokoll sind gleich. variante pdfa (Standard, ohne nr), original oder arbeitsfassung (nr ab 1, Standard 1). ansicht download (Standard, Content-Disposition attachment mit sicherem Dateinamen) oder vorschau (inline mit dem Typ der Datei, für die Anzeige in der Seite; nur für PDF und Bilder, sonst attachment). Unsichtbare, verworfene oder fehlende Dateien → 404 NICHT_GEFUNDEN.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "name" : "id",
@@ -3064,6 +3064,14 @@
           "schema" : {
             "$ref" : "#/components/schemas/UUID"
           }
+        }, {
+          "schema" : {
+            "type" : "string",
+            "default" : "download",
+            "enum" : [ "download", "vorschau" ]
+          },
+          "name" : "ansicht",
+          "in" : "query"
         }, {
           "description" : "Nummer der Datei (nur original und arbeitsfassung)",
           "schema" : {

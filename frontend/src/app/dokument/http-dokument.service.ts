@@ -10,7 +10,7 @@ import {
   Kontakt,
   KontakteService,
 } from '../gemeinsam/api';
-import { DokumentPort, Variante } from './dokument-port';
+import { DokumentPort, Variante, Ansicht } from './dokument-port';
 
 /** Dokument und Download-Adresse über den generierten OpenAPI-Client; die Adresse kommt als JSON (Accept). */
 @Injectable()
@@ -27,8 +27,8 @@ export class HttpDokumentService extends DokumentPort {
     return this.arten.apiV1DokumentartenGet();
   }
 
-  adresse(id: string, variante: Variante): Observable<DownloadAdresse> {
-    return this.dokumente.apiV1DokumenteIdDateiGet(id, variante === 'original' ? 1 : undefined, variante, 'body', false, {
+  adresse(id: string, variante: Variante, ansicht: Ansicht): Observable<DownloadAdresse> {
+    return this.dokumente.apiV1DokumenteIdDateiGet(id, ansicht, variante === 'original' ? 1 : undefined, variante, 'body', false, {
       httpHeaderAccept: 'application/json',
     });
   }
