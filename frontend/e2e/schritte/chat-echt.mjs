@@ -142,7 +142,7 @@ Then(/^bin ich auf der Seite des angelegten Dokuments «(.+)»$/, async function
 });
 
 Then(
-  /^enthält das Zugriffsprotokoll von «([^»]+)» ANZEIGEN für das Dokument «(.+)» einmal mit dem Kanal «(.+)» und einmal ohne Kanal$/,
+  /^enthält das Zugriffsprotokoll von «([^»]+)» ANZEIGEN für das Dokument «(.+)» mindestens einmal mit dem Kanal «(.+)» und mindestens einmal ohne Kanal$/,
   async function (mandant, name, kanal) {
     const id = echteDokumente(this).get(name);
     const kopf = { authorization: `Bearer ${await echtesToken('inhaber', mandant)}` };

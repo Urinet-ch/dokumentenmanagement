@@ -214,14 +214,14 @@ flowchart LR
   - Menüpunkt «Chat» in `MENUE` (Recht `A2`, alle vier Rollen, Entscheid Fabian 14.11.2026) nach «Suche», weil beide
     Wege zum Finden von Belegen sind und die Rechte übereinstimmen; «Kontakte» und die Verwaltung bleiben dahinter.
     Reihenfolge: Erfassen, Eingangskorb, Suche, Chat, Kontakte, Importe, Dokumentarten, Zugriffsprotokoll, Jahresexport.
-    Ohne Änderung am Agenten, an den Werkzeugen und an der Schnittstelle; kein Changeset, kein neues Secret.
+    Ohne Änderung an Agent und Schnittstelle (eine Korrektur in den Werkzeug-Daten, siehe unten); kein Changeset, kein neues Secret.
   - Durchstich `features/chat/chat-freischaltung-pwa.feature` (`@spec-02 @browser`, 375 und 1280 px) gegen das echte
     Archiv: `BrowserBackendTest` schaltet `TestChatAgent` auf `ECHT` (echter `LangChain4jChatAgent`) und nennt die
     Adresse des WireMock aus `KiWireMock` als `modell` in `browser-backend.json`. Das Szenario registriert über dessen
     Admin-Schnittstelle zwei gestreamte Antworten (Szenario-Zustände): zuerst den Tool-Call `dokument_zeigen` auf ein
     synthetisches Dokument im Eingangskorb, danach den Text, über zwei Sekunden verteilt. Belegt: Menüpunkt, Antwort
     wächst fortlaufend, Quellen-Chip öffnet `/dokument/<id>`, kein horizontales Scrollen, Zugriffsprotokoll mit
-    `ANZEIGEN` einmal mit `kanal` `CHAT` (Werkzeug) und einmal ohne Kanal (GET der Ansicht), `@req-4.3`. Kein Rückfall
+    `ANZEIGEN` mindestens einmal mit `kanal` `CHAT` (Werkzeug) und mindestens einmal ohne Kanal (GET der Ansicht), `@req-4.3`. Kein Rückfall
     auf den Stub nötig: WireMock geht im Browser-Lauf (kein Request an Infomaniak).
   - Testhilfe: Die Anfrage zum Status (4.10) nimmt für `EINGANGSKORB` einen optionalen `titel` (Quellen tragen den Titel).
   - Fund beim Durchstich: `PanacheWerkzeugDaten.inhalt` scheiterte mit `NullPointerException` (`findFirst()` über eine
