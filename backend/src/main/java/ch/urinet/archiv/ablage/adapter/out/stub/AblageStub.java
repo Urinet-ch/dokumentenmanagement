@@ -15,6 +15,7 @@ import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
+import ch.urinet.archiv.ablage.domain.SicherungsSperre;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
@@ -59,7 +60,8 @@ public class AblageStub implements AblagePort {
     private Path wurzel;
     private boolean ohneVersionsIdMarker;
 
-    private record Version(String versionId, Path datei, String sha256, long groesse, Instant sperreBis) {
+    private record Version(String versionId, Path datei, String sha256, long groesse, Instant sperreBis,
+                           Instant lastModified) {
 
         boolean gesperrt(Instant jetzt) {
             return sperreBis != null && sperreBis.isAfter(jetzt);
@@ -280,7 +282,10 @@ public class AblageStub implements AblagePort {
         List<Objektversion> alle = new ArrayList<>();
         versionen.keySet().stream().filter(k -> k.startsWith(vorsatz + praefix)).sorted().forEach(k ->
                 versionen.get(k).forEach(v -> alle.add(new Objektversion(k.substring(vorsatz.length()), v.versionId(),
-                        false))));
+                        false, v.lastModified(), v.groesse()))));
+        alle.sort(java.util.Comparator.comparing(Objektversion::schluessel)
+                .thenComparing(Objektversion::lastModified, java.util.Comparator.reverseOrder())
+                .thenComparing(Objektversion::versionId));
         // wie S3 mit key-marker und version-id-marker: nach genau dieser Version; ohne Versions-ID kein Fortsetzen
         int start = ab.map(m -> {
             String versionId = m.versionIdZumFortsetzen(praefix);
@@ -298,6 +303,18 @@ public class AblageStub implements AblagePort {
         return new Versionsseite(seite, Versionsseite.weiter(praefix, abgeschnitten,
                 abgeschnitten ? seite.getLast().schluessel() : null,
                 abgeschnitten && !ohneVersionsIdMarker ? seite.getLast().versionId() : null));
+    }
+
+    @Override
+    public synchronized Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion objekt) {
+        if (objekt.loeschmarke() || objekt.schluessel().startsWith("eingang/")) {
+            return Optional.empty();
+        }
+        Version version = liste(mandant, objekt.schluessel()).stream()
+                .filter(v -> v.versionId().equals(objekt.versionId())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + objekt.schluessel()));
+        return Optional.ofNullable(version.sperreBis()).map(bis ->
+                new SicherungsSperre(objekt.schluessel().startsWith("manifest/") ? "COMPLIANCE" : "GOVERNANCE", bis));
     }
 
     /** Nur für Tests: abgeschnittene Seiten ohne {@code NextVersionIdMarker}, wie ihn ein Object Storage weglassen kann. */
@@ -324,6 +341,20 @@ public class AblageStub implements AblagePort {
 
     @Override
     public synchronized Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
+        return kopieSchreiben(mandant, schluessel, versionId, ziel);
+    }
+
+    @Override
+    public synchronized Kopie sicherungsKopie(MandantCode mandant, String schluessel, String versionId,
+                                               OutputStream ziel) {
+        if (!(schluessel.startsWith("archiv/") || schluessel.startsWith("manifest/")
+                || schluessel.startsWith("eingang/"))) {
+            throw new IllegalArgumentException("Nur Versionen unter archiv/, manifest/ oder eingang/: " + schluessel);
+        }
+        return kopieSchreiben(mandant, schluessel, versionId, ziel);
+    }
+
+    private Kopie kopieSchreiben(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
         Version v = liste(mandant, schluessel).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
                 .filter(x -> Files.exists(x.datei()))
                 .orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + schluessel));
@@ -360,7 +391,7 @@ public class AblageStub implements AblagePort {
                     aus.close();
                     fertig = true;
                     byte[] daten = Files.readAllBytes(datei);
-                    Version v = new Version(versionId, datei, Pruefsumme.von(daten), daten.length, null);
+                    Version v = new Version(versionId, datei, Pruefsumme.von(daten), daten.length, null, Instant.now());
                     synchronized (AblageStub.this) {
                         versionen.computeIfAbsent(mandant.wert() + "/" + key, k -> new ArrayList<>()).add(v);
                     }
@@ -405,7 +436,7 @@ public class AblageStub implements AblagePort {
             String versionId = UUID.randomUUID().toString();
             Path datei = wurzel.resolve(versionId);
             Files.write(datei, daten);
-            Version v = new Version(versionId, datei, Pruefsumme.von(daten), daten.length, sperreBis);
+            Version v = new Version(versionId, datei, Pruefsumme.von(daten), daten.length, sperreBis, Instant.now());
             versionen.computeIfAbsent(mandant.wert() + "/" + key, k -> new ArrayList<>()).add(v);
             return v;
         } catch (IOException e) {
@@ -418,7 +449,7 @@ public class AblageStub implements AblagePort {
         if (alt.sperreBis() != null && alt.sperreBis().isAfter(bis)) {
             throw new IllegalStateException("Sperre lässt sich nicht verkürzen: " + key);
         }
-        Version neu = new Version(alt.versionId(), alt.datei(), alt.sha256(), alt.groesse(), bis);
+        Version neu = new Version(alt.versionId(), alt.datei(), alt.sha256(), alt.groesse(), bis, alt.lastModified());
         List<Version> liste = versionen.get(mandant.wert() + "/" + key);
         liste.set(liste.indexOf(alt), neu);
         return neu;

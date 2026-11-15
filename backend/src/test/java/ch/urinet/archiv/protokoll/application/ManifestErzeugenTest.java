@@ -100,10 +100,25 @@ class ManifestErzeugenTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("nicht kanonisch");
     }
 
+    @Test
+    void einAbgelegtesManifestWirdAuchBeiAbweichenderSicherungslisteWiederverwendet() {
+        ManifestInhalt abgelegt = inhalt(List.of(eintrag("a")));
+        ManifestInhalt neu = inhalt(List.of(eintrag("a")), List.of("b".repeat(64)));
+
+        ManifestInhalt wiederverwendet = ManifestErzeugen.wiederverwenden(new JacksonJsonLeser(), DATUM,
+                abgelegt.kanonisch(), neu);
+
+        assertThat(wiederverwendet.sicherung()).isEmpty();
+    }
+
     private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege) {
+        return inhalt(eintraege, List.of());
+    }
+
+    private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege, List<String> sicherungen) {
         ManifestFenster fenster = ManifestFenster.fuer(DATUM, null);
         return new ManifestInhalt("probe", DATUM, null, fenster.bis(), null, null, eintraege, new TreeMap<>(),
-                List.of());
+                sicherungen);
     }
 
     private static ManifestEintrag eintrag(String zeichen) {

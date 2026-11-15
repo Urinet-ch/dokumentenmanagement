@@ -225,7 +225,8 @@ public class ManifestErzeugen implements AuftragHandler {
         sammlung.blaetter().forEach((tabelle, blaetter) -> protokolle.put(tabelle, ProtokollHash.aus(bytes(blaetter))));
         ManifestInhalt inhalt = new ManifestInhalt(mandant.wert(), datum, fenster.von(), fenster.bis(),
                 vorgaenger.map(ManifestStand::sha256).orElse(null), vorgaenger.map(ManifestStand::verweis).orElse(null),
-                sammlung.eintraege(), new TreeMap<>(protokolle), List.of());
+                sammlung.eintraege(), new TreeMap<>(protokolle),
+                daten.sicherungen(mandant, fenster.von(), fenster.bis()));
         Optional<LocalDate> sperre = sperre(sammlung.fristen(), ManifestFenster.tag(Instant.now()), datum,
                 einstellungen.lesen(mandant).geschaeftsjahresende().monatTag());
 
@@ -318,6 +319,10 @@ public class ManifestErzeugen implements AuftragHandler {
         if (!gleich) {
             throw new IllegalStateException("Manifest " + datum + ": das abgelegte Manifest weicht von den gesammelten "
                     + "Einträgen oder Protokoll-Hashes ab (verspätet festgeschriebene Zeile?)");
+        }
+        if (!frueher.sicherung().equals(neu.sicherung())) {
+            LOG.warnf("Manifest %s: abgelegte Sicherungsliste weicht ab (abgelegt=%d, neu=%d)", datum,
+                    frueher.sicherung().size(), neu.sicherung().size());
         }
         LOG.infof("Manifest %s: abgelegtes Manifest aus einem früheren Versuch wiederverwendet", datum);
         return frueher;

@@ -18,6 +18,7 @@ import ch.urinet.archiv.ablage.domain.MehrdeutigeVersion;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
+import ch.urinet.archiv.ablage.domain.SicherungsSperre;
 import ch.urinet.archiv.ablage.domain.Sperrfrist;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
@@ -105,7 +106,9 @@ public class S3Ablage implements AblagePort {
     private static final Set<String> FEHLT = Set.of("NoSuchKey", "NoSuchVersion");
     private static final Set<String> ZEITUEBERSCHREITUNG = Set.of("RequestTimeout", "RequestTimeoutException");
     private static final String MANIFEST = "manifest/";
+    private static final String EINGANG = "eingang/";
     private static final Set<String> PRUEFBEREICHE = Set.of(ARCHIV, MANIFEST);
+    private static final Set<String> SICHERUNGSBEREICHE = Set.of(ARCHIV, MANIFEST, EINGANG);
     static final String EXPORT_REGEL = "exporte-7-tage";
     private static final Duration MAX_SIGNATUR = Duration.ofDays(7);
     private static final Pattern EXPORT_NAME = Pattern.compile("^[A-Za-z0-9._-]{1,100}\\.zip$");
@@ -714,8 +717,8 @@ public class S3Ablage implements AblagePort {
     @Override
     public Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab,
                                    int anzahl) {
-        if (!PRUEFBEREICHE.contains(praefix)) {
-            throw new IllegalArgumentException("Versionsliste nur unter archiv/ oder manifest/: " + praefix);
+        if (!SICHERUNGSBEREICHE.contains(praefix)) {
+            throw new IllegalArgumentException("Versionsliste nur unter archiv/, manifest/ oder eingang/: " + praefix);
         }
         if (anzahl < 1 || anzahl > 1000) {
             throw new IllegalArgumentException("anzahl zwischen 1 und 1000");
@@ -728,11 +731,26 @@ public class S3Ablage implements AblagePort {
             ab.ifPresent(m -> b.keyMarker(m.schluessel()).versionIdMarker(versionIdMarker.orElseThrow()));
         }));
         List<Objektversion> versionen = new ArrayList<>();
-        antwort.versions().forEach(v -> versionen.add(new Objektversion(v.key(), v.versionId(), false)));
-        antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true)));
-        versionen.sort(Comparator.comparing(Objektversion::schluessel));
+        antwort.versions().forEach(v -> versionen.add(new Objektversion(v.key(), v.versionId(), false,
+                Objects.requireNonNull(v.lastModified(), "S3 version lastModified"),
+                Objects.requireNonNull(v.size(), "S3 version size"))));
+        antwort.deleteMarkers().forEach(m -> versionen.add(new Objektversion(m.key(), m.versionId(), true,
+                Objects.requireNonNull(m.lastModified(), "S3 delete marker lastModified"), 0)));
+        versionen.sort(Comparator.comparing(Objektversion::schluessel)
+                .thenComparing(Objektversion::lastModified, Comparator.reverseOrder())
+                .thenComparing(Objektversion::versionId));
         return new Versionsseite(versionen, Versionsseite.weiter(praefix, Boolean.TRUE.equals(antwort.isTruncated()),
                 antwort.nextKeyMarker(), antwort.nextVersionIdMarker()));
+    }
+
+    @Override
+    public Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion version) {
+        sicherungsBereichPruefen(version.schluessel(), version.versionId());
+        if (version.loeschmarke()) {
+            return Optional.empty();
+        }
+        return retention(bucket(mandant), version.schluessel(), version.versionId())
+                .map(r -> new SicherungsSperre(r.mode().name(), r.retainUntilDate()));
     }
 
     @Override
@@ -771,6 +789,16 @@ public class S3Ablage implements AblagePort {
     @Override
     public Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
         bereichPruefen(schluessel, versionId);
+        return kopieLesen(mandant, schluessel, versionId, ziel);
+    }
+
+    @Override
+    public Kopie sicherungsKopie(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
+        sicherungsBereichPruefen(schluessel, versionId);
+        return kopieLesen(mandant, schluessel, versionId, ziel);
+    }
+
+    private Kopie kopieLesen(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
         Objects.requireNonNull(ziel, "ziel");
         String bucket = bucket(mandant);
         boolean[] begonnen = {false};
@@ -890,6 +918,13 @@ public class S3Ablage implements AblagePort {
     private static void bereichPruefen(String schluessel, String versionId) {
         if (schluessel == null || PRUEFBEREICHE.stream().noneMatch(schluessel::startsWith) || ohneVersion(versionId)) {
             throw new IllegalArgumentException("Nur Versionen unter archiv/ oder manifest/: " + schluessel);
+        }
+    }
+
+    private static void sicherungsBereichPruefen(String schluessel, String versionId) {
+        if (schluessel == null || SICHERUNGSBEREICHE.stream().noneMatch(schluessel::startsWith)
+                || ohneVersion(versionId)) {
+            throw new IllegalArgumentException("Nur Versionen unter archiv/, manifest/ oder eingang/: " + schluessel);
         }
     }
 

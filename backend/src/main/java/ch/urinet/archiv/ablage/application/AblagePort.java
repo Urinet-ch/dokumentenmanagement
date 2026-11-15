@@ -8,7 +8,9 @@ import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
+import ch.urinet.archiv.ablage.domain.SicherungsSperre;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
@@ -150,10 +152,13 @@ public interface AblagePort {
     Optional<Dateipruefung> pruefen(MandantCode mandant, String schluessel, String versionId);
 
     /**
-     * Prüflauf (Req 15.10): eine Seite aller Versionen und Löschmarken unter {@code praefix} ({@code archiv/} oder
-     * {@code manifest/}), höchstens {@code anzahl}, fortgesetzt nach {@code ab}.
+     * Eine Seite aller Versionen und Löschmarken unter {@code praefix} ({@code archiv/}, {@code manifest/} oder
+     * {@code eingang/}), höchstens {@code anzahl}, fortgesetzt nach {@code ab}.
      */
     Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab, int anzahl);
+
+    /** Object-Lock-Angaben einer Version für das Sicherungsinventar; {@code eingang/} hat keine Sperre. */
+    Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion version);
 
     /**
      * Prüflauf (Req 15.9): verlängert die aktive Sperre dieser Version unter {@code archiv/} oder {@code manifest/} bis
@@ -169,6 +174,11 @@ public interface AblagePort {
      * innerhalb des Aufrufs schreibt nie ein zweites Mal nach {@code ziel}, sondern bricht ab.
      */
     Kopie kopieren(MandantCode mandant, String schluessel, String versionId, OutputStream ziel);
+
+    /**
+     * Sicherungsexport: liest eine Version unter {@code archiv/}, {@code manifest/} oder {@code eingang/} stromweise.
+     */
+    Kopie sicherungsKopie(MandantCode mandant, String schluessel, String versionId, OutputStream ziel);
 
     /**
      * Jahresexport (Spec 02, Req 7.1): öffnet {@code exporte/<exportId>.zip} zum stromweisen Schreiben, ohne Sperre.

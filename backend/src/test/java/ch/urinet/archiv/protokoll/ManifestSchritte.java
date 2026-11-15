@@ -188,6 +188,23 @@ public class ManifestSchritte {
         }
     }
 
+    @Angenommen("ein globaler Sicherungsexport mit SHA-256 «{word}» wurde am «{word}» um «{word}» festgehalten")
+    public void globalerSicherungsexport(String sha256, String datum, String uhrzeit) throws SQLException {
+        try (Connection v = datenbank.get().getConnection(); PreparedStatement p = v.prepareStatement(
+                "insert into public.sicherung_export (art, sha256, erstellt) values ('db', ?, ?)")) {
+            p.setString(1, sha256);
+            p.setTimestamp(2, Timestamp.from(zeit(datum, uhrzeit)));
+            assertThat(p.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Dann("enthält das Manifest «{word}» von «{word}» die Sicherungs-SHA-256 «{word}»")
+    public void manifestSicherung(String datum, String alias, String sha256) throws Exception {
+        List<String> sicherungen = new ArrayList<>();
+        manifest(alias, datum).path("sicherung").forEach(eintrag -> sicherungen.add(eintrag.asText()));
+        assertThat(sicherungen).contains(sha256);
+    }
+
     @Angenommen("im Mandanten «{word}» wurde das Dokument «{word}» am «{word}» um «{word}» archiviert, aufzubewahren bis «{word}»")
     public void dokument(String alias, String name, String datum, String uhrzeit, String aufbewahrenBis)
             throws SQLException {
