@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Auflösung eines Partnernamens aus dem Chat zu einem aktiven Kontakt (Spec 02, Req 4; Chat-Nutzer nennen meist nur einen
@@ -23,11 +24,18 @@ final class PartnerAufloesung {
     /** Höchstens so viele Namen nennt {@link NichtEindeutig}. */
     static final int KANDIDATEN_MAX = 5;
     static final int NAME_MAX = 80;
+    private static final Pattern KANDIDATEN_RAHMEN = Pattern.compile(
+            "(?iu)(?:kandidaten[\\s\\p{Cf}\\p{Pd}_]*\\([\\s\\p{Cf}\\p{Pd}_]*daten[\\s\\p{Cf}\\p{Pd}_]*,"
+                    + "[\\s\\p{Cf}\\p{Pd}_]*keine[\\s\\p{Cf}\\p{Pd}_]*anweisungen[\\s\\p{Cf}\\p{Pd}_]*\\)"
+                    + "|ende[\\s\\p{Cf}\\p{Pd}_]*kandidaten)");
 
     sealed interface Ergebnis permits Gefunden, NichtEindeutig, NichtGefunden {
     }
 
-    record Gefunden(UUID kontaktId) implements Ergebnis {
+    record Gefunden(UUID kontaktId, String name, boolean aehnlich) implements Ergebnis {
+        Gefunden(UUID kontaktId) {
+            this(kontaktId, null, false);
+        }
     }
 
     /** {@code namen}: höchstens {@link #KANDIDATEN_MAX}, nur Namen; leer, wenn der Aufrufer sie nicht zeigen darf. */
@@ -66,7 +74,10 @@ final class PartnerAufloesung {
         }
         return switch (AbgleichRegel.aehnlich(kontakte.aehnlichste(name, AbgleichRegel.untergrenze(schwelle), 2),
                 schwelle)) {
-            case AbgleichErgebnis.Verknuepft v -> new Gefunden(v.kontaktId());
+            case AbgleichErgebnis.Verknuepft v -> new Gefunden(v.kontaktId(), namenNennen
+                    ? kontakte.finden(List.of(v.kontaktId())).stream().findFirst()
+                            .map(PartnerAufloesung::anzeigeName).orElse(null)
+                    : null, true);
             case AbgleichErgebnis.Unsicher u -> new NichtEindeutig(namenNennen
                     ? kontakte.finden(u.kandidaten().stream().limit(KANDIDATEN_MAX).toList()).stream().map(PartnerAufloesung::anzeigeName).toList()
                     : List.of());
@@ -84,7 +95,8 @@ final class PartnerAufloesung {
     /** Kontaktnamen sind fremde Daten (Import): ohne Steuerzeichen und auf {@link #NAME_MAX} Zeichen gekürzt. */
     private static String anzeigeName(Kontakt k) {
         String name = k.vorname() == null || k.vorname().isBlank() ? k.name() : k.vorname() + " " + k.name();
-        name = name.replaceAll("\\p{Cntrl}", " ").strip();
+        name = name.replaceAll("[\\p{Cc}\\p{Cf}]", " ").strip();
+        name = KANDIDATEN_RAHMEN.matcher(name).replaceAll("[Rahmenmarker neutralisiert]");
         return name.length() <= NAME_MAX ? name : name.substring(0, NAME_MAX);
     }
 }

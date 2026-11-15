@@ -506,6 +506,16 @@ public class WerkzeugSchritte {
         assertThat(antwortText).doesNotContain("dateiname");
     }
 
+    @Dann("stehen die bestätigten Metadaten von «{word}» vor dem OCR-Text")
+    public void metadatenVorOcr(String dokument) {
+        String metadaten = antwort.path("metadaten").asText();
+        assertThat(metadaten).startsWith("Metadaten (bestätigt)")
+                .contains("Belegnummer: 1100745", "Betrag: CHF 123.45", "Datum: 10.03.2071",
+                        "Fälligkeit: 20.03.2071", "Partner: Bergbahn Quellwald AG");
+        assertThat(antwortText.indexOf("\"metadaten\"")).isLessThan(antwortText.indexOf("\"inhalt\""));
+        assertThat(antwort.path("inhalt").asText()).as(dokument).contains("1190745").doesNotContain("1100745");
+    }
+
     @Dann("ist der Inhalt der Antwort {int} Zeichen lang")
     public void inhaltLaenge(int zeichen) {
         assertThat(antwort.path("inhalt").asText()).hasSize(zeichen);

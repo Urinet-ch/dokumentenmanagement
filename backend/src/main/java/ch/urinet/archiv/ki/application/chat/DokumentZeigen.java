@@ -41,9 +41,9 @@ public class DokumentZeigen {
     }
 
     /** Ein sichtbares Dokument; fehlende Angaben sind {@code null}. */
-    public record Ansicht(String id, String titel, String art, String datum, String partner, String belegnummer,
-                          String betrag, String faelligkeit, Vertrag vertrag, boolean bestaetigt, String inhalt,
-                          String link) {
+    public record Ansicht(String metadaten, String inhalt, String id, String titel, String art, String datum,
+                          String partner, String belegnummer, String betrag, String faelligkeit, Vertrag vertrag,
+                          boolean bestaetigt, String link) {
     }
 
     private final DokumentRepository dokumente;
@@ -80,13 +80,34 @@ public class DokumentZeigen {
         String inhalt = daten.inhalt(id, kontext.sicht(), INHALT_MAX).orElse(null);
         DokumentFinanz f = d.finanz();
         DokumentVertrag v = d.vertrag();
-        return Optional.of(new Ansicht(id.toString(), d.titel(), d.art(), Werteformat.datum(d.datum()),
-                d.partnerName(), f == null ? null : f.belegnummer(),
-                f == null ? null : Werteformat.betrag(f.betrag(), f.waehrung()),
-                f == null ? null : Werteformat.datum(f.faelligkeit()),
+        String datum = Werteformat.datum(d.datum());
+        String belegnummer = f == null ? null : f.belegnummer();
+        String betrag = f == null ? null : Werteformat.betrag(f.betrag(), f.waehrung());
+        String faelligkeit = f == null ? null : Werteformat.datum(f.faelligkeit());
+        String partner = d.partnerName();
+        return Optional.of(new Ansicht(metadaten(d.bestaetigtesDokument(), belegnummer, betrag, datum, faelligkeit,
+                partner), inhalt, id.toString(), d.titel(), d.art(), datum, partner, belegnummer, betrag, faelligkeit,
                 v == null ? null : new Vertrag(Werteformat.datum(v.gueltigAb()), Werteformat.datum(v.gueltigBis()),
                         v.kuendigungsfrist(), Werteformat.datum(v.naechsteFrist())),
-                d.bestaetigtesDokument(), inhalt, DokumenteSuchen.link(id)));
+                d.bestaetigtesDokument(), DokumenteSuchen.link(id)));
+    }
+
+    static String metadaten(boolean bestaetigt, String belegnummer, String betrag, String datum, String faelligkeit,
+                            String partner) {
+        StringBuilder text = new StringBuilder("Metadaten (")
+                .append(bestaetigt ? "bestätigt" : "nicht bestätigt").append(')');
+        zeile(text, "Belegnummer", belegnummer);
+        zeile(text, "Betrag", betrag);
+        zeile(text, "Datum", datum);
+        zeile(text, "Fälligkeit", faelligkeit);
+        zeile(text, "Partner", partner);
+        return text.toString();
+    }
+
+    private static void zeile(StringBuilder text, String feld, String wert) {
+        if (wert != null && !wert.isBlank()) {
+            text.append('\n').append(feld).append(": ").append(wert.strip());
+        }
     }
 
     private void verweigert(WerkzeugKontext kontext, Optional<UUID> id) {

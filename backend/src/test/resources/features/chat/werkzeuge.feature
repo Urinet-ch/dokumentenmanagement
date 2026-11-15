@@ -167,6 +167,17 @@ Funktionalität: Werkzeuge des Chat-Agenten: Suche, Dokument, Fristen (Aufgabe 7
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_VERTRAG | 203.0.113.9 | CHAT  |
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_LANG    | 203.0.113.9 | CHAT  |
 
+  @req-5.2 @req-5.3 @chat-metadaten-vorrang
+  Szenario: Bestätigte Metadaten stehen vor einem abweichenden OCR-Text
+    Angenommen im Mandanten «urinet» liegen diese Chat-Dokumente:
+      | name     | titel           | art              | partner               | datum      | betrag | belegnummer | vertraulichkeit | bestaetigt | erfasser       | status     | text                              |
+      | U_ZIFFER | OCR-Ziffernprobe | AUSGANGSRECHNUNG | Bergbahn Quellwald AG | 2071-03-10 | 123.45 | 1100745     | NORMAL          | ja         | inhaber-urinet | ARCHIVIERT | OCR hat die Belegnummer 1190745. |
+    Und die Chat-Dokumente haben diese Fristen:
+      | name     | faelligkeit |
+      | U_ZIFFER | 2071-03-20  |
+    Wenn «inhaber-urinet» im Chat das Dokument «U_ZIFFER» zeigen lässt
+    Dann stehen die bestätigten Metadaten von «U_ZIFFER» vor dem OCR-Text
+
   @req-3.1
   Szenario: dokument_zeigen für ein Dokument ohne Volltext zeigt die Metadaten ohne Inhalt und schreibt ANZEIGEN
     Angenommen im Mandanten «urinet» liegt das Chat-Dokument «U_OHNE_TEXT» ohne Text
