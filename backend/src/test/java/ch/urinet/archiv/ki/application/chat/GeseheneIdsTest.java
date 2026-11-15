@@ -4,8 +4,15 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 import java.util.UUID;
 
@@ -97,5 +104,74 @@ class GeseheneIdsTest {
         List<UUID> treffer = List.of(UUID.fromString(ECHT), zweite);
         assertThat(GeseheneIds.zuordnen(" 2", Set.of(zweite), treffer)).isEqualTo(zweite.toString());
         assertThat(GeseheneIds.zuordnen("2 ", Set.of(zweite), treffer)).isEqualTo(zweite.toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "02", "1.0", "1e1", "+1", "١", "99999999999999999999", "", "   ", "eins"})
+    void keineGueltigeNummerBleibtUnveraendert(String eingabe) {
+        List<UUID> treffer = List.of(UUID.fromString(ECHT));
+        assertThat(GeseheneIds.zuordnen(eingabe, Set.of(UUID.fromString(ECHT)), treffer)).isEqualTo(eingabe);
+    }
+
+    @Test
+    void nummerOhneNummerierteTrefferWirdNieAufEineGeseheneIdAbgebildet() {
+        assertThat(GeseheneIds.zuordnen("1", gesehen, List.of())).isEqualTo("1");
+        assertThat(GeseheneIds.zuordnen("1", gesehen)).isEqualTo("1");
+    }
+
+    @Test
+    void zweiZeichenAbweichungWerdenZugeordnetDreiNicht() {
+        // der Präfix aus acht Zeichen stimmt nicht mehr überein, es zählen nur die abweichenden Zeichen
+        String zwei = "a5c8fc52-af7e-4e1e-9023-bc07333cd53x";
+        String drei = "a5c8fc52-af7e-4e1x-9023-bc07333cd53x";
+        assertThat(GeseheneIds.zuordnen(zwei, gesehen)).isEqualTo(ECHT);
+        assertThat(GeseheneIds.zuordnen(drei, gesehen)).isEqualTo(drei);
+    }
+
+    @Test
+    void falscheLaengeUndGrossschreibungVerhaltenSichWieErwartet() {
+        assertThat(GeseheneIds.zuordnen(ECHT.substring(1), gesehen)).isEqualTo(ECHT.substring(1));
+        assertThat(GeseheneIds.zuordnen(ECHT + "0", gesehen)).isEqualTo(ECHT + "0");
+        assertThat(GeseheneIds.zuordnen(" " + ECHT.toUpperCase() + " ", gesehen)).isEqualTo(" " + ECHT.toUpperCase() + " ");
+    }
+
+    @Test
+    void nummerUndGeseheneIdsKreuzenSichNichtZwischenGespraechen() {
+        UUID fremd = UUID.fromString("c2d81843-f193-43f9-8675-cf16609e8a7e");
+        // «1» ist die erste Nummer dieses Gesprächs, nicht die erste gesehene ID eines anderen
+        assertThat(GeseheneIds.zuordnen("1", Set.of(fremd, UUID.fromString(ECHT)), List.of(UUID.fromString(ECHT))))
+                .isEqualTo(ECHT);
+    }
+
+    @Test
+    void parallelNummerierteTrefferBekommenEindeutigeLueckenloseNummern() throws Exception {
+        WerkzeugKontextRegister register = new WerkzeugKontextRegister();
+        register.festhalten("g", WerkzeugKontext.fuer(new MandantCode("urinet"), new Benutzer("a", Rolle.INHABER), null));
+        List<UUID> ids = new ArrayList<>();
+        for (int i = 0; i < 200; i++) {
+            ids.add(new UUID(0xAB, i));
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<?>> laeufe = new ArrayList<>();
+            for (int t = 0; t < 8; t++) {
+                int start = t * 25;
+                // jeder Thread nummeriert einen Ausschnitt und alle gemeinsam die Mitte doppelt
+                laeufe.add(pool.submit(() -> register.nummerieren("g", ids.subList(start, Math.min(200, start + 60)))));
+            }
+            for (Future<?> lauf : laeufe) {
+                lauf.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        List<UUID> nummeriert = register.nummerierte("g");
+        assertThat(nummeriert).hasSize(200).doesNotHaveDuplicates();
+        for (int i = 0; i < nummeriert.size(); i++) {
+            UUID id = nummeriert.get(i);
+            int erwartet = i + 1;
+            assertThat(register.nummerieren("g", List.of(id))).containsEntry(id, erwartet);
+        }
     }
 }
