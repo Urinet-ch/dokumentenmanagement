@@ -39,6 +39,8 @@ class WerkzeugeNurLesendTest {
     static final Map<String, Set<String>> LESENDE_PORTS = Map.of(
             "ch.urinet.archiv.dokument.application.DokumentRepository", Set.of("finden"),
             "ch.urinet.archiv.suche.application.SuchePort", Set.of("suchen"),
+            // Hybridsuche der Wortsuche vorgeschaltet (7.1d); liest nur
+            "ch.urinet.archiv.suche.application.HybridSuche", Set.of("suchen"),
             "ch.urinet.archiv.kontakt.application.KontaktRegister", Set.of("aehnlichste"),
             "ch.urinet.archiv.dokumentart.application.DokumentartRepository", Set.of("alle"),
             "ch.urinet.archiv.mandant.application.MandantKontext", Set.of("mit", "aktuell"),

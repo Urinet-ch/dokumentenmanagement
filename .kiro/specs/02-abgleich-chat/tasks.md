@@ -53,8 +53,9 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 7.1 Werkzeuge [Backend]
   - Teil erledigt (PR #145): Kontext, Auswahl, `dokumente_suchen` (Volltext), `dokument_zeigen`, `fristen`, Index 028
-  - Teil erledigt (7.1b, 14.11.2026): `kennzahl` (Req 3.2, 3.3, 5.2), `offene_posten` (Req 3.4), `Funktionen.finanzVerfuegbar()` minimal, Arten je Mandant (E1); offen: `vollstaendigkeit` (7.1c). Haken erst, wenn 7.1c da ist und `ReqAbdeckungTest` für alle Anforderungszeilen grün ist
+  - Teil erledigt (7.1b, 14.11.2026): `kennzahl` (Req 3.2, 3.3, 5.2), `offene_posten` (Req 3.4), `Funktionen.finanzVerfuegbar()` minimal, Arten je Mandant (E1); Haken erst, wenn alle Teile (7.1c) da sind und `ReqAbdeckungTest` für alle Anforderungszeilen grün ist
   - Teil erledigt (7.1d, 15.11.2026): `dokumente_suchen` über die Hybridsuche (Req 3.1, 2.3, 2.5, 2.8; Spec 01, Req 3.13), Rückfall Volltext mit Hinweis «nur Volltext», `seiten` als Fundstelle; Umsetzungsvermerk in design.md «Umsetzung 7.1a»
+  - Teil erledigt (PR #161): `vollstaendigkeit` mit Port `Lueckenbericht` und Übergangsquelle aus der Konfiguration (design.md «Umsetzung (Aufgabe 7.1c, 14.11.2026)»); mit 7.1a, 7.1b und 7.1d sind alle Teile von 7.1 da, der Haken folgt, wenn `ReqAbdeckungTest` für alle Anforderungszeilen grün ist
   - `ArchivWerkzeuge` mit `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`; Mandant/Benutzer aus Kontext; Sichtbarkeitsfilter nach Rechtematrix (Spec 01, 2.6) auch in Summen, Anzahlen und Lücken
   - je Werkzeug Szenarien mit zwei Mandanten und den Rollen `inhaber`, `mitarbeiter`, `treuhaender`
   - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); `dokumente_suchen` ist der erste Konsument dieser Variante

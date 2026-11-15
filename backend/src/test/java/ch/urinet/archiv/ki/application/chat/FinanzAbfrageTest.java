@@ -59,6 +59,21 @@ class FinanzAbfrageTest {
         }
 
         @Override
+        public List<String> belegnummern(String art, int geschaeftsjahr, ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Monatszeile> monate(Monatsquelle quelle, ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long belege(java.util.Collection<String> arten, ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public KennzahlSeite kennzahl(KennzahlAnfrage anfrage, ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
             kennzahlAnfrage.set(anfrage);
             return new KennzahlSeite(List.of(new KennzahlZeile("2071", new BigDecimal("1234.50"), 2),
