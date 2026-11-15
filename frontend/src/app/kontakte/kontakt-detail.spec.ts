@@ -313,6 +313,12 @@ describe('Kontakte: Detail (Req 17.3, 17.4, 17.6)', () => {
       telefon.value = '041 222 22 22';
       telefon.dispatchEvent(new Event('input'));
       await klick('speichern');
+      expect(port.aktionen[0]).toEqual({
+        art: 'aendern',
+        id: 'k1',
+        version: 3,
+        daten: { telefon: '041 222 22 22' },
+      });
       await laden({ ...DETAIL, telefon: '041 111 11 11', ort: 'Luzern', version: 4 });
       expect(element.querySelector<HTMLInputElement>('[data-test=feld-telefon]')!.value).toBe(
         '041 222 22 22',
