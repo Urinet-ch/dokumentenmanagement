@@ -3,6 +3,7 @@ package ch.urinet.archiv.export.adapter.out.persistence;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.export.application.ExportRepository;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
 import ch.urinet.archiv.export.domain.ExportStatus;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import io.agroal.api.AgroalDataSource;
@@ -32,7 +33,7 @@ public class JdbcExportRepository implements ExportRepository {
     static final int ZEITGRENZE_S = 30;
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final String SPALTEN = "id, geschaeftsjahr, status, s3_schluessel, s3_version, sha256, groesse, "
-            + "anzahl, benutzer, rolle, erstellt, fertig";
+            + "anzahl, benutzer, rolle, erstellt, fertig, fehler_id, fehler_art";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -68,9 +69,9 @@ public class JdbcExportRepository implements ExportRepository {
     }
 
     @Override
-    public boolean fehler(UUID id, UUID fehlerId) {
-        return aendern("update " + schema() + ".export set status = 'FEHLER', fehler_id = ? where id = ? "
-                + "and status = 'OFFEN'", fehlerId, id) == 1;
+    public boolean fehler(UUID id, UUID fehlerId, ExportFehlerart art) {
+        return aendern("update " + schema() + ".export set status = 'FEHLER', fehler_id = ?, fehler_art = ? "
+                + "where id = ? and status = 'OFFEN'", fehlerId, art.name(), id) == 1;
     }
 
     private String schema() {
@@ -129,6 +130,8 @@ public class JdbcExportRepository implements ExportRepository {
                 ExportStatus.valueOf(z.getString("status")), Optional.ofNullable(z.getString("s3_schluessel")),
                 Optional.ofNullable(z.getString("s3_version")), Optional.ofNullable(z.getString("sha256")), mitGroesse,
                 mitAnzahl, z.getString("benutzer"), z.getString("rolle"), z.getTimestamp("erstellt").toInstant(),
-                Optional.ofNullable(fertig).map(Timestamp::toInstant));
+                Optional.ofNullable(fertig).map(Timestamp::toInstant),
+                Optional.ofNullable(z.getObject("fehler_id", UUID.class)),
+                Optional.ofNullable(z.getString("fehler_art")).map(ExportFehlerart::valueOf));
     }
 }

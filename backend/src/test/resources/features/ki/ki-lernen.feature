@@ -42,6 +42,14 @@ Funktionalität: Lernen aus Korrekturen
     Und die Korrekturquote zählt für «titel» 1 Bestätigung und 0 Korrekturen
     Und die Korrekturquote zählt für «art» 1 Bestätigung und 0 Korrekturen
 
+  @req-16.4
+  Szenario: Die Korrekturquote je Feld steht intern unter /q/metrics, nur mit Feldnamen
+    Angenommen der Beleg «A» als digitales PDF mit «Muster Buerobedarf AG» und «IBAN CH44 3199 9123 0008 8901 2»
+    Und der Worker die Aufträge bearbeitet
+    Wenn «inhaber-urinet» den Beleg «A» mit dem Titel «Rechnung Büromaterial» und der Vertraulichkeit «INTERN» bestätigt
+    Dann nennt «/q/metrics» die Korrekturquote für «urinet» zu jedem Feld des Vorschlags
+    Und trägt die Korrekturquote in «/q/metrics» nur die Tags «feld» und «mandant»
+
   @req-7.7
   Szenario: Ein vor dem Bestätigen umgehängter Partner zählt als Korrektur
     Angenommen der Partner «Zweitlieferant GmbH» ist als Kontakt ohne IBAN erfasst

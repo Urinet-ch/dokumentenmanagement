@@ -74,7 +74,22 @@
               <span class="angaben">{{ texte.abgelaufenHinweis }}</span>
             }
             @case ('FEHLER') {
-              <span class="angaben">{{ texte.fehlerHinweis }}</span>
+              <span class="angaben" data-test="fehler-art">{{ fehlerArtText(eintrag) }}</span>
+              @if (eintrag.fehlerId) {
+                <span class="pruefsumme"
+                  >{{ texte.fehlerId }}:
+                  <code data-test="fehler-id">{{ eintrag.fehlerId }}</code></span
+                >
+              }
+              <button
+                mat-stroked-button
+                type="button"
+                (click)="erneutAnfordern(eintrag)"
+                [disabled]="laeuft()"
+                [attr.aria-label]="texte.erneutAnfordernFuer(eintrag.geschaeftsjahr)"
+              >
+                {{ texte.erneutAnfordern }}
+              </button>
             }
           }
         </li>

@@ -39,8 +39,9 @@ class ChatSystemPromptTest {
                 .contains("kennzahl und offene_posten nur für Summen und Listen über mehrere Belege")
                 .contains("Datenbasis und Datenstand stammen nur aus dem Ergebnis des Werkzeugs, das du für diese Frage "
                         + "aufgerufen hast, nie aus früheren Antworten des Gesprächs")
-                .contains("dokument_zeigen nimmt nur eine ID aus einem früheren Ergebnis; ohne ID rufst du zuerst "
-                        + "dokumente_suchen auf")
+                .contains("dokument_zeigen nimmt bevorzugt die Gesprächsnummer aus dokumente_suchen")
+                .contains("Gesprächsnummern gelten nur in diesem Gespräch")
+                .contains("Ohne Treffer rufst du zuerst dokumente_suchen auf")
                 .contains("Meldet ein Werkzeug «Partner nicht eindeutig»");
     }
 

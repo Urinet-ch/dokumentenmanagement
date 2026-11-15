@@ -5,10 +5,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Sprachmodelle schreiben UUIDs beim Abschreiben aus einem Werkzeugergebnis unzuverlässig ab. Eine unbekannte ID wird
- * darum einer ID zugeordnet, die {@code dokumente_suchen} im selben Lauf geliefert hat, wenn genau eine passt: gleiche
- * Länge und höchstens {@link #ABWEICHUNGEN_MAX} abweichende Zeichen oder gleiche ersten 8 Zeichen. Es gibt nie ein
- * Erraten fremder IDs: Kandidaten sind nur Treffer dieses Laufs, die der Benutzer nach der Sichtregel schon gesehen hat.
+ * Sprachmodelle schreiben UUIDs beim Abschreiben aus einem Werkzeugergebnis unzuverlässig ab. Eine Gesprächsnummer wird
+ * auf die vorherigen Suchtreffer abgebildet; eine veränderte ID nur auf eine eindeutige ID aus Werkzeugergebnissen des
+ * Gesprächs. Es gibt nie ein Erraten fremder IDs: Kandidaten sind nur Treffer, die nach der Sichtregel im Gespräch
+ * zurückgegeben wurden.
  */
 public final class GeseheneIds {
 
@@ -20,6 +20,15 @@ public final class GeseheneIds {
 
     /** Die zugeordnete ID oder {@code id} unverändert (auch bei gültiger ID, bei mehreren oder keinem Kandidaten). */
     public static String zuordnen(String id, Set<UUID> gesehene) {
+        return zuordnen(id, gesehene, List.of());
+    }
+
+    /** Ordnet zuerst eine Gesprächsnummer, danach eine veränderte ID einem gesehenen Treffer zu. */
+    public static String zuordnen(String id, Set<UUID> gesehene, List<UUID> nummerierteTreffer) {
+        Integer nummer = nummer(id);
+        if (nummer != null && nummer <= nummerierteTreffer.size()) {
+            return nummerierteTreffer.get(nummer - 1).toString();
+        }
         UUID exakt = Werkzeugparameter.id(id);
         if (id == null || exakt != null && gesehene.contains(exakt)) {
             return id;
@@ -30,6 +39,18 @@ public final class GeseheneIds {
         }
         List<UUID> kandidaten = gesehene.stream().filter(g -> passt(roh, g.toString())).toList();
         return kandidaten.size() == 1 ? kandidaten.get(0).toString() : id;
+    }
+
+    private static Integer nummer(String id) {
+        String roh = id == null ? null : id.strip();
+        if (roh == null || !roh.matches("[1-9][0-9]*")) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(roh);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static boolean passt(String roh, String echt) {

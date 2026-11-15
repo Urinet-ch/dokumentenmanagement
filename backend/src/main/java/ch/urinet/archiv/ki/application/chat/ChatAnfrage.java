@@ -9,6 +9,7 @@ import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Eine Frage an den {@link ChatAgentPort}. Mandant, Benutzer (mit Rolle) und Sichtregel stammen aus der Anmeldung und
@@ -19,9 +20,12 @@ import java.util.Optional;
  * @param mandantenname Name des Mandanten für den Systemprompt (leer, wenn nicht gepflegt)
  * @param verlauf       die letzten 10 Nachrichten des Gesprächs vor dieser Frage, nur Fragen und Antworten, älteste
  *                      zuerst
+ * @param geseheneDokumente IDs aus Werkzeugergebnissen dieses, dem Benutzer gehörenden Gesprächs
+ * @param nummerierteTreffer IDs aus {@code dokumente_suchen}, in Reihenfolge ihres ersten Auftretens
  */
 public record ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sichtregel, Optional<IpAdresse> ip,
-                          String mandantenname, String frage, List<VerlaufEintrag> verlauf) {
+                          String mandantenname, String frage, List<VerlaufEintrag> verlauf,
+                          List<UUID> geseheneDokumente, List<UUID> nummerierteTreffer) {
 
     public ChatAnfrage {
         Objects.requireNonNull(mandant, "mandant");
@@ -31,5 +35,12 @@ public record ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sic
         Objects.requireNonNull(mandantenname, "mandantenname");
         Objects.requireNonNull(frage, "frage");
         verlauf = List.copyOf(verlauf);
+        geseheneDokumente = List.copyOf(geseheneDokumente);
+        nummerierteTreffer = List.copyOf(nummerierteTreffer);
+    }
+
+    public ChatAnfrage(MandantCode mandant, Benutzer benutzer, Sichtregel sichtregel, Optional<IpAdresse> ip,
+                       String mandantenname, String frage, List<VerlaufEintrag> verlauf) {
+        this(mandant, benutzer, sichtregel, ip, mandantenname, frage, verlauf, List.of(), List.of());
     }
 }

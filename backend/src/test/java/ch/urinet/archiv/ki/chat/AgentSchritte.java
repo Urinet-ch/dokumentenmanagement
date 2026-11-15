@@ -55,7 +55,7 @@ public class AgentSchritte {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<String> MANDANTEN = List.of("urinet", "vhf-gsk");
     private static final Duration GEDULD = Duration.ofSeconds(60);
-    private static final Pattern ID_PLATZHALTER = Pattern.compile("\\{id:([^}]+)}");
+    private static final Pattern ID_PLATZHALTER = Pattern.compile("\\{id(~?):([^}]+)}");
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -100,7 +100,8 @@ public class AgentSchritte {
 
     /**
      * Spalten {@code antwort} (Nummer), {@code art} ({@code werkzeug} oder {@code text}), {@code inhalt} (Werkzeugname
-     * oder Text), {@code argumente} (JSON, {@code {id:Titel}} wird zur ID des Dokuments mit diesem Titel) und
+     * oder Text), {@code argumente} (JSON, {@code {id:Titel}} wird zur ID, {@code {id~:Titel}} zur veränderten ID
+     * des Dokuments mit diesem Titel) und
      * {@code tokens} ({@code ein/aus}, in der ersten Zeile der Antwort; leer: ohne {@code usage}). Mehrere Zeilen mit
      * derselben Nummer sind eine Antwort mit mehreren Werkzeugen.
      */
@@ -153,7 +154,7 @@ public class AgentSchritte {
         return new ChatAntwort(text, aufrufe, ein, aus);
     }
 
-    /** {@code {id:Titel}} wird zur ID des Dokuments mit diesem Titel (in einem der beiden Mandanten). */
+    /** {@code {id:Titel}} wird zur ID und {@code {id~:Titel}} zur abweichenden ID des Dokuments mit diesem Titel. */
     private String ids(String argumente) throws SQLException {
         Matcher m = ID_PLATZHALTER.matcher(argumente);
         StringBuilder sb = new StringBuilder();
@@ -161,13 +162,16 @@ public class AgentSchritte {
             String id = null;
             for (String mandant : MANDANTEN) {
                 List<String> treffer = texte("select id::text from " + schema(mandant) + ".dokument where titel = ?",
-                        m.group(1));
+                        m.group(2));
                 if (!treffer.isEmpty()) {
                     id = treffer.getFirst();
                 }
             }
-            assertThat(id).as("Dokument " + m.group(1)).isNotNull();
-            m.appendReplacement(sb, id);
+            assertThat(id).as("Dokument " + m.group(2)).isNotNull();
+            if (!m.group(1).isEmpty()) {
+                id = (id.charAt(0) == '0' ? '1' : '0') + id.substring(1);
+            }
+            m.appendReplacement(sb, Matcher.quoteReplacement(id));
         }
         m.appendTail(sb);
         return sb.toString();
@@ -295,6 +299,16 @@ public class AgentSchritte {
         List<String> da = new ArrayList<>();
         ereignis("quellen").forEach(q -> da.add(q.path("titel").asText()));
         assertThat(da).containsExactlyInAnyOrderElementsOf(erwartet);
+    }
+
+    @Dann("zeigt eine Quelle des Agenten die echte ID von «{}»")
+    public void echteQuellenId(String titel) throws SQLException {
+        List<String> ids = texte("select id::text from " + schema("urinet") + ".dokument where titel = ?", titel);
+        assertThat(ids).hasSize(1);
+        JsonNode quellen = ereignis("quellen");
+        assertThat(quellen).hasSize(1);
+        assertThat(quellen.get(0).path("id").asText()).isEqualTo(ids.getFirst());
+        assertThat(quellen.get(0).path("link").asText()).isEqualTo("/dokument/" + ids.getFirst());
     }
 
     @Dann("nennen die Quellen im Stream den Datenstand von «{word}» mit {int} Belegen")
