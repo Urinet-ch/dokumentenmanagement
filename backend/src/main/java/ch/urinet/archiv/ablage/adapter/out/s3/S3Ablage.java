@@ -14,6 +14,7 @@ import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.MehrdeutigeVersion;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
@@ -313,6 +314,11 @@ public class S3Ablage implements AblagePort {
     public Optional<ManifestDatei> lesenManifest(MandantCode mandant, LocalDate datum, ManifestTeil teil) {
         String bucket = bucket(mandant);
         String key = teil.pfad(datum);
+        // vorübergehende Fehler als AblageGestoert wie beim Prüfen einer Datei (Prüflauf, Manifest-Vergleich)
+        return pruefzugriff(key, () -> manifestLesen(bucket, key));
+    }
+
+    private Optional<ManifestDatei> manifestLesen(String bucket, String key) {
         Manifestversionen vorhanden = manifestVersionen(bucket, key);
         if (vorhanden.versionen().isEmpty()) {
             return Optional.empty();
@@ -356,12 +362,12 @@ public class S3Ablage implements AblagePort {
             return sortiert;
         }
         if (sortiert.stream().anyMatch(v -> v.lastModified() == null)) {
-            throw new IllegalStateException("Unter " + key + " liegen mehrere Versionen, nicht alle mit Zeitpunkt; "
+            throw new MehrdeutigeVersion("Unter " + key + " liegen mehrere Versionen, nicht alle mit Zeitpunkt; "
                     + "die älteste ist nicht eindeutig");
         }
         sortiert.sort(Comparator.comparing(ObjectVersion::lastModified));
         if (sortiert.get(0).lastModified().equals(sortiert.get(1).lastModified())) {
-            throw new IllegalStateException("Unter " + key + " liegen mehrere Versionen mit gleichem Zeitpunkt; "
+            throw new MehrdeutigeVersion("Unter " + key + " liegen mehrere Versionen mit gleichem Zeitpunkt; "
                     + "die älteste ist nicht eindeutig");
         }
         return sortiert;

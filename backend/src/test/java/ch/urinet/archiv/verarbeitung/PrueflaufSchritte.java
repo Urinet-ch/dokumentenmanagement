@@ -4,9 +4,11 @@ import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.SchedulerTakt;
 import ch.urinet.archiv.mandant.application.MandantAusAnmeldung;
 import ch.urinet.archiv.mandant.application.MandantBucket;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ManifestErzeugen;
 import ch.urinet.archiv.verarbeitung.adapter.in.job.PrueflaufZeitplan;
 import ch.urinet.archiv.verarbeitung.application.AuftragArbeiter;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufStarten;
@@ -35,6 +37,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -86,6 +89,9 @@ public class PrueflaufSchritte {
     MandantBucket buckets;
 
     @Inject
+    MandantProvisionierung provisionierung;
+
+    @Inject
     S3Client s3;
 
     @Inject
@@ -102,7 +108,10 @@ public class PrueflaufSchritte {
 
     private final ExecutorService threads = Executors.newSingleThreadExecutor();
     private final Map<String, Archiviert> dokumente = new HashMap<>();
+    private final Map<String, Archiviert> manifestDokumente = new HashMap<>();
     private final List<UUID> laeufe = new ArrayList<>();
+    private final List<UUID> manifestLaeufe = new ArrayList<>();
+    private String manifestMandant;
     private Instant laufStart;
     private Optional<UUID> zweiterStart;
     private String manifestSchluessel;
@@ -129,6 +138,115 @@ public class PrueflaufSchritte {
             laeufe.add(alt);
         }
         aufraeumenLaeufe();
+    }
+
+    @Angenommen("ein eigener Mandant «{word}» für den Manifest-Prüflauf")
+    public void manifestMandant(String code) throws SQLException {
+        manifestMandant = code;
+        provisionierung.anlegen(manifestMandant, null, null);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement(
+                     "update public.mandant set erstellt = ? where code = ?")) {
+            aendern.setTimestamp(1, java.sql.Timestamp.from(zeit("09.01.2026", "08:00")));
+            aendern.setString(2, manifestMandant);
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+        buckets.einrichten(new MandantCode(manifestMandant).bucket(bucketPraefix));
+    }
+
+    @Angenommen("im Testmandanten ist das Dokument «{word}» am «{word}» um «{word}» archiviert")
+    public void manifestDokument(String name, String datum, String uhrzeit) throws Exception {
+        archivieren(manifestMandant, name, null, 2, manifestDokumente);
+        manifestArchivierungszeitpunkt(name, datum, uhrzeit);
+    }
+
+    @Angenommen("im Testmandanten liegt das Dokument «{word}» ohne Archivierungszeitpunkt")
+    public void manifestDokumentOhneArchivierungszeitpunkt(String name) throws Exception {
+        archivieren(manifestMandant, name, null, 2, manifestDokumente);
+    }
+
+    @Angenommen("der Archivierungszeitpunkt des Testdokuments «{word}» wird auf «{word}» um «{word}» gesetzt")
+    public void manifestArchivierungszeitpunkt(String name, String datum, String uhrzeit) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement("update " + schema(manifestMandant)
+                     + ".dokument set archiviert = ? where id = ?")) {
+            aendern.setTimestamp(1, java.sql.Timestamp.from(zeit(datum, uhrzeit)));
+            aendern.setObject(2, manifestDokument(name).id());
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Angenommen("die gespeicherte Prüfsumme des Testdokuments «{word}» wird verfälscht")
+    public void manifestPruefsummeVerfaelscht(String name) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement("update " + schema(manifestMandant)
+                     + ".dokument_datei set sha256 = ? where dokument_id = ?")) {
+            aendern.setString(1, "0".repeat(64));
+            aendern.setObject(2, manifestDokument(name).id());
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Wenn("für den Testmandanten das Tages-Manifest bis «{word}» erzeugt wird")
+    public void testManifestErzeugen(String bis) throws Exception {
+        long auftrag = auftraege.rohEinreihen(manifestMandant, ManifestErzeugen.TYP,
+                "{\"" + ManifestErzeugen.BIS_TAG + "\": " + LocalDate.parse(bis, DATUM).toEpochDay() + "}");
+        auftraege.abarbeiten();
+        assertThat(auftraege.zeile(auftrag).status()).isEqualTo("FERTIG");
+    }
+
+    @Wenn("der Prüflauf für den Testmandanten läuft")
+    public void testPrueflaufLaeuft() throws Exception {
+        UUID lauf = starten(manifestMandant, Optional.empty()).orElseThrow();
+        manifestLaeufe.add(lauf);
+        for (int runde = 0; runde < 500 && !"ABGESCHLOSSEN".equals(phase(manifestMandant, lauf)); runde++) {
+            List<CompletableFuture<Void>> geholt = arbeiter.abholen();
+            if (geholt.isEmpty()) {
+                break;
+            }
+            CompletableFuture.allOf(geholt.toArray(CompletableFuture[]::new)).get(2, TimeUnit.MINUTES);
+        }
+    }
+
+    @Dann("ist der Prüflauf im Testmandanten abgeschlossen")
+    public void testPrueflaufAbgeschlossen() throws SQLException {
+        assertThat(phase(manifestMandant, manifestLaeufe.getLast())).isEqualTo("ABGESCHLOSSEN");
+    }
+
+    @Dann("meldet der Prüflauf im Testmandanten für «{word}» keine Manifest-Abweichung")
+    public void testKeineManifestAbweichung(String name) throws SQLException {
+        assertThat(abfragen("select art from " + schema(manifestMandant) + ".prueflauf_abweichung where lauf_id = '"
+                + manifestLaeufe.getLast() + "' and dokument_id = '" + manifestDokument(name).id()
+                + "' and art in ('MANIFEST_EINTRAG_FEHLT', 'MANIFEST_PRUEFSUMME')", String.class)).isEmpty();
+    }
+
+    @Dann("meldet der Prüflauf im Testmandanten für «{word}» «{word}» und «{word}»")
+    public void testManifestAbweichungen(String name, String erste, String zweite) throws SQLException {
+        assertThat(abfragen("select art from " + schema(manifestMandant) + ".prueflauf_abweichung where lauf_id = '"
+                + manifestLaeufe.getLast() + "' and dokument_id = '" + manifestDokument(name).id()
+                + "' order by id", String.class)).containsExactly(erste, zweite);
+    }
+
+    @Dann("meldet der Prüflauf im Testmandanten für «{word}» nur «{word}»")
+    public void testManifestAbweichung(String name, String art) throws SQLException {
+        assertThat(abfragen("select art from " + schema(manifestMandant) + ".prueflauf_abweichung where lauf_id = '"
+                + manifestLaeufe.getLast() + "' and dokument_id = '" + manifestDokument(name).id()
+                + "' order by id", String.class)).containsExactly(art);
+    }
+
+    @Dann("hat der Inhaber eine Mail zum Test-Prüflauf erhalten, die nur IDs nennt")
+    public void testPrueflaufMail() {
+        UUID lauf = manifestLaeufe.getLast();
+        String mailpit = "http://localhost:" + mailpitPort.orElseThrow();
+        Response nachrichten = given().baseUri(mailpit)
+                .queryParam("query", "subject:\"" + lauf + "\"").when().get("/api/v1/search");
+        assertThat(nachrichten.statusCode()).isEqualTo(200);
+        List<String> ids = nachrichten.jsonPath().getList("messages.ID");
+        assertThat(ids).hasSize(1);
+        Response nachricht = given().baseUri(mailpit).when().get("/api/v1/message/" + ids.getFirst());
+        String text = nachricht.jsonPath().getString("Text");
+        assertThat(text).contains(manifestDokument("A").id().toString())
+                .doesNotContainPattern("[0-9a-f]{64}");
     }
 
     @Angenommen("im Mandanten «urinet» ist das unbefristete Dokument «{word}» archiviert, gesperrt für {int} Stunden")
@@ -328,15 +446,22 @@ public class PrueflaufSchritte {
     }
 
     private void archivieren(String name, LocalDate aufbewahrenBis, int stunden) throws Exception {
+        archivieren(MANDANT, name, aufbewahrenBis, stunden, dokumente);
+    }
+
+    private void archivieren(String mandant, String name, LocalDate aufbewahrenBis, int stunden,
+                             Map<String, Archiviert> ziel) throws Exception {
         UUID id = UUID.randomUUID();
         String titel = "Prüflauf-Probe " + UUID.randomUUID();
         String schluessel = "archiv/" + VerarbeitungTestHilfe.JAHR + "/" + id + "/1-original.pdf";
         byte[] inhalt = VerarbeitungTestHilfe.zufall(256);
         Instant sperre = Instant.now().plus(Duration.ofHours(stunden)).truncatedTo(ChronoUnit.SECONDS);
-        String version = s3.putObject(b -> b.bucket(bucket()).key(schluessel).objectLockMode(ObjectLockMode.GOVERNANCE)
+        MandantCode code = new MandantCode(mandant);
+        String version = s3.putObject(b -> b.bucket(code.bucket(bucketPraefix)).key(schluessel)
+                        .objectLockMode(ObjectLockMode.GOVERNANCE)
                 .objectLockRetainUntilDate(sperre), RequestBody.fromBytes(inhalt)).versionId();
         try (Connection verbindung = datenbank.get().getConnection()) {
-            try (PreparedStatement dokument = verbindung.prepareStatement("insert into " + schema()
+            try (PreparedStatement dokument = verbindung.prepareStatement("insert into " + code.schema()
                     + ".dokument (id, eingang, quelle, erstellt_von, status, art, titel, aufbewahren_bis) "
                     + "values (?, ?, 'UPLOAD', ?, 'ARCHIVIERT', 'QUITTUNG', ?, ?)")) {
                 dokument.setObject(1, id);
@@ -346,7 +471,7 @@ public class PrueflaufSchritte {
                 dokument.setDate(5, aufbewahrenBis == null ? null : Date.valueOf(aufbewahrenBis));
                 dokument.executeUpdate();
             }
-            try (PreparedStatement datei = verbindung.prepareStatement("insert into " + schema()
+            try (PreparedStatement datei = verbindung.prepareStatement("insert into " + code.schema()
                     + ".dokument_datei (dokument_id, nr, rolle, sha256, s3_schluessel, s3_version, mime, groesse) "
                     + "values (?, 1, 'ORIGINAL', ?, ?, ?, 'application/pdf', ?)")) {
                 datei.setObject(1, id);
@@ -357,12 +482,16 @@ public class PrueflaufSchritte {
                 datei.executeUpdate();
             }
         }
-        dokumente.put(name, new Archiviert(id, titel, schluessel, version, sperre));
+        ziel.put(name, new Archiviert(id, titel, schluessel, version, sperre));
     }
 
     /** Startet wie der Zeitplan in einem eigenen Thread ohne Request-Kontext und ohne Transaktion. */
     private Optional<UUID> starten(Optional<YearMonth> monat) throws Exception {
-        return threads.submit(() -> starten.starten(new MandantCode(MANDANT), monat)).get(30, TimeUnit.SECONDS);
+        return starten(MANDANT, monat);
+    }
+
+    private Optional<UUID> starten(String mandant, Optional<YearMonth> monat) throws Exception {
+        return threads.submit(() -> starten.starten(new MandantCode(mandant), monat)).get(30, TimeUnit.SECONDS);
     }
 
     private List<String> arten(String name) throws SQLException {
@@ -372,6 +501,11 @@ public class PrueflaufSchritte {
 
     private String phase(UUID lauf) throws SQLException {
         return abfragen("select phase from " + schema() + ".prueflauf where id = '" + lauf + "'", String.class)
+                .getFirst();
+    }
+
+    private String phase(String mandant, UUID lauf) throws SQLException {
+        return abfragen("select phase from " + schema(mandant) + ".prueflauf where id = '" + lauf + "'", String.class)
                 .getFirst();
     }
 
@@ -407,11 +541,23 @@ public class PrueflaufSchritte {
         return dokumente.get(name);
     }
 
+    private Archiviert manifestDokument(String name) {
+        return manifestDokumente.get(name);
+    }
+
     private String bucket() {
         return new MandantCode(MANDANT).bucket(bucketPraefix);
     }
 
     private static String schema() {
         return new MandantCode(MANDANT).schema();
+    }
+
+    private static String schema(String mandant) {
+        return new MandantCode(mandant).schema();
+    }
+
+    private static Instant zeit(String datum, String uhrzeit) {
+        return LocalDate.parse(datum, DATUM).atTime(LocalTime.parse(uhrzeit)).atZone(ZUERICH).toInstant();
     }
 }

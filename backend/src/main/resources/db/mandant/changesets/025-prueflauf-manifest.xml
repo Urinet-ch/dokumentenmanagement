@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Prüflauf: Vergleich mit dem Inhalt der Tages-Manifeste (Aufgabe 5.3, Req 15.5). Erweitert die erlaubten Arten
+         von prueflauf_abweichung um MANIFEST_EINTRAG_FEHLT und MANIFEST_PRUEFSUMME; 011-prueflauf bleibt unverändert
+         (tech.md Regel 11). Rückwärtskompatibel: Der Vorgänger-Release schreibt nur die bisherigen Arten. -->
+    <changeSet id="025-prueflauf-manifest" author="archiv">
+        <sql>
+            alter table prueflauf_abweichung drop constraint prueflauf_abweichung_art_ck;
+            alter table prueflauf_abweichung add constraint prueflauf_abweichung_art_ck
+                check (art in ('PRUEFSUMME', 'VERSION_FEHLT', 'FREMDE_VERSION', 'LOESCHMARKE', 'SPERRE_FEHLT',
+                               'PRUEFFEHLER', 'MANIFEST_EINTRAG_FEHLT', 'MANIFEST_PRUEFSUMME'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

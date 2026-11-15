@@ -157,7 +157,7 @@ class ArchivWerkzeugeTest {
             }
         };
         Werkzeuglauf lauf = new Werkzeuglauf(register, new WerkzeugAuswahl(m -> true), mandanten);
-        return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, new BigDecimal("0.6")),
+        return new ArchivWerkzeuge(lauf, new DokumenteSuchen(null, null, null, null, null, null, new BigDecimal("0.6")),
                 new DokumentZeigen(null, null, null, null), new FristenAbfrage(null, null, null),
                 new KennzahlAbfrage(null, null, null, null), new OffenePostenAbfrage(null, null, null, null),
                 new ObjectMapper());
