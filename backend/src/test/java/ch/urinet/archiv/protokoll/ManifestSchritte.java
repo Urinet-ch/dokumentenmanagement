@@ -419,7 +419,8 @@ public class ManifestSchritte {
                 return register.erstellt(c);
             }
         };
-        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, einreihen), "worker", false);
+        ManifestPlaner planer = new ManifestPlaner(new ManifestPlanen(nurDieser, kontext, einreihen), "worker", false,
+                "B");
         planerGestern = ManifestFenster.tag(Instant.now()).minusDays(1);
         SchedulerTakt.ausloesen(scheduler, anmeldung, "manifest-planer", () -> ManifestPlanerAusloesen.planen(planer));
     }

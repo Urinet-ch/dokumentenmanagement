@@ -4,6 +4,7 @@ import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import io.smallrye.config.source.file.FileSystemConfigSource;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,7 +42,8 @@ class SecretPruefungTest {
     void dateiFehlt() throws IOException {
         dateien("s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_db_owner", "archiv_manifest_key");
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_OWNER, String.class))
-                .hasMessageContaining("Secret-Datei fehlt, ist leer oder wird übersteuert: archiv_db_app.")
+                .hasMessageContaining("archiv_db_app")
+                .hasMessageContaining("infomaniak_ai_token")
                 .hasMessageContaining(verzeichnis.toString());
     }
 
@@ -71,7 +73,8 @@ class SecretPruefungTest {
 
     @Test
     void eigentuemerNurBeiMigration() throws IOException {
-        dateien("archiv_db_app", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_manifest_key");
+        dateien("archiv_db_app", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "infomaniak_ai_token",
+                "archiv_manifest_key");
         assertThatCode(() -> config("worker", Map.of()).getValue(DB_APP, String.class)).as("Worker")
                 .doesNotThrowAnyException();
         assertThatThrownBy(() -> config("api", Map.of()).getValue(DB_APP, String.class)).as("API")
@@ -84,8 +87,27 @@ class SecretPruefungTest {
         assertThatCode(() -> config.getOptionalValue(DB_APP, String.class)).doesNotThrowAnyException();
     }
 
+    @Test
+    @Tag("req-16.24")
+    void stufePOhneKiUndManifestSchluesselZulaessigUndStufeBVerlangtKiToken() throws IOException {
+        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis");
+        String pflichtOhneKiOderManifest = "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis";
+        SmallRyeConfig stufeP = config("api", Map.of(SecretPruefung.PFLICHT, pflichtOhneKiOderManifest));
+
+        assertThatCode(() -> stufeP.getValue(DB_APP, String.class)).doesNotThrowAnyException();
+        assertThat(stufeP.getOptionalValue("infomaniak_ai_token", String.class)).isEmpty();
+        assertThat(stufeP.getOptionalValue("archiv.manifest.schluessel", String.class)).isEmpty();
+
+        SmallRyeConfig stufeB = config("api", Map.of());
+        assertThat(stufeB.getValue(SecretPruefung.PFLICHT, String.class)).contains("infomaniak_ai_token");
+        assertThatThrownBy(() -> stufeB.getValue(DB_APP, String.class))
+                .hasMessageContaining("infomaniak_ai_token")
+                .hasMessageContaining("archiv_manifest_key");
+    }
+
     private void alleDateien() throws IOException {
-        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis", "archiv_manifest_key");
+        dateien("archiv_db_app", "archiv_db_owner", "s3_app_zugang_id", "s3_app_zugang_geheimnis",
+                "infomaniak_ai_token", "archiv_manifest_key");
     }
 
     private void dateien(String... namen) throws IOException {
@@ -102,7 +124,8 @@ class SecretPruefungTest {
     private SmallRyeConfigBuilder builder(String rolle, Map<String, String> uebersteuert) {
         Map<String, String> werte = new HashMap<>();
         werte.put("archiv.rolle", rolle);
-        werte.put("%prod." + SecretPruefung.PFLICHT, "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis,archiv_manifest_key");
+        werte.put("%prod." + SecretPruefung.PFLICHT,
+                "archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis,infomaniak_ai_token,archiv_manifest_key");
         werte.put("%prod." + SecretPruefung.PFLICHT_MIGRATION, "archiv_db_owner");
         werte.put(SecretPruefung.MIGRIEREN, "true");
         werte.put("%prod.smallrye.config.source.file.locations", verzeichnis.toString());

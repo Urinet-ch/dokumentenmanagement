@@ -1,0 +1,226 @@
+# Restore-Probe auf der Stufe-B-VPS (Req 16.23, 16.24).
+# Das Infra-Repo erzeugt den tmpfs-Secrets-Pfad pro Lauf, spielt die Dumps ein und führt danach
+# kc.sh bootstrap-admin sowie «docker compose down -v» aus; hier steht nur der Pfad-Platzhalter.
+name: archiv-probe
+
+services:
+  api:
+    image: archiv:current
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 300m
+    cpus: 0.5
+    init: true
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
+      ARCHIV_ROLLE: api
+      ARCHIV_STUFE: P
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-p-
+      ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: COMPLIANCE
+      ARCHIV_SECRETS_PFLICHT: archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis
+      ARCHIV_TSA_DIENSTE: ""
+      ARCHIV_MANIFEST_BEIM_START: "false"
+      ARCHIV_MANIFEST_ZEITPLAN: "off"
+      ARCHIV_ALARM_EMPFAENGER_URINET: ""
+      QUARKUS_OIDC_AUTH_SERVER_URL: http://probe-kc:8080/realms/urinet-archiv
+      QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "4"
+      JAVA_OPTS_APPEND: >-
+        -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+        -Xmx96m -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=24m
+        -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    secrets:
+      - archiv_db_app
+      - archiv_db_owner
+      - s3_app_zugang_id
+      - s3_app_zugang_geheimnis
+      - archiv_data_key
+    networks:
+      - intern
+    depends_on:
+      db:
+        condition: service_healthy
+      kc:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /q/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 120s
+
+  worker:
+    image: archiv:current
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 256m
+    cpus: 0.5
+    init: true
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
+      QUARKUS_LIQUIBASE_MIGRATE_AT_START: "false"
+      ARCHIV_ROLLE: worker
+      ARCHIV_STUFE: P
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-p-
+      ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: COMPLIANCE
+      ARCHIV_SECRETS_PFLICHT: archiv_db_app,s3_app_zugang_id,s3_app_zugang_geheimnis
+      ARCHIV_TSA_DIENSTE: ""
+      ARCHIV_MANIFEST_BEIM_START: "false"
+      ARCHIV_MANIFEST_ZEITPLAN: "off"
+      ARCHIV_ALARM_EMPFAENGER_URINET: ""
+      QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "4"
+      JAVA_OPTS_APPEND: >-
+        -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+        -Xmx96m -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=24m
+        -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+    secrets:
+      - archiv_db_app
+      - s3_app_zugang_id
+      - s3_app_zugang_geheimnis
+    networks:
+      - intern
+    depends_on:
+      api:
+        condition: service_healthy
+
+  db:
+    image: archiv:db-current
+    restart: unless-stopped
+    user: "999:999"
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql:size=1m,uid=999,gid=999,mode=0775
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 128m
+    cpus: 0.5
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/archiv_db_postgres
+    command:
+      - postgres
+      - -c
+      - shared_buffers=24MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - max_connections=20
+      - -c
+      - effective_cache_size=64MB
+    secrets:
+      - archiv_db_postgres
+      - archiv_db_owner_scram
+      - archiv_db_app_scram
+      - keycloak_db_scram
+    volumes:
+      - type: volume
+        source: daten
+        target: /var/lib/postgresql/data
+    networks:
+      - intern
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, archiv, -h, 127.0.0.1]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  kc:
+    image: archiv:kc-current
+    restart: unless-stopped
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+      - /opt/keycloak/data/tmp:size=32m,uid=1000,gid=1000,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 340m
+    cpus: 0.5
+    environment:
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_POOL_MAX_SIZE: "4"
+      KC_HOSTNAME: http://probe-kc:8080
+      KC_HTTP_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: archiv-admin
+      MALLOC_ARENA_MAX: "2"
+      JAVA_OPTS: >-
+        -XX:+UseSerialGC -Xms32m -Xmx96m -XX:MaxMetaspaceSize=128m
+        -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=24m
+        -XX:MaxDirectMemorySize=24m -Xss512k
+        -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom
+        -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.err.encoding=UTF-8
+        -Djdk.tls.rejectClientInitiatedRenegotiation=true
+    secrets:
+      - keycloak_db
+      - keycloak_admin
+    networks:
+      - intern
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && head -n1 <&3 | grep -q ' 200 '
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 180s
+
+networks:
+  intern:
+    internal: true
+
+volumes:
+  daten:
+    name: archiv_probe_daten
+
+secrets:
+  archiv_db_app:
+    file: /run/archiv-probe-secrets/archiv_db_app
+  archiv_db_owner:
+    file: /run/archiv-probe-secrets/archiv_db_owner
+  s3_app_zugang_id:
+    file: /run/archiv-probe-secrets/s3_app_zugang_id
+  s3_app_zugang_geheimnis:
+    file: /run/archiv-probe-secrets/s3_app_zugang_geheimnis
+  archiv_data_key:
+    file: /run/archiv-probe-secrets/archiv_data_key
+  archiv_db_postgres:
+    file: /run/archiv-probe-secrets/archiv_db_postgres
+  archiv_db_owner_scram:
+    file: /run/archiv-probe-secrets/archiv_db_owner_scram
+  archiv_db_app_scram:
+    file: /run/archiv-probe-secrets/archiv_db_app_scram
+  keycloak_db_scram:
+    file: /run/archiv-probe-secrets/keycloak_db_scram
+  keycloak_db:
+    file: /run/archiv-probe-secrets/keycloak_db
+  keycloak_admin:
+    file: /run/archiv-probe-secrets/keycloak_admin

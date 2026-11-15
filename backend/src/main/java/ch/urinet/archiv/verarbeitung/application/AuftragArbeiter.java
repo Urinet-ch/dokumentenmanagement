@@ -1,9 +1,11 @@
 package ch.urinet.archiv.verarbeitung.application;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.WertefreieMeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.verarbeitung.domain.AuftragFehler;
+import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nachbearbeitung;
 import ch.urinet.archiv.verarbeitung.domain.Wiederholung;
 import jakarta.annotation.PreDestroy;
@@ -61,6 +63,7 @@ public class AuftragArbeiter {
     static final String ZEITGRENZE = "zeitgrenze";
     static final String VERWAIST = "verwaist";
     static final int HAENGEND_NACH_ZEITGRENZEN = 2;
+    static final AuftragTyp PRUEFLAUF = PrueflaufHandler.TYP;
 
     private static final Logger LOG = Logger.getLogger(AuftragArbeiter.class);
 
@@ -69,6 +72,7 @@ public class AuftragArbeiter {
     private final MandantKontext kontext;
     private final Duration lebenszeichen;
     private final Duration stoppFrist;
+    private final boolean nurPrueflauf;
     private final Semaphore plaetze;
     private final AtomicBoolean herunterfahren = new AtomicBoolean();
     private final ExecutorService ueberwachung = Executors.newThreadPerTaskExecutor(
@@ -85,7 +89,8 @@ public class AuftragArbeiter {
     public AuftragArbeiter(AuftragSchlange schlange, AuftragHandlerVerzeichnis verzeichnis, MandantKontext kontext,
                            @ConfigProperty(name = "archiv.worker.parallel") int parallel,
                            @ConfigProperty(name = "archiv.auftrag.lebenszeichen") Duration lebenszeichen,
-                           @ConfigProperty(name = "archiv.worker.stopp-frist") Duration stoppFrist) {
+                           @ConfigProperty(name = "archiv.worker.stopp-frist") Duration stoppFrist,
+                           @ConfigProperty(name = "archiv.stufe", defaultValue = "B") String stufe) {
         if (parallel < 1) {
             throw new IllegalArgumentException("archiv.worker.parallel muss mindestens 1 sein");
         }
@@ -100,6 +105,7 @@ public class AuftragArbeiter {
         this.kontext = kontext;
         this.lebenszeichen = lebenszeichen;
         this.stoppFrist = stoppFrist;
+        this.nurPrueflauf = Stufe.aus(Optional.ofNullable(stufe)) == Stufe.P;
         this.plaetze = new Semaphore(parallel);
     }
 
@@ -117,8 +123,12 @@ public class AuftragArbeiter {
         }
         List<Auftrag> geholt = List.of();
         try {
-            if (!verzeichnis.typen().isEmpty()) {
-                geholt = schlange.holen(verzeichnis.typen(), frei);
+            Set<AuftragTyp> typen = verzeichnis.typen();
+            if (nurPrueflauf) {
+                typen = typen.contains(PRUEFLAUF) ? Set.of(PRUEFLAUF) : Set.<AuftragTyp>of();
+            }
+            if (!typen.isEmpty()) {
+                geholt = schlange.holen(typen, frei);
             }
         } finally {
             plaetze.release(frei - geholt.size());

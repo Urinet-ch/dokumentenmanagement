@@ -4,6 +4,7 @@ import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfigBuilder;
 import org.eclipse.microprofile.config.Config;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -64,6 +65,13 @@ class TsaStartpruefungTest {
                 .doesNotThrowAnyException();
         assertThatThrownBy(() -> TsaStartpruefung.beimStart(leer, PROD, "kommando,worker"))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @Tag("req-16.24")
+    void stufePAusgesetztAuchOhneZeitstempeldienste() {
+        assertThatCode(() -> TsaStartpruefung.beimStart(config(Map.of("archiv.stufe", "P")), PROD, "api,worker"))
+                .doesNotThrowAnyException();
     }
 
     private static Map<String, String> dienst(String kennung) {

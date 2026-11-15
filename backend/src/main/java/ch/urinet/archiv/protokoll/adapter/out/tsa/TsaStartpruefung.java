@@ -1,5 +1,6 @@
 package ch.urinet.archiv.protokoll.adapter.out.tsa;
 
+import ch.urinet.archiv.ablage.domain.Stufe;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.config.SmallRyeConfig;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,7 +18,7 @@ import java.util.List;
  * {@code archiv.tsa.dienste} oder mit einem unvollständig konfigurierten Dienst bricht der Start ab, weil sich ein
  * Zeitstempel nicht rückwirkend nachholen lässt; mit nur einem Dienst warnt jeder Start (Übergang nach Wegfall des
  * Hauptdiensts). Admin-Kommandos ({@code archiv.rolle=kommando}) erzeugen keine Manifeste und sind ausgenommen.
- * Stufe P (Req 16.24) gibt es noch nicht; sie kommt mit 4.9-E5 und wird dann hier ausgenommen.
+ * Stufe P (Req 16.24) erzeugt ebenfalls keine Manifeste und ist darum ausgenommen.
  */
 @ApplicationScoped
 public class TsaStartpruefung {
@@ -37,6 +38,9 @@ public class TsaStartpruefung {
     static void beimStart(Config config, List<String> profile, String rolle) {
         boolean kommando = Arrays.stream(rolle.split(",")).map(String::trim).allMatch("kommando"::equals);
         if (!profile.contains("prod") || kommando) {
+            return;
+        }
+        if (Stufe.aus(config.getOptionalValue("archiv.stufe", String.class)) == Stufe.P) {
             return;
         }
         List<String> dienste = pruefen(config);
