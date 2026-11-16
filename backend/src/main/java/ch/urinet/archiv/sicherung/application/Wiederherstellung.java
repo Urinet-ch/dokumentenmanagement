@@ -43,7 +43,7 @@ public final class Wiederherstellung {
 
     public Ergebnis wiederherstellen(MandantCode mandant, List<InventarZeile> inventar, Path strom, boolean kappen) {
         Zaehler leer = Zaehler.leer();
-        if (kappen && !ziel.praefix().startsWith(Stufenregel.PRAEFIX_STUFE_P)) {
+        if (kappen && !ziel.praefix().equals(Stufenregel.PRAEFIX_STUFE_P)) {
             return new Ergebnis(2, leer);
         }
         if (!ziel.leer(mandant)) {

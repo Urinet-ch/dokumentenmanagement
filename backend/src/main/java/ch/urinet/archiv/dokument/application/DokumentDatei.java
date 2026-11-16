@@ -36,7 +36,13 @@ public class DokumentDatei {
     /** {@code nr} gilt für Original und Arbeitsfassung (ab 1); für PDF/A ist sie 0. */
     public VorsignierteUrl herunterladen(Benutzer benutzer, MandantCode mandant, UUID id, DateiRolle rolle, int nr,
                                          Ansicht ansicht) {
-        DateiFundstelle fundstelle = repository.dateiFinden(id, Sichtregel.fuer(benutzer), rolle, nr)
+        return herunterladen(Sichtregel.fuer(benutzer), mandant, id, rolle, nr, ansicht);
+    }
+
+    /** Wie oben für eine beliebige Sicht, z. B. die der Webseiten-Schnittstelle (Spec 03, Aufgabe 11.2). */
+    public VorsignierteUrl herunterladen(Sichtregel sicht, MandantCode mandant, UUID id, DateiRolle rolle, int nr,
+                                         Ansicht ansicht) {
+        DateiFundstelle fundstelle = repository.dateiFinden(id, sicht, rolle, nr)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         AblagePfad pfad = AblagePfad.lesen(fundstelle.pfad());
         if (!pfad.schluessel().docId().equals(id) || pfad.schluessel().rolle() != rolle) {

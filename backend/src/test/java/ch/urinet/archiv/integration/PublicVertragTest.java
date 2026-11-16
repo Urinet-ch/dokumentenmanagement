@@ -78,12 +78,13 @@ class PublicVertragTest {
 
     @Test
     void gegenprobeEndpunktNurImCodeIstRot() throws IOException {
-        assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), datei(vertrag)))
+        assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), nurGegenprobe(datei(vertrag))))
                 .containsExactly("/public/v1/gegenprobe/{id}: nur im Code");
     }
 
     @Test
     void gegenprobeEndpunktNurInDerDateiIstRot() {
+        // die Datei der Gegenprobe kennt nur ihren Endpunkt: die echten Endpunkte (Aufgabe 11.2) bleiben aussen vor
         assertThat(PublicVertrag.unterschiede(nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausCode(hauptIndex,
                 einstellungen))), datei(gegenprobe))).containsExactly("/public/v1/gegenprobe/{id}: nur in der Datei");
     }
@@ -129,26 +130,20 @@ class PublicVertragTest {
                 .containsExactly("/public/v1/gegenprobe/{id} get: Statuscode 4044");
     }
 
-    /** Die Gegenproben betreffen nur ihren eigenen Pfad; echte Endpunkte (Code und Vertrag) sind Sache der ersten Probe. */
-    private static final String GEGENPROBE_PFAD = "/public/v1/gegenprobe";
-
+    /** Beschreibung aus dem Code mit den Klassen der Gegenprobe, beschränkt auf deren Pfad. */
     private static Map<String, Object> code(Class<?>... zusaetzlich) throws IOException {
-        return nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich),
-                einstellungen)));
-    }
-
-    private static Map<String, Object> datei(String yaml) {
-        return nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausDatei(yaml)));
+        return nurGegenprobe(PublicVertrag.pfade(
+                PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich), einstellungen)));
     }
 
     private static Map<String, Object> nurGegenprobe(Map<String, Object> pfade) {
-        Map<String, Object> ergebnis = new java.util.TreeMap<>();
-        pfade.forEach((pfad, wert) -> {
-            if (pfad.startsWith(GEGENPROBE_PFAD)) {
-                ergebnis.put(pfad, wert);
-            }
-        });
+        Map<String, Object> ergebnis = new java.util.TreeMap<>(pfade);
+        ergebnis.keySet().removeIf(pfad -> !pfad.startsWith("/public/v1/gegenprobe"));
         return ergebnis;
+    }
+
+    private static Map<String, Object> datei(String yaml) {
+        return PublicVertrag.pfade(PublicVertrag.ausDatei(yaml));
     }
 
     private static String ersetzen(String text, String alt, String neu) {

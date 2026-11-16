@@ -5,7 +5,23 @@ info:
   description: |
     Vertrag der Webseiten-Schnittstelle unter `/public/v1` (Hauptversion 1), gleich für jede Webseite
     (Spec 03, Requirement 11, ADR-014). Endpunkte kommen additiv mit den Aufgaben, die sie bauen; diese Fassung
-    beschreibt Anmeldung, Fehler, Header und Versionierung.
+    beschreibt Anmeldung, Fehler, Header und Versionierung sowie die lesenden Endpunkte (Liste, Suche, Details,
+    Datei-Link, Filter, Umleitung).
+
+    Lesen:
+    - **Stufe der Anfrage.** Der Header `X-Archiv-Zugriff` (`oeffentlich`, `mitglieder`, `vorstand`; fehlt er, gilt
+      `oeffentlich`) meldet die Stufe des Besuchers. Sie darf nicht über der Stufe des Schlüssels liegen (403
+      `NICHT_ERLAUBT`); ein unbekannter Wert ergibt 400 `ANFRAGE_UNGUELTIG`. Es gilt für Liste, Suche, Details,
+      Datei-Link, Filter und Umleitung.
+    - **Fester Filter.** Jede Abfrage liefert nur archivierte, veröffentlichte Dokumente der Vertraulichkeit `NORMAL`
+      mit einer Zugriffsstufe bis zur Stufe der Anfrage. Ein Dokument ausserhalb davon gibt es für die Anfrage nicht:
+      404 `NICHT_GEFUNDEN`, gleich wie bei einer unbekannten ID. Kein Parameter ändert diesen Filter.
+    - **Dokumente heissen nur mit ihrer ID.** Die Antworten nennen nie eine URL einer Seite der Webseite, nie den
+      Dateinamen, die Vertraulichkeit, den Status oder Angaben zur Veröffentlichung; den Link auf die Dokumentseite
+      bildet die Webseite selbst.
+    - **Client-Hash.** `X-Archiv-Client` (SHA-256 aus IP und Tages-Salz des Besuchers, 64 Hexziffern in
+      Kleinbuchstaben, von der Webseite berechnet) ist optional; die IP des Besuchers erhält das Archiv nie.
+    - **Unbekannte Parameter** einer Abfrage werden ignoriert.
 
     Regeln:
     - **Nur serverseitig.** Nur der Server einer Webseite ruft die Schnittstelle auf. Das Archiv erlaubt kein CORS;
@@ -90,6 +106,237 @@ paths:
           $ref: "#/components/responses/ZuVieleAnfragen"
         "503":
           $ref: "#/components/responses/Ueberlastet"
+  "/public/v1/dokumente":
+    get:
+      summary: Veröffentlichte Dokumente auflisten
+      description: Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert
+        (archiviert, veröffentlicht, Vertraulichkeit NORMAL, Zugriffsstufe bis zur gemeldeten
+        Stufe). Filter nach reihe (Code), jahr und ausgabe; sortierung datum_ab (Standard),
+        datum_auf oder titel. Unbekannte Parameter werden ignoriert.
+      parameters:
+      - description: Ausgabe innerhalb der Reihe
+        name: ausgabe
+        in: query
+        schema:
+          type: string
+      - description: Jahr, vier Ziffern
+        name: jahr
+        in: query
+        schema:
+          type: string
+      - description: Einträge je Seite, 1 bis 100 (Standard 20)
+        schema:
+          maximum: 100
+          minimum: 1
+          format: int32
+          type: integer
+        name: pro_seite
+        in: query
+      - description: Code der Reihe, z. B. aus /public/v1/filter
+        name: reihe
+        in: query
+        schema:
+          type: string
+      - description: Seite ab 1 (Standard 1, höchstens 9999)
+        schema:
+          minimum: 1
+          format: int32
+          type: integer
+        name: seite
+        in: query
+      - description: Sortierung (Standard datum_ab)
+        schema:
+          type: string
+          enum:
+          - datum_ab
+          - datum_auf
+          - titel
+        name: sortierung
+        in: query
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Seite der Liste
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteDokumentListe"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/dokumente/{id}":
+    get:
+      summary: Details eines Dokuments
+      description: Dokument mit Auszug. Ein Dokument ausserhalb des festen Filters (nicht
+        veröffentlicht, höhere Stufe, fremder Mandant) und eine unbekannte oder ungültige
+        ID ergeben dieselbe Antwort 404.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Dokument
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteDokumentDetails"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '404':
+          "$ref": "#/components/responses/NichtGefunden"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/dokumente/{id}/datei":
+    get:
+      summary: Datei-Link eines öffentlichen Dokuments
+      description: Vorsignierte Adresse der PDF-Datei, höchstens 5 Minuten gültig; jeder
+        Abruf wird mit gekürzter IP protokolliert. Nur für Dokumente der Stufe oeffentlich;
+        für andere Dokumente gibt es hier keine Adresse (404), ihr Abruf folgt als Stream
+        mit einer späteren Fassung.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Adresse der Datei
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteDateiLink"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '404':
+          "$ref": "#/components/responses/NichtGefunden"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/filter":
+    get:
+      summary: Werte für die Filter
+      description: Reihen (Code und Name der aktiven Dokumentarten), zu denen der feste
+        Filter bis zur Stufe der Anfrage mindestens ein Dokument liefert; eine Reihe
+        oder ein Wert einer höheren Stufe wird nie genannt.
+      parameters:
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Filter
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteFilter"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/suche":
+    get:
+      summary: Dokumente suchen
+      description: Hybridsuche (Volltext und semantische Suche mit Reranker) über die
+        Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert, ohne Dateinamen.
+        q ist Pflicht (höchstens 200 Zeichen). Höchstens 30 Treffer ohne Blättern; degradiert
+        heisst, dass nur im Volltext gesucht wurde. Die Fundstelle fehlt, wenn die Seite
+        unbekannt ist.
+      parameters:
+      - description: Ausgabe innerhalb der Reihe
+        name: ausgabe
+        in: query
+        schema:
+          type: string
+      - description: Jahr, vier Ziffern
+        name: jahr
+        in: query
+        schema:
+          type: string
+      - description: Suchbegriff (Websuche-Syntax), höchstens 200 Zeichen
+        required: true
+        name: q
+        in: query
+        schema:
+          type: string
+      - description: Code der Reihe
+        name: reihe
+        in: query
+        schema:
+          type: string
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Treffer
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteSuchergebnis"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/umleitung":
+    get:
+      summary: Dokument zu einer alten URL
+      description: Zuordnung alte URL der bisherigen Webseite zur Dokument-ID, nur für
+        Dokumente, die der feste Filter bis zur Stufe der Anfrage liefert; sonst 404.
+        Die URL darf mit Schema und Host stehen; geprüft wird nur der Pfad (ohne Anfrage
+        und Fragment, Prozent-Kodierung aufgelöst, ohne abschliessenden Schrägstrich).
+      parameters:
+      - description: Alte URL oder ihr Pfad
+        required: true
+        name: url
+        in: query
+        schema:
+          type: string
+      - "$ref": "#/components/parameters/ClientHeader"
+      - "$ref": "#/components/parameters/ZugriffHeader"
+      responses:
+        '200':
+          description: Dokument
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteUmleitung"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '404':
+          "$ref": "#/components/responses/NichtGefunden"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
 security:
   - webseitenSchluessel: []
 components:
@@ -158,6 +405,271 @@ components:
             - DATEI_ZU_GROSS
             - INTERNER_FEHLER
             - UEBERLASTET
+    WebseiteDateiLink:
+      description: Vorsignierte Adresse der Datei, kurz gültig
+      type: object
+      required:
+      - url
+      - gueltigBis
+      properties:
+        url:
+          type: string
+          description: Adresse der PDF-Datei; bis gueltigBis ein Zugangsschlüssel, nicht
+            weitergeben, nicht speichern, nicht loggen
+        gueltigBis:
+          type: string
+          format: date-time
+          description: Ablauf, höchstens 5 Minuten nach der Anfrage
+    WebseiteDokument:
+      description: Dokument in der Liste; bezeichnet nur mit der ID, nie mit einer URL
+      type: object
+      required:
+      - id
+      - zugriff
+      properties:
+        id:
+          type: string
+          format: uuid
+        titel:
+          type:
+          - string
+          - 'null'
+        reihe:
+          anyOf:
+          - "$ref": "#/components/schemas/WebseiteReihe"
+          - type: 'null'
+        ausgabe:
+          type:
+          - string
+          - 'null'
+          description: Ausgabe innerhalb der Reihe, z. B. Nummer
+        jahr:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        datum:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: Erscheinungsdatum; fehlt, wenn unbekannt
+        zugriff:
+          type: string
+          description: Zugriffsstufe des Dokuments
+          enum:
+          - oeffentlich
+          - mitglieder
+          - vorstand
+        seiten:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Zahl der Seiten, wenn bekannt
+    WebseiteDokumentDetails:
+      description: Dokument mit Auszug
+      type: object
+      required:
+      - id
+      - zugriff
+      properties:
+        id:
+          type: string
+          format: uuid
+        titel:
+          type:
+          - string
+          - 'null'
+        reihe:
+          anyOf:
+          - "$ref": "#/components/schemas/WebseiteReihe"
+          - type: 'null'
+        ausgabe:
+          type:
+          - string
+          - 'null'
+        jahr:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        datum:
+          type:
+          - string
+          - 'null'
+          format: date
+        zugriff:
+          type: string
+          enum:
+          - oeffentlich
+          - mitglieder
+          - vorstand
+        seiten:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        auszug:
+          type:
+          - string
+          - 'null'
+          description: Anfang des Textes, höchstens 300 Zeichen; fehlt ohne Text
+    WebseiteDokumentListe:
+      description: Seite der Liste veröffentlichter Dokumente
+      type: object
+      required:
+      - eintraege
+      - seite
+      - proSeite
+      - gesamt
+      properties:
+        eintraege:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteDokument"
+        seite:
+          type: integer
+          format: int32
+          description: Nummer dieser Seite, ab 1
+        proSeite:
+          type: integer
+          format: int32
+        gesamt:
+          type: integer
+          format: int64
+          description: Zahl aller Dokumente, die die Anfrage liefert
+    WebseiteFilter:
+      description: Auswahl für die Filter der Webseite
+      type: object
+      required:
+      - reihen
+      properties:
+        reihen:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteReihe"
+          description: Reihen mit mindestens einem sichtbaren Dokument
+    WebseiteFundstelle:
+      description: Stelle des besten Treffers im Dokument
+      type: object
+      required:
+      - seite
+      properties:
+        seite:
+          type: integer
+          format: int32
+          description: PDF-Seite, ab 1
+    WebseiteReihe:
+      type: object
+      description: Reihe (Dokumentart) eines Dokuments
+      required:
+      - code
+      - name
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+    WebseiteSuchergebnis:
+      description: Treffer der Hybridsuche, höchstens 30, ohne Blättern
+      type: object
+      required:
+      - treffer
+      - degradiert
+      properties:
+        treffer:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteTreffer"
+        degradiert:
+          type: boolean
+          description: true, wenn nur im Volltext gesucht wurde (Rückfall, ohne semantische
+            Suche)
+    WebseiteTreffer:
+      type: object
+      description: Dokument als Treffer der Suche
+      required:
+      - id
+      - zugriff
+      - rang
+      properties:
+        id:
+          type: string
+          format: uuid
+        titel:
+          type:
+          - string
+          - 'null'
+        reihe:
+          anyOf:
+          - "$ref": "#/components/schemas/WebseiteReihe"
+          - type: 'null'
+        ausgabe:
+          type:
+          - string
+          - 'null'
+        jahr:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        datum:
+          type:
+          - string
+          - 'null'
+          format: date
+        zugriff:
+          type: string
+          enum:
+          - oeffentlich
+          - mitglieder
+          - vorstand
+        seiten:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        auszug:
+          type:
+          - string
+          - 'null'
+          description: Textstelle zum Suchbegriff aus dem Text, höchstens 300 Zeichen;
+            ohne Dateinamen
+        fundstelle:
+          "$ref": "#/components/schemas/WebseiteFundstelle"
+        rang:
+          type: integer
+          format: int32
+          description: Platz in dieser Antwort, ab 1
+    WebseiteUmleitung:
+      description: Dokument zu einer alten URL
+      type: object
+      required:
+      - dokumentId
+      properties:
+        dokumentId:
+          type: string
+          format: uuid
+  parameters:
+    ClientHeader:
+      description: SHA-256 aus IP und Tages-Salz des Besuchers, von der Webseite berechnet
+        (64 Hexziffern in Kleinbuchstaben); die IP selbst bekommt das Archiv nie
+      schema:
+        type: string
+      name: X-Archiv-Client
+      in: header
+    ZugriffHeader:
+      description: Zugriffsstufe der Anfrage; fehlt der Header, gilt oeffentlich; über
+        der Stufe des Schlüssels 403, unbekannt 400
+      schema:
+        type: string
+        enum:
+        - oeffentlich
+        - mitglieder
+        - vorstand
+      name: X-Archiv-Zugriff
+      in: header
   headers:
     CacheControl:
       description: Auf jeder Antwort; nicht zwischenspeichern.

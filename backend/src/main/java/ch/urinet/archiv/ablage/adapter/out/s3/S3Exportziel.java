@@ -35,6 +35,7 @@ final class S3Exportziel extends OutputStream implements Exportziel {
     private final S3Client s3;
     private final String bucket;
     private final String key;
+    private final String contentType;
     private final byte[] puffer;
     private final MessageDigest digest = Pruefsumme.sha256();
     private final List<CompletedPart> teile = new ArrayList<>();
@@ -44,12 +45,17 @@ final class S3Exportziel extends OutputStream implements Exportziel {
     private boolean beendet;
 
     S3Exportziel(S3Client s3, String bucket, String key, int teilGroesse) {
+        this(s3, bucket, key, teilGroesse, "application/zip");
+    }
+
+    S3Exportziel(S3Client s3, String bucket, String key, int teilGroesse, String contentType) {
         if (teilGroesse < MIN_TEIL) {
             throw new IllegalArgumentException("Teile eines Multipart-Uploads sind mindestens 5 MiB gross");
         }
         this.s3 = Objects.requireNonNull(s3, "s3");
         this.bucket = Objects.requireNonNull(bucket, "bucket");
         this.key = Objects.requireNonNull(key, "key");
+        this.contentType = Objects.requireNonNull(contentType, "contentType");
         this.puffer = new byte[teilGroesse];
     }
 
@@ -138,7 +144,7 @@ final class S3Exportziel extends OutputStream implements Exportziel {
     /** Lädt den Puffer als nächsten Teil hoch; der letzte Teil darf kleiner als 5 MiB sein. */
     private void teilHochladen() {
         if (uploadId == null) {
-            uploadId = s3.createMultipartUpload(b -> b.bucket(bucket).key(key).contentType("application/zip")
+            uploadId = s3.createMultipartUpload(b -> b.bucket(bucket).key(key).contentType(contentType)
                     .checksumAlgorithm(ChecksumAlgorithm.CRC32)).uploadId();
         }
         int nummer = teile.size() + 1;
