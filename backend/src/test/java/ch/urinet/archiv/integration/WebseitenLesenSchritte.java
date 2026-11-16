@@ -5,7 +5,10 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.integration.application.webseite.AenderungFeedAufraeumen;
 import ch.urinet.archiv.integration.application.webseite.DateiPlaetze;
+import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.ki.domain.Vektortext;
 import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -50,6 +53,9 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,6 +81,9 @@ public class WebseitenLesenSchritte {
     @Inject
     DateiPlaetze plaetze;
 
+    @Inject
+    AenderungFeedAufraeumen aufraeumen;
+
     private record Dok(String mandant, UUID id) {
     }
 
@@ -85,6 +94,7 @@ public class WebseitenLesenSchritte {
     private long protokollStand;
     private final List<RohClient> offeneStreams = new ArrayList<>();
     private final Map<String, String> sha256 = new HashMap<>();
+    private final Map<String, String> cursor = new HashMap<>();
     private RohClient.Kopf streamKopf;
     private String streamText = "";
     private String gelesenSha256;
@@ -92,6 +102,7 @@ public class WebseitenLesenSchritte {
     private long heapZuwachs;
     private Response antwort;
     private Response vergleich;
+    private boolean embeddingGesetzt;
 
     @After
     public void aufraeumen() throws SQLException, InterruptedException {
@@ -117,9 +128,14 @@ public class WebseitenLesenSchritte {
             ausfuehren("delete from " + new MandantCode(mandant).schema()
                     + ".dokumentart where code like 'WEBTEST\\_%'");
         }
+        if (embeddingGesetzt) {
+            embeddingGesetzt = false;
+            KiWireMock.zuruecksetzen();
+        }
         dokumente.clear();
         tokenIds.clear();
         schluessel.clear();
+        cursor.clear();
         mandantenMitReihen.clear();
     }
 
@@ -282,6 +298,12 @@ public class WebseitenLesenSchritte {
     @Dann("antwortet die Lese-Schnittstelle mit Status {int} und Fehlercode «{word}»")
     public void statusUndCode(int status, String code) {
         assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
+    }
+
+    @Dann("nennt die Antwort nicht das Dokument «{word}»")
+    public void nichtDokument(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(titel()).doesNotContain(name);
     }
 
     @Dann("nennt die Antwort genau die Dokumente «{}»")
@@ -505,10 +527,40 @@ public class WebseitenLesenSchritte {
         }
     }
 
+    /**
+     * Liest langsam und misst den Heap in der Mitte. Der Leerlauf im %test-Profil (PT3S) ist knapp: stockt die
+     * Auslieferung auf einem überlasteten CI-Läufer (Garbage Collection der Messung, Object Storage) länger als das,
+     * beendet die API den Stream zu Recht vorzeitig. Das Szenario prüft Vollständigkeit und Speicher, nicht den
+     * Leerlauf (den prüft das Szenario mit dem nur angelesenen Stream); darum wird ein vorzeitig beendeter Versuch
+     * nach Freigabe der Plätze höchstens zweimal wiederholt.
+     */
     @Wenn("der Webseiten-Lesezugang «{word}» die Datei von «{word}» mit der Stufe «{word}» langsam liest")
     public void langsamLesen(String name, String dokument, String stufe) throws IOException, InterruptedException {
         assertThat(schluessel).containsKey(name);
+        for (int versuch = 1; versuch <= 3; versuch++) {
+            try {
+                langsamLesenEinmal(name, dokument, stufe);
+                if (gelesenBytes == streamKopf.laenge()) {
+                    return;
+                }
+            } catch (IOException e) {
+                // Abbruch der Verbindung (z. B. Reset statt sauberem Ende) zählt wie ein vorzeitiges Ende
+                if (versuch == 3) {
+                    throw e;
+                }
+            }
+            // Wiederholung sichtbar machen, damit die Häufigkeit der Flakiness in CI-Läufen erkennbar bleibt
+            System.out.println("langsamLesen: Versuch " + versuch + " vorzeitig beendet nach " + gelesenBytes + " Bytes, wiederhole");
+            long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
+                Thread.sleep(50);
+            }
+        }
+    }
+
+    private void langsamLesenEinmal(String name, String dokument, String stufe) throws IOException, InterruptedException {
         Runtime laufzeit = Runtime.getRuntime();
+        heapZuwachs = Long.MAX_VALUE; // unvollständige Messung ist sicher rot
         gc();
         long vorher = laufzeit.totalMemory() - laufzeit.freeMemory();
         MessageDigest digest = digest();
@@ -655,6 +707,228 @@ public class WebseitenLesenSchritte {
             System.gc();
             Thread.sleep(50);
         }
+    }
+
+    // ---- Fundstelle der Suche (Aufgabe 11.13, Req 5.7)
+
+    /** Das Embedding-Modell (WireMock) bettet jede Frage als Einheitsvektor {@code e0} ein. */
+    @Angenommen("das Embedding-Modell bettet jede Frage der Webseiten-Suche gleich ein")
+    public void embeddingBereit() {
+        embeddingGesetzt = true;
+        KiWireMock.zuruecksetzen();
+        float[] frage = new float[KiWireMock.DIMENSION];
+        frage[0] = 1f;
+        String vektor = Vektortext.text(frage);
+        KiWireMock.client().register(post(urlPathEqualTo("/v1/embeddings")).atPriority(5).willReturn(okJson(
+                "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":" + vektor
+                        + "}],\"model\":\"bge_multilingual_gemma2\",\"usage\":{\"prompt_tokens\":"
+                        + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":" + KiWireMock.TOKENS_JE_TEXT + "}}")));
+    }
+
+    /** Spalte {@code seiten}: «von-bis» oder «-» ohne Seitenbereich; der Vektor liegt nahe bei der Frage. */
+    @Angenommen("das Dokument «{word}» hat diese Abschnitte nahe der Frage:")
+    public void abschnitte(String name, DataTable tabelle) throws SQLException {
+        Dok d = dokumente.get(name);
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            int nr = Integer.parseInt(zeile.get("nr"));
+            String seiten = zeile.get("seiten");
+            Integer von = null;
+            Integer bis = null;
+            if (!"-".equals(seiten)) {
+                String[] teile = seiten.split("-");
+                von = Integer.valueOf(teile[0]);
+                bis = Integer.valueOf(teile[1]);
+            }
+            float[] vektor = new float[KiWireMock.DIMENSION];
+            vektor[0] = 1f;
+            vektor[1] = 0.01f * nr;
+            ausfuehren("insert into " + new MandantCode(d.mandant()).schema() + ".chunk (dokument_id, nr, text, "
+                    + "seite_von, seite_bis, embedding) values (?, ?, ?, ?, ?, ?::public.halfvec)", d.id(), nr,
+                    "webtest-" + name + " Abschnittstext-" + nr + " mit Geheimwort-Abschnitt", von, bis,
+                    Vektortext.text(vektor));
+        }
+    }
+
+    @Dann("trägt der Treffer «{word}» die Fundstelle mit Seite {int}")
+    public void fundstelle(String name, int seite) {
+        Map<String, Object> treffer = treffer(name);
+        assertThat(treffer).containsKey("fundstelle");
+        assertThat(treffer.get("fundstelle")).isEqualTo(Map.of("seite", seite));
+    }
+
+    @Dann("trägt der Treffer «{word}» keine Fundstelle")
+    public void keineFundstelle(String name) {
+        assertThat(treffer(name)).doesNotContainKey("fundstelle");
+    }
+
+    @Dann("nennt die Antwort den Text der Abschnitte nicht")
+    public void keinAbschnittstext() {
+        assertThat(antwort.asString()).doesNotContain("Geheimwort-Abschnitt").doesNotContain("Abschnittstext");
+    }
+
+    private Map<String, Object> treffer(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String id = dokumente.get(name).id().toString();
+        List<Map<String, Object>> treffer = antwort.path("treffer");
+        return treffer.stream().filter(x -> id.equals(x.get("id"))).findFirst()
+                .orElseThrow(() -> new AssertionError("Treffer fehlt: " + name));
+    }
+
+    // ---- Änderungs-Feed (Aufgabe 11.9)
+
+    @Angenommen("der Zugang «{word}» hat den Cursor «{word}» von «{}» gemerkt")
+    public void cursorMerken(String name, String marke, String pfad) {
+        antwort = anfrage(name).when().get(pfad);
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<List<Object>>path("eintraege")).isEmpty();
+        cursor.put(marke, antwort.path("cursor"));
+    }
+
+    @Angenommen("die Webseite «{word}» hat für das Dokument «{word}» die Referenz «{}»")
+    public void referenz(String webseite, String dokument, String referenz) throws SQLException {
+        Dok d = dokumente.get(dokument);
+        ausfuehren("insert into " + new MandantCode(d.mandant()).schema() + ".webseite_referenz (webseite, referenz, "
+                + "dokument_id, sha256) values (?, ?, ?, repeat('0', 64))", webseite, referenz, d.id());
+    }
+
+    @Wenn("das Dokument «{word}» auf die Stufe «{word}» gesetzt wird")
+    public void stufeSetzen(String name, String stufe) throws SQLException {
+        Dok d = dokumente.get(name);
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set zusatz = jsonb_set(coalesce("
+                + "zusatz, '{}'::jsonb), '{zugriff}', to_jsonb(?::text)), version = version + 1 where id = ?", stufe,
+                d.id());
+    }
+
+    @Wenn("das Dokument «{word}» zurückgezogen wird")
+    public void zurueckziehen(String name) throws SQLException {
+        veroeffentlicht(name, false);
+    }
+
+    @Wenn("das Dokument «{word}» veröffentlicht wird")
+    public void veroeffentlichen(String name) throws SQLException {
+        veroeffentlicht(name, true);
+    }
+
+    private void veroeffentlicht(String name, boolean wert) throws SQLException {
+        Dok d = dokumente.get(name);
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set zusatz = jsonb_set(coalesce("
+                + "zusatz, '{}'::jsonb), '{veroeffentlicht}', to_jsonb(?::boolean)), version = version + 1 "
+                + "where id = ?", wert, d.id());
+    }
+
+    @Wenn("das Dokument «{word}» eine neue Version erhält")
+    public void neueVersion(String name) throws SQLException {
+        Dok d = dokumente.get(name);
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set version = version + 1 "
+                + "where id = ?", d.id());
+    }
+
+    @Wenn("das Dokument «{word}» den Status «{word}» erhält")
+    public void statusSetzen(String name, String status) throws SQLException {
+        Dok d = dokumente.get(name);
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set status = ?, version = version + 1 "
+                + "where id = ?", status, d.id());
+    }
+
+    @Wenn("das Dokument «{word}» die Vertraulichkeit «{word}» erhält")
+    public void vertraulichkeitSetzen(String name, String vertraulichkeit) throws SQLException {
+        Dok d = dokumente.get(name);
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set vertraulichkeit = ?, "
+                + "version = version + 1 where id = ?", vertraulichkeit, d.id());
+    }
+
+    @Wenn("der Zugang «{word}» «{}» ab dem Cursor «{word}» abruft")
+    public void feedAb(String name, String pfad, String marke) {
+        feedAbrufen(name, pfad, marke, null, null);
+    }
+
+    @Wenn("der Zugang «{word}» «{}» ab dem Cursor «{word}» mit höchstens {int} Einträgen abruft")
+    public void feedAbMax(String name, String pfad, String marke, int max) {
+        feedAbrufen(name, pfad, marke, max, null);
+    }
+
+    @Wenn("der Zugang «{word}» «{}» ab dem Cursor «{word}» mit der Stufe «{}» im Header abruft")
+    public void feedAbMitStufe(String name, String pfad, String marke, String stufe) {
+        feedAbrufen(name, pfad, marke, null, stufe);
+    }
+
+    private void feedAbrufen(String name, String pfad, String marke, Integer max, String stufe) {
+        RequestSpecification spec = anfrage(name).queryParam("seit", cursor.get(marke));
+        if (max != null) {
+            spec = spec.queryParam("max", max);
+        }
+        if (stufe != null) {
+            spec = spec.header("X-Archiv-Zugriff", stufe).header("X-Archiv-Client", "kein-hash");
+        }
+        antwort = spec.when().get(pfad);
+        if (antwort.statusCode() == 200) {
+            cursor.put(marke, antwort.path("cursor"));
+        }
+    }
+
+    @Wenn("der Zugang «{word}» «{}» mit dem Cursor-Text «{}» abruft")
+    public void feedMitText(String name, String pfad, String text) {
+        antwort = anfrage(name).queryParam("seit", text).when().get(pfad);
+    }
+
+    @Wenn("der Zugang «{word}» «{}» mit höchstens «{}» Einträgen abruft")
+    public void feedMitMax(String name, String pfad, String max) {
+        antwort = anfrage(name).queryParam("max", max).when().get(pfad);
+    }
+
+    @Wenn("der Zugang «{word}» «{}» ohne Cursor abruft")
+    public void feedOhneCursor(String name, String pfad) {
+        antwort = anfrage(name).when().get(pfad);
+    }
+
+    @Wenn("die Einträge des Feeds im Mandanten «{word}» {int} Tage später bereinigt werden")
+    public void feedBereinigen(String mandant, int tage) {
+        // eigener Thread ohne Request-Kontext wie der Worker; MandantKontext.mit verlangt das
+        java.util.concurrent.CompletableFuture.runAsync(() -> aufraeumen.aufraeumen(new MandantCode(mandant),
+                Instant.now().plus(Duration.ofDays(tage)))).join();
+    }
+
+    @Dann("nennt der Feed genau diese Änderungen:")
+    public void feedGenau(DataTable tabelle) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<String> soll = new ArrayList<>();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            soll.add(dokumente.get(zeile.get("dokument")).id() + " " + zeile.get("art") + " " + zeile.get("stufe"));
+        }
+        List<Map<String, Object>> ist = antwort.path("eintraege");
+        assertThat(ist.stream().map(e -> e.get("dokumentId") + " " + e.get("art") + " " + e.get("stufe")).toList())
+                .containsExactlyElementsOf(soll);
+        ist.forEach(e -> assertThat(Instant.parse((String) e.get("zeit"))).isBefore(Instant.now().plusSeconds(5)));
+    }
+
+    @Dann("nennt der Feed keine Änderungen")
+    public void feedLeer() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<List<Object>>path("eintraege")).isEmpty();
+        assertThat(antwort.<String>path("cursor")).isNotBlank();
+    }
+
+    @Dann("nennt der Feed genau diese Erfassungs-Änderungen:")
+    public void erfassungGenau(DataTable tabelle) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<String> soll = new ArrayList<>();
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            soll.add(dokumente.get(zeile.get("dokument")).id() + " " + zeile.get("referenz") + " " + zeile.get("status")
+                    + " " + zeile.get("fehlercode") + " " + zeile.get("version"));
+        }
+        List<Map<String, Object>> ist = antwort.path("eintraege");
+        assertThat(ist.stream().map(e -> e.get("dokumentId") + " " + (e.get("referenz") == null ? "-" : e.get("referenz"))
+                + " " + e.get("status") + " " + (e.get("fehlercode") == null ? "-" : e.get("fehlercode")) + " "
+                + e.get("version")).toList()).containsExactlyElementsOf(soll);
+        ist.forEach(e -> assertThat(e.keySet()).containsExactlyInAnyOrder("dokumentId", "referenz", "status",
+                "fehlercode", "version", "zeit"));
+    }
+
+    @Dann("hat jeder Eintrag des Feeds nur die Felder «{}»")
+    public void feedFelder(String felder) {
+        List<Map<String, Object>> ist = antwort.path("eintraege");
+        assertThat(ist).isNotEmpty();
+        ist.forEach(e -> assertThat(e.keySet()).containsExactlyInAnyOrderElementsOf(Arrays.asList(felder.split(","))));
     }
 
     // ---- Hilfen

@@ -69,6 +69,11 @@ Funktionalität: Upload von Dateien
     Und lagen die Teile der Uploads im Arbeitsverzeichnis, nicht im temporären Verzeichnis der JVM
     Und bleibt im Arbeitsverzeichnis keine Datei zurück
 
+  @req-3.4
+  Szenario: Zwei gleichzeitige Uploads derselben Datei legen sie nur einmal an
+    Wenn «inhaber-urinet» gleichzeitig in 2 Anfragen dieselbe Datei «parallel-dublette.pdf» hochlädt
+    Dann antworten alle Anfragen mit genau einer Annahme und einer Dublette
+
   @req-3.3
   Szenario: Der Typ wird am Inhalt erkannt, nicht an der Endung
     Wenn «inhaber-urinet» diese Dateien hochlädt:

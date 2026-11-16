@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Referenz einer Webseite zu einem Dokument (Spec 03, design.md «Data Models»). Der Erfassungs-Feed (Aufgabe 11.9,
+         Req 14.2) liest sie; befüllt wird sie vom Upload der Erfassung (Aufgabe 11.10), die diese Tabelle übernimmt. -->
+    <changeSet id="033-webseite-referenz" author="archiv">
+        <sql>
+            create table webseite_referenz (
+                webseite text not null,
+                referenz text not null,
+                dokument_id uuid not null constraint webseite_referenz_dokument_fk references dokument (id),
+                sha256 text not null constraint webseite_referenz_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                erstellt timestamptz not null default clock_timestamp(),
+                constraint webseite_referenz_pk primary key (webseite, referenz)
+            );
+            create index webseite_referenz_dokument_ix on webseite_referenz (dokument_id, webseite)
+        </sql>
+        <rollback>
+            <sql>drop table if exists webseite_referenz</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
