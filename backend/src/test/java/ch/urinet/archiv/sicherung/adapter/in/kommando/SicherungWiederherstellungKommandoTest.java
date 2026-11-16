@@ -8,6 +8,7 @@ import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
@@ -166,8 +167,15 @@ class SicherungWiederherstellungKommandoTest {
 
     private static SicherungKommando kommando(InMemoryZiel ziel, boolean ablageStub) {
         return new SicherungKommando(new SicherungBucketExport(ablage()),
-                new SicherungExportVerwaltung((SicherungExportSpeicher) (art, mandant, sha256) -> { },
-                        mandantRegister()),
+                new SicherungExportVerwaltung(new SicherungExportSpeicher() {
+                    @Override
+                    public void festhalten(SicherungsArt art, Optional<MandantCode> mandant, String sha256) { }
+
+                    @Override
+                    public Optional<Instant> juengsterEintrag(SicherungsArt art, Optional<MandantCode> mandant) {
+                        return Optional.empty();
+                    }
+                }, mandantRegister()),
                 new ObjectMapper(), ziel, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
                 ablageStub);
     }

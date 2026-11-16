@@ -10,10 +10,11 @@ import java.time.Duration;
 
 /**
  * Startprüfung der Überwachung (Req 16.5, Review PR #91): {@code archiv.ueberwachung.grenze} und
- * {@code archiv.ueberwachung.manifest-frist} müssen grösser als 0 und {@code archiv.ueberwachung.betrieb-mandant} ein
- * gültiger Mandant-Code sein, sonst bricht der Start ab. Ohne diese
- * Prüfung entstünde die Bean {@link Ueberwachung} erst im ersten Takt und die Alarme fielen still aus. Gilt in jeder
- * Rolle, damit eine falsche Einstellung schon beim Deploy auffällt.
+ * {@code archiv.ueberwachung.manifest-frist} sowie {@code archiv.ueberwachung.sicherung-frist} müssen grösser als 0
+ * und {@code archiv.ueberwachung.betrieb-mandant} ein gültiger Mandant-Code sein, sonst bricht der Start ab.
+ * {@code archiv.ueberwachung.sicherung-aktiv} muss als boolesche Einstellung lesbar sein. Ohne diese Prüfung entstünde
+ * die Bean {@link Ueberwachung} erst im ersten Takt und die Alarme fielen still aus. Gilt in jeder Rolle, damit eine
+ * falsche Einstellung schon beim Deploy auffällt.
  */
 @ApplicationScoped
 public class UeberwachungPruefung {
@@ -21,8 +22,11 @@ public class UeberwachungPruefung {
     void beimStart(@Observes StartupEvent ereignis,
                    @ConfigProperty(name = "archiv.ueberwachung.grenze") Duration grenze,
                    @ConfigProperty(name = "archiv.ueberwachung.betrieb-mandant") String betrieb,
-                   @ConfigProperty(name = "archiv.ueberwachung.manifest-frist") Duration manifestFrist) {
+                   @ConfigProperty(name = "archiv.ueberwachung.manifest-frist") Duration manifestFrist,
+                   @ConfigProperty(name = "archiv.ueberwachung.sicherung-frist") Duration sicherungFrist,
+                   @ConfigProperty(name = "archiv.ueberwachung.sicherung-aktiv") Boolean sicherungAktiv) {
         Ueberwachung.pruefeEinstellungen(grenze, betrieb);
         Ueberwachung.pruefeManifestFrist(manifestFrist);
+        Ueberwachung.pruefeSicherungEinstellungen(sicherungFrist, sicherungAktiv);
     }
 }

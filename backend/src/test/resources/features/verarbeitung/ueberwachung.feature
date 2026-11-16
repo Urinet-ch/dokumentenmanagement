@@ -99,6 +99,18 @@ Funktionalität: Überwachung, Alarm an den Inhaber und Kennzahlen
     Dann hat «mu-nachholen» genau je ein Manifest für die Tage vom «10.01.2026» bis «20.01.2026»
     Und hat der Inhaber keine Mail zu einem fehlenden Manifest von «mu-nachholen» erhalten
 
+  @sicherung @req-16.5 @req-16.7
+  Szenario: Fehlende Sicherungen melden einmalig und ein neuer Export erledigt den Alarm
+    Angenommen die Sicherungsüberwachung ist aktiviert und es gibt keine Exporte für den Betriebsmandanten
+    Wenn die Überwachung läuft
+    Dann hat der Inhaber genau sechs Sicherungs-Mails erhalten, nur Codes und Status
+    Wenn ein globaler DB-Export festgehalten wird
+    Und die Überwachung läuft
+    Dann ist der fehlende DB-Sicherungsalarm erledigt
+    Und hat der Inhaber weiterhin genau sechs Sicherungs-Mails erhalten
+    Wenn die Überwachung läuft
+    Dann hat der Inhaber weiterhin genau sechs Sicherungs-Mails erhalten
+
   @req-16.4
   Szenario: Kennzahlen stehen intern bereit, öffentlich ist unter /q/ nur der schlanke Health-Pfad
     Angenommen im Mandanten «urinet» steht das Dokument «A» seit 5 Minuten im Status «EINGANGSKORB»
