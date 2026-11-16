@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 03, Aufgabe 11.3, Req 6.4: Token-Budget des öffentlichen Chatbots je Mandant und Monat. -->
+    <changeSet id="012-mandant-budget" author="archiv">
+        <sql>
+            create table public.mandant_budget (
+                mandant text not null,
+                monat date not null,
+                tokens_max bigint not null,
+                tokens_verbraucht bigint not null default 0,
+                constraint mandant_budget_pk primary key (mandant, monat),
+                constraint mandant_budget_mandant_fk foreign key (mandant) references public.mandant (code),
+                constraint mandant_budget_monat_ck check (extract(day from monat) = 1),
+                constraint mandant_budget_tokens_ck check (tokens_max &gt;= 0 and tokens_verbraucht &gt;= 0)
+            );
+        </sql>
+        <sql splitStatements="false">
+            do $$
+            begin
+                if exists (select 1 from pg_roles where rolname = 'archiv_app') then
+                    execute 'revoke all on public.mandant_budget from archiv_app';
+                    execute 'grant select, insert, update on public.mandant_budget to archiv_app';
+                end if;
+            end
+            $$;
+        </sql>
+        <rollback>
+            <sql>drop table public.mandant_budget;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

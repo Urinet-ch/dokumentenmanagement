@@ -32,4 +32,27 @@ class SichtregelTest {
                 Sichtregel.Personal.ALLE, false));
         assertThat(regel.uneingeschraenkt()).isFalse();
     }
+
+    @Test
+    void webseitenSichtSiehtNurNormalBestaetigtMitDenStufenOhneEingangskorb() {
+        Sichtregel regel = Sichtregel.fuerWebseite(new Sichtregel.Webseite(java.util.List.of("oeffentlich", "mitglieder"), null, null));
+        assertThat(regel.webseite().stufen()).containsExactly("oeffentlich", "mitglieder");
+        assertThat(regel.normal()).isTrue();
+        assertThat(regel.intern()).isFalse();
+        assertThat(regel.personal()).isEqualTo(Sichtregel.Personal.KEINE);
+        assertThat(regel.unbestaetigt()).isEqualTo(Sichtregel.Unbestaetigt.KEINE);
+        assertThat(regel.uneingeschraenkt()).isFalse();
+    }
+
+    @Test
+    void webseitenSichtOhneStufenIstVerboten() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Sichtregel.Webseite(java.util.List.of(), null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void appSichtHatKeinenFestenFilter() {
+        assertThat(new Sichtregel("t", Sichtregel.Unbestaetigt.ALLE, true, true, Sichtregel.Personal.ALLE, false)
+                .webseite()).isNull();
+    }
 }

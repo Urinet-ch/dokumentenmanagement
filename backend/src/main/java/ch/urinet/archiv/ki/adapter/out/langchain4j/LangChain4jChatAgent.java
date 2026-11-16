@@ -149,7 +149,7 @@ public class LangChain4jChatAgent implements ChatAgentPort {
         long eigeneEin = ein;
         long eigeneAus = aus;
         try {
-            mandanten.mit(lauf.anfrage().mandant(), () -> verbrauch.erfassen(KiVerbrauchPort.CHAT,
+            mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(KiVerbrauchPort.CHAT,
                     new KiPort.Verbrauch(modell.modell(), eigeneEin, eigeneAus)));
         } catch (RuntimeException e) {
             LOG.errorf("Verbrauch des Chats nicht geschrieben: %s", e.getClass().getSimpleName());
