@@ -178,7 +178,7 @@ class DokumenteSuchenPartnerTest {
 
         DokumenteSuchen.Antwort neueste = werkzeug(List.of(bachmann), List.of(aehnlich))
                 .suchen(kontext(Rolle.INHABER), anfrage("Dinkel vollkorngipfel", "Bachmann Konfiseur", true));
-        assertThat(neueste.hinweis()).isNull();
+        assertThat(neueste.hinweis()).isEqualTo("Partner ähnlich zugeordnet: Confiseur Bachmann AG Tribschenstadt");
     }
 
     @Test

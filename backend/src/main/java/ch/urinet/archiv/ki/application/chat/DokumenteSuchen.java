@@ -143,8 +143,7 @@ public class DokumenteSuchen {
         boolean namenNennen = Rechtematrix.ergebnis(kontext.rolle(), Aktion.A6) == ch.urinet.archiv.sicherheit.domain.Ergebnis.ERLAUBT;
         Vorbereitet v = transaktion.neu(() -> {
             daten.nurLesend();
-            return vorbereiten(frage, art, partner, von, bis, neueste ? Sortierung.DATUM : null, anzahl, namenNennen,
-                    neueste);
+            return vorbereiten(frage, art, partner, von, bis, neueste ? Sortierung.DATUM : null, anzahl, namenNennen);
         });
         if (v.leer() != null) {
             return v.leer();
@@ -191,7 +190,7 @@ public class DokumenteSuchen {
     }
 
     private Vorbereitet vorbereiten(String frage, String art, String partner, LocalDate von, LocalDate bis,
-                                    Sortierung sortierung, int anzahl, boolean namenNennen, boolean neueste) {
+                                    Sortierung sortierung, int anzahl, boolean namenNennen) {
         String code = art == null ? null : artCode(art);
         UUID partnerId = null;
         boolean ohnePartner = false;
@@ -200,7 +199,7 @@ public class DokumenteSuchen {
             switch (partnerAufloesung.aufloesen(partner, namenNennen)) {
                 case PartnerAufloesung.Gefunden g -> {
                     partnerId = g.kontaktId();
-                    if (g.aehnlich() && !neueste) {
+                    if (g.aehnlich()) {
                         partnerHinweis = PARTNER_AEHNLICH_ZUGEORDNET
                                 + (g.name() == null ? "" : ": " + g.name());
                     }

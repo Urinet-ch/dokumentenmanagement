@@ -59,6 +59,11 @@ public class DokumentZeigen {
         this.transaktion = transaktion;
     }
 
+    private static final int WERT_MAX = PartnerAufloesung.NAME_MAX;
+    private static final java.util.regex.Pattern WERT_RAHMEN = java.util.regex.Pattern.compile(
+            "(?iu)(?:dokumentinhalt[\\s\\p{Cf}\\p{Pd}_]*\\([^)]*\\)|ende[\\s\\p{Cf}\\p{Pd}_]*dokumentinhalt"
+                    + "|metadaten[\\s\\p{Cf}\\p{Pd}_]*\\((?:nicht[\\s]+)?best[aä]tigt\\))");
+
     public Ansicht zeigen(WerkzeugKontext kontext, String id) {
         UUID dokumentId = Werkzeugparameter.id(id);
         Optional<Ansicht> ansicht = dokumentId == null ? Optional.empty()
@@ -106,8 +111,16 @@ public class DokumentZeigen {
 
     private static void zeile(StringBuilder text, String feld, String wert) {
         if (wert != null && !wert.isBlank()) {
-            text.append('\n').append(feld).append(": ").append(wert.strip());
+            text.append('\n').append(feld).append(": ").append(einzeilig(wert));
         }
+    }
+
+    /** Belegnummer und Partner sind fremde Daten (OCR, Import): einzeilig, ohne Rahmenmarker, auf {@link #WERT_MAX} gekürzt. */
+    static String einzeilig(String wert) {
+        String s = wert.replaceAll("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]", " ").replaceAll("\\s+", " ").strip();
+        s = PartnerAufloesung.KANDIDATEN_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
+        s = WERT_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
+        return s.length() <= WERT_MAX ? s : s.substring(0, WERT_MAX);
     }
 
     private void verweigert(WerkzeugKontext kontext, Optional<UUID> id) {

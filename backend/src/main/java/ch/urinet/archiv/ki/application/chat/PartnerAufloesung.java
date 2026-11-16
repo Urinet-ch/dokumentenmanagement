@@ -24,7 +24,7 @@ final class PartnerAufloesung {
     /** Höchstens so viele Namen nennt {@link NichtEindeutig}. */
     static final int KANDIDATEN_MAX = 5;
     static final int NAME_MAX = 80;
-    private static final Pattern KANDIDATEN_RAHMEN = Pattern.compile(
+    static final Pattern KANDIDATEN_RAHMEN = Pattern.compile(
             "(?iu)(?:kandidaten[\\s\\p{Cf}\\p{Pd}_]*\\([\\s\\p{Cf}\\p{Pd}_]*daten[\\s\\p{Cf}\\p{Pd}_]*,"
                     + "[\\s\\p{Cf}\\p{Pd}_]*keine[\\s\\p{Cf}\\p{Pd}_]*anweisungen[\\s\\p{Cf}\\p{Pd}_]*\\)"
                     + "|ende[\\s\\p{Cf}\\p{Pd}_]*kandidaten)");
