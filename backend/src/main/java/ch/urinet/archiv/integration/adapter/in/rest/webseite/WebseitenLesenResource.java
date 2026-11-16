@@ -1,9 +1,9 @@
 package ch.urinet.archiv.integration.adapter.in.rest.webseite;
 
-import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
-import ch.urinet.archiv.integration.application.webseite.WebseiteDatei;
+import ch.urinet.archiv.integration.application.webseite.DateiAuslieferung;
+import ch.urinet.archiv.integration.application.webseite.DateiAuslieferung.Auslieferung;
 import ch.urinet.archiv.integration.application.webseite.WebseiteLesen;
 import ch.urinet.archiv.integration.application.webseite.WebseiteSuche;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
@@ -18,6 +18,7 @@ import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.vertx.core.http.HttpServerRequest;
 import jakarta.ws.rs.BeanParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
@@ -25,7 +26,11 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
@@ -76,16 +81,17 @@ public class WebseitenLesenResource {
 
     private final WebseiteLesen lesen;
     private final WebseiteSuche suche;
-    private final WebseiteDatei datei;
+    private final DateiAuslieferung auslieferung;
     private final LeseAnfrage anfrage;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
 
-    public WebseitenLesenResource(WebseiteLesen lesen, WebseiteSuche suche, WebseiteDatei datei, LeseAnfrage anfrage,
+    public WebseitenLesenResource(WebseiteLesen lesen, WebseiteSuche suche, DateiAuslieferung auslieferung,
+                                  LeseAnfrage anfrage,
                                   MandantAufloesung aufloesung, SecurityIdentity identitaet) {
         this.lesen = lesen;
         this.suche = suche;
-        this.datei = datei;
+        this.auslieferung = auslieferung;
         this.anfrage = anfrage;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
@@ -266,25 +272,63 @@ public class WebseitenLesenResource {
 
     @GET
     @Path("/dokumente/{id}/datei")
+    @Produces({MediaType.APPLICATION_JSON, DateiAuslieferung.MEDIENTYP})
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
-    @Operation(summary = "Datei-Link eines öffentlichen Dokuments",
-            description = "Vorsignierte Adresse der PDF-Datei, höchstens 5 Minuten gültig; jeder Abruf wird mit "
-                    + "gekürzter IP protokolliert. Nur für Dokumente der Stufe oeffentlich; für andere Dokumente gibt "
-                    + "es hier keine Adresse (404), ihr Abruf folgt als Stream mit einer späteren Fassung.")
-    @APIResponse(responseCode = "200", description = "Adresse der Datei",
-            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DateiLinkDto.class)))
+    @Operation(summary = "Datei eines veröffentlichten Dokuments",
+            description = "Gemischte Auslieferung nach der Stufe des Dokuments (Req 13): Stufe oeffentlich liefert 200 "
+                    + "application/json mit der vorsignierten Adresse der PDF-Datei, höchstens 5 Minuten gültig; "
+                    + "mitglieder und vorstand liefert 200 application/pdf als Stream, nie eine Speicher-Adresse. Der "
+                    + "Stream trägt Content-Type, Content-Length, Cache-Control: private, no-store, "
+                    + "X-Content-Type-Options: nosniff, Content-Disposition: inline ohne Dateinamen und Accept-Ranges: "
+                    + "none; ein Range-Kopf wird ignoriert (immer die ganze Datei, 200). Jeder Abruf wird mit gekürzter "
+                    + "IP protokolliert, bevor er beginnt. Ein Dokument über der Stufe der Anfrage oder ein "
+                    + "unsichtbares Dokument ist 404. 429 ZU_VIELE_ANFRAGEN mit Retry-After 5, wenn die Höchstzahl "
+                    + "gleichzeitiger Streams (gesamt oder je Schlüssel) läuft. Ein Stream, der 30 Sekunden keinen "
+                    + "Block weitergibt oder länger als 15 Minuten läuft, wird abgebrochen.")
+    @APIResponse(responseCode = "200", description = "Adresse der Datei (Stufe oeffentlich) oder die Datei als Stream",
+            content = {
+                    @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DateiLinkDto.class)),
+                    @Content(mediaType = DateiAuslieferung.MEDIENTYP,
+                            schema = @Schema(type = SchemaType.STRING, format = "binary"))})
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
     @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "404", ref = "NichtGefunden")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
-    public DateiLinkDto datei(@BeanParam LeseKopf kopf, @PathParam("id") String id, @HeaderParam(REAL_IP) @Parameter(hidden = true) String ip) {
-        // die Sicht der Datei (feste Filter mit Stufe oeffentlich) ist enger als die der Anfrage und gilt immer
-        VorsignierteUrl url = datei.link(aufloesung.pruefen(), uuid(id),
-                Optional.ofNullable(identitaet.getPrincipal().getName()), IpAdresse.aus(ip));
-        return new DateiLinkDto(url.url().toString(), url.gueltigBis());
+    public Response datei(@BeanParam LeseKopf kopf, @PathParam("id") String id,
+                          @HeaderParam(REAL_IP) @Parameter(hidden = true) String ip,
+                          @Context HttpServerRequest http) {
+        if (http.method() == io.vertx.core.http.HttpMethod.HEAD) {
+            // das Framework führte sonst den GET-Handler aus: Platz und Protokolleintrag, ohne dass je ein Byte fliesst
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).header(HttpHeaders.ALLOW, "GET").build();
+        }
+        Auslieferung ergebnis = auslieferung.ausliefern(aufloesung.pruefen(), anfrage.zugriff(), uuid(id),
+                Optional.ofNullable(identitaet.getPrincipal().getName()), IpAdresse.aus(ip),
+                () -> http.response().close());
+        return switch (ergebnis) {
+            case DateiAuslieferung.Link link -> Response.ok(new DateiLinkDto(link.url().url().toString(),
+                    link.url().gueltigBis())).type(MediaType.APPLICATION_JSON_TYPE).build();
+            case DateiAuslieferung.Strom strom -> {
+                try {
+                    StreamingOutput ausgabe = strom.lauf()::senden;
+                    yield Response.ok(ausgabe, DateiAuslieferung.MEDIENTYP)
+                            .header(HttpHeaders.CONTENT_LENGTH, strom.lauf().laenge())
+                            .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                            .header("X-Content-Type-Options", "nosniff")
+                            // ohne Dateinamen: der Name käme aus Daten (Req 13.5, Spec 01, 3.12)
+                            .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                            .header("Accept-Ranges", "none")
+                            .build();
+                } catch (RuntimeException e) {
+                    // der Lauf hält Platz und Speicherverbindung; ohne senden() gäbe sie sonst erst der Leerlauf frei
+                    strom.lauf().abbrechen();
+                    throw e;
+                }
+            }
+        };
     }
 
     @GET

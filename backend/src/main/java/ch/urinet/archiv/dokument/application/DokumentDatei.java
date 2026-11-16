@@ -2,8 +2,10 @@ package ch.urinet.archiv.dokument.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AblagePfad;
+import ch.urinet.archiv.ablage.domain.Ablageort;
 import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.DateiRolle;
+import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -42,12 +44,25 @@ public class DokumentDatei {
     /** Wie oben für eine beliebige Sicht, z. B. die der Webseiten-Schnittstelle (Spec 03, Aufgabe 11.2). */
     public VorsignierteUrl herunterladen(Sichtregel sicht, MandantCode mandant, UUID id, DateiRolle rolle, int nr,
                                          Ansicht ansicht) {
+        Dateiort ort = finden(sicht, id, rolle, nr);
+        return ablage.vorsignierteUrl(mandant, ort.ort(), ort.schluessel(), ort.versionId(), ansicht);
+    }
+
+    /**
+     * Wo die gespeicherte Version einer Datei liegt (für den Stream der Webseiten-Schnittstelle, Spec 03, Aufgabe
+     * 11.8): dieselbe Prüfung wie beim Link, unsichtbar oder fehlend ergibt 404 {@code NICHT_GEFUNDEN}.
+     */
+    public Dateiort finden(Sichtregel sicht, UUID id, DateiRolle rolle, int nr) {
         DateiFundstelle fundstelle = repository.dateiFinden(id, sicht, rolle, nr)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         AblagePfad pfad = AblagePfad.lesen(fundstelle.pfad());
         if (!pfad.schluessel().docId().equals(id) || pfad.schluessel().rolle() != rolle) {
             throw new IllegalStateException("Gespeicherter Pfad passt nicht zum Dokument " + id);
         }
-        return ablage.vorsignierteUrl(mandant, pfad.ort(), pfad.schluessel(), fundstelle.versionId(), ansicht);
+        return new Dateiort(pfad.ort(), pfad.schluessel(), fundstelle.versionId());
+    }
+
+    /** Ort einer Version im Object Storage: Bereich, Schlüssel und S3-Versions-ID. */
+    public record Dateiort(Ablageort ort, DateiSchluessel schluessel, String versionId) {
     }
 }

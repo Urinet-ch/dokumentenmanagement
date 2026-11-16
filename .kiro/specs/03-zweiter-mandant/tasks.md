@@ -113,10 +113,11 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; Schlüssel und Szenarien mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Das Changeset `db/public` nimmt die nächste freie Nummer (009 ist durch Spec 02, Aufgabe 6.3 belegt)
   - _Anforderungen: 12.1–12.8, 15.3_
 
-- [ ] 11.8 Dateiauslieferung gemischt [Backend]
+- [x] 11.8 Dateiauslieferung gemischt [Backend]
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026 (E-D)
   - `DateiAuslieferung`: `oeffentlich` → vorsignierte URL (5 Min.), sonst Stream in Blöcken von 64 KiB mit Gegendruck; Plätze gesamt und je Schlüssel, 429 `ZU_VIELE_ANFRAGEN` (Fehlercode im selben PR in Spec 01 design.md eintragen, falls noch nicht eingetragen); Leerlauf- und Gesamt-Zeitlimit; Freigabe bei Abbruch; Protokoll `HERUNTERLADEN` in einer Transaktion, die vor dem ersten Byte endet; keine Dateinamen in Headern; `DateiStreamTest`; Messfall «50 MB an einen langsamen Client»
   - Reihenfolge (entschieden 16.11.2026): 11.8 kommt vor dem Plugin-Download (11.5); bis dahin liefert `/public/v1/dokumente/{id}/datei` für `mitglieder` und `vorstand` 404
+  - Umsetzung (Vorzieh-Entscheid 16.11.2026; mandantenneutral, getestet mit `urinet` und Testmandanten): `GET /public/v1/dokumente/{id}/datei` liefert für `oeffentlich` weiter `{url, gueltigBis}`, für `mitglieder` und `vorstand` `application/pdf` als Stream (statt 404); `DateiAuslieferung`, `WebseiteDatei` (kurze Transaktionen), `DateiPlaetze`, `StreamLauf`, `StreamWaechter`, neu `AblagePort.oeffnen` und `DokumentDatei.finden`; Plätze `archiv.webseite.streams-gesamt` und `streams-je-schluessel` (je 8), Leerlauf `PT30S`, Gesamtdauer `PT15M`; Protokoll `HERUNTERLADEN` nach Platz und Öffnen in einer kurzen Transaktion vor dem ersten Byte; `Cache-Control: private, no-store`, `nosniff`, `Content-Disposition: inline` ohne Dateinamen, `Range` ignoriert (`Accept-Ranges: none`); Vertrag `public-v1.yaml` additiv (Stream-Antwort, 429); Szenarien `@req-13.1`–`@req-13.8` in `features/integration/webseiten-datei.feature` und `webseiten-lesen.feature`, JUnit `DateiStreamTest`, Messfall «50 MB an einen langsamen Client» (Szenario `@req-13.3`); Einzelheiten und Auslegungen in design.md, «Dateiauslieferung und Stream»; die Grenze je Schlüssel (Anfragen je Sekunde) bleibt Aufgabe 11.11
   - _Anforderungen: 13.1–13.8, 5.4_
   - _Abhängig von: 11.1_
 

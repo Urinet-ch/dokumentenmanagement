@@ -222,7 +222,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Wenn der Webseiten-Lesezugang «oeffentlich» die Suche mit einem Begriff von 201 Zeichen aufruft
     Dann antwortet die Lese-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
-  @req-5.4
+  @req-5.4 @req-13.1
   Szenario: Der Datei-Link eines öffentlichen Dokuments gilt höchstens 5 Minuten und wird mit gekürzter IP protokolliert
     Angenommen das Dokument «b1» hat eine Datei
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
@@ -231,14 +231,14 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Und nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt
     Und steht im Zugriffsprotokoll von «urinet» genau ein neuer Eintrag HERUNTERLADEN für «b1» von der Adresse «192.0.2.0» ohne weitere Angaben
 
-  @req-5.4
+  @req-5.4 @req-13.1
   Szenario: Der Datei-Link eines öffentlichen Dokuments gilt auch bei höherer gemeldeter Stufe
     Angenommen das Dokument «b1» hat eine Datei
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «b1» mit der Stufe «vorstand» und der Adresse «2001:db8:1:2::5» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 200
 
   @req-5.4 @req-5.5
-  Szenariogrundriss: Ohne Datei-Link bleiben Dokumente über der Stufe oeffentlich und unsichtbare Dokumente
+  Szenariogrundriss: Ohne Datei bleiben unveröffentlichte und unsichtbare Dokumente 404 (Stufen mitglieder und vorstand streamt Aufgabe 11.8, siehe webseiten-datei.feature)
     Angenommen im Mandanten «urinet» liegen diese Webseiten-Dokumente:
       | name | art         | zugriff     | veroeffentlicht | text     |
       | z    | WEBTEST_BUL | <zugriff>   | <veroeffentlicht> | Datei  |
@@ -248,12 +248,10 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
 
-    Beispiele:
-      | zugriff    | veroeffentlicht |
-      | mitglieder | true            |
-      | vorstand   | true            |
-      | oeffentlich | false          |
-      | -          | true            |
+ Beispiele:
+  | zugriff | veroeffentlicht |
+  | oeffentlich | false |
+  | - | true |
 
   @req-5.4
   Szenario: Der Datei-Link ist 404, wenn das Dokument keine Datei hat, und ein unbekanntes Dokument ist 404

@@ -6,6 +6,7 @@ import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
@@ -88,6 +89,14 @@ public interface AblagePort {
      */
     VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel, String versionId,
                                     Ansicht ansicht);
+
+    /**
+     * Öffnet genau diese Version zum Streamen durch die API (Spec 03, Aufgabe 11.8, Req 13.2): Datenstrom und Länge aus
+     * den Objektdaten; nichts wird in den Speicher geladen, der Aufrufer liest in Blöcken und schliesst den Strom.
+     * Ist der Object Storage nicht erreichbar oder antwortet mit 5xx, kommt {@code SPEICHER_NICHT_ERREICHBAR}; fehlt die
+     * Version, {@code NICHT_GEFUNDEN}.
+     */
+    DateiStrom oeffnen(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel, String versionId);
 
     /** Wie {@link #vorsignierteUrl(MandantCode, Ablageort, DateiSchluessel, String, Ansicht)} als Download. */
     default VorsignierteUrl vorsignierteUrl(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel,
