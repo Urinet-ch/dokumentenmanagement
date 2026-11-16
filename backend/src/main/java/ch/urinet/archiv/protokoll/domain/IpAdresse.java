@@ -30,4 +30,25 @@ public record IpAdresse(String text) {
             return Optional.empty();
         }
     }
+
+    /**
+     * Gekürzte Adresse für Protokolle ohne Personendaten (Spec 03, Req 5.4): IPv4 ohne das letzte Byte
+     * ({@code 192.0.2.17} → {@code 192.0.2.0}), IPv6 auf die ersten 48 Bit ({@code 2001:db8:1:2::5} →
+     * {@code 2001:db8:1::}); ein eingebettetes IPv4 in IPv6 ({@code ::ffff:192.0.2.17}) wird wie IPv4 gekürzt.
+     */
+    public IpAdresse gekuerzt() {
+        try {
+            byte[] bytes = InetAddress.ofLiteral(text).getAddress();
+            if (bytes.length == 4) {
+                bytes[3] = 0;
+            } else {
+                for (int i = 6; i < bytes.length; i++) {
+                    bytes[i] = 0;
+                }
+            }
+            return new IpAdresse(InetAddress.getByAddress(bytes).getHostAddress());
+        } catch (java.net.UnknownHostException | IllegalArgumentException e) {
+            throw new IllegalStateException("Adresse nicht kürzbar", e);
+        }
+    }
 }

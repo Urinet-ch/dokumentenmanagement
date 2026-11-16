@@ -3,7 +3,9 @@
 Funktionalität: Zugriffsstufen der Webseiten-Schnittstelle (Aufgabe 11.1)
   Gemeldete Stufe (Header X-Archiv-Zugriff), Kappung durch den Lese-Schlüssel, fester Filter auf veroeffentlicht,
   Zugriffsstufe und Vertraulichkeit sowie 404 bei zu hoher Stufe. Die Szenarien laufen gegen die Probe /public/v1/probe
-  (nur in src/test); die echten Endpunkte folgen mit Aufgabe 11.2. Alle Dokumente sind synthetisch.
+  (nur in src/test), die den festen Filter und die Stufen der Anfrage unmittelbar zeigt. Dieselben Filterachsen gegen
+  die echten Endpunkte unter /public/v1 prüft webseiten-lesen.feature (Aufgabe 11.2). Alle Dokumente sind
+  synthetisch.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -131,6 +133,13 @@ Funktionalität: Zugriffsstufen der Webseiten-Schnittstelle (Aufgabe 11.1)
       | ohne-flag    | ARCHIVIERT    | NORMAL          | oeffentlich | -               |
       | ohne-stufe   | ARCHIVIERT    | NORMAL          | -           | true            |
       | fremde-stufe | ARCHIVIERT    | NORMAL          | geheim      | true            |
+      | umlaut-stufe | ARCHIVIERT | NORMAL | "öffentlich" | true |
+      | stufe-null | ARCHIVIERT | NORMAL | null | true |
+      | stufe-zahl | ARCHIVIERT | NORMAL | 1 | true |
+      | stufe-liste | ARCHIVIERT | NORMAL | ["oeffentlich"] | true |
+      | flag-null | ARCHIVIERT | NORMAL | oeffentlich | null |
+      | flag-zahl | ARCHIVIERT | NORMAL | oeffentlich | 1 |
+      | flag-liste | ARCHIVIERT | NORMAL | oeffentlich | [true] |
     Wenn der Schlüssel «vorstand» «/public/v1/probe/dokumente» mit dem Header «X-Archiv-Zugriff» und dem Wert «vorstand» aufruft
     Dann liefert der feste Filter genau die Dokumente «a,b,c»
 
