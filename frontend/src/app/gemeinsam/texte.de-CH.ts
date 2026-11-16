@@ -240,6 +240,7 @@ export const TEXTE = {
     betragHinweis: 'z. B. 1234.50',
     betragUngueltig:
       'Bitte einen Betrag mit höchstens zwei Nachkommastellen angeben, z. B. 1234.50.',
+    zusatzUngueltig: (felder: string) => `Bitte gültige Werte eingeben: ${felder}.`,
     rueckfragePdfa:
       'Für dieses Dokument gibt es keine PDF/A-Fassung. Trotzdem nur mit Original und Arbeitsfassung archivieren?',
     rueckfragePdfaJa: 'Ohne PDF/A bestätigen',

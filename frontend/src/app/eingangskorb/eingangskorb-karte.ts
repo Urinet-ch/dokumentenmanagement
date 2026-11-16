@@ -29,7 +29,7 @@ import {
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { ZusatzFeld, zusatzFelder as schemaZusatzFelder } from '../dokument/aenderung';
+import { ZusatzFeld, zusatzFelder as schemaZusatzFelder, zusatzGueltig } from '../dokument/aenderung';
 import {
   AktionFehler,
   Entwurf,
@@ -156,6 +156,13 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly zusatzFehltImFormular = computed(() => {
     const bearbeitbar = new Set(schemaZusatzFelder(this.art()).map((feld) => feld.name));
     return this.zusatzFehlt().filter((feld) => bearbeitbar.has(feld.substring('zusatz.'.length)));
+  });
+  protected readonly zusatzUngueltig = computed(() => {
+    const werte = this.zusatzEingaben();
+    return schemaZusatzFelder(this.art())
+      .filter((feld) => feld.name !== 'veroeffentlicht' && feld.name !== 'zugriff')
+      .filter((feld) => !zusatzGueltig(feld, werte[feld.name] ?? ''))
+      .map((feld) => `zusatz.${feld.name}`);
   });
   /**
    * Steht die Art nur im KI-Vorschlag oder ist sie hier ungespeichert gewählt, geht sie als `?art=` an die
@@ -389,10 +396,19 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       );
       return;
     }
+    const ungueltigeZusatzfelder = this.zusatzUngueltig();
+    if (ungueltigeZusatzfelder.length > 0) {
+      this.imFormular(
+        this.texte.zusatzUngueltig(ungueltigeZusatzfelder.map(feldName).join(', ')),
+        ungueltigeZusatzfelder,
+      );
+      return;
+    }
     if (this.dokument().pdfaFehlt && !zusatz.ohnePdfa) {
       this.rueckfrage('rueckfragePdfa', zusatz);
       return;
     }
+    const artNeu = this.artNeu();
     const zusatzBody = this.zusatzBody();
     const bisherigerZusatz = objekt(this.dokument().zusatz);
     const aendern = this.zusatzGespeichert()
@@ -400,7 +416,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz)
         ? of(this.dokument())
         : this.api
-            .apiV1DokumenteIdPatch(this.id(), this.etag(), { zusatz: zusatzBody } as DokumentAenderung)
+            .apiV1DokumenteIdPatch(this.id(), this.etag(), { ...(artNeu ? { art: artNeu } : {}), zusatz: zusatzBody } as DokumentAenderung)
             .pipe(
               tap((dokument) => {
                 this.aktuelleVersion.set(dokument.version);
@@ -480,7 +496,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   private zusatzBody(): Record<string, unknown> {
-    const body = { ...objekt(this.dokument().zusatz) };
+    // Bei abweichender Art nur Schlüssel der gewählten Art behalten (additionalProperties false im Schema).
+    const bekannt = new Set(Object.keys(objekt(objekt(this.art()?.zusatzSchema)['properties'])));
+    const body = Object.fromEntries(
+      Object.entries(objekt(this.dokument().zusatz)).filter(([k]) => !this.artNeu() || bekannt.has(k)),
+    );
     const werte = this.zusatzEingaben();
     for (const feld of schemaZusatzFelder(this.art())) {
       if (feld.name === 'veroeffentlicht') {
@@ -502,10 +522,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       }
       switch (feld.typ) {
         case 'zahl':
-          body[feld.name] = Number(roh.replace(',', '.'));
+          body[feld.name] = Number(roh.replace(/'/g, '').replace(',', '.'));
           break;
         case 'ganzzahl':
-          body[feld.name] = Number.parseInt(roh, 10);
+          body[feld.name] = Number(roh.replace(/'/g, ''));
           break;
         case 'janein':
           body[feld.name] = roh === 'true';

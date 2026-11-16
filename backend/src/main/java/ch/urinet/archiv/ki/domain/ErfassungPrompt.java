@@ -180,9 +180,21 @@ public final class ErfassungPrompt {
         return SYSTEM.replace("{mandant}", mandant).replace("{dokumentarten}", dokumentarten);
     }
 
-    /** Zusätzliche, feste Einordnungshinweise nur für VHF/GSK; sie erweitern das Gate-Prompt von UriNet nicht. */
+    /** Mandant mit eigenen Einordnungshinweisen und ohne KI-Finanzfelder (Spec 03, 10.4); der Code steht nur hier. */
+    public static final String MANDANT_MIT_HINWEISEN = "vhf-gsk";
+
+    /** Hat der Mandant Hinweise aus {@link #mandantenHinweise(String)} (dann auch ohne KI-Finanzfelder)? */
+    public static boolean hatMandantenHinweise(String mandantCode) {
+        return MANDANT_MIT_HINWEISEN.equals(mandantCode);
+    }
+
+    /**
+     * Zusätzliche, feste Einordnungshinweise nur für VHF/GSK. Sie hängen am System-Prompt, nicht an dessen Kennung:
+     * {@link #GATE_KENNUNG} gilt für das Prompt von UriNet. Teilumsetzung: die Felder je Art kommen erst mit
+     * Spec 05, Aufgabe 18.4, aus der Dokumentart-Konfiguration; bis dahin tippt die Geschäftsstelle sie von Hand.
+     */
     public static String mandantenHinweise(String mandantCode) {
-        if (!"vhf-gsk".equals(mandantCode)) {
+        if (!hatMandantenHinweise(mandantCode)) {
             return "";
         }
         return """

@@ -40,6 +40,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 05 ergänzt: KI-Prompt und Felder je Art aus der Konfiguration von `vhf-gsk`; die Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht liefert Spec 05, Aufgabe 18.4 (Spec 05, Req 7.5, 8.1)
   - Ergänzt 13.11.2026 (E-C): Auswahl der Zugriffsstufe mit drei Werten (`oeffentlich`, `mitglieder`, `vorstand`), Standard `mitglieder`
   - Umsetzung (PR #229): Zusatzfelder aus dem Dokumentart-Schema; Veröffentlichung erst nach bestätigter Archivierung, Rückzug über A6; bestehende Rechte A1–A10/A11–A14 wiederverwendet, auch für Aufgabe 11.10
+  - Offen (Nachbesserung Review PR #229): Der Mandantenhinweis im KI-Prompt ist eine Teilumsetzung (fester Textblock für `vhf-gsk`, keine zusätzlichen Antwortfelder); Req 3.2 mit Feldern je Art aus der Konfiguration folgt mit Spec 05, Aufgabe 18.1/18.4. Der Feed-Eintrag beim Veröffentlichen und Zurückziehen gehört zu Spec 04 (#230) und ist hier nicht belegt.
   - _Anforderungen: 3.1–3.5_
 
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]

@@ -118,9 +118,9 @@ public class MetadatenExtraktion {
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
         ErfassungMandant mandant = new ErfassungMandant(werte.name(), werte.uid(), werte.ibans(), werte.eigeneArten());
         List<ArtEintrag> arten = arten();
-        String system = ErfassungPrompt.system(mandant.name(),
-                ErfassungPrompt.artListe(arten, mandant.eigeneArten(), mandant.name()))
-                + ErfassungPrompt.mandantenHinweise(eingabe.mandant().wert());
+        String grundPrompt = ErfassungPrompt.system(mandant.name(),
+                ErfassungPrompt.artListe(arten, mandant.eigeneArten(), mandant.name()));
+        String system = grundPrompt + ErfassungPrompt.mandantenHinweise(eingabe.mandant().wert());
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
         String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
@@ -128,7 +128,7 @@ public class MetadatenExtraktion {
                 ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
                 auswahl);
-        String kennung = ErfassungPrompt.hash(system, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
+        String kennung = ErfassungPrompt.hash(grundPrompt, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
         if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
             LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "
                     + "weichen ab)", eingabe.dokumentId(), kennung, ErfassungPrompt.GATE_KENNUNG);
@@ -141,7 +141,7 @@ public class MetadatenExtraktion {
             case KiPort.Gueltig g -> {
                 Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeite(g.vorschlag(), qr, eingabe.text(),
                         mandant, arten, eingabe.eingang());
-                if ("vhf-gsk".equals(eingabe.mandant().wert())) {
+                if (ErfassungPrompt.hatMandantenHinweise(eingabe.mandant().wert())) {
                     vorschlag = ohneFinanz(vorschlag);
                 }
                 LOG.infof("KI-Vorschlag für Dokument %s (Prompt %s, Nachbearbeitung %s, QR %s, Bildweg %s)",

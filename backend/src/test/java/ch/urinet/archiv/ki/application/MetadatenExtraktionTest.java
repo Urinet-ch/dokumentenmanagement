@@ -1,5 +1,6 @@
 package ch.urinet.archiv.ki.application;
 
+import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Vorschlag;
 import org.junit.jupiter.api.Test;
@@ -39,5 +40,18 @@ class MetadatenExtraktionTest {
                 Feld.BELEGNUMMER, Feld.RICHTUNG, Feld.BETRAG, Feld.WAEHRUNG, Feld.FAELLIGKEIT, Feld.QR_REFERENZ);
         assertThat(bereinigt).extracting(Vorschlag::partnerName, Vorschlag::titel, Vorschlag::datum)
                 .containsExactly("Verein", "Ausgabe", LocalDate.of(2026, 1, 2));
+    }
+
+    /** Der Mandantenhinweis hängt am Mandanten; die Kennung des Gate-Prompts bleibt vom Anhang unberührt. */
+    @Test
+    void mandantenHinweiseGeltenNurFuerDenMandantenMitHinweisen() {
+        assertThat(ErfassungPrompt.hatMandantenHinweise("vhf-gsk")).isTrue();
+        assertThat(ErfassungPrompt.mandantenHinweise("vhf-gsk")).isNotBlank();
+        assertThat(ErfassungPrompt.hatMandantenHinweise("urinet")).isFalse();
+        assertThat(ErfassungPrompt.mandantenHinweise("urinet")).isEmpty();
+        String grund = ErfassungPrompt.system("Mandant", "ART");
+        assertThat(ErfassungPrompt.hash(grund + ErfassungPrompt.mandantenHinweise("vhf-gsk"), "{}", List.of("ART"),
+                ErfassungPrompt.BILDWEG))
+                .isNotEqualTo(ErfassungPrompt.hash(grund, "{}", List.of("ART"), ErfassungPrompt.BILDWEG));
     }
 }

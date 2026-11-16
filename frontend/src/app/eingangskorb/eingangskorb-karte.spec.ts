@@ -7,6 +7,7 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, Aktion, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { EingangskorbKarte } from './eingangskorb-karte';
+import { feldName } from './entwurf';
 
 const T = TEXTE.eingangskorb;
 
@@ -260,6 +261,42 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     bestaetigung.flush(null, { status: 202, statusText: 'Accepted' });
     await fixture.whenStable();
     expect(erledigt).toEqual([T.erfolgBestaetigt('Ohne Titel')]);
+  });
+
+  const zusatzAusfuellen = (jahr: string) => {
+    const textfeld = (id: string, value: string) => {
+      const input = element.querySelector<HTMLInputElement>(id)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    textfeld('#d1-zusatz-reihe', 'Bulletin');
+    textfeld('#d1-zusatz-ausgabe', '12');
+    textfeld('#d1-zusatz-jahr', jahr);
+    const fachgebiet = element.querySelector<HTMLSelectElement>('#d1-zusatz-fachgebiet')!;
+    fachgebiet.value = 'Technik';
+    fachgebiet.dispatchEvent(new Event('change'));
+  };
+
+  it('sendet die gewählte Art mit, wenn sie nur im Vorschlag steht (Review #229, M1)', async () => {
+    await zeigen(dokument({ vorschlag: { art: 'BULLETIN' } }), 'geschaeftsstelle', [VHF_ART]);
+    await klicken(T.bestaetigen);
+    zusatzAusfuellen('2026');
+    await klicken(T.bestaetigen);
+    const patch = http.expectOne({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    expect(patch.request.body.art).toBe('BULLETIN');
+    expect(patch.request.body.zusatz.jahr).toBe(2026);
+    patch.flush(dokument({ art: 'BULLETIN', version: 4, zusatz: patch.request.body.zusatz }));
+    await fixture.whenStable();
+    http.expectOne('/api/v1/dokumente/d1/bestaetigen');
+  });
+
+  it('verwirft ungültige Zahlen im Zusatzfeld, statt sie zu kürzen (Review #229, S2)', async () => {
+    await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [VHF_ART]);
+    await klicken(T.bestaetigen);
+    zusatzAusfuellen('20x4');
+    await klicken(T.bestaetigen);
+    http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    expect(element.textContent).toContain(T.zusatzUngueltig(feldName('zusatz.jahr')));
   });
 
   it('zeigt dem Mitarbeiter keine Aktion (Req 2.6, A6–A10)', async () => {
