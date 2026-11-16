@@ -17,6 +17,7 @@ export MOCK_STDIN_DIR="$temp/stdin"
 export MOCK_FAIL_ZUWACHS=0
 export MOCK_FAIL_FESTHALTEN=0
 export MOCK_FAIL_REALM=0
+export MOCK_FAIL_AGE=0
 export MOCK_EMPTY_BUCKET=0
 export MOCK_HANG_ZUWACHS=0
 export MOCK_STARTED="$temp/gestartet"
@@ -163,6 +164,10 @@ shift 2
 output=$2
 input=$3
 [[ -f $input ]] || exit 1
+if [[ ${MOCK_FAIL_AGE:-0} == 1 ]]; then
+  printf 'partial ciphertext\n' > "$output"
+  exit 1
+fi
 printf 'synthetic ciphertext\n' > "$output"
 MOCK
 
@@ -412,6 +417,9 @@ assert test -z "$(find "$duplicate_root/laeufe" -mindepth 1 -maxdepth 1 -type d 
 export ARCHIV_MANDANTEN=urinet
 
 erwarte_konfigurationsfehler 'ARCHIV_MANDANTEN darf keinen Zeilenumbruch' ARCHIV_MANDANTEN=$'urinet\nvhf-gsk'
+vorherige_befehle=$(wc -l < "$MOCK_LOG")
+erwarte_konfigurationsfehler 'ARCHIV_SICHERUNGSVERZEICHNIS fehlt' 'ARCHIV_SICHERUNGSVERZEICHNIS='
+assert test "$(wc -l < "$MOCK_LOG")" -eq "$vorherige_befehle"
 erwarte_konfigurationsfehler 'ARCHIV_AGE_EMPFAENGER_SICHERUNG fehlt' -u ARCHIV_AGE_EMPFAENGER_SICHERUNG
 erwarte_konfigurationsfehler 'ARCHIV_AGE_EMPFAENGER_PROBE fehlt' -u ARCHIV_AGE_EMPFAENGER_PROBE
 erwarte_konfigurationsfehler 'müssen verschiedene Schlüssel sein' "ARCHIV_AGE_EMPFAENGER_PROBE=$schluessel_a"
@@ -440,6 +448,25 @@ if "$script" > /dev/null 2> "$temp/root-path.stderr"; then
   exit 1
 fi
 assert grep -q 'Sicherungsverzeichnis darf nicht das Stammverzeichnis sein' "$temp/root-path.stderr"
+
+# ---- Fehler zwischen Dump und Verschlüsselung (zum Beispiel volle Platte) ----------------------------------------
+age_failed_root="$temp/age-failed-backup"
+export ARCHIV_SICHERUNGSVERZEICHNIS=$age_failed_root
+export MOCK_FAIL_AGE=1
+if "$script" > /dev/null 2> "$temp/age-failure.stderr"; then
+  printf 'Fehler beim Verschlüsseln hätte den Lauf abbrechen müssen.\n' >&2
+  exit 1
+fi
+assert grep -q 'Exportdatei konnte nicht verschlüsselt werden' "$temp/age-failure.stderr"
+assert test ! -e "$age_failed_root/.taeglich.lock"
+assert test -z "$(find "$age_failed_root" -mindepth 1 -maxdepth 1 -name '.arbeit.*' -print -quit)"
+assert test -z "$(find "$age_failed_root/laeufe" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+if grep -rlE 'synthetic-database-dump|partial ciphertext' "$age_failed_root" > "$temp/age-klartext.treffer"; then
+  cat "$temp/age-klartext.treffer" >&2
+  printf 'Klartext oder unvollständiges Chiffrat blieb nach dem Fehler zurück.\n' >&2
+  exit 1
+fi
+export MOCK_FAIL_AGE=0
 
 # ---- Sperre ------------------------------------------------------------------------------------------------------
 # Belegte Sperre eines lebenden Prozesses: Abbruch mit Exit 3, Sperre bleibt.
@@ -473,6 +500,58 @@ assert test -s "$(find "$lock_root/laeufe" -mindepth 2 -maxdepth 2 -name FERTIG 
 start_zeile=$(grep -n 'start kc' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 dump_zeile=$(grep -n 'pg_dump' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 assert test "$start_zeile" -lt "$dump_zeile"
+
+# ---- Zwei gleichzeitige Läufe und Zeitstempel-Kollisionen --------------------------------------------------------
+gleichzeitig_root="$temp/concurrent-backup"
+export ARCHIV_SICHERUNGSVERZEICHNIS=$gleichzeitig_root
+export MOCK_HANG_ZUWACHS=1
+rm -f -- "$MOCK_STARTED" "$MOCK_RELEASE"
+"$script" > /dev/null 2> "$temp/concurrent-first.stderr" &
+erster_pid=$!
+for _ in $(seq 1 100); do
+  [[ -e $MOCK_STARTED ]] && break
+  sleep 0.1
+done
+assert test -e "$MOCK_STARTED"
+if "$script" > /dev/null 2> "$temp/concurrent-second.stderr"; then
+  printf 'Ein zweiter gleichzeitiger Sicherungslauf hätte abbrechen müssen.\n' >&2
+  exit 1
+else
+  gleichzeitig_status=$?
+fi
+assert test "$gleichzeitig_status" -eq 3
+assert grep -q 'Ein Sicherungslauf läuft bereits' "$temp/concurrent-second.stderr"
+assert test "$(< "$gleichzeitig_root/.taeglich.lock/pid")" = "$erster_pid"
+: > "$MOCK_RELEASE"
+wait "$erster_pid"
+assert test ! -e "$gleichzeitig_root/.taeglich.lock"
+assert test "$(find "$gleichzeitig_root/laeufe" -mindepth 1 -maxdepth 1 -type d -name 'lauf-*' | wc -l | tr -d ' ')" -eq 1
+export MOCK_HANG_ZUWACHS=0
+rm -f -- "$MOCK_STARTED" "$MOCK_RELEASE"
+
+echtes_date=$(command -v date)
+festes_datum_bin="$temp/festes-datum-bin"
+mkdir -p "$festes_datum_bin"
+cat > "$festes_datum_bin/date" <<'MOCK'
+#!/usr/bin/env bash
+if [[ $* == '-u +%Y%m%dT%H%M%SZ' ]]; then
+  printf '20261116T000000Z\n'
+else
+  exec "$ECHTES_DATE" "$@"
+fi
+MOCK
+chmod +x "$festes_datum_bin/date"
+export ECHTES_DATE=$echtes_date
+gleichzeitiges_datum_root="$temp/backup mit [Sonder] & Zeichen"
+ARCHIV_COMPOSE_FILE="$temp/compose mit [Sonder] & Zeichen.yml"
+export ARCHIV_COMPOSE_FILE ARCHIV_SICHERUNGSVERZEICHNIS=$gleichzeitiges_datum_root
+printf 'synthetic compose\n' > "$ARCHIV_COMPOSE_FILE"
+PATH="$festes_datum_bin:$PATH" "$script" 2> "$temp/fixed-date-first.stderr"
+PATH="$festes_datum_bin:$PATH" "$script" 2> "$temp/fixed-date-second.stderr"
+assert test "$(find "$gleichzeitiges_datum_root/laeufe" -mindepth 1 -maxdepth 1 -type d \
+  -name 'lauf-20261116T000000Z-*' | wc -l | tr -d ' ')" -eq 2
+compose_sonderdatei="$(cd -- "$(dirname -- "$ARCHIV_COMPOSE_FILE")" && pwd -P)/$(basename -- "$ARCHIV_COMPOSE_FILE")"
+assert grep -Fq -- "docker compose --file $compose_sonderdatei" "$MOCK_LOG"
 
 # ---- Abbruch durch SIGTERM ---------------------------------------------------------------------------------------
 term_root="$temp/term-backup"

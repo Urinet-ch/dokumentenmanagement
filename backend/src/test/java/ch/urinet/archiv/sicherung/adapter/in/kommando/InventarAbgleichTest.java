@@ -57,4 +57,16 @@ class InventarAbgleichTest {
         assertThatThrownBy(() -> new InventarAbgleich(new StringReader(vorher), new ObjectMapper())
                 .vollstaendigPruefen()).isInstanceOf(InventarDateiFehler.class);
     }
+
+    @Test
+    void leeresVorinventarBehandeltJedeVersionAlsNeu() {
+        var abgleich = new InventarAbgleich(new StringReader(""), new ObjectMapper());
+
+        assertThat(abgleich.test(new Objektversion("archiv/a", "v1", false,
+                Instant.parse("2026-01-01T00:00:00Z"), 1))).isTrue();
+
+        assertThat(abgleich.test(new Objektversion("manifest/b", "v2", false,
+                Instant.parse("2026-01-02T00:00:00Z"), 2))).isTrue();
+        abgleich.vollstaendigPruefen();
+    }
 }
