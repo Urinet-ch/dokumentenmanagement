@@ -24,6 +24,7 @@ import org.jboss.logging.Logger;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +64,8 @@ public class DokumenteSuchen {
      * Ein Treffer; {@code betrag} fehlt ohne Finanzangaben, {@code link} ist der Pfad der PWA. {@code bestaetigt} ist
      * {@code false} bei einem Dokument, dessen Art noch nicht bestätigt ist (nur nach Recht A7 oder für den Erfasser
      * sichtbar, Spec 01, Req 2.21). {@code seiten} ist die Fundstelle der Hybridsuche («2» oder «2-3»), fehlt bei
-     * Treffern nur aus dem Volltext und ohne Seitentrenner.
+     * Treffern nur aus dem Volltext, ohne Seitentrenner und bei einer Seite ausserhalb von {@code dokument.seiten}
+     * (Spec 03, Req 5.7).
      */
     public record Treffer(String id, String titel, String art, String datum, String partner, String betrag,
                           String auszug, boolean bestaetigt, String link, String seiten, Integer nummer) {
@@ -239,8 +241,10 @@ public class DokumenteSuchen {
 
     private Antwort antwort(Hybridergebnis ergebnis) {
         Set<UUID> bestaetigt = daten.bestaetigte(ergebnis.treffer().stream().map(h -> h.treffer().id()).toList());
+        Map<UUID, Integer> seiten = daten.seiten(ergebnis.treffer().stream().map(h -> h.treffer().id()).toList());
         List<Treffer> treffer = ergebnis.treffer().stream()
-                .map(h -> treffer(h.treffer(), bestaetigt.contains(h.treffer().id()), h.fundstelle())).toList();
+                .map(h -> treffer(h.treffer(), bestaetigt.contains(h.treffer().id()), h.fundstelle(),
+                        seiten.get(h.treffer().id()))).toList();
         return new Antwort(treffer, treffer.size(), ergebnis.degradiert() ? NUR_VOLLTEXT : null,
                 ergebnis.degradiert() ? Boolean.TRUE : null);
     }
@@ -248,7 +252,7 @@ public class DokumenteSuchen {
     private Antwort volltext(Suchanfrage anfrage, Sichtregel sicht, boolean rueckfall) {
         Suchergebnis ergebnis = suche.suchen(anfrage, sicht, false);
         Set<UUID> bestaetigt = daten.bestaetigte(ergebnis.treffer().stream().map(Suchtreffer::id).toList());
-        return new Antwort(ergebnis.treffer().stream().map(t -> treffer(t, bestaetigt.contains(t.id()), null)).toList(),
+        return new Antwort(ergebnis.treffer().stream().map(t -> treffer(t, bestaetigt.contains(t.id()), null, null)).toList(),
                 ergebnis.gesamt(), rueckfall ? NUR_VOLLTEXT : null, rueckfall ? Boolean.TRUE : null);
     }
 
@@ -262,19 +266,11 @@ public class DokumenteSuchen {
         return code;
     }
 
-    private static Treffer treffer(Suchtreffer t, boolean bestaetigt, Fundstelle fundstelle) {
+    private static Treffer treffer(Suchtreffer t, boolean bestaetigt, Fundstelle fundstelle, Integer dokumentSeiten) {
         String auszug = t.auszug().stream().map(AuszugTeil::text).collect(Collectors.joining());
         return new Treffer(t.id().toString(), t.titel(), t.art(), Werteformat.datum(t.datum()), t.partnerName(),
                 Werteformat.betrag(t.betrag(), t.waehrung()), auszug.isEmpty() ? null : auszug, bestaetigt,
-                link(t.id()), seiten(fundstelle));
-    }
-
-    private static String seiten(Fundstelle f) {
-        if (f == null || f.seiteVon() == null) {
-            return null;
-        }
-        return f.seiteBis() == null || f.seiteBis().equals(f.seiteVon()) ? f.seiteVon().toString()
-                : f.seiteVon() + "-" + f.seiteBis();
+                link(t.id()), fundstelle == null ? null : fundstelle.seitenText(dokumentSeiten));
     }
 
     static String link(UUID id) {

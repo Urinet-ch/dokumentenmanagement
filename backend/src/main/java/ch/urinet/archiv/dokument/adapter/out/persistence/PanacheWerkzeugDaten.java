@@ -55,6 +55,19 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
     }
 
     @Override
+    public Map<UUID, Integer> seiten(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em().createNativeQuery("select d.id, d.seiten from dokument d where d.id in (:ids) "
+                + "and d.seiten is not null").setParameter("ids", List.copyOf(ids)).getResultList();
+        Map<UUID, Integer> seiten = new HashMap<>();
+        zeilen.forEach(z -> seiten.put((UUID) z[0], ((Number) z[1]).intValue()));
+        return seiten;
+    }
+
+    @Override
     public Optional<String> inhalt(UUID id, Sichtregel regel, int zeichen) {
         VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
         Query abfrage = em().createNativeQuery("select left(d.volltext, :zeichen) from dokument d where d.id = :id and "
