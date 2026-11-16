@@ -679,7 +679,6 @@ public class WebseitenLesenSchritte {
         }
     }
 
-<<<<<<< HEAD
     // ---- Fundstelle der Suche (Aufgabe 11.13, Req 5.7)
 
     /** Das Embedding-Modell (WireMock) bettet jede Frage als Einheitsvektor {@code e0} ein. */
@@ -743,7 +742,8 @@ public class WebseitenLesenSchritte {
         List<Map<String, Object>> treffer = antwort.path("treffer");
         return treffer.stream().filter(x -> id.equals(x.get("id"))).findFirst()
                 .orElseThrow(() -> new AssertionError("Treffer fehlt: " + name));
-=======
+    }
+
     // ---- Änderungs-Feed (Aufgabe 11.9)
 
     @Angenommen("der Zugang «{word}» hat den Cursor «{word}» von «{}» gemerkt")
@@ -899,7 +899,6 @@ public class WebseitenLesenSchritte {
         List<Map<String, Object>> ist = antwort.path("eintraege");
         assertThat(ist).isNotEmpty();
         ist.forEach(e -> assertThat(e.keySet()).containsExactlyInAnyOrderElementsOf(Arrays.asList(felder.split(","))));
->>>>>>> origin/main
     }
 
     // ---- Hilfen
