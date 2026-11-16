@@ -121,9 +121,10 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 13.1–13.8, 5.4_
   - _Abhängig von: 11.1_
 
-- [ ] 11.9 Änderungs-Feed [Backend]
+- [x] 11.9 Änderungs-Feed [Backend]
   - Herkunft: Spec-Erweiterung, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
   - Neues Changeset `db/mandant`: `webseite_aenderung` mit Trigger `AFTER INSERT OR UPDATE OR DELETE` auf `dokument`, `webseite_feed_stand`; Cursor über `pg_current_xact_id()` und `pg_snapshot_xmin`; `/public/v1/aenderungen` (`stufe` = tiefere sichtbare Stufe, nie über dem Schlüssel) und `/public/v1/erfassung/aenderungen` (Referenz nur der eigenen Webseite); Auftrag `FEED_BEREINIGEN` (90 Tage), 410 `CURSOR_ABGELAUFEN` (Fehlercode im selben PR in Spec 01 design.md eintragen); `AenderungFeedTest` mit Stufenwechseln und lang offener Transaktion; Warnung bei Stillstand des Horizonts
+  - Umsetzung (Vorzieh-Entscheid 16.11.2026; mandantenneutral, getestet mit `urinet` und `vhf-gsk` als Testmandanten, ohne Seed und Domain von VHF/GSK): Changesets `db/mandant` 032 (`webseite_aenderung`, `webseite_feed_stand`, Trigger `webseite_aenderung_erfassen`) und 033 (`webseite_referenz`, von 11.10 vorweggenommen); `GET /public/v1/aenderungen` (Stufe des Schlüssels, `@FeedZugriff`) und `GET /public/v1/erfassung/aenderungen`; Cursor `v1.<xid>.<id>` mit Horizont `pg_snapshot_xmin` aus demselben Schnappschuss; `FEED_BEREINIGEN` als täglicher Worker-Takt (90 Tage), 410 `CURSOR_ABGELAUFEN` (Eintrag in Spec 01 design.md); `FeedHorizontWaechter` warnt bei Stillstand (`archiv.webseite.feed-stillstand`); Vertrag `public-v1.yaml` additiv; Szenarien `@req-14.1`–`@req-14.4` und `@req-15.1` in `features/integration/webseiten-feed.feature`, JUnit `AenderungFeedTest` (Trigger gegen festen Filter, alle Stufenwechsel, lang offene Transaktion, Bereinigung), `AenderungFeedLogikTest`, `FeedCursorTest`, `LeseAenderungTest`, ArchUnit `keinHttpClientInDerWebseitenSchnittstelle` (Req 14.5); Einzelheiten und Auslegungen in design.md, «Änderungs-Feed»
   - _Anforderungen: 14.1–14.5_
   - _Abhängig von: 11.7_
 
