@@ -101,7 +101,7 @@ Funktionalität: Werkzeuge des Chat-Agenten: Suche, Dokument, Fristen (Aufgabe 7
   Szenario: dokumente_suchen löst den Partner über den Namen auf und vermutet nie
     Dann findet «inhaber-urinet» mit dokumente_suchen diese Treffer:
       | frage          | partner                  | art      | neueste | treffer                  | hinweis                |
-      | Gondelrevision | Bergbahn Quelwald        |          | true    | U_INTERN, U_NORMAL, U_ALT |                        |
+      | Gondelrevision | Bergbahn Quelwald        |          | true    | U_INTERN, U_NORMAL, U_ALT | Partner ähnlich zugeordnet: Bergbahn Quellwald AG |
       | Gondelrevision | seilerei brunnmatt       | offerte  |         | U_OFFERTE                |                        |
       | Gondelrevision | Zahnarztpraxis Nordlicht |          |         |                          | Partner nicht gefunden, Suche über den Namen im Text |
     Und antwortet dokumente_suchen für «inhaber-urinet» mit der Art «PIZZA» mit dem Fehler «unbekannte Art» und den aktiven Codes, darunter «AUSGANGSRECHNUNG»
