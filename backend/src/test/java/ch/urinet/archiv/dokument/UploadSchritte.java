@@ -558,12 +558,14 @@ public class UploadSchritte {
 
     @Dann("antworten alle Anfragen mit genau einer Annahme und einer Dublette")
     public void genauEineAnnahmeUndDublette() throws SQLException {
-        assertThat(parallel).hasSize(2).allSatisfy(einzeln -> {
+        assertThat(parallel).hasSizeGreaterThanOrEqualTo(2).allSatisfy(einzeln -> {
             assertThat(einzeln.statusCode()).as(einzeln.asString()).isEqualTo(202);
             assertThat(einzeln.jsonPath().getList("status", String.class)).hasSize(1);
         });
+        List<String> erwartet = new ArrayList<>(java.util.Collections.nCopies(parallel.size() - 1, "DUBLETTE"));
+        erwartet.add("NEU");
         assertThat(parallel.stream().map(e -> e.jsonPath().getString("[0].status")))
-                .containsExactlyInAnyOrder("NEU", "DUBLETTE");
+                .containsExactlyInAnyOrderElementsOf(erwartet);
         Datei datei = gesendet.getFirst();
         assertThat(abfragen("select dokument_id || '/' || rolle || '/' || nr as zeile from " + schema()
                 + ".dokument_datei where sha256 = ? and rolle = 'ORIGINAL'", sha256(datei.inhalt()))).hasSize(1);

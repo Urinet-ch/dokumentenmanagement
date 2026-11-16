@@ -15,6 +15,10 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
       | 10 Jahre ab GESCHAEFTSJAHR | 15.03.2026 | –                    | –    | –          | 12-31 | 31.12.2036  |
       | 10 Jahre ab GESCHAEFTSJAHR | 15.08.2026 | –                    | –    | –          | 06-30 | 30.06.2037  |
       | 10 Jahre ab GESCHAEFTSJAHR | –          | 2026-12-31T23:30:00Z | –    | –          | 12-31 | 31.12.2037  |
+      | 10 Jahre ab GESCHAEFTSJAHR | 29.02.2028 | –                    | –    | –          | 02-29 | 28.02.2038  |
+      | 10 Jahre ab GESCHAEFTSJAHR | 01.03.2028 | –                    | –    | –          | 02-29 | 28.02.2039  |
+      | 10 Jahre ab GESCHAEFTSJAHR | 28.02.2027 | –                    | –    | –          | 02-29 | 28.02.2037  |
+      | 10 Jahre ab GESCHAEFTSJAHR | –          | 2028-02-28T23:30:00Z | –    | –          | 02-28 | 28.02.2039  |
       | 10 Jahre ab GESCHAEFTSJAHR | 15.03.2026 | –                    | 2025 | –          | 12-31 | 31.12.2035  |
       | 10 Jahre ab GUELTIG_BIS   | 01.02.2026 | –                    | –    | 31.01.2028 | 12-31 | 31.01.2038  |
       | 10 Jahre ab GUELTIG_BIS   | 01.02.2026 | –                    | –    | –          | 12-31 | unbefristet |
