@@ -193,7 +193,7 @@ public class ManifestErzeugen implements AuftragHandler {
      * Hashes das Manifest trägt: Ende des Geschäftsjahres des Fensterdatums + 10 Jahre (Req 10.9). So endet kein
      * Manifest vor dem Protokoll, das es belegt (Auslegung, design.md «Umsetzung (Aufgabe 5.2)»).
      */
-    static Optional<LocalDate> sperre(Fristen fristen, LocalDate heute, LocalDate datum, MonthDay gjEnde) {
+    public static Optional<LocalDate> sperre(Fristen fristen, LocalDate heute, LocalDate datum, MonthDay gjEnde) {
         LocalDate sperre = protokollfrist(datum, gjEnde);
         if (fristen.dokumente() > 0) {
             Optional<LocalDate> spaetestens = fristen.spaetestens().filter(d -> !d.isBefore(heute));

@@ -7,6 +7,7 @@ import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKommando;
 import ch.urinet.archiv.sicherung.adapter.in.kommando.SicherungKommando;
+import ch.urinet.archiv.sicherung.adapter.in.kommando.SperrpruefungKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.runtime.ApplicationLifecycleManager;
 import io.quarkus.runtime.Quarkus;
@@ -78,6 +79,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     SicherungKommando sicherung;
+
+    @Inject
+    SperrpruefungKommando sperrpruefung;
 
     @Inject
     MailKommando mail;
@@ -164,7 +168,8 @@ public class ArchivMain implements QuarkusApplication {
                             ? Optional.empty() : Optional.of(WebseitenSchluesselKommando.AUFRUF);
             case "manifest" -> ManifestKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(ManifestKommando.AUFRUF);
-            case "sicherung" -> SicherungKommando.lesen(rest).isPresent() ? Optional.empty()
+            case "sicherung" -> SicherungKommando.lesen(rest).isPresent()
+                    || SperrpruefungKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(SicherungKommando.AUFRUF);
             case "mail" -> MailKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(MailKommando.AUFRUF);
@@ -215,7 +220,9 @@ public class ArchivMain implements QuarkusApplication {
             case "token" -> token.ausfuehren(rest, ergebnis, System.err);
             case "webseite" -> webseitenSchluessel.ausfuehren(rest.subList(1, rest.size()), ergebnis, System.err);
             case "manifest" -> manifest.ausfuehren(rest, ergebnis, System.err);
-            case "sicherung" -> sicherung.ausfuehren(rest, ergebnis, System.err);
+            case "sicherung" -> SperrpruefungKommando.lesen(rest).isPresent()
+                    ? sperrpruefung.ausfuehren(rest, ergebnis, System.err)
+                    : sicherung.ausfuehren(rest, ergebnis, System.err);
             case "mail" -> mail.ausfuehren(rest, MailPasswortEingabe::nehmen, System.err);
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
