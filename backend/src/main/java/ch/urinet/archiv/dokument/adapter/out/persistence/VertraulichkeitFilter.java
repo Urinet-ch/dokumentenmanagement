@@ -45,6 +45,10 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
     }
 
     private static VertraulichkeitFilter bauen(Sichtregel regel, Spalten s) {
+        if (regel.istWebseite()) {
+            // die Sicht der Webseiten-Schnittstelle gilt nur über den festen Filter der Suche (SuchFilter), nie hier
+            throw new IllegalArgumentException("Sicht der Webseiten-Schnittstelle ohne festen Filter");
+        }
         Map<String, Object> parameter = new HashMap<>();
         if (regel.uneingeschraenkt()) {
             return new VertraulichkeitFilter("1 = 1", parameter);

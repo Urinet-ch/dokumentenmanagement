@@ -67,9 +67,10 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 5.1, 5.4, 5.8, 5.10, 5.11_
   - _Abhängig von: 11.1, 11.6_
 
-- [ ] 11.3 Öffentlicher Chatbot [Backend]
+- [x] 11.3 Öffentlicher Chatbot [Backend]
   - `OeffentlicherChatAgent` mit eingeschränkten Werkzeugen, Quellen mit Reihe/Ausgabe/Link, Hinweis auf Geschäftsstelle, Rate-Limit 20/h, `mandant_budget`, Speicherung 90 Tage ohne Personenbezug
   - Ergänzt 13.11.2026: Werkzeuge mit `:stufen` aus der Anfrage (drei Stufen); Quellen mit `dokumentId`, Titel, Reihe, Ausgabe (Link bildet die Webseite); 429 `BUDGET` und `ZU_VIELE_ANFRAGEN` als Problem Details, beide im selben PR in die Fehlercode-Tabelle von Spec 01 design.md eintragen, `ZU_VIELE_ANFRAGEN` falls noch nicht eingetragen (Spec 03 design.md, Error Handling)
+  - Umsetzung (Vorzieh-Entscheid 16.11.2026; PR siehe PR-Text): `OeffentlicherChatAgent` (`OeffentlicherAgent`, `OeffentlicheWerkzeuge` mit nur `dokumente_suchen` und `dokument_zeigen`), fester Filter in zwei Schichten (`Sichtregel.webseite`, `OeffentlicheDokumente`), Quellen mit `dokumentId`, Titel, Reihe, Ausgabe, fester Hinweis auf die Geschäftsstelle, Grenzen im Speicher (20/h je Client, je Webseite), `public.mandant_budget` (Monat), `oeffentliche_frage` ohne Personenbezug mit Löschjob (90 Tage), `BUDGET` in `Fehlercode` und Spec 01 design.md, Endpunkt im Vertrag `public-v1.yaml`; Szenarien `@req-6.1`–`@req-6.5` in `features/integration/oeffentlicher-chat.feature`, JUnit `OeffentlicheGrenzenTest`, `OeffentlicheGespraecheTest`, `FrageBereinigungTest`, `OeffentlicherSystemPromptTest`, `SuchFilterWebseiteTest`; Einzelheiten in design.md, «Umsetzung (Aufgabe 11.3)»
   - _Anforderungen: 6.1–6.5_
   - _Abhängig von: 11.1_
 

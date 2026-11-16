@@ -65,6 +65,8 @@ public enum Fehlercode {
     ZU_VIELE_ANFRAGEN(429, "Zu viele Anfragen",
             "Sie haben in kurzer Zeit zu viele Anfragen gestellt. Bitte warten Sie die angegebene Zeit "
                     + "(Retry-After) und versuchen Sie es dann erneut."),
+    BUDGET(429, "Budget erschöpft",
+            "Der Chatbot ist in diesem Monat ausgelastet. Die Suche funktioniert weiterhin."),
     INTERNER_FEHLER(500, "Interner Fehler",
             "Im Archiv ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut und "
                     + "nennen Sie bei Rückfragen die Fehler-ID."),

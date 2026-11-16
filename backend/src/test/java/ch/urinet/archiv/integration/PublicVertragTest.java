@@ -84,8 +84,8 @@ class PublicVertragTest {
 
     @Test
     void gegenprobeEndpunktNurInDerDateiIstRot() {
-        assertThat(PublicVertrag.unterschiede(PublicVertrag.pfade(PublicVertrag.ausCode(hauptIndex, einstellungen)),
-                datei(gegenprobe))).containsExactly("/public/v1/gegenprobe/{id}: nur in der Datei");
+        assertThat(PublicVertrag.unterschiede(nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausCode(hauptIndex,
+                einstellungen))), datei(gegenprobe))).containsExactly("/public/v1/gegenprobe/{id}: nur in der Datei");
     }
 
     @Test
@@ -129,12 +129,26 @@ class PublicVertragTest {
                 .containsExactly("/public/v1/gegenprobe/{id} get: Statuscode 4044");
     }
 
+    /** Die Gegenproben betreffen nur ihren eigenen Pfad; echte Endpunkte (Code und Vertrag) sind Sache der ersten Probe. */
+    private static final String GEGENPROBE_PFAD = "/public/v1/gegenprobe";
+
     private static Map<String, Object> code(Class<?>... zusaetzlich) throws IOException {
-        return PublicVertrag.pfade(PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich), einstellungen));
+        return nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich),
+                einstellungen)));
     }
 
     private static Map<String, Object> datei(String yaml) {
-        return PublicVertrag.pfade(PublicVertrag.ausDatei(yaml));
+        return nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausDatei(yaml)));
+    }
+
+    private static Map<String, Object> nurGegenprobe(Map<String, Object> pfade) {
+        Map<String, Object> ergebnis = new java.util.TreeMap<>();
+        pfade.forEach((pfad, wert) -> {
+            if (pfad.startsWith(GEGENPROBE_PFAD)) {
+                ergebnis.put(pfad, wert);
+            }
+        });
+        return ergebnis;
     }
 
     private static String ersetzen(String text, String alt, String neu) {
