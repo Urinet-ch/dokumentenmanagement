@@ -1,5 +1,6 @@
 package ch.urinet.archiv.integration.application.webseite;
 
+import ch.urinet.archiv.gemeinsam.domain.Seitentext;
 import ch.urinet.archiv.integration.domain.webseite.ListenFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteDokument;
@@ -25,7 +26,7 @@ import java.util.UUID;
  * {@link Sichtregel#fuerWebseite}, die den festen Filter samt den Stufen der Anfrage in jede Teilabfrage (Volltext,
  * Vektor, Texte, Details) trägt. Die Felder der Treffer lädt danach {@link WebseitenLesePort} unter demselben Filter
  * noch einmal; die Fundstelle ist die erste Seite des besten Abschnitts (Req 5.7, nur wenn plausibel gegen
- * {@code dokument.seiten}); der Auszug stammt aus dem Text des Dokuments, nie aus Partnername oder Tags. Höchstens
+ * {@code dokument.seiten}, {@link Seitentext#plausibel}); der Auszug stammt aus dem Text des Dokuments, nie aus Partnername oder Tags. Höchstens
  * {@value HybridSuche#PWA} Treffer ohne Blättern.
  */
 @ApplicationScoped
@@ -63,16 +64,8 @@ public class WebseiteSuche {
         }
         List<WebseiteTreffer> treffer = new ArrayList<>();
         for (WebseiteDokument d : port.treffer(zugriff, ids, anfrage.begriff())) {
-            treffer.add(new WebseiteTreffer(d, plausibel(seiten.get(d.id()), d.seiten()), treffer.size() + 1));
+            treffer.add(new WebseiteTreffer(d, Seitentext.plausibel(seiten.get(d.id()), d.seiten()), treffer.size() + 1));
         }
         return new Ergebnis(treffer, ergebnis.degradiert());
-    }
-
-    /**
-     * Die Seite des besten Abschnitts nur, wenn sie im Dokument liegt (1 bis {@code dokument.seiten}); sonst zeigte
-     * {@code #page=} auf eine falsche oder fehlende Seite (Req 5.7), und die Fundstelle fehlt.
-     */
-    static Integer plausibel(Integer seite, Integer seiten) {
-        return seite != null && seiten != null && seite >= 1 && seite <= seiten ? seite : null;
     }
 }
