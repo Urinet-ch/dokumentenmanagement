@@ -3,7 +3,12 @@ package ch.urinet.archiv.sicherheit;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantRegister;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Base64;
@@ -17,6 +22,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @QuarkusTest
 class BenutzerIdTest {
+
+    private static final MandantCode URINET = new MandantCode("urinet");
+
+    @Inject
+    MandantRegister register;
+
+    @Inject
+    MandantProvisionierung provisionierung;
+
+    /** Der Test legt den Mandanten selbst an, falls kein anderer Test ihn schon angelegt hat (Einzelstart). */
+    @BeforeEach
+    void mandantSicherstellen() {
+        if (!register.existiert(URINET)) {
+            provisionierung.anlegen(URINET.wert(), null, null);
+        }
+    }
 
     @Test
     void benutzerIdIstDerClaimSub() throws Exception {
