@@ -222,7 +222,7 @@ class ArchivWerkzeugeTest {
             @Override
             public Ansicht zeigen(WerkzeugKontext kontext, String idText) {
                 return new Ansicht("Metadaten (bestätigt)\nBelegnummer: 1100745\nBetrag: CHF 123.45"
-                        + "\nDatum: 10.03.2071", "OCR-Text 1190745", id.toString(), "OCR-Ziffernprobe",
+                        + "\nDatum: 10.03.2071", "OCR-Text 1190745", null, null, null, id.toString(), "OCR-Ziffernprobe",
                         "AUSGANGSRECHNUNG", "10.03.2071", null, "1100745", "CHF 123.45", null, null,
                         true, "/dokument/" + id);
             }
@@ -238,6 +238,39 @@ class ArchivWerkzeugeTest {
         assertThat(text.indexOf("\"metadaten\"")).isLessThan(text.indexOf("\"inhalt\""));
         assertThat(antwort.path("metadaten").asText()).contains("Belegnummer: 1100745");
         assertThat(antwort.path("inhalt").asText()).contains("1190745").doesNotContain("1100745");
+    }
+
+    @Test
+    void dokumentZeigenMeldetGekuerztenInhaltAlsEigeneFelderUndNurDann() throws Exception {
+        java.util.UUID id = java.util.UUID.fromString("6f0c2a7e-1b3d-4c5e-8f60-123456789abc");
+        for (boolean gekuerzt : new boolean[] {true, false}) {
+            DokumentZeigen zeigen = new DokumentZeigen(null, null, null, null) {
+                @Override
+                public Ansicht zeigen(WerkzeugKontext kontext, String idText) {
+                    return new Ansicht("Metadaten (bestätigt)", "Anfang", gekuerzt ? Boolean.TRUE : null,
+                            gekuerzt ? DokumentZeigen.INHALT_MAX : null,
+                            gekuerzt ? DokumentZeigen.HINWEIS_GEKUERZT.formatted(DokumentZeigen.INHALT_MAX) : null,
+                            id.toString(), "Bericht", "KORRESPONDENZ", null, null, null, null, null, null, true,
+                            "/dokument/" + id);
+                }
+            };
+            ArchivWerkzeuge werkzeuge = werkzeuge(new DokumenteSuchen(null, null, null, null, null, null,
+                    new BigDecimal("0.6")), zeigen, new FristenAbfrage(null, null, null),
+                    new OffenePostenAbfrage(null, null, null, null), new KennzahlAbfrage(null, null, null, null));
+            register.festhalten("lauf", kontext());
+
+            com.fasterxml.jackson.databind.JsonNode antwort = new ObjectMapper()
+                    .readTree(werkzeuge.dokumentZeigen("lauf", id.toString()));
+
+            assertThat(antwort.has("inhaltGekuerzt")).isEqualTo(gekuerzt);
+            assertThat(antwort.has("inhaltZeichen")).isEqualTo(gekuerzt);
+            assertThat(antwort.has("inhaltHinweis")).isEqualTo(gekuerzt);
+            if (gekuerzt) {
+                assertThat(antwort.path("inhaltGekuerzt").asBoolean()).isTrue();
+                assertThat(antwort.path("inhaltZeichen").asInt()).isEqualTo(4_000);
+                assertThat(antwort.path("inhaltHinweis").asText()).startsWith("Dokumentinhalt gekürzt: nur der Anfang (4000 Zeichen)");
+            }
+        }
     }
 
     /** Ändert das letzte Zeichen. */

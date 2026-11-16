@@ -167,6 +167,15 @@ Funktionalität: Werkzeuge des Chat-Agenten: Suche, Dokument, Fristen (Aufgabe 7
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_VERTRAG | 203.0.113.9 | CHAT  |
       | mitarbeiter-urinet | MITARBEITER | ANZEIGEN | U_LANG    | 203.0.113.9 | CHAT  |
 
+  @req-5.2 @req-5.3 @chat-inhalt-gekuerzt
+  Szenario: dokument_zeigen meldet einen gekürzten Inhalt, bei vollständigem Text kein Hinweis
+    Angenommen im Mandanten «urinet» liegt das Chat-Dokument «U_LANG» mit 5000 Zeichen Text
+    Wenn «mitarbeiter-urinet» im Chat das Dokument «U_LANG» zeigen lässt
+    Dann ist der Inhalt der Antwort 4000 Zeichen lang
+    Und meldet die Antwort den Inhalt als gekürzt auf 4000 Zeichen
+    Wenn «mitarbeiter-urinet» im Chat das Dokument «U_NORMAL» zeigen lässt
+    Dann meldet die Antwort keine Kürzung des Inhalts
+
   @req-5.2 @req-5.3 @chat-metadaten-vorrang
   Szenario: Bestätigte Metadaten stehen vor einem abweichenden OCR-Text
     Angenommen im Mandanten «urinet» liegen diese Chat-Dokumente:

@@ -521,6 +521,22 @@ public class WerkzeugSchritte {
         assertThat(antwort.path("inhalt").asText()).hasSize(zeichen);
     }
 
+    @Dann("meldet die Antwort den Inhalt als gekürzt auf {int} Zeichen")
+    public void inhaltGekuerzt(int zeichen) {
+        assertThat(antwort.path("inhaltGekuerzt").asBoolean()).as(antwortText).isTrue();
+        assertThat(antwort.path("inhaltZeichen").asInt()).isEqualTo(zeichen);
+        assertThat(antwort.path("inhaltHinweis").asText()).contains("Dokumentinhalt gekürzt: nur der Anfang (" + zeichen
+                + " Zeichen)", "Suche");
+        // der Hinweis ist Systemtext: er steht ausserhalb des gerahmten Dokumentinhalts
+        assertThat(antwort.path("inhalt").asText()).doesNotContain("Dokumentinhalt gekürzt");
+    }
+
+    @Dann("meldet die Antwort keine Kürzung des Inhalts")
+    public void keineKuerzung() {
+        assertThat(antwort.has("inhalt")).as(antwortText).isTrue();
+        assertThat(antwortText).doesNotContain("inhaltGekuerzt", "inhaltZeichen", "inhaltHinweis");
+    }
+
     @Dann("enthält die Antwort keinen Inhalt")
     public void keinInhalt() {
         assertThat(antwort.has("fehler")).as(antwortText).isFalse();
