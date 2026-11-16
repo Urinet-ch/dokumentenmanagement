@@ -119,7 +119,11 @@ class MailKommandoStartTest {
 
         assertThat(ergebnis.exitCode()).as(ergebnis.getErrorOutput()).isEqualTo(1);
         assertThat(ergebnis.getErrorOutput()).contains(MailPasswortEingabe.FEHLT);
-        // ohne Start kein Konsolen-Log (der Mitschnitt zählt es zu stdout, siehe TokenKommandoStartTest)
-        assertThat(ergebnis.getOutput()).as("kein Start").isEmpty();
+        // ohne Start kein Konsolen-Log der Anwendung (der Mitschnitt zählt es zu stdout, siehe TokenKommandoStartTest).
+        // Läuft vorher ein Test mit anderer Konfiguration im selben Prozess, baut dieser Aufruf die Anwendung neu und
+        // startet dabei die Dev Services; deren Log gehört zum Bau, nicht zum Start und darf darum erscheinen.
+        assertThat(ergebnis.getOutput().lines().filter(z -> !z.contains("[tc.") && !z.contains("Dev Services")
+                        && !z.contains("DevServices") && !z.startsWith("To enable reuse of containers")))
+                .as("kein Start").isEmpty();
     }
 }
