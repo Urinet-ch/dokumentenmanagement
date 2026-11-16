@@ -502,13 +502,25 @@ public class UploadSchritte {
 
     @Wenn("«{word}» gleichzeitig in {int} Anfragen je eine Datei von {int} MB hochlädt")
     public void gleichzeitigHochladen(String benutzer, int anzahl, int megabyte) throws Exception {
-        String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
-        String token = Testanmeldung.token(benutzer);
         List<List<Datei>> anfragen = new ArrayList<>();
         for (int i = 1; i <= anzahl; i++) {
             anfragen.add(List.of(new Datei("parallel-" + i + ".pdf", inhalt("parallel-" + i + ".pdf",
                     "pdf:" + megabyte), null)));
         }
+        parallelHochladen(benutzer, anfragen);
+    }
+
+    @Wenn("«{word}» gleichzeitig in {int} Anfragen dieselbe Datei «{}» hochlädt")
+    public void gleichzeitigDieselbeDateiHochladen(String benutzer, int anzahl, String name) throws Exception {
+        String dateiname = name(name);
+        Datei datei = new Datei(dateiname, inhalt(dateiname, "pdf"), null);
+        parallelHochladen(benutzer, java.util.Collections.nCopies(anzahl, List.of(datei)));
+    }
+
+    private void parallelHochladen(String benutzer, List<List<Datei>> anfragen) throws Exception {
+        String mandantCode = benutzer.substring(benutzer.indexOf('-') + 1);
+        String token = Testanmeldung.token(benutzer);
+        int anzahl = anfragen.size();
         stand(mandantCode, anfragen.stream().flatMap(List::stream).toList());
         arbeitVorher = arbeitsDateien();
         beobachtet.clear();
@@ -542,6 +554,21 @@ public class UploadSchritte {
             antwort = einzeln;
             merken(mandantCode);
         }
+    }
+
+    @Dann("antworten alle Anfragen mit genau einer Annahme und einer Dublette")
+    public void genauEineAnnahmeUndDublette() throws SQLException {
+        assertThat(parallel).hasSize(2).allSatisfy(einzeln -> {
+            assertThat(einzeln.statusCode()).as(einzeln.asString()).isEqualTo(202);
+            assertThat(einzeln.jsonPath().getList("status", String.class)).hasSize(1);
+        });
+        assertThat(parallel.stream().map(e -> e.jsonPath().getString("[0].status")))
+                .containsExactlyInAnyOrder("NEU", "DUBLETTE");
+        Datei datei = gesendet.getFirst();
+        assertThat(abfragen("select dokument_id || '/' || rolle || '/' || nr as zeile from " + schema()
+                + ".dokument_datei where sha256 = ? and rolle = 'ORIGINAL'", sha256(datei.inhalt()))).hasSize(1);
+        assertThat(zahl("select count(*) from public.auftrag where typ = 'VERARBEITEN' and mandant = '" + mandant
+                + "'")).isEqualTo(vorher.auftraege() + 1);
     }
 
     @Dann("antworten alle Anfragen mit Status 202 und je einem neuen Dokument im Status «NEU»")
