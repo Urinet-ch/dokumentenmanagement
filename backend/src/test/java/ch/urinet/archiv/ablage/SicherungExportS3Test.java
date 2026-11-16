@@ -1,6 +1,7 @@
 package ch.urinet.archiv.ablage;
 
 import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
+import ch.urinet.archiv.ablage.adapter.out.s3.BypassVerbot;
 import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
@@ -11,6 +12,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherung.adapter.in.kommando.SicherungKommando;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeile;
+import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -18,8 +20,14 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.core.SdkResponse;
+import software.amazon.awssdk.core.interceptor.Context;
+import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
+import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
+import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 
 import java.io.ByteArrayOutputStream;
@@ -82,14 +90,18 @@ class SicherungExportS3Test {
 
     /** Die echte Ablage, aber Versionslisten mit höchstens zwei Einträgen, damit mehrere Seiten entstehen. */
     private AblagePort ablage() {
+        return ablage(s3, 2);
+    }
+
+    private AblagePort ablage(S3Client client, int seitenGroesse) {
         var einstellungen = new AblageEinstellungen(TestBucket.PRAEFIX, Optional.of(Duration.ofDays(1)),
                 Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)), Duration.ofMinutes(5), ZWISCHENABLAGE);
-        S3Ablage echt = new S3Ablage(s3, S3Ablage.presigner(s3, true), einstellungen, Clock.systemUTC());
+        S3Ablage echt = new S3Ablage(client, S3Ablage.presigner(client, true), einstellungen, Clock.systemUTC());
         return (AblagePort) Proxy.newProxyInstance(AblagePort.class.getClassLoader(),
                 new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
                     Object[] angepasst = args == null ? null : args.clone();
                     if (methode.getName().equals("versionen")) {
-                        angepasst[3] = Math.min(2, (Integer) angepasst[3]);
+                        angepasst[3] = Math.min(seitenGroesse, (Integer) angepasst[3]);
                     }
                     try {
                         return methode.invoke(echt, angepasst);
@@ -202,6 +214,41 @@ class SicherungExportS3Test {
     }
 
     @Test
+    void inventarEnthaeltGleichzeitigeVersionenUeberSeitengrenzeInS3Reihenfolge() {
+        String key = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
+        String erste = put(key, "erste synthetische Version");
+        String zweite = put(key, "zweite synthetische Version");
+        Instant gleicherZeitpunkt = Instant.parse("2026-01-01T00:00:00Z");
+        int[] seitenMitVersionen = {0};
+        ExecutionInterceptor gleicheZeit = new ExecutionInterceptor() {
+            @Override
+            public SdkResponse modifyResponse(Context.ModifyResponse kontext, ExecutionAttributes attribute) {
+                if (kontext.response() instanceof ListObjectVersionsResponse antwort) {
+                    if (!antwort.versions().isEmpty()) {
+                        seitenMitVersionen[0]++;
+                    }
+                    List<ObjectVersion> versionen = antwort.versions().stream()
+                            .map(v -> v.toBuilder().lastModified(gleicherZeitpunkt).build()).toList();
+                    return antwort.toBuilder().versions(versionen).build();
+                }
+                return kontext.response();
+            }
+        };
+
+        try (S3Client zeitgleich = TestBucket.client(new BypassVerbot(), new KeinBypassInterceptor(), gleicheZeit)) {
+            SicherungBucketExport export = new SicherungBucketExport(ablage(zeitgleich, 1));
+            List<InventarZeile> inventar = inventar(export).stream().filter(z -> z.schluessel().equals(key)).toList();
+            List<String> erwartet = verwaltung.listObjectVersions(r -> r.bucket(bucket).prefix(key)).versions().stream()
+                    .map(ObjectVersion::versionId).toList();
+
+            assertThat(erwartet).containsExactlyInAnyOrder(erste, zweite);
+            assertThat(seitenMitVersionen[0]).isEqualTo(2);
+            assertThat(inventar).extracting(InventarZeile::versionId).containsExactlyElementsOf(erwartet);
+            assertThat(inventar).extracting(InventarZeile::lastModified).containsOnly(gleicherZeitpunkt.toString());
+        }
+    }
+
+    @Test
     void zuwachsGegenVorinventarUndZweiZuwaechseInEinemStrom() throws IOException {
         String a = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
         String b = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
@@ -211,7 +258,18 @@ class SicherungExportS3Test {
         SicherungBucketExport export = new SicherungBucketExport(ablage());
         MandantRegister register = register();
         SicherungKommando kommando = new SicherungKommando(export,
-                new SicherungExportVerwaltung((art, man, sha) -> { }, register), new ObjectMapper());
+                new SicherungExportVerwaltung(new SicherungExportSpeicher() {
+                    @Override
+                    public void festhalten(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                           Optional<MandantCode> man, String sha) {
+                    }
+
+                    @Override
+                    public Optional<Instant> juengsterEintrag(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                                              Optional<MandantCode> man) {
+                        return Optional.empty();
+                    }
+                }, register), new ObjectMapper(), ZWISCHENABLAGE);
 
         byte[] strom = zuwachs(export, v -> true);
         Path inventar1 = inventarDatei(kommando);

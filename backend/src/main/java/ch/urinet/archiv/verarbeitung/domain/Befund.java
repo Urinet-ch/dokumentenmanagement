@@ -5,9 +5,9 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Befund der Überwachung (Req 16.5): Quelle, Gegenstand (Dokument-ID, Datum des Manifests, Name des Exports) und Status.
- * Der Schlüssel besteht nur aus diesen drei Teilen und enthält damit nur IDs und Status (Req 16.7); je Schlüssel geht
- * genau eine Mail. Wechselt ein Dokument den Status und steht wieder zu lange, ist das ein neuer Befund.
+ * Befund der Überwachung (Req 16.5): Quelle, Gegenstand (Dokument-ID, Datum des Manifests oder Sicherungscode) und
+ * Status. Der Schlüssel besteht nur aus diesen drei Teilen und enthält damit nur IDs und Status (Req 16.7); je Schlüssel
+ * geht genau eine Mail. Wechselt ein Dokument den Status und steht wieder zu lange, ist das ein neuer Befund.
  */
 public record Befund(Quelle quelle, String gegenstand, String status) {
 

@@ -20,10 +20,10 @@ import java.util.function.Supplier;
 /**
  * Überwachung (Req 16.5, design.md «Überwachung»): je aktiven Mandanten Dokumente, die länger als
  * {@code archiv.ueberwachung.grenze} in {@code VERARBEITUNG}, {@code FEHLER} oder {@code ARCHIVIERUNG_FEHLER} stehen,
- * und fehlende Manifeste; einmal für den Betrieb der Stand der Sicherung. Je Befund geht genau eine Mail an den Inhaber,
- * nur mit IDs und Status (Req 16.7). Scheitert der Versand, versucht es der nächste Lauf wieder; scheitert danach auch
- * das Freigeben, wiederholt es jeder weitere Lauf, bis es gelingt (Review PR #91). Ein Fehler bei einem Mandanten hält
- * die anderen nicht auf.
+ * fehlende Manifeste und Sicherungsexporte. Je Befund geht genau eine Mail an den Inhaber, nur mit IDs und Status
+ * (Req 16.7). Scheitert der Versand, versucht es der nächste Lauf wieder; scheitert danach auch das Freigeben,
+ * wiederholt es jeder weitere Lauf, bis es gelingt (Review PR #91). Ein Fehler bei einem Mandanten hält die anderen
+ * nicht auf.
  */
 @ApplicationScoped
 public class Ueberwachung {
@@ -83,6 +83,17 @@ public class Ueberwachung {
             throw new IllegalArgumentException("archiv.ueberwachung.manifest-frist muss grösser als 0 sein");
         }
         return frist;
+    }
+
+    /** Prüft die Sicherungsfrist und den Aktivierungsschalter bereits beim Start jeder Rolle (Aufgabe 5.6). */
+    public static boolean pruefeSicherungEinstellungen(Duration frist, Boolean aktiv) {
+        if (frist == null || frist.isNegative() || frist.isZero()) {
+            throw new IllegalArgumentException("archiv.ueberwachung.sicherung-frist muss grösser als 0 sein");
+        }
+        if (aktiv == null) {
+            throw new IllegalArgumentException("archiv.ueberwachung.sicherung-aktiv muss true oder false sein");
+        }
+        return aktiv;
     }
 
     /** Ein Lauf über alle aktiven Mandanten; liefert die Anzahl zugestellter Mails. */
