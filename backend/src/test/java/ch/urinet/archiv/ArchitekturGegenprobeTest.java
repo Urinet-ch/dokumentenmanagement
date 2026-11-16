@@ -25,6 +25,20 @@ class ArchitekturGegenprobeTest {
     }
 
     @Test
+    void httpClientInDerWebseitenSchnittstelleVerstoesst() {
+        JavaClasses klassen = new ClassFileImporter().importClasses(
+                ch.urinet.archiv.integration.application.webseite.HttpClientGegenprobe.class,
+                ch.urinet.archiv.integration.application.webseite.AenderungFeed.class);
+
+        var ergebnis = ArchitekturTest.keinHttpClientInDerWebseitenSchnittstelle.evaluate(klassen);
+
+        assertThat(ergebnis.hasViolation()).isTrue();
+        assertThat(ergebnis.getFailureReport().getDetails())
+                .anyMatch(zeile -> zeile.contains("HttpClientGegenprobe"))
+                .noneMatch(zeile -> zeile.contains("AenderungFeed "));
+    }
+
+    @Test
     void methodenreferenzAufGetenvVerstoesst() {
         JavaClasses klassen = new ClassFileImporter().importClasses(UmgebungAlsReferenz.class);
 

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Änderungs-Feed der Webseiten-Schnittstelle (Spec 03, Aufgabe 11.9, Req 14.1 bis 14.4). Ein Trigger auf dokument
+         schreibt jede Änderung in derselben Transaktion; er erfasst so jeden Weg (Web-App, Erfassung, Worker, Import).
+         xid ist pg_current_xact_id() der schreibenden Transaktion: Der Feed liefert nur Einträge unterhalb des Horizonts
+         pg_snapshot_xmin, damit keine Änderung einer noch offenen Transaktion übersprungen wird. dokument_id ohne
+         Fremdschlüssel, damit ein späteres physisches Löschen (Spec 01, 9.9) den Eintrag nicht verhindert. stufe_vorher
+         und stufe_nachher sind die öffentliche Stufe, wenn das Dokument den festen Filter ohne Stufe erfüllt
+         (ARCHIVIERT, NORMAL, bestätigt, veröffentlicht = true, zugriff bekannt), sonst null. Die Funktion läuft
+         unabhängig vom search_path der Session (Zielschema aus TG_TABLE_SCHEMA). -->
+    <changeSet id="032-webseite-feed" author="archiv">
+        <sql splitStatements="false">
+            create table webseite_aenderung (
+                id bigserial constraint webseite_aenderung_pk primary key,
+                xid xid8 not null,
+                dokument_id uuid not null,
+                zeit timestamptz not null default clock_timestamp(),
+                status text,
+                version int,
+                stufe_vorher text constraint webseite_aenderung_vorher_ck
+                    check (stufe_vorher in ('oeffentlich', 'mitglieder', 'vorstand')),
+                stufe_nachher text constraint webseite_aenderung_nachher_ck
+                    check (stufe_nachher in ('oeffentlich', 'mitglieder', 'vorstand')),
+                fehlercode text
+            );
+            create index webseite_aenderung_xid_ix on webseite_aenderung (xid, id);
+            create index webseite_aenderung_zeit_ix on webseite_aenderung (zeit);
+
+            create table webseite_feed_stand (
+                id int constraint webseite_feed_stand_pk primary key constraint webseite_feed_stand_ck check (id = 1),
+                bereinigt_bis xid8
+            );
+            insert into webseite_feed_stand (id, bereinigt_bis) values (1, null);
+
+            create function webseite_aenderung_erfassen() returns trigger language plpgsql as $$
+            declare
+                vorher text;
+                nachher text;
+                fehlercode text;
+            begin
+                if TG_OP in ('UPDATE', 'DELETE') then
+                    vorher := case when OLD.status = 'ARCHIVIERT' and OLD.vertraulichkeit = 'NORMAL'
+                            and OLD.bestaetigt is not null and OLD.zusatz -> 'veroeffentlicht' = 'true'::jsonb
+                            and OLD.zusatz ->> 'zugriff' in ('oeffentlich', 'mitglieder', 'vorstand')
+                        then OLD.zusatz ->> 'zugriff' end;
+                end if;
+                if TG_OP = 'DELETE' then
+                    execute format('insert into %I.webseite_aenderung (xid, dokument_id, zeit, status, version, '
+                            || 'stufe_vorher, stufe_nachher, fehlercode) values (pg_current_xact_id(), $1, '
+                            || 'clock_timestamp(), null, null, $2, null, null)', TG_TABLE_SCHEMA)
+                        using OLD.id, vorher;
+                    return null;
+                end if;
+                nachher := case when NEW.status = 'ARCHIVIERT' and NEW.vertraulichkeit = 'NORMAL'
+                        and NEW.bestaetigt is not null and NEW.zusatz -> 'veroeffentlicht' = 'true'::jsonb
+                        and NEW.zusatz ->> 'zugriff' in ('oeffentlich', 'mitglieder', 'vorstand')
+                    then NEW.zusatz ->> 'zugriff' end;
+                if TG_OP = 'UPDATE' and OLD.status is not distinct from NEW.status
+                        and OLD.version is not distinct from NEW.version
+                        and OLD.fehler is not distinct from NEW.fehler
+                        and vorher is not distinct from nachher then
+                    return null;
+                end if;
+                fehlercode := case NEW.status when 'FEHLER' then 'VERARBEITUNG_FEHLGESCHLAGEN'
+                    when 'ARCHIVIERUNG_FEHLER' then 'ARCHIVIERUNG_FEHLGESCHLAGEN' end;
+                execute format('insert into %I.webseite_aenderung (xid, dokument_id, zeit, status, version, '
+                        || 'stufe_vorher, stufe_nachher, fehlercode) values (pg_current_xact_id(), $1, '
+                        || 'clock_timestamp(), $2, $3, $4, $5, $6)', TG_TABLE_SCHEMA)
+                    using NEW.id, NEW.status, NEW.version, vorher, nachher, fehlercode;
+                return null;
+            end
+            $$;
+            create trigger webseite_aenderung_erfassen after insert or update or delete on dokument
+                for each row execute function webseite_aenderung_erfassen()
+        </sql>
+        <rollback>
+            <sql>
+                drop trigger if exists webseite_aenderung_erfassen on dokument;
+                drop function if exists webseite_aenderung_erfassen();
+                drop table if exists webseite_feed_stand;
+                drop table if exists webseite_aenderung
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

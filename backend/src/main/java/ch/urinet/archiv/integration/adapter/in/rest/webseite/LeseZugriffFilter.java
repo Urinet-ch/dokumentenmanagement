@@ -32,7 +32,8 @@ import java.util.regex.Pattern;
  * <li>{@code X-Archiv-Client} fehlt: kein Hash (nur der Chat verlangt ihn, Aufgabe 11.3); sonst genau 64 Hexziffern
  * in Kleinbuchstaben (SHA-256), andernfalls 400. Der Hash gelangt nie ins Protokoll.</li>
  * </ul>
- * Nicht beachtet im Änderungs-Feed (Aufgabe 11.9): dort gilt die Stufe des Schlüssels; der Feed liest den Header nicht.
+ * Nicht beachtet im Änderungs-Feed (Aufgabe 11.9, {@link FeedZugriff}): dort gilt die Stufe des Schlüssels; der Feed
+ * liest die Header nicht.
  */
 public class LeseZugriffFilter {
 
@@ -65,6 +66,11 @@ public class LeseZugriffFilter {
                 .flatMap(w -> Zugriffsstufe.ausCode(w.toString()));
         if (webseite.isEmpty() || hoechste.isEmpty()) {
             berechtigung.ohneZugang(benutzer, Optional.empty(), Optional.empty());
+            return;
+        }
+        if (methode.isAnnotationPresent(FeedZugriff.class)) {
+            // Feed: die Stufe des Schlüssels, die Header der Webseite werden nicht gelesen (Req 14.1)
+            anfrage.setzen(new Lesezugriff(webseite.get(), hoechste.get(), hoechste.get(), Optional.empty()));
             return;
         }
         Zugriffsstufe gemeldet = einzelwert(kontext, ZUGRIFF)

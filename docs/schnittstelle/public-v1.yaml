@@ -6,7 +6,7 @@ info:
     Vertrag der Webseiten-Schnittstelle unter `/public/v1` (Hauptversion 1), gleich für jede Webseite
     (Spec 03, Requirement 11, ADR-014). Endpunkte kommen additiv mit den Aufgaben, die sie bauen; diese Fassung
     beschreibt Anmeldung, Fehler, Header und Versionierung sowie die lesenden Endpunkte (Liste, Suche, Details,
-    Datei-Link, Filter, Umleitung).
+    Datei-Link, Filter, Umleitung) und den Änderungs-Feed (Lese- und Erfassungs-Schlüssel).
 
     Lesen:
     - **Stufe der Anfrage.** Der Header `X-Archiv-Zugriff` (`oeffentlich`, `mitglieder`, `vorstand`; fehlt er, gilt
@@ -369,6 +369,93 @@ paths:
           "$ref": "#/components/responses/NichtGefunden"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/aenderungen":
+    get:
+      summary: Änderungen veröffentlichter Dokumente
+      description: Änderungen ab dem Cursor, durch die ein Dokument bis zur Stufe des
+        Schlüssels sichtbar wurde, sich als sichtbares Dokument änderte oder nicht mehr
+        sichtbar ist; sichtbar heisst wie im festen Filter (archiviert, veröffentlicht,
+        Vertraulichkeit NORMAL). Es gilt die Stufe des Schlüssels; X-Archiv-Zugriff und
+        X-Archiv-Client werden nicht gelesen. Jeder Eintrag erscheint genau einmal, nie
+        vor dem Ende seiner Transaktion. Ohne seit liefert der Feed keine Einträge, nur
+        den aktuellen Cursor; erst den Cursor holen, dann den Bestand laden, dann
+        ab dem Cursor lesen. Ein Cursor älter als die Aufbewahrung (90 Tage) ergibt 410
+        CURSOR_ABGELAUFEN; die Webseite verwirft dann alles und beginnt ohne Cursor.
+      parameters:
+      - description: Höchstzahl der Einträge, 1 bis 500 (Standard 100)
+        schema:
+          maximum: 500
+          minimum: 1
+          format: int32
+          type: integer
+        name: max
+        in: query
+      - description: Cursor der letzten Antwort; fehlt er, kommen keine Einträge, nur
+          der aktuelle Cursor
+        name: seit
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Änderungen und nächster Cursor
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteAenderungen"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '410':
+          "$ref": "#/components/responses/CursorAbgelaufen"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/erfassung/aenderungen":
+    get:
+      summary: Änderungen der Dokumente des Mandanten (Erfassung)
+      description: Jede Status- und Metadatenänderung der Dokumente des Mandanten ab
+        dem Cursor mit ID, Referenz, Status, Fehlercode und Version; die Referenz nur
+        für Dokumente der Webseite des Schlüssels, sonst leer. Cursor, Reihenfolge, max
+        und 410 wie beim Feed der Lese-Schlüssel. Kein Titel, kein Dateiname, kein Inhalt.
+      parameters:
+      - description: Höchstzahl der Einträge, 1 bis 500 (Standard 100)
+        schema:
+          maximum: 500
+          minimum: 1
+          format: int32
+          type: integer
+        name: max
+        in: query
+      - description: Cursor der letzten Antwort; fehlt er, kommen keine Einträge, nur
+          der aktuelle Cursor
+        name: seit
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Änderungen und nächster Cursor
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteErfassungAenderungen"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '410':
+          "$ref": "#/components/responses/CursorAbgelaufen"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
 security:
   - webseitenSchluessel: []
 components:
@@ -436,6 +523,7 @@ components:
             - MANDANT_FEHLT
             - NICHT_ERLAUBT
             - NICHT_GEFUNDEN
+            - CURSOR_ABGELAUFEN
             - ZU_VIELE_ANFRAGEN
             - BUDGET
             - DATEI_ZU_GROSS
@@ -687,6 +775,109 @@ components:
         dokumentId:
           type: string
           format: uuid
+    WebseiteAenderung:
+      description: Änderung eines Dokuments, gesehen mit der Stufe des Schlüssels
+      type: object
+      required:
+      - dokumentId
+      - art
+      - stufe
+      - zeit
+      properties:
+        dokumentId:
+          type: string
+          format: uuid
+        art:
+          type: string
+          x-erweiterbar: true
+          enum:
+          - SICHTBAR
+          - GEAENDERT
+          - NICHT_SICHTBAR
+          description: 'SICHTBAR: vorher nicht, nachher bis zur Stufe des Schlüssels sichtbar;
+            GEAENDERT: vorher und nachher sichtbar; NICHT_SICHTBAR: vorher sichtbar, nachher
+            nicht mehr (auch bei Wechsel auf eine höhere Stufe). Ohne Inhalt: Details holt
+            die Webseite bei Bedarf.'
+        stufe:
+          type: string
+          enum:
+          - oeffentlich
+          - mitglieder
+          - vorstand
+          description: Die tiefere der sichtbaren Stufen vor und nach der Änderung, nie
+            über der Stufe des Schlüssels; ab dieser Stufe aufwärts verwirft die Webseite
+            ihren Cache
+        zeit:
+          type: string
+          format: date-time
+    WebseiteAenderungen:
+      description: Änderungen ab dem Cursor
+      type: object
+      required:
+      - eintraege
+      - cursor
+      properties:
+        eintraege:
+          type: array
+          description: Höchstens max Einträge, nach Eintrag geordnet
+          items:
+            "$ref": "#/components/schemas/WebseiteAenderung"
+        cursor:
+          type: string
+          description: Opak; für den nächsten Abruf als seit übergeben, unverändert und
+            ohne ihn zu deuten
+    WebseiteErfassungAenderung:
+      description: Status- oder Metadatenänderung eines Dokuments
+      type: object
+      required:
+      - dokumentId
+      - zeit
+      properties:
+        dokumentId:
+          type: string
+          format: uuid
+        referenz:
+          type:
+          - string
+          - 'null'
+          description: Referenz der Webseite des Schlüssels; leer bei Dokumenten ohne
+            Referenz dieser Webseite
+        status:
+          type:
+          - string
+          - 'null'
+          description: Status des Dokuments nach der Änderung; leer bei physischem Löschen
+        fehlercode:
+          type:
+          - string
+          - 'null'
+          description: Stabiler Fehlercode bei einem Fehlerstatus, sonst leer
+        version:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          description: Version des Dokuments nach der Änderung (ETag); leer bei physischem
+            Löschen
+        zeit:
+          type: string
+          format: date-time
+    WebseiteErfassungAenderungen:
+      description: Änderungen der Dokumente des Mandanten ab dem Cursor
+      type: object
+      required:
+      - eintraege
+      - cursor
+      properties:
+        eintraege:
+          type: array
+          description: Höchstens max Einträge, nach Eintrag geordnet
+          items:
+            "$ref": "#/components/schemas/WebseiteErfassungAenderung"
+        cursor:
+          type: string
+          description: Opak; für den nächsten Abruf als seit übergeben, unverändert und
+            ohne ihn zu deuten
   parameters:
     ClientHeader:
       description: SHA-256 aus IP und Tages-Salz des Besuchers, von der Webseite berechnet
@@ -854,6 +1045,23 @@ components:
           schema:
             type: integer
             format: int32
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    CursorAbgelaufen:
+      description: |
+        Der Cursor ist älter als die Aufbewahrung des Feeds (90 Tage; `CURSOR_ABGELAUFEN`). Die Webseite verwirft ihren
+        Zwischenspeicher, lädt ihren Bestand neu und beginnt den Feed ohne Cursor.
+      headers:
         Cache-Control:
           $ref: "#/components/headers/CacheControl"
         Deprecation:

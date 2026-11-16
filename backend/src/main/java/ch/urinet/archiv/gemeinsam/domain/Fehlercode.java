@@ -27,6 +27,9 @@ public enum Fehlercode {
     DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
             "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
                     + "bestehende Art."),
+    CURSOR_ABGELAUFEN(410, "Cursor abgelaufen",
+            "Der Cursor ist älter als die Aufbewahrung des Feeds. Bitte laden Sie den Bestand neu und beginnen Sie "
+                    + "ohne Cursor."),
     VERSION_KONFLIKT(412, "Version veraltet",
             "Jemand hat das Dokument inzwischen geändert. Bitte laden Sie es neu und ändern Sie es erneut."),
     DATEI_ZU_GROSS(413, "Datei zu gross",
