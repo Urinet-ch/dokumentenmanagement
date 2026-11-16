@@ -511,7 +511,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - [Fabian] Probe-Projekt (eigenes Public-Cloud-Projekt) und dessen S3-Schlüssel anlegen, Schlüssel als GitHub-Secret des App-Repos
   - [Backend] Port `SicherungUeberwachung` (5.6) umgesetzt mit PR #191, ersetzt den Platzhalter `SicherungUeberwachungNichtAngebunden`; Szenario `@req-16.5` für eine fehlgeschlagene oder zu alte Sicherung; Aktivierung in prod erst nach Start des Sicherungs-Workflows auf Stufe B (Deploy-Teil dieser Aufgabe)
   - `docs/wiederherstellung.md`, mit dem S3-Wiederherstellungsziel in PR #200 ergänzt; einmal vollständig in einer Testumgebung durchgespielt (Nachweis: manuell [Fabian]); darin: nur Snapshots einspielen, deren SHA-256 ein Manifest unter `sicherung` belegt; Sperren nach der Wiederherstellung aus dem Inventar ohne Kappung neu setzen; Ausdünnen von Hand; Rückfall cloudscale.ch
-  - Lokale synthetische Restore-Übung vorhanden: `deploy/backup/restore-uebung-lokal.sh` prüft den Sicherungs-Shellablauf mit temporären Testschlüsseln sowie S3- und DB-Dateireferenzen mit Dev Services; vollständiger manueller Datenbank-/Realm-Restore und wiederkehrende Probe auf der VPS bleiben offen (Infra)
+  - Lokale synthetische Restore-Übung vorhanden: `deploy/backup/restore-uebung-lokal.sh` prüft den Sicherungs-Shellablauf mit temporären Testschlüsseln sowie S3- und DB-Dateireferenzen mit Dev Services; nur Teilprobe; der vollständige lokale Roundtrip (Export entschlüsseln, in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten) ist Aufgabe 5.12, die wiederkehrende Probe auf der VPS bleibt Infra
   - solange Stufe A läuft: nur Funktionstest mit Testdaten und eigenem Testschlüsselpaar auf der VPS der Stufe A (16.19; der Probe-Schlüssel entsteht erst auf Stufe B), keine Aufbewahrungspflicht; Aufbewahrung nach 16.2 erst auf Stufe B (5.11)
   - _Anforderungen: 6.11, 16.2, 16.3, 16.7, 16.8, 16.19, 16.23, 16.24, 16.27_
   - _Abhängig von: 4.9, 5.3; für die Restore-Probe auf Stufe B die neue VPS aus 5.11_
@@ -568,6 +568,12 @@ Arbeitsweise je Aufgabe (Claude Code):
   - verfehlt die Messung ein Ziel: VPS an Ort auf 4 vCPU / 8 GB / 160 GB aufrüsten (CHF 18.00/Mt., nicht umkehrbar), Limits nachführen, neu messen; Wechsel auf VPS Cloud, wenn auch 4/8 ein Ziel verfehlt, die Vektoren aus Spec 02/04 mehr Speicher brauchen, Spec 03 (öffentliche Schnittstelle, zweiter Mandant) die Last erhöht oder Fabian SLA, Snapshots oder Support will (design.md «Stufen der Plattform»)
   - _Anforderungen: 3.2, 5.5, 14.3, 16.1, 16.2, 16.3, 16.10, 16.15, 16.16, 16.17, 16.18, 16.19, 16.26_
   - _Abhängig von: 1.9, 2.4, 2.6, 4.5, 4.9 (bei vorgezogenem Wechsel nur der Entscheid K5 aus 4.9)_
+
+- [ ] 5.12 Lokaler Roundtrip der Sicherung (vollständige Restore-Übung) [Backend] [Infra]
+  - Rest aus 5.5 (Review PR #222): `deploy/backup/restore-uebung-lokal.sh` ist nur eine Teilprobe (Shellablauf mit Attrappen und S3-/DB-Referenz-Roundtrip mit synthetischen Daten). Es fehlt die Kette in einem Lauf: Export von `taeglich.sh` mit Wegwerf-`age`-Schlüsseln, `SHA256SUMS` prüfen, entschlüsseln, `pg_dump` in eine neue leere Datenbank einspielen, Bucket mit dem Wiederherstellungskommando in einen neuen `urinet-archiv-p-`-Bucket schreiben, Archiv gegen dieses Ziel starten, Startprüfungen, Dokumentliste (Anzahl, IDs, Prüfsummen) mit der Quelle vergleichen
+  - Manifest-Versionen: `manifest` und `manifest_zeitstempel` sind nur einfügbar (Trigger) und behalten nach dem Restore die alten S3-Versions-IDs. Festlegen, wie Prüfwerkzeug und Export die Manifestdateien im Ziel auffinden (Auflösung über Schlüssel und SHA-256 statt über die Versions-ID, Req 15.5), und im Roundtrip eine Manifestprüfung (`archiv manifest pruefen`) einschliessen
+  - _Anforderungen: 15.5, 16.3_
+  - _Abhängig von: 5.5_
 
 ## Optionen
 Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04, O.7–O.8 in Spec 01).

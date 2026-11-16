@@ -66,7 +66,8 @@ class SicherungRestoreUebungTest {
         mandantSicherstellen();
         String quellPraefix = QUELL_PRAEFIX + UUID.randomUUID().toString().substring(0, 8) + "-";
         String quellBucket = mandant.bucket(quellPraefix);
-        String zielBucket = mandant.bucket(ZIEL_PRAEFIX);
+        String zielPraefix = ZIEL_PRAEFIX + UUID.randomUUID().toString().substring(0, 8) + "-";
+        String zielBucket = mandant.bucket(zielPraefix);
         boolean quelleAngelegt = false;
         UUID archivId = UUID.randomUUID();
         UUID eingangId = UUID.randomUUID();
@@ -84,14 +85,14 @@ class SicherungRestoreUebungTest {
         boolean zielAngelegt = false;
 
         try {
+            quelleAngelegt = true;
             verwaltung.createBucket(b -> b.bucket(quellBucket).objectLockEnabledForBucket(true));
             verwaltung.putBucketVersioning(b -> b.bucket(quellBucket)
                     .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
-            quelleAngelegt = true;
+            zielAngelegt = true;
             verwaltung.createBucket(b -> b.bucket(zielBucket).objectLockEnabledForBucket(true));
             verwaltung.putBucketVersioning(b -> b.bucket(zielBucket)
                     .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
-            zielAngelegt = true;
 
             String archivOriginalQuelle = ablegen(quellBucket, archivOriginal, archivOriginalBytes);
             String archivPdfaQuelle = ablegen(quellBucket, archivPdfa, archivPdfaBytes);
@@ -116,7 +117,7 @@ class SicherungRestoreUebungTest {
             Path strom = temp.resolve("bucket.bin");
             java.nio.file.Files.write(strom, bytes.toByteArray());
 
-            var zielEinstellungen = new AblageEinstellungen(ZIEL_PRAEFIX, Optional.empty(), Sperrmodus.COMPLIANCE,
+            var zielEinstellungen = new AblageEinstellungen(zielPraefix, Optional.empty(), Sperrmodus.COMPLIANCE,
                     Optional.empty(), einstellungen.urlGueltigkeit(), einstellungen.zwischenablage());
             S3Wiederherstellung wiederherstellungsZiel = new S3Wiederherstellung(s3, zielEinstellungen);
             Wiederherstellung.Ergebnis ergebnis;

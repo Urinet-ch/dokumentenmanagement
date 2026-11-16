@@ -126,7 +126,10 @@ Der Lauf ist eine lokale Teilprobe, kein vollständiger Restore des täglichen S
 `taeglich.sh` mit Docker-Attrappen aus; sein erzeugter Export wird nicht an den S3-Roundtrip-Test übergeben. Der
 Roundtrip prüft synthetische Dokumentzeilen und Dateien im Test-PostgreSQL sowie einen getrennten S3-Ziel-Bucket, aber
 keinen `pg_dump`-/Keycloak-Realm-Restore in eine zweite Datenbank und keinen API-Start gegen diese zweite Datenbank.
-Der vollständige manuelle Restore-Nachweis bleibt damit offen.
+Der vollständige manuelle Restore-Nachweis bleibt damit offen und ist Aufgabe 5.12 in `tasks.md` (Export entschlüsseln,
+in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten, Dokumentliste vergleichen). Die Manifest-Versions-IDs
+in der Datenbank (`manifest`, `manifest_zeitstempel`) bleiben nach dem Restore auf dem Stand der Quelle (siehe
+`docs/wiederherstellung.md`); der Roundtrip-Test prüft deshalb nur das lesbare Manifestobjekt im Ziel.
 
 Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
 
