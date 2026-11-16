@@ -61,12 +61,20 @@
       } @else if (artInaktiv()) {
         <span data-test="art-inaktiv">{{ texte.zusatzArtInaktiv(art()!.name) }}</span>
       }
-      <a
-        [routerLink]="['/dokument', d.id]"
-        [queryParams]="artUebernehmen()"
-        data-test="zusatz-ergaenzen"
-        >{{ texte.zusatzErgaenzen }}</a
-      >
+      @if (darfAendern()) {
+        @if (zusatzFelder().length > 0) {
+          <button mat-button type="button" data-test="zusatz-ergaenzen" (click)="oeffnen('formular')">
+            {{ texte.zusatzFormularOeffnen }}
+          </button>
+        } @else {
+          <a
+            [routerLink]="['/dokument', d.id]"
+            [queryParams]="artUebernehmen()"
+            data-test="zusatz-ergaenzen"
+            >{{ texte.zusatzErgaenzen }}</a
+          >
+        }
+      }
     </p>
   }
   @for (warnung of belegnummerWarnungen(); track $index) {
@@ -274,25 +282,27 @@
             }
           }
         </div>
-        <div class="feld">
-          <label [for]="d.id + '-richtung'"
-            >{{ texte.feld['richtung'] }}
-            @if (pflicht('richtung')) {
-              <span aria-hidden="true"> *</span>
-            }
-          </label>
-          <select
-            [id]="d.id + '-richtung'"
-            [attr.aria-required]="pflicht('richtung') || null"
-            [attr.aria-invalid]="ungueltig('richtung') || null"
-            (change)="setze('richtung', wert($event))"
-          >
-            <option value="" [selected]="!e.richtung"></option>
-            @for (r of richtungen; track r) {
-              <option [value]="r" [selected]="r === e.richtung">{{ texte.richtung[r] }}</option>
-            }
-          </select>
-        </div>
+        @if (mitFinanz()) {
+          <div class="feld">
+            <label [for]="d.id + '-richtung'"
+              >{{ texte.feld['richtung'] }}
+              @if (pflicht('richtung')) {
+                <span aria-hidden="true"> *</span>
+              }
+            </label>
+            <select
+              [id]="d.id + '-richtung'"
+              [attr.aria-required]="pflicht('richtung') || null"
+              [attr.aria-invalid]="ungueltig('richtung') || null"
+              (change)="setze('richtung', wert($event))"
+            >
+              <option value="" [selected]="!e.richtung"></option>
+              @for (r of richtungen; track r) {
+                <option [value]="r" [selected]="r === e.richtung">{{ texte.richtung[r] }}</option>
+              }
+            </select>
+          </div>
+        }
         @for (f of weitereFelder(); track f.feld) {
           <div class="feld">
             <label [for]="d.id + '-' + f.feld"
@@ -315,6 +325,59 @@
               <span class="pruefen">{{ texte.bittePruefen }}</span>
             }
           </div>
+        }
+        @if (zusatzFelder().length > 0) {
+          <fieldset class="zusatzfelder" data-test="zusatzfelder">
+            <legend>{{ texte.zusatzTitel }}</legend>
+            @for (f of zusatzFelder(); track f.name) {
+              <div class="feld">
+                <label [for]="d.id + '-zusatz-' + f.name"
+                  >{{ zusatzBeschriftung(f) }}
+                  @if (f.pflicht) {
+                    <span aria-hidden="true"> *</span>
+                  }
+                </label>
+                @if (f.name === 'zugriff' || f.typ === 'auswahl') {
+                  <select
+                    [id]="d.id + '-zusatz-' + f.name"
+                    [attr.aria-required]="f.pflicht || null"
+                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
+                    [value]="zusatzEingaben()[f.name] ?? ''"
+                    (change)="setzeZusatz(f.name, wert($event))"
+                  >
+                    <option value="" [selected]="!(zusatzEingaben()[f.name] ?? '')"></option>
+                    @for (option of (f.name === 'zugriff' ? zugriffOptionen : f.optionen); track option) {
+                      <option [value]="option" [selected]="option === zusatzEingaben()[f.name]">
+                        {{ zusatzOption(f, option) }}
+                      </option>
+                    }
+                  </select>
+                } @else if (f.typ === 'janein') {
+                  <select
+                    [id]="d.id + '-zusatz-' + f.name"
+                    [attr.aria-required]="f.pflicht || null"
+                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
+                    [value]="zusatzEingaben()[f.name] ?? ''"
+                    (change)="setzeZusatz(f.name, wert($event))"
+                  >
+                    <option value=""></option>
+                    <option value="true">{{ texte.ja }}</option>
+                    <option value="false">{{ texte.nein }}</option>
+                  </select>
+                } @else {
+                  <input
+                    [id]="d.id + '-zusatz-' + f.name"
+                    [type]="f.typ === 'datum' ? 'date' : 'text'"
+                    [attr.inputmode]="f.typ === 'zahl' ? 'decimal' : f.typ === 'ganzzahl' ? 'numeric' : null"
+                    [attr.aria-required]="f.pflicht || null"
+                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
+                    [value]="zusatzEingaben()[f.name] ?? ''"
+                    (input)="setzeZusatz(f.name, wert($event))"
+                  />
+                }
+              </div>
+            }
+          </fieldset>
         }
         @if (darfVertraulichkeit()) {
           <div class="feld">

@@ -17,9 +17,10 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { Observable, Subject, catchError, of, switchMap, timer } from 'rxjs';
+import { Observable, Subject, catchError, of, switchMap, tap, timer } from 'rxjs';
 import {
   Dokument,
+  DokumentAenderung,
   Dokumentart,
   DokumenteService,
   Kontakt,
@@ -28,6 +29,7 @@ import {
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { ZusatzFeld, zusatzFelder as schemaZusatzFelder } from '../dokument/aenderung';
 import {
   AktionFehler,
   Entwurf,
@@ -82,6 +84,9 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly vertraulichkeiten = ['', 'NORMAL', 'INTERN', 'PERSONAL'];
 
   protected readonly entwurf = linkedSignal<Entwurf>(() => entwurfAus(this.dokument()));
+  protected readonly zusatzEingaben = linkedSignal<Record<string, string>>(() => this.zusatzStart());
+  private readonly aktuelleVersion = linkedSignal(() => this.dokument().version);
+  private readonly zusatzGespeichert = signal(false);
   protected readonly modus = signal<Modus>('ansicht');
   protected readonly laeuft = signal(false);
   protected readonly fehler = signal('');
@@ -120,6 +125,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     () => !this.darfBestaetigen() && !this.darfVerwerfen() && !this.darfWiederholen(),
   );
   protected readonly art = computed(() => this.arten().get(this.entwurf().art));
+  protected readonly mitFinanz = computed(() => this.art()?.gruppen.includes('finanz') ?? false);
+  protected readonly zusatzFelder = computed(() =>
+    schemaZusatzFelder(this.art()).filter((feld) => feld.name !== 'veroeffentlicht'),
+  );
+  protected readonly zugriffOptionen = ['oeffentlich', 'mitglieder', 'vorstand'];
   protected readonly artenWahl = computed(() =>
     [...this.arten().values()].filter((a) => a.aktiv || a.code === this.entwurf().art),
   );
@@ -132,18 +142,20 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         art.pflichtfelder.includes('gueltig_bis'))
     );
   });
-  /**
-   * Pflicht-Zusatzfelder der Art, die am Dokument fehlen. Der Eingangskorb hat dafür kein Eingabefeld, und der Body der
-   * Bestätigung nimmt keine Zusatzfelder an (design.md «Umsetzung 3.6», bekannte Grenze).
-   */
   protected readonly zusatzFehlt = computed(() => {
-    const vorhanden = (this.dokument().zusatz ?? {}) as Record<string, unknown>;
+    const werte = this.zusatzEingaben();
     return (this.art()?.pflichtfelder ?? [])
       .filter((f) => f.startsWith('zusatz.'))
       .filter((f) => {
-        const wert = vorhanden[f.substring('zusatz.'.length)];
-        return wert === undefined || wert === null || wert === '';
+        const name = f.substring('zusatz.'.length);
+        const wert = werte[name];
+        return wert === undefined || wert.trim() === ''
+          || name === 'zugriff' && !this.zugriffOptionen.includes(wert);
       });
+  });
+  protected readonly zusatzFehltImFormular = computed(() => {
+    const bearbeitbar = new Set(schemaZusatzFelder(this.art()).map((feld) => feld.name));
+    return this.zusatzFehlt().filter((feld) => bearbeitbar.has(feld.substring('zusatz.'.length)));
   });
   /**
    * Steht die Art nur im KI-Vorschlag oder ist sie hier ungespeichert gewählt, geht sie als `?art=` an die
@@ -172,23 +184,29 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       { feld: 'art', wert: this.art()?.name ?? e.art },
       { feld: 'datum', wert: datumAnzeige(e.datum) },
       { feld: 'partnerName', wert: e.partnerName },
-      { feld: 'belegnummer', wert: e.belegnummer },
-      { feld: 'richtung', wert: e.richtung ? (this.texte.richtung[e.richtung] ?? e.richtung) : '' },
-      { feld: 'betrag', wert: e.betrag ? betragAnzeige(e.betrag, e.waehrung) : '' },
-      { feld: 'faelligkeit', wert: datumAnzeige(e.faelligkeit) },
+      ...(this.mitFinanz()
+        ? [
+            { feld: 'belegnummer' as const, wert: e.belegnummer },
+            { feld: 'richtung' as const, wert: e.richtung ? (this.texte.richtung[e.richtung] ?? e.richtung) : '' },
+            { feld: 'betrag' as const, wert: e.betrag ? betragAnzeige(e.betrag, e.waehrung) : '' },
+            { feld: 'faelligkeit' as const, wert: datumAnzeige(e.faelligkeit) },
+          ]
+        : []),
     ];
     return zeilen.filter((z) => z.wert !== '');
   });
 
   protected readonly weitereFelder = computed(() => {
-    const felder: { feld: EntwurfFeld; typ: string; modus?: string }[] = [
-      { feld: 'belegnummer', typ: 'text' },
-      { feld: 'betrag', typ: 'text', modus: 'decimal' },
-      { feld: 'waehrung', typ: 'text' },
-      { feld: 'faelligkeit', typ: 'date' },
-      { feld: 'qrReferenz', typ: 'text' },
-      { feld: 'projekt', typ: 'text' },
-    ];
+    const felder: { feld: EntwurfFeld; typ: string; modus?: string }[] = [{ feld: 'projekt', typ: 'text' }];
+    if (this.mitFinanz()) {
+      felder.unshift(
+        { feld: 'belegnummer', typ: 'text' },
+        { feld: 'betrag', typ: 'text', modus: 'decimal' },
+        { feld: 'waehrung', typ: 'text' },
+        { feld: 'faelligkeit', typ: 'date' },
+        { feld: 'qrReferenz', typ: 'text' },
+      );
+    }
     if (this.mitGueltigkeit()) {
       felder.push({ feld: 'gueltigAb', typ: 'date' }, { feld: 'gueltigBis', typ: 'date' });
     }
@@ -261,6 +279,9 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   protected setze(feld: EntwurfFeld, wert: string): void {
+    if (feld === 'art') {
+      this.zusatzGespeichert.set(false);
+    }
     if (feld === 'vertraulichkeit') {
       this.vertraulichkeitGewaehlt = true;
     }
@@ -273,6 +294,29 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       }
       return neu;
     });
+  }
+
+  protected setzeZusatz(name: string, wert: string): void {
+    this.zusatzGespeichert.set(false);
+    this.zusatzEingaben.update((werte) => ({ ...werte, [name]: wert }));
+  }
+
+  protected zusatzBeschriftung(feld: ZusatzFeld): string {
+    const namen: Record<string, string> = {
+      reihe: 'Reihe',
+      ausgabe: 'Ausgabe-Nr.',
+      jahr: 'Erscheinungsjahr',
+      fachgebiet: 'Fachgebiet',
+      zugriff: 'Zugriffsstufe',
+    };
+    return namen[feld.name] ?? this.texte.zusatzFeld(feld.name);
+  }
+
+  protected zusatzOption(feld: ZusatzFeld, wert: string): string {
+    if (feld.name !== 'zugriff') {
+      return wert;
+    }
+    return this.texte.zugriff[wert] ?? wert;
   }
 
   protected wert(ereignis: Event): string {
@@ -313,6 +357,8 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected schliessen(): void {
     if (this.modus() === 'formular') {
       this.entwurf.set(entwurfAus(this.dokument()));
+      this.zusatzEingaben.set(this.zusatzStart());
+      this.zusatzGespeichert.set(false);
       this.vertraulichkeitGewaehlt = false;
     }
     const ziel =
@@ -331,19 +377,45 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       this.imFormular(this.texte.artWaehlen, ['art']);
       return;
     }
-    if (!betragGueltig(entwurf.betrag)) {
+    if (this.mitFinanz() && !betragGueltig(entwurf.betrag)) {
       this.imFormular(this.texte.betragUngueltig, ['betrag']);
+      return;
+    }
+    const fehlendeZusatzfelder = this.zusatzFehltImFormular();
+    if (fehlendeZusatzfelder.length > 0) {
+      this.imFormular(
+        this.texte.fehlerPflichtfelder(fehlendeZusatzfelder.map(feldName).join(', ')),
+        fehlendeZusatzfelder,
+      );
       return;
     }
     if (this.dokument().pdfaFehlt && !zusatz.ohnePdfa) {
       this.rueckfrage('rueckfragePdfa', zusatz);
       return;
     }
+    const zusatzBody = this.zusatzBody();
+    const bisherigerZusatz = objekt(this.dokument().zusatz);
+    const aendern = this.zusatzGespeichert()
+      ? of(this.dokument())
+      : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz)
+        ? of(this.dokument())
+        : this.api
+            .apiV1DokumenteIdPatch(this.id(), this.etag(), { zusatz: zusatzBody } as DokumentAenderung)
+            .pipe(
+              tap((dokument) => {
+                this.aktuelleVersion.set(dokument.version);
+                this.zusatzGespeichert.set(true);
+              }),
+            );
     this.ausfuehren(
-      this.api.apiV1DokumenteIdBestaetigenPost(
-        this.id(),
-        this.etag(),
-        bestaetigungAus(entwurf, this.dokument(), zusatz),
+      aendern.pipe(
+        switchMap(() =>
+          this.api.apiV1DokumenteIdBestaetigenPost(
+            this.id(),
+            `"${this.aktuelleVersion()}"`,
+            bestaetigungAus(entwurf, this.dokument(), { ...zusatz, mitFinanz: this.mitFinanz() }),
+          ),
+        ),
       ),
       this.texte.erfolgBestaetigt(this.titel()),
       zusatz,
@@ -381,7 +453,68 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   private etag(): string {
-    return `"${this.dokument().version}"`;
+    return `"${this.aktuelleVersion()}"`;
+  }
+
+  private zusatzStart(): Record<string, string> {
+    const dokument = this.dokument();
+    const vorhandene = objekt(dokument.zusatz);
+    const eigenschaften = objekt(objekt(this.art()?.zusatzSchema)['properties']);
+    const werte = Object.fromEntries(
+      Object.entries(vorhandene).map(([name, wert]) => [
+        name,
+        typeof wert === 'string' || typeof wert === 'number' || typeof wert === 'boolean' ? String(wert) : '',
+      ]),
+    );
+    for (const feld of schemaZusatzFelder(this.art())) {
+      if (werte[feld.name] !== undefined && werte[feld.name] !== '') {
+        continue;
+      }
+        const standard = objekt(eigenschaften[feld.name])['default'];
+        const wert =
+          standard ??
+          (feld.name === 'zugriff' ? 'mitglieder' : feld.name === 'veroeffentlicht' ? false : '');
+        werte[feld.name] = wert === null || wert === undefined ? '' : String(wert);
+    }
+    return werte;
+  }
+
+  private zusatzBody(): Record<string, unknown> {
+    const body = { ...objekt(this.dokument().zusatz) };
+    const werte = this.zusatzEingaben();
+    for (const feld of schemaZusatzFelder(this.art())) {
+      if (feld.name === 'veroeffentlicht') {
+        body[feld.name] = false;
+        continue;
+      }
+      const roh = (werte[feld.name] ?? '').trim();
+      if (roh === '') {
+        delete body[feld.name];
+        continue;
+      }
+      if (feld.name === 'zugriff') {
+        if (this.zugriffOptionen.includes(roh)) {
+          body[feld.name] = roh;
+        } else {
+          delete body[feld.name];
+        }
+        continue;
+      }
+      switch (feld.typ) {
+        case 'zahl':
+          body[feld.name] = Number(roh.replace(',', '.'));
+          break;
+        case 'ganzzahl':
+          body[feld.name] = Number.parseInt(roh, 10);
+          break;
+        case 'janein':
+          body[feld.name] = roh === 'true';
+          break;
+        default:
+          body[feld.name] = roh;
+      }
+    }
+    return body;
   }
 
   private ausfuehren(aufruf: Observable<unknown>, erfolg: string, zusatz: Zusatz = {}): void {
@@ -476,4 +609,8 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
 
 function camel(feld: string): string {
   return feld.replace(/_([a-z])/g, (_, b: string) => b.toUpperCase());
+}
+
+function objekt(wert: unknown): Record<string, unknown> {
+  return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
 }

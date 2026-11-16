@@ -208,7 +208,7 @@
       @for (z of zusatz(); track z.name) {
         <div class="feld">
           <label [for]="'bearbeiten-zusatz-' + z.name"
-            >{{ z.name }}
+            >{{ beschriftung(z.name) }}
             @if (z.pflicht) {
               <span aria-hidden="true"> *</span>
             }
@@ -223,7 +223,9 @@
               >
                 <option value="" [selected]="!f.zusatz[z.name]"></option>
                 @for (o of z.optionen; track o) {
-                  <option [value]="o" [selected]="o === f.zusatz[z.name]">{{ o }}</option>
+                  <option [value]="o" [selected]="o === f.zusatz[z.name]">
+                    {{ z.name === 'zugriff' ? (zugriffNamen[o] ?? o) : o }}
+                  </option>
                 }
               </select>
             }

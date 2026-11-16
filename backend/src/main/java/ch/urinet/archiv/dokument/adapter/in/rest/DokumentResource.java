@@ -346,11 +346,26 @@ public class DokumentResource {
             berechtigung.dokumentAktion(benutzer, Aktion.A8, id);
         }
         int version = version(ifMatch);
-        aendern.aendern(benutzer, id, version, () -> aenderung(knoten(inhalt)));
+        aendern.aendern(benutzer, id, version, () -> {
+            JsonNode knoten = knoten(inhalt);
+            veroeffentlichungPruefen(benutzer, id, knoten);
+            return aenderung(knoten);
+        });
         DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
         Dokument dokument = ansicht.dokument();
         return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
+    }
+
+    private void veroeffentlichungPruefen(Benutzer benutzer, UUID id, JsonNode aenderung) {
+        JsonNode veroeffentlicht = aenderung.path("zusatz").path("veroeffentlicht");
+        if (!veroeffentlicht.isBoolean() || !veroeffentlicht.booleanValue()) {
+            return;
+        }
+        Dokument dokument = lesen.ansicht(benutzer, id).dokument();
+        if (dokument.status() != DokumentStatus.ARCHIVIERT || !dokument.bestaetigtesDokument()) {
+            throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
+        }
     }
 
     @POST

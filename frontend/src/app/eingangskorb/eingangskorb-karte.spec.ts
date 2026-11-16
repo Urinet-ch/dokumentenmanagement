@@ -32,7 +32,7 @@ const ARTEN: Dokumentart[] = [
   {
     code: 'LIEFERANTENRECHNUNG',
     name: 'Lieferantenrechnung',
-    gruppen: [],
+    gruppen: ['finanz'],
     pflichtfelder: ['datum', 'partner', 'betrag'],
     zusatzSchema: {},
     vertraulichkeit: 'NORMAL',
@@ -50,6 +50,34 @@ const ARTEN: Dokumentart[] = [
     aktiv: true,
   },
 ];
+
+const VHF_ART: Dokumentart = {
+  code: 'BULLETIN',
+  name: 'Bulletin',
+  gruppen: [],
+  pflichtfelder: [
+    'zusatz.reihe',
+    'zusatz.ausgabe',
+    'zusatz.jahr',
+    'zusatz.fachgebiet',
+    'zusatz.zugriff',
+    'zusatz.veroeffentlicht',
+  ],
+  zusatzSchema: {
+    type: 'object',
+    properties: {
+      reihe: { type: 'string' },
+      ausgabe: { type: 'string' },
+      jahr: { type: 'integer' },
+      fachgebiet: { type: 'string', enum: ['Bad', 'Eis', 'Technik', 'Recht', 'Allgemein'] },
+      zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'mitglieder' },
+      veroeffentlicht: { type: 'boolean', default: false },
+    },
+  },
+  vertraulichkeit: 'NORMAL',
+  gesetzlichePflicht: false,
+  aktiv: true,
+};
 
 describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
   let fixture: ComponentFixture<EingangskorbKarte>;
@@ -154,6 +182,84 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(anfrage.body).not.toHaveProperty('vertraulichkeit');
     expect(anfrage.body).not.toHaveProperty('ohnePdfa');
     expect(erledigt).toEqual([T.erfolgBestaetigt('Rechnung Muster AG')]);
+  });
+
+  it('zeigt Zusatzfelder je Art und setzt die Zugriffsstufe manuell auf Mitglieder', async () => {
+    await zeigen(
+      dokument({
+        art: 'BULLETIN',
+        vorschlag: { zugriff: 'vorstand', veroeffentlicht: true, betrag: 123.45, waehrung: 'CHF' },
+      }),
+      'geschaeftsstelle',
+      [VHF_ART],
+    );
+    await klicken(T.aendern);
+
+    expect(element.querySelector('[data-test=zusatzfelder]')).not.toBeNull();
+    expect(element.querySelector('#d1-zusatz-reihe')).not.toBeNull();
+    expect(element.querySelector('#d1-zusatz-ausgabe')).not.toBeNull();
+    expect(element.querySelector('#d1-zusatz-jahr')).not.toBeNull();
+    expect(element.querySelector('#d1-zusatz-fachgebiet')).not.toBeNull();
+    expect(element.querySelector<HTMLInputElement>('#d1-zusatz-veroeffentlicht')).toBeNull();
+    expect(element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')?.value).toBe('mitglieder');
+    expect(
+      [...element.querySelectorAll<HTMLSelectElement>('#d1-zusatz-zugriff option')].map((o) => o.value),
+    ).toEqual(['', 'oeffentlich', 'mitglieder', 'vorstand']);
+    expect(element.querySelector('#d1-betrag')).toBeNull();
+  });
+
+  it('speichert Zusatzfelder vor der Bestätigung und setzt veroeffentlicht nicht durch die KI', async () => {
+    await zeigen(
+      dokument({
+        art: 'BULLETIN',
+        vorschlag: { zugriff: 'vorstand', veroeffentlicht: true, betrag: 123.45, waehrung: 'CHF' },
+      }),
+      'geschaeftsstelle',
+      [VHF_ART],
+    );
+    await klicken(T.bestaetigen);
+    http.expectNone('/api/v1/dokumente/d1/bestaetigen');
+
+    const textfeld = (id: string, value: string) => {
+      const input = element.querySelector<HTMLInputElement>(id)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    textfeld('#d1-zusatz-reihe', 'Bulletin');
+    textfeld('#d1-zusatz-ausgabe', '12');
+    textfeld('#d1-zusatz-jahr', '2026');
+    const fachgebiet = element.querySelector<HTMLSelectElement>('#d1-zusatz-fachgebiet')!;
+    fachgebiet.value = 'Technik';
+    fachgebiet.dispatchEvent(new Event('change'));
+    const zugriff = element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')!;
+    zugriff.value = 'oeffentlich';
+    zugriff.dispatchEvent(new Event('change'));
+
+    await klicken(T.bestaetigen);
+    const patch = http.expectOne({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+    expect(patch.request.headers.get('If-Match')).toBe('"3"');
+    expect(patch.request.body).toEqual({
+      zusatz: {
+        reihe: 'Bulletin',
+        ausgabe: '12',
+        jahr: 2026,
+        fachgebiet: 'Technik',
+        zugriff: 'oeffentlich',
+        veroeffentlicht: false,
+      },
+    });
+    patch.flush(dokument({ art: 'BULLETIN', version: 4, zusatz: patch.request.body.zusatz }));
+    await fixture.whenStable();
+
+    const bestaetigung = http.expectOne('/api/v1/dokumente/d1/bestaetigen');
+    expect(bestaetigung.request.headers.get('If-Match')).toBe('"4"');
+    expect(bestaetigung.request.body).not.toHaveProperty('zugriff');
+    expect(bestaetigung.request.body).not.toHaveProperty('veroeffentlicht');
+    expect(bestaetigung.request.body).not.toHaveProperty('betrag');
+    expect(bestaetigung.request.body).not.toHaveProperty('waehrung');
+    bestaetigung.flush(null, { status: 202, statusText: 'Accepted' });
+    await fixture.whenStable();
+    expect(erledigt).toEqual([T.erfolgBestaetigt('Ohne Titel')]);
   });
 
   it('zeigt dem Mitarbeiter keine Aktion (Req 2.6, A6–A10)', async () => {

@@ -98,6 +98,12 @@ dieser Tabelle; neu 13.11.2026, E-C):
 - Domain-Typ `Zugriffsstufe` (`integration/webseite/domain`) mit `OEFFENTLICH < MITGLIEDER < VORSTAND` und
   `bisUndMit()` → Liste der Codes; der Filter nimmt diese Liste, nie einen Wert aus der Anfrage.
 - Keine Datenmigration nötig: Werte für `zugriff` gibt es erst ab Welle 10 (Spec 05, Wellen 17/18 vor Welle 10).
+- Aufgabe 10.4 (PR #229): Der Eingangskorb und die Metadatenansicht bauen Zusatzfelder aus dem Schema der gewählten
+  Dokumentart. `zugriff` startet unabhängig von KI-Vorschlägen bei `mitglieder`; `veroeffentlicht` erscheint erst bei
+  archivierten Dokumenten und wird über A6 geändert. `PATCH` protokolliert die Änderung als `AENDERN` und weist
+  Veröffentlichung vor bestätigter Archivierung ab. Bei `vhf-gsk` werden Finanzfelder weder angezeigt noch bestätigt;
+  finanzielle KI-Vorschläge und ihre Sicherheitswerte werden serverseitig verworfen. Die Geschäftsstelle behält die
+  bestehenden Rechte A1–A10; A11–A14 bleiben 403, wiederverwendbar für Aufgabe 11.10.
 
 ### Webseiten-Schnittstelle: Anmeldung, Schlüssel, Stufen (`integration/webseite`)
 - Bisher `SiteKeyAuthMechanism` (Scope `wordpress`); geändert 13.11.2026 (E-B): Kein eigener Mechanismus. Webseiten-Schlüssel sind API-Tokens nach Spec 01, 2.5 (`ua_<id>_<geheimnis>`, Argon2id, `HashSperre`) mit den neuen Scopes `webseite-lesen` und `webseite-erfassung`; `ApiTokenAuthMechanism` meldet sie an. Die Identität trägt zusätzlich die Attribute `webseite` (Kennung) und `hoechste-stufe`.
