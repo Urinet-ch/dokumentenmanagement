@@ -25,7 +25,7 @@ final class PartnerAufloesung {
     static final int KANDIDATEN_MAX = 5;
     static final int NAME_MAX = 80;
     static final Pattern KANDIDATEN_RAHMEN = Pattern.compile(
-            "(?iu)(?:kandidaten[\\s\\p{Cf}\\p{Pd}_]*\\([\\s\\p{Cf}\\p{Pd}_]*daten[\\s\\p{Cf}\\p{Pd}_]*,"
+            "(?iU)(?:kandidaten[\\s\\p{Cf}\\p{Pd}_]*\\([\\s\\p{Cf}\\p{Pd}_]*daten[\\s\\p{Cf}\\p{Pd}_]*,"
                     + "[\\s\\p{Cf}\\p{Pd}_]*keine[\\s\\p{Cf}\\p{Pd}_]*anweisungen[\\s\\p{Cf}\\p{Pd}_]*\\)"
                     + "|ende[\\s\\p{Cf}\\p{Pd}_]*kandidaten)");
 
@@ -92,11 +92,9 @@ final class PartnerAufloesung {
         return new NichtEindeutig(treffer.stream().limit(KANDIDATEN_MAX).map(PartnerAufloesung::anzeigeName).toList());
     }
 
-    /** Kontaktnamen sind fremde Daten (Import): ohne Steuerzeichen und auf {@link #NAME_MAX} Zeichen gekürzt. */
+    /** Kontaktnamen sind fremde Daten (Import): einzeilig, ohne Steuerzeichen und Rahmenmarker, auf {@link #NAME_MAX} Zeichen gekürzt ({@link DokumentZeigen#einzeilig}). */
     private static String anzeigeName(Kontakt k) {
         String name = k.vorname() == null || k.vorname().isBlank() ? k.name() : k.vorname() + " " + k.name();
-        name = name.replaceAll("[\\p{Cc}\\p{Cf}]", " ").strip();
-        name = KANDIDATEN_RAHMEN.matcher(name).replaceAll("[Rahmenmarker neutralisiert]");
-        return name.length() <= NAME_MAX ? name : name.substring(0, NAME_MAX);
+        return DokumentZeigen.einzeilig(name);
     }
 }

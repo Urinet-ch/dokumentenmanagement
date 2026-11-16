@@ -34,13 +34,14 @@ public final class Werteformat {
         if (betrag == null) {
             return null;
         }
-        String ziffern = betrag.abs().setScale(2, RoundingMode.HALF_UP).toPlainString();
+        BigDecimal gerundet = betrag.setScale(2, RoundingMode.HALF_UP);
+        String ziffern = gerundet.abs().toPlainString();
         int punkt = ziffern.indexOf('.');
         StringBuilder ganz = new StringBuilder(ziffern.substring(0, punkt));
         for (int i = ganz.length() - 3; i > 0; i -= 3) {
             ganz.insert(i, '\'');
         }
-        String vorzeichen = betrag.signum() < 0 ? "-" : "";
+        String vorzeichen = gerundet.signum() < 0 ? "-" : "";
         return (waehrung == null || waehrung.isBlank() ? CHF : waehrung.strip()) + " " + vorzeichen + ganz
                 + ziffern.substring(punkt);
     }
