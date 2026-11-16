@@ -172,6 +172,12 @@ public class ZugriffsstufenSchritte {
         antwort = anfrage(name).header(header, eins).header(header, zwei).when().get(pfad);
     }
 
+    @Wenn("der Schlüssel «{word}» «{}» mit unterschiedlich geschriebenen Headern «{}» und «{}» sowie den Werten «{}» und «{}» aufruft")
+    public void mitUnterschiedlichGeschriebenenHeadern(String name, String pfad, String header1, String header2,
+            String eins, String zwei) {
+        antwort = anfrage(name).header(header1, eins).header(header2, zwei).when().get(pfad);
+    }
+
     @Wenn("der Schlüssel «{word}» das Dokument «{word}» mit der Stufe «{word}» abruft")
     public void dokumentAbrufen(String name, String dokument, String stufe) {
         antwort = anfrage(name).header("X-Archiv-Zugriff", stufe).when()

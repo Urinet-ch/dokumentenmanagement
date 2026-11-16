@@ -193,6 +193,15 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und enthält der Text des Chatbots «Dazu habe ich nichts gefunden.»
     Und enthält der Text des Chatbots «Bitte wenden Sie sich an die Geschäftsstelle.»
 
+  @req-6.1 @req-15.4
+  Szenario: Ein erfolgreicher Chat-Stream wird nicht zwischengespeichert
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt         | argumente | tokens |
+      | 1       | text | Guten Tag.     |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und trägt die Chatbot-Antwort den Header «Cache-Control» mit dem Wert «no-store»
+
   # ---- Grenzen und Budget (Req 6.4)
 
   @req-6.4

@@ -344,6 +344,11 @@ public class OeffentlicherChatSchritte {
         assertThat(antwort.headers().hasHeaderWithName(name)).as(antwort.headers().toString()).isTrue();
     }
 
+    @Dann("trägt die Chatbot-Antwort den Header «{word}» mit dem Wert «{word}»")
+    public void headerMitWert(String name, String wert) {
+        assertThat(antwort.getHeader(name)).contains(wert);
+    }
+
     @Dann("trägt die Chatbot-Antwort keinen Header «{word}»")
     public void keinHeader(String name) {
         assertThat(antwort.headers().hasHeaderWithName(name)).as(antwort.headers().toString()).isFalse();
