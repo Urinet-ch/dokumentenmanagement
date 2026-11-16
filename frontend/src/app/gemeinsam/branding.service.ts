@@ -17,6 +17,10 @@ export const STANDARD_BRANDING: Branding = {
   sprache: 'de-CH',
 };
 
+const TEXT_DUNKEL = '#05070c';
+const TEXT_HELL = '#f2efe7';
+/** WCAG 2.1 AA für normalen Text. */
+const MIN_KONTRAST = 4.5;
 const FARBE = /^#[\da-f]{6}$/i;
 const NAME = /^[\p{L}\p{N}][\p{L}\p{N} &'’().,/-]{0,79}$/u;
 const LOGO_PFAD = /(?:\.png|\.jpe?g|\.webp)$/i;
@@ -30,12 +34,10 @@ function logo(wert: unknown): string | null {
     return wert;
   }
   try {
+    // Nur Pfade auf der eigenen Origin: keine Anfragen an Drittserver.
     const url = new URL(wert, 'https://archiv.invalid');
-    const pfadErlaubt = LOGO_PFAD.test(url.pathname);
-    const ursprungErlaubt = wert.startsWith('/') && !wert.startsWith('//')
-      ? !url.search && !url.hash
-      : url.protocol === 'https:' && wert.startsWith('https://') && !url.username && !url.password && !url.search && !url.hash;
-    return pfadErlaubt && ursprungErlaubt ? wert : null;
+    const eigenerPfad = wert.startsWith('/') && !wert.startsWith('//') && !url.search && !url.hash;
+    return eigenerPfad && LOGO_PFAD.test(url.pathname) ? wert : null;
   } catch (error) {
     if (error instanceof TypeError) {
       return null;
@@ -48,22 +50,35 @@ function sicher(antwort: Partial<Branding> | null): Branding {
   if (!antwort || typeof antwort.name !== 'string' || !NAME.test(antwort.name)) {
     return STANDARD_BRANDING;
   }
-  const primaerfarbe =
+  const gewuenscht =
     typeof antwort.primaerfarbe === 'string' && FARBE.test(antwort.primaerfarbe)
       ? antwort.primaerfarbe.toLowerCase()
+      : STANDARD_BRANDING.primaerfarbe;
+  const primaerfarbe =
+    Math.max(kontrast(gewuenscht, TEXT_DUNKEL), kontrast(gewuenscht, TEXT_HELL)) >= MIN_KONTRAST
+      ? gewuenscht
       : STANDARD_BRANDING.primaerfarbe;
   const sprache = antwort.sprache === 'de-CH' ? antwort.sprache : STANDARD_BRANDING.sprache;
   const logoUrl = logo(antwort.logoUrl);
   return { name: antwort.name, logoUrl, primaerfarbe, sprache };
 }
 
-function textfarbe(farbe: string): string {
+function luminanz(farbe: string): number {
   const kanal = (start: number) => {
     const wert = Number.parseInt(farbe.slice(start, start + 2), 16) / 255;
     return wert <= 0.04045 ? wert / 12.92 : ((wert + 0.055) / 1.055) ** 2.4;
   };
-  const luminanz = 0.2126 * kanal(1) + 0.7152 * kanal(3) + 0.0722 * kanal(5);
-  return luminanz > 0.179 ? '#05070c' : '#f2efe7';
+  return 0.2126 * kanal(1) + 0.7152 * kanal(3) + 0.0722 * kanal(5);
+}
+
+function kontrast(farbeA: string, farbeB: string): number {
+  const a = luminanz(farbeA);
+  const b = luminanz(farbeB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+export function textfarbe(farbe: string): string {
+  return kontrast(farbe, TEXT_DUNKEL) >= kontrast(farbe, TEXT_HELL) ? TEXT_DUNKEL : TEXT_HELL;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -86,7 +101,6 @@ export class BrandingService {
         this.dokument.documentElement.style.setProperty('--brand-primary', branding.primaerfarbe);
         this.dokument.documentElement.style.setProperty('--brand-text', textfarbe(branding.primaerfarbe));
         this.dokument.documentElement.lang = branding.sprache;
-        this.dokument.title = branding.name;
       });
   }
 }

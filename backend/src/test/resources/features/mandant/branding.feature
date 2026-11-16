@@ -23,7 +23,16 @@ Funktionalität: Mandanten-Branding
     Dann antwortet das Archiv mit Status 200
     Und antwortet das Archiv mit derselben neutralen Antwort
 
-  @req-2.3
+  @req-2.2
   Szenario: Ungültige Domain ablehnen
     Wenn das öffentliche Branding für die Domain "https://fremd.test.invalid/pfad" angefragt wird
+    Dann antwortet das Archiv mit Status 400
+
+  @req-2.2
+  Szenario: Fehlende, überlange und IP-Domain ablehnen
+    Wenn das öffentliche Branding ohne Domain angefragt wird
+    Dann antwortet das Archiv mit Status 400
+    Wenn das öffentliche Branding für die Domain "127.0.0.1" angefragt wird
+    Dann antwortet das Archiv mit Status 400
+    Wenn das öffentliche Branding für eine Domain mit 254 Zeichen angefragt wird
     Dann antwortet das Archiv mit Status 400

@@ -31,4 +31,26 @@ class BrandingTest {
         assertThat(Branding.ausKonfiguration("VHF/GSK", "/logos/logo.svg", "#eeb111", "de-CH").logoUrl())
                 .isNull();
     }
+
+    @Test
+    void primaerfarbeOhneAaKontrastFaelltAufStandardfarbeZurueck() {
+        for (String farbe : new String[] {"#707070", "#747474", "#777777", "#9a6a00"}) {
+            assertThat(Branding.ausKonfiguration("VHF/GSK", null, farbe, "de-CH").primaerfarbe())
+                    .as(farbe).isEqualTo(Branding.STANDARD.primaerfarbe());
+        }
+        Branding hell = Branding.ausKonfiguration("VHF/GSK", null, "#ffffff", "de-CH");
+        assertThat(hell.primaerfarbe()).isEqualTo("#ffffff");
+        assertThat(hell.textfarbe()).isEqualTo("#05070c");
+        Branding dunkel = Branding.ausKonfiguration("VHF/GSK", null, "#1a2b5c", "de-CH");
+        assertThat(dunkel.primaerfarbe()).isEqualTo("#1a2b5c");
+        assertThat(dunkel.textfarbe()).isEqualTo("#f2efe7");
+    }
+
+    @Test
+    void logoNurAufEigenerOriginOderAlsPruefbareDatenUri() {
+        assertThat(Branding.ausKonfiguration("VHF/GSK", "https://fremd.example/l.png", "#eeb111", "de-CH").logoUrl())
+                .isNull();
+        assertThat(Branding.ausKonfiguration("VHF/GSK", "//fremd.example/l.png", "#eeb111", "de-CH").logoUrl())
+                .isNull();
+    }
 }

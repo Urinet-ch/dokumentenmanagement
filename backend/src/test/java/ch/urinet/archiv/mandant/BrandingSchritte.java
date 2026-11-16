@@ -17,6 +17,16 @@ public class BrandingSchritte {
         antwort = given().queryParam("domain", domain).get("/api/v1/branding");
     }
 
+    @Wenn("das öffentliche Branding ohne Domain angefragt wird")
+    public void brandingOhneDomainAnfragen() {
+        antwort = given().get("/api/v1/branding");
+    }
+
+    @Wenn("das öffentliche Branding für eine Domain mit 254 Zeichen angefragt wird")
+    public void brandingMitUeberlangerDomainAnfragen() {
+        antwort = given().queryParam("domain", "a".repeat(254)).get("/api/v1/branding");
+    }
+
     @Dann("antwortet das Archiv mit Status {int}")
     public void statusPruefen(int status) {
         assertThat(antwort.statusCode()).isEqualTo(status);

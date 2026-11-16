@@ -21,7 +21,12 @@ public record Branding(String name, String logoUrl, String primaerfarbe, String 
             "^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$");
     private static final Pattern BILD_PFAD = Pattern.compile("(?i).+\\.(png|jpe?g|webp)$");
 
-    public static final Branding STANDARD = new Branding("Archiv", null, "#eeb111", "#05070c", "de-CH");
+    private static final String TEXT_DUNKEL = "#05070c";
+    private static final String TEXT_HELL = "#f2efe7";
+    /** WCAG 2.1 AA für normalen Text. */
+    private static final double MIN_KONTRAST = 4.5;
+
+    public static final Branding STANDARD = new Branding("Archiv", null, "#eeb111", TEXT_DUNKEL, "de-CH");
 
     public static Optional<String> domain(String wert) {
         if (wert == null || wert.isBlank() || wert.length() > 253) {
@@ -39,6 +44,9 @@ public record Branding(String name, String logoUrl, String primaerfarbe, String 
         String sicherName = name != null && NAME.matcher(name.strip()).matches() ? name.strip() : STANDARD.name;
         String sicherFarbe = primaerfarbe != null && FARBE.matcher(primaerfarbe).matches()
                 ? primaerfarbe.toLowerCase(Locale.ROOT) : STANDARD.primaerfarbe;
+        if (bestesKontrastverhaeltnis(sicherFarbe) < MIN_KONTRAST) {
+            sicherFarbe = STANDARD.primaerfarbe;
+        }
         String sicherSprache = "de-CH".equals(sprache) ? sprache : STANDARD.sprache;
         return new Branding(sicherName, logo(logoUrl), sicherFarbe, textfarbe(sicherFarbe), sicherSprache);
     }
@@ -75,10 +83,8 @@ public record Branding(String name, String logoUrl, String primaerfarbe, String 
             if (!pfadBild || uri.getRawQuery() != null || uri.getRawFragment() != null || uri.getUserInfo() != null) {
                 return null;
             }
-            if (uri.isAbsolute()) {
-                return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null ? wert : null;
-            }
-            return wert.startsWith("/") && !wert.startsWith("//") ? wert : null;
+            // Keine fremden Hosts: Besucher des öffentlichen Archivs würden sonst Dritte kontaktieren.
+            return !uri.isAbsolute() && wert.startsWith("/") && !wert.startsWith("//") ? wert : null;
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -97,11 +103,24 @@ public record Branding(String name, String logoUrl, String primaerfarbe, String 
     }
 
     private static String textfarbe(String farbe) {
+        return kontrast(farbe, TEXT_DUNKEL) >= kontrast(farbe, TEXT_HELL) ? TEXT_DUNKEL : TEXT_HELL;
+    }
+
+    private static double bestesKontrastverhaeltnis(String farbe) {
+        return Math.max(kontrast(farbe, TEXT_DUNKEL), kontrast(farbe, TEXT_HELL));
+    }
+
+    private static double kontrast(String farbeA, String farbeB) {
+        double a = luminanz(farbeA);
+        double b = luminanz(farbeB);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    }
+
+    private static double luminanz(String farbe) {
         int rot = Integer.parseInt(farbe.substring(1, 3), 16);
         int gruen = Integer.parseInt(farbe.substring(3, 5), 16);
         int blau = Integer.parseInt(farbe.substring(5, 7), 16);
-        double luminanz = 0.2126 * linear(rot) + 0.7152 * linear(gruen) + 0.0722 * linear(blau);
-        return luminanz > 0.179 ? "#05070c" : "#f2efe7";
+        return 0.2126 * linear(rot) + 0.7152 * linear(gruen) + 0.0722 * linear(blau);
     }
 
     private static double linear(int wert) {
