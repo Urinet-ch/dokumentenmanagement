@@ -176,6 +176,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 04 erweitert `MandantenIsolationIT` um die Wissensbasis (Spec 04, 11.5; Aufgabe 16.1)
   - Spec 05 erweitert `MandantenIsolationIT` um Arten, Klassifikationen, Regeln, KI-Texte und Konfigurationsversionen; liegt der Test noch nicht vor, legt ihn Spec 05, Aufgabe 18.5 an (Spec 05, Req 9.3)
   - Ergänzt 13.11.2026: `MandantenIsolationIT` mit Lese- und Erfassungs-Schlüsseln beider Mandanten über Lesen, Erfassung, Stream, Feed und Referenzen; zwei Schlüssel desselben Mandanten mit verschiedenen Stufen (9.4); OWASP-Prüfliste umfasst Erfassung, Stream, Feed, Filter und Umleitung, Stufe `vorstand` und die Erschöpfung der Schlüsselprüfung durch fremde Anfragen
+  - Vorhandene Teilnachweise auf `origin/main` (u. a. Dokumentzugriff, Webseiten-Lese-Feed, Chat, Protokoll und Worker) werden nicht doppelt gebaut; ergänzende Isolationstests und offene Wege werden in diesem PR festgehalten. Der Haken bleibt bis zur Gesamtaufgabe offen.
   - _Anforderungen: 1.4, 9.1, 9.2, 9.4_
 
 - [ ] 12.4 Einführung und Abnahme [Fabian]
