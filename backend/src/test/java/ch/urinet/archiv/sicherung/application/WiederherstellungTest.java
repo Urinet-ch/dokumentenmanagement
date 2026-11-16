@@ -219,14 +219,14 @@ class WiederherstellungTest {
         for (String praefix : List.of("Urinet-archiv-p-", " urinet-archiv-p-", "xurinet-archiv-p-",
                 "urinet-archiv-p- ")) {
             InMemoryZiel falschesZiel = new InMemoryZiel(praefix, true);
-            Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR)
+            Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR, KEINE_REFERENZ)
                     .wiederherstellen(MANDANT, List.of(inventar), datei, true);
             assertThat(abgelehnt.exitCode()).isEqualTo(2);
             assertThat(falschesZiel.leerAufrufe).isZero();
         }
 
         InMemoryZiel ohnePraefix = new InMemoryZiel(null, true);
-        Wiederherstellung.Ergebnis ohnePraefixAbgelehnt = new Wiederherstellung(ohnePraefix, UHR)
+        Wiederherstellung.Ergebnis ohnePraefixAbgelehnt = new Wiederherstellung(ohnePraefix, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(inventar), datei, true);
         assertThat(ohnePraefixAbgelehnt.exitCode()).isEqualTo(2);
         assertThat(ohnePraefix.leerAufrufe).isZero();
@@ -264,7 +264,7 @@ class WiederherstellungTest {
         Path datei = temp.resolve("strom.bin");
         Files.write(datei, frame("archiv/a", "v1", new byte[]{1}, JETZT));
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
-        var wiederherstellung = new Wiederherstellung(ziel, UHR);
+        var wiederherstellung = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ);
         List<InventarZeile> inventar = List.of(zeile("archiv/a", "v1", false, 1, JETZT.toString(), null, null));
 
         Wiederherstellung.Ergebnis erste = wiederherstellung.wiederherstellen(MANDANT, inventar, datei, false);
@@ -282,7 +282,7 @@ class WiederherstellungTest {
         Files.write(datei, Arrays.copyOf(vollstaendig, vollstaendig.length - 10));
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(), null, null)),
                         datei, false);
 
@@ -301,7 +301,7 @@ class WiederherstellungTest {
                 zeile("archiv/a", "v1", false, 1, JETZT.toString(), null, "2036-11-15T12:00:00Z"));
 
         for (InventarZeile zeile : inventar) {
-            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                     .wiederherstellen(MANDANT, List.of(zeile), datei, false);
             assertThat(ergebnis.exitCode()).isEqualTo(3);
         }
