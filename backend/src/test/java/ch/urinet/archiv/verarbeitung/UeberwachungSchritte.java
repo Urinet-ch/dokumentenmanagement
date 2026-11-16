@@ -1,7 +1,10 @@
 package ch.urinet.archiv.verarbeitung;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
+import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import ch.urinet.archiv.verarbeitung.adapter.in.kennzahlen.MicrometerKennzahlen;
 import ch.urinet.archiv.verarbeitung.application.Ueberwachung;
 import io.agroal.api.AgroalDataSource;
@@ -60,12 +63,32 @@ public class UeberwachungSchritte {
     @Inject
     MicrometerKennzahlen kennzahlen;
 
+    @Inject
+    MandantRegister mandanten;
+
+    @Inject
+    SicherungExportSpeicher sicherungen;
+
     // nur über Compose Dev Services gesetzt; als Pflichtwert bräche er die Starttests ohne Dev Services (prod)
     @ConfigProperty(name = "archiv.entwicklung.mailpit-port")
     Optional<Integer> mailpitPort;
 
+    @ConfigProperty(name = "archiv.ueberwachung.betrieb-mandant")
+    String sicherungsMandant;
+
+    @ConfigProperty(name = "archiv.ueberwachung.sicherung-aktiv")
+    Boolean sicherungAktiv;
+
+    @ConfigProperty(name = "archiv.benachrichtigung.empfaenger.urinet")
+    Optional<String> sicherungsEmpfaenger;
+
     private final Map<String, Ort> dokumente = new LinkedHashMap<>();
     private String metriken;
+    private List<String> aktiveVorher;
+    private boolean sicherungsSzenarioVorbereitet;
+
+    private record SicherungsMail(String betreff, String text) {
+    }
 
     @After
     public void aufraeumen() throws SQLException {
@@ -79,6 +102,16 @@ public class UeberwachungSchritte {
             Testdokumente.loeschen(datenbank.get(), eintrag.getKey(), eintrag.getValue());
         }
         dokumente.clear();
+        if (sicherungsSzenarioVorbereitet) {
+            String schema = new MandantCode(sicherungsMandant).schema();
+            ausfuehren("delete from " + schema + ".alarm where starts_with(schluessel, ?)", "sicherung:");
+            ausfuehren("update public.mandant set aktiv = false");
+            for (String code : aktiveVorher) {
+                ausfuehren("update public.mandant set aktiv = true where code = ?", code);
+            }
+            aktiveVorher = null;
+            sicherungsSzenarioVorbereitet = false;
+        }
     }
 
     @Angenommen("im Mandanten «{word}» steht das Dokument «{word}» seit {int} Minuten im Status «{word}»")
@@ -106,6 +139,48 @@ public class UeberwachungSchritte {
     @Wenn("die Überwachung läuft")
     public void laeuft() {
         ueberwachung.pruefen();
+    }
+
+    @Angenommen("die Sicherungsüberwachung ist aktiviert und es gibt keine Exporte für den Betriebsmandanten")
+    public void sicherungsueberwachungVorbereiten() throws SQLException {
+        assertThat(sicherungAktiv).isTrue();
+        MandantCode code = new MandantCode(sicherungsMandant);
+        aktiveVorher = aktiveMandanten();
+        assertThat(mandanten.existiert(code)).isTrue();
+        sicherungsSzenarioVorbereitet = true;
+        ausfuehren("update public.mandant set aktiv = false");
+        ausfuehren("update public.mandant set aktiv = true where code = ?", sicherungsMandant);
+        ausfuehren("delete from " + code.schema() + ".alarm where starts_with(schluessel, ?)", "sicherung:");
+    }
+
+    @Wenn("ein globaler DB-Export festgehalten wird")
+    public void globalerDatenbankExport() {
+        sicherungen.festhalten(SicherungsArt.DB, Optional.empty(),
+                UUID.randomUUID().toString().replace("-", "").repeat(2).substring(0, 64));
+    }
+
+    @Dann("hat der Inhaber genau sechs Sicherungs-Mails erhalten, nur Codes und Status")
+    public void genauSechsSicherungsMails() {
+        sicherungsMailsPruefen();
+    }
+
+    @Dann("hat der Inhaber weiterhin genau sechs Sicherungs-Mails erhalten")
+    public void weiterhinSechsSicherungsMails() {
+        sicherungsMailsPruefen();
+    }
+
+    @Dann("ist der fehlende DB-Sicherungsalarm erledigt")
+    public void datenbankAlarmErledigt() throws SQLException {
+        String sql = "select erledigt from " + new MandantCode(sicherungsMandant).schema()
+                + ".alarm where schluessel = ?";
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(sql)) {
+            abfrage.setString(1, "sicherung:db:FEHLT");
+            try (var ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getObject(1)).isNotNull();
+            }
+        }
     }
 
     @Wenn("die Kennzahlen erhoben werden")
@@ -208,6 +283,60 @@ public class UeberwachungSchritte {
         List<Map<String, Object>> liste = nachrichten.jsonPath().getList("messages");
         return liste.stream().filter(m -> String.valueOf(m.get("Subject")).contains(" hängt in "))
                 .map(m -> String.valueOf(m.get("ID"))).toList();
+    }
+
+    private void sicherungsMailsPruefen() {
+        List<SicherungsMail> mails = sicherungsMails();
+        assertThat(mails).hasSize(6);
+        List<String> gegenstaende = List.of("db", "keycloak", "realm", "schluessel",
+                "bucket-" + sicherungsMandant, "inventar-" + sicherungsMandant);
+        assertThat(mails).extracting(SicherungsMail::betreff).containsExactlyInAnyOrderElementsOf(gegenstaende.stream()
+                .map(gegenstand -> "UriNet Archiv: Sicherung " + gegenstand + " FEHLT").toList());
+        for (SicherungsMail mail : mails) {
+            assertThat(mail.text()).contains("Mandant: " + sicherungsMandant, "FEHLT")
+                    .doesNotContain("SHA-256", "sha256", "archiv/", "/manifest/");
+        }
+    }
+
+    private List<SicherungsMail> sicherungsMails() {
+        String mailpit = "http://localhost:" + mailpitPort.orElseThrow();
+        String empfaengerErwartet = sicherungsEmpfaenger.orElseThrow();
+        Response suchergebnis = given().baseUri(mailpit)
+                .queryParam("query", "subject:\"UriNet Archiv: Sicherung\"")
+                .when().get("/api/v1/search");
+        assertThat(suchergebnis.statusCode()).isEqualTo(200);
+        List<Map<String, Object>> nachrichten = suchergebnis.jsonPath().getList("messages");
+        List<SicherungsMail> mails = new ArrayList<>();
+        for (Map<String, Object> nachricht : nachrichten) {
+            if (!String.valueOf(nachricht.get("Subject")).startsWith("UriNet Archiv: Sicherung")) {
+                continue;
+            }
+            Response detail = given().baseUri(mailpit).when().get("/api/v1/message/" + nachricht.get("ID"));
+            assertThat(detail.statusCode()).isEqualTo(200);
+            List<String> empfaenger = detail.jsonPath().getList("To.Address");
+            if (!empfaenger.contains(empfaengerErwartet)) {
+                continue;
+            }
+            String text = detail.jsonPath().getString("Text");
+            if (text.contains("Mandant: " + sicherungsMandant)) {
+                assertThat(empfaenger).containsExactly(empfaengerErwartet);
+                mails.add(new SicherungsMail(detail.jsonPath().getString("Subject"), text));
+            }
+        }
+        return mails;
+    }
+
+    private List<String> aktiveMandanten() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select code from public.mandant where aktiv order by code");
+             var ergebnis = abfrage.executeQuery()) {
+            List<String> codes = new ArrayList<>();
+            while (ergebnis.next()) {
+                codes.add(ergebnis.getString(1));
+            }
+            return List.copyOf(codes);
+        }
     }
 
     private Ort ort(String name) {
