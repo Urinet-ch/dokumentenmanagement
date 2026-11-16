@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Spec 03, Aufgabe 11.3, Req 6.5: Fragen des öffentlichen Chatbots, 90 Tage. Bewusst ohne Spalte für Client-Hash,
+        IP, Webseite, Schlüssel, Gespräch oder Antwort: Die Zeile verrät nicht, wer gefragt hat. Die gespeicherte
+        Frage ist bereinigt (E-Mail, Telefon, lange Zifferfolgen); der Löschjob entfernt nach archiv.webseite.chat.aufbewahrung.
+    -->
+    <changeSet id="030-oeffentliche-frage" author="archiv">
+        <sql>
+            create table oeffentliche_frage (
+                id bigserial constraint oeffentliche_frage_pk primary key,
+                frage text not null,
+                quellen jsonb not null default '[]'::jsonb,
+                tokens int not null constraint oeffentliche_frage_tokens_ck check (tokens &gt;= 0),
+                zeit timestamptz not null
+            );
+            create index oeffentliche_frage_zeit_ix on oeffentliche_frage (zeit);
+        </sql>
+        <rollback>
+            <sql>drop table oeffentliche_frage;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

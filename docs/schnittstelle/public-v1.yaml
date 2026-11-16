@@ -44,6 +44,68 @@ info:
     - **`x-erweiterbar: true`** an einem Feld mit Aufzählung (`enum`) heisst: Innerhalb der Hauptversion können
       neue Werte dazukommen; Nutzer müssen unbekannte Werte vertragen.
 paths:
+  /public/v1/chat:
+    post:
+      tags: [Webseite]
+      summary: Frage an den öffentlichen Chatbot
+      description: |
+        Der Chatbot der Webseite antwortet auf Fragen zu den veröffentlichten Publikationen, nur aus Dokumenten, die
+        der feste Filter bis zur gemeldeten Stufe liefert (veröffentlicht, archiviert, normale Vertraulichkeit,
+        `zugriff` bis zur Stufe). Er verwendet nur Suche und Anzeige dieser Dokumente: keine Kennzahlen, keine internen
+        Daten, keine Rechte oder Sicht eines Benutzers. Anonym für den Besucher: Das Archiv speichert Frage (bereinigt),
+        Quellen und Tokens befristet (Standard 90 Tage, je Mandant einstellbar), nie Client-Hash, IP, Antwort oder Gespräch.
+
+        Antwort als Server-Sent Events (`text/event-stream`) mit benannten Ereignissen, JSON in `data:`:
+        - `werkzeug` `{werkzeug}`: je Werkzeugaufruf (nur zur Anzeige «sucht …»).
+        - `text` `{delta}`: Teil der Antwort. Ohne passende Publikation sagt der Chatbot das und verweist auf die
+          Geschäftsstelle; `quellen` ist dann leer.
+        - `quellen` `[{dokumentId, titel, reihe {code, name}, ausgabe}]`: genau einmal, unmittelbar vor `fertig`. Die
+          Quellen stammen aus den Werkzeugergebnissen und sind über den festen Filter geprüft; nie Stufe, Status oder
+          Dateiname. Den Link auf die Dokumentseite bildet die Webseite aus `dokumentId`.
+        - `fertig` `{gespraechId}`: Ende der Antwort. Das Gespräch lebt höchstens 30 Minuten im Speicher des Archivs, nur
+          für denselben Client; eine unbekannte, fremde oder abgelaufene ID beginnt ein neues Gespräch.
+        - `fehler` `{meldung, gespraechId}`: fester Text, beendet den Stream ohne `fertig`.
+
+        Grenzen: höchstens 20 Fragen je Client (`X-Archiv-Client`) und Stunde, dazu eine Grenze je Webseite und eine
+        laufende Frage je Client; ein Monatsbudget an Tokens je Mandant. Darüber 429 mit `ZU_VIELE_ANFRAGEN` bzw.
+        `BUDGET`.
+      parameters:
+        - name: X-Archiv-Zugriff
+          in: header
+          description: Stufe des Besuchers; fehlt der Header, gilt `oeffentlich`; über der Stufe des Schlüssels 403.
+          schema:
+            type: string
+            enum: [oeffentlich, mitglieder, vorstand]
+        - name: X-Archiv-Client
+          in: header
+          description: |
+            SHA-256 (64 Hexziffern, Kleinbuchstaben) von IP und Tages-Salz, von der Webseite berechnet; ohne Header
+            zählen alle Besucher ohne Hash der Webseite zusammen.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFrage"
+      responses:
+        "200":
+          description: Stream der Ereignisse
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
   "/public/v1/dokumente":
     get:
       summary: Veröffentlichte Dokumente auflisten
@@ -287,6 +349,19 @@ components:
         Mandant vom Betreiber ausgestellt. Die Scopes legt Aufgabe 11.7 fest. Ein fehlender, ungültiger, abgelaufener
         oder widerrufener Schlüssel ergibt dieselbe Antwort 401 `NICHT_ANGEMELDET`.
   schemas:
+    ChatFrage:
+      type: object
+      required: [frage]
+      properties:
+        frage:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Frage, nach Trim 1 bis 500 Zeichen (Obergrenze konfigurierbar, Standard 500).
+        gespraechId:
+          type: [string, "null"]
+          format: uuid
+          description: Gespräch fortsetzen; ohne beginnt ein neues.
     Problem:
       type: object
       description: Fehlerantwort nach RFC 9457 mit stabilem Fehlercode.
@@ -308,6 +383,13 @@ components:
         instance:
           type: string
           description: Fehler-ID `urn:uuid:<uuid>`; dieselbe ID steht im Log des Archivs.
+        grund:
+          type: string
+          x-erweiterbar: true
+          enum: [STUNDENLIMIT, LAEUFT]
+          description: |
+            Nur bei `ZU_VIELE_ANFRAGEN` des Chats: `STUNDENLIMIT` (Stundengrenze je Client oder Webseite erreicht) oder
+            `LAEUFT` (schon eine Frage dieses Clients läuft, `Retry-After` höchstens 5 Sekunden).
         fehlercode:
           type: string
           description: Stabiler Fehlercode; neue Codes sind additiv.
@@ -318,6 +400,8 @@ components:
             - MANDANT_FEHLT
             - NICHT_ERLAUBT
             - NICHT_GEFUNDEN
+            - ZU_VIELE_ANFRAGEN
+            - BUDGET
             - DATEI_ZU_GROSS
             - INTERNER_FEHLER
             - UEBERLASTET
@@ -707,6 +791,29 @@ components:
     InternerFehler:
       description: Unerwarteter Fehler (`INTERNER_FEHLER`); die Antwort nennt nur die Fehler-ID.
       headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ZuVieleAnfragen:
+      description: |
+        Grenze überschritten. `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Sekunden bis zum nächsten Versuch) und im Chat dem
+        Feld `grund`; `BUDGET` (nur Chat): Token-Budget des Mandanten im Monat erschöpft, ohne `Retry-After`; die
+        Webseite zeigt dann «Der Chatbot ist diesen Monat ausgelastet – die Suche funktioniert weiterhin.».
+      headers:
+        Retry-After:
+          description: Nur bei `ZU_VIELE_ANFRAGEN`; Sekunden bis zum nächsten Versuch.
+          schema:
+            type: integer
+            format: int32
         Cache-Control:
           $ref: "#/components/headers/CacheControl"
         Deprecation:

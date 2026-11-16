@@ -149,15 +149,20 @@ public class DokumentZeigen {
 
     /** Belegnummer und Partner sind fremde Daten (OCR, Import): einzeilig, ohne Rahmenmarker, auf {@link #WERT_MAX} gekürzt. */
     static String einzeilig(String wert) {
+        return einzeilig(wert, WERT_MAX);
+    }
+
+    /** Wie {@link #einzeilig(String)} mit eigener Obergrenze (Titel des öffentlichen Chats, Spec 03, 11.3). */
+    public static String einzeilig(String wert, int max) {
         String s = wert.replaceAll("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]", " ").replaceAll("(?U)\\s+", " ").strip();
         s = PartnerAufloesung.KANDIDATEN_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
         s = WERT_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
         s = DokumentDaten.METADATEN_KOPF.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
-        if (s.length() <= WERT_MAX) {
+        if (s.length() <= max) {
             return s;
         }
         // nie mitten in einem Surrogatpaar (Emoji) kürzen: sonst bleibt ein halbes Zeichen stehen
-        int ende = Character.isHighSurrogate(s.charAt(WERT_MAX - 1)) ? WERT_MAX - 1 : WERT_MAX;
+        int ende = Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max;
         return s.substring(0, ende).strip();
     }
 
