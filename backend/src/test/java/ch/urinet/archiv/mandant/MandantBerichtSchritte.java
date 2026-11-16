@@ -3,6 +3,7 @@ package ch.urinet.archiv.mandant;
 import ch.urinet.archiv.mandant.application.MandantBerichtDaten;
 import ch.urinet.archiv.mandant.application.MandantBerichtEinreihen;
 import ch.urinet.archiv.mandant.application.MandantBerichtHandler;
+import ch.urinet.archiv.mandant.application.MandantBerichtPlanen;
 import ch.urinet.archiv.mandant.application.MandantBerichtSpeicher;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantBericht;
@@ -64,6 +65,9 @@ public class MandantBerichtSchritte {
     MandantBerichtHandler handler;
 
     @Inject
+    MandantBerichtPlanen planen;
+
+    @Inject
     MandantBerichtSpeicher speicher;
 
     @Inject
@@ -82,6 +86,8 @@ public class MandantBerichtSchritte {
     private final Map<String, List<Long>> oeffentlicheFragen = new HashMap<>();
     private final List<Long> auftragIds = new ArrayList<>();
     private YearMonth monat;
+    private YearMonth planMonat;
+    private boolean deaktiviert;
 
     @Angenommen("die synthetischen Monatsbericht-Daten für zwei Mandanten sind vorbereitet")
     public void datenVorbereiten() throws Exception {
@@ -111,10 +117,114 @@ public class MandantBerichtSchritte {
         }
     }
 
-    @Dann("sind die Berichte getrennt, idempotent gespeichert und die Mails enthalten nur Zahlen")
-    public void berichtePruefen() throws Exception {
-        pruefen("urinet", Map.of("NEU", 1L, "ARCHIVIERT", 1L), 10, 20, 30, 40, 3);
-        pruefen("vhf-gsk", Map.of("FEHLER", 1L), 3, 4, 5, 6, 2);
+    @Dann("enthält der Bericht je Mandant nur dessen eigene Dokumente, Speicherwerte und Kennzahlen")
+    public void berichteGetrennt() throws Exception {
+        for (String code : MANDANTEN) {
+            MandantBericht bericht = gespeichert(code).bericht();
+            MandantBericht vorheriger = vorher.get(code);
+            assertThat(bericht.mandant()).isEqualTo(new MandantCode(code));
+            assertThat(bericht.monat()).isEqualTo(monat);
+            assertThat(bericht.speicherBytes()).isEqualTo(vorheriger.speicherBytes());
+            Map<String, Long> neu = code.equals("urinet") ? Map.of("NEU", 1L, "ARCHIVIERT", 1L) : Map.of("FEHLER", 1L);
+            for (var delta : neu.entrySet()) {
+                assertThat(bericht.dokumente().getOrDefault(delta.getKey(), 0L)
+                        - vorheriger.dokumente().getOrDefault(delta.getKey(), 0L)).isEqualTo(delta.getValue());
+            }
+        }
+    }
+
+    @Dann("zählen KI-Tokens und Chat-Fragen nur Einträge innerhalb des Monats")
+    public void monatsgrenze() throws Exception {
+        for (String code : MANDANTEN) {
+            MandantBericht bericht = gespeichert(code).bericht();
+            MandantBericht vorheriger = vorher.get(code);
+            boolean urinet = code.equals("urinet");
+            tokensDelta(bericht, vorheriger, "ERFASSUNG", urinet ? 10 : 3, urinet ? 20 : 4);
+            tokensDelta(bericht, vorheriger, "CHAT", urinet ? 30 : 5, urinet ? 40 : 6);
+            int interneFragen = urinet ? 2 : 1;
+            assertThat(bericht.chatFragen() - vorheriger.chatFragen()).isEqualTo(interneFragen + 1);
+        }
+    }
+
+    @Dann("ist je Mandant genau ein Bericht gespeichert und genau eine Mail an dessen Empfänger versandt")
+    public void idempotent() throws Exception {
+        for (String code : MANDANTEN) {
+            assertThat(gespeichert(code).mailVersandt()).isTrue();
+            assertThat(mail(code).jsonPath().<String>getList("To.Address"))
+                    .containsExactly(config.getValue("archiv.benachrichtigung.empfaenger." + code, String.class));
+        }
+    }
+
+    @Dann("enthalten gespeicherter Bericht und Mail nur Zahlen und keine Inhalte")
+    public void ohneInhalte() throws Exception {
+        for (String code : MANDANTEN) {
+            assertThat(serialisierteZeile(code)).doesNotContain(marker);
+            assertThat(gespeichert(code).bericht().toString()).doesNotContain(marker);
+            long fragenNeu = code.equals("urinet") ? 3 : 2;
+            String text = mail(code).jsonPath().getString("Text");
+            assertThat(text).contains("Chat-Fragen: " + fragenNeu);
+            assertThat(text).doesNotContain(marker, "synthetischer Titel", "synthetischer Fragetext",
+                    "synthetische Person");
+        }
+    }
+
+    @Angenommen("der Mandant «vhf-gsk» ist deaktiviert")
+    public void mandantDeaktivieren() throws Exception {
+        planMonat = YearMonth.of(3000 + ThreadLocalRandom.current().nextInt(6000), 3);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement update = verbindung.prepareStatement(
+                     "update public.mandant set aktiv = false where code = 'vhf-gsk' and aktiv")) {
+            deaktiviert = update.executeUpdate() == 1;
+        }
+    }
+
+    @Wenn("die Monatsberichte des Vormonats geplant werden")
+    public void planen() throws Exception {
+        // wie der Takt in einem eigenen Thread, ausserhalb des Request-Kontexts des Tests
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            worker.submit(() -> planen.planen(planMonat.plusMonths(1).atDay(5).atStartOfDay(ZUERICH).toInstant()))
+                    .get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    @Dann("ist nur für den aktiven Mandanten «urinet» ein Berichtsauftrag eingereiht")
+    public void nurAktiveGeplant() throws Exception {
+        assertThat(berichtsauftraege("urinet")).isEqualTo(1);
+        assertThat(berichtsauftraege("vhf-gsk")).isZero();
+    }
+
+    @After("@req-8.1")
+    public void planungAufraeumen() throws Exception {
+        if (planMonat == null) {
+            return;
+        }
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            try (PreparedStatement loeschen = verbindung.prepareStatement(
+                    "delete from public.auftrag where typ = 'MANDANT_BERICHT' and nutzlast ->> 'monat' = ?")) {
+                loeschen.setString(1, String.valueOf(planMonat.atDay(1).toEpochDay()));
+                loeschen.executeUpdate();
+            }
+            if (deaktiviert) {
+                try (PreparedStatement update = verbindung.prepareStatement(
+                        "update public.mandant set aktiv = true where code = 'vhf-gsk'")) {
+                    update.executeUpdate();
+                }
+            }
+        }
+    }
+
+    private long berichtsauftraege(String code) throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from public.auftrag where typ = 'MANDANT_BERICHT' and mandant = ? "
+                             + "and nutzlast ->> 'monat' = ?")) {
+            abfrage.setString(1, code);
+            abfrage.setString(2, String.valueOf(planMonat.atDay(1).toEpochDay()));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                return zeile.getLong(1);
+            }
+        }
     }
 
     @After("@req-8.1")
@@ -178,27 +288,8 @@ public class MandantBerichtSchritte {
         }
     }
 
-    private void pruefen(String code, Map<String, Long> dokumenteNeu, long erfassungEin, long erfassungAus,
-                         long chatEin, long chatAus, long fragenNeu) throws Exception {
-        MandantBericht vorheriger = vorher.get(code);
-        MandantBerichtSpeicher.Eintrag eintrag = imMandanten(code,
-                () -> speicher.lesen(monat).orElseThrow());
-        MandantBericht bericht = eintrag.bericht();
-        assertThat(bericht.mandant()).isEqualTo(new MandantCode(code));
-        assertThat(bericht.monat()).isEqualTo(monat);
-        assertThat(eintrag.mailVersandt()).isTrue();
-        assertThat(bericht.speicherBytes()).isEqualTo(vorheriger.speicherBytes());
-        for (var delta : dokumenteNeu.entrySet()) {
-            assertThat(bericht.dokumente().getOrDefault(delta.getKey(), 0L)
-                    - vorheriger.dokumente().getOrDefault(delta.getKey(), 0L)).isEqualTo(delta.getValue());
-        }
-        tokensDelta(bericht, vorheriger, "ERFASSUNG", erfassungEin, erfassungAus);
-        tokensDelta(bericht, vorheriger, "CHAT", chatEin, chatAus);
-        int interneFragen = code.equals("urinet") ? 2 : 1;
-        assertThat(bericht.chatFragen() - vorheriger.chatFragen()).isEqualTo(interneFragen + 1);
-        assertThat(serialisierteZeile(code)).doesNotContain(marker);
-        assertThat(bericht.toString()).doesNotContain(marker);
-        mailPruefen(code, fragenNeu);
+    private MandantBerichtSpeicher.Eintrag gespeichert(String code) throws Exception {
+        return imMandanten(code, () -> speicher.lesen(monat).orElseThrow());
     }
 
     private static void tokensDelta(MandantBericht bericht, MandantBericht vorheriger, String zweck,
@@ -209,7 +300,8 @@ public class MandantBerichtSchritte {
         assertThat(aktuell.ausgabe() - vorher.ausgabe()).isEqualTo(ausgabe);
     }
 
-    private void mailPruefen(String code, long fragenNeu) {
+    /** Die einzige Mail des Mandanten zum Monat (genau eine, auch nach zweimaliger Verarbeitung). */
+    private Response mail(String code) {
         String betreff = "UriNet Archiv: Monatsbericht " + code + " " + monat;
         int port = mailpitPort.orElseThrow(() -> new IllegalStateException("Mailpit-Port für das Szenario fehlt"));
         Response suche = given().baseUri("http://localhost:" + port)
@@ -222,11 +314,7 @@ public class MandantBerichtSchritte {
         Response mail = given().baseUri("http://localhost:" + port)
                 .when().get("/api/v1/message/" + passend.getFirst().get("ID"));
         assertThat(mail.statusCode()).isEqualTo(200);
-        assertThat(mail.jsonPath().<String>getList("To.Address"))
-                .containsExactly(config.getValue("archiv.benachrichtigung.empfaenger." + code, String.class));
-        String text = mail.jsonPath().getString("Text");
-        assertThat(text).contains("Chat-Fragen: " + fragenNeu);
-        assertThat(text).doesNotContain(marker, "synthetischer Titel", "synthetischer Fragetext", "synthetische Person");
+        return mail;
     }
 
     private String serialisierteZeile(String code) throws Exception {

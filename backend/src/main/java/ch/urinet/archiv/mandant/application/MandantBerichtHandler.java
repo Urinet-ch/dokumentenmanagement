@@ -12,7 +12,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
-/** Handler für {@code MANDANT_BERICHT}; gespeicherte Kennzahlen bleiben bei Mailfehlern wiederverwendbar. */
+/**
+ * Handler für {@code MANDANT_BERICHT}; gespeicherte Kennzahlen bleiben bei Mailfehlern wiederverwendbar.
+ * Die Betreiber-Mail ist bewusst mindestens-einmal: Versand und Versandmarke sind nicht atomar. Scheitert die Marke
+ * nach erfolgreichem Versand, geht dieselbe Mail bei der Wiederholung erneut an den Betreiber (nur Zahlen).
+ */
 @ApplicationScoped
 public class MandantBerichtHandler implements AuftragHandler {
 
