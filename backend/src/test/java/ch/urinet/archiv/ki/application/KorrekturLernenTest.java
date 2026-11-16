@@ -2,6 +2,8 @@ package ch.urinet.archiv.ki.application;
 
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.mandant.application.MandantKontext;
+import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantRegister;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import io.agroal.api.AgroalDataSource;
 import io.micrometer.core.instrument.Counter;
@@ -11,6 +13,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -51,6 +54,12 @@ class KorrekturLernenTest {
     MandantKontext kontext;
 
     @Inject
+    MandantRegister register;
+
+    @Inject
+    MandantProvisionierung provisionierung;
+
+    @Inject
     MeterRegistry kennzahlen;
 
     @Inject
@@ -58,6 +67,14 @@ class KorrekturLernenTest {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final List<UUID> dokumente = new ArrayList<>();
+
+    /** Der Test legt den Mandanten selbst an, falls kein anderer Test ihn schon angelegt hat (Einzelstart). */
+    @BeforeEach
+    void mandantSicherstellen() {
+        if (!register.existiert(URINET)) {
+            provisionierung.anlegen(URINET.wert(), null, null);
+        }
+    }
 
     @AfterEach
     void aufraeumen() throws SQLException {
