@@ -42,7 +42,8 @@ public class SicherungKommando {
     public static final String AUFRUF = "Aufruf: archiv sicherung inventar --mandant <code> | "
             + "zuwachs --mandant <code> [--inventar-vorher <datei|->] | "
             + "wiederherstellen --mandant <code> --inventar <datei> --strom <datei> [--kappen] | "
-            + "festhalten --art <db|keycloak|realm|schluessel|bucket|inventar> [--mandant <code>] --sha256 <hex>";
+            + "festhalten --art <db|keycloak|realm|schluessel|bucket|inventar> [--mandant <code>] --sha256 <hex> | "
+            + "sperren-pruefen --mandant <code> [--stichprobe <0..50>]";
     private static final Pattern SHA256 = Pattern.compile("^[0-9a-fA-F]{64}$");
 
     private final SicherungBucketExport bucketExport;

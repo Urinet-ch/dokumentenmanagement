@@ -68,6 +68,33 @@ Funktionstest; die Aufbewahrung nach Req 16.2 gilt erst ab Stufe B (Req 16.19).
 5. **Prüfen.** Die Anzahl wiederhergestellter Objekte mit den Datenbankeinträgen abgleichen, Manifeste prüfen und den
    vorgesehenen Prüflauf erfolgreich abschliessen. Abweichungen sind vor der Freigabe zu klären.
 
+## Sperrprüfung der Restore-Probe
+
+Nach der Wiederherstellung von Datenbank und Bucket prüft dieses Kommando die Objektversionen unabhängig vom
+Dokument-Prüflauf:
+
+```sh
+archiv sicherung sperren-pruefen --mandant <code> [--stichprobe <0..50>]
+```
+
+Die Stichprobe ist gleichmässig über `archiv/` und `manifest/` verteilt; Standard sind fünf Versionen, null deaktiviert
+die Löschprobe. Das konfigurierte Bucketpräfix muss mit `urinet-archiv-p-` beginnen. Das Kommando prüft dies vor dem
+Zugriff auf das Mandantenregister oder den Bucket und ist ausschliesslich in der isolierten Restore-Probe auszuführen.
+Die geprüften Objekte werden mit den wiederhergestellten Datenbankeinträgen abgeglichen: Objektbestand, aktive Sperre,
+Modus und `retainUntil` gegen den Sollwert. Erwartete Sperren werden in Stufe P höchstens einen Tag angesetzt.
+
+Für jede Stichprobenversion versucht die Probe, genau diese Version ohne Bypass-Header zu löschen. Bei einer fehlenden
+Sperre kann S3 die Version tatsächlich löschen; die Probe meldet dies als Abweichung und endet fehlerhaft. Das ist nur
+im wegwerfbaren Probe-Bucket zulässig.
+
+Das Kommando gibt JSON mit Zählern und betroffenen Dokument-IDs beziehungsweise Manifest-Daten aus, keine
+Objektschlüssel oder Dateinamen. Abweichungen: `SPERRE_FEHLT` (keine aktive Soll-Sperre), `MODUS_ABWEICHEND`,
+`SPERRE_ZU_KURZ`, `OBJEKT_FEHLT` (Datenbankeintrag ohne Bucket-Version), `OBJEKT_UEBERZAEHLIG` (Bucket-Version ohne
+Datenbankeintrag) und `LOESCHEN_MOEGLICH`. `SPERRE_FEHLT` bedeutet, dass ein Objekt mit Sperrpflicht keine aktive
+Sperre hat. Exit-Codes: `0` keine Abweichung, `1` Abweichung gefunden, `2` ungültiger Aufruf, unbekannter/inaktiver
+Mandant oder falsches Bucketpräfix, `3` Zugriffsfehler auf Datenbank oder Bucket beziehungsweise sonstiger technischer
+Fehler.
+
 ## Aufbewahrung und Rückfall
 
 `forget` und `prune` werden nur von Hand mit dem zweiten Schlüssel aus den Notfallunterlagen ausgeführt. Vor dem
@@ -83,4 +110,5 @@ nichts daran, dass ein Snapshot nur mit passendem Manifestnachweis verwendet wer
 
 ## Status
 
-Entwurf; einmal vollständig in einer Testumgebung durchgespielt: offen (Nachweis manuell, tasks.md 5.5)
+Entwurf; die Backend-Sperrprüfung ist implementiert, der vollständige manuelle Durchlauf in einer Testumgebung bleibt
+offen (Nachweis manuell, tasks.md 5.5).
