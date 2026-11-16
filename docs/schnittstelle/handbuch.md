@@ -15,7 +15,12 @@ Jeder Schlüssel ist an genau eine Webseite und einen Mandanten gebunden. Der
 Mandant kommt aus dem Schlüssel, nicht aus einem Pfad, Query-Parameter oder
 Header. Ein Schlüssel mit Scope `webseite-lesen` darf nur lesen und chatten;
 `webseite-erfassung` darf nur erfassen. Diese Anleitung behandelt den
-Lesezugang.
+Lesezugang; die Erfassung ist noch nicht verfügbar (siehe «Noch nicht
+verfügbar» nach Abschnitt 5).
+
+Das Archiv protokolliert jeden Lesezugriff, auch abgelehnte Stufen, ohne
+Client-Hash und ohne IP. Die IP des Besuchers wird nie übermittelt und nicht
+gespeichert.
 
 Der Lese-Schlüssel legt die höchste erlaubte Zugriffsstufe fest. Die Webseite
 meldet die Stufe des aktuellen Besuchers mit `X-Archiv-Zugriff`. Das Archiv
@@ -131,7 +136,8 @@ Beispielantwort:
 `GET /public/v1/suche` verlangt `q` (1 bis 200 Zeichen) und unterstützt
 zusätzlich `reihe`, `jahr` und `ausgabe`. Die Suche liefert höchstens 30 Treffer
 ohne Blättern. `degradiert: true` bedeutet, dass nur die Volltextsuche verwendet
-wurde. `fundstelle` kann fehlen, wenn keine Seitenangabe bekannt ist.
+wurde. `fundstelle` kann fehlen, wenn keine Seitenangabe bekannt ist (siehe «Noch nicht
+verfügbar», 11.13).
 
 ```sh
 curl --get 'https://archiv.example.invalid/public/v1/suche' \
@@ -349,6 +355,17 @@ weitergegeben wird.
 Findet der Chat keine passende Publikation, bleibt `quellen` leer. Die Antwort
 sagt das und verweist auf die Geschäftsstelle.
 
+**Speicherung und Aufbewahrung.** Für den Besucher ist der Chat anonym. Das
+Archiv speichert befristet die bereinigte Frage, die Quellen und die Tokens. Die
+Frist beträgt standardmässig 90 Tage; der Betreiber kann sie je Mandant
+abweichend festlegen. Client-Hash, IP, Antwort und Gespräch werden nie
+gespeichert. Ein Gespräch lebt höchstens 30 Minuten im Speicher des Archivs. Der
+Datenschutzhinweis der Webseite muss das berücksichtigen.
+
+**Monatsbudget.** Der Betreiber begrenzt den Chat je Mandant und Monat nach
+Tokens. Ist das Budget aufgebraucht, antwortet der Chat mit `429 BUDGET`
+(siehe Abschnitt 5); Liste, Suche und Details bleiben nutzbar.
+
 ## 5. Fehler und Wiederholung
 
 Fehler sind Problem Details nach RFC 9457 mit dem Medientyp
@@ -362,14 +379,18 @@ Anfragewerte oder internen Angaben.
 | 400 | `ANFRAGE_UNGUELTIG` | Anfrage korrigieren; den gesendeten Wert nicht ungeprüft anzeigen. |
 | 401 | `NICHT_ANGEMELDET` | `WWW-Authenticate: Bearer`; Schlüsselkonfiguration prüfen und Betreiber kontaktieren. Die Antwort unterscheidet fehlende, falsche, abgelaufene und widerrufene Schlüssel nicht. |
 | 403 | `NICHT_ERLAUBT` | Scope und angeforderte Stufe prüfen; keine Wiederholung ohne Änderung. |
+| 403 | `MANDANT_FEHLT` | Der Mandant des Schlüssels ist nicht nutzbar (zum Beispiel deaktiviert). Betreiber kontaktieren; nicht wiederholen. |
 | 404 | `NICHT_GEFUNDEN` | Dokument oder Zuordnung als nicht verfügbar behandeln, ohne Existenz eines geschützten Dokuments anzudeuten. |
 | 429 | `ZU_VIELE_ANFRAGEN` | `Retry-After` (Sekunden) abwarten. Bei lesenden Endpunkten bis dahin nur einen bewusst serverseitig zwischengespeicherten Inhalt derselben Stufe anzeigen. |
 | 429 | `BUDGET` | Gilt für den Chat und enthält kein `Retry-After`; zeige «Der Chatbot ist diesen Monat ausgelastet – die Suche funktioniert weiterhin.» |
 | 503 | `UEBERLASTET` | `Retry-After` abwarten und dann erneut versuchen. |
+| 503 | `SPEICHER_NICHT_ERREICHBAR` | Betrifft Datei-Aufrufe. `Retry-After` abwarten. Der Code ist im Vertrag `public-v1.yaml` noch nicht aufgezählt; er wird dort in einem getrennten Schritt nachgezogen. |
+| 500 | `INTERNER_FEHLER` | Nicht wiederholen, bis die Ursache geklärt ist; die Fehler-ID aus `instance` dem Betreiber melden. |
 
 Bei `ZU_VIELE_ANFRAGEN` kann `grund` den begrenzten Bereich nennen. Im Chat
 stehen insbesondere `STUNDENLIMIT` und `LAEUFT`, beim Lesen `ANFRAGEN` und
-`SUCHE`. Unbekannte neue `fehlercode`- oder `grund`-Werte müssen ohne
+`SUCHE` (Werte siehe «Grenzen»). Unbekannte neue `fehlercode`- oder
+`grund`-Werte müssen ohne
 Sonderbehandlung anhand des HTTP-Status behandelt werden. Fehler dürfen nicht
 durch rasche automatische Wiederholungen verstärkt werden.
 
@@ -377,10 +398,49 @@ Nach Beginn eines Chat-Streams ist ein HTTP-Statuswechsel nicht mehr möglich.
 Behandle deshalb das SSE-Ereignis `fehler` ebenfalls und zeige nur dessen
 festen Meldungstext.
 
+### Grenzen
+
+Das Archiv begrenzt die Anfragen. Die Werte unten sind **Startwerte des
+Betreibers**, keine Zusage des Vertrags: Der Betreiber kann sie je Betrieb
+ändern, und die Suchgrenze ist vorsichtig geschätzt (Entscheid offen). Die
+Webseite darf sich nicht auf genau diese Zahlen verlassen, sondern muss `429`
+mit `Retry-After` immer behandeln.
+
+| Bereich | Startwert | `grund` bei 429 |
+| --- | --- | --- |
+| Lesen (Liste, Details, Filter, Umleitung) | 20 Anfragen je Sekunde und Lese-Schlüssel, Spitze 100 (Token-Bucket) | `ANFRAGEN` |
+| Suche | 2 Anfragen je Sekunde und Lese-Schlüssel, Spitze 10 (Token-Bucket) | `SUCHE` |
+| Chat je Besucher | 20 Fragen je Stunde und `X-Archiv-Client` | `STUNDENLIMIT` |
+| Chat je Webseite | 600 Fragen je Stunde und Webseite | `STUNDENLIMIT` |
+| Chat gleichzeitig | eine laufende Frage je Client | `LAEUFT` |
+| Datei-Streams | höchstens 8 gleichzeitig (insgesamt und je Lese-Schlüssel) | kein `grund` |
+
+Bei `429` wartet die Webseite die Sekunden aus `Retry-After` ab und wiederholt
+erst danach, ohne Parallelität zu erhöhen. Das Monatsbudget des Chats ist eine
+eigene Grenze (`BUDGET`, ohne `Retry-After`).
+
+## Noch nicht verfügbar
+
+Folgendes ist laut Aufgabenliste (Spec 03) noch offen. Die Webseite darf es
+heute nicht voraussetzen:
+
+- **11.9 Änderungs-Feed:** Es gibt keinen Feed. Die Stufenregeln aus Abschnitt 3
+  gelten für ihn erst, wenn er umgesetzt ist. Bis dahin liest die Webseite
+  Liste und Suche.
+- **11.10 Erfassung über eine Webseite:** Es gibt keine Erfassungs-Endpunkte. Der
+  Scope `webseite-erfassung` ist nur ausgestellt, aber nicht nutzbar.
+- **11.13 Fundstelle in Suchtreffern:** `fundstelle.seite` ist nicht
+  verlässlich gefüllt. Behandle das Feld immer als optional; das Beispiel
+  oben zeigt den Fall mit Seitenangabe.
+- **11.6 Vertrag und Versionierung (Rest):** Die automatische Prüfung im
+  CI-Build und die Drosselung je IP im Reverse-Proxy fehlen noch. Die
+  Abkündigungs-Header (`Deprecation`, `Sunset`, `Link`) sind angelegt, aber nur
+  bei einer Abkündigung gesetzt.
+
 ## 6. Zwischenspeicherung
 
-Jede Antwort der Schnittstelle – auch Fehlerantworten – trägt
-`Cache-Control: no-store`. Browser, CDN und HTTP-Proxy dürfen die Antwort daher
+Jede Antwort der Schnittstelle – auch Fehlerantworten – enthält
+`Cache-Control: no-store` (der Datei-Stream sendet `private, no-store`). Browser, CDN und HTTP-Proxy dürfen die Antwort daher
 nicht automatisch zwischenspeichern. Eine Webseite darf nur dann bewusst in
 ihrer serverseitigen Anwendungslogik cachen, wenn sie die Stufe als Teil des
 Cache-Schlüssels verwendet. `oeffentlich`, `mitglieder` und `vorstand` sind
