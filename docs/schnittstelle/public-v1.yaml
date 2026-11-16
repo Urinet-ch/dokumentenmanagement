@@ -683,7 +683,8 @@ components:
         seite:
           type: integer
           format: int32
-          description: PDF-Seite, ab 1
+          description: 'PDF-Seite, ab 1; die Webseite verlinkt mit #page=<n> an die Datei,
+            das Archiv liefert keine Seiten-URL'
     WebseiteReihe:
       type: object
       description: Reihe (Dokumentart) eines Dokuments
