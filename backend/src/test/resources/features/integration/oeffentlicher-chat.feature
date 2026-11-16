@@ -263,6 +263,18 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Dann hat «urinet» genau 1 gespeicherte öffentliche Frage
     Und steht in der gespeicherten Frage von «urinet» «neu» und nicht «alt»
 
+  @req-6.5
+  Szenario: Die Aufbewahrung ist je Mandant einstellbar: vhf-gsk 30 Tage, urinet der Standard 90 Tage
+    Angenommen in «vhf-gsk» liegt eine öffentliche Frage «alt» von vor 31 Tagen
+    Und in «vhf-gsk» liegt eine öffentliche Frage «neu» von vor 29 Tagen
+    Und in «urinet» liegt eine öffentliche Frage «mittel» von vor 31 Tagen
+    Wenn der Löschjob für öffentliche Fragen in «vhf-gsk» läuft
+    Und der Löschjob für öffentliche Fragen in «urinet» läuft
+    Dann hat «vhf-gsk» genau 1 gespeicherte öffentliche Frage
+    Und steht in der gespeicherten Frage von «vhf-gsk» «neu» und nicht «alt»
+    Und hat «urinet» genau 1 gespeicherte öffentliche Frage
+    Und steht in der gespeicherten Frage von «urinet» «mittel» und nicht «alt»
+
   # ---- Fehler ohne interne Angaben, Eingabegrenzen, Verlauf
 
   @req-6.1

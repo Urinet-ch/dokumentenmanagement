@@ -37,7 +37,7 @@ paths:
         der feste Filter bis zur gemeldeten Stufe liefert (veröffentlicht, archiviert, normale Vertraulichkeit,
         `zugriff` bis zur Stufe). Er verwendet nur Suche und Anzeige dieser Dokumente: keine Kennzahlen, keine internen
         Daten, keine Rechte oder Sicht eines Benutzers. Anonym für den Besucher: Das Archiv speichert Frage (bereinigt),
-        Quellen und Tokens 90 Tage, nie Client-Hash, IP, Antwort oder Gespräch.
+        Quellen und Tokens befristet (Standard 90 Tage, je Mandant einstellbar), nie Client-Hash, IP, Antwort oder Gespräch.
 
         Antwort als Server-Sent Events (`text/event-stream`) mit benannten Ereignissen, JSON in `data:`:
         - `werkzeug` `{werkzeug}`: je Werkzeugaufruf (nur zur Anzeige «sucht …»).
