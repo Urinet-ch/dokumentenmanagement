@@ -14,17 +14,18 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,36 +47,39 @@ public class SicherungKommando {
     private final SicherungBucketExport bucketExport;
     private final SicherungExportVerwaltung verwaltung;
     private final ObjectMapper json;
+    private final Path arbeitsverzeichnis;
     private final Supplier<Optional<WiederherstellungsZiel>> wiederherstellungsZiel;
     private final Clock uhr;
 
     @Inject
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
-                             ObjectMapper json, Instance<WiederherstellungsZiel> ziel) {
-        this.bucketExport = bucketExport;
-        this.verwaltung = verwaltung;
-        this.json = json;
-        wiederherstellungsZiel = () -> ziel.isUnsatisfied() ? Optional.empty() : Optional.of(ziel.get());
-        uhr = Clock.systemUTC();
+                             ObjectMapper json, Instance<WiederherstellungsZiel> ziel,
+                             @ConfigProperty(name = "archiv.arbeit.verzeichnis") Path arbeitsverzeichnis) {
+        this(bucketExport, verwaltung, json,
+                () -> ziel.isUnsatisfied() ? Optional.empty() : Optional.of(ziel.get()), Clock.systemUTC(),
+                arbeitsverzeichnis);
     }
 
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
-                             ObjectMapper json) {
-        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC());
+                             ObjectMapper json, Path arbeitsverzeichnis) {
+        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), arbeitsverzeichnis);
     }
 
     SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                        ObjectMapper json, WiederherstellungsZiel ziel, Clock uhr) {
-        this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr);
+        this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr,
+                Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     private SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
-                              ObjectMapper json, Supplier<Optional<WiederherstellungsZiel>> ziel, Clock uhr) {
+                              ObjectMapper json, Supplier<Optional<WiederherstellungsZiel>> ziel, Clock uhr,
+                              Path arbeitsverzeichnis) {
         this.bucketExport = bucketExport;
         this.verwaltung = verwaltung;
         this.json = json;
         wiederherstellungsZiel = ziel;
         this.uhr = uhr;
+        this.arbeitsverzeichnis = arbeitsverzeichnis;
     }
 
     public enum Befehl {
@@ -323,27 +327,54 @@ public class SicherungKommando {
     }
 
     private void zuwachs(Aufruf aufruf, PrintStream stdout) {
-        OutputStream aus = pruefend(stdout);
         Optional<String> vorher = aufruf.inventarVorher();
         if (vorher.isEmpty()) {
-            bucketExport.zuwachs(aufruf.mandant().orElseThrow(), version -> true, aus);
+            bucketExport.zuwachs(aufruf.mandant().orElseThrow(), version -> true, pruefend(stdout));
             return;
         }
         String quelle = vorher.get();
         if (quelle.equals("-")) {
-            var leser = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-            var abgleich = new InventarAbgleich(leser, json);
-            bucketExport.zuwachs(aufruf.mandant().orElseThrow(), abgleich, aus);
-            abgleich.vollstaendigPruefen();
+            try (var zwischenablage = new VorinventarZwischenablage(arbeitsverzeichnis)) {
+                Files.copy(System.in, zwischenablage.pfad(), StandardCopyOption.REPLACE_EXISTING);
+                zuwachsMitVorinventar(aufruf.mandant().orElseThrow(), zwischenablage.pfad(), stdout);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Vorheriges Inventar nicht lesbar", e);
+            }
             return;
         }
-        Path datei = Path.of(quelle);
+        zuwachsMitVorinventar(aufruf.mandant().orElseThrow(), Path.of(quelle), stdout);
+    }
+
+    private void zuwachsMitVorinventar(MandantCode mandant, Path datei, PrintStream stdout) {
+        try (var leser = Files.newBufferedReader(datei, StandardCharsets.UTF_8)) {
+            new InventarAbgleich(leser, json).vollstaendigPruefen();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Vorheriges Inventar nicht lesbar", e);
+        }
         try (var leser = Files.newBufferedReader(datei, StandardCharsets.UTF_8)) {
             var abgleich = new InventarAbgleich(leser, json);
-            bucketExport.zuwachs(aufruf.mandant().orElseThrow(), abgleich, aus);
+            bucketExport.zuwachs(mandant, abgleich, pruefend(stdout));
             abgleich.vollstaendigPruefen();
         } catch (IOException e) {
             throw new UncheckedIOException("Vorheriges Inventar nicht lesbar", e);
+        }
+    }
+
+    private static final class VorinventarZwischenablage implements AutoCloseable {
+        private final Path pfad;
+
+        private VorinventarZwischenablage(Path arbeitsverzeichnis) throws IOException {
+            Files.createDirectories(arbeitsverzeichnis);
+            pfad = Files.createTempFile(arbeitsverzeichnis, "archiv-vorinventar-", ".jsonl");
+        }
+
+        private Path pfad() {
+            return pfad;
+        }
+
+        @Override
+        public void close() throws IOException {
+            Files.deleteIfExists(pfad);
         }
     }
 }

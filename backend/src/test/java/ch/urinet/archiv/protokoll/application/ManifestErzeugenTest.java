@@ -2,6 +2,7 @@ package ch.urinet.archiv.protokoll.application;
 
 import ch.urinet.archiv.protokoll.application.ManifestDaten.Fristen;
 import ch.urinet.archiv.protokoll.adapter.out.json.JacksonJsonLeser;
+import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
@@ -12,11 +13,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.MonthDay;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,6 +117,29 @@ class ManifestErzeugenTest {
         assertThat(wiederverwendet.sicherung()).isEmpty();
     }
 
+    @Test
+    void fehlendeOderLeereSicherungslisteWarntNurMitAnzahlen() {
+        ManifestInhalt abgelegt = inhalt(List.of(eintrag("a")));
+        String hash = "c".repeat(64);
+        ManifestInhalt neu = inhalt(List.of(eintrag("a")), List.of(hash));
+        Map<String, Object> ohneSammlung = new JacksonJsonLeser().objekt(abgelegt.kanonisch());
+        ohneSammlung.remove("sicherung");
+        List<byte[]> varianten = List.of(abgelegt.kanonisch(), Jcs.utf8(ohneSammlung));
+        Logger logger = Logger.getLogger(ManifestErzeugen.class.getName());
+        Warnungen warnungen = new Warnungen();
+        logger.addHandler(warnungen);
+        try {
+            for (byte[] variante : varianten) {
+                ManifestErzeugen.wiederverwenden(new JacksonJsonLeser(), DATUM, variante, neu);
+            }
+        } finally {
+            logger.removeHandler(warnungen);
+        }
+
+        assertThat(warnungen.meldungen).hasSize(2).allSatisfy(meldung -> assertThat(meldung)
+                .contains("abgelegt=0", "neu=1").doesNotContain(hash, "original"));
+    }
+
     private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege) {
         return inhalt(eintraege, List.of());
     }
@@ -148,5 +177,24 @@ class ManifestErzeugenTest {
         assertThat(e).hasMessageContaining("kein Zeitstempel von [a, b]").hasCause(erster);
         assertThat(e.getSuppressed()).containsExactly(zweiter);
         assertThat(ManifestErzeugen.keinZeitstempel(DATUM, List.of("a"), List.of()).getCause()).isNull();
+    }
+
+    private static final class Warnungen extends Handler {
+        private final List<String> meldungen = new ArrayList<>();
+
+        @Override
+        public void publish(LogRecord record) {
+            if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+                meldungen.add(record.getMessage());
+            }
+        }
+
+        @Override
+        public void flush() {
+        }
+
+        @Override
+        public void close() {
+        }
     }
 }
