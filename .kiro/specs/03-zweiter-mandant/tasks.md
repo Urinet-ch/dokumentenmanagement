@@ -158,8 +158,9 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 12 — Mandantenverwaltung und Abnahme
 
-- [ ] 12.1 Monatsbericht pro Mandant [Backend]
+- [x] 12.1 Monatsbericht pro Mandant [Backend]
   - Auftrag `MANDANT_BERICHT` (Speicher, Dokumente, Tokens nach Zweck, Chat-Fragen), E-Mail an Betreiber
+  - Umsetzung (PR #224): Changeset `032-mandant-bericht`, Bericht, tägliche Wiederholung fehlender Läufe, mandantengetrennte Speicherung und Betreiber-Mail; Zeitfenster und Req-8.1-Szenario ergänzt
   - _Anforderungen: 8.1_
 
 - [ ] 12.2 Vollexport und Abbau [Backend]

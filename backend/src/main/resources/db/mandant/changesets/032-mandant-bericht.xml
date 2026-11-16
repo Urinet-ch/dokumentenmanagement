@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="032-mandant-bericht" author="archiv">
+        <sql>
+            create table mandant_bericht (
+                monat date not null constraint mandant_bericht_pk primary key
+                    check (extract(day from monat) = 1),
+                speicher_bytes bigint not null constraint mandant_bericht_speicher_ck check (speicher_bytes >= 0),
+                dokumente jsonb not null constraint mandant_bericht_dokumente_ck
+                    check (jsonb_typeof(dokumente) = 'object'),
+                ki_tokens jsonb not null constraint mandant_bericht_tokens_ck
+                    check (jsonb_typeof(ki_tokens) = 'object'),
+                chat_fragen bigint not null constraint mandant_bericht_chat_fragen_ck check (chat_fragen >= 0),
+                mail_versandt boolean not null default false,
+                erstellt timestamptz not null default clock_timestamp()
+            );
+        </sql>
+        <rollback>
+            <sql>drop table mandant_bericht;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

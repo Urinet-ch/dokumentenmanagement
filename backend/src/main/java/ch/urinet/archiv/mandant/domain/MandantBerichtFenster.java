@@ -11,7 +11,9 @@ public record MandantBerichtFenster(YearMonth monat, Instant von, Instant bis) {
     public static final ZoneId ZEITZONE = ZoneId.of("Europe/Zurich");
 
     public MandantBerichtFenster {
-        if (monat == null || von == null || bis == null || !von.isBefore(bis)) {
+        if (monat == null || von == null || bis == null
+                || !von.equals(monat.atDay(1).atStartOfDay(ZEITZONE).toInstant())
+                || !bis.equals(monat.plusMonths(1).atDay(1).atStartOfDay(ZEITZONE).toInstant())) {
             throw new IllegalArgumentException("Ungültiges Monatsfenster");
         }
     }
