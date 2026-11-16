@@ -70,7 +70,6 @@ Stand dieser Seite gegen `design.md` «Überwachung» (Spec 01) und Spec 02:
   vorhandenes Manifest gültig ist, prüfen Prüfwerkzeug und Prüflauf (Mail «Prüflauf … Abweichungen»).
 - **Sicherung:** `design.md` nennt «das Alter des letzten Sicherungs-Exports». Der Code prüft jede Sicherungsart einzeln
   und ist ab Werk ausgeschaltet (`archiv.ueberwachung.sicherung-aktiv=false`).
-- **Dokument-Mail:** Der Text nennt «Standard 1 Stunde», auch wenn `archiv.ueberwachung.grenze` anders gesetzt ist.
 - **Export:** Ein gescheiterter Jahresexport löst keine Mail aus (Spec 02: «ohne Mail»); er ist nur über Status, Fehlerart
   und Log sichtbar.
 - **Speicher-Mail:** Req 16.7 schliesst Dokumentinhalte aus; die Speicher-Mail nennt Bereich, Prozent und MiB. Es sind
