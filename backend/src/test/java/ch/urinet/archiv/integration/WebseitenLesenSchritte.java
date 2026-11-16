@@ -511,9 +511,29 @@ public class WebseitenLesenSchritte {
         }
     }
 
+    /**
+     * Liest langsam und misst den Heap in der Mitte. Der Leerlauf im %test-Profil (PT3S) ist knapp: stockt die
+     * Auslieferung auf einem überlasteten CI-Läufer (Garbage Collection der Messung, Object Storage) länger als das,
+     * beendet die API den Stream zu Recht vorzeitig. Das Szenario prüft Vollständigkeit und Speicher, nicht den
+     * Leerlauf (den prüft das Szenario mit dem nur angelesenen Stream); darum wird ein vorzeitig beendeter Versuch
+     * nach Freigabe der Plätze höchstens zweimal wiederholt.
+     */
     @Wenn("der Webseiten-Lesezugang «{word}» die Datei von «{word}» mit der Stufe «{word}» langsam liest")
     public void langsamLesen(String name, String dokument, String stufe) throws IOException, InterruptedException {
         assertThat(schluessel).containsKey(name);
+        for (int versuch = 1; versuch <= 3; versuch++) {
+            langsamLesenEinmal(name, dokument, stufe);
+            if (gelesenBytes == streamKopf.laenge()) {
+                return;
+            }
+            long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
+                Thread.sleep(50);
+            }
+        }
+    }
+
+    private void langsamLesenEinmal(String name, String dokument, String stufe) throws IOException, InterruptedException {
         Runtime laufzeit = Runtime.getRuntime();
         gc();
         long vorher = laufzeit.totalMemory() - laufzeit.freeMemory();
