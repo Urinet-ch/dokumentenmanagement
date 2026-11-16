@@ -70,6 +70,16 @@ class WebseitenRouteTest {
         }
     }
 
+    /** Der Stream setzt «private, no-store» selbst (Aufgabe 11.8); ein Wert ohne no-store wird dagegen ersetzt. */
+    @Test
+    void strengerCacheControlEinerResourceBleibtAberOhneNoStoreGiltNoStore() throws Exception {
+        int port = starten(Map.of());
+        HttpResponse<String> streng = abrufen(port, "/public/v1/streng");
+        assertThat(streng.headers().allValues("cache-control")).containsExactly("private, no-store");
+        HttpResponse<String> lax = abrufen(port, "/public/v1/lax");
+        assertThat(lax.headers().allValues("cache-control")).containsExactly("no-store");
+    }
+
     @Test
     void abkuendigungGiltNurFuerIhreHauptversion() throws Exception {
         int port = starten(Map.of(1, V1));
@@ -147,6 +157,10 @@ class WebseitenRouteTest {
         new WebseitenRoute("/api/v1/", abkuendigungen).einrichten(router);
         router.get("/api/v1/public/v1/ok").handler(k -> k.response()
                 .end("intern " + k.normalizedPath() + " " + k.request().query()));
+        router.get("/api/v1/public/v1/streng").handler(k -> k.response()
+                .putHeader("Cache-Control", "private, no-store").end("streng"));
+        router.get("/api/v1/public/v1/lax").handler(k -> k.response()
+                .putHeader("Cache-Control", "public, max-age=60").end("lax"));
         router.get("/api/v1/public/v2/ok").handler(k -> k.response().end("v2"));
         router.get("/api/v1/public/v1/fehler").handler(k -> k.fail(new IllegalStateException("Probe")));
         router.get("/api/v1/anderes").handler(k -> k.response().end("app"));

@@ -136,7 +136,11 @@ public class WebseitenRoute {
 
     /** Header jeder Antwort unter {@code /public/}: {@code no-store}, bei abgekündigter Version die drei Header. */
     void kopfzeilen(HttpServerResponse antwort, String aeussererPfad) {
-        antwort.putHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        // eine Resource darf strenger sein (Stream: «private, no-store»); ohne no-store gilt immer no-store
+        String vorhanden = antwort.headers().get(HttpHeaders.CACHE_CONTROL);
+        if (vorhanden == null || !vorhanden.toLowerCase(java.util.Locale.ROOT).contains("no-store")) {
+            antwort.putHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        }
         Hauptversion.ausPfad(aeussererPfad).map(v -> abkuendigungen.get(v.nummer())).ifPresent(a -> {
             antwort.putHeader("Deprecation", a.deprecation());
             antwort.putHeader("Sunset", a.sunsetHttpDatum());

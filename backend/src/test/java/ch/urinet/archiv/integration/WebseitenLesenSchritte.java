@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.integration.application.webseite.DateiPlaetze;
 import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -16,12 +17,18 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -65,6 +72,9 @@ public class WebseitenLesenSchritte {
     @Inject
     AblagePort ablage;
 
+    @Inject
+    DateiPlaetze plaetze;
+
     private record Dok(String mandant, UUID id) {
     }
 
@@ -73,11 +83,25 @@ public class WebseitenLesenSchritte {
     private final Map<String, Dok> dokumente = new LinkedHashMap<>();
     private final Set<String> mandantenMitReihen = new TreeSet<>();
     private long protokollStand;
+    private final List<RohClient> offeneStreams = new ArrayList<>();
+    private final Map<String, String> sha256 = new HashMap<>();
+    private RohClient.Kopf streamKopf;
+    private String streamText = "";
+    private String gelesenSha256;
+    private long gelesenBytes;
+    private long heapZuwachs;
     private Response antwort;
     private Response vergleich;
 
     @After
-    public void aufraeumen() throws SQLException {
+    public void aufraeumen() throws SQLException, InterruptedException {
+        offeneStreams.forEach(RohClient::close);
+        offeneStreams.clear();
+        // der nächste Lauf braucht freie Plätze: die API gibt sie nach dem Abbruch des Clients von selbst frei
+        long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+        while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
+            Thread.sleep(50);
+        }
         for (String id : tokenIds) {
             ausfuehren("delete from public.api_client where id = ?", id);
         }
@@ -414,6 +438,217 @@ public class WebseitenLesenSchritte {
     @Dann("steht im Zugriffsprotokoll von «{word}» kein neuer Eintrag")
     public void keinEintrag(String mandant) throws SQLException {
         assertThat(hoechsteProtokollId(mandant)).isEqualTo(protokollStand);
+    }
+
+    // ---- Stream (Aufgabe 11.8)
+
+    @Angenommen("das Dokument «{word}» hat eine Datei von {int} MB")
+    public void grosseDatei(String name, int megabyte) throws SQLException, IOException {
+        Dok d = dokumente.get(name);
+        long laenge = (long) megabyte * 1024 * 1024;
+        MessageDigest digest = digest();
+        InputStream erzeugt = new InputStream() {
+            long gelesen;
+
+            @Override
+            public int read() {
+                byte[] eins = new byte[1];
+                return read(eins, 0, 1) < 0 ? -1 : eins[0] & 0xff;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) {
+                if (gelesen >= laenge) {
+                    return -1;
+                }
+                int n = (int) Math.min(len, Math.min(laenge - gelesen, 65536));
+                for (int i = 0; i < n; i++) {
+                    b[off + i] = (byte) ((gelesen + i) * 31 % 251);
+                }
+                digest.update(b, off, n);
+                gelesen += n;
+                return n;
+            }
+        };
+        AbgelegteDatei datei = ablage.ablegenEingang(new MandantCode(d.mandant()), DateiSchluessel.pdfa(JAHR, d.id()),
+                erzeugt, laenge);
+        sha256.put(name, HexFormat.of().formatHex(digest.digest()));
+        ausfuehren("update " + new MandantCode(d.mandant()).schema() + ".dokument set s3_pdfa = ?, s3_version_pdfa = ?, "
+                + "sha256_pdfa = ? where id = ?", datei.schluessel(), datei.versionId(), datei.sha256(), d.id());
+    }
+
+    @Wenn("der Webseiten-Lesezugang «{word}» die Datei des Dokuments «{word}» mit der Stufe «{word}» und dem Range-Kopf «{}» abruft")
+    public void dateiMitRange(String name, String dokument, String stufe, String range) {
+        antwort = anfrage(name).header("X-Archiv-Zugriff", stufe).header("Range", range).when()
+                .get("/public/v1/dokumente/" + dokumente.get(dokument).id() + "/datei");
+    }
+
+    @Wenn("der Webseiten-Lesezugang «{word}» einen Stream für «{word}» mit der Stufe «{word}» öffnet und nur den Anfang liest")
+    public void streamOeffnen(String name, String dokument, String stufe) throws IOException {
+        assertThat(schluessel).containsKey(name);
+        RohClient client = RohClient.get("localhost", RestAssured.port,
+                "/public/v1/dokumente/" + dokumente.get(dokument).id() + "/datei",
+                "Authorization: Bearer " + schluessel.get(name), "X-Archiv-Zugriff: " + stufe,
+                "X-Real-Ip: 192.0.2.77");
+        offeneStreams.add(client);
+        streamKopf = client.kopf();
+        if (client.kopf().status() == 200) {
+            assertThat(client.koerper().readNBytes(1024)).hasSize(1024);
+        } else {
+            streamText = new String(client.koerper().readNBytes((int) streamKopf.laenge()), StandardCharsets.UTF_8);
+        }
+    }
+
+    @Wenn("der Webseiten-Lesezugang «{word}» die Datei von «{word}» mit der Stufe «{word}» langsam liest")
+    public void langsamLesen(String name, String dokument, String stufe) throws IOException, InterruptedException {
+        assertThat(schluessel).containsKey(name);
+        Runtime laufzeit = Runtime.getRuntime();
+        gc();
+        long vorher = laufzeit.totalMemory() - laufzeit.freeMemory();
+        MessageDigest digest = digest();
+        try (RohClient client = RohClient.get("localhost", RestAssured.port,
+                "/public/v1/dokumente/" + dokumente.get(dokument).id() + "/datei",
+                "Authorization: Bearer " + schluessel.get(name), "X-Archiv-Zugriff: " + stufe)) {
+            streamKopf = client.kopf();
+            assertThat(streamKopf.status()).isEqualTo(200);
+            long gesamt = streamKopf.laenge();
+            byte[] block = new byte[64 * 1024];
+            gelesenBytes = 0;
+            long messpunkt = gesamt / 2;
+            boolean gemessen = false;
+            for (int n; (n = client.koerper().read(block)) > 0; ) {
+                digest.update(block, 0, n);
+                gelesenBytes += n;
+                Thread.sleep(3); // gedrosselter Client: rund 20 MB/s
+                if (!gemessen && gelesenBytes >= messpunkt) {
+                    // der Client steht, die Hälfte ist weg: was die API jetzt noch hält, ist ihr Puffer, nicht die Datei
+                    gc();
+                    heapZuwachs = laufzeit.totalMemory() - laufzeit.freeMemory() - vorher;
+                    gemessen = true;
+                }
+            }
+        }
+        gelesenSha256 = HexFormat.of().formatHex(digest.digest());
+    }
+
+    @Wenn("der Client den ersten offenen Stream schliesst")
+    public void ersterStreamZu() {
+        offeneStreams.getFirst().close();
+    }
+
+    @Dann("liefert der Stream Status {int} und den Medientyp «{}»")
+    public void streamStatus(int status, String typ) {
+        assertThat(streamKopf.status()).isEqualTo(status);
+        assertThat(streamKopf.header().get("content-type")).isEqualTo(typ);
+    }
+
+    @Dann("lehnt der Stream mit Status {int} ab und nennt Retry-After {int}")
+    public void streamAbgelehnt(int status, int sekunden) {
+        assertThat(streamKopf.status()).isEqualTo(status);
+        assertThat(streamKopf.header().get("retry-after")).isEqualTo(Integer.toString(sekunden));
+    }
+
+    @Dann("nennt der abgelehnte Stream den Fehlercode «{word}»")
+    public void streamFehlercode(String code) {
+        assertThat(streamText).contains("\"fehlercode\":\"" + code + "\"");
+    }
+
+    @Dann("trägt der Stream den Header «{}» mit dem Wert «{}»")
+    public void streamHeader(String name, String wert) {
+        assertThat(streamKopf.header().get(name.toLowerCase(java.util.Locale.ROOT))).isEqualTo(wert);
+    }
+
+    @Dann("liefert die Antwort die Datei von «{word}» als «{}» mit der Länge der Datei")
+    public void dateiAlsStream(String dokument, String typ) {
+        assertThat(antwort.statusCode()).isEqualTo(200);
+        assertThat(antwort.header("Content-Type")).isEqualTo(typ);
+        byte[] inhalt = ("PDF/A " + dokument).getBytes(StandardCharsets.UTF_8);
+        assertThat(antwort.asByteArray()).isEqualTo(inhalt);
+        assertThat(antwort.header("Content-Length")).isEqualTo(Integer.toString(inhalt.length));
+        // nie eine Speicher-Adresse: weder Umleitung noch JSON mit url
+        assertThat(antwort.header("Location")).isNull();
+        assertThat(antwort.asString()).doesNotContain("X-Amz");
+    }
+
+    @Dann("steht in keinem Header der Antwort der Dateiname «{}»")
+    public void keinDateiname(String dateiname) {
+        assertThat(antwort.headers().asList().toString()).doesNotContain(dateiname);
+    }
+
+    @Dann("steht im Zugriffsprotokoll von «{word}» schon vor dem Ende des Streams ein Eintrag HERUNTERLADEN für «{word}»")
+    public void protokollVorDemEnde(String mandant, String dokument) throws SQLException {
+        // der Stream ist offen und steht (Client liest nicht weiter): der Eintrag muss festgeschrieben sein
+        assertThat(hoechsteProtokollId(mandant)).isGreaterThan(protokollStand);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select count(*) from " + new MandantCode(mandant).schema() + ".zugriff_protokoll where id > ? "
+                        + "and aktion = 'HERUNTERLADEN' and dokument_id = ?")) {
+            abfrage.setLong(1, protokollStand);
+            abfrage.setObject(2, dokumente.get(dokument).id());
+            try (ResultSet z = abfrage.executeQuery()) {
+                z.next();
+                assertThat(z.getInt(1)).isEqualTo(1);
+            }
+        }
+    }
+
+    @Dann("hält die API während des Streams keine offene Transaktion")
+    public void keineTransaktion() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); Statement abfrage = verbindung.createStatement();
+             ResultSet z = abfrage.executeQuery("select count(*) from pg_stat_activity where datname = "
+                     + "current_database() and pid <> pg_backend_pid() and state like 'idle in transaction%'")) {
+            z.next();
+            assertThat(z.getInt(1)).as("offene Transaktionen der API").isZero();
+        }
+    }
+
+    @Dann("belegt die API noch {int} Plätze für Streams")
+    public void belegtePlaetze(int anzahl) {
+        assertThat(plaetze.belegt()).isEqualTo(anzahl);
+    }
+
+    @Dann("sind nach höchstens {int} Sekunden nur noch {int} Plätze belegt")
+    public void nurNochBelegt(int sekunden, int anzahl) throws InterruptedException {
+        long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(sekunden);
+        while (plaetze.belegt() > anzahl && System.nanoTime() < bis) {
+            Thread.sleep(50);
+        }
+        assertThat(plaetze.belegt()).isEqualTo(anzahl);
+    }
+
+    @Dann("sind nach höchstens {int} Sekunden alle Plätze für Streams wieder frei")
+    public void plaetzeFrei(int sekunden) throws InterruptedException {
+        long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(sekunden);
+        while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
+            Thread.sleep(50);
+        }
+        assertThat(plaetze.belegt()).isZero();
+    }
+
+    @Dann("stimmt die Prüfsumme der gelesenen Datei mit der von «{word}» überein")
+    public void pruefsumme(String dokument) {
+        assertThat(gelesenBytes).isEqualTo(streamKopf.laenge());
+        assertThat(gelesenSha256).isEqualTo(sha256.get(dokument));
+    }
+
+    @Dann("ist der Heap der API nach der Hälfte höchstens um {int} MB gewachsen")
+    public void heap(int megabyte) {
+        assertThat(heapZuwachs).as("Heap-Zuwachs der API nach der halben Datei, in Bytes")
+                .isLessThan((long) megabyte * 1024 * 1024);
+    }
+
+    private static MessageDigest digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void gc() throws InterruptedException {
+        for (int i = 0; i < 3; i++) {
+            System.gc();
+            Thread.sleep(50);
+        }
     }
 
     // ---- Hilfen

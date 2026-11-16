@@ -8,6 +8,7 @@ import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
@@ -24,6 +25,8 @@ import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
 import ch.urinet.archiv.ablage.domain.Importdatei;
 import ch.urinet.archiv.ablage.domain.Vorschau;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
@@ -158,6 +161,21 @@ public class AblageStub implements AblagePort {
         Version v = liste(mandant, schluessel.pfad(ort)).stream().filter(x -> x.versionId().equals(versionId))
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("Version fehlt: " + schluessel.pfad(ort)));
         return new VorsignierteUrl(v.datei().toUri(), Instant.now().plus(URL_GUELTIGKEIT));
+    }
+
+    @Override
+    public synchronized DateiStrom oeffnen(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel,
+                                           String versionId) {
+        if (versionId == null || versionId.isBlank()) {
+            throw new IllegalArgumentException("Öffnen nur mit Versions-ID");
+        }
+        Version v = liste(mandant, schluessel.pfad(ort)).stream().filter(x -> x.versionId().equals(versionId))
+                .findFirst().orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+        try {
+            return new DateiStrom(Files.newInputStream(v.datei()), Files.size(v.datei()));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

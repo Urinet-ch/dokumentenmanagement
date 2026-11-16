@@ -10,6 +10,7 @@ import ch.urinet.archiv.ablage.domain.ArchiviertesDokument;
 import ch.urinet.archiv.ablage.domain.ArchivierungAbgebrochen;
 import ch.urinet.archiv.ablage.application.Exportziel;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.ablage.domain.Dateipruefung;
 import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
@@ -286,6 +287,37 @@ public class S3Ablage implements AblagePort {
             return new VorsignierteUrl(signiert.url().toURI(), signiert.expiration());
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Vorsignierte URL ungültig: " + key, e);
+        }
+    }
+
+    @Override
+    public DateiStrom oeffnen(MandantCode mandant, Ablageort ort, DateiSchluessel schluessel, String versionId) {
+        if (versionId == null || versionId.isBlank()) {
+            throw new IllegalArgumentException("Öffnen nur mit Versions-ID");
+        }
+        String bucket = bucket(mandant);
+        String key = schluessel.pfad(ort);
+        try {
+            var antwort = s3.getObject(b -> b.bucket(bucket).key(key).versionId(versionId));
+            Long laenge = antwort.response().contentLength();
+            if (laenge == null) {
+                antwort.abort();
+                throw new IllegalStateException("Object Storage nennt keine Länge: " + key);
+            }
+            return new DateiStrom(antwort, laenge, antwort::abort);
+        } catch (SdkClientException e) {
+            LOG.warnf("Object Storage nicht erreichbar: %s (%s)", key, e.getClass().getSimpleName());
+            throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
+        } catch (S3Exception e) {
+            if (FEHLT.contains(fehlercode(e))) {
+                LOG.warnf("Version der Datei fehlt im Object Storage: %s", key);
+                throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+            }
+            if (e.statusCode() >= 500) {
+                LOG.warnf("Object Storage antwortet mit HTTP %d: %s", e.statusCode(), key);
+                throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
+            }
+            throw e;
         }
     }
 
