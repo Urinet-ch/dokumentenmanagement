@@ -6,6 +6,7 @@ import ch.urinet.archiv.dokument.domain.DokumentFinanz;
 import ch.urinet.archiv.dokument.domain.DokumentVertrag;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.ki.domain.Werteformat;
+import ch.urinet.archiv.ki.domain.chat.DokumentDaten;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
@@ -60,9 +61,10 @@ public class DokumentZeigen {
     }
 
     private static final int WERT_MAX = PartnerAufloesung.NAME_MAX;
+    /** Unicode-Leerraum gilt wie Leerzeichen ({@code U}): ein geschütztes Leerzeichen macht aus dem Marker keinen anderen Text. */
     private static final java.util.regex.Pattern WERT_RAHMEN = java.util.regex.Pattern.compile(
-            "(?iu)(?:dokumentinhalt[\\s\\p{Cf}\\p{Pd}_]*\\([^)]*\\)|ende[\\s\\p{Cf}\\p{Pd}_]*dokumentinhalt"
-                    + "|metadaten[\\s\\p{Cf}\\p{Pd}_]*\\((?:nicht[\\s]+)?best[aä]tigt\\))");
+            "(?iU)(?:dokument[\\s\\p{Cf}\\p{Pd}_]*inhalt[\\s\\p{Cf}\\p{Pd}_]*\\([^)]*\\)"
+                    + "|ende[\\s\\p{Cf}\\p{Pd}_]*dokument[\\s\\p{Cf}\\p{Pd}_]*inhalt)");
 
     public Ansicht zeigen(WerkzeugKontext kontext, String id) {
         UUID dokumentId = Werkzeugparameter.id(id);
@@ -110,17 +112,24 @@ public class DokumentZeigen {
     }
 
     private static void zeile(StringBuilder text, String feld, String wert) {
-        if (wert != null && !wert.isBlank()) {
-            text.append('\n').append(feld).append(": ").append(einzeilig(wert));
+        String sauber = wert == null ? "" : einzeilig(wert);
+        if (!sauber.isEmpty()) {
+            text.append('\n').append(feld).append(": ").append(sauber);
         }
     }
 
     /** Belegnummer und Partner sind fremde Daten (OCR, Import): einzeilig, ohne Rahmenmarker, auf {@link #WERT_MAX} gekürzt. */
     static String einzeilig(String wert) {
-        String s = wert.replaceAll("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]", " ").replaceAll("\\s+", " ").strip();
+        String s = wert.replaceAll("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]", " ").replaceAll("(?U)\\s+", " ").strip();
         s = PartnerAufloesung.KANDIDATEN_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
         s = WERT_RAHMEN.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
-        return s.length() <= WERT_MAX ? s : s.substring(0, WERT_MAX);
+        s = DokumentDaten.METADATEN_KOPF.matcher(s).replaceAll("[Rahmenmarker neutralisiert]");
+        if (s.length() <= WERT_MAX) {
+            return s;
+        }
+        // nie mitten in einem Surrogatpaar (Emoji) kürzen: sonst bleibt ein halbes Zeichen stehen
+        int ende = Character.isHighSurrogate(s.charAt(WERT_MAX - 1)) ? WERT_MAX - 1 : WERT_MAX;
+        return s.substring(0, ende).strip();
     }
 
     private void verweigert(WerkzeugKontext kontext, Optional<UUID> id) {
