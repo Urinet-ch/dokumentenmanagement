@@ -41,6 +41,10 @@ async function bedienen(welt, route) {
     exp.abfragenSeitAnforderung = 0;
     return antwort(route, 202, exp.liste[0]);
   }
+  if (url.pathname === PFAD && exp.abfrageStatus) {
+    // Archiv beim Neustart: der Proxy antwortet 502/503/504 ohne Fehlercode
+    return antwort(route, exp.abfrageStatus, {});
+  }
   if (url.pathname === PFAD) {
     // die zweite Abfrage nach der Anforderung findet den Export fertig, wie nach dem Auftrag EXPORT_JAHR im Worker
     if (exp.abfragenSeitAnforderung++ >= 1) {
@@ -65,6 +69,25 @@ async function bedienen(welt, route) {
   }
   return antwort(route, 200, { ...eintrag, url: eintrag.status === 'FERTIG' ? url.origin + ZIP : null });
 }
+
+Given(
+  /^ein gescheiterter Export für das Geschäftsjahr (\d+) mit Fehlerart «(.+)» und Fehler-ID «(.+)»$/,
+  function (jahr, fehlerArt, fehlerId) {
+    // wie ExportResource nach einem Abbruch: Status FEHLER, nur Art und ID, keine Werte
+    attrappe(this).liste.push({
+      id: randomUUID(),
+      geschaeftsjahr: Number(jahr),
+      status: 'FEHLER',
+      erstellt: new Date().toISOString(),
+      fehlerArt,
+      fehlerId,
+    });
+  },
+);
+
+Given(/^die Export-Schnittstelle antwortet beim Abfragen mit (50[234])$/, function (status) {
+  attrappe(this).abfrageStatus = Number(status);
+});
 
 Given('die Export-Schnittstelle ist eine Attrappe', async function () {
   this.exporte = { liste: [], anfragen: [], anforderungen: [], abfragenSeitAnforderung: 0, download: null };
@@ -111,4 +134,19 @@ Then(/^lädt der Browser «(.+)» herunter$/, async function (name) {
 Then('hat die PWA die Export-Schnittstelle nicht aufgerufen', async function () {
   await this.seite.waitForLoadState('networkidle');
   assert.deepEqual(attrappe(this).anfragen, []);
+});
+
+Then(
+  /^zeigt der Export (\d+) den Satz «(.+)» und die Fehler-ID «(.+)»$/,
+  async function (jahr, satz, fehlerId) {
+    const karte = this.seite.locator('[data-test=export]').filter({ hasText: `Geschäftsjahr ${jahr}` });
+    await karte.locator('.marke', { hasText: 'Fehlgeschlagen' }).waitFor();
+    assert.equal((await karte.locator('[data-test=fehler-art]').textContent()).trim(), satz);
+    assert.equal((await karte.locator('[data-test=fehler-id]').textContent()).trim(), fehlerId);
+  },
+);
+
+Then('zeigt die Seite keinen Export', async function () {
+  await this.seite.getByRole('alert').waitFor();
+  assert.equal(await this.seite.locator('[data-test=export]').count(), 0);
 });

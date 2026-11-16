@@ -2,6 +2,8 @@ package ch.urinet.archiv.export.adapter.out.persistence;
 
 import ch.urinet.archiv.export.application.ExportVerwaltung;
 import ch.urinet.archiv.export.domain.Export;
+import ch.urinet.archiv.export.domain.ExportFehlerart;
+import ch.urinet.archiv.export.domain.ExportStatus;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -28,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Reihenfolge und Begrenzung von {@code neueste} gegen die echte Abfrage (Req 7.1): neueste zuerst, bei gleichem
@@ -92,6 +95,92 @@ class JdbcExportRepositoryTest {
         assertThat(liste).extracting(Export::id).containsExactlyElementsOf(erwartet.stream().map(Zeile::id).toList());
         assertThat(liste).extracting(Export::erstellt)
                 .containsExactlyElementsOf(erwartet.stream().map(Zeile::erstellt).toList());
+    }
+
+    @Test
+    void fehlerzeilenVorDerFehlerartLassenSichLadenUndLeseneKeineArtVor() throws Exception {
+        mandantVorhanden();
+        UUID ohneAlles = new UUID(0xE001, 1);
+        UUID nurFehlerId = new UUID(0xE001, 2);
+        UUID fehlerId = UUID.randomUUID();
+        fehlerzeile(ohneAlles, null, null);
+        fehlerzeile(nurFehlerId, fehlerId, null);
+
+        Export a = imMandanten(() -> repository.laden(ohneAlles)).orElseThrow();
+        Export b = imMandanten(() -> repository.laden(nurFehlerId)).orElseThrow();
+
+        assertThat(a.status()).isEqualTo(ExportStatus.FEHLER);
+        assertThat(a.fehlerId()).isEmpty();
+        assertThat(a.fehlerart()).isEmpty();
+        assertThat(b.fehlerId()).contains(fehlerId);
+        assertThat(b.fehlerart()).isEmpty();
+    }
+
+    @Test
+    void fehlerSchreibtIdUndArtNurBeiOffenenExporten() throws Exception {
+        mandantVorhanden();
+        UUID offen = new UUID(0xE002, 1);
+        UUID fertigerFehler = new UUID(0xE002, 2);
+        UUID alteId = UUID.randomUUID();
+        fehlerzeile(fertigerFehler, alteId, ExportFehlerart.ZEITGRENZE.name());
+        offen(offen);
+
+        boolean schonFehler = imMandanten(() -> repository.fehler(fertigerFehler, UUID.randomUUID(),
+                ExportFehlerart.VERWAIST));
+        UUID neueId = UUID.randomUUID();
+        boolean geschrieben = imMandanten(() -> repository.fehler(offen, neueId, ExportFehlerart.VERWAIST));
+        boolean zweimal = imMandanten(() -> repository.fehler(offen, UUID.randomUUID(), ExportFehlerart.FEHLGESCHLAGEN));
+
+        assertThat(schonFehler).as("ein Fehler wird nicht überschrieben").isFalse();
+        assertThat(geschrieben).isTrue();
+        assertThat(zweimal).as("der erste Fehlversuch bleibt stehen").isFalse();
+        Export unveraendert = imMandanten(() -> repository.laden(fertigerFehler)).orElseThrow();
+        assertThat(unveraendert.fehlerId()).contains(alteId);
+        assertThat(unveraendert.fehlerart()).contains(ExportFehlerart.ZEITGRENZE);
+        Export gesetzt = imMandanten(() -> repository.laden(offen)).orElseThrow();
+        assertThat(gesetzt.status()).isEqualTo(ExportStatus.FEHLER);
+        assertThat(gesetzt.fehlerId()).contains(neueId);
+        assertThat(gesetzt.fehlerart()).contains(ExportFehlerart.VERWAIST);
+    }
+
+    @Test
+    void dieDatenbankLehntEineUnbekannteFehlerartAb() throws Exception {
+        mandantVorhanden();
+        UUID id = new UUID(0xE003, 1);
+
+        assertThatThrownBy(() -> fehlerzeile(id, UUID.randomUUID(), "verwaist")).isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> fehlerzeile(id, UUID.randomUUID(), "ABGESTUERZT")).isInstanceOf(SQLException.class);
+    }
+
+    private <T> T imMandanten(java.util.concurrent.Callable<T> arbeit) throws Exception {
+        return thread.submit(() -> kontext.mit(MANDANT, () -> QuarkusTransaction.requiringNew().call(arbeit)))
+                .get(30, TimeUnit.SECONDS);
+    }
+
+    private void fehlerzeile(UUID id, UUID fehlerId, String art) throws SQLException {
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + MANDANT.schema()
+                     + ".export (id, geschaeftsjahr, status, benutzer, rolle, erstellt, fehler_id, fehler_art) "
+                     + "values (?, 2025, 'FEHLER', 'probe-export', 'INHABER', ?, ?, ?)")) {
+            einfuegen.setObject(1, id);
+            einfuegen.setTimestamp(2, Timestamp.from(BASIS.minusSeconds(5000)));
+            einfuegen.setObject(3, fehlerId);
+            einfuegen.setObject(4, art);
+            angelegt.add(id);
+            einfuegen.executeUpdate();
+        }
+    }
+
+    private void offen(UUID id) throws SQLException {
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement einfuegen = verbindung.prepareStatement("insert into " + MANDANT.schema()
+                     + ".export (id, geschaeftsjahr, status, benutzer, rolle, erstellt) "
+                     + "values (?, 2025, 'OFFEN', 'probe-export', 'INHABER', ?)")) {
+            einfuegen.setObject(1, id);
+            einfuegen.setTimestamp(2, Timestamp.from(BASIS.minusSeconds(5000)));
+            angelegt.add(id);
+            einfuegen.executeUpdate();
+        }
     }
 
     private record Zeile(UUID id, Instant erstellt) {

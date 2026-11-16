@@ -35,3 +35,26 @@ Funktionalität: Jahresexport in der PWA
     Dann bin ich auf der Seite «/»
     Und sehe ich im Menü genau «Erfassen, Eingangskorb, Suche, Chat»
     Und hat die PWA die Export-Schnittstelle nicht aufgerufen
+
+  @req-7.1
+  Szenario: Gescheiterter Export zeigt Satz und Fehler-ID, «Erneut anfordern» startet das Geschäftsjahr neu
+    Angenommen ein Bildschirm mit 375 Pixel Breite
+    Und die Export-Schnittstelle ist eine Attrappe
+    Und ein gescheiterter Export für das Geschäftsjahr 2025 mit Fehlerart «VERWAIST» und Fehler-ID «f3a9c1d2-0000-4000-8000-000000000001»
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Jahresexport» wähle
+    Dann zeigt der Export 2025 den Satz «Der Export wurde unterbrochen, zum Beispiel durch einen Neustart des Archivs. Bitte fordern Sie ihn erneut an.» und die Fehler-ID «f3a9c1d2-0000-4000-8000-000000000001»
+    Wenn ich auf «Export 2025 erneut anfordern» klicke
+    Dann hat das Archiv die Anforderung für das Geschäftsjahr 2025 erhalten
+    Und sehe ich den Export 2025 mit Status «In Arbeit»
+    Und ragt nichts über den Bildschirm hinaus
+
+  @req-7.1
+  Szenario: Archiv beim Abfragen nicht erreichbar (503) ist kein Fehlerzustand des Exports
+    Angenommen ein Bildschirm mit 375 Pixel Breite
+    Und die Export-Schnittstelle ist eine Attrappe
+    Und die Export-Schnittstelle antwortet beim Abfragen mit 503
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und ich im Menü «Jahresexport» wähle
+    Dann sehe ich die Meldung «Das Archiv ist gerade nicht erreichbar, zum Beispiel wegen eines Neustarts. Bitte versuchen Sie es in einer Minute erneut.»
+    Und zeigt die Seite keinen Export
