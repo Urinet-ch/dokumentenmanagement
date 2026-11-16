@@ -21,7 +21,7 @@ import java.util.UUID;
  * Verlauf der öffentlichen Gespräche, nur im Speicher dieser Instanz (Spec 03, design.md «OeffentlicherChatAgent»:
  * Gesprächsspeicher 6 Nachrichten; Req 6.5: keine Gesprächsinhalte mit Personenbezug gespeichert). Es gibt keine Tabelle:
  * Fragen und Antworten liegen höchstens {@code archiv.webseite.chat.gespraech-dauer} (30 Minuten ab der letzten Frage) im
- * Heap und verschwinden beim Neustart. Ein Gespräch gehört zu Mandant, Webseite und Client-Hash; eine fremde, unbekannte
+ * Heap und verschwinden beim Neustart. Ein Gespräch gehört zu Mandant, Webseite, Client-Hash und wirksamer Zugriffsstufe (ein Stufenwechsel beginnt ein neues Gespräch, damit Antworttexte einer höheren Stufe nie in den Verlauf einer niedrigeren gelangen); eine fremde, unbekannte
  * oder abgelaufene ID beginnt still ein neues Gespräch (kein Hinweis, ob es die ID gibt). Höchstens
  * {@code archiv.webseite.chat.max-gespraeche} Gespräche; bei Überlauf fällt das älteste weg.
  */
@@ -107,6 +107,7 @@ public class OeffentlicheGespraeche {
     }
 
     private static String bindung(MandantCode mandant, Lesezugriff zugriff) {
-        return mandant.wert() + "\n" + zugriff.webseite() + "\n" + zugriff.clientHash().orElse("-");
+        return mandant.wert() + "\n" + zugriff.webseite() + "\n" + zugriff.clientHash().orElse("-") + "\n"
+                + zugriff.wirksameStufe().name();
     }
 }

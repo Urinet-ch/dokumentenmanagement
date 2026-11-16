@@ -309,3 +309,14 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Wenn ein anderer Client «berta» im Gespräch des ersten Clients fragt: «Dritte Frage?»
     Dann enthält die Anfrage 3 an das Sprachmodell 2 Nachrichten
     Und endet der Stream des Chatbots mit «quellen» und «fertig»
+
+  @req-6.1
+  Szenario: Ein Stufenwechsel beginnt ein neues Gespräch, der Verlauf der höheren Stufe geht nie an das Modell der niedrigeren
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt                    | argumente | tokens |
+      | 1       | text | Die erste Antwort.        |           | 5/2    |
+      | 2       | text | Die zweite Antwort.       |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «vorstand» fragt: «Erste Frage?»
+    Und die Webseite im selben Gespräch auf der Stufe «oeffentlich» fragt: «Zweite Frage?»
+    Dann enthält die Anfrage 2 an das Sprachmodell 2 Nachrichten
+    Und endet der Stream des Chatbots mit «quellen» und «fertig»
