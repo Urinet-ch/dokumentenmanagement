@@ -230,10 +230,10 @@ Arbeitsweise je Aufgabe (Claude Code):
   - Stand 13.11.2026: entschieden von Fabian – nur die aktuelle Hauptversion von iOS (Safari) und das aktuelle Chrome auf Android (Req 4.1); Testgeräte sind Fabians eigene Handys (Gerätetest in 3.7)
   - _Anforderungen: 4.1_
 
-- [ ] 2.9 Ziel für echte Belege festlegen (Auflage A2 aus Gate 0) [Fabian]
+- [x] 2.9 Ziel für echte Belege festlegen (Auflage A2 aus Gate 0) [Fabian]
   - Zielwerte für die Realitätsprüfung vor der Übernahme, Aufteilung der echten Belege in Abstimmungs- und zurückgehaltenen Teil und Umgang mit Änderungen aus dem Abstimmen (Prompt, Regeln, Parameter: neuer Golden-Lauf nach Req 0.9 oder nur Regeln, die Sicherheiten senken wie A1) entscheiden; Ergebnis in `docs/umsetzungsplan.md`, Abschnitt 6, und per PR in Req 0.10 (alt → neu) nachtragen
   - Stand 15.11.2026: entschieden von Fabian, vorgeschlagen 15.11.2026, entschieden mit dem Merge des Spec-PR – (1) echte Belege 2026 je etwa zur Hälfte Abstimm-Teil und zurückgehaltener Prüfteil (Zufall mit festem Seed, stratifiziert nach Dokumentart, Zuordnung als ID-Liste ausserhalb des Repositorys bei Fabian); (2) nur Regeln, die Sicherheiten senken (wie A1), ohne neuen Golden-Lauf, Prompt oder Parameter nur mit neuem Lauf vor der Übernahme; (3) Zielwerte wie Gate 0 (Req 0.3, 0.9), gemessen auf dem zurückgehaltenen Teil, Lauf dort nach dem Abstimmen wiederholt (Req 0.10, `docs/umsetzungsplan.md`, Abschnitt 6)
-  - Offen [Fabian]: Anzahl der echten Belege 2026 und Grösse des Prüfteils (die Zielwerte nennen 20 Belege); der Haken folgt mit dieser Zahl
+  - Stand 16.11.2026: Fabian nennt die Anzahl der echten Belege 2026 für Urinet: etwa 50 Dokumente. Damit hat der Prüfteil rund 25, der Abstimm-Teil rund 25 Belege (Aufteilung nach (1)). Umrechnung der Zielwerte auf einen Prüfteil von 25 (vorgeschlagen 16.11.2026, entschieden mit dem Merge dieses PR): gleicher Anteil wie bei Gate 0, also mindestens 23/25 (≥ 90 %, wie 18/20) in Art, Datum, Partner, Betrag korrekt; «höchstens 1 Fehler unter Feldern mit Sicherheit ab der Schwelle» bleibt unverändert. Bei einer anderen tatsächlichen Zahl gilt derselbe Anteil (aufgerundet). Zuordnung der IDs weiter ausserhalb des Repositorys
   - Der erneute Lauf vor der Übernahme ist Voraussetzung von 5.8
   - _Anforderungen: 0.10_
 
