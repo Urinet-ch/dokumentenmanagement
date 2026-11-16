@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 03, Aufgabe 11.2 (Req 4.3, 5.10): Zuordnung alte URL der bisherigen Webseite -> Dokument. Die URL steht in
+         der Form von AlteUrl.normalisieren (nur Pfad); den CSV-Import füllt Aufgabe 10.5. -->
+    <changeSet id="031-alte-url" author="archiv">
+        <sql>
+            create table alte_url (
+                url text primary key constraint alte_url_url_ck check (url like '/%' and length(url) &lt;= 2000),
+                dokument_id uuid not null references dokument (id)
+            );
+            create index alte_url_dokument_ix on alte_url (dokument_id)
+        </sql>
+        <rollback>
+            <sql>drop table if exists alte_url</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -3,6 +3,7 @@ package ch.urinet.archiv.ablage;
 import ch.urinet.archiv.ablage.adapter.out.AblageEinstellungen;
 import ch.urinet.archiv.ablage.adapter.out.s3.BypassVerbot;
 import ch.urinet.archiv.ablage.adapter.out.s3.S3Ablage;
+import ch.urinet.archiv.ablage.adapter.out.s3.S3Wiederherstellung;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
@@ -14,6 +15,7 @@ import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeile;
 import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
+import ch.urinet.archiv.sicherung.application.Wiederherstellung;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -26,6 +28,7 @@ import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
@@ -43,8 +46,11 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -57,14 +63,17 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Bucket-Export (Aufgabe 5.5b) durch {@link S3Ablage} gegen MinIO (Compose Dev Services) oder Ceph RGW: Inventar mit
- * Sperren und Löschmarken, Ausschluss von {@code vorschau/} und {@code importe/}, Seitenfortsetzung (Seitengrösse 2),
- * Zuwachs gegen ein Vorinventar, mehrere Zuwächse in einem Strom und ein Objekt grösser als der Heap des Testprofils.
+ * Bucket-Export und Wiederherstellung durch {@link S3Ablage} gegen MinIO (Compose Dev Services) oder Ceph RGW:
+ * Inventar mit Sperren und Löschmarken, Ausschluss von {@code vorschau/} und {@code importe/}, Seitenfortsetzung
+ * (Seitengrösse 2), Zuwachs gegen ein Vorinventar sowie versionserhaltender Roundtrip.
  */
 @QuarkusTest
 class SicherungExportS3Test {
 
     private static final Path ZWISCHENABLAGE = Path.of("target", "arbeit-s3ablage", "sicherung").toAbsolutePath();
+    private static final String ZIEL_PRAEFIX = "restore-test-";
+    private static final String FALSCHES_PRAEFIX = "restore-test-falsch-";
+    private static final String PROBE_PRAEFIX = "urinet-archiv-p-";
     private static final int OBJEKT = 0x55424a31;
     private static final int SHA256 = 0x53484131;
 
@@ -74,27 +83,38 @@ class SicherungExportS3Test {
     private S3Client verwaltung;
     private MandantCode mandant;
     private String bucket;
+    private final List<String> buckets = new ArrayList<>();
 
     @BeforeEach
     void bucketAnlegen() {
         verwaltung = TestBucket.verwaltung();
         mandant = TestBucket.neu(verwaltung, true);
         bucket = TestBucket.bucket(mandant);
+        buckets.add(bucket);
     }
 
     @AfterEach
     void aufraeumen() {
-        TestBucket.aufraeumen(verwaltung, mandant);
+        buckets.forEach(b -> TestBucket.aufraeumen(verwaltung, b));
+        buckets.clear();
         verwaltung.close();
     }
 
     /** Die echte Ablage, aber Versionslisten mit höchstens zwei Einträgen, damit mehrere Seiten entstehen. */
     private AblagePort ablage() {
-        return ablage(s3, 2);
+        return ablage(s3, TestBucket.PRAEFIX, 2);
+    }
+
+    private AblagePort ablage(String praefix) {
+        return ablage(s3, praefix, 2);
     }
 
     private AblagePort ablage(S3Client client, int seitenGroesse) {
-        var einstellungen = new AblageEinstellungen(TestBucket.PRAEFIX, Optional.of(Duration.ofDays(1)),
+        return ablage(client, TestBucket.PRAEFIX, seitenGroesse);
+    }
+
+    private AblagePort ablage(S3Client client, String praefix, int seitenGroesse) {
+        var einstellungen = new AblageEinstellungen(praefix, Optional.of(Duration.ofDays(1)),
                 Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)), Duration.ofMinutes(5), ZWISCHENABLAGE);
         S3Ablage echt = new S3Ablage(client, S3Ablage.presigner(client, true), einstellungen, Clock.systemUTC());
         return (AblagePort) Proxy.newProxyInstance(AblagePort.class.getClassLoader(),
@@ -111,14 +131,66 @@ class SicherungExportS3Test {
                 });
     }
 
+    private S3Wiederherstellung wiederherstellungsZiel(String praefix) {
+        var einstellungen = new AblageEinstellungen(praefix, Optional.empty(), Sperrmodus.GOVERNANCE,
+                Optional.empty(), Duration.ofMinutes(5), ZWISCHENABLAGE);
+        return new S3Wiederherstellung(s3, einstellungen);
+    }
+
+    private String zielBucketAnlegen(String praefix) {
+        String zielBucket = mandant.bucket(praefix);
+        verwaltung.createBucket(r -> r.bucket(zielBucket).objectLockEnabledForBucket(true));
+        verwaltung.putBucketVersioning(r -> r.bucket(zielBucket)
+                .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
+        buckets.add(zielBucket);
+        return zielBucket;
+    }
+
     private String put(String key, String inhalt) {
         return verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString(inhalt)).versionId();
+    }
+
+    private String put(String targetBucket, String key, String inhalt) {
+        return verwaltung.putObject(r -> r.bucket(targetBucket).key(key), RequestBody.fromString(inhalt)).versionId();
+    }
+
+    private void sperre(String key, String versionId, software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode modus,
+                        Instant bis) {
+        verwaltung.putObjectRetention(r -> r.bucket(bucket).key(key).versionId(versionId).retention(s -> s
+                .mode(modus).retainUntilDate(bis)));
     }
 
     private List<InventarZeile> inventar(SicherungBucketExport export) {
         List<InventarZeile> zeilen = new ArrayList<>();
         export.inventar(mandant, zeilen::add);
         return zeilen;
+    }
+
+    private Path exportDatei(byte[] voll, byte[] zuwachs) throws IOException {
+        Path datei = Files.createTempFile("bucket-wiederherstellung-", ".bin");
+        datei.toFile().deleteOnExit();
+        Files.write(datei, voll);
+        Files.write(datei, zuwachs, java.nio.file.StandardOpenOption.APPEND);
+        return datei;
+    }
+
+    private Map<String, List<String>> inhalte(String targetBucket) throws IOException {
+        Map<String, List<String>> inhalte = new HashMap<>();
+        for (var seite : verwaltung.listObjectVersionsPaginator(r -> r.bucket(targetBucket))) {
+            for (var version : seite.versions()) {
+                try (var objekt = verwaltung.getObject(r -> r.bucket(targetBucket).key(version.key())
+                        .versionId(version.versionId()))) {
+                    inhalte.computeIfAbsent(version.key(), ignoriert -> new ArrayList<>())
+                            .add(new String(objekt.readAllBytes(), StandardCharsets.UTF_8));
+                }
+            }
+        }
+        inhalte.values().forEach(werte -> werte.sort(Comparator.naturalOrder()));
+        return inhalte;
+    }
+
+    private static String inventarMerkmal(InventarZeile zeile) {
+        return zeile.schluessel() + "|" + zeile.groesse() + "|" + zeile.sperrmodus() + "|" + zeile.retainUntil();
     }
 
     private static Set<String> ids(List<InventarZeile> zeilen) {
@@ -296,6 +368,118 @@ class SicherungExportS3Test {
         assertThat(eintraege).hasSize(eintraege.stream().map(x -> x.versionId).distinct().toList().size());
         assertThat(eintragIds(eintraege)).isEqualTo(ids(aktuell.stream().filter(z -> !z.loeschmarke()).toList()));
         assertThat(zuwachsLeer(kommando, inventarDatei(kommando))).isTrue();
+    }
+
+    @Test
+    void vollExportUndZuwachsStellenAlleVersionenMitInhaltUndSperrenWiederHer() throws IOException {
+        Instant governanceBis = Instant.now().plus(Duration.ofDays(10)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        Instant complianceBis = Instant.now().plus(Duration.ofHours(1)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        String archiv = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
+        String eingang = "eingang/2026/" + UUID.randomUUID() + "/original.pdf";
+        String manifest = "manifest/" + UUID.randomUUID() + ".json";
+        String ersteVersion = put(archiv, "vorherige Version");
+        sperre(archiv, ersteVersion, ObjectLockRetentionMode.GOVERNANCE, governanceBis);
+        put(archiv, "aktuelle Version");
+        put(eingang, "eingegangener Beleg");
+        String manifestVersion = put(manifest, "synthetisches Manifest");
+        sperre(manifest, manifestVersion, ObjectLockRetentionMode.COMPLIANCE, complianceBis);
+
+        SicherungBucketExport export = new SicherungBucketExport(ablage());
+        byte[] voll = zuwachs(export, ignoriert -> true);
+        Set<String> vorherigeVersionen = inventar(export).stream()
+                .map(z -> z.schluessel() + "@" + z.versionId()).collect(Collectors.toSet());
+
+        String dritteVersion = put(archiv, "Zuwachs");
+        sperre(archiv, dritteVersion, ObjectLockRetentionMode.GOVERNANCE, governanceBis);
+        byte[] zuwachs = zuwachs(export, v -> !vorherigeVersionen.contains(v.schluessel() + "@" + v.versionId()));
+        List<InventarZeile> quelle = inventar(export);
+        Path strom = exportDatei(voll, zuwachs);
+        String zielBucket = zielBucketAnlegen(ZIEL_PRAEFIX);
+        S3Wiederherstellung ziel = wiederherstellungsZiel(ZIEL_PRAEFIX);
+
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, Clock.systemUTC())
+                .wiederherstellen(mandant, quelle, strom, false);
+
+        assertThat(ergebnis.exitCode()).isZero();
+        assertThat(ergebnis.zaehler().versionen()).isEqualTo(5);
+        assertThat(inventar(new SicherungBucketExport(ablage(ZIEL_PRAEFIX))))
+                .extracting(SicherungExportS3Test::inventarMerkmal)
+                .containsExactlyInAnyOrderElementsOf(quelle.stream()
+                        .filter(z -> !z.loeschmarke()).map(SicherungExportS3Test::inventarMerkmal).toList());
+        assertThat(inhalte(zielBucket)).containsExactlyInAnyOrderEntriesOf(Map.of(
+                archiv, List.of("Zuwachs", "aktuelle Version", "vorherige Version"),
+                eingang, List.of("eingegangener Beleg"),
+                manifest, List.of("synthetisches Manifest")));
+    }
+
+    @Test
+    void kappungIstNurImProbeBucketZulaessigUndBegrenztSperrenAufEinenTag() throws IOException {
+        Instant jetzt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        Instant originalBis = jetzt.plus(Duration.ofDays(5));
+        String key = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
+        String version = put(key, "synthetischer Beleg");
+        sperre(key, version, ObjectLockRetentionMode.GOVERNANCE, originalBis);
+        SicherungBucketExport export = new SicherungBucketExport(ablage());
+        byte[] strom = zuwachs(export, ignoriert -> true);
+        List<InventarZeile> quelle = inventar(export);
+        Path datei = exportDatei(strom, new byte[0]);
+
+        String falschesBucket = zielBucketAnlegen(FALSCHES_PRAEFIX);
+        Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(wiederherstellungsZiel(FALSCHES_PRAEFIX),
+                Clock.fixed(jetzt, ZoneOffset.UTC)).wiederherstellen(mandant, quelle, datei, true);
+        assertThat(abgelehnt.exitCode()).isEqualTo(2);
+        assertThat(verwaltung.listObjectVersions(r -> r.bucket(falschesBucket)).versions()).isEmpty();
+
+        String probeBucket = zielBucketAnlegen(PROBE_PRAEFIX);
+        Wiederherstellung.Ergebnis wiederhergestellt = new Wiederherstellung(wiederherstellungsZiel(PROBE_PRAEFIX),
+                Clock.fixed(jetzt, ZoneOffset.UTC)).wiederherstellen(mandant, quelle, datei, true);
+
+        assertThat(wiederhergestellt.exitCode()).isZero();
+        assertThat(wiederhergestellt.zaehler().gekappt()).isEqualTo(1);
+        InventarZeile probeZeile = inventar(new SicherungBucketExport(ablage(PROBE_PRAEFIX))).getFirst();
+        assertThat(probeZeile.retainUntil()).isEqualTo(jetzt.plus(Duration.ofDays(1)).toString());
+        assertThat(inhalte(probeBucket)).containsEntry(key, List.of("synthetischer Beleg"));
+    }
+
+    @Test
+    void nichtLeeresZielBleibtUnveraendertUndManipulierterHashWirdVerworfen() throws IOException {
+        String key = "archiv/2026/" + UUID.randomUUID() + "/original.pdf";
+        put(key, "synthetischer Beleg");
+        SicherungBucketExport export = new SicherungBucketExport(ablage());
+        byte[] strom = zuwachs(export, ignoriert -> true);
+        List<InventarZeile> quelle = inventar(export);
+        Path datei = exportDatei(strom, new byte[0]);
+
+        String vollesBucket = zielBucketAnlegen(ZIEL_PRAEFIX);
+        put(vollesBucket, "archiv/vorhanden.bin", "vorhanden");
+        Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(wiederherstellungsZiel(ZIEL_PRAEFIX),
+                Clock.systemUTC()).wiederherstellen(mandant, quelle, datei, false);
+        assertThat(abgelehnt.exitCode()).isEqualTo(2);
+        assertThat(verwaltung.listObjectVersions(r -> r.bucket(vollesBucket)).versions())
+                .extracting(v -> v.key()).containsExactly("archiv/vorhanden.bin");
+
+        String korruptBucket = zielBucketAnlegen("restore-test-korrupt-");
+        byte[] manipuliert = strom.clone();
+        ByteBuffer rahmen = ByteBuffer.wrap(manipuliert);
+        rahmen.position(SicherungBucketExport.BUCKET_FORMAT.length());
+        assertThat(rahmen.getInt()).isEqualTo(OBJEKT);
+        ueberspringeText(rahmen);
+        ueberspringeText(rahmen);
+        assertThat(rahmen.getLong()).isPositive();
+        rahmen.getLong();
+        manipuliert[rahmen.position()] ^= 1;
+        Path korrupt = exportDatei(manipuliert, new byte[0]);
+        Wiederherstellung.Ergebnis fehler = new Wiederherstellung(
+                wiederherstellungsZiel("restore-test-korrupt-"), Clock.systemUTC())
+                .wiederherstellen(mandant, quelle, korrupt, false);
+
+        assertThat(fehler.exitCode()).isEqualTo(3);
+        assertThat(verwaltung.listObjectVersions(r -> r.bucket(korruptBucket)).versions()).isEmpty();
+    }
+
+    private static void ueberspringeText(ByteBuffer puffer) {
+        int laenge = puffer.getInt();
+        puffer.position(puffer.position() + laenge);
     }
 
     private Path inventarDatei(SicherungKommando kommando) throws IOException {

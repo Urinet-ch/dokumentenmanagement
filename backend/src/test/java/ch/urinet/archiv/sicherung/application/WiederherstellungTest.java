@@ -181,7 +181,7 @@ class WiederherstellungTest {
         Files.write(datei, frame("archiv/a", "v1", "inhalt".getBytes(StandardCharsets.UTF_8), JETZT));
         InventarZeile inventar = zeile("archiv/a", "v1", false, 6, JETZT.toString(), "GOVERNANCE",
                 "2036-11-15T12:00:00Z");
-        for (String praefix : List.of("urinet-archiv-", "urinet-archiv-a-")) {
+        for (String praefix : List.of("urinet-archiv-", "urinet-archiv-a-", "urinet-archiv-p-x-")) {
             InMemoryZiel falschesZiel = new InMemoryZiel(praefix, true);
             Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR)
                     .wiederherstellen(MANDANT, List.of(inventar), datei, true);

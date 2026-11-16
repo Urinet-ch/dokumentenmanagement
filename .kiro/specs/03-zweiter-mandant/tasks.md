@@ -43,7 +43,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
   - Drive-Import mit API-Token vom Scope `import` des Mandanten `vhf-gsk` und Pfad-Mustern (Reihe/Jahr), Bericht mit Lücken in der Nummerierung
-  - Tabelle `alte_url` und CSV-Import der alten Links
+  - Tabelle `alte_url` und CSV-Import der alten Links (die Tabelle besteht seit Aufgabe 11.2, Changeset `031-alte-url`; der Import verwendet `AlteUrl.normalisieren` für die Form der URL)
   - _Anforderungen: 4.1–4.3_
 
 - [ ] 10.6 Sicherung für Mandant 2 [Infra]
@@ -64,6 +64,8 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); Index oder Vorfilter anlegen, falls Spec 02 (Aufgabe 7.1) ihn noch nicht angelegt hat
   - Spec 05 ergänzt: Liste filtert zusätzlich nach den Klassifikationen mit `oeffentlich_filter` (z. B. `?fachgebiet=bad`), gibt nur diese aus; fester Sicherheitsfilter unverändert davor; reservierte Parameter in Spec 05 design.md (Spec 05, Req 8.6)
   - Ergänzt 13.11.2026: Endpunkte `/public/v1/filter` (nur Reihen und Werte bis zur Stufe) und `/public/v1/umleitung` (alte Links, bis zur Stufe); Antwortfelder nach design.md «Antwortfelder» (nur `dokumentId`, keine Seiten-URLs); Datei-Link nur für Stufe `oeffentlich` (Stream in Aufgabe 11.8); feste Parameter um `seit`, `max`, `referenz`, `groesse`, `status`, `url` ergänzt
+  - Umsetzung Teil 1 (PR #216; Vorstufe, mandantenneutral, getestet mit `urinet` und Testmandanten, ohne Seed und Domain VHF/GSK): `GET /public/v1/dokumente`, `/suche`, `/dokumente/{id}`, `/dokumente/{id}/datei`, `/filter`, `/umleitung`; `WebseitenLesenResource`, `WebseiteLesen`, `WebseiteSuche`, `WebseiteDatei`, `SqlWebseitenLese`, `Sichtregel.fuerWebseite` (fester Filter in jeder Teilabfrage der Hybridsuche), Tabelle `alte_url` (Changeset `031-alte-url`), `AlteUrl`, `IpAdresse.gekuerzt()`; Vertrag `docs/schnittstelle/public-v1.yaml` mit den Endpunkten und den Headern `X-Archiv-Zugriff` und `X-Archiv-Client`; Szenarien `@req-5.1` bis `@req-5.5`, `@req-5.8` bis `@req-5.11`, `@req-15.3`, `@req-15.4` in `features/integration/webseiten-lesen.feature` (je Filterachse ein Beispiel gegen Liste, Suche, Details, Filter und Umleitung); Einzelheiten in design.md, «Umsetzung (Aufgabe 11.2)». Offen: Filter nach den Klassifikationen mit `oeffentlich_filter` und deren Ausgabe in Liste und `/filter` (Spec 05 besteht im Code noch nicht), Fundstelle der Suche (Aufgabe 11.13), Datei-Link für `mitglieder` und `vorstand` als Stream (Aufgabe 11.8; bis dahin 404), Grenzen je Schlüssel und Drosselung (11.11, 11.6)
+  - Entschieden von Fabian am 16.11.2026 (PR #216): `seite` der Liste ist 1-basiert und in Version 1 fest; Datei-Link nur für Stufe `oeffentlich`, `mitglieder` und `vorstand` sind 404 bis Aufgabe 11.8; Suche über Partner und Tags (Gewicht B) bleibt
   - _Anforderungen: 5.1, 5.4, 5.8, 5.10, 5.11_
   - _Abhängig von: 11.1, 11.6_
 
@@ -86,6 +88,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 05 ergänzt: Filter der Liste nach den Klassifikationen mit `oeffentlich_filter`, nur diese werden angezeigt (Spec 05, Req 8.6)
   - Geändert 13.11.2026 (E-D): Download-Route `oeffentlich` → 302, `mitglieder`/`vorstand` → Stream blockweise durchreichen (cURL-Write-Callback, keine temporäre Datei) mit `Cache-Control: private, no-store`, höchstens 2 gleichzeitige Downloads je Person, Meldung bei 429; Filter aus `/public/v1/filter` (Cache je Stufe); Treffer verlinken mit `#page=<n>` auf die Fundstelle
   - Ergänzt 13.11.2026: Dokumentseite `/urinet-archiv/dokument/{id}`, alle Links auf Dokumente bildet das Plugin; Umleitung alter Links mit 301 über `/public/v1/umleitung`
+  - Reihenfolge (entschieden 16.11.2026): Der Download für `mitglieder` und `vorstand` setzt Aufgabe 11.8 voraus; 11.8 kommt vor dem Plugin-Download
   - _Anforderungen: 7.2, 7.6, 7.8, 5.4_
   - _Abhängig von: 11.2, 11.4, 11.8, 11.13_
 
@@ -95,6 +98,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Traefik: eigener Router für `/public/` mit eigener Drosselung je IP (Labels in `deploy/infomaniak/compose.yml`, nur über den Deploy-Workflow)
   - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; getestet mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Der Vertrag enthält, was es bei der Umsetzung gibt (Problem Details, Header, Versionierung); die Endpunkte kommen additiv mit 11.2 und 11.10 dazu
   - Umsetzung Teil 1 (PR #140): Vertrag `docs/schnittstelle/public-v1.yaml` ohne Endpunkte, Reroute `/public/` → interner Pfad (`WebseitenRoute`), `PublicVertragTest`, Ausschluss aus der App-OpenAPI, Problem Details und `Cache-Control: no-store` unter `/public/`, Abkündigung über `archiv.webseite.v<n>.sunset`, Skript `pruefe-vertrag.sh` mit Selbsttest; offen: CI-Schritt, Traefik-Router
+  - Reihenfolge (entschieden 16.11.2026): Die Drosselung im Reverse-Proxy kommt vor dem Livegang der Webseite von VHF/GSK; bis dahin nur Urinet und Testmandanten
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
 - [x] 11.7 Webseiten-Schlüssel [Backend]
@@ -111,6 +115,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 11.8 Dateiauslieferung gemischt [Backend]
   - Herkunft: Spec-Erweiterung, entschieden von Fabian am 13.11.2026 (E-D)
   - `DateiAuslieferung`: `oeffentlich` → vorsignierte URL (5 Min.), sonst Stream in Blöcken von 64 KiB mit Gegendruck; Plätze gesamt und je Schlüssel, 429 `ZU_VIELE_ANFRAGEN` (Fehlercode im selben PR in Spec 01 design.md eintragen, falls noch nicht eingetragen); Leerlauf- und Gesamt-Zeitlimit; Freigabe bei Abbruch; Protokoll `HERUNTERLADEN` in einer Transaktion, die vor dem ersten Byte endet; keine Dateinamen in Headern; `DateiStreamTest`; Messfall «50 MB an einen langsamen Client»
+  - Reihenfolge (entschieden 16.11.2026): 11.8 kommt vor dem Plugin-Download (11.5); bis dahin liefert `/public/v1/dokumente/{id}/datei` für `mitglieder` und `vorstand` 404
   - _Anforderungen: 13.1–13.8, 5.4_
   - _Abhängig von: 11.1_
 
@@ -131,6 +136,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 11.11 Grenzen je Schlüssel [Backend]
   - Herkunft: Spec-Erweiterung, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
   - Token-Bucket je Schlüssel (Startwerte in design.md «Grenzen»), Uploads je Stunde, 429 `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Fehlercode im selben PR in Spec 01 design.md eintragen, falls noch nicht eingetragen); Grenze des Chats je Client-Hash bleibt; Startwerte messen
+  - Reihenfolge (entschieden 16.11.2026): 11.11 kommt vor dem Livegang der Webseite von VHF/GSK, weil jede öffentliche Suche Embedding und Reranker auslöst; bis dahin nur Urinet und Testmandanten
   - _Anforderungen: 15.1, 6.4_
   - _Abhängig von: 11.7_
 
