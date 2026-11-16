@@ -25,6 +25,9 @@ public interface ManifestDaten {
     /** Das festgehaltene Manifest des Datums mit seinen Zeitstempeln aus {@code manifest_zeitstempel}, sonst leer. */
     Optional<ManifestStand> stand(LocalDate datum);
 
+    /** Eine Seite der Manifeste nach Datum, für den begrenzten Soll-/Ist-Abgleich der Restore-Probe. */
+    List<Sperrpruefstand> sperrpruefstaende(Optional<LocalDate> nach, int anzahl);
+
     /**
      * Das festgehaltene Manifest, in dessen Fenster {@code [von, bis)} der Zeitpunkt liegt ({@code von = null} heisst
      * ohne untere Grenze); leer, wenn keines (Prüflauf, Req 15.5).
@@ -64,6 +67,15 @@ public interface ManifestDaten {
             Objects.requireNonNull(bis, "bis");
             Objects.requireNonNull(sha256, "sha256");
             Objects.requireNonNull(verweis, "verweis");
+        }
+    }
+
+    /** Datum und Fenster eines Manifests; {@code von} ist leer beim ersten Manifest. */
+    record Sperrpruefstand(LocalDate datum, Optional<Instant> von, Instant bis) {
+        public Sperrpruefstand {
+            Objects.requireNonNull(datum, "datum");
+            Objects.requireNonNull(von, "von");
+            Objects.requireNonNull(bis, "bis");
         }
     }
 

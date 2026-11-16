@@ -336,6 +336,24 @@ public class AblageStub implements AblagePort {
                 new SicherungsSperre(objekt.schluessel().startsWith("manifest/") ? "COMPLIANCE" : "GOVERNANCE", bis));
     }
 
+    @Override
+    public synchronized boolean loeschprobe(MandantCode mandant, String schluessel, String versionId) {
+        List<Version> dateien = liste(mandant, schluessel);
+        for (var iterator = dateien.iterator(); iterator.hasNext(); ) {
+            Version version = iterator.next();
+            if (!version.versionId().equals(versionId)) {
+                continue;
+            }
+            if (version.gesperrt(Instant.now())) {
+                return false;
+            }
+            loeschen(version.datei());
+            iterator.remove();
+            return true;
+        }
+        throw new IllegalArgumentException("Version fehlt: " + schluessel);
+    }
+
     /** Nur für Tests: abgeschnittene Seiten ohne {@code NextVersionIdMarker}, wie ihn ein Object Storage weglassen kann. */
     synchronized void ohneVersionsIdMarker(boolean ohne) {
         this.ohneVersionsIdMarker = ohne;

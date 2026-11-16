@@ -182,6 +182,13 @@ public interface AblagePort {
     Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion version);
 
     /**
+     * Restore-Probe (Req 16.27): versucht genau diese Version unter {@code archiv/} oder {@code manifest/} ohne
+     * Bypass-Header zu löschen. {@code false} bedeutet, dass der Object Storage den Löschversuch wegen Object Lock
+     * verweigert hat; andere Fehler werden weitergegeben.
+     */
+    boolean loeschprobe(MandantCode mandant, String schluessel, String versionId);
+
+    /**
      * Prüflauf (Req 15.9): verlängert die aktive Sperre dieser Version unter {@code archiv/} oder {@code manifest/} bis
      * {@code bis}, im bisherigen Modus und gekappt auf die Höchstfrist des Bereichs. Ohne aktive Sperre setzt der
      * Aufruf keine neue ({@code KEINE_SPERRE}); eine längere Sperre bleibt ({@code UNVERAENDERT}), nie verkürzt.

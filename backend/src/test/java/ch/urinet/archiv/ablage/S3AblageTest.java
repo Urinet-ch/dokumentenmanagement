@@ -18,10 +18,19 @@ import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Sperrvorgabe;
 import ch.urinet.archiv.ablage.domain.SicherungsSperre;
+import ch.urinet.archiv.ablage.domain.Stufenregel;
 import ch.urinet.archiv.ablage.domain.UnsichereFortsetzung;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.ablage.domain.ZuArchivieren;
+import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort;
+import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.export.application.ExportBelege;
+import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
+import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ManifestDaten;
+import ch.urinet.archiv.sicherung.application.Sperrpruefung;
+import ch.urinet.archiv.sicherung.application.SperrpruefungDaten;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -40,6 +49,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
@@ -55,6 +65,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -517,6 +528,101 @@ class S3AblageTest {
                 .isEqualTo(datei.versionId());
         assertThatThrownBy(() -> ablage.ablegenManifest(mandant, datum, ManifestTeil.JSON, inhalt("anders"),
                 Optional.empty())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void restoreSperrpruefungNutztProbePraefixUndLoeschtNurUngesperrtesStichprobenobjekt() throws Exception {
+        S3Client probeVerwaltung = TestBucket.verwaltung();
+        MandantCode probe = new MandantCode("probe-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8));
+        String probeBucket = probe.bucket(Stufenregel.PRAEFIX_STUFE_P);
+        probeVerwaltung.createBucket(b -> b.bucket(probeBucket).objectLockEnabledForBucket(true));
+        probeVerwaltung.putBucketVersioning(b -> b.bucket(probeBucket)
+                .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
+        try {
+            var einstellungen = new AblageEinstellungen(Stufenregel.PRAEFIX_STUFE_P,
+                    Optional.of(Duration.ofDays(1)), Sperrmodus.COMPLIANCE, Optional.of(Duration.ofDays(1)),
+                    Duration.ofMinutes(5), ZWISCHENABLAGE);
+            S3Ablage probeAblage = new S3Ablage(s3, S3Ablage.presigner(s3, true), einstellungen, Clock.systemUTC());
+            String governanceKey = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
+            String ungesperrtKey = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
+            LocalDate datum = LocalDate.now(ZoneId.of("Europe/Zurich"));
+            String complianceKey = "manifest/" + datum + ".json";
+            String governanceVersion = objekt(probeVerwaltung, probeBucket, governanceKey);
+            String ungesperrtVersion = objekt(probeVerwaltung, probeBucket, ungesperrtKey);
+            String complianceVersion = objekt(probeVerwaltung, probeBucket, complianceKey);
+            Instant bis = Instant.now().plus(Duration.ofDays(1)).plusSeconds(10).truncatedTo(ChronoUnit.SECONDS);
+            retention(probeVerwaltung, probeBucket, governanceKey, governanceVersion,
+                    ObjectLockRetentionMode.GOVERNANCE, bis);
+            retention(probeVerwaltung, probeBucket, complianceKey, complianceVersion,
+                    ObjectLockRetentionMode.COMPLIANCE, bis);
+
+            UUID dokumentId = UUID.randomUUID();
+            var dokument = new DokumentPrueflaufPort.Pruefdokument(dokumentId, DokumentStatus.ARCHIVIERT,
+                    Sperrvorgabe.unbefristet(), Optional.of(Instant.now()), List.of(
+                    pruefDatei(governanceKey, governanceVersion), pruefDatei(ungesperrtKey, ungesperrtVersion)));
+            var manifestDatei = new ExportBelege.Manifestdatei(datum, "json", complianceKey, complianceVersion, "hash");
+            var manifest = new SperrpruefungDaten.Pruefmanifest(
+                    new ManifestDaten.Sperrpruefstand(datum, Optional.empty(), Instant.now()),
+                    new ManifestDaten.Fristen(0, false, Optional.empty()), List.of(manifestDatei));
+            SperrpruefungDaten daten = new SperrpruefungDaten() {
+                @Override
+                public List<DokumentPrueflaufPort.Pruefdokument> dokumente(MandantCode mandant, Optional<UUID> nach,
+                                                                           int anzahl) {
+                    return nach.isEmpty() ? List.of(dokument) : List.of();
+                }
+
+                @Override
+                public List<Pruefmanifest> manifeste(MandantCode mandant, Optional<LocalDate> nach, int anzahl) {
+                    return nach.isEmpty() ? List.of(manifest) : List.of();
+                }
+
+                @Override
+                public java.util.Set<DokumentPrueflaufPort.Bekannt> bekannteDokumente(MandantCode mandant,
+                                                                                       java.util.Collection<String> keys) {
+                    return dokument.dateien().stream().filter(datei -> keys.contains(datei.schluessel()))
+                            .map(datei -> new DokumentPrueflaufPort.Bekannt(datei.schluessel(),
+                                    datei.versionId().orElseThrow()))
+                            .collect(java.util.stream.Collectors.toSet());
+                }
+
+                @Override
+                public java.util.Set<Version> bekannteManifeste(MandantCode mandant,
+                                                                 java.util.Collection<Objektversion> versionen) {
+                    return versionen.stream().filter(version -> version.schluessel().equals(complianceKey)
+                                    && version.versionId().equals(complianceVersion))
+                            .map(version -> new Version(version.schluessel(), version.versionId()))
+                            .collect(java.util.stream.Collectors.toSet());
+                }
+            };
+            Mandant mandant = new Mandant(probe, "Probe", probe.schema(), probeBucket,
+                    Geschaeftsjahresende.STANDARD, true);
+
+            try (var bericht = new Sperrpruefung(probeAblage, daten).pruefen(mandant, 3, ZWISCHENABLAGE)) {
+                assertThat(bericht.zaehler().get(Sperrpruefung.Abweichung.SPERRE_FEHLT)).isEqualTo(1);
+                assertThat(bericht.zaehler().get(Sperrpruefung.Abweichung.LOESCHEN_MOEGLICH)).isEqualTo(1);
+                assertThat(bericht.zaehler().get(Sperrpruefung.Abweichung.MODUS_ABWEICHEND)).isZero();
+            }
+            assertThat(probeAblage.pruefen(probe, ungesperrtKey, ungesperrtVersion)).isEmpty();
+            assertThat(probeAblage.pruefen(probe, governanceKey, governanceVersion)).isPresent();
+            assertThat(probeAblage.pruefen(probe, complianceKey, complianceVersion)).isPresent();
+        } finally {
+            TestBucket.aufraeumen(probeVerwaltung, probeBucket);
+            probeVerwaltung.close();
+        }
+    }
+
+    private static DokumentPrueflaufPort.Datei pruefDatei(String key, String version) {
+        return new DokumentPrueflaufPort.Datei(key, Optional.of(version), Optional.of("hash"), "original", 1, true);
+    }
+
+    private static String objekt(S3Client client, String bucket, String key) {
+        return client.putObject(b -> b.bucket(bucket).key(key), RequestBody.fromBytes(inhalt("synthetisch"))).versionId();
+    }
+
+    private static void retention(S3Client client, String bucket, String key, String version,
+                                  ObjectLockRetentionMode modus, Instant bis) {
+        client.putObjectRetention(b -> b.bucket(bucket).key(key).versionId(version)
+                .retention(r -> r.mode(modus).retainUntilDate(bis)));
     }
 
     @Test

@@ -81,6 +81,34 @@ public class JdbcManifestDaten implements ManifestDaten {
         return lesenStand("where datum = ?", java.util.Objects.requireNonNull(tag, "datum"));
     }
 
+    @Override
+    public List<Sperrpruefstand> sperrpruefstaende(Optional<LocalDate> nach, int anzahl) {
+        if (anzahl < 1) {
+            throw new IllegalArgumentException("Die Seitengrösse muss positiv sein");
+        }
+        String sql = "select datum, von, bis from " + schema()
+                + ".manifest" + (nach.isPresent() ? " where datum > ?" : "") + " order by datum limit ?";
+        try (Connection v = verbindung(); PreparedStatement p = v.prepareStatement(sql)) {
+            int parameter = 1;
+            if (nach.isPresent()) {
+                p.setObject(parameter++, nach.get());
+            }
+            p.setInt(parameter, anzahl);
+            try (ResultSet r = p.executeQuery()) {
+                List<Sperrpruefstand> ergebnis = new ArrayList<>();
+                while (r.next()) {
+                    OffsetDateTime von = r.getObject(2, OffsetDateTime.class);
+                    ergebnis.add(new Sperrpruefstand(r.getObject(1, LocalDate.class),
+                            Optional.ofNullable(von).map(OffsetDateTime::toInstant),
+                            r.getObject(3, OffsetDateTime.class).toInstant()));
+                }
+                return List.copyOf(ergebnis);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Manifeste nicht gelesen", e);
+        }
+    }
+
     private Optional<ManifestStand> lesenStand(String auswahl, LocalDate tag) {
         String s = schema();
         try (Connection v = verbindung()) {

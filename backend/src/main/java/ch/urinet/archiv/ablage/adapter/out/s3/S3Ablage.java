@@ -809,6 +809,22 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
+    public boolean loeschprobe(MandantCode mandant, String schluessel, String versionId) {
+        sicherungsBereichPruefen(schluessel, versionId);
+        try {
+            s3.deleteObject(b -> b.bucket(bucket(mandant)).key(schluessel).versionId(versionId));
+            return true;
+        } catch (S3Exception e) {
+            String code = fehlercode(e);
+            if (e.statusCode() == 400 && "InvalidRequest".equals(code)
+                    || e.statusCode() == 403 && "AccessDenied".equals(code)) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId,
                                                Instant bis) {
         bereichPruefen(schluessel, versionId);

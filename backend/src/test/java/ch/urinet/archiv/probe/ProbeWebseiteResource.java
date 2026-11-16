@@ -3,6 +3,8 @@ package ch.urinet.archiv.probe;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.integration.adapter.in.rest.webseite.LeseAnfrage;
+import ch.urinet.archiv.integration.adapter.in.rest.webseite.WebseitenGrenze;
+import ch.urinet.archiv.integration.domain.webseite.Grenzklasse;
 import ch.urinet.archiv.integration.application.webseite.FesterFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
@@ -49,6 +51,28 @@ public class ProbeWebseiteResource {
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
     public Map<String, String> erfassen() {
         return Map.of("probe", "erfasst");
+    }
+
+    /** Aufgabe 11.11: Beleg für die Grenze «Uploads je Stunde», bis die Erfassung (11.10) einen echten Upload hat. */
+    @POST
+    @Path("/erfassung/upload")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenGrenze(Grenzklasse.UPLOAD)
+    public Map<String, String> hochladen() {
+        return Map.of("probe", "hochgeladen");
+    }
+
+    /** Aufgabe 11.11: stuft wie die Suche ein (teure Anfrage), ohne Datenbank. */
+    @GET
+    @Path("/teuer")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
+    @WebseitenGrenze(Grenzklasse.SUCHE)
+    public Map<String, String> teuer() {
+        return Map.of("probe", "teuer");
     }
 
     /** Ungültiger Parameter → 400 {@code ANFRAGE_UNGUELTIG}, ohne den Wert zu nennen. */

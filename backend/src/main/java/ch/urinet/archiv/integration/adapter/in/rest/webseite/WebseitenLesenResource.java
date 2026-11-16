@@ -201,6 +201,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public ListeDto liste(@BeanParam LeseKopf kopf,
             @QueryParam("reihe") @Parameter(description = "Code der Reihe, z. B. aus /public/v1/filter") String reihe,
@@ -224,6 +225,7 @@ public class WebseitenLesenResource {
     @Path("/suche")
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
+    @WebseitenGrenze(ch.urinet.archiv.integration.domain.webseite.Grenzklasse.SUCHE)
     @Operation(summary = "Dokumente suchen",
             description = "Hybridsuche (Volltext und semantische Suche mit Reranker) über die Dokumente, die der feste "
                     + "Filter bis zur Stufe der Anfrage liefert, ohne Dateinamen. q ist Pflicht (höchstens 200 "
@@ -234,6 +236,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public SucheDto suchen(@BeanParam LeseKopf kopf,
             @QueryParam("q") @Parameter(required = true, description = "Suchbegriff (Websuche-Syntax), höchstens 200 "
@@ -258,6 +261,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "404", ref = "NichtGefunden")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public DetailsDto details(@BeanParam LeseKopf kopf, @PathParam("id") String id) {
@@ -290,6 +294,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "404", ref = "NichtGefunden")
     @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
@@ -339,6 +344,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public FilterDto filter(@BeanParam LeseKopf kopf) {
         List<WebseiteReihe> reihen = lesen.reihen(anfrage.zugriff());
@@ -359,6 +365,7 @@ public class WebseitenLesenResource {
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
     @APIResponse(responseCode = "401", ref = "NichtAngemeldet")
     @APIResponse(responseCode = "403", ref = "NichtErlaubt")
+    @APIResponse(responseCode = "429", ref = "ZuVieleAnfragen")
     @APIResponse(responseCode = "404", ref = "NichtGefunden")
     @APIResponse(responseCode = "503", ref = "Ueberlastet")
     public UmleitungDto umleitung(@BeanParam LeseKopf kopf, @QueryParam("url") @Parameter(required = true,
