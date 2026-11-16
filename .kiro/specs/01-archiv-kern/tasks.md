@@ -493,7 +493,8 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 5.5 Sicherung und Wiederherstellung [Infra] [Backend] [Fabian]
   - im Repository (`deploy/backup/`): täglicher Export von Archiv-Datenbank, Keycloak-Datenbank und Realm, Bucket (Original, Arbeitsfassung, PDF/A, Manifeste; Zuwachs seit dem letzten Export) und Manifest-Schlüssel; je Lauf ein Inventar mit Sperrmodus und `retainUntil` aller Versionen, nicht nur der neuen; der Server verschlüsselt mit `age` an zwei Empfänger (Sicherungsschlüssel offline, Probe-Schlüssel) und hält die SHA-256 jedes Exports für `probe-gate.sh` fest; dieselbe Liste gelangt ins Feld `sicherung` des nächsten Manifests (Weg im PR festlegen, design.md «Manifest»)
-  - Teil Backend des ersten Unterpunkts umgesetzt mit PR #174: Bucket-Inventar, Zuwachsexport, SHA-256-Register und Manifest-Anbindung; Shell, `age`, Dumps und Wiederherstellung bleiben offen
+  - Teil Backend des ersten Unterpunkts umgesetzt mit PR #174: Bucket-Inventar, Zuwachsexport, SHA-256-Register und Manifest-Anbindung
+  - Shell-Teil umgesetzt: `deploy/backup/taeglich.sh` erstellt atomare, doppelt mit `age` verschlüsselte Läufe mit Dumps, Realm, Manifest-Schlüssel, Inventar, Bucket-Zuwachs und SHA-256-Register; restic und Probe-Workflow bleiben Infra
   - `archiv.ueberwachung.sicherung-aktiv` bleibt standardmässig `false`; im prod-Deploy erst einschalten, wenn der tägliche Sicherungs-Workflow auf Stufe B aktiv ist (Deploy-Teil dieser Aufgabe)
   - Teil Wiederherstellungskern umgesetzt mit PR #194: Streaming-Leser, zweiphasiger Inventarabgleich, Sperrplan und Kommando; S3-Ziel und Anleitung folgen
   - Folge zu PR #174 (Nachbesserung Review PR #189): `zuwachs` prüft das Vorinventar vor dem Bucketstrom vollständig (Exit 2 ohne Ausgabe); bei `-` liegt es kurz als Temp-Datei im Arbeitsverzeichnis; dazu Heap-Nachweis (64 MiB, stromweise), S3-Seitengrenztest für gleichzeitige Versionen und Warnungstest für eine fehlende oder leere Sicherungsliste im Manifest
