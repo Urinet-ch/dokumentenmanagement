@@ -27,4 +27,17 @@ class IpAdresseTest {
     void ungueltigeAdresseBleibtLeer(String header) {
         assertThat(IpAdresse.aus(header)).isEmpty();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "203.0.113.7, 203.0.113.0",
+            "203.0.113.0, 203.0.113.0",
+            "2001:db8:1:2::5, 2001:db8:1:0:0:0:0:0",
+            "2001:db8:1:2:3:4:5:6, 2001:db8:1:0:0:0:0:0",
+            "::ffff:203.0.113.7, 203.0.113.0",
+            "::1, 0:0:0:0:0:0:0:0"})
+    void gekuerztOhnePersonenbezug(String adresse, String erwartet) {
+        // Spec 03, Req 5.4: das Protokoll des Datei-Links trägt nur die gekürzte Adresse
+        assertThat(IpAdresse.aus(adresse).orElseThrow().gekuerzt().text()).isEqualTo(erwartet);
+    }
 }

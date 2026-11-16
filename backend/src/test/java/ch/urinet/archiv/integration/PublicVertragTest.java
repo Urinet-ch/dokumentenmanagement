@@ -78,14 +78,15 @@ class PublicVertragTest {
 
     @Test
     void gegenprobeEndpunktNurImCodeIstRot() throws IOException {
-        assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), datei(vertrag)))
+        assertThat(PublicVertrag.unterschiede(code(GegenprobeResource.class, GegenprobeResource.Eintrag.class), nurGegenprobe(datei(vertrag))))
                 .containsExactly("/public/v1/gegenprobe/{id}: nur im Code");
     }
 
     @Test
     void gegenprobeEndpunktNurInDerDateiIstRot() {
-        assertThat(PublicVertrag.unterschiede(PublicVertrag.pfade(PublicVertrag.ausCode(hauptIndex, einstellungen)),
-                datei(gegenprobe))).containsExactly("/public/v1/gegenprobe/{id}: nur in der Datei");
+        // die Datei der Gegenprobe kennt nur ihren Endpunkt: die echten Endpunkte (Aufgabe 11.2) bleiben aussen vor
+        assertThat(PublicVertrag.unterschiede(nurGegenprobe(PublicVertrag.pfade(PublicVertrag.ausCode(hauptIndex,
+                einstellungen))), datei(gegenprobe))).containsExactly("/public/v1/gegenprobe/{id}: nur in der Datei");
     }
 
     @Test
@@ -129,8 +130,16 @@ class PublicVertragTest {
                 .containsExactly("/public/v1/gegenprobe/{id} get: Statuscode 4044");
     }
 
+    /** Beschreibung aus dem Code mit den Klassen der Gegenprobe, beschränkt auf deren Pfad. */
     private static Map<String, Object> code(Class<?>... zusaetzlich) throws IOException {
-        return PublicVertrag.pfade(PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich), einstellungen));
+        return nurGegenprobe(PublicVertrag.pfade(
+                PublicVertrag.ausCode(PublicVertrag.mit(hauptIndex, zusaetzlich), einstellungen)));
+    }
+
+    private static Map<String, Object> nurGegenprobe(Map<String, Object> pfade) {
+        Map<String, Object> ergebnis = new java.util.TreeMap<>(pfade);
+        ergebnis.keySet().removeIf(pfad -> !pfad.startsWith("/public/v1/gegenprobe"));
+        return ergebnis;
     }
 
     private static Map<String, Object> datei(String yaml) {
