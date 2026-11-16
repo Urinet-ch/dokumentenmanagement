@@ -48,14 +48,17 @@ public class DokumentZeigen {
     }
 
     /**
-     * Kürzt auf höchstens {@link #INHALT_MAX} Unicode-Zeichen (Codepoints, nie mitten in einem Surrogatpaar). Der
+     * Kürzt auf höchstens {@link #INHALT_MAX} Unicode-Zeichen (Codepoints, nie mitten in einem Surrogatpaar). Die Zahl
+     * zählt den Archivtext vor der Neutralisierung ({@code DokumentDaten.neutralisieren}), nicht das gerahmte Feld. Der
      * Aufrufer holt {@code INHALT_MAX + 1} Zeichen: ist es mehr als {@code INHALT_MAX}, war der Text länger.
      */
     static Inhalt kuerzen(String roh) {
         if (roh == null || roh.codePointCount(0, roh.length()) <= INHALT_MAX) {
             return new Inhalt(roh, false);
         }
-        return new Inhalt(roh.substring(0, roh.offsetByCodePoints(0, INHALT_MAX)), true);
+        String anfang = roh.substring(0, roh.offsetByCodePoints(0, INHALT_MAX));
+        // nur Leerraum im Anfang: wie bisher kein Inhalt (der Adapter verwirft Leerraum ebenfalls)
+        return anfang.isBlank() ? new Inhalt(null, false) : new Inhalt(anfang, true);
     }
 
     private static final Logger LOG = Logger.getLogger(DokumentZeigen.class);

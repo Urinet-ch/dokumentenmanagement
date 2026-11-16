@@ -64,4 +64,10 @@ class DokumentZeigenTest {
                 .isEqualTo("Dokumentinhalt gekürzt: nur der Anfang (4000 Zeichen); für weitere Stellen die Suche mit "
                         + "passenden Begriffen nutzen oder das Dokument öffnen");
     }
+
+    @Test
+    void gekuerzterAnfangNurAusLeerraumLiefertKeinenInhalt() {
+        String text = " ".repeat(DokumentZeigen.INHALT_MAX) + "Rechnung Nr. 5";
+        assertThat(DokumentZeigen.kuerzen(text)).isEqualTo(new DokumentZeigen.Inhalt(null, false));
+    }
 }
