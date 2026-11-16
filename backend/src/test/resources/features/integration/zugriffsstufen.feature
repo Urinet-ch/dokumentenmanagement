@@ -43,9 +43,11 @@ Funktionalität: Zugriffsstufen der Webseiten-Schnittstelle (Aufgabe 11.1)
 
   @req-5.9
   Szenariogrundriss: Eine gemeldete Stufe über der Stufe des Schlüssels ergibt 403 und nichts
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist für die Stufenprüfung gemerkt
     Wenn der Schlüssel «<schluessel>» «/public/v1/probe/dokumente» mit dem Header «X-Archiv-Zugriff» und dem Wert «<stufe>» aufruft
     Dann liefert das Archiv Status 403 und Fehlercode «NICHT_ERLAUBT»
     Und steht in der Antwort weder «stufentest» noch «vorstand-»
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag VERWEIGERT NICHT_ERLAUBT ohne Dokument, IP und Header-Werte
 
     Beispiele:
       | schluessel  | stufe      |
@@ -84,6 +86,36 @@ Funktionalität: Zugriffsstufen der Webseiten-Schnittstelle (Aufgabe 11.1)
     Wenn der Schlüssel «oeffentlich» «/public/v1/probe/stufe» mit dem Header «X-Archiv-Client» und dem Wert «192.0.2.1» aufruft
     Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und steht in der Antwort weder «192.0.2.1» noch «meldung»
+
+  @req-5.3
+  Szenariogrundriss: Ein Client-Hash, der nicht aus genau 64 Hexziffern in Kleinbuchstaben besteht, ergibt 400
+    Wenn der Schlüssel «oeffentlich» «/public/v1/probe/stufe» mit dem Header «X-Archiv-Client» und dem Wert «<hash>» aufruft
+    Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und steht in der Antwort weder «<hash>» noch «meldung»
+
+    Beispiele:
+      | hash                                                              |
+      | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde   |
+      | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0 |
+      | 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF  |
+      | 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg  |
+
+  @req-5.9
+  Szenario: Zwei Header X-Archiv-Client ergeben 400
+    Wenn der Schlüssel «oeffentlich» «/public/v1/probe/stufe» mit zwei Headern «X-Archiv-Client» und den Werten «0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef» und «0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef» aufruft
+    Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+
+  @req-5.9
+  Szenariogrundriss: Auf einem Erfassungs-Endpunkt bleiben die Lese-Header wirkungslos
+    Angenommen der Erfassungs-Schlüssel «erfassung» der Webseite «probe-stufen» im Mandanten «urinet» ist angelegt
+    Wenn der Schlüssel «erfassung» «/public/v1/probe/erfassung» per POST mit den Headern X-Archiv-Zugriff «<zugriff>» und X-Archiv-Client «192.0.2.1» aufruft
+    Dann liefert das Archiv Status 200
+
+    Beispiele:
+      | zugriff    |
+      | admin-4711 |
+      | vorstand   |
+      | Mitglieder |
 
   @req-3.6 @req-3.7
   Szenario: Der feste Filter liefert nur archivierte, veröffentlichte Dokumente der Vertraulichkeit NORMAL mit gültiger Stufe

@@ -18,6 +18,8 @@ import jakarta.inject.Inject;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +49,7 @@ public class ZugriffsstufenSchritte {
     private final Map<String, String> schluessel = new HashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
     private final Map<String, Dokument> dokumente = new LinkedHashMap<>();
+    private long protokollStand;
     private Response antwort;
     private Response vergleich;
 
@@ -88,7 +91,10 @@ public class ZugriffsstufenSchritte {
             dokumente.put(zeile.get("name"), new Dokument(mandant, id));
             List<String> felder = new ArrayList<>();
             if (!"-".equals(zeile.get("zugriff"))) {
-                felder.add("\"zugriff\": \"" + zeile.get("zugriff") + "\"");
+                // Bezeichner stehen als JSON-String, alles andere («1», «null», «["vorstand"]») roh
+                String zugriff = zeile.get("zugriff");
+                felder.add("\"zugriff\": " + (zugriff.matches("[a-z]+") && !"null".equals(zugriff)
+                        ? "\"" + zugriff + "\"" : zugriff));
             }
             String veroeffentlicht = zeile.get("veroeffentlicht");
             if (!"-".equals(veroeffentlicht)) {
@@ -104,6 +110,51 @@ public class ZugriffsstufenSchritte {
                 befehl.executeUpdate();
             }
         }
+    }
+
+    @Angenommen("der Erfassungs-Schlüssel «{word}» der Webseite «{word}» im Mandanten «{word}» ist angelegt")
+    public void erfassungsSchluessel(String name, String webseite, String mandant) {
+        String text = verwaltung.erstellen(mandant, webseite, "erfassung", null, false).token().text();
+        tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
+        schluessel.put(name, text);
+    }
+
+    @Angenommen("der Stand des Zugriffsprotokolls von «{word}» ist für die Stufenprüfung gemerkt")
+    public void protokollStand(String mandant) throws SQLException {
+        protokollStand = hoechsteProtokollId(mandant);
+    }
+
+    @Dann("das Zugriffsprotokoll von «{word}» hat genau einen neuen Eintrag VERWEIGERT NICHT_ERLAUBT ohne Dokument, IP und Header-Werte")
+    public void verweigerungProtokolliert(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage = verbindung.prepareStatement(
+                "select aktion, dokument_id::text, host(ip), details->>'fehlercode', details::text from "
+                        + new MandantCode(mandant).schema() + ".zugriff_protokoll where id > ?")) {
+            abfrage.setLong(1, protokollStand);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                assertThat(zeile.next()).as("ein neuer Eintrag").isTrue();
+                assertThat(zeile.getString(1)).isEqualTo("VERWEIGERT");
+                assertThat(zeile.getString(2)).as("Dokument").isNull();
+                assertThat(zeile.getString(3)).as("IP").isNull();
+                assertThat(zeile.getString(4)).isEqualTo("NICHT_ERLAUBT");
+                assertThat(zeile.getString(5)).as("Einzelheiten ohne Header-Wert").doesNotContain("vorstand")
+                        .doesNotContain("mitglieder").doesNotContain("192.0.2");
+                assertThat(zeile.next()).as("genau ein neuer Eintrag").isFalse();
+            }
+        }
+    }
+
+    private long hoechsteProtokollId(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement();
+             ResultSet zeile = befehl.executeQuery("select coalesce(max(id), 0) from "
+                     + new MandantCode(mandant).schema() + ".zugriff_protokoll")) {
+            zeile.next();
+            return zeile.getLong(1);
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» «{}» per POST mit den Headern X-Archiv-Zugriff «{}» und X-Archiv-Client «{}» aufruft")
+    public void postMitLeseHeadern(String name, String pfad, String zugriff, String client) {
+        antwort = anfrage(name).header("X-Archiv-Zugriff", zugriff).header("X-Archiv-Client", client).when().post(pfad);
     }
 
     @Wenn("der Schlüssel «{word}» «{}» ohne Stufen-Header aufruft")
