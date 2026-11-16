@@ -210,7 +210,8 @@ public class DokumenteSuchen {
                 }
                 case PartnerAufloesung.NichtGefunden n -> {
                     ohnePartner = true;
-                    partnerHinweis = PARTNER_TEXTSUCHE;
+                    // passt der Name nicht mehr in den Suchtext (zusammen), stimmt «Suche über den Namen» nicht
+                    partnerHinweis = zusammen(frage, partner).equals(frage) ? PARTNER_NICHT_GEFUNDEN : PARTNER_TEXTSUCHE;
                 }
             }
         }

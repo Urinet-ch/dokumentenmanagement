@@ -16,7 +16,10 @@ public final class DokumentDaten {
     public static final String ENDE = "Ende Dokumentinhalt";
 
     /** Das Schlüsselwort beider Begrenzer, auch getrennt durch Leerraum, Bindestrich oder unsichtbare Zeichen. */
-    private static final Pattern BEGRENZER = Pattern.compile("(?iu)dokument[\\s\\p{Cf}\\p{Pd}_]*inhalt");
+    private static final Pattern BEGRENZER = Pattern.compile("(?iU)dokument[\\s\\p{Cf}\\p{Pd}_]*inhalt");
+    /** Kopf der Metadaten von {@code dokument_zeigen}: ein Dokumenttext darf ihn nicht nachahmen (Spec 02, Req 5.3). */
+    public static final Pattern METADATEN_KOPF = Pattern.compile(
+            "(?iU)metadaten[\\s\\p{Cf}\\p{Pd}_]*\\((?:nicht[\\s\\p{Cf}]+)?best[aä]tigt\\)");
     private static final Pattern UNSICHTBAR = Pattern.compile("[\\p{Cf}\\p{Cc}&&[^\\n\\t]]");
 
     private DokumentDaten() {
@@ -36,6 +39,6 @@ public final class DokumentDaten {
      */
     static String neutralisieren(String text) {
         String sauber = UNSICHTBAR.matcher(text).replaceAll("");
-        return BEGRENZER.matcher(sauber).replaceAll("Dokument-Text");
+        return METADATEN_KOPF.matcher(BEGRENZER.matcher(sauber).replaceAll("Dokument-Text")).replaceAll("Metadaten-Text");
     }
 }
