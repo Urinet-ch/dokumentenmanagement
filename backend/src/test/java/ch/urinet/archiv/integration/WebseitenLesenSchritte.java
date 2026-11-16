@@ -522,10 +522,19 @@ public class WebseitenLesenSchritte {
     public void langsamLesen(String name, String dokument, String stufe) throws IOException, InterruptedException {
         assertThat(schluessel).containsKey(name);
         for (int versuch = 1; versuch <= 3; versuch++) {
-            langsamLesenEinmal(name, dokument, stufe);
-            if (gelesenBytes == streamKopf.laenge()) {
-                return;
+            try {
+                langsamLesenEinmal(name, dokument, stufe);
+                if (gelesenBytes == streamKopf.laenge()) {
+                    return;
+                }
+            } catch (IOException e) {
+                // Abbruch der Verbindung (z. B. Reset statt sauberem Ende) zählt wie ein vorzeitiges Ende
+                if (versuch == 3) {
+                    throw e;
+                }
             }
+            // Wiederholung sichtbar machen, damit die Häufigkeit der Flakiness in CI-Läufen erkennbar bleibt
+            System.out.println("langsamLesen: Versuch " + versuch + " vorzeitig beendet nach " + gelesenBytes + " Bytes, wiederhole");
             long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
             while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
                 Thread.sleep(50);
@@ -535,6 +544,7 @@ public class WebseitenLesenSchritte {
 
     private void langsamLesenEinmal(String name, String dokument, String stufe) throws IOException, InterruptedException {
         Runtime laufzeit = Runtime.getRuntime();
+        heapZuwachs = Long.MAX_VALUE; // unvollständige Messung ist sicher rot
         gc();
         long vorher = laufzeit.totalMemory() - laufzeit.freeMemory();
         MessageDigest digest = digest();
