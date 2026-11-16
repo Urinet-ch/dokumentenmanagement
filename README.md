@@ -13,6 +13,7 @@ Die Specs folgen dem Kiro-Format; umgesetzt wird mit Claude Code, nicht mit dem 
 - `.kiro/specs/02-abgleich-chat/` – Phase 2
 - `.kiro/specs/03-zweiter-mandant/` – Phase 3
 - `docs/umsetzungsplan.md` – Wellen, Crew, Gates, Zeitplan, Risiken
+- [Handbuch für Entwickler von Webseiten](docs/schnittstelle/handbuch.md) – serverseitige Anbindung an die Webseiten-Schnittstelle
 
 Eine Spec ist freigegeben, wenn Fabian den PR auf `main` merged. Start: `docs/umsetzungsplan.md`, Abschnitt 3.
 

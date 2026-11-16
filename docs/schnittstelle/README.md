@@ -4,6 +4,8 @@
 Hauptversion eine Datei (Spec 03, Requirement 11, ADR-014). Jede Webseite nutzt sie gleich und nur über diesen
 Vertrag; er gehört nicht in die App-Beschreibung `frontend/openapi/` und nicht in den Angular-Client.
 
+Für die praktische serverseitige Anbindung siehe [Handbuch für Entwickler von Webseiten](./handbuch.md).
+
 ## Regeln
 - Nur serverseitig: kein CORS, kein Schlüssel im Browser.
 - Innerhalb einer Hauptversion nur additiv: neue Endpunkte, neue optionale Parameter, neue Antwortfelder, neue Werte nur
