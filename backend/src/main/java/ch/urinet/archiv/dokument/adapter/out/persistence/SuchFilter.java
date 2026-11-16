@@ -1,6 +1,5 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
-import ch.urinet.archiv.integration.application.webseite.FesterFilter;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 
@@ -21,16 +20,10 @@ final class SuchFilter {
 
     /** Erste Bedingung ist die Sicht; die Werte landen in {@code parameter}. */
     static List<String> bedingungen(Suchanfrage a, Sichtregel regel, Map<String, Object> parameter) {
+        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
+        parameter.putAll(sicht.parameter());
         List<String> bedingungen = new ArrayList<>();
-        if (regel.istWebseite()) {
-            // Webseiten-Schnittstelle (Spec 03, 11.3): fester Filter statt Sicht der App, Stufen aus dem Lesezugriff
-            bedingungen.add(FesterFilter.bedingung("d"));
-            parameter.put(FesterFilter.PARAMETER, regel.webseitenStufen().toArray(String[]::new));
-        } else {
-            VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
-            parameter.putAll(sicht.parameter());
-            bedingungen.add(sicht.bedingung());
-        }
+        bedingungen.add(sicht.bedingung());
         filter(bedingungen, parameter, "d.art = :art", "art", a.art());
         filter(bedingungen, parameter, "d.partner_id = :partner", "partner", a.partner());
         filter(bedingungen, parameter, "d.datum >= :datumVon", "datumVon", a.datumVon());

@@ -9,24 +9,27 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Spec 03, Aufgabe 11.3: Die Suche der Webseite läuft über den festen Filter, nie über die Sicht der App. */
+/**
+ * Spec 03, Aufgabe 11.3: Die Suche der Webseite läuft mit der Sicht der Webseite ({@code Sichtregel.fuerWebseite}) über
+ * {@code SuchFilter}: Sicht (nur bestätigte {@code NORMAL}) und fester Filter ({@code veroeffentlicht}, Stufen), nie
+ * die Sicht eines App-Benutzers. Das Modell ist das von 11.2 ({@code VertraulichkeitFilterWebseiteTest}).
+ */
 class SuchFilterWebseiteTest {
 
     private static final Suchanfrage ANFRAGE = new Suchanfrage("seilbahn", null, null, null, null, null, null, null,
             null, null, null, null, null, 0, 5);
 
     @Test
-    void webseiteNimmtDenFestenFilterMitDenStufen() {
+    void webseiteNimmtSichtUndFestenFilterMitDenStufen() {
         Map<String, Object> parameter = new HashMap<>();
-        List<String> bedingungen = SuchFilter.bedingungen(ANFRAGE, Sichtregel.webseite(List.of("oeffentlich", "mitglieder")),
-                parameter);
-        assertThat(bedingungen.getFirst()).isEqualTo("(d.status = 'ARCHIVIERT' and d.vertraulichkeit = 'NORMAL' and "
-                + "d.zusatz -> 'veroeffentlicht' = 'true'::jsonb and d.zusatz ->> 'zugriff' = any(:stufen))");
+        List<String> bedingungen = SuchFilter.bedingungen(ANFRAGE, Sichtregel.fuerWebseite(
+                new Sichtregel.Webseite(List.of("oeffentlich", "mitglieder"), null, null)), parameter);
+        String sicht = bedingungen.getFirst();
+        assertThat(sicht).contains("d.bestaetigt is not null").contains("d.vertraulichkeit = 'NORMAL'")
+                .contains("d.status = 'ARCHIVIERT'").contains("d.zusatz -> 'veroeffentlicht' = 'true'::jsonb")
+                .contains("d.zusatz ->> 'zugriff' = any(:stufen)").doesNotContain("'INTERN'").doesNotContain("PERSONAL");
         assertThat((String[]) parameter.get("stufen")).containsExactly("oeffentlich", "mitglieder");
-        assertThat(String.join(" ", bedingungen)).doesNotContain("bestaetigt").doesNotContain("person_benutzer")
-                .doesNotContain(":benutzer");
     }
 
     @Test
@@ -37,12 +40,5 @@ class SuchFilterWebseiteTest {
                 parameter);
         assertThat(bedingungen.getFirst()).contains("d.bestaetigt is not null").doesNotContain("veroeffentlicht");
         assertThat(parameter).doesNotContainKey("stufen");
-    }
-
-    @Test
-    void dieWebseitenSichtGiltNurInDerSucheNichtInDerSichtDerApp() {
-        Sichtregel regel = Sichtregel.webseite(List.of("oeffentlich"));
-        assertThatThrownBy(() -> VertraulichkeitFilter.sql(regel, "d")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> VertraulichkeitFilter.fuer(regel)).isInstanceOf(IllegalArgumentException.class);
     }
 }

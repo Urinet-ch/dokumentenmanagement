@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 /**
  * Die beiden Werkzeuge des öffentlichen Chatbots (Spec 03, Req 6.1; design.md «OeffentlicherChatAgent»):
  * {@code dokumente_suchen} und {@code dokument_zeigen}, nur lesend, nur Dokumente, die der feste Filter bis zur Stufe des
- * {@link Lesezugriff} liefert. Zwei Schichten: Die Suche filtert in der Datenbank ({@link Sichtregel#webseite}), und jeder
+ * {@link Lesezugriff} liefert. Zwei Schichten: Die Suche filtert in der Datenbank ({@link Sichtregel#fuerWebseite}), und jeder
  * Treffer wird danach nochmals über {@link OeffentlicheDokumente} geprüft und dort mit Titel, Reihe und Ausgabe
  * angereichert; was der Filter nicht liefert, fehlt. Antworten tragen nur Titel, Reihe, Ausgabe, Jahr, Auszug und
  * Fundstelle: nie Stufe, Status, Vertraulichkeit, Dateiname, Partner, Beträge oder Belegnummern. Titel, Reihe und Ausgabe
@@ -106,7 +106,7 @@ public class OeffentlicheAbfragen {
             throw WerkzeugFehler.ungueltig("frage");
         }
         Lesezugriff zugriff = kontext.zugriff();
-        Sichtregel sicht = Sichtregel.webseite(zugriff.stufen());
+        Sichtregel sicht = Sichtregel.fuerWebseite(new Sichtregel.Webseite(zugriff.stufen(), null, null));
         Hybridergebnis ergebnis = hybridSuchen(anfrage, sicht, n);
         List<Suchtreffer> treffer;
         Map<UUID, String> fundstellen = new LinkedHashMap<>();

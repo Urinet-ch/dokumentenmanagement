@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
+import ch.urinet.archiv.integration.application.webseite.FesterFilter;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 
 import java.util.ArrayList;
@@ -32,6 +33,10 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
 
     /** HQL-Prädikat auf {@link DokumentEintrag} ohne Alias. */
     static VertraulichkeitFilter fuer(Sichtregel regel) {
+        if (regel.webseite() != null) {
+            // der feste Filter der Webseiten-Schnittstelle ist nur als SQL gebaut: lieber Fehler als eine zu weite Sicht
+            throw new IllegalStateException("Sichtregel der Webseite nur für SQL-Abfragen");
+        }
         return bauen(regel, HQL);
     }
 
@@ -40,15 +45,32 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
         if (!ALIAS.matcher(alias).matches()) {
             throw new IllegalArgumentException("Ungültiger Alias");
         }
-        return bauen(regel, new Spalten(alias + ".bestaetigt", alias + ".erstellt_von", alias + ".vertraulichkeit",
-                alias + ".person_benutzer"));
+        VertraulichkeitFilter sicht = bauen(regel, new Spalten(alias + ".bestaetigt", alias + ".erstellt_von",
+                alias + ".vertraulichkeit", alias + ".person_benutzer"));
+        return regel.webseite() == null ? sicht : webseite(sicht, regel.webseite(), alias);
+    }
+
+    /**
+     * Webseiten-Schnittstelle: die Sicht der Regel und dazu der feste Filter ({@link FesterFilter}) samt Parameter
+     * {@code stufen}; Jahr und Ausgabe als gebundene Werte.
+     */
+    private static VertraulichkeitFilter webseite(VertraulichkeitFilter sicht, Sichtregel.Webseite w, String alias) {
+        Map<String, Object> parameter = new HashMap<>(sicht.parameter());
+        StringBuilder bedingung = new StringBuilder(sicht.bedingung()).append(" and ")
+                .append(FesterFilter.bedingung(alias));
+        parameter.put(FesterFilter.PARAMETER, w.stufen().toArray(String[]::new));
+        if (w.jahr() != null) {
+            bedingung.append(" and ").append(alias).append(".zusatz ->> 'jahr' = :webJahr");
+            parameter.put("webJahr", w.jahr());
+        }
+        if (w.ausgabe() != null) {
+            bedingung.append(" and ").append(alias).append(".zusatz ->> 'ausgabe' = :webAusgabe");
+            parameter.put("webAusgabe", w.ausgabe());
+        }
+        return new VertraulichkeitFilter("(" + bedingung + ")", parameter);
     }
 
     private static VertraulichkeitFilter bauen(Sichtregel regel, Spalten s) {
-        if (regel.istWebseite()) {
-            // die Sicht der Webseiten-Schnittstelle gilt nur über den festen Filter der Suche (SuchFilter), nie hier
-            throw new IllegalArgumentException("Sicht der Webseiten-Schnittstelle ohne festen Filter");
-        }
         Map<String, Object> parameter = new HashMap<>();
         if (regel.uneingeschraenkt()) {
             return new VertraulichkeitFilter("1 = 1", parameter);

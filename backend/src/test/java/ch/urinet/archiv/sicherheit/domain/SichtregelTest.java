@@ -34,10 +34,10 @@ class SichtregelTest {
     }
 
     @Test
-    void webseitenSichtHatKeinenBenutzerKeineRechteUndDieStufen() {
-        Sichtregel regel = Sichtregel.webseite(java.util.List.of("oeffentlich", "mitglieder"));
-        assertThat(regel.istWebseite()).isTrue();
-        assertThat(regel.webseitenStufen()).containsExactly("oeffentlich", "mitglieder");
+    void webseitenSichtSiehtNurNormalBestaetigtMitDenStufenOhneEingangskorb() {
+        Sichtregel regel = Sichtregel.fuerWebseite(new Sichtregel.Webseite(java.util.List.of("oeffentlich", "mitglieder"), null, null));
+        assertThat(regel.webseite().stufen()).containsExactly("oeffentlich", "mitglieder");
+        assertThat(regel.normal()).isTrue();
         assertThat(regel.intern()).isFalse();
         assertThat(regel.personal()).isEqualTo(Sichtregel.Personal.KEINE);
         assertThat(regel.unbestaetigt()).isEqualTo(Sichtregel.Unbestaetigt.KEINE);
@@ -46,15 +46,13 @@ class SichtregelTest {
 
     @Test
     void webseitenSichtOhneStufenIstVerboten() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> Sichtregel.webseite(java.util.List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> Sichtregel.webseite(null))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new Sichtregel.Webseite(java.util.List.of(), null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void appSichtIstKeineWebseitenSicht() {
+    void appSichtHatKeinenFestenFilter() {
         assertThat(new Sichtregel("t", Sichtregel.Unbestaetigt.ALLE, true, true, Sichtregel.Personal.ALLE, false)
-                .istWebseite()).isFalse();
+                .webseite()).isNull();
     }
 }
