@@ -15,7 +15,7 @@ class FesterFilterTest {
     @Test
     void bedingungNenntAlleVierPraedikate() {
         assertThat(FesterFilter.bedingung("d")).isEqualTo("(d.status = 'ARCHIVIERT' and d.vertraulichkeit = 'NORMAL' "
-                + "and d.zusatz ->> 'veroeffentlicht' = 'true' and d.zusatz ->> 'zugriff' = any(:stufen))");
+                + "and d.zusatz -> 'veroeffentlicht' = 'true'::jsonb and d.zusatz ->> 'zugriff' = any(:stufen))");
     }
 
     @Test
