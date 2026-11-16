@@ -104,6 +104,38 @@
       "aktiv": true
     },
     {
+      "code": "JAHRESBERICHT",
+      "name": "Jahresbericht",
+      "beschreibung": "Jahresbericht des Verbands.",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "jahr": {"type": "integer"},
+          "verband": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["vhf", "gsk"]},
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": ["oeffentlich", "mitglieder", "vorstand"],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {"type": "boolean", "default": false}
+        },
+        "required": ["jahr", "verband", "zugriff", "veroeffentlicht"],
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "aufbewahrung_ab": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true
+    },
+    {
       "code": "MERKBLATT",
       "name": "Merkblatt",
       "beschreibung": "Merkblatt für Mitglieder oder die Öffentlichkeit.",

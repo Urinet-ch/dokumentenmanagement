@@ -23,10 +23,17 @@ class VhfGskDokumentartSeedTest {
 
         JsonNode arten = seed.path("dokumentarten");
         JsonNode hinweise = seed.path("_hinweise");
-        assertThat(arten).hasSize(6);
+        assertThat(arten).hasSize(7);
         assertThat(arten).extracting(art -> art.path("code").asText())
                 .containsExactlyInAnyOrder("BULLETIN", "NORM_RICHTLINIE", "VORSTANDSPROTOKOLL", "MERKBLATT",
-                        "FORMULAR", "SONSTIGES");
+                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT");
+
+        assertThat(hinweise.path("verband").path("mehrfach").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("suchfilter").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("oeffentlich_filter").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("ki_vorschlag").asBoolean()).isFalse();
+        assertThat(hinweise.path("zugriff").path("nur_manuell").asBoolean()).isTrue();
+        assertThat(hinweise.path("veroeffentlicht").path("ki_vorschlag").asBoolean()).isFalse();
 
         for (JsonNode art : arten) {
             List<String> gruppen = new ArrayList<>();
@@ -37,16 +44,12 @@ class VhfGskDokumentartSeedTest {
             assertThat(eigenschaften.path("verband").path("type").asText()).isEqualTo("array");
             assertThat(texte(eigenschaften.path("verband").path("items").path("enum")))
                     .containsExactly("vhf", "gsk");
-            assertThat(hinweise.path("verband").path("mehrfach").asBoolean()).isTrue();
-            assertThat(hinweise.path("verband").path("suchfilter").asBoolean()).isTrue();
-            assertThat(hinweise.path("verband").path("oeffentlich_filter").asBoolean()).isTrue();
-            assertThat(hinweise.path("verband").path("ki_vorschlag").asBoolean()).isFalse();
             assertThat(texte(eigenschaften.path("zugriff").path("enum")))
                     .containsExactly("oeffentlich", "mitglieder", "vorstand");
             assertThat(eigenschaften.path("zugriff").path("default").asText()).isEqualTo("mitglieder");
-            assertThat(hinweise.path("zugriff").path("nur_manuell").asBoolean()).isTrue();
+            assertThat(texte(art.path("zusatz_schema").path("required")))
+                    .as(art.path("code").asText()).contains("verband", "zugriff", "veroeffentlicht");
             assertThat(eigenschaften.path("veroeffentlicht").path("default").asBoolean()).isFalse();
-            assertThat(hinweise.path("veroeffentlicht").path("ki_vorschlag").asBoolean()).isFalse();
         }
 
         JsonNode bulletin = finde(arten, "BULLETIN").path("zusatz_schema").path("properties");
@@ -54,6 +57,7 @@ class VhfGskDokumentartSeedTest {
         assertThat(bulletin.has("ausgabe")).isTrue();
         assertThat(bulletin.has("jahr")).isTrue();
         assertThat(bulletin.has("fachgebiet")).isTrue();
+        assertThat(finde(arten, "JAHRESBERICHT").path("zusatz_schema").path("properties").has("jahr")).isTrue();
         assertThat(finde(arten, "VORSTANDSPROTOKOLL").path("vertraulichkeit").asText()).isEqualTo("INTERN");
     }
 
