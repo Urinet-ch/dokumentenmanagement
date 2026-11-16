@@ -7,6 +7,7 @@ import ch.urinet.archiv.integration.application.webseite.FesterFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import io.quarkus.security.Authenticated;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -86,7 +87,7 @@ public class ProbeWebseiteResource {
     LeseAnfrage anfrage;
 
     @Inject
-    EntityManager em;
+    Instance<EntityManager> emQuelle;
 
     /** Aufgabe 11.1: gemeldete und wirksame Stufe der Anfrage und die Stufen für den Filter. */
     @GET
@@ -110,7 +111,7 @@ public class ProbeWebseiteResource {
     @Transactional
     @SuppressWarnings("unchecked")
     public List<String> dokumente() {
-        return em.createNativeQuery("select d.titel from dokument d where d.titel like 'stufentest-%' and "
+        return emQuelle.get().createNativeQuery("select d.titel from dokument d where d.titel like 'stufentest-%' and "
                         + FesterFilter.bedingung("d") + " order by d.titel")
                 .setParameter(FesterFilter.PARAMETER, FesterFilter.stufen(anfrage.zugriff())).getResultList();
     }
@@ -130,7 +131,7 @@ public class ProbeWebseiteResource {
         } catch (IllegalArgumentException e) {
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
-        List<String> titel = em.createNativeQuery("select d.titel from dokument d where d.id = :id and "
+        List<String> titel = emQuelle.get().createNativeQuery("select d.titel from dokument d where d.id = :id and "
                         + FesterFilter.bedingung("d"))
                 .setParameter("id", uuid)
                 .setParameter(FesterFilter.PARAMETER, FesterFilter.stufen(anfrage.zugriff())).getResultList();
