@@ -182,7 +182,7 @@ vorsignierten URL von `/datei` bei Stufe `oeffentlich`) und URLs von Seiten der 
   - Datei-Link: nur für Dokumente der Stufe `oeffentlich`: `DokumentDatei.herunterladen` mit der Sicht «fester Filter mit der einen Stufe `oeffentlich`» (liegt in jeder gemeldeten Stufe, ein höheres Dokument bleibt unsichtbar), PDF/A mit gespeicherter Versions-ID, `archiv.ablage.url-gueltigkeit` (5 Minuten), Dateiname der Adresse nur aus ID und Rolle. Jedes andere Dokument ist bis Aufgabe 11.8 404 `NICHT_GEFUNDEN` (der Stream für `mitglieder` und `vorstand` folgt dort). Protokoll `HERUNTERLADEN` in derselben Transaktion nach dem Signieren, mit Kennung des Schlüssels (`token:<id>`), Dokument-ID und der IP aus `X-Real-Ip` gekürzt (`IpAdresse.gekuerzt()`: IPv4 ohne letztes Byte, IPv6 auf 48 Bit), ohne Rolle, ohne Client-Hash und ohne Header-Werte; 404 schreibt keinen Eintrag. Die Antwort ist `{url, gueltigBis}`; `toString` nennt die Adresse nie.
   - Filter: `{reihen: [{code, name}]}`, nach Name sortiert: aktive Dokumentarten mit mindestens einem Dokument, das der feste Filter bis zur Stufe liefert. Die Klassifikationen mit `oeffentlich_filter` (Spec 05, Req 8.6) fehlen, weil Spec 05 im Code noch nicht besteht; das Feld kommt additiv, sobald es sie gibt.
   - Umleitung: `?url=` (Pfad oder URL, bis 2000 Zeichen) → `AlteUrl.normalisieren` (nur Pfad, ohne Schema, Host, Anfrage und Fragment, Prozent-Kodierung aufgelöst, NFC, doppelte Schrägstriche zusammengefasst, ohne abschliessenden Schrägstrich, Gross- und Kleinschreibung bleibt; ungültig 400) → Tabelle `alte_url(url text primary key, dokument_id uuid not null references dokument)` (Changeset `031-alte-url`; die Nummer 030 bleibt frei für parallele Aufgaben, die Tabelle füllt der Import in Aufgabe 10.5 mit derselben `AlteUrl`) → `{dokumentId}` nur, wenn das Dokument der feste Filter bis zur Stufe liefert, sonst 404.
-  - Fehler: 400, 401, 403 (nach `LeseZugriffFilter`), 404 (Details, Datei, Umleitung) und 503 `UEBERLASTET` stehen im Vertrag je Endpunkt; 429 `ZU_VIELE_ANFRAGEN` kommt mit den Grenzen (11.11 und 11.8), die Drosselung je IP mit Traefik (11.6, nicht hier). Die Suche verbraucht Embedding- und Reranker-Tokens (Zweck `SUCHE`, ohne Limit, Spec 02, Req 2.8); eine Grenze je Schlüssel gehört zu 11.11.
+  - Fehler: 400, 401, 403 (nach `LeseZugriffFilter`), 404 (Details, Datei, Umleitung) und 503 `UEBERLASTET` stehen im Vertrag je Endpunkt; 429 `ZU_VIELE_ANFRAGEN` kommt mit den Grenzen (11.11 umgesetzt, Abschnitt «Grenzen»; 11.8 für Streams), die Drosselung je IP mit Traefik (11.6, nicht hier). Die Suche verbraucht Embedding- und Reranker-Tokens (Zweck `SUCHE`, ohne Limit, Spec 02, Req 2.8); die Grenze je Schlüssel (strenger für die Suche) setzt 11.11 durch.
   - Entschieden von Fabian am 16.11.2026: `seite` 1-basiert (in Version 1 fest); Datei-Link nur `oeffentlich`, `mitglieder`/`vorstand` 404 bis 11.8 (11.8 vor dem Plugin-Download 11.5); Suche über Partner und Tags (Gewicht B) angenommen; 11.11 und 11.6 vor dem Livegang der Webseite von VHF/GSK, bis dahin nur Urinet und Testmandanten.
   - Nachweis: `features/integration/webseiten-lesen.feature` (`@req-5.1`, `5.2`, `5.3`, `5.4`, `5.5`, `5.8`, `5.9`, `5.10`, `5.11`, `15.3`, `15.4`) mit je einer Filterachse als eigenem Beispiel gegen alle Endpunkte; JUnit `AlteUrlTest`, `IpAdresseTest`, `VertraulichkeitFilterWebseiteTest`, `PublicVertragTest` (Code = Datei, Gegenprobe nur auf ihren Pfad beschränkt).
 - Fester Filter in allen Abfragen (geändert 13.11.2026, E-C; bisher `(zusatz->>'zugriff'='oeffentlich' OR :mitglied)`): `status='ARCHIVIERT' AND vertraulichkeit='NORMAL' AND zusatz -> 'veroeffentlicht' = 'true'::jsonb AND zusatz->>'zugriff' = ANY(:stufen)` mit `:stufen = min(gemeldete Stufe, Stufe des Schlüssels).bisUndMit()` (Requirement 3.4, 3.6, 3.7, 5.3). Seit 11.1 läuft der Vergleich als `jsonb` (siehe «Umsetzung (Aufgabe 11.1)»): Nur JSON-`true` zählt. `->> 'veroeffentlicht' = 'true'` liesse den String `"true"` durch und darf nicht kopiert werden; `ZUSATZ_UNGUELTIG` genügt als Sperre nicht, weil sie nur beim Schreiben greift, nicht bei bestehenden Zeilen.
@@ -326,6 +326,7 @@ Startwerte (Requirement 15.1; vorgeschlagen 13.11.2026, entschieden mit dem Merg
 | Grenze | Startwert | Antwort |
 | --- | --- | --- |
 | Anfragen je Lese-Schlüssel | 20/s, Spitze 100 (Token-Bucket) | 429 `ZU_VIELE_ANFRAGEN`, `Retry-After` |
+| Suche je Lese-Schlüssel (zusätzlich, strenger; Embedding und Reranker) | 2/s, Spitze 10 (Startwert 16.11.2026, vorsichtig geschätzt, Entscheid Fabian offen) | 429 `ZU_VIELE_ANFRAGEN`, `grund` `SUCHE` |
 | Anfragen je Erfassungs-Schlüssel | 5/s, Spitze 20 | 429 `ZU_VIELE_ANFRAGEN` |
 | Uploads je Erfassungs-Schlüssel | 120 je Stunde | 429 `ZU_VIELE_ANFRAGEN` |
 | Streams gesamt / je Schlüssel | 8 / 8 gleichzeitig (Leerlauf `PT30S`, Gesamtdauer `PT15M`) | 429 `ZU_VIELE_ANFRAGEN`, `Retry-After: 5` |
@@ -336,6 +337,51 @@ Startwerte (Requirement 15.1; vorgeschlagen 13.11.2026, entschieden mit dem Merg
 
 Die Zähler liegen im Speicher der API (eine Instanz); nach einem Neustart beginnen sie neu. Mehrere Instanzen sind
 nicht vorgesehen; kämen sie, brauchte es einen gemeinsamen Zähler (Open Points).
+
+Umsetzung (Aufgabe 11.11; Stand: Baustein und Lese-Endpunkte umgesetzt, Messung und echter Upload offen):
+- Baustein: `WebseitenGrenzen` (Paket `integration/application/webseite`, `@ApplicationScoped`) mit `TokenBucket`
+  (`integration/domain/webseite`, rechnet nur mit der übergebenen Zeit). Je Schlüssel-ID (Principal `token:<id>` der
+  angemeldeten Identität, nie ein Header-Wert) vier Buckets: Lesen, Suche, Erfassung, Uploads. Eine Anfrage nimmt aus allen
+  Buckets ihrer `Grenzklasse` je eine Marke oder aus keinem (eine abgelehnte kostet nichts): `LESEN` = Lesen; `SUCHE` =
+  Lesen und Suche; `ERFASSUNG` = Erfassung; `UPLOAD` = Erfassung und Uploads. Sperre: ein `synchronized` für alle
+  Schlüssel (die Rechnung dauert Nanosekunden).
+- Einhängen: `WebseitenGrenzenFilter` (Priorität `USER + 50`: nach `ZugangFilter`, vor `LeseZugriffFilter`) bei jedem
+  Endpunkt mit `@WebseitenZugang`; Klasse nach Scope (Lesen/Erfassung), strenger mit `@WebseitenGrenze(SUCHE|UPLOAD)`
+  (Suche trägt `SUCHE`; Endpunkt des Uploads in 11.10 trägt `UPLOAD`; bis dahin belegt ihn die Probe
+  `/public/v1/probe/erfassung/upload` in `src/test`). Interne Endpunkte ohne `@WebseitenZugang` berühren die Grenzen nie.
+  Die Prüfung läuft vor `LeseZugriffFilter`, damit auch Anfragen mit ungültigen Headern zählen.
+- Auslegungen: Der öffentliche Chat zählt als Lese-Anfrage im Bucket seines Schlüssels mit; seine Grenzen
+  (20 Fragen/h je Client-Hash, 600/h je Webseite, Gleichzeitigkeit, Monatsbudget) bleiben unverändert und sind eigene
+  Bausteine (`OeffentlicheGrenzen`). Die Suche zählt zusätzlich im Bucket «Lesen» (sie ist auch eine Lese-Anfrage). Uploads je
+  Stunde sind ein Bucket mit Fassungsvermögen = Stundenwert und gleichmässiger Auffüllung über die Stunde (kein festes
+  Stundenfenster: kein Stoss zum Stundenwechsel); der Stundenwert ist zugleich der erlaubte Stoss. Die Rotation eines
+  Schlüssels (zwei IDs während der Überlappung) verdoppelt für diese Zeit die Grenze der Webseite; hingenommen.
+- Antwort: `FachFehler` `ZuVieleAnfragen` (429 `ZU_VIELE_ANFRAGEN`, Problem Details, schon in Spec 01 eingetragen) mit
+  `Retry-After` = Sekunden bis zur nächsten Marke des knappsten Buckets (aufgerundet, mindestens 1, höchstens 3600) und
+  `grund` `ANFRAGEN`, `SUCHE` oder `UPLOADS`; die Antwort nennt weder Schlüssel noch Header-Wert. Der Vertrag
+  `public-v1.yaml` führt 429 mit `Retry-After` an allen lesenden Endpunkten und die Werte `ANFRAGEN` und `SUCHE` in `grund`.
+- Speicher: höchstens `archiv.webseite.grenzen.max-schluessel` (1000) Einträge; nur ein angemeldeter, gültiger Schlüssel legt
+  einen an. Ist die Tabelle voll, fliegen Einträge im Leerlauf (alle Buckets voll, also verlustfrei) hinaus, höchstens einmal je
+  Minute; reicht das nicht, teilen sich die weiteren Schlüssel einen Sammel-Eintrag (sie begrenzen sich dann gegenseitig, die
+  Tabelle wächst nie).
+- Neustart und mehrere Instanzen: Die Buckets liegen im Speicher des Prozesses (Stufe A hat eine Instanz). Nach einem Neustart
+  beginnt jeder Schlüssel mit vollem Bucket (ein Stoss ist wieder möglich, kein Dauerschaden); bei mehreren Instanzen gälte die
+  Grenze je Instanz (Open Points: gemeinsamer Zähler).
+- Fehler der Prüfung: Eine unerwartete Ausnahme in der Prüfung lässt die Anfrage durch (Log nur mit Klassennamen, Kennzahl
+  `archiv_webseite_grenze_ausgefallen_total`). Begründung: Sie rechnet nur im Speicher und kann ausser durch einen
+  Programmfehler nicht ausfallen; ein solcher soll die Webseite nicht abschalten, und die Anmeldung davor bleibt fail closed. Die
+  Drosselung je IP vor der API (11.6) und das Monatsbudget des Chats bleiben als weitere Schichten.
+- Kennzahl: `archiv_webseite_grenze_abgelehnt_total` mit dem einzigen Tag `grund` (`ANFRAGEN`, `SUCHE`, `UPLOADS`, alle von Beginn
+  an mit 0 angelegt); nie Schlüssel-ID, Webseite oder Client. Messung der Startwerte (Aufgabe): mit dem Livegang an dieser
+  Kennzahl und an den 429 im Zugriffs-Log der Webseite prüfen.
+- Einstellungen `archiv.webseite.grenzen.*` (`application.properties`): `lesen-je-sekunde` 20, `lesen-spitze` 100,
+  `suche-je-sekunde` 2, `suche-spitze` 10, `erfassung-je-sekunde` 5, `erfassung-spitze` 20, `uploads-je-stunde` 120,
+  `max-schluessel` 1000; ungültige Werte (Spitze unter 1, Rate 0) brechen den Start ab, ohne einen Wert zu nennen. Im Profil
+  `test` kleine Werte, damit die Szenarien die Grenze mit wenigen Anfragen erreichen.
+- Nachweis: `TokenBucketTest`, `WebseitenGrenzenTest` (Uhr-Attrappe: Auffüllen, Stoss, Suche strenger, Uploads, Speicher,
+  Fehlerverhalten), `features/integration/webseiten-grenzen.feature` (`@req-15.1`, `@req-6.4`: Schlüssel A begrenzt und B nicht,
+  Wechsel von `X-Archiv-Client` und `X-Archiv-Zugriff` umgeht nichts, `Retry-After`, Suche strenger, Uploads, Chat zählt mit
+  und behält seine Grenzen, interne Endpunkte unberührt, Kennzahl nur mit `grund`).
 
 ### WordPress-Plugin `wordpress/urinet-archiv-plugin`
 Nutzer des Vertrags `public-v1` (geändert 13.11.2026, E-B): Das Plugin nutzt nur, was in `docs/schnittstelle/public-v1.yaml`
