@@ -224,6 +224,9 @@ gh variable set ARCHIV_ALARM_EMPFAENGER_URINET -R Urinet-ch/dokumentenmanagement
   einrichten»). Bis beides nachgeführt ist, kann auch die Meldung «Mail-Eingang gestört» nicht ankommen, weil sie
   über dasselbe Konto geht; dann steht der Ausfall nur im Log.
 
+Welche Alarme es gibt, was sie bedeuten und welche Kennzahlen unter `/q/metrics` stehen, beschreibt
+[docs/alarme.md](docs/alarme.md).
+
 ### Frühwarnung vor knappem Speicher
 Die API prüft alle fünf Minuten Metaspace, Compressed Class Space und den Heap (nach der letzten Garbage Collection).
 Über der Schwelle steht eine WARN-Zeile «Speicher … knapp» im Log, und der Inhaber erhält je Bereich und Stufe eine
