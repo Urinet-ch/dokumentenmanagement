@@ -18,6 +18,8 @@ import java.util.logging.SimpleFormatter;
  */
 public final class LogMitschnitt implements AutoCloseable {
 
+    private static final String NACH_ABSCHALTEN = " [Error Occurred After Shutdown]";
+
     private final List<LogRecord> eintraege = new CopyOnWriteArrayList<>();
     private final SimpleFormatter format = new SimpleFormatter();
     private final Handler mithoerer = new Handler() {
@@ -62,8 +64,14 @@ public final class LogMitschnitt implements AutoCloseable {
         return text.toString();
     }
 
+    /**
+     * Nach dem Ende eines {@code @QuarkusMainTest} im selben Prozess hängt der LogManager an jede Nachricht
+     * {@value #NACH_ABSCHALTEN}; die Prüfung soll nicht davon abhängen, ob vorher ein solcher Test lief.
+     */
     public String nachricht(LogRecord eintrag) {
-        return eintrag instanceof ExtLogRecord ext ? ext.getFormattedMessage() : format.formatMessage(eintrag);
+        String text = eintrag instanceof ExtLogRecord ext ? ext.getFormattedMessage() : format.formatMessage(eintrag);
+        return text != null && text.endsWith(NACH_ABSCHALTEN)
+                ? text.substring(0, text.length() - NACH_ABSCHALTEN.length()) : text;
     }
 
     @Override
