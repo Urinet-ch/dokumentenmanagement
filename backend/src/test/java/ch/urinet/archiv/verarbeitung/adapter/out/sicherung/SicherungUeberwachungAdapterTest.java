@@ -79,6 +79,7 @@ class SicherungUeberwachungAdapterTest {
         assertThat(adapter.befunde()).isEmpty();
     }
 
+    /** Regressionsschutz (Charakterisierung): die Frist ist eine Dauer, keine Kalenderrechnung; kein belegter Fehler. */
     @Test
     void sicherungsfristIstAuchUeberSommerzeitUndZeitzonenwechselEineDauer() {
         Instant jetzt = Instant.parse("2026-03-29T01:30:00Z");

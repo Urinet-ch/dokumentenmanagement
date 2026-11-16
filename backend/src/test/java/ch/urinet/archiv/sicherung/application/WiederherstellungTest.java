@@ -198,6 +198,12 @@ class WiederherstellungTest {
             assertThat(falschesZiel.leerAufrufe).isZero();
         }
 
+        InMemoryZiel ohnePraefix = new InMemoryZiel(null, true);
+        Wiederherstellung.Ergebnis ohnePraefixAbgelehnt = new Wiederherstellung(ohnePraefix, UHR)
+                .wiederherstellen(MANDANT, List.of(inventar), datei, true);
+        assertThat(ohnePraefixAbgelehnt.exitCode()).isEqualTo(2);
+        assertThat(ohnePraefix.leerAufrufe).isZero();
+
         InMemoryZiel probeZiel = new InMemoryZiel("urinet-archiv-p-", true);
         Wiederherstellung.Ergebnis gekappt = new Wiederherstellung(probeZiel, UHR)
                 .wiederherstellen(MANDANT, List.of(inventar), datei, true);
@@ -221,6 +227,11 @@ class WiederherstellungTest {
         assertThat(ziel.reihenfolge).isEmpty();
     }
 
+    /**
+     * Die Idempotenz beruht auf dem Vertrag von {@code WiederherstellungsZiel.leer()}: nach einem Schreiben ist das
+     * Ziel nicht leer. Die Attrappe bildet das nach; gegen den echten Adapter belegt es
+     * {@code S3WiederherstellungTest#nichtLeresZielLiefertKeinenZustandFuerSchreiben}.
+     */
     @Test
     void zweiteAusfuehrungIstIdempotentUndSchreibtKeineWeitereVersion(@TempDir Path temp) throws Exception {
         Path datei = temp.resolve("strom.bin");
