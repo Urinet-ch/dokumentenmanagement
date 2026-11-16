@@ -49,6 +49,22 @@ class ArchitekturTest {
             "application", Set.of("application", "domain"),
             "adapter", Set.of("application", "domain"));
 
+    /**
+     * Req 14.5 (Spec 03, Aufgabe 11.9): Das Archiv ruft keine Webseite auf, keine ausgehenden Webhooks. Die Webseiten-
+     * Schnittstelle und der Änderungs-Feed bestehen nur aus Antworten auf Anfragen; kein HTTP-Client in
+     * {@code integration/webseite} (alle Schichten) und in den Klassen des Feeds.
+     */
+    @ArchTest
+    static final ArchRule keinHttpClientInDerWebseitenSchnittstelle = noClasses()
+            .that().resideInAnyPackage("ch.urinet.archiv.integration..webseite..")
+            .or().haveSimpleNameContaining("AenderungFeed")
+            .should().dependOnClassesThat().resideInAnyPackage("java.net.http..", "jakarta.ws.rs.client..",
+                    "org.eclipse.microprofile.rest.client..", "io.quarkus.restclient..", "io.vertx.ext.web.client..",
+                    "org.jboss.resteasy.reactive.client..", "org.apache.http..", "org.apache.hc..", "okhttp3..")
+            .orShould().dependOnClassesThat().haveFullyQualifiedName("java.net.HttpURLConnection")
+            .orShould().dependOnClassesThat().haveFullyQualifiedName("io.vertx.core.http.HttpClient")
+            .because("das Archiv ruft keine Webseite auf (Spec 03, Req 14.5)");
+
     /** {@code domain} hängt nur vom JDK und von Domain-Typen ab: kein Quarkus, Jakarta, JPA, Hibernate oder Jackson. */
     @ArchTest
     static final ArchRule domainOhneFramework = classes().that().resideInAPackage("ch.urinet.archiv..domain..")
