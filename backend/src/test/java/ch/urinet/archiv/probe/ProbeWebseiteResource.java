@@ -2,8 +2,14 @@ package ch.urinet.archiv.probe;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.integration.adapter.in.rest.webseite.LeseAnfrage;
+import ch.urinet.archiv.integration.application.webseite.FesterFilter;
+import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import io.quarkus.security.Authenticated;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -12,7 +18,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Probe der Webseiten-Schnittstelle nur für Tests (Spec 03, Aufgabe 11.6): erreichbar unter {@code /public/v1/probe}
@@ -72,5 +80,63 @@ public class ProbeWebseiteResource {
     @WebseitenZugang(WebseitenZugang.Art.LESEN)
     public void inhalt(String inhalt) {
         // nur die Grenze der Anfrage zählt
+    }
+
+    @Inject
+    LeseAnfrage anfrage;
+
+    @Inject
+    EntityManager em;
+
+    /** Aufgabe 11.1: gemeldete und wirksame Stufe der Anfrage und die Stufen für den Filter. */
+    @GET
+    @Path("/stufe")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
+    public Map<String, Object> stufe() {
+        Lesezugriff z = anfrage.zugriff();
+        return Map.of("gemeldet", z.gemeldeteStufe().code(), "hoechste", z.hoechsteStufe().code(),
+                "wirksam", z.wirksameStufe().code(), "stufen", z.stufen(), "webseite", z.webseite(),
+                "clientHash", z.clientHash().orElse(""));
+    }
+
+    /** Aufgabe 11.1: Titel der Dokumente, die der feste Filter für die Anfrage liefert (nur Testdokumente mit Titel). */
+    @GET
+    @Path("/dokumente")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public List<String> dokumente() {
+        return em.createNativeQuery("select d.titel from dokument d where d.titel like 'stufentest-%' and "
+                        + FesterFilter.bedingung("d") + " order by d.titel")
+                .setParameter(FesterFilter.PARAMETER, FesterFilter.stufen(anfrage.zugriff())).getResultList();
+    }
+
+    /** Aufgabe 11.1: ein Dokument über den festen Filter; was er nicht liefert, ist 404 {@code NICHT_GEFUNDEN}. */
+    @GET
+    @Path("/dokumente/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Authenticated
+    @WebseitenZugang(WebseitenZugang.Art.LESEN)
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, String> dokument(@PathParam("id") String id) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        List<String> titel = em.createNativeQuery("select d.titel from dokument d where d.id = :id and "
+                        + FesterFilter.bedingung("d"))
+                .setParameter("id", uuid)
+                .setParameter(FesterFilter.PARAMETER, FesterFilter.stufen(anfrage.zugriff())).getResultList();
+        if (titel.isEmpty()) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        return Map.of("titel", titel.getFirst());
     }
 }
