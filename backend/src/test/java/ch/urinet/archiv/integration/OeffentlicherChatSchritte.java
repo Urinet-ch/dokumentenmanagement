@@ -214,6 +214,13 @@ public class OeffentlicherChatSchritte {
         senden(frage, gespraech);
     }
 
+    @Wenn("die Webseite im selben Gespräch auf der Stufe «{word}» fragt: «{}»")
+    public void fragenAufAndererStufe(String stufe, String frage) throws Exception {
+        assertThat(gespraech).as("Gespräch der ersten Frage").isNotNull();
+        letzteStufe = stufe;
+        senden(frage, gespraech);
+    }
+
     @Wenn("ein anderer Client «{word}» im Gespräch des ersten Clients fragt: «{}»")
     public void fremdesGespraech(String client, String frage) throws Exception {
         assertThat(gespraech).as("Gespräch der ersten Frage").isNotNull();

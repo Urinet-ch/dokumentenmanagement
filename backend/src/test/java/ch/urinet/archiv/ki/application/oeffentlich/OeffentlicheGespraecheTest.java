@@ -75,6 +75,20 @@ class OeffentlicheGespraecheTest {
     }
 
     @Test
+    void einStufenwechselBeginntEinNeuesGespraech() {
+        OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
+        String client = "a".repeat(64);
+        Lesezugriff vorstand = new Lesezugriff("w", Zugriffsstufe.VORSTAND, Zugriffsstufe.VORSTAND, Optional.of(client));
+        Lesezugriff oeffentlich = zugriff("w", client);
+        UUID id = g.oeffnen(null, URINET, vorstand).id();
+        g.merken(id, URINET, vorstand, "Frage", "Antwort aus einem Vorstandsprotokoll");
+        var niedriger = g.oeffnen(id, URINET, oeffentlich);
+        assertThat(niedriger.id()).isNotEqualTo(id);
+        assertThat(niedriger.verlauf()).isEmpty();
+        assertThat(g.oeffnen(id, URINET, vorstand).verlauf()).hasSize(2);
+    }
+
+    @Test
     void unbekannteIdBeginntStillEinNeuesGespraech() {
         OeffentlicheGespraeche g = new OeffentlicheGespraeche(Duration.ofMinutes(30), 10, 6, new Uhr());
         UUID unbekannt = UUID.randomUUID();
