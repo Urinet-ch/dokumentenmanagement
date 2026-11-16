@@ -94,5 +94,7 @@ Funktionalität: Datei eines Dokuments herunterladen (Aufgabe 4.5)
       | inhaber-urinet           | D_NORMAL    | ansicht=vorschau          | 302    |                   | Ansicht Vorschau |
       | inhaber-urinet           | D_NORMAL    | ansicht=download          | 302    |                   | Ansicht Download |
       | inhaber-urinet           | D_NORMAL    | ansicht=inline            | 400    | ANFRAGE_UNGUELTIG | unbekannte Ansicht |
+      | inhaber-urinet           | D_NORMAL    | ansicht=VORSCHAU          | 400    | ANFRAGE_UNGUELTIG | Schreibweise gilt genau |
+      | inhaber-urinet           | D_NORMAL    | ansicht=vorschau; x=y     | 400    | ANFRAGE_UNGUELTIG | Zusatz im Wert |
     Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «mitarbeiter-urinet» für «D_INTERN»
     Und das Zugriffsprotokoll von «urinet» enthält kein HERUNTERLADEN von «inhaber-urinet» für «D_VERWORFEN»
