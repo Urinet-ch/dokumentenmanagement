@@ -52,8 +52,10 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 11 — Öffentliche Schnittstelle und Plugin (parallel)
 
-- [ ] 11.1 Webseiten-Schlüssel und Zugriffsstufen [Backend]
+- [x] 11.1 Webseiten-Schlüssel und Zugriffsstufen [Backend]
   - Geändert 13.11.2026 (E-B, E-C; bisher «Site-Key und Zugriffsstufen» mit `SiteKeyAuthMechanism`): Anmeldung der Lese-Schlüssel über `ApiTokenAuthMechanism` (Scopes aus Aufgabe 11.7), `@WebseitenZugang`, Header `X-Archiv-Zugriff` (drei Stufen, Kappung durch den Schlüssel, 403/400 nach 5.9) und `X-Archiv-Client`, Filter auf `veroeffentlicht`, `zugriff = ANY(:stufen)` und Vertraulichkeit `NORMAL`, 404 bei zu hoher Stufe, kein CORS; Domain-Typ `Zugriffsstufe`
+  - Vorstufe (entschieden von Fabian am 14.11.2026): mandantenneutral, vor Gate Phase 2 und Zuschlag; Schlüssel, Dokumente und Szenarien mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK
+  - Umsetzung (Spec-PR #211 für den Vorzieh-Entscheid; Umsetzungs-PR siehe PR-Text): wiederverwendbare Schicht ohne Endpunkte (die kommen mit 11.2): `Zugriffsstufe`, `Lesezugriff` (Domain), `FesterFilter` (Abfragebaustein), `LeseZugriffFilter` und `LeseAnfrage` (Header, Fehlerabbildung, Identität); Szenarien `@req-3.6`, `@req-3.7`, `@req-5.2`, `@req-5.3`, `@req-5.5`, `@req-5.6`, `@req-5.9` in `features/integration/zugriffsstufen.feature` gegen die Probe `/public/v1/probe/stufe|dokumente` (nur `src/test`); JUnit `ZugriffsstufeTest`, `FesterFilterTest`; Einzelheiten in design.md, «Umsetzung (Aufgabe 11.1)»
   - _Anforderungen: 3.6, 3.7, 5.2, 5.3, 5.5, 5.6, 5.9_
   - _Abhängig von: 11.7_
 
