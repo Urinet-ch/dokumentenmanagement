@@ -296,6 +296,10 @@ public class WebseitenLesenResource {
     public Response datei(@BeanParam LeseKopf kopf, @PathParam("id") String id,
                           @HeaderParam(REAL_IP) @Parameter(hidden = true) String ip,
                           @Context HttpServerRequest http) {
+        if (http.method() == io.vertx.core.http.HttpMethod.HEAD) {
+            // das Framework führte sonst den GET-Handler aus: Platz und Protokolleintrag, ohne dass je ein Byte fliesst
+            return Response.status(Response.Status.METHOD_NOT_ALLOWED).header(HttpHeaders.ALLOW, "GET").build();
+        }
         Auslieferung ergebnis = auslieferung.ausliefern(aufloesung.pruefen(), anfrage.zugriff(), uuid(id),
                 Optional.ofNullable(identitaet.getPrincipal().getName()), IpAdresse.aus(ip),
                 () -> http.response().close());
@@ -303,15 +307,21 @@ public class WebseitenLesenResource {
             case DateiAuslieferung.Link link -> Response.ok(new DateiLinkDto(link.url().url().toString(),
                     link.url().gueltigBis())).type(MediaType.APPLICATION_JSON_TYPE).build();
             case DateiAuslieferung.Strom strom -> {
-                StreamingOutput ausgabe = strom.lauf()::senden;
-                yield Response.ok(ausgabe, DateiAuslieferung.MEDIENTYP)
-                        .header(HttpHeaders.CONTENT_LENGTH, strom.lauf().laenge())
-                        .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-                        .header("X-Content-Type-Options", "nosniff")
-                        // ohne Dateinamen: der Name käme aus Daten (Req 13.5, Spec 01, 3.12)
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                        .header("Accept-Ranges", "none")
-                        .build();
+                try {
+                    StreamingOutput ausgabe = strom.lauf()::senden;
+                    yield Response.ok(ausgabe, DateiAuslieferung.MEDIENTYP)
+                            .header(HttpHeaders.CONTENT_LENGTH, strom.lauf().laenge())
+                            .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                            .header("X-Content-Type-Options", "nosniff")
+                            // ohne Dateinamen: der Name käme aus Daten (Req 13.5, Spec 01, 3.12)
+                            .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                            .header("Accept-Ranges", "none")
+                            .build();
+                } catch (RuntimeException e) {
+                    // der Lauf hält Platz und Speicherverbindung; ohne senden() gäbe sie sonst erst der Leerlauf frei
+                    strom.lauf().abbrechen();
+                    throw e;
+                }
             }
         };
     }

@@ -1,5 +1,15 @@
 package ch.urinet.archiv.integration.application.webseite;
 
+import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.ablage.domain.Ablageort;
+import ch.urinet.archiv.ablage.domain.DateiRolle;
+import ch.urinet.archiv.ablage.domain.DateiSchluessel;
+import ch.urinet.archiv.dokument.application.DokumentDatei;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
+import ch.urinet.archiv.integration.domain.webseite.Zugriffsstufe;
+import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
@@ -10,10 +20,13 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Proxy;
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -211,6 +224,7 @@ class DateiStreamTest {
 
         assertThat(lauf.ende()).isEqualTo(StreamLauf.Ende.ABBRUCH);
         assertThat(quelle.geschlossen).isTrue();
+        assertThat(quelle.abgebrochen).as("Speicherverbindung verworfen, nicht leergelesen").isTrue();
         assertThat(plaetze.belegt()).isZero();
         assertThat(plaetze.belegt("a")).isZero();
         assertThat(quelle.gelesen.get()).as("kein Weiterlesen nach dem Abbruch").isLessThan(10L * BLOCK);
@@ -444,5 +458,66 @@ class DateiStreamTest {
 
         assertThat(erhalten.get()).isEqualTo(5);
         assertThat(p.belegt()).isEqualTo(5);
+    }
+
+    @Test
+    void vollstaendigerStreamVerwirftDieSpeicherverbindungNicht() throws IOException {
+        Quelle quelle = new Quelle(2L * BLOCK);
+        StreamLauf lauf = lauf(quelle, "a", LANG, LANG, () -> {
+        });
+
+        lauf.senden(OutputStream.nullOutputStream());
+
+        assertThat(quelle.abgebrochen).isFalse();
+        assertThat(quelle.geschlossen).isTrue();
+    }
+
+    @Test
+    void abbrechenOhneSendenGibtPlatzUndSpeicherverbindungFrei() {
+        Quelle quelle = new Quelle(BLOCK);
+        StreamLauf lauf = lauf(quelle, "a", LANG, LANG, () -> {
+        });
+
+        lauf.abbrechen();
+
+        assertThat(quelle.abgebrochen).isTrue();
+        assertThat(plaetze.belegt()).isZero();
+    }
+
+    @Test
+    void speicherNichtErreichbarBeimOeffnenGibtPlatzFreiUndProtokolliertNicht() {
+        AtomicInteger protokolliert = new AtomicInteger();
+        var ziel = new WebseiteDatei.Stream(new DokumentDatei.Dateiort(Ablageort.values()[0],
+                new DateiSchluessel(2026, UUID.randomUUID(), DateiRolle.PDFA, 0, "pdf"), "v1"));
+        // ohne Mockito: Unterklasse ohne Datenbank und Proxy für den Port
+        WebseiteDatei datei = new WebseiteDatei(null, null, null) {
+            @Override
+            public Ziel vorbereiten(MandantCode mandant, Lesezugriff zugriff, UUID id, Optional<String> benutzer,
+                                    Optional<IpAdresse> ip) {
+                return ziel;
+            }
+
+            @Override
+            public void protokollieren(UUID id, Optional<String> benutzer, Optional<IpAdresse> ip) {
+                protokolliert.incrementAndGet();
+            }
+        };
+        AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
+                    throw new FachFehler(Fehlercode.SPEICHER_NICHT_ERREICHBAR);
+                });
+        DateiAuslieferung auslieferung = new DateiAuslieferung(datei, ablage, plaetze, new StreamWaechter(),
+                Duration.ofSeconds(30), LANG);
+
+        assertThatThrownBy(() -> auslieferung.ausliefern(new MandantCode("urinet"),
+                new Lesezugriff("w", Zugriffsstufe.values()[0], Zugriffsstufe.values()[0], Optional.empty()),
+                UUID.randomUUID(), Optional.of("schluessel"), Optional.empty(), () -> {
+                }))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        e -> assertThat(e.code()).isEqualTo(Fehlercode.SPEICHER_NICHT_ERREICHBAR));
+
+        assertThat(plaetze.belegt()).isZero();
+        assertThat(plaetze.belegt("schluessel")).isZero();
+        assertThat(protokolliert).hasValue(0);
     }
 }

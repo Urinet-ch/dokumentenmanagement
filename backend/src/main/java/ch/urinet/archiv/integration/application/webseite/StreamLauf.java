@@ -22,7 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Zwei Zeitlimits halten Plätze nicht ewig fest: {@code leerlauf} (kein Block weitergegeben) und {@code gesamt}
  * (Gesamtdauer ab Erstellung). Läuft eines ab, verwirft der Zeitgeber die Verbindung zum Speicher und zum Client
  * ({@code verbindungSchliessen}), damit ein blockiertes {@code read} oder {@code write} mit einer Ausnahme endet, und
- * gibt den Platz frei. Dasselbe tut {@link #senden(OutputStream)} in {@code finally}, wenn der Client abbricht oder der
+ * gibt den Platz frei. Dasselbe tut {@link #senden(OutputStream)} (verwirft die Speicherverbindung per {@code abbrechen}, gibt dann in
+ * {@code finally} den Platz frei), wenn der Client abbricht oder der
  * Speicher ausfällt; ein nie gestartetes {@code senden} erledigt der Zeitgeber nach dem Leerlauf. Der Lauf hält keine
  * Transaktion und keine Datenbankverbindung.
  */
@@ -105,10 +106,24 @@ public final class StreamLauf {
             if (ende == null) {
                 ende = Ende.ABBRUCH;
             }
+            // Client weg oder Speicher ausgefallen: Verbindung zum Speicher verwerfen, nicht den Rest lesen (Req 13.7)
+            strom.abbrechen();
             throw e;
         } finally {
             freigeben();
             LOG.debugf("Stream beendet: %s, %d von %d Bytes", ende, gesendet, strom.laenge());
+        }
+    }
+
+    /** Für einen Lauf, dessen {@link #senden} nie beginnt (Fehler beim Bauen der Antwort): Speicher verwerfen, freigeben. */
+    public void abbrechen() {
+        if (ende == null) {
+            ende = Ende.ABBRUCH;
+        }
+        try {
+            strom.abbrechen();
+        } finally {
+            freigeben();
         }
     }
 

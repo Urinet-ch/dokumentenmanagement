@@ -221,6 +221,7 @@ paths:
         Jeder Abruf wird mit gekürzter IP protokolliert, bevor er beginnt; ein abgelehnter (404, 429, 503) nicht.
         Ein Dokument über der Stufe der Anfrage oder ein unsichtbares Dokument ist 404 `NICHT_GEFUNDEN`; ist der Speicher
         nicht erreichbar, 503 `SPEICHER_NICHT_ERREICHBAR` mit `Retry-After`.
+        HEAD wird nicht bedient (405 mit `Allow: GET`): ein Abruf ohne Körper hielte sonst Platz und Protokolleintrag.
       parameters:
       - name: id
         in: path

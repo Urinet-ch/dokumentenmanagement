@@ -152,6 +152,15 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
     Dann belegt die API noch 1 Plätze für Streams
     Und sind nach höchstens 10 Sekunden alle Plätze für Streams wieder frei
 
+  @req-13.7
+  Szenario: Eine HEAD-Anfrage hält weder einen Platz noch schreibt sie ein Protokoll
+    Angenommen das Dokument «b3» hat eine Datei von 32 MB
+    Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «b3» mit der Stufe «mitglieder» per HEAD abfragt
+    Dann antwortet die Lese-Schnittstelle mit Status 405
+    Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
+    Und belegt die API noch 0 Plätze für Streams
+
   @req-13.3
   Szenario: Messfall 50 MB an einen langsamen Client: die Datei kommt vollständig an, ohne dass die API sie im Speicher hält
     Angenommen das Dokument «b3» hat eine Datei von 50 MB

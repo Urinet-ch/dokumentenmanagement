@@ -483,6 +483,12 @@ public class WebseitenLesenSchritte {
                 .get("/public/v1/dokumente/" + dokumente.get(dokument).id() + "/datei");
     }
 
+    @Wenn("der Webseiten-Lesezugang «{word}» die Datei des Dokuments «{word}» mit der Stufe «{word}» per HEAD abfragt")
+    public void dateiMitHead(String name, String dokument, String stufe) {
+        antwort = anfrage(name).header("X-Archiv-Zugriff", stufe).when()
+                .head("/public/v1/dokumente/" + dokumente.get(dokument).id() + "/datei");
+    }
+
     @Wenn("der Webseiten-Lesezugang «{word}» einen Stream für «{word}» mit der Stufe «{word}» öffnet und nur den Anfang liest")
     public void streamOeffnen(String name, String dokument, String stufe) throws IOException {
         assertThat(schluessel).containsKey(name);
