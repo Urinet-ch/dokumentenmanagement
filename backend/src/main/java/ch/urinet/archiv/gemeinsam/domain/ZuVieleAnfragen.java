@@ -11,7 +11,13 @@ public class ZuVieleAnfragen extends FachFehler {
         /** Stundenlimit der Gespräche erreicht. */
         STUNDENLIMIT,
         /** Ein Gespräch des Benutzers (oder die Höchstzahl der Instanz) läuft noch. */
-        LAEUFT
+        LAEUFT,
+        /** Grenze je Webseiten-Schlüssel (Spec 03, 11.11): Anfragen insgesamt. */
+        ANFRAGEN,
+        /** Grenze je Webseiten-Schlüssel: die teure Suche (Embedding und Reranker). */
+        SUCHE,
+        /** Grenze je Erfassungs-Schlüssel: Uploads je Stunde. */
+        UPLOADS
     }
 
     private final Grund grund;

@@ -168,6 +168,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
   "/public/v1/dokumente/{id}":
@@ -197,6 +199,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '404':
           "$ref": "#/components/responses/NichtGefunden"
         '503':
@@ -229,6 +233,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '404':
           "$ref": "#/components/responses/NichtGefunden"
         '503':
@@ -255,6 +261,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
   "/public/v1/suche":
@@ -302,6 +310,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
   "/public/v1/umleitung":
@@ -333,6 +343,8 @@ paths:
           "$ref": "#/components/responses/NichtAngemeldet"
         '403':
           "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '404':
           "$ref": "#/components/responses/NichtGefunden"
         '503':
@@ -386,10 +398,14 @@ components:
         grund:
           type: string
           x-erweiterbar: true
-          enum: [STUNDENLIMIT, LAEUFT]
+          enum: [STUNDENLIMIT, LAEUFT, ANFRAGEN, SUCHE, UPLOADS]
           description: |
-            Nur bei `ZU_VIELE_ANFRAGEN` des Chats: `STUNDENLIMIT` (Stundengrenze je Client oder Webseite erreicht) oder
-            `LAEUFT` (schon eine Frage dieses Clients läuft, `Retry-After` höchstens 5 Sekunden).
+            Nur bei `ZU_VIELE_ANFRAGEN`: im Chat `STUNDENLIMIT` (Stundengrenze je Client oder Webseite erreicht) oder
+            `LAEUFT` (schon eine Frage dieses Clients läuft, `Retry-After` höchstens 5 Sekunden); an den lesenden
+            Endpunkten `ANFRAGEN` (Grenze des Schlüssels erreicht) oder `SUCHE` (strengere Grenze der Suche erreicht).
+            `UPLOADS` (Uploads je Stunde eines Erfassungs-Schlüssels, mit Aufgabe 11.10).
+            Die Grenze gilt je Schlüssel, nicht je Besucher: Wechselnde Werte von `X-Archiv-Client` oder
+            `X-Archiv-Zugriff` umgehen sie nicht.
         fehlercode:
           type: string
           description: Stabiler Fehlercode; neue Codes sind additiv.
@@ -805,8 +821,10 @@ components:
             $ref: "#/components/schemas/Problem"
     ZuVieleAnfragen:
       description: |
-        Grenze überschritten. `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Sekunden bis zum nächsten Versuch) und im Chat dem
-        Feld `grund`; `BUDGET` (nur Chat): Token-Budget des Mandanten im Monat erschöpft, ohne `Retry-After`; die
+        Grenze überschritten. `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Sekunden bis zum nächsten Versuch, höchstens 3600)
+        und dem Feld `grund`; an den lesenden Endpunkten gilt eine Grenze je Schlüssel (Token-Bucket; die Suche hat eine
+        strengere eigene; die Werte gehören dem Betreiber, nicht dem Vertrag), die Webseite wartet die genannte Zeit
+        ab und zeigt bis dahin ihren Zwischenspeicher; `BUDGET` (nur Chat): Token-Budget des Mandanten im Monat erschöpft, ohne `Retry-After`; die
         Webseite zeigt dann «Der Chatbot ist diesen Monat ausgelastet – die Suche funktioniert weiterhin.».
       headers:
         Retry-After:
