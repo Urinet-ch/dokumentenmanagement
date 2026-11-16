@@ -31,5 +31,6 @@
     <include file="changesets/027-chat.xml" relativeToChangelogFile="true"/>
     <include file="changesets/028-dokument-volltext-ohne-dateiname.xml" relativeToChangelogFile="true"/>
     <include file="changesets/029-export-fehlerart.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/030-oeffentliche-frage.xml" relativeToChangelogFile="true"/>
     <include file="changesets/031-alte-url.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

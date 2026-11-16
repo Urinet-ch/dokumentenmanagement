@@ -109,6 +109,32 @@ class SicherungBucketExportTest {
     }
 
     @Test
+    void inventarUndStromBewahrenUnicodeLeerzeichenUndZeilenumbruecheImSchluessel() throws Exception {
+        String schluessel = "archiv/ü 2026/\n\"synthetisch.pdf";
+        Eintrag eintrag = eintrag(schluessel, "u1", false, "synthetischer Inhalt", null);
+        SicherungBucketExport export = new SicherungBucketExport(ablage(List.of(eintrag)));
+        List<InventarZeile> inventar = new ArrayList<>();
+
+        export.inventar(MANDANT, inventar::add);
+
+        assertThat(inventar).singleElement().satisfies(zeile -> {
+            assertThat(zeile.schluessel()).isEqualTo(schluessel);
+            String json = new ObjectMapper().valueToTree(zeile).toString();
+            assertThat(json).contains("\\n").doesNotContain("\n");
+        });
+        var abgleich = new InventarAbgleich(new StringReader(new ObjectMapper().writeValueAsString(inventar.getFirst())
+                + "\n"), new ObjectMapper());
+        assertThat(abgleich.test(eintrag.version())).isFalse();
+        abgleich.vollstaendigPruefen();
+
+        ByteArrayOutputStream ausgabe = new ByteArrayOutputStream();
+        export.zuwachs(MANDANT, version -> true, ausgabe);
+
+        assertThat(leseObjekte(ausgabe.toByteArray()))
+                .containsExactly(schluessel + "@u1:" + eintrag.sha256());
+    }
+
+    @Test
     void exportiertEinFuenfzigMiBObjektOhneEsImSpeicherZuPuffern() throws Exception {
         long groesse = 50L * 1024 * 1024;
         Eintrag eintrag = nullBytes("archiv/gross", "v1", groesse);

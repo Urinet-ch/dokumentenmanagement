@@ -111,7 +111,7 @@ damit ich Merkblätter nicht durchblättern muss.
 2. Jede Antwort SOLL auf die verwendeten Publikationen mit Titel, Reihe, Ausgabe und Link zur Dokumentseite verweisen. Spec 03, 5.11 ergänzt dieses Kriterium (13.11.2026, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR): Das Archiv liefert je Quelle `dokumentId`, Titel, Reihe und Ausgabe; den Link auf die Dokumentseite bildet die Webseite (umgesetzt in Aufgaben 11.3 und 11.5).
 3. FALLS keine passende Publikation gefunden wird, DANN SOLL der Chatbot das sagen und auf die Geschäftsstelle (`gs@vhf-gsk.ch`) verweisen.
 4. Das Archiv SOLL pro Client (gehashte IP, von der Webseite übermittelt) höchstens 20 Fragen pro Stunde und pro Mandant ein konfigurierbares monatliches Token-Budget zulassen; bei Überschreitung SOLL der Chatbot freundlich ablehnen (geändert 13.11.2026, entschieden von Fabian, E-B; bisher «von WordPress übermittelt»). Spec 03, 15.1 ergänzt (13.11.2026, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR): Zusätzlich gilt die Grenze je Lese-Schlüssel.
-5. Der Chatbot SOLL keine Gesprächsinhalte mit Personenbezug speichern; gespeichert werden Frage, Quellen und Tokens für 90 Tage.
+5. Der Chatbot SOLL keine Gesprächsinhalte mit Personenbezug speichern; gespeichert werden Frage, Quellen und Tokens für 90 Tage (geändert 16.11.2026, entschieden von Fabian: Standard 90 Tage, je Mandant einstellbar von 1 bis 365 Tagen; für VHF/GSK 30 Tage laut Zusage an den Verband).
 
 ### Requirement 7: WordPress-Plugin (M4)
 **User Story:** Als Redaktor der Verbandsseite möchte ich Archiv, Suche und Chatbot per Shortcode oder Block einfügen,

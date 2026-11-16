@@ -5,6 +5,7 @@ import ch.urinet.archiv.ki.application.chat.ChatAnfrage;
 import ch.urinet.archiv.ki.domain.chat.ChatEreignis;
 import ch.urinet.archiv.ki.domain.chat.ChatRolle;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.ChatMemory;
@@ -35,6 +36,7 @@ final class AgentLauf {
 
     private final UUID id;
     private final ChatAnfrage anfrage;
+    private final MandantCode mandant;
     private final Consumer<ChatEreignis> ausgabe;
     private final ChatAbbruch abbruch;
     private final CompletableFuture<Void> fertig = new CompletableFuture<>();
@@ -47,12 +49,23 @@ final class AgentLauf {
     private volatile StreamingHandle handle;
 
     AgentLauf(UUID id, ChatAnfrage anfrage, Consumer<ChatEreignis> ausgabe, ChatAbbruch abbruch, int fenster) {
+        this(id, anfrage, anfrage.mandant(), anfrage.verlauf(), ausgabe, abbruch, fenster);
+    }
+
+    /** Durchgang des öffentlichen Chatbots (Spec 03, 11.3): kein Benutzer, nur Mandant und Verlauf. */
+    AgentLauf(UUID id, MandantCode mandant, List<VerlaufEintrag> verlauf, Consumer<ChatEreignis> ausgabe,
+              ChatAbbruch abbruch, int fenster) {
+        this(id, null, mandant, verlauf, ausgabe, abbruch, fenster);
+    }
+
+    private AgentLauf(UUID id, ChatAnfrage anfrage, MandantCode mandant, List<VerlaufEintrag> verlauf,
+                      Consumer<ChatEreignis> ausgabe, ChatAbbruch abbruch, int fenster) {
         this.id = id;
         this.anfrage = anfrage;
+        this.mandant = mandant;
         this.ausgabe = ausgabe;
         this.abbruch = abbruch;
         this.speicher = MessageWindowChatMemory.withMaxMessages(fenster + REICHWEITE_DURCHGANG);
-        List<VerlaufEintrag> verlauf = anfrage.verlauf();
         verlauf = VerlaufEintrag.normalisieren(verlauf.subList(Math.max(0, verlauf.size() - fenster), verlauf.size()));
         for (VerlaufEintrag e : verlauf) {
             speicher.add(e.rolle() == ChatRolle.BENUTZER ? UserMessage.from(e.inhalt()) : AiMessage.from(e.inhalt()));
@@ -65,6 +78,10 @@ final class AgentLauf {
 
     ChatAnfrage anfrage() {
         return anfrage;
+    }
+
+    MandantCode mandant() {
+        return mandant;
     }
 
     ChatMemory speicher() {
