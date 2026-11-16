@@ -9,6 +9,7 @@ import ch.urinet.archiv.integration.domain.webseite.WebseiteReihe;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSeite;
 import ch.urinet.archiv.integration.domain.webseite.WebseiteSortierung;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
@@ -60,10 +61,11 @@ public class SqlWebseitenLese implements WebseitenLesePort {
     private static final String FEST = FesterFilter.bedingung("d") + " and d.bestaetigt is not null";
     private static final Pattern JAHR = Pattern.compile("^[0-9]{4}$");
 
-    private final EntityManager em;
+    // lazy: ohne Datenquelle (Start ohne Datenbank) ist der EntityManager nicht aktiv, der Start darf daran nicht scheitern
+    private final Instance<EntityManager> em;
     private final Duration zeitgrenze;
 
-    public SqlWebseitenLese(EntityManager em, @ConfigProperty(name = "archiv.suche.zeitgrenze") Duration zeitgrenze) {
+    public SqlWebseitenLese(Instance<EntityManager> em, @ConfigProperty(name = "archiv.suche.zeitgrenze") Duration zeitgrenze) {
         this.em = em;
         this.zeitgrenze = zeitgrenze;
     }
@@ -164,12 +166,12 @@ public class SqlWebseitenLese implements WebseitenLesePort {
     }
 
     private void vorbereiten() {
-        em.createNativeQuery("select set_config('statement_timeout', :ms, true)")
+        em.get().createNativeQuery("select set_config('statement_timeout', :ms, true)")
                 .setParameter("ms", Long.toString(zeitgrenze.toMillis())).getSingleResult();
     }
 
     private Query abfrage(String sql, Map<String, Object> parameter) {
-        Query q = em.createNativeQuery(sql);
+        Query q = em.get().createNativeQuery(sql);
         parameter.forEach(q::setParameter);
         return q;
     }
