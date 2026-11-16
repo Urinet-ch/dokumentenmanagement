@@ -5,7 +5,23 @@ info:
   description: |
     Vertrag der Webseiten-Schnittstelle unter `/public/v1` (Hauptversion 1), gleich für jede Webseite
     (Spec 03, Requirement 11, ADR-014). Endpunkte kommen additiv mit den Aufgaben, die sie bauen; diese Fassung
-    beschreibt Anmeldung, Fehler, Header und Versionierung.
+    beschreibt Anmeldung, Fehler, Header und Versionierung sowie die lesenden Endpunkte (Liste, Suche, Details,
+    Datei-Link, Filter, Umleitung).
+
+    Lesen:
+    - **Stufe der Anfrage.** Der Header `X-Archiv-Zugriff` (`oeffentlich`, `mitglieder`, `vorstand`; fehlt er, gilt
+      `oeffentlich`) meldet die Stufe des Besuchers. Sie darf nicht über der Stufe des Schlüssels liegen (403
+      `NICHT_ERLAUBT`); ein unbekannter Wert ergibt 400 `ANFRAGE_UNGUELTIG`. Es gilt für Liste, Suche, Details,
+      Datei-Link, Filter und Umleitung.
+    - **Fester Filter.** Jede Abfrage liefert nur archivierte, veröffentlichte Dokumente der Vertraulichkeit `NORMAL`
+      mit einer Zugriffsstufe bis zur Stufe der Anfrage. Ein Dokument ausserhalb davon gibt es für die Anfrage nicht:
+      404 `NICHT_GEFUNDEN`, gleich wie bei einer unbekannten ID. Kein Parameter ändert diesen Filter.
+    - **Dokumente heissen nur mit ihrer ID.** Die Antworten nennen nie eine URL einer Seite der Webseite, nie den
+      Dateinamen, die Vertraulichkeit, den Status oder Angaben zur Veröffentlichung; den Link auf die Dokumentseite
+      bildet die Webseite selbst.
+    - **Client-Hash.** `X-Archiv-Client` (SHA-256 aus IP und Tages-Salz des Besuchers, 64 Hexziffern in
+      Kleinbuchstaben, von der Webseite berechnet) ist optional; die IP des Besuchers erhält das Archiv nie.
+    - **Unbekannte Parameter** einer Abfrage werden ignoriert.
 
     Regeln:
     - **Nur serverseitig.** Nur der Server einer Webseite ruft die Schnittstelle auf. Das Archiv erlaubt kein CORS;

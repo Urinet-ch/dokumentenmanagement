@@ -43,7 +43,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
   - Drive-Import mit API-Token vom Scope `import` des Mandanten `vhf-gsk` und Pfad-Mustern (Reihe/Jahr), Bericht mit Lücken in der Nummerierung
-  - Tabelle `alte_url` und CSV-Import der alten Links
+  - Tabelle `alte_url` und CSV-Import der alten Links (die Tabelle besteht seit Aufgabe 11.2, Changeset `031-alte-url`; der Import verwendet `AlteUrl.normalisieren` für die Form der URL)
   - _Anforderungen: 4.1–4.3_
 
 - [ ] 10.6 Sicherung für Mandant 2 [Infra]
@@ -64,6 +64,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Spec 01 ergänzt: Suche ohne Dateinamen (`mitDateiname=false`, Spec 01, Req 3.13) braucht einen Index oder Vorfilter: `ts_filter(volltext_tsv, '{a,b,c}')` nutzt den GIN-Index nicht und durchsucht sonst alle Dokumente des Mandanten (Spec 01, design.md, «Umsetzung 4.10»; Review #104); Index oder Vorfilter anlegen, falls Spec 02 (Aufgabe 7.1) ihn noch nicht angelegt hat
   - Spec 05 ergänzt: Liste filtert zusätzlich nach den Klassifikationen mit `oeffentlich_filter` (z. B. `?fachgebiet=bad`), gibt nur diese aus; fester Sicherheitsfilter unverändert davor; reservierte Parameter in Spec 05 design.md (Spec 05, Req 8.6)
   - Ergänzt 13.11.2026: Endpunkte `/public/v1/filter` (nur Reihen und Werte bis zur Stufe) und `/public/v1/umleitung` (alte Links, bis zur Stufe); Antwortfelder nach design.md «Antwortfelder» (nur `dokumentId`, keine Seiten-URLs); Datei-Link nur für Stufe `oeffentlich` (Stream in Aufgabe 11.8); feste Parameter um `seit`, `max`, `referenz`, `groesse`, `status`, `url` ergänzt
+  - Umsetzung Teil 1 (PR #216; Vorstufe, mandantenneutral, getestet mit `urinet` und Testmandanten, ohne Seed und Domain VHF/GSK): `GET /public/v1/dokumente`, `/suche`, `/dokumente/{id}`, `/dokumente/{id}/datei`, `/filter`, `/umleitung`; `WebseitenLesenResource`, `WebseiteLesen`, `WebseiteSuche`, `WebseiteDatei`, `SqlWebseitenLese`, `Sichtregel.fuerWebseite` (fester Filter in jeder Teilabfrage der Hybridsuche), Tabelle `alte_url` (Changeset `031-alte-url`), `AlteUrl`, `IpAdresse.gekuerzt()`; Vertrag `docs/schnittstelle/public-v1.yaml` mit den Endpunkten und den Headern `X-Archiv-Zugriff` und `X-Archiv-Client`; Szenarien `@req-5.1` bis `@req-5.5`, `@req-5.8` bis `@req-5.11`, `@req-15.3`, `@req-15.4` in `features/integration/webseiten-lesen.feature` (je Filterachse ein Beispiel gegen Liste, Suche, Details, Filter und Umleitung); Einzelheiten in design.md, «Umsetzung (Aufgabe 11.2)». Offen: Filter nach den Klassifikationen mit `oeffentlich_filter` und deren Ausgabe in Liste und `/filter` (Spec 05 besteht im Code noch nicht), Fundstelle der Suche (Aufgabe 11.13), Datei-Link für `mitglieder` und `vorstand` als Stream (Aufgabe 11.8; bis dahin 404), Grenzen je Schlüssel und Drosselung (11.11, 11.6)
   - _Anforderungen: 5.1, 5.4, 5.8, 5.10, 5.11_
   - _Abhängig von: 11.1, 11.6_
 

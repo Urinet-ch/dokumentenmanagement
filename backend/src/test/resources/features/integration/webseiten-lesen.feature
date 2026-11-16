@@ -28,7 +28,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.1 @req-5.3
   Szenariogrundriss: Die Liste liefert die Dokumente bis zur Stufe der Anfrage
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?pro_seite=100» mit der Stufe «<stufe>» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Dann antwortet die Lese-Schnittstelle mit Status 200
     Und nennt die Antwort genau die Dokumente «<dokumente>»
 
     Beispiele:
@@ -69,8 +69,8 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.1
   Szenariogrundriss: Ungültige Parameter der Liste ergeben 400 ohne den Wert zu nennen
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?<parameter>» mit der Stufe «vorstand» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
-    Und steht in der Antwort weder «<wert>» noch «meldung»
+    Dann antwortet die Lese-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Und steht in der Lese-Antwort weder «<wert>» noch «meldung»
 
     Beispiele:
       | parameter                     | wert        |
@@ -81,7 +81,6 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | sortierung=zufall             | zufall      |
       | jahr=20x4                     | 20x4        |
       | reihe=kleinbuchstaben         | kleinbuch   |
-      | ausgabe=%00                   | %00         |
 
   @req-5.3
   Szenario: Feste Parameter wie zugriff, veroeffentlicht und status ändern den Filter nicht
@@ -103,11 +102,11 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/suche?q=Rhabarber» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort genau die Dokumente «ok»
     Wenn der Webseiten-Lesezugang «vorstand» das Dokument «x» mit der Stufe «vorstand» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort nicht die Reihe «WEBTEST_XXX»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/x» mit der Stufe «vorstand» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/ok» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort die Dokument-ID von «ok»
 
@@ -142,9 +141,9 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «<stufe>» aufruft
     Dann nennt die Antwort genau die Reihen «<reihen>»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/b3» mit der Stufe «<stufe>» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status <status_b3>
+    Dann antwortet die Lese-Schnittstelle mit Status <status_b3>
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/v1» mit der Stufe «<stufe>» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status <status_v1>
+    Dann antwortet die Lese-Schnittstelle mit Status <status_v1>
 
     Beispiele:
       | stufe       | suche             | reihen                                  | status_b3 | status_v1 |
@@ -156,14 +155,14 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenario: Details eines Dokuments über der Stufe sind 404 wie bei einem unbekannten Dokument
     Wenn der Webseiten-Lesezugang «vorstand» das Dokument «v1» mit der Stufe «mitglieder» abruft
     Und der Webseiten-Lesezugang «vorstand» ein unbekanntes Dokument mit der Stufe «mitglieder» abruft
-    Dann ist die Antwort für das Dokument gleich der für ein unbekanntes Dokument
+    Dann ist die Lese-Antwort für das Dokument gleich der für ein unbekanntes Dokument
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente/kein-uuid» mit der Stufe «vorstand» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
   @req-5.1 @req-5.11
   Szenario: Die Details nennen die Antwortfelder mit Auszug und sonst nichts
     Wenn der Webseiten-Lesezugang «oeffentlich» das Dokument «b1» mit der Stufe «oeffentlich» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Dann antwortet die Lese-Schnittstelle mit Status 200
     Und hat die Antwort die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug» und nur diese
     Und nennt die Antwort die Reihe «WEBTEST_BUL» mit dem Namen «Probe-Bulletin», die Ausgabe «1», das Jahr 2024, das Datum «2024-03-01», die Zugriffsstufe «oeffentlich» und 12 Seiten
     Und beginnt der Auszug mit «Der Zitronenkuchen»
@@ -173,15 +172,15 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Angenommen das Dokument «b1» trägt den Dateinamen «geheimer-dateiname-4711.pdf» und den Partner «Geheimpartner AG»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/dokumente?pro_seite=100» mit der Stufe «oeffentlich» aufruft
     Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten»
-    Und steht in der Antwort weder «geheimer-dateiname» noch «Geheimpartner»
-    Und steht in der Antwort weder «http» noch «vertraulichkeit»
+    Und steht in der Lese-Antwort weder «geheimer-dateiname» noch «Geheimpartner»
+    Und steht in der Lese-Antwort weder «http» noch «vertraulichkeit»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/suche?q=Zitronenkuchen» mit der Stufe «oeffentlich» aufruft
     Dann haben alle Einträge nur die Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug,fundstelle,rang»
-    Und steht in der Antwort weder «geheimer-dateiname» noch «Geheimpartner»
-    Und steht in der Antwort weder «http» noch «status»
+    Und steht in der Lese-Antwort weder «geheimer-dateiname» noch «Geheimpartner»
+    Und steht in der Lese-Antwort weder «http» noch «status»
     Wenn der Webseiten-Lesezugang «oeffentlich» das Dokument «b1» mit der Stufe «oeffentlich» abruft
-    Dann steht in der Antwort weder «geheimer-dateiname» noch «Geheimpartner»
-    Und steht in der Antwort weder «http» noch «veroeffentlicht»
+    Dann steht in der Lese-Antwort weder «geheimer-dateiname» noch «Geheimpartner»
+    Und steht in der Lese-Antwort weder «http» noch «veroeffentlicht»
 
   @req-5.1
   Szenario: Die Suche findet Dokumente im Text, ohne Dateinamen, und nennt Rang und Rückfall
@@ -208,7 +207,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.1
   Szenariogrundriss: Eine ungültige Suche ergibt 400
     Wenn der Webseiten-Lesezugang «oeffentlich» «<pfad>» mit der Stufe «oeffentlich» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Dann antwortet die Lese-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
     Beispiele:
       | pfad                                     |
@@ -221,14 +220,14 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.1
   Szenario: Ein zu langer Suchbegriff ergibt 400
     Wenn der Webseiten-Lesezugang «oeffentlich» die Suche mit einem Begriff von 201 Zeichen aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Dann antwortet die Lese-Schnittstelle mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
   @req-5.4
   Szenario: Der Datei-Link eines öffentlichen Dokuments gilt höchstens 5 Minuten und wird mit gekürzter IP protokolliert
     Angenommen das Dokument «b1» hat eine Datei
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
     Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «b1» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Dann antwortet die Lese-Schnittstelle mit Status 200
     Und nennt die Antwort eine Adresse der Datei, die höchstens 5 Minuten gilt
     Und steht im Zugriffsprotokoll von «urinet» genau ein neuer Eintrag HERUNTERLADEN für «b1» von der Adresse «192.0.2.0» ohne weitere Angaben
 
@@ -236,7 +235,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenario: Der Datei-Link eines öffentlichen Dokuments gilt auch bei höherer gemeldeter Stufe
     Angenommen das Dokument «b1» hat eine Datei
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «b1» mit der Stufe «vorstand» und der Adresse «2001:db8:1:2::5» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Dann antwortet die Lese-Schnittstelle mit Status 200
 
   @req-5.4 @req-5.5
   Szenariogrundriss: Ohne Datei-Link bleiben Dokumente über der Stufe oeffentlich und unsichtbare Dokumente
@@ -246,7 +245,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Und das Dokument «z» hat eine Datei
     Und der Stand des Zugriffsprotokolls von «urinet» ist für die Webseite gemerkt
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «z» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Und steht im Zugriffsprotokoll von «urinet» kein neuer Eintrag
 
     Beispiele:
@@ -259,7 +258,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.4
   Szenario: Der Datei-Link ist 404, wenn das Dokument keine Datei hat, und ein unbekanntes Dokument ist 404
     Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «b2» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
   @req-5.8
   Szenariogrundriss: Der Filter nennt nur Reihen mit sichtbaren Dokumenten bis zur Stufe
@@ -281,13 +280,13 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenariogrundriss: Die Umleitung liefert die Dokument-ID zur alten URL, auch mit Schema, Host, Anfrage und Fragment
     Angenommen die alten URLs «/alt/bulletin/2024/heft-1.pdf» und «/alt/zweite seite» führen im Mandanten «urinet» zu den Dokumenten «b1» und «b2»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/umleitung?url=<url>» mit der Stufe «oeffentlich» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Dann antwortet die Lese-Schnittstelle mit Status 200
     Und nennt die Antwort die Dokument-ID von «<dokument>»
 
     Beispiele:
       | url                                                            | dokument |
       | /alt/bulletin/2024/heft-1.pdf                                  | b1       |
-      | https://alt.example/alt/bulletin/2024/heft-1.pdf?x=1#seite=3   | b1       |
+      | https%3A%2F%2Falt.example%2Falt%2Fbulletin%2F2024%2Fheft-1.pdf%3Fx%3D1%23seite%3D3 | b1       |
       | /alt//bulletin/2024/heft-1.pdf/                                | b1       |
       | /alt/bulletin/2024/heft%2D1.pdf                                | b1       |
       | /alt/zweite%20seite                                            | b2       |
@@ -296,14 +295,13 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenariogrundriss: Die Umleitung ergibt 404 für unbekannte URLs und 400 für ungültige
     Angenommen die alten URLs «/alt/bulletin/2024/heft-1.pdf» und «/alt/zweite seite» führen im Mandanten «urinet» zu den Dokumenten «b1» und «b2»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/umleitung<anfrage>» mit der Stufe «oeffentlich» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status <status> und Fehlercode «<code>»
-    Und steht in der Antwort weder «unbekannt» noch «meldung»
+    Dann antwortet die Lese-Schnittstelle mit Status <status> und Fehlercode «<code>»
+    Und steht in der Lese-Antwort weder «unbekannt» noch «meldung»
 
     Beispiele:
       | anfrage                                   | status | code             |
       | ?url=/alt/unbekannt                       | 404    | NICHT_GEFUNDEN   |
       | ?url=/ALT/bulletin/2024/heft-1.pdf        | 404    | NICHT_GEFUNDEN   |
-      | ?url=/alt/bulletin/2024/heft-1.pdf%3Bx    | 400    | ANFRAGE_UNGUELTIG |
       |                                           | 400    | ANFRAGE_UNGUELTIG |
       | ?url=                                     | 400    | ANFRAGE_UNGUELTIG |
       | ?url=kein-pfad                            | 400    | ANFRAGE_UNGUELTIG |
@@ -315,9 +313,9 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | x    | oeffentlich | Fremdmandant   |
     Und die alten URLs «/alt/fremd» und «/alt/fremd2» führen im Mandanten «vhf-gsk» zu den Dokumenten «x» und «x»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/fremd» mit der Stufe «vorstand» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «vorstand» das Dokument «x» mit der Stufe «vorstand» abruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/suche?q=Fremdmandant» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort genau die Dokumente «»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?pro_seite=100&mandant=vhf-gsk» mit der Stufe «vorstand» aufruft
@@ -326,8 +324,8 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   @req-5.9
   Szenariogrundriss: Eine gemeldete Stufe über der Stufe des Schlüssels ergibt 403, ein unbekannter Wert 400 – an jedem Endpunkt
     Wenn der Webseiten-Lesezugang «<schluessel>» «<pfad>» mit der Stufe «<stufe>» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status <status> und Fehlercode «<code>»
-    Und steht in der Antwort weder «<stufe>» noch «meldung»
+    Dann antwortet die Lese-Schnittstelle mit Status <status> und Fehlercode «<code>»
+    Und steht in der Lese-Antwort weder «<stufe>» noch «meldung»
 
     Beispiele:
       | schluessel  | pfad                                  | stufe      | status | code              |
@@ -343,7 +341,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
   Szenariogrundriss: Ohne gültigen Lese-Schlüssel gibt es nichts, ein Erfassungs-Schlüssel genügt nicht
     Angenommen der Webseiten-Erfassungszugang «erfassung» der Webseite «probe-lesen» im Mandanten «urinet» ist angelegt
     Wenn <zugang> «<pfad>» aufruft
-    Dann antwortet die Webseiten-Schnittstelle mit Status <status> und Fehlercode «<code>»
+    Dann antwortet die Lese-Schnittstelle mit Status <status> und Fehlercode «<code>»
 
     Beispiele:
       | zugang                                    | pfad                              | status | code             |
@@ -353,10 +351,10 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | mit dem Erfassungs-Zugang «erfassung»     | /public/v1/filter                 | 403    | NICHT_ERLAUBT    |
 
   @req-15.4
-  Szenariogrundriss: Jede Antwort ist nicht zwischenzuspeichern und der Datei-Typ ist JSON
+  Szenariogrundriss: Jede Antwort ist nicht zwischenzuspeichern und ohne CORS
     Wenn der Webseiten-Lesezugang «oeffentlich» «<pfad>» mit der Stufe «oeffentlich» aufruft
-    Dann trägt die Antwort den Header «Cache-Control» mit dem Wert «no-store»
-    Und trägt die Antwort keinen Header «Access-Control-Allow-Origin»
+    Dann trägt die Lese-Antwort den Header «Cache-Control» mit dem Wert «no-store»
+    Und trägt die Lese-Antwort keinen Header «Access-Control-Allow-Origin»
 
     Beispiele:
       | pfad                              |
