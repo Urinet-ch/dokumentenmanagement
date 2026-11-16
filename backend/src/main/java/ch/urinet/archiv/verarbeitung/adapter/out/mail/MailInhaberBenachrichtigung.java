@@ -227,7 +227,7 @@ public class MailInhaberBenachrichtigung implements InhaberBenachrichtigung {
 
     static String text(MandantCode mandant, Befund befund) {
         String was = switch (befund.quelle()) {
-            case DOKUMENT -> "Das Dokument " + befund.gegenstand() + " steht länger als erlaubt (Standard 1 Stunde) im "
+            case DOKUMENT -> "Das Dokument " + befund.gegenstand() + " steht länger als die eingestellte Grenze (archiv.ueberwachung.grenze) im "
                     + "Status " + befund.status() + ".\n\nIm Eingangskorb prüfen und «Wiederholen» wählen; steht es in "
                     + "VERARBEITUNG, im Log nach der Dokument-ID suchen.";
             case MANIFEST -> "Das Tages-Manifest vom " + befund.gegenstand() + " fehlt (Befund " + befund.status()

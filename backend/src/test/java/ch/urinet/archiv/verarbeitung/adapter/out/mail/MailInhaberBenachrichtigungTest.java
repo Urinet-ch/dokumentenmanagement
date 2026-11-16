@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.adapter.out.mail;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Abweichung;
+import ch.urinet.archiv.verarbeitung.domain.Befund;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Art;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Fortsetzung;
 import ch.urinet.archiv.verarbeitung.application.PrueflaufRegister.Phase;
@@ -154,5 +155,13 @@ class MailInhaberBenachrichtigungTest {
             config.withDefaultValue(MailInhaberBenachrichtigung.EMPFAENGER + MANDANT.wert(), empfaenger);
         }
         return new MailInhaberBenachrichtigung(mailer, config.build());
+    }
+
+    @Test
+    void dokumentMailNenntKeinenFestenStundenWertSondernDieEinstellung() {
+        String text = MailInhaberBenachrichtigung.text(MANDANT,
+                new Befund(Befund.Quelle.DOKUMENT, UUID.randomUUID().toString(), "VERARBEITUNG"));
+
+        assertThat(text).doesNotContain("Standard 1 Stunde").contains("archiv.ueberwachung.grenze");
     }
 }
