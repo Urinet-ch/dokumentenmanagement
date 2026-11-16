@@ -362,7 +362,16 @@ public class AgentSchritte {
 
     @Dann("verlangt der Systemprompt der ersten Anfrage «{}»")
     public void systemprompt(String teile) throws IOException {
-        String prompt = systemprompt(0);
+        systempromptEnthaelt(0, teile);
+    }
+
+    @Dann("verlangt der Systemprompt der Anfrage {int} «{}»")
+    public void systempromptAnfrage(int nummer, String teile) throws IOException {
+        systempromptEnthaelt(nummer - 1, teile);
+    }
+
+    private void systempromptEnthaelt(int nummer, String teile) throws IOException {
+        String prompt = systemprompt(nummer);
         for (String teil : teile.split("\\|")) {
             assertThat(prompt).contains(teil.strip());
         }

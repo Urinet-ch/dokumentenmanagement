@@ -215,6 +215,31 @@ class ArchivWerkzeugeTest {
                 ausKennzahl.toString(), fremd.toString(), verfaelscht(fremd));
     }
 
+    @Test
+    void dokumentZeigenStelltDenMetadatenkopfVorDenDokumentinhalt() throws Exception {
+        java.util.UUID id = java.util.UUID.fromString("6f0c2a7e-1b3d-4c5e-8f60-123456789abc");
+        DokumentZeigen zeigen = new DokumentZeigen(null, null, null, null) {
+            @Override
+            public Ansicht zeigen(WerkzeugKontext kontext, String idText) {
+                return new Ansicht("Metadaten (bestätigt)\nBelegnummer: 1100745\nBetrag: CHF 123.45"
+                        + "\nDatum: 10.03.2071", "OCR-Text 1190745", id.toString(), "OCR-Ziffernprobe",
+                        "AUSGANGSRECHNUNG", "10.03.2071", null, "1100745", "CHF 123.45", null, null,
+                        true, "/dokument/" + id);
+            }
+        };
+        ArchivWerkzeuge werkzeuge = werkzeuge(new DokumenteSuchen(null, null, null, null, null, null,
+                new BigDecimal("0.6")), zeigen, new FristenAbfrage(null, null, null),
+                new OffenePostenAbfrage(null, null, null, null), new KennzahlAbfrage(null, null, null, null));
+        register.festhalten("lauf", kontext());
+
+        String text = werkzeuge.dokumentZeigen("lauf", id.toString());
+        com.fasterxml.jackson.databind.JsonNode antwort = new ObjectMapper().readTree(text);
+
+        assertThat(text.indexOf("\"metadaten\"")).isLessThan(text.indexOf("\"inhalt\""));
+        assertThat(antwort.path("metadaten").asText()).contains("Belegnummer: 1100745");
+        assertThat(antwort.path("inhalt").asText()).contains("1190745").doesNotContain("1100745");
+    }
+
     /** Ändert das letzte Zeichen. */
     private static String verfaelscht(java.util.UUID id) {
         String text = id.toString();
