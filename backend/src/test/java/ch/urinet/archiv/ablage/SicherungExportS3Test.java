@@ -12,6 +12,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherung.adapter.in.kommando.SicherungKommando;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeile;
+import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
@@ -257,7 +258,18 @@ class SicherungExportS3Test {
         SicherungBucketExport export = new SicherungBucketExport(ablage());
         MandantRegister register = register();
         SicherungKommando kommando = new SicherungKommando(export,
-                new SicherungExportVerwaltung((art, man, sha) -> { }, register), new ObjectMapper(), ZWISCHENABLAGE);
+                new SicherungExportVerwaltung(new SicherungExportSpeicher() {
+                    @Override
+                    public void festhalten(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                           Optional<MandantCode> man, String sha) {
+                    }
+
+                    @Override
+                    public Optional<Instant> juengsterEintrag(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                                              Optional<MandantCode> man) {
+                        return Optional.empty();
+                    }
+                }, register), new ObjectMapper(), ZWISCHENABLAGE);
 
         byte[] strom = zuwachs(export, v -> true);
         Path inventar1 = inventarDatei(kommando);

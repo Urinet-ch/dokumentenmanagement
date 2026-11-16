@@ -35,7 +35,7 @@ class SicherungKommandoTest {
     @Test
     void festhaltenLehntUngueltigeAufrufeMitExitZweiOhneSchreibvorgangAb() {
         int[] festgehalten = {0};
-        SicherungExportSpeicher speicher = (art, mandant, sha256) -> festgehalten[0]++;
+        SicherungExportSpeicher speicher = speicher((art, mandant, sha256) -> festgehalten[0]++);
         MandantRegister register = new MandantRegister() {
             @Override
             public boolean existiert(ch.urinet.archiv.mandant.domain.MandantCode code) {
@@ -75,10 +75,10 @@ class SicherungKommandoTest {
     void sha256WirdKanonisiertUndEinGueltigerGlobalerExportFestgehalten() {
         int[] festgehalten = {0};
         String[] gespeicherteSha = {null};
-        SicherungExportSpeicher speicher = (art, mandant, sha256) -> {
+        SicherungExportSpeicher speicher = speicher((art, mandant, sha256) -> {
             festgehalten[0]++;
             gespeicherteSha[0] = sha256;
-        };
+        });
         MandantRegister register = new MandantRegister() {
             @Override
             public boolean existiert(ch.urinet.archiv.mandant.domain.MandantCode code) {
@@ -154,7 +154,7 @@ class SicherungKommandoTest {
             }
         };
         SicherungKommando kommando = new SicherungKommando(new SicherungBucketExport(ablage),
-                new SicherungExportVerwaltung((art, mandant, sha256) -> { }, register), new ObjectMapper(),
+                new SicherungExportVerwaltung(speicher((art, mandant, sha256) -> { }), register), new ObjectMapper(),
                 ARBEITSVERZEICHNIS);
         PrintStream kaputt = new PrintStream(new java.io.OutputStream() {
             @Override
@@ -209,7 +209,7 @@ class SicherungKommandoTest {
         };
         Path arbeitsverzeichnis = Path.of("target", "arbeit", "sicherung-kommando-" + UUID.randomUUID());
         SicherungKommando kommando = new SicherungKommando(new SicherungBucketExport(ablage),
-                new SicherungExportVerwaltung((art, mandant, sha256) -> { }, register), new ObjectMapper(),
+                new SicherungExportVerwaltung(speicher((art, mandant, sha256) -> { }), register), new ObjectMapper(),
                 arbeitsverzeichnis);
         InventarZeile vorher = new InventarZeile(SicherungBucketExport.INVENTAR_FORMAT, "archiv/z", "v1", false,
                 1, "2026-01-01T00:00:00Z", "", null, null);
@@ -268,5 +268,28 @@ class SicherungKommandoTest {
                 new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
                     throw new UnsupportedOperationException(methode.getName());
                 });
+    }
+
+    private static SicherungExportSpeicher speicher(Festhalten festhalten) {
+        return new SicherungExportSpeicher() {
+            @Override
+            public void festhalten(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                   java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant,
+                                   String sha256) {
+                festhalten.ausfuehren(art, mandant, sha256);
+            }
+
+            @Override
+            public Optional<Instant> juengsterEintrag(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                                                      java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant) {
+                return Optional.empty();
+            }
+        };
+    }
+
+    @FunctionalInterface
+    private interface Festhalten {
+        void ausfuehren(ch.urinet.archiv.sicherung.domain.SicherungsArt art,
+                        java.util.Optional<ch.urinet.archiv.mandant.domain.MandantCode> mandant, String sha256);
     }
 }
