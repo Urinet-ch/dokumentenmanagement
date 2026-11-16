@@ -14,6 +14,7 @@ import ch.urinet.archiv.protokoll.application.ManifestDaten;
 import ch.urinet.archiv.sicherung.application.Sperrpruefung;
 import ch.urinet.archiv.sicherung.application.SperrpruefungDaten;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -26,12 +27,17 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SperrpruefungKommandoTest {
 
     @Test
+    @Tag("req-16.27")
     void parstMandantUndStichprobenbereich() {
         assertThat(SperrpruefungKommando.lesen(List.of("sperren-pruefen", "--mandant", "probe")))
                 .contains(new SperrpruefungKommando.Aufruf(new MandantCode("probe"), 5));
@@ -46,6 +52,7 @@ class SperrpruefungKommandoTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void falschesPraefixVerweigertVorMandantenUndBucketzugriff() {
         for (String praefix : List.of("urinet-archiv-", "urinet-archiv-a-")) {
             int[] bucketAufrufe = {0};
@@ -66,6 +73,7 @@ class SperrpruefungKommandoTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void inaktiverMandantErgibtExitZweiOhneBucketzugriff() {
         int[] bucketAufrufe = {0};
         int[] registerAufrufe = {0};
@@ -83,6 +91,7 @@ class SperrpruefungKommandoTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void jsonEnthaeltNurZaehlerUndIdsUndLiefertExitEinsBeiAbweichung() {
         int[] bucketAufrufe = {0};
         var kommando = kommando(Stufenregel.PRAEFIX_STUFE_P, register(new int[1], List.of(mandant())),
@@ -98,6 +107,73 @@ class SperrpruefungKommandoTest {
         assertThat(json).contains("\"OBJEKT_UEBERZAEHLIG\":1");
         assertThat(json).doesNotContain("synthetischer-schluessel", "v1");
         assertThat(bucketAufrufe[0]).isEqualTo(2);
+    }
+
+    @Test
+    @Tag("req-16.27")
+    void ablagefehlerErgibtExitDreiNurMitKlassennameOhneSchluesselImLog() {
+        var kommando = kommando(Stufenregel.PRAEFIX_STUFE_P, register(new int[1], List.of(mandant())),
+                (AblagePort) Proxy.newProxyInstance(AblagePort.class.getClassLoader(),
+                        new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
+                            throw new IllegalStateException("archiv/synthetischer-schluessel dokument.pdf");
+                        }));
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        ByteArrayOutputStream fehler = new ByteArrayOutputStream();
+
+        List<String> log = new java.util.ArrayList<>();
+        int exit = mitLog(log, () -> kommando.ausfuehren(
+                List.of("sperren-pruefen", "--mandant", "probe", "--stichprobe", "0"), aus(aus), aus(fehler)));
+
+        assertThat(exit).isEqualTo(3);
+        assertThat(fehler.toString(StandardCharsets.UTF_8)).contains("IllegalStateException")
+                .doesNotContain("synthetischer-schluessel", "dokument.pdf");
+        assertThat(aus.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(String.join("\n", log)).doesNotContain("synthetischer-schluessel", "dokument.pdf");
+    }
+
+    @Test
+    @Tag("req-16.27")
+    void lauflogEnthaeltWederSchluesselNochNamen() {
+        var kommando = kommando(Stufenregel.PRAEFIX_STUFE_P, register(new int[1], List.of(mandant())),
+                ablage(new int[1], List.of(new Objektversion("archiv/synthetischer-schluessel.pdf", "v1", false))));
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        List<String> log = new java.util.ArrayList<>();
+
+        int exit = mitLog(log, () -> kommando.ausfuehren(
+                List.of("sperren-pruefen", "--mandant", "probe", "--stichprobe", "0"), aus(aus),
+                aus(new ByteArrayOutputStream())));
+
+        assertThat(exit).isEqualTo(1);
+        assertThat(String.join("\n", log)).doesNotContain("synthetischer-schluessel", ".pdf");
+    }
+
+    private static int mitLog(List<String> log, java.util.function.IntSupplier lauf) {
+        Logger wurzel = Logger.getLogger("");
+        Level alt = wurzel.getLevel();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord r) {
+                log.add(r.getLoggerName() + " " + r.getMessage() + " "
+                        + java.util.Arrays.toString(r.getParameters())
+                        + (r.getThrown() == null ? "" : " " + r.getThrown()));
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        wurzel.setLevel(Level.ALL);
+        wurzel.addHandler(handler);
+        try {
+            return lauf.getAsInt();
+        } finally {
+            wurzel.removeHandler(handler);
+            wurzel.setLevel(alt);
+        }
     }
 
     private static SperrpruefungKommando kommando(String praefix, MandantRegister register, AblagePort ablage) {

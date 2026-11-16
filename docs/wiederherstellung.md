@@ -81,7 +81,7 @@ Die Stichprobe ist gleichmässig über `archiv/` und `manifest/` verteilt; Stand
 die Löschprobe. Das konfigurierte Bucketpräfix muss mit `urinet-archiv-p-` beginnen. Das Kommando prüft dies vor dem
 Zugriff auf das Mandantenregister oder den Bucket und ist ausschliesslich in der isolierten Restore-Probe auszuführen.
 Die geprüften Objekte werden mit den wiederhergestellten Datenbankeinträgen abgeglichen: Objektbestand, aktive Sperre,
-Modus und `retainUntil` gegen den Sollwert. Erwartete Sperren werden in Stufe P höchstens einen Tag angesetzt.
+Modus und `retainUntil` gegen den Sollwert. Erwartete Sperren werden in Stufe P höchstens einen Tag angesetzt. Ist die Frist so gekappt, genügt eine aktive Sperre (die Prüfung kennt den Zeitpunkt der Wiederherstellung nicht); Fristen unter einem Tag werden voll verglichen.
 
 Für jede Stichprobenversion versucht die Probe, genau diese Version ohne Bypass-Header zu löschen. Bei einer fehlenden
 Sperre kann S3 die Version tatsächlich löschen; die Probe meldet dies als Abweichung und endet fehlerhaft. Das ist nur

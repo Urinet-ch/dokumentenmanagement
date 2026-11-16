@@ -13,6 +13,7 @@ import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.ManifestDaten;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,16 +52,18 @@ class SperrpruefungTest {
     Path arbeitsverzeichnis;
 
     @Test
+    @Tag("req-16.27")
     void aktiveSperreMitSollfristIstZulaessigUndEineSekundeZuKurzNicht() throws Exception {
         String key = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
-        long sollSekunden = 60 * 60 * 24;
-        Fixture passend = fixture(List.of(dokument(key, "v1")), List.of(), Map.of(
+        LocalDate bis = LocalDate.of(2026, 11, 16);
+        long sollSekunden = Instant.parse("2026-11-16T23:00:00Z").getEpochSecond() - JETZT.getEpochSecond();
+        Fixture passend = fixture(List.of(dokumentBis(key, "v1", bis)), List.of(), Map.of(
                 new Kennung(key, "v1"), new SicherungsSperre("GOVERNANCE", JETZT.plusSeconds(sollSekunden))));
         try (var ergebnis = passend.pruefen(0)) {
             assertThat(ergebnis.zaehler()).allSatisfy((art, anzahl) -> assertThat(anzahl).isZero());
         }
 
-        Fixture zuKurz = fixture(List.of(dokument(key, "v1")), List.of(), Map.of(
+        Fixture zuKurz = fixture(List.of(dokumentBis(key, "v1", bis)), List.of(), Map.of(
                 new Kennung(key, "v1"), new SicherungsSperre("GOVERNANCE",
                         JETZT.plusSeconds(sollSekunden - 1))));
         try (var ergebnis = zuKurz.pruefen(0)) {
@@ -69,6 +72,7 @@ class SperrpruefungTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void fehlendeSperreFalscherModusUndFehlendesObjektWerdenGetrenntGezaehlt() throws Exception {
         String ohneSperre = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
         String falscherModus = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
@@ -87,6 +91,7 @@ class SperrpruefungTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void ueberzaehligesObjektWirdNurGezaehlt() throws Exception {
         Fixture fixture = fixture(List.of(), List.of(), Map.of(), Set.of(),
                 Set.of(new Kennung("archiv/fremd", "v1")));
@@ -98,6 +103,7 @@ class SperrpruefungTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void stichprobeNullLoeschtNichtsUndZuGrosseStichprobePrueftAlle() throws Exception {
         String erster = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
         String zweiter = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
@@ -117,6 +123,7 @@ class SperrpruefungTest {
     }
 
     @Test
+    @Tag("req-16.27")
     void manifestSperreWirdMitComplianceUndStufePHoechstfristGeprueft() throws Exception {
         LocalDate datum = LocalDate.of(2026, 11, 15);
         String key = "manifest/" + datum + ".json";
@@ -131,6 +138,51 @@ class SperrpruefungTest {
             assertThat(ergebnis.zaehler()).allSatisfy((art, anzahl) -> assertThat(anzahl).isZero());
             assertThat(fixture.loeschversuche).isEqualTo(1);
         }
+    }
+
+    @Test
+    @Tag("req-16.27")
+    @Tag("req-6.11")
+    void gekappteSperreBleibtMinutenNachDerWiederherstellungOhneAbweichung() throws Exception {
+        String key = "archiv/2026/" + UUID.randomUUID() + "/original/1.pdf";
+        Instant restore = JETZT.minusSeconds(5 * 60);
+        Fixture fixture = fixture(List.of(dokument(key, "v1")), List.of(), Map.of(
+                new Kennung(key, "v1"), new SicherungsSperre("GOVERNANCE", restore.plusSeconds(86400))));
+        try (var ergebnis = fixture.pruefen(0)) {
+            assertThat(ergebnis.zaehler()).allSatisfy((art, anzahl) -> assertThat(anzahl).isZero());
+        }
+        LocalDate morgen = LocalDate.of(2026, 11, 16);
+        String kurzKey = "archiv/2026/" + UUID.randomUUID() + "/original/2.pdf";
+        Fixture kurz = fixture(List.of(dokumentBis(kurzKey, "v1", morgen)), List.of(), Map.of(
+                new Kennung(kurzKey, "v1"), new SicherungsSperre("GOVERNANCE", JETZT.plusSeconds(60))));
+        try (var ergebnis = kurz.pruefen(0)) {
+            assertThat(ergebnis.zaehler().get(SPERRE_ZU_KURZ)).isEqualTo(1);
+        }
+    }
+
+    @Test
+    @Tag("req-16.27")
+    @Tag("req-6.11")
+    void gekapptesManifestBleibtMinutenNachDerWiederherstellungOhneAbweichung() throws Exception {
+        LocalDate datum = LocalDate.of(2026, 11, 15);
+        String key = "manifest/" + datum + ".json";
+        var datei = new ExportBelege.Manifestdatei(datum, "json", key, "m1", "hash");
+        var stand = new ManifestDaten.Sperrpruefstand(datum, Optional.empty(), JETZT);
+        var manifest = new SperrpruefungDaten.Pruefmanifest(stand,
+                new ManifestDaten.Fristen(0, false, Optional.empty()), List.of(datei));
+        Instant restore = JETZT.minusSeconds(10 * 60);
+        Fixture fixture = fixture(List.of(), List.of(manifest), Map.of(
+                new Kennung(key, "m1"), new SicherungsSperre("COMPLIANCE", restore.plusSeconds(86400))));
+        try (var ergebnis = fixture.pruefen(0)) {
+            assertThat(ergebnis.zaehler()).allSatisfy((art, anzahl) -> assertThat(anzahl).isZero());
+        }
+    }
+
+    private static DokumentPrueflaufPort.Pruefdokument dokumentBis(String key, String version, LocalDate bis) {
+        var datei = new DokumentPrueflaufPort.Datei(key, Optional.of(version), Optional.of("hash"),
+                "original", 1, true);
+        return new DokumentPrueflaufPort.Pruefdokument(UUID.randomUUID(), DokumentStatus.ARCHIVIERT,
+                Sperrvorgabe.bis(bis), Optional.of(JETZT), List.of(datei));
     }
 
     private Fixture fixture(List<DokumentPrueflaufPort.Pruefdokument> dokumente,
@@ -164,7 +216,9 @@ class SperrpruefungTest {
         private final Set<Kennung> bucketVersionen;
         private final Set<Kennung> loeschbar = new HashSet<>();
         private int loeschversuche;
-        private final Sperrpruefung pruefung;
+        private Sperrpruefung pruefung;
+        private AblagePort ablageStub;
+        private SperrpruefungDaten datenStub;
 
         private Fixture(List<DokumentPrueflaufPort.Pruefdokument> dokumente,
                         List<SperrpruefungDaten.Pruefmanifest> manifeste,
@@ -238,7 +292,9 @@ class SperrpruefungTest {
                             .map(k -> new Version(k.key(), k.version())).collect(java.util.stream.Collectors.toSet());
                 }
             };
-            pruefung = new Sperrpruefung(ablage, daten, Clock.fixed(JETZT, ZoneOffset.UTC));
+            ablageStub = ablage;
+            datenStub = daten;
+            um(JETZT);
         }
 
         private Versionsseite versionen(String praefix, Optional<Versionsseite.Marke> nach, int anzahl) {
@@ -252,6 +308,11 @@ class SperrpruefungTest {
                                     m.versionId().orElse("")) > 0).orElse(true))
                     .limit(anzahl).toList();
             return new Versionsseite(liste, Optional.empty());
+        }
+
+        private Fixture um(Instant zeit) {
+            pruefung = new Sperrpruefung(ablageStub, datenStub, Clock.fixed(zeit, ZoneOffset.UTC));
+            return this;
         }
 
         private Sperrpruefung.Ergebnis pruefen(int n) throws Exception {

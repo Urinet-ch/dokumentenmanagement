@@ -149,8 +149,9 @@ public class Sperrpruefung {
                 SEITENGROESSE)).isEmpty(); ) {
             for (var dokument : seite) {
                 boolean betroffen = false;
-                Optional<Instant> soll = Sperrfrist.retainUntil(dokument.vorgabe(), jetzt,
-                        Optional.of(P_HOECHSTFRIST));
+                Optional<Instant> soll = untergrenze(Sperrfrist.retainUntil(dokument.vorgabe(), jetzt,
+                        Optional.of(P_HOECHSTFRIST)),
+                        Sperrfrist.retainUntil(dokument.vorgabe(), jetzt, Optional.empty()), jetzt);
                 for (var datei : dokument.dateien()) {
                     boolean kandidatAktuell = soll.isPresent() && datei.versionId().isPresent();
                     Optional<String> versionId = datei.versionId();
@@ -265,7 +266,19 @@ public class Sperrpruefung {
         var fristBis = ManifestErzeugen.sperre(manifest.fristen(),
                 ch.urinet.archiv.protokoll.domain.ManifestFenster.tag(jetzt), manifest.stand().datum(),
                 mandant.geschaeftsjahresende().monatTag());
-        return Optional.of(Sperrfrist.manifest(fristBis, jetzt, Optional.of(P_HOECHSTFRIST)));
+        return untergrenze(Optional.of(Sperrfrist.manifest(fristBis, jetzt, Optional.of(P_HOECHSTFRIST))),
+                Optional.of(Sperrfrist.manifest(fristBis, jetzt, Optional.empty())), jetzt);
+    }
+
+    /**
+     * Mindest-{@code retainUntil} der Ist-Sperre. Wurde die Soll-Frist durch die Stufe-P-Höchstfrist gekappt, hängt
+     * sie vom Zeitpunkt der Wiederherstellung ab (Sperre = Restore + 1 Tag), den die Prüfung nicht kennt. Der Vergleich
+     * mit «Prüfzeit + 1 Tag» wäre dann schon Sekunden später falsch rot. Bei gekappter Frist genügt darum eine
+     * aktive Sperre (Ist &gt;= Prüfzeit); ungekappte Fristen werden voll verglichen (Req 16.27, 6.11).
+     */
+    private static Optional<Instant> untergrenze(Optional<Instant> gekappt, Optional<Instant> ungekappt,
+                                                 Instant jetzt) {
+        return gekappt.map(g -> ungekappt.filter(g::equals).isPresent() ? g : jetzt);
     }
 
     private boolean istAktiv(MandantCode mandant, String schluessel, String versionId, Instant jetzt) {
