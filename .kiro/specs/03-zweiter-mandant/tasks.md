@@ -28,6 +28,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Szenario: Finanzwerkzeuge für `vhf-gsk` nicht verfügbar
   - Spec 05 ergänzt: Seed `backend/src/main/resources/seed/vhf-gsk/konfiguration.json` statt `dokumentarten.json`, mit Klassifikation `fachgebiet`, Reihen als Dokumentarten, Regeln `EINDEUTIG` und `FOLGE` für Ausgabe-Nr. und Jahr; `KonfigurationSeedTest` prüft den Seed (Spec 05, Req 1.6, 6.7; Aufgabe 17.7)
   - Ergänzt 13.11.2026: Klassifikation `verband` (`vhf`, `gsk`, mehrfach, öffentlich filterbar, ohne KI-Vorschlag) im Seed; `zugriff` und `veroeffentlicht` nach design.md «Reservierte Felder» (drei Stufen)
+  - Nachtrag (PR #227): Produktions-Seed mit sechs Verbandsarten und Finanzwerkzeug-Szenario ergänzt. Der Test-Seed `PROBE_VHF_BULLETIN` bleibt, weil zahlreiche Szenarien aus Aufgabe 1.4 ihn direkt verwenden; Werte zu Aufbewahrung und Vertraulichkeit sind vorsichtig ausgelegt. `_hinweise` dokumentiert Filter- und KI-Vorgaben bis zur Umsetzung der Spec-05-Konfiguration. Offen: Spec-05-Konfiguration, Keycloak-Client in Produktion und Produktiv-Provisionierung (Fabian).
   - _Anforderungen: 1.1, 1.2, 1.3, 1.5, 1.6, 3.7_
 
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
