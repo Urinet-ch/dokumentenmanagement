@@ -7,6 +7,8 @@ import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.integration.application.webseite.AenderungFeedAufraeumen;
 import ch.urinet.archiv.integration.application.webseite.DateiPlaetze;
+import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.ki.domain.Vektortext;
 import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -51,6 +53,9 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,6 +102,7 @@ public class WebseitenLesenSchritte {
     private long heapZuwachs;
     private Response antwort;
     private Response vergleich;
+    private boolean embeddingGesetzt;
 
     @After
     public void aufraeumen() throws SQLException, InterruptedException {
@@ -121,6 +127,10 @@ public class WebseitenLesenSchritte {
         for (String mandant : mandantenMitReihen) {
             ausfuehren("delete from " + new MandantCode(mandant).schema()
                     + ".dokumentart where code like 'WEBTEST\\_%'");
+        }
+        if (embeddingGesetzt) {
+            embeddingGesetzt = false;
+            KiWireMock.zuruecksetzen();
         }
         dokumente.clear();
         tokenIds.clear();
@@ -288,6 +298,12 @@ public class WebseitenLesenSchritte {
     @Dann("antwortet die Lese-Schnittstelle mit Status {int} und Fehlercode «{word}»")
     public void statusUndCode(int status, String code) {
         assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
+    }
+
+    @Dann("nennt die Antwort nicht das Dokument «{word}»")
+    public void nichtDokument(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(titel()).doesNotContain(name);
     }
 
     @Dann("nennt die Antwort genau die Dokumente «{}»")
@@ -661,6 +677,71 @@ public class WebseitenLesenSchritte {
             System.gc();
             Thread.sleep(50);
         }
+    }
+
+    // ---- Fundstelle der Suche (Aufgabe 11.13, Req 5.7)
+
+    /** Das Embedding-Modell (WireMock) bettet jede Frage als Einheitsvektor {@code e0} ein. */
+    @Angenommen("das Embedding-Modell bettet jede Frage der Webseiten-Suche gleich ein")
+    public void embeddingBereit() {
+        embeddingGesetzt = true;
+        KiWireMock.zuruecksetzen();
+        float[] frage = new float[KiWireMock.DIMENSION];
+        frage[0] = 1f;
+        String vektor = Vektortext.text(frage);
+        KiWireMock.client().register(post(urlPathEqualTo("/v1/embeddings")).atPriority(5).willReturn(okJson(
+                "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":" + vektor
+                        + "}],\"model\":\"bge_multilingual_gemma2\",\"usage\":{\"prompt_tokens\":"
+                        + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":" + KiWireMock.TOKENS_JE_TEXT + "}}")));
+    }
+
+    /** Spalte {@code seiten}: «von-bis» oder «-» ohne Seitenbereich; der Vektor liegt nahe bei der Frage. */
+    @Angenommen("das Dokument «{word}» hat diese Abschnitte nahe der Frage:")
+    public void abschnitte(String name, DataTable tabelle) throws SQLException {
+        Dok d = dokumente.get(name);
+        for (Map<String, String> zeile : tabelle.asMaps()) {
+            int nr = Integer.parseInt(zeile.get("nr"));
+            String seiten = zeile.get("seiten");
+            Integer von = null;
+            Integer bis = null;
+            if (!"-".equals(seiten)) {
+                String[] teile = seiten.split("-");
+                von = Integer.valueOf(teile[0]);
+                bis = Integer.valueOf(teile[1]);
+            }
+            float[] vektor = new float[KiWireMock.DIMENSION];
+            vektor[0] = 1f;
+            vektor[1] = 0.01f * nr;
+            ausfuehren("insert into " + new MandantCode(d.mandant()).schema() + ".chunk (dokument_id, nr, text, "
+                    + "seite_von, seite_bis, embedding) values (?, ?, ?, ?, ?, ?::public.halfvec)", d.id(), nr,
+                    "webtest-" + name + " Abschnittstext-" + nr + " mit Geheimwort-Abschnitt", von, bis,
+                    Vektortext.text(vektor));
+        }
+    }
+
+    @Dann("trägt der Treffer «{word}» die Fundstelle mit Seite {int}")
+    public void fundstelle(String name, int seite) {
+        Map<String, Object> treffer = treffer(name);
+        assertThat(treffer).containsKey("fundstelle");
+        assertThat(treffer.get("fundstelle")).isEqualTo(Map.of("seite", seite));
+    }
+
+    @Dann("trägt der Treffer «{word}» keine Fundstelle")
+    public void keineFundstelle(String name) {
+        assertThat(treffer(name)).doesNotContainKey("fundstelle");
+    }
+
+    @Dann("nennt die Antwort den Text der Abschnitte nicht")
+    public void keinAbschnittstext() {
+        assertThat(antwort.asString()).doesNotContain("Geheimwort-Abschnitt").doesNotContain("Abschnittstext");
+    }
+
+    private Map<String, Object> treffer(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        String id = dokumente.get(name).id().toString();
+        List<Map<String, Object>> treffer = antwort.path("treffer");
+        return treffer.stream().filter(x -> id.equals(x.get("id"))).findFirst()
+                .orElseThrow(() -> new AssertionError("Treffer fehlt: " + name));
     }
 
     // ---- Änderungs-Feed (Aufgabe 11.9)

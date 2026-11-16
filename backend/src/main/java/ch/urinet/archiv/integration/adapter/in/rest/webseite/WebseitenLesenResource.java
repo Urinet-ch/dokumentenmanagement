@@ -137,7 +137,8 @@ public class WebseitenLesenResource {
     }
 
     @Schema(name = "WebseiteFundstelle", description = "Stelle des besten Treffers im Dokument")
-    public record FundstelleDto(@Schema(required = true, description = "PDF-Seite, ab 1") int seite) {
+    public record FundstelleDto(@Schema(required = true, description = "PDF-Seite, ab 1; die Webseite verlinkt mit #page=<n> an die Datei, "
+            + "das Archiv liefert keine Seiten-URL") int seite) {
     }
 
     @Schema(name = "WebseiteTreffer", description = "Dokument als Treffer der Suche")
@@ -153,8 +154,8 @@ public class WebseitenLesenResource {
             @Schema(nullable = true, description = "Textstelle zum Suchbegriff aus dem Text, höchstens 300 Zeichen; "
                     + "ohne Dateinamen") String auszug,
             @JsonInclude(JsonInclude.Include.NON_NULL)
-            @Schema(description = "Fehlt, wenn die Seite unbekannt ist (Treffer nur aus dem Volltext oder Text ohne "
-                    + "Seitentrenner)") FundstelleDto fundstelle,
+            @Schema(description = "Fehlt, wenn die Seite unbekannt ist (Treffer nur aus dem Volltext, Text ohne "
+                    + "Seitentrenner oder Seite ausserhalb von seiten)") FundstelleDto fundstelle,
             @Schema(required = true, description = "Platz in dieser Antwort, ab 1") int rang) {
     }
 
