@@ -11,9 +11,10 @@ import java.util.UUID;
  * @param reiheName Name der Reihe (leer, wenn die Art nicht gefunden wird)
  * @param ausgabe   {@code zusatz.ausgabe} als Text, kann fehlen
  * @param jahr      {@code zusatz.jahr}, kann fehlen
+ * @param seiten    {@code dokument.seiten}, kann fehlen (nur für die Plausibilität der Fundstelle, nie an das Modell)
  */
 public record OeffentlichesDokument(UUID id, String titel, String reiheCode, String reiheName, String ausgabe,
-                                    Integer jahr) {
+                                    Integer jahr, Integer seiten) {
 
     public OeffentlichesDokument {
         Objects.requireNonNull(id, "id");

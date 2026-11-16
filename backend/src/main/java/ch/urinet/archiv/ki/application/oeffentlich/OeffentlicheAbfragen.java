@@ -109,14 +109,13 @@ public class OeffentlicheAbfragen {
         Sichtregel sicht = Sichtregel.fuerWebseite(new Sichtregel.Webseite(zugriff.stufen(), null, null));
         Hybridergebnis ergebnis = hybridSuchen(anfrage, sicht, n);
         List<Suchtreffer> treffer;
-        Map<UUID, String> fundstellen = new LinkedHashMap<>();
+        Map<UUID, Fundstelle> fundstellen = new LinkedHashMap<>();
         boolean degradiert;
         long gesamt;
         if (ergebnis != null) {
             treffer = ergebnis.treffer().stream().map(h -> {
-                String seiten = seiten(h.fundstelle());
-                if (seiten != null) {
-                    fundstellen.put(h.treffer().id(), seiten);
+                if (h.fundstelle() != null) {
+                    fundstellen.put(h.treffer().id(), h.fundstelle());
                 }
                 return h.treffer();
             }).toList();
@@ -137,7 +136,7 @@ public class OeffentlicheAbfragen {
             OeffentlichesDokument d = sichtbar.get(t.id());
             String auszug = t.auszug().stream().map(AuszugTeil::text).collect(Collectors.joining());
             return new Treffer(null, t.id().toString(), fremd(d.titel()), fremd(d.reiheName()), fremd(d.ausgabe()),
-                    d.jahr(), auszug.isEmpty() ? null : auszug, fundstellen.get(t.id()));
+                    d.jahr(), auszug.isEmpty() ? null : auszug, seiten(fundstellen.get(t.id()), d.seiten()));
         }).toList();
         long verworfen = treffer.size() - ergebnisse.size();
         return new Antwort(ergebnisse, Math.max(ergebnisse.size(), gesamt - verworfen),
@@ -197,12 +196,9 @@ public class OeffentlicheAbfragen {
         }
     }
 
-    private static String seiten(Fundstelle f) {
-        if (f == null || f.seiteVon() == null) {
-            return null;
-        }
-        return f.seiteBis() == null || f.seiteBis().equals(f.seiteVon()) ? f.seiteVon().toString()
-                : f.seiteVon() + "-" + f.seiteBis();
+    /** Seiten der Fundstelle nur, wenn sie im Dokument liegen (Req 5.7); sonst keine Angabe. */
+    private static String seiten(Fundstelle f, Integer dokumentSeiten) {
+        return f == null ? null : f.seitenText(dokumentSeiten);
     }
 
     /** Fremder Text für das Modell: einzeilig, ohne Rahmenmarker, gekürzt; leer bleibt {@code null}. */

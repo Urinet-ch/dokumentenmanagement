@@ -347,8 +347,8 @@ public class ChatHybridSchritte {
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement befehl = verbindung
                 .prepareStatement("insert into " + schema + ".dokument (id, art, titel, datum, quelle, tags, "
                         + "vertraulichkeit, person_benutzer, erstellt_von, status, bestaetigt, bestaetigt_von, "
-                        + "geschaeftsjahr, volltext, dateiname, partner_id, partner_name) values (?, ?, ?, ?, "
-                        + "'UPLOAD', cast('{}' as text[]), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                        + "geschaeftsjahr, volltext, dateiname, partner_id, partner_name, seiten) values (?, ?, ?, ?, "
+                        + "'UPLOAD', cast('{}' as text[]), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             befehl.setObject(1, id);
             befehl.setString(2, leer(z.get("art")));
             befehl.setString(3, z.get("name"));
@@ -364,6 +364,9 @@ public class ChatHybridSchritte {
             befehl.setString(13, leer(z.get("dateiname")));
             befehl.setObject(14, kontakt == null ? null : kontakt.id());
             befehl.setString(15, partner);
+            // Spalte «seiten»: ohne Angabe 100 (die Fundstellen der Szenarien liegen im Dokument), «-» ohne Seitenzahl
+            String seiten = z.getOrDefault("seiten", "100");
+            befehl.setObject(16, "-".equals(seiten) ? null : Integer.valueOf(seiten), Types.INTEGER);
             befehl.executeUpdate();
         }
         dokumente.put(z.get("name"), new Ort(mandant, id));
