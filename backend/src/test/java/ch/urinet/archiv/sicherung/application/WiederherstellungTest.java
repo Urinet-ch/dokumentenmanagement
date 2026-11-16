@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -186,6 +187,15 @@ class WiederherstellungTest {
                     .wiederherstellen(MANDANT, List.of(inventar), datei, true);
             assertThat(abgelehnt.exitCode()).isEqualTo(2);
             assertThat(falschesZiel.reihenfolge).isEmpty();
+            assertThat(falschesZiel.leerAufrufe).isZero();
+        }
+        for (String praefix : List.of("Urinet-archiv-p-", " urinet-archiv-p-", "xurinet-archiv-p-",
+                "urinet-archiv-p- ")) {
+            InMemoryZiel falschesZiel = new InMemoryZiel(praefix, true);
+            Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR)
+                    .wiederherstellen(MANDANT, List.of(inventar), datei, true);
+            assertThat(abgelehnt.exitCode()).isEqualTo(2);
+            assertThat(falschesZiel.leerAufrufe).isZero();
         }
 
         InMemoryZiel probeZiel = new InMemoryZiel("urinet-archiv-p-", true);
@@ -208,6 +218,56 @@ class WiederherstellungTest {
                         datei, false);
 
         assertThat(ergebnis.exitCode()).isEqualTo(2);
+        assertThat(ziel.reihenfolge).isEmpty();
+    }
+
+    @Test
+    void zweiteAusfuehrungIstIdempotentUndSchreibtKeineWeitereVersion(@TempDir Path temp) throws Exception {
+        Path datei = temp.resolve("strom.bin");
+        Files.write(datei, frame("archiv/a", "v1", new byte[]{1}, JETZT));
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+        var wiederherstellung = new Wiederherstellung(ziel, UHR);
+        List<InventarZeile> inventar = List.of(zeile("archiv/a", "v1", false, 1, JETZT.toString(), null, null));
+
+        Wiederherstellung.Ergebnis erste = wiederherstellung.wiederherstellen(MANDANT, inventar, datei, false);
+        Wiederherstellung.Ergebnis zweite = wiederherstellung.wiederherstellen(MANDANT, inventar, datei, false);
+
+        assertThat(erste.exitCode()).isZero();
+        assertThat(zweite.exitCode()).isEqualTo(2);
+        assertThat(ziel.reihenfolge).containsExactly("v1");
+    }
+
+    @Test
+    void mittenImObjektAbgeschnittenerStromSchreibtKeineVersion(@TempDir Path temp) throws Exception {
+        byte[] vollstaendig = frame("archiv/a", "v1", "inhalt".getBytes(StandardCharsets.UTF_8), JETZT);
+        Path datei = temp.resolve("abgeschnitten.bin");
+        Files.write(datei, Arrays.copyOf(vollstaendig, vollstaendig.length - 10));
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+                .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(), null, null)),
+                        datei, false);
+
+        assertThat(ergebnis.exitCode()).isEqualTo(3);
+        assertThat(ziel.reihenfolge).isEmpty();
+        assertThat(ziel.sperren).isEmpty();
+    }
+
+    @Test
+    void unvollstaendigeSperrfristImInventarBrichtVorDemSchreibenAb(@TempDir Path temp) throws Exception {
+        Path datei = temp.resolve("strom.bin");
+        Files.write(datei, frame("archiv/a", "v1", new byte[]{1}, JETZT));
+        InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
+        List<InventarZeile> inventar = List.of(
+                zeile("archiv/a", "v1", false, 1, JETZT.toString(), "GOVERNANCE", null),
+                zeile("archiv/a", "v1", false, 1, JETZT.toString(), null, "2036-11-15T12:00:00Z"));
+
+        for (InventarZeile zeile : inventar) {
+            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+                    .wiederherstellen(MANDANT, List.of(zeile), datei, false);
+            assertThat(ergebnis.exitCode()).isEqualTo(3);
+        }
+
         assertThat(ziel.reihenfolge).isEmpty();
     }
 
@@ -339,6 +399,7 @@ class WiederherstellungTest {
         private int verworfen;
         private boolean sperrFehler;
         private int groessterLeseaufruf;
+        private int leerAufrufe;
 
         private InMemoryZiel(String praefix, boolean zielLeer) {
             this(praefix, zielLeer, true);
@@ -396,7 +457,8 @@ class WiederherstellungTest {
 
         @Override
         public boolean leer(MandantCode mandant) {
-            return zielLeer;
+            leerAufrufe++;
+            return zielLeer && reihenfolge.isEmpty();
         }
     }
 }

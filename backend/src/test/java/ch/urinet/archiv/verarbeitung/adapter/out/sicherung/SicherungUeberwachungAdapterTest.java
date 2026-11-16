@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -78,8 +79,38 @@ class SicherungUeberwachungAdapterTest {
         assertThat(adapter.befunde()).isEmpty();
     }
 
+    @Test
+    void sicherungsfristIstAuchUeberSommerzeitUndZeitzonenwechselEineDauer() {
+        Instant jetzt = Instant.parse("2026-03-29T01:30:00Z");
+        Map<Schluessel, Instant> eintraege = new HashMap<>();
+        for (SicherungsArt art : SicherungsArt.values()) {
+            Optional<MandantCode> code = art.mandantPflicht() ? Optional.of(new MandantCode("alpha"))
+                    : Optional.empty();
+            eintraege.put(new Schluessel(art, code.map(MandantCode::wert).orElse(null)), jetzt);
+        }
+        Schluessel db = new Schluessel(SicherungsArt.DB, null);
+        eintraege.put(db, jetzt.minus(FRIST));
+        Clock schweizerSommerzeit = Clock.fixed(jetzt, ZoneId.of("Europe/Zurich"));
+        SicherungUeberwachungAdapter adapter = adapter(List.of(mandant("alpha", true)), eintraege, true,
+                schweizerSommerzeit);
+
+        assertThat(adapter.befunde()).hasValue(List.of());
+
+        eintraege.remove(db);
+        assertThat(adapter.befunde()).hasValue(List.of(new Befund(Befund.Quelle.SICHERUNG, "db", "FEHLT")));
+
+        eintraege.put(db, jetzt.minus(FRIST).minusSeconds(1));
+        assertThat(adapter.befunde()).hasValue(List.of(new Befund(Befund.Quelle.SICHERUNG, "db", "ZU_ALT")));
+    }
+
     private static SicherungUeberwachungAdapter adapter(List<Mandant> mandanten,
                                                         Map<Schluessel, Instant> eintraege, boolean aktiv) {
+        return adapter(mandanten, eintraege, aktiv, Clock.fixed(JETZT, ZoneOffset.UTC));
+    }
+
+    private static SicherungUeberwachungAdapter adapter(List<Mandant> mandanten,
+                                                        Map<Schluessel, Instant> eintraege, boolean aktiv,
+                                                        Clock uhr) {
         SicherungExportSpeicher speicher = new SicherungExportSpeicher() {
             @Override
             public void festhalten(SicherungsArt art, Optional<MandantCode> mandant, String sha256) {
@@ -113,8 +144,7 @@ class SicherungUeberwachungAdapterTest {
                 return Optional.empty();
             }
         };
-        return new SicherungUeberwachungAdapter(speicher, register, FRIST, aktiv,
-                Clock.fixed(JETZT, ZoneOffset.UTC));
+        return new SicherungUeberwachungAdapter(speicher, register, FRIST, aktiv, uhr);
     }
 
     private static Mandant mandant(String code, boolean aktiv) {
