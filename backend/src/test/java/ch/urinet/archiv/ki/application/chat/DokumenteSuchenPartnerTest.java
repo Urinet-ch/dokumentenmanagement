@@ -166,6 +166,15 @@ class DokumenteSuchenPartnerTest {
     }
 
     @Test
+    void passtDerUnbekannteNameNichtInDenSuchtextNenntDerHinweisKeineSucheUeberDenNamen() {
+        String frage = "Rechnung ".repeat(21).strip();
+        DokumenteSuchen.Antwort a = werkzeug(List.of(bachmann)).suchen(kontext(Rolle.INHABER),
+                anfrage(frage, "Dinkel Vollkorngipfel AG", null));
+        assertThat(hybridAnfragen).singleElement().satisfies(s -> assertThat(s.begriff()).isEqualTo(frage));
+        assertThat(a.hinweis()).isEqualTo("Partner nicht gefunden");
+    }
+
+    @Test
     void aehnlichkeitstrefferMeldetDieZuordnungUndNenntDenNamenNurMitRechtA6() {
         PartnerKandidat aehnlich = new PartnerKandidat(bachmann.id(), new java.math.BigDecimal("0.9"));
         DokumenteSuchen.Antwort inhaber = werkzeug(List.of(bachmann), List.of(aehnlich)).suchen(kontext(Rolle.INHABER),
