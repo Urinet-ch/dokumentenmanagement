@@ -26,8 +26,18 @@ ARCHIV_KEYCLOAK_DB_NAME=${ARCHIV_KEYCLOAK_DB_NAME:-keycloak}
 ARCHIV_AUFBEWAHRUNG_TAGE=${ARCHIV_AUFBEWAHRUNG_TAGE:-3}
 
 [[ -f $ARCHIV_COMPOSE_FILE ]] || fehler 2 "Compose-Datei fehlt."
-[[ $ARCHIV_AGE_EMPFAENGER_SICHERUNG == age1* ]] || fehler 2 "Sicherungs-Empfänger muss ein öffentlicher age-Schlüssel sein."
-[[ $ARCHIV_AGE_EMPFAENGER_PROBE == age1* ]] || fehler 2 "Probe-Empfänger muss ein öffentlicher age-Schlüssel sein."
+# age-Schlüssel sind «age1» plus 58 Zeichen aus dem Bech32-Alphabet (ohne 1, b, i, o). Die strenge Prüfung verhindert,
+# dass Leerraum, Zeilenumbrüche oder Optionen als Empfänger an age gelangen.
+age_schluessel='^age1[02-9ac-hj-np-z]{58}$'
+[[ $ARCHIV_AGE_EMPFAENGER_SICHERUNG =~ $age_schluessel ]] \
+  || fehler 2 "Sicherungs-Empfänger muss ein öffentlicher age-Schlüssel sein."
+[[ $ARCHIV_AGE_EMPFAENGER_PROBE =~ $age_schluessel ]] \
+  || fehler 2 "Probe-Empfänger muss ein öffentlicher age-Schlüssel sein."
+# Zwei gleiche Empfänger ergäben nur einen Schlüssel: Die Restore-Probe wäre nicht unabhängig von der Sicherung (Req 16.23).
+[[ $ARCHIV_AGE_EMPFAENGER_SICHERUNG != "$ARCHIV_AGE_EMPFAENGER_PROBE" ]] \
+  || fehler 2 "Sicherungs- und Probe-Empfänger müssen verschiedene Schlüssel sein."
+ARCHIV_VOLLEXPORT=${ARCHIV_VOLLEXPORT:-0}
+[[ $ARCHIV_VOLLEXPORT == 0 || $ARCHIV_VOLLEXPORT == 1 ]] || fehler 2 "ARCHIV_VOLLEXPORT muss 0 oder 1 sein."
 if [[ ! $ARCHIV_AUFBEWAHRUNG_TAGE =~ ^[1-9][0-9]*$ ]] \
   || [[ ${#ARCHIV_AUFBEWAHRUNG_TAGE} -gt 4 ]] \
   || (( ARCHIV_AUFBEWAHRUNG_TAGE > 3650 )); then
@@ -63,6 +73,8 @@ done
 chmod 700 "$laeufe"
 chmod 700 "$zustand" "$zustandslaeufe"
 
+# read liest nur die erste Zeile: Ein Zeilenumbruch würde weitere Mandanten stillschweigend auslassen.
+[[ $ARCHIV_MANDANTEN != *$'\n'* ]] || fehler 2 "ARCHIV_MANDANTEN darf keinen Zeilenumbruch enthalten."
 read -r -a mandanten <<< "$ARCHIV_MANDANTEN"
 (( ${#mandanten[@]} > 0 )) || fehler 2 "ARCHIV_MANDANTEN enthält keinen Mandanten."
 bereits_gesehen=" "
@@ -80,7 +92,26 @@ zustandsziel="$zustandslaeufe/$laufname"
   || fehler 3 "Für diesen Zeitpunkt gibt es bereits einen Sicherungslauf."
 
 sperre="$sicherungswurzel/.taeglich.lock"
-mkdir -- "$sperre" 2>/dev/null || fehler 3 "Ein Sicherungslauf läuft bereits oder die Sperre ist belegt."
+veraltete_sperre=0
+if ! mkdir -- "$sperre" 2>/dev/null; then
+  # Nach SIGKILL, OOM-Kill oder Neustart läuft der EXIT-Trap nicht und die Sperre bleibt liegen. Gehört die gespeicherte
+  # Prozess-ID keinem lebenden Prozess mehr, wird die Sperre übernommen; sonst bricht der Lauf ab (siehe README).
+  sperre_pid=
+  if [[ -f $sperre/pid && ! -L $sperre/pid ]]; then
+    IFS= read -r sperre_pid < "$sperre/pid" || true
+  fi
+  if [[ $sperre_pid =~ ^[0-9]+$ ]] && ! kill -0 "$sperre_pid" 2>/dev/null; then
+    # Die Umbenennung gelingt nur einem von zwei gleichzeitig startenden Läufen.
+    mv -- "$sperre" "$sperre.veraltet.$$" 2>/dev/null \
+      || fehler 3 "Ein Sicherungslauf läuft bereits oder die Sperre ist belegt."
+    rm -rf -- "$sperre.veraltet.$$"
+    mkdir -- "$sperre" 2>/dev/null || fehler 3 "Ein Sicherungslauf läuft bereits oder die Sperre ist belegt."
+    printf 'Hinweis: Veraltete Sperre eines abgebrochenen Laufs übernommen.\n' >&2
+    veraltete_sperre=1
+  else
+    fehler 3 "Ein Sicherungslauf läuft bereits oder die Sperre ist belegt."
+  fi
+fi
 sperre_aktiv=1
 
 arbeitsverzeichnis=
@@ -97,9 +128,11 @@ compose() {
 }
 
 api_kommando() {
-  # Quarkus-Argumente laufen im vorhandenen API-Container und bleiben in dessen Speicherlimit.
+  # Wegwerf-Container des API-Dienstes (gleiche Secrets und JAVA_OPTS_APPEND), nie «exec» im laufenden Container: Eine
+  # zweite JVM sprengt dessen mem_limit (design.md, Aufgabe 1.3). Ohne Traefik-Anmeldung. -T reicht stdin weiter:
+  # Aufrufer ohne gewollte Eingabe leiten stdin von /dev/null um, sonst verbraucht der Container ihren stdin.
   # shellcheck disable=SC2016 # JAVA_OPTS_APPEND und "$@" werden im Container-Shellprozess ausgewertet.
-  compose exec -T "$ARCHIV_API_SERVICE" sh -c \
+  compose run --rm --no-deps -T -l traefik.enable=false "$ARCHIV_API_SERVICE" sh -c \
     'exec java ${JAVA_OPTS_APPEND:-} -jar /deployments/quarkus-run.jar "$@"' archiv "$@"
 }
 
@@ -177,6 +210,16 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 printf '%s\n' "$$" > "$sperre/pid" || fehler 3 "Lauf-Sperre konnte nicht protokolliert werden."
+
+if (( veraltete_sperre )); then
+  # Der abgebrochene Lauf kann Keycloak angehalten und Klartext im Arbeitsverzeichnis hinterlassen haben.
+  compose start "$ARCHIV_KEYCLOAK_SERVICE" >/dev/null \
+    || fehler 3 "Keycloak konnte nach einem abgebrochenen Lauf nicht gestartet werden."
+  for verwaist in "$sicherungswurzel"/.arbeit.????????; do
+    [[ -d $verwaist && ! -L $verwaist && -O $verwaist ]] || continue
+    rm -rf -- "$verwaist" || fehler 3 "Verwaistes Arbeitsverzeichnis konnte nicht entfernt werden."
+  done
+fi
 
 arbeitsverzeichnis=$(mktemp -d "$sicherungswurzel/.arbeit.XXXXXXXX") \
   || fehler 3 "Arbeitsverzeichnis kann nicht angelegt werden."
@@ -258,36 +301,62 @@ fi
 verschluesseln keycloak - "$plain/keycloak.dump"
 realm_container_angelegt=1
 # shellcheck disable=SC2016 # Der Befehl wird im Container ausgewertet, nicht im Host-Shellprozess.
-realm_export_befehl='set -euo pipefail; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /tmp/archiv-export --realm urinet-archiv --users same_file'
-compose run --no-deps -T --name "$realm_container" --entrypoint /bin/bash \
+# /tmp des Dienstes ist ein 32-MiB-tmpfs, und tmpfs-Inhalt überlebt das Containerende nicht (docker cp erfasst ihn
+# nicht). Darum schreibt der Export in ein Bind-Mount unter dem Arbeitsverzeichnis. Der Keycloak-Benutzer (uid 1000)
+# braucht Schreibrecht; das übergeordnete Arbeitsverzeichnis ist 700, andere Benutzer erreichen das Verzeichnis nicht.
+realm_export_befehl='set -euo pipefail; umask 022; export KC_DB_PASSWORD="$(< /run/secrets/keycloak_db)"; exec /opt/keycloak/bin/kc.sh export --optimized --dir /archiv-export --realm urinet-archiv --users same_file'
+chmod 777 "$plain/realm" || fehler 3 "Verzeichnis für den Realm-Export konnte nicht vorbereitet werden."
+compose run --no-deps -T --name "$realm_container" --volume "$plain/realm:/archiv-export" --entrypoint /bin/bash \
   "$ARCHIV_KEYCLOAK_SERVICE" -c "$realm_export_befehl" \
   || fehler 3 "Keycloak-Realm konnte nicht exportiert werden."
 compose start "$ARCHIV_KEYCLOAK_SERVICE" >/dev/null \
   || fehler 3 "Keycloak konnte nach dem Realm-Export nicht gestartet werden."
 keycloak_angehalten=0
-"$ARCHIV_DOCKER_BIN" cp "$realm_container:/tmp/archiv-export/." "$plain/realm/" >/dev/null \
-  || fehler 3 "Realm-Export konnte nicht aus dem temporären Container kopiert werden."
 "$ARCHIV_DOCKER_BIN" rm "$realm_container" >/dev/null \
   || fehler 3 "Temporärer Realm-Export-Container konnte nicht entfernt werden."
 realm_container_angelegt=0
-[[ -n $(find "$plain/realm" -type f -print -quit) ]] || fehler 3 "Keycloak-Realm-Export ist leer."
+[[ -n $(find "$plain/realm" -type f -size +0c -print -quit) ]] || fehler 3 "Keycloak-Realm-Export ist leer."
 if ! tar -C "$plain" -cf "$plain/keycloak-realm.tar" realm; then
   fehler 3 "Keycloak-Realm-Export konnte nicht gebündelt werden."
 fi
 verschluesseln realm - "$plain/keycloak-realm.tar"
 rm -rf -- "$plain/realm"
 
-"$ARCHIV_DOCKER_BIN" compose --file "$compose_datei" cp \
+compose cp \
   "$ARCHIV_API_SERVICE:/run/secrets/archiv_manifest_key" "$plain/manifest.key" \
   || fehler 3 "Manifest-Schlüssel konnte nicht aus dem API-Container kopiert werden."
 [[ -s $plain/manifest.key ]] || fehler 3 "Manifest-Schlüssel ist leer."
 chmod 600 "$plain/manifest.key"
 verschluesseln schluessel - "$plain/manifest.key"
 
+# Req 16.23: Wird der Probe-Schlüssel gewechselt, folgt ein neuer Vollexport. Ein Zuwachs der Tage vor dem Wechsel bliebe
+# sonst nur für den alten Probe-Schlüssel lesbar, und die Restore-Probe könnte den Bucket nicht vollständig entschlüsseln.
+# Gespeichert wird nur die Prüfsumme des öffentlichen Schlüssels, im Zustand des Laufs neben den Inventaren.
+printf '%s' "$ARCHIV_AGE_EMPFAENGER_PROBE" > "$arbeitsverzeichnis/probe-empfaenger"
+probe_summe=$(sha256_datei "$arbeitsverzeichnis/probe-empfaenger") || fehler 3 "SHA-256 konnte nicht berechnet werden."
+rm -f -- "$arbeitsverzeichnis/probe-empfaenger"
+printf '%s\n' "$probe_summe" > "$neuer_zustand/probe-empfaenger.sha256"
+vollexport=0
+vollexport_grund="Erster Export"
+if [[ $ARCHIV_VOLLEXPORT == 1 ]]; then
+  vollexport=1
+  vollexport_grund="Vollexport angefordert (ARCHIV_VOLLEXPORT=1)"
+elif [[ -n $vorheriger_lauf ]]; then
+  vorherige_summe=
+  vorheriger_probe="$zustandslaeufe/$vorheriger_lauf/probe-empfaenger.sha256"
+  if [[ -f $vorheriger_probe && ! -L $vorheriger_probe ]]; then
+    IFS= read -r vorherige_summe < "$vorheriger_probe" || true
+  fi
+  if [[ $vorherige_summe != "$probe_summe" ]]; then
+    vollexport=1
+    vollexport_grund="Probe-Schlüssel gewechselt oder unbekannt (Req 16.23)"
+  fi
+fi
+
 for mandant in "${mandanten[@]}"; do
   inventar="$plain/inventar-$mandant.jsonl"
   bucket="$plain/bucket-$mandant.bin"
-  if ! api_kommando sicherung inventar --mandant "$mandant" > "$inventar"; then
+  if ! api_kommando sicherung inventar --mandant "$mandant" > "$inventar" < /dev/null; then
     fehler 3 "Bucket-Inventar konnte nicht erstellt werden."
   fi
 
@@ -298,14 +367,14 @@ for mandant in "${mandanten[@]}"; do
     vorheriges_inventar=$vorheriger_pfad
   fi
 
-  if [[ -n $vorheriges_inventar ]]; then
+  if [[ -n $vorheriges_inventar ]] && (( ! vollexport )); then
     if ! cat -- "$vorheriges_inventar" \
       | api_kommando sicherung zuwachs --mandant "$mandant" --inventar-vorher - > "$bucket"; then
       fehler 3 "Bucket-Zuwachs konnte nicht exportiert werden."
     fi
   else
-    printf 'Hinweis: Erster Export für Mandant %s; vollständiger Bucket-Export.\n' "$mandant" >&2
-    if ! api_kommando sicherung zuwachs --mandant "$mandant" > "$bucket"; then
+    printf 'Hinweis: %s für Mandant %s; vollständiger Bucket-Export.\n' "$vollexport_grund" "$mandant" >&2
+    if ! api_kommando sicherung zuwachs --mandant "$mandant" > "$bucket" < /dev/null; then
       fehler 3 "Vollständiger Bucket-Export konnte nicht erstellt werden."
     fi
   fi
@@ -320,19 +389,20 @@ lauf_veroeffentlicht=1
 mv -- "$neuer_zustand" "$zustandsziel" || fehler 3 "Neuer Sicherungszustand konnte nicht gespeichert werden."
 zustand_angelegt=1
 
-while IFS=$'\t' read -r art mandant dateiname summe; do
+# Eigener Dateideskriptor: Kein Aufruf in der Schleife kann die restlichen Zeilen von stdin verbrauchen.
+while IFS=$'\t' read -r -u 3 art mandant dateiname summe; do
   [[ -n $art && -n $dateiname && -n $summe ]] || fehler 3 "Interne SHA-256-Liste ist ungültig."
   registrierung_begonnen=1
   if [[ $mandant == - ]]; then
-    if ! api_kommando sicherung festhalten --art "$art" --sha256 "$summe" >/dev/null; then
+    if ! api_kommando sicherung festhalten --art "$art" --sha256 "$summe" >/dev/null < /dev/null; then
       fehler 3 "SHA-256 konnte nicht im Sicherungsregister festgehalten werden."
     fi
   else
-    if ! api_kommando sicherung festhalten --art "$art" --mandant "$mandant" --sha256 "$summe" >/dev/null; then
+    if ! api_kommando sicherung festhalten --art "$art" --mandant "$mandant" --sha256 "$summe" >/dev/null < /dev/null; then
       fehler 3 "SHA-256 konnte nicht im Sicherungsregister festgehalten werden."
     fi
   fi
-done < "$registrierungen"
+done 3< "$registrierungen"
 
 printf 'Vollständig verschlüsselt und registriert.\n' > "$ziel/FERTIG.tmp"
 mv -- "$ziel/FERTIG.tmp" "$ziel/FERTIG" || fehler 3 "Sicherungslauf konnte nicht als vollständig markiert werden."

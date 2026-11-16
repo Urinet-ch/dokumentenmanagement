@@ -20,13 +20,14 @@ Vorgaben der Compose-Datei dieses Repositories.
 | `ARCHIV_COMPOSE_FILE` | ja | Compose-Datei |
 | `ARCHIV_SICHERUNGSVERZEICHNIS` | ja | Eigenes Verzeichnis für Läufe und lokalen Zustand |
 | `ARCHIV_MANDANTEN` | ja | Leerzeichengetrennte Mandantencodes |
-| `ARCHIV_AGE_EMPFAENGER_SICHERUNG` | ja | Öffentlicher `age`-Empfänger des Sicherungsschlüssels (`age1…`) |
-| `ARCHIV_AGE_EMPFAENGER_PROBE` | ja | Öffentlicher `age`-Empfänger des Probe-Schlüssels (`age1…`) |
+| `ARCHIV_AGE_EMPFAENGER_SICHERUNG` | ja | Öffentlicher `age`-Empfänger des Sicherungsschlüssels (`age1…`, 62 Zeichen) |
+| `ARCHIV_AGE_EMPFAENGER_PROBE` | ja | Öffentlicher `age`-Empfänger des Probe-Schlüssels, muss vom Sicherungsschlüssel verschieden sein |
 | `ARCHIV_API_SERVICE` | nein | API-Dienst, Standard `api` |
 | `ARCHIV_DB_SERVICE` | nein | Datenbankdienst, Standard `db` |
 | `ARCHIV_KEYCLOAK_SERVICE` | nein | Keycloak-Dienst, Standard `kc` |
 | `ARCHIV_DB_NAME` | nein | Archiv-Datenbank, Standard `archiv` |
 | `ARCHIV_KEYCLOAK_DB_NAME` | nein | Keycloak-Datenbank, Standard `keycloak` |
+| `ARCHIV_VOLLEXPORT` | nein | `1` erzwingt für diesen Lauf einen vollständigen Bucket-Export, Standard `0` |
 | `ARCHIV_AUFBEWAHRUNG_TAGE` | nein | Aufbewahrung alter Läufe, Standard `3`, zulässig `1` bis `3650` |
 | `ARCHIV_DOCKER_BIN` | nein | Docker-Programm, Standard `docker` |
 | `ARCHIV_AGE_BIN` | nein | `age`-Programm, Standard `age` |
@@ -41,6 +42,11 @@ Der Ordner `.zustand/` ausserhalb von `laeufe/` enthält das letzte Inventar unv
 mit restriktiven Dateirechten. Es wird ausschliesslich als Vorinventar für den nächsten
 `zuwachs`-Aufruf benötigt und gehört nicht zu den Dateien, die das Infra-Repository abholt.
 Bei einem neuen Mandanten wird einmal bewusst ein vollständiger Bucket-Export erstellt.
+Dasselbe gilt nach einem Wechsel des Probe-Schlüssels (Req 16.23): Der Zustand speichert die Prüfsumme des
+Probe-Empfängers, bei Abweichung oder fehlendem Eintrag folgt ein Vollexport für alle Mandanten, sonst bliebe der
+Zuwachs der Tage vor dem Wechsel nur für den alten Probe-Schlüssel lesbar. Von Hand erzwingt man ihn mit
+`ARCHIV_VOLLEXPORT=1`. Das Vorinventar enthält Objektschlüssel, Versionen und Sperrfristen und liegt bewusst nur
+mit Rechten 600/700 vor, nicht verschlüsselt: Zur Laufzeit gibt es keinen privaten Schlüssel zum Entschlüsseln.
 
 ## Ablauf
 
@@ -60,9 +66,14 @@ Bei einem neuen Mandanten wird einmal bewusst ein vollständiger Bucket-Export e
    nächsten Lauf aktualisiert. Alte Läufe werden erst danach innerhalb des konfigurierten
    Sicherungsverzeichnisses aufgeräumt.
 
-Die Quarkus-Adminbefehle laufen mit `docker compose exec` im vorhandenen API-Container und
-bleiben damit innerhalb seines Speicherlimits. Für den konsistenten Realm-Export wird Keycloak
-kurz angehalten und ein Wegwerf-Container verwendet. Die Shell-Skripte transportieren keine
+Die Quarkus-Adminbefehle (`inventar`, `zuwachs`, `festhalten`) laufen wie in der README des Repositories unter
+«Admin-Kommandos auf der VPS» in einem Wegwerf-Container (`docker compose run --rm --no-deps -T -l
+traefik.enable=false api …`), nie per `exec` im laufenden API-Container: Eine zweite JVM sprengt dessen `mem_limit`.
+Auf der VPS muss dafür kurz Platz für einen zweiten API-Container sein. Der Manifest-Schlüssel wird mit `compose cp`
+als Datei aus dem laufenden Container kopiert; dabei startet keine JVM. Für den konsistenten Realm-Export wird
+Keycloak kurz angehalten und ein Wegwerf-Container verwendet. Dessen Export schreibt in ein Bind-Mount unter dem
+Arbeitsverzeichnis, weil `/tmp` des Dienstes ein 32-MiB-tmpfs ist, das mit dem Container verschwindet. Dieser Teil ist
+nur gegen Attrappen getestet; der Lauf gegen die echte Compose-Umgebung ist Teil der Inbetriebnahme (Infra). Die Shell-Skripte transportieren keine
 Exporte an einen Backup-Anbieter.
 
 ## Aufruf und Fehlercodes
@@ -74,7 +85,20 @@ Exit-Code `3`; ein vollständig abgeschlossener Lauf endet mit `0`. Abbruch durc
 erfolgreichen Registereintrag fehlt `FERTIG`; solche Läufe sind nicht zur Abholung freigegeben.
 Bei einem Fehler in diesem Schritt bleibt das zuletzt erfolgreiche Vorinventar unverändert.
 
-Shell-Tests mit Attrappen für Docker und `age`:
+## Abbruch, Sperre und Aufräumen
+Die Sperre ist das Verzeichnis `.taeglich.lock` mit der Prozess-ID des Laufs. Nach `SIGKILL`, OOM-Kill oder Neustart
+läuft der Aufräum-Trap nicht. Der nächste Lauf erkennt eine Sperre, deren Prozess nicht mehr existiert, übernimmt sie
+und meldet `Hinweis: Veraltete Sperre …`. Er startet dann Keycloak (falls der Abbruch zwischen Anhalten und Start
+lag) und entfernt verwaiste `.arbeit.*`-Verzeichnisse, die Klartext enthalten können. Gehört die Prozess-ID einem
+lebenden Prozess, bricht der Lauf mit Exit-Code `3` ab. Nach einem Neustart kann eine alte ID von einem fremden Prozess
+belegt sein; dann hilft nur, `.taeglich.lock` von Hand zu entfernen, nachdem man geprüft hat, dass kein Lauf aktiv ist.
+
+## Zeitsteuerung
+Die tägliche Ausführung (Timer oder Cron auf der VPS, vor dem Abholfenster des Infra-Repositorys) ist nicht Teil dieses
+Skripts und gehört zum Infra-Teil von Aufgabe 5.5.
+
+Shell-Tests mit Attrappen für Docker und `age` sowie, wenn `age` und `age-keygen` installiert sind, einem Lauf mit
+echtem `age` und zwei Wegwerf-Identitäten:
 
 ```sh
 bash deploy/backup/test/taeglich-test.sh
