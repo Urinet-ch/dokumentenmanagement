@@ -57,7 +57,8 @@ Bei einem neuen Mandanten wird einmal bewusst ein vollständiger Bucket-Export e
 5. Die verschlüsselten Dateien und `SHA256SUMS` werden atomar unter
    `laeufe/lauf-<UTC-Zeit>-<Prozess-ID>/` veröffentlicht; ihre SHA-256-Werte werden im Register festgehalten.
    Erst nach erfolgreichem Registereintrag entsteht `FERTIG` und wird das Vorinventar für den
-   nächsten Lauf aktualisiert.
+   nächsten Lauf aktualisiert. Alte Läufe werden erst danach innerhalb des konfigurierten
+   Sicherungsverzeichnisses aufgeräumt.
 
 Die Quarkus-Adminbefehle laufen mit `docker compose exec` im vorhandenen API-Container und
 bleiben damit innerhalb seines Speicherlimits. Für den konsistenten Realm-Export wird Keycloak

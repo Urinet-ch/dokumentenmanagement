@@ -215,11 +215,17 @@ assert grep -q -- '--inventar-vorher -' "$MOCK_LOG"
 failed_root="$temp/failed-backup"
 export ARCHIV_SICHERUNGSVERZEICHNIS=$failed_root
 export MOCK_FAIL_ZUWACHS=1
+failed_old_run="$failed_root/laeufe/lauf-20000101T000000Z-2"
+mkdir -p "$failed_old_run"
+printf 'older completed backup\n' > "$failed_old_run/FERTIG"
+touch -t 200001010000 "$failed_old_run" "$failed_old_run/FERTIG"
 if "$script" > /dev/null 2> "$temp/failure.stderr"; then
   printf 'Fehlerfall hätte fehlschlagen müssen.\n' >&2
   exit 1
 fi
-assert test -z "$(find "$failed_root/laeufe" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+assert test -s "$failed_old_run/FERTIG"
+assert test -z "$(find "$failed_root/laeufe" -mindepth 1 -maxdepth 1 -type d \
+  ! -name 'lauf-20000101T000000Z-2' -print -quit)"
 assert test ! -e "$failed_root/.zustand/aktuell"
 if grep -q 'Keycloak konnte nach dem Realm-Export nicht gestartet werden' "$temp/failure.stderr"; then
   printf 'Keycloak wurde nach einem Exportfehler nicht korrekt gestartet.\n' >&2

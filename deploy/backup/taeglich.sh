@@ -231,7 +231,6 @@ loesche_alte_lauefe() {
     rm -rf -- "$verzeichnis" || fehler 3 "Alter Sicherungszustand konnte nicht entfernt werden."
   done < "$alte_zustaende"
 }
-loesche_alte_lauefe
 
 if ! compose exec -T "$ARCHIV_DB_SERVICE" pg_dump --no-password --format=custom \
   --username=postgres --dbname="$ARCHIV_DB_NAME" > "$plain/archiv.dump"; then
@@ -340,4 +339,5 @@ mv -- "$ziel/FERTIG.tmp" "$ziel/FERTIG" || fehler 3 "Sicherungslauf konnte nicht
 printf '%s\n' "$laufname" > "$arbeitsverzeichnis/aktuell"
 mv -f -- "$arbeitsverzeichnis/aktuell" "$zustand/aktuell" || fehler 3 "Sicherungszustand konnte nicht atomar aktualisiert werden."
 zustand_aktiv=1
+loesche_alte_lauefe
 printf 'Sicherungslauf abgeschlossen: %s\n' "$laufname"
