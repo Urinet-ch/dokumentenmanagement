@@ -423,14 +423,29 @@ public class MailSchritte {
     }
 
     @Dann("steht das Dokument der Mail unbestätigt im «{word}» mit PDF\\/A und dem Text «{}» im Volltext")
-    public void imEingangskorb(String status, String text) throws SQLException {
+    public void imEingangskorb(String status, String text) throws SQLException, InterruptedException {
         UUID id = dokument("urinet");
-        Map<String, Object> dok = verarbeitung.dokument("urinet", id);
+        Map<String, Object> dok = aufVerarbeitungWarten("urinet", id);
         assertThat(dok).containsEntry("status", status).containsEntry("pdfa_fehlt", false);
         assertThat(dok.get("sha256_pdfa")).isNotNull();
         assertThat((String) dok.get("volltext")).contains(text);
         assertThat(zeile("select bestaetigt from " + schema("urinet") + ".dokument where id = ?", id)
                 .get("bestaetigt")).isNull();
+    }
+
+    private Map<String, Object> aufVerarbeitungWarten(String mandant, UUID id)
+            throws SQLException, InterruptedException {
+        long ende = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        Map<String, Object> dokument;
+        do {
+            dokument = verarbeitung.dokument(mandant, id);
+            Object status = dokument.get("status");
+            if (!"NEU".equals(status) && !"VERARBEITUNG".equals(status)) {
+                return dokument;
+            }
+            TimeUnit.MILLISECONDS.sleep(100);
+        } while (System.nanoTime() < ende);
+        return dokument;
     }
 
     @Angenommen("im Postfach liegt eine HTML-Mail von «{}» mit dem Betreff «{}» und einem eingebetteten Logo")
