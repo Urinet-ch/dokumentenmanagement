@@ -450,6 +450,33 @@ class S3AblageTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /** Spec 03, Aufgabe 11.8: Stream einer Datei durch die API, genau diese Version, mit Länge aus den Objektdaten. */
+    @Test
+    void oeffnenLiefertGenauDieseVersionMitLaengeUndFehltBeiUnbekannterVersion() throws Exception {
+        S3Ablage ablage = ablage();
+        var schluessel = DateiSchluessel.pdfa(2026, UUID.randomUUID());
+        String erste = verwaltung.putObject(r -> r.bucket(bucket).key(schluessel.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("erste Fassung")).versionId();
+        verwaltung.putObject(r -> r.bucket(bucket).key(schluessel.pfad(Ablageort.ARCHIV)),
+                RequestBody.fromString("zweite, längere Fassung"));
+
+        try (var strom = ablage.oeffnen(mandant, Ablageort.ARCHIV, schluessel, erste)) {
+            assertThat(strom.laenge()).isEqualTo("erste Fassung".length());
+            assertThat(new String(strom.inhalt().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                    .isEqualTo("erste Fassung");
+        }
+        // abbrechen verwirft die Verbindung, ohne den Rest zu lesen, und darf nach close erneut laufen
+        var angefangen = ablage.oeffnen(mandant, Ablageort.ARCHIV, schluessel, erste);
+        angefangen.abbrechen();
+        angefangen.abbrechen();
+        assertThatThrownBy(() -> ablage.oeffnen(mandant, Ablageort.ARCHIV, schluessel,
+                UUID.randomUUID().toString()))
+                .isInstanceOfSatisfying(ch.urinet.archiv.gemeinsam.domain.FachFehler.class, e -> assertThat(e.code())
+                        .isEqualTo(ch.urinet.archiv.gemeinsam.domain.Fehlercode.NICHT_GEFUNDEN));
+        assertThatThrownBy(() -> ablage.oeffnen(mandant, Ablageort.ARCHIV, schluessel, ""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void vorsignierteUrlNurFuerDieseVersionUndHoechstensFuenfMinuten() throws Exception {
         S3Ablage ablage = ablage();

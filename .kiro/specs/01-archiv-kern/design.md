@@ -1761,7 +1761,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 429 | `BUDGET` | Token-Budget des öffentlichen Chatbots für den Mandanten im laufenden Monat erschöpft, ohne `Retry-After` (Spec 03, Req 6.4; seit Aufgabe 11.3) |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |
 | 503 | `UEBERLASTET` | zu viele gleichzeitige Argon2-Rechnungen für API-Tokens (Prüfen und Anlegen, seit 2.1), mit `Retry-After: 1` (Aufgabe 1.5); kein Platz nach `archiv.api-token.wartezeit`, bei `0` ohne Warten |
-| 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload nicht erreichbar, mit `Retry-After` |
+| 503 | `SPEICHER_NICHT_ERREICHBAR` | Object Storage beim Upload oder beim Öffnen einer Datei für den Stream der Webseiten-Schnittstelle (Spec 03, Req 13) nicht erreichbar, mit `Retry-After` |
 
 - PostgreSQL-Sperrkonflikte mit SQLState `40P01` (Deadlock) oder `55P03` (`lock_timeout`) werden an allen Endpunkten als 409 `STATUS_KONFLIKT` ausgegeben; der Server wiederholt die Transaktion nicht. Die Abbildung steht im zentralen Mapper (Log: Klasse und SQLState auf INFO, keine Meldungen). Nachweis zu Req 17.12 und 17.16: `SperrkonfliktAbbildungTest` führt Zusammenführen (`POST /kontakte/{id}/zusammenfuehren`: Kontakte, dann Dokumente) und Ändern des Partners (`PATCH /dokumente/{id}`: Dokument, dann Kontakt `for share`) über die echten Endpunkte gegeneinander; ohne den Mapper endet der Lauf mit 500.
 

@@ -207,11 +207,25 @@ paths:
           "$ref": "#/components/responses/Ueberlastet"
   "/public/v1/dokumente/{id}/datei":
     get:
-      summary: Datei-Link eines öffentlichen Dokuments
-      description: Vorsignierte Adresse der PDF-Datei, höchstens 5 Minuten gültig; jeder
-        Abruf wird mit gekürzter IP protokolliert. Nur für Dokumente der Stufe oeffentlich;
-        für andere Dokumente gibt es hier keine Adresse (404), ihr Abruf folgt als Stream
-        mit einer späteren Fassung.
+      summary: Datei eines veröffentlichten Dokuments
+      description: |
+        Gemischte Auslieferung nach der Stufe des Dokuments (Req 13): Stufe `oeffentlich` liefert 200 `application/json`
+        mit der vorsignierten Adresse der PDF-Datei, höchstens 5 Minuten gültig; `mitglieder` und `vorstand` liefert
+        200 `application/pdf` als Stream, nie eine Speicher-Adresse. Welche Variante kommt, zeigt `zugriff` der Details.
+
+        Der Stream trägt `Content-Type`, `Content-Length`, `Cache-Control: private, no-store`,
+        `X-Content-Type-Options: nosniff`, `Content-Disposition: inline` ohne Dateinamen und `Accept-Ranges: none`;
+        ein `Range`-Kopf wird ignoriert (immer die ganze Datei mit 200, kein 206). Die API gibt die Datei in Blöcken
+        von 64 KiB weiter und wartet, bis der Webseitenserver sie angenommen hat: Wer langsam liest, hält seinen Platz.
+        Läuft 30 Sekunden kein Block oder länger als 15 Minuten (Startwerte), bricht die API den Stream ab; ein
+        abgebrochener Stream ist dann kürzer als `Content-Length` und gilt als fehlgeschlagen. Gleichzeitige Streams
+        sind begrenzt (Startwert 8 gesamt und 8 je Schlüssel): darüber 429 `ZU_VIELE_ANFRAGEN` mit `Retry-After: 5`,
+        ohne Warten.
+
+        Jeder Abruf wird mit gekürzter IP protokolliert, bevor er beginnt; ein abgelehnter (404, 429, 503) nicht.
+        Ein Dokument über der Stufe der Anfrage oder ein unsichtbares Dokument ist 404 `NICHT_GEFUNDEN`; ist der Speicher
+        nicht erreichbar, 503 `SPEICHER_NICHT_ERREICHBAR` mit `Retry-After`.
+        HEAD wird nicht bedient (405 mit `Allow: GET`): ein Abruf ohne Körper hielte sonst Platz und Protokolleintrag.
       parameters:
       - name: id
         in: path
@@ -222,11 +236,15 @@ paths:
       - "$ref": "#/components/parameters/ZugriffHeader"
       responses:
         '200':
-          description: Adresse der Datei
+          description: Adresse der Datei (Stufe oeffentlich) oder die Datei als Stream (mitglieder, vorstand)
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/WebseiteDateiLink"
+            application/pdf:
+              schema:
+                type: string
+                format: binary
         '400':
           "$ref": "#/components/responses/AnfrageUngueltig"
         '401':
@@ -237,6 +255,8 @@ paths:
           "$ref": "#/components/responses/ZuVieleAnfragen"
         '404':
           "$ref": "#/components/responses/NichtGefunden"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
   "/public/v1/filter":
@@ -826,6 +846,8 @@ components:
         strengere eigene; die Werte gehören dem Betreiber, nicht dem Vertrag), die Webseite wartet die genannte Zeit
         ab und zeigt bis dahin ihren Zwischenspeicher; `BUDGET` (nur Chat): Token-Budget des Mandanten im Monat erschöpft, ohne `Retry-After`; die
         Webseite zeigt dann «Der Chatbot ist diesen Monat ausgelastet – die Suche funktioniert weiterhin.».
+        Bei der Datei eines Dokuments (`/dokumente/{id}/datei`): die Höchstzahl gleichzeitiger Streams (gesamt oder je
+        Schlüssel) läuft schon, `grund` `LAEUFT`, `Retry-After: 5`.
       headers:
         Retry-After:
           description: Nur bei `ZU_VIELE_ANFRAGEN`; Sekunden bis zum nächsten Versuch.
