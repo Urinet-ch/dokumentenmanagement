@@ -4,8 +4,12 @@ Voraussetzungen: Gate Phase 2, Zuschlag VHF/GSK, Konzept-Entscheid E4, Spec 03 a
 mandantenneutralen Vorstufen 11.6 (Vertrag und Versionierung `/public/v1`) und 11.7 (Webseiten-Schlüssel) werden vor
 Gate Phase 2 und vor dem Zuschlag entwickelt (entschieden von Fabian am 14.11.2026, «Neutrale Vorstufen jetzt»), ohne
 VHF-spezifisches: keine Domain VHF/GSK, kein Seed `vhf-gsk`, keine Dateiauslieferung (11.8), kein Feed (11.9), keine
-Erfassung (11.10). Alle übrigen Aufgaben (Welle 10, 11.1–11.5, 11.8–11.13, Welle 12) bleiben an Gate Phase 2,
-Zuschlag und E4 gebunden.
+Erfassung (11.10). Erweitert am 16.11.2026 (entschieden von Fabian, Priorität Webseiten-Anbindung inkl. Chat): auch die
+Backend-Aufgaben 11.1 (Zugriffsstufen), 11.2 (Endpunkte `/public/v1`), 11.3 (öffentlicher Chatbot), 11.8 (Dateiauslieferung)
+und 11.9 (Änderungs-Feed) werden vorgezogen, nur mandantenneutral und mit Urinet bzw. Testmandanten, ohne Seed `vhf-gsk`,
+ohne Domain VHF/GSK und ohne Erfassung (11.10); das WordPress-Plugin (11.4, 11.5) entsteht in einem eigenen Repository
+(Entscheid 16.11.2026) und wartet auf den Vertrag. Alle übrigen Aufgaben (Welle 10, 11.10–11.13, Welle 12) bleiben an
+Gate Phase 2, Zuschlag und E4 gebunden.
 Wellen, Rollen und Gates wie in `docs/umsetzungsplan.md`; Arbeitsweise (ein Branch und PR je Aufgabe) nach `CLAUDE.md`.
 Jede Aufgabe liefert für ihre Anforderungen Cucumber-Szenarien mit `@req-<x.y>` (ausser bei Nachweis-Vermerk)
 und erfüllt die Definition of Done aus `tech.md`.
