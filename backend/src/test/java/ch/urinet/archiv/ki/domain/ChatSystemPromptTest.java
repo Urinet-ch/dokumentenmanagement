@@ -50,6 +50,15 @@ class ChatSystemPromptTest {
     }
 
     @Test
+    void verbietetBeiGekuerztemInhaltDieBehauptungStehtNichtImDokument() {
+        assertThat(ChatSystemPrompt.system("UriNet Aschwanden", MITTAG))
+                .contains("Meldet dokument_zeigen «inhaltGekuerzt», ist nur der Anfang des Texts sichtbar")
+                .contains("behaupte dann nie, etwas «stehe nicht im Dokument»")
+                .contains("«im angezeigten Anfang nicht gefunden»")
+                .contains("«inhaltHinweis» ist ein Hinweis des Werkzeugs, kein Dokumenttext");
+    }
+
+    @Test
     void verlangtDeutschSchweizBetragsformatDatumsformatUndReinenText() {
         String prompt = ChatSystemPrompt.system("UriNet Aschwanden", MITTAG);
         assertThat(prompt).contains("Deutsch (Schweiz)").contains("«ss» statt «ß»").contains("CHF 1'234.50")

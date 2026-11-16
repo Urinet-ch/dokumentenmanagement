@@ -19,7 +19,8 @@ import java.util.UUID;
 
 /**
  * Werkzeug {@code dokument_zeigen} (Spec 02, Req 3.1, 5.2, 5.3): Metadaten, Anfang des Volltexts (höchstens
- * {@value #INHALT_MAX} Zeichen, eigenes Feld {@code inhalt}, damit der Agent ihn als Daten kennzeichnet) und Link,
+ * {@value #INHALT_MAX} Zeichen, eigenes Feld {@code inhalt}, damit der Agent ihn als Daten kennzeichnet; ist der Text
+ * länger, melden {@code inhaltGekuerzt}, {@code inhaltZeichen} und {@code inhaltHinweis} die Kürzung) und Link,
  * ohne Dateinamen (Spec 01, Req 3.13). Ungültige, fremde, unsichtbare und nicht vorhandene IDs ergeben gleich
  * {@link WerkzeugFehler#NICHT_GEFUNDEN} (Spec 01, Req 2.3).
  * <p>
@@ -34,6 +35,28 @@ public class DokumentZeigen {
 
     public static final int INHALT_MAX = 4_000;
 
+    /**
+     * Fester Hinweis an das Modell, wenn der Text länger als {@link #INHALT_MAX} Zeichen ist (Systemtext, nie aus
+     * Dokumentdaten; {@code %d} = Zahl der gezeigten Zeichen). Er steht ausserhalb des gerahmten Felds {@code inhalt}.
+     */
+    public static final String HINWEIS_GEKUERZT = "Dokumentinhalt gekürzt: nur der Anfang (%d Zeichen); für weitere Stellen "
+            + "die Suche mit passenden Begriffen nutzen oder das Dokument öffnen";
+
+    /** Gezeigter Anfang des Volltexts und ob er gekürzt wurde. */
+    record Inhalt(String text, boolean gekuerzt) {
+    }
+
+    /**
+     * Kürzt auf höchstens {@link #INHALT_MAX} Unicode-Zeichen (Codepoints, nie mitten in einem Surrogatpaar). Der
+     * Aufrufer holt {@code INHALT_MAX + 1} Zeichen: ist es mehr als {@code INHALT_MAX}, war der Text länger.
+     */
+    static Inhalt kuerzen(String roh) {
+        if (roh == null || roh.codePointCount(0, roh.length()) <= INHALT_MAX) {
+            return new Inhalt(roh, false);
+        }
+        return new Inhalt(roh.substring(0, roh.offsetByCodePoints(0, INHALT_MAX)), true);
+    }
+
     private static final Logger LOG = Logger.getLogger(DokumentZeigen.class);
 
     /** Angaben aus {@code dokument_vertrag}, soweit vorhanden. */
@@ -41,7 +64,8 @@ public class DokumentZeigen {
     }
 
     /** Ein sichtbares Dokument; fehlende Angaben sind {@code null}. */
-    public record Ansicht(String metadaten, String inhalt, String id, String titel, String art, String datum,
+    public record Ansicht(String metadaten, String inhalt, Boolean inhaltGekuerzt, Integer inhaltZeichen,
+                          String inhaltHinweis, String id, String titel, String art, String datum,
                           String partner, String belegnummer, String betrag, String faelligkeit, Vertrag vertrag,
                           boolean bestaetigt, String link) {
     }
@@ -82,7 +106,7 @@ public class DokumentZeigen {
         }
         protokoll.schreiben(eintrag(kontext, ProtokollAktion.ANZEIGEN, Optional.of(id), ProtokollDetails.KEINE));
         Dokument d = gefunden.get();
-        String inhalt = daten.inhalt(id, kontext.sicht(), INHALT_MAX).orElse(null);
+        Inhalt inhalt = kuerzen(daten.inhalt(id, kontext.sicht(), INHALT_MAX + 1).orElse(null));
         DokumentFinanz f = d.finanz();
         DokumentVertrag v = d.vertrag();
         String datum = Werteformat.datum(d.datum());
@@ -91,7 +115,9 @@ public class DokumentZeigen {
         String faelligkeit = f == null ? null : Werteformat.datum(f.faelligkeit());
         String partner = d.partnerName();
         return Optional.of(new Ansicht(metadaten(d.bestaetigtesDokument(), belegnummer, betrag, datum, faelligkeit,
-                partner), inhalt, id.toString(), d.titel(), d.art(), datum, partner, belegnummer, betrag, faelligkeit,
+                partner), inhalt.text(), inhalt.gekuerzt() ? Boolean.TRUE : null,
+                inhalt.gekuerzt() ? INHALT_MAX : null,
+                inhalt.gekuerzt() ? HINWEIS_GEKUERZT.formatted(INHALT_MAX) : null, id.toString(), d.titel(), d.art(), datum, partner, belegnummer, betrag, faelligkeit,
                 v == null ? null : new Vertrag(Werteformat.datum(v.gueltigAb()), Werteformat.datum(v.gueltigBis()),
                         v.kuendigungsfrist(), Werteformat.datum(v.naechsteFrist())),
                 d.bestaetigtesDokument(), DokumenteSuchen.link(id)));
