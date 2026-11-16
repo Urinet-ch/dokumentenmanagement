@@ -34,7 +34,8 @@ public record IpAdresse(String text) {
     /**
      * Gekürzte Adresse für Protokolle ohne Personendaten (Spec 03, Req 5.4): IPv4 ohne das letzte Byte
      * ({@code 192.0.2.17} → {@code 192.0.2.0}), IPv6 auf die ersten 48 Bit ({@code 2001:db8:1:2::5} →
-     * {@code 2001:db8:1::}); ein eingebettetes IPv4 in IPv6 ({@code ::ffff:192.0.2.17}) wird wie IPv4 gekürzt.
+     * {@code 2001:db8:1:0:0:0:0:0}, die ausgeschriebene Form von {@code getHostAddress()}; die Datenbank
+     * zeigt sie als {@code 2001:db8:1::}); ein eingebettetes IPv4 in IPv6 ({@code ::ffff:192.0.2.17}) wird wie IPv4 gekürzt.
      */
     public IpAdresse gekuerzt() {
         try {

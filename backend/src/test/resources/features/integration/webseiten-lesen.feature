@@ -304,6 +304,9 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | ?url=/ALT/bulletin/2024/heft-1.pdf        | 404    | NICHT_GEFUNDEN   |
       |                                           | 400    | ANFRAGE_UNGUELTIG |
       | ?url=                                     | 400    | ANFRAGE_UNGUELTIG |
+      | ?url=/alt/zweite%25ZZseite                  | 400    | ANFRAGE_UNGUELTIG |
+      | ?url=/alt/zweite%2500seite                  | 400    | ANFRAGE_UNGUELTIG |
+      | ?url=/alt/bulletin/2024/heft-1.pdf%3Bx    | 404    | NICHT_GEFUNDEN    |
       | ?url=kein-pfad                            | 400    | ANFRAGE_UNGUELTIG |
 
   @req-5.2 @req-5.10

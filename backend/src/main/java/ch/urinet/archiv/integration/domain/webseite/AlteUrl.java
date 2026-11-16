@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 
 /**
  * Alte URL der bisherigen Webseite in der Form der Zuordnungstabelle {@code alte_url} (Spec 03, Req 4.3, 5.10): nur der
- * Pfad, ohne Schema, Host, Anfrage ({@code ?…}) und Fragment ({@code #…}), Prozent-Kodierung aufgelöst (UTF-8), Unicode
+ * Pfad, ohne Schema, Host (auch protokollrelativ {@code //host/pfad}), Anfrage ({@code ?…}) und Fragment ({@code #…}), Prozent-Kodierung aufgelöst (UTF-8), Unicode
  * in NFC, doppelte Schrägstriche zusammengefasst, ohne abschliessenden Schrägstrich (ausser Wurzel). Gross- und
  * Kleinschreibung bleibt: Dateipfade sind verschieden, auch wenn die Seite sie gleich behandelt. Der CSV-Import der
  * alten Links (Aufgabe 10.5) und die Abfrage {@code /public/v1/umleitung} verwenden diese Form; was sich nicht so lesen
@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 public final class AlteUrl {
 
     public static final int MAX_LAENGE = 2000;
-    private static final Pattern AUTORITAET = Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*");
+    private static final Pattern AUTORITAET = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*:)?//[^/?#]*");
 
     private AlteUrl() {
     }

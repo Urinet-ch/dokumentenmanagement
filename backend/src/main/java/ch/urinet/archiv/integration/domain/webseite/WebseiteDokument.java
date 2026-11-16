@@ -20,7 +20,15 @@ public record WebseiteDokument(UUID id, String titel, WebseiteReihe reihe, Strin
         Objects.requireNonNull(zugriff, "zugriff");
         if (auszug != null) {
             String eng = auszug.replaceAll("\\s+", " ").strip();
-            auszug = eng.isEmpty() ? null : eng.length() > AUSZUG_MAX ? eng.substring(0, AUSZUG_MAX).strip() : eng;
+            auszug = eng.isEmpty() ? null : kuerzen(eng);
         }
+    }
+
+    /** Höchstens {@link #AUSZUG_MAX} Zeichen (Unicode-Zeichen, nie ein halbes Surrogatpaar). */
+    private static String kuerzen(String text) {
+        if (text.codePointCount(0, text.length()) <= AUSZUG_MAX) {
+            return text;
+        }
+        return text.substring(0, text.offsetByCodePoints(0, AUSZUG_MAX)).strip();
     }
 }

@@ -21,6 +21,9 @@ class AlteUrlTest {
         assertThat(AlteUrl.normalisieren("/alt/heft.pdf?x=1")).isEqualTo("/alt/heft.pdf");
         assertThat(AlteUrl.normalisieren("https://alt.example")).isEqualTo("/");
         assertThat(AlteUrl.normalisieren("https://alt.example?x=1")).isEqualTo("/");
+        // protokollrelativ: der Host steht nach «//», er ist kein erstes Pfadsegment
+        assertThat(AlteUrl.normalisieren("//www.beispiel.ch/archiv/x.pdf")).isEqualTo("/archiv/x.pdf");
+        assertThat(AlteUrl.normalisieren("//www.beispiel.ch")).isEqualTo("/");
     }
 
     @Test
