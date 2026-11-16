@@ -6,16 +6,17 @@ import ch.urinet.archiv.sicherung.application.SicherungExportFehler;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZiel;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsZielNichtGeeignet;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung.Ergebnis;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung.Zaehler;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeile;
 import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -50,36 +51,51 @@ public class SicherungKommando {
     private final Path arbeitsverzeichnis;
     private final Supplier<Optional<WiederherstellungsZiel>> wiederherstellungsZiel;
     private final Clock uhr;
+    private final boolean ablageStub;
 
     @Inject
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                              ObjectMapper json, Instance<WiederherstellungsZiel> ziel,
+                             @ConfigProperty(name = "archiv.ablage.stub") boolean ablageStub,
                              @ConfigProperty(name = "archiv.arbeit.verzeichnis") Path arbeitsverzeichnis) {
         this(bucketExport, verwaltung, json,
                 () -> ziel.isUnsatisfied() ? Optional.empty() : Optional.of(ziel.get()), Clock.systemUTC(),
-                arbeitsverzeichnis);
+                ablageStub, arbeitsverzeichnis);
+    }
+
+    public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
+                             ObjectMapper json) {
+        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), false,
+                Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                              ObjectMapper json, Path arbeitsverzeichnis) {
-        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), arbeitsverzeichnis);
+        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), false, arbeitsverzeichnis);
     }
 
     SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                        ObjectMapper json, WiederherstellungsZiel ziel, Clock uhr) {
         this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr,
-                Path.of(System.getProperty("java.io.tmpdir")));
+                false, Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     private SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                               ObjectMapper json, Supplier<Optional<WiederherstellungsZiel>> ziel, Clock uhr,
-                              Path arbeitsverzeichnis) {
+                              boolean ablageStub, Path arbeitsverzeichnis) {
         this.bucketExport = bucketExport;
         this.verwaltung = verwaltung;
         this.json = json;
         wiederherstellungsZiel = ziel;
         this.uhr = uhr;
+        this.ablageStub = ablageStub;
         this.arbeitsverzeichnis = arbeitsverzeichnis;
+    }
+
+    SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
+                      ObjectMapper json, WiederherstellungsZiel ziel, Clock uhr, boolean ablageStub) {
+        this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr, ablageStub,
+                Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     public enum Befehl {
@@ -241,26 +257,35 @@ public class SicherungKommando {
 
     private int wiederherstellen(Aufruf aufruf, PrintStream aus, PrintStream fehler) {
         Ergebnis ergebnis;
-        try {
-            List<InventarZeile> zeilen = inventarLesen(Path.of(aufruf.inventar().orElseThrow()));
-            Optional<WiederherstellungsZiel> ziel = wiederherstellungsZiel.get();
-            if (ziel.isEmpty()) {
-                ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
-                fehler.println("Wiederherstellungsziel ist nicht angebunden.");
-            } else {
-                ergebnis = new Wiederherstellung(ziel.get(), uhr).wiederherstellen(
-                        aufruf.mandant().orElseThrow(), zeilen, Path.of(aufruf.strom().orElseThrow()),
-                        aufruf.kappen());
-                if (ergebnis.exitCode() != 0) {
-                    fehler.println(schlechteWiederherstellung(ergebnis.exitCode()));
+        if (ablageStub) {
+            ergebnis = new Ergebnis(2, new Zaehler(0, 0, 0, 0, 0, 0));
+            fehler.printf("Wiederherstellung im Ablage-Stub nicht möglich (Mandant %s).%n",
+                    aufruf.mandant().orElseThrow().wert());
+        } else {
+            try {
+                List<InventarZeile> zeilen = inventarLesen(Path.of(aufruf.inventar().orElseThrow()));
+                Optional<WiederherstellungsZiel> ziel = wiederherstellungsZiel.get();
+                if (ziel.isEmpty()) {
+                    ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
+                    fehler.println("Wiederherstellungsziel ist nicht angebunden.");
+                } else {
+                    ergebnis = new Wiederherstellung(ziel.get(), uhr).wiederherstellen(
+                            aufruf.mandant().orElseThrow(), zeilen, Path.of(aufruf.strom().orElseThrow()),
+                            aufruf.kappen());
+                    if (ergebnis.exitCode() != 0) {
+                        fehler.println(schlechteWiederherstellung(ergebnis.exitCode()));
+                    }
                 }
+            } catch (WiederherstellungsZielNichtGeeignet e) {
+                ergebnis = new Ergebnis(2, new Zaehler(0, 0, 0, 0, 0, 0));
+                fehler.println(e.getMessage());
+            } catch (IOException | IllegalArgumentException | SicherungExportFehler e) {
+                ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
+                fehler.println("Wiederherstellung fehlgeschlagen.");
+            } catch (RuntimeException e) {
+                ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
+                fehler.println("Wiederherstellung fehlgeschlagen: " + e.getClass().getSimpleName());
             }
-        } catch (IOException | IllegalArgumentException | SicherungExportFehler e) {
-            ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
-            fehler.println("Wiederherstellung fehlgeschlagen.");
-        } catch (RuntimeException e) {
-            ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
-            fehler.println("Wiederherstellung fehlgeschlagen: " + e.getClass().getSimpleName());
         }
         try {
             aus.println(json.writeValueAsString(ergebnis.zaehler()));
