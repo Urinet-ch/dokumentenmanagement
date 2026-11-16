@@ -5,6 +5,7 @@ import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.SicherungExportFehler;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsReferenz;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZiel;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZielNichtGeeignet;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung.Ergebnis;
@@ -50,43 +51,49 @@ public class SicherungKommando {
     private final ObjectMapper json;
     private final Path arbeitsverzeichnis;
     private final Supplier<Optional<WiederherstellungsZiel>> wiederherstellungsZiel;
+    private final WiederherstellungsReferenz wiederherstellungsReferenz;
     private final Clock uhr;
     private final boolean ablageStub;
 
     @Inject
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                              ObjectMapper json, Instance<WiederherstellungsZiel> ziel,
+                             WiederherstellungsReferenz referenz,
                              @ConfigProperty(name = "archiv.ablage.stub") boolean ablageStub,
                              @ConfigProperty(name = "archiv.arbeit.verzeichnis") Path arbeitsverzeichnis) {
         this(bucketExport, verwaltung, json,
                 () -> ziel.isUnsatisfied() ? Optional.empty() : Optional.of(ziel.get()), Clock.systemUTC(),
-                ablageStub, arbeitsverzeichnis);
+                referenz, ablageStub, arbeitsverzeichnis);
     }
 
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                              ObjectMapper json) {
-        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), false,
+        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(),
+                (mandant, schluessel, alt, neu) -> { }, false,
                 Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     public SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                              ObjectMapper json, Path arbeitsverzeichnis) {
-        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(), false, arbeitsverzeichnis);
+        this(bucketExport, verwaltung, json, Optional::empty, Clock.systemUTC(),
+                (mandant, schluessel, alt, neu) -> { }, false, arbeitsverzeichnis);
     }
 
     SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                        ObjectMapper json, WiederherstellungsZiel ziel, Clock uhr) {
         this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr,
-                false, Path.of(System.getProperty("java.io.tmpdir")));
+                (mandant, schluessel, alt, neu) -> { }, false, Path.of(System.getProperty("java.io.tmpdir")));
     }
 
     private SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                               ObjectMapper json, Supplier<Optional<WiederherstellungsZiel>> ziel, Clock uhr,
+                              WiederherstellungsReferenz referenz,
                               boolean ablageStub, Path arbeitsverzeichnis) {
         this.bucketExport = bucketExport;
         this.verwaltung = verwaltung;
         this.json = json;
         wiederherstellungsZiel = ziel;
+        wiederherstellungsReferenz = referenz;
         this.uhr = uhr;
         this.ablageStub = ablageStub;
         this.arbeitsverzeichnis = arbeitsverzeichnis;
@@ -94,7 +101,8 @@ public class SicherungKommando {
 
     SicherungKommando(SicherungBucketExport bucketExport, SicherungExportVerwaltung verwaltung,
                       ObjectMapper json, WiederherstellungsZiel ziel, Clock uhr, boolean ablageStub) {
-        this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr, ablageStub,
+        this(bucketExport, verwaltung, json, () -> Optional.of(ziel), uhr,
+                (mandant, schluessel, alt, neu) -> { }, ablageStub,
                 Path.of(System.getProperty("java.io.tmpdir")));
     }
 
@@ -269,7 +277,7 @@ public class SicherungKommando {
                     ergebnis = new Ergebnis(3, new Zaehler(0, 0, 0, 0, 0, 0));
                     fehler.println("Wiederherstellungsziel ist nicht angebunden.");
                 } else {
-                    ergebnis = new Wiederherstellung(ziel.get(), uhr).wiederherstellen(
+                    ergebnis = new Wiederherstellung(ziel.get(), uhr, wiederherstellungsReferenz).wiederherstellen(
                             aufruf.mandant().orElseThrow(), zeilen, Path.of(aufruf.strom().orElseThrow()),
                             aufruf.kappen());
                     if (ergebnis.exitCode() != 0) {

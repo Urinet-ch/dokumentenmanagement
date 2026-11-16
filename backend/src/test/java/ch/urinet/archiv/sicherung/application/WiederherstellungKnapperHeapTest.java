@@ -29,6 +29,7 @@ class WiederherstellungKnapperHeapTest {
     private static final long GROESSE = 50L * 1024 * 1024;
     private static final Instant LAST_MODIFIED = Instant.parse("2026-01-01T00:00:00Z");
     private static final byte[] BLOCK = new byte[32 * 1024];
+    private static final WiederherstellungsReferenz KEINE_REFERENZ = (mandant, schluessel, alt, neu) -> { };
 
     @Test
     void stelltFuenfzigMiBObjektMitBegrenztemHeapWiederHer(@TempDir Path temp) throws Exception {
@@ -40,7 +41,7 @@ class WiederherstellungKnapperHeapTest {
                 LAST_MODIFIED.toString(), erwarteterHash, null, null);
 
         Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel,
-                Clock.fixed(LAST_MODIFIED, ZoneOffset.UTC))
+                Clock.fixed(LAST_MODIFIED, ZoneOffset.UTC), KEINE_REFERENZ)
                 .wiederherstellen(new MandantCode("probe"), List.of(inventar), strom, false);
 
         assertThat(ergebnis.exitCode()).isZero();

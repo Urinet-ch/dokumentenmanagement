@@ -9,6 +9,7 @@ import ch.urinet.archiv.ablage.domain.Sperrmodus;
 import ch.urinet.archiv.ablage.domain.Versionsseite;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeile;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsReferenz;
 import ch.urinet.archiv.sicherung.application.WiederherstellungsZiel.Quittung;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class WiederherstellungTest {
     private static final MandantCode MANDANT = new MandantCode("probe");
     private static final Instant JETZT = Instant.parse("2026-11-15T12:00:00Z");
     private static final Clock UHR = Clock.fixed(JETZT, ZoneOffset.UTC);
+    private static final WiederherstellungsReferenz KEINE_REFERENZ = (mandant, schluessel, alt, neu) -> { };
 
     @Test
     void rundreiseAusVollexportUndZweiZuwaechsenStelltVersionenAufsteigendWiederHer(@TempDir Path temp)
@@ -64,20 +66,45 @@ class WiederherstellungTest {
         Files.write(datei, ausgabe.toByteArray());
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, inventar, datei, false);
 
         assertThat(ergebnis.exitCode()).isZero();
         assertThat(ergebnis.zaehler()).isEqualTo(new Wiederherstellung.Zaehler(3, 1, 0, 0, 0, 0));
         assertThat(ziel.reihenfolge).containsExactly("v1", "v2", "v3");
-        assertThat(ziel.inhalt.get("v1")).containsExactly("eins".getBytes(StandardCharsets.UTF_8));
-        assertThat(ziel.inhalt.get("v2")).containsExactly("zwei".getBytes(StandardCharsets.UTF_8));
-        assertThat(ziel.inhalt.get("v3")).containsExactly("drei".getBytes(StandardCharsets.UTF_8));
-        assertThat(ziel.sperren.get("v1")).isEqualTo(new Sperrung(Sperrmodus.GOVERNANCE,
+        assertThat(ziel.inhalt.get("ziel-v1")).containsExactly("eins".getBytes(StandardCharsets.UTF_8));
+        assertThat(ziel.inhalt.get("ziel-v2")).containsExactly("zwei".getBytes(StandardCharsets.UTF_8));
+        assertThat(ziel.inhalt.get("ziel-v3")).containsExactly("drei".getBytes(StandardCharsets.UTF_8));
+        assertThat(ziel.sperren.get("ziel-v1")).isEqualTo(new Sperrung(Sperrmodus.GOVERNANCE,
                 Instant.parse("2036-11-15T12:00:00Z")));
-        assertThat(ziel.sperren.get("v3")).isEqualTo(new Sperrung(Sperrmodus.COMPLIANCE,
+        assertThat(ziel.sperren.get("ziel-v3")).isEqualTo(new Sperrung(Sperrmodus.COMPLIANCE,
                 Instant.parse("2027-11-15T12:00:00Z")));
-        assertThat(ziel.sperren).doesNotContainKey("v2");
+        assertThat(ziel.sperren).doesNotContainKey("ziel-v2");
+    }
+
+    @Test
+    void aktualisiertDokumentDateireferenzenAberKeineManifestReferenzen(@TempDir Path temp) throws Exception {
+        Path datei = temp.resolve("referenzen.bin");
+        Files.write(datei, concat(
+                frame("archiv/dokument/a", "quelle-v1", "dokument".getBytes(StandardCharsets.UTF_8), JETZT),
+                frame("eingang/dokument/a", "quelle-v2", "arbeitsfassung".getBytes(StandardCharsets.UTF_8), JETZT),
+                frame("manifest/2026.json", "quelle-v3", "manifest".getBytes(StandardCharsets.UTF_8), JETZT)));
+        List<Referenz> referenzen = new ArrayList<>();
+        WiederherstellungsReferenz referenz = (mandant, schluessel, alt, neu) ->
+                referenzen.add(new Referenz(mandant, schluessel, alt, neu));
+
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(
+                new InMemoryZiel("urinet-archiv-p-", true), UHR, referenz)
+                .wiederherstellen(MANDANT, List.of(
+                        zeile("archiv/dokument/a", "quelle-v1", false, 8, JETZT.toString(), null, null),
+                        zeile("eingang/dokument/a", "quelle-v2", false, 14, JETZT.toString(), null, null),
+                        zeile("manifest/2026.json", "quelle-v3", false, 8, JETZT.toString(), null, null)),
+                        datei, false);
+
+        assertThat(ergebnis.exitCode()).isZero();
+        assertThat(referenzen).containsExactly(
+                new Referenz(MANDANT, "archiv/dokument/a", "quelle-v1", "ziel-quelle-v1"),
+                new Referenz(MANDANT, "eingang/dokument/a", "quelle-v2", "ziel-quelle-v2"));
     }
 
     @Test
@@ -89,7 +116,7 @@ class WiederherstellungTest {
                 Instant.parse("2026-01-01T00:00:00Z")));
         InMemoryZiel zielFehlt = new InMemoryZiel("urinet-archiv-p-", true);
 
-        Wiederherstellung.Ergebnis fehlend = new Wiederherstellung(zielFehlt, UHR)
+        Wiederherstellung.Ergebnis fehlend = new Wiederherstellung(zielFehlt, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(vorhanden, fehlt), nurVorhanden, false);
 
         assertThat(fehlend.exitCode()).isEqualTo(4);
@@ -100,7 +127,7 @@ class WiederherstellungTest {
         Files.write(mitExtra, frame("archiv/c", "v3", "extra".getBytes(StandardCharsets.UTF_8),
                 Instant.parse("2026-03-01T00:00:00Z")));
         InMemoryZiel zielExtra = new InMemoryZiel("urinet-archiv-p-", true);
-        Wiederherstellung.Ergebnis extra = new Wiederherstellung(zielExtra, UHR)
+        Wiederherstellung.Ergebnis extra = new Wiederherstellung(zielExtra, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(), mitExtra, false);
 
         assertThat(extra.exitCode()).isEqualTo(4);
@@ -116,7 +143,7 @@ class WiederherstellungTest {
         Files.write(datei, daten);
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(), null, null)),
                         datei, false);
 
@@ -134,7 +161,7 @@ class WiederherstellungTest {
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
         ziel.sperrFehler = true;
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(),
                         "GOVERNANCE", "2036-11-15T12:00:00Z")), datei, false);
 
@@ -150,7 +177,7 @@ class WiederherstellungTest {
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
 
         for (String wert : new String[]{"gestern", null}) {
-            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+            Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                     .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, wert, null, null)),
                             datei, false);
             assertThat(ergebnis.exitCode()).isEqualTo(3);
@@ -164,7 +191,7 @@ class WiederherstellungTest {
         Files.write(datei, frame("archiv/a", "v1", "inhalt".getBytes(StandardCharsets.UTF_8), JETZT));
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 6, JETZT.toString(),
                         "GOVERNANCE", "2026-01-01T00:00:00Z")), datei, false);
 
@@ -182,19 +209,19 @@ class WiederherstellungTest {
                 "2036-11-15T12:00:00Z");
         for (String praefix : List.of("urinet-archiv-", "urinet-archiv-a-", "urinet-archiv-p-x-")) {
             InMemoryZiel falschesZiel = new InMemoryZiel(praefix, true);
-            Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR)
+            Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(falschesZiel, UHR, KEINE_REFERENZ)
                     .wiederherstellen(MANDANT, List.of(inventar), datei, true);
             assertThat(abgelehnt.exitCode()).isEqualTo(2);
             assertThat(falschesZiel.reihenfolge).isEmpty();
         }
 
         InMemoryZiel probeZiel = new InMemoryZiel("urinet-archiv-p-", true);
-        Wiederherstellung.Ergebnis gekappt = new Wiederherstellung(probeZiel, UHR)
+        Wiederherstellung.Ergebnis gekappt = new Wiederherstellung(probeZiel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(inventar), datei, true);
 
         assertThat(gekappt.exitCode()).isZero();
         assertThat(gekappt.zaehler().gekappt()).isEqualTo(1);
-        assertThat(probeZiel.sperren.get("v1").bis()).isEqualTo(JETZT.plusSeconds(86_400));
+        assertThat(probeZiel.sperren.get("ziel-v1").bis()).isEqualTo(JETZT.plusSeconds(86_400));
     }
 
     @Test
@@ -203,7 +230,7 @@ class WiederherstellungTest {
         Files.write(datei, frame("archiv/a", "v1", new byte[]{1}, JETZT));
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", false);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(zeile("archiv/a", "v1", false, 1, JETZT.toString(), null, null)),
                         datei, false);
 
@@ -220,7 +247,7 @@ class WiederherstellungTest {
                 false, groesse, JETZT.toString(), "", null, null);
         InMemoryZiel ziel = new InMemoryZiel("urinet-archiv-p-", true, false);
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR)
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, UHR, KEINE_REFERENZ)
                 .wiederherstellen(MANDANT, List.of(inventar), datei, false);
 
         assertThat(ergebnis.exitCode()).isZero();
@@ -281,6 +308,16 @@ class WiederherstellungTest {
         return bytes.toByteArray();
     }
 
+    private static byte[] concat(byte[]... teile) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bytes.write(SicherungBucketExport.BUCKET_FORMAT.getBytes(StandardCharsets.US_ASCII));
+        for (byte[] teil : teile) {
+            bytes.write(teil, SicherungBucketExport.BUCKET_FORMAT.length(),
+                    teil.length - SicherungBucketExport.BUCKET_FORMAT.length());
+        }
+        return bytes.toByteArray();
+    }
+
     private static void schreibeFrame(DataOutputStream aus, String schluessel, String versionId, long groesse,
                                       Instant lastModified, byte[] daten, boolean trailer) throws IOException {
         aus.writeInt(0x55424a31);
@@ -329,6 +366,9 @@ class WiederherstellungTest {
     private record Sperrung(Sperrmodus modus, Instant bis) {
     }
 
+    private record Referenz(MandantCode mandant, String schluessel, String alteVersion, String neueVersion) {
+    }
+
     private static final class InMemoryZiel implements WiederherstellungsZiel {
         private final String praefix;
         private final boolean zielLeer;
@@ -336,6 +376,7 @@ class WiederherstellungTest {
         private final List<String> reihenfolge = new ArrayList<>();
         private final Map<String, byte[]> inhalt = new HashMap<>();
         private final Map<String, Sperrung> sperren = new HashMap<>();
+        private final Map<String, String> quelleJeZielVersion = new HashMap<>();
         private int verworfen;
         private boolean sperrFehler;
         private int groessterLeseaufruf;
@@ -367,11 +408,13 @@ class WiederherstellungTest {
             } catch (IOException e) {
                 throw new IllegalStateException(e);
             }
+            String zielVersion = "ziel-" + versionId;
             reihenfolge.add(versionId);
+            quelleJeZielVersion.put(zielVersion, versionId);
             if (bytes != null) {
-                this.inhalt.put(versionId, bytes.toByteArray());
+                this.inhalt.put(zielVersion, bytes.toByteArray());
             }
-            return new Quittung(versionId, java.util.HexFormat.of().formatHex(digest.digest()));
+            return new Quittung(zielVersion, java.util.HexFormat.of().formatHex(digest.digest()));
         }
 
         @Override
@@ -385,7 +428,7 @@ class WiederherstellungTest {
         @Override
         public void verwerfen(Quittung quittung) {
             verworfen++;
-            reihenfolge.remove(quittung.versionId());
+            reihenfolge.remove(quelleJeZielVersion.remove(quittung.versionId()));
             inhalt.remove(quittung.versionId());
         }
 

@@ -105,3 +105,34 @@ bash deploy/backup/test/taeglich-test.sh
 ```
 
 Für diese Shell-Tests gibt es derzeit keinen CI-Job; sie müssen lokal ausgeführt werden.
+
+## Lokale Restore-Übung
+
+Der lokale Prüflauf erstellt keine Verbindung zu einem Sicherungsanbieter und verwendet keine Produktions-Secrets:
+
+```sh
+deploy/backup/restore-uebung-lokal.sh
+```
+
+Voraussetzungen sind Docker, Maven, `age`, `age-keygen` und die lokal vorhandenen Dev-Service-Images. Der Lauf prüft
+`taeglich.sh` mit Docker-Attrappen und zwei temporären `age`-Identitäten. Anschliessend starten die Quarkus-Tests
+PostgreSQL und MinIO lokal, legen synthetische Dokumente an, stellen den Bucket in einen neuen leeren
+`urinet-archiv-p-`-Bucket wieder her und prüfen Dokument-IDs, Prüfsummen, abrufbare Dateien, die aktualisierten
+Versionsreferenzen sowie ein lesbares Manifestobjekt. Die S3-Tests prüfen zusätzlich Inventar, Object Lock und
+Sperrfristen. Die Tests entfernen ihre Wegwerf-Buckets und Dev Services selbst; das Skript verwendet keinen
+`docker compose down -v`- oder `prune`-Befehl.
+
+Der Lauf ist eine lokale Teilprobe, kein vollständiger Restore des täglichen Sicherungspakets: Der Shelltest führt
+`taeglich.sh` mit Docker-Attrappen aus; sein erzeugter Export wird nicht an den S3-Roundtrip-Test übergeben. Der
+Roundtrip prüft synthetische Dokumentzeilen und Dateien im Test-PostgreSQL sowie einen getrennten S3-Ziel-Bucket, aber
+keinen `pg_dump`-/Keycloak-Realm-Restore in eine zweite Datenbank und keinen API-Start gegen diese zweite Datenbank.
+Der vollständige manuelle Restore-Nachweis bleibt damit offen.
+
+Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
+
+```sh
+bash deploy/backup/test/restore-uebung-lokal-test.sh
+```
+
+Der lokale Lauf prüft die Sicherungs-Shell und den Restore-Kern gemeinsam, ersetzt aber nicht die spätere Restore-Probe
+auf der VPS im Infra-Repository.

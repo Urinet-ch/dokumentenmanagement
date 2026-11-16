@@ -65,6 +65,10 @@ Funktionstest; die Aufbewahrung nach Req 16.2 gilt erst ab Stufe B (Req 16.19).
    `--kappen` ist ausschliesslich für die Restore-Probe zulässig. Bei einer echten Wiederherstellung werden Modus und
    `retainUntil` aus dem Inventar ohne Kappung neu gesetzt. Die Prüfung der Sperren gegen die Sollwerte aus der
    wiederhergestellten Datenbank ist Aufgabe der Restore-Probe.
+
+   S3 vergibt beim Schreiben neue Versions-IDs. Das Wiederherstellungskommando aktualisiert deshalb nach erfolgreichem
+   Schreiben und Sperren die passenden Referenzen der Dokumentdateien unter `archiv/` und `eingang/` in der
+   wiederhergestellten Datenbank. Die unveränderlichen Manifest-Dateien unter `manifest/` werden nicht umgeschrieben.
 5. **Prüfen.** Die Anzahl wiederhergestellter Objekte mit den Datenbankeinträgen abgleichen, Manifeste prüfen und den
    vorgesehenen Prüflauf erfolgreich abschliessen. Abweichungen sind vor der Freigabe zu klären.
 
@@ -83,4 +87,7 @@ nichts daran, dass ein Snapshot nur mit passendem Manifestnachweis verwendet wer
 
 ## Status
 
-Entwurf; einmal vollständig in einer Testumgebung durchgespielt: offen (Nachweis manuell, tasks.md 5.5)
+Die lokale synthetische Restore-Übung steht unter `deploy/backup/restore-uebung-lokal.sh`. Sie prüft den
+Sicherungs-Shellablauf mit Attrappen sowie S3-Restore und Dateireferenzen mit lokalen Dev Services. Eine vollständige
+manuelle Wiederherstellung einschliesslich Datenbank-Dumps und Keycloak-Realm in einer getrennten Testumgebung bleibt
+als Nachweis nach tasks.md 5.5 offen; die wiederkehrende Probe auf der VPS gehört zur Infra.
