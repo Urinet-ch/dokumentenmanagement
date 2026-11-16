@@ -213,6 +213,23 @@
           }
         }
       },
+      "BrandingDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "logoUrl" : {
+            "type" : "string"
+          },
+          "primaerfarbe" : {
+            "type" : "string"
+          },
+          "sprache" : {
+            "type" : "string"
+          }
+        }
+      },
       "ChatFrage" : {
         "type" : "object",
         "required" : [ "frage" ],
@@ -2198,6 +2215,8 @@
   "tags" : [ {
     "name" : "API-Tokens"
   }, {
+    "name" : "Branding"
+  }, {
     "name" : "Chat"
   }, {
     "name" : "Dokumentarten"
@@ -2309,6 +2328,35 @@
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
         } ]
+      }
+    },
+    "/api/v1/branding" : {
+      "get" : {
+        "summary" : "Lädt das Branding für eine registrierte Domain oder das neutrale Standard-Branding.",
+        "tags" : [ "Branding" ],
+        "parameters" : [ {
+          "description" : "Registrierte Domain, ohne Schema oder Port",
+          "name" : "domain",
+          "in" : "query",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Branding",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BrandingDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Ungültiger Hostname"
+          }
+        }
       }
     },
     "/api/v1/chat" : {

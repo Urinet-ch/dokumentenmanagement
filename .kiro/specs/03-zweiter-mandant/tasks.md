@@ -32,6 +32,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
+  - Umsetzung (PR #228): öffentlicher Branding-Endpunkt und Web-App mit neutralem Fallback; Domains bleiben ausserhalb des Repos konfigurierbar, da die Domain-Entscheidung offen ist. Offen: Keycloak-Theme und Traefik-Router (Deploy).
   - _Anforderungen: 2.1–2.3_
 
 - [ ] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
