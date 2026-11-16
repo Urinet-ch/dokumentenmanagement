@@ -40,7 +40,8 @@ Funktionstest; die Aufbewahrung nach Req 16.2 gilt erst ab Stufe B (Req 16.19).
    ```sh
    kc.sh import --file realm-export.json
    ```
-4. **Bucket und Sperren wiederherstellen.** Vollexport und sämtliche Zuwächse chronologisch zu einer Datei
+4. **Bucket und Sperren wiederherstellen.** Als Ziel zuerst einen neuen, leeren Bucket des Mandanten anlegen, mit
+   aktivierter Versionierung und aktiviertem Object Lock (keine Versionen, keine Löschmarken). Vollexport und sämtliche Zuwächse chronologisch zu einer Datei
    zusammenfügen. Die Zuwächse explizit in zeitlicher Reihenfolge aufführen; als `--inventar` das jüngste Inventar
    verwenden:
 
@@ -48,6 +49,18 @@ Funktionstest; die Aufbewahrung nach Req 16.2 gilt erst ab Stufe B (Req 16.19).
    cat voll.bin zuwachs-2026-01-02.bin zuwachs-2026-01-03.bin > bucket-export.bin
    archiv sicherung wiederherstellen --mandant <code> --inventar inventar.jsonl --strom bucket-export.bin
    ```
+
+   Exit-Codes: `0` Erfolg. `2` Ziel ungeeignet (Bucket fehlt, Versionierung oder Object Lock aus), Ziel nicht leer,
+   Kappung ausserhalb des Probe-Präfixes `urinet-archiv-p-` oder Ablage-Stub (`archiv.ablage.stub`) aktiv; in all
+   diesen Fällen wurde nichts geschrieben. `3` Format-, Prüfsummen- oder technischer Schreibfehler. `4` Exportkette
+   unvollständig oder überzählig (vor dem ersten Schreibzugriff erkannt, das Ziel bleibt leer; fehlende Zuwächse
+   ergänzen und erneut starten).
+
+   **Abbruch und Wiederaufnahme.** Es gibt keine Fortsetzung in einem teilweise befüllten Ziel. Nach Exit 3 oder einem
+   Abbruch mitten im Lauf (zum Beispiel Netzausfall) ist das Ziel nicht mehr leer, und bereits geschriebene Versionen
+   sind bis `retainUntil` gesperrt und lassen sich nicht löschen. Ein zweiter Lauf im selben Bucket endet deshalb mit
+   Exit 2. Die Wiederholung erfolgt immer in einem frischen, leeren Bucket (anderer Name, gleiche Voraussetzungen); den
+   Teilstand bis zum Ablauf der Sperren liegen lassen.
 
    `--kappen` ist ausschliesslich für die Restore-Probe zulässig. Bei einer echten Wiederherstellung werden Modus und
    `retainUntil` aus dem Inventar ohne Kappung neu gesetzt. Die Prüfung der Sperren gegen die Sollwerte aus der

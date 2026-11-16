@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
@@ -89,9 +90,10 @@ public class S3Wiederherstellung implements WiederherstellungsZiel {
     }
 
     @Override
-    public void sperren(Quittung quittung, Sperrmodus modus, Instant bis) {
+    public void sperren(Quittung quittung, Sperrmodus modus, Instant bisGenau) {
         Objects.requireNonNull(modus, "modus");
-        Objects.requireNonNull(bis, "bis");
+        // S3 speichert Retain-Until nur sekundengenau; sonst weicht der zurückgelesene Wert beim Kappen ab.
+        Instant bis = Objects.requireNonNull(bisGenau, "bis").truncatedTo(ChronoUnit.SECONDS);
         Zielzustand ziel = zielzustand();
         Ausstehend ausstehend = ausstehend(ziel, quittung);
         ObjectLockRetentionMode erwartet = ObjectLockRetentionMode.fromValue(modus.name());
@@ -142,9 +144,13 @@ public class S3Wiederherstellung implements WiederherstellungsZiel {
             if (konfiguration == null || konfiguration.objectLockEnabled() != ObjectLockEnabled.ENABLED) {
                 throw new WiederherstellungsZielNichtGeeignet(mandant);
             }
-            zustand.set(new Zielzustand(bucket));
+            zustand.remove();
             var objekte = s3.listObjectVersions(b -> b.bucket(bucket).maxKeys(1));
-            return objekte.versions().isEmpty() && objekte.deleteMarkers().isEmpty();
+            boolean leer = objekte.versions().isEmpty() && objekte.deleteMarkers().isEmpty();
+            if (leer) {
+                zustand.set(new Zielzustand(bucket));
+            }
+            return leer;
         } catch (WiederherstellungsZielNichtGeeignet e) {
             throw e;
         } catch (S3Exception e) {

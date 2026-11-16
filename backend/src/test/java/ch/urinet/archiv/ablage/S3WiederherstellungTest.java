@@ -142,6 +142,32 @@ class S3WiederherstellungTest {
     }
 
     @Test
+    void kappungMitSubsekundenWirdAufSekundenGekuerztUndBrichtNichtAb() {
+        S3Wiederherstellung ziel = ziel();
+        assertThat(ziel.leer(mandant)).isTrue();
+        String bucket = TestBucket.bucket(mandant);
+        Quittung quittung = ziel.schreiben("archiv/kappung.bin", "quellversion", Instant.now(),
+                new ByteArrayInputStream(new byte[]{1}), 1);
+        Instant bis = Instant.now().plus(Duration.ofDays(1)).plusNanos(123_456_789);
+
+        ziel.sperren(quittung, Sperrmodus.GOVERNANCE, bis);
+
+        assertThat(s3.getObjectRetention(r -> r.bucket(bucket).key("archiv/kappung.bin")
+                .versionId(quittung.versionId())).retention().retainUntilDate())
+                .isEqualTo(bis.truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    @Test
+    void nichtLeresZielLiefertKeinenZustandFuerSchreiben() {
+        S3Wiederherstellung ziel = ziel();
+        assertThat(ziel.leer(mandant)).isTrue();
+        ziel.schreiben("archiv/a.bin", "v", Instant.now(), new ByteArrayInputStream(new byte[]{1}), 1);
+        assertThat(ziel.leer(mandant)).isFalse();
+        assertThatThrownBy(() -> ziel.schreiben("archiv/b.bin", "v", Instant.now(),
+                new ByteArrayInputStream(new byte[]{1}), 1)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void verwirftNurDieGeradeGeschriebeneVersion() {
         S3Wiederherstellung ziel = ziel();
         assertThat(ziel.leer(mandant)).isTrue();
