@@ -36,7 +36,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
       | vorstand   | vorstand   | b3       |
       | vorstand   | vorstand   | v1       |
 
-  @req-13.2 @req-5.5
+  @req-13.2 @req-5.5 @req-9.4
   Szenariogrundriss: Was die Anfrage nicht sehen darf, ist 404, nie ein Teil der Datei, und schreibt kein Protokoll
     Angenommen im Mandanten «urinet» liegen diese Webseiten-Dokumente:
       | name | art         | zugriff     | veroeffentlicht | vertraulichkeit | bestaetigt | status       | text  |
@@ -53,6 +53,7 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
       | mitglieder  | mitglieder  | vorstand   | true            | NORMAL          | ja         | ARCHIVIERT   |
       | vorstand    | mitglieder  | vorstand   | true            | NORMAL          | ja         | ARCHIVIERT   |
       | oeffentlich | oeffentlich | mitglieder | true            | NORMAL          | ja         | ARCHIVIERT   |
+      | oeffentlich | oeffentlich | vorstand   | true            | NORMAL          | ja         | ARCHIVIERT   |
       | vorstand    | oeffentlich | mitglieder | true            | NORMAL          | ja         | ARCHIVIERT   |
       | vorstand    | vorstand    | mitglieder | false           | NORMAL          | ja         | ARCHIVIERT   |
       | vorstand    | vorstand    | mitglieder | true            | INTERN          | ja         | ARCHIVIERT   |
@@ -60,6 +61,19 @@ Funktionalität: Dateiauslieferung der Webseiten-Schnittstelle (Aufgabe 11.8)
       | vorstand    | vorstand    | mitglieder | true            | NORMAL          | ja         | EINGANGSKORB |
       | vorstand    | vorstand    | mitglieder | true            | NORMAL          | ja         | VERWORFEN    |
       | vorstand    | vorstand    | -          | true            | NORMAL          | ja         | ARCHIVIERT   |
+
+  @req-9.1
+  Szenario: Ein Schlüssel eines anderen Mandanten kann keine Datei streamen
+    Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name                  | aktiv |
+      | WEBTEST_VHF | Fremdmandanten-Reihe  | true  |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text         |
+      | x    | WEBTEST_VHF | mitglieder  | Fremdmandant |
+    Und das Dokument «x» hat eine Datei
+    Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «x» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Und belegt die API noch 0 Plätze für Streams
 
   @req-13.2
   Szenario: Ein Dokument ohne Datei oder ohne Sicht ist 404 und ein unbekanntes ebenso

@@ -307,11 +307,15 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | ?url=/alt/bulletin/2024/heft-1.pdf%3Bx    | 404    | NICHT_GEFUNDEN    |
       | ?url=kein-pfad                            | 400    | ANFRAGE_UNGUELTIG |
 
-  @req-5.2 @req-5.10
+  @req-5.2 @req-5.10 @req-9.1
   Szenario: Die Zuordnung eines anderen Mandanten wird nie geliefert
+    Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name                  | aktiv |
+      | WEBTEST_VHF | Fremdmandanten-Reihe  | true  |
     Angenommen im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
-      | name | zugriff     | text           |
-      | x    | oeffentlich | Fremdmandant   |
+      | name | art         | zugriff     | text           |
+      | x    | WEBTEST_VHF | oeffentlich | Fremdmandant   |
+    Und das Dokument «x» hat eine Datei
     Und die alten URLs «/alt/fremd» und «/alt/fremd2» führen im Mandanten «vhf-gsk» zu den Dokumenten «x» und «x»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/umleitung?url=/alt/fremd» mit der Stufe «vorstand» aufruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
@@ -321,6 +325,27 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Dann nennt die Antwort genau die Dokumente «»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?pro_seite=100&mandant=vhf-gsk» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort genau die Dokumente «b1,b2,b3,m1,v1,a1»
+    Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «x» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «vorstand» aufruft
+    Dann nennt die Antwort genau die Reihen «WEBTEST_BUL,WEBTEST_MER,WEBTEST_VOR»
+
+  @req-9.4
+  Szenario: Ein öffentlicher Schlüssel sieht keine Dokumente höherer Zugriffsstufe
+    Angenommen die alten URLs «/alt/mitglieder» und «/alt/vorstand» führen im Mandanten «urinet» zu den Dokumenten «b3» und «v1»
+    Und das Dokument «b3» hat eine Datei
+    Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/dokumente?pro_seite=100» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Dokumente «b1,b2,m1,a1»
+    Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/suche?q=Zitronenkuchen» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Dokumente «b1,m1,a1»
+    Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/filter» mit der Stufe «oeffentlich» aufruft
+    Dann nennt die Antwort genau die Reihen «WEBTEST_BUL,WEBTEST_MER»
+    Wenn der Webseiten-Lesezugang «oeffentlich» das Dokument «b3» mit der Stufe «oeffentlich» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «b3» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/umleitung?url=/alt/mitglieder» mit der Stufe «oeffentlich» aufruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
   @req-5.9
   Szenariogrundriss: Eine gemeldete Stufe über der Stufe des Schlüssels ergibt 403, ein unbekannter Wert 400 – an jedem Endpunkt

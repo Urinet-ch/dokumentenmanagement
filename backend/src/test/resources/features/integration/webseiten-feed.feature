@@ -109,7 +109,7 @@ Funktionalität: Änderungs-Feed der Webseiten-Schnittstelle (Aufgabe 11.9)
     Wenn der Zugang «oeffentlich» «/public/v1/aenderungen» ab dem Cursor «o» mit der Stufe «unsinn» im Header abruft
     Dann nennt der Feed keine Änderungen
 
-  @req-14.2
+  @req-14.2 @req-9.4
   Szenario: Der Erfassungs-Feed nennt Status und Fehlercode und die Referenz nur der eigenen Webseite
     Angenommen im Mandanten «urinet» liegen diese Webseiten-Dokumente:
       | name | status       | veroeffentlicht |
@@ -138,7 +138,7 @@ Funktionalität: Änderungs-Feed der Webseiten-Schnittstelle (Aufgabe 11.9)
       | e3       | -        | EINGANGSKORB | -                           | 1       |
     Und steht in der Lese-Antwort weder «webtest-e1» noch «R-1»
 
-  @req-14.2
+  @req-14.2 @req-9.4
   Szenario: Lese- und Erfassungs-Schlüssel erreichen nur ihren eigenen Feed
     Wenn mit dem Erfassungs-Zugang «oeffentlich» «/public/v1/erfassung/aenderungen» aufruft
     Dann antwortet die Lese-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
@@ -170,6 +170,47 @@ Funktionalität: Änderungs-Feed der Webseiten-Schnittstelle (Aufgabe 11.9)
     Dann nennt der Feed genau diese Änderungen:
       | dokument | art            | stufe       |
       | mv       | NICHT_SICHTBAR | oeffentlich |
+
+  @req-14.1 @req-9.4
+  Szenario: Der öffentliche Schlüssel erhält keine Feed-Änderungen zu höheren Zugriffsstufen
+    Angenommen im Mandanten «urinet» liegen diese Webseiten-Dokumente:
+      | name | zugriff     |
+      | h1   | mitglieder  |
+      | h2   | vorstand    |
+    Und der Zugang «oeffentlich» hat den Cursor «o» von «/public/v1/aenderungen» gemerkt
+    Und der Zugang «mitglieder» hat den Cursor «m» von «/public/v1/aenderungen» gemerkt
+    Wenn das Dokument «h1» eine neue Version erhält
+    Und das Dokument «h2» eine neue Version erhält
+    Und der Zugang «oeffentlich» «/public/v1/aenderungen» ab dem Cursor «o» abruft
+    Dann nennt der Feed keine Änderungen
+    Wenn der Zugang «mitglieder» «/public/v1/aenderungen» ab dem Cursor «m» abruft
+    Dann nennt der Feed genau diese Änderungen:
+      | dokument | art       | stufe       |
+      | h1       | GEAENDERT | mitglieder  |
+
+  @req-14.2 @req-9.1
+  Szenario: Erfassungs-Referenzen bleiben auch zwischen Mandanten getrennt
+    Angenommen der Webseiten-Erfassungszugang «fremd-erfassung» der Webseite «probe-feed» im Mandanten «vhf-gsk» ist angelegt
+    Und im Mandanten «urinet» liegen diese Webseiten-Dokumente:
+      | name | status     | veroeffentlicht |
+      | ru   | ARCHIVIERT | false           |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | status     | veroeffentlicht |
+      | rv   | ARCHIVIERT | false           |
+    Und die Webseite «probe-feed» hat für das Dokument «ru» die Referenz «REFERENZ-URINET»
+    Und die Webseite «probe-feed» hat für das Dokument «rv» die Referenz «REFERENZ-VHF»
+    Und der Zugang «erfassung» hat den Cursor «ru-cursor» von «/public/v1/erfassung/aenderungen» gemerkt
+    Und der Zugang «fremd-erfassung» hat den Cursor «rv-cursor» von «/public/v1/erfassung/aenderungen» gemerkt
+    Wenn das Dokument «ru» den Status «FEHLER» erhält
+    Und das Dokument «rv» den Status «FEHLER» erhält
+    Und der Zugang «erfassung» «/public/v1/erfassung/aenderungen» ab dem Cursor «ru-cursor» abruft
+    Dann nennt der Feed genau diese Erfassungs-Änderungen:
+      | dokument | referenz       | status | fehlercode                  | version |
+      | ru       | REFERENZ-URINET | FEHLER | VERARBEITUNG_FEHLGESCHLAGEN | 1       |
+    Wenn der Zugang «fremd-erfassung» «/public/v1/erfassung/aenderungen» ab dem Cursor «rv-cursor» abruft
+    Dann nennt der Feed genau diese Erfassungs-Änderungen:
+      | dokument | referenz    | status | fehlercode                  | version |
+      | rv       | REFERENZ-VHF | FEHLER | VERARBEITUNG_FEHLGESCHLAGEN | 1       |
 
   @req-14.3
   Szenario: Jeder Eintrag kommt genau einmal, höchstens max je Abruf, und der Cursor führt weiter
