@@ -445,7 +445,8 @@ public class MailSchritte {
             }
             TimeUnit.MILLISECONDS.sleep(100);
         } while (System.nanoTime() < ende);
-        return dokument;
+        throw new AssertionError("Verarbeitung von Dokument " + id + " nach 30 s nicht abgeschlossen, Status="
+                + dokument.get("status"));
     }
 
     @Angenommen("im Postfach liegt eine HTML-Mail von «{}» mit dem Betreff «{}» und einem eingebetteten Logo")
