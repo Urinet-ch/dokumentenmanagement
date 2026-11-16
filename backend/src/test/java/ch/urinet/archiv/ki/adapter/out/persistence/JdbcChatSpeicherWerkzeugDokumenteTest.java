@@ -122,6 +122,37 @@ class JdbcChatSpeicherWerkzeugDokumenteTest {
         assertThat(im(ZWEITER, () -> speicher.werkzeugDokumente(a))).isEmpty();
     }
 
+    @Test
+    void antwortenOhneWerkzeugeFragenUndAbgebrocheneDurchgaengeStoerenDieAbfrageNicht() throws SQLException {
+        if (!vorhanden(URINET)) {
+            provisionierung.anlegen(URINET.wert(), null, null);
+        }
+        UUID g = gespraech(URINET, "benutzer-a", urinetGespraeche);
+        UUID eins = UUID.randomUUID();
+        UUID zwei = UUID.randomUUID();
+        im(URINET, () -> {
+            speicher.frageSpeichern(g, "Frage ohne Werkzeug", Instant.now());
+            return null;
+        });
+        antwort(URINET, g);
+        antwort(URINET, g, new WerkzeugAufruf("kennzahl", Map.of(), List.of(), Optional.empty()));
+        im(URINET, () -> {
+            speicher.antwortSpeichern(g, new ChatAntwort("", List.of(new WerkzeugAufruf("dokumente_suchen", Map.of(),
+                    List.of(eins), Optional.empty())), List.of(), Optional.empty(), ChatStatus.ABGEBROCHEN),
+                    Instant.now());
+            return null;
+        });
+        im(URINET, () -> {
+            speicher.frageSpeichern(g, "noch eine Frage", Instant.now());
+            return null;
+        });
+        antwort(URINET, g, new WerkzeugAufruf("dokumente_suchen", Map.of(), List.of(zwei, eins), Optional.empty()));
+
+        assertThat(im(URINET, () -> speicher.werkzeugDokumente(g))).containsExactly(
+                new ChatWerkzeugDokument("dokumente_suchen", eins), new ChatWerkzeugDokument("dokumente_suchen", zwei),
+                new ChatWerkzeugDokument("dokumente_suchen", eins));
+    }
+
     private UUID gespraech(MandantCode mandant, String benutzer, List<UUID> merken) {
         UUID id = UUID.randomUUID();
         im(mandant, () -> {

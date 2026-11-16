@@ -113,10 +113,14 @@ public class KorrekturLernen {
         LOG.infof("Korrektur für Dokument %s: %d von %d Feldern korrigiert, Beispiel %s", dokumentId,
                 korrektur.korrigiert().size(), korrektur.bestaetigt().size(), korrektur.beispiel());
         Runnable zaehlen = () -> zaehler.zaehlen(mandant, korrektur.bestaetigt(), korrektur.korrigiert().keySet());
-        if (transaktion.getTransactionStatus() == Status.STATUS_ACTIVE) {
+        int status = transaktion.getTransactionStatus();
+        if (status == Status.STATUS_ACTIVE) {
             transaktion.registerInterposedSynchronization(new NachCommit(zaehlen));
-        } else {
+        } else if (status == Status.STATUS_NO_TRANSACTION) {
             zaehlen.run();
+        } else {
+            // zum Zurückrollen vorgemerkt (oder schon im Abschluss): nichts wird gespeichert, also nichts zählen
+            LOG.debugf("Korrekturquote für Dokument %s nicht fortgeschrieben, Transaktion nicht aktiv", dokumentId);
         }
     }
 

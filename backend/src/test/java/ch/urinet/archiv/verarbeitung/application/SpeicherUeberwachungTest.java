@@ -136,4 +136,89 @@ class SpeicherUeberwachungTest {
         SpeicherUeberwachung.pruefeEinstellungen(85, 100);
         assertThat(Stufe.values()).hasSize(2);
     }
+
+    @Test
+    @Tag("req-16.5")
+    void schwellenGeltenAbDerGrenzeSelbstNichtDarunter() {
+        lauf(new SpeicherMessung("Metaspace", 8499, 10000)); // 84.99 %
+        assertThat(mails).isEmpty();
+        lauf(new SpeicherMessung("Metaspace", 8500, 10000)); // genau 85 %
+        assertThat(mails).containsExactly("Metaspace:WARNUNG");
+        lauf(new SpeicherMessung("Metaspace", 9499, 10000));
+        assertThat(mails).hasSize(1);
+        lauf(new SpeicherMessung("Metaspace", 9500, 10000)); // genau 95 %
+        assertThat(mails).containsExactly("Metaspace:WARNUNG", "Metaspace:KRITISCH");
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void ueberMaximumGiltAlsKritischUndMeldetEinmal() {
+        lauf(new SpeicherMessung("Heap", 130 * MIB, 100 * MIB));
+        lauf(new SpeicherMessung("Heap", 130 * MIB, 100 * MIB));
+
+        assertThat(mails).containsExactly("Heap:KRITISCH");
+        assertThat(kennzahlen).containsEntry("Heap", 130.0);
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void fehltDasMaximumZwischendurchBeginntDieMeldungVonVorn() {
+        lauf(metaspace(90));
+        lauf(new SpeicherMessung("Metaspace", 900 * MIB, -1));
+        lauf(metaspace(90));
+
+        assertThat(mails).containsExactly("Metaspace:WARNUNG", "Metaspace:WARNUNG");
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void gescheiterteWarnungHindertDieKritischeMeldungNicht() {
+        zugestellt = false;
+        lauf(metaspace(90));
+        lauf(metaspace(97));
+        zugestellt = true;
+        lauf(metaspace(97));
+        lauf(metaspace(97));
+
+        assertThat(mails).containsExactly("Metaspace:WARNUNG", "Metaspace:KRITISCH", "Metaspace:KRITISCH");
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void gescheiterterKritischVersandBeiBereitsGemeldeterWarnungWirdWiederholt() {
+        lauf(metaspace(90));
+        zugestellt = false;
+        lauf(metaspace(97));
+        lauf(metaspace(97));
+        zugestellt = true;
+        lauf(metaspace(97));
+        lauf(metaspace(97));
+
+        assertThat(mails).containsExactly("Metaspace:WARNUNG", "Metaspace:KRITISCH", "Metaspace:KRITISCH",
+                "Metaspace:KRITISCH");
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void ausfallDerQuelleKommtBeimAufruferAn() {
+        SpeicherUeberwachung kaputt = new SpeicherUeberwachung(() -> {
+            throw new IllegalStateException("synthetisches-betriebsdetail");
+        }, (stufe, messung) -> true, (pool, prozent) -> { }, 85, 95);
+
+        assertThatThrownBy(kaputt::pruefen).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @Tag("req-16.5")
+    void logZeilenNennenNurBereichProzentUndMengen() {
+        try (ch.urinet.archiv.gemeinsam.LogMitschnitt log = ch.urinet.archiv.gemeinsam.LogMitschnitt.starten()) {
+            SpeicherUeberwachung u = new SpeicherUeberwachung(List::of, (stufe, messung) -> {
+                throw new IllegalStateException("synthetisches-betriebsdetail inhaber@example.invalid");
+            }, kennzahlen::put, 85, 95);
+            u.pruefen(List.of(metaspace(90), new SpeicherMessung("Heap", 1, 0)));
+
+            assertThat(log.volltext()).contains("Metaspace").doesNotContain("synthetisches-betriebsdetail")
+                    .doesNotContain("inhaber@example.invalid");
+        }
+    }
 }
