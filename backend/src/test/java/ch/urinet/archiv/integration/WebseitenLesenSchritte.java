@@ -364,7 +364,9 @@ public class WebseitenLesenSchritte {
 
     @Dann("steht in der Lese-Antwort weder «{}» noch «{}»")
     public void nennt(String eins, String zwei) {
-        assertThat(antwort.asString()).doesNotContain(eins).doesNotContain(zwei);
+        // instance trägt eine zufällige UUID, die Hex-Folgen wie «abc» oder «101» enthalten kann
+        String text = antwort.asString().replaceAll("\"instance\":\"[^\"]*\"", "");
+        assertThat(text).doesNotContain(eins).doesNotContain(zwei);
     }
 
     @Dann("trägt die Lese-Antwort den Header «{}» mit dem Wert «{}»")

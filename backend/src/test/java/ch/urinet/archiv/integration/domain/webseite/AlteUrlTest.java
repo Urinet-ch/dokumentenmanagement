@@ -45,7 +45,7 @@ class AlteUrlTest {
     @Test
     void ungueltigeUrlsSindOhneErgebnis() {
         for (String falsch : new String[] {null, "", "   ", "kein-pfad", "alt/heft", "ftp:alt", "/alt/%", "/alt/%4",
-                "/alt/%zz", "/alt/%FF", "/alt/%00", "/alt/\u0000", "/alt/\n", "/" + "a".repeat(2000)}) {
+                "/alt/%zz", "/a%\uFF14\uFF11", "/a%\u0664\u0661", "/a\uD800", "/a\uDC00b", "/alt/%FF", "/alt/%00", "/alt/\u0000", "/alt/\n", "/" + "a".repeat(2000)}) {
             assertThat(AlteUrl.versuchen(falsch)).as("«%s»", falsch).isEqualTo(Optional.empty());
         }
     }

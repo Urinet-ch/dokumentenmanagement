@@ -79,20 +79,22 @@ public final class AlteUrl {
                 if (i + 2 >= text.length()) {
                     return Optional.empty();
                 }
-                int hoch = Character.digit(text.charAt(i + 1), 16);
-                int tief = Character.digit(text.charAt(i + 2), 16);
+                int hoch = hexWert(text.charAt(i + 1));
+                int tief = hexWert(text.charAt(i + 2));
                 if (hoch < 0 || tief < 0) {
                     return Optional.empty();
                 }
                 bytes.write(hoch * 16 + tief);
                 i += 2;
             } else {
-                byte[] roh = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
-                if (Character.isSurrogate(c) && i + 1 < text.length() && Character.isSurrogatePair(c, text.charAt(i + 1))) {
-                    roh = text.substring(i, i + 2).getBytes(StandardCharsets.UTF_8);
+                if (Character.isHighSurrogate(c) && i + 1 < text.length() && Character.isLowSurrogate(text.charAt(i + 1))) {
+                    bytes.writeBytes(text.substring(i, i + 2).getBytes(StandardCharsets.UTF_8));
                     i++;
+                } else if (Character.isSurrogate(c)) {
+                    return Optional.empty();
+                } else {
+                    bytes.writeBytes(String.valueOf(c).getBytes(StandardCharsets.UTF_8));
                 }
-                bytes.writeBytes(roh);
             }
         }
         try {
@@ -102,5 +104,19 @@ public final class AlteUrl {
         } catch (CharacterCodingException e) {
             return Optional.empty();
         }
+    }
+
+    /** Nur ASCII-Hex-Ziffern; {@link Character#digit} liesse auch Vollbreite- und andere Unicode-Ziffern zu. */
+    private static int hexWert(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        }
+        if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        }
+        return -1;
     }
 }
