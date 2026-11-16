@@ -149,7 +149,7 @@ damit ich mich auf ihn verlassen kann.
 
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - I4: eigene Rechnungen als PDF nach AbaNinja importieren (ersetzt Nacherfassung).
-- I5: Bankbewegungen aus AbaNinja für «bezahlt am».
+- I5: Bankbewegungen aus AbaNinja für «bezahlt am». Entfällt mit AbaNinja (Entscheid 15.11.2026, bestätigt 16.11.2026).
 - C3: Archiv-Werkzeuge als MCP-Server für Claude (nur lesend, Token pro Benutzer).
 
 ## Rückverfolgung Konzept → Spec

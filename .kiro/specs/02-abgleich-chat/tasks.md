@@ -121,6 +121,6 @@ Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit 
 
 - [ ]* O.1 Eigene Rechnungen nach AbaNinja importieren (I4) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus)
   - Generator-Dokumente der Art Ausgangsrechnung per PDF-Import an AbaNinja senden, AbaNinja-UUID speichern
-- [ ]* O.2 Bankbewegungen für «bezahlt am» (I5) [Backend]
+- [ ]* O.2 Bankbewegungen für «bezahlt am» (I5) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus; bestätigt von Fabian am 16.11.2026)
 - [ ]* O.3 MCP-Server für Claude (C3) [Backend]
   - Werkzeuge aus 7.1 als MCP-Server (nur lesend), Token pro Benutzer, gleiche Schutzregeln
