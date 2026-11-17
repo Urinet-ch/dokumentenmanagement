@@ -53,6 +53,9 @@ services:
       # Empfänger der Benachrichtigungen an den Inhaber (Aufgabe 5.6, Entscheid Fabian 14.11.2026): keine Geheimnisse, aus
       # der .env des Bundles (der Deploy schreibt sie aus der GitHub-Variable gleichen Namens); leer heisst nur Log
       ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
+      # Domain des Mandanten VHF/GSK für das Branding (Aufgabe 10.3, Vorschlag 17.11.2026): dieselbe Variable wie der Router
+      # unten; bis zur Umstellung auf die Verbandsdomain gilt die Platzhalter-Subdomain
+      ARCHIV_BRANDING_VHF_GSK_DOMAIN: ${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
       # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die
@@ -156,6 +159,22 @@ services:
       traefik.http.routers.archiv.tls.certresolver: le
       traefik.http.routers.archiv.service: archiv
       traefik.http.routers.archiv.middlewares: archiv-drossel
+      # Mandant VHF/GSK (Aufgabe 10.3, Vorschlag 17.11.2026, wartet auf Prüfung von Fabian): Platzhalter-Subdomain unter der
+      # Archiv-Domain, Hostname aus ARCHIV_HOST_VHF_GSK (.env des Bundles, sonst der Standard). Voraussetzung: DNS-Eintrag
+      # für den Host (sonst scheitert das Zertifikat, die UriNet-Router bleiben unberührt). Umstellung auf die Verbandsdomain
+      # = nur den Wert der Variablen ändern (der Deploy schreibt .env über .github/scripts/schreibe-env.sh). Gleiche Dienste und
+      # Drosselung wie archiv.apps.urinet.ch; ohne /q/ (intern) und ohne /public/ (die Webseiten-Schnittstelle gehört nur
+      # an den Host oben mit ihrer eigenen Drosselung).
+      traefik.http.routers.archiv-vhf-gsk-api.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && PathPrefix(`/api/`)
+      traefik.http.routers.archiv-vhf-gsk-api.entrypoints: websecure
+      traefik.http.routers.archiv-vhf-gsk-api.tls.certresolver: le
+      traefik.http.routers.archiv-vhf-gsk-api.service: archiv
+      traefik.http.routers.archiv-vhf-gsk-api.middlewares: archiv-drossel
+      traefik.http.routers.archiv-vhf-gsk.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`) && !PathPrefix(`/public/`)
+      traefik.http.routers.archiv-vhf-gsk.entrypoints: websecure
+      traefik.http.routers.archiv-vhf-gsk.tls.certresolver: le
+      traefik.http.routers.archiv-vhf-gsk.service: archiv
+      traefik.http.routers.archiv-vhf-gsk.middlewares: archiv-drossel
       # Schlanker öffentlicher Health-Pfad
       traefik.http.routers.archiv-health.rule: Host(`archiv.apps.urinet.ch`) && Path(`/q/health/live`)
       traefik.http.routers.archiv-health.entrypoints: websecure
