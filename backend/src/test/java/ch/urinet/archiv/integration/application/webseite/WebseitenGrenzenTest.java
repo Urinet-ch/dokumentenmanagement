@@ -203,7 +203,7 @@ class WebseitenGrenzenTest {
     @Test
     void internerFehlerLaesstAnfrageDurchUndErhoehtGenauDieAusfallkennzahl() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 3), uhr,
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr,
                 new MicrometerWebseitenGrenzen(registry));
 
         g.pruefen(null, Grenzklasse.LESEN);
