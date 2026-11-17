@@ -370,7 +370,7 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und enthält kein Werkzeugergebnis der Anfrage 2 «Probe-Merkblatt|Probe-Protokoll|Probe-Fremdmandant»
     Und nennen die Quellen des Chatbots genau die Dokumente «A»
 
-  @req-6.1 @req-9.1
+  @req-6.1 @req-1.4 @req-9.1
   Szenario: Die Gesprächs-ID eines anderen Mandanten beginnt ein neues Gespräch
     Angenommen der Chatbot-Schlüssel «vhf» der Webseite «probe-chat» im Mandanten «vhf-gsk» hat die höchste Stufe «oeffentlich»
     Und das simulierte Sprachmodell antwortet nacheinander:

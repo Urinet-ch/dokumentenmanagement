@@ -188,7 +188,7 @@ Funktionalität: Änderungs-Feed der Webseiten-Schnittstelle (Aufgabe 11.9)
       | dokument | art       | stufe       |
       | h1       | GEAENDERT | mitglieder  |
 
-  @req-14.2 @req-9.1
+  @req-14.2 @req-1.4 @req-9.1
   Szenario: Erfassungs-Referenzen bleiben auch zwischen Mandanten getrennt
     Angenommen der Webseiten-Erfassungszugang «fremd-erfassung» der Webseite «probe-feed» im Mandanten «vhf-gsk» ist angelegt
     Und im Mandanten «urinet» liegen diese Webseiten-Dokumente:

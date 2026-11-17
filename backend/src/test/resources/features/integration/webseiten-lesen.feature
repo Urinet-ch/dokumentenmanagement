@@ -307,7 +307,7 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | ?url=/alt/bulletin/2024/heft-1.pdf%3Bx    | 404    | NICHT_GEFUNDEN    |
       | ?url=kein-pfad                            | 400    | ANFRAGE_UNGUELTIG |
 
-  @req-5.2 @req-5.10 @req-9.1
+  @req-5.2 @req-5.10 @req-1.4 @req-9.1
   Szenario: Die Zuordnung eines anderen Mandanten wird nie geliefert
     Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
       | code        | name                  | aktiv |
@@ -325,6 +325,16 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Dann nennt die Antwort genau die Dokumente «»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/dokumente?pro_seite=100&mandant=vhf-gsk» mit der Stufe «vorstand» aufruft
     Dann nennt die Antwort genau die Dokumente «b1,b2,b3,m1,v1,a1»
+
+  @req-1.4 @req-9.1
+  Szenario: Datei und Filter eines anderen Mandanten werden nie geliefert
+    Angenommen im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name                  | aktiv |
+      | WEBTEST_VHF | Fremdmandanten-Reihe  | true  |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | art         | zugriff     | text           |
+      | x    | WEBTEST_VHF | oeffentlich | Fremdmandant   |
+    Und das Dokument «x» hat eine Datei
     Wenn der Webseiten-Lesezugang «vorstand» die Datei des Dokuments «x» mit der Stufe «vorstand» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/filter» mit der Stufe «vorstand» aufruft
@@ -345,6 +355,8 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Wenn der Webseiten-Lesezugang «oeffentlich» die Datei des Dokuments «b3» mit der Stufe «oeffentlich» und der Adresse «192.0.2.77» abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/umleitung?url=/alt/mitglieder» mit der Stufe «oeffentlich» aufruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/umleitung?url=/alt/vorstand» mit der Stufe «oeffentlich» aufruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
 
   @req-5.9
