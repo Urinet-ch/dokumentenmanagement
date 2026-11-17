@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="036-webseite-liste-index" author="archiv">
+        <comment>Bedient nur die Sortierung DATUM_AB der Webseiten-Liste (datum desc nulls last, id) je Reihe. DATUM_AUF
+            (asc nulls last) und TITEL (lower(titel)) sortieren weiter ueber Sort; Jahr, Ausgabe und Zugriffsstufe werden
+            nach dem Index gefiltert.</comment>
+        <sql>
+            create index dokument_webseite_liste_ix on dokument (art, datum desc nulls last, id)
+                where status = 'ARCHIVIERT' and vertraulichkeit = 'NORMAL' and bestaetigt is not null
+                    and zusatz -> 'veroeffentlicht' = 'true'::jsonb
+        </sql>
+        <rollback>
+            <sql>drop index if exists dokument_webseite_liste_ix</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

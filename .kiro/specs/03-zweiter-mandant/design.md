@@ -85,6 +85,7 @@ sequenceDiagram
   Umsetzung (PR #228, Abweichung): Das Verzeichnis liest `archiv.branding.mandanten.<id>.*` aus der Konfiguration (`application.properties`, Domain per Umgebungsvariable), nicht aus den Spalten `mandant.domain` und `mandant.branding`; die Domain von VHF/GSK ist offen und soll nicht im Repo stehen, die UriNet-Domain `archiv.apps.urinet.ch` ist öffentlich und Standard. Die Spalten bleiben ungenutzt, bis ein Entscheid die Quelle wechselt. Die Antwort enthält zusätzlich `sprache` (nur `de-CH`); `textfarbe` berechnet die Web-App aus `primaerfarbe` (besseres Verhältnis aus dunkler und heller Textfarbe). Primärfarben, bei denen keine Textfarbe 4,5:1 (WCAG 2.1 AA) erreicht, fallen auf die Standardfarbe zurück. Logos: nur Pfade auf der eigenen Origin oder geprüfte Daten-URIs (png, jpeg, webp), keine fremden Hosts. Offline zeigt die PWA die zuletzt gültige, erneut geprüfte Antwort aus `localStorage` (je Domain; ohne gespeicherte Antwort das neutrale Standard-Branding). Ein einzelner abschliessender Punkt im Hostnamen wird entfernt (FQDN-Schreibweise).
 - Domain: [offen: Domain VHF/GSK – Entscheid vor Welle 10]; zusätzlicher Traefik-Router per Labels in `deploy/infomaniak/compose.yml`, Deploy nur über den GitHub-Actions-Workflow.
 - Keycloak (`archiv-auth.apps.urinet.ch`): Client `archiv-vhf-gsk` mit Theme `vhf-gsk`; Benutzer der Geschäftsstelle mit Attribut `mandant=vhf-gsk`, Rolle `geschaeftsstelle` (Rechte nach Rechtematrix Spec 01, 2.6; A11 bis A14 offen, bis dahin 403; A19 der Wissensbasis 403, Spec 04, 12.1).
+  Vorschlag Rest von 10.3 (17.11.2026, wartet auf Prüfung von Fabian, nichts ausgerollt): Theme `vhf-gsk` unter `deploy/infomaniak/keycloak/themes/vhf-gsk/login/` (Elterntheme `keycloak.v2`; nur Platzhalter: Textmarke «VHF/GSK Archiv» statt Logo, Primärfarbe `#eeb111` und dunkler Text wie in `archiv.branding.mandanten.vhf-gsk.*`, keine echten Assets), vom `Dockerfile` des Keycloak-Images nach `/opt/keycloak/themes/vhf-gsk` kopiert. Es gilt erst, wenn der Client `archiv-vhf-gsk` im Realm besteht und dort «Login-Theme» = `vhf-gsk` trägt: Der Realm wird nur beim ersten Start importiert (`start.sh`), eine Änderung an `realm-export.json` erreicht den laufenden Realm nicht; Client, Redirect-URI des Hosts und Theme setzt Fabian darum einmal in der Admin-Konsole (die Konsole ist von aussen nicht erreichbar). Die Web-App verwendet bis dahin `archiv-pwa` (Anmeldung auf dem Host von VHF/GSK schlägt ohne diesen Client fehl; offen, mit der Aufgabe für den Mandanten-Client). Router: Labels `archiv-vhf-gsk` und `archiv-vhf-gsk-api` in `deploy/infomaniak/compose.yml` für den Host aus `ARCHIV_HOST_VHF_GSK` (Standard `vhf-gsk.archiv.apps.urinet.ch`, Platzhalter unter der Archiv-Domain; DNS-Eintrag nötig); dieselbe Variable setzt `ARCHIV_BRANDING_VHF_GSK_DOMAIN` der API, damit das Branding dort den Mandanten erkennt. Ohne `/q/` und ohne `/public/` (die Webseiten-Schnittstelle bleibt am Host von UriNet mit eigener Drosselung). Umstellung auf die Verbandsdomain: Wert der Variable ändern; weil die `.env` des Bundles heute nur `ARCHIV_ALARM_EMPFAENGER_URINET` enthält (`schreibe-env.sh`, `.github/`), braucht das eine Änderung des Deploy-Workflows (nicht Teil dieses PR). Rückfall: Labels, Variable und Theme-Kopie entfernen und neu deployen.
 - KI-Prompt pro Mandant: Dokumentarten-Beschreibung und Fachgebiet-Liste aus dem Seed; Zugriffsstufe nicht Teil des Vorschlags. Spec 05 ergänzt (Spec 05, Req 8.1, 8.4, 8.9): Prompt und Antwortschema kommen aus der Konfiguration von `vhf-gsk` (Arten mit `ki_vorschlag = ja`, `ki_felder` `ausgabe` und `jahr`, Klassifikation `fachgebiet` mit KI-Vorschlag); `zugriff` und `veroeffentlicht` schlägt die KI nie vor; Vorschläge erst nach Abnahme und KI-Freigabe (umgesetzt in Spec 05, Aufgabe 18.1).
 
 ### Reservierte Felder
@@ -346,6 +347,22 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
   - Offen: CI-Schritt «Vertrag nur additiv» im Build-Job (`.github/workflows/` nicht in dieser Aufgabe), Router für
     `/public/` mit eigener Drosselung in Traefik (`deploy/infomaniak/compose.yml`, Wert betrieblich); bis dahin läuft
     `/public/` über den Router der App.
+  - Vorschlag Traefik-Drosselung (17.11.2026, Aufgabe 11.6; wartet auf Prüfung von Fabian, nichts ausgerollt): Router
+    `archiv-public` (`PathPrefix(/public/)`, Priorität 200, vor dem PWA-Router) und `archiv-public-suche`
+    (`Path(/public/v1/suche)`, Priorität 300), Labels in `deploy/infomaniak/compose.yml`. Je Quell-IP (Traefik-Standard
+    `remoteAddr`, wie die bestehende Drosselung): alle Pfade 50/s, Spitze 200; Suche zusätzlich 5/s, Spitze 20; höchstens
+    24 gleichzeitige Anfragen (`inflightreq`). Begründung: äussere Schicht, bewusst über den Grenzen je Schlüssel (Lesen
+    20/s, Suche 2/s, Erfassung 5/s, Uploads 120/h, siehe «Grenzen»), damit im Normalfall das Backend mit
+    `ZU_VIELE_ANFRAGEN` und `Retry-After` antwortet; ein Webseitenserver ist eine IP und bedient mehrere Schlüssel
+    (Lesen und Erfassung, je Webseite), darum Summe plus Reserve. Die Schicht fängt Schlüssel-Raten (viele falsche
+    Schlüssel je IP, jeder rechnet Argon2) und Last vor dem Backend ab. Die Zähler liegen im Speicher von Traefik; das 429
+    von Traefik hat kein Problem Details und kein `Retry-After` (Clients behandeln jedes 429 als «später erneut»; die
+    Messung am Livegang, Kennzahl `archiv_webseite_grenze_abgelehnt_total` und Traefik-Zugriffslog, zeigt, ob die Werte
+    passen). Header `X-Archiv-Zugriff`, `-Client`, `-Bearbeiter`: Traefik reicht Request-Header unverändert weiter, keine
+    Middleware ändert sie. Body-Grösse der Uploads: nur
+    als Kommentar in `compose.yml` (`buffering` mit 52 MiB), weil es den Body in Traefik puffert; Entscheid mit 11.10.
+    Interne Routen (`/api/`, `/q/`) unberührt. Rückfall: die Labels entfernen und neu deployen; `/public/` läuft dann
+    wie bisher über den PWA-Router (nur Backend-Grenzen).
 
 ### Grenzen
 Startwerte (Requirement 15.1; vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR), konfigurierbar unter
