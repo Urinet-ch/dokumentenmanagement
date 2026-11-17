@@ -7,6 +7,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaException;
 import com.networknt.schema.SchemaLocation;
@@ -43,6 +44,7 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * {@link ZusatzSchemaPruefer} mit networknt json-schema-validator (Draft 2020-12, {@code format} als Prüfung, Req 9.5).
@@ -268,10 +270,21 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
-    public boolean reservierteFelderGueltig(String schemaJson, String artCode) {
+    public boolean reservierteFelderGueltig(String schemaJson) {
         try {
             JsonNode schema = StrengesJson.lesen(schemaJson);
             if (schema == null || !schema.isObject()) {
+                return false;
+            }
+            // Reservierte Felder nur direkt unter «properties» der Wurzel: Wer sie über patternProperties, allOf/anyOf/
+            // oneOf/if-then-else, $ref/$defs o. ä. definiert, würde die Prüfung umgehen.
+            ObjectNode ohneProperties = ((ObjectNode) schema).deepCopy();
+            ohneProperties.remove("properties");
+            ohneProperties.remove("required");
+            ohneProperties.remove("patternProperties");
+            String rest = ohneProperties.toString();
+            if (rest.contains("\"zugriff\"") || rest.contains("\"veroeffentlicht\"")
+                    || patternProperties(schema.path("patternProperties"))) {
                 return false;
             }
             JsonNode properties = schema.path("properties");
@@ -281,25 +294,25 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             if (!properties.isObject()) {
                 return false;
             }
-            String zugriffStandard = "VORSTANDSPROTOKOLL".equals(artCode) ? "vorstand" : "mitglieder";
+            // Standard von zugriff: nie «oeffentlich»; «mitglieder» (Spec 03) oder «vorstand» (z. B. VORSTANDSPROTOKOLL,
+            // Entscheid Fabian 17.11.2026), ohne Art-Code in der Programmlogik (Req 2.9)
             return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
-                    List.of("oeffentlich", "mitglieder", "vorstand"), zugriffStandard)
+                    List.of("oeffentlich", "mitglieder", "vorstand"), List.of("mitglieder", "vorstand"))
                     && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",
-                    List.of(), "false");
+                    List.of(), List.of());
         } catch (JsonProcessingException e) {
             return false;
         }
     }
 
     private static boolean reserviertesFeldGueltig(JsonNode properties, JsonNode required, String name, String typ,
-                                                    List<String> werte, String standard) {
+                                                    List<String> werte, List<String> standardWerte) {
         JsonNode eigenschaft = properties.get(name);
         if (eigenschaft == null) {
             return true;
         }
         if (!eigenschaft.isObject() || !typ.equals(eigenschaft.path("type").asText())
-                || !standard.equals(eigenschaft.path("default").asText())
-                || !required(required, name)) {
+                || !standardGueltig(eigenschaft.get("default"), standardWerte) || !required(required, name)) {
             return false;
         }
         JsonNode enumWerte = eigenschaft.get("enum");
@@ -319,6 +332,35 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         }
         return enumWerte.isArray() && enumWerte.size() == 2 && enumWerte.get(0).isBoolean()
                 && enumWerte.get(1).isBoolean() && enumWerte.get(0).booleanValue() != enumWerte.get(1).booleanValue();
+    }
+
+    /** Trifft ein Schlüssel von patternProperties eines der reservierten Felder (oder ist er kein gültiges Muster)? */
+    private static boolean patternProperties(JsonNode muster) {
+        if (!muster.isObject()) {
+            return !muster.isMissingNode();
+        }
+        for (Iterator<String> it = muster.fieldNames(); it.hasNext(); ) {
+            try {
+                Pattern p = Pattern.compile(it.next());
+                if (p.matcher("zugriff").find() || p.matcher("veroeffentlicht").find()) {
+                    return true;
+                }
+            } catch (PatternSyntaxException e) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Typgenau: Text aus {@code standardWerte}; ohne Liste der JSON-Wahrheitswert {@code false} (kein String). */
+    private static boolean standardGueltig(JsonNode standard, List<String> standardWerte) {
+        if (standard == null) {
+            return false;
+        }
+        if (standardWerte.isEmpty()) {
+            return standard.isBoolean() && !standard.booleanValue();
+        }
+        return standard.isTextual() && standardWerte.contains(standard.textValue());
     }
 
     private static boolean required(JsonNode required, String feld) {

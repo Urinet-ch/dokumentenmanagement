@@ -71,7 +71,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
 ## Welle 18 — Wirkung und Oberfläche
 - [ ] 18.1 KI aus der Konfiguration [Backend]
   - Prompt und Antwortschema aus Arten, `ki_felder` und Klassifikationen, KI-Texte, Nachbearbeitung über
-    Art-Attribute, Belegnummer-Muster aus den Arten mit Zeitgrenze zur Laufzeit, Schalter `ki_freigegeben` und
+    Art-Attribute, Belegnummer-Muster aus den Arten mit Zeitgrenze zur Laufzeit (inkl. ReDoS-Test mit `(a+)+$` gegen langen
+    Eingabetext: gilt als «trifft nicht zu» und landet im Protokoll; 17.3 prüft nur Syntax und Länge), Schalter `ki_freigegeben` und
     Admin-Kommando `ki-freigeben`, Snapshot-Test gegen den Stand von Spec 01, Aufgabe 3.2, Quelltext-Test ohne
     Art-Codes.
   - _Anforderungen: 2.3, 2.4, 2.5, 2.9, 8.1, 8.2, 8.3, 8.4_

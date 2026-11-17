@@ -76,7 +76,7 @@ class KonfigurationSeedVersionTest {
     }
 
     @Test
-    void changeset039UebernimmtVorhandeneArtenUndFuegtMigrationsabbildAn() throws Exception {
+    void changeset040UebernimmtVorhandeneArtenUndFuegtMigrationsabbildAn() throws Exception {
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
             befehl.execute("drop schema if exists " + MIGRATION_SCHEMA + " cascade");
             befehl.execute("create schema " + MIGRATION_SCHEMA);
@@ -101,7 +101,7 @@ class KonfigurationSeedVersionTest {
                     insert into konfiguration_version values (7, 'system:migration', null, 'MIGRATION',
                         '{"version":7,"marker":"vorher"}', 'alter-hash')
                     """);
-            liquibase039(verbindung);
+            liquibase040(verbindung, MIGRATION_SCHEMA);
             verbindung.commit();
 
             assertThat(wert(befehl, "select count(*) from konfiguration_version")).isEqualTo("2");
@@ -127,11 +127,121 @@ class KonfigurationSeedVersionTest {
         }
     }
 
-    private static void liquibase039(Connection verbindung) throws Exception {
+    /**
+     * Datenerhalt und Muster des Changesets in einer eigenen, kurzlebigen Datenbank: Nur dort darf das Schema
+     * {@code m_urinet} samt Zeile in {@code public.mandant} ohne Berührung der echten Daten angelegt werden.
+     */
+    @Test
+    void changeset040UebernimmtAusstellerMusterUndUmstufungenFuerUrinet() throws Exception {
+        String name = "probe_konf_migration_" + Long.toHexString(System.nanoTime());
+        try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+            befehl.execute("create database " + name);
+        }
+        try {
+            try (Connection verbindung = verbinden(name); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("""
+                        create table public.mandant (code text, schema_name text, eigene_arten text[],
+                            geschaeftsjahr_ende text, kennungen jsonb)
+                        """);
+                befehl.execute("""
+                        insert into public.mandant values ('urinet', 'm_urinet', array['AUSGANGSRECHNUNG','OFFERTE','X'],
+                            '12-31', '{"uid":"CHE-1","ibans":["CH1"]}')
+                        """);
+                befehl.execute("create schema m_urinet");
+                befehl.execute("set search_path to m_urinet");
+                befehl.execute("""
+                        create table dokumentart (
+                            code text primary key, name text not null, beschreibung text, gruppen text[],
+                            pflichtfelder text[], zusatz_schema jsonb, vertraulichkeit text not null,
+                            aufbewahrung_jahre integer, aufbewahrung_ab text,
+                            gesetzliche_pflicht boolean not null, aktiv boolean not null)
+                        """);
+                befehl.execute("""
+                        create table konfiguration_version (
+                            version integer primary key, wer text not null, grund text, quelle text not null,
+                            inhalt jsonb not null, sha256 text not null)
+                        """);
+                for (String code : List.of("AUSGANGSRECHNUNG", "OFFERTE", "LIEFERANTENBELEG", "QUITTUNG", "WISSENSQUELLE",
+                        "X")) {
+                    befehl.execute("insert into dokumentart values ('" + code + "', '" + code
+                            + "', null, '{}', '{}', '{\"type\":\"object\"}', 'NORMAL', 10, 'GESCHAEFTSJAHR', false, true)");
+                }
+                liquibase040(verbindung, "m_urinet");
+                verbindung.commit();
+
+                // eigene_arten wird übernommen (nicht die Standardliste), auch eine Art ausserhalb der Standardliste
+                assertThat(wert(befehl, "select string_agg(code, ',' order by code) from dokumentart "
+                        + "where selbst_ausgestellt")).isEqualTo("AUSGANGSRECHNUNG,OFFERTE,X");
+                assertThat(wert(befehl, "select array_to_string(belegnummer_muster, '|') from dokumentart "
+                        + "where code = 'AUSGANGSRECHNUNG'")).isEqualTo("^\\d{4}-\\d{3}$|^R\\d{4}$");
+                assertThat(wert(befehl, "select array_to_string(belegnummer_muster, '|') from dokumentart where code = 'OFFERTE'"))
+                        .isEqualTo("^O-\\d{4}-\\d{3}$");
+                assertThat(wert(befehl, "select array_to_string(belegnummer_muster, '|') from dokumentart "
+                        + "where code = 'LIEFERANTENBELEG'")).isEqualTo("^F\\d{4}$");
+                assertThat(wert(befehl, "select fremdbeleg_art from dokumentart where code = 'AUSGANGSRECHNUNG'"))
+                        .isEqualTo("LIEFERANTENBELEG");
+                assertThat(wert(befehl, "select fremdbeleg_art from dokumentart where code = 'OFFERTE'"))
+                        .isEqualTo("LIEFERANTENBELEG");
+                assertThat(wert(befehl, "select ohne_zahlungsdaten_art from dokumentart "
+                        + "where code = 'LIEFERANTENBELEG'")).isEqualTo("QUITTUNG");
+                assertThat(wert(befehl, "select ki_vorschlag::text from dokumentart where code = 'WISSENSQUELLE'"))
+                        .isEqualTo("false");
+                assertThat(wert(befehl, "select count(*) from dokumentart where ki_vorschlag")).isEqualTo("5");
+                // Abbild der Migration trägt dieselben Werte und die Mandanten-Einstellungen
+                assertThat(wert(befehl, "select inhalt #>> '{einstellungen,kennungen,uid}' from konfiguration_version"))
+                        .isEqualTo("CHE-1");
+                assertThat(wert(befehl, "select count(*) from konfiguration_version, "
+                        + "jsonb_array_elements(inhalt -> 'arten') a where (a ->> 'selbstAusgestellt')::boolean"))
+                        .isEqualTo("3");
+                assertThat(wert(befehl, "select a ->> 'fremdbelegArt' from konfiguration_version, "
+                        + "jsonb_array_elements(inhalt -> 'arten') a where a ->> 'code' = 'OFFERTE'"))
+                        .isEqualTo("LIEFERANTENBELEG");
+            }
+        } finally {
+            try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {
+                befehl.execute("drop database if exists " + name + " with (force)");
+            }
+        }
+    }
+
+    @Test
+    void changeset040OhneMandantenzeileBehaeltDefaultsUndFuehrtWissensquelleOhneKi() throws Exception {
+        try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("drop schema if exists " + MIGRATION_SCHEMA + " cascade");
+            befehl.execute("create schema " + MIGRATION_SCHEMA);
+            befehl.execute("set search_path to " + MIGRATION_SCHEMA);
+            befehl.execute("""
+                    create table dokumentart (
+                        code text primary key, name text not null, beschreibung text, gruppen text[],
+                        pflichtfelder text[], zusatz_schema jsonb, vertraulichkeit text not null,
+                        aufbewahrung_jahre integer, aufbewahrung_ab text,
+                        gesetzliche_pflicht boolean not null, aktiv boolean not null)
+                    """);
+            befehl.execute("""
+                    create table konfiguration_version (
+                        version integer primary key, wer text not null, grund text, quelle text not null,
+                        inhalt jsonb not null, sha256 text not null)
+                    """);
+            befehl.execute("""
+                    insert into dokumentart values ('WISSENSQUELLE', 'W', null, '{}', '{}', '{"type":"object"}',
+                        'NORMAL', 10, 'GESCHAEFTSJAHR', false, true)
+                    """);
+            liquibase040(verbindung, MIGRATION_SCHEMA);
+            verbindung.commit();
+            // fehlt die Zeile in public.mandant, wirkt das UPDATE trotzdem (left join)
+            assertThat(wert(befehl, "select ki_vorschlag::text from dokumentart")).isEqualTo("false");
+        } finally {
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("drop schema if exists " + MIGRATION_SCHEMA + " cascade");
+            }
+        }
+    }
+
+    private static void liquibase040(Connection verbindung, String schema) throws Exception {
         Database datenbank = DatabaseFactory.getInstance()
                 .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
-        datenbank.setDefaultSchemaName(MIGRATION_SCHEMA);
-        datenbank.setLiquibaseSchemaName(MIGRATION_SCHEMA);
+        datenbank.setDefaultSchemaName(schema);
+        datenbank.setLiquibaseSchemaName(schema);
         ClassLoaderResourceAccessor ressource = new ClassLoaderResourceAccessor(
                 KonfigurationSeedVersionTest.class.getClassLoader());
         Scope.child(Map.of(Scope.Attr.resourceAccessor.name(), ressource,
@@ -139,13 +249,22 @@ class KonfigurationSeedVersionTest {
                 new CommandScope(UpdateCommandStep.COMMAND_NAME)
                         .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, datenbank)
                         .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG,
-                                "db/mandant/changesets/039-dokumentart-konfiguration.xml")
+                                "db/mandant/changesets/040-dokumentart-konfiguration.xml")
                         .execute());
     }
 
     private static Connection verbinden() throws SQLException {
+        return verbinden(null);
+    }
+
+    /** Verbindung zur Test-Datenbank oder, mit {@code datenbankName}, zu einer anderen Datenbank desselben Servers. */
+    private static Connection verbinden(String datenbankName) throws SQLException {
         var config = ConfigProvider.getConfig();
-        return DriverManager.getConnection(config.getValue("quarkus.datasource.jdbc.url", String.class),
+        String url = config.getValue("quarkus.datasource.jdbc.url", String.class);
+        if (datenbankName != null) {
+            url = url.replaceFirst("/[^/?]+(\\?|$)", "/" + datenbankName + "$1");
+        }
+        return DriverManager.getConnection(url,
                 config.getValue("quarkus.datasource.username", String.class),
                 config.getValue("quarkus.datasource.password", String.class));
     }

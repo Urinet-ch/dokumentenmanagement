@@ -4,7 +4,7 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet id="039-dokumentart-konfiguration" author="archiv">
+    <changeSet id="040-dokumentart-konfiguration" author="archiv">
         <sql>
             alter table dokumentart
                 add column selbst_ausgestellt boolean not null default false,
@@ -46,7 +46,8 @@
                     else null
                 end,
                 ki_vorschlag = a.code &lt;&gt; 'WISSENSQUELLE'
-            from mandant m;
+            from (select 1) einsatz
+            left join mandant m on true;
         </sql>
         <sql>
             with naechste as (

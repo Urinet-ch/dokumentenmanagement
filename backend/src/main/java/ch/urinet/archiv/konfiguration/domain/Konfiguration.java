@@ -39,7 +39,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             if (art.belegnummerMuster().size() > 20 || art.belegnummerMuster().stream()
                     .anyMatch(muster -> !BelegnummerMuster.gueltig(muster))) {
                 befunde.add(new Befund("arten." + art.code() + ".belegnummerMuster", "MUSTER_UNGUELTIG",
-                        "Ein Belegnummer-Muster ist ungültig oder unsicher."));
+                        "Ein Belegnummer-Muster ist ungültig."));
             }
             artReferenzPruefen(befunde, nachCode, art, art.fremdbelegArt(), "fremdbelegArt");
             artReferenzPruefen(befunde, nachCode, art, art.ohneZahlungsdatenArt(), "ohneZahlungsdatenArt");

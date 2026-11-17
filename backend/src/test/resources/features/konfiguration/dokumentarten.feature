@@ -118,3 +118,28 @@ Funktionalität: Mandantenspezifische Dokumentart-Attribute
        "fremdbelegArt":"PROBE_DA_ZIEL"}
       """
     Dann antwortet die Dokumentart-Verwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+
+  @req-2.8
+  Szenario: Ein Verweis auf eine nicht vorhandene Art wird fachlich abgelehnt
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code":"PROBE_DA_QUELLE","name":"Probe Quelle","vertraulichkeit":"NORMAL","gesetzlichePflicht":false,
+       "fremdbelegArt":"PROBE_DA_GIBT_ES_NICHT"}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+
+  @req-2.8
+  Szenario: Eine Art, auf die eine andere verweist, lässt sich nicht löschen
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code":"PROBE_DA_ZIEL","name":"Probe Ziel","vertraulichkeit":"NORMAL","gesetzlichePflicht":false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code":"PROBE_DA_QUELLE","name":"Probe Quelle","vertraulichkeit":"NORMAL","gesetzlichePflicht":false,
+       "ohneZahlungsdatenArt":"PROBE_DA_ZIEL"}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_ZIEL» löscht
+    Dann antwortet die Dokumentart-Verwaltung mit Status 409 und Fehlercode «DOKUMENTART_IN_GEBRAUCH»
