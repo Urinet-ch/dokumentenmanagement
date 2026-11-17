@@ -52,23 +52,22 @@ class ErfassungPromptTest {
     }
 
     /**
-     * Produktpfad (Review PR #93): Arten aus dem Seed des Mandanten {@code urinet}, gefiltert und geordnet wie in
-     * {@code MetadatenExtraktion.arten()}, eigene Arten aus {@code application.properties}, Antwortschema und Codes aus
-     * dem Adapter. Weicht der Text ab, warnt das Archiv bei jedem Aufruf; hier bricht der Build.
+     * Produktpfad (Review PR #93): Arten und selbst ausgestellte Arten aus dem Seed des Mandanten {@code urinet},
+     * gefiltert und geordnet wie in {@code MetadatenExtraktion.arten()}, Antwortschema und Codes aus dem Adapter.
+     * Weicht der Text ab, warnt das Archiv bei jedem Aufruf; hier bricht der Build.
      */
     @Test
     void produktpfadMitSeedUrinetErgibtDieGateKennung() throws Exception {
-        List<ArtEintrag> aktiv = new KlassenpfadDokumentartSeed(new ObjectMapper()).lesen(new MandantCode("urinet"))
+        var vorlagen = new KlassenpfadDokumentartSeed(new ObjectMapper()).lesen(new MandantCode("urinet"));
+        List<ArtEintrag> aktiv = vorlagen
                 .stream()
                 .filter(DokumentartVorlage::aktiv)
                 .map(v -> new ArtEintrag(v.code(), v.name(), v.vertraulichkeit()))
                 .toList();
         List<ArtEintrag> arten = ErfassungPrompt.schemaArten(aktiv, LangChain4jKiAdapter.codes());
-        Properties properties = new Properties();
-        try (var ein = getClass().getResourceAsStream("/application.properties")) {
-            properties.load(new InputStreamReader(ein, StandardCharsets.UTF_8));
-        }
-        Set<String> eigene = Set.of(properties.getProperty("archiv.mandant.urinet.eigene-arten").split(","));
+        Set<String> eigene = vorlagen.stream().filter(DokumentartVorlage::selbstAusgestellt)
+                .map(DokumentartVorlage::code).collect(java.util.stream.Collectors.toSet());
+        assertThat(eigene).isEqualTo(EIGENE);
 
         String system = ErfassungPrompt.system(MANDANT, ErfassungPrompt.artListe(arten, eigene, MANDANT));
 

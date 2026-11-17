@@ -3,7 +3,6 @@ package ch.urinet.archiv.sicherheit.application;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -16,25 +15,19 @@ import java.util.regex.Pattern;
  * {@code X-Real-Ip} (Traefik) zählt nur, wenn der unmittelbare Peer in einem konfigurierten Netz liegt
  * ({@code archiv.api-token.vertrauenswuerdige-proxies}, CIDR-Liste) und der Wert genau eine IPv4- oder IPv6-Adresse ist.
  * Sonst gilt die Verbindungsadresse; ein Client kann die Quelle so nie selbst setzen. Ohne Netze (leere Liste) wird der
- * Header nie ausgewertet; produktiv warnt der Start, wenn nur Loopback eingetragen ist. Quarkus' eigene Proxy-Weiterleitung kennt {@code X-Real-Ip} nicht und ist deshalb nicht im Spiel.
+ * Header nie ausgewertet; produktiv warnt der Start davor ({@code QuellAdresseWarnungBeimStart}). Quarkus' eigene Proxy-Weiterleitung kennt {@code X-Real-Ip} nicht und ist deshalb nicht im Spiel.
  */
 @ApplicationScoped
 public class QuellAdresse {
 
-    private static final Logger LOG = Logger.getLogger(QuellAdresse.class);
     private static final Pattern ZEICHEN = Pattern.compile("^[0-9A-Fa-f:.]{2,45}$");
 
     private final List<Netz> netze;
 
     @Inject
     public QuellAdresse(
-            @ConfigProperty(name = "archiv.api-token.vertrauenswuerdige-proxies") Optional<List<String>> netze,
-            @ConfigProperty(name = "quarkus.profile", defaultValue = "prod") String profil) {
+            @ConfigProperty(name = "archiv.api-token.vertrauenswuerdige-proxies") Optional<List<String>> netze) {
         this(netze.orElse(List.of()));
-        if ("prod".equals(profil) && this.netze.stream().allMatch(Netz::loopback)) {
-            LOG.warn("Nur Loopback als vertrauenswürdiges Proxy-Netz: Clients hinter dem Proxy teilen eine Quelladresse "
-                    + "(ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE setzen)");
-        }
     }
 
     public QuellAdresse(List<String> netze) {
@@ -100,14 +93,6 @@ public class QuellAdresse {
                 }
             }
             return new Netz(bytes, laenge);
-        }
-
-        boolean loopback() {
-            try {
-                return InetAddress.getByAddress(basis).isLoopbackAddress();
-            } catch (java.net.UnknownHostException e) {
-                return false;
-            }
         }
 
         boolean enthaelt(InetAddress kandidat) {
