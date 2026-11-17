@@ -431,6 +431,16 @@ public class BestaetigenSchritte {
                 Testanmeldung.sub(benutzer)).get("anzahl")).intValue()).isEqualTo(anzahl);
     }
 
+    /** Letzter Eintrag des Änderungs-Feeds (Spec 04, 11.9); «-» steht für keine Stufe (NULL). */
+    @Dann("steht im Änderungs-Feed für «{word}» zuletzt die Stufe vorher «{word}» und nachher «{word}»")
+    public void feedStufen(String name, String vorher, String nachher) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> eintrag = zeile("select stufe_vorher, stufe_nachher from " + schema(ort.mandant())
+                + ".webseite_aenderung where dokument_id = ? order by id desc limit 1", ort.id());
+        assertThat(eintrag.get("stufe_vorher")).isEqualTo("-".equals(vorher) ? null : vorher);
+        assertThat(eintrag.get("stufe_nachher")).isEqualTo("-".equals(nachher) ? null : nachher);
+    }
+
     /** Req 9.7: nur die beiden Fristen, keine Werte des Dokuments (Req 10.2). */
     @Dann("hält das Zugriffsprotokoll für «{word}» «SPERRE_KONFLIKT» von «{word}» mit der Frist bisher «{word}» und neu «{word}» fest")
     public void sperrKonflikt(String name, String benutzer, String bisher, String neu) throws SQLException {

@@ -209,6 +209,15 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und enthält der Text des Chatbots «Dazu habe ich nichts gefunden.»
     Und enthält der Text des Chatbots «Bitte wenden Sie sich an die Geschäftsstelle.»
 
+  @req-6.1 @req-15.4
+  Szenario: Ein erfolgreicher Chat-Stream wird nicht zwischengespeichert
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt         | argumente | tokens |
+      | 1       | text | Guten Tag.     |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und trägt die Chatbot-Antwort den Header «Cache-Control» mit dem Wert «no-store»
+
   # ---- Grenzen und Budget (Req 6.4)
 
   @req-6.4
@@ -321,6 +330,18 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Wenn die Webseite mit dem Schlüssel «vorstand» den Rohkörper «keinjson» sendet
     Dann liefert der Chatbot Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und steht in der Chatbot-Antwort weder «keinjson» noch «Exception»
+
+  @req-6.1
+  Szenario: Ein falscher Inhaltstyp wird mit 415 abgelehnt, Zusatzfelder im Körper werden ignoriert und stellen nichts frei
+    Wenn die Webseite mit dem Schlüssel «vorstand» mit dem Inhaltstyp «text/plain» den Rohkörper «{"frage":"Hallo"}» sendet
+    Dann liefert der Chatbot Status 415 und Fehlercode «MEDIENTYP_FALSCH»
+    Und steht in der Chatbot-Antwort weder «Exception» noch «java.»
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt     | argumente | tokens |
+      | 1       | text | Guten Tag. |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «oeffentlich» den Rohkörper «{"frage":"Hallo","stufe":"vorstand","zugriff":"vorstand","mandant":"fremd"}» sendet
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und sind die Quellen des Chatbots leer
 
   @req-6.1
   Szenario: Der Verlauf umfasst Frage und Antwort der letzten Runde und gehört dem Client; eine fremde Gesprächs-ID beginnt ein neues Gespräch

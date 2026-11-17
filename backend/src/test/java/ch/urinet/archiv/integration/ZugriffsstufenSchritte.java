@@ -5,17 +5,23 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.io.IOException;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -39,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ZugriffsstufenSchritte {
 
     private static final String PROBE = "/public/v1/probe";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @Inject
     WebseitenSchluesselVerwaltung verwaltung;
@@ -52,6 +59,8 @@ public class ZugriffsstufenSchritte {
     private long protokollStand;
     private Response antwort;
     private Response vergleich;
+    private Integer roherStatus;
+    private String roherAntwort;
 
     private record Dokument(String mandant, UUID id) {
     }
@@ -73,6 +82,8 @@ public class ZugriffsstufenSchritte {
         dokumente.clear();
         tokenIds.clear();
         schluessel.clear();
+        roherStatus = null;
+        roherAntwort = null;
     }
 
     @Angenommen("der Lese-Schlüssel «{word}» der Webseite «{word}» im Mandanten «{word}» hat die höchste Stufe «{word}»")
@@ -172,6 +183,40 @@ public class ZugriffsstufenSchritte {
         antwort = anfrage(name).header(header, eins).header(header, zwei).when().get(pfad);
     }
 
+    @Wenn("der Schlüssel «{word}» «{}» mit unterschiedlich geschriebenen Headern «{}» und «{}» sowie den Werten «{}» und «{}» aufruft")
+    public void mitUnterschiedlichGeschriebenenHeadern(String name, String pfad, String header1, String header2,
+            String eins, String zwei) {
+        int port = RestAssured.port;
+        String anfrage = "GET " + pfad + " HTTP/1.1\r\n"
+                + "Host: localhost:" + port + "\r\n"
+                + "Authorization: Bearer " + schluessel.get(name) + "\r\n"
+                + header1 + ": " + eins + "\r\n"
+                + header2 + ": " + zwei + "\r\n"
+                + "Accept: application/json\r\n"
+                + "Connection: close\r\n\r\n";
+        try (Socket socket = new Socket("127.0.0.1", port)) {
+            socket.setSoTimeout(5_000);
+            socket.getOutputStream().write(anfrage.getBytes(StandardCharsets.US_ASCII));
+            byte[] roh = socket.getInputStream().readAllBytes();
+            int trennung = trennung(roh);
+            String kopf = new String(roh, 0, trennung, StandardCharsets.ISO_8859_1);
+            roherStatus = Integer.parseInt(kopf.substring(0, kopf.indexOf("\r\n")).split(" ")[1]);
+            roherAntwort = new String(roh, trennung + 4, roh.length - trennung - 4, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Die Webseiten-Schnittstelle antwortete nicht auf die Header-Prüfung", e);
+        }
+    }
+
+    private static int trennung(byte[] antwort) {
+        for (int i = 0; i < antwort.length - 3; i++) {
+            if (antwort[i] == '\r' && antwort[i + 1] == '\n' && antwort[i + 2] == '\r'
+                    && antwort[i + 3] == '\n') {
+                return i;
+            }
+        }
+        throw new AssertionError("Die HTTP-Rohantwort enthält keinen Header-Abschluss");
+    }
+
     @Wenn("der Schlüssel «{word}» das Dokument «{word}» mit der Stufe «{word}» abruft")
     public void dokumentAbrufen(String name, String dokument, String stufe) {
         antwort = anfrage(name).header("X-Archiv-Zugriff", stufe).when()
@@ -197,6 +242,18 @@ public class ZugriffsstufenSchritte {
 
     @Dann("liefert das Archiv Status {int} und Fehlercode «{word}»")
     public void statusUndCode(int status, String code) {
+        if (roherStatus != null) {
+            assertThat(roherStatus).isEqualTo(status);
+            try {
+                assertThat(JSON.readTree(roherAntwort).path("fehlercode").asText()).isEqualTo(code);
+            } catch (JsonProcessingException e) {
+                throw new AssertionError("Die Rohantwort ist kein gültiges Problem Details", e);
+            } finally {
+                roherStatus = null;
+                roherAntwort = null;
+            }
+            return;
+        }
         assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
     }
 

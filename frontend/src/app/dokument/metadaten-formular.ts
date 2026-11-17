@@ -91,6 +91,7 @@ export class MetadatenFormular {
   protected readonly feldNamen = TEXTE.eingangskorb.feld;
   protected readonly vertraulichkeitNamen = TEXTE.dokument.vertraulichkeiten;
   protected readonly richtungNamen = TEXTE.eingangskorb.richtung;
+  protected readonly zugriffNamen = TEXTE.eingangskorb.zugriff;
   protected readonly richtungen = ['EINNAHME', 'AUSGABE'];
   protected readonly vertraulichkeiten = ['NORMAL', 'INTERN', 'PERSONAL'];
   protected readonly grundMax = GRUND_MAX;
@@ -138,7 +139,9 @@ export class MetadatenFormular {
       ? VERTRAG_FELDER.map((feld) => ({ feld, typ: TYPEN[feld] ?? 'text' }))
       : [],
   );
-  protected readonly zusatz = computed<ZusatzFeld[]>(() => zusatzFelder(this.art()));
+  protected readonly zusatz = computed<ZusatzFeld[]>(() =>
+    zusatzFelder(this.art()).filter((feld) => feld.name !== 'veroeffentlicht' || this.archiviert()),
+  );
 
   constructor() {
     this.suche
