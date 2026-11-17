@@ -9,7 +9,9 @@ import ch.urinet.archiv.integration.application.webseite.WebseitenErfassung.List
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
+import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -146,7 +148,9 @@ public class WebseitenErfassungResource {
     @POST
     @Path("/erfassung/dokumente")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A1)
     @WebseitenGrenze(ch.urinet.archiv.integration.domain.webseite.Grenzklasse.UPLOAD)
     @Protokolliert(aktion = ProtokollAktion.ERFASSEN)
     @Transactional
@@ -199,7 +203,9 @@ public class WebseitenErfassungResource {
     @PUT
     @Path("/erfassung/bearbeiter/{kennung}")
     @Consumes(MediaType.APPLICATION_JSON)
+    @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A1)
     @Operation(summary = "Bearbeiter der Webseite melden")
     @APIResponse(responseCode = "204", description = "Bearbeiter neu oder mit geändertem Namen gemeldet")
     @APIResponse(responseCode = "400", ref = "AnfrageUngueltig")
@@ -215,7 +221,9 @@ public class WebseitenErfassungResource {
 
     @GET
     @Path("/erfassung/dokumente")
+    @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A2)
     @Operation(summary = "Erfasste Dokumente auflisten oder Status über Referenz abrufen")
     @APIResponse(responseCode = "200", description = "Liste oder Status",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
@@ -268,7 +276,9 @@ public class WebseitenErfassungResource {
 
     @GET
     @Path("/erfassung/dokumente/{id}")
+    @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A2)
     @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
     @Operation(summary = "Erfasstes Dokument ohne Dateinamen anzeigen")
     @APIResponse(responseCode = "200", description = "Dokumentdetails",

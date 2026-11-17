@@ -9,6 +9,7 @@ import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
+import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
@@ -72,6 +73,17 @@ public class ZugangFilter {
             if (benutzerId.isEmpty() || !(scope instanceof ch.urinet.archiv.sicherheit.domain.ApiTokenScope tokenScope)
                     || !webseitenScopePasst(webseitenZugang, tokenScope)) {
                 berechtigung.ohneZugang(benutzerId, Optional.empty(), aktion);
+                return;
+            }
+            if (webseitenZugang.value() == WebseitenZugang.Art.ERFASSUNG) {
+                WebseitenErfassungAktion webseitenAktion = methode.getAnnotation(WebseitenErfassungAktion.class);
+                if (webseitenAktion == null) {
+                    berechtigung.ohneZugang(benutzerId, Optional.of(Rolle.GESCHAEFTSSTELLE), Optional.empty());
+                    return;
+                }
+                berechtigung.webseitenErfassung(new Benutzer(benutzerId.get(), Rolle.GESCHAEFTSSTELLE),
+                        webseitenAktion.value(), methode.isAnnotationPresent(NichtDokumentbezogen.class) ? null
+                                : anfrage.getUriInfo().getPathParameters().getFirst(DOKUMENT_ID));
             }
             return;
         }

@@ -8,6 +8,8 @@ import ch.urinet.archiv.integration.domain.webseite.Grenzklasse;
 import ch.urinet.archiv.integration.application.webseite.FesterFilter;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import io.quarkus.security.Authenticated;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -49,6 +51,7 @@ public class ProbeWebseiteResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A1)
     public Map<String, String> erfassen() {
         return Map.of("probe", "erfasst");
     }
