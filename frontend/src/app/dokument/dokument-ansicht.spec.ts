@@ -318,16 +318,18 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     });
     await oeffnen();
     port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const fenster = { opener: 'x', location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(fenster as unknown as Window);
     const klick = new MouseEvent('click', { cancelable: true, bubbles: true });
     element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.dispatchEvent(klick);
     await fixture.whenStable();
+    fixture.detectChanges();
     expect(klick.defaultPrevented).toBe(true);
-    expect(open).toHaveBeenCalledWith(
-      'https://s3.example/pdfa?sig=neu',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    // Fenster noch in der Klick-Geste geöffnet, ohne noopener-Merkmal (sonst immer null), Verbindung zur PWA getrennt
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    expect(fenster.opener).toBeNull();
+    expect(fenster.location.href).toBe('https://s3.example/pdfa?sig=neu');
+    expect(element.querySelector('[data-test=pdf-bereit]')).toBeNull();
     expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
   });
 
@@ -338,6 +340,8 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     });
     await oeffnen();
     port.pdfa = new Subject<DownloadAdresse>();
+    const fenster = { opener: 'x', location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(fenster as unknown as Window);
     const link = element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!;
     link.click();
     link.click();
@@ -348,7 +352,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(element.querySelector('[data-test=download]')).not.toBeNull();
   });
 
-  it('weist bei gesperrtem Fenster auf den zweiten Klick hin', async () => {
+  it('weist nur dann auf den zweiten Klick hin, wenn der Browser das Fenster wirklich sperrt', async () => {
     port.pdfa = of({
       url: 'https://s3.example/pdfa?sig=alt',
       gueltigBis: new Date(Date.now() - 1000).toISOString(),
@@ -358,7 +362,26 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     vi.spyOn(window, 'open').mockReturnValue(null);
     element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.click();
     await fixture.whenStable();
+    fixture.detectChanges();
     expect(element.querySelector('[data-test=pdf-bereit]')).not.toBeNull();
+    expect(port.ansichten).toEqual(['vorschau']);
+  });
+
+  it('schliesst das leere Fenster, wenn der Neuabruf der PDF-Adresse scheitert', async () => {
+    port.pdfa = of({
+      url: 'https://s3.example/pdfa?sig=alt',
+      gueltigBis: new Date(Date.now() - 1000).toISOString(),
+    });
+    await oeffnen();
+    port.pdfa = throwError(() => new HttpErrorResponse({ status: 503 }));
+    const fenster = { opener: 'x', location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(fenster as unknown as Window);
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fenster.close).toHaveBeenCalled();
+    expect(element.querySelector('[data-test=datei-fehler]')).not.toBeNull();
+    expect(element.querySelector('[data-test=pdf-bereit]')).toBeNull();
   });
 
   it('sagt bei 404 nur, dass es das Dokument nicht gibt oder es nicht sichtbar ist (Req 2.3)', async () => {

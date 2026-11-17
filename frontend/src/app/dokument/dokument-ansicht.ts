@@ -342,26 +342,33 @@ export class DokumentAnsicht {
     if (this.pdfaLaedt()) {
       return;
     }
-    this.pdfaLaedt.set(true);
     this.dateiFehler.set(false);
     this.pdfaHinweis.set(false);
+    // Das Fenster wird noch in der Klick-Geste geöffnet (sonst sperren Popup-Blocker, v. a. iOS Safari) und erst nach
+    // der Antwort auf die Adresse gesetzt. Mit `noopener` liefe `window.open` immer `null`; darum ohne und `opener` trennen.
+    const fenster = window.open('', '_blank');
+    if (!fenster) {
+      this.pdfaHinweis.set(true);
+      return;
+    }
+    fenster.opener = null;
+    this.pdfaLaedt.set(true);
     this.abos.add(
       this.port.adresse(this.id(), 'pdfa', 'vorschau').subscribe({
         next: (adresse) => {
           this.pdfaLaedt.set(false);
           const url = sichereAdresse(adresse.url);
           if (!url) {
+            fenster.close();
             this.dateiFehler.set(true);
             return;
           }
           this.pdfa.set(adresse);
-          // Ausserhalb der Klick-Geste kann der Browser das Fenster sperren: dann genügt ein zweiter Klick.
-          if (!window.open(url, '_blank', 'noopener,noreferrer')) {
-            this.pdfaHinweis.set(true);
-          }
+          fenster.location.href = url;
         },
         error: () => {
           this.pdfaLaedt.set(false);
+          fenster.close();
           this.dateiFehler.set(true);
         },
       }),

@@ -357,7 +357,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [x] 4.6 Suche und Dokumentansicht [Frontend]
   - Suchfeld, Filterleiste (Art, Partner, Zeitraum, Betrag, Richtung, Status, Tags, Geschäftsjahr, Belegnummer), Trefferliste mit Auszug
-  - Dokumentansicht: PDF-Vorschau, Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
+  - Dokumentansicht: PDF-Vorschau als Link «PDF öffnen» statt eingebettetem `<object>` (bestätigt von Fabian am 17.11.2026), Metadaten bearbeiten (mit Grund, nur mit Recht A6), Versionen, Download
   - _Anforderungen: 10.1, 14.1, 14.2, 14.4, 14.7_
   - Teilweise erledigt (PR #71): Suche mit Filterleiste und Auszug, Dokumentansicht mit Metadaten, PDF/A-Vorschau und Download (dazu `GET /dokumente/{id}/datei` mit `Accept: application/json`, 14.6), design.md «Frontend», «Suche und Dokumentansicht (Aufgabe 4.6)». Offen: Metadaten bearbeiten mit Grund (A6, 10.1; braucht 3.5), Versionsliste (`GET /dokumente/{id}` liefert laut Endpunkt-Tabelle die Versionen, `DokumentDto` noch nicht; folgt mit oder nach 3.5, PR #67), Vorschaubild (PR #68)
   - Erledigt (PR #100): Metadaten bearbeiten mit Grund und `If-Match` (A6, A8 für die Vertraulichkeit, 10.1), Versionsliste (`DokumentDto.versionen`), Vorschaubild der ersten Seite; design.md «Suche und Dokumentansicht (Aufgabe 4.6)», «Rest von 4.6»
