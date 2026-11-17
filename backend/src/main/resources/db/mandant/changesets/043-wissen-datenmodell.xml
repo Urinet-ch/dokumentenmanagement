@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 04, Aufgabe 13.3: Wissensbasisdaten je Mandant. Versionen, Versionshüllen und Log sind unveränderbar;
+         App-Rolle nur INSERT/SELECT, zusätzlich Trigger als Schutz für den Eigentümer. -->
+    <changeSet id="043-wissen-datenmodell" author="archiv">
+        <sql>
+            create table wissensseite (
+                id uuid constraint wissensseite_pk primary key,
+                pfad text not null constraint wissensseite_pfad_uk unique,
+                typ text not null constraint wissensseite_typ_ck
+                    check (typ in ('Synthese', 'Quelle', 'Konzept', 'Akteur', 'Projekt', 'Analyse')),
+                titel text not null,
+                beschreibung text not null,
+                tags text[] not null default '{}',
+                status text not null default 'AKTIV'
+                    constraint wissensseite_status_ck check (status in ('AKTIV', 'VERALTET')),
+                veraltet_ab date,
+                vertraulichkeit text not null
+                    constraint wissensseite_vertraulichkeit_ck check (vertraulichkeit in ('NORMAL', 'INTERN')),
+                vertraulichkeit_mindest text not null default 'NORMAL'
+                    constraint wissensseite_vertraulichkeit_mindest_ck
+                        check (vertraulichkeit_mindest in ('NORMAL', 'INTERN')),
+                inhalt text not null,
+                version int not null constraint wissensseite_version_ck check (version >= 1),
+                erzeugt_von text not null,
+                erzeugt_am timestamptz not null,
+                freigegeben_von text not null,
+                freigegeben_am timestamptz not null,
+                quelle_pruefen boolean not null default false,
+                widerspruch_offen boolean not null default false,
+                wissensquelle_id uuid constraint wissensseite_wissensquelle_fk references dokument (id),
+                lint_geprueft_am timestamptz,
+                inhalt_tsv tsvector generated always as (
+                    setweight(to_tsvector('german'::regconfig, coalesce(titel, '')), 'A')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(beschreibung, '')), 'B')
+                    || setweight(to_tsvector('german'::regconfig, archiv_tags_text(tags)), 'B')
+                    || setweight(to_tsvector('german'::regconfig, coalesce(inhalt, '')), 'C')
+                ) stored
+            );
+            create index wissensseite_inhalt_tsv_gin on wissensseite using gin (inhalt_tsv);
+            create index wissensseite_tags_gin on wissensseite using gin (tags);
+            create index wissensseite_typ_ix on wissensseite (typ);
+            create unique index wissensseite_wissensquelle_uk on wissensseite (wissensquelle_id)
+                where wissensquelle_id is not null;
+
+            create table wissens_entwurf (
+                id uuid constraint wissens_entwurf_pk primary key,
+                anlass text not null constraint wissens_entwurf_anlass_ck
+                    check (anlass in ('INGEST', 'LINT', 'MANUELL', 'ANALYSE')),
+                dokument_id uuid constraint wissens_entwurf_dokument_fk references dokument (id),
+                seite_von int,
+                seite_bis int,
+                status text not null constraint wissens_entwurf_status_ck
+                    check (status in ('WARTEND', 'IN_ARBEIT', 'OFFEN', 'ERLEDIGT', 'FEHLER', 'ABGELEHNT')),
+                schritt text,
+                kernaussagen jsonb,
+                unvollstaendig boolean not null default false,
+                hinweis text,
+                ki_modell text,
+                tokens_ein int not null default 0 constraint wissens_entwurf_tokens_ein_ck check (tokens_ein >= 0),
+                tokens_aus int not null default 0 constraint wissens_entwurf_tokens_aus_ck check (tokens_aus >= 0),
+                erstellt_von text not null,
+                erstellt timestamptz not null,
+                abgeschlossen timestamptz,
+                constraint wissens_entwurf_seiten_ck check (
+                    (seite_von is null and seite_bis is null)
+                    or (seite_von >= 1 and (seite_bis is null or seite_bis >= seite_von))),
+                constraint wissens_entwurf_kernaussagen_ck
+                    check (kernaussagen is null or jsonb_typeof(kernaussagen) = 'array')
+            );
+            create unique index wissens_entwurf_dokument_laufend_uk on wissens_entwurf (dokument_id)
+                where dokument_id is not null and status in ('WARTEND', 'IN_ARBEIT');
+            create unique index wissens_entwurf_ingest_aktiv_uk on wissens_entwurf ((true))
+                where anlass = 'INGEST' and status in ('IN_ARBEIT', 'OFFEN');
+
+            create table wissens_aenderung (
+                id bigserial constraint wissens_aenderung_pk primary key,
+                entwurf_id uuid not null constraint wissens_aenderung_entwurf_fk
+                    references wissens_entwurf (id),
+                nr int not null constraint wissens_aenderung_nr_ck check (nr >= 1),
+                aktion text not null constraint wissens_aenderung_aktion_ck
+                    check (aktion in ('NEU', 'AENDERN', 'VERALTEN')),
+                seite_id uuid constraint wissens_aenderung_seite_fk references wissensseite (id),
+                pfad text not null,
+                basis_version int constraint wissens_aenderung_basis_version_ck
+                    check (basis_version is null or basis_version >= 1),
+                daten jsonb not null constraint wissens_aenderung_daten_ck check (jsonb_typeof(daten) = 'object'),
+                inhalt text not null,
+                diff jsonb not null,
+                begruendung text,
+                widersprueche jsonb,
+                entfernte_aussagen jsonb,
+                befunde jsonb,
+                hinweise jsonb,
+                vertraulichkeit_kontext text not null default 'NORMAL'
+                    constraint wissens_aenderung_vertraulichkeit_ck
+                        check (vertraulichkeit_kontext in ('NORMAL', 'INTERN')),
+                status text not null constraint wissens_aenderung_status_ck
+                    check (status in ('OFFEN', 'ANGENOMMEN', 'VERWORFEN', 'VERALTET')),
+                entschieden_von text,
+                entschieden_am timestamptz,
+                grund text,
+                ergebnis_version int constraint wissens_aenderung_ergebnis_version_ck
+                    check (ergebnis_version is null or ergebnis_version >= 1),
+                etag int not null default 0 constraint wissens_aenderung_etag_ck check (etag >= 0),
+                constraint wissens_aenderung_entwurf_nr_uk unique (entwurf_id, nr)
+            );
+
+            create table wissensseite_version (
+                id bigserial constraint wissensseite_version_pk primary key,
+                seite_id uuid not null constraint wissensseite_version_seite_fk
+                    references wissensseite (id),
+                version int not null constraint wissensseite_version_nr_ck check (version >= 1),
+                daten jsonb not null constraint wissensseite_version_daten_ck check (jsonb_typeof(daten) = 'object'),
+                inhalt text not null,
+                erzeugt_von text not null,
+                freigegeben_von text not null,
+                zeit timestamptz not null,
+                grund text,
+                entwurf_id uuid constraint wissensseite_version_entwurf_fk references wissens_entwurf (id),
+                aenderung_id bigint constraint wissensseite_version_aenderung_fk references wissens_aenderung (id),
+                constraint wissensseite_version_seite_nr_uk unique (seite_id, version)
+            );
+            create index wissensseite_version_zeit_ix on wissensseite_version (zeit);
+
+            create table wissensseite_quelle (
+                seite_id uuid not null constraint wissensseite_quelle_seite_fk
+                    references wissensseite (id) on delete cascade,
+                schluessel text not null,
+                dokument_id uuid constraint wissensseite_quelle_dokument_fk references dokument (id),
+                quell_seite_id uuid constraint wissensseite_quelle_quell_seite_fk
+                    references wissensseite (id),
+                seite_von int,
+                seite_bis int,
+                auszug text constraint wissensseite_quelle_auszug_ck
+                    check (auszug is null or length(auszug) &lt;= 300),
+                constraint wissensseite_quelle_pk primary key (seite_id, schluessel),
+                constraint wissensseite_quelle_ziel_ck check (
+                    (dokument_id is null and quell_seite_id is not null)
+                    or (dokument_id is not null and quell_seite_id is null)),
+                constraint wissensseite_quelle_dokument_seite_ck check (dokument_id is null or seite_von is not null),
+                constraint wissensseite_quelle_seiten_ck check (
+                    (seite_von is null or seite_von >= 1)
+                    and (seite_bis is null or seite_bis >= seite_von))
+            );
+            create index wissensseite_quelle_dokument_ix on wissensseite_quelle (dokument_id);
+            create index wissensseite_quelle_quell_seite_ix on wissensseite_quelle (quell_seite_id);
+
+            create table wissensseite_dokument (
+                seite_id uuid not null constraint wissensseite_dokument_seite_fk
+                    references wissensseite (id) on delete cascade,
+                dokument_id uuid not null constraint wissensseite_dokument_dokument_fk references dokument (id),
+                constraint wissensseite_dokument_pk primary key (seite_id, dokument_id)
+            );
+            create index wissensseite_dokument_dokument_ix on wissensseite_dokument (dokument_id);
+
+            create table wissensseite_version_dokument (
+                seite_id uuid not null,
+                version int not null,
+                dokument_id uuid not null constraint wissensseite_version_dokument_dokument_fk references dokument (id),
+                constraint wissensseite_version_dokument_version_fk
+                    foreign key (seite_id, version) references wissensseite_version (seite_id, version),
+                constraint wissensseite_version_dokument_pk primary key (seite_id, version, dokument_id)
+            );
+            create index wissensseite_version_dokument_dokument_ix on wissensseite_version_dokument (dokument_id);
+
+            create table wissensseite_link (
+                von_seite_id uuid not null constraint wissensseite_link_von_fk
+                    references wissensseite (id) on delete cascade,
+                nach_pfad text not null,
+                constraint wissensseite_link_pk primary key (von_seite_id, nach_pfad)
+            );
+            create index wissensseite_link_nach_pfad_ix on wissensseite_link (nach_pfad);
+
+            create table wissensseite_chunk (
+                id bigserial constraint wissensseite_chunk_pk primary key,
+                seite_id uuid not null,
+                version int not null,
+                nr int not null constraint wissensseite_chunk_nr_ck check (nr >= 1),
+                text text not null,
+                embedding public.halfvec(3584),
+                constraint wissensseite_chunk_version_fk
+                    foreign key (seite_id, version) references wissensseite_version (seite_id, version),
+                constraint wissensseite_chunk_seite_version_nr_uk unique (seite_id, version, nr)
+            );
+            create index wissensseite_chunk_embedding_hnsw
+                on wissensseite_chunk using hnsw (embedding public.halfvec_cosine_ops);
+
+            create table wissens_log (
+                id bigserial constraint wissens_log_pk primary key,
+                zeit timestamptz not null,
+                aktion text not null constraint wissens_log_aktion_ck
+                    check (aktion in ('INGEST', 'CREATION', 'UPDATE', 'DEPRECATION', 'LINT', 'ANALYSE')),
+                akteur text not null,
+                seiten uuid[] not null,
+                dokument_id uuid constraint wissens_log_dokument_fk references dokument (id),
+                entwurf_id uuid constraint wissens_log_entwurf_fk references wissens_entwurf (id),
+                angaben jsonb constraint wissens_log_angaben_ck
+                    check (angaben is null or jsonb_typeof(angaben) = 'object')
+            );
+            create index wissens_log_zeit_ix on wissens_log (zeit);
+
+            create table wissens_lint (
+                id uuid constraint wissens_lint_pk primary key,
+                gestartet timestamptz not null,
+                beendet timestamptz,
+                ausgeloest_von text,
+                befunde jsonb not null constraint wissens_lint_befunde_ck check (jsonb_typeof(befunde) = 'array'),
+                entwurf_id uuid constraint wissens_lint_entwurf_fk references wissens_entwurf (id),
+                constraint wissens_lint_zeit_ck check (beendet is null or beendet >= gestartet)
+            );
+
+            create table wissens_einstellung (
+                id int not null default 1 constraint wissens_einstellung_pk primary key
+                    constraint wissens_einstellung_id_ck check (id = 1),
+                budget_tokens int constraint wissens_einstellung_budget_ck
+                    check (budget_tokens is null or budget_tokens > 0),
+                lint_budget_tokens int constraint wissens_einstellung_lint_budget_ck
+                    check (lint_budget_tokens is null or lint_budget_tokens > 0),
+                lint_zeitplan text,
+                monatsbudget_tokens int constraint wissens_einstellung_monatsbudget_ck
+                    check (monatsbudget_tokens is null or monatsbudget_tokens > 0)
+            );
+
+            alter table protokoll_blatt drop constraint protokoll_blatt_tabelle_ck;
+            alter table protokoll_blatt add constraint protokoll_blatt_tabelle_ck
+                check (tabelle in ('zugriff_protokoll', 'dokument_version', 'wissensseite_version', 'wissens_log'));
+        </sql>
+        <sql splitStatements="false">
+            create function wissen_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception '%: nur Einfügen erlaubt (% verweigert)', tg_table_name, tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger wissensseite_version_nur_einfuegen before update or delete on wissensseite_version
+                for each row execute function wissen_nur_einfuegen();
+            create trigger wissensseite_version_kein_truncate before truncate on wissensseite_version
+                for each statement execute function wissen_nur_einfuegen();
+            create trigger wissensseite_version_dokument_nur_einfuegen before update or delete on wissensseite_version_dokument
+                for each row execute function wissen_nur_einfuegen();
+            create trigger wissensseite_version_dokument_kein_truncate before truncate on wissensseite_version_dokument
+                for each statement execute function wissen_nur_einfuegen();
+            create trigger wissens_log_nur_einfuegen before update or delete on wissens_log
+                for each row execute function wissen_nur_einfuegen();
+            create trigger wissens_log_kein_truncate before truncate on wissens_log
+                for each statement execute function wissen_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>

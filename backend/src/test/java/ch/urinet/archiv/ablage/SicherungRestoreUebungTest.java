@@ -7,7 +7,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.Sperrmodus;
-import ch.urinet.archiv.mandant.application.MandantProvisionierung;
+import ch.urinet.archiv.mandant.application.MandantDatenbank;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherung.application.SicherungBucketExport;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung;
@@ -51,7 +51,7 @@ class SicherungRestoreUebungTest {
     AblageEinstellungen einstellungen;
 
     @Inject
-    MandantProvisionierung provisionierung;
+    MandantDatenbank mandantDatenbank;
 
     @Inject
     WiederherstellungsReferenz referenz;
@@ -62,8 +62,8 @@ class SicherungRestoreUebungTest {
     @Test
     void stelltSynthetischeDokumenteWiederHerUndLiefertDateienUndManifest(@TempDir Path temp) throws Exception {
         S3Client verwaltung = TestBucket.verwaltung();
-        MandantCode mandant = new MandantCode("urinet");
-        mandantSicherstellen();
+        MandantCode mandant = new MandantCode("probe-wissen-" + UUID.randomUUID().toString().substring(0, 8));
+        String schema = mandant.schema();
         String quellPraefix = QUELL_PRAEFIX + UUID.randomUUID().toString().substring(0, 8) + "-";
         String quellBucket = mandant.bucket(quellPraefix);
         String zielPraefix = ZIEL_PRAEFIX + UUID.randomUUID().toString().substring(0, 8) + "-";
@@ -76,6 +76,7 @@ class SicherungRestoreUebungTest {
         String eingangOriginal = "eingang/2026/" + eingangId + "/original.pdf";
         String eingangPdfa = "eingang/2026/" + eingangId + "/pdfa.pdf";
         String manifest = "manifest/2026-01-01.json";
+        UUID seiteId = UUID.randomUUID();
         byte[] archivOriginalBytes = "synthetisches archiviertes Original".getBytes(StandardCharsets.UTF_8);
         byte[] archivPdfaBytes = "synthetische archivierte PDF/A".getBytes(StandardCharsets.UTF_8);
         byte[] eingangOriginalBytes = "synthetisches Original im Eingang".getBytes(StandardCharsets.UTF_8);
@@ -83,8 +84,14 @@ class SicherungRestoreUebungTest {
         byte[] manifestBytes = "{\"format\":\"synthetisch\"}".getBytes(StandardCharsets.UTF_8);
         List<UUID> dokumente = List.of(archivId, eingangId);
         boolean zielAngelegt = false;
+        boolean schemaAngelegt = false;
+        boolean mandantEingetragen = false;
 
         try {
+            mandantDatenbank.schemaAnlegen(schema);
+            schemaAngelegt = true;
+            mandantEintragen(mandant, schema);
+            mandantEingetragen = true;
             quelleAngelegt = true;
             verwaltung.createBucket(b -> b.bucket(quellBucket).objectLockEnabledForBucket(true));
             verwaltung.putBucketVersioning(b -> b.bucket(quellBucket)
@@ -99,10 +106,12 @@ class SicherungRestoreUebungTest {
             String eingangOriginalQuelle = ablegen(quellBucket, eingangOriginal, eingangOriginalBytes);
             String eingangPdfaQuelle = ablegen(quellBucket, eingangPdfa, eingangPdfaBytes);
             ablegen(quellBucket, manifest, manifestBytes);
-            dokumentAnlegen(mandant.schema(), archivId, "ARCHIVIERT", archivPdfa, archivPdfaQuelle,
+            dokumentAnlegen(schema, archivId, "ARCHIVIERT", archivPdfa, archivPdfaQuelle,
                     archivPdfaBytes, archivOriginal, archivOriginalQuelle, archivOriginalBytes);
-            dokumentAnlegen(mandant.schema(), eingangId, "EINGANGSKORB", eingangPdfa, eingangPdfaQuelle,
+            dokumentAnlegen(schema, eingangId, "EINGANGSKORB", eingangPdfa, eingangPdfaQuelle,
                     eingangPdfaBytes, eingangOriginal, eingangOriginalQuelle, eingangOriginalBytes);
+            wissensseiteAnlegen(schema, seiteId, archivId);
+            var wissensstandVor = wissensAnzahl(schema);
 
             AblageEinstellungen quellEinstellungen = new AblageEinstellungen(quellPraefix, Optional.of(Duration.ofDays(1)),
                     Sperrmodus.GOVERNANCE, Optional.of(Duration.ofDays(1)), einstellungen.urlGueltigkeit(),
@@ -127,22 +136,31 @@ class SicherungRestoreUebungTest {
             }
 
             assertThat(ergebnis.exitCode()).isZero();
-            assertThat(dokumentIds(mandant.schema(), dokumente)).containsExactlyInAnyOrderElementsOf(dokumente);
-            assertDatei(zielBucket, mandant.schema(), archivId, archivOriginal, archivOriginalBytes, false, verwaltung);
-            assertDatei(zielBucket, mandant.schema(), archivId, archivPdfa, archivPdfaBytes, true, verwaltung);
-            assertDatei(zielBucket, mandant.schema(), eingangId, eingangOriginal, eingangOriginalBytes, false, verwaltung);
-            assertDatei(zielBucket, mandant.schema(), eingangId, eingangPdfa, eingangPdfaBytes, true, verwaltung);
+            assertThat(dokumentIds(schema, dokumente)).containsExactlyInAnyOrderElementsOf(dokumente);
+            WissensAnzahl wissensstandNach = wissensAnzahl(schema);
+            assertThat(wissensstandNach).isEqualTo(wissensstandVor);
+            assertThat(wissensstandNach.seiten()).isEqualTo(1L);
+            assertThat(wissensstandNach.versionen()).isEqualTo(1L);
+            assertDatei(zielBucket, schema, archivId, archivOriginal, archivOriginalBytes, false, verwaltung);
+            assertDatei(zielBucket, schema, archivId, archivPdfa, archivPdfaBytes, true, verwaltung);
+            assertDatei(zielBucket, schema, eingangId, eingangOriginal, eingangOriginalBytes, false, verwaltung);
+            assertDatei(zielBucket, schema, eingangId, eingangPdfa, eingangPdfaBytes, true, verwaltung);
 
             var zielAblage = new S3Ablage(s3, S3Ablage.presigner(s3, true), zielEinstellungen, Clock.systemUTC());
             assertThat(zielAblage.lesenManifest(mandant, java.time.LocalDate.of(2026, 1, 1), ManifestTeil.JSON))
                     .get().extracting(d -> d.inhalt()).isEqualTo(manifestBytes);
         } finally {
-            datenLoeschen(mandant.schema(), dokumente);
             if (zielAngelegt) {
                 TestBucket.aufraeumen(verwaltung, zielBucket);
             }
             if (quelleAngelegt) {
                 TestBucket.aufraeumen(verwaltung, quellBucket);
+            }
+            if (mandantEingetragen) {
+                mandantLoeschen(mandant.wert());
+            }
+            if (schemaAngelegt) {
+                mandantDatenbank.schemaEntfernen(schema);
             }
             verwaltung.close();
         }
@@ -152,15 +170,25 @@ class SicherungRestoreUebungTest {
         return s3.putObject(r -> r.bucket(bucket).key(schluessel), RequestBody.fromBytes(bytes)).versionId();
     }
 
-    private void mandantSicherstellen() throws SQLException {
-        boolean vorhanden;
+    private void mandantEintragen(MandantCode mandant, String schema) throws SQLException {
         try (Connection v = datenquelle.getConnection();
-             PreparedStatement p = v.prepareStatement("select 1 from public.mandant where code = 'urinet'");
-             ResultSet r = p.executeQuery()) {
-            vorhanden = r.next();
+             PreparedStatement p = v.prepareStatement("insert into public.mandant (code, name, schema_name, bucket) "
+                     + "values (?, ?, ?, ?)")) {
+            p.setString(1, mandant.wert());
+            p.setString(2, mandant.wert());
+            p.setString(3, schema);
+            p.setString(4, mandant.bucket("urinet-archiv-"));
+            p.executeUpdate();
         }
-        if (!vorhanden) {
-            provisionierung.anlegen("urinet", null, null);
+    }
+
+    private void mandantLoeschen(String code) {
+        try (Connection v = datenquelle.getConnection();
+             PreparedStatement p = v.prepareStatement("delete from public.mandant where code = ?")) {
+            p.setString(1, code);
+            p.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Synthetischer Testmandant konnte nicht entfernt werden", e);
         }
     }
 
@@ -206,6 +234,36 @@ class SicherungRestoreUebungTest {
         }
     }
 
+    private void wissensseiteAnlegen(String schema, UUID seiteId, UUID dokumentId) throws SQLException {
+        try (Connection v = datenquelle.getConnection()) {
+            try (PreparedStatement p = v.prepareStatement("insert into " + schema
+                    + ".wissensseite (id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, erzeugt_von, erzeugt_am, "
+                    + "freigegeben_von, freigegeben_am, wissensquelle_id) values (?, 'quellen/probe', 'Quelle', "
+                    + "'Synthetische Probe', 'Restore-Test', 'NORMAL', 'Synthetischer Inhalt', 1, 'human:probe', "
+                    + "clock_timestamp(), 'human:probe', clock_timestamp(), ?)")) {
+                p.setObject(1, seiteId);
+                p.setObject(2, dokumentId);
+                p.executeUpdate();
+            }
+            try (PreparedStatement p = v.prepareStatement("insert into " + schema
+                    + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) "
+                    + "values (?, 1, '{}', 'Synthetischer Inhalt', 'human:probe', 'human:probe', clock_timestamp())")) {
+                p.setObject(1, seiteId);
+                p.executeUpdate();
+            }
+        }
+    }
+
+    private WissensAnzahl wissensAnzahl(String schema) throws SQLException {
+        try (Connection v = datenquelle.getConnection();
+             PreparedStatement p = v.prepareStatement("select (select count(*) from " + schema
+                     + ".wissensseite), (select count(*) from " + schema + ".wissensseite_version)");
+             ResultSet r = p.executeQuery()) {
+            assertThat(r.next()).isTrue();
+            return new WissensAnzahl(r.getLong(1), r.getLong(2));
+        }
+    }
+
     private void assertDatei(String bucket, String schema, UUID id, String schluessel, byte[] erwartet, boolean pdfa,
                              S3Client verwaltung) throws SQLException, java.io.IOException {
         String version = pdfa ? pdfaVersion(schema, id) : dateiVersion(schema, id, schluessel);
@@ -240,22 +298,6 @@ class SicherungRestoreUebungTest {
         }
     }
 
-    private void datenLoeschen(String schema, List<UUID> ids) {
-        try (Connection v = datenquelle.getConnection()) {
-            try (PreparedStatement p = v.prepareStatement("delete from " + schema
-                    + ".dokument_datei where dokument_id in (?, ?)")) {
-                p.setObject(1, ids.getFirst());
-                p.setObject(2, ids.getLast());
-                p.executeUpdate();
-            }
-            try (PreparedStatement p = v.prepareStatement("delete from " + schema
-                    + ".dokument where id in (?, ?)")) {
-                p.setObject(1, ids.getFirst());
-                p.setObject(2, ids.getLast());
-                p.executeUpdate();
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Synthetische Testdokumente konnten nicht entfernt werden", e);
-        }
+    private record WissensAnzahl(long seiten, long versionen) {
     }
 }

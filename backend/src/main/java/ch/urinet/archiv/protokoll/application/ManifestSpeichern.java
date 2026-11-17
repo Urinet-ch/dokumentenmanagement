@@ -28,7 +28,8 @@ import java.util.Optional;
 @ApplicationScoped
 public class ManifestSpeichern {
 
-    static final List<String> PROTOKOLLE = List.of(ProtokollHash.DOKUMENT_VERSION, ProtokollHash.ZUGRIFF_PROTOKOLL);
+    static final List<String> PROTOKOLLE = List.of(ProtokollHash.DOKUMENT_VERSION, ProtokollHash.ZUGRIFF_PROTOKOLL,
+            ProtokollHash.WISSENSSEITE_VERSION, ProtokollHash.WISSENS_LOG);
 
     private final ManifestDaten daten;
     private final AuftragService auftraege;
