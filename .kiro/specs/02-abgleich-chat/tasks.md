@@ -125,5 +125,5 @@ Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit 
 - [ ]* O.2 Bankbewegungen für «bezahlt am» (I5) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus; bestätigt von Fabian am 16.11.2026)
 - [ ]* O.3 MCP-Server für Claude (C3) [Backend]
   - Werkzeuge aus 7.1 als MCP-Server (nur lesend), Token pro Benutzer, gleiche Schutzregeln
-  - Status: Entwurf in design.md («Entwurf O.3», Requirement 14, ungeprüft); Haken erst nach den Entscheiden von Fabian
+  - Status: Entwurf in design.md («Entwurf O.3», Requirement 14, ungeprüft); Haken erst nach den Entscheiden von Fabian. Entscheide 1 und 3 gefallen (17.11.2026); ob Requirement 14 nach Entscheid 1 entfällt (Requirement 14.11), ist offen für Fabian, bis dahin nicht beginnen
   - _Anforderungen: 14.1–14.11_

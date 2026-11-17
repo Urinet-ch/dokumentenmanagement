@@ -294,7 +294,8 @@ flowchart LR
 ### Entwurf O.3 MCP-Server (C3)
 
 **Status:** Entwurf, ungeprüft und nicht freigegeben. O.3 bleibt optional und unabgehakt. Der Abschnitt ist eine
-Entscheidungsvorlage; nichts davon ist implementiert oder für den Betrieb freigegeben.
+Entscheidungsvorlage; nichts davon ist implementiert oder für den Betrieb freigegeben. Entscheide 1 und 3 sind am
+17.11.2026 gefallen; die Folge von Entscheid 1 für Requirement 14 (Requirement 14.11) ist offen, siehe unten.
 
 #### Grenze und Transport
 
@@ -320,7 +321,8 @@ MCP-Token; sie werden nicht wiederverwendet.
 
 **Empfehlung:** eigener Scope `mcp`, Tokengeheimnis nur einmal ausgeben und gehasht speichern, Ablaufdatum und
 Widerruf unterstützen, Aktivität bei jedem Aufruf prüfen. A14 gewährt heute nur dem `inhaber` die Tokenverwaltung.
-Ob dieser MCP-Tokens für andere Benutzer ausstellt oder ob Selbstverwaltung ein neues Recht braucht, ist offen.
+Entschieden von Fabian am 17.11.2026 (Entscheid 3): Ausgabe und Widerruf nur durch den `inhaber` über A14;
+Tokenidentität ist die Zielperson; Selbstverwaltung nur nach separatem Entscheid.
 Ein widerrufenes Token muss beim nächsten Aufruf abgelehnt werden; der genaue Token- und Sitzungsmechanismus ist
 vor der Umsetzung zu entscheiden.
 
@@ -368,11 +370,11 @@ Requirement 10.9; eine zweite Gesprächshistorie wird nicht angelegt.
 - **Testplan:** Protokoll-Handshake und Fehlerformate; gültiges, ungültiges, abgelaufenes und widerrufenes Token; Tokenbindung an Benutzer und Mandant; Allowlist je Rolle und Mandantenfunktion; A2–A4, 404 und zwei Mandanten; keine schreibenden Aktionen; Grenzen und `Retry-After`; append-only Protokoll ohne Inhalte oder Geheimnisse; synthetisches Dokument mit Prompt-Injection-Anweisung; Nachweis, dass der Server keine Modellanfrage auslöst. Für freigegebene Kriterien kommen Szenarien mit `@spec-02`/`@req-14.x` und JUnit-Tests nach den Konventionen von `tech.md` hinzu.
 - **Schätzung:** vorläufig 5–8 Personentage: Authentifizierung und Tokenbindung 1–2, Adapter und Werkzeug-Allowlist 2–3, Grenzen/Protokollierung 1, Integrationstests und Sicherheitsnachweis 1–2. Nicht enthalten sind ein Entscheid zu Fremdmodellnutzung, neue Rechte oder ein zusätzlicher Deploy-Client.
 
-#### Offene Entscheide für Fabian (mit Empfehlung)
+#### Entscheide für Fabian (mit Empfehlung, Stand 17.11.2026)
 
-1. **Darf Claude Inhalte echter Archivdokumente erhalten?** Empfehlung: keine Weitergabe an Claude-/andere Cloud-Modelle; O.3 nur mit einem nach `tech.md` zugelassenen Modell freigeben. Falls C3 zwingend Cloud-Claude meint, nicht produktiv umsetzen. **Entschieden von Fabian am 17.11.2026: Empfehlung übernommen.** Keine Weitergabe von Archivinhalten an Cloud-Modelle; O.3 nur mit einem nach `tech.md` zugelassenen Modell; lokal und auf Stufe A nur synthetische Daten, Produktivbetrieb frühestens auf Stufe B.
+1. **Darf Claude Inhalte echter Archivdokumente erhalten?** Empfehlung: keine Weitergabe an Claude-/andere Cloud-Modelle; O.3 nur mit einem nach `tech.md` zugelassenen Modell freigeben. Falls C3 zwingend Cloud-Claude meint, nicht produktiv umsetzen. **Entschieden von Fabian am 17.11.2026: Empfehlung übernommen.** Keine Weitergabe von Archivinhalten an Claude oder andere Cloud-Modelle (Antwort «nein»). **Folge offen:** Nach Requirement 14.11 entfällt Requirement 14 bei «nein»; die Empfehlung führt O.3 dagegen mit einem nach `tech.md` zugelassenen Modell weiter. Ob Requirement 14 entfällt oder mit einem zugelassenen Modell bleibt (dann C3 ohne «für Claude» und Requirement 14.11 als Änderung ausgewiesen), entscheidet Fabian. Bis dahin gilt Requirement 14.11 unverändert und O.3 wird nicht begonnen.
 2. **Transport und Betriebsort?** Empfehlung: Streamable HTTP im bestehenden API-Adapter; lokal und Stufe A nur mit synthetischen Daten, Produktivbetrieb frühestens auf Stufe B.
-3. **Wer stellt persönliche MCP-Tokens aus und widerruft sie?** Empfehlung: für den ersten Entwurf nur der `inhaber` über A14; Tokenidentität bleibt die Zielperson. Selbstverwaltung erst nach separatem Entscheid zu Rechten und Oberfläche. **Entschieden von Fabian am 17.11.2026: Empfehlung übernommen.** Ausgabe und Widerruf nur durch den `inhaber` über A14; Selbstverwaltung nur nach separatem Entscheid.
+3. **Wer stellt persönliche MCP-Tokens aus und widerruft sie?** Empfehlung: für den ersten Entwurf nur der `inhaber` über A14; Tokenidentität bleibt die Zielperson. Selbstverwaltung erst nach separatem Entscheid zu Rechten und Oberfläche. **Entschieden von Fabian am 17.11.2026: Empfehlung übernommen.** Ausgabe und Widerruf nur durch den `inhaber` über A14; Tokenidentität bleibt die Zielperson; Selbstverwaltung nur nach separatem Entscheid. Folge: Die `geschaeftsstelle` im Mandanten `vhf-gsk` kann keine MCP-Tokens ausstellen, solange A14 für sie nach Spec 01, Requirement 2, Fussnote ¹ offen ist (bis dahin 403); eine Rechteerweiterung ist damit nicht verbunden.
 4. **Welche Tokenlaufzeit und Limits?** Empfehlung: begrenzte Laufzeit, sofortige Widerrufswirkung, höchstens 100 Werkzeugaufrufe je Benutzer und Stunde plus ein tieferer Spitzenwert je Token; genaue Werte vor Implementierung messen und festlegen. Das Limit zählt je Werkzeugaufruf (nicht je Frage) und getrennt vom Chat-Limit nach Requirement 5.5, damit MCP den Chat nicht sperrt.
 5. **Ist ein zusätzlicher gemeinsamer OIDC-Client nötig?** Empfehlung: keine Mandanten-Clients; falls OAuth für den MCP-Transport nötig ist, nur ein gemeinsamer Client nach gesonderter Konfiguration und Prüfung.
 6. **Protokollwert für MCP:** `kanal` `MCP` in `details` von `ANZEIGEN` oder Erweiterung von `zugriff_protokoll_aktion_ck`? Empfehlung: nur `kanal`, keine neue Aktion.
