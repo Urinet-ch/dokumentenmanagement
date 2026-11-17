@@ -129,14 +129,17 @@ class DatenbankAbfragenLeistungTest {
 
             String listenPlan = planListen(mandant, arten.get(i));
             String feedPlan = planFeed(mandant);
+            String vektorPlan = planVektor(mandant);
             String exportPlan = planExport(mandant);
             System.out.printf("%s: Liste 10=%d ms, 100=%d ms, SQL=%d/%d; Feed=%d ms%n",
                     mandant.wert(), dauer10, dauer100, anweisungen10, anweisungen100, dauerFeed);
             System.out.println("Listenplan " + mandant.wert() + ":\n" + listenPlan);
             System.out.println("Feedplan " + mandant.wert() + ":\n" + feedPlan);
+            System.out.println("Vektorplan " + mandant.wert() + ":\n" + vektorPlan);
             System.out.println("Exportplan " + mandant.wert() + ":\n" + exportPlan);
             assertThat(listenPlan).contains("dokument_webseite_liste_ix");
             assertThat(feedPlan).contains("webseite_aenderung_xid_ix");
+            assertThat(vektorPlan).contains("chunk_embedding_hnsw");
             assertThat(exportPlan).contains("dokument_pk");
         }
 
@@ -306,6 +309,13 @@ class DatenbankAbfragenLeistungTest {
             statement.setArray(4, statement.getConnection().createArrayOf("text", STUFEN.toArray()));
             statement.setInt(5, FEED_MAX);
         });
+    }
+
+    private String planVektor(MandantCode mandant) throws SQLException {
+        String sql = "select c.dokument_id from " + mandant.schema()
+                + ".chunk c where c.embedding is not null "
+                + "order by c.embedding operator(public.<=>) cast(? as public.halfvec) limit 50";
+        return plan(sql, statement -> statement.setString(1, embedding(1)));
     }
 
     private String planExport(MandantCode mandant) throws SQLException {
