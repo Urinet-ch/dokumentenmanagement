@@ -46,7 +46,8 @@ class VhfGskDokumentartSeedTest {
                     .containsExactly("vhf", "gsk");
             assertThat(texte(eigenschaften.path("zugriff").path("enum")))
                     .containsExactly("oeffentlich", "mitglieder", "vorstand");
-            assertThat(eigenschaften.path("zugriff").path("default").asText()).isEqualTo("mitglieder");
+            assertThat(eigenschaften.path("zugriff").path("default").asText()).as(art.path("code").asText())
+                    .isEqualTo("VORSTANDSPROTOKOLL".equals(art.path("code").asText()) ? "vorstand" : "mitglieder");
             assertThat(texte(art.path("zusatz_schema").path("required")))
                     .as(art.path("code").asText()).contains("verband", "zugriff", "veroeffentlicht");
             assertThat(eigenschaften.path("veroeffentlicht").path("default").asBoolean()).isFalse();

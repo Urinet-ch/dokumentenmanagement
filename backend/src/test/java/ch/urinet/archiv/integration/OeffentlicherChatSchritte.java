@@ -244,6 +244,17 @@ public class OeffentlicherChatSchritte {
         senden(frage, gespraech);
     }
 
+    @Wenn("die Webseite mit dem Schlüssel «{word}» eines anderen Mandanten im selben Gespräch fragt: «{}»")
+    public void fremderMandantImGespraech(String name, String frage) throws Exception {
+        assertThat(gespraech).as("Gespräch des ersten Mandanten").isNotNull();
+        String fremdeId = gespraech;
+        gespraech = null;
+        letzterSchluessel = name;
+        letzteStufe = "oeffentlich";
+        senden(frage, fremdeId);
+        assertThat(gespraech).as("neue Gespräch-ID nach Mandantenwechsel").isNotNull().isNotEqualTo(fremdeId);
+    }
+
     @Wenn("die Webseite im selben Gespräch auf der Stufe «{word}» fragt: «{}»")
     public void fragenAufAndererStufe(String stufe, String frage) throws Exception {
         assertThat(gespraech).as("Gespräch der ersten Frage").isNotNull();

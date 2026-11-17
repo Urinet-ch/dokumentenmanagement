@@ -100,7 +100,7 @@ dieser Tabelle; neu 13.11.2026, E-C):
   `bisUndMit()` → Liste der Codes; der Filter nimmt diese Liste, nie einen Wert aus der Anfrage.
 - Keine Datenmigration nötig: Werte für `zugriff` gibt es erst ab Welle 10 (Spec 05, Wellen 17/18 vor Welle 10).
 - Aufgabe 10.4 (PR #229): Der Eingangskorb und die Metadatenansicht bauen Zusatzfelder aus dem Schema der gewählten
-  Dokumentart. `zugriff` startet unabhängig von KI-Vorschlägen bei `mitglieder`; `veroeffentlicht` erscheint erst bei
+  Dokumentart. `zugriff` startet unabhängig von KI-Vorschlägen bei `mitglieder` (Ausnahme `VORSTANDSPROTOKOLL`: `vorstand`, Entscheid Fabian 17.11.2026); `veroeffentlicht` erscheint erst bei
   archivierten Dokumenten und wird über A6 geändert. `PATCH` protokolliert die Änderung als `AENDERN` und weist
   Veröffentlichung vor bestätigter Archivierung ab. Bei `vhf-gsk` werden Finanzfelder weder angezeigt noch bestätigt;
   finanzielle KI-Vorschläge und ihre Sicherheitswerte werden serverseitig verworfen. Die Geschäftsstelle behält die
