@@ -147,6 +147,25 @@ damit ich mich auf ihn verlassen kann.
 1. Das Archiv-Projekt SOLL eine Prüfliste mit den 7 Beispielfragen aus `product.md` und mindestens 13 weiteren Fragen mit erwarteter Antwort und erwarteten Quellen verwenden; weil die erwarteten Antworten echte Geschäftsdaten enthalten, SOLL sie wie der Golden-Datensatz (Spec 01, 0.1) nur ausserhalb des Repositorys unter `ARCHIV_GOLDEN_DIR` liegen, im Repository nur Schema und Test.
 2. WENN beim Lauf der Prüfliste gegen den Produktivbestand alle 7 Beispielfragen und mindestens 18 von 20 Fragen insgesamt korrekt und mit Quelle beantwortet werden, DANN SOLL das Gate «Phase 2 bestanden» gelten. Der Lauf erfolgt nur manuell, nie in der CI. Nachweis: manuell [Fabian].
 
+### Requirement 14: MCP-Schnittstelle für Archiv-Werkzeuge (C3, Entwurf)
+**Status:** Entwurf, nicht freigegeben. Die optionale Umsetzung O.3 beginnt erst nach den Entscheiden in `design.md`.
+
+**User Story:** Als berechtigte Person möchte ich die lesenden Archiv-Werkzeuge über einen MCP-Client nutzen,
+damit ich Dokumente auch in einer unterstützten KI-Anwendung finden und prüfen kann.
+
+#### Acceptance Criteria
+1. Das Archiv SOLL die MCP-Schnittstelle als Adapter der bestehenden API über HTTPS anbieten; der Entwurf empfiehlt Streamable HTTP am bestehenden API-Eingang und keinen zusätzlichen Listener. Die Transportwahl bleibt bis zum Entscheid offen.
+2. WENN ein MCP-Aufruf eingeht, DANN SOLL das Archiv ein geprüftes, für genau eine Person ausgestelltes MCP-Token verlangen. Benutzer und Mandant SOLLEN ausschliesslich aus der verifizierten Token-Identität stammen; Werkzeugparameter dürfen weder Benutzer noch Mandant setzen. Ein fehlendes, ungültiges, abgelaufenes oder widerrufenes Token SOLL mit HTTP 401 `NICHT_ANGEMELDET` abgelehnt werden.
+3. Das Archiv SOLL nur die lesenden Werkzeuge `dokumente_suchen`, `dokument_zeigen`, `kennzahl`, `offene_posten`, `fristen`, `vollstaendigkeit`, `wissen_index` und `wissen_seite_zeigen` anbieten, soweit diese nach Spec 02, Requirement 3, Spec 04, Requirement 8 und der Rolle sowie den Funktionen des Mandanten verfügbar sind.
+4. Das Archiv DARF über MCP keine schreibenden oder administrativen Aktionen, freien SQL-Aufrufe oder Werkzeuge ausserhalb der in Kriterium 3 genannten Liste anbieten.
+5. Jeder MCP-Aufruf SOLL dieselbe Mandantenisolation, Vertraulichkeit, Rechtematrix und Sichtprüfung wie der entsprechende Aufruf in der Web-App anwenden. Ein nicht sichtbares Dokument SOLL wie nicht vorhanden behandelt werden; ein MCP-Token DARF keine weitergehenden Rechte als die Person erhalten.
+6. Die MCP-Antworten SOLLEN höchstens die Felder und Inhalte der bestehenden Werkzeugverträge liefern. Sie SOLLEN keine Dateinamen, Dateipfade, S3-Schlüssel, Token oder zusätzlichen personenbezogenen Angaben enthalten; `dokument_zeigen` bleibt auf höchstens 4'000 Zeichen Volltext begrenzt.
+7. Dokumentinhalte SOLLEN als nicht vertrauenswürdige Daten behandelt werden. Anweisungen in einem Dokument DÜRFEN weder die angebotenen Werkzeuge ändern noch zusätzliche Aufrufe oder Schreibaktionen auslösen; die Berechtigung SOLL bei jedem Aufruf serverseitig geprüft werden.
+8. Das Archiv SOLL Anfragen je MCP-Token und zusätzlich je Benutzer begrenzen. Nach Überschreiten der konfigurierten Grenze SOLL es weitere Werkzeugaufrufe mit HTTP 429 `ZU_VIELE_ANFRAGEN` und `Retry-After` ablehnen. Die konkreten Grenzen sind vor der Umsetzung zu entscheiden.
+9. Das Archiv SOLL jeden authentifizierten MCP-Werkzeugaufruf append-only protokollieren: Zeit, Mandant, Benutzer- oder Token-ID, Werkzeug und Ergebnis der Berechtigungsprüfung. Tokenwert, Frage, Dokumenttext, Parameterwerte und Antwortinhalt DÜRFEN nicht im Protokoll stehen.
+10. WENN ein MCP-Token widerrufen wird, DANN SOLL der nächste Aufruf mit diesem Token abgelehnt werden. Das Tokengeheimnis SOLL nur einmal ausgegeben, gehasht gespeichert und weder protokolliert noch in einer URL übertragen werden.
+11. Der MCP-Server SOLL selbst keine Archivdaten an ein Sprachmodell senden. Produktiv dürfen Antworten nur mit einem gemäss `tech.md` zugelassenen Modell verarbeitet werden; eine Weitergabe an einen fremden Modellanbieter ist ausgeschlossen. In Stufe A darf MCP nur mit synthetischen oder anonymisierten Daten geprüft werden; der Produktiveinsatz ist frühestens auf Stufe B nach manueller Freigabe zulässig (Nachweis: manuell [Fabian]).
+
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - I4: eigene Rechnungen als PDF nach AbaNinja importieren (ersetzt Nacherfassung).
 - I5: Bankbewegungen aus AbaNinja für «bezahlt am». Entfällt mit AbaNinja (Entscheid 15.11.2026, bestätigt 16.11.2026).
@@ -162,3 +181,4 @@ damit ich mich auf ihn verlassen kann.
 | B4 | 7 |
 | I3 | 8–12 |
 | Gate Phase 2 | 13 |
+| C3 | 14 |

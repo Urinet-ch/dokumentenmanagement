@@ -33,6 +33,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Entscheid Fabian 17.11.2026: Standard-Zugriffsstufe von `VORSTANDSPROTOKOLL` im Seed ist `vorstand` (alle anderen Arten bleiben `mitglieder`); `VhfGskDokumentartSeedTest` prüft den Standard je Art. Die Anwendung setzt Schema-Standards nicht selbst ein, die Stufe wählt weiterhin eine Person.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.5, 1.6, 3.7_
   - Anzeigetexte (PR dieses Auftrags): Der Seed hängt an `verband` jeder Art `"x-labels": {"vhf": "VHF", "gsk": "GSK"}`; die Oberfläche zeigt diese Texte, gespeichert und gesendet wird weiter der Enum-Wert (`VhfGskDokumentartSeedTest`)
+  - Entscheid Fabian 17.11.2026 (PR #257): Das Archiv legt keinen mandantenspezifischen Keycloak-Client an. Falls für Theme oder Redirect-URI nötig, richtet ihn der Betreiber manuell ein; «Keycloak-Client in Produktion» oben meint diese manuelle Einrichtung.
 
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
