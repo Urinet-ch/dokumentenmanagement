@@ -202,6 +202,8 @@ class AufbewahrungTest {
                 }).bis()).isEqualTo(LocalDate.of(2038, 2, 28));
         assertThat(Aufbewahrung.berechne(regel, HEUTE, Instant.now(), 2025, HEUTE, ende("12-31"), HEUTE,
                 feld -> null)).isEqualTo(new Aufbewahrung(null, false));
+        assertThat(Aufbewahrung.berechne(regel, HEUTE, Instant.now(), 2025, HEUTE, ende("12-31"), HEUTE))
+                .isEqualTo(new Aufbewahrung(null, false));
     }
 
     @Test
