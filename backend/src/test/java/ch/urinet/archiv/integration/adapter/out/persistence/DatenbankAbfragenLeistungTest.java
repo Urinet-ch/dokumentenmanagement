@@ -129,16 +129,19 @@ class DatenbankAbfragenLeistungTest {
 
             String listenPlan = planListen(mandant, arten.get(i));
             String feedPlan = planFeed(mandant);
+            String volltextPlan = planVolltext(mandant);
             String vektorPlan = planVektor(mandant);
             String exportPlan = planExport(mandant);
             System.out.printf("%s: Liste 10=%d ms, 100=%d ms, SQL=%d/%d; Feed=%d ms%n",
                     mandant.wert(), dauer10, dauer100, anweisungen10, anweisungen100, dauerFeed);
             System.out.println("Listenplan " + mandant.wert() + ":\n" + listenPlan);
             System.out.println("Feedplan " + mandant.wert() + ":\n" + feedPlan);
+            System.out.println("Volltextplan " + mandant.wert() + ":\n" + volltextPlan);
             System.out.println("Vektorplan " + mandant.wert() + ":\n" + vektorPlan);
             System.out.println("Exportplan " + mandant.wert() + ":\n" + exportPlan);
             assertThat(listenPlan).contains("dokument_webseite_liste_ix");
             assertThat(feedPlan).contains("webseite_aenderung_xid_ix");
+            assertThat(volltextPlan).contains("dokument_volltext_ohne_dateiname_ix");
             assertThat(vektorPlan).contains("chunk_embedding_hnsw");
             assertThat(exportPlan).contains("dokument_pk");
         }
@@ -201,7 +204,8 @@ class DatenbankAbfragenLeistungTest {
                         dokument.setString(3, "Synthetische Leistungsprobe " + n);
                         dokument.setObject(4, LocalDate.of(2099, 1, 1).plusDays(n % 365));
                         dokument.setInt(5, n % 10 == 0 ? 2099 : 2098);
-                        dokument.setString(6, "Synthetischer Text für die Datenbank-Leistungsprüfung " + n);
+                        dokument.setString(6, "Synthetischer Text für die Datenbank-Leistungsprüfung " + n
+                                + (n % 1_000 == 0 ? " leistungsprobe" + lauf : ""));
                         dokument.setString(7, dokumentZusatz);
                         dokument.addBatch();
 
@@ -316,6 +320,13 @@ class DatenbankAbfragenLeistungTest {
                 + ".chunk c where c.embedding is not null "
                 + "order by c.embedding operator(public.<=>) cast(? as public.halfvec) limit 50";
         return plan(sql, statement -> statement.setString(1, embedding(1)));
+    }
+
+    private String planVolltext(MandantCode mandant) throws SQLException {
+        String sql = "select d.id from " + mandant.schema() + ".dokument d where "
+                + "ts_filter(d.volltext_tsv, cast('{a,b,c}' as \"char\"[])) "
+                + "@@ websearch_to_tsquery('german', ?) limit 10";
+        return plan("explain " + sql, statement -> statement.setString(1, "leistungsprobe" + lauf), true);
     }
 
     private String planExport(MandantCode mandant) throws SQLException {
