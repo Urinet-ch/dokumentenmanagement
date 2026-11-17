@@ -59,6 +59,7 @@ der Abruf; liefert ein Mandant keinen Stand, verschwinden seine Reihen, statt ei
 | `archiv_ki_feld_bestaetigt_total`, `archiv_ki_feld_korrigiert_total` | Zähler | `feld`, `mandant` | Wie oft ein KI-Vorschlag für das Feld unverändert bestätigt bzw. korrigiert wurde; die Reihen aller Felder entstehen beim ersten Zählen eines Mandanten mit 0 |
 | `archiv_ki_feld_korrekturquote` | Gauge | `feld`, `mandant` | korrigiert geteilt durch bestätigt seit dem Start des Prozesses (0 ohne Bestätigung); die Quote über einen längeren Zeitraum rechnet das Monitoring aus den Zählern (`increase(…[90d])`) |
 | `archiv_webseite_grenze_ausgefallen_total` | Zähler | – | Prüfung einer Grenze je Webseiten-Schlüssel ist fehlgeschlagen; die Anfrage wurde wie vorgesehen durchgelassen |
+| `archiv_oeffentlicher_chat_nutzung_schreibfehler_total` | Zähler | – | Tokenverbrauch oder `ki_verbrauch` des öffentlichen Chats konnte nicht geschrieben werden; die Antwort wurde trotzdem ausgegeben |
 
 Die Kennzahlen des Speichers sind je JVM (API und Worker getrennt), die Zähler der KI-Felder gehören dem Prozess, der
 den Vorschlag bestätigt.
@@ -69,6 +70,13 @@ Vorschlag für das externe Monitoring: Alarm, wenn `increase(archiv_webseite_gre
 Der Zähler meldet einen internen Fehler der Pro-Schlüssel-Prüfung; diese lässt Anfragen bewusst durch, damit ein
 Limiterfehler die Webseite nicht abschaltet. Bei einem Alarm den Fehlergrund im Log prüfen und die Prüfung beheben.
 Das Archiv versendet dafür keine Alarm-Mail.
+
+### Alarmvorschlag: Nutzung des öffentlichen Chats nicht geschrieben
+
+Vorschlag für das externe Monitoring: Alarm, wenn
+`increase(archiv_oeffentlicher_chat_nutzung_schreibfehler_total[5m]) > 0`. Die Antwort bleibt bei einem Schreibfehler
+fail-open, da sie bereits gestreamt sein kann; in diesem Fall ist die monatliche Budgetobergrenze nicht nachgewiesen.
+Bei einem Alarm den Fehlergrund im Log prüfen und die Nutzungsbuchung wiederherstellen.
 
 ## Abweichungen zwischen Spec und Code
 

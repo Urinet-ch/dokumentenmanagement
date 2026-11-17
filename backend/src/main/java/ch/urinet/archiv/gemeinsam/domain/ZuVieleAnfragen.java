@@ -17,7 +17,9 @@ public class ZuVieleAnfragen extends FachFehler {
         /** Grenze je Webseiten-Schlüssel: die teure Suche (Embedding und Reranker). */
         SUCHE,
         /** Grenze je Erfassungs-Schlüssel: Uploads je Stunde. */
-        UPLOADS
+        UPLOADS,
+        /** Neue oder nicht im Prüf-Cache enthaltene API-Token-Prüfungen je vertrauenswürdiger Quelladresse. */
+        SCHLUESSELPRUEFUNG
     }
 
     private final Grund grund;

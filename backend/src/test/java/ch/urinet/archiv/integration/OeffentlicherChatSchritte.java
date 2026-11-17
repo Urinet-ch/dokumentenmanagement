@@ -17,6 +17,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
@@ -29,6 +30,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -41,6 +43,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -70,6 +75,9 @@ public class OeffentlicherChatSchritte {
     @Inject
     OeffentlicheFragenAufraeumen aufraeumen;
 
+    @Inject
+    MeterRegistry registry;
+
     private final String lauf = UUID.randomUUID().toString().substring(0, 8);
     private final Map<String, String> schluessel = new HashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
@@ -79,11 +87,15 @@ public class OeffentlicherChatSchritte {
     private final Set<String> frageMandanten = new LinkedHashSet<>();
     private String ip;
     private Response antwort;
+    private List<Response> paralleleAntworten = List.of();
     private List<Ereignis> ereignisse = List.of();
     private String gespraech;
     private String letzterSchluessel;
     private String letzterClient;
     private String letzteStufe;
+    private String budgetFehlerTrigger;
+    private String budgetFehlerFunktion;
+    private double budgetFehlerZaehlerVorher;
 
     private record Dokument(String mandant, UUID id, String titel) {
     }
@@ -93,6 +105,10 @@ public class OeffentlicherChatSchritte {
 
     @After
     public void aufraeumen() throws SQLException {
+        if (budgetFehlerTrigger != null) {
+            ausfuehren("drop trigger if exists " + budgetFehlerTrigger + " on public.mandant_budget");
+            ausfuehren("drop function if exists public." + budgetFehlerFunktion + "()");
+        }
         for (String id : tokenIds) {
             ausfuehren("delete from public.api_client where id = ?", id);
         }
@@ -121,6 +137,7 @@ public class OeffentlicherChatSchritte {
         frageMandanten.clear();
         ip = null;
         gespraech = null;
+        paralleleAntworten = List.of();
     }
 
     // ---- Vorbereitung
@@ -219,6 +236,21 @@ public class OeffentlicherChatSchritte {
                 + "date_trunc('month', now() at time zone 'Europe/Zurich')::date, ?, ?)", mandant, maximum, verbraucht);
     }
 
+    @Angenommen("das Schreiben des Monatsbudgets wird für diese Frage verhindert")
+    public void budgetSchreibfehler() throws SQLException {
+        budgetFehlerZaehlerVorher = registry.counter("archiv.oeffentlicher_chat.nutzung_schreibfehler").count();
+        String suffix = lauf.replace("-", "");
+        budgetFehlerFunktion = "probe_budget_schreibfehler_" + suffix;
+        budgetFehlerTrigger = "probe_budget_schreibfehler_" + suffix;
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("create function public." + budgetFehlerFunktion
+                    + "() returns trigger language plpgsql as $$ begin raise exception 'synthetic write failure'; end $$");
+            befehl.execute("create trigger " + budgetFehlerTrigger
+                    + " before update of tokens_verbraucht on public.mandant_budget for each row execute function public."
+                    + budgetFehlerFunktion + "()");
+        }
+    }
+
     @Angenommen("in «{word}» liegt eine öffentliche Frage «{}» von vor {int} Tagen")
     public void alteFrage(String mandant, String frage, int tage) throws SQLException {
         frageMandanten.add(mandant);
@@ -280,6 +312,37 @@ public class OeffentlicherChatSchritte {
             senden(frage, null);
             assertThat(antwort.statusCode()).as("Frage " + (i + 1) + ": " + antwort.asString()).isEqualTo(200);
         }
+    }
+
+    @Wenn("die Webseite mit dem Schlüssel «{word}» zwei gleichzeitige Fragen «{}» und «{}» stellt")
+    public void gleichzeitigeFragen(String name, String frageEins, String frageZwei) throws Exception {
+        letzterSchluessel = name;
+        letzterClient = "parallel";
+        letzteStufe = "oeffentlich";
+        CountDownLatch bereit = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        CompletableFuture<Response> eins = paralleleFrage(name, "parallel-eins", frageEins, bereit, start);
+        CompletableFuture<Response> zwei = paralleleFrage(name, "parallel-zwei", frageZwei, bereit, start);
+        assertThat(bereit.await(10, TimeUnit.SECONDS)).as("beide Fragen warten am Start").isTrue();
+        start.countDown();
+        paralleleAntworten = List.of(eins.get(60, TimeUnit.SECONDS), zwei.get(60, TimeUnit.SECONDS));
+    }
+
+    private CompletableFuture<Response> paralleleFrage(String name, String client, String frage,
+                                                       CountDownLatch bereit, CountDownLatch start) {
+        return CompletableFuture.supplyAsync(() -> {
+            bereit.countDown();
+            try {
+                if (!start.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Start der parallelen Chatfragen abgelaufen");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Start der parallelen Chatfragen unterbrochen", e);
+            }
+            return anfrage(name, "oeffentlich", client).body("{\"frage\":" + quote(frage) + "}")
+                    .when().post(PFAD);
+        });
     }
 
     @Wenn("die Webseite ohne Schlüssel fragt: «{}»")
@@ -384,6 +447,14 @@ public class OeffentlicherChatSchritte {
     public void problem(int status, String code) {
         assertThat(ProblemDetails.pruefen(antwort, status, "ZU_VIELE_ANFRAGEN".equals(code) ? new String[]{"grund"}
                 : new String[0])).isEqualTo(code);
+    }
+
+    @Dann("wird genau eine parallele Frage mit Status 200 beantwortet und die andere mit «{word}» abgelehnt")
+    public void paralleleFragenAntworten(String grund) {
+        assertThat(paralleleAntworten).extracting(Response::statusCode).containsExactlyInAnyOrder(200, 429);
+        Response abgelehnt = paralleleAntworten.stream().filter(r -> r.statusCode() == 429).findFirst().orElseThrow();
+        assertThat(ProblemDetails.pruefen(abgelehnt, 429, new String[]{"grund"})).isEqualTo("ZU_VIELE_ANFRAGEN");
+        assertThat(abgelehnt.<String>path("grund")).isEqualTo(grund);
     }
 
     @Dann("trägt die Chatbot-Antwort den Header «{word}»")
@@ -568,6 +639,12 @@ public class OeffentlicherChatSchritte {
         budgetMandanten.add(mandant);
         assertThat(zahl("select coalesce(sum(tokens_verbraucht), 0) from public.mandant_budget where mandant = ?",
                 mandant)).isEqualTo(tokens);
+    }
+
+    @Dann("wird ein Monatsbudget-Schreibfehler in der Kennzahl erfasst")
+    public void budgetFehlerKennzahl() {
+        assertThat(registry.counter("archiv.oeffentlicher_chat.nutzung_schreibfehler").count())
+                .isEqualTo(budgetFehlerZaehlerVorher + 1);
     }
 
     @Dann("hat das Budget von «{word}» einen Eintrag im Verbrauch des Sprachmodells mit Zweck CHAT")

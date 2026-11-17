@@ -19,9 +19,11 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 /**
- * {@code public.mandant_budget} per JDBC (Spec 03, Req 6.4; Changeset {@code public/012}): ein Zeile je Mandant und Monat
+ * {@code public.mandant_budget} per JDBC (Spec 03, Req 6.4; Changesets {@code public/012} und {@code public/038}): eine
+ * Zeile je Mandant und Monat
  * (erster Tag, Monat in {@code Europe/Zurich}). Verbrauchen ist ein einziger {@code insert … on conflict do update}, damit
- * gleichzeitige Fragen nichts verlieren; jede Anweisung in eigener, kurzer Transaktion. Ohne Zeile gilt der Standard
+ * gleichzeitige Fragen nichts verlieren. Eine bedingte Aktualisierung reserviert atomar den einzigen laufenden Platz des
+ * Monats; jede Anweisung läuft in einer kurzen Transaktion. Ohne Zeile gilt der Standard
  * {@code archiv.webseite.chat.monatsbudget-tokens}.
  */
 @ApplicationScoped
@@ -51,27 +53,71 @@ public class JdbcMandantBudget implements MandantBudget {
 
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean erschoepft(MandantCode mandant) {
+    public Reservierung reservieren(MandantCode mandant) {
+        LocalDate monat = monat();
         try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select tokens_max, tokens_verbraucht from public.mandant_budget where mandant = ? and monat = ?")) {
-            abfrage.setQueryTimeout(ZEITGRENZE_S);
-            abfrage.setString(1, mandant.wert());
-            abfrage.setDate(2, Date.valueOf(monat()));
-            try (ResultSet zeile = abfrage.executeQuery()) {
-                if (!zeile.next()) {
-                    return standard <= 0;
+             PreparedStatement anlegen = verbindung.prepareStatement(
+                     "insert into public.mandant_budget (mandant, monat, tokens_max, tokens_verbraucht) "
+                             + "values (?, ?, ?, 0) on conflict (mandant, monat) do nothing")) {
+            anlegen.setQueryTimeout(ZEITGRENZE_S);
+            anlegen.setString(1, mandant.wert());
+            anlegen.setDate(2, Date.valueOf(monat));
+            anlegen.setLong(3, standard);
+            anlegen.executeUpdate();
+            try (PreparedStatement reservieren = verbindung.prepareStatement(
+                    "update public.mandant_budget set frage_laufend = true where mandant = ? and monat = ? "
+                            + "and tokens_verbraucht < tokens_max and not frage_laufend");
+                 PreparedStatement abfrage = verbindung.prepareStatement(
+                         "select frage_laufend, tokens_verbraucht >= tokens_max from public.mandant_budget "
+                                 + "where mandant = ? and monat = ?")) {
+                for (int versuch = 0; versuch < 2; versuch++) {
+                    reservieren.setQueryTimeout(ZEITGRENZE_S);
+                    reservieren.setString(1, mandant.wert());
+                    reservieren.setDate(2, Date.valueOf(monat));
+                    if (reservieren.executeUpdate() == 1) {
+                        return new Reservierung(ReservierungsStatus.RESERVIERT, monat);
+                    }
+                    abfrage.setQueryTimeout(ZEITGRENZE_S);
+                    abfrage.setString(1, mandant.wert());
+                    abfrage.setDate(2, Date.valueOf(monat));
+                    try (ResultSet zeile = abfrage.executeQuery()) {
+                        if (!zeile.next()) {
+                            throw new IllegalStateException("Budget des Chatbots nicht vorhanden");
+                        }
+                        if (zeile.getBoolean(1)) {
+                            return new Reservierung(ReservierungsStatus.BEREITS_LAUFEND, monat);
+                        }
+                        if (zeile.getBoolean(2)) {
+                            return new Reservierung(ReservierungsStatus.BUDGET_ERSCHOEPFT, monat);
+                        }
+                    }
                 }
-                return zeile.getLong(2) >= zeile.getLong(1);
             }
+            return new Reservierung(ReservierungsStatus.BEREITS_LAUFEND, monat);
         } catch (SQLException e) {
-            throw new IllegalStateException("Budget des Chatbots nicht gelesen", e);
+            throw new IllegalStateException("Budget des Chatbots nicht reserviert", e);
         }
     }
 
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public void verbrauchen(MandantCode mandant, long tokens) {
+    public void freigeben(MandantCode mandant, LocalDate monat) {
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement(
+                     "update public.mandant_budget set frage_laufend = false "
+                             + "where mandant = ? and monat = ? and frage_laufend")) {
+            befehl.setQueryTimeout(ZEITGRENZE_S);
+            befehl.setString(1, mandant.wert());
+            befehl.setDate(2, Date.valueOf(monat));
+            befehl.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Budget-Reservierung des Chatbots nicht freigegeben", e);
+        }
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void verbrauchen(MandantCode mandant, LocalDate monat, long tokens) {
         if (tokens < 0) {
             throw new IllegalArgumentException("Tokens negativ");
         }
@@ -85,7 +131,7 @@ public class JdbcMandantBudget implements MandantBudget {
                              + "tokens_verbraucht = public.mandant_budget.tokens_verbraucht + excluded.tokens_verbraucht")) {
             befehl.setQueryTimeout(ZEITGRENZE_S);
             befehl.setString(1, mandant.wert());
-            befehl.setDate(2, Date.valueOf(monat()));
+            befehl.setDate(2, Date.valueOf(monat));
             befehl.setLong(3, standard);
             befehl.setLong(4, tokens);
             befehl.executeUpdate();

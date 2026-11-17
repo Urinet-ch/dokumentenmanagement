@@ -10,6 +10,7 @@ import io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism;
 import io.quarkus.vertx.http.runtime.security.HttpSecurityUtils;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -39,8 +40,10 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
         if (token.isEmpty()) {
             return Uni.createFrom().failure(new AuthenticationFailedException("API-Token ungültig"));
         }
+        Optional<String> absender = Optional.ofNullable(kontext.request().remoteAddress())
+                .map(SocketAddress::hostAddress);
         ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get(),
-                Optional.ofNullable(kontext.request().headers().get("X-Real-Ip")));
+                absender);
         HttpSecurityUtils.setRoutingContextAttribute(anfrage, kontext);
         return anbieter.authenticate(anfrage);
     }

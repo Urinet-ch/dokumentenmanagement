@@ -8,6 +8,7 @@ import io.quarkus.security.identity.request.AuthenticationRequest;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
+import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.jupiter.api.Test;
 
@@ -63,13 +64,35 @@ class ApiTokenAuthMechanismTest {
                 anfrage -> assertThat(anfrage.token().id()).isEqualTo(token.id()));
     }
 
+    @Test
+    void gefaelschterRealIpHeaderUeberschreibtDieVomServerErmittelteQuelladresseNicht() {
+        ApiToken token = ApiToken.neu(new SecureRandom());
+
+        mechanismus.authenticate(kontext("Bearer " + token.text(), "203.0.113.17",
+                SocketAddress.inetSocketAddress(8080, "192.0.2.10")), anbieter).await().indefinitely();
+
+        assertThat(anfragen).singleElement().isInstanceOfSatisfying(ApiTokenAnfrage.class,
+                anfrage -> assertThat(anfrage.absenderIp()).contains("192.0.2.10"));
+    }
+
     private static RoutingContext kontext(String authorization) {
+        return kontext(authorization, null, null);
+    }
+
+    private static RoutingContext kontext(String authorization, String realIp, SocketAddress peer) {
         MultiMap kopf = MultiMap.caseInsensitiveMultiMap();
         if (authorization != null) {
             kopf.add("Authorization", authorization);
         }
+        if (realIp != null) {
+            kopf.add("X-Real-Ip", realIp);
+        }
         HttpServerRequest anfrage = proxy(HttpServerRequest.class,
-                (methode, args) -> methode.equals("headers") ? kopf : null);
+                (methode, args) -> switch (methode) {
+                    case "headers" -> kopf;
+                    case "remoteAddress" -> peer;
+                    default -> null;
+                });
         return proxy(RoutingContext.class, (methode, args) -> methode.equals("request") ? anfrage : null);
     }
 

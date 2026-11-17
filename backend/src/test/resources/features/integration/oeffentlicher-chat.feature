@@ -261,6 +261,29 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Dann liefert der Chatbot Status 429 und Fehlercode «BUDGET»
     Und beträgt der Verbrauch im Monatsbudget von «urinet» 240 Tokens
 
+  @req-6.4
+  Szenario: Gleichzeitige Fragen können das Monatsbudget nur einmal überschreiten
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 100/20 |
+    Und das simulierte Sprachmodell streamt die erste Antwort über 2 Sekunden
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 100 Tokens und ist zu 0 Tokens verbraucht
+    Wenn die Webseite mit dem Schlüssel «vorstand» zwei gleichzeitige Fragen «Eins?» und «Zwei?» stellt
+    Dann wird genau eine parallele Frage mit Status 200 beantwortet und die andere mit «LAEUFT» abgelehnt
+    Und beträgt der Verbrauch im Monatsbudget von «urinet» 120 Tokens
+
+  @req-6.4
+  Szenario: Ein Fehler beim Schreiben des Monatsbudgets wird in einer Kennzahl erfasst, ohne die Antwort abzubrechen
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 5/2    |
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 100 Tokens und ist zu 0 Tokens verbraucht
+    Und das Schreiben des Monatsbudgets wird für diese Frage verhindert
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «budgetfehler» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und wird ein Monatsbudget-Schreibfehler in der Kennzahl erfasst
+    Und beträgt der Verbrauch im Monatsbudget von «urinet» 0 Tokens
+
   # ---- Speicherung ohne Personenbezug (Req 6.5)
 
   @req-6.5

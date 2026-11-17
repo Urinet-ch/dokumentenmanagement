@@ -174,6 +174,18 @@ public class WebseitenSchritte {
         webseitenToken = erstellen("probe", "oeffentlich", false);
     }
 
+    @Angenommen("es gibt einen kalten Webseiten-Lese-Schlüssel")
+    public void kalterLeseSchluessel() {
+        webseitenToken = erstellen("kalt", "oeffentlich", false);
+    }
+
+    @Angenommen("es gibt einen Erfassungs-Schlüssel für «{}»")
+    public void erfassungsSchluessel(String webseite) {
+        String text = webseitenVerwaltung.erstellen("urinet", webseite, "erfassung", null, false).token().text();
+        tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
+        erfassungsToken = text;
+    }
+
     @Wenn("«inhaber-urinet» die API-Tokens auflistet")
     public void apiTokensAuflisten() {
         antwort = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
@@ -334,6 +346,44 @@ public class WebseitenSchritte {
         antwort = probe(ApiToken.neu(zufall).text());
     }
 
+    @Wenn("{int} ungültige Schlüssel von Quelle «{}» die Probe aufrufen")
+    public void ungueltigeSchluesselVonQuelle(int anzahl, String quelle) {
+        abgelehnt.clear();
+        for (int i = 0; i < anzahl; i++) {
+            abgelehnt.add(probe(ApiToken.neu(zufall).text(), quelle));
+        }
+    }
+
+    @Dann("werden alle mit Status 401 abgelehnt")
+    public void alleUngueltigenAbgelehnt() {
+        assertThat(abgelehnt).isNotEmpty().allSatisfy(a -> {
+            assertThat(ProblemDetails.pruefen(a, 401)).isEqualTo("NICHT_ANGEMELDET");
+            assertThat(a.header("WWW-Authenticate")).isEqualTo("Bearer");
+        });
+    }
+
+    @Wenn("ein weiterer ungültiger Schlüssel von Quelle «{}» die Probe aufruft")
+    public void weitererUngueltigerSchluesselVonQuelle(String quelle) {
+        antwort = probe(ApiToken.neu(zufall).text(), quelle);
+    }
+
+    @Dann("wird die Schlüsselprüfung mit Status 429 und «Retry-After» abgelehnt")
+    public void schluesselpruefung429() {
+        assertThat(ProblemDetails.pruefen(antwort, 429)).isEqualTo("ZU_VIELE_ANFRAGEN");
+        assertThat(antwort.header("Retry-After")).isNotBlank();
+        assertThat(antwort.jsonPath().getString("grund")).isEqualTo("SCHLUESSELPRUEFUNG");
+    }
+
+    @Wenn("der kalte Webseiten-Schlüssel mit Quelle «{}» die Probe aufruft")
+    public void kalterSchluesselVonQuelle(String quelle) {
+        antwort = probe(webseitenToken, quelle);
+    }
+
+    @Wenn("der Erfassungs-Schlüssel mit Quelle «{}» die Probe aufruft")
+    public void erfassungsSchluesselVonQuelle(String quelle) {
+        antwort = probe(erfassungsToken, quelle);
+    }
+
     @Wenn("die Webseite den warmen Schlüssel erneut an der Probe verwendet")
     public void warmenSchluesselVerwenden() {
         antwort = probe(webseitenToken);
@@ -397,6 +447,11 @@ public class WebseitenSchritte {
 
     private static Response probe(String token) {
         return given().header("Authorization", "Bearer " + token).when().get("/public/v1/probe");
+    }
+
+    private static Response probe(String token, String quelle) {
+        return given().header("Authorization", "Bearer " + token)
+                .header("X-Real-Ip", quelle).when().get("/public/v1/probe");
     }
 
     private void hashSperreFreigeben() {
