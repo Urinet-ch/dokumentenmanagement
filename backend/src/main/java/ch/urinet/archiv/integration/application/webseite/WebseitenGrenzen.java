@@ -53,6 +53,7 @@ public class WebseitenGrenzen {
         final TokenBucket suche;
         final TokenBucket erfassung;
         final TokenBucket upload;
+        final TokenBucket datei;
         Instant zuletzt;
 
         Eintrag(Einstellung e, Instant jetzt) {
@@ -61,11 +62,13 @@ public class WebseitenGrenzen {
             erfassung = new TokenBucket(e.erfassungSpitze(), e.erfassungProSekunde(), jetzt);
             // Uploads: Fassungsvermögen = Stundenwert, Auffüllung gleichmässig über die Stunde
             upload = new TokenBucket(e.uploadsProStunde(), e.uploadsProStunde() / 3600.0, jetzt);
+            datei = new TokenBucket(2, 1, jetzt);
             zuletzt = jetzt;
         }
 
         boolean leerlauf(Instant jetzt) {
-            return lesen.voll(jetzt) && suche.voll(jetzt) && erfassung.voll(jetzt) && upload.voll(jetzt);
+            return lesen.voll(jetzt) && suche.voll(jetzt) && erfassung.voll(jetzt) && upload.voll(jetzt)
+                    && datei.voll(jetzt);
         }
     }
 
@@ -152,6 +155,8 @@ public class WebseitenGrenzen {
             case ERFASSUNG -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN));
             case UPLOAD -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN),
                     new Pruefung(e.upload, ZuVieleAnfragen.Grund.UPLOADS));
+            case DATEI -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN),
+                    new Pruefung(e.datei, ZuVieleAnfragen.Grund.ANFRAGEN));
         };
     }
 

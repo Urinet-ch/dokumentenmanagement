@@ -597,6 +597,66 @@ paths:
         '503':
           "$ref": "#/components/responses/SpeicherNichtErreichbar"
   "/public/v1/erfassung/dokumente/{id}":
+    patch:
+      summary: "Metadaten ändern"
+      description: "Felder wie in der Web-App, ausser personBenutzer, dateiname und zusatz.veroeffentlicht.\
+        \ Unbekannte Felder und ungültige Typen sind 400. Zusatz ersetzt die bisherigen\
+        \ Formularfelder; veroeffentlicht bleibt erhalten. Bei ARCHIVIERT ist grund Pflicht."
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "If-Match"
+        in: "header"
+        schema:
+          type: "string"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebseiteErfassungMetadatenAenderung"
+        required: true
+      responses:
+        "200":
+          description: "Geändertes Dokument"
+          headers:
+            ETag:
+              schema:
+                type: "string"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebseiteErfassungDetails"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "409":
+          description: "Status- oder Sperrkonflikt"
+        "412":
+          description: "VERSION_KONFLIKT"
+        "422":
+          description: "Pflichtfelder oder Zusatzfelder ungültig"
+        "428":
+          description: "VERSION_FEHLT"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
     get:
       summary: Erfasstes Dokument ohne Dateinamen anzeigen
       parameters:
@@ -664,6 +724,312 @@ paths:
           "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/dokumentarten:
+    get:
+      summary: "Aktive Dokumentarten des Mandanten mit Formularfeldern"
+      tags:
+      - "Webseite Erfassung"
+      responses:
+        "200":
+          description: "Arten"
+          content:
+            application/json:
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/WebseiteErfassungArt"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/dokumente/{id}/bestaetigen:
+    post:
+      summary: "Dokument mit denselben Pflichtfeldern wie die Web-App bestätigen"
+      description: "Felder der Bestätigung der Web-App ohne personBenutzer und dateiname,\
+        \ zusätzlich zusatz. zusatz.veroeffentlicht und unbekannte Felder sind 400.\
+        \ Zusatz wird atomar mitbestätigt."
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "If-Match"
+        in: "header"
+        schema:
+          type: "string"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebseiteErfassungBestaetigung"
+        required: true
+      responses:
+        "202":
+          description: "Archivierung eingereiht"
+          headers:
+            ETag:
+              schema:
+                type: "string"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebseiteErfassungDetails"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "409":
+          description: "Status-, Frist- oder Belegnummernkonflikt"
+        "412":
+          description: "VERSION_KONFLIKT"
+        "422":
+          description: "Pflichtfelder oder Zusatzfelder ungültig"
+        "428":
+          description: "VERSION_FEHLT"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/dokumente/{id}/datei:
+    get:
+      summary: "Datei zur Prüfung streamen, nie eine Speicher-URL"
+      description: "PDF/A, sonst erstes Original. HEAD ist 405 ohne Stream und Protokoll.\
+        \ Kein Range."
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "Dateistream"
+          content:
+            application/octet-stream:
+              schema:
+                format: "binary"
+                type: "string"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/SpeicherNichtErreichbar"
+  /public/v1/erfassung/dokumente/{id}/veroeffentlichen:
+    post:
+      summary: "Archiviertes Dokument veröffentlichen"
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "If-Match"
+        in: "header"
+        schema:
+          type: "string"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "Veröffentlicht"
+          headers:
+            ETag:
+              schema:
+                type: "string"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebseiteErfassungDetails"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "409":
+          description: "STATUS_KONFLIKT"
+        "412":
+          description: "VERSION_KONFLIKT"
+        "422":
+          description: "Zusatzfelder der Dokumentart ungültig"
+        "428":
+          description: "VERSION_FEHLT"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/dokumente/{id}/wiederholen:
+    post:
+      summary: "Verarbeitung oder Archivierung wiederholen"
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "If-Match"
+        in: "header"
+        schema:
+          type: "string"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      responses:
+        "202":
+          description: "Auftrag eingereiht"
+          headers:
+            ETag:
+              schema:
+                type: "string"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "409":
+          description: "STATUS_KONFLIKT"
+        "412":
+          description: "VERSION_KONFLIKT"
+        "428":
+          description: "VERSION_FEHLT"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/dokumente/{id}/zurueckziehen:
+    post:
+      summary: "Archiviertes Dokument zurückziehen, nicht löschen"
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        schema:
+          $ref: "#/components/schemas/UUID"
+      - required: true
+        name: "If-Match"
+        in: "header"
+        schema:
+          type: "string"
+      - required: true
+        name: "X-Archiv-Bearbeiter"
+        in: "header"
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "Zurückgezogen"
+          headers:
+            ETag:
+              schema:
+                type: "string"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebseiteErfassungDetails"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "404":
+          $ref: "#/components/responses/NichtGefunden"
+        "409":
+          description: "STATUS_KONFLIKT"
+        "412":
+          description: "VERSION_KONFLIKT"
+        "422":
+          description: "Zusatzfelder der Dokumentart ungültig"
+        "428":
+          description: "VERSION_FEHLT"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
+  /public/v1/erfassung/eingangskorb:
+    get:
+      summary: "Eingangskorb des Mandanten ohne Dateinamen"
+      tags:
+      - "Webseite Erfassung"
+      parameters:
+      - name: "groesse"
+        in: "query"
+        schema:
+          type: "integer"
+          format: "int32"
+          default: 20
+      - name: "seite"
+        in: "query"
+        schema:
+          type: "integer"
+          format: "int32"
+          default: 0
+      responses:
+        "200":
+          description: "Sichtbare Dokumente im Eingangskorb"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebseiteErfassungListe"
+        "400":
+          $ref: "#/components/responses/AnfrageUngueltig"
+        "401":
+          $ref: "#/components/responses/NichtAngemeldet"
+        "403":
+          $ref: "#/components/responses/NichtErlaubt"
+        "429":
+          $ref: "#/components/responses/ZuVieleAnfragen"
+        "503":
+          $ref: "#/components/responses/Ueberlastet"
 security:
   - webseitenSchluessel: []
 components:
@@ -676,6 +1042,211 @@ components:
         Mandant vom Betreiber ausgestellt. Die Scopes legt Aufgabe 11.7 fest. Ein fehlender, ungültiger, abgelaufener
         oder widerrufener Schlüssel ergibt dieselbe Antwort 401 `NICHT_ANGEMELDET`.
   schemas:
+    DokumentVertrag1:
+      type: "object"
+      properties:
+        gueltigAb:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        gueltigBis:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        kuendigungsfrist:
+          type: "string"
+        naechsteFrist:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+    DokumentFinanz1:
+      type: "object"
+      properties:
+        belegnummer:
+          type: "string"
+        richtung:
+          type: "string"
+        betrag:
+          type: "number"
+        waehrung:
+          type: "string"
+        faelligkeit:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        qrReferenz:
+          type: "string"
+        konto:
+          type: "string"
+    JsonObjekt:
+      type: "object"
+    WebseiteErfassungBestaetigung:
+      additionalProperties: false
+      type: "object"
+      properties:
+        personBenutzer:
+          type: "string"
+        art:
+          type: "string"
+        titel:
+          type: "string"
+        datum:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        partnerId:
+          type: "string"
+          format: "uuid"
+          pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+        projekt:
+          type: "string"
+        tags:
+          type: "array"
+          items:
+            type: "string"
+        vertraulichkeit:
+          type: "string"
+        geschaeftsjahr:
+          type: "integer"
+          format: "int32"
+        belegnummer:
+          type: "string"
+        richtung:
+          type: "string"
+        betrag:
+          type: "number"
+        waehrung:
+          type: "string"
+        faelligkeit:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        qrReferenz:
+          type: "string"
+        konto:
+          type: "string"
+        gueltigAb:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        gueltigBis:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        kuendigungsfrist:
+          type: "string"
+        naechsteFrist:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        zusatz:
+          description: "Formularfelder ohne veroeffentlicht, geprüft gegen das Art-Schema"
+          type: "object"
+          $ref: "#/components/schemas/JsonObjekt"
+        ohnePdfa:
+          type: "boolean"
+        fristAbgelaufenAkzeptiert:
+          type: "boolean"
+    WebseiteErfassungMetadatenAenderung:
+      additionalProperties: false
+      type: "object"
+      properties:
+        art:
+          type: "string"
+        titel:
+          type: "string"
+        datum:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        partnerId:
+          type: "string"
+          format: "uuid"
+          pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+        projekt:
+          type: "string"
+        tags:
+          type: "array"
+          items:
+            type: "string"
+        vertraulichkeit:
+          type: "string"
+        geschaeftsjahr:
+          type: "integer"
+          format: "int32"
+        belegnummer:
+          type: "string"
+        richtung:
+          type: "string"
+        betrag:
+          type: "number"
+        waehrung:
+          type: "string"
+        faelligkeit:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        qrReferenz:
+          type: "string"
+        konto:
+          type: "string"
+        gueltigAb:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        gueltigBis:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        kuendigungsfrist:
+          type: "string"
+        naechsteFrist:
+          type: "string"
+          format: "date"
+          examples:
+          - "2022-03-10"
+        zusatz:
+          description: "Formularfelder ohne veroeffentlicht, geprüft gegen das Art-Schema"
+          type: "object"
+          $ref: "#/components/schemas/JsonObjekt"
+        grund:
+          type: "string"
+    UUID:
+      type: "string"
+      format: "uuid"
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+    WebseiteErfassungArt:
+      type: "object"
+      properties:
+        code:
+          type: "string"
+        name:
+          type: "string"
+        gruppen:
+          type: "array"
+          items:
+            type: "string"
+        pflichtfelder:
+          type: "array"
+          items:
+            type: "string"
+        zusatzSchema:
+          $ref: "#/components/schemas/JsonObjekt"
+        vertraulichkeit:
+          type: "string"
     ChatFrage:
       type: object
       required: [frage]
@@ -1150,6 +1721,10 @@ components:
       - status
       - version
       properties:
+        ausgabe:
+          type:
+          - "string"
+          - "null"
         id:
           type: string
           format: uuid
@@ -1233,6 +1808,10 @@ components:
       description: Metadaten eines Dokuments ohne Dateinamen oder interne Fehlerdetails
       type: object
       properties:
+        vertrag:
+          $ref: "#/components/schemas/DokumentVertrag1"
+        finanz:
+          $ref: "#/components/schemas/DokumentFinanz1"
         id:
           type: string
           format: uuid

@@ -36,7 +36,8 @@ public class WebseitenBearbeiterFilter {
         Method methode = ressource.getResourceMethod();
         WebseitenZugang zugang = methode == null ? null : methode.getAnnotation(WebseitenZugang.class);
         if (zugang == null || zugang.value() != WebseitenZugang.Art.ERFASSUNG
-                || methode.getAnnotation(Protokolliert.class) == null) {
+                || methode.getAnnotation(Protokolliert.class) == null
+                && !methode.isAnnotationPresent(BearbeiterErforderlich.class)) {
             return;
         }
         String webseite = identitaet.getAttribute(TokenIdentitaet.WEBSEITE);
