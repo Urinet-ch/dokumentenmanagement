@@ -12,7 +12,7 @@ Funktionalität: Webseiten-Schlüssel (Aufgabe 11.7)
     Wenn «inhaber-urinet» GET «/public/v1/probe» aufruft
     Dann antwortet die Webseiten-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
 
-  @req-12.1
+  @req-12.1 @req-9.4
   Szenario: Ein Lese-Schlüssel erreicht keinen Erfassungs-Endpunkt
     Wenn «webseite» POST «/public/v1/probe/erfassung» aufruft
     Dann antwortet die Webseiten-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
@@ -46,7 +46,7 @@ Funktionalität: Webseiten-Schlüssel (Aufgabe 11.7)
     Wenn der Webseiten-Schlüssel mit einer Überlappung von 30 Sekunden rotiert wird
     Dann erreicht der alte und der neue Webseiten-Schlüssel die Probe
 
-  @req-12.4
+  @req-12.4 @req-9.4
   Szenario: Ohne Überlappung wird der alte Schlüssel sofort ungültig
     Angenommen es gibt einen Webseiten-Lese-Schlüssel für «probe» mit höchster Stufe «oeffentlich»
     Wenn der Webseiten-Schlüssel ohne Überlappung rotiert wird
