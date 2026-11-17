@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit.adapter.in.auth;
 
+import ch.urinet.archiv.sicherheit.application.QuellAdresse;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.IdentityProviderManager;
@@ -12,7 +13,6 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
-import ch.urinet.archiv.sicherheit.application.QuellAdresse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

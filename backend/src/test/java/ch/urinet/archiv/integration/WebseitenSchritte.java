@@ -387,8 +387,7 @@ public class WebseitenSchritte {
 
     @Wenn("der Erfassungs-Schlüssel mit Quelle «{}» die Probe aufruft")
     public void erfassungsSchluesselVonQuelle(String quelle) {
-        antwort = given().header("Authorization", "Bearer " + erfassungsToken)
-                .header("X-Real-Ip", quelle).when().post("/public/v1/probe/erfassung");
+        antwort = probeErfassung(erfassungsToken, quelle);
     }
 
     @Wenn("die Webseite den warmen Schlüssel erneut an der Probe verwendet")
@@ -469,6 +468,11 @@ public class WebseitenSchritte {
     private static Response probe(String token, String quelle) {
         return given().header("Authorization", "Bearer " + token)
                 .header("X-Real-Ip", quelle).when().get("/public/v1/probe");
+    }
+
+    private static Response probeErfassung(String token, String quelle) {
+        return given().header("Authorization", "Bearer " + token)
+                .header("X-Real-Ip", quelle).when().post("/public/v1/probe/erfassung");
     }
 
     private void hashSperreFreigeben() {

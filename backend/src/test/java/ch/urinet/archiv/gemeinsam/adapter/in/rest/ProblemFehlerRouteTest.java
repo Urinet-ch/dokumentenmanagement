@@ -1,6 +1,8 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import io.quarkus.runtime.configuration.MemorySize;
+import io.quarkus.security.AuthenticationCompletionException;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,16 @@ class ProblemFehlerRouteTest {
 
     @Test
     void vorDerResourceAbgelehnteSchluesselpruefungLiefert429MitRetryAfterUndGrund() {
+        pruefen429(new ZuVieleAnfragen(ZuVieleAnfragen.Grund.SCHLUESSELPRUEFUNG, 2));
+    }
+
+    @Test
+    void vonDerAnmeldungVerpackteSchluesselpruefungLiefert429MitRetryAfterUndGrund() {
+        pruefen429(new AuthenticationCompletionException(
+                new ZuVieleAnfragen(ZuVieleAnfragen.Grund.SCHLUESSELPRUEFUNG, 2)));
+    }
+
+    private void pruefen429(Throwable fehler) {
         AtomicInteger status = new AtomicInteger();
         AtomicReference<String> body = new AtomicReference<>();
         Map<String, String> headers = new HashMap<>();
@@ -65,8 +77,7 @@ class ProblemFehlerRouteTest {
             default -> null;
         });
         RoutingContext kontext = proxy(RoutingContext.class, (methode, argumente) -> switch (methode) {
-            case "failure" -> new ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen(
-                    ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.Grund.SCHLUESSELPRUEFUNG, 2);
+            case "failure" -> fehler;
             case "response" -> antwort[0];
             default -> null;
         });
