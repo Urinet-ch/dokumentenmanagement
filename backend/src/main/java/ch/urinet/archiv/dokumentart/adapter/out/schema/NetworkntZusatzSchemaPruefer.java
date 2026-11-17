@@ -294,8 +294,8 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             if (!properties.isObject()) {
                 return false;
             }
-            // Standard von zugriff: nie «oeffentlich»; «mitglieder» (Spec 03) oder «vorstand» (z. B. VORSTANDSPROTOKOLL,
-            // Entscheid Fabian 17.11.2026), ohne Art-Code in der Programmlogik (Req 2.9)
+            // Spec 05, design.md «Umsetzung 17.3»: «vorstand» ist ohne Art-Code zulässig (Req 2.9).
+            // Der Standard «oeffentlich» bleibt ausgeschlossen (Req 2.7).
             return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
                     List.of("oeffentlich", "mitglieder", "vorstand"), List.of("mitglieder", "vorstand"))
                     && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",

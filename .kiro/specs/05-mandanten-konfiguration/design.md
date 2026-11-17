@@ -314,12 +314,28 @@ auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder 
 speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
 `veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
 oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
-`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig (Entscheid Fabian 17.11.2026 für
-VORSTANDSPROTOKOLL, Spec 03 Aufgabe 10.4).
+`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig: Der strengere Standard aus
+Spec 03, design.md «Reservierte Felder» (dort bei Aufgabe 10.4 für die Vorstandsprotokolle beschrieben) wird wegen
+Req 2.9 nicht an einen Art-Code gebunden. Nachverfolgung 17.2/17.3: Das ist die technische Auslegung dieser
+Prüfung, kein zusätzlicher allgemeiner Entscheid von Fabian; die bestehende Zulässigkeit bleibt unverändert.
 
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.
+Datensparsame Ausnahme bei `einstellungen.kennungen.uid` und `.ibans` (Nachverfolgung 17.2/17.3, Spec 01, 16.7):
+Diese Änderungen enthalten nur `{pfad, aenderung: "geändert"}`, keine alten oder neuen Werte. Bereits
+`ProtokollDetails.Aenderung` entfernt die Werte, bevor sie serialisiert oder als Objekt geloggt werden können.
+Andere Elemente behalten die bisherige Form mit `alt` und `neu`. Das unveränderliche Konfigurationsabbild enthält
+die vollständigen Einstellungen weiterhin; dort lässt sich die Änderung mit der protokollierten Version
+nachvollziehen, ohne die Kennungen im Zugriffsprotokoll zu vervielfältigen.
+
+Nachweise der Nachverfolgung: `KonfigurationMigrationTest` migriert zwei getrennte synthetische Mandantenschemas
+mit allen echten Changesets bis 036, legt Bestand an und führt erst dann 037 aus. Dokumente, Fassungen und
+Einstellungen bleiben erhalten, ihre Version verweist auf das mit gültigem SHA-256 lesbare Migrationsabbild.
+Der Dokumentarten-Seed ist bereits eine JDBC-Transaktion einschliesslich des nachgelagerten Referenz-Batches;
+`DokumentartSeedIdempotenzTest` belegt jetzt Abbruch nach der ersten Art sowie Abbruch im Referenz-Batch, vollständigen
+Rollback, erfolgreiche Wiederholung und Unverändertheit eines zweiten Mandanten. Keine Änderung alter Changesets
+und keine zusätzliche Transaktionslogik für einen bereits atomaren Schritt.
 
 ## Error Handling (neue Codes)
 | Status | Code | Wann |

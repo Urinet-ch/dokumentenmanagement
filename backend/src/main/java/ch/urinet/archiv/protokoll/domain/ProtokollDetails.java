@@ -3,6 +3,7 @@ package ch.urinet.archiv.protokoll.domain;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -13,7 +14,8 @@ import java.util.regex.Pattern;
  * und Quelle ({@link Konfiguration}) und der Kanal eines Auslösers ohne
  * eigenen Endpunkt ({@code kanal}, z. B. {@value #KANAL_CHAT} für das Chat-Werkzeug {@code dokument_zeigen},
  * Spec 02, Aufgabe 7.1a), bei Änderungen an einem API-Token dessen ID ({@code tokenId}, Req 2.20), nie Dokument-,
- * Kontakt- oder Konfigurationsinhalte ausser den geänderten Konfigurationselementen mit alt und neu (Req 9.7, 9.10,
+ * Kontakt- oder Konfigurationsinhalte ausser den geänderten Konfigurationselementen mit alt und neu, bei UID und
+ * IBANs ohne Werte (Req 9.7, 9.10,
  * 10.2, 16.7, 17.8; Spec 05, Req 1.3). Jedes Feld darf
  * fehlen ({@code null}); ohne {@code kanal} ist der Eintrag an einem REST-Endpunkt entstanden.
  */
@@ -179,12 +181,23 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         }
     }
 
-    /** Ein geändertes Konfigurationselement: Pfad, alter und neuer Wert als Text ({@code null} = nicht vorhanden). */
+    /** Kennungswerte bleiben ausschliesslich im Konfigurationsabbild, nicht im Änderungsprotokoll. */
     public record Aenderung(String pfad, String alt, String neu) {
+        private static final Set<String> OHNE_WERTE = Set.of(
+                "einstellungen.kennungen.uid", "einstellungen.kennungen.ibans");
+
         public Aenderung {
             if (pfad == null || pfad.isBlank()) {
                 throw new IllegalArgumentException("pfad ist Pflicht");
             }
+            if (OHNE_WERTE.contains(pfad)) {
+                alt = null;
+                neu = null;
+            }
+        }
+
+        public boolean ohneWerte() {
+            return OHNE_WERTE.contains(pfad);
         }
     }
 }

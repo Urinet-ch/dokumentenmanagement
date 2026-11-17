@@ -2,6 +2,10 @@ package ch.urinet.archiv.protokoll;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.konfiguration.application.KonfigurationAenderungsProtokoll;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
+import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +14,8 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
+import io.cucumber.java.de.Wenn;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
@@ -22,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +43,12 @@ public class ZugriffProtokollSchritte {
 
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Inject
+    KonfigurationAenderungsProtokoll konfigurationsProtokoll;
+
+    @Inject
+    MandantKontext kontext;
 
     private final Map<String, Long> stand = new HashMap<>();
     private final List<String> fehlerSchemas = new ArrayList<>();
@@ -116,6 +129,42 @@ public class ZugriffProtokollSchritte {
         assertThat(jahre).as("geänderte Aufbewahrungsjahre im Protokoll").isNotNull();
         assertThat(jahre.path("alt").asText()).isEqualTo("10");
         assertThat(jahre.path("neu").asText()).isEqualTo("6");
+    }
+
+    @Wenn("eine synthetische UID- und IBAN-Änderung für «{word}» protokolliert wird")
+    public void kennungenProtokollieren(String mandant) {
+        CompletableFuture.runAsync(() -> kontext.mit(new MandantCode(mandant),
+                () -> QuarkusTransaction.requiringNew().run(() -> konfigurationsProtokoll.schreiben(
+                        7, KonfigurationQuelle.APP, "Synthetische Kennungsprobe", List.of(
+                                new Konfiguration.Aenderung("einstellungen.kennungen.uid",
+                                        "CHE-000.000.001", "CHE-000.000.002"),
+                                new Konfiguration.Aenderung("einstellungen.kennungen.ibans",
+                                        "[CH0000000000000000000]", "[CH0000000000000000001]"),
+                                new Konfiguration.Aenderung("einstellungen.geschaeftsjahrEnde",
+                                        "12-31", "06-30")))))).join();
+    }
+
+    @Dann("enthält der neue Konfigurationseintrag von «{word}» nur Kennungsfeldnamen und «geändert»")
+    public void kennungenVerdeckt(String mandant) throws Exception {
+        var eintraege = eintraegeFuerAktion(mandant, "KONFIGURATION_AENDERN");
+        assertThat(eintraege).hasSize(1);
+        String text = eintraege.getFirst().get("details");
+        assertThat(text).doesNotContain("CHE-000.000.001", "CHE-000.000.002",
+                "CH0000000000000000000", "CH0000000000000000001");
+        JsonNode aenderungen = new ObjectMapper().readTree(text).path("aenderungen");
+        assertThat(aenderungen.size()).isEqualTo(3);
+        for (int i = 0; i < 2; i++) {
+            JsonNode kennung = aenderungen.get(i);
+            assertThat(feldnamen(kennung)).containsExactlyInAnyOrder("pfad", "aenderung");
+            assertThat(kennung.path("pfad").asText())
+                    .isEqualTo("einstellungen.kennungen." + (i == 0 ? "uid" : "ibans"));
+            assertThat(kennung.path("aenderung").asText()).isEqualTo("geändert");
+        }
+        JsonNode anderesFeld = aenderungen.get(2);
+        assertThat(feldnamen(anderesFeld)).containsExactlyInAnyOrder("pfad", "alt", "neu");
+        assertThat(anderesFeld.path("pfad").asText()).isEqualTo("einstellungen.geschaeftsjahrEnde");
+        assertThat(anderesFeld.path("alt").asText()).isEqualTo("12-31");
+        assertThat(anderesFeld.path("neu").asText()).isEqualTo("06-30");
     }
 
     private static List<String> feldnamen(JsonNode knoten) {
