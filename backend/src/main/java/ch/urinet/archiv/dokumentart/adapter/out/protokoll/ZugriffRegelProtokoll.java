@@ -45,7 +45,7 @@ public class ZugriffRegelProtokoll implements RegelProtokollPort {
     private static ProtokollDetails.Regel regel(Dokumentart art) {
         var ab = art.aufbewahrung().ab();
         return new ProtokollDetails.Regel(art.aufbewahrung().jahre(), ab == null ? null : ab.name(),
-                art.gesetzlichePflicht());
+                art.gesetzlichePflicht(), art.aufbewahrung().feld());
     }
 
     private Optional<String> benutzer() {

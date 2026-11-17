@@ -8,14 +8,25 @@ public record DokumentartVorlage(String code, String name, String beschreibung, 
                                  String aufbewahrungAb, boolean gesetzlichePflicht, boolean aktiv,
                                  boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
                                  String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
-                                 String kiHinweise, int reihenfolge) {
+                                 String kiHinweise, int reihenfolge, String aufbewahrungFeld) {
 
     public DokumentartVorlage(String code, String name, String beschreibung, List<String> gruppen,
                               List<String> pflichtfelder, String zusatzSchemaJson, String vertraulichkeit,
                               Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht,
                               boolean aktiv) {
         this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchemaJson, vertraulichkeit, aufbewahrungJahre,
-                aufbewahrungAb, gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0);
+                aufbewahrungAb, gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0, null);
+    }
+
+    public DokumentartVorlage(String code, String name, String beschreibung, List<String> gruppen,
+                              List<String> pflichtfelder, String zusatzSchemaJson, String vertraulichkeit,
+                              Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht,
+                              boolean aktiv, boolean selbstAusgestellt, List<String> belegnummerMuster,
+                              String fremdbelegArt, String ohneZahlungsdatenArt, boolean kiVorschlag,
+                              List<String> kiFelder, String kiHinweise, int reihenfolge) {
+        this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchemaJson, vertraulichkeit, aufbewahrungJahre,
+                aufbewahrungAb, gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
+                ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, null);
     }
 
     public DokumentartVorlage {

@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokumentart.application;
 
 import java.util.Set;
+import java.time.LocalDate;
 
 /**
  * Prüft {@code zusatz_schema} (JSON Schema Draft 2020-12) und Zusatzwerte dagegen (Req 9.5). Fehler ergeben
@@ -23,4 +24,9 @@ public interface ZusatzSchemaPruefer {
 
     /** Prüft die festen Definitionen der reservierten Felder, sofern sie im Schema vorkommen. */
     boolean reservierteFelderGueltig(String schemaJson);
+
+    boolean datumsfeldGueltig(String schemaJson, String feld);
+
+    /** Fehlend, null oder leer ergibt kein Datum; andere ungültige Werte ergeben ZUSATZ_UNGUELTIG. */
+    LocalDate datumswert(String werteJson, String feld);
 }
