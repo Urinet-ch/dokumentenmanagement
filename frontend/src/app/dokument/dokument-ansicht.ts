@@ -15,7 +15,6 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
@@ -36,7 +35,7 @@ const RESERVE_MS = 15_000;
 const AENDERBAR = new Set(['EINGANGSKORB', 'FEHLER', 'ARCHIVIERT']);
 const BREIT = '(min-width: 960px)';
 
-/** Nur http(s) darf in object/Link; die Adresse kommt vom Archiv, die Prüfung schützt trotzdem vor javascript: o. Ä. */
+/** Nur http(s) darf als vorsignierter Link verwendet werden; so werden etwa javascript:-Adressen ausgeschlossen. */
 export function sichereAdresse(url: string | null | undefined): string | null {
   try {
     const adresse = new URL(url ?? '');
@@ -52,7 +51,7 @@ interface Zusatzfeld {
 }
 
 /**
- * Dokumentansicht (Req 14.6): Metadaten, PDF-Vorschau der PDF/A-Fassung und Download über eine vorsignierte Adresse,
+ * Dokumentansicht (Req 14.6): Metadaten, Link zur PDF/A-Fassung und Download über eine vorsignierte Adresse,
  * die beim Öffnen geholt und vom Archiv protokolliert wird; Metadaten bearbeiten mit Grund (A6, Req 10.1) und die
  * gesicherten Fassungen. Das Vorschaubild der ersten Seite ersetzt die PDF-Vorschau auf schmalen Bildschirmen und
  * ohne PDF/A-Fassung.
@@ -66,7 +65,6 @@ interface Zusatzfeld {
 })
 export class DokumentAnsicht {
   private readonly port = inject(DokumentPort);
-  private readonly bereinigen = inject(DomSanitizer);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -76,6 +74,7 @@ export class DokumentAnsicht {
   readonly art = input<string | undefined>();
 
   protected readonly texte = TEXTE.dokument;
+  protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
   protected readonly stati = TEXTE.suche.stati;
   protected readonly datum = datum;
   protected readonly zeitpunkt = zeitpunkt;
@@ -87,15 +86,13 @@ export class DokumentAnsicht {
   protected readonly vorschau = signal<Vorschau>('laedt');
   private readonly pdfa = signal<DownloadAdresse | null>(null);
   protected readonly pdfaUrl = computed(() => sichereAdresse(this.pdfa()?.url));
-  protected readonly pdfaRessource = computed<SafeResourceUrl | null>(() => {
-    const url = this.pdfaUrl();
-    return url ? this.bereinigen.bypassSecurityTrustResourceUrl(url) : null;
-  });
   protected readonly dateiFehler = signal(false);
   /**
    * Zuletzt per Klick geholte Adresse: `window.open` läuft erst nach der Antwort und damit ausserhalb der Klick-Geste;
    * blockiert der Browser das Fenster, bleibt dieser Link als zweite, eigene Geste.
    */
+  private readonly pdfaLaedt = signal(false);
+  protected readonly pdfaHinweis = signal(false);
   private readonly geholt = signal<{ adresse: DownloadAdresse; variante: Variante } | null>(null);
   protected readonly geholtUrl = computed(() => sichereAdresse(this.geholt()?.adresse.url));
 
@@ -127,8 +124,10 @@ export class DokumentAnsicht {
   protected readonly meldung = signal('');
   protected readonly ich = computed(() => this.anmeldung.benutzer()?.id ?? '');
 
-  /** Breiter Bildschirm: PDF im `<object>`; sonst das Vorschaubild, weil Mobilbrowser PDFs oft nicht einbetten. */
-  protected readonly breit = signal(typeof window.matchMedia === 'function' && window.matchMedia(BREIT).matches);
+  /** Auf schmalen Bildschirmen das Vorschaubild statt der PDF-Datei zeigen. */
+  protected readonly breit = signal(
+    typeof window.matchMedia === 'function' && window.matchMedia(BREIT).matches,
+  );
   private readonly bild = signal<{ id: string; url: string } | null>(null);
   protected readonly bildUrl = computed(() => {
     const bild = this.bild();
@@ -152,7 +151,10 @@ export class DokumentAnsicht {
     }
     return Object.entries(z)
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
-      .map(([name, wert]) => ({ name, wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert) }));
+      .map(([name, wert]) => ({
+        name,
+        wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert),
+      }));
   });
 
   private abos = new Subscription();
@@ -216,6 +218,18 @@ export class DokumentAnsicht {
   protected veraltet(meldung: string): void {
     this.oeffnen(this.id());
     this.melden(meldung);
+  }
+
+  protected neuLaden(): void {
+    this.oeffnen(this.id());
+  }
+
+  protected vorschauNeuLaden(): void {
+    const dokument = this.dokument();
+    if (dokument) {
+      this.vorschau.set('laedt');
+      this.vorschauLaden(dokument.id);
+    }
   }
 
   protected wer(sub: string): string {
@@ -316,6 +330,49 @@ export class DokumentAnsicht {
     if (geholt) {
       this.holenUndOeffnen(geholt.variante);
     }
+  }
+
+  /** Die Vorschau-Adresse wird beim Öffnen der Ansicht geholt; ist sie beim Klick abgelaufen, wird vor dem Öffnen eine frische geholt. */
+  protected pdfaKlick(ereignis: MouseEvent): void {
+    const pdfa = this.pdfa();
+    if (pdfa && gueltig(pdfa)) {
+      return;
+    }
+    ereignis.preventDefault();
+    if (this.pdfaLaedt()) {
+      return;
+    }
+    this.dateiFehler.set(false);
+    this.pdfaHinweis.set(false);
+    // Das Fenster wird noch in der Klick-Geste geöffnet (sonst sperren Popup-Blocker, v. a. iOS Safari) und erst nach
+    // der Antwort auf die Adresse gesetzt. Mit `noopener` liefe `window.open` immer `null`; darum ohne und `opener` trennen.
+    const fenster = window.open('', '_blank');
+    if (!fenster) {
+      this.pdfaHinweis.set(true);
+      return;
+    }
+    fenster.opener = null;
+    this.pdfaLaedt.set(true);
+    this.abos.add(
+      this.port.adresse(this.id(), 'pdfa', 'vorschau').subscribe({
+        next: (adresse) => {
+          this.pdfaLaedt.set(false);
+          const url = sichereAdresse(adresse.url);
+          if (!url) {
+            fenster.close();
+            this.dateiFehler.set(true);
+            return;
+          }
+          this.pdfa.set(adresse);
+          fenster.location.href = url;
+        },
+        error: () => {
+          this.pdfaLaedt.set(false);
+          fenster.close();
+          this.dateiFehler.set(true);
+        },
+      }),
+    );
   }
 
   private holenUndOeffnen(variante: Variante): void {

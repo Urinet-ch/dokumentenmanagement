@@ -168,10 +168,13 @@ Then(/^hat die PWA die PDF\/A-Adresse von «(.+)» als JSON angefragt$/, async f
   assert.equal(this.suche.abgelehnt, 0, 'Anfrage ohne Token');
 });
 
-Then('zeigt die Vorschau die vorsignierte Adresse als PDF', async function () {
-  const vorschau = this.seite.locator('object[data-test=vorschau]');
-  assert.equal(await vorschau.getAttribute('type'), 'application/pdf');
-  assert.ok((await vorschau.getAttribute('data')).includes(S3_PFAD), await vorschau.getAttribute('data'));
+Then('zeigt die PDF-Vorschau als sicheren Link', async function () {
+  const link = this.seite.locator('a[data-test=pdf-laden]');
+  const adresse = await link.getAttribute('href');
+  assert.ok(adresse && adresse.includes(S3_PFAD));
+  assert.ok(['http:', 'https:'].includes(new URL(adresse).protocol));
+  assert.equal(await link.getAttribute('target'), '_blank');
+  assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
 });
 
 // Der Knopf holt beim Klick eine eigene Adresse mit ansicht=download (attachment) und öffnet sie in einem neuen Tab;
@@ -184,7 +187,7 @@ Then(/^öffnet «(.+)» die vorsignierte Download-Adresse in einem neuen Tab$/, 
   await this.seite.getByRole('button', { name, exact: true }).click();
   await this.seite.waitForFunction(() => window.__geoeffnet.length > 0);
   const [adresse, ziel, merkmale] = await this.seite.evaluate(() => window.__geoeffnet[0]);
-  assert.ok(adresse.includes(S3_PFAD), adresse);
+  assert.ok(adresse.includes(S3_PFAD));
   assert.equal(ziel, '_blank');
   assert.equal(merkmale, 'noopener,noreferrer');
   const abrufe = this.suche.downloads.map((d) => d.ansicht);
