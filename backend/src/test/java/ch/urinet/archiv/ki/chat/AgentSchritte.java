@@ -355,6 +355,14 @@ public class AgentSchritte {
         assertThat(inhalte).contains(text);
     }
 
+    @Dann("enthält keine Nachricht der Anfrage {int} den Text «{}»")
+    public void nachrichtEnthaeltNicht(int nummer, String text) throws IOException {
+        JsonNode anfrage = JSON.readTree(KiWireMock.chatAnfragen().get(nummer - 1));
+        List<String> inhalte = new ArrayList<>();
+        anfrage.path("messages").forEach(m -> inhalte.add(m.path("content").asText()));
+        assertThat(inhalte).noneMatch(i -> i.contains(text));
+    }
+
     @Dann("hat das simulierte Sprachmodell {int} Anfragen erhalten")
     public void anfragen(int anzahl) {
         assertThat(KiWireMock.chatAnfragen()).hasSize(anzahl);
