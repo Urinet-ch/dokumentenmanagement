@@ -11,6 +11,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung.Neuberechnung;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
@@ -272,7 +273,9 @@ public class DokumentAendern {
         }
         List<String> fehlen = new ArrayList<>();
         for (String feld : art.pflichtfelder()) {
-            if (!vorhanden(feld, neu) && (artGewechselt || vorhanden(feld, alt))) {
+            boolean leeresFristfeldBeimArtwechsel = artGewechselt && art.aufbewahrung().ab() == AufbewahrungAb.FELD
+                    && feld.equals(Dokumentart.ZUSATZ + art.aufbewahrung().feld());
+            if (!leeresFristfeldBeimArtwechsel && !vorhanden(feld, neu) && (artGewechselt || vorhanden(feld, alt))) {
                 fehlen.add(feld);
             }
         }
@@ -331,7 +334,10 @@ public class DokumentAendern {
     private Metadaten fristUndSperre(UUID id, Aenderung a, Metadaten alt, Metadaten neu, Dokumentart art,
                                      boolean artGewechselt, MandantCode mandant) {
         boolean ausloeser = a.hat(Aenderung.DATUM) || artGewechselt || a.hat(Aenderung.GESCHAEFTSJAHR)
-                || a.hat(Aenderung.GUELTIG_BIS);
+                || a.hat(Aenderung.GUELTIG_BIS)
+                || a.hat(Aenderung.ZUSATZ) && art != null && art.aufbewahrung().ab() == AufbewahrungAb.FELD
+                && !java.util.Objects.equals(arten.fristbezug(alt.zusatz()).datum(art.aufbewahrung().feld()),
+                        arten.fristbezug(neu.zusatz()).datum(art.aufbewahrung().feld()));
         if (!ausloeser || art == null) {
             return neu;
         }
@@ -339,7 +345,8 @@ public class DokumentAendern {
         boolean vertrag = art.gruppen().contains(VERTRAG);
         LocalDate gueltigBis = vertrag ? neu.vertrag().map(Vertrag::gueltigBis).orElse(null) : null;
         Aufbewahrung berechnet = Aufbewahrung.berechne(art.aufbewahrung(), neu.datum(), alt.eingang(),
-                neu.geschaeftsjahr(), gueltigBis, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                neu.geschaeftsjahr(), gueltigBis, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(neu.zusatz()));
         boolean altPflicht = alt.art() != null
                 && (artGewechselt ? arten.finden(alt.art()).gesetzlichePflicht() : art.gesetzlichePflicht());
         boolean gesperrt = altPflicht || art.gesetzlichePflicht() || alt.sperreBis() != null;

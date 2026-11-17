@@ -351,7 +351,7 @@ stateDiagram-v2
 
 - `bestaetigen` setzt `bestaetigt`, `bestaetigt_von`, `geschaeftsjahr`, `aufbewahren_bis`, reserviert bei eigenen Arten die Belegnummer und reiht `ARCHIVIEREN` ein, alles in einer Transaktion. Die bestätigten Metadaten bleiben bei `ARCHIVIERUNG_FEHLER` unverändert (Req 6.4, 6.8).
 - Bestätigen eines Dokuments mit `pdfa_fehlt` verlangt `{ohnePdfa: true}` und archiviert nur Original und Arbeitsfassung (Req 5.9).
-- Warnungen im Eingangskorb (Req 8.10): gibt es bei einem Fremdbeleg schon ein nicht verworfenes Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art, liefert `GET /dokumente/{id}` `warnungen: [{code: "BELEGNUMMER_BEKANNT", vorhandenId}]` (ohne ID, wenn unsichtbar); die Bestätigung bleibt erlaubt.
+- Warnungen im Eingangskorb (Req 8.10): gibt es bei einem Fremdbeleg schon ein nicht verworfenes Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art, liefert `GET /dokumente/{id}` `warnungen: [{code: "BELEGNUMMER_BEKANNT", vorhandenId}]` (ohne ID, wenn unsichtbar); die Bestätigung bleibt erlaubt. Zusätzlich `FRISTBEZUG_FEHLT` (ohne `vorhandenId`) bei `aufbewahrung_ab = FELD` und leerem Fristfeld, auch ausserhalb des Eingangskorbs (Spec 05, Req 4.4).
 - Port `DokumentEreignisse` in `dokument/application` (Spec 04 ergänzt, umgesetzt in Spec 04, Aufgabe 14.1; Spec 04, Req 5.1, 15.1): `archiviert(id, art)` meldet der Handler `ARCHIVIEREN` beim Wechsel auf `ARCHIVIERT`, `geaendert(id, felder)` melden `PATCH` (auch A8) und jeder Statuswechsel, jeweils synchron in derselben Transaktion wie der Statuswechsel bzw. die Metadaten-Version. Grund: Asynchron ginge ein Folgeauftrag (z. B. `WISSEN_INGEST`) bei einem Absturz verloren, und andere Fachbereiche erreichen `dokument` nur über `application` (ADR-011).
 
 - Umsetzung 2.2 (Erkenntnisse):
@@ -371,7 +371,7 @@ stateDiagram-v2
   - Benachrichtigung (Req 6.4): `MailInhaberBenachrichtigung` über Quarkus Mailer an `archiv.benachrichtigung.empfaenger.<mandant>`; Betreff und Text nennen nur Dokument-ID und Fehler-ID. Ohne Empfänger oder bei einem Mail-Fehler bleibt es beim Log-Eintrag mit IDs; der Status bleibt `ARCHIVIERUNG_FEHLER`.
   - Verwerfen (A9, `grund` 1–1'000 Zeichen, fehlt → 422 `PFLICHTFELD_FEHLT` mit `felder: ["grund"]`, zu lang → 400): nur aus `EINGANGSKORB` und `FEHLER`, sonst 409 `STATUS_KONFLIKT` ohne Löschen; setzt `VERWORFEN`, spiegelt den Status in `dokument_datei`, gibt eine reservierte Belegnummer frei, schreibt je Datei (Originale, Arbeitsfassungen, PDF/A) einen Eintrag `VERWERFEN` mit SHA-256 und Grund (zusätzlich zum Eintrag des Interceptors) und löscht als letzte Schritte der Transaktion die Vorschaubilder und `eingang/`. Scheitert das Löschen, rollt alles zurück; ein erneuter Aufruf löscht, was noch da ist. Bekannte Grenze (Review PR #57, K1): Scheitert erst der Commit nach dem Löschen (z. B. Verbindungsabbruch zur Datenbank), sind die Dateien unter `eingang/` weg, Status und Protokoll aber zurückgerollt; das Dokument steht dann ohne Dateien im Eingangskorb, bis ein erneuter Aufruf es verwirft (die Einträge `VERWERFEN` nennen die SHA-256 aus der Datenbank). Ein Löschen erst nach dem Commit (eigener Auftrag) schliesst dieses Fenster; offen für eine spätere Aufgabe. Zeilen in `dokument_finanz` und `dokument_vertrag` bleiben.
   - Wiederholen (A10): `FEHLER` → `NEU` mit `VERARBEITEN`, `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` mit `ARCHIVIEREN`, jeweils `fehler` geleert, Metadaten unverändert; sonst 409 `STATUS_KONFLIKT`.
-  - Warnungen (Req 8.10): nur bei Dokumenten in den Status des Eingangskorbs und nur für Arten, die nicht zu `eigene_arten` gehören; `GET /dokumente/{id}` und `GET /eingangskorb` liefern `warnungen`. `vorhandenId` fehlt, wenn das vorhandene Dokument für den Leser unsichtbar ist.
+  - Warnungen (Req 8.10): `BELEGNUMMER_BEKANNT` nur bei Dokumenten in den Status des Eingangskorbs und nur für Arten, die nicht zu `eigene_arten` gehören; `FRISTBEZUG_FEHLT` (Spec 05, Req 4.4) gilt in jedem Status, ein unlesbarer Altwert im Fristfeld zählt beim Lesen als leer; `GET /dokumente/{id}` und `GET /eingangskorb` liefern `warnungen`. `vorhandenId` fehlt, wenn das vorhandene Dokument für den Leser unsichtbar ist.
   - Der Port `DokumentEreignisse` (Spec 04) ist nicht Teil von 3.4 und folgt mit Spec 04, Aufgabe 14.1. `SPERRE_KONFLIKT` und Änderungen nach `ARCHIVIERT` (A6) folgen mit 3.5 (siehe «Umsetzung (Aufgabe 3.5)»).
   - Nachweise: `features/dokument/bestaetigen.feature`, `verwerfen.feature`, `wiederholen.feature`, `features/verarbeitung/archivieren.feature` (Schritte `BestaetigenSchritte`; die Mail prüft das Szenario über Mailpit), JUnit `DokumentBestaetigenTest`, `ArchivierenHandlerTest`.
 
@@ -431,6 +431,7 @@ stateDiagram-v2
   - Geschäftsjahr-Vorschlag: das Geschäftsjahr, in das das Belegdatum fällt, ohne Belegdatum das Eingangsdatum (Europe/Zurich); bezeichnet nach dem Kalenderjahr seines Endes. Beispiel GJ-Ende `06-30`: Beleg 15.08.2026 → GJ 2027.
   - `aufbewahrung_ab = GESCHAEFTSJAHR`: Ende des bestätigten Geschäftsjahres + `aufbewahrung_jahre` (Beleg 2026, GJ-Ende `12-31` → 31.12.2036).
   - `aufbewahrung_ab = GUELTIG_BIS`: `gueltig_bis` + `aufbewahrung_jahre`; ohne `gueltig_bis` unbefristet.
+  - `aufbewahrung_ab = BELEGDATUM` bzw. `FELD`: Belegdatum bzw. Datum aus dem Zusatzfeld `aufbewahrung_feld` + `aufbewahrung_jahre`; fehlt der Wert, unbefristet mit Warnung `FRISTBEZUG_FEHLT` (Spec 05, Req 4.1, 4.4).
   - `aufbewahrung_jahre = null`: unbefristet, `aufbewahren_bis = null`.
   - Ergebnis vor heute: `frist_abgelaufen = true` (Req 9.8).
   - Testfälle: 29.02., GJ-Ende ungleich `12-31`, fehlendes Belegdatum, Vertrag ohne Ende, Änderung der Art.
@@ -1575,7 +1576,7 @@ sicherung_export(id uuid pk, art text, mandant text null fk, sha256 varchar(64),
 dokumentart(code text pk, name text, beschreibung text null,   -- Abgrenzung für den KI-Prompt (2.1)
             gruppen text[], pflichtfelder text[],
             zusatz_schema jsonb, vertraulichkeit text, aufbewahrung_jahre int null,  -- null = unbefristet
-            aufbewahrung_ab text null,   -- GESCHAEFTSJAHR | GUELTIG_BIS; null bei unbefristet
+            aufbewahrung_ab text null,   -- GESCHAEFTSJAHR | GUELTIG_BIS | BELEGDATUM | FELD (Spec 05, Req 4); null bei unbefristet
             gesetzliche_pflicht bool not null,   -- Object Lock nur bei true (Req 6.3, 6.12)
             aktiv bool)
 -- Spec 05 ergänzt (Spec 05, Req 2.1, 4.1; design.md «Data Models», umgesetzt in Spec 05, Aufgaben 17.3 und 17.4):

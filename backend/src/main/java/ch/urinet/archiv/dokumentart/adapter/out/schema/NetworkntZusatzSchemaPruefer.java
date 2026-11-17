@@ -32,6 +32,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -302,6 +304,40 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
                     List.of(), List.of());
         } catch (JsonProcessingException e) {
             return false;
+        }
+    }
+
+    @Override
+    public boolean datumsfeldGueltig(String schemaJson, String feld) {
+        try {
+            JsonNode eigenschaft = StrengesJson.lesen(schemaJson).path("properties").path(feld);
+            return eigenschaft.isObject() && "string".equals(eigenschaft.path("type").asText())
+                    && "date".equals(eigenschaft.path("format").asText());
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
+    }
+
+    @Override
+    public LocalDate datumswert(String werteJson, String feld) {
+        if (werteJson == null) {
+            return null;
+        }
+        try {
+            JsonNode werte = StrengesJson.lesen(werteJson);
+            if (werte == null || !werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            JsonNode wert = werte.path(feld);
+            if (wert.isMissingNode() || wert.isNull() || wert.isTextual() && wert.textValue().isBlank()) {
+                return null;
+            }
+            if (!wert.isTextual()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            return LocalDate.parse(wert.textValue());
+        } catch (JsonProcessingException | DateTimeParseException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
         }
     }
 

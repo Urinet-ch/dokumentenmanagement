@@ -34,6 +34,10 @@ export interface Dokumentart {
      */
     aufbewahrungJahre?: number | null;
     aufbewahrungAb?: Dokumentart.AufbewahrungAbEnum | null;
+    /**
+     * Pflichtiges Zusatzfeld vom Typ string mit format date; nur bei FELD
+     */
+    aufbewahrungFeld?: string | null;
     gesetzlichePflicht: boolean;
     aktiv: boolean;
     selbstAusgestellt: boolean;
@@ -58,6 +62,8 @@ export namespace Dokumentart {
     export const AufbewahrungAbEnum = {
         Geschaeftsjahr: 'GESCHAEFTSJAHR',
         GueltigBis: 'GUELTIG_BIS',
+        Belegdatum: 'BELEGDATUM',
+        Feld: 'FELD',
     } as const;
     export type AufbewahrungAbEnum = typeof AufbewahrungAbEnum[keyof typeof AufbewahrungAbEnum];
 }

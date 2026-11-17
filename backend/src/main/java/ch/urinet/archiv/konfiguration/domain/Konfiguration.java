@@ -58,6 +58,13 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
             artReferenzPruefen(befunde, nachCode, art, art.fremdbelegArt(), "fremdbelegArt");
             artReferenzPruefen(befunde, nachCode, art, art.ohneZahlungsdatenArt(), "ohneZahlungsdatenArt");
+            if ("FELD".equals(art.aufbewahrung().ab())
+                    ? art.aufbewahrung().feld() == null
+                        || !art.pflichtfelder().contains("zusatz." + art.aufbewahrung().feld())
+                    : art.aufbewahrung().feld() != null) {
+                befunde.add(new Befund("arten." + art.code() + ".aufbewahrung.feld", "FRISTFELD_UNGUELTIG",
+                        "Der Fristbezug FELD benötigt ein pflichtiges Zusatzfeld."));
+            }
             wissensquellePruefen(befunde, art);
         }
         Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
@@ -280,6 +287,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             feld(aenderungen, pfad + "aufbewahrung.jahre", alt.aufbewahrung().jahre(),
                     aktuell.aufbewahrung().jahre());
             feld(aenderungen, pfad + "aufbewahrung.ab", alt.aufbewahrung().ab(), aktuell.aufbewahrung().ab());
+            feld(aenderungen, pfad + "aufbewahrung.feld", alt.aufbewahrung().feld(), aktuell.aufbewahrung().feld());
             feld(aenderungen, pfad + "gesetzlichePflicht", alt.gesetzlichePflicht(), aktuell.gesetzlichePflicht());
             feld(aenderungen, pfad + "aktiv", alt.aktiv(), aktuell.aktiv());
             feld(aenderungen, pfad + "selbstAusgestellt", alt.selbstAusgestellt(), aktuell.selbstAusgestellt());
@@ -426,7 +434,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
     }
 
-    public record Aufbewahrung(Integer jahre, String ab) {
+    public record Aufbewahrung(Integer jahre, String ab, String feld) {
+        public Aufbewahrung(Integer jahre, String ab) {
+            this(jahre, ab, null);
+        }
     }
 
     public record Kennungen(String uid, List<String> ibans) {

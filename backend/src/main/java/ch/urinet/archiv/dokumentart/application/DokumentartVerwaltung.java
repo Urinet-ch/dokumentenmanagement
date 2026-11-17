@@ -4,6 +4,7 @@ import ch.urinet.archiv.dokumentart.application.DokumentartAngaben.Feld;
 import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrungsregel;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
+import ch.urinet.archiv.dokumentart.domain.Fristbezug;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
@@ -71,7 +72,7 @@ public class DokumentartVerwaltung {
                 angaben.hat(Feld.PFLICHTFELDER) ? pflichtwert(angaben.pflichtfelder()) : List.of(),
                 angaben.hat(Feld.ZUSATZ_SCHEMA) ? pflichtwert(angaben.zusatzSchema()) : Dokumentart.OHNE_ZUSATZ,
                 vertraulichkeit(angaben.vertraulichkeit()),
-                regel(jahre, ab),
+                regel(jahre, ab, angaben.aufbewahrungFeld()),
                 pflichtwert(angaben.gesetzlichePflicht()),
                 !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()),
                 angaben.hat(Feld.SELBST_AUSGESTELLT) && pflichtwert(angaben.selbstAusgestellt()),
@@ -110,6 +111,8 @@ public class DokumentartVerwaltung {
         Integer jahre = angaben.hat(Feld.AUFBEWAHRUNG_JAHRE) ? angaben.aufbewahrungJahre() : bisher.aufbewahrung().jahre();
         String ab = angaben.hat(Feld.AUFBEWAHRUNG_AB) ? angaben.aufbewahrungAb()
                 : jahre == null ? null : name(bisher.aufbewahrung().ab());
+        String feld = angaben.hat(Feld.AUFBEWAHRUNG_FELD) ? angaben.aufbewahrungFeld()
+                : AufbewahrungAb.FELD.name().equals(ab) ? bisher.aufbewahrung().feld() : null;
         Dokumentart art = new Dokumentart(code,
                 angaben.hat(Feld.NAME) ? angaben.name() : bisher.name(),
                 angaben.hat(Feld.BESCHREIBUNG) ? angaben.beschreibung() : bisher.beschreibung(),
@@ -117,7 +120,7 @@ public class DokumentartVerwaltung {
                 angaben.hat(Feld.PFLICHTFELDER) ? pflichtwert(angaben.pflichtfelder()) : bisher.pflichtfelder(),
                 angaben.hat(Feld.ZUSATZ_SCHEMA) ? pflichtwert(angaben.zusatzSchema()) : bisher.zusatzSchema(),
                 angaben.hat(Feld.VERTRAULICHKEIT) ? vertraulichkeit(angaben.vertraulichkeit()) : bisher.vertraulichkeit(),
-                regel(jahre, ab),
+                regel(jahre, ab, feld),
                 angaben.hat(Feld.GESETZLICHE_PFLICHT) ? pflichtwert(angaben.gesetzlichePflicht())
                         : bisher.gesetzlichePflicht(),
                 angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv(),
@@ -172,11 +175,15 @@ public class DokumentartVerwaltung {
         }
     }
 
-    private static Aufbewahrungsregel regel(Integer jahre, String ab) {
+    public Fristbezug fristbezug(String zusatzJson) {
+        return feld -> schemaPruefer.datumswert(zusatzJson, feld);
+    }
+
+    private static Aufbewahrungsregel regel(Integer jahre, String ab, String feld) {
         if (ab == null) {
-            return new Aufbewahrungsregel(jahre, null);
+            return new Aufbewahrungsregel(jahre, null, feld);
         }
-        return new Aufbewahrungsregel(jahre, AufbewahrungAb.aus(ab).orElseThrow(DokumentartVerwaltung::ungueltig));
+        return new Aufbewahrungsregel(jahre, AufbewahrungAb.aus(ab).orElseThrow(DokumentartVerwaltung::ungueltig), feld);
     }
 
     private static Vertraulichkeit vertraulichkeit(String text) {
