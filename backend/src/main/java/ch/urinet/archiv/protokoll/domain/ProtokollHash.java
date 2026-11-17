@@ -13,6 +13,8 @@ public record ProtokollHash(long anzahl, String sha256) {
 
     public static final String ZUGRIFF_PROTOKOLL = "zugriff_protokoll";
     public static final String DOKUMENT_VERSION = "dokument_version";
+    public static final String WISSENSSEITE_VERSION = "wissensseite_version";
+    public static final String WISSENS_LOG = "wissens_log";
 
     public ProtokollHash {
         if (anzahl < 0) {
