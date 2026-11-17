@@ -2,6 +2,7 @@ package ch.urinet.archiv.integration;
 
 import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.ki.KiWireMock;
+import ch.urinet.archiv.ki.domain.Vektortext;
 import ch.urinet.archiv.ki.application.oeffentlich.OeffentlicheFragenAufraeumen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
@@ -41,6 +42,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -174,6 +178,32 @@ public class OeffentlicherChatSchritte {
                     + "datum = '2071-03-01' where id = ?", z.get("titel"), zusatz.toString(),
                     "-".equals(z.get("text")) ? null : z.get("text"), id);
         }
+    }
+
+    /** Das Embedding-Modell (WireMock) bettet jede Frage als Einheitsvektor {@code e0} ein; die Abschnitte liegen nahe. */
+    @Angenommen("das Embedding-Modell bettet jede Frage des öffentlichen Chatbots gleich ein")
+    public void embeddingBereit() {
+        float[] frage = new float[KiWireMock.DIMENSION];
+        frage[0] = 1f;
+        KiWireMock.client().register(post(urlPathEqualTo("/v1/embeddings")).atPriority(5).willReturn(okJson(
+                "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":"
+                        + Vektortext.text(frage) + "}],\"model\":\"bge_multilingual_gemma2\",\"usage\":{"
+                        + "\"prompt_tokens\":" + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":"
+                        + KiWireMock.TOKENS_JE_TEXT + "}}")));
+    }
+
+    /** Setzt {@code dokument.seiten} und legt einen Abschnitt nahe der Frage mit dem Seitenbereich «von-bis» an. */
+    @Angenommen("das Chatbot-Dokument «{word}» hat {int} Seiten und einen Abschnitt nahe der Frage auf den Seiten «{}»")
+    public void abschnitt(String name, int seiten, String bereich) throws SQLException {
+        Dokument d = dokumente.get(name);
+        ausfuehren("update " + schema(d.mandant()) + ".dokument set seiten = ? where id = ?", seiten, d.id());
+        String[] teile = bereich.split("-");
+        float[] vektor = new float[KiWireMock.DIMENSION];
+        vektor[0] = 1f;
+        vektor[1] = 0.01f;
+        ausfuehren("insert into " + schema(d.mandant()) + ".chunk (dokument_id, nr, text, seite_von, seite_bis, "
+                + "embedding) values (?, 1, ?, ?, ?, ?::public.halfvec)", d.id(), "Abschnitt " + name,
+                Integer.valueOf(teile[0]), Integer.valueOf(teile[1]), Vektortext.text(vektor));
     }
 
     @Angenommen("die Webseite übermittelt bei jeder Frage die IP «{}»")

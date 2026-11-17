@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +30,9 @@ public interface WerkzeugDaten {
 
     /** Die Dokumente unter {@code ids} (Treffer einer Suche unter der Sichtregel), deren Art bestätigt ist. */
     Set<UUID> bestaetigte(Collection<UUID> ids);
+
+    /** {@code dokument.seiten} der Dokumente unter {@code ids}; ohne Eintrag, wo die Seitenzahl fehlt. */
+    Map<UUID, Integer> seiten(Collection<UUID> ids);
 
     /** Anfang des Volltexts eines sichtbaren Dokuments, höchstens {@code zeichen} Zeichen; leer ohne Text. */
     Optional<String> inhalt(UUID id, Sichtregel regel, int zeichen);

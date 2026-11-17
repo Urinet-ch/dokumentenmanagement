@@ -14,6 +14,15 @@ public record Seitentext(List<String> seiten) {
 
     public static final char TRENNER = '\f';
 
+    /**
+     * Die Seite einer Fundstelle nur, wenn sie im Dokument liegt (1 bis {@code seiten} = {@code dokument.seiten}); sonst
+     * zeigte ein Seitenlink auf eine falsche oder fehlende Seite (Spec 03, Req 5.7), und die Fundstelle fehlt. Die eine
+     * Regel für Webseiten-Suche und Chat-Quellen; {@code null} bei unbekannter Seite oder Seitenzahl.
+     */
+    public static Integer plausibel(Integer seite, Integer seiten) {
+        return seite != null && seiten != null && seite >= 1 && seite <= seiten ? seite : null;
+    }
+
     public Seitentext {
         seiten = List.copyOf(seiten);
         if (seiten.isEmpty()) {
