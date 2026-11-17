@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import { BrandingService } from '../gemeinsam/branding.service';
 import { MENUE } from '../gemeinsam/navigation';
 import { ONLINE } from '../gemeinsam/online';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
@@ -10,7 +11,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
   selector: 'app-start',
   imports: [MatButtonModule, RouterLink],
   template: `
-    <h1>{{ texte.appTitel }}</h1>
+    <h1>{{ branding.branding().name }}</h1>
     @if (anmeldung.angemeldet()) {
       @if (funktionen().length > 0) {
         <p>{{ texte.willkommen }}</p>
@@ -53,6 +54,7 @@ import { TEXTE } from '../gemeinsam/texte.de-CH';
 export class Start {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly texte = TEXTE;
+  protected readonly branding = inject(BrandingService);
   /** Ohne Verbindung ist keine Anmeldung möglich; «Erfassen» nimmt dann Aufnahmen in die Warteschlange (Req 4.4). */
   protected readonly online = inject(ONLINE);
   /** Ziel nach der Anmeldung (vom Guard gesetzt). */

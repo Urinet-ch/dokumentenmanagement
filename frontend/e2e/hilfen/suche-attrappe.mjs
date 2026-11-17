@@ -225,6 +225,10 @@ export async function sucheAttrappe(welt) {
     if (anfrage.method() !== 'GET' && !aendern) {
       return route.fallback();
     }
+    if (pfad === '/api/v1/branding') {
+      // Öffentlicher Endpunkt ohne Token: gehört nicht zur Such-API und zählt nicht als abgelehnt.
+      return route.fallback();
+    }
     if ((await anfrage.headerValue('authorization')) !== `Bearer ${welt.keycloak?.accessToken}`) {
       zustand.abgelehnt++;
       return json(route, 401, { status: 401, title: 'Nicht angemeldet' });

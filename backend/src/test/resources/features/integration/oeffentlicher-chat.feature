@@ -78,7 +78,7 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Dann enthält kein Werkzeugergebnis der Anfrage 2 «Probe-Entwurf|Probe-Notiz|Probe-Eingang|Probe-Textwert|Probe-Fremdmandant|Pinguin|Kolibri|Wombat|Flamingo|Axolotl»
     Und sind die Quellen des Chatbots leer
 
-  @req-6.1 @req-3.6
+  @req-6.1 @req-3.6 @req-9.4
   Szenario: Eine gemeldete Stufe über der Stufe des Schlüssels ergibt 403, das Modell wird nie gefragt
     Angenommen das simulierte Sprachmodell antwortet nacheinander:
       | antwort | art  | inhalt | argumente | tokens |
@@ -358,6 +358,33 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Wenn ein anderer Client «berta» im Gespräch des ersten Clients fragt: «Dritte Frage?»
     Dann enthält die Anfrage 3 an das Sprachmodell 2 Nachrichten
     Und endet der Stream des Chatbots mit «quellen» und «fertig»
+
+  @req-6.1 @req-9.4
+  Szenario: Ein öffentlicher Schlüssel erhält aus dem Chat keine höheren Zugriffsstufen
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt           | argumente                    | tokens |
+      | 1       | werkzeug | dokumente_suchen | {"frage":"Seilbahnrevision"} | 100/20 |
+      | 2       | text     | Nur öffentlich.  |                              | 150/30 |
+    Wenn die Webseite mit dem Schlüssel «oeffentlich» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Was gibt es zur Seilbahnrevision?»
+    Dann enthält ein Werkzeugergebnis der Anfrage 2 «Probe-Bulletin Seilbahnrevision»
+    Und enthält kein Werkzeugergebnis der Anfrage 2 «Probe-Merkblatt|Probe-Protokoll|Probe-Fremdmandant»
+    Und nennen die Quellen des Chatbots genau die Dokumente «A»
+
+  @req-6.1 @req-1.4 @req-9.1
+  Szenario: Die Gesprächs-ID eines anderen Mandanten beginnt ein neues Gespräch
+    Angenommen der Chatbot-Schlüssel «vhf» der Webseite «probe-chat» im Mandanten «vhf-gsk» hat die höchste Stufe «oeffentlich»
+    Und das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt           | argumente                    | tokens |
+      | 1       | werkzeug | dokumente_suchen | {"frage":"Seilbahnrevision"} | 100/20 |
+      | 2       | text     | Antwort Urinet.  |                              | 150/30 |
+      | 3       | werkzeug | dokumente_suchen | {"frage":"Seilbahnrevision"} | 100/20 |
+      | 4       | text     | Antwort VHF.     |                              | 150/30 |
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Erste Mandantenfrage zur Seilbahnrevision?»
+    Und die Webseite mit dem Schlüssel «vhf» eines anderen Mandanten im selben Gespräch fragt: «Zweite Mandantenfrage zur Seilbahnrevision?»
+    Dann enthält die Anfrage 3 an das Sprachmodell 2 Nachrichten
+    Und enthält keine Nachricht der Anfrage 3 den Text «Erste Mandantenfrage zur Seilbahnrevision?»
+    Und endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und nennen die Quellen des Chatbots genau die Dokumente «V»
 
   @req-6.1
   Szenario: Ein Stufenwechsel beginnt ein neues Gespräch, der Verlauf der höheren Stufe geht nie an das Modell der niedrigeren
