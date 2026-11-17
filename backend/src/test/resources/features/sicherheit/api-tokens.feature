@@ -72,6 +72,8 @@ Funktionalität: API-Tokens für Skripte
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Wenn «inhaber-urinet» den Ablauf des Tokens «vorhanden» auf «gestern» setzt
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» den Ablauf des Tokens «vorhanden» ohne Datum setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 422 und Fehlercode «PFLICHTFELD_FEHLT»
 
   @req-2.5
   Szenario: Inhaber kann Ablauf über REST setzen und entfernen

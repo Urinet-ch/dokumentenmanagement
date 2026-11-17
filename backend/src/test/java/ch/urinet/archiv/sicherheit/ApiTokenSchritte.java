@@ -211,6 +211,14 @@ public class ApiTokenSchritte {
                 .when().put(VERWALTUNG + "/" + id + "/gueltig-bis");
     }
 
+    @Wenn("«{word}» den Ablauf des Tokens «{word}» ohne Datum setzt")
+    public void ablaufOhneDatumSetzen(String benutzer, String name) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of())
+                .when().put(VERWALTUNG + "/" + id + "/gueltig-bis");
+    }
+
     @Wenn("«{word}» den Ablauf des Tokens «{word}» entfernt")
     public void ablaufEntfernen(String benutzer, String name) {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
@@ -373,7 +381,9 @@ public class ApiTokenSchritte {
         List<Map<String, String>> eintraege = abfragen("select aktion, details from " + schema(mandant)
                 + ".zugriff_protokoll where id > " + stand.get(mandant) + " and aktion = 'AENDERN'");
         assertThat(eintraege).hasSize(2);
+        String verwaltet = ApiToken.lesen(tokens.get("verwaltet")).orElseThrow().id();
         for (Map<String, String> eintrag : eintraege) {
+            assertThat(eintrag.get("details")).as("Details nennen das geänderte Token").contains(verwaltet);
             for (String token : tokens.values()) {
                 if (eintrag.get("details") != null) {
                     assertThat(eintrag.get("details"))
