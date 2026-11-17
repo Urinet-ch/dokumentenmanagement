@@ -29,7 +29,15 @@ import {
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { ZusatzFeld, zusatzFelder as schemaZusatzFelder, zusatzGueltig } from '../dokument/aenderung';
+import {
+  ZusatzFeld,
+  istListe,
+  listeAus,
+  listeZu,
+  zusatzFelder as schemaZusatzFelder,
+  zusatzGueltig,
+} from '../dokument/aenderung';
+import { Listenfeld } from '../dokument/listenfeld';
 import {
   AktionFehler,
   Entwurf,
@@ -59,7 +67,7 @@ const IM_FORMULAR: Record<string, string> = {
 /** Ein Dokument im Eingangskorb mit Vorschau, Vorschlag und den Aktionen nach Rechtematrix (Req 8.1, 8.5, 8.7). */
 @Component({
   selector: 'app-eingangskorb-karte',
-  imports: [MatButtonModule, RouterLink, TitelAnzeige],
+  imports: [MatButtonModule, RouterLink, TitelAnzeige, Listenfeld],
   templateUrl: './eingangskorb-karte.html',
   styleUrl: './eingangskorb-karte.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -129,6 +137,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly zusatzFelder = computed(() =>
     schemaZusatzFelder(this.art()).filter((feld) => feld.name !== 'veroeffentlicht'),
   );
+  protected readonly istListe = istListe;
   protected readonly zugriffOptionen = ['oeffentlich', 'mitglieder', 'vorstand'];
   protected readonly artenWahl = computed(() =>
     [...this.arten().values()].filter((a) => a.aktiv || a.code === this.entwurf().art),
@@ -144,8 +153,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   });
   protected readonly zusatzFehlt = computed(() => {
     const werte = this.zusatzEingaben();
-    return (this.art()?.pflichtfelder ?? [])
-      .filter((f) => f.startsWith('zusatz.'))
+    // Auch Pflicht nur über `required` im Schema (Seed vhf-gsk) zählt.
+    const ausSchema = this.zusatzFelder().filter((f) => f.pflicht).map((f) => `zusatz.${f.name}`);
+    const pflicht = new Set([...(this.art()?.pflichtfelder ?? []).filter((f) => f.startsWith('zusatz.')), ...ausSchema]);
+    return [...pflicht]
       .filter((f) => {
         const name = f.substring('zusatz.'.length);
         const wert = werte[name];
@@ -316,7 +327,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       fachgebiet: 'Fachgebiet',
       zugriff: 'Zugriffsstufe',
     };
-    return namen[feld.name] ?? this.texte.zusatzFeld(feld.name);
+    return namen[feld.name] ?? this.texte.feld[feld.name] ?? this.texte.zusatzFeld(feld.name);
   }
 
   protected zusatzOption(feld: ZusatzFeld, wert: string): string {
@@ -479,7 +490,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     const werte = Object.fromEntries(
       Object.entries(vorhandene).map(([name, wert]) => [
         name,
-        typeof wert === 'string' || typeof wert === 'number' || typeof wert === 'boolean' ? String(wert) : '',
+        typeof wert === 'string' || typeof wert === 'number' || typeof wert === 'boolean'
+          ? String(wert)
+          : Array.isArray(wert) && wert.every((e) => typeof e === 'string')
+            ? listeZu(wert)
+            : '',
       ]),
     );
     for (const feld of schemaZusatzFelder(this.art())) {
@@ -490,7 +505,12 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         const wert =
           standard ??
           (feld.name === 'zugriff' ? 'mitglieder' : feld.name === 'veroeffentlicht' ? false : '');
-        werte[feld.name] = wert === null || wert === undefined ? '' : String(wert);
+        werte[feld.name] =
+          wert === null || wert === undefined
+            ? ''
+            : Array.isArray(wert)
+              ? listeZu(wert.map(String))
+              : String(wert);
     }
     return werte;
   }
@@ -529,6 +549,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
           break;
         case 'janein':
           body[feld.name] = roh === 'true';
+          break;
+        case 'mehrfach':
+        case 'liste':
+          body[feld.name] = listeAus(roh);
           break;
         default:
           body[feld.name] = roh;

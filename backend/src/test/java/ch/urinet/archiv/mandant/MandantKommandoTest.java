@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ArchivMain;
+import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
@@ -8,6 +9,8 @@ import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,5 +78,45 @@ class MandantKommandoTest {
     void embeddingFalscheOption(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains(EmbeddingKommando.AUFRUF);
         assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
+    }
+
+    @Test
+    void vollexportAufrufUndDownloadWerdenVorDemStartGeprueft() {
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk", "--download",
+                "bc9b7ac8-0ddd-4ab8-9850-27a7f598f0d7"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("export", ""))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk", "--download", "ungueltig"))).isFalse();
+    }
+
+    @Test
+    void abbauIstStandardmaessigTrockenlaufUndVerlangtExpliziteBestaetigung() {
+        String exportId = "bc9b7ac8-0ddd-4ab8-9850-27a7f598f0d7";
+        assertThat(MandantKommando.abbauLesen(List.of("abbauen", "vhf-gsk", "--nach-export", exportId)))
+                .hasValueSatisfying(aufruf -> {
+                    assertThat(aufruf.ausfuehren()).isFalse();
+                    assertThat(aufruf.bestaetigtUrinet()).isFalse();
+                });
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "urinet", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "fabian", "--grund", "Kundenende", "--bestaetigt-urinet"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "fabian"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "", "--grund", "x"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "a", "--wer", "b", "--grund", "x"))).isFalse();
+        assertThat(MandantKommando.abbauLesen(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "fabian", "--grund", "Kundenende")))
+                .hasValueSatisfying(a -> assertThat(a.anlass()).hasValueSatisfying(l -> {
+                    assertThat(l.wer()).isEqualTo("fabian");
+                    assertThat(l.grund()).isEqualTo("Kundenende");
+                }));
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--dry-run", "--wer", "a", "--grund", "b"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", ""))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--bestaetigt-urinet"))).isFalse();
     }
 }

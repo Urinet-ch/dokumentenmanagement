@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of, Subject, throwError } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
 import { ApiToken, APITokensService } from '../../gemeinsam/api';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { ApiTokens } from './api-tokens';
@@ -24,8 +24,11 @@ describe('API-Token-Übersicht', () => {
     apiV1ApiTokensTokenIdGueltigBisDelete: vi.fn(),
   };
 
-  async function starten(tokens: ApiToken[] = [TOKEN]) {
-    service.apiV1ApiTokensGet.mockReset().mockReturnValue(of(tokens));
+  async function starten(
+    tokens: ApiToken[] = [TOKEN],
+    antwort: Observable<ApiToken[]> = of(tokens),
+  ) {
+    service.apiV1ApiTokensGet.mockReset().mockReturnValue(antwort);
     service.apiV1ApiTokensTokenIdDelete.mockReset().mockReturnValue(of(undefined));
     service.apiV1ApiTokensTokenIdGueltigBisPut.mockReset().mockReturnValue(of(undefined));
     service.apiV1ApiTokensTokenIdGueltigBisDelete.mockReset().mockReturnValue(of(undefined));
@@ -108,6 +111,23 @@ describe('API-Token-Übersicht', () => {
 
     expect(service.apiV1ApiTokensTokenIdGueltigBisDelete).toHaveBeenCalledExactlyOnceWith(TOKEN.id);
     expect(element.textContent).toContain(TEXTE.apiTokens.ablaufEntfernt);
+  });
+
+  it('ermöglicht erneutes Laden nach einem Serverfehler', async () => {
+    await starten(
+      [TOKEN],
+      throwError(() => new HttpErrorResponse({ status: 503 })),
+    );
+
+    expect(element.querySelector('[role=alert]')?.textContent).toBe(TEXTE.apiTokens.fehlerLaden);
+    service.apiV1ApiTokensGet.mockReturnValue(of([TOKEN]));
+    element.querySelector<HTMLButtonElement>('[data-test=erneut-laden]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[data-test=erneut-laden]')).toBeNull();
+    expect(element.querySelector('[data-test=token]')).not.toBeNull();
+    expect(service.apiV1ApiTokensGet).toHaveBeenCalledTimes(2);
   });
 
   it('widerruft erst nach Bestätigung und lädt die Liste neu', async () => {

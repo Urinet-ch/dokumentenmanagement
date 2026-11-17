@@ -64,7 +64,9 @@ export async function archivAttrappe(welt) {
       url.pathname === '/api/v1/kontakte' ||
       /^\/api\/v1\/dokumente\/[^/]+\/(vorschau|bestaetigen|verwerfen|wiederholen)$/.test(
         url.pathname,
-      ));
+      ) ||
+      // Zusatzangaben ändern (PATCH) vor dem Bestätigen, wenn die Art Zusatzfelder hat
+      /^\/api\/v1\/dokumente\/[^/]+$/.test(url.pathname));
 
   await welt.seite.route(zustaendig, async (route) => {
     const anfrage = route.request();
@@ -94,6 +96,24 @@ export async function archivAttrappe(welt) {
     const dokument = archiv.eintraege.find((d) => d.id === id);
     if (!dokument) {
       return json(route, 404, { fehlercode: 'NICHT_GEFUNDEN' });
+    }
+    if (aktion === undefined) {
+      if (anfrage.method() !== 'PATCH') {
+        return json(route, 405, { fehlercode: 'ANFRAGE_UNGUELTIG' });
+      }
+      // Wie das Archiv: Merge der gesendeten Felder, neue Version; der Body wird für die Szenarien festgehalten.
+      const body = anfrage.postDataJSON();
+      archiv.aktionen.push({
+        aktion: 'aendern',
+        id,
+        titel: dokument.titel,
+        dateiname: dokument.dateiname,
+        ifMatch: await anfrage.headerValue('if-match'),
+        body,
+        abgelehnt: false,
+      });
+      Object.assign(dokument, body, { version: dokument.version + 1 });
+      return json(route, 200, dokument);
     }
     if (aktion === 'vorschau') {
       return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });

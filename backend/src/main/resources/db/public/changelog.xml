@@ -17,5 +17,6 @@
     <include file="changesets/010-webseiten-schluessel.xml" relativeToChangelogFile="true"/>
     <include file="changesets/011-sicherung-export.xml" relativeToChangelogFile="true"/>
     <include file="changesets/012-mandant-budget.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/013-mandant-abbau.xml" relativeToChangelogFile="true"/>
     <include file="changesets/037-api-token-gueltig-bis.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -7,6 +7,10 @@
 @if (tokens() === null) {
   @if (!fehler()) {
     <p>{{ texte.laden }}</p>
+  } @else {
+    <button mat-button type="button" data-test="erneut-laden" (click)="laden()">
+      {{ neuLaden }}
+    </button>
   }
 } @else if (tokens()!.length === 0) {
   <p role="status">{{ texte.keine }}</p>

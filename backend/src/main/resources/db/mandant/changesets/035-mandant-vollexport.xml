@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="035-mandant-vollexport" author="archiv">
+        <sql>
+            create table mandant_vollexport (
+                id uuid not null constraint mandant_vollexport_pk primary key,
+                status text not null constraint mandant_vollexport_status_ck
+                    check (status in ('OFFEN', 'FERTIG', 'FEHLER')),
+                s3_schluessel text,
+                s3_version text,
+                sha256 text constraint mandant_vollexport_sha256_ck check (sha256 ~ '^[0-9a-f]{64}$'),
+                groesse bigint constraint mandant_vollexport_groesse_ck check (groesse &gt;= 0),
+                anzahl int constraint mandant_vollexport_anzahl_ck check (anzahl &gt;= 0),
+                erstellt timestamptz not null default clock_timestamp(),
+                fertig timestamptz,
+                fehler_id uuid,
+                constraint mandant_vollexport_fertig_ck check ((status = 'FERTIG') =
+                    (fertig is not null and sha256 is not null and s3_schluessel is not null
+                        and s3_version is not null and anzahl is not null))
+            );
+            create index mandant_vollexport_erstellt_ix on mandant_vollexport (erstellt desc);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

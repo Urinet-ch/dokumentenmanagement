@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 /** Zeile in {@code public.mandant}; nur die Spalten, die das Register heute braucht (Hibernate prüft mit validate). */
 @Entity
@@ -34,4 +35,19 @@ public class MandantEintrag extends PanacheEntityBase {
 
     @Column(name = "erstellt", nullable = false, insertable = false, updatable = false)
     public OffsetDateTime erstellt;
+
+    @Column(name = "deaktiviert_am")
+    public OffsetDateTime deaktiviertAm;
+
+    @Column(name = "vollexport_bestaetigt")
+    public UUID vollexportBestaetigt;
+
+    @Column(name = "abbau_wer")
+    public String abbauWer;
+
+    @Column(name = "abbau_grund")
+    public String abbauGrund;
+
+    @Column(name = "abbau_abgeschlossen", nullable = false)
+    public boolean abbauAbgeschlossen;
 }

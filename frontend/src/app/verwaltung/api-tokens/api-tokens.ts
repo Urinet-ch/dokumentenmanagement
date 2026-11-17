@@ -26,6 +26,7 @@ export class ApiTokens implements OnInit {
   private readonly apiTokens = inject(APITokensService);
 
   protected readonly texte = TEXTE.apiTokens;
+  protected readonly neuLaden = TEXTE.eingangskorb.neuLaden;
   protected readonly zeitpunkt = zeitpunkt;
   protected readonly scopeText = scopeText;
   protected readonly tokenStatus = tokenStatus;

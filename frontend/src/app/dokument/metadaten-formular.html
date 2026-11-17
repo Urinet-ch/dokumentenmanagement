@@ -206,6 +206,17 @@
     <fieldset class="raster" data-test="zusatz">
       <legend>{{ texte.zusatz }}</legend>
       @for (z of zusatz(); track z.name) {
+        @if (istListe(z)) {
+          <app-listenfeld
+            class="breit"
+            [feld]="z"
+            [kennung]="'bearbeiten-zusatz-' + z.name"
+            [beschriftung]="beschriftung(z.name)"
+            [wert]="f.zusatz[z.name] ?? ''"
+            [ungueltig]="ungueltig('zusatz.' + z.name)"
+            (geaendert)="setzeZusatz(z.name, $event)"
+          />
+        } @else {
         <div class="feld">
           <label [for]="'bearbeiten-zusatz-' + z.name"
             >{{ beschriftung(z.name) }}
@@ -254,6 +265,7 @@
             }
           }
         </div>
+        }
       }
     </fieldset>
   }
