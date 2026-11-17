@@ -32,8 +32,13 @@ public record Branding(String name, String logoUrl, String primaerfarbe, String 
         if (wert == null || wert.isBlank() || wert.length() > 253) {
             return Optional.empty();
         }
+        // Ein einzelner abschliessender Punkt (FQDN-Schreibweise) bezeichnet denselben Host.
+        String name = wert.endsWith(".") ? wert.substring(0, wert.length() - 1) : wert;
+        if (name.isEmpty()) {
+            return Optional.empty();
+        }
         try {
-            String ascii = IDN.toASCII(wert, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
+            String ascii = IDN.toASCII(name, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
             return HOST.matcher(ascii).matches() ? Optional.of(ascii) : Optional.empty();
         } catch (IllegalArgumentException e) {
             return Optional.empty();

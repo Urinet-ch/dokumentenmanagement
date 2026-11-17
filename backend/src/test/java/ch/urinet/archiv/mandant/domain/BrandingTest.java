@@ -1,6 +1,10 @@
 package ch.urinet.archiv.mandant.domain;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,5 +56,43 @@ class BrandingTest {
                 .isNull();
         assertThat(Branding.ausKonfiguration("VHF/GSK", "//fremd.example/l.png", "#eeb111", "de-CH").logoUrl())
                 .isNull();
+    }
+
+    private static final String PNG = Base64.getEncoder().encodeToString(
+            new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0});
+
+    @Test
+    void gueltigeDatenUriWirdUebernommen() {
+        String uri = "data:image/png;base64," + PNG;
+        assertThat(Branding.ausKonfiguration("VHF/GSK", uri, "#eeb111", "de-CH").logoUrl()).isEqualTo(uri);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "data:image/png;base64,AAAAAAAAAAAA",
+            "data:image/png;base64,%%%",
+            "data:image/png;base64,PNG*"})
+    void ungueltigeDatenUriWirdAbgelehnt(String uri) {
+        assertThat(Branding.ausKonfiguration("VHF/GSK", uri, "#eeb111", "de-CH").logoUrl()).isNull();
+    }
+
+    @Test
+    void zuGrosseDatenUriWirdAbgelehnt() {
+        byte[] gross = new byte[100_001];
+        gross[0] = (byte) 0x89;
+        gross[1] = 'P';
+        gross[2] = 'N';
+        gross[3] = 'G';
+        String uri = "data:image/png;base64," + Base64.getEncoder().encodeToString(gross);
+        assertThat(Branding.ausKonfiguration("VHF/GSK", uri, "#eeb111", "de-CH").logoUrl()).isNull();
+        String ueberlang = "data:image/png;base64," + "A".repeat(140_000);
+        assertThat(Branding.ausKonfiguration("VHF/GSK", ueberlang, "#eeb111", "de-CH").logoUrl()).isNull();
+    }
+
+    @Test
+    void abschliessenderPunktWirdEntfernt() {
+        assertThat(Branding.domain("archiv.apps.urinet.ch.")).contains("archiv.apps.urinet.ch");
+        assertThat(Branding.domain(".")).isEmpty();
+        assertThat(Branding.domain("a..")).isEmpty();
     }
 }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { DOCUMENT } from '@angular/common';
 import { inject, Injectable, signal } from '@angular/core';
-import { catchError, map, of } from 'rxjs';
+import { catchError, map, of, tap } from 'rxjs';
 
 export interface Branding {
   name: string;
@@ -81,6 +81,8 @@ export function textfarbe(farbe: string): string {
   return kontrast(farbe, TEXT_DUNKEL) >= kontrast(farbe, TEXT_HELL) ? TEXT_DUNKEL : TEXT_HELL;
 }
 
+const SPEICHER = 'archiv.branding.';
+
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
   readonly branding = signal(STANDARD_BRANDING);
@@ -94,7 +96,8 @@ export class BrandingService {
       .get<Partial<Branding>>('/api/v1/branding', { params: { domain } })
       .pipe(
         map(sicher),
-        catchError(() => of(STANDARD_BRANDING)),
+        tap((branding) => this.merken(domain, branding)),
+        catchError(() => of(this.gemerkt(domain) ?? STANDARD_BRANDING)),
       )
       .subscribe((branding) => {
         this.branding.set(branding);
@@ -102,5 +105,23 @@ export class BrandingService {
         this.dokument.documentElement.style.setProperty('--brand-text', textfarbe(branding.primaerfarbe));
         this.dokument.documentElement.lang = branding.sprache;
       });
+  }
+
+  /** Letzte gültige Antwort: Offline-Kaltstart der PWA behält so das Branding des Mandanten. */
+  private merken(domain: string, branding: Branding): void {
+    try {
+      this.dokument.defaultView?.localStorage.setItem(SPEICHER + domain, JSON.stringify(branding));
+    } catch {
+      // Speicher gesperrt oder voll: neutraler Fallback genügt.
+    }
+  }
+
+  private gemerkt(domain: string): Branding | null {
+    try {
+      const roh = this.dokument.defaultView?.localStorage.getItem(SPEICHER + domain);
+      return roh ? sicher(JSON.parse(roh) as Partial<Branding>) : null;
+    } catch {
+      return null;
+    }
   }
 }

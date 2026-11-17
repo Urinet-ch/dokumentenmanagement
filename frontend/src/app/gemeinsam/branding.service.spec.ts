@@ -9,6 +9,7 @@ describe('BrandingService', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     service = TestBed.inject(BrandingService);
     http = TestBed.inject(HttpTestingController);
@@ -59,6 +60,34 @@ describe('BrandingService', () => {
   it('verwendet bei Offline-Fehler das Standard-Branding', () => {
     http.expectOne('/api/v1/branding?domain=localhost').error(new ProgressEvent('network error'));
     expect(service.branding()).toEqual(STANDARD_BRANDING);
+  });
+
+  it('nutzt offline die zuletzt gültige Antwort, nicht das Standard-Branding', () => {
+    const domain = TestBed.inject(DOCUMENT).defaultView!.location.hostname;
+    http
+      .expectOne(`/api/v1/branding?domain=${domain}`)
+      .flush({ name: 'VHF/GSK Archiv', logoUrl: null, primaerfarbe: '#1a2b5c', sprache: 'de-CH' });
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const neu = TestBed.inject(BrandingService);
+    TestBed.inject(HttpTestingController)
+      .expectOne(`/api/v1/branding?domain=${domain}`)
+      .error(new ProgressEvent('network error'));
+    expect(neu.branding().name).toBe('VHF/GSK Archiv');
+    expect(neu.branding().primaerfarbe).toBe('#1a2b5c');
+  });
+
+  it('ignoriert eine manipulierte gemerkte Antwort', () => {
+    http.expectOne('/api/v1/branding?domain=localhost').error(new ProgressEvent('network error'));
+    localStorage.setItem('archiv.branding.localhost', JSON.stringify({ name: '<b>x', primaerfarbe: 'url(x)' }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const neu = TestBed.inject(BrandingService);
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/v1/branding?domain=localhost')
+      .error(new ProgressEvent('network error'));
+    expect(neu.branding().primaerfarbe).toBe('#eeb111');
   });
 
   it.each(['https://fremd.example/l.png', '//fremd.example/l.png', '/logos/l.png?x=1', '/logos/l.svg'])(
