@@ -8,6 +8,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -124,7 +125,8 @@ public class DokumentBestaetigen {
                 : Aufbewahrung.geschaeftsjahrVorschlagen(b.datum(), stand.eingang(), gjEnde);
         boolean vertrag = art.gruppen().contains("vertrag");
         Aufbewahrung aufbewahrung = Aufbewahrung.berechne(art.aufbewahrung(), b.datum(), stand.eingang(),
-                geschaeftsjahr, vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                geschaeftsjahr, vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(dokument.zusatz()));
         if (aufbewahrung.fristAbgelaufen() && !b.fristAbgelaufenAkzeptiert()) {
             frist.markieren(id);
             throw new FachFehler(Fehlercode.FRIST_ABGELAUFEN);
@@ -179,7 +181,11 @@ public class DokumentBestaetigen {
 
     /** Req 8.3: alle fehlenden Pflichtfelder der Art, in der Reihenfolge der Art; nur Namen, nie Werte. */
     static void pflichtfelderPruefen(Dokumentart art, Bestaetigung b, Stand stand) {
-        List<String> fehlen = fehlendePflichtfelder(art, b, stand.zusatzFelder());
+        List<String> fehlen = new ArrayList<>(fehlendePflichtfelder(art, b, stand.zusatzFelder()));
+        if (art.aufbewahrung().ab() == AufbewahrungAb.FELD) {
+            // Bestand und Artwechsel bleiben mit Warnung unbefristet (Spec 05, Req 4.4).
+            fehlen.remove(Dokumentart.ZUSATZ + art.aufbewahrung().feld());
+        }
         if (!fehlen.isEmpty()) {
             throw new PflichtfelderFehlen(fehlen);
         }

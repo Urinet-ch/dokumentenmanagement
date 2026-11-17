@@ -35,7 +35,7 @@
         <icu4j.version>79.1</icu4j.version>
         <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11): dieselbe Version wie im Golden-Lauf (spikes/golden-lauf) -->
         <zxing.version>3.5.4</zxing.version>
-        <wiremock.version>3.13.0</wiremock.version>
+        <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
     </properties>
 

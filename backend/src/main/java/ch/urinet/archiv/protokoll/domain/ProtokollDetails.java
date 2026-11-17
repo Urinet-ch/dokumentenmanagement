@@ -119,11 +119,19 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
      * Aufbewahrungsregel einer Dokumentart: Jahre und «ab» (beide {@code null} heisst unbefristet) sowie die
      * gesetzliche Pflicht, die über die Sperre entscheidet. Nur Werte der Regel, keine Werte eines Dokuments.
      */
-    public record Regel(Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht) {
+    public record Regel(Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht,
+                        String aufbewahrungFeld) {
+
+        public Regel(Integer aufbewahrungJahre, String aufbewahrungAb, boolean gesetzlichePflicht) {
+            this(aufbewahrungJahre, aufbewahrungAb, gesetzlichePflicht, null);
+        }
 
         public Regel {
             if (aufbewahrungAb != null && !CODE.matcher(aufbewahrungAb).matches()) {
                 throw new IllegalArgumentException("aufbewahrungAb ist kein Code");
+            }
+            if (aufbewahrungFeld != null && !aufbewahrungFeld.matches("[a-z][a-z0-9_]{0,62}")) {
+                throw new IllegalArgumentException("aufbewahrungFeld ist kein Feldname");
             }
         }
     }

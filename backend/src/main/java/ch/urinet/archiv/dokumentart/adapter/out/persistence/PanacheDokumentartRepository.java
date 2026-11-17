@@ -60,6 +60,7 @@ public class PanacheDokumentartRepository implements DokumentartRepository {
         eintrag.vertraulichkeit = art.vertraulichkeit().name();
         eintrag.aufbewahrungJahre = art.aufbewahrung().jahre();
         eintrag.aufbewahrungAb = art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name();
+        eintrag.aufbewahrungFeld = art.aufbewahrung().feld();
         eintrag.gesetzlichePflicht = art.gesetzlichePflicht();
         eintrag.aktiv = art.aktiv();
         eintrag.selbstAusgestellt = art.selbstAusgestellt();
@@ -86,7 +87,7 @@ public class PanacheDokumentartRepository implements DokumentartRepository {
                 e.zusatzSchema == null ? Dokumentart.OHNE_ZUSATZ : e.zusatzSchema,
                 Vertraulichkeit.valueOf(e.vertraulichkeit),
                 new Aufbewahrungsregel(e.aufbewahrungJahre,
-                        e.aufbewahrungAb == null ? null : AufbewahrungAb.valueOf(e.aufbewahrungAb)),
+                        e.aufbewahrungAb == null ? null : AufbewahrungAb.valueOf(e.aufbewahrungAb), e.aufbewahrungFeld),
                 e.gesetzlichePflicht, e.aktiv, e.selbstAusgestellt, liste(e.belegnummerMuster),
                 e.fremdbelegArt, e.ohneZahlungsdatenArt, e.kiVorschlag, liste(e.kiFelder), e.kiHinweise, e.reihenfolge);
     }

@@ -478,7 +478,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Warnung"
-          description: "Nur im Eingangskorb, sonst leer (Req 8.10)"
+          description: "Belegnummer-Warnungen im Eingangskorb; fehlender Fristbezug\
+            \ auch nach Bestätigung oder Artwechsel (Spec 05, Req 4.4)"
         fehler:
           type:
           - string
@@ -840,6 +841,14 @@ components:
           enum:
           - GESCHAEFTSJAHR
           - GUELTIG_BIS
+          - BELEGDATUM
+          - FELD
+        aufbewahrungFeld:
+          type:
+          - string
+          - "null"
+          description: Pflichtiges Zusatzfeld vom Typ string mit format date; nur
+            bei FELD
         gesetzlichePflicht:
           type: boolean
         aktiv:
@@ -918,6 +927,12 @@ components:
           enum:
           - GESCHAEFTSJAHR
           - GUELTIG_BIS
+          - BELEGDATUM
+          - FELD
+        aufbewahrungFeld:
+          type:
+          - string
+          - "null"
         gesetzlichePflicht:
           type: boolean
         aktiv:
@@ -2308,6 +2323,7 @@ components:
           type: string
           enum:
           - BELEGNUMMER_BEKANNT
+          - FRISTBEZUG_FEHLT
         vorhandenId:
           description: "Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist"
           type:

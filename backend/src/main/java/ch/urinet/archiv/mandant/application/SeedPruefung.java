@@ -43,7 +43,7 @@ public class SeedPruefung {
     static Dokumentart art(DokumentartVorlage v) {
         AufbewahrungAb ab = v.aufbewahrungAb() == null ? null
                 : AufbewahrungAb.aus(v.aufbewahrungAb()).orElseThrow(SeedPruefung::ungueltig);
-        Aufbewahrungsregel regel = new Aufbewahrungsregel(v.aufbewahrungJahre(), ab);
+        Aufbewahrungsregel regel = new Aufbewahrungsregel(v.aufbewahrungJahre(), ab, v.aufbewahrungFeld());
         return new Dokumentart(v.code(), v.name(), v.beschreibung(), v.gruppen(), v.pflichtfelder(),
                 v.zusatzSchemaJson() == null ? Dokumentart.OHNE_ZUSATZ : v.zusatzSchemaJson(),
                 Vertraulichkeit.aus(v.vertraulichkeit()).orElseThrow(SeedPruefung::ungueltig), regel,

@@ -10,6 +10,7 @@ import java.util.UUID;
 public record Warnung(String code, UUID vorhandenId) {
 
     public static final String BELEGNUMMER_BEKANNT = "BELEGNUMMER_BEKANNT";
+    public static final String FRISTBEZUG_FEHLT = "FRISTBEZUG_FEHLT";
 
     public Warnung {
         Objects.requireNonNull(code, "code");
