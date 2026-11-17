@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { App } from './app';
 import { WarteschlangeService } from './erfassen/handy/warteschlange/warteschlange.service';
+import { BrandingService, STANDARD_BRANDING } from './gemeinsam/branding.service';
 import {
   AnmeldungService,
   Benutzer,
@@ -55,6 +56,7 @@ describe('App (Req 2.6, 8.6)', () => {
         ]),
         { provide: WarteschlangeService, useFactory: () => ((warteschlangeGestartet = true), {}) },
         { provide: AnmeldungService, useValue: anmeldung },
+        { provide: BrandingService, useValue: { branding: signal(STANDARD_BRANDING) } },
         { provide: EingangskorbZaehler, useValue: zaehler },
       ],
     });
@@ -78,7 +80,7 @@ describe('App (Req 2.6, 8.6)', () => {
 
   it('zeigt den Titel und ohne Anmeldung kein Menü', async () => {
     const element = await zeigen();
-    expect(element.querySelector('.titel')?.textContent).toContain(TEXTE.appTitel);
+    expect(element.querySelector('.titel')?.textContent).toContain(STANDARD_BRANDING.name);
     expect(element.querySelector('nav')).toBeNull();
     expect(element.textContent).not.toContain(TEXTE.anmeldung.abmelden);
   });

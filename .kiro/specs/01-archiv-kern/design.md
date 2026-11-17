@@ -1742,6 +1742,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 409 | `FRIST_ABGELAUFEN` | Bestätigung mit Frist in der Vergangenheit (Req 9.8) |
 | 409 | `DOKUMENTART_IN_GEBRAUCH` | Löschen einer benutzten Art (Req 9.4) |
 | 409 | `DOKUMENTART_EXISTIERT` | Anlegen einer Art mit einem Code, den es im Mandanten schon gibt (Req 9.1; Review PR #40) |
+| 410 | `CURSOR_ABGELAUFEN` | Cursor des Änderungs-Feeds älter als die Aufbewahrung des Feeds (90 Tage); die Webseite lädt ihren Bestand neu und beginnt ohne Cursor (Spec 03, Req 14.4; seit Aufgabe 11.9) |
 | 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4) |
 | 413 | `DATEI_ZU_GROSS` | Datei über 50 MB oder Anfrage über der Gesamtgrenze (Req 3.6); CSV-Import über `archiv.import.max-groesse` (5 MiB, entschieden von Fabian am 11.11.2026) |
 | 415 | `DATEITYP_UNBEKANNT` | Inhalt kein unterstützter Typ (Req 3.3) |

@@ -3,6 +3,7 @@ export * from './api-token-erstellt';
 export * from './api-token-neu';
 export * from './auszug-teil';
 export * from './bestaetigung';
+export * from './branding-dto';
 export * from './chat-frage';
 export * from './chat-gespraech';
 export * from './chat-nachricht';

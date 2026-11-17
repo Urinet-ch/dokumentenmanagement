@@ -88,7 +88,9 @@ Then('liegt kein Token im Browser-Speicher', async function () {
   for (const token of this.keycloak.tokens) {
     assert.ok(!alles.includes(token.wert), `${token.typ}-Token im Browser-Speicher`);
   }
-  assert.deepEqual(gespeichert, [], 'Browser-Speicher nicht leer');
+  // Das öffentliche Branding (kein Geheimnis) liegt für den Offline-Start der PWA im localStorage.
+  const uebrig = gespeichert.filter((eintrag) => !eintrag.startsWith('archiv.branding.'));
+  assert.deepEqual(uebrig, [], 'Browser-Speicher nicht leer');
 });
 
 Then(/^bin ich auf der Seite «(.+)»$/, async function (pfad) {

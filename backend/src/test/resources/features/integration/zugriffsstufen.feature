@@ -77,6 +77,16 @@ Funktionalität: Zugriffsstufen der Webseiten-Schnittstelle (Aufgabe 11.1)
     Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
 
   @req-5.9
+  Szenario: Unterschiedliche Schreibweisen verdecken doppelte X-Archiv-Zugriff-Header nicht
+    Wenn der Schlüssel «vorstand» «/public/v1/probe/stufe» mit unterschiedlich geschriebenen Headern «X-Archiv-Zugriff» und «x-archiv-zugriff» sowie den Werten «oeffentlich» und «vorstand» aufruft
+    Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+
+  @req-5.9
+  Szenario: Unterschiedliche Schreibweisen verdecken doppelte X-Archiv-Client-Header nicht
+    Wenn der Schlüssel «oeffentlich» «/public/v1/probe/stufe» mit unterschiedlich geschriebenen Headern «X-Archiv-Client» und «x-archiv-client» sowie den Werten «0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef» und «abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789» aufruft
+    Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+
+  @req-5.9
   Szenario: Ein leerer Header X-Archiv-Zugriff ergibt 400
     Wenn der Schlüssel «vorstand» «/public/v1/probe/stufe» mit dem Header «X-Archiv-Zugriff» und dem Wert «» aufruft
     Dann liefert das Archiv Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»

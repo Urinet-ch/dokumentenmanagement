@@ -2,6 +2,7 @@ api.base.service.ts
 api.module.ts
 api/api-tokens.service.ts
 api/api.ts
+api/branding.service.ts
 api/chat.service.ts
 api/dokumentarten.service.ts
 api/dokumente.service.ts
@@ -17,6 +18,7 @@ model/api-token-neu.ts
 model/api-token.ts
 model/auszug-teil.ts
 model/bestaetigung.ts
+model/branding-dto.ts
 model/chat-frage.ts
 model/chat-gespraech.ts
 model/chat-nachricht.ts

@@ -74,6 +74,7 @@ class DokumenteSuchenRueckfallTest {
         WerkzeugDaten daten = (WerkzeugDaten) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{WerkzeugDaten.class}, (proxy, methode, args) -> switch (methode.getName()) {
                     case "bestaetigte" -> Set.of();
+                    case "seiten" -> java.util.Map.of();
                     case "nurLesend" -> null;
                     default -> throw new UnsupportedOperationException(methode.getName());
                 });
@@ -135,6 +136,7 @@ class DokumenteSuchenRueckfallTest {
         WerkzeugDaten daten = (WerkzeugDaten) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{WerkzeugDaten.class}, (proxy, methode, args) -> switch (methode.getName()) {
                     case "bestaetigte" -> Set.of();
+                    case "seiten" -> java.util.Map.of();
                     case "nurLesend" -> null;
                     default -> throw new UnsupportedOperationException(methode.getName());
                 });
