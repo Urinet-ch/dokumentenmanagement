@@ -30,16 +30,20 @@ export interface Eintrag {
 
 export const MAX_FEHLVERSUCHE = 3;
 
+/** Wartezeit nach 429 ohne lesbaren `Retry-After`. */
+export const STANDARD_WARTEN_MS = 30_000;
+
 /** Ausgang eines Upload-Versuchs, ohne Angular-Typen. */
 export type Ausgang =
   | { art: 'angenommen'; ergebnisse: UploadErgebnis[] }
-  | { art: 'abgelehnt'; status: number; fehlercode?: string; detail?: string; ergebnisse?: UploadErgebnis[] };
+  | { art: 'abgelehnt'; status: number; fehlercode?: string; detail?: string; ergebnisse?: UploadErgebnis[]; retryAfter?: number | null };
 
 export type Bewertung =
   | { art: 'loeschen' }
   /** 401: Eintrag bleibt unverändert, der Benutzer meldet sich neu an (Req 4.8). */
   | { art: 'anmelden' }
-  | { art: 'behalten'; eintrag: Eintrag };
+  /** `wartenMs`: 429 mit `Retry-After`; die Schlange wartet so lange, ohne den Versuch als Fehlversuch zu zählen. */
+  | { art: 'behalten'; eintrag: Eintrag; wartenMs?: number };
 
 /**
  * Wertet einen Upload-Versuch aus. `online` ist der Zustand des Geräts beim Fehler: Versuche im Offline-Zustand zählen
@@ -58,12 +62,18 @@ export function bewerten(eintrag: Eintrag, ausgang: Ausgang, online: boolean, me
   if (status === 401) {
     return { art: 'anmelden' };
   }
+  if (status === 429) {
+    // Zu viele Anfragen: vorübergehend, der Eintrag bleibt wartend und wird nach `Retry-After` erneut gesendet
+    const sekunden = ausgang.retryAfter ?? 0;
+    return { art: 'behalten', eintrag, wartenMs: sekunden > 0 ? sekunden * 1000 : STANDARD_WARTEN_MS };
+  }
   if (status >= 400 && status < 500) {
     const meldung =
       ausgang.detail ??
       (ausgang.fehlercode && meldungen.fehlercode[ausgang.fehlercode]) ??
       meldungAusErgebnissen(ausgang.ergebnisse ?? [], meldungen);
-    return fehlerhaft(eintrag, meldung || meldungen.unbekannt);
+    const statusText = [403, 404, 409, 412].includes(status) ? meldungen.status?.(status) : undefined;
+    return fehlerhaft(eintrag, meldung || statusText || meldungen.unbekannt);
   }
   if (!online) {
     return { art: 'behalten', eintrag };
@@ -79,6 +89,8 @@ export interface Meldungen {
   unbekannt: string;
   wiederholtFehlgeschlagen: string;
   fehlercode: Record<string, string>;
+  /** Text zum HTTP-Status (403, 404, 409, 412), wenn der Server weder Detail noch Fehlercode liefert. */
+  status?: (status: number) => string;
 }
 
 function fehlerhaft(eintrag: Eintrag, meldung: string): Bewertung {

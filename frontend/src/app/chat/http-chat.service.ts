@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, throwError } from 'rxjs';
+import { retryAfterSekunden } from '../gemeinsam/retry-after';
 import {
   ChatEreignis,
   ChatFehler,
@@ -13,19 +14,7 @@ import { SSE_START, SseZustand, chatEreignis, quellenAus, sseLesen } from './sse
 
 const PFAD = '/api/v1/chat';
 
-/** Längste Wartezeit eines 429: das Stundenlimit (Req 5.5); grössere Werte werden darauf begrenzt. */
-const RETRY_AFTER_MAX = 3600;
-
-/** `Retry-After` in Sekunden oder als HTTP-Datum, begrenzt auf 0–3'600; `null` ohne lesbaren Wert. */
-export function sekundenAus(wert: string | null, jetzt = Date.now()): number | null {
-  if (wert === null || wert.trim() === '') {
-    return null;
-  }
-  const sekunden = /^\d+$/.test(wert.trim())
-    ? Number(wert.trim())
-    : Math.ceil((Date.parse(wert) - jetzt) / 1000);
-  return Number.isNaN(sekunden) ? null : Math.min(RETRY_AFTER_MAX, Math.max(0, sekunden));
-}
+export { retryAfterSekunden as sekundenAus } from '../gemeinsam/retry-after';
 
 /** Feld `grund` der Problem Details eines 429 (als Text bei `responseType: 'text'`, sonst als Objekt). */
 export function grundAus(body: unknown): ZuVieleGrund | null {
@@ -58,7 +47,7 @@ export function chatFehlerAus(fehler: unknown): ChatFehler {
     case 429:
       return new ChatFehler(
         'ZU_VIELE',
-        sekundenAus((fehler as HttpErrorResponse).headers.get('Retry-After')),
+        retryAfterSekunden((fehler as HttpErrorResponse).headers.get('Retry-After')),
         grundAus((fehler as HttpErrorResponse).error),
       );
     default:

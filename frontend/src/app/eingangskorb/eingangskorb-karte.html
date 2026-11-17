@@ -87,7 +87,14 @@
   }
 
   @if (fehler()) {
-    <p class="fehler" role="alert" tabindex="-1" data-test="fehler">{{ fehler() }}</p>
+    <div class="fehler" role="alert" tabindex="-1" data-test="fehler">
+      <p>{{ fehler() }}</p>
+      @if (konfliktNeuLaden()) {
+        <button mat-button type="button" data-test="konflikt-neu-laden" (click)="neuLadenNachKonflikt()">
+          {{ texte.neuLaden }}
+        </button>
+      }
+    </div>
   }
 
   @switch (modus()) {

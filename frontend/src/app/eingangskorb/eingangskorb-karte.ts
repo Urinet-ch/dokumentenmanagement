@@ -28,6 +28,7 @@ import {
 } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
+import { httpFehlerText } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
   ZusatzFeld,
@@ -84,7 +85,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   readonly arten = input<ReadonlyMap<string, Dokumentart>>(new Map());
   /** Aktion gelungen; die Seite zeigt die Meldung und lädt neu. */
   readonly erledigt = output<string>();
-  /** Das Dokument hat sich inzwischen geändert; die Seite zeigt die Meldung und lädt neu. */
+  /** Der Benutzer hat nach einem Konflikt das Neuladen bestätigt. */
   readonly veraltet = output<string>();
 
   protected readonly texte = TEXTE.eingangskorb;
@@ -98,6 +99,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly modus = signal<Modus>('ansicht');
   protected readonly laeuft = signal(false);
   protected readonly fehler = signal('');
+  protected readonly konfliktNeuLaden = signal(false);
   protected readonly fehlerFelder = signal<readonly string[]>([]);
   protected readonly grund = signal('');
   protected readonly vorschauUrl = signal<string | null>(null);
@@ -225,6 +227,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         { feld: 'qrReferenz', typ: 'text' },
       );
     }
+
     if (this.mitGueltigkeit()) {
       felder.push({ feld: 'gueltigAb', typ: 'date' }, { feld: 'gueltigBis', typ: 'date' });
     }
@@ -367,6 +370,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
 
   protected oeffnen(modus: Modus): void {
     this.fehler.set('');
+    this.konfliktNeuLaden.set(false);
     this.fehlerFelder.set([]);
     this.modus.set(modus);
     this.fokus(`[data-fokus="${modus}"]`);
@@ -384,6 +388,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
         ? this.zurueck
         : 'ansicht';
     this.fehler.set('');
+    this.konfliktNeuLaden.set(false);
     this.fehlerFelder.set([]);
     this.modus.set(ziel);
     this.fokus(ziel === 'formular' ? '[data-fokus="formular"]' : '[data-test="aktionen"] button');
@@ -564,6 +569,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   private ausfuehren(aufruf: Observable<unknown>, erfolg: string, zusatz: Zusatz = {}): void {
     this.laeuft.set(true);
     this.fehler.set('');
+    this.konfliktNeuLaden.set(false);
     aufruf.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.laeuft.set(false);
@@ -598,8 +604,14 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       this.rueckfrage('rueckfrageFrist', zusatz);
       return;
     }
-    if (NEU_LADEN.has(code) || fehler.status === 404 || fehler.status === 412) {
-      this.veraltet.emit(this.texte.fehlercode[code] ?? this.texte.fehlercode['STATUS_KONFLIKT']);
+    if (
+      NEU_LADEN.has(code) ||
+      fehler.status === 404 ||
+      fehler.status === 412 ||
+      (fehler.status === 409 && (!code || NEU_LADEN.has(code)))
+    ) {
+      this.konfliktNeuLaden.set(true);
+      this.fehler.set(this.texte.fehlercode[code] ?? this.texte.fehlercode['VERSION_KONFLIKT']);
       return;
     }
     if (code in IM_FORMULAR && this.modus() !== 'verwerfen') {
@@ -611,14 +623,13 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   private meldung(fehler: AktionFehler): string {
-    if (fehler.status === 0) {
-      return this.texte.fehlerVerbindung;
+    // 409 mit fachlichem Code: dessen Text statt «Bitte neu laden», denn hier gibt es keinen «Neu laden»-Knopf
+    const fachlich = fehler.status === 409 && fehler.fehlercode ? this.texte.fehlercode[fehler.fehlercode] : undefined;
+    if (fachlich) {
+      return fachlich;
     }
-    if (fehler.status === 401) {
-      return this.texte.fehlerSitzung;
-    }
-    if (fehler.status === 403) {
-      return this.texte.fehlercode['NICHT_ERLAUBT'];
+    if ([0, 401, 403, 404, 409, 412, 429].includes(fehler.status) || fehler.status >= 500) {
+      return httpFehlerText(fehler.status, fehler.retryAfter ?? null);
     }
     return (
       (fehler.fehlercode && this.texte.fehlercode[fehler.fehlercode]) || this.texte.fehlerAllgemein
@@ -634,12 +645,20 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     this.fokus('[data-test="fehler"]');
   }
 
+  protected neuLadenNachKonflikt(): void {
+    const meldung = this.fehler();
+    this.fehler.set('');
+    this.konfliktNeuLaden.set(false);
+    this.veraltet.emit(meldung);
+  }
+
   private rueckfrage(modus: 'rueckfragePdfa' | 'rueckfrageFrist', zusatz: Zusatz): void {
     if (this.modus() !== 'rueckfragePdfa' && this.modus() !== 'rueckfrageFrist') {
       this.zurueck = this.modus();
     }
     this.zusatz = zusatz;
     this.fehler.set('');
+    this.konfliktNeuLaden.set(false);
     this.modus.set(modus);
     this.fokus(`[data-fokus="${modus}"]`);
   }

@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { retryAfterSekunden } from '../gemeinsam/retry-after';
 import { UploadErgebnis, UploadFehler } from './upload-port';
 
 export interface UploadProblem extends UploadFehler {
@@ -15,6 +16,9 @@ export function uploadProblem(fehler: unknown): UploadProblem {
     status: antwort?.status ?? 0,
     fehlercode: typeof problem['fehlercode'] === 'string' ? problem['fehlercode'] : undefined,
     detail: typeof problem['detail'] === 'string' ? problem['detail'] : undefined,
+    ...(antwort?.status === 429
+      ? { retryAfter: retryAfterSekunden(antwort.headers.get('Retry-After')) }
+      : {}),
     ergebnisse: Array.isArray(problem['ergebnisse']) ? (problem['ergebnisse'] as UploadErgebnis[]) : undefined,
   };
 }
