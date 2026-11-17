@@ -133,7 +133,7 @@ public class DokumentEintrag extends PanacheEntityBase {
     @Column(name = "version", nullable = false)
     public int version;
 
-    @Column(name = "konfiguration_version")
+    @Column(name = "konfiguration_version", nullable = false)
     public Integer konfigurationVersion;
 
     @Column(name = "erstellt", nullable = false)

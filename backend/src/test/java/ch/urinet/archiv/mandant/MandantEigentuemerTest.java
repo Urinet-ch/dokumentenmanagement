@@ -149,8 +149,11 @@ class MandantEigentuemerTest {
                     .isTrue();
             befehl.execute("insert into m_probe_version.dokument (id, quelle, erstellt_von, status) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 'UPLOAD', 'probe', 'NEU')");
+            assertThat(wert(befehl, "select konfiguration_version from m_probe_version.dokument"
+                    + " where id = '00000000-0000-4000-8000-0000000000a1'")).isEqualTo("1");
             befehl.execute("insert into " + tabelle + " (dokument_id, version, daten, geaendert_von, grund) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 0, '{}', 'probe', 'Probe')");
+            assertThat(wert(befehl, "select konfiguration_version from " + tabelle)).isEqualTo("1");
             assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
             verweigert(befehl, "update " + tabelle + " set grund = 'x'");
             verweigert(befehl, "delete from " + tabelle);
@@ -230,9 +233,6 @@ class MandantEigentuemerTest {
         String versionen = schema + ".konfiguration_version";
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {
-            befehl.execute("insert into " + versionen
-                    + " (version, wer, quelle, inhalt, sha256) values (1, 'probe', 'MIGRATION', '{}', '"
-                    + "a".repeat(64) + "')");
             for (String sql : List.of("update " + versionen + " set wer = 'geändert'",
                     "delete from " + versionen)) {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)

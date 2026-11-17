@@ -47,7 +47,7 @@
                             order by a.code)
                         from dokumentart a), '[]'::jsonb)
                 ) as inhalt
-                from (select schema_name from public.mandant where schema_name = current_schema()) s
+                from (select current_schema() as schema_name) s
                 left join public.mandant m on m.schema_name = s.schema_name
             )
             insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
@@ -64,6 +64,28 @@
                 foreign key (konfiguration_version) references konfiguration_version (version);
         </sql>
         <sql splitStatements="false">
+            create function dokument_konfiguration_version_vor_einfuegen() returns trigger language plpgsql as $$
+            begin
+                if new.konfiguration_version is null then
+                    execute format('select max(version) from %I.konfiguration_version', tg_table_schema)
+                        into new.konfiguration_version;
+                end if;
+                return new;
+            end
+            $$
+        </sql>
+        <sql splitStatements="false">
+            create function dokument_version_konfiguration_vor_einfuegen() returns trigger language plpgsql as $$
+            begin
+                if new.konfiguration_version is null then
+                    execute format('select konfiguration_version from %I.dokument where id = $1', tg_table_schema)
+                        into new.konfiguration_version using new.dokument_id;
+                end if;
+                return new;
+            end
+            $$
+        </sql>
+        <sql splitStatements="false">
             create function konfiguration_version_nur_einfuegen() returns trigger language plpgsql as $$
             begin
                 raise exception 'konfiguration_version: nur Einfügen erlaubt (% verweigert)', tg_op
@@ -76,6 +98,10 @@
                 for each row execute function konfiguration_version_nur_einfuegen();
             create trigger konfiguration_version_kein_truncate before truncate on konfiguration_version
                 for each statement execute function konfiguration_version_nur_einfuegen();
+            create trigger dokument_konfiguration_version_vor_einfuegen before insert on dokument
+                for each row execute function dokument_konfiguration_version_vor_einfuegen();
+            create trigger dokument_version_konfiguration_vor_einfuegen before insert on dokument_version
+                for each row execute function dokument_version_konfiguration_vor_einfuegen();
         </sql>
     </changeSet>
 </databaseChangeLog>
