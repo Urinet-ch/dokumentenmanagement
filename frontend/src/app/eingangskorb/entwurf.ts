@@ -193,7 +193,8 @@ export function fehlerAus(fehler: unknown): AktionFehler {
 /** Name eines Felds aus `felder` (Pflichtfeld der Art, z. B. `qr_referenz`, `partner` oder `zusatz.<name>`). */
 export function feldName(feld: string): string {
   if (feld.startsWith('zusatz.')) {
-    return TEXTE.eingangskorb.zusatzFeld(feld.substring('zusatz.'.length));
+    const name = feld.substring('zusatz.'.length);
+    return TEXTE.eingangskorb.feld[name] ?? TEXTE.eingangskorb.zusatzFeld(name);
   }
   const camel = feld.replace(/_([a-z])/g, (_, b: string) => b.toUpperCase());
   return TEXTE.eingangskorb.feld[camel] ?? feld;

@@ -330,6 +330,16 @@
           <fieldset class="zusatzfelder" data-test="zusatzfelder">
             <legend>{{ texte.zusatzTitel }}</legend>
             @for (f of zusatzFelder(); track f.name) {
+              @if (istListe(f)) {
+                <app-listenfeld
+                  [feld]="f"
+                  [kennung]="d.id + '-zusatz-' + f.name"
+                  [beschriftung]="zusatzBeschriftung(f)"
+                  [wert]="zusatzEingaben()[f.name] ?? ''"
+                  [ungueltig]="ungueltig('zusatz.' + f.name)"
+                  (geaendert)="setzeZusatz(f.name, $event)"
+                />
+              } @else {
               <div class="feld">
                 <label [for]="d.id + '-zusatz-' + f.name"
                   >{{ zusatzBeschriftung(f) }}
@@ -376,6 +386,7 @@
                   />
                 }
               </div>
+              }
             }
           </fieldset>
         }

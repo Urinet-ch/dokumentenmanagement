@@ -192,6 +192,7 @@ export const TEXTE = {
       ausgabe: 'Ausgabe-Nr.',
       jahr: 'Erscheinungsjahr',
       fachgebiet: 'Fachgebiet',
+      verband: 'Verband',
       veroeffentlicht: 'Veröffentlicht',
       projekt: 'Projekt',
       gueltigAb: 'Gültig ab',
@@ -288,6 +289,17 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerSitzung: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     fehlerAllgemein: 'Die Aktion ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
+  },
+  listenfeld: {
+    hinweisMehrfach: (min: number) =>
+      min > 1 ? `Mindestens ${min} Werte auswählen.` : min === 1 ? 'Mindestens einen Wert auswählen.' : 'Mehrfachauswahl.',
+    hinweisListe: (min: number) =>
+      min > 1 ? `Mindestens ${min} Einträge erfassen.` : min === 1 ? 'Mindestens einen Eintrag erfassen.' : 'Beliebig viele Einträge.',
+    neuerEintrag: 'Neuer Eintrag',
+    hinzufuegen: 'Hinzufügen',
+    entfernen: (eintrag: string) => `«${eintrag}» entfernen`,
+    schonVorhanden: 'Dieser Eintrag ist schon in der Liste.',
+    leer: 'Noch keine Einträge.',
   },
   suche: {
     titel: 'Suche',

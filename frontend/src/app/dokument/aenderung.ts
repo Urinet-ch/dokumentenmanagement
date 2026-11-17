@@ -32,7 +32,8 @@ export interface Formular {
 
 export type TextFeld = Exclude<keyof Formular, 'zusatz'>;
 
-export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl';
+/** `mehrfach`: Liste aus festen Werten (`items.enum`), `liste`: Liste freier Texte (`items.type` string). */
+export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
 
 /** Eingabefeld für einen Eintrag unter `properties` des Zusatz-Schemas der Art. */
 export interface ZusatzFeld {
@@ -40,7 +41,23 @@ export interface ZusatzFeld {
   typ: ZusatzTyp;
   optionen: readonly string[];
   pflicht: boolean;
+  /** Nur Listen: `minItems`, `maxItems` und `uniqueItems` des Schemas. */
+  minEintraege?: number;
+  maxEintraege?: number;
+  eindeutig?: boolean;
 }
+
+/** Listenwerte stehen im Formular als ein Text, ein Eintrag je Zeile (wie die übrigen Zusatzwerte als Text). */
+export const istListe = (feld: ZusatzFeld): boolean => feld.typ === 'mehrfach' || feld.typ === 'liste';
+
+export function listeAus(wert: string): string[] {
+  return wert
+    .split('\n')
+    .map((e) => e.trim())
+    .filter((e) => e !== '');
+}
+
+export const listeZu = (eintraege: readonly string[]): string => eintraege.join('\n');
 
 export interface Pruefung {
   meldung: string;
@@ -88,13 +105,17 @@ function objekt(wert: unknown): Record<string, unknown> {
   return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
 }
 
+function stringListe(wert: unknown): wert is string[] {
+  return Array.isArray(wert) && wert.every((e) => typeof e === 'string');
+}
+
 export function formularAus(d: Dokument): Formular {
   const f = d.finanz ?? null;
   const v = d.vertrag ?? null;
   const zusatz = Object.fromEntries(
     Object.entries(objekt(d.zusatz))
-      .filter(([, wert]) => typeof wert !== 'object' || wert === null)
-      .map(([name, wert]) => [name, text(wert)]),
+      .filter(([, wert]) => typeof wert !== 'object' || wert === null || stringListe(wert))
+      .map(([name, wert]) => [name, stringListe(wert) ? listeZu(wert) : text(wert)]),
   );
   return {
     art: d.art ?? '',
@@ -123,6 +144,13 @@ export function formularAus(d: Dokument): Formular {
 }
 
 function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
+  if (schema['type'] === 'array') {
+    const items = objekt(schema['items']);
+    if (Array.isArray(items['enum']) && items['enum'].every((w) => typeof w === 'string')) {
+      return 'mehrfach';
+    }
+    return items['type'] === 'string' ? 'liste' : null;
+  }
   if (Array.isArray(schema['enum']) && schema['enum'].every((w) => typeof w === 'string')) {
     return 'auswahl';
   }
@@ -148,17 +176,29 @@ function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
  */
 export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
   const schema = objekt(art?.zusatzSchema);
-  const pflicht = new Set(
-    (art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
-  );
+  // Pflicht ist, was in `pflichtfelder` als «zusatz.<name>» steht oder im Schema unter `required` (so im Seed vhf-gsk).
+  const required = Array.isArray(schema['required']) ? schema['required'].filter((n) => typeof n === 'string') : [];
+  const pflicht = new Set([
+    ...(art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
+    ...required,
+  ]);
   return Object.entries(objekt(schema['properties'])).flatMap(([name, eigenschaft]) => {
     const e = objekt(eigenschaft);
     const typ = typAus(e);
     if (!typ) {
       return [];
     }
-    const optionen = typ === 'auswahl' ? (e['enum'] as string[]) : [];
-    return [{ name, typ, optionen, pflicht: pflicht.has(name) }];
+    const optionen =
+      typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
+    const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
+    if (typ === 'mehrfach' || typ === 'liste') {
+      feld.minEintraege = typeof e['minItems'] === 'number' ? e['minItems'] : 0;
+      feld.eindeutig = e['uniqueItems'] === true;
+      if (typeof e['maxItems'] === 'number') {
+        feld.maxEintraege = e['maxItems'];
+      }
+    }
+    return [feld];
   });
 }
 
@@ -185,12 +225,28 @@ function zusatzWert(feld: ZusatzFeld, wert: string): unknown {
       return Number.parseInt(roh.replace(/'/g, ''), 10);
     case 'janein':
       return roh === 'true';
+    case 'mehrfach':
+    case 'liste':
+      return listeAus(wert);
     default:
       return roh;
   }
 }
 
-export function zusatzGueltig(feld: ZusatzFeld, wert: string): boolean {
+/** `leerOk`: eine leere Pflichtliste ist erlaubt (Altbestand, das Archiv prüft Pflichtfelder beim Bestätigen). */
+export function zusatzGueltig(feld: ZusatzFeld, wert: string, leerOk = false): boolean {
+  if (istListe(feld)) {
+    const eintraege = listeAus(wert);
+    if (eintraege.length === 0) {
+      return !feld.pflicht || leerOk;
+    }
+    return (
+      eintraege.length >= (feld.minEintraege ?? 0) &&
+      eintraege.length <= (feld.maxEintraege ?? Infinity) &&
+      (!feld.eindeutig || new Set(eintraege).size === eintraege.length) &&
+      (feld.typ !== 'mehrfach' || eintraege.every((e) => feld.optionen.includes(e)))
+    );
+  }
   const roh = wert.trim().replace(/'/g, '');
   if (roh === '') {
     return true;
@@ -287,7 +343,10 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
   const zusatzGeaendert = zusatz.filter((f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim());
   const artGewechselt = aenderung['art'] !== undefined;
   if (zusatzGeaendert.length > 0 || artGewechselt) {
-    const ungueltig = zusatz.filter((f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? ''));
+    // Altbestand: Eine Pflichtliste, die schon vorher leer war, bleibt erlaubt (wie im Archiv, DokumentAendern).
+    const ungueltig = zusatz.filter(
+      (f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? '', !artGewechselt && (start.zusatz[f.name] ?? '').trim() === ''),
+    );
     if (ungueltig.length > 0) {
       felder.push(...ungueltig.map((f) => `zusatz.${f.name}`));
     } else {
@@ -298,6 +357,10 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
         : { ...objekt(dokument.zusatz) };
       for (const f of zusatz) {
         const wert = neu.zusatz[f.name] ?? '';
+        // Unveränderte Listen bleiben im Originalwert (kein stilles Trimmen oder Aufteilen von Bestandsdaten).
+        if (istListe(f) && wert.trim() === (start.zusatz[f.name] ?? '').trim() && werte[f.name] !== undefined) {
+          continue;
+        }
         if (wert.trim() === '') {
           delete werte[f.name];
         } else {
