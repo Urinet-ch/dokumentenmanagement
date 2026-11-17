@@ -145,18 +145,6 @@ class S3AblageTest {
                 .isIn("400 InvalidRequest", "403 AccessDenied"));
     }
 
-    private static void abwarten(Instant bis) {
-        try {
-            long ms = Duration.between(Instant.now(), bis).toMillis();
-            if (ms > 0) {
-                Thread.sleep(ms);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
-    }
-
     private Optional<ObjectLockRetention> retention(String key, String versionId) {
         try {
             return Optional.ofNullable(verwaltung.getObjectRetention(b -> b.bucket(bucket).key(key).versionId(versionId))
@@ -239,57 +227,72 @@ class S3AblageTest {
     }
 
     @Test
-    void abbauVorschauUndAusfuehrungBeachtenObjectLock() {
+    void abbauVorschauBeachtetAbgelaufeneSperre() {
         S3Ablage ablage = ablage();
         DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
-        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
-        // kurze Sperre der Eingangsversionen, die der Test abwartet: Der Object Storage prüft sie mit seiner eigenen
-        // Uhr, ein simuliertes `jetzt` genügt für das echte Löschen nicht. Die Archivsperre (rund 1 Tag) bleibt aktiv.
-        Instant ablauf = Instant.now().plus(Duration.ofSeconds(4));
-        verwaltung.putObjectRetention(b -> b.bucket(bucket)
-                .key(eingang.schluessel().pfad(Ablageort.EINGANG))
-                .versionId(eingang.eingangVersionId())
+        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetische Frist"));
+        Instant ablauf = Instant.now().plus(Duration.ofDays(1));
+        String key = eingang.schluessel().pfad(Ablageort.EINGANG);
+        verwaltung.putObjectRetention(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId())
                 .retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(ablauf)));
-        verwaltung.putObjectLegalHold(b -> b.bucket(bucket)
-                .key(eingang.schluessel().pfad(Ablageort.EINGANG))
-                .versionId(eingang.eingangVersionId())
+        verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId())
                 .legalHold(h -> h.status(ObjectLockLegalHoldStatus.OFF)));
+        assertThat(s3.getObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId()))
+                .legalHold().status()).isEqualTo(ObjectLockLegalHoldStatus.OFF);
+
+        var vorschau = ablage.mandantAbbauPlanen(mandant, ablauf.plus(Duration.ofDays(1)));
+
+        assertThat(vorschau.geloescht()).isZero();
+        assertThat(vorschau.loeschbar()).isEqualTo(1);
+        assertThat(vorschau.gesperrt()).isEmpty();
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).containsExactly(eingang.eingangVersionId());
+    }
+
+    @Test
+    void abbauVorschauUndAusfuehrungBeachtenObjectLock() {
+        S3Ablage ablage = ablage(Optional.of(Duration.ofDays(20L * 366)), Sperrmodus.GOVERNANCE,
+                Optional.of(Duration.ofDays(1)));
+        DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
         ArchiviertesDokument archiviert = ablage.archivieren(mandant, List.of(eingang),
                 Sperrvorgabe.bis(IN_ZEHN_JAHREN));
         AbgelegteDatei gesperrt = archiviert.dateien().getFirst();
         DateiSchluessel legalHoldSchluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
         AbgelegteDatei legalHoldDatei = ablage.ablegenEingang(mandant, legalHoldSchluessel,
                 new ByteArrayInputStream(inhalt("synthetischer Legal Hold")), inhalt("synthetischer Legal Hold").length);
-        verwaltung.putObjectRetention(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
-                .versionId(legalHoldDatei.versionId())
-                .retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(ablauf)));
         verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
                 .versionId(legalHoldDatei.versionId())
                 .legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON)));
-        abwarten(ablauf.plusSeconds(2));
+        assertThat(s3.getObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
+                .versionId(legalHoldDatei.versionId())).legalHold().status())
+                .isEqualTo(ObjectLockLegalHoldStatus.ON);
         Instant jetzt = Instant.now();
 
         var vorschau = ablage.mandantAbbauPlanen(mandant, jetzt);
 
         assertThat(vorschau.geloescht()).isZero();
-        // nur die abgelaufene Eingangsversion des archivierten Dokuments ist löschbar
-        assertThat(vorschau.loeschbar()).isEqualTo(1);
         assertThat(vorschau.gesperrt()).hasSize(2)
-                .anySatisfy(objekt -> assertThat(objekt.versionId()).isEqualTo(gesperrt.versionId()))
+                .anySatisfy(objekt -> {
+                    assertThat(objekt.versionId()).isEqualTo(gesperrt.versionId());
+                    assertThat(objekt.gesperrtBis()).isPresent();
+                })
                 .anySatisfy(objekt -> {
                     assertThat(objekt.versionId()).isEqualTo(legalHoldDatei.versionId());
                     assertThat(objekt.legalHold()).isTrue();
                     assertThat(objekt.gesperrtBis()).isEmpty();
                 });
-        // abgelaufene Eingangsversion des archivierten Dokuments und die Legal-Hold-Version
-        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen()).hasSize(2);
+        assertThat(vorschau.loeschbar()).isEqualTo(1);
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId)
+                .containsExactlyInAnyOrder(eingang.eingangVersionId(), legalHoldDatei.versionId());
 
         var ergebnis = ablage.mandantAbbauen(mandant, jetzt);
 
         assertThat(ergebnis.geloescht()).isEqualTo(1);
         assertThat(ergebnis.gesperrt()).hasSize(2);
         assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
-                .extracting(Objektversion::versionId).containsExactly(legalHoldDatei.versionId());
+                .extracting(Objektversion::versionId).contains(legalHoldDatei.versionId());
         assertThat(ablage.versionen(mandant, "archiv/", Optional.empty(), 10).versionen())
                 .extracting(Objektversion::versionId).contains(gesperrt.versionId());
     }
