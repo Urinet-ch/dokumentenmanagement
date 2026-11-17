@@ -352,8 +352,11 @@ Then(
 
 // Listenfelder (Arrays) im Zusatz-Schema der Art (Spec 03, 3.1: Geschäftsstelle bestätigt im Eingangskorb)
 Given(
-  /^das Archiv kennt die Dokumentart «([^»]+)» mit dem Pflichtfeld «([^»]+)» als Mehrfachauswahl «([^»]+)»$/,
-  function (name, feld, werte) {
+  /^das Archiv kennt die Dokumentart «([^»]+)» mit dem Pflichtfeld «([^»]+)» als Mehrfachauswahl «([^»]+)» mit den Beschriftungen «([^»]+)»$/,
+  function (name, feld, werte, texte) {
+    const roh = werte.split(', ');
+    const beschriftungen = texte.split(', ');
+    assert.equal(beschriftungen.length, roh.length, 'Beschriftungen und Werte passen nicht zusammen');
     this.archiv.arten.push({
       code: name.toUpperCase(),
       name,
@@ -365,7 +368,9 @@ Given(
         properties: {
           [feld]: {
             type: 'array',
-            items: { type: 'string', enum: werte.split(', ') },
+            items: { type: 'string', enum: roh },
+            // Wie im Seed vhf-gsk: Anzeigetexte je Wert; gespeichert und gesendet wird der Rohwert.
+            'x-labels': Object.fromEntries(roh.map((w, i) => [w, beschriftungen[i]])),
             minItems: 1,
             uniqueItems: true,
           },

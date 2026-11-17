@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -296,14 +296,43 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       expect(element.querySelector('[data-test=nur-volltext]')).toBeNull();
     });
 
-    it('wiederholt bei einem Fehler nicht von sich aus im Volltext', async () => {
-      await antworten(ergebnis());
+    it.each([
+      [0, TEXTE.httpFehler.verbindung],
+      [429, TEXTE.httpFehler.zuViele(42)],
+      [503, TEXTE.httpFehler.server],
+    ] as const)('zeigt HTTP %s verständlich an und erlaubt das Wiederholen', async (status, erwartet) => {
       eingeben('q', 'Miete');
       await absenden();
-      port.antworten.at(-1)!.error(new HttpErrorResponse({ status: 503 }));
+      const index = port.antworten.length - 1;
+      port.antworten[index].error(
+        new HttpErrorResponse({
+          status,
+          headers: status === 429 ? new HttpHeaders({ 'Retry-After': '42' }) : undefined,
+        }),
+      );
       await fixture.whenStable();
-      expect(element.querySelector('[data-test=fehler]')!.textContent).toBe(TEXTE.suche.fehlerAllgemein);
-      expect(port.anfragen.length).toBe(2);
+      expect(element.querySelector('[data-test=fehler]')!.textContent).toBe(erwartet);
+      expect(element.querySelector('[aria-busy=true]')).toBeNull();
+      const fehlgeschlageneAnfrage = port.anfragen[index];
+      element.querySelector<HTMLButtonElement>('[data-test=wiederholen]')!.click();
+      await fixture.whenStable();
+      expect(port.anfragen.at(-1)).toEqual(fehlgeschlageneAnfrage);
+    });
+
+    it.each([
+      [400, TEXTE.suche.fehlerAnfrage],
+      [401, TEXTE.anmeldung.abgelaufen],
+      [403, TEXTE.httpFehler.keinZugriff],
+      [404, TEXTE.httpFehler.nichtGefunden],
+      [409, TEXTE.httpFehler.konflikt],
+      [412, TEXTE.httpFehler.konflikt],
+    ] as const)('zeigt HTTP %s verständlich an, ohne «Erneut versuchen» (derselbe Request scheitert wieder)', async (status, erwartet) => {
+      eingeben('q', 'Miete');
+      await absenden();
+      port.antworten.at(-1)!.error(new HttpErrorResponse({ status }));
+      await fixture.whenStable();
+      expect(element.querySelector('[data-test=fehler]')!.textContent).toBe(erwartet);
+      expect(element.querySelector('[data-test=wiederholen]')).toBeNull();
     });
 
     it('sendet beim Umschalten die zuletzt gesendete Anfrage im neuen Modus ab Seite 0', async () => {

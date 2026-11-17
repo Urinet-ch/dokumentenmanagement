@@ -167,6 +167,27 @@ describe('WarteschlangeService (Req 4.4–4.6, 4.8)', () => {
     expect(speicher.inhalt.size).toBe(1);
   });
 
+  it('wartet bei 429 nach Retry-After, zählt keinen Fehlversuch und sendet danach erneut', async () => {
+    vi.useFakeTimers();
+    try {
+      anmeldung.als('u1');
+      online.set(true);
+      upload.antworten.push({ art: 'abgelehnt', status: 429, retryAfter: 60 });
+      await schlange.hinzufuegen([seite()], new Date());
+      await ruhig();
+      expect(upload.gesendet).toHaveLength(1);
+      expect(schlange.eintraege()[0]).toMatchObject({ zustand: 'wartet', fehlversuche: 0 });
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(upload.gesendet).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await ruhig();
+      expect(upload.gesendet).toHaveLength(2);
+      expect(speicher.inhalt.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('meldet bei 401 die Sitzung als abgelaufen und behält den Eintrag', async () => {
     anmeldung.als('u1');
     upload.antworten.push({ art: 'abgelehnt', status: 401 });

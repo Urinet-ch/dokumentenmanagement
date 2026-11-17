@@ -5,8 +5,14 @@
 
 @if (fehlerLaden()) {
   <div class="fehler" role="alert">
-    <p>{{ texte.fehlerLaden }}</p>
-    <button mat-stroked-button type="button" (click)="laden()">{{ texte.neuLaden }}</button>
+    <p>{{ fehlerLaden() }}</p>
+    <button mat-stroked-button type="button" (click)="laden(fehlerWeitere())">{{ texte.neuLaden }}</button>
+  </div>
+}
+@if (fehlerArten(); as fehler) {
+  <div class="fehler" role="alert" data-test="fehler-arten">
+    <p>{{ fehler }}</p>
+    <button mat-stroked-button type="button" (click)="ladenArten()">{{ texte.neuLaden }}</button>
   </div>
 }
 

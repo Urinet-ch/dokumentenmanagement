@@ -15,8 +15,10 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { httpFehlerText } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { UploadErgebnis, UploadFehler, UploadPort } from './upload-port';
+import { uploadProblem } from './upload-problem';
 
 export const ERLAUBTE_TYPEN =
   '.pdf,.jpg,.jpeg,.png,.heic,.heif,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/heif,image/tiff';
@@ -138,8 +140,8 @@ export class Upload {
           this.beenden();
         }
       },
-      error: () => {
-        this.gesamtFehler.set(TEXTE.upload.fehlerAllgemein);
+      error: (fehler: unknown) => {
+        this.gesamtFehler.set(gesamtMeldung(uploadProblem(fehler)));
         this.beenden();
       },
     });
@@ -207,15 +209,12 @@ function dateiMeldung(fehler: UploadFehler | undefined): string {
 }
 
 function gesamtMeldung(fehler: UploadFehler): string {
-  if (fehler.status === 401) {
-    return TEXTE.upload.fehlerSitzung;
-  }
-  if (fehler.status === 0) {
-    return TEXTE.upload.fehlerVerbindung;
-  }
   // 413 ohne Ergebnisse je Datei: die ganze Anfrage liegt über der Gesamtgrenze (design.md «Upload»)
   if (fehler.status === 413) {
     return TEXTE.upload.fehlerAnfrageZuGross;
+  }
+  if ([0, 401, 403, 404, 409, 412, 429].includes(fehler.status) || fehler.status >= 500) {
+    return httpFehlerText(fehler.status, fehler.retryAfter ?? null);
   }
   const code = fehler.fehlercode;
   return fehler.detail || (code && TEXTE.upload.fehlercode[code]) || TEXTE.upload.fehlerAllgemein;

@@ -7,6 +7,7 @@ export interface UploadFehler {
   status: number;
   fehlercode?: string;
   detail?: string;
+  retryAfter?: number | null;
 }
 
 export interface UploadErgebnis {

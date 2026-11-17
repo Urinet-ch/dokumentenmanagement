@@ -19,6 +19,7 @@ import { Dokumentart, Kontakt, Suchtreffer } from '../gemeinsam/api';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { AnzeigeTitel, TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum } from '../gemeinsam/format';
+import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { SucheZustand } from './suche-zustand';
 import { Suchanfrage, SuchePort } from './suche-port';
@@ -72,11 +73,13 @@ export class Suche {
   protected readonly laeuft = signal(false);
   protected readonly pruefFehler = signal<Pruefung[]>([]);
   protected readonly fehler = signal<string | null>(null);
+  protected readonly wiederholbar = signal(false);
 
   protected readonly darfKontakte = computed(() => this.anmeldung.darf('A6'));
   protected readonly partnerEingabe = signal('');
   protected readonly partnerVorschlaege = signal<Kontakt[] | null>(null);
   private readonly partnerSuche = new Subject<string>();
+  private fehlerAnfrage: Suchanfrage | null = null;
 
   protected readonly anzahlFilter = computed(() => aktiveFilter(this.filter()));
   protected readonly artName = computed(() => {
@@ -195,6 +198,12 @@ export class Suche {
     this.senden({ ...letzte, seite: Math.min(Math.max((letzte.seite ?? 0) + richtung, 0), SEITE_MAX) }, true);
   }
 
+  protected wiederholen(): void {
+    if (this.fehlerAnfrage) {
+      this.senden(this.fehlerAnfrage, true);
+    }
+  }
+
   /** Ohne Titel der Dateiname als Platzhalter, auch in NEU, VERARBEITUNG und FEHLER (Req 14.9). */
   protected titel(t: Suchtreffer): AnzeigeTitel {
     return anzeigeTitel(t.titel, null, t.dateiname);
@@ -213,7 +222,9 @@ export class Suche {
 
   private senden(anfrage: Suchanfrage, fokus: boolean): void {
     this.fehler.set(null);
+    this.wiederholbar.set(false);
     this.laeuft.set(true);
+    this.fehlerAnfrage = anfrage;
     this.laufend?.unsubscribe();
     this.laufend = this.port.suchen(anfrage).subscribe({
       next: (ergebnis) => {
@@ -221,6 +232,7 @@ export class Suche {
         this.zustand.gesendet.set(anfrage);
         this.ergebnis.set(ergebnis);
         this.laeuft.set(false);
+        this.fehlerAnfrage = null;
         if (fokus) {
           queueMicrotask(() => this.trefferUeberschrift()?.nativeElement.focus());
         }
@@ -228,6 +240,9 @@ export class Suche {
       error: (fehler: unknown) => {
         this.laeuft.set(false);
         this.fehler.set(meldung(fehler));
+        // 400/401/403/404 liefern beim selben Request wieder dasselbe: «Erneut versuchen» nur bei vorübergehenden Fehlern
+        const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
+        this.wiederholbar.set(status === 0 || status === 429 || status >= 500);
       },
     });
   }
@@ -235,8 +250,5 @@ export class Suche {
 
 function meldung(fehler: unknown): string {
   const status = fehler instanceof HttpErrorResponse ? fehler.status : -1;
-  if (status === 0) {
-    return TEXTE.suche.fehlerVerbindung;
-  }
-  return status === 400 ? TEXTE.suche.fehlerAnfrage : TEXTE.suche.fehlerAllgemein;
+  return status === 400 ? TEXTE.suche.fehlerAnfrage : httpFehlerMeldung(fehler);
 }

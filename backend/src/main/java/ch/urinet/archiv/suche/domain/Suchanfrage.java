@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 public record Suchanfrage(String begriff, String art, UUID partner, LocalDate datumVon, LocalDate datumBis,
                           BigDecimal betragVon, BigDecimal betragBis, Richtung richtung, List<String> tags,
                           String status, Integer geschaeftsjahr, String belegnummer, Sortierung sortierung, int seite,
-                          int groesse) {
+                          int groesse, Integer jahr, Boolean veroeffentlicht) {
 
     public static final int BEGRIFF_MAX = 200;
     public static final int TAGS_MAX = 10;
@@ -47,6 +47,14 @@ public record Suchanfrage(String begriff, String art, UUID partner, LocalDate da
     private static final Pattern ART = Pattern.compile("^[A-Z][A-Z0-9_]{1,39}$");
     private static final Pattern STATUS = Pattern.compile("^[A-Z_]{1,30}$");
 
+    public Suchanfrage(String begriff, String art, UUID partner, LocalDate datumVon, LocalDate datumBis,
+                       BigDecimal betragVon, BigDecimal betragBis, Richtung richtung, List<String> tags,
+                       String status, Integer geschaeftsjahr, String belegnummer, Sortierung sortierung, int seite,
+                       int groesse) {
+        this(begriff, art, partner, datumVon, datumBis, betragVon, betragBis, richtung, tags, status, geschaeftsjahr,
+                belegnummer, sortierung, seite, groesse, null, null);
+    }
+
     public Suchanfrage {
         begriff = begriff == null || begriff.isBlank() ? null : begriff.strip();
         tags = tags == null ? List.of() : List.copyOf(tags);
@@ -59,6 +67,7 @@ public record Suchanfrage(String begriff, String art, UUID partner, LocalDate da
                 t -> t != null && !t.isBlank() && t.length() <= TAG_LAENGE_MAX && ohneSteuerzeichen(t)));
         pruefen(status == null || STATUS.matcher(status).matches());
         pruefen(geschaeftsjahr == null || (geschaeftsjahr >= 1000 && geschaeftsjahr <= 9999));
+        pruefen(jahr == null || (jahr >= 1000 && jahr <= 9999));
         pruefen(belegnummer == null || (!belegnummer.isBlank() && belegnummer.length() <= BELEGNUMMER_MAX
                 && ohneSteuerzeichen(belegnummer)));
         pruefen(seite >= 0 && seite <= SEITE_MAX && groesse >= 1 && groesse <= GROESSE_MAX);

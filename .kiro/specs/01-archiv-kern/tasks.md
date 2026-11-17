@@ -594,7 +594,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - ab Stufe B: Google als Empfänger der Anmeldedaten im Verzeichnis der Bearbeitungen und im Datenschutzhinweis [Fabian]
   - _Anforderungen: 2.25–2.29_
 
-- [ ]* O.9 Nachprüfung Frontend: Fehlermatrix für die übrigen Seiten [Frontend]
+- [x]* O.9 Nachprüfung Frontend: Fehlermatrix für die übrigen Seiten [Frontend]
   - Herkunft: Review von PR #238 (Teilumsetzung der Nachprüfung Frontend)
   - 401/403/404/409/429/5xx/Netzwerk seitenweise prüfen und mit Komponententests belegen für Anmeldung, Eingangskorb, Dokumentliste, Suche, Erfassen/Kamera (PR #238 deckt Dokumentdetail, Gesprächsliste, Token-Liste ab)
   - Offline und Service-Worker-Update mit Test belegen (bisher nur Code-Feststellung)

@@ -24,6 +24,11 @@ public class DokumentSuche {
 
     /** Suche der PWA: mit Dateinamen in Auszug und Treffer (Req 14.8, 14.9). */
     public Suchergebnis suchen(Benutzer benutzer, Suchanfrage anfrage) {
-        return port.suchen(anfrage, Sichtregel.fuer(benutzer), true);
+        return suchen(benutzer, anfrage, true);
+    }
+
+    /** Suche der Webseiten-Erfassung: Dateinamen werden weder gesucht noch zurückgegeben (Req 3.13, Spec 03 Req 10). */
+    public Suchergebnis suchen(Benutzer benutzer, Suchanfrage anfrage, boolean mitDateiname) {
+        return port.suchen(anfrage, Sichtregel.fuer(benutzer), mitDateiname);
     }
 }
