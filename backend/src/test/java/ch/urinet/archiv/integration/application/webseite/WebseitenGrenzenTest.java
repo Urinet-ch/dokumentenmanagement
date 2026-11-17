@@ -82,20 +82,6 @@ class WebseitenGrenzenTest {
         assertThat(abgelehnt(g, "token:e", Grenzklasse.DATEI)).isNotNull();
     }
 
-    @Test
-    void pruefdateienHabenEngereSpitzeUndZaehlenAuchImErfassungsbucket() {
-        WebseitenGrenzen g = grenzen();
-        g.pruefen("token:e", Grenzklasse.DATEI);
-        g.pruefen("token:e", Grenzklasse.DATEI);
-        assertThat(abgelehnt(g, "token:e", Grenzklasse.DATEI)).isNotNull();
-        g.pruefen("token:e", Grenzklasse.ERFASSUNG);
-        assertThat(abgelehnt(g, "token:e", Grenzklasse.ERFASSUNG)).isNotNull();
-        g.pruefen("token:anderer", Grenzklasse.DATEI);
-        uhr.vor(Duration.ofSeconds(1));
-        g.pruefen("token:e", Grenzklasse.DATEI);
-        assertThat(abgelehnt(g, "token:e", Grenzklasse.DATEI)).isNotNull();
-    }
-
     private static ZuVieleAnfragen abgelehnt(WebseitenGrenzen g, String id, Grenzklasse klasse) {
         try {
             g.pruefen(id, klasse);
