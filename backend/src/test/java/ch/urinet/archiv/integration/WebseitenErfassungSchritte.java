@@ -310,6 +310,13 @@ public class WebseitenErfassungSchritte {
         assertThat(ProblemDetails.pruefen(letzte, status, "felder")).isEqualTo(code);
     }
 
+    @Dann("ist die letzte Antwort HTTP 429 mit «{word}», «Retry-After» zwischen {int} und {int} Sekunden und dem Grund «{word}»")
+    public void statusGrenze(String code, int von, int bis, String grund) {
+        assertThat(ProblemDetails.pruefen(letzte, 429, "grund")).isEqualTo(code);
+        assertThat(Integer.parseInt(letzte.header("Retry-After"))).isBetween(von, bis);
+        assertThat(letzte.jsonPath().getString("grund")).isEqualTo(grund);
+    }
+
     @Dann("die Upload-Antwort enthält eine ID, den Status und ETag")
     public void uploadAntwort() {
         assertThat(letzteId).isNotNull();
@@ -767,6 +774,18 @@ public class WebseitenErfassungSchritte {
     @Wenn("der Schlüssel «{word}» die Prüfdatei des Pflegedokuments abruft")
     public void pruefdatei(String name) {
         letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER).when().get(PFAD + "/" + letzteId + "/datei");
+        letzterSchluessel = name;
+    }
+
+    @Wenn("der Schlüssel «{word}» dem Pflegedokument {int} MB JSON als Änderung sendet")
+    public void zuGrosseAenderung(String name, int mb) {
+        // mit «Expect: 100-continue» liest der Client die frühe 413, statt den Rest in eine geschlossene Verbindung zu schreiben
+        letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER)
+                .config(io.restassured.RestAssured.config().httpClient(
+                        io.restassured.config.HttpClientConfig.httpClientConfig()
+                                .setParam("http.protocol.expect-continue", true)))
+                .contentType("application/json").body(new byte[mb * 1024 * 1024]).when()
+                .patch(PFAD + "/" + letzteId);
         letzterSchluessel = name;
     }
 
