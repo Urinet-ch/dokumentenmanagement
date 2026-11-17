@@ -1,31 +1,26 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
-import io.smallrye.config.PropertiesConfigSource;
-import io.smallrye.config.SmallRyeConfig;
-import io.smallrye.config.SmallRyeConfigBuilder;
+import ch.urinet.archiv.gemeinsam.ProdZeitgrenzen;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PanacheDokumentVerarbeitungZeitgrenzeTest {
 
+    /**
+     * Der {@code statement_timeout} gilt für {@code VERARBEITEN}, {@code KI_VORSCHLAG} und {@code ARCHIVIEREN}
+     * ({@link PanacheDokumentArchivierung}); verglichen wird darum mit der kürzesten Auftragszeitgrenze (Review
+     * PR #266, S1).
+     */
     @Test
-    void statementTimeoutLiegtUnterDerAuftragszeitgrenze() throws IOException {
-        SmallRyeConfig konfiguration = new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
-                .withSources(new PropertiesConfigSource(getClass().getClassLoader().getResource("application.properties")))
-                .withSources(new PropertiesConfigSource(Map.of("test.statement-timeout",
-                        PanacheDokumentVerarbeitung.ZEITGRENZE), "test"))
-                .build();
-        Duration auftrag = Duration.parse("PT" + konfiguration.getValue(
-                "archiv.auftrag.zeitgrenze.VERARBEITEN", String.class).toUpperCase(Locale.ROOT));
-        Duration statement = Duration.parse("PT" + konfiguration.getValue("test.statement-timeout", String.class)
-                .toUpperCase(Locale.ROOT));
+    void statementTimeoutLiegtUnterJederAuftragszeitgrenze() throws IOException {
+        Map.Entry<String, Duration> kuerzeste = ProdZeitgrenzen.laden().kuerzesteAuftragszeitgrenze();
 
-        assertThat(statement).isLessThan(auftrag);
+        assertThat(ProdZeitgrenzen.dauerAus(PanacheDokumentVerarbeitung.ZEITGRENZE)).as(kuerzeste.getKey())
+                .isLessThan(kuerzeste.getValue());
     }
 }

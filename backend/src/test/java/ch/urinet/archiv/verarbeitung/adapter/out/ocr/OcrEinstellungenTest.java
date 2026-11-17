@@ -1,8 +1,6 @@
 package ch.urinet.archiv.verarbeitung.adapter.out.ocr;
 
-import io.smallrye.config.PropertiesConfigSource;
-import io.smallrye.config.SmallRyeConfig;
-import io.smallrye.config.SmallRyeConfigBuilder;
+import ch.urinet.archiv.gemeinsam.ProdZeitgrenzen;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -10,7 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,20 +25,19 @@ class OcrEinstellungenTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("archiv.ocr.zeitgrenze");
     }
 
+    /**
+     * {@code archiv.ocr.zeitgrenze} nutzt nur {@code VERARBEITEN} ({@code KI_VORSCHLAG} gibt sein Restbudget mit);
+     * {@code quarkus.s3.api-call-timeout} gilt für jeden Auftragstyp, darum gegen die kürzeste Auftragszeitgrenze
+     * (Review PR #266, S1).
+     */
     @Test
-    void produktiveOcrUndS3ZeitgrenzenLiegenUnterDerAuftragszeitgrenze() throws IOException {
-        SmallRyeConfig config = new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
-                .withSources(new PropertiesConfigSource(getClass().getClassLoader().getResource("application.properties")))
-                .build();
-        Duration verarbeiten = Duration.parse("PT" + config.getValue(
-                "archiv.auftrag.zeitgrenze.VERARBEITEN", String.class).toUpperCase(Locale.ROOT));
+    void produktiveOcrUndS3ZeitgrenzenLiegenUnterDenAuftragszeitgrenzen() throws IOException {
+        ProdZeitgrenzen grenzen = ProdZeitgrenzen.laden();
+        Map.Entry<String, Duration> kuerzeste = grenzen.kuerzesteAuftragszeitgrenze();
 
-        assertThat(Duration.parse("PT" + config.getValue("archiv.ocr.zeitgrenze", String.class)
-                .toUpperCase(Locale.ROOT)))
-                .isLessThan(verarbeiten);
-        assertThat(Duration.parse("PT" + config.getValue("quarkus.s3.api-call-timeout", String.class)
-                .toUpperCase(Locale.ROOT)))
-                .isLessThan(verarbeiten);
+        assertThat(grenzen.dauer("archiv.ocr.zeitgrenze")).isLessThan(grenzen.auftraege().get("VERARBEITEN"));
+        assertThat(grenzen.dauer("quarkus.s3.api-call-timeout")).as(kuerzeste.getKey())
+                .isLessThan(kuerzeste.getValue());
     }
 
     /** Leerzeichen, {@code :} oder {@code ,} würden {@code docker -v} bzw. Argumente aufteilen. */
