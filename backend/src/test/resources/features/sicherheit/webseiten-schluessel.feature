@@ -81,7 +81,8 @@ Funktionalität: Webseiten-Schlüssel (Aufgabe 11.7)
 
   @req-9.2 @req-12.8
   Szenario: Ungültige Schlüssel einer Quelle blockieren kalte Schlüssel anderer Quellen nicht
-    Angenommen es gibt einen kalten Webseiten-Lese-Schlüssel
+    Angenommen die Schlüsselprüfung lässt je Quelle 10 Prüfungen in Folge zu und füllt sich kaum nach
+    Und es gibt einen kalten Webseiten-Lese-Schlüssel
     Und es gibt einen Erfassungs-Schlüssel für «probe»
     Wenn 10 ungültige Schlüssel von Quelle «192.0.2.21» die Probe aufrufen
     Dann werden alle mit Status 401 abgelehnt

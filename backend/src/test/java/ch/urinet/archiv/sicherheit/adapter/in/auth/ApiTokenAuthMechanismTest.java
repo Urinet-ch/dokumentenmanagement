@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Welche Bearer-Werte das Archiv selbst prüft und welche an OIDC gehen (Req 2.5). Ohne Mockito: Proxys. */
 class ApiTokenAuthMechanismTest {
 
-    private final ApiTokenAuthMechanism mechanismus = new ApiTokenAuthMechanism(true);
+    private final ApiTokenAuthMechanism mechanismus = new ApiTokenAuthMechanism(
+            new ch.urinet.archiv.sicherheit.application.QuellAdresse(List.of("198.51.100.0/24")));
     private final List<AuthenticationRequest> anfragen = new ArrayList<>();
     private final IdentityProviderManager anbieter = proxy(IdentityProviderManager.class, (methode, args) -> {
         if (methode.equals("authenticate")) {
@@ -69,45 +70,34 @@ class ApiTokenAuthMechanismTest {
         ApiToken token = ApiToken.neu(new SecureRandom());
 
         mechanismus.authenticate(kontext("Bearer " + token.text(), "203.0.113.17",
-                "false", SocketAddress.inetSocketAddress(8080, "192.0.2.10")), anbieter).await().indefinitely();
+                SocketAddress.inetSocketAddress(8080, "192.0.2.10")), anbieter).await().indefinitely();
 
         assertThat(anfragen).singleElement().isInstanceOfSatisfying(ApiTokenAnfrage.class,
                 anfrage -> assertThat(anfrage.absenderIp()).contains("192.0.2.10"));
     }
 
     @Test
-    void vertrauensmarkierungErlaubtXRealIpNurMitAktiverProxyWeiterleitung() {
+    void realIpVomVertrauenswuerdigenProxyWirdUebernommen() {
         ApiToken token = ApiToken.neu(new SecureRandom());
-        SocketAddress peer = SocketAddress.inetSocketAddress(8080, "192.0.2.10");
 
-        new ApiTokenAuthMechanism(true).authenticate(
-                kontext("Bearer " + token.text(), "198.51.100.42", "true", peer), anbieter)
-                .await().indefinitely();
-        new ApiTokenAuthMechanism(false).authenticate(
-                kontext("Bearer " + token.text(), "203.0.113.17", "true", peer), anbieter)
-                .await().indefinitely();
+        mechanismus.authenticate(kontext("Bearer " + token.text(), "203.0.113.17",
+                SocketAddress.inetSocketAddress(8080, "198.51.100.4")), anbieter).await().indefinitely();
 
-        assertThat(anfragen).hasSize(2);
-        assertThat(anfragen.get(0)).isInstanceOfSatisfying(ApiTokenAnfrage.class,
-                anfrage -> assertThat(anfrage.absenderIp()).contains("198.51.100.42"));
-        assertThat(anfragen.get(1)).isInstanceOfSatisfying(ApiTokenAnfrage.class,
-                anfrage -> assertThat(anfrage.absenderIp()).contains("192.0.2.10"));
+        assertThat(anfragen).singleElement().isInstanceOfSatisfying(ApiTokenAnfrage.class,
+                anfrage -> assertThat(anfrage.absenderIp()).contains("203.0.113.17"));
     }
 
     private static RoutingContext kontext(String authorization) {
-        return kontext(authorization, null, null, null);
+        return kontext(authorization, null, null);
     }
 
-    private static RoutingContext kontext(String authorization, String realIp, String trustedProxy, SocketAddress peer) {
+    private static RoutingContext kontext(String authorization, String realIp, SocketAddress peer) {
         MultiMap kopf = MultiMap.caseInsensitiveMultiMap();
         if (authorization != null) {
             kopf.add("Authorization", authorization);
         }
         if (realIp != null) {
             kopf.add("X-Real-Ip", realIp);
-        }
-        if (trustedProxy != null) {
-            kopf.add("X-Forwarded-Trusted-Proxy", trustedProxy);
         }
         HttpServerRequest anfrage = proxy(HttpServerRequest.class,
                 (methode, args) -> switch (methode) {

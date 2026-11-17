@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKommando;
+import ch.urinet.archiv.sicherheit.application.ApiTokenPruefGrenzen;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.HashSperre;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -67,6 +68,11 @@ public class WebseitenSchritte {
 
     @Inject
     HashSperre hashSperre;
+
+    @Inject
+    ApiTokenPruefGrenzen pruefGrenzen;
+
+    private ApiTokenPruefGrenzen.Einstellung grenzenVorher;
 
     @Inject
     @ConfigProperty(name = "archiv.webseite.absender-datei")
@@ -410,8 +416,18 @@ public class WebseitenSchritte {
         assertThat(antwort.headers().hasHeaderWithName("Link")).isFalse();
     }
 
+    @Angenommen("die Schlüsselprüfung lässt je Quelle 10 Prüfungen in Folge zu und füllt sich kaum nach")
+    public void knappeSchluesselpruefung() {
+        grenzenVorher = pruefGrenzen.einstellung();
+        pruefGrenzen.einstellen(new ApiTokenPruefGrenzen.Einstellung(0.01, 10, grenzenVorher.maxQuellen()));
+    }
+
     @After
     public void aufraeumen() throws SQLException, IOException {
+        if (grenzenVorher != null) {
+            pruefGrenzen.einstellen(grenzenVorher);
+            grenzenVorher = null;
+        }
         hashSperreFreigeben();
         Files.deleteIfExists(absenderDatei);
         for (String id : tokenIds) {
