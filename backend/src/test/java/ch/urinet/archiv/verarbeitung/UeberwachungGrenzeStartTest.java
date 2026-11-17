@@ -39,7 +39,13 @@ class UeberwachungGrenzeStartTest {
     @Test
     @Launch(value = {"token", "erstellen", "probe-gibts-nicht", "Probe", "import"}, exitCode = 3)
     void startBrichtAb(LaunchResult ergebnis) {
-        assertThat(ergebnis.getErrorOutput()).contains("Start fehlgeschlagen", "archiv.ueberwachung.grenze");
-        assertThat(ergebnis.getOutput()).as("kein Token ausgegeben").doesNotContain("ua_");
+        String ausgabe = ergebnis.getOutput();
+        String fehlerAusgabe = ergebnis.getErrorOutput();
+        assertThat(fehlerAusgabe)
+                .as("stderr der Startprüfung; stdout=%s", ausgabe)
+                .contains("Start fehlgeschlagen", "archiv.ueberwachung.grenze");
+        assertThat(ausgabe)
+                .as("kein Token ausgegeben; stderr=%s", fehlerAusgabe)
+                .doesNotContain("ua_");
     }
 }
