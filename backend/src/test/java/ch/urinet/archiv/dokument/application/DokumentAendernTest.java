@@ -66,6 +66,19 @@ class DokumentAendernTest {
         assertThat(DokumentAendern.letzterTag(List.of())).isEmpty();
     }
 
+    @Test
+    void artwechselMitLeeremFristfeldBleibtMoeglichAberNichtDasEntfernenEinesVorhandenenWerts() {
+        var art = new Dokumentart("PROBE_FRIST", "Probe", null, List.of("frei"), List.of("zusatz.sitzung"),
+                Dokumentart.OHNE_ZUSATZ, Vertraulichkeit.NORMAL,
+                new Aufbewahrungsregel(10, AufbewahrungAb.FELD, "sitzung"), true, true);
+        Metadaten leer = metadaten("Probe", null, Set.of());
+        assertThatCode(() -> DokumentAendern.pflichtfelderPruefen(art, leer, leer, true)).doesNotThrowAnyException();
+        PflichtfelderFehlen fehler = catchThrowableOfType(PflichtfelderFehlen.class,
+                () -> DokumentAendern.pflichtfelderPruefen(art,
+                        metadaten("Probe", null, Set.of("sitzung")), leer, false));
+        assertThat(fehler.felder()).containsExactly("zusatz.sitzung");
+    }
+
     private static Metadaten metadaten(String titel, BigDecimal betrag, Set<String> zusatz) {
         return new Metadaten(UUID.randomUUID(), DokumentStatus.ARCHIVIERT, 3, Instant.now(), "SPENDE", titel,
                 LocalDate.of(2026, 3, 10), null, null, null, List.of(), "INTERN", null, null, null, false, null,

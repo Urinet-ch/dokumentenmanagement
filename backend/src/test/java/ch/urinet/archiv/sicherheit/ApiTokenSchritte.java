@@ -7,10 +7,12 @@ import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
+import ch.urinet.archiv.sicherheit.application.ApiTokenPruefGrenzenTeststeuerung;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
@@ -28,6 +30,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -62,10 +65,16 @@ public class ApiTokenSchritte {
     ApiTokenVerwaltung verwaltung;
 
     @Inject
+    Clock uhr;
+
+    @Inject
     Instance<AgroalDataSource> datenbank;
 
     @Inject
     TokenKommando kommando;
+
+    @Inject
+    ApiTokenPruefGrenzenTeststeuerung pruefGrenzen;
 
     /** Name im Szenario → Token-Text. */
     private final Map<String, String> tokens = new LinkedHashMap<>();
@@ -84,6 +93,11 @@ public class ApiTokenSchritte {
     private LogMitschnitt mitschnitt;
     private Response antwort;
 
+    @Before(order = 0)
+    public void grenzenZuruecksetzen() {
+        pruefGrenzen.szenarioZuruecksetzen();
+    }
+
     @Angenommen("alle Logeinträge werden mitgeschnitten")
     public void mitschneiden() {
         mitschnitt = LogMitschnitt.starten();
@@ -99,7 +113,7 @@ public class ApiTokenSchritte {
     @Angenommen("für «{word}» gibt es das Token «{word}» mit Scope «{word}» und Ablauf in {int} Tagen")
     public void tokenAnlegenMitAblauf(String mandant, String name, String scope, int tage) {
         ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant, "Probe " + name, scope,
-                Optional.of(LocalDate.now(ZEITZONE).plusDays(tage)));
+                Optional.of(LocalDate.now(uhr.withZone(ZEITZONE)).plusDays(tage)));
         merken(name, erstellt.token().text());
         tokenMandant.put(name, mandant);
     }
@@ -108,7 +122,7 @@ public class ApiTokenSchritte {
     public void tokenAbgelaufen(String name) throws SQLException {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
         ausfuehren("update public.api_client set gueltig_bis = ?::timestamptz where id = ?",
-                Instant.now().minusSeconds(1).toString(), id);
+                uhr.instant().minusSeconds(1).toString(), id);
     }
 
     @Angenommen("der aktive Mandant «{word}» steht nur im Register")
@@ -442,8 +456,8 @@ public class ApiTokenSchritte {
         }
     }
 
-    private static LocalDate datum(String ablauf) {
-        LocalDate heute = LocalDate.now(ZEITZONE);
+    private LocalDate datum(String ablauf) {
+        LocalDate heute = LocalDate.now(uhr.withZone(ZEITZONE));
         return switch (ablauf) {
             case "gestern" -> heute.minusDays(1);
             case "morgen" -> heute.plusDays(1);

@@ -46,7 +46,7 @@ export interface Dokument {
      */
     version: number;
     /**
-     * Nur im Eingangskorb, sonst leer (Req 8.10)
+     * Belegnummer-Warnungen im Eingangskorb; fehlender Fristbezug auch nach Bestätigung oder Artwechsel (Spec 05, Req 4.4)
      */
     warnungen: Array<Warnung>;
     /**

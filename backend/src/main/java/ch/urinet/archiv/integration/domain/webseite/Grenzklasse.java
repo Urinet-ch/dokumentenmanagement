@@ -6,5 +6,5 @@ package ch.urinet.archiv.integration.domain.webseite;
  * Erfassungs-Schlüssels, {@link #UPLOAD} zusätzlich ein Upload.
  */
 public enum Grenzklasse {
-    LESEN, SUCHE, ERFASSUNG, UPLOAD
+    LESEN, SUCHE, ERFASSUNG, UPLOAD, DATEI
 }

@@ -529,6 +529,7 @@ Arbeitsweise je Aufgabe (Claude Code):
 
 - [ ] 5.7 Verfahrensbeschreibung «Erfassen und Archivieren» [Fabian]
   - `docs/verfahrensbeschreibung.md` (≤ 2 Seiten, neu anzulegen): Eingänge, Scan-Regeln (ganze Seite, lesbar, ≥ 300 dpi), Prüfung im Eingangskorb, Sperre, Manifest, Zugriffe (Frist nach Req 10.9, Zweck Nachweis nach GeBüV und Datensicherheit, keine Auswertung des Verhaltens, Einsicht nur Inhaber nach A13; vorgemerkt mit 4.9-E6), Umgang mit Papier (Konzept-Entscheid E5, entschieden 15.11.2026: Papieroriginale werden nach dem Scan nicht vernichtet, sondern aufbewahrt, das Archiv ist eine Kopie; darum keine Vernichtungskontrolle und kein Vernichtungsprotokoll im Verfahren), Notfallablauf für den Treuhänder und Ort der Notfallunterlagen (ohne Zugangsdaten); vom Treuhänder gegenlesen lassen (K3)
+  - Ungeprüfter Entwurf gemäss Auftrag: `docs/verfahren/erfassen-und-archivieren.md`; Prüfung und Freigabe durch Fabian sowie Gegenlesen durch den Treuhänder offen. Der Haken 5.7 bleibt offen.
   - jede freigegebene Fassung mit «gültig ab» als PDF/A im Archiv ablegen
   - _Anforderungen: 10.9, 16.6, 16.12_
 
@@ -551,6 +552,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang des Inhabers (Inhaber-Zugang, 6.10), öffentlicher Manifest-Schlüssel, zweiter SSH-Schlüssel für das Ausdünnen der Zweitkopie auf dem Hostpoint-Webhosting (16.2); Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
   - nicht hinein gehört der Probe-Schlüssel: Er ist ersetzbar (neuer Empfänger, danach neuer Vollexport, 16.23)
   - Vollständigkeit einmal mit dem Notfallablauf aus 5.7 prüfen
+  - Ungeprüfter Entwurf gemäss Auftrag: `docs/notfall/notfallunterlagen.md`; Prüfung, Freigabe und Platzhalter füllen durch Fabian offen. Der Haken 5.10 bleibt offen.
   - _Anforderungen: 6.10, 16.12_
 
 - [ ] 5.11 Wechsel auf Stufe B [Infra] [Fabian]
@@ -585,6 +587,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - optionales `gueltig_bis` je Token, vor dem Wechsel auf Stufe B (5.11); ohne Wert gilt das Token weiter bis zum Widerruf
   - Spec 03 ergänzt: Die Spalte `gueltig_bis` legt Spec 03, Aufgabe 11.7 für Webseiten-Schlüssel nach einer Rotation an (Spec 03, Req 12.4); diese Option nutzt sie für `generator` und `import` mit
   - Stand Umsetzung (PR #155, ergänzt mit O.7): Übersicht und Widerruf sowie optionales `gueltig_bis` für `generator` und `import` umgesetzt.
+  - Review-Nachtrag (PR #248): Ein abgelaufenes Token kann durch Änderung oder Entfernung seines Ablaufdatums nicht reaktiviert werden (`API_TOKEN_ABGELAUFEN`); die Szenario-Schritte verwenden eine injizierte feste Uhr.
   - _Anforderungen: 2.5_
 
 - [ ]* O.8 Anmeldung mit Google [Infra] [Backend] [Fabian]

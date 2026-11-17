@@ -485,6 +485,69 @@ class DateiStreamTest {
     }
 
     @Test
+    void auchDerPruefstreamNutztDenKleinenPufferUndProtokolliertVorDemErstenByte() throws IOException {
+        Quelle quelle = new Quelle(50L * 1024 * 1024);
+        AtomicBoolean protokolliert = new AtomicBoolean();
+        UUID id = UUID.randomUUID();
+        var benutzer = new ch.urinet.archiv.sicherheit.domain.Benutzer("token:probe",
+                ch.urinet.archiv.sicherheit.domain.Rolle.GESCHAEFTSSTELLE);
+        var ort = new DokumentDatei.Dateiort(Ablageort.values()[0],
+                new DateiSchluessel(2026, id, DateiRolle.ORIGINAL, 1, "pdf"), "v-original");
+        WebseiteDatei datei = new WebseiteDatei(null, null, null) {
+            @Override
+            public DokumentDatei.Dateiort erfassungVorbereiten(ch.urinet.archiv.sicherheit.domain.Benutzer wer,
+                                                               UUID dokument) {
+                assertThat(wer).isEqualTo(benutzer);
+                assertThat(dokument).isEqualTo(id);
+                return ort;
+            }
+
+            @Override
+            public void erfassungProtokollieren(UUID dokument, ch.urinet.archiv.sicherheit.domain.Benutzer wer,
+                                                Optional<IpAdresse> ip, String bearbeiter) {
+                assertThat(bearbeiter).isEqualTo("probe/wp:1");
+                assertThat(quelle.gelesen).hasValue(0);
+                protokolliert.set(true);
+            }
+        };
+        AblagePort ablage = (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{AblagePort.class}, (proxy, methode, args) -> {
+                    assertThat(methode.getName()).isEqualTo("oeffnen");
+                    assertThat(args[3]).isEqualTo("v-original");
+                    return quelle.alsStrom();
+                });
+        StreamWaechter waechter = new StreamWaechter() {
+            @Override
+            public ScheduledExecutorService zeitgeber() {
+                return zeitgeber;
+            }
+        };
+        DateiAuslieferung auslieferung = new DateiAuslieferung(datei, ablage, plaetze, waechter, LANG, LANG);
+        var threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long vorher = threads.getThreadAllocatedBytes(Thread.currentThread().threadId());
+        var strom = auslieferung.erfassung(new MandantCode("urinet"), benutzer, id, Optional.empty(),
+                "probe/wp:1", () -> {});
+        strom.lauf().senden(new OutputStream() {
+            @Override
+            public void write(int b) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) {
+                if (!protokolliert.get() || len > BLOCK) {
+                    throw new AssertionError("Protokoll vor Bytes und höchstens ein Block");
+                }
+            }
+        });
+        long speicher = threads.getThreadAllocatedBytes(Thread.currentThread().threadId()) - vorher;
+        assertThat(strom.medientyp()).isEqualTo("application/pdf");
+        assertThat(strom.lauf().gesendet()).isEqualTo(quelle.laenge);
+        assertThat(speicher).isLessThan(1024 * 1024);
+        assertThat(plaetze.belegt()).isZero();
+    }
+
+    @Test
     void speicherNichtErreichbarBeimOeffnenGibtPlatzFreiUndProtokolliertNicht() {
         AtomicInteger protokolliert = new AtomicInteger();
         var ziel = new WebseiteDatei.Stream(new DokumentDatei.Dateiort(Ablageort.values()[0],

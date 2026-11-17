@@ -2,6 +2,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import io.quarkus.oidc.OIDCException;
 import io.quarkus.security.AuthenticationCompletionException;
 import io.quarkus.security.AuthenticationFailedException;
@@ -60,13 +61,34 @@ public class ProblemFehlerRoute {
     }
 
     void ueberlastet(RoutingContext kontext) {
-        if (kontext.failure() instanceof FachFehler fehler && fehler.code() == Fehlercode.UEBERLASTET
-                && !kontext.response().headWritten()) {
+        if (kontext.response().headWritten()) {
+            kontext.next();
+            return;
+        }
+        ZuVieleAnfragen zuViele = zuViele(kontext.failure());
+        if (zuViele != null) {
+            kontext.response().putHeader("Retry-After", Long.toString(zuViele.wartezeitSekunden()));
+            senden(kontext, ProblemAntwort.mitErweiterung(Fehlercode.ZU_VIELE_ANFRAGEN, "grund",
+                    zuViele.grund().name()), false);
+            return;
+        }
+        if (kontext.failure() instanceof FachFehler fehler && fehler.code() == Fehlercode.UEBERLASTET) {
             kontext.response().putHeader("Retry-After", NOCHMALS_NACH_SEKUNDEN);
             senden(kontext, ProblemAntwort.fuer(Fehlercode.UEBERLASTET), false);
             return;
         }
         kontext.next();
+    }
+
+    private static ZuVieleAnfragen zuViele(Throwable fehler) {
+        if (fehler instanceof ZuVieleAnfragen zuViele) {
+            return zuViele;
+        }
+        if (fehler instanceof AuthenticationCompletionException anmeldung
+                && anmeldung.getCause() instanceof ZuVieleAnfragen zuViele) {
+            return zuViele;
+        }
+        return null;
     }
 
     void grenzePruefen(RoutingContext kontext) {

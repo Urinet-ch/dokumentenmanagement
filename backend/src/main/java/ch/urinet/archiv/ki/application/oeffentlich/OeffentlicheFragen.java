@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.application.oeffentlich;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
+import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.ki.application.chat.ChatAbbruch;
 import ch.urinet.archiv.ki.application.chat.ChatFragen;
@@ -26,6 +27,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +61,8 @@ public class OeffentlicheFragen {
     /** Wortlaut bei Ausfall des Agenten: fest, ohne interne Angaben. */
     public static final String NICHT_VERFUEGBAR = ChatFragen.NICHT_VERFUEGBAR;
     /** Feste Antwort, wenn keine passende Publikation gefunden wird (Req 6.3); {@code %s} ist der Kontakt oder leer. */
+    /** Wartezeit bei laufender Frage des Mandanten: eine Frage dauert Sekunden, nicht eine. */
+    static final long MANDANT_LAEUFT_SEKUNDEN = 5;
     static final String KEIN_TREFFER = "Dazu habe ich keine passende Publikation gefunden. Bitte wenden Sie sich an die "
             + "Geschäftsstelle%s.";
 
@@ -123,23 +127,51 @@ public class OeffentlicheFragen {
     }
 
     /**
-     * Nimmt die Frage an. Reihenfolge der Ablehnungen: 400, 429 {@code BUDGET}, 429 {@code ZU_VIELE_ANFRAGEN}. Eine
-     * abgelehnte Frage zählt in keiner Grenze.
+     * Nimmt die Frage an: zuerst die Grenzen je Client und Webseite, dann die atomare Reservierung des Monatsbudgets.
+     * So berührt ein Client über seiner Grenze den einzigen Platz des Mandanten nie, und eine Frage, die an der
+     * Reservierung scheitert, zählt in keiner Grenze (Platz wird verworfen).
      */
     public Annahme annehmen(MandantCode mandant, Lesezugriff zugriff, String frage, Optional<UUID> gespraechId) {
         String text = frage(frage);
-        if (budget.erschoepft(mandant)) {
-            throw new FachFehler(Fehlercode.BUDGET);
-        }
         OeffentlicheGrenzen.Platz platz = grenzen.annehmen(mandant, zugriff);
+        MandantBudget.Reservierung reservierung;
+        try {
+            reservierung = budget.reservieren(mandant);
+            switch (reservierung.status()) {
+                case BUDGET_ERSCHOEPFT -> {
+                    platz.verwerfen();
+                    throw new FachFehler(Fehlercode.BUDGET);
+                }
+                case BEREITS_LAUFEND -> {
+                    platz.verwerfen();
+                    throw new ZuVieleAnfragen(ZuVieleAnfragen.Grund.LAEUFT, MANDANT_LAEUFT_SEKUNDEN);
+                }
+                case RESERVIERT -> {
+                    // Die Reservierung bleibt bis zum Ende des Durchgangs bestehen (oder bis ihr Lease verfällt).
+                }
+            }
+        } catch (RuntimeException e) {
+            platz.verwerfen();
+            throw e;
+        }
         try {
             OeffentlicheGespraeche.Geoeffnet gespraech = gespraeche.oeffnen(gespraechId.orElse(null), mandant, zugriff);
-            OeffentlicheAnfrage anfrage = new OeffentlicheAnfrage(mandant, zugriff,
+            OeffentlicheAnfrage anfrage = new OeffentlicheAnfrage(mandant, zugriff, reservierung.monat(),
                     einstellungen.lesen(mandant).name(), text, gespraech.verlauf());
             return new Annahme(gespraech.id(), anfrage, text, platz);
         } catch (RuntimeException e) {
             platz.freigeben();
+            freigebenOhneFehler(mandant, reservierung.monat());
             throw e;
+        }
+    }
+
+    /** Gibt die Reservierung frei; scheitert das, bleibt nur der Lease als Netz, und der Fehler geht nur ins Log. */
+    private void freigebenOhneFehler(MandantCode mandant, java.time.LocalDate monat) {
+        try {
+            budget.freigeben(mandant, monat);
+        } catch (RuntimeException e) {
+            LOG.errorf("Budget-Reservierung des öffentlichen Chats nicht freigegeben, ursache=%s", Ursachen.kette(e));
         }
     }
 
@@ -159,13 +191,21 @@ public class OeffentlicheFragen {
                     LOG.errorf("Öffentlicher Chat-Durchgang gescheitert, ursache=%s", Ursachen.kette(e));
                     einmalig.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
                 } finally {
-                    annahme.platz().freigeben();
+                    freigeben(annahme);
                 }
             });
         } catch (RejectedExecutionException e) {
-            annahme.platz().freigeben();
+            freigeben(annahme);
             LOG.errorf("Öffentlicher Chat-Durchgang nicht gestartet, ursache=%s", Ursachen.kette(e));
             einmalig.accept(new OeffentlicheAusgabe.Fehler(NICHT_VERFUEGBAR, id));
+        }
+    }
+
+    private void freigeben(Annahme annahme) {
+        try {
+            freigebenOhneFehler(annahme.anfrage().mandant(), annahme.anfrage().budgetMonat());
+        } finally {
+            annahme.platz().freigeben();
         }
     }
 

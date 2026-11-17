@@ -4,6 +4,7 @@ import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.ki.domain.chat.VerlaufEintrag;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
@@ -15,12 +16,13 @@ import java.util.Objects;
  * @param mandantenname Name des Mandanten für den Systemprompt (leer, wenn nicht gepflegt)
  * @param verlauf       die letzten Fragen und Antworten dieses Gesprächs vor dieser Frage, älteste zuerst
  */
-public record OeffentlicheAnfrage(MandantCode mandant, Lesezugriff zugriff, String mandantenname, String frage,
-                                  List<VerlaufEintrag> verlauf) {
+public record OeffentlicheAnfrage(MandantCode mandant, Lesezugriff zugriff, LocalDate budgetMonat,
+                                  String mandantenname, String frage, List<VerlaufEintrag> verlauf) {
 
     public OeffentlicheAnfrage {
         Objects.requireNonNull(mandant, "mandant");
         Objects.requireNonNull(zugriff, "zugriff");
+        Objects.requireNonNull(budgetMonat, "budgetMonat");
         Objects.requireNonNull(mandantenname, "mandantenname");
         Objects.requireNonNull(frage, "frage");
         verlauf = List.copyOf(verlauf);
