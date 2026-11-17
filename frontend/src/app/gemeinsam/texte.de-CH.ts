@@ -2,6 +2,10 @@
 export const TEXTE = {
   appTitel: 'UriNet Archiv',
   willkommen: 'Willkommen im UriNet Archiv.',
+  offlineHinweis: 'Sie sind offline. Daten aus dem Archiv lassen sich erst mit einer Verbindung laden.',
+  updateBereit: 'Eine neue Version ist verfügbar.',
+  updateJetzt: 'Jetzt aktualisieren',
+  updateFehler: 'Die neue Version konnte nicht aktiviert werden. Bitte laden Sie die Seite neu.',
   hauptnavigation: 'Hauptnavigation',
   zumInhalt: 'Zum Inhalt springen',
   menueOeffnen: 'Menü öffnen',
@@ -39,6 +43,20 @@ export const TEXTE = {
     ohneZugang:
       'Ihrem Benutzer ist kein Mandant oder keine Rolle im Archiv zugeordnet. Bitte wenden Sie sich an den Inhaber.',
     funktionen: 'Ihre Funktionen',
+  },
+  httpFehler: {
+    verbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+    keinZugriff: 'Sie sind für diese Aktion nicht berechtigt.',
+    nichtGefunden: 'Die angeforderten Daten sind nicht mehr vorhanden. Bitte laden Sie die Seite neu.',
+    konflikt: 'Die Daten wurden inzwischen geändert. Bitte laden Sie die aktuelle Version neu.',
+    zuViele: (sekunden: number | null) =>
+      sekunden === null
+        ? 'Zu viele Anfragen. Bitte später erneut versuchen.'
+        : sekunden === 0
+          ? 'Zu viele Anfragen. Bitte versuchen Sie es erneut.'
+          : `Zu viele Anfragen. Bitte in ${sekunden} Sekunden erneut versuchen.`,
+    server: 'Das Archiv ist vorübergehend nicht erreichbar. Bitte versuchen Sie es erneut.',
+    allgemein: 'Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
   },
   folgt: 'Diese Seite folgt in einer späteren Ausbaustufe.',
   upload: {
