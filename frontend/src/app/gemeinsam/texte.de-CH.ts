@@ -157,6 +157,8 @@ export const TEXTE = {
   },
   eingangskorb: {
     titel: 'Eingangskorb',
+    ja: 'Ja',
+    nein: 'Nein',
     einleitung: 'Neue Dokumente prüfen und bestätigen, neueste zuerst.',
     laedt: 'Eingangskorb wird geladen …',
     leer: 'Der Eingangskorb ist leer.',
@@ -185,6 +187,12 @@ export const TEXTE = {
       waehrung: 'Währung',
       faelligkeit: 'Fällig am',
       qrReferenz: 'QR-Referenz',
+      zugriff: 'Zugriffsstufe',
+      reihe: 'Reihe',
+      ausgabe: 'Ausgabe-Nr.',
+      jahr: 'Erscheinungsjahr',
+      fachgebiet: 'Fachgebiet',
+      veroeffentlicht: 'Veröffentlicht',
       projekt: 'Projekt',
       gueltigAb: 'Gültig ab',
       gueltigBis: 'Gültig bis',
@@ -199,6 +207,11 @@ export const TEXTE = {
       NORMAL: 'Normal',
       INTERN: 'Intern',
       PERSONAL: 'Personal',
+    } as Record<string, string>,
+    zugriff: {
+      oeffentlich: 'Öffentlich',
+      mitglieder: 'Mitglieder',
+      vorstand: 'Vorstand',
     } as Record<string, string>,
     bittePruefen: 'bitte prüfen',
     vorgeschlagen: 'Vorschlag',
@@ -227,6 +240,7 @@ export const TEXTE = {
     betragHinweis: 'z. B. 1234.50',
     betragUngueltig:
       'Bitte einen Betrag mit höchstens zwei Nachkommastellen angeben, z. B. 1234.50.',
+    zusatzUngueltig: (felder: string) => `Bitte gültige Werte eingeben: ${felder}.`,
     rueckfragePdfa:
       'Für dieses Dokument gibt es keine PDF/A-Fassung. Trotzdem nur mit Original und Arbeitsfassung archivieren?',
     rueckfragePdfaJa: 'Ohne PDF/A bestätigen',
@@ -246,8 +260,10 @@ export const TEXTE = {
     fehlerPflichtfelder: (felder: string) => `Bitte ergänzen: ${felder}.`,
     zusatzFeld: (name: string) => `Zusatzfeld «${name}»`,
     zusatzBleibtImKorb:
-      'Das Dokument bleibt im Eingangskorb, bis die Zusatzfelder in der Dokumentansicht ergänzt sind; Sie können es auch verwerfen.',
+      'Bitte ergänzen Sie die markierten Zusatzfelder hier im Eingangskorb.',
+    zusatzTitel: 'Angaben zur Dokumentart',
     zusatzErgaenzen: 'In der Dokumentansicht ergänzen',
+    zusatzFormularOeffnen: 'Zusatzfelder hier ergänzen',
     zusatzErgaenzenArt: (art: string) =>
       `Die Dokumentansicht übernimmt die Art «${art}» als Änderung; andere ungespeicherte Angaben gehen nicht mit.`,
     zusatzArtInaktiv: (art: string) =>

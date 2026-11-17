@@ -190,7 +190,7 @@ function zusatzWert(feld: ZusatzFeld, wert: string): unknown {
   }
 }
 
-function zusatzGueltig(feld: ZusatzFeld, wert: string): boolean {
+export function zusatzGueltig(feld: ZusatzFeld, wert: string): boolean {
   const roh = wert.trim().replace(/'/g, '');
   if (roh === '') {
     return true;

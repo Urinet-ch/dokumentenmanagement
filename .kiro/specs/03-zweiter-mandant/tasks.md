@@ -34,11 +34,13 @@ und erfüllt die Definition of Done aus `tech.md`.
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
   - _Anforderungen: 2.1–2.3_
 
-- [ ] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
+- [x] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
   - Rolle `geschaeftsstelle` nach Rechtematrix (Spec 01, 2.6: A1 bis A10 erlaubt, A11 bis A14 bis zum Entscheid 403), veröffentlichen/zurückziehen, KI-Prompt pro Mandant (Reihe, Ausgabe, Jahr, Fachgebiet), Zugriffsstufe nur manuell (Standard `mitglieder`)
   - Eingangskorb zeigt Felder je Dokumentart
   - Spec 05 ergänzt: KI-Prompt und Felder je Art aus der Konfiguration von `vhf-gsk`; die Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht liefert Spec 05, Aufgabe 18.4 (Spec 05, Req 7.5, 8.1)
   - Ergänzt 13.11.2026 (E-C): Auswahl der Zugriffsstufe mit drei Werten (`oeffentlich`, `mitglieder`, `vorstand`), Standard `mitglieder`
+  - Umsetzung (PR #229): Zusatzfelder aus dem Dokumentart-Schema; Veröffentlichung erst nach bestätigter Archivierung, Rückzug über A6; bestehende Rechte A1–A10/A11–A14 wiederverwendet, auch für Aufgabe 11.10
+  - Verschoben (Nachbesserung Review PR #229): Der Mandantenhinweis im KI-Prompt ist eine Teilumsetzung (fester Textblock für `vhf-gsk`, keine zusätzlichen Antwortfelder, durch `MetadatenExtraktionTest` über `vorschlagen` belegt). Req 3.2 mit Feldern je Art aus der Konfiguration ist beschlossen nach Spec 05, Aufgabe 18.1/18.4 verschoben (kein offener Rest dieser Aufgabe). Der Feed-Eintrag beim Veröffentlichen und Zurückziehen (Spec 04, #230, Aufgabe 11.9) ist im Szenario «Die Geschäftsstelle veröffentlicht nach der Archivierung und zieht zurück» belegt (`stufe_vorher`/`stufe_nachher`).
   - _Anforderungen: 3.1–3.5_
 
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
