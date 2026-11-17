@@ -799,6 +799,20 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
+    public long speicherbedarf(MandantCode mandant) {
+        String bucket = bucket(mandant);
+        return pruefzugriff("Bucket-Inventar", () -> {
+            long bytes = 0;
+            for (var seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket))) {
+                for (ObjectVersion version : seite.versions()) {
+                    bytes = Math.addExact(bytes, Objects.requireNonNull(version.size(), "S3 version size"));
+                }
+            }
+            return bytes;
+        });
+    }
+
+    @Override
     public Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion version) {
         sicherungsBereichPruefen(version.schluessel(), version.versionId());
         if (version.loeschmarke()) {

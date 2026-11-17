@@ -16,6 +16,7 @@ import ch.urinet.archiv.sicherung.application.SicherungBucketExport.InventarZeil
 import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
 import ch.urinet.archiv.sicherung.application.SicherungExportVerwaltung;
 import ch.urinet.archiv.sicherung.application.Wiederherstellung;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsReferenz;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -74,6 +75,7 @@ class SicherungExportS3Test {
     private static final String ZIEL_PRAEFIX = "restore-test-";
     private static final String FALSCHES_PRAEFIX = "restore-test-falsch-";
     private static final String PROBE_PRAEFIX = "urinet-archiv-p-";
+    private static final WiederherstellungsReferenz KEINE_REFERENZ = (code, key, alt, neu) -> { };
     private static final int OBJEKT = 0x55424a31;
     private static final int SHA256 = 0x53484131;
 
@@ -202,6 +204,9 @@ class SicherungExportS3Test {
     }
 
     private record Eintrag(String schluessel, String versionId, byte[] inhalt, String sha256) {
+    }
+
+    private record Referenz(String schluessel, String alteVersion, String neueVersion) {
     }
 
     /** Liest einen oder mehrere hintereinander gehängte Ströme. */
@@ -396,8 +401,11 @@ class SicherungExportS3Test {
         Path strom = exportDatei(voll, zuwachs);
         String zielBucket = zielBucketAnlegen(ZIEL_PRAEFIX);
         S3Wiederherstellung ziel = wiederherstellungsZiel(ZIEL_PRAEFIX);
+        List<Referenz> referenzen = new ArrayList<>();
+        WiederherstellungsReferenz referenz = (code, key, alt, neu) ->
+                referenzen.add(new Referenz(key, alt, neu));
 
-        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, Clock.systemUTC())
+        Wiederherstellung.Ergebnis ergebnis = new Wiederherstellung(ziel, Clock.systemUTC(), referenz)
                 .wiederherstellen(mandant, quelle, strom, false);
 
         assertThat(ergebnis.exitCode()).isZero();
@@ -410,6 +418,8 @@ class SicherungExportS3Test {
                 archiv, List.of("Zuwachs", "aktuelle Version", "vorherige Version"),
                 eingang, List.of("eingegangener Beleg"),
                 manifest, List.of("synthetisches Manifest")));
+        assertThat(referenzen).hasSize(4).extracting(Referenz::schluessel).containsOnly(archiv, eingang);
+        assertThat(referenzen).allSatisfy(r -> assertThat(r.neueVersion()).isNotEqualTo(r.alteVersion()));
     }
 
     @Test
@@ -426,13 +436,13 @@ class SicherungExportS3Test {
 
         String falschesBucket = zielBucketAnlegen(FALSCHES_PRAEFIX);
         Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(wiederherstellungsZiel(FALSCHES_PRAEFIX),
-                Clock.fixed(jetzt, ZoneOffset.UTC)).wiederherstellen(mandant, quelle, datei, true);
+                Clock.fixed(jetzt, ZoneOffset.UTC), KEINE_REFERENZ).wiederherstellen(mandant, quelle, datei, true);
         assertThat(abgelehnt.exitCode()).isEqualTo(2);
         assertThat(verwaltung.listObjectVersions(r -> r.bucket(falschesBucket)).versions()).isEmpty();
 
         String probeBucket = zielBucketAnlegen(PROBE_PRAEFIX);
         Wiederherstellung.Ergebnis wiederhergestellt = new Wiederherstellung(wiederherstellungsZiel(PROBE_PRAEFIX),
-                Clock.fixed(jetzt, ZoneOffset.UTC)).wiederherstellen(mandant, quelle, datei, true);
+                Clock.fixed(jetzt, ZoneOffset.UTC), KEINE_REFERENZ).wiederherstellen(mandant, quelle, datei, true);
 
         assertThat(wiederhergestellt.exitCode()).isZero();
         assertThat(wiederhergestellt.zaehler().gekappt()).isEqualTo(1);
@@ -453,7 +463,7 @@ class SicherungExportS3Test {
         String vollesBucket = zielBucketAnlegen(ZIEL_PRAEFIX);
         put(vollesBucket, "archiv/vorhanden.bin", "vorhanden");
         Wiederherstellung.Ergebnis abgelehnt = new Wiederherstellung(wiederherstellungsZiel(ZIEL_PRAEFIX),
-                Clock.systemUTC()).wiederherstellen(mandant, quelle, datei, false);
+                Clock.systemUTC(), KEINE_REFERENZ).wiederherstellen(mandant, quelle, datei, false);
         assertThat(abgelehnt.exitCode()).isEqualTo(2);
         assertThat(verwaltung.listObjectVersions(r -> r.bucket(vollesBucket)).versions())
                 .extracting(v -> v.key()).containsExactly("archiv/vorhanden.bin");
@@ -470,7 +480,7 @@ class SicherungExportS3Test {
         manipuliert[rahmen.position()] ^= 1;
         Path korrupt = exportDatei(manipuliert, new byte[0]);
         Wiederherstellung.Ergebnis fehler = new Wiederherstellung(
-                wiederherstellungsZiel("restore-test-korrupt-"), Clock.systemUTC())
+                wiederherstellungsZiel("restore-test-korrupt-"), Clock.systemUTC(), KEINE_REFERENZ)
                 .wiederherstellen(mandant, quelle, korrupt, false);
 
         assertThat(fehler.exitCode()).isEqualTo(3);

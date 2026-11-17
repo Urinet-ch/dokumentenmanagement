@@ -167,8 +167,11 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 ## Welle 12 — Mandantenverwaltung und Abnahme
 
-- [ ] 12.1 Monatsbericht pro Mandant [Backend]
+- [x] 12.1 Monatsbericht pro Mandant [Backend]
   - Auftrag `MANDANT_BERICHT` (Speicher, Dokumente, Tokens nach Zweck, Chat-Fragen), E-Mail an Betreiber
+  - Umsetzung (PR #224): Changeset `034-mandant-bericht`, Bericht, tägliche Wiederholung fehlender Läufe, mandantengetrennte Speicherung und Betreiber-Mail; Zeitfenster und Req-8.1-Szenarien ergänzt
+  - Nachweis: `mvn -o test -Dquarkus.http.test-port=0 -Dtest=MandantBerichtSzenarienTest,MandantBerichtHandlerTest,MandantBerichtFensterTest` (Feature `features/mandant/monatsbericht.feature`: fünf Szenarien `@req-8.1` für getrennte Mandanten, Monatsgrenze, Idempotenz, keine Inhalte und Planung ohne deaktivierte Mandanten; Mailfehler mit Wiederholung in `MandantBerichtHandlerTest`)
+  - Auslegungen (Review entscheidet): «Speicher» zählt alle Objektversionen (`listObjectVersions`), nicht nur die aktuellen Objekte; Speicher und Dokumente je Status sind der Stand bei der Erhebung (nicht zum Monatsende), nur KI-Tokens und Chat-Fragen sind auf das Fenster begrenzt; Mail ist mindestens-einmal; ohne Empfänger bleibt der Bericht gespeichert und die Planung reiht täglich neu ein (WARN als Betreibersignal)
   - _Anforderungen: 8.1_
 
 - [ ] 12.2 Vollexport und Abbau [Backend]

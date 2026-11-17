@@ -3,6 +3,7 @@ package ch.urinet.archiv.sicherung.adapter.in.kommando;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherung.application.SicherungExportSpeicher;
+import ch.urinet.archiv.sicherung.application.WiederherstellungsReferenz;
 import ch.urinet.archiv.sicherung.domain.SicherungsArt;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -20,6 +21,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executors;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +45,9 @@ class SicherungKommandoDbTest {
 
     @Inject
     SicherungExportSpeicher exportSpeicher;
+
+    @Inject
+    WiederherstellungsReferenz wiederherstellungsReferenz;
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -116,6 +121,103 @@ class SicherungKommandoDbTest {
         assertThat(datenbank).isAfter(inventar);
         assertThat(exportSpeicher.juengsterEintrag(SicherungsArt.DB, Optional.of(aktiv))).isEmpty();
         assertThat(exportSpeicher.juengsterEintrag(SicherungsArt.BUCKET, Optional.empty())).isEmpty();
+    }
+
+    @Test
+    void aktualisiertNachRestoreNurAktiveDokumentDateireferenzen() throws Exception {
+        vorhanden(AKTIV);
+        UUID id = UUID.randomUUID();
+        String hash = sha();
+        String dateiSchluessel = "archiv/restore-test/" + id + "/original.pdf";
+        String eingangSchluessel = "eingang/2026/" + id + "/arbeitsfassung.pdf";
+        String pdfaSchluessel = "archiv/restore-test/" + id + "/pdfa.pdf";
+        String alteDateiVersion = "quelle-" + id;
+        String neueDateiVersion = "ziel-" + id;
+        String alteEingangVersion = "quelle-eingang-" + id;
+        String neueEingangVersion = "ziel-eingang-" + id;
+        String altePdfaVersion = "quelle-pdfa-" + id;
+        String neuePdfaVersion = "ziel-pdfa-" + id;
+
+        try {
+            try (Connection v = datenbank.get().getConnection()) {
+                try (PreparedStatement p = v.prepareStatement("insert into m_urinet.dokument "
+                        + "(id, quelle, erstellt_von, status, s3_pdfa, s3_version_pdfa, sha256_pdfa) "
+                        + "values (?, 'UPLOAD', 'restore-test', 'ARCHIVIERT', ?, ?, ?)")) {
+                    p.setObject(1, id);
+                    p.setString(2, pdfaSchluessel);
+                    p.setString(3, altePdfaVersion);
+                    p.setString(4, hash);
+                    p.executeUpdate();
+                }
+                try (PreparedStatement p = v.prepareStatement("insert into m_urinet.dokument_datei "
+                        + "(dokument_id, nr, rolle, sha256, s3_schluessel, s3_version) "
+                        + "values (?, 1, 'ORIGINAL', ?, ?, ?)")) {
+                    p.setObject(1, id);
+                    p.setString(2, hash);
+                    p.setString(3, dateiSchluessel);
+                    p.setString(4, alteDateiVersion);
+                    p.executeUpdate();
+                }
+                try (PreparedStatement p = v.prepareStatement("insert into m_urinet.dokument_datei "
+                        + "(dokument_id, nr, rolle, sha256, s3_schluessel, s3_version) "
+                        + "values (?, 1, 'ARBEITSFASSUNG', ?, ?, ?)")) {
+                    p.setObject(1, id);
+                    p.setString(2, hash);
+                    p.setString(3, eingangSchluessel);
+                    p.setString(4, alteEingangVersion);
+                    p.executeUpdate();
+                }
+            }
+            MandantCode mandant = new MandantCode(AKTIV);
+            try (var thread = Executors.newSingleThreadExecutor()) {
+                thread.submit(() -> {
+                    wiederherstellungsReferenz.versionErsetzt(mandant, dateiSchluessel, alteDateiVersion, neueDateiVersion);
+                    wiederherstellungsReferenz.versionErsetzt(mandant, eingangSchluessel, alteEingangVersion,
+                            neueEingangVersion);
+                    wiederherstellungsReferenz.versionErsetzt(mandant, pdfaSchluessel, altePdfaVersion, neuePdfaVersion);
+                    wiederherstellungsReferenz.versionErsetzt(mandant, "manifest/restore.json", "alt", "neu");
+                }).get();
+            }
+
+            assertThat(dateiVersion(id, dateiSchluessel)).isEqualTo(neueDateiVersion);
+            assertThat(dateiVersion(id, eingangSchluessel)).isEqualTo(neueEingangVersion);
+            assertThat(pdfaVersion(id)).isEqualTo(neuePdfaVersion);
+        } finally {
+            try (Connection v = datenbank.get().getConnection()) {
+                try (PreparedStatement p = v.prepareStatement("delete from m_urinet.dokument_datei where dokument_id = ?")) {
+                    p.setObject(1, id);
+                    p.executeUpdate();
+                }
+                try (PreparedStatement p = v.prepareStatement("delete from m_urinet.dokument where id = ?")) {
+                    p.setObject(1, id);
+                    p.executeUpdate();
+                }
+            }
+        }
+    }
+
+    private String dateiVersion(UUID id, String schluessel) throws SQLException {
+        try (Connection v = datenbank.get().getConnection();
+             PreparedStatement p = v.prepareStatement(
+                     "select s3_version from m_urinet.dokument_datei where dokument_id = ? and s3_schluessel = ?")) {
+            p.setObject(1, id);
+            p.setString(2, schluessel);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                return r.getString(1);
+            }
+        }
+    }
+
+    private String pdfaVersion(UUID id) throws SQLException {
+        try (Connection v = datenbank.get().getConnection();
+             PreparedStatement p = v.prepareStatement("select s3_version_pdfa from m_urinet.dokument where id = ?")) {
+            p.setObject(1, id);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                return r.getString(1);
+            }
+        }
     }
 
     private int aufruf(String... argumente) {
