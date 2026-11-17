@@ -91,6 +91,8 @@ export class DokumentAnsicht {
    * Zuletzt per Klick geholte Adresse: `window.open` läuft erst nach der Antwort und damit ausserhalb der Klick-Geste;
    * blockiert der Browser das Fenster, bleibt dieser Link als zweite, eigene Geste.
    */
+  private readonly pdfaLaedt = signal(false);
+  protected readonly pdfaHinweis = signal(false);
   private readonly geholt = signal<{ adresse: DownloadAdresse; variante: Variante } | null>(null);
   protected readonly geholtUrl = computed(() => sichereAdresse(this.geholt()?.adresse.url));
 
@@ -337,18 +339,31 @@ export class DokumentAnsicht {
       return;
     }
     ereignis.preventDefault();
+    if (this.pdfaLaedt()) {
+      return;
+    }
+    this.pdfaLaedt.set(true);
+    this.dateiFehler.set(false);
+    this.pdfaHinweis.set(false);
     this.abos.add(
       this.port.adresse(this.id(), 'pdfa', 'vorschau').subscribe({
         next: (adresse) => {
+          this.pdfaLaedt.set(false);
           const url = sichereAdresse(adresse.url);
           if (!url) {
-            this.vorschau.set('fehler');
+            this.dateiFehler.set(true);
             return;
           }
           this.pdfa.set(adresse);
-          window.open(url, '_blank', 'noopener,noreferrer');
+          // Ausserhalb der Klick-Geste kann der Browser das Fenster sperren: dann genügt ein zweiter Klick.
+          if (!window.open(url, '_blank', 'noopener,noreferrer')) {
+            this.pdfaHinweis.set(true);
+          }
         },
-        error: () => this.vorschau.set('fehler'),
+        error: () => {
+          this.pdfaLaedt.set(false);
+          this.dateiFehler.set(true);
+        },
       }),
     );
   }

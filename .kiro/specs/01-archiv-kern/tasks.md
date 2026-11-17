@@ -569,7 +569,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - _Abhängig von: 1.9, 2.4, 2.6, 4.5, 4.9 (bei vorgezogenem Wechsel nur der Entscheid K5 aus 4.9)_
 
 ## Optionen
-Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04, O.7–O.8 in Spec 01).
+Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spec 02, O.4–O.6 in Spec 04, O.7–O.10 in Spec 01).
 
 - [ ]* O.7 Übersicht und Ablauf der API-Tokens vor Stufe B [Backend] [Frontend]
   - Herkunft: Review von PR #37 (Aufgabe 1.5); Grundlage: Tokens laufen nicht ab, sie gelten bis zum Widerruf (entschieden von Fabian am 10.11.2026)
@@ -586,3 +586,13 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - Szenarien gegen einen `oidc`-Test-IdP: unbekanntes Konto abgelehnt, E-Mail allein verknüpft nicht, verknüpftes Konto angemeldet mit TOTP, Rollen und `mandant` nur aus Keycloak, Lösen der Verknüpfung im Ereignisprotokoll und Sitzungen beendet
   - ab Stufe B: Google als Empfänger der Anmeldedaten im Verzeichnis der Bearbeitungen und im Datenschutzhinweis [Fabian]
   - _Anforderungen: 2.25–2.29_
+
+- [ ]* O.9 Nachprüfung Frontend: Fehlermatrix für die übrigen Seiten [Frontend]
+  - Herkunft: Review von PR #238 (Teilumsetzung der Nachprüfung Frontend)
+  - 401/403/404/409/429/5xx/Netzwerk seitenweise prüfen und mit Komponententests belegen für Anmeldung, Eingangskorb, Dokumentliste, Suche, Erfassen/Kamera (PR #238 deckt Dokumentdetail, Gesprächsliste, Token-Liste ab)
+  - Offline und Service-Worker-Update mit Test belegen (bisher nur Code-Feststellung)
+
+- [ ]* O.10 Eingangskorb-Entwurf bleibt bei Sitzungsablauf (401) [Frontend] [Fabian]
+  - Herkunft: Review von PR #238; der frühere Ausschlussgrund (#228/#229) ist mit deren Merge entfallen
+  - Entwurfsentscheid [Fabian]: Wohin der Entwurf bei 401 geht (z. B. sessionStorage nur mit Metadaten, keine Dateiinhalte), Verfall und Löschung beim Abmelden
+  - Nach erneuter Anmeldung den Entwurf wiederherstellen; Test für den Ablauf

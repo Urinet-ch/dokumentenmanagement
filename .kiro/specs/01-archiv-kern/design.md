@@ -1480,7 +1480,7 @@ Entscheide 4.9-E2 bis 4.9-E5 aus Aufgabe 4.9: vorgeschlagen 12.11.2026, entschie
   - Mobil (< 960 px) ist die Filterleiste eingeklappt (Knopf mit `aria-expanded`), die Seite scrollt nicht waagrecht.
   - `/dokument/:id` (A2) hinter `DokumentPort`: Metadaten aus `GET /dokumente/{id}` (Art mit Namen aus
     `GET /dokumentarten`, Zusatzfelder ohne leere Werte), Vorschau der PDF/A-Fassung als Link «PDF öffnen» (neuer Tab) auf die
-    vorsignierte Adresse (bei Bildern die Seitenvorschau; keine eingebettete Ressource, PR #238), Knopf «PDF/A herunterladen» (neuer Tab, `noopener noreferrer`). Die PWA übernimmt nur
+    vorsignierte Adresse (bei Bildern die Seitenvorschau; keine eingebettete Ressource; vorgeschlagen mit PR #238, entschieden erst mit Merge und Bestätigung durch Fabian), Knopf «PDF/A herunterladen» (neuer Tab, `noopener noreferrer`). Die PWA übernimmt nur
     `http`/`https`-Adressen; läuft die Adresse in weniger als 15 s ab, holt der Knopf eine neue. Ohne PDF/A-Fassung
     (404) bietet die Ansicht das Original zum Herunterladen an.
   - Holt ein Klick die Adresse erst (Original, abgelaufene PDF/A-Adresse), öffnet `window.open` sie nach der Antwort,

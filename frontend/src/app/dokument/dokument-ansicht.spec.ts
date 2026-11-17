@@ -323,8 +323,42 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.dispatchEvent(klick);
     await fixture.whenStable();
     expect(klick.defaultPrevented).toBe(true);
-    expect(open).toHaveBeenCalledWith('https://s3.example/pdfa?sig=neu', '_blank', 'noopener,noreferrer');
+    expect(open).toHaveBeenCalledWith(
+      'https://s3.example/pdfa?sig=neu',
+      '_blank',
+      'noopener,noreferrer',
+    );
     expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
+  });
+
+  it('lässt beim Neuholen der PDF-Adresse nur eine Anfrage laufen und zeigt einen Fehler ohne die Vorschau zu verlieren', async () => {
+    port.pdfa = of({
+      url: 'https://s3.example/pdfa?sig=alt',
+      gueltigBis: new Date(Date.now() - 1000).toISOString(),
+    });
+    await oeffnen();
+    port.pdfa = new Subject<DownloadAdresse>();
+    const link = element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!;
+    link.click();
+    link.click();
+    expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
+    (port.pdfa as Subject<DownloadAdresse>).error(new HttpErrorResponse({ status: 0 }));
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=datei-fehler]')).not.toBeNull();
+    expect(element.querySelector('[data-test=download]')).not.toBeNull();
+  });
+
+  it('weist bei gesperrtem Fenster auf den zweiten Klick hin', async () => {
+    port.pdfa = of({
+      url: 'https://s3.example/pdfa?sig=alt',
+      gueltigBis: new Date(Date.now() - 1000).toISOString(),
+    });
+    await oeffnen();
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=pdf-bereit]')).not.toBeNull();
   });
 
   it('sagt bei 404 nur, dass es das Dokument nicht gibt oder es nicht sichtbar ist (Req 2.3)', async () => {
