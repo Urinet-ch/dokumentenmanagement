@@ -1,5 +1,7 @@
 export * from './api-tokens.service';
 import { APITokensService } from './api-tokens.service';
+export * from './branding.service';
+import { BrandingService } from './branding.service';
 export * from './chat.service';
 import { ChatService } from './chat.service';
 export * from './dokumentarten.service';
@@ -14,4 +16,4 @@ export * from './kontakte.service';
 import { KontakteService } from './kontakte.service';
 export * from './protokoll.service';
 import { ProtokollService } from './protokoll.service';
-export const APIS = [APITokensService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KontakteService, ProtokollService];
+export const APIS = [APITokensService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KontakteService, ProtokollService];
