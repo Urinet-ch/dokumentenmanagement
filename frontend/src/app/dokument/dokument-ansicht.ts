@@ -35,7 +35,7 @@ const RESERVE_MS = 15_000;
 const AENDERBAR = new Set(['EINGANGSKORB', 'FEHLER', 'ARCHIVIERT']);
 const BREIT = '(min-width: 960px)';
 
-/** Nur http(s) darf in object/Link; die Adresse kommt vom Archiv, die Prüfung schützt trotzdem vor javascript: o. Ä. */
+/** Nur http(s) darf als vorsignierter Link verwendet werden; so werden etwa javascript:-Adressen ausgeschlossen. */
 export function sichereAdresse(url: string | null | undefined): string | null {
   try {
     const adresse = new URL(url ?? '');

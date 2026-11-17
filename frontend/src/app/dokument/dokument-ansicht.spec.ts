@@ -265,7 +265,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
   });
 
-  it('bindet keine nicht-http(s)-Adresse als PDF-Ressource ein', async () => {
+  it('verlinkt keine nicht-http(s)-Adresse als PDF-Vorschau', async () => {
     port.pdfa = of({ url: 'javascript:alert(1)', gueltigBis: zukunft() });
     await oeffnen();
 

@@ -1,6 +1,6 @@
-// Vorschau und Download der Dokumentansicht (Req 14.6) gegen das echte Archiv im Testmodus mit MinIO. Der Browser lädt
-// die Datei von der vorsignierten Adresse der Ablage (anderer Host als die API); geprüft werden die Antwort-Header und
-// ob der Browser einen Download auslöst. Adressen (Zugangsschlüssel auf Zeit) werden nie geloggt oder verglichen.
+// Vorschau und Download der Dokumentansicht (Req 14.6) gegen das echte Archiv im Testmodus mit MinIO. Die PWA bindet
+// die vorsignierte Ablage-Adresse nicht als Ressource ein; der Link wird nur auf Klick im neuen Tab geöffnet.
+// Adressen (Zugangsschlüssel auf Zeit) werden nie geloggt oder verglichen.
 import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { direktHochladen, echteDokumente, inhalt, statusSetzen } from '../hilfen/echtes-backend.mjs';
@@ -55,26 +55,18 @@ When(/^ich die Dokumentansicht von «(.+)» öffne$/, async function (name) {
   await this.seite.getByRole('heading', { level: 1 }).waitFor();
 });
 
-Then('sehe ich die Vorschau des PDF', async function () {
-  const vorschau = this.seite.locator('object[data-test=vorschau]');
-  await vorschau.waitFor();
-  assert.equal(await vorschau.getAttribute('type'), 'application/pdf');
+Then('sehe ich einen sicheren Link zur PDF-Vorschau', async function () {
+  const link = this.seite.locator('a[data-test=pdf-laden]');
+  await link.waitFor();
+  const adresse = await link.getAttribute('href');
+  assert.ok(adresse && ['http:', 'https:'].includes(new URL(adresse).protocol));
+  assert.equal(await link.getAttribute('target'), '_blank');
+  assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
 });
 
-async function warteAufAblage(welt) {
-  for (const ende = Date.now() + 15_000; Date.now() < ende && welt.ablageAntworten.length === 0; ) {
-    await new Promise((weiter) => setTimeout(weiter, 100));
-  }
-  assert.ok(welt.ablageAntworten.length > 0, 'der Browser hat die Ablage nicht abgefragt');
-}
-
-Then(
-  /^hat der Browser die Vorschau mit Content-Type «(.+)» und Content-Disposition «(.+)» erhalten$/,
-  async function (typ, disposition) {
-    await warteAufAblage(this);
-    assert.deepEqual(this.ablageAntworten.map((a) => [a.status, a.typ, a.disposition]), [[200, typ, disposition]]);
-  },
-);
+Then('hat die PWA das PDF nicht automatisch abgerufen', async function () {
+  assert.equal(this.ablageAntworten.length, 0, 'die PWA hat die PDF-Adresse automatisch abgerufen');
+});
 
 Then('hat der Browser keine Datei heruntergeladen', async function () {
   // dem Browser Zeit lassen, einen Download auszulösen, falls die Antwort ein attachment wäre
@@ -89,13 +81,12 @@ Then('hat der Browser eine Datei heruntergeladen', async function () {
   assert.equal(this.downloads.length, 1, 'der Klick hat keinen Download ausgelöst');
 });
 
-// Die Antwort einer Navigation, die zum Download wird, meldet Playwright nicht als Antwort; geprüft wird darum das
-// Ergebnis: Die Vorschau kam inline, die Datei heisst nach dem Archiv («<Dokument-ID>-<Name aus dem Schlüssel>»),
-// nicht nach dem Namen der hochgeladenen Datei (Req 3.12).
+// Die vorsignierte Download-Navigation meldet Playwright nicht als Antwort; geprüft werden der fehlende automatische
+// Vorschau-Abruf und der Dateiname aus dem Archiv («<Dokument-ID>-<Name aus dem Schlüssel>», Req 3.12).
 Then(
-  /^hat der Browser nur die Vorschau mit Content-Disposition «(.+)» erhalten und die Datei als «(.+)» mit der ID von «(.+)» heruntergeladen$/,
-  async function (vorschau, name, dokument) {
-    assert.deepEqual(this.ablageAntworten.map((a) => a.disposition?.split(';')[0]), [vorschau]);
+  /^hat die PWA das PDF nicht automatisch abgerufen und die Datei als «(.+)» mit der ID von «(.+)» heruntergeladen$/,
+  async function (name, dokument) {
+    assert.equal(this.ablageAntworten.length, 0, 'die PWA hat die PDF-Adresse vor dem Klick abgerufen');
     assert.equal(this.downloads[0].suggestedFilename(), `${echteDokumente(this).get(dokument)}-${name}`);
   },
 );
