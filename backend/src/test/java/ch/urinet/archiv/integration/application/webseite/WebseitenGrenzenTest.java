@@ -63,7 +63,21 @@ class WebseitenGrenzenTest {
 
     /** Lesen 1/s Spitze 5, Suche 0.5/s Spitze 2, Erfassung 1/s Spitze 3, Uploads 2 je Stunde, höchstens 3 Schlüssel. */
     private WebseitenGrenzen grenzen() {
-        return new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl);
+        return new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl);
+    }
+
+    @Test
+    void pruefdateienHabenEngereSpitzeUndZaehlenAuchImErfassungsbucket() {
+        WebseitenGrenzen g = grenzen();
+        g.pruefen("token:e", Grenzklasse.DATEI);
+        g.pruefen("token:e", Grenzklasse.DATEI);
+        assertThat(abgelehnt(g, "token:e", Grenzklasse.DATEI)).isNotNull();
+        g.pruefen("token:e", Grenzklasse.ERFASSUNG);
+        assertThat(abgelehnt(g, "token:e", Grenzklasse.ERFASSUNG)).isNotNull();
+        g.pruefen("token:anderer", Grenzklasse.DATEI);
+        uhr.vor(Duration.ofSeconds(1));
+        g.pruefen("token:e", Grenzklasse.DATEI);
+        assertThat(abgelehnt(g, "token:e", Grenzklasse.DATEI)).isNotNull();
     }
 
     private static ZuVieleAnfragen abgelehnt(WebseitenGrenzen g, String id, Grenzklasse klasse) {
@@ -145,7 +159,7 @@ class WebseitenGrenzenTest {
 
     @Test
     void dieWartezeitIstAufEineStundeBegrenzt() {
-        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 1, 3), uhr, kennzahl);
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 1, 1, 2, 3), uhr, kennzahl);
         g.pruefen("token:e", Grenzklasse.UPLOAD);
         assertThat(abgelehnt(g, "token:e", Grenzklasse.UPLOAD).wartezeitSekunden()).isEqualTo(3600);
     }
@@ -178,7 +192,7 @@ class WebseitenGrenzenTest {
 
     @Test
     void einFehlerDerPruefungLaesstDieAnfrageDurchUndZaehltInDerKennzahl() {
-        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl);
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl);
         g.pruefen(null, Grenzklasse.LESEN);
         g.pruefen("token:a", null);
         assertThat(kennzahl.ausgefallen).isEqualTo(2);
@@ -186,8 +200,8 @@ class WebseitenGrenzenTest {
 
     @Test
     void ungueltigeEinstellungBrichtDenStartAbOhneWerteZuNennen() {
-        assertThatThrownBy(() -> new WebseitenGrenzen(new Einstellung(0, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl))
+        assertThatThrownBy(() -> new WebseitenGrenzen(new Einstellung(0, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageNotContaining("0.5");
-        assertThatThrownBy(() -> new Einstellung(1, 5, 1, 2, 1, 3, 2, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Einstellung(1, 5, 1, 2, 1, 3, 2, 1, 2, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 }

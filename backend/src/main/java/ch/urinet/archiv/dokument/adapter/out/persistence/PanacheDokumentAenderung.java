@@ -34,12 +34,12 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
      * eine Änderung ({@link #VERSION_SICHERN}) und das Umhängen beim Zusammenführen von Kontakten (Req 17.8).
      */
     private static final String FASSUNG_SICHERN = """
-            insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund)
+            insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund, bearbeiter)
             select d.id, d.version, coalesce(d.konfiguration_version, :konfigurationVersion), jsonb_build_object(
                 'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
                 'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
                 'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
-                :benutzer, :grund
+                :benutzer, :grund, :bearbeiter
             from dokument d""";
     private static final String VERSION_SICHERN = FASSUNG_SICHERN + " where d.id = :id";
     /** Wie {@link DokumentAendern} beim Ändern des Partners: eine Fassung nur bei archivierten Dokumenten. */
@@ -47,6 +47,9 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
             + " where d.partner_id = :quelle and d.status = 'ARCHIVIERT'";
 
     private final KonfigurationVersionsPort konfiguration;
+
+    @jakarta.inject.Inject
+    jakarta.enterprise.inject.Instance<ch.urinet.archiv.dokument.application.FassungsBearbeiter> bearbeiter;
 
     public PanacheDokumentAenderung(KonfigurationVersionsPort konfiguration) {
         this.konfiguration = konfiguration;
@@ -79,7 +82,10 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
     @Override
     public void versionSichern(UUID id, String benutzer, String grund) {
         int konfigurationVersion = konfiguration.aktuelleVersion();
+        String kennung = bearbeiter != null && io.quarkus.arc.Arc.container().requestContext().isActive()
+                ? bearbeiter.get().kennung().orElse(null) : null;
         em().createNativeQuery(VERSION_SICHERN).setParameter("id", id).setParameter("benutzer", benutzer)
+                .setParameter("bearbeiter", kennung)
                 .setParameter("grund", grund).setParameter("konfigurationVersion", konfigurationVersion)
                 .executeUpdate();
     }
@@ -101,6 +107,7 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
         int konfigurationVersion = konfiguration.aktuelleVersion();
         em().createNativeQuery(VERSIONEN_SICHERN_PARTNER).setParameter("quelle", quelle)
                 .setParameter("benutzer", benutzer).setParameter("grund", grund)
+                .setParameter("bearbeiter", null)
                 .setParameter("konfigurationVersion", konfigurationVersion).executeUpdate();
         em().createNativeQuery("update dokument set partner_id = :ziel, version = version + 1, "
                         + "konfiguration_version = :konfigurationVersion, geaendert = now() where partner_id = :quelle")

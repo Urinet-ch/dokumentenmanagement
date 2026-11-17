@@ -18,6 +18,7 @@ import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -32,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -68,6 +70,7 @@ public class WebseitenErfassungSchritte {
     private List<Response> paralleleAntworten = List.of();
     private UUID filterDokument;
     private long dokumenteVorher;
+    private String gemerktesEtag;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -75,7 +78,7 @@ public class WebseitenErfassungSchritte {
             List<UUID> ids = List.copyOf(eintrag.getValue());
             try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement befehl = verbindung.prepareStatement(
-                         "delete from public.auftrag where typ in ('VERARBEITEN', 'KI_VORSCHLAG') "
+                         "delete from public.auftrag where typ in ('VERARBEITEN', 'KI_VORSCHLAG', 'ARCHIVIEREN', 'EMBEDDING') "
                                  + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))")) {
                 befehl.setString(1, String.join(",", ids.stream().map(UUID::toString).toList()));
                 befehl.executeUpdate();
@@ -104,6 +107,7 @@ public class WebseitenErfassungSchritte {
         paralleleAntworten = List.of();
         filterDokument = null;
         dokumenteVorher = 0;
+        gemerktesEtag = null;
     }
 
     @Angenommen("der Erfassungs-Schlüssel «{word}» für die Webseite «{word}» im Mandanten «{word}» ist angelegt")
@@ -303,7 +307,14 @@ public class WebseitenErfassungSchritte {
 
     @Dann("ist die letzte Antwort HTTP {int} mit «{word}»")
     public void statusMitFehlercode(int status, String code) {
-        assertThat(ProblemDetails.pruefen(letzte, status, "fehlercode")).isEqualTo(code);
+        assertThat(ProblemDetails.pruefen(letzte, status, "felder")).isEqualTo(code);
+    }
+
+    @Dann("ist die letzte Antwort HTTP 429 mit «{word}», «Retry-After» zwischen {int} und {int} Sekunden und dem Grund «{word}»")
+    public void statusGrenze(String code, int von, int bis, String grund) {
+        assertThat(ProblemDetails.pruefen(letzte, 429, "grund")).isEqualTo(code);
+        assertThat(Integer.parseInt(letzte.header("Retry-After"))).isBetween(von, bis);
+        assertThat(letzte.jsonPath().getString("grund")).isEqualTo(grund);
     }
 
     @Dann("die Upload-Antwort enthält eine ID, den Status und ETag")
@@ -605,6 +616,320 @@ public class WebseitenErfassungSchritte {
 
     private String schluesselKey(String name, String referenz) {
         return name + ":" + schluessel.get(name).webseite() + ":" + referenz;
+    }
+
+    @Angenommen("für den Schlüssel «{word}» liegt ein Pflegedokument im Status «{word}» vor")
+    public void pflegedokument(String name, String status) throws SQLException {
+        Zugang zugang = schluessel.get(name);
+        hochladen(name, "pflege.pdf", "pflege");
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(202);
+        String schema = new MandantCode(zugang.mandant()).schema();
+        mandantenMitTestart.add(zugang.mandant());
+        ausfuehren("insert into " + schema + ".dokumentart "
+                        + "(code, name, gruppen, pflichtfelder, zusatz_schema, vertraulichkeit, gesetzliche_pflicht, aktiv) "
+                        + "values ('WEBTEST_ERFASSUNG', 'Webtest Erfassung', '{frei}', "
+                        + "'{titel,zusatz.zugriff}', ?::jsonb, 'NORMAL', false, true) "
+                        + "on conflict (code) do nothing",
+                """
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"]},
+                "veroeffentlicht":{"type":"boolean"},"jahr":{"type":"integer"}},
+                "required":["zugriff","veroeffentlicht"],"additionalProperties":false}
+                """);
+        boolean bestaetigt = status.startsWith("ARCHIV");
+        ausfuehren("update " + schema + ".dokument set art = 'WEBTEST_ERFASSUNG', titel = 'Pflegeprobe', "
+                        + "status = ?, bestaetigt = " + (bestaetigt ? "now()" : "null")
+                        + ", geschaeftsjahr = 2026, zusatz = "
+                        + "'{\"zugriff\":\"mitglieder\",\"veroeffentlicht\":false,\"jahr\":2026}'::jsonb where id = ?",
+                status, letzteId);
+        gemerktesEtag = aktuellesEtag(name);
+    }
+
+    private String aktuellesEtag(String name) throws SQLException {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement p = c.prepareStatement("select version from "
+                     + new MandantCode(schluessel.get(name).mandant()).schema() + ".dokument where id = ?")) {
+            p.setObject(1, letzteId);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                return "\"" + r.getInt(1) + "\"";
+            }
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» das Pflegedokument mit «{word}» und ETag «{}» bearbeitet:")
+    public void pflegen(String name, String aktion, String etag, String body) throws SQLException {
+        pflegeAnfrage(name, aktion, etag, body, BEARBEITER);
+    }
+
+    @Wenn("der Schlüssel «{word}» am Pflegedokument «{word}» mit ETag «{}» ausführt")
+    public void pflegenOhneBody(String name, String aktion, String etag) throws SQLException {
+        pflegeAnfrage(name, aktion, etag, null, BEARBEITER);
+    }
+
+    @Wenn("der Schlüssel «{word}» am Pflegedokument «{word}» ohne gemeldeten Bearbeiter ausführt")
+    public void pflegenOhneBearbeiter(String name, String aktion) throws SQLException {
+        pflegeAnfrage(name, aktion, "aktuell", "{}", null);
+    }
+
+    private void pflegeAnfrage(String name, String aktion, String etag, String body, String bearbeiter)
+            throws SQLException {
+        RequestSpecification request = mit(name);
+        if (bearbeiter != null) {
+            request.header("X-Archiv-Bearbeiter", bearbeiter);
+        }
+        if (!etag.equals("fehlt")) {
+            request.header("If-Match", switch (etag) {
+                case "aktuell" -> aktuellesEtag(name);
+                case "gemerkt" -> gemerktesEtag;
+                default -> etag;
+            });
+        }
+        if (body != null || aktion.equals("bestaetigen") || aktion.equals("PATCH")) {
+            request.contentType("application/json").body(body == null ? "{}" : body);
+        }
+        String pfad = PFAD + "/" + letzteId;
+        letzte = aktion.equals("PATCH") ? request.when().patch(pfad)
+                : request.when().post(pfad + "/" + aktion);
+        letzterSchluessel = name;
+    }
+
+    @Wenn("die Web-App das Pflegedokument des Schlüssels «{word}» ändert")
+    public void webAppAendert(String name) throws SQLException {
+        String mandant = schluessel.get(name).mandant();
+        Response antwort = given().auth().oauth2(ch.urinet.archiv.gemeinsam.Testanmeldung.token("inhaber-" + mandant))
+                .header("If-Match", aktuellesEtag(name)).contentType("application/json")
+                .body("{\"titel\":\"Web-App Änderung\",\"grund\":\"Konfliktprobe\"}")
+                .when().patch("/api/v1/dokumente/" + letzteId);
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+    }
+
+    @Dann("ist das Pflegedokument «{word}» und trägt eine neue Version")
+    public void pflegeStatus(String status) {
+        assertThat(letzte.jsonPath().getString("status")).isEqualTo(status);
+        assertThat(letzte.header("ETag")).isNotEqualTo(gemerktesEtag);
+        assertThat(letzte.asString()).doesNotContain("dateiname", "pflege.pdf");
+    }
+
+    @Dann("ist das Pflegedokument des Schlüssels «{word}» nach der Ablehnung unverändert")
+    public void pflegeUnveraendert(String name) throws SQLException {
+        assertThat(aktuellesEtag(name)).isEqualTo(gemerktesEtag);
+        Zugang z = schluessel.get(name);
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement p = c.prepareStatement("select titel, zusatz->>'zugriff' from "
+                     + new MandantCode(z.mandant()).schema() + ".dokument where id = ?")) {
+            p.setObject(1, letzteId);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getString(1)).isEqualTo("Pflegeprobe");
+                assertThat(r.getString(2)).isEqualTo("mitglieder");
+            }
+        }
+    }
+
+    @Angenommen("das Pflegedokument des Schlüssels «{word}» hat Finanz- und Vertragsmetadaten")
+    public void finanzUndVertrag(String name) throws SQLException {
+        String schema = new MandantCode(schluessel.get(name).mandant()).schema();
+        ausfuehren("insert into " + schema + ".dokument_finanz (dokument_id, betrag, waehrung) values (?, 12.35, 'CHF')",
+                letzteId);
+        ausfuehren("insert into " + schema + ".dokument_vertrag (dokument_id, gueltig_ab) values (?, '2026-01-01')",
+                letzteId);
+    }
+
+    @Dann("liefert die Detailansicht die Finanz- und Vertragsmetadaten ohne Dateinamen")
+    public void finanzUndVertragLesen() {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        assertThat(letzte.jsonPath().getString("finanz.betrag")).isEqualTo("12.35");
+        assertThat(letzte.jsonPath().getString("finanz.waehrung")).isEqualTo("CHF");
+        assertThat(letzte.jsonPath().getString("vertrag.gueltigAb")).isEqualTo("2026-01-01");
+        assertThat(letzte.asString()).doesNotContain("dateiname", "pflege.pdf");
+    }
+
+    @Dann("ist die Veröffentlichung des Pflegedokuments {word} und der Grund «{}» mit Bearbeiter gesichert")
+    public void veroeffentlichungGesichert(String flag, String grund) throws SQLException {
+        assertThat(letzte.jsonPath().getBoolean("veroeffentlicht")).isEqualTo(Boolean.parseBoolean(flag));
+        Zugang zugang = schluessel.get(letzterSchluessel);
+        String schema = new MandantCode(zugang.mandant()).schema();
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement p = c.prepareStatement("select geaendert_von, grund, bearbeiter from " + schema
+                     + ".dokument_version where dokument_id = ? order by id desc limit 1")) {
+            p.setObject(1, letzteId);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getString(1)).isEqualTo("token:" + zugang.tokenId());
+                assertThat(r.getString(2)).isEqualTo(grund);
+                assertThat(r.getString(3)).isEqualTo(zugang.webseite() + "/" + BEARBEITER);
+            }
+        }
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement p = c.prepareStatement("select bearbeiter from " + schema
+                     + ".zugriff_protokoll where dokument_id = ? and aktion = 'AENDERN' order by id desc limit 1")) {
+            p.setObject(1, letzteId);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getString(1)).isEqualTo(zugang.webseite() + "/" + BEARBEITER);
+            }
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» die Prüfdatei des Pflegedokuments abruft")
+    public void pruefdatei(String name) {
+        letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER).when().get(PFAD + "/" + letzteId + "/datei");
+        letzterSchluessel = name;
+    }
+
+    @Wenn("der Schlüssel «{word}» dem Pflegedokument {int} MB JSON als Änderung sendet")
+    public void zuGrosseAenderung(String name, int mb) {
+        // mit «Expect: 100-continue» liest der Client die frühe 413, statt den Rest in eine geschlossene Verbindung zu schreiben
+        letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER)
+                .config(io.restassured.RestAssured.config().httpClient(
+                        io.restassured.config.HttpClientConfig.httpClientConfig()
+                                .setParam("http.protocol.expect-continue", true)))
+                .contentType("application/json").body(new byte[mb * 1024 * 1024]).when()
+                .patch(PFAD + "/" + letzteId);
+        letzterSchluessel = name;
+    }
+
+    @Wenn("der Schlüssel «{word}» die Prüfdatei ohne Bearbeiter abruft")
+    public void pruefdateiOhneBearbeiter(String name) {
+        letzte = mit(name).when().get(PFAD + "/" + letzteId + "/datei");
+    }
+
+    @Wenn("der Schlüssel «{word}» die Prüfdatei mit HEAD abruft")
+    public void pruefdateiHead(String name) {
+        letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER).when().head(PFAD + "/" + letzteId + "/datei");
+    }
+
+    @Dann("entspricht der Prüfstream dem Original ohne Adresse oder Dateinamen und ist protokolliert")
+    public void pruefstream() throws SQLException {
+        assertThat(letzte.statusCode()).isEqualTo(200);
+        assertThat(letzte.asByteArray()).isEqualTo(dateien.get("pflege.pdf"));
+        assertThat(letzte.header("Content-Type")).startsWith("application/pdf");
+        assertThat(letzte.header("Content-Length")).isEqualTo(Integer.toString(dateien.get("pflege.pdf").length));
+        assertThat(letzte.header("Content-Disposition")).isEqualTo("inline");
+        assertThat(letzte.header("Cache-Control")).contains("no-store");
+        assertThat(letzte.header("Location")).isNull();
+        Zugang z = schluessel.get(letzterSchluessel);
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement p = c.prepareStatement("select bearbeiter from " + new MandantCode(z.mandant()).schema()
+                     + ".zugriff_protokoll where dokument_id = ? and aktion = 'HERUNTERLADEN'")) {
+            p.setObject(1, letzteId);
+            try (ResultSet r = p.executeQuery()) {
+                assertThat(r.next()).isTrue();
+                assertThat(r.getString(1)).isEqualTo(z.webseite() + "/" + BEARBEITER);
+            }
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» die Hilfsliste «{word}» abruft")
+    public void hilfsliste(String name, String liste) {
+        letzte = mit(name).when().get("/public/v1/erfassung/" + liste);
+        letzterSchluessel = name;
+    }
+
+    @Dann("enthält der Erfassungs-Eingangskorb das Pflegedokument ohne Dateinamen")
+    public void pflegeEingangskorb() {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        assertThat(letzte.jsonPath().getList("eintraege.id", String.class)).contains(letzteId.toString());
+        assertThat(letzte.asString()).doesNotContain("dateiname", "pflege.pdf");
+    }
+
+    @Dann("enthält die Artenliste die Formularfelder der Pflegeart")
+    public void artenliste() throws IOException {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        var arten = new com.fasterxml.jackson.databind.ObjectMapper().readTree(letzte.asString());
+        var art = java.util.stream.StreamSupport.stream(arten.spliterator(), false)
+                .filter(a -> a.path("code").asText().equals("WEBTEST_ERFASSUNG")).findFirst().orElseThrow();
+        assertThat(art.path("zusatzSchema").path("properties").path("zugriff").path("type").asText())
+                .isEqualTo("string");
+    }
+
+    @Wenn("der Schlüssel «{word}» versucht, das Pflegedokument zu löschen oder zu verwerfen")
+    public void keinLoeschen(String name) {
+        for (String methode : List.of("DELETE", "POST")) {
+            Response antwort = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER).when()
+                    .request(methode, PFAD + "/" + letzteId + (methode.equals("POST") ? "/verwerfen" : ""));
+            assertThat(antwort.statusCode()).as(antwort.asString()).isIn(404, 405);
+        }
+
+    }
+
+    @Dann("erreicht der Lese-Schlüssel «{word}» keinen Erfassungs-Endpunkt des Inventars")
+    public void leseSchluesselOhneErfassung(String name) {
+        int geprueft = 0;
+        for (var endpunkt : WebseitenEndpunkte.alle()) {
+            if (endpunkt.art() != ch.urinet.archiv.sicherheit.application.WebseitenZugang.Art.ERFASSUNG) {
+                continue;
+            }
+            String pfad = endpunkt.pfad().replace("{id}", letzteId.toString())
+                    .replace("{referenz}", "pflege").replace("{kennung}", "wp:1");
+            RequestSpecification request = mit(name).header("If-Match", "\"0\"")
+                    .header("X-Archiv-Bearbeiter", BEARBEITER);
+            if (endpunkt.medientyp().equals("multipart/form-data")) {
+                request.multiPart("datei", "probe.pdf", Testdateien.pdf(), "application/pdf")
+                        .multiPart("referenz", "nicht-angenommen");
+            } else if (java.util.Set.of("POST", "PATCH", "PUT").contains(endpunkt.verb())) {
+                request.contentType(endpunkt.medientyp()).body("{\"name\":\"Prüfung\"}");
+            }
+            Response antwort = request.when().request(endpunkt.verb(), pfad);
+            assertThat(antwort.statusCode()).as(endpunkt.verb() + " " + pfad + ": " + antwort.asString())
+                    .isEqualTo(403);
+            geprueft++;
+        }
+        assertThat(geprueft).isGreaterThanOrEqualTo(13);
+    }
+
+    @Dann("zeigt eine Gegenprobe ohne Referenzsperre beim Schlüssel «{word}» den Datenbankkonflikt")
+    public void ohneReferenzsperre(String name) throws Exception {
+        hochladen(name, "gegenprobe-a.pdf", "gegenprobe-a");
+        status(202);
+        UUID a = letzteId;
+        hochladen(name, "gegenprobe-b.pdf", "gegenprobe-b");
+        status(202);
+        UUID b = letzteId;
+        CyclicBarrier gelesen = new CyclicBarrier(2);
+        Zugang z = schluessel.get(name);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> erster = pool.submit(() -> ohneSperreEintragen(z, a, "a".repeat(64), gelesen));
+            Future<String> zweiter = pool.submit(() -> ohneSperreEintragen(z, b, "b".repeat(64), gelesen));
+            assertThat(List.of(erster.get(20, TimeUnit.SECONDS), zweiter.get(20, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("angenommen", "23505");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private String ohneSperreEintragen(Zugang z, UUID id, String hash, CyclicBarrier gelesen) throws Exception {
+        String tabelle = new MandantCode(z.mandant()).schema() + ".webseite_referenz";
+        try (Connection c = datenbank.get().getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement p = c.prepareStatement("select dokument_id from " + tabelle
+                        + " where webseite = ? and referenz = 'gegenprobe-ohne-lock'")) {
+                    p.setString(1, z.webseite());
+                    try (ResultSet r = p.executeQuery()) {
+                        assertThat(r.next()).isFalse();
+                    }
+                }
+                gelesen.await(10, TimeUnit.SECONDS);
+                try (PreparedStatement p = c.prepareStatement("insert into " + tabelle
+                        + " (webseite, referenz, dokument_id, sha256) values (?, 'gegenprobe-ohne-lock', ?, ?)")) {
+                    p.setQueryTimeout(10);
+                    p.setString(1, z.webseite());
+                    p.setObject(2, id);
+                    p.setString(3, hash);
+                    p.executeUpdate();
+                }
+                c.commit();
+                return "angenommen";
+            } catch (SQLException e) {
+                c.rollback();
+                if (!"23505".equals(e.getSQLState())) {
+                    throw e;
+                }
+                return e.getSQLState();
+            }
+        }
     }
 
     private void ausfuehren(String sql, Object... werte) throws SQLException {

@@ -4,9 +4,11 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.Ansicht;
 import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.ablage.domain.VorsignierteUrl;
+import ch.urinet.archiv.dokument.application.DokumentDatei;
 import ch.urinet.archiv.integration.domain.webseite.Lesezugriff;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -41,7 +43,10 @@ public class DateiAuslieferung {
     public record Link(VorsignierteUrl url) implements Auslieferung {
     }
 
-    public record Strom(StreamLauf lauf) implements Auslieferung {
+    public record Strom(StreamLauf lauf, String medientyp) implements Auslieferung {
+        public Strom(StreamLauf lauf) {
+            this(lauf, MEDIENTYP);
+        }
     }
 
     private final WebseiteDatei datei;
@@ -76,16 +81,31 @@ public class DateiAuslieferung {
         if (!MEDIENTYP.equals(Ansicht.anzeigbarerTyp(ort.schluessel()).orElse(null))) {
             throw new IllegalStateException("Medientyp der Datei " + id + " nicht in der Liste");
         }
-        DateiPlaetze.Platz platz = plaetze.reservieren(benutzer.orElse("unbekannt"));
+        return stream(mandant, ort, benutzer.orElse("unbekannt"), MEDIENTYP,
+                () -> datei.protokollieren(id, benutzer, ip), verbindungSchliessen);
+    }
+
+    public Strom erfassung(MandantCode mandant, Benutzer benutzer, UUID id,
+                            Optional<IpAdresse> ip, String bearbeiter, Runnable verbindungSchliessen) {
+        var ort = datei.erfassungVorbereiten(benutzer, id);
+        String typ = Ansicht.anzeigbarerTyp(ort.schluessel()).orElse("application/octet-stream");
+        return stream(mandant, ort, benutzer.id(), typ,
+                () -> datei.erfassungProtokollieren(id, benutzer, ip, bearbeiter), verbindungSchliessen);
+    }
+
+    private Strom stream(MandantCode mandant, DokumentDatei.Dateiort ort,
+                          String schluessel, String medientyp, Runnable protokollieren,
+                          Runnable verbindungSchliessen) {
+        DateiPlaetze.Platz platz = plaetze.reservieren(schluessel);
         boolean uebergeben = false;
         try {
             DateiStrom strom = ablage.oeffnen(mandant, ort.ort(), ort.schluessel(), ort.versionId());
             try {
-                datei.protokollieren(id, benutzer, ip);
+                protokollieren.run();
                 StreamLauf lauf = new StreamLauf(strom, platz, leerlauf, zeitlimit, waechter.zeitgeber(),
                         verbindungSchliessen);
                 uebergeben = true;
-                return new Strom(lauf);
+                return new Strom(lauf, medientyp);
             } catch (RuntimeException e) {
                 strom.abbrechen();
                 throw e;
