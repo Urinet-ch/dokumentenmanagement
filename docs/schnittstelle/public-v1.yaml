@@ -456,6 +456,214 @@ paths:
           "$ref": "#/components/responses/ZuVieleAnfragen"
         '503':
           "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/erfassung/dokumente":
+    get:
+      summary: Erfasste Dokumente auflisten oder Status über Referenz abrufen
+      description: |
+        Ohne `referenz` eine paginierte Liste mit Filtern nach Status, Reihe, Jahr, Veröffentlichungsstatus und
+        Suchbegriff. Mit `referenz` wird nur der Status der Referenz dieser Webseite geliefert; weitere Filter sind
+        unzulässig. `dateiname` wird nie ausgegeben und als Anfrageparameter mit HTTP 400 abgelehnt.
+      parameters:
+      - name: referenz
+        in: query
+        description: Status für eine Referenz der Webseite; nicht mit Listenfiltern kombinierbar
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Statusfilter
+        schema:
+          type: string
+      - name: reihe
+        in: query
+        description: Code der Dokumentart
+        schema:
+          type: string
+      - name: jahr
+        in: query
+        description: Jahr aus den Zusatzfeldern
+        schema:
+          type: integer
+          format: int32
+      - name: veroeffentlicht
+        in: query
+        description: Veröffentlichungsstatus als true oder false
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: Suchbegriff, höchstens 200 Zeichen
+        schema:
+          type: string
+      - name: seite
+        in: query
+        description: Seite ab 0 (Standard 0)
+        schema:
+          type: integer
+          format: int32
+      - name: groesse
+        in: query
+        description: Einträge je Seite, 1 bis 100 (Standard 20)
+        schema:
+          type: integer
+          format: int32
+      - name: dateiname
+        in: query
+        description: Nicht unterstützt; führt zu 400 ANFRAGE_UNGUELTIG
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Liste oder Status
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - "$ref": "#/components/schemas/WebseiteErfassungListe"
+                - "$ref": "#/components/schemas/WebseiteErfassungStatus"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '404':
+          "$ref": "#/components/responses/NichtGefunden"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+    post:
+      summary: Dokument über eine Webseite erfassen
+      description: |
+        Nimmt genau eine Datei als Multipart-Teil `datei`, die Pflichtreferenz `referenz` und optional `hinweis` an.
+        URLs und weitere Teile sind unzulässig. Der Dateiname wird weder gespeichert noch ausgegeben.
+      parameters:
+      - name: X-Archiv-Bearbeiter
+        in: header
+        required: true
+        description: Zuvor gemeldete Bearbeiterkennung
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/components/schemas/WebseiteErfassungUploadAnfrage"
+      responses:
+        '200':
+          description: Idempotenter Upload oder Dublette
+          headers:
+            Location:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteErfassungUpload"
+        '202':
+          description: Dokument angelegt
+          headers:
+            Location:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteErfassungUpload"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '409':
+          "$ref": "#/components/responses/ReferenzVergeben"
+        '413':
+          "$ref": "#/components/responses/ZuGross"
+        '415':
+          "$ref": "#/components/responses/DateitypNichtUnterstuetzt"
+        '422':
+          "$ref": "#/components/responses/DateiUngueltig"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/SpeicherNichtErreichbar"
+  "/public/v1/erfassung/dokumente/{id}":
+    get:
+      summary: Erfasstes Dokument ohne Dateinamen anzeigen
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Archiv-Bearbeiter
+        in: header
+        required: true
+        description: Zuvor gemeldete Bearbeiterkennung
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Dokumentdetails ohne Dateiname
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WebseiteErfassungDetails"
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '404':
+          "$ref": "#/components/responses/NichtGefunden"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
+  "/public/v1/erfassung/bearbeiter/{kennung}":
+    put:
+      summary: Bearbeiter der Webseite melden
+      parameters:
+      - name: kennung
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[A-Za-z0-9._:@-]{1,64}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WebseiteErfassungBearbeiter"
+      responses:
+        '204':
+          description: Bearbeiter neu oder mit geändertem Namen gemeldet
+        '400':
+          "$ref": "#/components/responses/AnfrageUngueltig"
+        '401':
+          "$ref": "#/components/responses/NichtAngemeldet"
+        '403':
+          "$ref": "#/components/responses/NichtErlaubt"
+        '429':
+          "$ref": "#/components/responses/ZuVieleAnfragen"
+        '503':
+          "$ref": "#/components/responses/Ueberlastet"
 security:
   - webseitenSchluessel: []
 components:
@@ -523,12 +731,17 @@ components:
             - MANDANT_FEHLT
             - NICHT_ERLAUBT
             - NICHT_GEFUNDEN
+            - REFERENZ_VERGEBEN
             - CURSOR_ABGELAUFEN
             - ZU_VIELE_ANFRAGEN
             - BUDGET
             - DATEI_ZU_GROSS
+            - DATEITYP_UNBEKANNT
+            - MEDIENTYP_FALSCH
+            - DATEI_UNGUELTIG
             - INTERNER_FEHLER
             - UEBERLASTET
+            - SPEICHER_NICHT_ERREICHBAR
     WebseiteDateiLink:
       description: Vorsignierte Adresse der Datei, kurz gültig
       type: object
@@ -879,6 +1092,226 @@ components:
           type: string
           description: Opak; für den nächsten Abruf als seit übergeben, unverändert und
             ohne ihn zu deuten
+    WebseiteErfassungUploadAnfrage:
+      description: Genau eine Datei, Referenz und optionaler Hinweis; keine URL und keine weiteren Teile
+      type: object
+      required:
+      - datei
+      - referenz
+      properties:
+        datei:
+          type: string
+          format: binary
+        referenz:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[A-Za-z0-9._:-]{1,100}$"
+        hinweis:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+    WebseiteErfassungUpload:
+      description: Ergebnis eines Uploads ohne Dateinamen
+      type: object
+      required:
+      - referenz
+      - dublette
+      properties:
+        id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        referenz:
+          type: string
+        status:
+          type:
+          - string
+          - 'null'
+        fehlercode:
+          type:
+          - string
+          - 'null'
+          description: Stabiler Fehlercode ohne interne Fehlerdetails
+        version:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        dublette:
+          type: boolean
+    WebseiteErfassungDokument:
+      description: Dokument in der Erfassungsliste ohne Dateinamen
+      type: object
+      required:
+      - id
+      - status
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenz:
+          type:
+          - string
+          - 'null'
+        titel:
+          type:
+          - string
+          - 'null'
+        reihe:
+          type:
+          - string
+          - 'null'
+        jahr:
+          type:
+          - integer
+          - 'null'
+          format: int32
+        status:
+          type: string
+        zugriff:
+          type:
+          - string
+          - 'null'
+        veroeffentlicht:
+          type:
+          - boolean
+          - 'null'
+        version:
+          type: integer
+          format: int32
+    WebseiteErfassungListe:
+      description: Seite der Erfassungsliste
+      type: object
+      required:
+      - eintraege
+      - seite
+      - proSeite
+      - gesamt
+      properties:
+        eintraege:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WebseiteErfassungDokument"
+        seite:
+          type: integer
+          format: int32
+          description: Nummer dieser Seite, ab 1
+        proSeite:
+          type: integer
+          format: int32
+        gesamt:
+          type: integer
+          format: int64
+    WebseiteErfassungStatus:
+      description: Status einer Referenz ohne Dateinamen
+      type: object
+      required:
+      - id
+      - referenz
+      - status
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenz:
+          type: string
+        status:
+          type: string
+        fehlercode:
+          type:
+          - string
+          - 'null'
+        version:
+          type: integer
+          format: int32
+    WebseiteErfassungDetails:
+      description: Metadaten eines Dokuments ohne Dateinamen oder interne Fehlerdetails
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        referenz:
+          type: string
+        art:
+          type: string
+        titel:
+          type: string
+        datum:
+          type: string
+          format: date
+        eingang:
+          type: string
+          format: date-time
+        quelle:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        vertraulichkeit:
+          type: string
+        personBenutzer:
+          type: string
+        erstelltVon:
+          type: string
+        status:
+          type: string
+        bestaetigt:
+          type: string
+          format: date-time
+        geschaeftsjahr:
+          type: integer
+          format: int32
+        aufbewahrenBis:
+          type: string
+          format: date
+        sperreBis:
+          type: string
+          format: date
+        fristAbgelaufen:
+          type: boolean
+        zusatz:
+          type: object
+        version:
+          type: integer
+          format: int32
+        fehlercode:
+          type: string
+        pdfaFehlt:
+          type: boolean
+        seiten:
+          type: integer
+          format: int32
+        partnerId:
+          type: string
+          format: uuid
+        partnerName:
+          type: string
+        vorschlag:
+          type: object
+        kiSicherheit:
+          type: object
+        projekt:
+          type: string
+        zugriff:
+          type: string
+        veroeffentlicht:
+          type: boolean
+    WebseiteErfassungBearbeiter:
+      description: Name des Bearbeiters, wie er auf der Webseite angezeigt wird
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
   parameters:
     ClientHeader:
       description: SHA-256 aus IP und Tages-Salz des Besuchers, von der Webseite berechnet
@@ -1003,6 +1436,66 @@ components:
             $ref: "#/components/schemas/Problem"
     ZuGross:
       description: Anfrage über der Grenze des Archivs (`DATEI_ZU_GROSS`).
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ReferenzVergeben:
+      description: Referenz der Webseite gehört bereits zu einer anderen Datei (`REFERENZ_VERGEBEN`).
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    DateitypNichtUnterstuetzt:
+      description: Dateityp oder Anfrage-Medientyp wird nicht unterstützt.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    DateiUngueltig:
+      description: Datei ist leer oder ungültig.
+      headers:
+        Cache-Control:
+          $ref: "#/components/headers/CacheControl"
+        Deprecation:
+          $ref: "#/components/headers/Deprecation"
+        Sunset:
+          $ref: "#/components/headers/Sunset"
+        Link:
+          $ref: "#/components/headers/Link"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    SpeicherNichtErreichbar:
+      description: Speicher zurzeit nicht erreichbar (`SPEICHER_NICHT_ERREICHBAR`).
       headers:
         Cache-Control:
           $ref: "#/components/headers/CacheControl"

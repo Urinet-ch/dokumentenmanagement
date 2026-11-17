@@ -3,8 +3,8 @@
 Funktionalität: Grenzen je Schlüssel der Webseiten-Schnittstelle (Aufgabe 11.11)
   Jeder Webseiten-Schlüssel hat Token-Buckets (Lesen, strengere Suche, Erfassung, Uploads je Stunde); gezählt wird je
   Schlüssel, nie je Header-Wert. Bei Überschreitung antwortet das Archiv 429 «ZU_VIELE_ANFRAGEN» mit «Retry-After».
-  Die Szenarien laufen mit kleinen Testwerten (application.properties, Profil test) gegen die Probe /public/v1/probe und
-  die Suche; es gibt nur synthetische Daten, Schlüssel entstehen zur Laufzeit.
+  Die Szenarien laufen mit kleinen Testwerten (application.properties, Profil test) gegen die Probe /public/v1/probe,
+  die Suche und den echten Upload-Endpunkt; es gibt nur synthetische Daten, Schlüssel entstehen zur Laufzeit.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
@@ -44,12 +44,12 @@ Funktionalität: Grenzen je Schlüssel der Webseiten-Schnittstelle (Aufgabe 11.1
   @req-15.1
   Szenario: Uploads je Stunde sind je Erfassungs-Schlüssel begrenzt
     Angenommen es gibt den Erfassungs-Schlüssel «E» und den Erfassungs-Schlüssel «F» für Grenzen
-    Wenn der Schlüssel «E» «/public/v1/probe/erfassung/upload» mit wechselnden Clients und Stufen hochlädt, bis eine Anfrage abgelehnt wird
+    Wenn der Schlüssel «E» «/public/v1/erfassung/dokumente» mit wechselnden Clients und Stufen hochlädt, bis eine Anfrage abgelehnt wird
     Dann wurde die erste Anfrage zwischen der 4. und der 4. abgelehnt
     Und die Ablehnung ist 429 «ZU_VIELE_ANFRAGEN» mit «Retry-After» zwischen 1 und 3600 Sekunden und dem Grund «UPLOADS»
     Wenn der Schlüssel «E» «/public/v1/probe/erfassung» ohne Header hochgeladen wird
     Dann antwortet die Grenze mit Status 200
-    Wenn der Schlüssel «F» «/public/v1/probe/erfassung/upload» ohne Header hochgeladen wird
+    Wenn der Schlüssel «F» «/public/v1/erfassung/dokumente» ohne Header hochgeladen wird
     Dann antwortet die Grenze mit Status 200
     Und die Kennzahl der abgelehnten Anfragen trägt nur den Grund und zählt für «UPLOADS» mindestens 1
 

@@ -21,6 +21,7 @@ class BerechtigungTest {
     private static final UUID DOKUMENT = UUID.randomUUID();
     private static final Benutzer TREUHAENDER = new Benutzer("treuhaender-urinet", Rolle.TREUHAENDER);
     private static final Benutzer MITARBEITER = new Benutzer("mitarbeiter-urinet", Rolle.MITARBEITER);
+    private static final Benutzer GESCHAEFTSSTELLE = new Benutzer("webseite-vhf-gsk", Rolle.GESCHAEFTSSTELLE);
 
     private final List<Verweigerung.Grund> gemeldet = new ArrayList<>();
 
@@ -62,6 +63,18 @@ class BerechtigungTest {
                 .isInstanceOfSatisfying(Verweigerung.class,
                         v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
         assertThatCode(() -> mit(true).aktion(MITARBEITER, Aktion.A1)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void webseitenErfassungErlaubtNurPositivlisteUndPrueftDokumentsichtbarkeit() {
+        assertThatCode(() -> mit(true).webseitenErfassung(GESCHAEFTSSTELLE, Aktion.A10, DOKUMENT.toString()))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> mit(true).webseitenErfassung(GESCHAEFTSSTELLE, Aktion.A9, DOKUMENT.toString()))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
+        assertThatThrownBy(() -> mit(false).webseitenErfassung(GESCHAEFTSSTELLE, Aktion.A2, DOKUMENT.toString()))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_GEFUNDEN));
     }
 
     @Test

@@ -10,7 +10,13 @@ import java.util.UUID;
  * {@link ProtokollDetails}. Die Zeit setzt die Datenbank.
  */
 public record ZugriffEintrag(Optional<String> benutzer, Optional<String> rolle, ProtokollAktion aktion,
-                             Optional<UUID> dokumentId, Optional<IpAdresse> ip, ProtokollDetails details) {
+                             Optional<UUID> dokumentId, Optional<IpAdresse> ip, ProtokollDetails details,
+                             Optional<String> bearbeiter) {
+
+    public ZugriffEintrag(Optional<String> benutzer, Optional<String> rolle, ProtokollAktion aktion,
+                          Optional<UUID> dokumentId, Optional<IpAdresse> ip, ProtokollDetails details) {
+        this(benutzer, rolle, aktion, dokumentId, ip, details, Optional.empty());
+    }
 
     public ZugriffEintrag {
         Objects.requireNonNull(benutzer, "benutzer");
@@ -19,6 +25,8 @@ public record ZugriffEintrag(Optional<String> benutzer, Optional<String> rolle, 
         Objects.requireNonNull(dokumentId, "dokumentId");
         Objects.requireNonNull(ip, "ip");
         Objects.requireNonNull(details, "details");
+        Objects.requireNonNull(bearbeiter, "bearbeiter");
         benutzer = benutzer.filter(b -> !b.isBlank());
+        bearbeiter = bearbeiter.filter(b -> !b.isBlank());
     }
 }
