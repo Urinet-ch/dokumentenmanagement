@@ -53,7 +53,7 @@ Die Angaben der Dokumentart stehen im Eingangskorb unter «Angaben zur Dokumenta
 
 Beim Bulletin sind die Fachgebiete «Bad», «Eis», «Technik», «Recht» und «Allgemein».
 
-**Verband wählen:** «Verband» ist eine Mehrfachauswahl mit den Kontrollkästchen «vhf» und «gsk». Setzen Sie ein Häkchen bei jedem Verband, zu dem das Dokument gehört; mindestens einer ist nötig (Hinweis unter dem Feld: «Mindestens einen Wert auswählen.»). Ohne Auswahl lässt sich das Dokument nicht bestätigen und das Archiv meldet «Bitte ergänzen: Verband.». Wählen Sie nicht auf Verdacht: Ist unklar, zu welchem Verband ein Dokument gehört, fragen Sie bei [Kontaktstelle Geschäftsstelle einsetzen] nach. Dasselbe Feld finden Sie bei «Metadaten bearbeiten»; dort wird ein Speichern ohne Verband ebenfalls abgelehnt.
+**Verband wählen:** «Verband» ist eine Mehrfachauswahl mit den Kontrollkästchen «VHF» und «GSK». Setzen Sie ein Häkchen bei jedem Verband, zu dem das Dokument gehört; mindestens einer ist nötig (Hinweis unter dem Feld: «Mindestens einen Wert auswählen.»). Ohne Auswahl lässt sich das Dokument nicht bestätigen und das Archiv meldet «Bitte ergänzen: Verband.». Wählen Sie nicht auf Verdacht: Ist unklar, zu welchem Verband ein Dokument gehört, fragen Sie bei [Kontaktstelle Geschäftsstelle einsetzen] nach. Dasselbe Feld finden Sie bei «Metadaten bearbeiten»; dort wird ein Speichern ohne Verband ebenfalls abgelehnt.
 
 Die «Zugriffsstufe» wählen Sie im Eingangskorb. «Veröffentlicht» steht dort nicht zur Wahl: Neue Dokumente sind nach dem Bestätigen immer unveröffentlicht und erhalten die Einstellung erst unter «Metadaten bearbeiten».
 

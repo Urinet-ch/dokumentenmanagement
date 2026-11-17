@@ -682,6 +682,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
           verband: {
             type: 'array',
             items: { type: 'string', enum: ['vhf', 'gsk'] },
+            'x-labels': { vhf: 'VHF', gsk: 'GSK' },
             minItems: 1,
             uniqueItems: true,
           },
@@ -715,7 +716,7 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       const gruppe = element.querySelector<HTMLFieldSetElement>('fieldset[data-test=listenfeld]')!;
       expect(gruppe.querySelector('legend')?.textContent).toContain('Verband');
       expect(gruppe.querySelector('legend')?.textContent).toContain('*');
-      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['vhf', 'gsk']);
+      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['VHF', 'GSK']);
       expect(checkbox('vhf').checked).toBe(false);
       expect(checkbox('vhf').getAttribute('aria-required')).toBe('true');
       expect(gruppe.textContent).toContain('Mindestens einen Wert auswählen.');
@@ -736,6 +737,23 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
       expect(element.textContent).toContain(T.fehlerPflichtfelder(feldName('zusatz.verband')));
       expect(checkbox('vhf').getAttribute('aria-invalid')).toBe('true');
+    });
+
+    it('zeigt ohne x-labels den Rohwert; der Wert der Checkbox bleibt vhf', async () => {
+      const ohne = {
+        ...VERBAND_ART,
+        zusatzSchema: {
+          type: 'object',
+          properties: {
+            ...(VERBAND_ART.zusatzSchema as { properties: object }).properties,
+            verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1 },
+          },
+        },
+      };
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [ohne]);
+      await klicken(T.aendern);
+      const gruppe = element.querySelector<HTMLFieldSetElement>('fieldset[data-test=listenfeld]')!;
+      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['vhf', 'gsk']);
     });
 
     it('sendet die gewählten Werte als Array an PATCH und bestätigt danach', async () => {
