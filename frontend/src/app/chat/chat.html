@@ -29,6 +29,9 @@
     <div id="gespraech-liste" [hidden]="!listeOffen()">
       @if (listeFehler()) {
         <p class="fehler" role="alert">{{ texte.fehlerListe }}</p>
+        <button mat-button type="button" data-test="gespraeche-neu-laden" (click)="listeNeuLaden()">
+          {{ neuLadenText }}
+        </button>
       }
       @if (gespraeche() === null) {
         <p class="gedaempft">{{ texte.gespraecheLaden }}</p>

@@ -272,8 +272,12 @@ describe('Chat (Req 6.1–6.3)', () => {
       'Du hast in dieser Stunde 100 Fragen gestellt. Ab 09:01 geht es weiter.',
     );
     // 09:00:40 in Zürich + 3'561 s = 10:00:01: angezeigt wird die erste Minute, in der es sicher weitergeht
-    expect(text(3561)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.');
-    expect(text(null)).toBe('Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.');
+    expect(text(3561)).toBe(
+      'Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.',
+    );
+    expect(text(null)).toBe(
+      'Du hast in dieser Stunde 100 Fragen gestellt. Ab 10:01 geht es weiter.',
+    );
   });
 
   it('beginnt nach dem Abbruch der ersten Frage ein neues Gespräch auch in der Ansicht', async () => {
@@ -286,9 +290,9 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(element.querySelector('[data-test=neu-beginnen]')!.textContent).toBe(t.neuBeginnen);
     const b = await senden('Und welche davon ist die grösste?');
     expect(b.gespraechId).toBeNull();
-    expect([...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent)).toEqual([
-      'Und welche davon ist die grösste?',
-    ]);
+    expect(
+      [...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent),
+    ).toEqual(['Und welche davon ist die grösste?']);
     expect(element.querySelector('[data-test=neu-beginnen]')).toBeNull();
     await ereignis({ typ: 'fertig', gespraechId: 'g9' });
     port.fragen_.at(-1)!.strom.complete();
@@ -311,9 +315,9 @@ describe('Chat (Req 6.1–6.3)', () => {
     expect(feld().value).toBe('Zweite');
     const neu = await senden('Zweite');
     expect(neu.gespraechId).toBeNull();
-    expect([...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent)).toEqual([
-      'Zweite',
-    ]);
+    expect(
+      [...element.querySelectorAll('[data-test=frage] .inhalt')].map((f) => f.textContent),
+    ).toEqual(['Zweite']);
   });
 
   it('bricht beim Verlassen der Seite ab', async () => {
@@ -387,5 +391,15 @@ describe('Chat (Req 6.1–6.3)', () => {
     fixture.destroy();
     await oeffnen();
     expect(element.querySelector('.gespraeche [role=alert]')!.textContent).toBe(t.fehlerListe);
+    expect(element.textContent).not.toContain(t.gespraecheLaden);
+
+    port.listeFehler = false;
+    element.querySelector<HTMLButtonElement>('[data-test=gespraeche-neu-laden]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[data-test=gespraeche-neu-laden]')).toBeNull();
+    expect(element.querySelectorAll('[data-test=gespraech]')).toHaveLength(2);
+    expect(port.listeAbrufe).toBe(3);
   });
 });

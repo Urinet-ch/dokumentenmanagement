@@ -76,6 +76,16 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
         }
     }
 
+    @Override
+    public void schemaEntfernen(String schema) {
+        pruefen(schema);
+        try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("drop schema if exists " + schema + " cascade");
+        } catch (SQLException e) {
+            throw new IllegalStateException("Mandanten-Schema " + schema + " nicht entfernt", e);
+        }
+    }
+
     private void einrichten(String schema, boolean anlegen) {
         pruefen(schema);
         try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {

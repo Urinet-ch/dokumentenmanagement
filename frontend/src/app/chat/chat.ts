@@ -62,6 +62,7 @@ export class Chat {
   private readonly port = inject(ChatPort);
 
   protected readonly texte = TEXTE.chat;
+  protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
   protected readonly tag = tag;
   protected readonly frageMax = FRAGE_MAX;
 
@@ -124,6 +125,12 @@ export class Chat {
 
   protected listeUmschalten(): void {
     this.listeGeoeffnet.set(!this.listeOffen());
+  }
+
+  protected listeNeuLaden(): void {
+    this.listeFehler.set(false);
+    this.gespraeche.set(null);
+    this.listeLaden();
   }
 
   protected eingeben(wert: string): void {
