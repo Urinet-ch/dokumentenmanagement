@@ -45,7 +45,7 @@ Funktionalität: Erfassung durch die Geschäftsstelle
  """
  {"code": "PROBE_DA_HEFT", "name": "Heft Probe", "gruppen": [], "pflichtfelder": ["datum"],
  "zusatzSchema": {"type": "object", "properties": {"reihe": {"type": "string"}, "jahr": {"type": "integer"},
- "veroeffentlicht": {"type": "boolean"}}, "additionalProperties": false},
+ "zugriff": {"type": "string"}, "veroeffentlicht": {"type": "boolean"}}, "additionalProperties": false},
  "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10, "aufbewahrungAb": "GESCHAEFTSJAHR",
  "gesetzlichePflicht": false}
  """
@@ -56,14 +56,16 @@ Funktionalität: Erfassung durch die Geschäftsstelle
  | titel | Heft Probe |
  | datum | 2026-03-10 |
  Und der Worker die Archivierung ausführt
- Wenn «geschaeftsstelle-vhf-gsk» das Dokument «H» mit dem Körper '{"zusatz":{"veroeffentlicht":true},"grund":"Freigabe"}' ändert
+ Wenn «geschaeftsstelle-vhf-gsk» das Dokument «H» mit dem Körper '{"zusatz":{"zugriff":"mitglieder","veroeffentlicht":true},"grund":"Freigabe"}' ändert
  Dann meldet das Archiv Status 200
  Und hat das Dokument «H» diese Werte:
- | zusatz | {"veroeffentlicht": true} |
- Wenn «geschaeftsstelle-vhf-gsk» das Dokument «H» mit dem Körper '{"zusatz":{"veroeffentlicht":false},"grund":"Rückzug"}' ändert
+ | zusatz | {"zugriff": "mitglieder", "veroeffentlicht": true} |
+ Und steht im Änderungs-Feed für «H» zuletzt die Stufe vorher «-» und nachher «mitglieder»
+ Wenn «geschaeftsstelle-vhf-gsk» das Dokument «H» mit dem Körper '{"zusatz":{"zugriff":"mitglieder","veroeffentlicht":false},"grund":"Rückzug"}' ändert
  Dann meldet das Archiv Status 200
  Und hat das Dokument «H» diese Werte:
- | zusatz | {"veroeffentlicht": false} |
+ | zusatz | {"zugriff": "mitglieder", "veroeffentlicht": false} |
+ Und steht im Änderungs-Feed für «H» zuletzt die Stufe vorher «mitglieder» und nachher «-»
  Und steht im Zugriffsprotokoll für «H» 2 Mal «AENDERN» von «geschaeftsstelle-vhf-gsk»
 
  @req-3.4
