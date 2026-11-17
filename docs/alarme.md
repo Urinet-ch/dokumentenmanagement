@@ -58,9 +58,17 @@ der Abruf; liefert ein Mandant keinen Stand, verschwinden seine Reihen, statt ei
 | `archiv_jvm_speicher_prozent` | Gauge | `pool` (`Metaspace`, `Compressed Class Space`, `Heap`) | Auslastung des Bereichs in Prozent des Maximums, gemessen im Takt der Speicherprüfung; ohne Maximum keine Reihe. Grundlage des Speicher-Alarms, siehe [speicherbudget.md](speicherbudget.md) |
 | `archiv_ki_feld_bestaetigt_total`, `archiv_ki_feld_korrigiert_total` | Zähler | `feld`, `mandant` | Wie oft ein KI-Vorschlag für das Feld unverändert bestätigt bzw. korrigiert wurde; die Reihen aller Felder entstehen beim ersten Zählen eines Mandanten mit 0 |
 | `archiv_ki_feld_korrekturquote` | Gauge | `feld`, `mandant` | korrigiert geteilt durch bestätigt seit dem Start des Prozesses (0 ohne Bestätigung); die Quote über einen längeren Zeitraum rechnet das Monitoring aus den Zählern (`increase(…[90d])`) |
+| `archiv_webseite_grenze_ausgefallen_total` | Zähler | – | Prüfung einer Grenze je Webseiten-Schlüssel ist fehlgeschlagen; die Anfrage wurde wie vorgesehen durchgelassen |
 
 Die Kennzahlen des Speichers sind je JVM (API und Worker getrennt), die Zähler der KI-Felder gehören dem Prozess, der
 den Vorschlag bestätigt.
+
+### Alarmvorschlag: Fehler der Webseiten-Grenzen
+
+Vorschlag für das externe Monitoring: Alarm, wenn `increase(archiv_webseite_grenze_ausgefallen_total[5m]) > 0`.
+Der Zähler meldet einen internen Fehler der Pro-Schlüssel-Prüfung; diese lässt Anfragen bewusst durch, damit ein
+Limiterfehler die Webseite nicht abschaltet. Bei einem Alarm den Fehlergrund im Log prüfen und die Prüfung beheben.
+Das Archiv versendet dafür keine Alarm-Mail.
 
 ## Abweichungen zwischen Spec und Code
 
