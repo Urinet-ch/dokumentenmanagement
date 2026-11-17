@@ -7,18 +7,17 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Einstellungen eines Mandanten aus {@code public.mandant} (design.md «Mandanten-Einstellungen»): Geschäftsjahresende
- * (Req 9.6), die eigenen Arten, deren Belegnummer eindeutig sein muss (Req 8.9, 11.3), sowie Name und Kennungen (eigene
- * UID und IBANs aus {@code kennungen}) für den Metadaten-Extraktor (Req 7.5, 7.12).
+ * Geschäftsjahresende, Name und Kennungen aus {@code public.mandant} sowie selbst ausgestellte Dokumentarten aus dem
+ * Mandanten-Schema (Spec 05, Req 2.2).
  */
 public interface MandantEinstellungen {
 
-    /** Einstellungen des Mandanten; ein unbekannter Mandant hat Standard-Ende und keine eigenen Arten. */
+    /** Einstellungen und selbst ausgestellte Arten des aktuellen Mandanten. */
     Werte lesen(MandantCode mandant);
 
     /**
-     * {@code eigeneArten} leer, wenn {@code eigene_arten} nicht gesetzt ist; {@code name} leer und {@code uid} leer bzw.
-     * {@code ibans} ohne Einträge, wenn der Mandant unbekannt ist oder {@code kennungen} fehlt.
+     * {@code eigeneArten} wird aus {@code dokumentart.selbst_ausgestellt} gebildet; Name und Kennungen sind leer,
+     * wenn der Mandant unbekannt ist oder {@code kennungen} fehlt.
      */
     record Werte(Geschaeftsjahresende geschaeftsjahresende, Set<String> eigeneArten, String name, String uid,
                  List<String> ibans) {

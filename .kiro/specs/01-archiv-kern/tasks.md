@@ -550,6 +550,7 @@ Arbeitsweise je Aufgabe (Claude Code):
   - versiegelt zusammenstellen: Keycloak-Admin-Zugang, TOTP-Backup-Codes, restic-Schlüssel, privater Sicherungsschlüssel (Export-Verschlüsselung), S3-Zugang des Inhabers (Inhaber-Zugang, 6.10), öffentlicher Manifest-Schlüssel, zweiter SSH-Schlüssel für das Ausdünnen der Zweitkopie auf dem Hostpoint-Webhosting (16.2); Ablage ausserhalb des Systems am Ort aus der Verfahrensbeschreibung, nie im Repository
   - nicht hinein gehört der Probe-Schlüssel: Er ist ersetzbar (neuer Empfänger, danach neuer Vollexport, 16.23)
   - Vollständigkeit einmal mit dem Notfallablauf aus 5.7 prüfen
+  - Ungeprüfter Entwurf gemäss Auftrag: `docs/notfall/notfallunterlagen.md`; Prüfung, Freigabe und Platzhalter füllen durch Fabian offen. Der Haken 5.10 bleibt offen.
   - _Anforderungen: 6.10, 16.12_
 
 - [ ] 5.11 Wechsel auf Stufe B [Infra] [Fabian]

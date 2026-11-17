@@ -619,6 +619,66 @@ class NetworkntZusatzSchemaPrueferTest {
         assertUngueltig(() -> pruefer.schemaPruefen(musterSchema("a".repeat(max + 1))));
     }
 
+    @Test
+    void reservierteFelderMuessenIhreFesteDefinitionBehalten() {
+        String gueltig = """
+                {"type":"object","properties":{
+                  "zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"mitglieder"},
+                  "veroeffentlicht":{"type":"boolean","default":false}},
+                 "required":["zugriff","veroeffentlicht"]}""";
+        assertThat(pruefer.reservierteFelderGueltig(gueltig)).isTrue();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["mitglieder","oeffentlich"],
+                "default":"mitglieder"}},"required":["zugriff"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"veroeffentlicht":{"type":"string","default":false}},
+                "required":["veroeffentlicht"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder",
+                "vorstand"],"default":"oeffentlich"}},"required":["zugriff"]}""")).isFalse();
+        // «vorstand» als Standard ist zulässig (z. B. VORSTANDSPROTOKOLL), ohne Art-Code in der Programmlogik
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{
+                  "zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"vorstand"}},
+                 "required":["zugriff"]}""")).isTrue();
+    }
+
+    @Test
+    void reservierteFelderVerlangenTypgenauenStandard() {
+        // String «false» ist kein JSON-Wahrheitswert (Spec 03, Req 3.7)
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"veroeffentlicht":{"type":"boolean","default":"false"}},
+                "required":["veroeffentlicht"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"veroeffentlicht":{"type":"boolean","default":true}},
+                "required":["veroeffentlicht"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder",
+                "vorstand"],"default":["mitglieder"]}},"required":["zugriff"]}""")).isFalse();
+    }
+
+    @Test
+    void reservierteFelderLassenSichNichtUeberAndereSchluesselwoerterUmgehen() {
+        for (String schema : List.of(
+                """
+                {"type":"object","patternProperties":{"^zugriff$":{"type":"string"}}}""",
+                """
+                {"type":"object","patternProperties":{"^zug":{"type":"string"}}}""",
+                """
+                {"type":"object","anyOf":[{"properties":{"zugriff":{"type":"string"}}}]}""",
+                """
+                {"type":"object","allOf":[{"properties":{"veroeffentlicht":{"type":"string"}}}]}""",
+                """
+                {"type":"object","$defs":{"z":{"properties":{"zugriff":{"type":"string"}}}},
+                 "if":{"properties":{"x":{"const":1}}},"then":{"$ref":"#/$defs/z"}}""")) {
+            assertThat(pruefer.reservierteFelderGueltig(schema)).as(schema).isFalse();
+        }
+        // unverdächtige Kombinatoren und patternProperties bleiben erlaubt
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","patternProperties":{"^x_":{"type":"string"}},
+                 "anyOf":[{"required":["a"]}],"properties":{"a":{"type":"string"}}}""")).isTrue();
+    }
+
     private static String musterSchema(String muster) {
         return "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\",\"pattern\":\"" + muster + "\"}}}";
     }
