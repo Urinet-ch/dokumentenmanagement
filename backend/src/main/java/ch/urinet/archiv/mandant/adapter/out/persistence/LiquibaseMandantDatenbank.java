@@ -110,29 +110,56 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     public void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten) {
         pruefen(schema);
         String sql = "insert into " + schema + ".dokumentart (code, name, gruppen, pflichtfelder, zusatz_schema, "
-                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung) "
-                + "values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?) on conflict (code) do nothing";
+                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung, "
+                + "selbst_ausgestellt, belegnummer_muster, fremdbeleg_art, ohne_zahlungsdaten_art, ki_vorschlag, "
+                + "ki_felder, ki_hinweise, reihenfolge) values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, "
+                + "?, null, null, ?, ?, ?, ?) on conflict (code) do nothing returning code";
+        String referenzenAktualisieren = "update " + schema
+                + ".dokumentart set fremdbeleg_art = ?, ohne_zahlungsdaten_art = ? where code = ?";
         try (Connection verbindung = eigentuemer.oeffnen(); PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
-            verbindung.setAutoCommit(true);
-            for (DokumentartVorlage art : arten) {
-                einfuegen.setString(1, art.code());
-                einfuegen.setString(2, art.name());
-                einfuegen.setArray(3, verbindung.createArrayOf("text", art.gruppen().toArray()));
-                einfuegen.setArray(4, verbindung.createArrayOf("text", art.pflichtfelder().toArray()));
-                einfuegen.setString(5, art.zusatzSchemaJson());
-                einfuegen.setString(6, art.vertraulichkeit());
-                if (art.aufbewahrungJahre() == null) {
-                    einfuegen.setNull(7, Types.INTEGER);
-                } else {
-                    einfuegen.setInt(7, art.aufbewahrungJahre());
+            verbindung.setAutoCommit(false);
+            try (PreparedStatement referenzen = verbindung.prepareStatement(referenzenAktualisieren)) {
+                for (DokumentartVorlage art : arten) {
+                    einfuegen.setString(1, art.code());
+                    einfuegen.setString(2, art.name());
+                    einfuegen.setArray(3, verbindung.createArrayOf("text", art.gruppen().toArray()));
+                    einfuegen.setArray(4, verbindung.createArrayOf("text", art.pflichtfelder().toArray()));
+                    einfuegen.setString(5, art.zusatzSchemaJson());
+                    einfuegen.setString(6, art.vertraulichkeit());
+                    if (art.aufbewahrungJahre() == null) {
+                        einfuegen.setNull(7, Types.INTEGER);
+                    } else {
+                        einfuegen.setInt(7, art.aufbewahrungJahre());
+                    }
+                    einfuegen.setString(8, art.aufbewahrungAb());
+                    einfuegen.setBoolean(9, art.gesetzlichePflicht());
+                    einfuegen.setBoolean(10, art.aktiv());
+                    einfuegen.setString(11, art.beschreibung());
+                    einfuegen.setBoolean(12, art.selbstAusgestellt());
+                    einfuegen.setArray(13, verbindung.createArrayOf("text", art.belegnummerMuster().toArray()));
+                    einfuegen.setBoolean(14, art.kiVorschlag());
+                    einfuegen.setArray(15, verbindung.createArrayOf("text", art.kiFelder().toArray()));
+                    einfuegen.setString(16, art.kiHinweise());
+                    einfuegen.setInt(17, art.reihenfolge());
+                    try (ResultSet eingefuegt = einfuegen.executeQuery()) {
+                        if (eingefuegt.next()) {
+                            referenzen.setString(1, art.fremdbelegArt());
+                            referenzen.setString(2, art.ohneZahlungsdatenArt());
+                            referenzen.setString(3, art.code());
+                            referenzen.addBatch();
+                        }
+                    }
                 }
-                einfuegen.setString(8, art.aufbewahrungAb());
-                einfuegen.setBoolean(9, art.gesetzlichePflicht());
-                einfuegen.setBoolean(10, art.aktiv());
-                einfuegen.setString(11, art.beschreibung());
-                einfuegen.addBatch();
+                referenzen.executeBatch();
+            } catch (SQLException e) {
+                try {
+                    verbindung.rollback();
+                } catch (SQLException rollbackFehler) {
+                    e.addSuppressed(rollbackFehler);
+                }
+                throw e;
             }
-            einfuegen.executeBatch();
+            verbindung.commit();
         } catch (SQLException e) {
             throw new IllegalStateException("Dokumentarten für " + schema + " nicht eingespielt", e);
         }
@@ -168,7 +195,15 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                                 'jahre', a.aufbewahrung_jahre,
                                 'ab', a.aufbewahrung_ab),
                             'gesetzlichePflicht', a.gesetzliche_pflicht,
-                            'aktiv', a.aktiv)
+                            'aktiv', a.aktiv,
+                            'selbstAusgestellt', a.selbst_ausgestellt,
+                            'belegnummerMuster', to_jsonb(coalesce(a.belegnummer_muster, '{}'::text[])),
+                            'fremdbelegArt', a.fremdbeleg_art,
+                            'ohneZahlungsdatenArt', a.ohne_zahlungsdaten_art,
+                            'kiVorschlag', a.ki_vorschlag,
+                            'kiFelder', to_jsonb(coalesce(a.ki_felder, '{}'::text[])),
+                            'kiHinweise', a.ki_hinweise,
+                            'reihenfolge', a.reihenfolge)
                             order by a.code collate "C")
                         from dokumentart a), '[]'::jsonb)
                 ) as inhalt

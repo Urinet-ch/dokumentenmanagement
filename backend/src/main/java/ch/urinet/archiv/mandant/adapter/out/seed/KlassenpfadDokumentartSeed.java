@@ -21,8 +21,10 @@ import java.util.Set;
 @ApplicationScoped
 public class KlassenpfadDokumentartSeed implements DokumentartSeed {
 
-    private static final Set<String> FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder", "zusatz_schema",
-            "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv");
+    private static final Set<String> FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder",
+            "zusatz_schema", "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht",
+            "aktiv", "selbst_ausgestellt", "belegnummer_muster", "fremdbeleg_art", "ohne_zahlungsdaten_art",
+            "ki_vorschlag", "ki_felder", "ki_hinweise", "reihenfolge");
 
     private final ObjectMapper json;
 
@@ -68,7 +70,15 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                     jahre(art, pfad),
                     aufbewahrungAb(art, pfad),
                     pflicht(art, pfad),
-                    aktiv(art, pfad)));
+                    aktiv(art, pfad),
+                    boolesch(art, "selbst_ausgestellt", false, pfad),
+                    liste(art, "belegnummer_muster", pfad),
+                    optionalText(art, "fremdbeleg_art", pfad),
+                    optionalText(art, "ohne_zahlungsdaten_art", pfad),
+                    boolesch(art, "ki_vorschlag", true, pfad),
+                    liste(art, "ki_felder", pfad),
+                    optionalText(art, "ki_hinweise", pfad),
+                    ganzzahl(art, "reihenfolge", 0, pfad)));
         }
         return ergebnis;
     }
@@ -117,14 +127,40 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
     }
 
     private static boolean aktiv(JsonNode art, String pfad) {
-        JsonNode aktiv = art.path("aktiv");
-        if (aktiv.isMissingNode()) {
-            return true;
+        return boolesch(art, "aktiv", true, pfad);
+    }
+
+    private static boolean boolesch(JsonNode art, String feld, boolean standard, String pfad) {
+        JsonNode wert = art.path(feld);
+        if (wert.isMissingNode()) {
+            return standard;
         }
-        if (!aktiv.isBoolean()) {
-            throw ungueltig(pfad, "Feld aktiv ist nicht boolesch");
+        if (!wert.isBoolean()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist nicht boolesch");
         }
-        return aktiv.booleanValue();
+        return wert.booleanValue();
+    }
+
+    private static String optionalText(JsonNode art, String feld, String pfad) {
+        JsonNode wert = art.path(feld);
+        if (wert.isMissingNode() || wert.isNull()) {
+            return null;
+        }
+        if (!wert.isTextual() || wert.asText().isBlank()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist kein nicht leerer Text");
+        }
+        return wert.asText();
+    }
+
+    private static int ganzzahl(JsonNode art, String feld, int standard, String pfad) {
+        JsonNode wert = art.path(feld);
+        if (wert.isMissingNode()) {
+            return standard;
+        }
+        if (!wert.isIntegralNumber() || !wert.canConvertToInt()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist keine Ganzzahl");
+        }
+        return wert.intValue();
     }
 
     private static List<String> liste(JsonNode art, String feld, String pfad) {
