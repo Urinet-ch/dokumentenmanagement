@@ -90,6 +90,14 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   Summe aller Texte und Beschreibungen im Prompt höchstens 24'000 Zeichen (Prüfung in `Konfiguration.pruefen`).
   Ohne Abnahme nach Req 8.4 (Schalter `ki_freigegeben` in den KI-Texten, setzt nur der Betreiber mit Verweis auf die
   Abnahme) erzeugt der Worker für den Mandanten keinen Auftrag `KI_VORSCHLAG`; `urinet` startet mit `true`.
+  Abnahme eines Mandanten ohne Golden-Datensatz (Req 8.9, Entscheid Fabian 17.11.2026): Stichprobe mit der
+  Geschäftsstelle, 20 bis 30 echte, repräsentative Dokumente. Die Auswertung liest die Zähler
+  `archiv_ki_feld_bestaetigt_total` und `archiv_ki_feld_korrigiert_total` je Feld und Mandant (Spec 01, design.md
+  «Überwachung»); je Feld gilt: bestätigt plus korrigiert mindestens 20 und korrigiert / (bestätigt plus korrigiert)
+  höchstens 10 %. Weil `ki_freigegeben` nur je Mandant besteht (Tabelle `ki_texte`), müssen alle Felder die Schwelle
+  erreichen; eine Freigabe je Feld wäre eine Erweiterung (Schalter je Feld, nicht entschieden). Hinweis: Die Gauge
+  `archiv_ki_feld_korrekturquote` teilt korrigiert durch bestätigt (Verhältnis, Stand seit Prozessstart) und ist für
+  die Schwelle nicht massgeblich; massgeblich ist der Anteil an den bewerteten Feldern über den Zeitraum der Stichprobe.
 - `dokument/` – `dokument_version` (Spec 01, Aufgabe 3.5) enthält zusätzlich `klassifikationen: {<code>: [<wert>…]}`
   und `konfigurationVersion`; `PATCH /dokumente/{id}` versioniert Änderungen der Klassifikationen (Req 3.7).
 - `suche/` – Filter `klassifikation.<code>=<wert>` (Req 8.5) und Facetten je Wert über `dokument_klassifikation`, im
@@ -365,5 +373,6 @@ Code kommen: Fehlercodes und A11 (siehe oben) sowie die Stammdaten-Tabelle (Aufg
   im PR dieser Spec nachgetragen).
 
 ## Open Points
-- [offen: Entscheid Fabian] Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9; spätestens vor Welle 10).
+- [offen: Entscheid Fabian] Weg, die KI-Vorschläge für die Stichprobe vor der Freigabe zu erzeugen und zu bewerten
+  («Probelauf»): Solange `ki_freigegeben = false` gilt, erzeugt der Worker keinen Auftrag `KI_VORSCHLAG` (Req 8.4).
 - Rechte der Geschäftsstelle für A11 bleiben der Entscheid aus Spec 03, 3.5.

@@ -330,8 +330,16 @@ kennen, damit ich keine fremden Kategorien sehe.
    Jahresexport: ohne Finanzfunktionen bietet das Archiv die Werkzeuge dem Agenten nicht an und beantwortet den
    Export für Rollen mit Exportrecht mit HTTP 404, für die übrigen Rollen bleibt es bei HTTP 403 nach Spec 02, 7.5.
 9. Ein Mandant ohne eigenen Golden-Datensatz (z. B. `vhf-gsk`) SOLL die KI-Freigabe nach 8.4 erst nach einer
-   Abnahme erhalten: [offen: Entscheid Fabian] (Verfahren der Abnahme ohne Golden-Datensatz, spätestens vor Welle 10).
-   Nachweis: manuell [Fabian].
+   Abnahme durch eine Stichprobe mit der Geschäftsstelle erhalten (Entscheid Fabian 17.11.2026, spätestens vor
+   Welle 10): Die Geschäftsstelle des Mandanten lädt 20 bis 30 echte, repräsentative Dokumente hoch (nicht nur
+   einfache Fälle) und bestätigt oder korrigiert die KI-Vorschläge im Eingangskorb. Die Kennzahl «Korrekturquote je
+   Feld» (Spec 01, 7.7 und 16.4: Zähler `archiv.ki.feld.bestaetigt` und `archiv.ki.feld.korrigiert`) entscheidet:
+   Der Betreiber setzt `ki_freigegeben` (Admin-Kommando `ki-freigeben`, 8.4) nur, wenn für **jedes** Feld, das die
+   KI für den Mandanten vorschlägt (8.1), mindestens 20 Stichprobendokumente bewertet sind (bestätigt plus
+   korrigiert) und der Anteil der korrigierten Bewertungen je Feld höchstens 10 % beträgt. Die Freigabe gilt je
+   Mandant (8.4), nicht je Feld: Erreicht ein Feld die Schwelle nicht, bleibt die KI für den Mandanten aus, bis
+   Prompt, Beschreibungen oder Hinweise angepasst sind und eine neue Stichprobe die Schwelle erreicht. Der
+   Verweis `--abnahme` des Kommandos nennt die Auswertung der Stichprobe. Nachweis: manuell [Fabian].
 
 ### Requirement 9: Bestand und Abnahme (ohne Konzept-ID, nicht funktional)
 **User Story:** Als Inhaber von Urinet möchte ich, dass sich mit dieser Spec an meinem Archiv nichts ändert,
