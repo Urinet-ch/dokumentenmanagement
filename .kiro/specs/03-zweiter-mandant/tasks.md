@@ -24,7 +24,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 8.4, 2.2, 1.2, 3.5_
 
 - [ ] 10.2 Seed und Mandant anlegen [Backend]
-  - `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` mit Zusatz-Schema, Standard-Vertraulichkeit und `gesetzliche_pflicht`; keine Finanzarten; Provisionierung nach Spec 01 (Liquibase `db/mandant`, Bucket mit Object Lock, Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`, Zugriff mit dem App-Schlüssel `s3_app_zugang`, nie mit Bypass-Header nach Spec 01, 6.5); Keycloak-Client `archiv-vhf-gsk`
+  - `backend/src/main/resources/seed/vhf-gsk/dokumentarten.json` mit Zusatz-Schema, Standard-Vertraulichkeit und `gesetzliche_pflicht`; keine Finanzarten; Provisionierung nach Spec 01 (Liquibase `db/mandant`, Bucket mit Object Lock, Versionierung und Bucket Policy mit Deny auf `s3:BypassGovernanceRetention`, Zugriff mit dem App-Schlüssel `s3_app_zugang`, nie mit Bypass-Header nach Spec 01, 6.5); Keycloak-Client `archiv-vhf-gsk` nur manuell durch den Betreiber, nicht durch den Befehl (für Theme/Redirect, Req 1.1/2.3)
   - Test-Seed `backend/src/test/resources/seed/vhf-gsk` (Dokumentart `PROBE_VHF_BULLETIN` aus Spec 01, Aufgabe 1.4) entfernen, sobald der echte Seed besteht; die Szenarien von 1.4 auf eine echte Art umstellen
   - Szenario: Finanzwerkzeuge für `vhf-gsk` nicht verfügbar
   - Spec 05 ergänzt: Seed `backend/src/main/resources/seed/vhf-gsk/konfiguration.json` statt `dokumentarten.json`, mit Klassifikation `fachgebiet`, Reihen als Dokumentarten, Regeln `EINDEUTIG` und `FOLGE` für Ausgabe-Nr. und Jahr; `KonfigurationSeedTest` prüft den Seed (Spec 05, Req 1.6, 6.7; Aufgabe 17.7)
@@ -33,7 +33,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Entscheid Fabian 17.11.2026: Standard-Zugriffsstufe von `VORSTANDSPROTOKOLL` im Seed ist `vorstand` (alle anderen Arten bleiben `mitglieder`); `VhfGskDokumentartSeedTest` prüft den Standard je Art. Die Anwendung setzt Schema-Standards nicht selbst ein, die Stufe wählt weiterhin eine Person.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.5, 1.6, 3.7_
   - Anzeigetexte (PR dieses Auftrags): Der Seed hängt an `verband` jeder Art `"x-labels": {"vhf": "VHF", "gsk": "GSK"}`; die Oberfläche zeigt diese Texte, gespeichert und gesendet wird weiter der Enum-Wert (`VhfGskDokumentartSeedTest`)
-  - Entscheid Fabian 17.11.2026 (PR #257): Das Archiv legt keinen mandantenspezifischen Keycloak-Client an. Falls für Theme oder Redirect-URI nötig, richtet ihn der Betreiber manuell ein; «Keycloak-Client in Produktion» oben meint diese manuelle Einrichtung.
+  - Entscheid Fabian 17.11.2026 (PR #257): Das Archiv legt keinen mandantenspezifischen Keycloak-Client an. Falls für Theme oder Redirect-URI nötig, richtet ihn der Betreiber manuell ein;
 
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow

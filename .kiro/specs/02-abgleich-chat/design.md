@@ -349,7 +349,7 @@ offen. **Empfehlung:** die bestehende Grenze von 100 Aufrufen pro Stunde je Benu
 zusätzlich einen niedrigeren konfigurierbaren Spitzenwert je Token festlegen.
 
 Jeder authentifizierte Werkzeugaufruf wird append-only in `zugriff_protokoll` erfasst: Zeit, Mandant, Benutzer-
-oder Token-ID, Werkzeug und Berechtigungs-/Ergebnisstatus. Frage, Antwort, Dokumenttext, Parameterwerte und
+(Token als `token:<id>`, Benutzerverzeichnis nach Req 10.10), Werkzeug, Berechtigungs-/Ergebnisstatus (verweigert: `VERWEIGERT`) und die ID gelieferter Dokumente oder Wissensseiten. Der Eintrag entsteht synchron in derselben Transaktion vor der Lieferung, bei Fehler gibt es kein Ergebnis (fail-closed). `dokument_zeigen` schreibt wie E4 `ANZEIGEN` mit Dokument-ID, IP und `details` `{"kanal":"MCP"}`. Frage, Antwort, Dokumenttext, übrige Parameterwerte und
 Tokengeheimnis gehören weder ins Zugriffsprotokoll noch in Anwendungslogs. Die Aufbewahrung folgt Spec 01,
 Requirement 10.9; eine zweite Gesprächshistorie wird nicht angelegt.
 
@@ -363,7 +363,7 @@ Requirement 10.9; eine zweite Gesprächshistorie wird nicht angelegt.
 #### Betrieb, Tests und Aufwand
 
 - **Lokal:** Entwicklung und Protokolltests nur mit synthetischen Testdaten; das Profil `lokal` ist kein Produktionsnachweis.
-- **Stufe A:** höchstens Funktionstest mit synthetischen oder anonymisierten Daten und Test-Tokens; keine echten Belege oder Personendaten.
+- **Stufe A:** höchstens Funktionstest mit synthetischen Testdaten (anonymisierte Echtdaten nur mit Nachweis durch Fabian, `tech.md`) und Test-Tokens; keine echten Belege oder Personendaten.
 - **Stufe B:** frühestens nach Entscheiden, Datenschutz-/Modellfluss-Nachweis und Freigabe durch Fabian. Wenn kein datenschutzkonformer MCP-Client feststeht, bleibt O.3 deaktiviert.
 - **Testplan:** Protokoll-Handshake und Fehlerformate; gültiges, ungültiges, abgelaufenes und widerrufenes Token; Tokenbindung an Benutzer und Mandant; Allowlist je Rolle und Mandantenfunktion; A2–A4, 404 und zwei Mandanten; keine schreibenden Aktionen; Grenzen und `Retry-After`; append-only Protokoll ohne Inhalte oder Geheimnisse; synthetisches Dokument mit Prompt-Injection-Anweisung; Nachweis, dass der Server keine Modellanfrage auslöst. Für freigegebene Kriterien kommen Szenarien mit `@spec-02`/`@req-14.x` und JUnit-Tests nach den Konventionen von `tech.md` hinzu.
 - **Schätzung:** vorläufig 5–8 Personentage: Authentifizierung und Tokenbindung 1–2, Adapter und Werkzeug-Allowlist 2–3, Grenzen/Protokollierung 1, Integrationstests und Sicherheitsnachweis 1–2. Nicht enthalten sind ein Entscheid zu Fremdmodellnutzung, neue Rechte oder ein zusätzlicher Deploy-Client.
@@ -373,8 +373,9 @@ Requirement 10.9; eine zweite Gesprächshistorie wird nicht angelegt.
 1. **Darf Claude Inhalte echter Archivdokumente erhalten?** Empfehlung: keine Weitergabe an Claude-/andere Cloud-Modelle; O.3 nur mit einem nach `tech.md` zugelassenen Modell freigeben. Falls C3 zwingend Cloud-Claude meint, nicht produktiv umsetzen.
 2. **Transport und Betriebsort?** Empfehlung: Streamable HTTP im bestehenden API-Adapter; lokal und Stufe A nur mit synthetischen Daten, Produktivbetrieb frühestens auf Stufe B.
 3. **Wer stellt persönliche MCP-Tokens aus und widerruft sie?** Empfehlung: für den ersten Entwurf nur der `inhaber` über A14; Tokenidentität bleibt die Zielperson. Selbstverwaltung erst nach separatem Entscheid zu Rechten und Oberfläche.
-4. **Welche Tokenlaufzeit und Limits?** Empfehlung: begrenzte Laufzeit, sofortige Widerrufswirkung, höchstens 100 Werkzeugaufrufe je Benutzer und Stunde plus ein tieferer Spitzenwert je Token; genaue Werte vor Implementierung messen und festlegen.
+4. **Welche Tokenlaufzeit und Limits?** Empfehlung: begrenzte Laufzeit, sofortige Widerrufswirkung, höchstens 100 Werkzeugaufrufe je Benutzer und Stunde plus ein tieferer Spitzenwert je Token; genaue Werte vor Implementierung messen und festlegen. Das Limit zählt je Werkzeugaufruf (nicht je Frage) und getrennt vom Chat-Limit nach Requirement 5.5, damit MCP den Chat nicht sperrt.
 5. **Ist ein zusätzlicher gemeinsamer OIDC-Client nötig?** Empfehlung: keine Mandanten-Clients; falls OAuth für den MCP-Transport nötig ist, nur ein gemeinsamer Client nach gesonderter Konfiguration und Prüfung.
+6. **Protokollwert für MCP:** `kanal` `MCP` in `details` von `ANZEIGEN` oder Erweiterung von `zugriff_protokoll_aktion_ck`? Empfehlung: nur `kanal`, keine neue Aktion.
 
 ### Jahresexport (`export`)
 - `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).
