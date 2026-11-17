@@ -156,6 +156,23 @@ class ApiTokenPruefungTest {
     }
 
     @Test
+    void importTokenIstBisZumAblaufzeitpunktGueltigAberNichtDanach() {
+        ApiToken token = register.anlegen(ApiToken.neu(zufall), ApiTokenScope.IMPORT,
+                Optional.of(START.plusSeconds(30)));
+
+        assertThat(pruefung.pruefen(token)).isPresent();
+        uhr.weiter(Duration.ofSeconds(30));
+        assertThat(pruefung.pruefen(token)).isEmpty();
+    }
+
+    @Test
+    void generatorTokenIstAmAblaufzeitpunktUngueltig() {
+        ApiToken token = register.anlegen(ApiToken.neu(zufall), ApiTokenScope.GENERATOR, Optional.of(START));
+
+        assertThat(pruefung.pruefen(token)).isEmpty();
+    }
+
+    @Test
     void erfolgreicherWebseitenSchluesselNutztDenPruefCacheAberFalschesGeheimnisNicht() {
         ApiToken token = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
 
@@ -359,8 +376,16 @@ class ApiTokenPruefungTest {
         boolean zuletztFehler;
 
         ApiToken anlegen(ApiToken token, boolean aktiv) {
-            ApiClient client = new ApiClient(token.id(), "urinet", "Probe", ApiTokenScope.IMPORT, aktiv, START,
-                    Optional.empty());
+            return anlegen(token, ApiTokenScope.IMPORT, aktiv, Optional.empty());
+        }
+
+        ApiToken anlegen(ApiToken token, ApiTokenScope scope, Optional<Instant> gueltigBis) {
+            return anlegen(token, scope, true, gueltigBis);
+        }
+
+        private ApiToken anlegen(ApiToken token, ApiTokenScope scope, boolean aktiv, Optional<Instant> gueltigBis) {
+            ApiClient client = new ApiClient(token.id(), "urinet", "Probe", scope, aktiv, START, Optional.empty(),
+                    Optional.empty(), Optional.empty(), gueltigBis, false);
             eintraege.put(token.id(), new Zugang(client, "hash:" + token.geheimnis()));
             return token;
         }
