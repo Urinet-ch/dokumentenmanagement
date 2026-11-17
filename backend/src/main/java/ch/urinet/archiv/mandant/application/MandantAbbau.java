@@ -32,21 +32,14 @@ public class MandantAbbau {
     }
 
     /**
-     * Der Keycloak-Zugang wird nie entfernt (gemeinsame Realm-Clients, Spec 03 Req 8.3 offen); darum ist
-     * {@code keycloakClientEntfernt} immer {@code false} und {@code ABGESCHLOSSEN} gilt nur ohne diesen Schritt.
+     * Der Abbau entfernt keinen Keycloak-Client (gemeinsame Realm-Clients, Spec 03 Req 8.3); er deaktiviert den
+     * Mandanten und löst die Zuordnung im Archiv. Darum trägt {@code ABGESCHLOSSEN} keinen Zusatz.
      */
     public record Bericht(Zustand zustand, Instant abbauAb, LocalDate sicherungsstaendeBis, int geloescht,
-                          boolean schemaEntfernt, boolean bucketEntfernt,
-                          MandantAblageAbbau ablage, boolean keycloakClientEntfernt) {
-        public Bericht(Zustand zustand, Instant abbauAb, LocalDate sicherungsstaendeBis, int geloescht,
-                       boolean schemaEntfernt, boolean bucketEntfernt, MandantAblageAbbau ablage) {
-            this(zustand, abbauAb, sicherungsstaendeBis, geloescht, schemaEntfernt, bucketEntfernt, ablage, false);
-        }
-
-        /** Zustand für die Ausgabe; {@code ABGESCHLOSSEN} nennt die Einschränkung beim Keycloak-Client. */
+                          boolean schemaEntfernt, boolean bucketEntfernt, MandantAblageAbbau ablage) {
+        /** Zustand für die Ausgabe. */
         public String zustandText() {
-            return zustand == Zustand.ABGESCHLOSSEN && !keycloakClientEntfernt
-                    ? "ABGESCHLOSSEN (ohne Keycloak-Client)" : zustand.name();
+            return zustand.name();
         }
     }
 
