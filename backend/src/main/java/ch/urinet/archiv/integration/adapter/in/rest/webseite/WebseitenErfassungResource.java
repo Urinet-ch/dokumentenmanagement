@@ -459,7 +459,7 @@ public class WebseitenErfassungResource {
     @WebseitenErfassungAktion(Aktion.A7)
     @Protokolliert(aktion = ProtokollAktion.BESTAETIGEN)
     @Operation(summary = "Dokument mit denselben Pflichtfeldern wie die Web-App bestätigen",
-            description = "Felder der Bestätigung der Web-App ohne personBenutzer und dateiname, zusätzlich zusatz. "
+            description = "Felder der Bestätigung der Web-App ohne dateiname, zusätzlich zusatz. "
                     + "zusatz.veroeffentlicht und unbekannte Felder sind 400. Zusatz wird atomar mitbestätigt.")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = BestaetigungDto.class)))
     @APIResponse(responseCode = "202", description = "Archivierung eingereiht",
