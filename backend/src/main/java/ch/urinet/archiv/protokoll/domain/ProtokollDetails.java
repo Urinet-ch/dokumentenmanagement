@@ -12,15 +12,17 @@ import java.util.regex.Pattern;
  * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}), bei {@code KONFIGURATION_AENDERN} Version
  * und Quelle ({@link Konfiguration}) und der Kanal eines Auslösers ohne
  * eigenen Endpunkt ({@code kanal}, z. B. {@value #KANAL_CHAT} für das Chat-Werkzeug {@code dokument_zeigen},
- * Spec 02, Aufgabe 7.1a), nie Dokument-, Kontakt- oder Konfigurationsinhalte (Req 9.7, 9.10, 10.2, 16.7, 17.8).
- * Jedes Feld darf
+ * Spec 02, Aufgabe 7.1a), bei Änderungen an einem API-Token dessen ID ({@code tokenId}, Req 2.20), nie Dokument-,
+ * Kontakt- oder Konfigurationsinhalte ausser den geänderten Konfigurationselementen mit alt und neu (Req 9.7, 9.10,
+ * 10.2, 16.7, 17.8; Spec 05, Req 1.3). Jedes Feld darf
  * fehlen ({@code null}); ohne {@code kanal} ist der Eintrag an einem REST-Endpunkt entstanden.
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                                FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
-                               String kanal) {
+                               String kanal, String tokenId) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
+    private static final Pattern TOKEN_ID = Pattern.compile("^[a-z0-9]{12}$");
     /** Chat-Werkzeug (Spec 02, design.md «Vertrag Welle 7», E4). */
     public static final String KANAL_CHAT = "CHAT";
 
@@ -44,20 +46,29 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         if (kanal != null && !CODE.matcher(kanal).matches()) {
             throw new IllegalArgumentException("kanal ist kein Code");
         }
+        if (tokenId != null && !TOKEN_ID.matcher(tokenId).matches()) {
+            throw new IllegalArgumentException("tokenId ist keine Token-ID");
+        }
+    }
+
+    /** Kompatibel zur Form vor {@code tokenId}. */
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, String kanal) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, null, kanal, null);
     }
 
 
     public ProtokollDetails(String grund, String sha256, String fehlercode) {
-        this(grund, sha256, fehlercode, null, null, null, null, null);
+        this(grund, sha256, fehlercode, null, null, null, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung) {
-        this(grund, sha256, fehlercode, regelAenderung, null, null, null, null);
+        this(grund, sha256, fehlercode, regelAenderung, null, null, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                             FristKonflikt fristKonflikt) {
-        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null, null, null);
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null, null, null, null);
     }
 
     public static ProtokollDetails fehlercode(String fehlercode) {
@@ -74,22 +85,28 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
 
     /** Details eines Eintrags {@code KONTAKT_*} mit Grund (Req 17.8, 17.11, 17.15). */
     public static ProtokollDetails kontakte(String grund, Kontakte kontakte) {
-        return new ProtokollDetails(grund, null, null, null, null, kontakte, null, null);
+        return new ProtokollDetails(grund, null, null, null, null, kontakte, null, null, null);
     }
 
     public static ProtokollDetails konfiguration(String grund, Konfiguration konfiguration) {
-        return new ProtokollDetails(grund, null, null, null, null, null, konfiguration, null);
+        return new ProtokollDetails(grund, null, null, null, null, null, konfiguration, null, null);
     }
 
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
-                && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null;
+                && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null
+                && tokenId == null;
     }
 
     /** Dieselben Details mit dem Kanal {@code kanal}. */
     public ProtokollDetails mitKanal(String kanal) {
         return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration,
-                kanal);
+                kanal, tokenId);
+    }
+
+    /** Details eines Eintrags zu einem API-Token: dessen ID (kein Geheimnis). */
+    public static ProtokollDetails token(String tokenId) {
+        return new ProtokollDetails(null, null, null, null, null, null, null, null, tokenId);
     }
 
     /**

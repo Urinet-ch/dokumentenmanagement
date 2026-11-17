@@ -50,6 +50,49 @@ Funktionalität: API-Tokens für Skripte
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
 
   @req-2.5
+  Szenario: Ablaufdatum wird bei jeder Token-Anfrage geprüft
+    Angenommen für «urinet» gibt es das Token «abgelaufen» mit Scope «generator» und Ablauf in 30 Tagen
+    Und das Ablaufdatum des Tokens «abgelaufen» liegt in der Vergangenheit
+    Und für «urinet» gibt es das Token «gueltig» mit Scope «generator» und Ablauf in 30 Tagen
+    Und für «urinet» gibt es das Token «ohne-ablauf» mit Scope «generator»
+    Wenn das Token «abgelaufen» an «/api/v1/dokumente/generator» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 401 und Fehlercode «NICHT_ANGEMELDET»
+    Wenn das Token «gueltig» an «/api/v1/dokumente/generator» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
+    Wenn das Token «ohne-ablauf» an «/api/v1/dokumente/generator» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 202
+    Und kein Logeintrag enthält das Geheimnis eines Tokens
+
+  @req-2.5
+  Szenario: Ablaufdatum wird beim Anlegen und Ändern validiert
+    Angenommen für «urinet» gibt es das Token «vorhanden» mit Scope «import»
+    Wenn «inhaber-urinet» ein Token «vergangen» mit Scope «import» und Ablaufdatum «gestern» anlegt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» ein Token «zuweit» mit Scope «import» und Ablaufdatum «in-sechs-jahren» anlegt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» den Ablauf des Tokens «vorhanden» auf «gestern» setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
+    Wenn «inhaber-urinet» den Ablauf des Tokens «vorhanden» ohne Datum setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 422 und Fehlercode «PFLICHTFELD_FEHLT»
+
+  @req-2.5
+  Szenario: Inhaber kann Ablauf über REST setzen und entfernen
+    Wenn «inhaber-urinet» ein Token «verwaltet» mit Scope «import» und Ablaufdatum «morgen» anlegt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 201
+    Und enthält die Antwort das Ablaufdatum «morgen»
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist für Ablaufänderungen gemerkt
+    Wenn «inhaber-urinet» den Ablauf des Tokens «verwaltet» auf «morgen» setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 204
+    Wenn «inhaber-urinet» die Tokens auflistet
+    Dann hat das Token «verwaltet» in der Liste das Ablaufdatum «morgen»
+    Wenn «inhaber-urinet» den Ablauf des Tokens «verwaltet» entfernt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 204
+    Wenn «inhaber-urinet» die Tokens auflistet
+    Dann hat das Token «verwaltet» in der Liste kein Ablaufdatum
+    Und das Zugriffsprotokoll von «urinet» enthält seit dem gemerkten Stand zwei Aktionen «AENDERN» ohne Geheimnis
+    Und kein Logeintrag enthält das Geheimnis eines Tokens
+
+  @req-2.5
   Szenario: Ein Token ist an seinen Mandanten gebunden
     Angenommen für «vhf-gsk» gibt es das Token «vhf» mit Scope «import»
     Und für «vhf-gsk» gibt es das Token «vhf-generator» mit Scope «generator»
@@ -144,6 +187,10 @@ Funktionalität: API-Tokens für Skripte
     Wenn «<benutzer>» die Tokens auflistet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
     Wenn «<benutzer>» das Token «vorhanden» widerruft
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Wenn «<benutzer>» den Ablauf des Tokens «vorhanden» auf «morgen» setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Wenn «<benutzer>» den Ablauf des Tokens «vorhanden» entfernt
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
     Wenn das Token «vorhanden» an «/api/v1/dokumente» sendet
     Dann antwortet das Archiv auf die Token-Anfrage mit Status 202

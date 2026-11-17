@@ -9,11 +9,15 @@ import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +31,8 @@ import java.util.Optional;
 public class ApiTokenVerwaltung {
 
     static final int NAME_MAX = 100;
+    static final int GUELTIGKEIT_MAX_JAHRE = 5;
+    private static final ZoneId ZEITZONE = ZoneId.of("Europe/Zurich");
     private static final Logger LOG = Logger.getLogger(ApiTokenVerwaltung.class);
 
     private final ApiClientRegister register;
@@ -34,15 +40,23 @@ public class ApiTokenVerwaltung {
     private final MandantVerzeichnis verzeichnis;
     private final HashSperre sperre;
     private final BenutzerVerzeichnisPflege benutzerVerzeichnis;
+    private final Clock uhr;
     private final SecureRandom zufall = new SecureRandom();
 
+    @Inject
     public ApiTokenVerwaltung(ApiClientRegister register, GeheimnisHasher hasher, MandantVerzeichnis verzeichnis,
                               HashSperre sperre, BenutzerVerzeichnisPflege benutzerVerzeichnis) {
+        this(register, hasher, verzeichnis, sperre, benutzerVerzeichnis, Clock.systemUTC());
+    }
+
+    ApiTokenVerwaltung(ApiClientRegister register, GeheimnisHasher hasher, MandantVerzeichnis verzeichnis,
+                       HashSperre sperre, BenutzerVerzeichnisPflege benutzerVerzeichnis, Clock uhr) {
         this.register = register;
         this.hasher = hasher;
         this.verzeichnis = verzeichnis;
         this.sperre = sperre;
         this.benutzerVerzeichnis = benutzerVerzeichnis;
+        this.uhr = uhr;
     }
 
     /** Das neue Token mit seinem Eintrag; {@code token} ist die einzige Stelle, an der das Geheimnis vorkommt. */
@@ -55,6 +69,11 @@ public class ApiTokenVerwaltung {
      * kein Platz für den Hash innerhalb der Wartezeit → {@code UEBERLASTET}.
      */
     public Erstellt erstellen(String mandant, String name, String scope) {
+        return erstellen(mandant, name, scope, Optional.empty());
+    }
+
+    /** Das Ablaufdatum ist einschliesslich des gewählten Tages in Europe/Zurich gültig. */
+    public Erstellt erstellen(String mandant, String name, String scope, Optional<LocalDate> gueltigBis) {
         MandantCode code = aktiverMandant(mandant);
         String bereinigt = name == null ? "" : name.strip();
         if (bereinigt.isEmpty() || scope == null || scope.isBlank()) {
@@ -68,12 +87,14 @@ public class ApiTokenVerwaltung {
         if (gueltig.webseitenSchluessel()) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
+        Optional<Instant> ablauf = ablauf(gueltigBis);
         ApiToken token = ApiToken.neu(zufall);
-        ApiClient client = new ApiClient(token.id(), code.wert(), bereinigt, gueltig, true, Instant.now(),
-                Optional.empty());
+        ApiClient client = new ApiClient(token.id(), code.wert(), bereinigt, gueltig, true, uhr.instant(),
+                Optional.empty(), Optional.empty(), Optional.empty(), ablauf, false);
         String hash = sperre.ausfuehren(() -> hasher.hashen(token.geheimnis()));
         register.anlegen(client, hash);
-        LOG.infof("API-Token angelegt: id=%s mandant=%s scope=%s", client.id(), client.mandant(), gueltig.code());
+        LOG.infof("API-Token angelegt: id=%s mandant=%s scope=%s gueltigBis=%s", client.id(), client.mandant(),
+                gueltig.code(), ablauf.map(Instant::toString).orElse("ohne"));
         return new Erstellt(client, token);
     }
 
@@ -96,6 +117,39 @@ public class ApiTokenVerwaltung {
         benutzerVerzeichnis.tokenWiderrufen(mandant, ApiToken.principal(id), client.name(), client.erstellt(),
                 erfasstVon);
         LOG.infof("API-Token widerrufen: id=%s mandant=%s", id, mandant.wert());
+    }
+
+    @Transactional
+    public void gueltigBisSetzen(MandantCode mandant, String id, LocalDate datum) {
+        Instant ablauf = ablauf(Optional.ofNullable(datum))
+                .orElseThrow(() -> new FachFehler(Fehlercode.PFLICHTFELD_FEHLT));
+        if (!ApiToken.gueltigeId(id)
+                || !register.apiTokenGueltigkeitSetzen(mandant.wert(), id, Optional.of(ablauf))) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        LOG.infof("Ablauf des API-Tokens geändert: id=%s mandant=%s gueltigBis=%s", id, mandant.wert(),
+                ablauf.toString());
+    }
+
+    @Transactional
+    public void gueltigBisEntfernen(MandantCode mandant, String id) {
+        if (!ApiToken.gueltigeId(id) || !register.apiTokenGueltigkeitSetzen(mandant.wert(), id, Optional.empty())) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        LOG.infof("Ablauf des API-Tokens entfernt: id=%s mandant=%s", id, mandant.wert());
+    }
+
+    private Optional<Instant> ablauf(Optional<LocalDate> datum) {
+        if (datum == null) {
+            throw new IllegalArgumentException("gueltigBis darf nicht null sein");
+        }
+        LocalDate heute = LocalDate.now(uhr.withZone(ZEITZONE));
+        return datum.map(tag -> {
+            if (tag.isBefore(heute) || tag.isAfter(heute.plusYears(GUELTIGKEIT_MAX_JAHRE))) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            return tag.plusDays(1).atStartOfDay(ZEITZONE).toInstant();
+        });
     }
 
     private MandantCode aktiverMandant(String mandant) {

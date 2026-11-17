@@ -153,6 +153,33 @@ When('ich das genutzte API-Token mit Bestätigung widerrufe', async function () 
     .waitFor();
 });
 
+When('ich dem nie genutzten API-Token ein Ablaufdatum gebe', async function () {
+  const zeile = this.seite
+    .locator('[data-test=token]')
+    .filter({ hasText: this.apiTokens.nie.name });
+  const eingabe = zeile.getByLabel('Gültig bis einschliesslich');
+  const heute = await eingabe.getAttribute('min');
+  assert.ok(heute, 'Datumsfeld hat kein frühestes Datum');
+  this.apiTokenAblauf = heute;
+  await eingabe.fill(heute);
+  await zeile.getByRole('button', { name: 'Ablaufdatum speichern', exact: true }).click();
+  await this.seite
+    .getByRole('status')
+    .filter({ hasText: 'Das Ablaufdatum wurde gespeichert.' })
+    .waitFor();
+});
+
+Then('sehe ich das Ablaufdatum des API-Tokens und es ist gespeichert', async function () {
+  const zeile = this.seite
+    .locator('[data-test=token]')
+    .filter({ hasText: this.apiTokens.nie.name });
+  await zeile.waitFor();
+  assert.ok((await zeile.innerText()).includes('Läuft ab am'));
+  const eingabe = zeile.getByLabel('Gültig bis einschliesslich');
+  const gespeichert = await eingabe.inputValue();
+  assert.equal(gespeichert, this.apiTokenAblauf, 'Ablaufdatum wurde nicht zurückgeladen');
+});
+
 Then('das API-Token ist widerrufen und erhält bei Verwendung HTTP 401', async function () {
   const zeile = this.seite
     .locator('[data-test=token]')
