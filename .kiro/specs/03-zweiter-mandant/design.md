@@ -346,6 +346,22 @@ Neu 13.11.2026 (Requirement 11; entschieden von Fabian am 13.11.2026, E-B).
   - Offen: CI-Schritt «Vertrag nur additiv» im Build-Job (`.github/workflows/` nicht in dieser Aufgabe), Router für
     `/public/` mit eigener Drosselung in Traefik (`deploy/infomaniak/compose.yml`, Wert betrieblich); bis dahin läuft
     `/public/` über den Router der App.
+  - Vorschlag Traefik-Drosselung (17.11.2026, Aufgabe 11.6; wartet auf Prüfung von Fabian, nichts ausgerollt): Router
+    `archiv-public` (`PathPrefix(/public/)`, Priorität 200, vor dem PWA-Router) und `archiv-public-suche`
+    (`Path(/public/v1/suche)`, Priorität 300), Labels in `deploy/infomaniak/compose.yml`. Je Quell-IP (Traefik-Standard
+    `remoteAddr`, wie die bestehende Drosselung): alle Pfade 50/s, Spitze 200; Suche zusätzlich 5/s, Spitze 20; höchstens
+    24 gleichzeitige Anfragen (`inflightreq`). Begründung: äussere Schicht, bewusst über den Grenzen je Schlüssel (Lesen
+    20/s, Suche 2/s, Erfassung 5/s, Uploads 120/h, siehe «Grenzen»), damit im Normalfall das Backend mit
+    `ZU_VIELE_ANFRAGEN` und `Retry-After` antwortet; ein Webseitenserver ist eine IP und bedient mehrere Schlüssel
+    (Lesen und Erfassung, je Webseite), darum Summe plus Reserve. Die Schicht fängt Schlüssel-Raten (viele falsche
+    Schlüssel je IP, jeder rechnet Argon2) und Last vor dem Backend ab. Die Zähler liegen im Speicher von Traefik; das 429
+    von Traefik hat kein Problem Details und kein `Retry-After` (Clients behandeln jedes 429 als «später erneut»; die
+    Messung am Livegang, Kennzahl `archiv_webseite_grenze_abgelehnt_total` und Traefik-Zugriffslog, zeigt, ob die Werte
+    passen). Header `X-Archiv-Zugriff`, `-Client`, `-Bearbeiter`: Traefik reicht Request-Header unverändert weiter, keine
+    Middleware ändert sie. Body-Grösse der Uploads: nur
+    als Kommentar in `compose.yml` (`buffering` mit 52 MiB), weil es den Body in Traefik puffert; Entscheid mit 11.10.
+    Interne Routen (`/api/`, `/q/`) unberührt. Rückfall: die Labels entfernen und neu deployen; `/public/` läuft dann
+    wie bisher über den PWA-Router (nur Backend-Grenzen).
 
 ### Grenzen
 Startwerte (Requirement 15.1; vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR), konfigurierbar unter

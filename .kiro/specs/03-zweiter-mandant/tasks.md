@@ -105,6 +105,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; getestet mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Der Vertrag enthält, was es bei der Umsetzung gibt (Problem Details, Header, Versionierung); die Endpunkte kommen additiv mit 11.2 und 11.10 dazu
   - Umsetzung Teil 1 (PR #140): Vertrag `docs/schnittstelle/public-v1.yaml` ohne Endpunkte, Reroute `/public/` → interner Pfad (`WebseitenRoute`), `PublicVertragTest`, Ausschluss aus der App-OpenAPI, Problem Details und `Cache-Control: no-store` unter `/public/`, Abkündigung über `archiv.webseite.v<n>.sunset`, Skript `pruefe-vertrag.sh` mit Selbsttest; offen: CI-Schritt, Traefik-Router
   - Reihenfolge (entschieden 16.11.2026): Die Drosselung im Reverse-Proxy kommt vor dem Livegang der Webseite von VHF/GSK; bis dahin nur Urinet und Testmandanten
+  - Vorschlag, wartet auf Fabians Prüfung (Traefik-Drosselung für `/public/`, Labels in `deploy/infomaniak/compose.yml`, Werte und Begründung in design.md; Haken erst nach Deploy und Prüfung): offen bleibt der CI-Schritt «Vertrag nur additiv» (`.github/workflows/`)
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
 - [x] 11.7 Webseiten-Schlüssel [Backend]
