@@ -3,6 +3,7 @@ package ch.urinet.archiv.integration;
 import ch.urinet.archiv.integration.adapter.in.rest.webseite.WebseitenErfassungResource;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
@@ -21,7 +22,8 @@ final class WebseitenEndpunkte {
 
     static List<Endpunkt> alle() {
         List<Endpunkt> endpunkte = new ArrayList<>();
-        new ClassFileImporter().importPackages("ch.urinet.archiv").stream()
+        new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("ch.urinet.archiv").stream()
                 .filter(k -> k.getName().startsWith("ch.urinet.archiv.integration.adapter.in.")
                         && k.isAnnotatedWith(Path.class))
                 .map(k -> k.reflect()).forEach(klasse -> {
