@@ -26,6 +26,9 @@ public interface ApiClientRegister {
      */
     boolean gueltigBisSetzen(String mandant, String id, Instant zeit);
 
+    /** Setzt oder entfernt das Ablaufdatum eines aktiven generator/import-Tokens im eigenen Mandanten. */
+    boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit);
+
     void zuletztSetzen(String id, Instant zeit);
 
     /** Eintrag mit dem gespeicherten Hash des Geheimnisses; verlässt die Anwendungsschicht nie. */

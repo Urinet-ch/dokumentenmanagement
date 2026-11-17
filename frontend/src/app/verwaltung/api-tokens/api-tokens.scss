@@ -52,6 +52,23 @@ h1 {
   gap: 0.5rem;
 }
 
+.ablauf {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.ablauf input {
+  min-height: 2.75rem;
+  max-width: 100%;
+}
+
+.hinweis,
+[data-status='abgelaufen'] {
+  color: var(--urinet-fehler);
+  font-weight: 700;
+}
+
 .fehler {
   color: var(--urinet-fehler);
 }

@@ -7,8 +7,9 @@ import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
-import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.http.HttpServerRequest;
@@ -37,6 +38,7 @@ import java.util.UUID;
 public class ZugriffProtokollInterceptor {
 
     static final String DOKUMENT_ID = "id";
+    static final String TOKEN_ID = "tokenId";
     static final String REAL_IP = "X-Real-Ip";
 
     private final ZugriffProtokoll protokoll;
@@ -56,7 +58,7 @@ public class ZugriffProtokollInterceptor {
     Object protokollieren(InvocationContext aufruf) throws Exception {
         Protokolliert erklaerung = aufruf.getInterceptorBinding(Protokolliert.class);
         ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(), dokumentId(),
-                ip(), ProtokollDetails.KEINE, bearbeiter());
+                ip(), tokenDetails(), bearbeiter());
         return QuarkusTransaction.joiningExisting().call(() -> {
             protokoll.schreiben(eintrag);
             return aufruf.proceed();
@@ -98,6 +100,19 @@ public class ZugriffProtokollInterceptor {
         } catch (RuntimeException e) {
             // ausserhalb einer HTTP-Anfrage (z. B. Worker) gibt es keinen Pfad
             return Optional.empty();
+        }
+    }
+
+    /** Pfad-Parameter {@code tokenId} (API-Token-Verwaltung): die ID gehört ins Protokoll, weil sie keine UUID ist. */
+    private ProtokollDetails tokenDetails() {
+        if (!pfad.isResolvable()) {
+            return ProtokollDetails.KEINE;
+        }
+        try {
+            String id = pfad.get().getPathParameters().getFirst(TOKEN_ID);
+            return ApiToken.gueltigeId(id) ? ProtokollDetails.token(id) : ProtokollDetails.KEINE;
+        } catch (RuntimeException e) {
+            return ProtokollDetails.KEINE;
         }
     }
 

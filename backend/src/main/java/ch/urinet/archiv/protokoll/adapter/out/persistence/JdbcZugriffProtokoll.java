@@ -117,6 +117,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         if (details.kanal() != null) {
             knoten.put("kanal", details.kanal());
         }
+        if (details.tokenId() != null) {
+            knoten.put("tokenId", details.tokenId());
+        }
         if (details.regelAenderung() != null) {
             knoten.put("dokumentart", details.regelAenderung().dokumentart());
             regel(knoten.putObject("alt"), details.regelAenderung().alt());
