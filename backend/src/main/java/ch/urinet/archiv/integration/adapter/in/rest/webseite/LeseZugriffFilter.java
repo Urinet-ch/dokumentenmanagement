@@ -8,8 +8,8 @@ import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.ws.rs.Priorities;
-import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ResourceInfo;
 import org.jboss.resteasy.reactive.server.ServerRequestFilter;
 
@@ -52,7 +52,7 @@ public class LeseZugriffFilter {
     }
 
     @ServerRequestFilter(priority = Priorities.USER + 100)
-    public void lesen(ResourceInfo ressource, ContainerRequestContext kontext) {
+    public void lesen(ResourceInfo ressource, RoutingContext kontext) {
         Method methode = ressource.getResourceMethod();
         WebseitenZugang zugang = methode == null ? null : methode.getAnnotation(WebseitenZugang.class);
         if (zugang == null || zugang.value() != WebseitenZugang.Art.LESEN) {
@@ -89,9 +89,9 @@ public class LeseZugriffFilter {
     }
 
     /** Der eine Wert des Headers; mehrere Header oder Werte mit Komma sind ungültig (400), kein Header ist leer. */
-    private static Optional<String> einzelwert(ContainerRequestContext kontext, String name) {
-        List<String> werte = kontext.getHeaders().get(name);
-        if (werte == null || werte.isEmpty()) {
+    private static Optional<String> einzelwert(RoutingContext kontext, String name) {
+        List<String> werte = kontext.request().headers().getAll(name);
+        if (werte.isEmpty()) {
             return Optional.empty();
         }
         if (werte.size() > 1 || werte.getFirst().isEmpty()) {
