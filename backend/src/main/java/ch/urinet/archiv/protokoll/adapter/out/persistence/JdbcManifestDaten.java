@@ -60,8 +60,14 @@ public class JdbcManifestDaten implements ManifestDaten {
             ProtokollHash.ZUGRIFF_PROTOKOLL,
             "id, zeit, benutzer, rolle, aktion, dokument_id::text as dokument_id, ip::text as ip, details::text as details",
             ProtokollHash.DOKUMENT_VERSION,
-            "id, zeit, dokument_id::text as dokument_id, version, daten::text as daten, geaendert_von, grund");
-    private static final java.util.Set<String> JSONB = java.util.Set.of("details", "daten");
+            "id, zeit, dokument_id::text as dokument_id, version, daten::text as daten, geaendert_von, grund",
+            ProtokollHash.WISSENSSEITE_VERSION,
+            "id, seite_id::text as seite_id, version, daten::text as daten, inhalt, erzeugt_von, freigegeben_von, "
+                    + "zeit, grund, entwurf_id::text as entwurf_id, aenderung_id",
+            ProtokollHash.WISSENS_LOG,
+            "id, zeit, aktion, akteur, seiten::text as seiten, dokument_id::text as dokument_id, "
+                    + "entwurf_id::text as entwurf_id, angaben::text as angaben");
+    private static final java.util.Set<String> JSONB = java.util.Set.of("details", "daten", "angaben");
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
