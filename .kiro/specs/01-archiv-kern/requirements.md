@@ -141,6 +141,10 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A13 | Zugriffsprotokoll einsehen | erlaubt | 403 | 403 | 403 |
 | A14 | API-Tokens verwalten | erlaubt | 403 | 403 | 403 |
 
+A11 umfasst das Anlegen, Ändern, Deaktivieren und Löschen von Dokumentarten. Lesen der Dokumentarten und der
+Konfigurationsversionen ist kein A11-Verwaltungsrecht; es richtet sich nach den jeweiligen Leserechten (Spec 05,
+Requirement 7).
+
 ¹ `geschaeftsstelle` hat in Phase 1 keinen produktiven Benutzer (Mandant 2, `03-zweiter-mandant`); Dokumentrechte A1 bis A10 wie dort beschrieben. Verwaltungsrechte A11 bis A14: [offen: Rechte der Geschäftsstelle – Entscheid in `03-zweiter-mandant`], bis dahin 403.
 ² eigene: Die Art ist bestätigt und `person_benutzer` ist der Benutzer selbst, oder die Art ist noch nicht bestätigt und er hat das Dokument erfasst (2.21). Ein unbestätigtes Dokument, das ein anderer erfasst hat, ist nicht seines, auch wenn `person_benutzer` er selbst ist (entschieden von Fabian am 11.11.2026).
 
@@ -160,7 +164,7 @@ Präzisierung zu A6 und A12 (entschieden von Fabian am 14.11.2026, Requirement 1
 14. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` die Vertraulichkeit oder `person_benutzer` setzen will (A8), DANN SOLL das Archiv mit HTTP 403 antworten und nichts ändern.
 15. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` ein Dokument verwerfen will (A9), DANN SOLL das Archiv mit HTTP 403 antworten und keine Datei löschen.
 16. FALLS ein Benutzer mit Rolle `mitarbeiter` oder `treuhaender` die Verarbeitung oder Archivierung wiederholen will (A10), DANN SOLL das Archiv mit HTTP 403 antworten.
-17. FALLS ein Benutzer ohne Rolle `inhaber` Dokumentarten anlegen, ändern oder deaktivieren will (A11), DANN SOLL das Archiv mit HTTP 403 antworten.
+17. FALLS ein Benutzer ohne Rolle `inhaber` Dokumentarten anlegen, ändern, deaktivieren oder löschen will (A11), DANN SOLL das Archiv mit HTTP 403 antworten.
 18. FALLS ein Benutzer ohne Rolle `inhaber` Kontakte ändern oder einen CSV-Import starten oder übernehmen will (A12), DANN SOLL das Archiv mit HTTP 403 antworten. Requirement 17.6 ergänzt dieses Kriterium (entschieden von Fabian am 14.11.2026): Zu «Kontakte ändern» gehören auch Zusammenführen, als inaktiv markieren und wieder aktivieren (umgesetzt in Aufgabe 4.11).
 19. FALLS ein Benutzer ohne Rolle `inhaber` das Zugriffsprotokoll abruft (A13), DANN SOLL das Archiv mit HTTP 403 antworten.
 20. FALLS ein Benutzer ohne Rolle `inhaber` API-Tokens anlegen, anzeigen oder widerrufen will (A14), DANN SOLL das Archiv mit HTTP 403 antworten.

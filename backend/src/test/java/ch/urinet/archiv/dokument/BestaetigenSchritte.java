@@ -404,7 +404,22 @@ public class BestaetigenSchritte {
                 .isLessThan(((Number) spalte(ort, "version")).intValue());
     }
 
-    /** Req 10.1: Versionsliste im DokumentDto, neueste zuerst, nur Nummer, Zeit, Benutzer und Grund. */
+    @Dann("hat das Dokument «{word}» die angewandte Konfigurationsversion im Dokument und in der letzten Fassung")
+    public void dokumentKonfigurationsversion(String name) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> version = zeile("select d.konfiguration_version as dokument, "
+                + "v.konfiguration_version as fassung, (select max(version) from "
+                + schema(ort.mandant()) + ".konfiguration_version) as aktuell "
+                + "from " + schema(ort.mandant()) + ".dokument d join " + schema(ort.mandant())
+                + ".dokument_version v on v.dokument_id = d.id where d.id = ? order by v.version desc limit 1",
+                ort.id());
+        int dokument = ((Number) version.get("dokument")).intValue();
+        assertThat(dokument).isPositive();
+        assertThat(((Number) version.get("fassung")).intValue()).isEqualTo(dokument);
+        assertThat(((Number) version.get("aktuell")).intValue()).isEqualTo(dokument);
+    }
+
+    /** Req 10.1: Versionsliste im DokumentDto, neueste zuerst, inklusive angewandter Konfigurationsversion. */
     @Dann("nennt die Antwort {int} Version(en), zuletzt mit dem Grund {string} von «{word}»")
     public void versionen(int anzahl, String grund, String benutzer) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
@@ -414,7 +429,7 @@ public class BestaetigenSchritte {
         assertThat(antwort.jsonPath().getString("versionen[0].zeit")).isNotBlank();
         assertThat(antwort.jsonPath().getInt("versionen[0].version")).isLessThan(antwort.jsonPath().getInt("version"));
         assertThat(antwort.jsonPath().getMap("versionen[0]").keySet())
-                .containsExactlyInAnyOrder("version", "zeit", "geaendertVon", "grund");
+                .containsExactlyInAnyOrder("version", "konfigurationVersion", "zeit", "geaendertVon", "grund");
     }
 
     @Dann("nennt die Antwort keine Versionen")

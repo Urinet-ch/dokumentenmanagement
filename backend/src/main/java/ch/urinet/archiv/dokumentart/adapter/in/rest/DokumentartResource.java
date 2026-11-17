@@ -7,6 +7,7 @@ import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
@@ -14,16 +15,20 @@ import ch.urinet.archiv.sicherheit.domain.Aktion;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
@@ -41,6 +46,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Dokumentarten des eigenen Mandanten (Req 9.1, 9.4, 9.5): lesen alle Archiv-Rollen, pflegen nur {@code inhaber}
@@ -53,6 +60,9 @@ import java.util.function.Predicate;
 @Produces(MediaType.APPLICATION_JSON)
 public class DokumentartResource {
 
+    private static final Pattern VERSION = Pattern.compile("^\"([0-9]+)\"$");
+    private static final int GRUND_MAX = 1000;
+
     private static final Map<String, Feld> FELDER = Map.ofEntries(
             Map.entry("code", Feld.CODE), Map.entry("name", Feld.NAME), Map.entry("beschreibung", Feld.BESCHREIBUNG),
             Map.entry("gruppen", Feld.GRUPPEN), Map.entry("pflichtfelder", Feld.PFLICHTFELDER),
@@ -63,11 +73,16 @@ public class DokumentartResource {
 
     private final DokumentartVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
+    private final KonfigurationVerwaltung konfiguration;
+    private final SecurityIdentity identitaet;
     private final ObjectMapper json;
 
-    public DokumentartResource(DokumentartVerwaltung verwaltung, MandantAufloesung aufloesung, ObjectMapper json) {
+    public DokumentartResource(DokumentartVerwaltung verwaltung, MandantAufloesung aufloesung,
+                               KonfigurationVerwaltung konfiguration, SecurityIdentity identitaet, ObjectMapper json) {
         this.verwaltung = verwaltung;
         this.aufloesung = aufloesung;
+        this.konfiguration = konfiguration;
+        this.identitaet = identitaet;
         this.json = json;
     }
 
@@ -102,16 +117,23 @@ public class DokumentartResource {
             @Schema(nullable = true, minimum = "1", maximum = "100") Integer aufbewahrungJahre,
             @Schema(nullable = true, enumeration = {"GESCHAEFTSJAHR", "GUELTIG_BIS"})
             String aufbewahrungAb,
-            Boolean gesetzlichePflicht, Boolean aktiv) {
+            Boolean gesetzlichePflicht, Boolean aktiv,
+            @Schema(nullable = true, maxLength = GRUND_MAX, description = "Änderungsgrund für das Zugriffsprotokoll")
+            String grund) {
     }
 
     @GET
     @AlleArchivRollen
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Dokumentarten des Mandanten auflisten (aktive und inaktive)")
-    public List<DokumentartDto> liste() {
+    @APIResponse(responseCode = "200", description = "Dokumentarten",
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Aktuelle Konfigurationsversion für If-Match"))
+    public Response liste() {
         aufloesung.pruefen();
-        return verwaltung.alle().stream().map(this::dto).toList();
+        int version = konfiguration.aktuelleVersion();
+        return Response.ok(verwaltung.alle().stream().map(this::dto).toList())
+                .tag(new EntityTag(Integer.toString(version))).build();
     }
 
     @POST
@@ -119,16 +141,21 @@ public class DokumentartResource {
     @ErfordertAktion(Aktion.A11)
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentart anlegen",
-            description = "Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 "
-                    + "DOKUMENTART_EXISTIERT.")
+            description = "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. "
+                    + "Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 DOKUMENTART_EXISTIERT.")
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
     @APIResponse(responseCode = "201", description = "Angelegt", content = @Content(
             mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DokumentartDto.class)))
-    public Response anlegen(String body) {
+    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
+    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
+    public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch, String body) {
         aufloesung.pruefen();
-        Dokumentart art = verwaltung.anlegen(angaben(body));
-        return Response.status(Response.Status.CREATED).entity(dto(art)).build();
+        int version = version(ifMatch);
+        DokumentartAnfrage anfrage = anfrage(body);
+        Dokumentart art = verwaltung.anlegen(anfrage.angaben(), version, wer(), anfrage.grund());
+        return Response.status(Response.Status.CREATED).entity(dto(art))
+                .tag(new EntityTag(Integer.toString(konfiguration.aktuelleVersion()))).build();
     }
 
     @PATCH
@@ -137,12 +164,19 @@ public class DokumentartResource {
     @ErfordertAktion(Aktion.A11)
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentart ändern oder deaktivieren",
-            description = "Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false deaktiviert.")
+            description = "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. "
+                    + "Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false deaktiviert.")
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
-    public DokumentartDto aendern(@PathParam("code") String code, String body) {
+    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
+    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
+    public Response aendern(@PathParam("code") String code, @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+                            String body) {
         aufloesung.pruefen();
-        return dto(verwaltung.aendern(code, angaben(body)));
+        int version = version(ifMatch);
+        DokumentartAnfrage anfrage = anfrage(body);
+        Dokumentart art = verwaltung.aendern(code, anfrage.angaben(), version, wer(), anfrage.grund());
+        return Response.ok(dto(art)).tag(new EntityTag(Integer.toString(konfiguration.aktuelleVersion()))).build();
     }
 
     @DELETE
@@ -150,11 +184,16 @@ public class DokumentartResource {
     @ErfordertAktion(Aktion.A11)
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentart löschen",
-            description = "Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.")
+            description = "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. "
+                    + "Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.")
     @APIResponse(responseCode = "204", description = "Gelöscht")
-    public void loeschen(@PathParam("code") String code) {
+    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
+    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
+    public Response loeschen(@PathParam("code") String code, @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch) {
         aufloesung.pruefen();
-        verwaltung.loeschen(code);
+        int version = version(ifMatch);
+        verwaltung.loeschen(code, version, wer(), null);
+        return Response.noContent().tag(new EntityTag(Integer.toString(konfiguration.aktuelleVersion()))).build();
     }
 
     private DokumentartDto dto(Dokumentart art) {
@@ -170,7 +209,7 @@ public class DokumentartResource {
                 art.aktiv());
     }
 
-    private static DokumentartAngaben angaben(String text) {
+    private static DokumentartAnfrage anfrage(String text) {
         JsonNode body;
         try {
             body = text == null ? null : StrengesJson.lesen(text);
@@ -182,20 +221,52 @@ public class DokumentartResource {
         }
         Set<Feld> gesetzt = EnumSet.noneOf(Feld.class);
         for (Iterator<String> namen = body.fieldNames(); namen.hasNext(); ) {
-            Feld feld = FELDER.get(namen.next());
+            String name = namen.next();
+            if (name.equals("grund")) {
+                continue;
+            }
+            Feld feld = FELDER.get(name);
             if (feld == null) {
                 throw ungueltig();
             }
             gesetzt.add(feld);
         }
-        return new DokumentartAngaben(gesetzt, text(body, "code"), text(body, "name"), text(body, "beschreibung"),
+        String grund = text(body, "grund");
+        if (grund != null && (grund.length() > GRUND_MAX
+                || grund.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL))) {
+            throw ungueltig();
+        }
+        return new DokumentartAnfrage(new DokumentartAngaben(gesetzt, text(body, "code"), text(body, "name"),
+                text(body, "beschreibung"),
                 liste(body, "gruppen"), liste(body, "pflichtfelder"),
                 wert(body, "zusatzSchema", JsonNode::toString, n -> true),
                 text(body, "vertraulichkeit"),
                 wert(body, "aufbewahrungJahre", JsonNode::intValue, JsonNode::isInt),
                 text(body, "aufbewahrungAb"),
                 wert(body, "gesetzlichePflicht", JsonNode::booleanValue, JsonNode::isBoolean),
-                wert(body, "aktiv", JsonNode::booleanValue, JsonNode::isBoolean));
+                wert(body, "aktiv", JsonNode::booleanValue, JsonNode::isBoolean)), grund == null ? null : grund.strip());
+    }
+
+    private String wer() {
+        return identitaet.getPrincipal().getName();
+    }
+
+    private static int version(String ifMatch) {
+        if (ifMatch == null || ifMatch.isBlank()) {
+            throw new FachFehler(Fehlercode.VERSION_FEHLT);
+        }
+        Matcher treffer = VERSION.matcher(ifMatch.strip());
+        if (!treffer.matches()) {
+            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
+        }
+        try {
+            return Integer.parseInt(treffer.group(1));
+        } catch (NumberFormatException e) {
+            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
+        }
+    }
+
+    private record DokumentartAnfrage(DokumentartAngaben angaben, String grund) {
     }
 
     private static String text(JsonNode body, String name) {

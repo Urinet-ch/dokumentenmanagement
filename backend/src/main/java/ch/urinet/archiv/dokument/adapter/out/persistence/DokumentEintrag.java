@@ -133,6 +133,9 @@ public class DokumentEintrag extends PanacheEntityBase {
     @Column(name = "version", nullable = false)
     public int version;
 
+    @Column(name = "konfiguration_version")
+    public Integer konfigurationVersion;
+
     @Column(name = "erstellt", nullable = false)
     public OffsetDateTime erstellt;
 

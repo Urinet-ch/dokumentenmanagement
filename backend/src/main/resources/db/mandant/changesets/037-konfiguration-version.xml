@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="037-konfiguration-version" author="archiv">
+        <sql>
+            create table konfiguration_version (
+                version int not null constraint konfiguration_version_pk primary key
+                    constraint konfiguration_version_nummer_ck check (version &gt; 0),
+                zeit timestamptz not null default clock_timestamp(),
+                wer text not null,
+                grund text,
+                quelle text not null constraint konfiguration_version_quelle_ck
+                    check (quelle in ('APP', 'DATEI', 'SEED', 'KOMMANDO', 'MIGRATION')),
+                inhalt jsonb not null constraint konfiguration_version_inhalt_ck
+                    check (jsonb_typeof(inhalt) = 'object'),
+                sha256 varchar(64) not null constraint konfiguration_version_sha256_ck
+                    check (sha256 ~ '^[0-9a-f]{64}$')
+            );
+
+            alter table dokument add column konfiguration_version int;
+            alter table dokument_version add column konfiguration_version int;
+        </sql>
+        <sql>
+            with abbild as (
+                select jsonb_build_object(
+                    'version', 1,
+                    'einstellungen', jsonb_build_object(
+                        'geschaeftsjahrEnde', coalesce(m.geschaeftsjahr_ende, '12-31'),
+                        'kennungen', coalesce(m.kennungen, '{"uid":null,"ibans":[]}'::jsonb)),
+                    'arten', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'code', a.code,
+                            'name', a.name,
+                            'beschreibung', a.beschreibung,
+                            'gruppen', a.gruppen,
+                            'pflichtfelder', a.pflichtfelder,
+                            'zusatzSchema', a.zusatz_schema,
+                            'vertraulichkeit', a.vertraulichkeit,
+                            'aufbewahrung', jsonb_build_object(
+                                'jahre', a.aufbewahrung_jahre,
+                                'ab', a.aufbewahrung_ab),
+                            'gesetzlichePflicht', a.gesetzliche_pflicht,
+                            'aktiv', a.aktiv)
+                            order by a.code)
+                        from dokumentart a), '[]'::jsonb)
+                ) as inhalt
+                from (select schema_name from public.mandant where schema_name = current_schema()) s
+                left join public.mandant m on m.schema_name = s.schema_name
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select 1, 'system:migration', null, 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild;
+
+            update dokument set konfiguration_version = 1
+                where exists (select 1 from konfiguration_version where version = 1);
+            update dokument_version set konfiguration_version = 1
+                where exists (select 1 from konfiguration_version where version = 1);
+
+            alter table dokument add constraint dokument_konfiguration_version_fk
+                foreign key (konfiguration_version) references konfiguration_version (version);
+            alter table dokument_version add constraint dokument_version_konfiguration_fk
+                foreign key (konfiguration_version) references konfiguration_version (version);
+        </sql>
+        <sql splitStatements="false">
+            create function konfiguration_version_nur_einfuegen() returns trigger language plpgsql as $$
+            begin
+                raise exception 'konfiguration_version: nur Einfügen erlaubt (% verweigert)', tg_op
+                    using errcode = 'insufficient_privilege';
+            end
+            $$
+        </sql>
+        <sql>
+            create trigger konfiguration_version_nur_einfuegen before update or delete on konfiguration_version
+                for each row execute function konfiguration_version_nur_einfuegen();
+            create trigger konfiguration_version_kein_truncate before truncate on konfiguration_version
+                for each statement execute function konfiguration_version_nur_einfuegen();
+        </sql>
+    </changeSet>
+</databaseChangeLog>

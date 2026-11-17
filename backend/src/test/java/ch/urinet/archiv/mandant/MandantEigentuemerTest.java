@@ -209,7 +209,7 @@ class MandantEigentuemerTest {
     @Test
     void alleNurEinfuegenTabellenSindGeschuetzt() throws Exception {
         List<String> tabellen = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-                "manifest", "manifest_zeitstempel", "protokoll_blatt");
+                "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
         var feld = Class.forName("ch.urinet.archiv.mandant.adapter.out.persistence.LiquibaseMandantDatenbank")
                 .getDeclaredField("NUR_EINFUEGEN");
         feld.setAccessible(true);
@@ -227,6 +227,19 @@ class MandantEigentuemerTest {
                         .as(tabelle).isTrue();
             }
         }
+        String versionen = schema + ".konfiguration_version";
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            befehl.execute("insert into " + versionen
+                    + " (version, wer, quelle, inhalt, sha256) values (1, 'probe', 'MIGRATION', '{}', '"
+                    + "a".repeat(64) + "')");
+            for (String sql : List.of("update " + versionen + " set wer = 'geändert'",
+                    "delete from " + versionen)) {
+                assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("nur Einfügen erlaubt");
+            }
+            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo("1");
+        }
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {
             for (String tabelle : tabellen) {
@@ -236,8 +249,10 @@ class MandantEigentuemerTest {
                         + " and not tgisinternal and tgtype & 27 = 27)")).as(tabelle + " UPDATE/DELETE").isTrue();
                 assertThat(wahr(befehl, "exists (select 1 from pg_trigger where tgrelid = " + klasse
                         + " and not tgisinternal and tgtype & 34 = 34)")).as(tabelle + " TRUNCATE").isTrue();
-                assertThatThrownBy(() -> befehl.execute("truncate " + schema + "." + tabelle + " cascade"))
-                        .as(tabelle).isInstanceOf(SQLException.class).hasMessageContaining("nur Einfügen erlaubt");
+                if (!tabelle.equals("konfiguration_version")) {
+                    assertThatThrownBy(() -> befehl.execute("truncate " + schema + "." + tabelle + " cascade"))
+                            .as(tabelle).isInstanceOf(SQLException.class).hasMessageContaining("nur Einfügen erlaubt");
+                }
             }
         }
     }

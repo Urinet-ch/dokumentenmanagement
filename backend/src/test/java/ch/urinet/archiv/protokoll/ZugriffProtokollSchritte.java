@@ -54,7 +54,7 @@ public class ZugriffProtokollSchritte {
     @Dann("das Zugriffsprotokoll von «{word}» hat genau einen neuen Eintrag:")
     public void einNeuerEintrag(String mandant, DataTable tabelle) throws Exception {
         Map<String, String> erwartet = tabelle.asMaps().getFirst();
-        List<Map<String, String>> neu = neueEintraege(mandant);
+        List<Map<String, String>> neu = eintraegeFuerAktion(mandant, erwartet.get("aktion"));
         assertThat(neu).hasSize(1);
         Map<String, String> eintrag = neu.getFirst();
         assertThat(eintrag.get("benutzer")).isEqualTo(erwartet.get("benutzer") == null ? null
@@ -76,7 +76,7 @@ public class ZugriffProtokollSchritte {
     /** Nur Werte der Regel, keine Werte eines Dokuments (Req 9.10, 10.2); leere Zelle heisst {@code null}. */
     @Dann("der neue Eintrag im Zugriffsprotokoll von «{word}» hält für die Dokumentart «{word}» diese Regeln fest:")
     public void regelFestgehalten(String mandant, String code, DataTable tabelle) throws Exception {
-        List<Map<String, String>> neu = neueEintraege(mandant);
+        List<Map<String, String>> neu = eintraegeFuerAktion(mandant, "REGEL_AENDERN");
         assertThat(neu).hasSize(1);
         JsonNode details = new ObjectMapper().readTree(neu.getFirst().get("details"));
         assertThat(feldnamen(details)).containsExactlyInAnyOrder("dokumentart", "alt", "neu");
@@ -93,6 +93,21 @@ public class ZugriffProtokollSchritte {
         }
     }
 
+    @Dann("das Zugriffsprotokoll von «{word}» hat genau einen neuen Konfigurationseintrag ohne Konfigurationsinhalte")
+    public void konfigurationOhneInhalte(String mandant) throws Exception {
+        List<Map<String, String>> neu = eintraegeFuerAktion(mandant, "KONFIGURATION_AENDERN");
+        assertThat(neu).hasSize(1);
+        Map<String, String> eintrag = neu.getFirst();
+        assertThat(eintrag.get("benutzer")).isEqualTo(Testanmeldung.sub("inhaber-urinet"));
+        assertThat(eintrag.get("rolle")).isEqualTo("INHABER");
+        assertThat(eintrag.get("grund")).isEqualTo("Aufbewahrungsregel anpassen");
+        JsonNode details = new ObjectMapper().readTree(eintrag.get("details"));
+        assertThat(feldnamen(details)).containsExactlyInAnyOrder("grund", "version", "quelle");
+        assertThat(details.path("grund").asText()).isEqualTo("Aufbewahrungsregel anpassen");
+        assertThat(details.path("version").asInt()).isPositive();
+        assertThat(details.path("quelle").asText()).isEqualTo("APP");
+    }
+
     private static List<String> feldnamen(JsonNode knoten) {
         List<String> namen = new ArrayList<>();
         knoten.fieldNames().forEachRemaining(namen::add);
@@ -102,6 +117,11 @@ public class ZugriffProtokollSchritte {
     @Dann("das Zugriffsprotokoll von «{word}» hat keinen neuen Eintrag")
     public void keinNeuerEintrag(String mandant) throws SQLException {
         assertThat(neueEintraege(mandant)).isEmpty();
+    }
+
+    @Dann("das Zugriffsprotokoll von «{word}» hat keinen neuen Eintrag für die Aktion «{word}»")
+    public void keineNeueAktion(String mandant, String aktion) throws SQLException {
+        assertThat(eintraegeFuerAktion(mandant, aktion)).isEmpty();
     }
 
     @Dann("scheitert im Schema von «{word}» jeder Versuch, das Zugriffsprotokoll zu ändern, zu löschen oder zu leeren")
@@ -195,6 +215,10 @@ public class ZugriffProtokollSchritte {
             }
         }
         return eintraege;
+    }
+
+    private List<Map<String, String>> eintraegeFuerAktion(String mandant, String aktion) throws SQLException {
+        return neueEintraege(mandant).stream().filter(eintrag -> aktion.equals(eintrag.get("aktion"))).toList();
     }
 
     private static String schema(String mandant) {

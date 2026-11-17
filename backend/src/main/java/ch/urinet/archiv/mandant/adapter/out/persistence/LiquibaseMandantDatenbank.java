@@ -40,7 +40,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
      * ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
      */
     static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-            "manifest", "manifest_zeitstempel", "protokoll_blatt");
+            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;

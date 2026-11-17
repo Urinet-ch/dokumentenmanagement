@@ -7,6 +7,7 @@ import ch.urinet.archiv.dokument.application.Fassung;
 import ch.urinet.archiv.dokument.application.NeueDatei;
 import ch.urinet.archiv.dokument.application.NeuesDokument;
 import ch.urinet.archiv.dokument.application.Seite;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentFinanz;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
@@ -45,8 +46,10 @@ public class PanacheDokumentRepository implements DokumentRepository {
             limit 1""";
 
     private static final String DOKUMENT_ANLEGEN = """
-            insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis, dateiname)
-            values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis, :dateiname)""";
+            insert into dokument (id, eingang, quelle, vertraulichkeit, erstellt_von, status, hinweis, dateiname,
+                konfiguration_version)
+            values (:id, :eingang, :quelle, 'PERSONAL', :erstelltVon, 'NEU', :hinweis, :dateiname,
+                :konfigurationVersion)""";
 
     private static final String ART_VORBELEGEN = """
             update dokument set art = :art
@@ -63,6 +66,12 @@ public class PanacheDokumentRepository implements DokumentRepository {
 
     private static final List<String> EINGANGSKORB = DokumentStatus.EINGANGSKORB_STATUS.stream()
             .map(Enum::name).sorted().toList();
+
+    private final KonfigurationVersionsPort konfiguration;
+
+    public PanacheDokumentRepository(KonfigurationVersionsPort konfiguration) {
+        this.konfiguration = konfiguration;
+    }
 
     @Override
     public Optional<Dokument> finden(UUID id, Sichtregel regel) {
@@ -81,7 +90,8 @@ public class PanacheDokumentRepository implements DokumentRepository {
     public List<Fassung> fassungen(UUID id, int bisVersion) {
         return DokumentVersionEintrag.<DokumentVersionEintrag>find("dokumentId = ?1 and version < ?2",
                         Sort.descending("version", "id"), id, bisVersion)
-                .stream().map(v -> new Fassung(v.version, v.zeit.toInstant(), v.geaendertVon, v.grund)).toList();
+                .stream().map(v -> new Fassung(v.version, java.util.Objects.requireNonNull(v.konfigurationVersion),
+                        v.zeit.toInstant(), v.geaendertVon, v.grund)).toList();
     }
 
     @Override
@@ -153,6 +163,7 @@ public class PanacheDokumentRepository implements DokumentRepository {
                 .setParameter("erstelltVon", dokument.erstelltVon())
                 .setParameter("hinweis", dokument.hinweis().orElse(null))
                 .setParameter("dateiname", dokument.dateiname().orElse(null))
+                .setParameter("konfigurationVersion", konfiguration.aktuelleVersion())
                 .executeUpdate();
     }
 

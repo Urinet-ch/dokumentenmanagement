@@ -322,7 +322,7 @@ Funktionalität: Dokumentarten verwalten
     Und der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
     Wenn «inhaber-urinet» die Dokumentart «PROBE_DA_REGEL» ändert:
       """
-      {"aufbewahrungJahre": 6, "gesetzlichePflicht": false}
+      {"aufbewahrungJahre": 6, "gesetzlichePflicht": false, "grund": "Aufbewahrungsregel anpassen"}
       """
     Dann antwortet die Dokumentart-Verwaltung mit Status 200
     Und hat die Dokumentart in der Antwort diese Werte:
@@ -332,6 +332,7 @@ Funktionalität: Dokumentarten verwalten
     Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
       | benutzer       | rolle   | aktion        | dokument | ip | grund | fehlercode |
       | inhaber-urinet | INHABER | REGEL_AENDERN |          |    |       |            |
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Konfigurationseintrag ohne Konfigurationsinhalte
     Und der neue Eintrag im Zugriffsprotokoll von «urinet» hält für die Dokumentart «PROBE_DA_REGEL» diese Regeln fest:
       | regel | aufbewahrungJahre | aufbewahrungAb | gesetzlichePflicht |
       | alt   | 10                | GESCHAEFTSJAHR | true               |
@@ -348,7 +349,7 @@ Funktionalität: Dokumentarten verwalten
       | neu   |                   |                | false              |
 
   @req-9.10
-  Szenario: Ohne Änderung der Regel gibt es keinen Protokolleintrag (Gegenprobe)
+  Szenario: Ohne Änderung der Regel gibt es keinen Regeländerungseintrag (Gegenprobe)
     Angenommen «inhaber-urinet» eine Dokumentart anlegt:
       """
       {"code": "PROBE_DA_REGEL", "name": "Regel", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10,
@@ -361,7 +362,7 @@ Funktionalität: Dokumentarten verwalten
        "aufbewahrungJahre": 10, "gesetzlichePflicht": true, "aktiv": false}
       """
     Dann antwortet die Dokumentart-Verwaltung mit Status 200
-    Und das Zugriffsprotokoll von «urinet» hat keinen neuen Eintrag
+    Und das Zugriffsprotokoll von «urinet» hat keinen neuen Eintrag für die Aktion «REGEL_AENDERN»
 
   @req-9.10
   Szenario: Lässt sich die Regeländerung nicht protokollieren, bleibt die Regel unverändert

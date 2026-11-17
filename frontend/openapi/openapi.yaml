@@ -694,10 +694,11 @@ components:
       - waehrung
     DokumentVersion:
       type: object
-      description: "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Zeit, Benutzer\
-        \ und Grund; die früheren Werte selbst liefert das Archiv nicht"
+      description: "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Konfigurationsversion,\
+        \ Zeit, Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht"
       required:
       - version
+      - konfigurationVersion
       - zeit
       - geaendertVon
       properties:
@@ -705,6 +706,10 @@ components:
           type: integer
           format: int32
           description: "Version des Dokuments, die diese Fassung gesichert hat"
+        konfigurationVersion:
+          type: integer
+          format: int32
+          description: Angewandte Konfigurationsversion
         zeit:
           description: Zeitpunkt der Änderung (UTC)
           type: string
@@ -858,6 +863,12 @@ components:
           type: boolean
         aktiv:
           type: boolean
+        grund:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          description: Änderungsgrund für das Zugriffsprotokoll
     DownloadAdresse:
       description: Vorsignierte URL für genau eine Versions-ID (Req 14.6)
       type: object
@@ -1482,6 +1493,49 @@ components:
       - 2022-03-10T16:15:50Z
     JsonObjekt:
       type: object
+    KonfigurationsVersion:
+      type: object
+      required:
+      - version
+      - zeit
+      - wer
+      - quelle
+      - sha256
+      properties:
+        version:
+          type: integer
+          format: int32
+          minimum: 1
+        zeit:
+          type: string
+          $ref: "#/components/schemas/Instant"
+        wer:
+          type: string
+        grund:
+          type:
+          - string
+          - "null"
+        quelle:
+          type: string
+          enum:
+          - APP
+          - DATEI
+          - SEED
+          - KOMMANDO
+          - MIGRATION
+        sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+    KonfigurationsVersionDetail:
+      type: object
+      required:
+      - version
+      - inhalt
+      properties:
+        version:
+          $ref: "#/components/schemas/KonfigurationsVersion"
+        inhalt:
+          description: Unveränderliches Konfigurationsabbild
     Kontakt:
       type: object
       properties:
@@ -1838,6 +1892,7 @@ components:
       - VERWEIGERT
       - SPERRE_KONFLIKT
       - REGEL_AENDERN
+      - KONFIGURATION_AENDERN
       - WISSEN_ANZEIGEN
       - WISSEN_ANNEHMEN
       - WISSEN_VERWERFEN
@@ -2192,6 +2247,7 @@ tags:
 - name: Dokumente
 - name: Exporte
 - name: Importe
+- name: Konfiguration
 - name: Kontakte
 - name: Protokoll
 paths:
@@ -2392,13 +2448,13 @@ paths:
       - Dokumentarten
       responses:
         "200":
-          description: OK
+          description: Dokumentarten
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Dokumentart"
+              schema: {}
+          headers:
+            ETag:
+              description: Aktuelle Konfigurationsversion für If-Match
         "401":
           description: Not Authorized
         "403":
@@ -2411,10 +2467,16 @@ paths:
         - geschaeftsstelle
     post:
       summary: Dokumentart anlegen
-      description: Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code
-        → 409 DOKUMENTART_EXISTIERT.
+      description: "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428,\
+        \ veraltet → 412. Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener\
+        \ Code → 409 DOKUMENTART_EXISTIERT."
       tags:
       - Dokumentarten
+      parameters:
+      - name: If-Match
+        in: header
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -2428,6 +2490,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dokumentart"
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
         "401":
           description: Not Authorized
         "403":
@@ -2440,7 +2506,8 @@ paths:
   /api/v1/dokumentarten/{code}:
     delete:
       summary: Dokumentart löschen
-      description: Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.
+      description: "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428,\
+        \ veraltet → 412. Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH."
       tags:
       - Dokumentarten
       parameters:
@@ -2449,9 +2516,17 @@ paths:
         required: true
         schema:
           type: string
+      - name: If-Match
+        in: header
+        schema:
+          type: string
       responses:
         "204":
           description: Gelöscht
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
         "401":
           description: Not Authorized
         "403":
@@ -2461,14 +2536,19 @@ paths:
         - inhaber
     patch:
       summary: Dokumentart ändern oder deaktivieren
-      description: Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false
-        deaktiviert.
+      description: "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428,\
+        \ veraltet → 412. Angegebene Felder ersetzen die bisherigen; der Code bleibt.\
+        \ aktiv=false deaktiviert."
       tags:
       - Dokumentarten
       parameters:
       - name: code
         in: path
         required: true
+        schema:
+          type: string
+      - name: If-Match
+        in: header
         schema:
           type: string
       requestBody:
@@ -2478,12 +2558,10 @@ paths:
               $ref: "#/components/schemas/DokumentartAenderung"
         required: true
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Dokumentart"
+        "412":
+          description: VERSION_KONFLIKT
+        "428":
+          description: VERSION_FEHLT
         "401":
           description: Not Authorized
         "403":
@@ -3469,6 +3547,53 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/konfiguration/versionen:
+    get:
+      summary: Konfigurationsversionen auflisten
+      description: Nur mit Recht A11.
+      tags:
+      - Konfiguration
+      responses:
+        "200":
+          description: Versionen
+          content:
+            application/json:
+              schema: {}
+        "403":
+          description: NICHT_ERLAUBT
+        "401":
+          description: Not Authorized
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/konfiguration/versionen/{nummer}:
+    get:
+      summary: Konfigurationsversion ansehen
+      description: Das Abbild bleibt unverändert lesbar.
+      tags:
+      - Konfiguration
+      parameters:
+      - name: nummer
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: Version und vollständiges Abbild
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: NICHT_GEFUNDEN
+        "403":
+          description: NICHT_ERLAUBT
+        "401":
+          description: Not Authorized
       security:
       - SecurityScheme:
         - inhaber

@@ -31,7 +31,7 @@ public enum Fehlercode {
             "Der Cursor ist älter als die Aufbewahrung des Feeds. Bitte laden Sie den Bestand neu und beginnen Sie "
                     + "ohne Cursor."),
     VERSION_KONFLIKT(412, "Version veraltet",
-            "Jemand hat das Dokument inzwischen geändert. Bitte laden Sie es neu und ändern Sie es erneut."),
+            "Jemand hat den Stand inzwischen geändert. Bitte laden Sie ihn neu und wiederholen Sie die Änderung."),
     DATEI_ZU_GROSS(413, "Datei zu gross",
             "Die Datei oder die Anfrage ist zu gross. Bitte teilen Sie die Datei auf oder verkleinern Sie sie."),
     DATEITYP_UNBEKANNT(415, "Dateityp nicht unterstützt",
@@ -47,6 +47,8 @@ public enum Fehlercode {
             "Der angegebene Partner ist im Archiv nicht bekannt. Bitte importieren Sie zuerst die Kontakte."),
     ZUSATZ_UNGUELTIG(422, "Zusatzfelder ungültig",
             "Die Zusatzfelder passen nicht zur Dokumentart. Bitte prüfen Sie die Angaben."),
+    KONFIGURATION_UNGUELTIG(422, "Konfiguration ungültig",
+            "Die Konfiguration ist ungültig. Bitte prüfen Sie die angegebenen Werte."),
     CSV_UNGUELTIG(422, "CSV-Datei ungültig",
             "Die CSV-Datei hat nicht das erwartete Format (UTF-8 oder Windows-1252, Semikolon oder Komma), mehr als "
                     + "10'000 Datenzeilen, mehr als 1'000 Spalten, einen zu langen Spaltennamen oder keine Spalte "
@@ -64,7 +66,7 @@ public enum Fehlercode {
     ANALYSE_NICHT_MOEGLICH(422, "Analyse nicht möglich",
             "Aus diesem Gespräch kann kein Analyse-Vorschlag entstehen."),
     VERSION_FEHLT(428, "Version fehlt",
-            "Für Änderungen ist die Version des Dokuments nötig (If-Match). Bitte laden Sie das Dokument neu."),
+            "Für Änderungen ist die erwartete Version nötig (If-Match). Bitte laden Sie den aktuellen Stand neu."),
     ZU_VIELE_ANFRAGEN(429, "Zu viele Anfragen",
             "Sie haben in kurzer Zeit zu viele Anfragen gestellt. Bitte warten Sie die angegebene Zeit "
                     + "(Retry-After) und versuchen Sie es dann erneut."),
