@@ -1,0 +1,64 @@
+@let f = feld();
+@if (f.typ === 'mehrfach') {
+  <fieldset #gruppe class="gruppe" [attr.aria-describedby]="kennung() + '-hinweis'" data-test="listenfeld">
+    <legend>
+      {{ beschriftung() }}
+      @if (f.pflicht) {
+        <span aria-hidden="true"> *</span>
+      }
+    </legend>
+    @for (option of f.optionen; track option) {
+      <label class="option">
+        <input
+          type="checkbox"
+          [value]="option"
+          [checked]="gewaehlt(option)"
+          [attr.aria-required]="f.pflicht || null"
+          [attr.aria-invalid]="ungueltig() || null"
+          (change)="umschalten(gruppe)"
+        />
+        <span>{{ option }}</span>
+      </label>
+    }
+    <p class="hinweis" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
+  </fieldset>
+} @else {
+  <div class="gruppe" role="group" [attr.aria-labelledby]="kennung() + '-label'" data-test="listenfeld">
+    <label class="titel" [id]="kennung() + '-label'" [for]="kennung()">
+      {{ beschriftung() }}
+      @if (f.pflicht) {
+        <span aria-hidden="true"> *</span>
+      }
+    </label>
+    @if (eintraege().length > 0) {
+      <ul class="eintraege">
+        @for (eintrag of eintraege(); track $index) {
+          <li>
+            <span>{{ eintrag }}</span>
+            <button mat-button type="button" [attr.aria-label]="texte.entfernen(eintrag)" (click)="entfernen($index, neu)">
+              Entfernen
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="hinweis">{{ texte.leer }}</p>
+    }
+    <div class="neu">
+      <input
+        #neu
+        type="text"
+        [id]="kennung()"
+        [attr.aria-required]="f.pflicht && eintraege().length === 0 ? true : null"
+        [attr.aria-invalid]="ungueltig() || null"
+        [attr.aria-describedby]="kennung() + '-hinweis'"
+        (keydown.enter)="$event.preventDefault(); hinzufuegen(neu)"
+      />
+      <button mat-stroked-button type="button" (click)="hinzufuegen(neu)">{{ texte.hinzufuegen }}</button>
+    </div>
+    <p class="hinweis" [id]="kennung() + '-hinweis'">{{ hinweis() }}</p>
+    @if (doppelt()) {
+      <p class="fehler" role="alert">{{ texte.schonVorhanden }}</p>
+    }
+  </div>
+}

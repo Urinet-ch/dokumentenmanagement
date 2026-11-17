@@ -32,7 +32,8 @@ export interface Formular {
 
 export type TextFeld = Exclude<keyof Formular, 'zusatz'>;
 
-export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl';
+/** `mehrfach`: Liste aus festen Werten (`items.enum`), `liste`: Liste freier Texte (`items.type` string). */
+export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'auswahl' | 'mehrfach' | 'liste';
 
 /** Eingabefeld für einen Eintrag unter `properties` des Zusatz-Schemas der Art. */
 export interface ZusatzFeld {
@@ -40,7 +41,22 @@ export interface ZusatzFeld {
   typ: ZusatzTyp;
   optionen: readonly string[];
   pflicht: boolean;
+  /** Nur Listen: `minItems` und `uniqueItems` des Schemas. */
+  minEintraege?: number;
+  eindeutig?: boolean;
 }
+
+/** Listenwerte stehen im Formular als ein Text, ein Eintrag je Zeile (wie die übrigen Zusatzwerte als Text). */
+export const istListe = (feld: ZusatzFeld): boolean => feld.typ === 'mehrfach' || feld.typ === 'liste';
+
+export function listeAus(wert: string): string[] {
+  return wert
+    .split('\n')
+    .map((e) => e.trim())
+    .filter((e) => e !== '');
+}
+
+export const listeZu = (eintraege: readonly string[]): string => eintraege.join('\n');
 
 export interface Pruefung {
   meldung: string;
@@ -88,13 +104,17 @@ function objekt(wert: unknown): Record<string, unknown> {
   return wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
 }
 
+function stringListe(wert: unknown): wert is string[] {
+  return Array.isArray(wert) && wert.every((e) => typeof e === 'string');
+}
+
 export function formularAus(d: Dokument): Formular {
   const f = d.finanz ?? null;
   const v = d.vertrag ?? null;
   const zusatz = Object.fromEntries(
     Object.entries(objekt(d.zusatz))
-      .filter(([, wert]) => typeof wert !== 'object' || wert === null)
-      .map(([name, wert]) => [name, text(wert)]),
+      .filter(([, wert]) => typeof wert !== 'object' || wert === null || stringListe(wert))
+      .map(([name, wert]) => [name, stringListe(wert) ? listeZu(wert) : text(wert)]),
   );
   return {
     art: d.art ?? '',
@@ -123,6 +143,13 @@ export function formularAus(d: Dokument): Formular {
 }
 
 function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
+  if (schema['type'] === 'array') {
+    const items = objekt(schema['items']);
+    if (Array.isArray(items['enum']) && items['enum'].every((w) => typeof w === 'string')) {
+      return 'mehrfach';
+    }
+    return items['type'] === 'string' ? 'liste' : null;
+  }
   if (Array.isArray(schema['enum']) && schema['enum'].every((w) => typeof w === 'string')) {
     return 'auswahl';
   }
@@ -157,8 +184,14 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
     if (!typ) {
       return [];
     }
-    const optionen = typ === 'auswahl' ? (e['enum'] as string[]) : [];
-    return [{ name, typ, optionen, pflicht: pflicht.has(name) }];
+    const optionen =
+      typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
+    const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
+    if (typ === 'mehrfach' || typ === 'liste') {
+      feld.minEintraege = typeof e['minItems'] === 'number' ? e['minItems'] : 0;
+      feld.eindeutig = e['uniqueItems'] === true;
+    }
+    return [feld];
   });
 }
 
@@ -185,12 +218,26 @@ function zusatzWert(feld: ZusatzFeld, wert: string): unknown {
       return Number.parseInt(roh.replace(/'/g, ''), 10);
     case 'janein':
       return roh === 'true';
+    case 'mehrfach':
+    case 'liste':
+      return listeAus(wert);
     default:
       return roh;
   }
 }
 
 export function zusatzGueltig(feld: ZusatzFeld, wert: string): boolean {
+  if (istListe(feld)) {
+    const eintraege = listeAus(wert);
+    if (eintraege.length === 0) {
+      return !feld.pflicht;
+    }
+    return (
+      eintraege.length >= (feld.minEintraege ?? 0) &&
+      (!feld.eindeutig || new Set(eintraege).size === eintraege.length) &&
+      (feld.typ !== 'mehrfach' || eintraege.every((e) => feld.optionen.includes(e)))
+    );
+  }
   const roh = wert.trim().replace(/'/g, '');
   if (roh === '') {
     return true;

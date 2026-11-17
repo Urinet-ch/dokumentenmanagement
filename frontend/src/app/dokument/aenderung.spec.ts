@@ -1,6 +1,6 @@
 import { Dokument, Dokumentart } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { aenderungAus, feldText, formularAus, formularFeld, zusatzFelder } from './aenderung';
+import { aenderungAus, feldText, formularAus, formularFeld, zusatzFelder, zusatzGueltig } from './aenderung';
 
 const ART = (teil: Partial<Dokumentart> = {}): Dokumentart => ({
   code: 'OFFERTE',
@@ -200,5 +200,54 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
     expect(formularFeld('zusatz.periode')).toBe('zusatz.periode');
     expect(feldText('qr_referenz')).toBe('QR-Referenz');
     expect(feldText('geschaeftsjahr')).toBe('Geschäftsjahr');
+  });
+});
+
+describe('Zusatzfelder vom Typ Liste (Array)', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1, uniqueItems: true },
+      stichworte: { type: 'array', items: { type: 'string' } },
+      zahlen: { type: 'array', items: { type: 'integer' } },
+    },
+  };
+  const art = ART({ pflichtfelder: ['zusatz.verband'], zusatzSchema: schema });
+
+  it('erkennt Mehrfachauswahl und freie Liste, nicht aber Listen anderer Elementtypen', () => {
+    expect(zusatzFelder(art)).toEqual([
+      { name: 'verband', typ: 'mehrfach', optionen: ['vhf', 'gsk'], pflicht: true, minEintraege: 1, eindeutig: true },
+      { name: 'stichworte', typ: 'liste', optionen: [], pflicht: false, minEintraege: 0, eindeutig: false },
+    ]);
+  });
+
+  it('prüft Pflicht, Auswahl, minItems und uniqueItems', () => {
+    const [verband, stichworte] = zusatzFelder(art);
+    expect(zusatzGueltig(verband, '')).toBe(false);
+    expect(zusatzGueltig(verband, 'vhf')).toBe(true);
+    expect(zusatzGueltig(verband, 'vhf\ngsk')).toBe(true);
+    expect(zusatzGueltig(verband, 'xyz')).toBe(false);
+    expect(zusatzGueltig(verband, 'vhf\nvhf')).toBe(false);
+    expect(zusatzGueltig(stichworte, '')).toBe(true);
+    expect(zusatzGueltig({ ...stichworte, minEintraege: 2 }, 'a')).toBe(false);
+  });
+
+  it('übernimmt Listenwerte ins Formular und sendet sie als Array', () => {
+    const d = DOKUMENT({ zusatz: { verband: ['vhf'] } });
+    const start = formularAus(d);
+    expect(start.zusatz['verband']).toBe('vhf');
+    const neu = { ...start, zusatz: { ...start.zusatz, verband: 'vhf\ngsk' }, grund: 'Verband ergänzt' };
+    expect(aenderungAus(d, start, neu, kontext({ art }))).toEqual({
+      aenderung: { zusatz: { verband: ['vhf', 'gsk'] }, grund: 'Verband ergänzt' },
+    });
+  });
+
+  it('weist ein leeres Pflicht-Array beim Ändern zurück', () => {
+    const d = DOKUMENT({ zusatz: { verband: ['vhf'] } });
+    const start = formularAus(d);
+    const neu = { ...start, zusatz: { ...start.zusatz, verband: '' }, grund: 'x' };
+    expect(aenderungAus(d, start, neu, kontext({ art }))).toMatchObject({
+      pruefung: { felder: ['zusatz.verband'] },
+    });
   });
 });

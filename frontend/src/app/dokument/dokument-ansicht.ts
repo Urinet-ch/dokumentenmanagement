@@ -152,7 +152,12 @@ export class DokumentAnsicht {
     }
     return Object.entries(z)
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
-      .map(([name, wert]) => ({ name, wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert) }));
+      .map(([name, wert]) => ({ name, wert:
+          Array.isArray(wert) && wert.every((e) => typeof e !== 'object')
+            ? wert.join(', ')
+            : typeof wert === 'object'
+              ? JSON.stringify(wert)
+              : String(wert) }));
   });
 
   private abos = new Subscription();
