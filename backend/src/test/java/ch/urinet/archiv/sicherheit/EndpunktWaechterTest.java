@@ -7,7 +7,9 @@ import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.application.ErlaubtScope;
 import ch.urinet.archiv.sicherheit.application.NichtDokumentbezogen;
 import ch.urinet.archiv.sicherheit.application.Oeffentlich;
+import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
@@ -132,6 +134,10 @@ class EndpunktWaechterTest {
                 .contains("jede Methode unter /public/ verlangt @WebseitenZugang");
         assertThat(verstoesse(WebseitenZugangAusserhalbPublic.class)).singleElement().asString()
                 .contains("@WebseitenZugang nur unter /public/");
+        assertThat(verstoesse(WebseitenErfassungOhneAktion.class)).singleElement().asString()
+                .contains("@WebseitenZugang(ERFASSUNG) verlangt @WebseitenErfassungAktion");
+        assertThat(verstoesse(WebseitenErfassungMitVerbotenerAktion.class)).singleElement().asString()
+                .contains("Webseiten-Erfassungsaktion A9 ist nicht freigegeben");
     }
 
     @Test
@@ -171,6 +177,17 @@ class EndpunktWaechterTest {
             if (webseitenZugang != null) {
                 if (!unterPublic) {
                     verstoesse.add(name + ": @WebseitenZugang nur unter /public/");
+                }
+                WebseitenErfassungAktion webseitenAktion = methode.getAnnotation(WebseitenErfassungAktion.class);
+                if (webseitenZugang.value() == WebseitenZugang.Art.ERFASSUNG) {
+                    if (webseitenAktion == null) {
+                        verstoesse.add(name + ": @WebseitenZugang(ERFASSUNG) verlangt @WebseitenErfassungAktion");
+                    } else if (!Berechtigung.webseitenErfassungErlaubt(webseitenAktion.value())) {
+                        verstoesse.add(name + ": Webseiten-Erfassungsaktion " + webseitenAktion.value()
+                                + " ist nicht freigegeben");
+                    }
+                } else if (webseitenAktion != null) {
+                    verstoesse.add(name + ": @WebseitenErfassungAktion nur mit @WebseitenZugang(ERFASSUNG)");
                 }
                 if (methode.isAnnotationPresent(ErfordertAktion.class)
                         || methode.isAnnotationPresent(AlleArchivRollen.class)
@@ -594,6 +611,27 @@ class EndpunktWaechterTest {
         @Authenticated
         @WebseitenZugang(WebseitenZugang.Art.LESEN)
         public void lesen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/public/v1/probe")
+    static class WebseitenErfassungOhneAktion {
+        @POST
+        @Authenticated
+        @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+        public void erfassen() {
+        }
+    }
+
+    @IfBuildProperty(name = ATTRAPPE, stringValue = "an")
+    @Path("/public/v1/probe")
+    static class WebseitenErfassungMitVerbotenerAktion {
+        @POST
+        @Authenticated
+        @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+        @WebseitenErfassungAktion(Aktion.A9)
+        public void erfassen() {
         }
     }
 

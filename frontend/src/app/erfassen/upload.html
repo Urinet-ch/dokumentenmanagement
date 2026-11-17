@@ -112,7 +112,7 @@
     </mat-checkbox>
     <p id="zusammenfassen-hinweis" class="hinweis">{{ texte.alsEinDokumentHinweis }}</p>
     <button mat-flat-button type="button" (click)="hochladen()" [disabled]="laeuft() || dateien().length === 0">
-      {{ texte.hochladen }}
+      {{ gesamtFehler() ? texte.erneutHochladen : texte.hochladen }}
     </button>
   </section>
 } @else {

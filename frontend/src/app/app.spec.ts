@@ -1,7 +1,9 @@
 import { Component, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { App } from './app';
+import { SwUpdate } from '@angular/service-worker';
+import { Subject } from 'rxjs';
+import { App, SEITE_NEU_LADEN } from './app';
 import { WarteschlangeService } from './erfassen/handy/warteschlange/warteschlange.service';
 import { BrandingService, STANDARD_BRANDING } from './gemeinsam/branding.service';
 import {
@@ -11,6 +13,7 @@ import {
 } from './gemeinsam/anmeldung/anmeldung.service';
 import { Aktion, Rolle, darf } from './gemeinsam/anmeldung/rechte';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
+import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
 
 class AnmeldungAttrappe {
@@ -40,11 +43,19 @@ describe('App (Req 2.6, 8.6)', () => {
   let anmeldung: AnmeldungAttrappe;
   let zaehler: ZaehlerAttrappe;
   let warteschlangeGestartet: boolean;
+  let online: ReturnType<typeof signal<boolean>>;
+  let versionUpdates: Subject<{ type: string }>;
+  let activateUpdate: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
+  let seiteNeuLaden: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
     anmeldung = new AnmeldungAttrappe();
     zaehler = new ZaehlerAttrappe();
     warteschlangeGestartet = false;
+    online = signal(true);
+    versionUpdates = new Subject<{ type: string }>();
+    activateUpdate = vi.fn<() => Promise<boolean>>();
+    seiteNeuLaden = vi.fn<() => void>();
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -58,6 +69,12 @@ describe('App (Req 2.6, 8.6)', () => {
         { provide: AnmeldungService, useValue: anmeldung },
         { provide: BrandingService, useValue: { branding: signal(STANDARD_BRANDING) } },
         { provide: EingangskorbZaehler, useValue: zaehler },
+        { provide: ONLINE, useValue: online },
+        {
+          provide: SwUpdate,
+          useValue: { isEnabled: true, versionUpdates, activateUpdate },
+        },
+        { provide: SEITE_NEU_LADEN, useValue: seiteNeuLaden },
       ],
     });
   });
@@ -66,6 +83,13 @@ describe('App (Req 2.6, 8.6)', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
+  }
+
+  async function fixtureZeigen() {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(warteschlangeGestartet).toBe(true));
+    return fixture;
   }
 
   const menue = (element: HTMLElement) =>
@@ -140,6 +164,47 @@ describe('App (Req 2.6, 8.6)', () => {
     const element = await zeigen();
     expect(element.querySelector('[data-test=eingangskorb-zaehler]')).toBeNull();
     expect(element.querySelector('[role=alert]')).toBeNull();
+  });
+
+  it('zeigt den Offline-Hinweis global und entfernt ihn nach der Wiederverbindung', async () => {
+    online.set(false);
+    const fixture = await fixtureZeigen();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[data-test=offline-hinweis]')?.textContent).toContain(TEXTE.offlineHinweis);
+
+    online.set(true);
+    fixture.detectChanges();
+    expect(element.querySelector('[data-test=offline-hinweis]')).toBeNull();
+  });
+
+  it('zeigt ein bereitstehendes Service-Worker-Update und lädt nach Aktivierung neu', async () => {
+    activateUpdate.mockResolvedValue(true);
+    const fixture = await fixtureZeigen();
+    const element = fixture.nativeElement as HTMLElement;
+    versionUpdates.next({ type: 'VERSION_READY' });
+    fixture.detectChanges();
+    expect(element.querySelector('[data-test=update-hinweis]')?.textContent).toContain(TEXTE.updateBereit);
+
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.updateJetzt)!
+      .click();
+    await fixture.whenStable();
+    expect(activateUpdate).toHaveBeenCalledOnce();
+    expect(seiteNeuLaden).toHaveBeenCalledOnce();
+  });
+
+  it('zeigt einen Fehler, wenn das Service-Worker-Update nicht aktiviert werden kann', async () => {
+    activateUpdate.mockRejectedValue(new Error('synthetischer Fehler'));
+    const fixture = await fixtureZeigen();
+    const element = fixture.nativeElement as HTMLElement;
+    versionUpdates.next({ type: 'VERSION_READY' });
+    fixture.detectChanges();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === TEXTE.updateJetzt)!
+      .click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(element.querySelector('[data-test=update-fehler]')?.textContent).toContain(TEXTE.updateFehler);
   });
 
   it('meldet über Keycloak ab', async () => {

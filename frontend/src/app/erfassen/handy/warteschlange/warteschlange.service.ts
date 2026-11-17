@@ -1,6 +1,7 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { AnmeldungService } from '../../../gemeinsam/anmeldung/anmeldung.service';
 import { ONLINE } from '../../../gemeinsam/online';
+import { httpFehlerText } from '../../../gemeinsam/http-fehler';
 import { TEXTE } from '../../../gemeinsam/texte.de-CH';
 import { Eintrag, Meldungen, Seite, bewerten } from './eintrag';
 import { WarteschlangeSpeicher } from './speicher';
@@ -13,6 +14,7 @@ const MELDUNGEN: Meldungen = {
   unbekannt: TEXTE.handy.fehlerUnbekannt,
   wiederholtFehlgeschlagen: TEXTE.handy.fehlerWiederholt,
   fehlercode: TEXTE.upload.fehlercode,
+  status: (status) => httpFehlerText(status),
 };
 
 /**
@@ -240,6 +242,7 @@ export class WarteschlangeService {
         return;
       }
       this.nichtVor.delete(eintrag.id);
+      const wartenMs = bewertung.art === 'behalten' ? bewertung.wartenMs : undefined;
       if (bewertung.art === 'loeschen') {
         await this.speicher.loeschen(eintrag.id);
       } else {
@@ -247,6 +250,12 @@ export class WarteschlangeService {
       }
       await this.neuLaden();
       const neu = bewertung.art === 'behalten' ? bewertung.eintrag : null;
+      if (neu?.zustand === 'wartet' && wartenMs !== undefined) {
+        // 429 mit Retry-After: genau so lange warten, kein Fehlversuch
+        this.nichtVor.set(eintrag.id, Date.now() + wartenMs);
+        this.wecken(wartenMs);
+        return;
+      }
       if (neu?.zustand === 'wartet') {
         // Netzwerkfehler oder 5xx: später erneut; offline wartet die Schlange auf das Ereignis «online»
         if (neu.fehlversuche > eintrag.fehlversuche) {

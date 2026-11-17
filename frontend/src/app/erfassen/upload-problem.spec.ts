@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { UploadErgebnis } from './upload-port';
 import { uploadProblem } from './upload-problem';
 
@@ -45,6 +45,17 @@ describe('uploadProblem', () => {
       detail: undefined,
       ergebnisse: undefined,
     });
+  });
+
+  it('liest Retry-After aus einer 429-Antwort', () => {
+    expect(
+      uploadProblem(
+        new HttpErrorResponse({
+          status: 429,
+          headers: new HttpHeaders({ 'Retry-After': '42' }),
+        }),
+      ),
+    ).toMatchObject({ status: 429, retryAfter: 42 });
   });
 
   it('ignoriert einen fehlercode, der keine Zeichenkette ist', () => {

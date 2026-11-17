@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpHeaders, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -145,9 +145,10 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     body: Parameters<ReturnType<HttpTestingController['expectOne']>['flush']>[0],
     status = 200,
     statusText = 'OK',
+    headers?: HttpHeaders,
   ) {
     const anfrage = http.expectOne(url);
-    anfrage.flush(body, { status, statusText });
+    anfrage.flush(body, { status, statusText, headers });
     await fixture.whenStable();
     return anfrage.request;
   }
@@ -376,16 +377,59 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(element.querySelector('#d1-art')?.getAttribute('aria-invalid')).toBe('true');
   });
 
-  it('meldet einen Versionskonflikt der Seite zum Neuladen', async () => {
-    await zeigen(dokument({ art: 'LIEFERANTENRECHNUNG' }));
+  it.each([
+    [409, 'Conflict'],
+    [412, 'Precondition Failed'],
+  ] as const)('behält Formulareingaben bei HTTP %s, bis der Benutzer die aktuelle Version neu lädt', async (status, statusText) => {
+    await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
+    await klicken(T.aendern);
+    const titel = element.querySelector<HTMLInputElement>('#d1-titel')!;
+    titel.value = 'Entwurf bleibt erhalten';
+    titel.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
     await klicken(T.bestaetigen);
     await antworten(
       '/api/v1/dokumente/d1/bestaetigen',
       { fehlercode: 'VERSION_KONFLIKT' },
-      412,
-      'Precondition Failed',
+      status,
+      statusText,
     );
+    expect(veraltet).toEqual([]);
+    expect(element.querySelector('[data-test=formular]')).not.toBeNull();
+    expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe('Entwurf bleibt erhalten');
+    expect(element.querySelector('[data-test=konflikt-neu-laden]')?.textContent).toContain(T.neuLaden);
+
+    await klicken(T.neuLaden);
     expect(veraltet).toEqual([T.fehlercode['VERSION_KONFLIKT']]);
+  });
+
+  it('zeigt bei 409 mit fachlichem Code dessen Text, behält die Eingaben und bietet kein «Neu laden» an', async () => {
+    await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
+    await klicken(T.aendern);
+    const titel = element.querySelector<HTMLInputElement>('#d1-titel')!;
+    titel.value = 'Bleibt';
+    titel.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    await klicken(T.bestaetigen);
+    await antworten('/api/v1/dokumente/d1/bestaetigen', { fehlercode: 'BELEGNUMMER_VERGEBEN' }, 409, 'Conflict');
+    expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(T.fehlercode['BELEGNUMMER_VERGEBEN']);
+    expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe('Bleibt');
+    expect(element.querySelector('[data-test=konflikt-neu-laden]')).toBeNull();
+  });
+
+  it('zeigt bei 429 Retry-After an und erlaubt das Wiederholen', async () => {
+    await zeigen(dokument({ status: 'FEHLER', fehler: 'OCR fehlgeschlagen' }));
+    await klicken(T.erneutVerarbeiten);
+    await antworten(
+      '/api/v1/dokumente/d1/wiederholen',
+      null,
+      429,
+      'Too Many Requests',
+      new HttpHeaders({ 'Retry-After': '42' }),
+    );
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.zuViele(42));
+    expect(knoepfe()).toContain(T.erneutVerarbeiten);
+    expect(veraltet).toEqual([]);
   });
 
   it('verwirft nur mit Grund nach Rückfrage (Req 8.5)', async () => {

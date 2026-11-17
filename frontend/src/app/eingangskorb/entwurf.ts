@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Bestaetigung, Dokument } from '../gemeinsam/api';
+import { retryAfterSekunden } from '../gemeinsam/retry-after';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 
 /** Felder, die der Eingangskorb anzeigt und beim Bestätigen sendet; Texte so, wie sie im Formular stehen. */
@@ -30,6 +31,7 @@ export interface AktionFehler {
   fehlercode?: string;
   detail?: string;
   felder: readonly string[];
+  retryAfter?: number | null;
 }
 
 type Vorschlag = Record<string, unknown>;
@@ -187,6 +189,7 @@ export function fehlerAus(fehler: unknown): AktionFehler {
     fehlercode: typeof problem['fehlercode'] === 'string' ? problem['fehlercode'] : undefined,
     detail: typeof problem['detail'] === 'string' ? problem['detail'] : undefined,
     felder,
+    ...(fehler.status === 429 ? { retryAfter: retryAfterSekunden(fehler.headers.get('Retry-After')) } : {}),
   };
 }
 
