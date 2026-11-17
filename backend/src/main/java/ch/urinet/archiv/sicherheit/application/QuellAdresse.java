@@ -3,7 +3,6 @@ package ch.urinet.archiv.sicherheit.application;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -21,7 +20,6 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class QuellAdresse {
 
-    private static final Logger LOG = Logger.getLogger(QuellAdresse.class);
     private static final Pattern ZEICHEN = Pattern.compile("^[0-9A-Fa-f:.]{2,45}$");
 
     private final List<Netz> netze;
@@ -30,9 +28,6 @@ public class QuellAdresse {
     public QuellAdresse(
             @ConfigProperty(name = "archiv.api-token.vertrauenswuerdige-proxies") Optional<List<String>> netze) {
         this(netze.orElse(List.of()));
-        if (ohneNetze() && io.quarkus.runtime.LaunchMode.current() == io.quarkus.runtime.LaunchMode.NORMAL) {
-            LOG.warn("Keine vertrauenswürdigen Proxy-Netze gesetzt: Clients hinter dem Proxy teilen eine Quelladresse");
-        }
     }
 
     public QuellAdresse(List<String> netze) {
