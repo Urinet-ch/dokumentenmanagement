@@ -268,9 +268,14 @@ alter table dokument add konfiguration_version int null references konfiguration
 -- <nnn>-protokoll-konfiguration
 -- Check der Protokollaktionen neu mit zusätzlich KONFIGURATION_AENDERN (wie 004-protokoll-regel-aendern)
 ```
-Die Migration (Req 9.1) füllt die neuen Spalten aus dem Register des jeweiligen Schemas und legt Version 1 an
-(Quelle `MIGRATION`); spätere Changesets dieser Spec, die Bestand ergänzen (z. B. die Regeln von `urinet` mit dem
-Changeset `<nnn>-regel`), legen je eine weitere Version mit Quelle `MIGRATION` an.
+Die Migration (Req 9.1) weist bestehenden Dokumenten und Dokumentversionen Version 1 zu und legt den Snapshot aus
+Dokumentarten und Mandanteneinstellungen an (Quelle `MIGRATION`). Soweit ein Eintrag im öffentlichen Mandantenregister
+besteht, übernimmt sie daraus die Einstellungen. Bei der Erstprovisionierung ist der Mandant während der
+Schema-Migration noch nicht im öffentlichen Register; Version 1 verwendet dann die dokumentierten Standardwerte.
+BEFORE-INSERT-Trigger setzen bei neuen Dokumenten die aktuelle Konfigurationsversion und übernehmen sie bei einer
+Dokumentversion vom Dokument. Die Trigger qualifizieren die Tabellen über das Schema der betroffenen Zeile. Spätere
+Changesets dieser Spec, die Bestand ergänzen (z. B. die Regeln von `urinet` mit dem Changeset `<nnn>-regel`), legen je
+eine weitere Version mit Quelle `MIGRATION` an.
 `public.mandant.eigene_arten` bleibt als Spalte bestehen (bestehende Changesets bleiben unverändert), wird aber nicht
 mehr gelesen; ein späteres Changeset kann sie entfernen.
 

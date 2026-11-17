@@ -57,6 +57,12 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, null, kanal, null);
     }
 
+    /** Kompatibel zu Einträgen ohne Token-ID. */
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                            String kanal) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, null);
+    }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode) {
         this(grund, sha256, fehlercode, null, null, null, null, null, null);
