@@ -1,0 +1,30 @@
+/* Platzhalter-Branding VHF/GSK: Primärfarbe wie archiv.branding.mandanten.vhf-gsk.primaerfarbe. Logo: Textmarke statt Bild,
+   bis der Verband ein Logo liefert (dann Datei unter resources/img/ und hier einbinden). */
+:root {
+  --vhf-gsk-primaer: #eeb111;
+  --vhf-gsk-text-auf-primaer: #1a1a1a;
+  --pf-v5-global--primary-color--100: var(--vhf-gsk-primaer);
+  --pf-v5-global--primary-color--200: #c99509;
+  --pf-v5-global--link--Color: #7a5800;
+  --pf-v5-global--link--Color--hover: #4d3700;
+}
+.pf-v5-c-button.pf-m-primary {
+  background-color: var(--vhf-gsk-primaer);
+  color: var(--vhf-gsk-text-auf-primaer);
+}
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:focus {
+  background-color: #c99509;
+  color: var(--vhf-gsk-text-auf-primaer);
+}
+#kc-header-wrapper {
+  font-size: 0;
+}
+#kc-header-wrapper::before {
+  content: "VHF/GSK Archiv";
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--vhf-gsk-text-auf-primaer);
+  border-bottom: 4px solid var(--vhf-gsk-primaer);
+  padding-bottom: 0.25rem;
+}

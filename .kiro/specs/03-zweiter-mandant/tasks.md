@@ -35,6 +35,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
   - Umsetzung (PR #228): öffentlicher Branding-Endpunkt und Web-App mit neutralem Fallback; Domains bleiben ausserhalb des Repos konfigurierbar, da die Domain-Entscheidung offen ist. Offen: Keycloak-Theme und Traefik-Router (Deploy). Nachbesserung Review: Quelle ist `archiv.branding.mandanten.*` statt `mandant.branding` (Entscheid in design.md); Domain `archiv.apps.urinet.ch` ist Standard für UriNet, `ARCHIV_BRANDING_VHF_GSK_DOMAIN` muss im Deploy gesetzt werden, sobald die Domain feststeht; Seitentitel und Startseite zeigen den Mandantennamen; Primärfarben ohne WCAG-AA-Kontrast (4,5:1) fallen auf die Standardfarbe zurück; Logos nur auf eigener Origin.
+  - Vorschlag, wartet auf Fabians Prüfung (Rest: Keycloak-Theme `vhf-gsk` und Traefik-Router für die Platzhalter-Subdomain, Einzelheiten in design.md; Haken erst nach Deploy und Prüfung)
   - _Anforderungen: 2.1–2.3_
 
 - [x] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
@@ -105,6 +106,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Vorstufe (entschieden von Fabian am 14.11.2026): vor Gate Phase 2 und Zuschlag, nur mandantenneutral; getestet mit dem Mandanten `urinet` bzw. Testmandanten, ohne Domain und Seed von VHF/GSK. Der Vertrag enthält, was es bei der Umsetzung gibt (Problem Details, Header, Versionierung); die Endpunkte kommen additiv mit 11.2 und 11.10 dazu
   - Umsetzung Teil 1 (PR #140): Vertrag `docs/schnittstelle/public-v1.yaml` ohne Endpunkte, Reroute `/public/` → interner Pfad (`WebseitenRoute`), `PublicVertragTest`, Ausschluss aus der App-OpenAPI, Problem Details und `Cache-Control: no-store` unter `/public/`, Abkündigung über `archiv.webseite.v<n>.sunset`, Skript `pruefe-vertrag.sh` mit Selbsttest; offen: CI-Schritt, Traefik-Router
   - Reihenfolge (entschieden 16.11.2026): Die Drosselung im Reverse-Proxy kommt vor dem Livegang der Webseite von VHF/GSK; bis dahin nur Urinet und Testmandanten
+  - Vorschlag, wartet auf Fabians Prüfung (Traefik-Drosselung für `/public/`, Labels in `deploy/infomaniak/compose.yml`, Werte und Begründung in design.md; Haken erst nach Deploy und Prüfung): offen bleibt der CI-Schritt «Vertrag nur additiv» (`.github/workflows/`)
   - _Anforderungen: 11.1–11.6, 15.2–15.4_
 
 - [x] 11.7 Webseiten-Schlüssel [Backend]
