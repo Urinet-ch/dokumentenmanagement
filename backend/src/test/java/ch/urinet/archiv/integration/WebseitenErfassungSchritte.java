@@ -58,6 +58,7 @@ public class WebseitenErfassungSchritte {
     Instance<AgroalDataSource> datenbank;
 
     private final Map<String, Zugang> schluessel = new HashMap<>();
+    private final Map<String, String> webseitenKennungen = new HashMap<>();
     private final Map<String, byte[]> dateien = new HashMap<>();
     private final Map<String, UUID> idsJeReferenz = new HashMap<>();
     private final Map<String, Set<UUID>> dokumente = new HashMap<>();
@@ -95,6 +96,7 @@ public class WebseitenErfassungSchritte {
             ausfuehren("delete from public.api_client where id = ?", zugang.tokenId());
         }
         schluessel.clear();
+        webseitenKennungen.clear();
         dateien.clear();
         idsJeReferenz.clear();
         dokumente.clear();
@@ -125,7 +127,8 @@ public class WebseitenErfassungSchritte {
     }
 
     private Zugang anlegen(String mandant, String webseitenName, String art) {
-        String webseite = webseitenName + "-" + UUID.randomUUID().toString().substring(0, 8);
+        String webseite = webseitenKennungen.computeIfAbsent(webseitenName,
+                name -> name + "-" + UUID.randomUUID().toString().substring(0, 8));
         return anlegen(mandant, webseite, art, false);
     }
 
@@ -439,8 +442,7 @@ public class WebseitenErfassungSchritte {
                 .fileName(dateiname).mimeType("application/pdf").build());
         request.multiPart("referenz", referenz);
         letzte = request.when().post(PFAD);
-        letzterSchluessel = name;
-        letzteDatei = dateiname;
+        antwortMerken(name, dateiname, referenz, letzte);
     }
 
     @Wenn("der Schlüssel «{word}» das Dokument der Referenz «{}» ohne Bearbeiterkennung abruft")
@@ -876,6 +878,153 @@ public class WebseitenErfassungSchritte {
             geprueft++;
         }
         assertThat(geprueft).isGreaterThanOrEqualTo(13);
+    }
+
+    @Dann("weist die Statusantwort auf die eigene Referenz «{}» von «{word}»")
+    public void eigeneStatusReferenz(String referenz, String name) {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        assertThat(letzte.jsonPath().getString("id"))
+                .isEqualTo(idsJeReferenz.get(schluesselKey(name, referenz)).toString());
+        assertThat(letzte.jsonPath().getString("referenz")).isEqualTo(referenz);
+    }
+
+    @Wenn("der Schlüssel «{word}» eine synthetische Multipart-Datei mit {int} MiB hochlädt")
+    public void uebergrosserUpload(String name, int mib) throws IOException {
+        var datei = java.nio.file.Files.createTempFile("webseiten-isolation-", ".pdf");
+        try {
+            try (var inhalt = new java.io.RandomAccessFile(datei.toFile(), "rw")) {
+                inhalt.setLength(mib * 1024L * 1024);
+            }
+            letzte = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER)
+                    .config(io.restassured.RestAssured.config().httpClient(
+                            io.restassured.config.HttpClientConfig.httpClientConfig()
+                                    .setParam("http.protocol.expect-continue", true)))
+                    .multiPart("datei", datei.toFile(), "application/pdf").multiPart("referenz", "zu-gross")
+                    .when().post(PFAD);
+        } finally {
+            java.nio.file.Files.delete(datei);
+        }
+    }
+
+    @Dann("trennen «{word}» und «{word}» beide Schlüsselarten über das vollständige Endpunktinventar")
+    public void schluesselartenMatrix(String lesen, String erfassung) {
+        var endpunkte = WebseitenEndpunkte.alle();
+        assertThat(endpunkte).anyMatch(e -> e.art()
+                == ch.urinet.archiv.sicherheit.application.WebseitenZugang.Art.LESEN);
+        for (var endpunkt : endpunkte) {
+            String name = endpunkt.art() == ch.urinet.archiv.sicherheit.application.WebseitenZugang.Art.ERFASSUNG
+                    ? lesen : erfassung;
+            Response antwort = inventarAnfrage(name, endpunkt, letzteId, "\"0\"");
+            assertThat(antwort.statusCode()).as(endpunkt + ": " + antwort.asString()).isEqualTo(403);
+            assertThat(ProblemDetails.pruefen(antwort, 403))
+                    .as(endpunkt.verb() + " " + endpunkt.pfad()).isEqualTo("NICHT_ERLAUBT");
+        }
+    }
+
+    private Response inventarAnfrage(String name, WebseitenEndpunkte.Endpunkt endpunkt, UUID id, String etag) {
+        String pfad = endpunkt.pfad().replace("{id}", id.toString()).replace("{kennung}", BEARBEITER);
+        assertThat(pfad).as("Alle Pfadparameter brauchen eine echte Anfrage").doesNotContain("{");
+        RequestSpecification request = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER)
+                .header("If-Match", etag);
+        if (endpunkt.medientyp().equals("multipart/form-data")) {
+            request.multiPart("datei", "probe.pdf", Testdateien.pdf(), "application/pdf")
+                    .multiPart("referenz", "nicht-angenommen");
+        } else if (Set.of("POST", "PATCH", "PUT").contains(endpunkt.verb())) {
+            String body = switch (endpunkt.verb()) {
+                case "PATCH" -> "{\"titel\":\"Isolationsprobe\",\"grund\":\"Isolationsprobe\"}";
+                case "PUT" -> "{\"name\":\"Isolationsprobe\"}";
+                default -> endpunkt.pfad().endsWith("/bestaetigen")
+                        ? "{\"art\":\"WEBTEST_ERFASSUNG\",\"titel\":\"Isolationsprobe\"}" : "{}";
+            };
+            request.contentType(endpunkt.medientyp()).body(body);
+        }
+        return request.when().request(endpunkt.verb(), pfad);
+    }
+
+    @Dann("sind alle Dokumentaktionen für «{word}» gegen fremde IDs von «{word}» wie gegen unbekannte IDs gesperrt")
+    public void dokumentaktionenIsoliert(String eigenerName, String fremderName) throws SQLException {
+        Zugang eigener = schluessel.get(eigenerName);
+        UUID eigeneId = idsJeReferenz.get(schluesselKey(eigenerName, "pflege"));
+        UUID fremdeId = idsJeReferenz.get(schluesselKey(fremderName, "pflege"));
+        var endpunkte = WebseitenEndpunkte.alle().stream()
+                .filter(e -> e.pfad().startsWith("/public/v1/erfassung") && e.pfad().contains("{"))
+                // Bearbeiterkennungen sind keine Dokument-IDs; sie belegt das Szenario zu getrennten Bearbeiterverzeichnissen.
+                .filter(e -> !e.pfad().startsWith("/public/v1/erfassung/bearbeiter/")).toList();
+        assertThat(endpunkte).hasSizeGreaterThanOrEqualTo(7);
+        for (var endpunkt : endpunkte) {
+            String name = "Probe-" + UUID.randomUUID();
+            schluessel.put(name, anlegen(eigener.mandant(), eigener.webseite(), "erfassung", false));
+            if (!endpunkt.pfad().startsWith(PFAD + "/{id}")) {
+                throw new AssertionError("Eigene Gegenprobe für neuen Endpunkt mit Pfadparameter ergänzen: " + endpunkt);
+            }
+            int erfolg = switch (endpunkt.verb() + " " + endpunkt.pfad().substring((PFAD + "/{id}").length())) {
+                case "GET ", "GET /datei", "PATCH ", "POST /veroeffentlichen", "POST /zurueckziehen" -> 200;
+                case "POST /bestaetigen", "POST /wiederholen" -> 202;
+                default -> throw new AssertionError("Eigene Gegenprobe für neuen Endpunkt ergänzen: " + endpunkt);
+            };
+            String status = endpunkt.pfad().endsWith("/wiederholen") ? "FEHLER"
+                    : endpunkt.pfad().endsWith("/bestaetigen") ? "EINGANGSKORB" : "ARCHIVIERT";
+            ausfuehren("update " + new MandantCode(eigener.mandant()).schema()
+                    + ".dokument set status = ?, bestaetigt = "
+                    + (status.equals("ARCHIVIERT") ? "now()" : "null") + " where id = ?", status, eigeneId);
+            letzteId = eigeneId;
+            String etag = aktuellesEtag(name);
+            Response fremd = inventarAnfrage(name, endpunkt, fremdeId, etag);
+            Response unbekannt = inventarAnfrage(name, endpunkt, UUID.randomUUID(), etag);
+            assertThat(ProblemDetails.pruefen(fremd, 404)).as(endpunkt.toString()).isEqualTo("NICHT_GEFUNDEN");
+            assertThat(ProblemDetails.pruefen(unbekannt, 404)).isEqualTo("NICHT_GEFUNDEN");
+            Map<String, Object> fremdInhalt = new HashMap<>(fremd.jsonPath().getMap(""));
+            Map<String, Object> unbekanntInhalt = new HashMap<>(unbekannt.jsonPath().getMap(""));
+            fremdInhalt.remove("instance");
+            unbekanntInhalt.remove("instance");
+            assertThat(fremdInhalt).isEqualTo(unbekanntInhalt);
+            assertThat(fremd.header("ETag")).isNull();
+            assertThat(fremd.header("Location")).isNull();
+            assertThat(fremd.asString()).doesNotContain(fremdeId.toString());
+            // Zwei abgewiesene Streams schöpfen die Spitze aus; die Gegenprobe nutzt einen zweiten Schlüssel.
+            if (endpunkt.pfad().endsWith("/datei")) {
+                name = "Datei-" + UUID.randomUUID();
+                schluessel.put(name, anlegen(eigener.mandant(), eigener.webseite(), "erfassung", false));
+            }
+            Response eigene = inventarAnfrage(name, endpunkt, eigeneId, etag);
+            assertThat(eigene.statusCode()).as(endpunkt + ": " + eigene.asString()).isEqualTo(erfolg);
+        }
+    }
+
+    @Dann("liefern Liste, Eingangskorb und Arten für «{word}» keine Daten von «{word}»")
+    public void hilfslistenIsoliert(String eigenerName, String fremderName) throws SQLException {
+        Zugang eigener = schluessel.get(eigenerName);
+        Zugang fremder = schluessel.get(fremderName);
+        UUID eigeneId = idsJeReferenz.get(schluesselKey(eigenerName, "pflege"));
+        UUID fremdeId = idsJeReferenz.get(schluesselKey(fremderName, "pflege"));
+        for (Zugang z : List.of(eigener, fremder)) {
+            ausfuehren("update " + new MandantCode(z.mandant()).schema()
+                    + ".dokumentart set name = ? where code = 'WEBTEST_ERFASSUNG'", "Pflegeart-" + z.mandant());
+        }
+        for (String pfad : List.of(PFAD, "/public/v1/erfassung/eingangskorb")) {
+            Response antwort = mit(eigenerName).queryParam("groesse", 100).when().get(pfad);
+            assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+            assertThat(antwort.jsonPath().getList("eintraege.id", String.class)).contains(eigeneId.toString())
+                    .doesNotContain(fremdeId.toString());
+        }
+        Response arten = mit(eigenerName).when().get("/public/v1/erfassung/dokumentarten");
+        assertThat(arten.statusCode()).isEqualTo(200);
+        assertThat(arten.asString()).contains("Pflegeart-" + eigener.mandant())
+                .doesNotContain("Pflegeart-" + fremder.mandant());
+    }
+
+    @Dann("nennt das Dokument der Referenz «{}» von «{word}» für «{word}» keine fremde Referenz")
+    public void detailOhneFremdeReferenz(String referenz, String quelle, String ziel) {
+        UUID id = idsJeReferenz.get(schluesselKey(quelle, referenz));
+        Response antwort = mit(ziel).header("X-Archiv-Bearbeiter", BEARBEITER).when().get(PFAD + "/" + id);
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getString("referenz")).isNull();
+        assertThat(antwort.asString()).doesNotContain(referenz);
+        Response liste = mit(ziel).queryParam("groesse", 100).when().get(PFAD);
+        assertThat(liste.statusCode()).as(liste.asString()).isEqualTo(200);
+        List<Map<String, Object>> eintraege = liste.jsonPath().getList("eintraege");
+        assertThat(eintraege).filteredOn(e -> id.toString().equals(e.get("id"))).singleElement()
+                .satisfies(e -> assertThat(e.get("referenz")).isNull());
     }
 
     @Dann("zeigt eine Gegenprobe ohne Referenzsperre beim Schlüssel «{word}» den Datenbankkonflikt")
