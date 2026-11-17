@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 03, F3: höchstens eine offene Budget-Reservierung je Mandant und Monat. -->
+    <changeSet id="038-chat-budget-reservierung" author="archiv">
+        <sql>
+            alter table public.mandant_budget
+                add column frage_laufend boolean not null default false;
+        </sql>
+        <rollback>
+            <sql>alter table public.mandant_budget drop column frage_laufend;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

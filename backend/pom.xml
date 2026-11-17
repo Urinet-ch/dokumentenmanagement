@@ -25,7 +25,7 @@
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
-        <build-helper-plugin.version>3.7.0</build-helper-plugin.version>
+        <build-helper-plugin.version>3.8.0</build-helper-plugin.version>
         <!-- 3.x braucht Jackson 3 (tools.jackson) neben dem Jackson 2 von Quarkus; nur der Schema-Prüfer nutzt es (Jackson3Baum).
              Jackson 3 kommt nur transitiv über diese Bibliothek (Version bestimmt sie, Dependabot hebt es nicht selbst):
              Sicherheitsmeldungen zu tools.jackson betreffen darum dieses Update (Review PR #83, Kann 3). -->

@@ -56,6 +56,10 @@ services:
       # Domain des Mandanten VHF/GSK für das Branding (Aufgabe 10.3, Vorschlag 17.11.2026): dieselbe Variable wie der Router
       # unten; bis zur Umstellung auf die Verbandsdomain gilt die Platzhalter-Subdomain
       ARCHIV_BRANDING_VHF_GSK_DOMAIN: ${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}
+      # Quelladresse für Prüfgrenze und Absenderprüfung (Review PR #258): X-Real-Ip von Traefik gilt nur, wenn der Peer in
+      # diesem Netz liegt. Standard: der Adressbereich der Docker-Bridge-Netze (kein Betriebsdetail); ein engeres Netz
+      # kommt über ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE in der .env des Bundles
+      ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE: ${ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE:-172.16.0.0/12}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
       # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die

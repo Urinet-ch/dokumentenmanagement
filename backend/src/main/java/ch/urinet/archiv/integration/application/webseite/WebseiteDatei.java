@@ -60,6 +60,9 @@ public class WebseiteDatei {
     private final WebseiteLesen lesen;
     private final ZugriffProtokoll protokoll;
 
+    @jakarta.inject.Inject
+    ch.urinet.archiv.dokument.application.DokumentLesen dokumente;
+
     public WebseiteDatei(DokumentDatei datei, WebseiteLesen lesen, ZugriffProtokoll protokoll) {
         this.datei = datei;
         this.lesen = lesen;
@@ -89,5 +92,27 @@ public class WebseiteDatei {
     public void protokollieren(UUID id, Optional<String> benutzer, Optional<IpAdresse> ip) {
         protokoll.schreiben(new ZugriffEintrag(benutzer, Optional.empty(), ProtokollAktion.HERUNTERLADEN,
                 Optional.of(id), ip.map(IpAdresse::gekuerzt), ProtokollDetails.KEINE));
+    }
+
+    public DokumentDatei.Dateiort erfassungVorbereiten(ch.urinet.archiv.sicherheit.domain.Benutzer benutzer, UUID id) {
+        var dokument = dokumente.lesen(benutzer, id);
+        if (dokument.status() == ch.urinet.archiv.dokument.domain.DokumentStatus.VERWORFEN) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        try {
+            return datei.finden(Sichtregel.fuer(benutzer), id, DateiRolle.PDFA, 0);
+        } catch (FachFehler e) {
+            if (e.code() != Fehlercode.NICHT_GEFUNDEN) {
+                throw e;
+            }
+            return datei.finden(Sichtregel.fuer(benutzer), id, DateiRolle.ORIGINAL, 1);
+        }
+    }
+
+    public void erfassungProtokollieren(UUID id, ch.urinet.archiv.sicherheit.domain.Benutzer benutzer,
+                                        Optional<IpAdresse> ip, String bearbeiter) {
+        protokoll.schreiben(new ZugriffEintrag(Optional.of(benutzer.id()), Optional.of(benutzer.rolle().name()),
+                ProtokollAktion.HERUNTERLADEN, Optional.of(id), ip.map(IpAdresse::gekuerzt),
+                ProtokollDetails.KEINE, Optional.of(bearbeiter)));
     }
 }
