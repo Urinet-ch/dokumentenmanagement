@@ -19,7 +19,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
     private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
     private static final Set<String> RESERVIERTE_PUBLIC_PARAMETER = Set.of("q", "reihe", "jahr", "ausgabe", "seite",
-            "pro_seite", "id", "sortierung", "gespraech_id", "zugriff", "veroeffentlicht", "seit", "max",
+            "pro_seite", "dateiname", "id", "sortierung", "gespraech_id", "zugriff", "veroeffentlicht", "seit", "max",
             "referenz", "groesse", "status", "url");
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
@@ -58,6 +58,13 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
             artReferenzPruefen(befunde, nachCode, art, art.fremdbelegArt(), "fremdbelegArt");
             artReferenzPruefen(befunde, nachCode, art, art.ohneZahlungsdatenArt(), "ohneZahlungsdatenArt");
+            if ("FELD".equals(art.aufbewahrung().ab())
+                    ? art.aufbewahrung().feld() == null
+                        || !art.pflichtfelder().contains("zusatz." + art.aufbewahrung().feld())
+                    : art.aufbewahrung().feld() != null) {
+                befunde.add(new Befund("arten." + art.code() + ".aufbewahrung.feld", "FRISTFELD_UNGUELTIG",
+                        "Der Fristbezug FELD benötigt ein pflichtiges Zusatzfeld."));
+            }
             wissensquellePruefen(befunde, art);
         }
         Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
@@ -112,6 +119,11 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                             "KLASSIFIKATION_UNGUELTIG", "Eine Klassifikation der Art fehlt oder ist doppelt zugeordnet."));
                     continue;
                 }
+                if (!klassifikation.aktiv() && (zuordnung.pflicht() || zuordnung.standardWert() != null)) {
+                    befunde.add(new Befund("arten." + art.code() + ".klassifikationen."
+                            + zuordnung.klassifikation(), "KLASSIFIKATION_UNGUELTIG",
+                            "Eine inaktive Klassifikation darf in der Art weder Pflicht sein noch einen Standardwert tragen."));
+                }
                 if (zuordnung.standardWert() != null && klassifikation.werte().stream()
                         .noneMatch(wert -> wert.code().equals(zuordnung.standardWert()) && wert.aktiv())) {
                     befunde.add(new Befund("arten." + art.code() + ".klassifikationen."
@@ -125,18 +137,28 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public List<String> ungueltigeDokumentKlassifikationen(String artCode, Map<String, List<String>> werte,
                                                            Map<String, List<String>> vorher) {
-        if (artCode == null) {
-            return List.of();
-        }
-        Art art = arten.stream().filter(eintrag -> artCode.equals(eintrag.code())).findFirst().orElse(null);
-        if (art == null) {
-            return List.of("art");
-        }
+        return dokumentKlassifikationenPruefen(artCode, werte, vorher, true);
+    }
+
+    /** Wie {@link #ungueltigeDokumentKlassifikationen}, aber ohne fehlende Pflicht-Klassifikationen (Req 1.7). */
+    public List<String> veralteteDokumentKlassifikationen(String artCode, Map<String, List<String>> werte,
+                                                          Map<String, List<String>> vorher) {
+        return dokumentKlassifikationenPruefen(artCode, werte, vorher, false);
+    }
+
+    private List<String> dokumentKlassifikationenPruefen(String artCode, Map<String, List<String>> werte,
+                                                         Map<String, List<String>> vorher, boolean pflichtPruefen) {
+        // Ohne Art oder mit einer Art, die der Stand nicht kennt, ist nichts zugeordnet: jeder gesetzte Code ist
+        // ungültig (Req 3.5). Ob die Art existiert, prüfen die Aufrufer selbst.
+        Art art = artCode == null ? null
+                : arten.stream().filter(eintrag -> artCode.equals(eintrag.code())).findFirst().orElse(null);
         Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
         klassifikationen.forEach(klassifikation ->
                 klassifikationenNachCode.put(klassifikation.code(), klassifikation));
         Map<String, ArtKlassifikation> zuordnungen = new TreeMap<>();
-        art.klassifikationen().forEach(zuordnung -> zuordnungen.put(zuordnung.klassifikation(), zuordnung));
+        if (art != null) {
+            art.klassifikationen().forEach(zuordnung -> zuordnungen.put(zuordnung.klassifikation(), zuordnung));
+        }
         Map<String, List<String>> gesetzt = werte == null ? Map.of() : werte;
         Map<String, List<String>> alt = vorher == null ? Map.of() : vorher;
         Set<String> ungueltig = new TreeSet<>();
@@ -154,8 +176,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
             Set<String> neueWerte = new HashSet<>(liste);
             Set<String> alteWerte = new HashSet<>(alt.getOrDefault(code, List.of()));
-            boolean unveraendert = neueWerte.equals(alteWerte) && neueWerte.size() == liste.size();
-            if (!klassifikation.aktiv() && !unveraendert
+            if (!klassifikation.aktiv() && !alteWerte.containsAll(neueWerte)
                     || !klassifikation.mehrfach() && liste.size() > 1
                     || zuordnung.pflicht() && liste.isEmpty()
                     || neueWerte.size() != liste.size()) {
@@ -166,7 +187,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             klassifikation.werte().stream().filter(KlassifikationWert::aktiv)
                     .map(KlassifikationWert::code).forEach(aktiveWerte::add);
             for (String wert : liste) {
-                if (!aktiveWerte.contains(wert) && (!unveraendert || !alteWerte.contains(wert))) {
+                if (!aktiveWerte.contains(wert) && !alteWerte.contains(wert)) {
                     ungueltig.add(sichererCode);
                     break;
                 }
@@ -174,7 +195,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
 
         for (ArtKlassifikation zuordnung : zuordnungen.values()) {
-            if (zuordnung.pflicht() && gesetzt.getOrDefault(zuordnung.klassifikation(), List.of()).isEmpty()) {
+            if (pflichtPruefen && zuordnung.pflicht() && gesetzt.getOrDefault(zuordnung.klassifikation(), List.of()).isEmpty()) {
                 ungueltig.add(zuordnung.klassifikation());
             }
         }
@@ -280,6 +301,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             feld(aenderungen, pfad + "aufbewahrung.jahre", alt.aufbewahrung().jahre(),
                     aktuell.aufbewahrung().jahre());
             feld(aenderungen, pfad + "aufbewahrung.ab", alt.aufbewahrung().ab(), aktuell.aufbewahrung().ab());
+            feld(aenderungen, pfad + "aufbewahrung.feld", alt.aufbewahrung().feld(), aktuell.aufbewahrung().feld());
             feld(aenderungen, pfad + "gesetzlichePflicht", alt.gesetzlichePflicht(), aktuell.gesetzlichePflicht());
             feld(aenderungen, pfad + "aktiv", alt.aktiv(), aktuell.aktiv());
             feld(aenderungen, pfad + "selbstAusgestellt", alt.selbstAusgestellt(), aktuell.selbstAusgestellt());
@@ -426,7 +448,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
     }
 
-    public record Aufbewahrung(Integer jahre, String ab) {
+    public record Aufbewahrung(Integer jahre, String ab, String feld) {
+        public Aufbewahrung(Integer jahre, String ab) {
+            this(jahre, ab, null);
+        }
     }
 
     public record Kennungen(String uid, List<String> ibans) {

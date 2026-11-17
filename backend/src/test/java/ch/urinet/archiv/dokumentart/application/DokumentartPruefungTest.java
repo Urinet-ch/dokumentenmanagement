@@ -49,6 +49,16 @@ class DokumentartPruefungTest {
             aufrufe.add("reservierteFelderGueltig");
             return reservierteFelderGueltig;
         }
+
+        @Override
+        public boolean datumsfeldGueltig(String schemaJson, String feld) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.time.LocalDate datumswert(String werteJson, String feld) {
+            throw new UnsupportedOperationException();
+        }
     });
 
     @Test

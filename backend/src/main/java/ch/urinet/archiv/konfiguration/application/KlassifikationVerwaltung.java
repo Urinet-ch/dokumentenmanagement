@@ -195,6 +195,11 @@ public class KlassifikationVerwaltung {
         return konfiguration.aktuell().ungueltigeDokumentKlassifikationen(art, werte, vorher);
     }
 
+    public List<String> veralteteDokumentKlassifikationen(String art, Map<String, List<String>> werte,
+                                                          Map<String, List<String>> vorher) {
+        return konfiguration.aktuell().veralteteDokumentKlassifikationen(art, werte, vorher);
+    }
+
     public Map<String, List<String>> beimArtwechselVorbelegen(String art, Map<String, List<String>> bisher) {
         return konfiguration.aktuell().beimArtwechselVorbelegen(art, bisher);
     }

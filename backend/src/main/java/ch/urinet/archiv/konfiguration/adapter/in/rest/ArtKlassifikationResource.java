@@ -1,6 +1,6 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
@@ -171,7 +171,8 @@ public class ArtKlassifikationResource {
 
     private static String grund(JsonNode json) {
         String grund = text(json, "grund");
-        if (grund != null && grund.length() > 1000) {
+        if (grund != null && (grund.length() > 1000
+                || grund.codePoints().anyMatch(c -> Character.getType(c) == Character.CONTROL))) {
             throw ungueltig();
         }
         return grund == null ? null : grund.strip();

@@ -138,6 +138,18 @@ public class KlassifikationenSchritte {
                 .when().patch("/api/v1/dokumente/" + dokument(name).id());
     }
 
+    @Wenn("«{word}» wechselt die Art des Dokuments «{word}» auf «{word}»")
+    public void artWechseln(String benutzer, String name, String art) {
+        Response stand = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        antwort = gegeben(benutzer).header("If-Match", stand.getHeader("ETag")).contentType(ContentType.JSON)
+                .body(Map.of("art", art, "projekt", "Probe", "grund", "Art wechseln"))
+                .when().patch("/api/v1/dokumente/" + dokument(name).id());
+        if (antwort.statusCode() == 200) {
+            antwort = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());
+        }
+    }
+
     @Wenn("«{word}» bestätigt das Dokument «{word}» mit diesen Angaben:")
     public void dokumentBestaetigen(String benutzer, String name, String body) {
         Response stand = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());
@@ -196,6 +208,12 @@ public class KlassifikationenSchritte {
     public void dokumentHatKlassifikation(String name, String code, String wert) {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.jsonPath().<String>getList("klassifikationen." + code)).contains(wert);
+    }
+
+    @Dann("enthält das Dokument «{word}» keine Klassifikation «{word}»")
+    public void dokumentOhneKlassifikation(String name, String code) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().<String>getList("klassifikationen." + code)).isNullOrEmpty();
     }
 
     @Dann("ist die Klassifikation «{word}» des Dokuments «{word}» ungültig")

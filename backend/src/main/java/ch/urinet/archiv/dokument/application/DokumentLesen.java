@@ -3,6 +3,8 @@ package ch.urinet.archiv.dokument.application;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
@@ -16,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,16 +38,19 @@ public class DokumentLesen {
     private final MandantEinstellungen einstellungen;
     private final AblagePort ablage;
     private final BigDecimal schwelle;
+    private final DokumentartVerwaltung arten;
 
     public DokumentLesen(DokumentRepository repository, DokumentStatusPort status, MandantAufloesung aufloesung,
                          MandantEinstellungen einstellungen, AblagePort ablage,
-                         @ConfigProperty(name = "archiv.ki.schwelle") BigDecimal schwelle) {
+                         @ConfigProperty(name = "archiv.ki.schwelle") BigDecimal schwelle,
+                         DokumentartVerwaltung arten) {
         this.repository = repository;
         this.status = status;
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
         this.ablage = ablage;
         this.schwelle = schwelle;
+        this.arten = arten;
     }
 
     /** Sicherheit, unter der ein Feld des KI-Vorschlags «bitte prüfen» zeigt (Req 7.6). */
@@ -109,18 +115,42 @@ public class DokumentLesen {
     /**
      * Warnungen eines Dokuments im Eingangskorb (Req 8.10, design.md «Statusmodell»): {@code BELEGNUMMER_BEKANNT}, wenn
      * ein anderes, nicht verworfenes Dokument gleiche Art, Belegnummer und Partner hat und die Art keine eigene Art
-     * des Mandanten ist (dort verhindert Req 8.9 die Bestätigung). Ausserhalb des Eingangskorbs keine Warnungen.
+     * des Mandanten ist (dort verhindert Req 8.9 die Bestätigung). Ein fehlendes Fristfeld wird auch in der Antwort
+     * nach Bestätigung oder Artwechsel angezeigt (Spec 05, Req 4.4).
      */
     public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument) {
+        List<Warnung> warnungen = new ArrayList<>();
+        if (dokument.art() != null) {
+            var regel = arten.finden(dokument.art()).aufbewahrung();
+            if (regel.ab() == AufbewahrungAb.FELD && fristfeldLeer(dokument, regel.feld())) {
+                warnungen.add(new Warnung(Warnung.FRISTBEZUG_FEHLT, null));
+            }
+        }
         if (!DokumentStatus.EINGANGSKORB_STATUS.contains(dokument.status()) || dokument.art() == null
                 || einstellungen.lesen(aufloesung.pruefen()).eigeneArten().contains(dokument.art())) {
-            return List.of();
+            return List.copyOf(warnungen);
         }
         Optional<UUID> vorhanden = status.gleicherBeleg(dokument.id());
         if (vorhanden.isEmpty()) {
-            return List.of();
+            return List.copyOf(warnungen);
         }
         UUID sichtbar = repository.sichtbar(vorhanden.get(), Sichtregel.fuer(benutzer)) ? vorhanden.get() : null;
-        return List.of(new Warnung(Warnung.BELEGNUMMER_BEKANNT, sichtbar));
+        warnungen.add(new Warnung(Warnung.BELEGNUMMER_BEKANNT, sichtbar));
+        return List.copyOf(warnungen);
+    }
+
+    /**
+     * Beim Lesen gilt ein unlesbarer Altwert im Fristfeld wie ein fehlender (Spec 05, Req 4.4): Der Bestand bleibt
+     * sichtbar, die Warnung erscheint. Die strenge Ablehnung ({@code ZUSATZ_UNGUELTIG}) bleibt auf den Schreibpfaden.
+     */
+    private boolean fristfeldLeer(Dokument dokument, String feld) {
+        try {
+            return arten.fristbezug(dokument.zusatz()).datum(feld) == null;
+        } catch (FachFehler e) {
+            if (e.code() == Fehlercode.ZUSATZ_UNGUELTIG) {
+                return true;
+            }
+            throw e;
+        }
     }
 }

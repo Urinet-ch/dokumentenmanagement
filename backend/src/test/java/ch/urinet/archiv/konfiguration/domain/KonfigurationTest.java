@@ -103,8 +103,9 @@ class KonfigurationTest {
                 .containsExactly("fachgebiet", "unbekannt");
         assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT", Map.of(), Map.of()))
                 .containsExactly("fachgebiet");
-        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("FEHLT", Map.of(), Map.of()))
-                .containsExactly("art");
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("FEHLT", Map.of(), Map.of())).isEmpty();
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("FEHLT",
+                Map.of("fachgebiet", List.of("alt")), Map.of())).containsExactly("fachgebiet");
     }
 
     @Test
@@ -156,6 +157,97 @@ class KonfigurationTest {
         return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"),
                 Konfiguration.OHNE_ZUSATZ, "NORMAL", new Konfiguration.Aufbewahrung(null, null), false, true,
                 false, List.of(), null, null, true, List.of(), null, 0, zuordnungen);
+    }
+
+    @Test
+    void fristfeldMussPflichtfeldDerArtSein() {
+        var art = new Konfiguration.Art("PROBE", "Probe", null, List.of("frei"), List.of("titel"),
+                "{\"type\":\"object\"}", "NORMAL", new Konfiguration.Aufbewahrung(10, "FELD", "sitzung"),
+                false, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art)).pruefen())
+                .extracting(Konfiguration.Befund::code).containsExactly("FRISTFELD_UNGUELTIG");
+    }
+
+    @Test
+    void erlaubtBeiMehrfachenKlassifikationenJedenBehaltenenInaktivenWert() {
+        var klassifikation = new Klassifikation("fachgebiet", "Fachgebiet", null, List.of(
+                new KlassifikationWert("bau", "Bau", null, 0, false),
+                new KlassifikationWert("elektro", "Elektro", null, 1, true)), true, false, true, false, true);
+        var art = artMitKlassifikationen("MERKBLATT", List.of(new ArtKlassifikation("fachgebiet", false, null)));
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(art), List.of(klassifikation));
+        Map<String, List<String>> alt = Map.of("fachgebiet", List.of("bau"));
+
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT",
+                Map.of("fachgebiet", List.of("bau", "elektro")), alt)).isEmpty();
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT",
+                Map.of("fachgebiet", List.of("bau", "elektro")), Map.of())).containsExactly("fachgebiet");
+    }
+
+    @Test
+    void ohneArtIstJederGesetzteCodeUngueltig() {
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(), List.of(
+                klassifikation("fachgebiet", "Fachgebiet", "Bau")));
+
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen(null,
+                Map.of("fachgebiet", List.of("wert"), "leer", List.of()), Map.of()))
+                .containsExactly("fachgebiet", "leer");
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen(null, Map.of(), Map.of())).isEmpty();
+    }
+
+    @Test
+    void veralteteWerteMeldenKeinePflichtLuecke() {
+        var klassifikation = klassifikation("fachgebiet", "Fachgebiet", "Bau");
+        var art = artMitKlassifikationen("MERKBLATT", List.of(new ArtKlassifikation("fachgebiet", true, null)));
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(art), List.of(klassifikation));
+
+        assertThat(konfiguration.veralteteDokumentKlassifikationen("MERKBLATT", Map.of(), Map.of())).isEmpty();
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT", Map.of(), Map.of()))
+                .containsExactly("fachgebiet");
+    }
+
+    @Test
+    void inaktiveKlassifikationDarfWederPflichtNochStandardwertTragen() {
+        var inaktiv = new Klassifikation("fachgebiet", "Fachgebiet", null,
+                List.of(new KlassifikationWert("wert", "Wert", null, 0, true)), false, false, true, false, false);
+        for (var zuordnung : List.of(new ArtKlassifikation("fachgebiet", true, null),
+                new ArtKlassifikation("fachgebiet", false, "wert"))) {
+            var konfiguration = new Konfiguration(1, einstellungen(),
+                    List.of(artMitKlassifikationen("MERKBLATT", List.of(zuordnung))), List.of(inaktiv));
+            assertThat(konfiguration.pruefen()).extracting(Konfiguration.Befund::code)
+                    .contains("KLASSIFIKATION_UNGUELTIG");
+        }
+        var frei = new Konfiguration(1, einstellungen(), List.of(artMitKlassifikationen("MERKBLATT",
+                List.of(new ArtKlassifikation("fachgebiet", false, null)))), List.of(inaktiv));
+        assertThat(frei.pruefen()).isEmpty();
+    }
+
+    @Test
+    void begrenztAnzahlUndZeichenVonKlassifikationenUndWerten() {
+        var zuViele = java.util.stream.IntStream.range(0, 51)
+                .mapToObj(i -> klassifikation("k" + i, "K" + i, "W")).toList();
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), zuViele).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("ANZAHL_UNGUELTIG");
+
+        var werte = java.util.stream.IntStream.range(0, 501)
+                .mapToObj(i -> new KlassifikationWert("w" + i, "W", null, i, true)).toList();
+        var zuvielWerte = new Klassifikation("fachgebiet", "Fachgebiet", null, werte, false, false, true, false, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(zuvielWerte)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("ANZAHL_UNGUELTIG");
+
+        for (String code : List.of("a".repeat(41), "Gross", "1abc", "mit-strich")) {
+            assertThat(new Konfiguration(1, einstellungen(), List.of(),
+                    List.of(klassifikation(code, "Name", "Wert"))).pruefen())
+                    .extracting(Konfiguration.Befund::code).contains("CODE_UNGUELTIG");
+        }
+        assertThat(new Konfiguration(1, einstellungen(), List.of(),
+                List.of(klassifikation("a".repeat(40), "Name", "Wert"))).pruefen()).isEmpty();
+    }
+
+    @Test
+    void reserviertDateinameAlsOeffentlichenFilter() {
+        var filter = new Klassifikation("dateiname", "Dateiname", null, List.of(), false, false, false, true, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(filter)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("PARAMETER_RESERVIERT");
     }
 
     private static Konfiguration.Einstellungen einstellungen() {

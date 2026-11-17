@@ -8,7 +8,9 @@ public enum AufbewahrungAb {
     /** Ende des bestätigten Geschäftsjahres */
     GESCHAEFTSJAHR,
     /** {@code gueltig_bis} des Vertrags; ohne {@code gueltig_bis} unbefristet */
-    GUELTIG_BIS;
+    GUELTIG_BIS,
+    BELEGDATUM,
+    FELD;
 
     public static Optional<AufbewahrungAb> aus(String text) {
         return Arrays.stream(values()).filter(v -> v.name().equals(text)).findFirst();

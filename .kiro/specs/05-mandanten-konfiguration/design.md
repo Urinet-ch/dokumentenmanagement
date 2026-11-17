@@ -119,6 +119,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | --- | --- | --- | --- |
 | GET | `/klassifikationen` | aktive und inaktive Klassifikationen und Werte mit `aktiv` (Req 7.2) | alle Rollen |
 | POST, PATCH, DELETE | `/klassifikationen[/{code}]`, `/klassifikationen/{code}/werte[/{wert}]` | anlegen, ändern, deaktivieren, löschen; 409 `KONFIGURATION_IN_GEBRAUCH`, 422 `KONFIGURATION_UNGUELTIG`, 412, 428 | A11 |
+| GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET, POST, PATCH, DELETE | `/regeln[/{code}]` | Regeln pflegen; POST/PATCH melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
@@ -316,6 +317,27 @@ speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne 
 oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
 `vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig (Entscheid Fabian 17.11.2026 für
 VORSTANDSPROTOKOLL, Spec 03 Aufgabe 10.4).
+
+Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
+Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
+in `Europe/Zurich`, auch beim Jahreswechsel und während der Sommerzeit. Alle taggenauen Bezüge verwenden
+`LocalDate.plusYears`: Der 29. Februar wird im Nicht-Schaltjahr zum 28. Februar (wie bisher bei `GUELTIG_BIS`).
+`Fristbezug` liefert das benannte Zusatzdatum ohne JSON-Abhängigkeit in der Domain. Das Feld steht ohne Präfix
+`zusatz.` in `aufbewahrungFeld` (API) bzw. `aufbewahrung_feld` (Datenbank und Übergangs-Seed); es muss direkt unter
+`properties` als `string` mit `format: date` definiert und in `pflichtfelder` als `zusatz.<feld>` enthalten sein.
+Schema- und Seed-Prüfung nutzen dafür denselben Port `ZusatzSchemaPruefer`; `Konfiguration.pruefen` prüft die
+fachliche Pflichtfeld-Zuordnung.
+
+Fehlend, `null` oder leer bedeutet bei vorhandenen Dokumenten unbefristet, nicht ein Ersatzdatum. Der Eingangskorb
+und die Dokumentantwort führen dann `FRISTBEZUG_FEHLT` ohne Dokumentverweis, auch nach Bestätigung oder einem
+Artwechsel; andere Pflichtfelder bleiben unverändert verpflichtend. Der Generator verlangt bei neuen Dokumenten
+weiter sämtliche Pflichtfelder. Ungültige, nicht leere Datumswerte ergeben `ZUSATZ_UNGUELTIG`, keinen stillen
+Rückfall. Ein Wechsel der Art darf das Fristfeld leer lassen; das Entfernen eines bereits vorhandenen Pflichtwerts
+derselben Art bleibt nach Spec 01, 8.3 verboten. Eine Änderung des Zusatzdatums löst dieselbe Neuberechnung wie das
+Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als Konflikt protokollieren, ohne beides
+übernehmen. Änderungen anderer Zusatzfelder lösen keine Fristneuberechnung aus. Die bestehende Sperrpflege bleibt
+unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
+und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
 
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv

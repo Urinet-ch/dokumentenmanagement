@@ -22,6 +22,7 @@ export interface Warnung {
 export namespace Warnung {
     export const CodeEnum = {
         BelegnummerBekannt: 'BELEGNUMMER_BEKANNT',
+        FristbezugFehlt: 'FRISTBEZUG_FEHLT',
     } as const;
     export type CodeEnum = typeof CodeEnum[keyof typeof CodeEnum];
 }

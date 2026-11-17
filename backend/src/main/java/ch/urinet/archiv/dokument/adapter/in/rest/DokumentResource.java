@@ -123,7 +123,7 @@ public class DokumentResource {
 
     @Schema(name = "Warnung", description = "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)")
     public record WarnungDto(
-            @Schema(required = true, enumeration = {"BELEGNUMMER_BEKANNT"}) String code,
+            @Schema(required = true, enumeration = {"BELEGNUMMER_BEKANNT", "FRISTBEZUG_FEHLT"}) String code,
             @Schema(nullable = true, description = "Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist")
             UUID vorhandenId) {
 
@@ -279,7 +279,8 @@ public class DokumentResource {
             @Schema(nullable = true, type = SchemaType.OBJECT, description = "Zusatzfelder nach dem Schema der Art")
             JsonNode zusatz,
             @Schema(required = true, description = "Version für If-Match (auch als ETag)") int version,
-            @Schema(required = true, description = "Nur im Eingangskorb, sonst leer (Req 8.10)")
+            @Schema(required = true, description = "Belegnummer-Warnungen im Eingangskorb; fehlender Fristbezug "
+                    + "auch nach Bestätigung oder Artwechsel (Spec 05, Req 4.4)")
             List<WarnungDto> warnungen,
             @Schema(nullable = true, description = "Grund des Fehlers bei FEHLER oder ARCHIVIERUNG_FEHLER (Req 8.7)")
             String fehler,

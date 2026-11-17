@@ -43,7 +43,7 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
                 'klassifikationen', coalesce((select jsonb_object_agg(k.klassifikation, k.werte) from (
                     select klassifikation, jsonb_agg(wert order by wert) as werte from dokument_klassifikation
                     where dokument_id = d.id group by klassifikation
-                ) k), '{}'::jsonb), :benutzer, :grund, :bearbeiter
+                ) k), '{}'::jsonb)), :benutzer, :grund, :bearbeiter
             from dokument d""";
     private static final String VERSION_SICHERN = FASSUNG_SICHERN + " where d.id = :id";
     /** Wie {@link DokumentAendern} beim Ändern des Partners: eine Fassung nur bei archivierten Dokumenten. */

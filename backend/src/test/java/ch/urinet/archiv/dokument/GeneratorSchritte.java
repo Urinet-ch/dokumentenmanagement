@@ -226,7 +226,8 @@ public class GeneratorSchritte {
 
     @Dann("antwortet der Generator mit Status {int} und Fehlercode «{word}»")
     public void fehler(int status, String code) {
-        assertThat(ProblemDetails.pruefen(antwort, status, "felder")).as(antwort.asString()).isEqualTo(code);
+        assertThat(ProblemDetails.pruefen(antwort, status, "felder", "klassifikationen")).as(antwort.asString())
+                .isEqualTo(code);
     }
 
     @Dann("nennt die Generator-Antwort die fehlenden Felder {string}")

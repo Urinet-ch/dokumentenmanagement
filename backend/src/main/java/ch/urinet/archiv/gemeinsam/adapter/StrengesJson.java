@@ -1,4 +1,4 @@
-package ch.urinet.archiv.dokumentart.adapter;
+package ch.urinet.archiv.gemeinsam.adapter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;

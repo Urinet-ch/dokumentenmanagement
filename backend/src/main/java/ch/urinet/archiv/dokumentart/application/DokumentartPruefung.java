@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokumentart.application;
 
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -31,6 +32,7 @@ public class DokumentartPruefung {
     /** Prüft zusätzlich die KI-Felder und reservierten Felddefinitionen (Spec 05, Req 2.7). */
     public void pruefen(Dokumentart art, List<String> kiFelder) {
         Set<String> schemaFelder = schemaPruefer.schemaPruefen(art.zusatzSchema());
+        fristfeldPruefen(art);
         pflichtfelderPruefen(art, schemaFelder);
         if (!schemaFelder.containsAll(kiFelder)
                 || kiFelder.contains("zugriff") || kiFelder.contains("veroeffentlicht")
@@ -42,8 +44,17 @@ public class DokumentartPruefung {
     /** Wie {@link #pruefen}, für den Seed eines Mandanten mit der Seed-Frist ({@code archiv.dokumentart.seed-zeitgrenze}). */
     public void seedPruefen(Dokumentart art) {
         Set<String> schemaFelder = schemaPruefer.seedSchemaPruefen(art.zusatzSchema());
+        fristfeldPruefen(art);
         pflichtfelderPruefen(art, schemaFelder);
         if (!schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
+    }
+
+    private void fristfeldPruefen(Dokumentart art) {
+        if (art.aufbewahrung().ab() == AufbewahrungAb.FELD
+                && (!art.zusatzPflichtfelder().contains(art.aufbewahrung().feld())
+                || !schemaPruefer.datumsfeldGueltig(art.zusatzSchema(), art.aufbewahrung().feld()))) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
     }

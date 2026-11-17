@@ -168,7 +168,8 @@ public class DokumentGenerator {
                 : Aufbewahrung.geschaeftsjahrVorschlagen(b.datum(), eingang, gjEnde);
         boolean vertrag = art.gruppen().contains("vertrag");
         Aufbewahrung aufbewahrung = Aufbewahrung.berechne(art.aufbewahrung(), b.datum(), eingang, geschaeftsjahr,
-                vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(anfrage.zusatzJson()));
         if (aufbewahrung.fristAbgelaufen()) {
             LOG.infof("Generator: Frist abgelaufen sha256=%s art=%s", pdf.sha256(), art.code());
             throw new FachFehler(Fehlercode.FRIST_ABGELAUFEN);
