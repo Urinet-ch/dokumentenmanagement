@@ -155,4 +155,10 @@ public class ApiTokenPruefGrenzen {
     int quellen() {
         return quellen.size();
     }
+
+    synchronized void fuerSzenarioZuruecksetzen() {
+        quellen.clear();
+        sammel = null;
+        letzteBereinigung = Instant.EPOCH;
+    }
 }
