@@ -106,6 +106,7 @@ dieser Tabelle; neu 13.11.2026, E-C):
   Veröffentlichung vor bestätigter Archivierung ab. Bei `vhf-gsk` werden Finanzfelder weder angezeigt noch bestätigt;
   finanzielle KI-Vorschläge und ihre Sicherheitswerte werden serverseitig verworfen. Die Geschäftsstelle behält die
   bestehenden Rechte A1–A10; A11–A14 bleiben 403. Aufgabe 11.10 nutzt dieselben Rechte über die Rolle `GESCHAEFTSSTELLE` und `Rechtematrix.ergebnis`.
+- Listenfelder (PR #245): Arrays von Strings im Zusatz-Schema sind bearbeitbar (`items.enum`: Mehrfachauswahl, sonst freie Liste). Pflicht ist ein Feld, wenn es in `pflichtfelder` als `zusatz.<name>` oder im Schema unter `required` steht (im Seed `vhf-gsk` steht `verband` nur dort). Das Formular prüft `minItems`, `maxItems`, `uniqueItems` und `items.enum`; weitere Schema-Grenzen prüft das Archiv (422 `ZUSATZ_UNGUELTIG`). Eine leere Pflichtliste blockiert beim Ändern nur, wenn sie zuvor gefüllt war oder die Art wechselt (Altbestand wie in `DokumentAendern`); im Eingangskorb gilt sie beim Bestätigen. Unveränderte Listen gehen im Originalwert zurück.
   Der Feed-Eintrag setzt `zugriff` voraus: ohne gültige Stufe bleibt `stufe_nachher` leer, das Dokument erscheint nicht.
   Der Server prüft `zugriff` und Vertraulichkeit beim Veröffentlichen nicht; er liefert fail-closed nichts aus. Finanzfelder
   sperrt für `vhf-gsk` nur die KI und das Frontend (bekannte Grenze, Spec 05, 18.2).

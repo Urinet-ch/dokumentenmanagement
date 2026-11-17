@@ -358,7 +358,8 @@ Given(
       code: name.toUpperCase(),
       name,
       gruppen: [],
-      pflichtfelder: [`zusatz.${feld}`],
+      // Wie im Seed vhf-gsk: Das Pflichtfeld steht nur im Schema unter `required`, nicht in `pflichtfelder`.
+      pflichtfelder: ['titel'],
       zusatzSchema: {
         type: 'object',
         properties: {

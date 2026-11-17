@@ -41,8 +41,9 @@ export interface ZusatzFeld {
   typ: ZusatzTyp;
   optionen: readonly string[];
   pflicht: boolean;
-  /** Nur Listen: `minItems` und `uniqueItems` des Schemas. */
+  /** Nur Listen: `minItems`, `maxItems` und `uniqueItems` des Schemas. */
   minEintraege?: number;
+  maxEintraege?: number;
   eindeutig?: boolean;
 }
 
@@ -175,9 +176,12 @@ function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
  */
 export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
   const schema = objekt(art?.zusatzSchema);
-  const pflicht = new Set(
-    (art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
-  );
+  // Pflicht ist, was in `pflichtfelder` als «zusatz.<name>» steht oder im Schema unter `required` (so im Seed vhf-gsk).
+  const required = Array.isArray(schema['required']) ? schema['required'].filter((n) => typeof n === 'string') : [];
+  const pflicht = new Set([
+    ...(art?.pflichtfelder ?? []).filter((p) => p.startsWith('zusatz.')).map((p) => p.substring('zusatz.'.length)),
+    ...required,
+  ]);
   return Object.entries(objekt(schema['properties'])).flatMap(([name, eigenschaft]) => {
     const e = objekt(eigenschaft);
     const typ = typAus(e);
@@ -190,6 +194,9 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
     if (typ === 'mehrfach' || typ === 'liste') {
       feld.minEintraege = typeof e['minItems'] === 'number' ? e['minItems'] : 0;
       feld.eindeutig = e['uniqueItems'] === true;
+      if (typeof e['maxItems'] === 'number') {
+        feld.maxEintraege = e['maxItems'];
+      }
     }
     return [feld];
   });
@@ -226,14 +233,16 @@ function zusatzWert(feld: ZusatzFeld, wert: string): unknown {
   }
 }
 
-export function zusatzGueltig(feld: ZusatzFeld, wert: string): boolean {
+/** `leerOk`: eine leere Pflichtliste ist erlaubt (Altbestand, das Archiv prüft Pflichtfelder beim Bestätigen). */
+export function zusatzGueltig(feld: ZusatzFeld, wert: string, leerOk = false): boolean {
   if (istListe(feld)) {
     const eintraege = listeAus(wert);
     if (eintraege.length === 0) {
-      return !feld.pflicht;
+      return !feld.pflicht || leerOk;
     }
     return (
       eintraege.length >= (feld.minEintraege ?? 0) &&
+      eintraege.length <= (feld.maxEintraege ?? Infinity) &&
       (!feld.eindeutig || new Set(eintraege).size === eintraege.length) &&
       (feld.typ !== 'mehrfach' || eintraege.every((e) => feld.optionen.includes(e)))
     );
@@ -334,7 +343,10 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
   const zusatzGeaendert = zusatz.filter((f) => (neu.zusatz[f.name] ?? '').trim() !== (start.zusatz[f.name] ?? '').trim());
   const artGewechselt = aenderung['art'] !== undefined;
   if (zusatzGeaendert.length > 0 || artGewechselt) {
-    const ungueltig = zusatz.filter((f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? ''));
+    // Altbestand: Eine Pflichtliste, die schon vorher leer war, bleibt erlaubt (wie im Archiv, DokumentAendern).
+    const ungueltig = zusatz.filter(
+      (f) => !zusatzGueltig(f, neu.zusatz[f.name] ?? '', !artGewechselt && (start.zusatz[f.name] ?? '').trim() === ''),
+    );
     if (ungueltig.length > 0) {
       felder.push(...ungueltig.map((f) => `zusatz.${f.name}`));
     } else {
@@ -345,6 +357,10 @@ export function aenderungAus(dokument: Dokument, start: Formular, neu: Formular,
         : { ...objekt(dokument.zusatz) };
       for (const f of zusatz) {
         const wert = neu.zusatz[f.name] ?? '';
+        // Unveränderte Listen bleiben im Originalwert (kein stilles Trimmen oder Aufteilen von Bestandsdaten).
+        if (istListe(f) && wert.trim() === (start.zusatz[f.name] ?? '').trim() && werte[f.name] !== undefined) {
+          continue;
+        }
         if (wert.trim() === '') {
           delete werte[f.name];
         } else {

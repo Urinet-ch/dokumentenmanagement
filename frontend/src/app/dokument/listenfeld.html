@@ -7,7 +7,7 @@
         <span aria-hidden="true"> *</span>
       }
     </legend>
-    @for (option of f.optionen; track option) {
+    @for (option of optionen(); track option) {
       <label class="option">
         <input
           type="checkbox"
@@ -53,6 +53,8 @@
         [attr.aria-invalid]="ungueltig() || null"
         [attr.aria-describedby]="kennung() + '-hinweis'"
         (keydown.enter)="$event.preventDefault(); hinzufuegen(neu)"
+        (input)="doppelt.set(false)"
+        (blur)="hinzufuegen(neu, false)"
       />
       <button mat-stroked-button type="button" (click)="hinzufuegen(neu)">{{ texte.hinzufuegen }}</button>
     </div>

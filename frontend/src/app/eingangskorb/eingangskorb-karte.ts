@@ -153,8 +153,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   });
   protected readonly zusatzFehlt = computed(() => {
     const werte = this.zusatzEingaben();
-    return (this.art()?.pflichtfelder ?? [])
-      .filter((f) => f.startsWith('zusatz.'))
+    // Auch Pflicht nur über `required` im Schema (Seed vhf-gsk) zählt.
+    const ausSchema = this.zusatzFelder().filter((f) => f.pflicht).map((f) => `zusatz.${f.name}`);
+    const pflicht = new Set([...(this.art()?.pflichtfelder ?? []).filter((f) => f.startsWith('zusatz.')), ...ausSchema]);
+    return [...pflicht]
       .filter((f) => {
         const name = f.substring('zusatz.'.length);
         const wert = werte[name];

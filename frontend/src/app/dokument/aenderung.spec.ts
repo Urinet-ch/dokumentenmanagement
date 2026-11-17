@@ -250,4 +250,37 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
       pruefung: { felder: ['zusatz.verband'] },
     });
   });
+
+  it('erkennt Pflicht auch nur über `required` im Schema (Seed vhf-gsk)', () => {
+    const seed = ART({ pflichtfelder: ['titel'], zusatzSchema: { ...schema, required: ['verband'] } });
+    const [verband, stichworte] = zusatzFelder(seed);
+    expect(verband.pflicht).toBe(true);
+    expect(stichworte.pflicht).toBe(false);
+    expect(zusatzGueltig(verband, '')).toBe(false);
+  });
+
+  it('prüft minItems und maxItems auch bei Mehrfachauswahl', () => {
+    const [verband] = zusatzFelder(art);
+    expect(zusatzGueltig({ ...verband, minEintraege: 2 }, 'vhf')).toBe(false);
+    expect(zusatzGueltig({ ...verband, maxEintraege: 1 }, 'vhf\ngsk')).toBe(false);
+    expect(zusatzGueltig({ ...verband, maxEintraege: 2 }, 'vhf\ngsk')).toBe(true);
+  });
+
+  it('lässt bei Altbestand ohne Wert eine leere Pflichtliste zu, wenn ein anderes Zusatzfeld geändert wird', () => {
+    const d = DOKUMENT({ zusatz: {} });
+    const start = formularAus(d);
+    const neu = { ...start, zusatz: { ...start.zusatz, stichworte: 'a' }, grund: 'Stichwort' };
+    expect(aenderungAus(d, start, neu, kontext({ art }))).toEqual({
+      aenderung: { zusatz: { stichworte: ['a'] }, grund: 'Stichwort' },
+    });
+  });
+
+  it('lässt Listen unverändert, die nicht bearbeitet wurden', () => {
+    const d = DOKUMENT({ zusatz: { verband: ['vhf'], stichworte: [' a\nb', 'c'] } });
+    const start = formularAus(d);
+    const neu = { ...start, zusatz: { ...start.zusatz, verband: 'vhf\ngsk' }, grund: 'x' };
+    expect(aenderungAus(d, start, neu, kontext({ art }))).toEqual({
+      aenderung: { zusatz: { verband: ['vhf', 'gsk'], stichworte: [' a\nb', 'c'] }, grund: 'x' },
+    });
+  });
 });

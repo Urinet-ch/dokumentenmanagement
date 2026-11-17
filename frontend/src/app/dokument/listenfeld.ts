@@ -27,6 +27,11 @@ export class Listenfeld {
   protected readonly texte = TEXTE.listenfeld;
   protected readonly doppelt = signal(false);
   protected readonly eintraege = computed(() => listeAus(this.wert()));
+  /** Optionen aus dem Schema plus Altwerte, die dort nicht (mehr) stehen: sichtbar und abwählbar statt still entfernt. */
+  protected readonly optionen = computed(() => [
+    ...this.feld().optionen,
+    ...this.eintraege().filter((e) => !this.feld().optionen.includes(e)),
+  ]);
   protected readonly hinweis = computed(() => {
     const feld = this.feld();
     const min = Math.max(feld.minEintraege ?? 0, feld.pflicht ? 1 : 0);
@@ -43,10 +48,11 @@ export class Listenfeld {
       [...gruppe.querySelectorAll<HTMLInputElement>('input[type=checkbox]:checked')].map((box) => box.value),
     );
     // Reihenfolge der Optionen aus dem Schema, nicht der Klicks: stabiler Body, nachvollziehbarer Vergleich.
-    this.geaendert.emit(listeZu(this.feld().optionen.filter((o) => gewaehlt.has(o))));
+    this.geaendert.emit(listeZu(this.optionen().filter((o) => gewaehlt.has(o))));
   }
 
-  protected hinzufuegen(eingabe: HTMLInputElement): void {
+  /** `fokus` aus: beim Verlassen des Felds (blur) wird der offene Text übernommen, ohne den Fokus zurückzuholen. */
+  protected hinzufuegen(eingabe: HTMLInputElement, fokus = true): void {
     const eintrag = eingabe.value.trim();
     if (eintrag === '') {
       return;
@@ -58,7 +64,9 @@ export class Listenfeld {
     this.doppelt.set(false);
     this.geaendert.emit(listeZu([...this.eintraege(), eintrag]));
     eingabe.value = '';
-    eingabe.focus();
+    if (fokus) {
+      eingabe.focus();
+    }
   }
 
   protected entfernen(index: number, eingabe: HTMLInputElement): void {

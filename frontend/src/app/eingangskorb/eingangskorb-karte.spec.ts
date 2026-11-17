@@ -779,5 +779,42 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       await klicken('Entfernen');
       expect(eintraege()).toEqual(['Bad']);
     });
+
+    it('übernimmt einen getippten, nicht bestätigten Eintrag beim Verlassen des Felds', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      const eingabe = element.querySelector<HTMLInputElement>('#d1-zusatz-stichworte')!;
+      eingabe.value = 'Rechnung';
+      eingabe.dispatchEvent(new Event('blur'));
+      await fixture.whenStable();
+      expect([...element.querySelectorAll('.eintraege li > span:first-child')].map((e) => e.textContent?.trim())).toEqual([
+        'Rechnung',
+      ]);
+      expect(eingabe.value).toBe('');
+    });
+
+    it('zeigt einen Altwert ausserhalb des Schemas als gewählt und lässt ihn abwählen', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['alt', 'vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      expect(checkbox('alt').checked).toBe(true);
+      await umschalten('gsk');
+      expect(checkbox('alt').checked).toBe(true);
+    });
+
+    it('erkennt ein Pflichtfeld, das nur im Schema unter `required` steht (Seed vhf-gsk)', async () => {
+      const nurSchema: Dokumentart = {
+        ...VERBAND_ART,
+        pflichtfelder: VHF_ART.pflichtfelder,
+        zusatzSchema: { ...(VERBAND_ART.zusatzSchema as object), required: ['verband'] },
+      };
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [nurSchema]);
+      await klicken(T.aendern);
+      expect(checkbox('vhf').getAttribute('aria-required')).toBe('true');
+      await klicken(T.bestaetigen);
+      feldAusfuellen();
+      await klicken(T.bestaetigen);
+      http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+      expect(element.textContent).toContain(T.fehlerPflichtfelder(feldName('zusatz.verband')));
+    });
   });
 });
