@@ -14,8 +14,15 @@ public interface MandantVollexportRepository {
     }
 
     record Vollexport(UUID id, Status status, Optional<String> schluessel, Optional<String> versionId,
-                      Optional<String> sha256, Optional<Long> groesse, Instant erstellt, Optional<Instant> fertig) {
+                      Optional<String> sha256, Optional<Long> groesse, Optional<Integer> anzahl, Instant erstellt,
+                      Optional<Instant> fertig) {
     }
+
+    /** Ist-Stand der Dokumente des Mandanten: Anzahl und jüngste Änderung. */
+    record Bestand(int dokumente, Optional<Instant> letzteAenderung) {
+    }
+
+    Bestand bestand();
 
     boolean anlegen(UUID id);
 

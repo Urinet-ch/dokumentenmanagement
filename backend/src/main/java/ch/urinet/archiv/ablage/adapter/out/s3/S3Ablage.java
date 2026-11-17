@@ -1008,6 +1008,23 @@ public class S3Ablage implements AblagePort {
      * ganze Konfiguration ersetzt. Sperren berührt die Regel nicht ({@code exporte/} wird nie gesperrt).
      */
     @Override
+    public boolean exportVorhanden(MandantCode mandant, String schluessel, String versionId, long groesse) {
+        if (!schluessel.startsWith(Exportdatei.PRAEFIX)) {
+            throw new IllegalArgumentException("Schlüssel nicht unter " + Exportdatei.PRAEFIX);
+        }
+        try {
+            HeadObjectResponse kopf = s3.headObject(b -> b.bucket(bucket(mandant)).key(schluessel));
+            return versionId.equals(kopf.versionId()) && kopf.contentLength() != null
+                    && kopf.contentLength() == groesse;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404 || "NoSuchKey".equals(fehlercode(e)) || "NoSuchBucket".equals(fehlercode(e))) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public void exportLebenszyklusSichern(MandantCode mandant) {
         String bucket = bucket(mandant);
         List<LifecycleRule> bisher;

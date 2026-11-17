@@ -23,7 +23,7 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
 
     private static final int ZEITGRENZE_S = 30;
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
-    private static final String SPALTEN = "id, status, s3_schluessel, s3_version, sha256, groesse, erstellt, fertig";
+    private static final String SPALTEN = "id, status, s3_schluessel, s3_version, sha256, groesse, anzahl, erstellt, fertig";
 
     private final Instance<AgroalDataSource> datenquelle;
     private final MandantAufloesung aufloesung;
@@ -52,17 +52,36 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
                 }
                 long groesse = zeile.getLong("groesse");
                 Optional<Long> mitGroesse = zeile.wasNull() ? Optional.empty() : Optional.of(groesse);
+                int anzahl = zeile.getInt("anzahl");
+                Optional<Integer> mitAnzahl = zeile.wasNull() ? Optional.empty() : Optional.of(anzahl);
                 Timestamp fertig = zeile.getTimestamp("fertig");
                 return Optional.of(new Vollexport(zeile.getObject("id", UUID.class),
                         Status.valueOf(zeile.getString("status")),
                         Optional.ofNullable(zeile.getString("s3_schluessel")),
                         Optional.ofNullable(zeile.getString("s3_version")),
-                        Optional.ofNullable(zeile.getString("sha256")), mitGroesse,
+                        Optional.ofNullable(zeile.getString("sha256")), mitGroesse, mitAnzahl,
                         zeile.getTimestamp("erstellt").toInstant(),
                         Optional.ofNullable(fertig).map(Timestamp::toInstant)));
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Mandanten-Vollexport nicht gelesen", e);
+        }
+    }
+
+    @Override
+    public Bestand bestand() {
+        try (Connection verbindung = datenquelle.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*), max(geaendert) from " + schema() + ".dokument")) {
+            abfrage.setQueryTimeout(ZEITGRENZE_S);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                int dokumente = zeile.getInt(1);
+                Timestamp letzte = zeile.getTimestamp(2);
+                return new Bestand(dokumente, Optional.ofNullable(letzte).map(Timestamp::toInstant));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Dokumentbestand für Vollexport nicht gelesen", e);
         }
     }
 

@@ -206,7 +206,7 @@ public class MandantVollexportSchreiber {
                 zeile.append(',');
             }
             String wert = Objects.requireNonNullElse(zellen[i], "");
-            if (!wert.isEmpty() && "=+-@".indexOf(wert.charAt(0)) >= 0) {
+            if (!wert.isEmpty() && "=+-@\t\r".indexOf(wert.charAt(0)) >= 0) {
                 wert = "'" + wert;
             }
             zeile.append('"').append(wert.replace("\"", "\"\"")).append('"');

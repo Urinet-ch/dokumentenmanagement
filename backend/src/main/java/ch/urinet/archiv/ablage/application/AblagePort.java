@@ -225,6 +225,12 @@ public interface AblagePort {
                               String dateiname);
 
     /**
+     * Prüft, dass {@code schluessel} unter {@code exporte/} im Bucket noch die aktuelle Version {@code versionId} mit
+     * genau {@code groesse} Bytes ist (nicht abgelaufen, keine Löschmarke); ändert nichts.
+     */
+    boolean exportVorhanden(MandantCode mandant, String schluessel, String versionId, long groesse);
+
+    /**
      * Jahresexport (design.md «Jahresexport»): stellt sicher, dass der Bucket alles unter {@code exporte/} nach
      * {@link ch.urinet.archiv.ablage.domain.Exportdatei#LEBENSZYKLUS_TAGE} Tagen entfernt (auch ältere Versionen und
      * unvollständige Uploads); andere Regeln des Buckets bleiben unverändert. Idempotent.

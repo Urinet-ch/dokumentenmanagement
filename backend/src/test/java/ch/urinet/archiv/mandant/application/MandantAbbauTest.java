@@ -105,6 +105,48 @@ class MandantAbbauTest {
     }
 
     @Test
+    void exportMitAbweichenderDokumentanzahlBlockiertDeaktivierung() {
+        Testaufbau t = new Testaufbau(START);
+        t.bestandAnzahl = 4;
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false))
+                .isInstanceOf(MandantFehler.class).hasMessageContaining("veraltet");
+        assertThat(t.register.status.mandant().aktiv()).isTrue();
+    }
+
+    @Test
+    void exportVorSpaeteremAenderungBlockiertDeaktivierung() {
+        Testaufbau t = new Testaufbau(START);
+        t.letzteAenderung = Optional.of(START.plusSeconds(1));
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false))
+                .isInstanceOf(MandantFehler.class).hasMessageContaining("geändert");
+        assertThat(t.register.status.mandant().aktiv()).isTrue();
+    }
+
+    @Test
+    void fehlendesZipBlockiertDeaktivierungAuchImTrockenlauf() {
+        Testaufbau t = new Testaufbau(START);
+        t.zipVorhanden = false;
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, false, false))
+                .isInstanceOf(MandantFehler.class).hasMessageContaining("ZIP fehlt");
+        assertThat(t.register.status.mandant().aktiv()).isTrue();
+        assertThat(t.ablagePlanAufrufe.get()).isZero();
+    }
+
+    @Test
+    void sicherungsstaendeBisRechnetVomLoeschtagInZuerichZeit() {
+        // 30 Tage nach 2026-01-01T00:00Z ist 2026-01-31T00:00Z, in Zürich 01:00 am selben Tag
+        Testaufbau t = new Testaufbau(START);
+
+        assertThat(t.abbau().ausfuehren(CODE, EXPORT_ID, false, false).sicherungsstaendeBis())
+                .isEqualTo(java.time.LocalDate.of(2036, 1, 31));
+        assertThat(MandantAbbau.sicherungsstaendeBis(Instant.parse("2026-03-15T23:30:00Z")))
+                .isEqualTo(java.time.LocalDate.of(2036, 3, 16));
+    }
+
+    @Test
     void mandantUrinetBrauchtZweiteBestaetigung() {
         Testaufbau t = new Testaufbau(START);
         MandantCode urinet = new MandantCode("urinet");
@@ -118,24 +160,28 @@ class MandantAbbauTest {
         assertThat(t.register.status.mandant().aktiv()).isTrue();
     }
 
-    private static final class Testaufbau {
-        private final TestRegister register = new TestRegister();
-        private final TestDatenbank datenbank = new TestDatenbank();
-        private final AtomicInteger ablageAufrufe = new AtomicInteger();
-        private final AtomicInteger ablagePlanAufrufe = new AtomicInteger();
-        private MandantVollexportRepository.Status exportStatus = MandantVollexportRepository.Status.FERTIG;
-        private List<MandantAblageAbbau.GesperrtesObjekt> gesperrteObjekte = List.of();
-        private boolean bucketEntfernbar = true;
-        private final Clock uhr;
+    static final class Testaufbau {
+        final TestRegister register = new TestRegister();
+        final TestDatenbank datenbank = new TestDatenbank();
+        final AtomicInteger ablageAufrufe = new AtomicInteger();
+        final AtomicInteger ablagePlanAufrufe = new AtomicInteger();
+        MandantVollexportRepository.Status exportStatus = MandantVollexportRepository.Status.FERTIG;
+        List<MandantAblageAbbau.GesperrtesObjekt> gesperrteObjekte = List.of();
+        boolean bucketEntfernbar = true;
+        int anzahl = 3;
+        int bestandAnzahl = 3;
+        Optional<Instant> letzteAenderung = Optional.of(START.minusSeconds(60));
+        boolean zipVorhanden = true;
+        final Clock uhr;
 
-        private Testaufbau(Instant jetzt) {
+        Testaufbau(Instant jetzt) {
             uhr = Clock.fixed(jetzt, ZoneOffset.UTC);
             register.status = new MandantAbbauRegister.Status(
                     new Mandant(CODE, "Test", "m_vhf_gsk", "bucket-vhf-gsk", Geschaeftsjahresende.STANDARD, true),
                     Optional.empty(), Optional.empty(), false);
         }
 
-        private MandantAbbau abbau() {
+        MandantAbbau abbau() {
             MandantKontext kontext = new MandantKontext(null, null, null) {
                 @Override
                 public <T> T mit(MandantCode code, java.util.function.Supplier<T> arbeit) {
@@ -150,8 +196,13 @@ class MandantAbbauTest {
 
                 @Override
                 public Optional<Vollexport> laden(UUID id) {
-                    return Optional.of(new Vollexport(id, exportStatus, Optional.empty(), Optional.empty(),
-                            Optional.empty(), Optional.empty(), START, Optional.empty()));
+                    return Optional.of(new Vollexport(id, exportStatus, Optional.of("exporte/x.zip"), Optional.of("v1"),
+                            Optional.of("abc"), Optional.of(1L), Optional.of(anzahl), START, Optional.of(START)));
+                }
+
+                @Override
+                public Bestand bestand() {
+                    return new Bestand(bestandAnzahl, letzteAenderung);
                 }
 
                 @Override
@@ -169,6 +220,9 @@ class MandantAbbauTest {
                         if (methode.getName().equals("mandantAbbauen")) {
                             ablageAufrufe.incrementAndGet();
                             return new MandantAblageAbbau(4, 4, gesperrteObjekte);
+                        }
+                        if (methode.getName().equals("exportVorhanden")) {
+                            return zipVorhanden;
                         }
                         if (methode.getName().equals("mandantAbbauPlanen")) {
                             ablagePlanAufrufe.incrementAndGet();
@@ -191,8 +245,8 @@ class MandantAbbauTest {
         }
     }
 
-    private static final class TestRegister implements MandantRegister, MandantAbbauRegister {
-        private MandantAbbauRegister.Status status;
+    static final class TestRegister implements MandantRegister, MandantAbbauRegister {
+        MandantAbbauRegister.Status status;
 
         @Override
         public boolean existiert(MandantCode code) {
@@ -241,8 +295,8 @@ class MandantAbbauTest {
         }
     }
 
-    private static final class TestDatenbank implements MandantDatenbank {
-        private boolean schemaEntfernt;
+    static final class TestDatenbank implements MandantDatenbank {
+        boolean schemaEntfernt;
 
         @Override
         public void schemaAnlegen(String schema) {

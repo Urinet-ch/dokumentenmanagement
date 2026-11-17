@@ -510,6 +510,12 @@ public class AblageStub implements AblagePort {
     }
 
     @Override
+    public synchronized boolean exportVorhanden(MandantCode mandant, String schluessel, String versionId,
+                                                long groesse) {
+        return liste(mandant, schluessel).stream().anyMatch(x -> x.versionId().equals(versionId));
+    }
+
+    @Override
     public void exportLebenszyklusSichern(MandantCode mandant) {
         // der Stub löscht beim Ende der JVM ohnehin alles
     }

@@ -10,7 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,6 +22,7 @@ public class MandantAbbau {
 
     static final Duration FRIST = Duration.ofDays(30);
     static final int SICHERUNGSJAHRE = 10;
+    private static final ZoneId ZUERICH = ZoneId.of("Europe/Zurich");
     public static final String DATEI_SICHERUNG_AUFBEWAHRUNG =
             "unbefristet, bis die Spec zur Löschfunktion (Spec 01, 9.9) einen Weg regelt";
 
@@ -73,7 +74,7 @@ public class MandantAbbau {
         bestaetigtenExportPruefen(code, bestaetigterExport, status);
         Instant deaktiviertAm = status.deaktiviertAm().orElse(jetzt);
         Instant abbauAb = deaktiviertAm.plus(FRIST);
-        LocalDate sicherungsstaendeBis = sicherungsstaendeBis(deaktiviertAm);
+        LocalDate sicherungsstaendeBis = sicherungsstaendeBis(abbauAb);
 
         if (status.abgeschlossen()) {
             return new Bericht(Zustand.ABGESCHLOSSEN, abbauAb, sicherungsstaendeBis, 0,
@@ -113,8 +114,12 @@ public class MandantAbbau {
                 schemaEntfernt, bucketEntfernt, bereinigung);
     }
 
-    public static LocalDate sicherungsstaendeBis(Instant deaktiviertAm) {
-        return deaktiviertAm.atZone(ZoneOffset.UTC).toLocalDate().plusYears(SICHERUNGSJAHRE);
+    /**
+     * Spätestens bis wann Sicherungsstände Daten des Mandanten enthalten: der letzte Stand entsteht am Löschtag
+     * ({@code abbauAb}); Jahresstände laufen 10 Jahre (Spec 01, 16.2), Tages- und Monatsstände kürzer.
+     */
+    public static LocalDate sicherungsstaendeBis(Instant abbauAb) {
+        return abbauAb.atZone(ZUERICH).toLocalDate().plusYears(SICHERUNGSJAHRE);
     }
 
     private void bestaetigtenExportPruefen(MandantCode code, UUID exportId, MandantAbbauRegister.Status status) {
@@ -131,6 +136,29 @@ public class MandantAbbau {
         Optional<MandantVollexportRepository.Vollexport> export = kontext.mit(code, () -> exporte.laden(exportId));
         if (export.filter(e -> e.status() == MandantVollexportRepository.Status.FERTIG).isEmpty()) {
             throw fehler("Vollexport fehlt oder ist nicht abgeschlossen");
+        }
+        exportAktuellPruefen(code, export.get());
+    }
+
+    /**
+     * Nach der Deaktivierung ist der Mandant für die Datenbank nicht mehr auflösbar und schreibgesperrt; darum
+     * muss der Export jetzt dem Ist-Stand entsprechen und das ZIP noch vorhanden sein, sonst wären später
+     * Dokumente ohne Kopie weg.
+     */
+    private void exportAktuellPruefen(MandantCode code, MandantVollexportRepository.Vollexport export) {
+        MandantVollexportRepository.Bestand bestand = kontext.mit(code, () -> exporte.bestand());
+        if (export.anzahl().isEmpty() || export.anzahl().get() != bestand.dokumente()) {
+            throw fehler("Vollexport veraltet: Dokumentanzahl weicht vom Ist-Stand ab, neuen Vollexport erstellen");
+        }
+        if (bestand.letzteAenderung().filter(z -> z.isAfter(export.erstellt())).isPresent()) {
+            throw fehler("Vollexport veraltet: Dokumente wurden danach geändert, neuen Vollexport erstellen");
+        }
+        boolean zipDa = export.schluessel().isPresent() && export.versionId().isPresent()
+                && export.groesse().isPresent()
+                && ablage.exportVorhanden(code, export.schluessel().get(), export.versionId().get(),
+                export.groesse().get());
+        if (!zipDa) {
+            throw fehler("Vollexport-ZIP fehlt in der Ablage (abgelaufen?), neuen Vollexport erstellen");
         }
     }
 
