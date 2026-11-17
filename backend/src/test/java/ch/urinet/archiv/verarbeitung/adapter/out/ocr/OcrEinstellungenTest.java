@@ -1,13 +1,19 @@
 package ch.urinet.archiv.verarbeitung.adapter.out.ocr;
 
+import io.smallrye.config.PropertiesConfigSource;
+import io.smallrye.config.SmallRyeConfig;
+import io.smallrye.config.SmallRyeConfigBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -19,6 +25,22 @@ class OcrEinstellungenTest {
                 .doesNotThrowAnyException();
         assertThatThrownBy(() -> OcrEinstellungen.pruefeZeitgrenze(Duration.ofMinutes(10), Duration.ofMinutes(10)))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("archiv.ocr.zeitgrenze");
+    }
+
+    @Test
+    void produktiveOcrUndS3ZeitgrenzenLiegenUnterDerAuftragszeitgrenze() throws IOException {
+        SmallRyeConfig config = new SmallRyeConfigBuilder().withProfile("prod").addDefaultInterceptors()
+                .withSources(new PropertiesConfigSource(getClass().getClassLoader().getResource("application.properties")))
+                .build();
+        Duration verarbeiten = Duration.parse("PT" + config.getValue(
+                "archiv.auftrag.zeitgrenze.VERARBEITEN", String.class).toUpperCase(Locale.ROOT));
+
+        assertThat(Duration.parse("PT" + config.getValue("archiv.ocr.zeitgrenze", String.class)
+                .toUpperCase(Locale.ROOT)))
+                .isLessThan(verarbeiten);
+        assertThat(Duration.parse("PT" + config.getValue("quarkus.s3.api-call-timeout", String.class)
+                .toUpperCase(Locale.ROOT)))
+                .isLessThan(verarbeiten);
     }
 
     /** Leerzeichen, {@code :} oder {@code ,} würden {@code docker -v} bzw. Argumente aufteilen. */

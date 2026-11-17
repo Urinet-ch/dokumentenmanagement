@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -67,6 +68,16 @@ class DeployHaertungTest {
             }
         });
         assertThat(fehler).isEmpty();
+    }
+
+    @Test
+    void workerDienstLaeuftMitNumerischerNichtRootUid() throws IOException {
+        List<Map.Entry<String, Map<String, Object>>> worker = dienste().entrySet().stream()
+                .filter(e -> hatWorkerRolle(e.getValue()))
+                .toList();
+
+        assertThat(worker).isNotEmpty().allSatisfy(e ->
+                assertThat(String.valueOf(e.getValue().get("user"))).as(e.getKey()).matches(UID));
     }
 
     @Test
@@ -153,6 +164,13 @@ class DeployHaertungTest {
         Map<String, Map<String, Object>> dienste = new java.util.TreeMap<>();
         roh.forEach((name, dienst) -> dienste.put(name, karte(dienst)));
         return dienste;
+    }
+
+    private static boolean hatWorkerRolle(Map<String, Object> dienst) {
+        Object environment = dienst.get("environment");
+        Object rolle = environment instanceof Map<?, ?> werte ? werte.get("ARCHIV_ROLLE") : null;
+        return rolle != null && Arrays.stream(String.valueOf(rolle).split(","))
+                .map(String::strip).anyMatch("worker"::equals);
     }
 
     @SuppressWarnings("unchecked")
