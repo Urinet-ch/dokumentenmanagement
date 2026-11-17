@@ -48,6 +48,11 @@ class FinanzAbfrageTest {
         }
 
         @Override
+        public java.util.Map<UUID, Integer> seiten(java.util.Collection<UUID> ids) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public java.util.Optional<String> inhalt(UUID id, ch.urinet.archiv.sicherheit.domain.Sichtregel regel, int z) {
             throw new UnsupportedOperationException();
         }
