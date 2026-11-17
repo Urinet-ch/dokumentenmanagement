@@ -1,16 +1,18 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { ApplicationConfig, provideBrowserGlobalErrorListeners, isDevMode } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, TitleStrategy, withComponentInputBinding } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 import { routes } from './app.routes';
 import { provideApi } from './gemeinsam/api';
 import { anmeldungInterceptor } from './gemeinsam/anmeldung/anmeldung.interceptor';
+import { BrandingTitelStrategie } from './gemeinsam/branding-titel.strategie';
 import { EingangskorbZaehler, HttpEingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
+    { provide: TitleStrategy, useExisting: BrandingTitelStrategie },
     provideHttpClient(withInterceptors([anmeldungInterceptor])),
     // Relative Pfade, damit der Interceptor das Token nur an die eigene API hängt
     provideApi(''),

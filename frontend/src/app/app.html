@@ -14,7 +14,12 @@
       </svg>
     </button>
   }
-  <a class="titel" routerLink="/">{{ texte.appTitel }}</a>
+  <a class="titel" routerLink="/">
+    @if (branding.branding().logoUrl; as logoUrl) {
+      <img class="logo" [src]="logoUrl" alt="" />
+    }
+    {{ branding.branding().name }}
+  </a>
   <span class="abstand"></span>
   @if (anmeldung.angemeldet()) {
     @if (anmeldung.benutzer(); as benutzer) {
