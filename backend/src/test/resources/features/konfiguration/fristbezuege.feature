@@ -93,11 +93,12 @@ Funktionalität: Taggenaue Aufbewahrung ab Belegdatum oder Zusatzfeld
       | aufbewahren_bis | null |
     Wenn der Worker die Archivierung ausführt
     Dann ist das Dokument «F» im Status «ARCHIVIERT»
+    Und haben die Archivdateien von «F» <sperre> Sperre
 
     Beispiele:
-      | pflicht |
-      | true    |
-      | false   |
+      | pflicht | sperre |
+      | true    | eine   |
+      | false   | keine  |
 
   @req-4.5 @req-4.6
   Szenario: Eine bestehende Sperre bleibt auch nach Wechsel auf eine Art ohne Pflicht geschützt

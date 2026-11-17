@@ -122,7 +122,7 @@ public class DokumentLesen {
         List<Warnung> warnungen = new ArrayList<>();
         if (dokument.art() != null) {
             var regel = arten.finden(dokument.art()).aufbewahrung();
-            if (regel.ab() == AufbewahrungAb.FELD && arten.fristbezug(dokument.zusatz()).datum(regel.feld()) == null) {
+            if (regel.ab() == AufbewahrungAb.FELD && fristfeldLeer(dokument, regel.feld())) {
                 warnungen.add(new Warnung(Warnung.FRISTBEZUG_FEHLT, null));
             }
         }
@@ -137,5 +137,20 @@ public class DokumentLesen {
         UUID sichtbar = repository.sichtbar(vorhanden.get(), Sichtregel.fuer(benutzer)) ? vorhanden.get() : null;
         warnungen.add(new Warnung(Warnung.BELEGNUMMER_BEKANNT, sichtbar));
         return List.copyOf(warnungen);
+    }
+
+    /**
+     * Beim Lesen gilt ein unlesbarer Altwert im Fristfeld wie ein fehlender (Spec 05, Req 4.4): Der Bestand bleibt
+     * sichtbar, die Warnung erscheint. Die strenge Ablehnung ({@code ZUSATZ_UNGUELTIG}) bleibt auf den Schreibpfaden.
+     */
+    private boolean fristfeldLeer(Dokument dokument, String feld) {
+        try {
+            return arten.fristbezug(dokument.zusatz()).datum(feld) == null;
+        } catch (FachFehler e) {
+            if (e.code() == Fehlercode.ZUSATZ_UNGUELTIG) {
+                return true;
+            }
+            throw e;
+        }
     }
 }
