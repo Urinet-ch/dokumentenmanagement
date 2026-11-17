@@ -23,7 +23,6 @@ import jakarta.persistence.EntityManager;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -50,7 +49,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code chunk.embedding} hat im Produktivschema fix 3'584 Dimensionen; die Testvektoren belegen davon nur 16.
  */
 @QuarkusTest
-@Tag("start-1")
 @EnabledIfSystemProperty(named = "archiv.db-leistung", matches = "true")
 class DatenbankAbfragenLeistungTest {
 
