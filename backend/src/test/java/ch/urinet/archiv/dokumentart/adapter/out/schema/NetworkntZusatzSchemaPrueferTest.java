@@ -605,6 +605,25 @@ class NetworkntZusatzSchemaPrueferTest {
         assertUngueltig(() -> pruefer.schemaPruefen(musterSchema("a".repeat(max + 1))));
     }
 
+    @Test
+    void reservierteFelderMuessenIhreFesteDefinitionBehalten() {
+        String gueltig = """
+                {"type":"object","properties":{
+                  "zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"mitglieder"},
+                  "veroeffentlicht":{"type":"boolean","default":false}},
+                 "required":["zugriff","veroeffentlicht"]}""";
+        assertThat(pruefer.reservierteFelderGueltig(gueltig)).isTrue();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["mitglieder","oeffentlich"],
+                "default":"mitglieder"}},"required":["zugriff"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"veroeffentlicht":{"type":"string","default":false}},
+                "required":["veroeffentlicht"]}""")).isFalse();
+        assertThat(pruefer.reservierteFelderGueltig("""
+                {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder",
+                "vorstand"],"default":"oeffentlich"}},"required":["zugriff"]}""")).isFalse();
+    }
+
     private static String musterSchema(String muster) {
         return "{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\",\"pattern\":\"" + muster + "\"}}}";
     }

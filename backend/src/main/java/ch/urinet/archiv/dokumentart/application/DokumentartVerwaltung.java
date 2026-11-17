@@ -73,8 +73,16 @@ public class DokumentartVerwaltung {
                 vertraulichkeit(angaben.vertraulichkeit()),
                 regel(jahre, ab),
                 pflichtwert(angaben.gesetzlichePflicht()),
-                !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()));
-        pruefung.pruefen(art);
+                !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()),
+                angaben.hat(Feld.SELBST_AUSGESTELLT) && pflichtwert(angaben.selbstAusgestellt()),
+                angaben.hat(Feld.BELEGNUMMER_MUSTER) ? pflichtwert(angaben.belegnummerMuster()) : List.of(),
+                angaben.hat(Feld.FREMDBELEG_ART) ? angaben.fremdbelegArt() : null,
+                angaben.hat(Feld.OHNE_ZAHLUNGSDATEN_ART) ? angaben.ohneZahlungsdatenArt() : null,
+                !angaben.hat(Feld.KI_VORSCHLAG) || pflichtwert(angaben.kiVorschlag()),
+                angaben.hat(Feld.KI_FELDER) ? pflichtwert(angaben.kiFelder()) : List.of(),
+                angaben.hat(Feld.KI_HINWEISE) ? angaben.kiHinweise() : null,
+                angaben.hat(Feld.REIHENFOLGE) ? pflichtwert(angaben.reihenfolge()) : 0);
+        pruefung.pruefen(art, art.kiFelder());
         if (repository.existiert(art.code())) {
             throw new FachFehler(Fehlercode.DOKUMENTART_EXISTIERT);
         }
@@ -111,8 +119,19 @@ public class DokumentartVerwaltung {
                 regel(jahre, ab),
                 angaben.hat(Feld.GESETZLICHE_PFLICHT) ? pflichtwert(angaben.gesetzlichePflicht())
                         : bisher.gesetzlichePflicht(),
-                angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv());
-        pruefung.pruefen(art);
+                angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv(),
+                angaben.hat(Feld.SELBST_AUSGESTELLT) ? pflichtwert(angaben.selbstAusgestellt())
+                        : bisher.selbstAusgestellt(),
+                angaben.hat(Feld.BELEGNUMMER_MUSTER) ? pflichtwert(angaben.belegnummerMuster())
+                        : bisher.belegnummerMuster(),
+                angaben.hat(Feld.FREMDBELEG_ART) ? angaben.fremdbelegArt() : bisher.fremdbelegArt(),
+                angaben.hat(Feld.OHNE_ZAHLUNGSDATEN_ART) ? angaben.ohneZahlungsdatenArt()
+                        : bisher.ohneZahlungsdatenArt(),
+                angaben.hat(Feld.KI_VORSCHLAG) ? pflichtwert(angaben.kiVorschlag()) : bisher.kiVorschlag(),
+                angaben.hat(Feld.KI_FELDER) ? pflichtwert(angaben.kiFelder()) : bisher.kiFelder(),
+                angaben.hat(Feld.KI_HINWEISE) ? angaben.kiHinweise() : bisher.kiHinweise(),
+                angaben.hat(Feld.REIHENFOLGE) ? pflichtwert(angaben.reihenfolge()) : bisher.reihenfolge());
+        pruefung.pruefen(art, art.kiFelder());
         if (!art.aufbewahrung().equals(bisher.aufbewahrung()) || art.gesetzlichePflicht() != bisher.gesetzlichePflicht()) {
             regelProtokoll.regelGeaendert(bisher, art);
         }

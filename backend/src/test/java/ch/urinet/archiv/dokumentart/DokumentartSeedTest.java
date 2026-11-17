@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +35,27 @@ class DokumentartSeedTest {
 
         assertThat(tabelle).hasSize(11);
         assertThat(seedUrinet()).containsExactlyElementsOf(tabelle);
+    }
+
+    @Test
+    void seedEnthaeltDieUrinetBelegnummerRegeln() throws IOException {
+        JsonNode seed;
+        try (InputStream inhalt = DokumentartSeedTest.class.getClassLoader().getResourceAsStream(SEED_URINET)) {
+            seed = new ObjectMapper().readTree(inhalt);
+        }
+        Map<String, JsonNode> arten = new java.util.HashMap<>();
+        seed.path("dokumentarten").forEach(art -> arten.put(art.path("code").asText(), art));
+
+        assertThat(arten.get("AUSGANGSRECHNUNG").path("selbst_ausgestellt").asBoolean()).isTrue();
+        assertThat(texte(arten.get("AUSGANGSRECHNUNG").path("belegnummer_muster")))
+                .containsExactly("^\\d{4}-\\d{3}$", "^R\\d{4}$");
+        assertThat(arten.get("AUSGANGSRECHNUNG").path("fremdbeleg_art").asText()).isEqualTo("LIEFERANTENBELEG");
+        assertThat(arten.get("OFFERTE").path("selbst_ausgestellt").asBoolean()).isTrue();
+        assertThat(texte(arten.get("OFFERTE").path("belegnummer_muster"))).containsExactly("^O-\\d{4}-\\d{3}$");
+        assertThat(arten.get("OFFERTE").path("fremdbeleg_art").asText()).isEqualTo("LIEFERANTENBELEG");
+        assertThat(texte(arten.get("LIEFERANTENBELEG").path("belegnummer_muster"))).containsExactly("^F\\d{4}$");
+        assertThat(arten.get("LIEFERANTENBELEG").path("ohne_zahlungsdaten_art").asText()).isEqualTo("QUITTUNG");
+        assertThat(arten.get("LOHNABRECHNUNG").path("selbst_ausgestellt").asBoolean()).isTrue();
     }
 
     @Test
@@ -123,5 +145,11 @@ class DokumentartSeedTest {
         List<String> kopf = StammdatenTabelle.kopfzeilen();
         return StammdatenTabelle.tabelle(List.of(StammdatenTabelle.START, kopf.get(0), kopf.get(1), zeile,
                 StammdatenTabelle.ENDE));
+    }
+
+    private static List<String> texte(JsonNode liste) {
+        List<String> ergebnis = new java.util.ArrayList<>();
+        liste.forEach(wert -> ergebnis.add(wert.asText()));
+        return ergebnis;
     }
 }

@@ -27,7 +27,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Abhängig von: Spec 01: 3.5, 4.7_
 
-- [ ] 17.3 Dokumentarten erweitern und Migration [Backend]
+- [x] 17.3 Dokumentarten erweitern und Migration [Backend]
   - Changeset `<nnn>-dokumentart-konfiguration`, Domain und API der neuen Attribute, `belegnummer_eigen` über
     `selbst_ausgestellt`, `eigene_arten` nicht mehr lesen, Muster und Umstufungs-Arten in die Arten von `urinet`
     (Changeset, Version mit Quelle `MIGRATION`), Ablehnung ungültiger Muster, feste Eigenschaften von

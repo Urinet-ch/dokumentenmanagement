@@ -35,4 +35,41 @@ class KonfigurationTest {
         assertThatThrownBy(() -> kennungen.ibans().add("TEST-IBAN-2"))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void prueftArtReferenzenAufAktivitaetUndVertraulichkeit() {
+        var ziel = art("ZIEL", "NORMAL", true, false);
+        var quelle = new Konfiguration.Art("QUELLE", "Quelle", null, List.of("frei"), List.of("titel"),
+                "{\"type\":\"object\"}", "INTERN", new Konfiguration.Aufbewahrung(null, null), false, true,
+                false, List.of(), "ZIEL", null, true, List.of(), null, 0);
+
+        assertThat(new Konfiguration(1, einstellungen(), List.of(quelle, ziel)).pruefen())
+                .extracting(Konfiguration.Befund::code).containsExactly("ART_REFERENZ_UNGUELTIG");
+    }
+
+    @Test
+    void prueftFesteEigenschaftenDerWissensquelle() {
+        var art = new Konfiguration.Art("WISSENSQUELLE", "Wissensquelle", null, List.of("frei"),
+                List.of("titel", "datum"), "{\"type\":\"object\"}", "NORMAL",
+                new Konfiguration.Aufbewahrung(null, null), false, true, false, List.of(), null, null, false,
+                List.of(), null, 0);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art)).pruefen()).isEmpty();
+
+        var ungueltig = new Konfiguration.Art("WISSENSQUELLE", "Wissensquelle", null, List.of("frei"),
+                List.of("titel", "datum"), "{\"type\":\"object\"}", "NORMAL",
+                new Konfiguration.Aufbewahrung(null, null), false, true, false, List.of(), null, null, true,
+                List.of(), null, 0);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(ungueltig)).pruefen())
+                .extracting(Konfiguration.Befund::code).containsExactly("WISSENSQUELLE_UNGUELTIG");
+    }
+
+    private static Konfiguration.Art art(String code, String vertraulichkeit, boolean aktiv, boolean selbstAusgestellt) {
+        return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"), "{\"type\":\"object\"}",
+                vertraulichkeit, new Konfiguration.Aufbewahrung(null, null), false, aktiv, selbstAusgestellt,
+                List.of(), null, null, true, List.of(), null, 0);
+    }
+
+    private static Konfiguration.Einstellungen einstellungen() {
+        return new Konfiguration.Einstellungen("12-31", new Konfiguration.Kennungen(null, List.of()));
+    }
 }

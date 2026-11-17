@@ -290,6 +290,14 @@ ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderun
 Die Module `dokumentart` und `konfiguration` hängen über ihre `application`-Schichten gegenseitig voneinander ab
 (bewusste Ausnahme bis 17.3, danach über einen Port für das Arten-Abbild aufzulösen).
 
+Umsetzung 17.3: Changeset 039 ergänzt die Dokumentart-Spalten und übernimmt bei bestehenden `urinet`-Arten die
+Ausstellerliste, Nummern-Muster und Umstufungsziele in das Konfigurationsabbild mit Quelle `MIGRATION`. Die
+Übergangs-Seeds `dokumentarten.json` enthalten dieselben Spec-05-Attribute, damit neu provisionierte Mandanten bis
+zur Ablösung des Seed-Formats in 17.7 keine abweichenden Standardwerte erhalten. Danach stammen selbst ausgestellte
+Arten ausschliesslich aus `DokumentartRepository`; `public.mandant.eigene_arten` wird nur noch durch Changeset 039
+gelesen. Belegnummer-Muster werden als JDK-RegEx mit höchstens 1'000 Zeichen geprüft; die Auswertungs-Zeitgrenze gilt
+bei der späteren Laufzeitnutzung in 18.1.
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.

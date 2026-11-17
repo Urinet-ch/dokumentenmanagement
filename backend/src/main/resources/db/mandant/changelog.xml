@@ -40,4 +40,5 @@
     <include file="changesets/036-webseite-liste-index.xml" relativeToChangelogFile="true"/>
     <include file="changesets/037-konfiguration-version.xml" relativeToChangelogFile="true"/>
     <include file="changesets/038-protokoll-konfiguration.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/039-dokumentart-konfiguration.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

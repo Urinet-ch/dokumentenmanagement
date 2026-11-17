@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="039-dokumentart-konfiguration" author="archiv">
+        <sql>
+            alter table dokumentart
+                add column selbst_ausgestellt boolean not null default false,
+                add column belegnummer_muster text[] not null default '{}',
+                add column fremdbeleg_art text references dokumentart (code),
+                add column ohne_zahlungsdaten_art text references dokumentart (code),
+                add column ki_vorschlag boolean not null default true,
+                add column ki_felder text[] not null default '{}',
+                add column ki_hinweise text,
+                add column reihenfolge int not null default 0;
+        </sql>
+        <sql>
+            with mandant as (
+                select code, eigene_arten
+                from public.mandant
+                where schema_name = current_schema()
+            )
+            update dokumentart a
+            set selbst_ausgestellt = case
+                    when m.eigene_arten is not null then a.code = any(m.eigene_arten)
+                    when current_schema() = 'm_urinet' then
+                        a.code = any(array['AUSGANGSRECHNUNG', 'OFFERTE', 'LOHNABRECHNUNG']::text[])
+                    else false
+                end,
+                belegnummer_muster = case
+                    when current_schema() &lt;&gt; 'm_urinet' then '{}'::text[]
+                    when a.code = 'AUSGANGSRECHNUNG' then array['^\d{4}-\d{3}$', '^R\d{4}$']::text[]
+                    when a.code = 'OFFERTE' then array['^O-\d{4}-\d{3}$']::text[]
+                    when a.code = 'LIEFERANTENBELEG' then array['^F\d{4}$']::text[]
+                    else '{}'::text[]
+                end,
+                fremdbeleg_art = case
+                    when current_schema() = 'm_urinet' and a.code in ('AUSGANGSRECHNUNG', 'OFFERTE')
+                        then 'LIEFERANTENBELEG'
+                    else null
+                end,
+                ohne_zahlungsdaten_art = case
+                    when current_schema() = 'm_urinet' and a.code = 'LIEFERANTENBELEG' then 'QUITTUNG'
+                    else null
+                end,
+                ki_vorschlag = a.code &lt;&gt; 'WISSENSQUELLE'
+            from mandant m;
+        </sql>
+        <sql>
+            with naechste as (
+                select coalesce(max(version), 0) + 1 as nummer
+                from konfiguration_version
+            ),
+            abbild as (
+                select n.nummer, jsonb_build_object(
+                    'version', n.nummer,
+                    'einstellungen', jsonb_build_object(
+                        'geschaeftsjahrEnde', coalesce(m.geschaeftsjahr_ende, '12-31'),
+                        'kennungen', jsonb_build_object(
+                            'uid', case when jsonb_typeof(m.kennungen -> 'uid') = 'string'
+                                and m.kennungen ->> 'uid' &lt;&gt; '' then m.kennungen -> 'uid' end,
+                            'ibans', case when jsonb_typeof(m.kennungen -> 'ibans') = 'array'
+                                then m.kennungen -> 'ibans' else '[]'::jsonb end)),
+                    'arten', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'code', a.code,
+                            'name', a.name,
+                            'beschreibung', a.beschreibung,
+                            'gruppen', to_jsonb(coalesce(a.gruppen, '{}'::text[])),
+                            'pflichtfelder', to_jsonb(coalesce(a.pflichtfelder, '{}'::text[])),
+                            'zusatzSchema', to_jsonb(coalesce(a.zusatz_schema::text,
+                                '{"type":"object","properties":{},"additionalProperties":false}')),
+                            'vertraulichkeit', a.vertraulichkeit,
+                            'aufbewahrung', jsonb_build_object(
+                                'jahre', a.aufbewahrung_jahre,
+                                'ab', a.aufbewahrung_ab),
+                            'gesetzlichePflicht', a.gesetzliche_pflicht,
+                            'aktiv', a.aktiv,
+                            'selbstAusgestellt', a.selbst_ausgestellt,
+                            'belegnummerMuster', to_jsonb(coalesce(a.belegnummer_muster, '{}'::text[])),
+                            'fremdbelegArt', a.fremdbeleg_art,
+                            'ohneZahlungsdatenArt', a.ohne_zahlungsdaten_art,
+                            'kiVorschlag', a.ki_vorschlag,
+                            'kiFelder', to_jsonb(coalesce(a.ki_felder, '{}'::text[])),
+                            'kiHinweise', a.ki_hinweise,
+                            'reihenfolge', a.reihenfolge)
+                            order by a.code collate "C")
+                        from dokumentart a), '[]'::jsonb)
+                ) as inhalt
+                from naechste n
+                left join public.mandant m on m.schema_name = current_schema()
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select nummer, 'system:migration', null, 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild
+            where exists (select 1 from dokumentart);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

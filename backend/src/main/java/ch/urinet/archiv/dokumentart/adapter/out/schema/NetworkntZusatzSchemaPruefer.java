@@ -262,6 +262,71 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         });
     }
 
+    @Override
+    public boolean reservierteFelderGueltig(String schemaJson) {
+        try {
+            JsonNode schema = StrengesJson.lesen(schemaJson);
+            if (schema == null || !schema.isObject()) {
+                return false;
+            }
+            JsonNode properties = schema.path("properties");
+            if (properties.isMissingNode()) {
+                return true;
+            }
+            if (!properties.isObject()) {
+                return false;
+            }
+            return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
+                    List.of("oeffentlich", "mitglieder", "vorstand"), "mitglieder")
+                    && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",
+                    List.of(), "false");
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    private static boolean reserviertesFeldGueltig(JsonNode properties, JsonNode required, String name, String typ,
+                                                    List<String> werte, String standard) {
+        JsonNode eigenschaft = properties.get(name);
+        if (eigenschaft == null) {
+            return true;
+        }
+        if (!eigenschaft.isObject() || !typ.equals(eigenschaft.path("type").asText())
+                || !standard.equals(eigenschaft.path("default").asText())
+                || !required(required, name)) {
+            return false;
+        }
+        JsonNode enumWerte = eigenschaft.get("enum");
+        if (!werte.isEmpty()) {
+            if (enumWerte == null || !enumWerte.isArray() || enumWerte.size() != werte.size()) {
+                return false;
+            }
+            for (int i = 0; i < werte.size(); i++) {
+                if (!enumWerte.get(i).isTextual() || !werte.get(i).equals(enumWerte.get(i).asText())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (enumWerte == null) {
+            return true;
+        }
+        return enumWerte.isArray() && enumWerte.size() == 2 && enumWerte.get(0).isBoolean()
+                && enumWerte.get(1).isBoolean() && enumWerte.get(0).booleanValue() != enumWerte.get(1).booleanValue();
+    }
+
+    private static boolean required(JsonNode required, String feld) {
+        if (!required.isArray()) {
+            return false;
+        }
+        for (JsonNode eintrag : required) {
+            if (feld.equals(eintrag.asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void werteGegen(String schemaJson, String werteJson) {
         // genau (BigDecimal), damit geprüft wird, was gespeichert wird (Review PR #95)
         JsonNode werte = lesen(werteJson, MAX_WERTE_BYTES, true);
