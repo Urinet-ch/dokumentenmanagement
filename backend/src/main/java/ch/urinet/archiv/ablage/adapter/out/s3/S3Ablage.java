@@ -955,6 +955,28 @@ public class S3Ablage implements AblagePort {
         return kopieLesen(mandant, schluessel, versionId, ziel);
     }
 
+    @Override
+    public Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256, OutputStream ziel) {
+        if (!schluessel.startsWith("manifest/") || !sha256.matches("[0-9a-fA-F]{64}")) {
+            throw new IllegalArgumentException("Ungültige Manifest-Referenz");
+        }
+        ManifestDatei manifest = pruefzugriff(schluessel,
+                () -> manifestLesen(bucket(mandant), schluessel).orElseThrow(
+                        () -> new IllegalStateException("Manifest-Teil fehlt: " + schluessel)));
+        if (manifest.weitere() > 0) {
+            throw new IllegalStateException("Unter " + schluessel + " liegen weitere Versionen oder Löschmarken");
+        }
+        if (!manifest.datei().sha256().equalsIgnoreCase(sha256)) {
+            throw new IllegalStateException("Prüfsumme des Manifest-Teils weicht ab: " + schluessel);
+        }
+        try {
+            ziel.write(manifest.inhalt());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Manifest-Teil konnte nicht in den Export geschrieben werden", e);
+        }
+        return new Kopie(manifest.datei().sha256(), manifest.datei().groesse());
+    }
+
     private Kopie kopieLesen(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
         Objects.requireNonNull(ziel, "ziel");
         String bucket = bucket(mandant);

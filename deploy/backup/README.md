@@ -115,21 +115,24 @@ deploy/backup/restore-uebung-lokal.sh
 ```
 
 Voraussetzungen sind Docker, Maven, `age`, `age-keygen` und die lokal vorhandenen Dev-Service-Images. Der Lauf prüft
-`taeglich.sh` mit Docker-Attrappen und zwei temporären `age`-Identitäten. Anschliessend starten die Quarkus-Tests
-PostgreSQL und MinIO lokal, legen synthetische Dokumente an, stellen den Bucket in einen neuen leeren
-`urinet-archiv-p-`-Bucket wieder her und prüfen Dokument-IDs, Prüfsummen, abrufbare Dateien, die aktualisierten
-Versionsreferenzen sowie ein lesbares Manifestobjekt. Die S3-Tests prüfen zusätzlich Inventar, Object Lock und
-Sperrfristen. Die Tests entfernen ihre Wegwerf-Buckets und Dev Services selbst; das Skript verwendet keinen
-`docker compose down -v`- oder `prune`-Befehl.
+`taeglich.sh` mit Docker-Attrappen und zwei temporären `age`-Identitäten. Der echte-`age`-Teil entschlüsselt mit beiden
+Wegwerf-Schlüsseln, weist den falschen Schlüssel zurück und prüft eine manipulierte `SHA256SUMS`-Datei. Anschliessend
+starten die Quarkus-Tests PostgreSQL und MinIO lokal, legen synthetische Dokumente an, stellen den Bucket in einen
+neuen leeren `urinet-archiv-p-`-Bucket wieder her und prüfen Dokument-IDs, Prüfsummen, abrufbare Dateien, die
+aktualisierten Versionsreferenzen sowie Manifest-Export über Schlüssel und SHA-256. Fehlende Manifest-Teile,
+Hashabweichungen und zusätzliche Versionen werden zurückgewiesen. `archiv manifest pruefen` prüft das signierte
+Manifest nach dem Restore im Ziel-Bucket; die Zeitstempelprüfung verwendet dabei eine synthetische TSA-Attrappe ohne
+Netzaufruf. Die S3-Tests prüfen zusätzlich Inventar, Object Lock und Sperrfristen. Die Tests entfernen ihre
+Wegwerf-Buckets und Dev Services selbst; das Skript verwendet keinen `docker compose down -v`- oder `prune`-Befehl.
 
-Der Lauf ist eine lokale Teilprobe, kein vollständiger Restore des täglichen Sicherungspakets: Der Shelltest führt
+Der Lauf bleibt eine lokale Teilprobe, kein vollständiger Restore des täglichen Sicherungspakets: Der Shelltest führt
 `taeglich.sh` mit Docker-Attrappen aus; sein erzeugter Export wird nicht an den S3-Roundtrip-Test übergeben. Der
 Roundtrip prüft synthetische Dokumentzeilen und Dateien im Test-PostgreSQL sowie einen getrennten S3-Ziel-Bucket, aber
 keinen `pg_dump`-/Keycloak-Realm-Restore in eine zweite Datenbank und keinen API-Start gegen diese zweite Datenbank.
 Der vollständige manuelle Restore-Nachweis bleibt damit offen und ist Aufgabe 5.12 in `tasks.md` (Export entschlüsseln,
-in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten, Dokumentliste vergleichen). Die Manifest-Versions-IDs
-in der Datenbank (`manifest`, `manifest_zeitstempel`) bleiben nach dem Restore auf dem Stand der Quelle (siehe
-`docs/wiederherstellung.md`); der Roundtrip-Test prüft deshalb nur das lesbare Manifestobjekt im Ziel.
+in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten, Dokumentliste vergleichen). Die Manifest-
+Versions-IDs in der Datenbank (`manifest`, `manifest_zeitstempel`) bleiben nach dem Restore Quellenachweise; das
+Prüfwerkzeug und die Exporte lesen Manifestteile über Schlüssel und SHA-256 statt über diese veralteten IDs.
 
 Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
 

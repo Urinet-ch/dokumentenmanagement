@@ -39,7 +39,10 @@ public interface ExportBelege {
         }
     }
 
-    /** Eine Datei eines Tages-Manifests unter {@code manifest/} ({@code json}, {@code sig}, {@code <dienst>.tsr}, …). */
+    /**
+     * Eine Datei eines Tages-Manifests unter {@code manifest/} ({@code json}, {@code sig}, {@code <dienst>.tsr}, …).
+     * Die Versions-ID bleibt als Nachweiswert erhalten; der Export liest anhand von Schlüssel und SHA-256.
+     */
     record Manifestdatei(LocalDate datum, String endung, String schluessel, String versionId, String sha256) {
     }
 

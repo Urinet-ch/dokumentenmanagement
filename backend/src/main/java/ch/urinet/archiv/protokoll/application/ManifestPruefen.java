@@ -38,7 +38,9 @@ import java.util.Set;
  * Die Datenbank bestimmt das auch für den jüngsten Tag, und jede Abweichung zwischen Datenbank, Ablage und Folgemanifest
  * ist ein Fehler. Fehler: fehlendes oder ungültiges Manifest, Lücke oder Bruch der Kette, kein gültiger Zeitstempel, ein
  * festgehaltener Zeitstempel ohne {@code .tsr} oder Prüfdaten, weitere Versionen oder Löschmarken unter einem
- * Manifest-Schlüssel oder ein ungesperrter Teil (geprüft wird immer die älteste Version). Meldungen: fehlender oder
+ * Manifest-Schlüssel oder ein ungesperrter Teil (geprüft wird immer die älteste Version). Manifest-Teile werden über
+ * ihren Schlüssel gelesen und per SHA-256 mit Datenbank und Hash-Kette verglichen; S3-Versions-IDs sind nach einer
+ * Wiederherstellung nicht stabil. Meldungen: fehlender oder
  * unvollständiger Zeitstempel eines Dienstes, der nicht festgehalten ist (Req 15.11), ein Manifest ohne Eintrag in der
  * Datenbank, Verspätung über {@code archiv.manifest.verspaetung-schwelle}.
  * <p>
@@ -279,7 +281,7 @@ public class ManifestPruefen {
     }
 
     /**
-     * Liest die älteste Version eines Teils. Weitere Versionen oder Löschmarken und ein ungesperrter Teil sind Fehler
+     * Liest den Teil über den Schlüssel. Weitere Versionen oder Löschmarken und ein ungesperrter Teil sind Fehler
      * (je Schlüssel einmal gemeldet): Jeder Schlüssel unter {@code manifest/} wird nur einmal gesperrt geschrieben.
      */
     private Optional<ManifestDatei> teil(Lauf lauf, LocalDate datum, ManifestTeil teil) {

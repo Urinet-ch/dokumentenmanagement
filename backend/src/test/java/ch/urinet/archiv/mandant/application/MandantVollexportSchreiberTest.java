@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MandantVollexportSchreiberTest {
 
+    private final List<String> manifestKopien = new java.util.ArrayList<>();
+
     @Test
     void csvEntschaerftFormelnUndEscapedAnfuehrungszeichen() {
         String zeile = MandantVollexportSchreiber.csvZeile("=1+1", "+1", "-1", "@cmd", "a\"b");
@@ -46,10 +48,11 @@ class MandantVollexportSchreiberTest {
                 datei("archiv/a", inhalt, "dateien/" + id + "/ARBEITSFASSUNG-1.bin"),
                 datei("archiv/p", inhalt, "dateien/" + id + "/pdfa.pdf")));
         var manifest = new MandantVollexportDaten.Manifestdatei(java.time.LocalDate.of(2026, 1, 2), "json",
-                "manifest/m", "v1", sha(inhalt.get("manifest/m")));
+                "manifest/m", "versions-id-der-quelle", sha(inhalt.get("manifest/m")));
 
         Path zipPfad = schreiben(temp, daten(List.of(dokument), List.of(manifest)), ablage(inhalt));
 
+        assertThat(manifestKopien).containsExactly("manifest/m");
         try (ZipFile zip = new ZipFile(zipPfad.toFile())) {
             assertThat(text(zip, "dateien/" + id + "/ORIGINAL-1.bin")).isEqualTo("original");
             assertThat(text(zip, "dateien/" + id + "/ARBEITSFASSUNG-1.bin")).isEqualTo("arbeit");
@@ -139,10 +142,15 @@ class MandantVollexportSchreiberTest {
     private AblagePort ablage(Map<String, byte[]> inhalt) {
         return (AblagePort) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{AblagePort.class},
                 (proxy, methode, argumente) -> {
-                    if (!methode.getName().equals("sicherungsKopie")) {
+                    if (!methode.getName().equals("sicherungsKopie")
+                            && !methode.getName().equals("sicherungsManifestKopie")) {
                         throw new AssertionError("Unerwarteter Ablageaufruf: " + methode.getName());
                     }
                     byte[] daten = inhalt.get((String) argumente[1]);
+                    if (methode.getName().equals("sicherungsManifestKopie")) {
+                        assertThat(sha(daten)).isEqualTo(argumente[2]);
+                        manifestKopien.add((String) argumente[1]);
+                    }
                     ((OutputStream) argumente[3]).write(daten);
                     return new Kopie(sha(daten), daten.length);
                 });

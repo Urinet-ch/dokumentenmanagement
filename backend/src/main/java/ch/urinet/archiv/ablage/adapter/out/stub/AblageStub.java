@@ -444,6 +444,30 @@ public class AblageStub implements AblagePort {
         return kopieSchreiben(mandant, schluessel, versionId, ziel);
     }
 
+    @Override
+    public synchronized Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256,
+                                                        OutputStream ziel) {
+        if (!schluessel.startsWith("manifest/") || !sha256.matches("[0-9a-fA-F]{64}")) {
+            throw new IllegalArgumentException("Ungültige Manifest-Referenz");
+        }
+        List<Version> vorhanden = liste(mandant, schluessel);
+        if (vorhanden.size() != 1) {
+            throw new IllegalStateException("Manifest-Teil fehlt oder ist mehrdeutig: " + schluessel);
+        }
+        Version version = vorhanden.getFirst();
+        byte[] daten = lesen(version);
+        String tatsaechlich = Pruefsumme.von(daten);
+        if (!tatsaechlich.equalsIgnoreCase(sha256)) {
+            throw new IllegalStateException("Prüfsumme des Manifest-Teils weicht ab: " + schluessel);
+        }
+        try {
+            ziel.write(daten);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return new Kopie(tatsaechlich, daten.length);
+    }
+
     private Kopie kopieSchreiben(MandantCode mandant, String schluessel, String versionId, OutputStream ziel) {
         Version v = liste(mandant, schluessel).stream().filter(x -> x.versionId().equals(versionId)).findFirst()
                 .filter(x -> Files.exists(x.datei()))
