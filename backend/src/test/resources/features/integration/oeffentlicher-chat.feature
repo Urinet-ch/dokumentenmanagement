@@ -261,6 +261,91 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Dann liefert der Chatbot Status 429 und Fehlercode «BUDGET»
     Und beträgt der Verbrauch im Monatsbudget von «urinet» 240 Tokens
 
+  @req-6.4
+  Szenario: Gleichzeitige Fragen können das Monatsbudget nur einmal überschreiten
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 100/20 |
+    Und das simulierte Sprachmodell streamt die erste Antwort über 2 Sekunden
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 100 Tokens und ist zu 0 Tokens verbraucht
+    Wenn die Webseite mit dem Schlüssel «vorstand» zwei gleichzeitige Fragen «Eins?» und «Zwei?» stellt
+    Dann wird genau eine parallele Frage mit Status 200 beantwortet und die andere mit «LAEUFT» abgelehnt
+    Und beträgt der Verbrauch im Monatsbudget von «urinet» 120 Tokens
+
+  @req-6.4
+  Szenario: Fällt das Modell aus, wird die Reservierung freigegeben, und die nächste Frage läuft wieder an
+    Angenommen das simulierte Sprachmodell antwortet mit HTTP 500
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 1000 Tokens und ist zu 0 Tokens verbraucht
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann meldet der Stream des Chatbots «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»
+    Und ist die Frage-Reservierung des Chatbots für «urinet» frei
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Nochmals?»
+    Dann meldet der Stream des Chatbots «fehler» «Der Chat ist im Moment nicht verfügbar. Die Suche funktioniert weiterhin.» und weder «quellen» noch «fertig»
+    Und ist die Frage-Reservierung des Chatbots für «urinet» frei
+
+  @req-6.4
+  Szenario: Eine verwaiste Reservierung verfällt nach dem Lease, eine frische blockiert weiter
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 5/2    |
+    Und die Frage-Reservierung des Chatbots für «urinet» läuft seit 1 Minuten
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Frisch?»
+    Dann liefert der Chatbot Status 429 und Fehlercode «ZU_VIELE_ANFRAGEN»
+    Und nennt das Problem den Grund «LAEUFT»
+    Und trägt die Chatbot-Antwort den Header «Retry-After» mit dem Wert «5»
+    Und ist die Frage-Reservierung des Chatbots für «urinet» noch belegt
+    Angenommen die Frage-Reservierung des Chatbots für «urinet» läuft seit 10 Minuten
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Verwaist?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und ist die Frage-Reservierung des Chatbots für «urinet» frei
+
+  @req-6.4
+  Szenario: Eine abgelehnte Frage zählt nicht im Stundenlimit des Clients
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 5/2    |
+    Und die Frage-Reservierung des Chatbots für «urinet» läuft seit 1 Minuten
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» 25 Fragen «Gibt es Neues?» stellt, die alle mit «LAEUFT» abgelehnt werden
+    Und die Frage-Reservierung des Chatbots für «urinet» läuft seit 10 Minuten
+    Und die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Und jetzt?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+
+  @req-6.4 @req-1.4
+  Szenario: Budget und Reservierung eines Mandanten blockieren einen anderen Mandanten nicht
+    Angenommen der Chatbot-Schlüssel «vhf» der Webseite «probe-chat» im Mandanten «vhf-gsk» hat die höchste Stufe «oeffentlich»
+    Und das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 5/2    |
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 1000 Tokens und ist zu 1000 Tokens verbraucht
+    Und die Frage-Reservierung des Chatbots für «urinet» läuft seit 1 Minuten
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Urinet?»
+    Dann liefert der Chatbot Status 429 und Fehlercode «ZU_VIELE_ANFRAGEN»
+    Wenn die Webseite mit dem Schlüssel «vhf» für den Client «berta» auf der Stufe «oeffentlich» fragt: «VHF?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und ist die Frage-Reservierung des Chatbots für «urinet» noch belegt
+
+  @req-6.4
+  Szenario: Zum Monatswechsel beginnt eine neue Zeile ohne Verbrauch und ohne hängende Reservierung
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 100/20 |
+    Und das Monatsbudget des Chatbots für «urinet» war im Vormonat verbraucht und die Frage-Reservierung hing
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Neuer Monat?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und beträgt der Verbrauch des Chatbots für «urinet» im laufenden Monat 120 Tokens
+
+  @req-6.4
+  Szenario: Ein Fehler beim Schreiben des Monatsbudgets wird in einer Kennzahl erfasst, ohne die Antwort abzubrechen
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt | argumente | tokens |
+      | 1       | text | Ja.    |           | 5/2    |
+    Und das Monatsbudget des Chatbots für «urinet» beträgt 100 Tokens und ist zu 0 Tokens verbraucht
+    Und das Schreiben des Monatsbudgets wird für diese Frage verhindert
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «budgetfehler» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und wird ein Monatsbudget-Schreibfehler in der Kennzahl erfasst
+    Und beträgt der Verbrauch im Monatsbudget von «urinet» 0 Tokens
+
   # ---- Speicherung ohne Personenbezug (Req 6.5)
 
   @req-6.5

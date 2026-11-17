@@ -1,5 +1,6 @@
 package ch.urinet.archiv.sicherheit.adapter.in.auth;
 
+import ch.urinet.archiv.sicherheit.application.QuellAdresse;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.IdentityProviderManager;
@@ -10,8 +11,10 @@ import io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism;
 import io.quarkus.vertx.http.runtime.security.HttpSecurityUtils;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.Optional;
 import java.util.Set;
@@ -28,6 +31,14 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
 
     static final int PRIORITAET = 2000;
     private static final String BEARER = "bearer ";
+    private static final String REAL_IP = "X-Real-Ip";
+
+    private final QuellAdresse quelle;
+
+    @Inject
+    public ApiTokenAuthMechanism(QuellAdresse quelle) {
+        this.quelle = quelle;
+    }
 
     @Override
     public Uni<SecurityIdentity> authenticate(RoutingContext kontext, IdentityProviderManager anbieter) {
@@ -39,8 +50,10 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
         if (token.isEmpty()) {
             return Uni.createFrom().failure(new AuthenticationFailedException("API-Token ungültig"));
         }
-        ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get(),
-                Optional.ofNullable(kontext.request().headers().get("X-Real-Ip")));
+        SocketAddress peer = kontext.request().remoteAddress();
+        Optional<String> absender = quelle.aufloesen(peer == null ? null : peer.hostAddress(),
+                kontext.request().headers().get(REAL_IP));
+        ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get(), absender);
         HttpSecurityUtils.setRoutingContextAttribute(anfrage, kontext);
         return anbieter.authenticate(anfrage);
     }

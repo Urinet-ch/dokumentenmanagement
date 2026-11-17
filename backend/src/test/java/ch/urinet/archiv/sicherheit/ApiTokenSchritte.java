@@ -7,10 +7,12 @@ import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.TokenKommando;
+import ch.urinet.archiv.sicherheit.application.ApiTokenPruefGrenzenTeststeuerung;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.Before;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
@@ -71,6 +73,9 @@ public class ApiTokenSchritte {
     @Inject
     TokenKommando kommando;
 
+    @Inject
+    ApiTokenPruefGrenzenTeststeuerung pruefGrenzen;
+
     /** Name im Szenario → Token-Text. */
     private final Map<String, String> tokens = new LinkedHashMap<>();
     /** Name im Szenario → Mandant des Tokens. */
@@ -87,6 +92,11 @@ public class ApiTokenSchritte {
     private String kommandoFehler;
     private LogMitschnitt mitschnitt;
     private Response antwort;
+
+    @Before(order = 0)
+    public void grenzenZuruecksetzen() {
+        pruefGrenzen.szenarioZuruecksetzen();
+    }
 
     @Angenommen("alle Logeinträge werden mitgeschnitten")
     public void mitschneiden() {
