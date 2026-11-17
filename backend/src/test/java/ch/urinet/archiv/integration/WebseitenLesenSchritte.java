@@ -113,6 +113,7 @@ public class WebseitenLesenSchritte {
     private boolean embeddingGesetzt;
     private Path alteLinksCsv;
     private String alteLinksUrl;
+    private UUID alteLinksZiel;
     private String alteLinksWer;
     private String alteLinksAusgabe;
     private String alteLinksFehler;
@@ -258,6 +259,7 @@ public class WebseitenLesenSchritte {
         alteLinksWer = "webtest-" + UUID.randomUUID();
         Dok ziel = dokumente.get(dokument);
         assertThat(ziel).isNotNull();
+        alteLinksZiel = ziel.id();
         String csvUrl = "\"" + url.replace("\"", "\"\"") + "\"";
         Files.writeString(alteLinksCsv, "\uFEFFalte_url;dokument_id\r\n" + csvUrl + ";" + ziel.id() + "\r\n",
                 StandardCharsets.UTF_8);
@@ -280,7 +282,7 @@ public class WebseitenLesenSchritte {
 
     @Dann("meldet der alte-Link-Import die Zeile 2 als «{word}»")
     public void alteLinksStatus(String status) {
-        assertThat(alteLinksExitCode).as(alteLinksFehler).isZero();
+        assertThat(alteLinksExitCode).as(alteLinksFehler).isEqualTo("ABGELEHNT".equals(status) ? 1 : 0);
         assertThat(alteLinksFehler).isEmpty();
         assertThat(alteLinksAusgabe).contains(" " + alteLinksUrl + ": " + status);
     }
@@ -295,9 +297,24 @@ public class WebseitenLesenSchritte {
         assertThat(anzahlAlteUrl(mandant)).isEqualTo(1);
     }
 
+    @Dann("nennt der alte-Link-Import den Grund «{}»")
+    public void alteLinksGrund(String grund) {
+        assertThat(alteLinksAusgabe).contains(grund);
+    }
+
     @Dann("ist die importierte alte URL im Mandanten «{word}» nicht zugeordnet")
     public void alteUrlNichtZugeordnet(String mandant) throws SQLException {
+        // weder die URL noch das Zieldokument darf im Mandanten in alte_url vorkommen
         assertThat(anzahlAlteUrl(mandant)).isZero();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from " + new MandantCode(mandant).schema() + ".alte_url where dokument_id = ?")) {
+            abfrage.setObject(1, alteLinksZiel);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                assertThat(zeile.getLong(1)).isZero();
+            }
+        }
     }
 
     @Dann("ist der alte-Link-Import einmal im Zugriffsprotokoll erfasst")

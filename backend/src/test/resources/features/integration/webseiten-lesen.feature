@@ -431,3 +431,13 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Und ist die importierte alte URL im Mandanten «urinet» einmal gespeichert
     Wenn die öffentliche Umleitung die importierte alte URL abruft
     Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+
+  @req-4.3 @req-5.10
+  Szenario: Ein Zieldokument eines anderen Mandanten wird abgelehnt und nichts geschrieben
+    Angenommen die CSV-Datei ordnet die URL «/alt/fremd» dem Dokument «b1» zu
+    Wenn der Import alter Links im Mandanten «vhf-gsk» ausgeführt wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «ABGELEHNT»
+    Und nennt der alte-Link-Import den Grund «Zieldokument existiert nicht im Mandanten»
+    Und ist die importierte alte URL im Mandanten «urinet» nicht gespeichert
+    Und ist die importierte alte URL im Mandanten «vhf-gsk» nicht gespeichert
+    Und ist der alte-Link-Import nicht im Zugriffsprotokoll erfasst
