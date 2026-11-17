@@ -325,6 +325,16 @@ public class AblageStub implements AblagePort {
     }
 
     @Override
+    public synchronized long speicherbedarf(MandantCode mandant) {
+        String vorsatz = mandant.wert() + "/";
+        return versionen.entrySet().stream()
+                .filter(e -> e.getKey().startsWith(vorsatz))
+                .flatMap(e -> e.getValue().stream())
+                .mapToLong(Version::groesse)
+                .reduce(0L, Math::addExact);
+    }
+
+    @Override
     public synchronized Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion objekt) {
         if (objekt.loeschmarke() || objekt.schluessel().startsWith("eingang/")) {
             return Optional.empty();
