@@ -14,7 +14,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
 
 ## Welle 17 — Modell, Prüfung, Datei
 - [ ] 17.1 Entscheide und Folgeänderungen [Fabian]
-  - Verfahren der KI-Abnahme ohne Golden-Datensatz (8.9, spätestens vor Welle 10).
+  - [offen: Entscheid Fabian] Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9, spätestens vor Welle 10).
   - Folgeänderungen in Spec 01–04 und Steering nach design.md «Folgeänderungen» als eigener PR.
   - _Anforderungen: 8.9_
 

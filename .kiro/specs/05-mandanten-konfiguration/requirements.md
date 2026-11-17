@@ -330,7 +330,7 @@ kennen, damit ich keine fremden Kategorien sehe.
    Jahresexport: ohne Finanzfunktionen bietet das Archiv die Werkzeuge dem Agenten nicht an und beantwortet den
    Export für Rollen mit Exportrecht mit HTTP 404, für die übrigen Rollen bleibt es bei HTTP 403 nach Spec 02, 7.5.
 9. Ein Mandant ohne eigenen Golden-Datensatz (z. B. `vhf-gsk`) SOLL die KI-Freigabe nach 8.4 erst nach einer
-   Abnahme erhalten: [offen: Verfahren der Abnahme ohne Golden-Datensatz – Entscheid vor Welle 10].
+   Abnahme erhalten: [offen: Entscheid Fabian] (Verfahren der Abnahme ohne Golden-Datensatz, spätestens vor Welle 10).
    Nachweis: manuell [Fabian].
 
 ### Requirement 9: Bestand und Abnahme (ohne Konzept-ID, nicht funktional)
