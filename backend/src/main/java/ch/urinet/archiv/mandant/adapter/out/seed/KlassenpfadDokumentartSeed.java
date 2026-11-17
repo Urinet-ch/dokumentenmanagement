@@ -61,14 +61,14 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                 }
             }
             ergebnis.add(new DokumentartVorlage(
-                    text(art, "code", pfad), text(art, "name", pfad), beschreibung(art, pfad), liste(art.path("gruppen")),
-                    liste(art.path("pflichtfelder")),
+                    text(art, "code", pfad), text(art, "name", pfad), beschreibung(art, pfad),
+                    liste(art, "gruppen", pfad), liste(art, "pflichtfelder", pfad),
                     art.path("zusatz_schema").isMissingNode() ? null : art.path("zusatz_schema").toString(),
                     text(art, "vertraulichkeit", pfad),
                     jahre(art, pfad),
-                    art.path("aufbewahrung_ab").isTextual() ? art.path("aufbewahrung_ab").asText() : null,
+                    aufbewahrungAb(art, pfad),
                     pflicht(art, pfad),
-                    art.path("aktiv").asBoolean(true)));
+                    aktiv(art, pfad)));
         }
         return ergebnis;
     }
@@ -105,9 +105,43 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
         return jahre.intValue();
     }
 
-    private static List<String> liste(JsonNode knoten) {
+    private static String aufbewahrungAb(JsonNode art, String pfad) {
+        JsonNode ab = art.path("aufbewahrung_ab");
+        if (ab.isMissingNode() || ab.isNull()) {
+            return null;
+        }
+        if (!ab.isTextual() || ab.asText().isBlank()) {
+            throw ungueltig(pfad, "Feld aufbewahrung_ab ist kein Text");
+        }
+        return ab.asText();
+    }
+
+    private static boolean aktiv(JsonNode art, String pfad) {
+        JsonNode aktiv = art.path("aktiv");
+        if (aktiv.isMissingNode()) {
+            return true;
+        }
+        if (!aktiv.isBoolean()) {
+            throw ungueltig(pfad, "Feld aktiv ist nicht boolesch");
+        }
+        return aktiv.booleanValue();
+    }
+
+    private static List<String> liste(JsonNode art, String feld, String pfad) {
+        JsonNode knoten = art.path(feld);
+        if (knoten.isMissingNode()) {
+            return List.of();
+        }
+        if (!knoten.isArray()) {
+            throw ungueltig(pfad, "Feld " + feld + " ist kein Array");
+        }
         List<String> werte = new ArrayList<>();
-        knoten.forEach(w -> werte.add(w.asText()));
+        for (JsonNode wert : knoten) {
+            if (!wert.isTextual()) {
+                throw ungueltig(pfad, "Feld " + feld + " enthält einen Nicht-Text");
+            }
+            werte.add(wert.textValue());
+        }
         return werte;
     }
 

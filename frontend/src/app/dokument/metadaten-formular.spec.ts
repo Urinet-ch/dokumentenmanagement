@@ -35,7 +35,7 @@ const ARTEN: Dokumentart[] = [
     code: 'BULLETIN',
     name: 'Bulletin',
     gruppen: [],
-    pflichtfelder: ['titel', 'datum'],
+    pflichtfelder: ['titel', 'datum', 'zusatz.verband'],
     zusatzSchema: {
       type: 'object',
       properties: {
@@ -44,6 +44,7 @@ const ARTEN: Dokumentart[] = [
         ausgabe: { type: 'string' },
         jahr: { type: 'integer' },
         fachgebiet: { type: 'string' },
+        verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1, uniqueItems: true },
         veroeffentlicht: { type: 'boolean', default: false },
       },
     },
@@ -171,7 +172,7 @@ describe('MetadatenFormular (Req 10.1)', () => {
     await oeffnen({
       ...DOKUMENT,
       art: 'BULLETIN',
-      zusatz: { zugriff: 'mitglieder', veroeffentlicht: vorher },
+      zusatz: { zugriff: 'mitglieder', verband: ['vhf'], veroeffentlicht: vorher },
     });
     eingeben('#bearbeiten-zusatz-veroeffentlicht', wert);
     eingeben('#bearbeiten-grund', grund);
@@ -180,6 +181,7 @@ describe('MetadatenFormular (Req 10.1)', () => {
     expect(port.aufrufe).toHaveLength(1);
     expect(port.aufrufe[0].aenderung.zusatz).toEqual({
       zugriff: 'mitglieder',
+      verband: ['vhf'],
       veroeffentlicht: wert === 'true',
     });
     expect(port.aufrufe[0].aenderung.grund).toBe(grund);
@@ -275,6 +277,31 @@ describe('MetadatenFormular (Req 10.1)', () => {
     expect(port.aufrufe).toEqual([]);
     expect(fehler()).toBe(T.grundFehlt);
     expect(element.querySelector('#bearbeiten-grund')!.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  describe('Listenfeld (Array)', () => {
+    const BULLETIN = { ...DOKUMENT, art: 'BULLETIN', zusatz: { verband: ['vhf'] } };
+    const box = (wert: string) =>
+      element.querySelector<HTMLInputElement>(`[data-test=listenfeld] input[value=${wert}]`)!;
+
+    it('zeigt die Auswahl und sendet geänderte Werte als Array', async () => {
+      await oeffnen(BULLETIN);
+      expect(box('vhf').checked).toBe(true);
+      expect(box('gsk').checked).toBe(false);
+      box('gsk').click();
+      eingeben('#bearbeiten-grund', 'Verband ergänzt');
+      await speichern();
+      expect(port.aufrufe[0].aenderung).toEqual({ zusatz: { verband: ['vhf', 'gsk'] }, grund: 'Verband ergänzt' });
+    });
+
+    it('lässt ein leeres Pflichtfeld nicht zu und markiert es', async () => {
+      await oeffnen(BULLETIN);
+      box('vhf').click();
+      eingeben('#bearbeiten-grund', 'Verband entfernt');
+      await speichern();
+      expect(port.aufrufe).toEqual([]);
+      expect(box('gsk').getAttribute('aria-invalid')).toBe('true');
+    });
   });
 
   it('speichert die Änderung mit Grund und der geladenen Version', async () => {

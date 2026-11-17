@@ -23,9 +23,17 @@ class DokumentartTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "A", "spende", "1ART", "ART-X", "AÖ", "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNO"})
+    @ValueSource(strings = {"", "A", "spende", "1ART", "ART-X", "AÖ", " AB", "A B", "AB ",
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNO"})
     void ungueltigerCode(String code) {
         assertUngueltig(() -> art(code, List.of(), List.of("titel")));
+    }
+
+    @Test
+    void codeMitVierzigZeichenIstGueltig() {
+        String code = "A" + "B".repeat(39);
+
+        assertThat(art(code, List.of(), List.of("titel")).code()).isEqualTo(code);
     }
 
     @ParameterizedTest

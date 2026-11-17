@@ -153,7 +153,12 @@ export class DokumentAnsicht {
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
       .map(([name, wert]) => ({
         name,
-        wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert),
+        wert:
+          Array.isArray(wert) && wert.every((e) => typeof e !== 'object')
+            ? wert.join(', ')
+            : typeof wert === 'object'
+              ? JSON.stringify(wert)
+              : String(wert),
       }));
   });
 

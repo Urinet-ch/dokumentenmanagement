@@ -30,12 +30,14 @@ import {
   VERTRAG_FELDER,
   ZusatzFeld,
   aenderungAus,
+  istListe,
   feldText,
   formularAus,
   formularFeld,
   zusatzFelder,
 } from './aenderung';
 import { DokumentPort } from './dokument-port';
+import { Listenfeld } from './listenfeld';
 
 const NEU_LADEN = new Set(['STATUS_KONFLIKT', 'VERSION_KONFLIKT', 'NICHT_GEFUNDEN']);
 const IM_FORMULAR: Record<string, string> = {
@@ -65,7 +67,7 @@ const TYPEN: Partial<Record<TextFeld, Eingabe['typ']>> = {
  */
 @Component({
   selector: 'app-metadaten-formular',
-  imports: [MatButtonModule, NgTemplateOutlet],
+  imports: [MatButtonModule, NgTemplateOutlet, Listenfeld],
   templateUrl: './metadaten-formular.html',
   styleUrl: './metadaten-formular.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -96,6 +98,7 @@ export class MetadatenFormular {
   protected readonly vertraulichkeiten = ['NORMAL', 'INTERN', 'PERSONAL'];
   protected readonly grundMax = GRUND_MAX;
   protected readonly feldText = feldText;
+  protected readonly istListe = istListe;
 
   private readonly start = computed(() => formularAus(this.dokument()));
   protected readonly formular = linkedSignal<Formular>(() => {

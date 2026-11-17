@@ -349,3 +349,87 @@ Then(
     assert.ok(!JSON.stringify(body).includes(name), JSON.stringify(body));
   },
 );
+
+// Listenfelder (Arrays) im Zusatz-Schema der Art (Spec 03, 3.1: Geschäftsstelle bestätigt im Eingangskorb)
+Given(
+  /^das Archiv kennt die Dokumentart «([^»]+)» mit dem Pflichtfeld «([^»]+)» als Mehrfachauswahl «([^»]+)»$/,
+  function (name, feld, werte) {
+    this.archiv.arten.push({
+      code: name.toUpperCase(),
+      name,
+      gruppen: [],
+      // Wie im Seed vhf-gsk: Das Pflichtfeld steht nur im Schema unter `required`, nicht in `pflichtfelder`.
+      pflichtfelder: ['titel'],
+      zusatzSchema: {
+        type: 'object',
+        properties: {
+          [feld]: {
+            type: 'array',
+            items: { type: 'string', enum: werte.split(', ') },
+            minItems: 1,
+            uniqueItems: true,
+          },
+        },
+        required: [feld],
+        additionalProperties: false,
+      },
+      vertraulichkeit: 'NORMAL',
+      gesetzlichePflicht: false,
+      aktiv: true,
+    });
+  },
+);
+
+const auswahl = (welt, titel, feld) =>
+  eintrag(welt, titel).getByRole('group', { name: new RegExp(`^${feld}`) });
+
+When(
+  /^ich beim Eintrag «([^»]+)» im Feld «([^»]+)» «([^»]+)» ankreuze$/,
+  async function (titel, feld, wert) {
+    await tippen(this, auswahl(this, titel, feld).getByRole('checkbox', { name: wert, exact: true }));
+  },
+);
+
+When(
+  /^ich beim Eintrag «([^»]+)» im Feld «([^»]+)» «([^»]+)» mit der Tastatur ankreuze$/,
+  async function (titel, feld, wert) {
+    const box = auswahl(this, titel, feld).getByRole('checkbox', { name: wert, exact: true });
+    await box.focus();
+    await this.seite.keyboard.press('Space');
+  },
+);
+
+Then(
+  /^ist beim Eintrag «([^»]+)» im Feld «([^»]+)» «([^»]+)» angekreuzt$/,
+  async function (titel, feld, wert) {
+    assert.ok(
+      await auswahl(this, titel, feld).getByRole('checkbox', { name: wert, exact: true }).isChecked(),
+    );
+  },
+);
+
+Then(
+  /^ist beim Eintrag «([^»]+)» die Auswahl «([^»]+)» als ungültig markiert$/,
+  async function (titel, feld) {
+    const box = auswahl(this, titel, feld).getByRole('checkbox').first();
+    await warten(
+      async () => (await box.getAttribute('aria-invalid')) === 'true',
+      `Auswahl «${feld}» nicht ungültig`,
+    );
+  },
+);
+
+Then(
+  /^hat das Archiv für «([^»]+)» die Zusatzangabe «([^»]+)» als Liste «([^»]+)» gespeichert und bestätigt$/,
+  async function (titel, feld, werte) {
+    const aktion = (name) => () =>
+      this.archiv.aktionen.find((a) => a.titel === titel && a.aktion === name && !a.abgelehnt);
+    await warten(() => Boolean(aktion('bestaetigen')()), `«${titel}» nicht bestätigt`);
+    const aendern = aktion('aendern')();
+    assert.ok(aendern, 'Zusatzangaben nicht gespeichert');
+    assert.deepEqual(aendern.body.zusatz[feld], werte.split(', '));
+    assert.equal(aendern.ifMatch, '"1"');
+    // das Bestätigen folgt auf die gespeicherte Version
+    assert.equal(aktion('bestaetigen')().ifMatch, '"2"');
+  },
+);

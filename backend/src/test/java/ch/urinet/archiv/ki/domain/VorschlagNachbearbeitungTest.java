@@ -28,6 +28,7 @@ class VorschlagNachbearbeitungTest {
             new ArtEintrag("OFFERTE", "Offerte", "NORMAL"),
             new ArtEintrag("LIEFERANTENBELEG", "Lieferantenbeleg", "INTERN"),
             new ArtEintrag("QUITTUNG", "Quittung / Spesen", "INTERN"),
+            new ArtEintrag("LOHNABRECHNUNG", "Lohnabrechnung", "PERSONAL"),
             new ArtEintrag("VERTRAG", "Vertrag", "PERSONAL"),
             new ArtEintrag("PROJEKTDOKUMENT", "Projektdokument", "NORMAL"));
     static final LocalDate EINGANG = LocalDate.of(2026, 11, 12);
@@ -254,6 +255,28 @@ class VorschlagNachbearbeitungTest {
                 EIGENER_KOPF).art()).isEqualTo("AUSGANGSRECHNUNG");
         assertThat(bearbeite(roh("PROJEKTDOKUMENT", "O-2026-005", new BigDecimal("0.9"), null), Optional.empty(),
                 FREMDER_KOPF).art()).isEqualTo("PROJEKTDOKUMENT");
+    }
+
+    @Test
+    void musterSetzenDieArtNurBeiVollstaendigerNummer() {
+        for (String nummer : List.of("x2026-003", "2026-003x", "2026-003/1")) {
+            Vorschlag v = bearbeite(roh("PROJEKTDOKUMENT", nummer, new BigDecimal("0.9"), null), Optional.empty(),
+                    EIGENER_KOPF);
+
+            assertThat(v.art()).as(nummer).isEqualTo("PROJEKTDOKUMENT");
+        }
+    }
+
+    @Test
+    void lohnabrechnungWirdBeiFremdemQrNichtUmgestuft() {
+        QrDaten qr = new QrDaten(FREMDE_IBAN, new BigDecimal("250.5"), "CHF", "NON", null, "Lieferant GmbH");
+
+        Vorschlag v = bearbeite(roh("LOHNABRECHNUNG", null, new BigDecimal("0.9"), "PERSONAL"), Optional.of(qr),
+                FREMDER_KOPF + "\n" + UID);
+
+        assertThat(v.art()).isEqualTo("LOHNABRECHNUNG");
+        assertThat(v.umstufung()).isNull();
+        assertThat(v.vertraulichkeit()).isEqualTo("PERSONAL");
     }
 
     /** Eine Regel setzt keine Art, die beim Mandanten nicht aktiv ist; die Art des Modells bleibt. */

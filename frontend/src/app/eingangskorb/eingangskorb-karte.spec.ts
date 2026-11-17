@@ -670,4 +670,151 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       }
     });
   });
+
+  describe('Listenfelder (Arrays) im Zusatz-Schema', () => {
+    const VERBAND_ART: Dokumentart = {
+      ...VHF_ART,
+      pflichtfelder: [...VHF_ART.pflichtfelder, 'zusatz.verband'],
+      zusatzSchema: {
+        type: 'object',
+        properties: {
+          ...(VHF_ART.zusatzSchema as { properties: object }).properties,
+          verband: {
+            type: 'array',
+            items: { type: 'string', enum: ['vhf', 'gsk'] },
+            minItems: 1,
+            uniqueItems: true,
+          },
+          stichworte: { type: 'array', items: { type: 'string' } },
+        },
+      },
+    };
+    const feldAusfuellen = () => {
+      const textfeld = (id: string, value: string) => {
+        const input = element.querySelector<HTMLInputElement>(id)!;
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+      };
+      textfeld('#d1-zusatz-reihe', 'Bulletin');
+      textfeld('#d1-zusatz-ausgabe', '12');
+      textfeld('#d1-zusatz-jahr', '2026');
+      const fachgebiet = element.querySelector<HTMLSelectElement>('#d1-zusatz-fachgebiet')!;
+      fachgebiet.value = 'Technik';
+      fachgebiet.dispatchEvent(new Event('change'));
+    };
+    const checkbox = (wert: string) =>
+      element.querySelector<HTMLInputElement>(`[data-test=listenfeld] input[type=checkbox][value=${wert}]`)!;
+    async function umschalten(wert: string) {
+      checkbox(wert).click();
+      await fixture.whenStable();
+    }
+
+    it('zeigt ein Mehrfachfeld als Checkbox-Gruppe mit Beschriftung, Pflichtstern und Hinweis', async () => {
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      const gruppe = element.querySelector<HTMLFieldSetElement>('fieldset[data-test=listenfeld]')!;
+      expect(gruppe.querySelector('legend')?.textContent).toContain('Verband');
+      expect(gruppe.querySelector('legend')?.textContent).toContain('*');
+      expect([...gruppe.querySelectorAll('label')].map((l) => l.textContent?.trim())).toEqual(['vhf', 'gsk']);
+      expect(checkbox('vhf').checked).toBe(false);
+      expect(checkbox('vhf').getAttribute('aria-required')).toBe('true');
+      expect(gruppe.textContent).toContain('Mindestens einen Wert auswählen.');
+    });
+
+    it('zeigt die gespeicherten Werte als gewählt', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['gsk'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      expect(checkbox('vhf').checked).toBe(false);
+      expect(checkbox('gsk').checked).toBe(true);
+    });
+
+    it('meldet ein leeres Pflicht-Listenfeld und sendet nichts', async () => {
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.bestaetigen);
+      feldAusfuellen();
+      await klicken(T.bestaetigen);
+      http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+      expect(element.textContent).toContain(T.fehlerPflichtfelder(feldName('zusatz.verband')));
+      expect(checkbox('vhf').getAttribute('aria-invalid')).toBe('true');
+    });
+
+    it('sendet die gewählten Werte als Array an PATCH und bestätigt danach', async () => {
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.bestaetigen);
+      feldAusfuellen();
+      await umschalten('gsk');
+      await umschalten('vhf');
+      await klicken(T.bestaetigen);
+      const patch = http.expectOne({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+      expect(patch.request.body.zusatz.verband).toEqual(['vhf', 'gsk']);
+      patch.flush(dokument({ art: 'BULLETIN', version: 4, zusatz: patch.request.body.zusatz }));
+      await fixture.whenStable();
+      http.expectOne('/api/v1/dokumente/d1/bestaetigen').flush(null, { status: 202, statusText: 'Accepted' });
+      await fixture.whenStable();
+      expect(erledigt).toHaveLength(1);
+    });
+
+    it('lässt Auswahl wieder abwählen und meldet dann den Pflichtfehler', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.bestaetigen);
+      feldAusfuellen();
+      await umschalten('vhf');
+      await klicken(T.bestaetigen);
+      http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+      expect(element.textContent).toContain(T.fehlerPflichtfelder(feldName('zusatz.verband')));
+    });
+
+    it('bearbeitet eine Liste freier Texte mit Hinzufügen (Knopf und Enter) und Entfernen', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      const eingabe = element.querySelector<HTMLInputElement>('#d1-zusatz-stichworte')!;
+      eingabe.value = 'Eis';
+      eingabe.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+      await fixture.whenStable();
+      eingabe.value = 'Bad';
+      await klicken('Hinzufügen');
+      const eintraege = () =>
+        [...element.querySelectorAll('.eintraege li > span:first-child')].map((e) => e.textContent?.trim());
+      expect(eintraege()).toEqual(['Eis', 'Bad']);
+      await klicken('Entfernen');
+      expect(eintraege()).toEqual(['Bad']);
+    });
+
+    it('übernimmt einen getippten, nicht bestätigten Eintrag beim Verlassen des Felds', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      const eingabe = element.querySelector<HTMLInputElement>('#d1-zusatz-stichworte')!;
+      eingabe.value = 'Rechnung';
+      eingabe.dispatchEvent(new Event('blur'));
+      await fixture.whenStable();
+      expect([...element.querySelectorAll('.eintraege li > span:first-child')].map((e) => e.textContent?.trim())).toEqual([
+        'Rechnung',
+      ]);
+      expect(eingabe.value).toBe('');
+    });
+
+    it('zeigt einen Altwert ausserhalb des Schemas als gewählt und lässt ihn abwählen', async () => {
+      await zeigen(dokument({ art: 'BULLETIN', zusatz: { verband: ['alt', 'vhf'] } }), 'geschaeftsstelle', [VERBAND_ART]);
+      await klicken(T.aendern);
+      expect(checkbox('alt').checked).toBe(true);
+      await umschalten('gsk');
+      expect(checkbox('alt').checked).toBe(true);
+    });
+
+    it('erkennt ein Pflichtfeld, das nur im Schema unter `required` steht (Seed vhf-gsk)', async () => {
+      const nurSchema: Dokumentart = {
+        ...VERBAND_ART,
+        pflichtfelder: VHF_ART.pflichtfelder,
+        zusatzSchema: { ...(VERBAND_ART.zusatzSchema as object), required: ['verband'] },
+      };
+      await zeigen(dokument({ art: 'BULLETIN' }), 'geschaeftsstelle', [nurSchema]);
+      await klicken(T.aendern);
+      expect(checkbox('vhf').getAttribute('aria-required')).toBe('true');
+      await klicken(T.bestaetigen);
+      feldAusfuellen();
+      await klicken(T.bestaetigen);
+      http.expectNone({ method: 'PATCH', url: '/api/v1/dokumente/d1' });
+      expect(element.textContent).toContain(T.fehlerPflichtfelder(feldName('zusatz.verband')));
+    });
+  });
 });
