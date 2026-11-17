@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant;
 
 import ch.urinet.archiv.ArchivMain;
+import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.verarbeitung.adapter.in.kommando.EmbeddingKommando;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
@@ -8,6 +9,8 @@ import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,5 +78,14 @@ class MandantKommandoTest {
     void embeddingFalscheOption(LaunchResult ergebnis) {
         assertThat(ergebnis.getErrorOutput()).contains(EmbeddingKommando.AUFRUF);
         assertThat(ergebnis.getOutput()).as("ohne Start").doesNotContain("Installed features");
+    }
+
+    @Test
+    void vollexportAufrufUndDownloadWerdenVorDemStartGeprueft() {
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk", "--download",
+                "bc9b7ac8-0ddd-4ab8-9850-27a7f598f0d7"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("export", ""))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk", "--download", "ungueltig"))).isFalse();
     }
 }

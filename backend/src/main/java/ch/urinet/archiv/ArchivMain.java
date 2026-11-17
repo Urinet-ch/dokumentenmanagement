@@ -159,7 +159,7 @@ public class ArchivMain implements QuarkusApplication {
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
         return switch (liste.getFirst()) {
-            case "mandant" -> MandantKommando.lesen(rest).isPresent() ? Optional.empty()
+            case "mandant" -> MandantKommando.gueltig(rest) ? Optional.empty()
                     : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);
