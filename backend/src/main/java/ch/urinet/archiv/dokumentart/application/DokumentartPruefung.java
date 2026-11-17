@@ -34,7 +34,7 @@ public class DokumentartPruefung {
         pflichtfelderPruefen(art, schemaFelder);
         if (!schemaFelder.containsAll(kiFelder)
                 || kiFelder.contains("zugriff") || kiFelder.contains("veroeffentlicht")
-                || !schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
+                || !schemaPruefer.reservierteFelderGueltig(art.zusatzSchema(), art.code())) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
     }
@@ -43,7 +43,7 @@ public class DokumentartPruefung {
     public void seedPruefen(Dokumentart art) {
         Set<String> schemaFelder = schemaPruefer.seedSchemaPruefen(art.zusatzSchema());
         pflichtfelderPruefen(art, schemaFelder);
-        if (!schemaPruefer.reservierteFelderGueltig(art.zusatzSchema())) {
+        if (!schemaPruefer.reservierteFelderGueltig(art.zusatzSchema(), art.code())) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
     }

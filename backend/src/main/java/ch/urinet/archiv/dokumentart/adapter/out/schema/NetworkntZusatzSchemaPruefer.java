@@ -263,7 +263,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
-    public boolean reservierteFelderGueltig(String schemaJson) {
+    public boolean reservierteFelderGueltig(String schemaJson, String artCode) {
         try {
             JsonNode schema = StrengesJson.lesen(schemaJson);
             if (schema == null || !schema.isObject()) {
@@ -276,8 +276,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             if (!properties.isObject()) {
                 return false;
             }
+            String zugriffStandard = "VORSTANDSPROTOKOLL".equals(artCode) ? "vorstand" : "mitglieder";
             return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
-                    List.of("oeffentlich", "mitglieder", "vorstand"), "mitglieder")
+                    List.of("oeffentlich", "mitglieder", "vorstand"), zugriffStandard)
                     && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",
                     List.of(), "false");
         } catch (JsonProcessingException e) {

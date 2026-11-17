@@ -45,7 +45,7 @@ class DokumentartPruefungTest {
         }
 
         @Override
-        public boolean reservierteFelderGueltig(String schemaJson) {
+        public boolean reservierteFelderGueltig(String schemaJson, String artCode) {
             aufrufe.add("reservierteFelderGueltig");
             return reservierteFelderGueltig;
         }

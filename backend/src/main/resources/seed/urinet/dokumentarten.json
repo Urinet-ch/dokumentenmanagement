@@ -63,8 +63,7 @@
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
       "gesetzliche_pflicht": true,
-      "aktiv": true,
-      "selbst_ausgestellt": true
+      "aktiv": true
     },
     {
       "code": "LOHNABRECHNUNG",

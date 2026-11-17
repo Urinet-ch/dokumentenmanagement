@@ -612,16 +612,22 @@ class NetworkntZusatzSchemaPrueferTest {
                   "zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"mitglieder"},
                   "veroeffentlicht":{"type":"boolean","default":false}},
                  "required":["zugriff","veroeffentlicht"]}""";
-        assertThat(pruefer.reservierteFelderGueltig(gueltig)).isTrue();
+        assertThat(pruefer.reservierteFelderGueltig(gueltig, "BULLETIN")).isTrue();
         assertThat(pruefer.reservierteFelderGueltig("""
                 {"type":"object","properties":{"zugriff":{"type":"string","enum":["mitglieder","oeffentlich"],
-                "default":"mitglieder"}},"required":["zugriff"]}""")).isFalse();
+                "default":"mitglieder"}},"required":["zugriff"]}""", "BULLETIN")).isFalse();
         assertThat(pruefer.reservierteFelderGueltig("""
                 {"type":"object","properties":{"veroeffentlicht":{"type":"string","default":false}},
-                "required":["veroeffentlicht"]}""")).isFalse();
+                "required":["veroeffentlicht"]}""", "BULLETIN")).isFalse();
         assertThat(pruefer.reservierteFelderGueltig("""
                 {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder",
-                "vorstand"],"default":"oeffentlich"}},"required":["zugriff"]}""")).isFalse();
+                "vorstand"],"default":"oeffentlich"}},"required":["zugriff"]}""", "BULLETIN")).isFalse();
+        String vorstandsprotokoll = """
+                {"type":"object","properties":{
+                  "zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"vorstand"}},
+                 "required":["zugriff"]}""";
+        assertThat(pruefer.reservierteFelderGueltig(vorstandsprotokoll, "VORSTANDSPROTOKOLL")).isTrue();
+        assertThat(pruefer.reservierteFelderGueltig(vorstandsprotokoll, "BULLETIN")).isFalse();
     }
 
     private static String musterSchema(String muster) {
