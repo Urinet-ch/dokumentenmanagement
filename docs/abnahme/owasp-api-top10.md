@@ -4,6 +4,8 @@
 
 Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gegenüber der ersten Fassung `dd80b6a8` änderten sich nur Frontend und zwei Feature-Dateien unter `dokument` und `suche`, die Backend-Quellen und alle zitierten Zeilen sind unverändert) gegen Req 9.2 sowie die Anforderungen 11–15 von Spec 03. Geprüft wurden die vorhandenen Endpunkte der Webseiten-Schnittstelle und die zugehörigen Tests. Es wurden weder Staging noch produktive Systeme angesprochen; die ZAP-Baseline gegen Staging bleibt offen.
 
+Ergänzung F1 am 17.11.2026 (Aufgabe 12.3 Teil 2, aufbauend auf #253 und #263): Die Erfassung ist implementiert. Die folgenden aktualisierten Abschnitte API1, API3, API4, API5, API7 und API9 beziehen ihre Erfassungsnachweise aus `features/sicherheit/mandanten-isolation.feature` (Grössen: Zeile 12; Scope-Matrix: 25; ID-Raten: 36; Hilfslisten: 48; Referenzen: 60 und 89; Bearbeiter: 103), `features/integration/webseiten-erfassung.feature` und `features/integration/webseiten-pflege.feature` sowie den dort genannten JUnit-Tests. F2–F4 wurden in diesem Teil nicht erneut beurteilt.
+
 «Lücke» bezeichnet hier eine fehlende Sicherheitsabdeckung oder eine nicht umgesetzte Funktion. Sie ist nicht gleichbedeutend mit einer bestätigten ausnutzbaren Schwachstelle. In den vorhandenen Lese-, Datei-, Feed- und Chat-Endpunkten wurde kein hoch oder kritisch eingestufter, bestätigter Befund festgestellt.
 
 ## Abdeckung der Punkte aus Req 9.2
@@ -15,12 +17,12 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 | Feed und Referenzen fremder Mandanten | ok | `webseiten-feed.feature:153`, `:192` |
 | Chat fremder Mandanten und Stufen | ok | `oeffentlicher-chat.feature:363` |
 | Stufe `vorstand` und zwei Schlüssel desselben Mandanten mit verschiedenen Stufen (Req 9.4) | ok | API1; `webseiten-lesen.feature:344`, `:363`; `zugriffsstufen.feature:47`; `webseiten-datei.feature:26`, `:40` |
-| Erfassung | noch nicht umgesetzt | Aufgabe 11.10; Folgeaufgabe F1 |
+| Erfassung | ok, Code- und Szenariennachweis | Aufgabe 11.10; F1 unten; `mandanten-isolation.feature` |
 | Erschöpfung der Schlüsselprüfung durch fremde Anfragen | Lücke, mittel | API2; Folgeaufgabe F2 |
 
 **Folgeaufgaben** (stehen als Vermerk in `tasks.md` unter 12.3; keine Haken gesetzt):
 
-- **F1:** Erfassung (Aufgabe 11.10) mit nachweisbaren Grenzen für Requestgrösse, Dateigrösse und Rate, Feld-Allowlist und Schutz vor Massenänderungen (BOPLA), Scope-Test mit beiden Schlüsselarten (BFLA), Vertrag und Endpunktinventar (API9) und ausschliesslich Datei-Bytes ohne URL-Abruf (API7).
+- **F1 – erledigt (Code-/Testnachweis):** Erfassung (Aufgabe 11.10) mit Grenzen für Requestgrösse, Dateigrösse und Rate (API4), Feld-Allowlist und Schutz vor Massenänderungen (API3), automatischer Scope-Matrix für beide Schlüsselarten und Mandanten (API5), Vertrag und Endpunktinventar (API9) sowie ausschliesslich Datei-Bytes ohne URL-Abruf (API7). Der manuelle ZAP-Nachweis bleibt getrennt offen.
 - **F2:** Test «N ungültige Schlüssel einer Quelle blockieren einen kalten Schlüssel und einen Erfassungs-Schlüssel nicht», Drosselung je Quelle vor der `HashSperre` (Traefik, Aufgabe 11.6, #241) und Klärung der Vertrauensfrage bei `X-Real-Ip`.
 - **F3:** Budget des Chats als harte Obergrenze (Parallelität, Überschreiten durch die letzte Frage, Fehler beim Schreiben der Nutzung) mit Test.
 - **F4:** Test zum Fehlerpfad des Pro-Schlüssel-Limiters (fail open, bewusster Entscheid in design.md Spec 03, «Grenzen») mit Kennzahl `archiv_webseite_grenze_ausgefallen_total` als Alarm.
@@ -31,7 +33,9 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Belege:** `ApiTokenIdentityProvider` bindet Identität, Mandant und Scope (`backend/src/main/java/ch/urinet/archiv/sicherheit/adapter/in/auth/ApiTokenIdentityProvider.java:54-66`); `MandantAufloesung` und `MandantTenantResolver` lösen den Mandanten fail-closed auf (`backend/src/main/java/ch/urinet/archiv/mandant/application/MandantAufloesung.java:25-52`, `backend/src/main/java/ch/urinet/archiv/mandant/adapter/out/persistence/MandantTenantResolver.java:22-30`). `FesterFilter` beschränkt veröffentlichte Leseergebnisse auf die effektive Stufe (`backend/src/main/java/ch/urinet/archiv/integration/application/webseite/FesterFilter.java:26-39`); die SQL-Abfragen für Liste, Suche, Details, Filter und Umleitung binden Filter und Eingaben (`backend/src/main/java/ch/urinet/archiv/integration/adapter/out/persistence/SqlWebseitenLese.java:61-147`). Die gemeldete Stufe (`oeffentlich`, `mitglieder` oder `vorstand`) darf nicht höher als die des Schlüssels sein; die Filterprüfung weist dies zurück (`backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/LeseZugriffFilter.java:63-88`). Stufentrennung innerhalb eines Mandanten: `webseiten-lesen.feature:344` (ein öffentlicher Schlüssel sieht keine höheren Stufen), `:363` (gemeldete Stufe über der des Schlüssels ergibt 403), `zugriffsstufen.feature:47`, `webseiten-datei.feature:26` und `:40` (Stufen `mitglieder` und `vorstand` nur als Stream, sonst 404). Mandantenübergreifende Szenarien: `webseiten-lesen.feature` (Zeilen 310-330), `webseiten-feed.feature` (152-153), `webseiten-datei.feature` (92) und `oeffentlicher-chat.feature` (362-386).
 
-**Befund:** ok für die vorhandenen Lese-, Datei-, Such-, Feed- und Chat-Pfade.
+**Erfassung:** `mandanten-isolation.feature` prüft alle dokumentbezogenen Erfassungsaktionen aus dem automatisch ermittelten Inventar in beide Mandantenrichtungen: fremde ID und unbekannte ID ergeben dieselben Problem Details (nur `instance` unterscheidet sich), ohne ETag oder Location; eine eigene positive Gegenprobe schliesst einen pauschal gesperrten Endpunkt aus. Weitere Szenarien prüfen Eingangskorb, Liste, mandanteneigene Formulararten, dieselbe Referenz in zwei Mandanten und zwei Webseiten sowie getrennte Bearbeiterverzeichnisse. `webseiten-feed.feature:192` belegt getrennte Erfassungs-Feeds, `:113` die Referenzsicht je Webseite; `mandanten-isolation.feature` ergänzt Status, Details und Liste.
+
+**Befund:** ok für die vorhandenen Lese-, Erfassungs-, Datei-, Such-, Feed- und Chat-Pfade.
 
 **Restrisiko:** Die Webseite meldet die Zugriffsstufe ihrer Besucherin oder ihres Besuchers; das Archiv begrenzt sie auf die Höchststufe des Schlüssels, verifiziert aber keine Website-Mitgliedschaft. Ein gestohlener Schlüssel erlaubt Zugriff bis zu seiner konfigurierten Höchststufe.
 
@@ -60,11 +64,11 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Bedeutung:** Antworten dürfen nur freigegebene Felder enthalten; Schreibpfade müssen geschützte Felder wie Zugriffsstufe und Veröffentlichung gegen unzulässige Massenänderungen absichern.
 
-**Belege:** Vorhandene Leseantworten werden über explizite DTO-Felder aufgebaut (`backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/WebseitenLesenResource.java:104-188`). Die produktiven Ressourcen enthalten Lese-, Datei-, Feed- und Chat-Pfade, aber keine produktiven Bestätigungs- oder Metadatenänderungs-Handler (`WebseitenLesenResource.java:191-374`, `backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/AenderungFeedResource.java:97-162`, `backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/OeffentlicherChatResource.java:76-108`). Spec 03 Req 10.5–10.6 verlangt solche Mutationen. Verhaltensbelege der Leseseite: `webseiten-lesen.feature:166` (Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug» und nur diese) und `:171-178` (nie Dateiname, Vertraulichkeit, Status, Partner oder eine URL).
+**Belege:** Vorhandene Leseantworten werden über explizite DTO-Felder aufgebaut (`backend/src/main/java/ch/urinet/archiv/integration/adapter/in/rest/webseite/WebseitenLesenResource.java:104-188`). Verhaltensbelege der Leseseite: `webseiten-lesen.feature:166` (Felder «id,titel,reihe,ausgabe,jahr,datum,zugriff,seiten,auszug» und nur diese) und `:171-178` (nie Dateiname, Vertraulichkeit, Status, Partner oder eine URL). Die Erfassung verwendet ebenfalls eigene DTOs. `ErfassungsMetadatenTest.unerlaubteFelderTypenUndMehrdeutigesJsonSindRot` und `webseiten-pflege.feature:42` prüfen die strikte Feld-Allowlist für PATCH und Bestätigen, einschliesslich `dateiname`, `mandant`, `status`, direkter Veröffentlichung, falscher Typen, doppelter Schlüssel und nachfolgenden JSONs. `webseiten-pflege.feature:20` prüft den vollständigen Rollback bei ungültiger Bestätigung. Veröffentlichung und Rückzug sind eigene, versionsgeprüfte Aktionen (`:86`); A8 gilt für Vertraulichkeit und Personenzuordnung. `ErfassungsMetadatenTest.personenzuordnungIstNurBeimBestaetigenWieInDerWebAppErlaubt` belegt die engere PATCH-Allowlist.
 
-**Befund:** ok für die Leseseite (Allowlist durch die genannten Szenarien belegt). Mutationen: noch nicht umgesetzt (Req 10.5–10.6, Aufgabe 11.10), Lücke – mittel, als Prüfbarkeitslücke. Für die noch fehlenden Mutationspfade lassen sich Feld-Allowlist und Schutz vor Massenänderungen noch nicht nachweisen; es wurde kein entsprechender produktiver Handler mit einer bestätigten Schwachstelle gefunden.
+**Befund:** ok für Lese- und Erfassungswege; die bisherige Prüfbarkeitslücke F1 ist geschlossen.
 
-**Restrisiko:** Die BOPLA-Prüfung muss bei Umsetzung der Erfassung und Änderung ergänzt werden (Folgeaufgabe F1, Aufgabe 11.10). Bis dahin lässt sich aus dieser Prüfliste keine Aussage über deren spätere Feldautorisierung ableiten.
+**Restrisiko:** Neue Schreibfelder müssen weiter ausdrücklich in Allowlist, Vertrag und Negativtests aufgenommen werden.
 
 ## API4: Unrestricted Resource Consumption
 
@@ -72,9 +76,11 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Belege:** Pro-Schlüssel-Grenzen für Lesen und Suche sowie getrennte Grenzen für Chat sind in `WebseitenGrenzen` und `OeffentlicheGrenzen` implementiert (`backend/src/main/java/ch/urinet/archiv/integration/application/webseite/WebseitenGrenzen.java:17-29,106-155`; `backend/src/main/java/ch/urinet/archiv/ki/application/oeffentlich/OeffentlicheGrenzen.java:18-29,86-117`). Streams sind global und je Schlüssel begrenzt und haben Zeitlimits (`backend/src/main/java/ch/urinet/archiv/integration/application/webseite/DateiPlaetze.java:11-17,46-97`; `backend/src/main/java/ch/urinet/archiv/integration/application/webseite/StreamLauf.java:17-28,88-115`). Der Feed ist auf höchstens 500 Einträge begrenzt (`backend/src/main/java/ch/urinet/archiv/integration/application/webseite/AenderungFeed.java:29-30,54-62`). Szenarien dazu: `webseiten-grenzen.feature:12-65` und `webseiten-datei.feature:150-203`.
 
-**Befund:** teilweise ok; die Grenzen für vorhandene Endpunkte sind belegt. Lücke – mittel, als Prüfbarkeitslücke: Es gibt keinen produktiven öffentlichen Upload-Endpunkt, daher belegen die allgemeine Uploadgrössen- und Upload-Ratenkonfiguration keine Begrenzung einer öffentlichen Erfassung. Der Fehlerpfad des Pro-Schlüssel-Limiters lässt bei einem unerwarteten Laufzeitfehler weiterlaufen (`WebseitenGrenzen.java:111-120`); ein vom Angreifer auslösbarer Fehler wurde nicht nachgewiesen. Das Verhalten ist in Spec 03 design.md («Grenzen», Fehler der Prüfung) als Entscheid begründet (fail open, Kennzahl `archiv_webseite_grenze_ausgefallen_total`); ein Test dazu fehlt (Folgeaufgabe F4).
+**Erfassung:** `mandanten-isolation.feature` prüft am echten Multipart-Endpunkt 51 MiB gegen die Dateigrenze von 50 MiB und 61 MiB gegen die Test-Anfragegrenze von 60 MiB: jeweils 413, keine Dokumente oder Referenzbindung. `webseiten-grenzen.feature:42` prüft die stündliche Uploadgrenze am echten Upload-Endpunkt (im Test 3 statt 120/h); `WebseitenGrenzenTest.uploadsSindProStundeBegrenztUndZaehlenImErfassungBucketMit` prüft den gemeinsamen Bucket. `WebseitenGrenzenTest.pruefdateienHabenEngereSpitzeUndZaehlenAuchImErfassungsbucket` belegt die zusätzliche Dateigrenze von 1/s, Spitze 2. `DateiStreamTest` prüft den tatsächlichen Erfassungs-Stream mit 50 MiB und weniger als 1 MiB Thread-Allokation; `WebseitenErfassungKnapperHeapTest` belegt nur den Hash-Pfad mit 96 MiB bei 64-MiB-Heap, ausdrücklich nicht das Multipart-Spooling.
 
-**Restrisiko:** Die Erfassung muss vor Bereitstellung eigene, nachweisbare Grenzen für Requestgrösse, Dateigrösse und Rate erhalten (Folgeaufgabe F1, Aufgabe 11.10). Für den bestehenden Limiter bleibt ein niedriges Restrisiko bei unerwarteten internen Fehlern.
+**Befund:** Erfassungsgrenzen nachgewiesen, F1 geschlossen. Unverändert separat: Der Fehlerpfad des Pro-Schlüssel-Limiters lässt bei einem unerwarteten Laufzeitfehler weiterlaufen; ein vom Angreifer auslösbarer Fehler wurde nicht nachgewiesen. Das Verhalten ist im Design als Entscheid begründet (fail open, Kennzahl `archiv_webseite_grenze_ausgefallen_total`); Folgeaufgabe F4 bleibt ausserhalb dieses Teilberichts.
+
+**Restrisiko:** Für den bestehenden Limiter bleibt ein niedriges Restrisiko bei unerwarteten internen Fehlern (F4).
 
 ## API5: Broken Function Level Authorization
 
@@ -82,9 +88,11 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Belege:** `ZugangFilter` verlangt den passenden Webseiten-Scope und weist nicht annotierte Pfade geschlossen ab (`backend/src/main/java/ch/urinet/archiv/sicherheit/adapter/in/rest/ZugangFilter.java:53-109`). `EndpunktWaechterTest.jederEndpunktFragtDieRegelAb` kontrolliert die REST-Endpunkte; der Wächter weist öffentliche Methoden ohne Zugangsannotation zurück (`backend/src/test/java/ch/urinet/archiv/sicherheit/EndpunktWaechterTest.java:86-95,168-190`). Szenarien prüfen die Trennung von Lese- und Erfassungsschlüsseln (`backend/src/test/resources/features/sicherheit/webseiten-schluessel.feature:15-23`).
 
-**Befund:** ok für implementierte Endpunkte; Lücke – mittel, als Prüfbarkeitslücke für die noch fehlenden Bestätigungs- und Änderungsaktionen aus Req 10.
+**Erfassung:** `mandanten-isolation.feature` durchläuft für beide Mandanten alle produktiven REST-Endpunkte aus `WebseitenEndpunkte.alle()` mit der jeweils falschen Schlüsselart: Lese-Schlüssel gegen sämtliche Erfassungswege einschliesslich Upload, Bearbeitermeldung, Feed, Hilfslisten und aller Mutationen; Erfassungs-Schlüssel gegen sämtliche Lesewege einschliesslich Chat. Jede Anfrage erwartet 403 `NICHT_ERLAUBT`. Das Inventar entsteht aus REST- und Zugangsannotationen, nicht aus einer handgepflegten Routenliste; der Endpunktwächter erzwingt die Annotation.
 
-**Restrisiko:** Die Test-Probe für Erfassung belegt nicht die Autorisierung künftiger produktiver Mutationspfade. Diese müssen vom Endpunktwächter erfasst und mit beiden Schlüsselarten getestet werden (Folgeaufgabe F1, Aufgabe 11.10).
+**Befund:** ok für implementierte Endpunkte; Prüfbarkeitslücke F1 geschlossen.
+
+**Restrisiko:** Die Scope-Matrix prüft die produktiven Endpunkte, nicht deaktivierte Test-Proben.
 
 ## API6: Unrestricted Access to Sensitive Business Flows
 
@@ -102,9 +110,11 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Belege:** Alte URLs werden normalisiert und als gebundener Datenbankwert gesucht; die URL wird nicht abgerufen (`backend/src/main/java/ch/urinet/archiv/integration/domain/webseite/AlteUrl.java:31-70`; `backend/src/main/java/ch/urinet/archiv/integration/adapter/out/persistence/SqlWebseitenLese.java:138-147`). In den geprüften öffentlichen Webseiten- und Chat-Pfaden wurde kein ausgehender HTTP-Aufruf festgestellt. Spec 03 Req 10.2 verlangt Datei-Bytes statt eines abzurufenden Datei-Links.
 
-**Befund:** nicht anwendbar auf die vorhandenen öffentlichen Routen; kein URL-Abrufpfad festgestellt.
+**Erfassung:** `webseiten-erfassung.feature:106` sendet am echten Upload einen zusätzlichen Multipart-Teil `url`: 400 `ANFRAGE_UNGUELTIG`, keine Dokumente oder Referenzbindung. Der Upload nimmt genau Datei-Bytes und Referenz entgegen; die Metadaten-Allowlist bietet keinen URL-Import. Die Datei wird nie über eine vom Aufrufer angegebene Adresse geholt.
 
-**Restrisiko:** Die noch nicht vorhandene Erfassung muss weiterhin ausschliesslich Datei-Bytes annehmen und darf keine URL abrufen (Folgeaufgabe F1).
+**Befund:** kein URL-Abrufpfad in den geprüften öffentlichen Routen; F1 belegt.
+
+**Restrisiko:** Künftige Erweiterungen dürfen keinen URL-Import ohne neue Prüfung ergänzen.
 
 ## API8: Security Misconfiguration
 
@@ -122,9 +132,11 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 **Belege:** `PublicVertragTest.codeUndDateiBeschreibenDieselbenPfade` gleicht Code und Vertrag ab (`backend/src/test/java/ch/urinet/archiv/integration/PublicVertragTest.java:61-65`); `EndpunktWaechterTest` prüft die Sicherheitsdeklarationen (`backend/src/test/java/ch/urinet/archiv/sicherheit/EndpunktWaechterTest.java:86-95`). Der Vertrag führt Lese-, Chat- und Feed-Endpunkte auf (`docs/schnittstelle/public-v1.yaml`).
 
-**Befund:** Lücke – mittel, als Funktions-/Prüfabdeckung: Die Anforderungen Req 10.1 und 10.5–10.6 beschreiben Upload, Bestätigen, Ändern und Veröffentlichen; diese produktiven Mutationspfade fehlen im geprüften Code und damit im aktuellen Vertrag. Das ist keine bestätigte Schwachstelle eines vorhandenen Endpunkts.
+**Erfassung:** Der Vertrag enthält Upload, Bearbeitermeldung, Status/Liste/Details, Hilfslisten, PATCH, Bestätigen, Veröffentlichen/Rückzug, Wiederholen und Prüfdatei sowie den Erfassungs-Feed. `PublicVertragTest` gleicht Pfade und DTO-Schemas mit dem Scanner ab. `WebseitenEndpunkte.alle()` ermittelt die produktiven Methoden automatisch; die ausführbare Scope-Matrix prüft jede Methode. Test-Fixtures werden über ArchUnits `DO_NOT_INCLUDE_TESTS` ausgeschlossen.
 
-**Restrisiko:** Vor Bereitstellung der Erfassung müssen Vertrag, Code, Scope-Schutz und Endpunktinventar gemeinsam ergänzt und geprüft werden (Folgeaufgabe F1, Aufgabe 11.10).
+**Befund:** ok, bisherige Funktions-/Prüflücke F1 geschlossen.
+
+**Restrisiko:** Neue dokumentbezogene Methoden verlangen eine eigene positive Gegenprobe in der ID-Matrix; sonst schlägt diese bewusst fehl.
 
 ## API10: Unsafe Consumption of APIs
 
@@ -138,6 +150,6 @@ Statische Prüfung des Quellstands `2ccc3ecf` (`origin/main` am 17.11.2026; gege
 
 ## Offene Nachweise
 - **Hoch/kritisch:** keine bestätigten offenen Befunde in den geprüften, vorhandenen öffentlichen Endpunkten.
-- **Mittel:** Erschöpfung der Schlüsselprüfung durch fremde Anfragen für kalte Schlüssel, Erfassungs-Schlüssel und interne Tokens (API2, Folgeaufgabe F2; Traefik-Drosselung je IP nur teilweise belegt, die eigene Drosselung für `/public/` nur vorgeschlagen, #241); BOPLA, Funktionsautorisierung, Ressourcenbegrenzung und Inventar der noch fehlenden Erfassungs-/Änderungsendpunkte (Folgeaufgabe F1, Aufgabe 11.10); Budgetkontrolle ist keine harte Obergrenze (Folgeaufgabe F3).
+- **Mittel:** Erschöpfung der Schlüsselprüfung durch fremde Anfragen für kalte Schlüssel, Erfassungs-Schlüssel und interne Tokens (API2, Folgeaufgabe F2; Traefik-Drosselung je IP nur teilweise belegt, die eigene Drosselung für `/public/` nur vorgeschlagen, #241); Budgetkontrolle ist keine harte Obergrenze (Folgeaufgabe F3). F1 ist mit der Erfassung und ihren automatisierten Nachweisen geschlossen.
 - **Tief:** Limiter-Fehlerpfad (Folgeaufgabe F4); unveränderte Besucherfrage an das Modell.
 - **Offen für Fabian:** ZAP-Baseline gegen Staging (Req 9.2). Dieser Codebericht ersetzt den Staging-Test nicht.
