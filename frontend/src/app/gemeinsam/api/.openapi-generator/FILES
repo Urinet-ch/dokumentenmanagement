@@ -13,6 +13,7 @@ api/protokoll.service.ts
 configuration.ts
 encoder.ts
 index.ts
+model/api-token-ablauf.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts

@@ -58,4 +58,5 @@ Funktionalität: Aufbewahrungsfrist der Dokumente
     Dann ist aufbewahren_bis «31.12.2020» und die Frist abgelaufen
     Und bietet die API DELETE nur für diese Pfade an:
       | /api/v1/api-tokens/{tokenId} |
+      | /api/v1/api-tokens/{tokenId}/gueltig-bis |
       | /api/v1/dokumentarten/{code} |
