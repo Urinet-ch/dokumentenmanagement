@@ -5,6 +5,7 @@ import ch.urinet.archiv.konfiguration.domain.ArtKlassifikation;
 import ch.urinet.archiv.konfiguration.domain.Klassifikation;
 import ch.urinet.archiv.konfiguration.domain.KlassifikationWert;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
 
 import java.util.ArrayList;
@@ -14,16 +15,20 @@ import java.util.Optional;
 @ApplicationScoped
 public class PanacheKlassifikationRepository implements KlassifikationRepository {
 
-    private final EntityManager em;
+    private final Instance<EntityManager> em;
 
-    public PanacheKlassifikationRepository(EntityManager em) {
+    public PanacheKlassifikationRepository(Instance<EntityManager> em) {
         this.em = em;
+    }
+
+    private EntityManager entityManager() {
+        return em.get();
     }
 
     @Override
     public List<Klassifikation> alle() {
         @SuppressWarnings("unchecked")
-        List<Object[]> rows = em.createNativeQuery("""
+        List<Object[]> rows = entityManager().createNativeQuery("""
                 select code, name, beschreibung, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv
                 from klassifikation order by code""").getResultList();
         return rows.stream().map(this::klassifikation).toList();
@@ -32,7 +37,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
     @Override
     public Optional<Klassifikation> finden(String code) {
         @SuppressWarnings("unchecked")
-        List<Object[]> rows = em.createNativeQuery("""
+        List<Object[]> rows = entityManager().createNativeQuery("""
                 select code, name, beschreibung, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv
                 from klassifikation where code = :code""").setParameter("code", code).getResultList();
         return rows.stream().findFirst().map(this::klassifikation);
@@ -40,7 +45,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void anlegen(Klassifikation klassifikation) {
-        em.createNativeQuery("""
+        entityManager().createNativeQuery("""
                 insert into klassifikation
                     (code, name, beschreibung, mehrfach, ki_vorschlag, suchfilter, oeffentlich_filter, aktiv)
                 values (:code, :name, :beschreibung, :mehrfach, :ki, :suchfilter, :oeffentlich, :aktiv)""")
@@ -55,7 +60,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void speichern(Klassifikation klassifikation) {
-        em.createNativeQuery("""
+        entityManager().createNativeQuery("""
                 update klassifikation set name = :name, beschreibung = :beschreibung, mehrfach = :mehrfach,
                     ki_vorschlag = :ki, suchfilter = :suchfilter, oeffentlich_filter = :oeffentlich, aktiv = :aktiv
                 where code = :code""")
@@ -70,13 +75,13 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void loeschen(String code) {
-        em.createNativeQuery("delete from klassifikation where code = :code").setParameter("code", code)
+        entityManager().createNativeQuery("delete from klassifikation where code = :code").setParameter("code", code)
                 .executeUpdate();
     }
 
     @Override
     public boolean inGebrauch(String code) {
-        Number count = (Number) em.createNativeQuery("""
+        Number count = (Number) entityManager().createNativeQuery("""
                 select (select count(*) from dokument_klassifikation where klassifikation = :code)
                      + (select count(*) from dokumentart_klassifikation where klassifikation = :code)""")
                 .setParameter("code", code).getSingleResult();
@@ -85,7 +90,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public boolean wertInGebrauch(String code, String wert) {
-        Number count = (Number) em.createNativeQuery("""
+        Number count = (Number) entityManager().createNativeQuery("""
                 select count(*) from dokument_klassifikation where klassifikation = :code and wert = :wert""")
                 .setParameter("code", code).setParameter("wert", wert).getSingleResult();
         return count.longValue() > 0;
@@ -93,7 +98,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public boolean mehrfachWirdVerletzt(String code) {
-        Number count = (Number) em.createNativeQuery("""
+        Number count = (Number) entityManager().createNativeQuery("""
                 select count(*) from (
                     select dokument_id from dokument_klassifikation
                     where klassifikation = :code group by dokument_id having count(*) > 1
@@ -104,7 +109,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
     @Override
     public List<ArtKlassifikation> zuordnungen(String art) {
         @SuppressWarnings("unchecked")
-        List<Object[]> rows = em.createNativeQuery("""
+        List<Object[]> rows = entityManager().createNativeQuery("""
                 select klassifikation, pflicht, standard_wert from dokumentart_klassifikation
                 where art = :art order by klassifikation""").setParameter("art", art).getResultList();
         return rows.stream().map(row -> new ArtKlassifikation((String) row[0], (Boolean) row[1], (String) row[2]))
@@ -113,7 +118,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public boolean zugeordnet(String art, String klassifikation) {
-        Number count = (Number) em.createNativeQuery("""
+        Number count = (Number) entityManager().createNativeQuery("""
                 select count(*) from dokumentart_klassifikation where art = :art and klassifikation = :klasse""")
                 .setParameter("art", art).setParameter("klasse", klassifikation).getSingleResult();
         return count.longValue() > 0;
@@ -121,7 +126,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void zuordnen(String art, ArtKlassifikation zuordnung) {
-        em.createNativeQuery("""
+        entityManager().createNativeQuery("""
                 insert into dokumentart_klassifikation (art, klassifikation, pflicht, standard_wert)
                 values (:art, :klasse, :pflicht, :standard)""")
                 .setParameter("art", art).setParameter("klasse", zuordnung.klassifikation())
@@ -131,7 +136,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void zuordnungSpeichern(String art, ArtKlassifikation zuordnung) {
-        em.createNativeQuery("""
+        entityManager().createNativeQuery("""
                 update dokumentart_klassifikation set pflicht = :pflicht, standard_wert = :standard
                 where art = :art and klassifikation = :klasse""")
                 .setParameter("art", art).setParameter("klasse", zuordnung.klassifikation())
@@ -141,7 +146,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
 
     @Override
     public void zuordnungEntfernen(String art, String klassifikation) {
-        em.createNativeQuery("""
+        entityManager().createNativeQuery("""
                 delete from dokumentart_klassifikation where art = :art and klassifikation = :klasse""")
                 .setParameter("art", art).setParameter("klasse", klassifikation).executeUpdate();
     }
@@ -149,7 +154,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
     private Klassifikation klassifikation(Object[] row) {
         String code = (String) row[0];
         @SuppressWarnings("unchecked")
-        List<Object[]> werte = em.createNativeQuery("""
+        List<Object[]> werte = entityManager().createNativeQuery("""
                 select code, name, beschreibung, reihenfolge, aktiv from klassifikation_wert
                 where klassifikation = :code order by reihenfolge, code""")
                 .setParameter("code", code).getResultList();
@@ -165,19 +170,19 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
     private void werteSpeichern(Klassifikation klassifikation) {
         List<String> codes = klassifikation.werte().stream().map(KlassifikationWert::code).toList();
         if (codes.isEmpty()) {
-            em.createNativeQuery("delete from klassifikation_wert where klassifikation = :code")
+            entityManager().createNativeQuery("delete from klassifikation_wert where klassifikation = :code")
                     .setParameter("code", klassifikation.code()).executeUpdate();
         } else {
-            em.createNativeQuery("""
+            entityManager().createNativeQuery("""
                     delete from klassifikation_wert where klassifikation = :code and code not in (:codes)""")
                     .setParameter("code", klassifikation.code()).setParameter("codes", codes).executeUpdate();
         }
         for (KlassifikationWert wert : klassifikation.werte()) {
-            Number count = (Number) em.createNativeQuery("""
+            Number count = (Number) entityManager().createNativeQuery("""
                     select count(*) from klassifikation_wert where klassifikation = :klasse and code = :code""")
                     .setParameter("klasse", klassifikation.code()).setParameter("code", wert.code()).getSingleResult();
             if (count.longValue() == 0) {
-                em.createNativeQuery("""
+                entityManager().createNativeQuery("""
                         insert into klassifikation_wert
                             (klassifikation, code, name, beschreibung, reihenfolge, aktiv)
                         values (:klasse, :code, :name, :beschreibung, :reihenfolge, :aktiv)""")
@@ -186,7 +191,7 @@ public class PanacheKlassifikationRepository implements KlassifikationRepository
                         .setParameter("reihenfolge", wert.reihenfolge()).setParameter("aktiv", wert.aktiv())
                         .executeUpdate();
             } else {
-                em.createNativeQuery("""
+                entityManager().createNativeQuery("""
                         update klassifikation_wert set name = :name, beschreibung = :beschreibung,
                             reihenfolge = :reihenfolge, aktiv = :aktiv
                         where klassifikation = :klasse and code = :code""")

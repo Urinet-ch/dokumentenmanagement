@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.DefaultValue;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -62,7 +61,6 @@ public class EingangskorbResource {
     }
 
     @GET
-    @Transactional
     @ErfordertAktion(Aktion.A5)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Eingangskorb lesen",

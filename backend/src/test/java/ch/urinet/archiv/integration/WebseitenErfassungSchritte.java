@@ -89,8 +89,11 @@ public class WebseitenErfassungSchritte {
                     key -> ids.stream().anyMatch(id -> key.contains(id.toString())));
         }
         for (String mandant : mandantenMitTestart) {
-            ausfuehren("delete from " + new MandantCode(mandant).schema()
-                    + ".dokumentart where code = 'WEBTEST_ERFASSUNG'");
+            Response stand = inhaber(mandant).get("/api/v1/dokumentarten");
+            assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+            Response geloescht = inhaber(mandant).header("If-Match", stand.getHeader("ETag"))
+                    .when().delete("/api/v1/dokumentarten/WEBTEST_ERFASSUNG");
+            assertThat(geloescht.statusCode()).as(geloescht.asString()).isEqualTo(204);
         }
         for (Zugang zugang : schluessel.values()) {
             ausfuehren("delete from public.api_client where id = ?", zugang.tokenId());
@@ -288,12 +291,8 @@ public class WebseitenErfassungSchritte {
 
     @Angenommen("im Mandanten «{word}» liegt ein synthetisches Dokument mit allen Listenfiltern")
     public void dokumentFuerListenfilter(String mandant) throws SQLException {
-        mandantenMitTestart.add(mandant);
+        testartSicherstellen(mandant);
         String schema = new MandantCode(mandant).schema();
-        ausfuehren("insert into " + schema + ".dokumentart "
-                + "(code, name, vertraulichkeit, gesetzliche_pflicht, aktiv) "
-                + "values ('WEBTEST_ERFASSUNG', 'Webtest Erfassung', 'NORMAL', false, true) "
-                + "on conflict (code) do nothing");
         filterDokument = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(
                 mandant, "WEBTEST_ERFASSUNG", "NORMAL", true, "probe", null, "ARCHIVIERT"));
         ausfuehren("update " + schema + ".dokument set titel = ?, zusatz = "
@@ -626,17 +625,7 @@ public class WebseitenErfassungSchritte {
         hochladen(name, "pflege.pdf", "pflege");
         assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(202);
         String schema = new MandantCode(zugang.mandant()).schema();
-        mandantenMitTestart.add(zugang.mandant());
-        ausfuehren("insert into " + schema + ".dokumentart "
-                        + "(code, name, gruppen, pflichtfelder, zusatz_schema, vertraulichkeit, gesetzliche_pflicht, aktiv) "
-                        + "values ('WEBTEST_ERFASSUNG', 'Webtest Erfassung', '{frei}', "
-                        + "'{titel,zusatz.zugriff}', ?::jsonb, 'NORMAL', false, true) "
-                        + "on conflict (code) do nothing",
-                """
-                {"type":"object","properties":{"zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"]},
-                "veroeffentlicht":{"type":"boolean"},"jahr":{"type":"integer"}},
-                "required":["zugriff","veroeffentlicht"],"additionalProperties":false}
-                """);
+        testartSicherstellen(zugang.mandant());
         boolean bestaetigt = status.startsWith("ARCHIV");
         ausfuehren("update " + schema + ".dokument set art = 'WEBTEST_ERFASSUNG', titel = 'Pflegeprobe', "
                         + "status = ?, bestaetigt = " + (bestaetigt ? "now()" : "null")
@@ -644,6 +633,32 @@ public class WebseitenErfassungSchritte {
                         + "'{\"zugriff\":\"mitglieder\",\"veroeffentlicht\":false,\"jahr\":2026}'::jsonb where id = ?",
                 status, letzteId);
         gemerktesEtag = aktuellesEtag(name);
+    }
+
+    private void testartSicherstellen(String mandant) {
+        if (mandantenMitTestart.contains(mandant)) {
+            return;
+        }
+        Response stand = inhaber(mandant).get("/api/v1/dokumentarten");
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        Response erstellt = inhaber(mandant).header("If-Match", stand.getHeader("ETag"))
+                .contentType("application/json")
+                .body("""
+                        {"code":"WEBTEST_ERFASSUNG","name":"Webtest Erfassung","gruppen":["frei"],
+                        "pflichtfelder":["titel","zusatz.zugriff"],
+                        "zusatzSchema":{"type":"object","properties":{                        "zugriff":{"type":"string","default":"mitglieder",
+                        "enum":["oeffentlich","mitglieder","vorstand"]},"veroeffentlicht":{"type":"boolean","default":false},
+                        "jahr":{"type":"integer"}},"required":["zugriff","veroeffentlicht"],
+                        "additionalProperties":false},"vertraulichkeit":"NORMAL","gesetzlichePflicht":false,
+                        "kiVorschlag":false,"grund":"Testfixture Webseiten-Erfassung"}
+                        """)
+                .when().post("/api/v1/dokumentarten");
+        assertThat(erstellt.statusCode()).as(erstellt.asString()).isEqualTo(201);
+        mandantenMitTestart.add(mandant);
+    }
+
+    private RequestSpecification inhaber(String mandant) {
+        return given().auth().oauth2(ch.urinet.archiv.gemeinsam.Testanmeldung.token("inhaber-" + mandant));
     }
 
     private String aktuellesEtag(String name) throws SQLException {

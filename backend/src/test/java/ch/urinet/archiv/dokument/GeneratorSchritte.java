@@ -226,8 +226,13 @@ public class GeneratorSchritte {
 
     @Dann("antwortet der Generator mit Status {int} und Fehlercode «{word}»")
     public void fehler(int status, String code) {
-        assertThat(ProblemDetails.pruefen(antwort, status, "felder", "klassifikationen")).as(antwort.asString())
-                .isEqualTo(code);
+        String erweiterung = "KLASSIFIKATION_UNGUELTIG".equals(code) ? "klassifikationen" : "felder";
+        assertThat(ProblemDetails.pruefen(antwort, status, erweiterung)).as(antwort.asString()).isEqualTo(code);
+    }
+
+    @Dann("nennt der Generator die ungültige Klassifikation «{word}»")
+    public void klassifikationUngueltig(String klassifikation) {
+        assertThat(antwort.jsonPath().<String>getList("klassifikationen")).containsExactly(klassifikation);
     }
 
     @Dann("nennt die Generator-Antwort die fehlenden Felder {string}")

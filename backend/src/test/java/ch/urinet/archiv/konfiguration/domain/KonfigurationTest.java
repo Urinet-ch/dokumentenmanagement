@@ -80,7 +80,7 @@ class KonfigurationTest {
 
     @Test
     void prueftAlleZusaetzlichenReserviertenPublicParameter() {
-        for (String code : List.of("seit", "max", "referenz", "groesse", "status", "url")) {
+        for (String code : List.of("seit", "max", "referenz", "groesse", "status", "url", "dateiname")) {
             var klassifikation = new Klassifikation(code, "Fachgebiet", null, List.of(),
                     false, false, true, true, true);
             assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(klassifikation)).pruefen())
@@ -241,13 +241,6 @@ class KonfigurationTest {
         }
         assertThat(new Konfiguration(1, einstellungen(), List.of(),
                 List.of(klassifikation("a".repeat(40), "Name", "Wert"))).pruefen()).isEmpty();
-    }
-
-    @Test
-    void reserviertDateinameAlsOeffentlichenFilter() {
-        var filter = new Klassifikation("dateiname", "Dateiname", null, List.of(), false, false, false, true, true);
-        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(filter)).pruefen())
-                .extracting(Konfiguration.Befund::code).contains("PARAMETER_RESERVIERT");
     }
 
     private static Konfiguration.Einstellungen einstellungen() {

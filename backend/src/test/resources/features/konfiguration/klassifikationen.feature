@@ -30,7 +30,7 @@ Funktionalität: Klassifikationen je Mandant
     Dann antwortet die Klassifikationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Wenn «inhaber-urinet» versucht, den Code der Klassifikation «fachgebiet» auf «gebiet» zu ändern
     Dann antwortet die Klassifikationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
-    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «KORRESPONDENZ» mit dem Standardwert «bau» zu
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
     Und enthält die Antwort den Standardwert «bau»
 
@@ -42,15 +42,17 @@ Funktionalität: Klassifikationen je Mandant
        "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «KORRESPONDENZ» mit dem Standardwert «elektro» zu
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Angenommen «inhaber-urinet» legt ein Dokument «Klassifikation-alt» der Art «KORRESPONDENZ» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
-    Und «inhaber-urinet» legt ein Dokument «Klassifikation-neu» der Art «KORRESPONDENZ» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
-    Und «inhaber-urinet» legt ein Dokument «Eingangskorb-klasse» der Art «KORRESPONDENZ» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «EINGANGSKORB» an
+    Angenommen «inhaber-urinet» legt ein Dokument «Klassifikation-alt» der Art «PROJEKTDOKUMENT» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
+    Und «inhaber-urinet» legt ein Dokument «Klassifikation-neu» der Art «PROJEKTDOKUMENT» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und «inhaber-urinet» legt ein Dokument «Eingangskorb-klasse» der Art «PROJEKTDOKUMENT» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «EINGANGSKORB» an
     Wenn «inhaber-urinet» versucht, den Wert «bau» der Klassifikation «fachgebiet» zu löschen
     Dann antwortet die Klassifikationsverwaltung mit Status 409 und Fehlercode «KONFIGURATION_IN_GEBRAUCH»
     Wenn «inhaber-urinet» versucht, die Klassifikation «fachgebiet» zu löschen
     Dann antwortet die Klassifikationsverwaltung mit Status 409 und Fehlercode «KONFIGURATION_IN_GEBRAUCH»
+    Wenn «inhaber-urinet» entfernt den Standardwert «bau» der Klassifikation «fachgebiet» von der Dokumentart «PROJEKTDOKUMENT»
+    Dann antwortet die Klassifikationsverwaltung mit Status 200
     Wenn «inhaber-urinet» deaktiviert den Wert «bau» der Klassifikation «fachgebiet»
     Dann antwortet die Klassifikationsverwaltung mit Status 200
     Wenn «inhaber-urinet» liest das Dokument «Klassifikation-alt»
@@ -65,7 +67,7 @@ Funktionalität: Klassifikationen je Mandant
       {"fachgebiet":["bau"]}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 422 und Fehlercode «KLASSIFIKATION_UNGUELTIG»
-    Wenn «inhaber-urinet» entfernt die Zuordnung «fachgebiet» von der Dokumentart «KORRESPONDENZ»
+    Wenn «inhaber-urinet» entfernt die Zuordnung «fachgebiet» von der Dokumentart «PROJEKTDOKUMENT»
     Dann antwortet die Klassifikationsverwaltung mit Status 204
     Wenn «inhaber-urinet» liest das Dokument «Eingangskorb-klasse»
     Dann ist die Klassifikation «fachgebiet» des Dokuments «Eingangskorb-klasse» ungültig
@@ -106,6 +108,7 @@ Funktionalität: Klassifikationen je Mandant
       {"art":"PROJEKTDOKUMENT","titel":"Probe","projekt":"Probe","klassifikationen":{"fachgebiet":["unbekannt"]}}
       """
     Dann antwortet der Generator mit Status 422 und Fehlercode «KLASSIFIKATION_UNGUELTIG»
+    Und nennt der Generator die ungültige Klassifikation «fachgebiet»
 
   @req-3.1
   Szenario: Nur der inhaber pflegt Klassifikationen
@@ -124,9 +127,9 @@ Funktionalität: Klassifikationen je Mandant
        "mehrfach":true,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «KORRESPONDENZ» mit dem Standardwert «elektro» zu
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «elektro» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Angenommen «inhaber-urinet» legt ein Dokument «Mehrfach-alt» der Art «KORRESPONDENZ» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
+    Angenommen «inhaber-urinet» legt ein Dokument «Mehrfach-alt» der Art «PROJEKTDOKUMENT» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
     Wenn «inhaber-urinet» deaktiviert den Wert «bau» der Klassifikation «fachgebiet»
     Dann antwortet die Klassifikationsverwaltung mit Status 200
     Wenn «inhaber-urinet» ändert die Klassifikationen des Dokuments «Mehrfach-alt» auf:
@@ -173,9 +176,9 @@ Funktionalität: Klassifikationen je Mandant
        "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
       """
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «KORRESPONDENZ» mit dem Standardwert «bau» zu
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
     Dann antwortet die Klassifikationsverwaltung mit Status 201
-    Angenommen «inhaber-urinet» legt ein Dokument «Version-klasse» der Art «KORRESPONDENZ» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Angenommen «inhaber-urinet» legt ein Dokument «Version-klasse» der Art «PROJEKTDOKUMENT» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
     Und das Dokument «Version-klasse» hat den freien Tag «freier-tag»
     Wenn «inhaber-urinet» ändert die Klassifikationen des Dokuments «Version-klasse» auf:
       """

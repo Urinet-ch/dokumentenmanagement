@@ -62,6 +62,12 @@ public class KlassifikationenSchritte {
                 .when().post("/api/v1/dokumentarten/" + art + "/klassifikationen");
     }
 
+    @Wenn("«{word}» entfernt den Standardwert «{word}» der Klassifikation «{word}» von der Dokumentart «{word}»")
+    public void standardwertEntfernen(String benutzer, String standardWert, String klassifikation, String art) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body("{\"standardWert\":null}")
+                .when().patch("/api/v1/dokumentarten/" + art + "/klassifikationen/" + klassifikation);
+    }
+
     @Wenn("«{word}» versucht, den Code der Klassifikation «{word}» auf «{word}» zu ändern")
     public void codeAendern(String benutzer, String code, String neuerCode) {
         antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("code", neuerCode))
