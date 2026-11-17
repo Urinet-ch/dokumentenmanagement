@@ -80,6 +80,7 @@ public class OeffentlicherChatSchritte {
 
     private final String lauf = UUID.randomUUID().toString().substring(0, 8);
     private final Map<String, String> schluessel = new HashMap<>();
+    private final Map<String, String> schluesselMandant = new HashMap<>();
     private final List<String> tokenIds = new ArrayList<>();
     private final Map<String, Dokument> dokumente = new LinkedHashMap<>();
     private final Map<String, Set<String>> reihen = new HashMap<>();
@@ -133,6 +134,7 @@ public class OeffentlicherChatSchritte {
         reihen.clear();
         tokenIds.clear();
         schluessel.clear();
+        schluesselMandant.clear();
         budgetMandanten.clear();
         frageMandanten.clear();
         ip = null;
@@ -159,6 +161,7 @@ public class OeffentlicherChatSchritte {
         String text = verwaltung.erstellen(mandant, webseite + "-" + lauf, "lesen", stufe, false).token().text();
         tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
         schluessel.put(name, text);
+        schluesselMandant.put(name, mandant);
     }
 
     @Angenommen("der Erfassungs-Schlüssel «{word}» der Webseite «{word}» im Mandanten «{word}» ist für den Chatbot angelegt")
@@ -166,6 +169,7 @@ public class OeffentlicherChatSchritte {
         String text = verwaltung.erstellen(mandant, webseite + "-" + lauf, "erfassung", null, false).token().text();
         tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
         schluessel.put(name, text);
+        schluesselMandant.put(name, mandant);
     }
 
     /**
@@ -391,6 +395,10 @@ public class OeffentlicherChatSchritte {
     }
 
     private RequestSpecification anfrage(String name, String stufe, String client) {
+        String mandant = schluesselMandant.get(name);
+        if (mandant != null) {
+            frageMandanten.add(mandant);
+        }
         RequestSpecification spec = given().header("Authorization", "Bearer " + schluessel.get(name))
                 .header("Content-Type", "application/json").header("Accept", "text/event-stream");
         if (stufe != null && !"-".equals(stufe)) {
