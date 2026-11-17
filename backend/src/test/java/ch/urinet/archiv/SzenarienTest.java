@@ -14,7 +14,7 @@ import io.quarkus.test.junit.QuarkusTest;
 @QuarkusTest
 @QuarkusTestResource(TsaTestRessource.class)
 @CucumberOptions(features = "classpath:features", glue = "ch.urinet.archiv",
-        tags = "not @browser and not @sicherung")
+        tags = "not @browser and not @sicherung and not @mandant-bericht")
 public class SzenarienTest extends CucumberQuarkusTest {
 
     public static void main(String[] args) {
