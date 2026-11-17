@@ -31,6 +31,13 @@ public class ManifestSpeichern {
     static final List<String> PROTOKOLLE = List.of(ProtokollHash.DOKUMENT_VERSION, ProtokollHash.ZUGRIFF_PROTOKOLL,
             ProtokollHash.WISSENSSEITE_VERSION, ProtokollHash.WISSENS_LOG);
 
+    /**
+     * Tabellen, die immer unter {@code protokolle} stehen. Die Wissenstabellen (Spec 04, Req 4.6) stehen dort nur mit
+     * Zeilen im Fenster, damit ein Manifest ohne Wissenszeilen bei Deploy und Rollback gleich bleibt.
+     */
+    static final List<String> PROTOKOLLE_IMMER = List.of(ProtokollHash.DOKUMENT_VERSION,
+            ProtokollHash.ZUGRIFF_PROTOKOLL);
+
     private final ManifestDaten daten;
     private final AuftragService auftraege;
 

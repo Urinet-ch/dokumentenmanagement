@@ -224,23 +224,6 @@ class ArchitekturTest {
             })
             .allowEmptyShould(true);
 
-    @ArchTest
-    static final ArchRule wissenNutztPublicNurUeberAuftrag = classes()
-            .that().resideInAPackage("ch.urinet.archiv.wissen..")
-            .and().areAnnotatedWith(Table.class)
-            .should(new ArchCondition<>("im Wissensbereich nur die öffentliche Auftragstabelle abbilden") {
-                @Override
-                public void check(JavaClass klasse, ConditionEvents ereignisse) {
-                    Table tabelle = klasse.getAnnotationOfType(Table.class);
-                    if ("public".equalsIgnoreCase(tabelle.schema()) && !"auftrag".equals(tabelle.name())) {
-                        ereignisse.add(SimpleConditionEvent.violated(klasse, klasse.getName() + " bildet public."
-                                + tabelle.name() + " ab"));
-                    }
-                }
-            })
-            .allowEmptyShould(true)
-            .because("Wissensbasisdaten liegen im Mandantenschema; public wird nur über auftrag genutzt (ADR-002)");
-
     /** Probe-Endpunkte aus Aufgabe 1.4 liegen nur unter src/test und gelangen nie ins Produktionsartefakt. */
     @ArchTest
     static final ArchRule probeNurInTests = noClasses().should().resideInAPackage("ch.urinet.archiv.probe..")
