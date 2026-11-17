@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 
@@ -12,19 +13,23 @@ import java.util.Map;
 import java.util.UUID;
 
 @ApplicationScoped
-@Transactional(Transactional.TxType.MANDATORY)
+@Transactional(Transactional.TxType.SUPPORTS)
 public class PanacheDokumentKlassifikationen implements DokumentKlassifikationenPort {
 
-    private final EntityManager em;
+    private final Instance<EntityManager> em;
 
-    public PanacheDokumentKlassifikationen(EntityManager em) {
+    public PanacheDokumentKlassifikationen(Instance<EntityManager> em) {
         this.em = em;
+    }
+
+    private EntityManager entityManager() {
+        return em.get();
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Map<String, List<String>> laden(UUID dokumentId) {
-        List<Object[]> rows = em.createNativeQuery("""
+        List<Object[]> rows = entityManager().createNativeQuery("""
                 select klassifikation, wert from dokument_klassifikation
                 where dokument_id = :id order by klassifikation, wert""")
                 .setParameter("id", dokumentId).getResultList();
@@ -38,11 +43,12 @@ public class PanacheDokumentKlassifikationen implements DokumentKlassifikationen
     }
 
     @Override
+    @Transactional(Transactional.TxType.MANDATORY)
     public void ersetzen(UUID dokumentId, Map<String, List<String>> klassifikationen) {
-        em.createNativeQuery("delete from dokument_klassifikation where dokument_id = :id")
+        entityManager().createNativeQuery("delete from dokument_klassifikation where dokument_id = :id")
                 .setParameter("id", dokumentId).executeUpdate();
         klassifikationen.forEach((code, values) -> values.forEach(wert ->
-                em.createNativeQuery("""
+                entityManager().createNativeQuery("""
                         insert into dokument_klassifikation (dokument_id, klassifikation, wert)
                         values (:id, :klasse, :wert)""")
                         .setParameter("id", dokumentId).setParameter("klasse", code).setParameter("wert", wert)

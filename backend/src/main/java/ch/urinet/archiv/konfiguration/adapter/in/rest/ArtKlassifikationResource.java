@@ -1,6 +1,6 @@
 package ch.urinet.archiv.konfiguration.adapter.in.rest;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
