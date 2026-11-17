@@ -40,6 +40,8 @@ export interface ZusatzFeld {
   name: string;
   typ: ZusatzTyp;
   optionen: readonly string[];
+  /** Optionale Anzeigetexte je Enum-Wert (`x-labels` im Schema); fehlt ein Wert, gilt der Rohwert. */
+  beschriftungen?: Readonly<Record<string, string>>;
   pflicht: boolean;
   /** Nur Listen: `minItems`, `maxItems` und `uniqueItems` des Schemas. */
   minEintraege?: number;
@@ -143,6 +145,33 @@ export function formularAus(d: Dokument): Formular {
   };
 }
 
+const BESCHRIFTUNG_MAX = 80;
+
+/**
+ * Liest `x-labels` (Eigenschaft oder `items`) als Anzeigetexte je Wert. Nur Texte, gekürzt auf {@link BESCHRIFTUNG_MAX};
+ * Schlüssel ausserhalb der Optionen und Nicht-Texte werden ignoriert. Angezeigt wird nur als Text, nie als HTML.
+ */
+function beschriftungenAus(
+  e: Record<string, unknown>,
+  optionen: readonly string[],
+): Record<string, string> | undefined {
+  const roh = { ...objekt(objekt(e['items'])['x-labels']), ...objekt(e['x-labels']) };
+  const ergebnis: Record<string, string> = {};
+  for (const option of optionen) {
+    const text = Object.hasOwn(roh, option) ? roh[option] : undefined;
+    if (typeof text === 'string' && text.trim() !== '') {
+      ergebnis[option] = text.trim().substring(0, BESCHRIFTUNG_MAX);
+    }
+  }
+  return Object.keys(ergebnis).length > 0 ? ergebnis : undefined;
+}
+
+/** Anzeigetext eines gespeicherten Werts: die Beschriftung aus dem Schema, sonst der Rohwert. */
+export function anzeigeText(feld: Pick<ZusatzFeld, 'beschriftungen'> | undefined, wert: string): string {
+  const b = feld?.beschriftungen;
+  return b && Object.hasOwn(b, wert) ? b[wert] : wert;
+}
+
 function typAus(schema: Record<string, unknown>): ZusatzTyp | null {
   if (schema['type'] === 'array') {
     const items = objekt(schema['items']);
@@ -191,6 +220,10 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
     const optionen =
       typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
     const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
+    const beschriftungen = beschriftungenAus(e, optionen);
+    if (beschriftungen) {
+      feld.beschriftungen = beschriftungen;
+    }
     if (typ === 'mehrfach' || typ === 'liste') {
       feld.minEintraege = typeof e['minItems'] === 'number' ? e['minItems'] : 0;
       feld.eindeutig = e['uniqueItems'] === true;

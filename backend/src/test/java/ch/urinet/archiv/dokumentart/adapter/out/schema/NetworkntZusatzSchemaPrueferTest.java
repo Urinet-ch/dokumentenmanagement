@@ -124,6 +124,20 @@ class NetworkntZusatzSchemaPrueferTest {
     }
 
     @Test
+    void anzeigetexteMitXLabelsSindErlaubteAnnotationenUndAendernDieWerteNicht() {
+        String schema = "{\"type\":\"object\",\"properties\":{\"verband\":{\"type\":\"array\","
+                + "\"items\":{\"type\":\"string\",\"enum\":[\"vhf\",\"gsk\"]},"
+                + "\"x-labels\":{\"vhf\":\"VHF\",\"gsk\":\"GSK\"},\"minItems\":1}},"
+                + "\"required\":[\"verband\"],\"additionalProperties\":false}";
+        assertThat(pruefer.schemaPruefen(schema)).containsExactly("verband");
+        assertThatCode(() -> pruefer.wertePruefen(schema, "{\"verband\":[\"vhf\",\"gsk\"]}"))
+                .doesNotThrowAnyException();
+        // Gültig ist weiter nur der Enum-Wert, nie der Anzeigetext.
+        assertThatThrownBy(() -> pruefer.wertePruefen(schema, "{\"verband\":[\"VHF\"]}"))
+                .isInstanceOf(FachFehler.class);
+    }
+
+    @Test
     void passendeWerteSindGueltig() {
         assertThatCode(() -> pruefer.wertePruefen(SCHEMA,
                 "{\"periode\":\"2026-03\",\"faellig\":\"2026-04-30\",\"betrag\":12.5}")).doesNotThrowAnyException();

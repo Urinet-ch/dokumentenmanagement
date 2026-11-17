@@ -18,6 +18,7 @@ import com.networknt.schema.dialect.Dialect;
 import com.networknt.schema.dialect.Dialects;
 import com.networknt.schema.keyword.Keyword;
 import com.networknt.schema.keyword.KeywordValidator;
+import com.networknt.schema.keyword.NonValidationKeyword;
 import com.networknt.schema.path.NodePath;
 import com.networknt.schema.regex.RegularExpression;
 import com.networknt.schema.regex.RegularExpressions;
@@ -167,11 +168,15 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         Dialect standard = Dialects.getDraft202012();
         // Der Builder ergänzt die Schlüsselwörter der Vokabulare erst beim Bauen; «format» lässt er nicht ersetzen.
         Dialect mitFrist = Dialect.builder(standard)
-                .keywords(k -> standard.getKeywords().forEach((name, keyword) -> {
-                    if (!"format".equals(name)) {
-                        k.put(name, new FristKeyword(keyword));
-                    }
-                }))
+                .keywords(k -> {
+                    standard.getKeywords().forEach((name, keyword) -> {
+                        if (!"format".equals(name)) {
+                            k.put(name, new FristKeyword(keyword));
+                        }
+                    });
+                    // Anzeigetexte je Enum-Wert für die Oberfläche (Seed vhf-gsk): reine Annotation, prüft nichts.
+                    k.put("x-labels", new NonValidationKeyword("x-labels"));
+                })
                 .build();
         this.registry = SchemaRegistry.withDefaultDialect(mitFrist,
                 b -> b.schemaLoader(l -> l.fetchRemoteResources(false)
