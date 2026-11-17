@@ -44,6 +44,11 @@ class VhfGskDokumentartSeedTest {
             assertThat(eigenschaften.path("verband").path("type").asText()).isEqualTo("array");
             assertThat(texte(eigenschaften.path("verband").path("items").path("enum")))
                     .containsExactly("vhf", "gsk");
+            // Anzeigetexte für die Oberfläche (x-labels); gespeichert wird weiter der Enum-Wert.
+            JsonNode beschriftung = eigenschaften.path("verband").path("x-labels");
+            assertThat(beschriftung.path("vhf").asText()).as(art.path("code").asText()).isEqualTo("VHF");
+            assertThat(beschriftung.path("gsk").asText()).as(art.path("code").asText()).isEqualTo("GSK");
+            assertThat(beschriftung).hasSize(2);
             assertThat(texte(eigenschaften.path("zugriff").path("enum")))
                     .containsExactly("oeffentlich", "mitglieder", "vorstand");
             assertThat(eigenschaften.path("zugriff").path("default").asText()).as(art.path("code").asText())

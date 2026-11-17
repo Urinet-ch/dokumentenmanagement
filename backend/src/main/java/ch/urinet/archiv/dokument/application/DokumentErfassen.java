@@ -73,6 +73,7 @@ public class DokumentErfassen {
     public static final String QUELLE_DRIVE = "DRIVE";
     public static final String QUELLE_GENERATOR = "GENERATOR";
     public static final String QUELLE_EMAIL = "EMAIL";
+    public static final String QUELLE_WEBSEITE = "WEBSEITE";
     /** Art einer Mail ohne unterstützten Anhang (Spec 02, Req 1.3), vorbelegt, solange der Mandant sie kennt. */
     public static final String ART_KORRESPONDENZ = "KORRESPONDENZ";
     /** Medientyp der Nachricht als Original ({@code <nr>-original.eml}); keine Quelle der Verarbeitung. */
@@ -118,6 +119,18 @@ public class DokumentErfassen {
     /** Ein Ergebnis je Seite in der gesendeten Reihenfolge; Fehler der ganzen Anfrage als {@link FachFehler}. */
     public List<UploadErgebnis> erfassen(UploadAnfrage anfrage) {
         return erfassen(aufloesung.pruefen(), anfrage);
+    }
+
+    /** Prüfsumme und Uploadgrenze für einen idempotenten Webseiten-Upload (Spec 03, Req 10.3). */
+    public EmpfangeneDatei pruefsumme(Path datei) {
+        Geprueft geprueft = empfangen(aufloesung.pruefen(), datei, DateiRolle.ORIGINAL);
+        geprueft.fehler().ifPresent(fehler -> {
+            throw new FachFehler(fehler);
+        });
+        return new EmpfangeneDatei(geprueft.sha256(), geprueft.groesse());
+    }
+
+    public record EmpfangeneDatei(String sha256, long groesse) {
     }
 
     /**
@@ -370,7 +383,7 @@ public class DokumentErfassen {
         }
     }
 
-    private static boolean hinweisUngueltig(String hinweis) {
+    public static boolean hinweisUngueltig(String hinweis) {
         return hinweis.codePointCount(0, hinweis.length()) > MAX_HINWEIS
                 || hinweis.codePoints().anyMatch(Character::isISOControl);
     }

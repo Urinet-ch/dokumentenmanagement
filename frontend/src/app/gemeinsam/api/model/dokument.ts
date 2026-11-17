@@ -95,6 +95,7 @@ export namespace Dokument {
         Drive: 'DRIVE',
         Email: 'EMAIL',
         Abaninja: 'ABANINJA',
+        Webseite: 'WEBSEITE',
     } as const;
     export type QuelleEnum = typeof QuelleEnum[keyof typeof QuelleEnum];
     export const VertraulichkeitEnum = {

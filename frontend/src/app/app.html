@@ -1,4 +1,18 @@
 <button type="button" class="sprunglink" (click)="zumInhalt(inhalt)">{{ texte.zumInhalt }}</button>
+@if (!online()) {
+  <p class="pwa-hinweis" role="status" aria-live="polite" data-test="offline-hinweis">
+    {{ texte.offlineHinweis }}
+  </p>
+}
+@if (updateBereit()) {
+  <div class="pwa-hinweis" role="status" aria-live="polite" data-test="update-hinweis">
+    <span>{{ texte.updateBereit }}</span>
+    <button mat-button type="button" (click)="aktualisieren()">{{ texte.updateJetzt }}</button>
+  </div>
+}
+@if (updateFehler()) {
+  <p class="pwa-hinweis" role="alert" data-test="update-fehler">{{ texte.updateFehler }}</p>
+}
 <mat-toolbar class="kopf">
   @if (menue().length > 0 && mobil()) {
     <button

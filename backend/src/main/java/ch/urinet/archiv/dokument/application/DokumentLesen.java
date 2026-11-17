@@ -53,8 +53,12 @@ public class DokumentLesen {
     }
 
     public Dokument lesen(Benutzer benutzer, UUID id) {
-        return repository.finden(id, Sichtregel.fuer(benutzer))
+        return sichtbar(benutzer, id)
                 .orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
+    }
+
+    public Optional<Dokument> sichtbar(Benutzer benutzer, UUID id) {
+        return repository.finden(id, Sichtregel.fuer(benutzer));
     }
 
     /**

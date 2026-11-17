@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpHeaders, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -119,11 +119,54 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
     expect(document.activeElement?.tagName).toBe('H1');
   });
 
-  it('meldet einen Ladefehler mit «Neu laden»', async () => {
-    http
-      .expectOne('/api/v1/eingangskorb?groesse=20&seite=0')
-      .flush(null, { status: 503, statusText: 'Service Unavailable' });
+  it.each([
+    [0, TEXTE.httpFehler.verbindung],
+    [401, TEXTE.anmeldung.abgelaufen],
+    [403, TEXTE.httpFehler.keinZugriff],
+    [404, TEXTE.httpFehler.nichtGefunden],
+    [409, TEXTE.httpFehler.konflikt],
+    [412, TEXTE.httpFehler.konflikt],
+    [429, TEXTE.httpFehler.zuViele(42)],
+    [503, TEXTE.httpFehler.server],
+  ] as const)('meldet HTTP %s ohne Dauerladen und bietet «Neu laden»', async (status, erwartet) => {
+    const anfrage = http.expectOne('/api/v1/eingangskorb?groesse=20&seite=0');
+    if (status === 0) {
+      anfrage.error(new ProgressEvent('error'));
+    } else {
+      anfrage.flush(null, {
+        status,
+        statusText: 'Synthetischer Fehler',
+        ...(status === 429 ? { headers: new HttpHeaders({ 'Retry-After': '42' }) } : {}),
+      });
+    }
     await fixture.whenStable();
-    expect(element.querySelector('[role=alert]')?.textContent).toContain(T.fehlerLaden);
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(erwartet);
+    expect(element.querySelector('[aria-busy=true]')).toBeNull();
+
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === T.neuLaden)!
+      .click();
+    await fixture.whenStable();
+    await seite(0, [], 0);
+    expect(element.querySelector('[role=alert]')).toBeNull();
+  });
+
+  it('meldet auch einen Fehler beim Laden der Dokumentarten und ermöglicht das Wiederholen', async () => {
+    fixture.componentInstance.ngOnInit();
+    const listen = http.match('/api/v1/eingangskorb?groesse=20&seite=0');
+    expect(listen).toHaveLength(2);
+    listen.forEach((anfrage) =>
+      anfrage.flush({ eintraege: [], gesamt: 0, seite: 0, groesse: 20 }),
+    );
+    http.expectOne('/api/v1/dokumentarten').flush(null, { status: 503, statusText: 'Service Unavailable' });
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=fehler-arten]')?.textContent).toContain(TEXTE.httpFehler.server);
+
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim() === T.neuLaden)!
+      .click();
+    http.expectOne('/api/v1/dokumentarten').flush([]);
+    await fixture.whenStable();
+    expect(element.querySelector('[data-test=fehler-arten]')).toBeNull();
   });
 });

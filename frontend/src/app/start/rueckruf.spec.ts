@@ -1,3 +1,4 @@
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
@@ -16,14 +17,17 @@ describe('Rueckruf', () => {
   let fixture: ComponentFixture<Rueckruf>;
   let element: HTMLElement;
 
-  async function starten(query: Record<string, string>, fehlgeschlagen = false) {
+  async function starten(query: Record<string, string>, fehlgeschlagen = false, antwortFehler?: unknown) {
     const rueckrufVerarbeiten = vi
       .fn<(parameter: URLSearchParams) => Promise<string>>()
-      .mockImplementation(() =>
-        fehlgeschlagen
+      .mockImplementation(() => {
+        if (antwortFehler) {
+          return Promise.reject(antwortFehler);
+        }
+        return fehlgeschlagen
           ? Promise.reject(new Error('synthetischer Fehler'))
-          : Promise.resolve('/erfassen'),
-      );
+          : Promise.resolve('/erfassen');
+      });
     anmeldung = {
       rueckrufVerarbeiten,
       anmelden: vi.fn(),
@@ -73,5 +77,25 @@ describe('Rueckruf', () => {
 
     element.querySelector('button')!.click();
     expect(anmeldung.anmelden).toHaveBeenCalledWith('/');
+  });
+
+  it.each([
+    [0, TEXTE.httpFehler.verbindung],
+    [400, TEXTE.anmeldung.fehlgeschlagen],
+    [401, TEXTE.anmeldung.fehlgeschlagen],
+    [403, TEXTE.anmeldung.fehlgeschlagen],
+    [404, TEXTE.anmeldung.fehlgeschlagen],
+    [409, TEXTE.anmeldung.fehlgeschlagen],
+    [412, TEXTE.anmeldung.fehlgeschlagen],
+    [429, TEXTE.httpFehler.zuViele(42)],
+    [503, TEXTE.httpFehler.server],
+  ] as const)('zeigt bei HTTP %s die passende Meldung mit erneutem Anmelden (400, 401, 403, 404 bleiben «Anmeldung fehlgeschlagen»)', async (status, erwartet) => {
+    const antwortFehler = new HttpErrorResponse({
+      status,
+      headers: status === 429 ? new HttpHeaders({ 'Retry-After': '42' }) : undefined,
+    });
+    await starten({}, false, antwortFehler);
+    expect(element.querySelector('[role=alert]')?.textContent).toBe(erwartet);
+    expect(element.querySelector('button')?.textContent).toContain(TEXTE.anmeldung.anmelden);
   });
 });
