@@ -439,10 +439,11 @@ class ApiTokenPruefungTest {
         }
 
         @Override
-        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit, Instant jetzt) {
             Zugang zugang = eintraege.get(id);
             if (zugang == null || !zugang.client().mandant().equals(mandant)
-                    || zugang.client().scope().webseitenSchluessel()) {
+                    || zugang.client().scope().webseitenSchluessel()
+                    || zugang.client().gueltigBis().filter(ablauf -> !ablauf.isAfter(jetzt)).isPresent()) {
                 return false;
             }
             ApiClient client = zugang.client();
@@ -450,6 +451,14 @@ class ApiTokenPruefungTest {
                     client.aktiv(), client.erstellt(), client.zuletzt(), client.webseite(), client.hoechsteStufe(),
                     zeit, client.absenderPruefen()), zugang.hash()));
             return true;
+        }
+
+        @Override
+        public boolean apiTokenAbgelaufen(String mandant, String id, Instant jetzt) {
+            Zugang zugang = eintraege.get(id);
+            return zugang != null && zugang.client().mandant().equals(mandant) && zugang.client().aktiv()
+                    && !zugang.client().scope().webseitenSchluessel()
+                    && zugang.client().gueltigBis().filter(ablauf -> !ablauf.isAfter(jetzt)).isPresent();
         }
 
         @Override

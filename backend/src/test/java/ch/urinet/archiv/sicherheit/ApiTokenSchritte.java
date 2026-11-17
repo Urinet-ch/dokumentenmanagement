@@ -28,6 +28,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -60,6 +61,9 @@ public class ApiTokenSchritte {
 
     @Inject
     ApiTokenVerwaltung verwaltung;
+
+    @Inject
+    Clock uhr;
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -99,7 +103,7 @@ public class ApiTokenSchritte {
     @Angenommen("für «{word}» gibt es das Token «{word}» mit Scope «{word}» und Ablauf in {int} Tagen")
     public void tokenAnlegenMitAblauf(String mandant, String name, String scope, int tage) {
         ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant, "Probe " + name, scope,
-                Optional.of(LocalDate.now(ZEITZONE).plusDays(tage)));
+                Optional.of(LocalDate.now(uhr.withZone(ZEITZONE)).plusDays(tage)));
         merken(name, erstellt.token().text());
         tokenMandant.put(name, mandant);
     }
@@ -108,7 +112,7 @@ public class ApiTokenSchritte {
     public void tokenAbgelaufen(String name) throws SQLException {
         String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
         ausfuehren("update public.api_client set gueltig_bis = ?::timestamptz where id = ?",
-                Instant.now().minusSeconds(1).toString(), id);
+                uhr.instant().minusSeconds(1).toString(), id);
     }
 
     @Angenommen("der aktive Mandant «{word}» steht nur im Register")
@@ -442,8 +446,8 @@ public class ApiTokenSchritte {
         }
     }
 
-    private static LocalDate datum(String ablauf) {
-        LocalDate heute = LocalDate.now(ZEITZONE);
+    private LocalDate datum(String ablauf) {
+        LocalDate heute = LocalDate.now(uhr.withZone(ZEITZONE));
         return switch (ablauf) {
             case "gestern" -> heute.minusDays(1);
             case "morgen" -> heute.plusDays(1);
