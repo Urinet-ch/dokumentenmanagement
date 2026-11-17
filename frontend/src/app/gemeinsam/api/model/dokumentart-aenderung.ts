@@ -24,6 +24,14 @@ export interface DokumentartAenderung {
     aufbewahrungAb?: DokumentartAenderung.AufbewahrungAbEnum | null;
     gesetzlichePflicht?: boolean;
     aktiv?: boolean;
+    selbstAusgestellt?: boolean;
+    belegnummerMuster?: Array<string>;
+    fremdbelegArt?: string;
+    ohneZahlungsdatenArt?: string;
+    kiVorschlag?: boolean;
+    kiFelder?: Array<string>;
+    kiHinweise?: string | null;
+    reihenfolge?: number;
     /**
      * Änderungsgrund für das Zugriffsprotokoll
      */
