@@ -43,6 +43,15 @@ components:
           - type: "null"
         absenderPruefen:
           type: boolean
+    ApiTokenAblauf:
+      type: object
+      required:
+      - gueltigBis
+      properties:
+        gueltigBis:
+          description: Gültig bis einschliesslich dieses Tages
+          type: string
+          $ref: "#/components/schemas/LocalDate"
     ApiTokenErstellt:
       type: object
       properties:
@@ -57,6 +66,13 @@ components:
           - import
         erstellt:
           $ref: "#/components/schemas/Instant"
+        gueltigBis:
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/Instant"
+          - type: "null"
         token:
           type: string
           description: Das Token `ua_<id>_<geheimnis>`; wird nur dieses eine Mal ausgegeben.
@@ -75,6 +91,14 @@ components:
           enum:
           - generator
           - import
+        gueltigBis:
+          description: Gültig bis einschliesslich dieses Tages
+          type:
+          - string
+          - "null"
+          anyOf:
+          - $ref: "#/components/schemas/LocalDate"
+          - type: "null"
     AuszugTeil:
       description: Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req
         14.4)
@@ -2306,7 +2330,8 @@ paths:
       tags:
       - API-Tokens
       parameters:
-      - name: tokenId
+      - description: ID des API-Tokens
+        name: tokenId
         in: path
         required: true
         schema:
@@ -2314,6 +2339,58 @@ paths:
       responses:
         "204":
           description: Widerrufen
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+  /api/v1/api-tokens/{tokenId}/gueltig-bis:
+    put:
+      summary: Ablaufdatum eines API-Tokens setzen
+      tags:
+      - API-Tokens
+      parameters:
+      - description: ID des API-Tokens
+        name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        description: "Neues Ablaufdatum, gültig bis einschliesslich dieses Tages"
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiTokenAblauf"
+        required: true
+      responses:
+        "204":
+          description: Ablaufdatum gesetzt
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+        "400":
+          description: Bad Request
+      security:
+      - SecurityScheme:
+        - inhaber
+    delete:
+      summary: Ablaufdatum eines API-Tokens entfernen
+      tags:
+      - API-Tokens
+      parameters:
+      - description: ID des API-Tokens
+        name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Ablaufdatum entfernt
         "401":
           description: Not Authorized
         "403":

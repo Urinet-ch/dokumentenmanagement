@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="037-api-token-gueltig-bis" author="archiv">
+        <sql>
+            alter table public.api_client drop constraint api_client_webseite_ck;
+            alter table public.api_client add constraint api_client_webseite_ck check (
+                (scope = 'webseite-lesen'
+                    and webseite is not null and length(btrim(webseite)) > 0
+                    and hoechste_stufe is not null
+                    and hoechste_stufe in ('oeffentlich', 'mitglieder', 'vorstand'))
+                or (scope = 'webseite-erfassung'
+                    and webseite is not null and length(btrim(webseite)) > 0
+                    and hoechste_stufe is not null and hoechste_stufe = 'vorstand')
+                or (scope in ('generator', 'import')
+                    and webseite is null and hoechste_stufe is null
+                    and not absender_pruefen)
+            );
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                do $$
+                begin
+                    if exists (select 1 from public.api_client
+                               where scope in ('generator', 'import') and gueltig_bis is not null) then
+                        raise exception 'Rollback 037 nicht möglich: Ablaufdaten der API-Tokens zuerst entfernen.';
+                    end if;
+                    alter table public.api_client drop constraint api_client_webseite_ck;
+                    alter table public.api_client add constraint api_client_webseite_ck check (
+                        (scope = 'webseite-lesen'
+                            and webseite is not null and length(btrim(webseite)) > 0
+                            and hoechste_stufe is not null
+                            and hoechste_stufe in ('oeffentlich', 'mitglieder', 'vorstand'))
+                        or (scope = 'webseite-erfassung'
+                            and webseite is not null and length(btrim(webseite)) > 0
+                            and hoechste_stufe is not null and hoechste_stufe = 'vorstand')
+                        or (scope in ('generator', 'import')
+                            and webseite is null and hoechste_stufe is null
+                            and gueltig_bis is null and not absender_pruefen)
+                    );
+                end
+                $$;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

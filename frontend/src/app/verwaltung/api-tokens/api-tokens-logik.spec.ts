@@ -1,5 +1,14 @@
 import { ApiToken } from '../../gemeinsam/api';
-import { scopeText, sortiereApiTokens, tokenStatus } from './api-tokens-logik';
+import {
+  ablaufdatumGueltig,
+  ablaufdatumText,
+  heuteInZurich,
+  langeUngenutzt,
+  scopeText,
+  sortiereApiTokens,
+  spaetestesAblaufdatum,
+  tokenStatus,
+} from './api-tokens-logik';
 
 describe('API-Token-Logik', () => {
   it('sortiert aktive vor widerrufenen, ungenutzte zuerst und Gleichstände nach Erstellung', () => {
@@ -53,8 +62,33 @@ describe('API-Token-Logik', () => {
 
   it('liefert Status und unbekannte Scopes ohne Abbruch als Text', () => {
     expect(tokenStatus({ aktiv: true })).toBe('aktiv');
+    expect(tokenStatus({ aktiv: true, gueltigBis: '2026-01-01T00:00:00Z' }, Date.parse('2026-01-01T00:00:00Z')))
+      .toBe('abgelaufen');
     expect(tokenStatus({ aktiv: false })).toBe('widerrufen');
     expect(scopeText('webseite-lesen')).toBe('webseite-lesen');
     expect(scopeText(undefined)).toBe('–');
+  });
+
+  it('zeigt API-Token-Daten als einschliessliches Datum in der Schweizer Zeitzone', () => {
+    expect(ablaufdatumText({ scope: 'generator', gueltigBis: '2026-03-01T23:00:00Z' })).toBe('2026-03-01');
+    expect(ablaufdatumText({ scope: 'webseite-lesen', gueltigBis: '2026-03-01T23:00:00Z' })).toBe('2026-03-02');
+    expect(ablaufdatumText({ scope: 'generator', gueltigBis: null })).toBeNull();
+  });
+
+  it('validiert Datumsgrenzen und begrenzt das Datum auf fünf Jahre', () => {
+    expect(ablaufdatumGueltig('2026-02-29', '2026-01-01')).toBe(false);
+    expect(ablaufdatumGueltig('2026-01-01', '2026-01-01')).toBe(true);
+    expect(ablaufdatumGueltig('2031-01-01', '2026-01-01')).toBe(true);
+    expect(ablaufdatumGueltig('2031-01-02', '2026-01-01')).toBe(false);
+    expect(spaetestesAblaufdatum('2024-02-29')).toBe('2029-02-28');
+  });
+
+  it('warnt nur bei aktiven, unbefristeten Tokens mit mindestens einem Jahr ohne Nutzung', () => {
+    const jetzt = Date.parse('2026-01-01T00:00:00Z');
+    expect(langeUngenutzt({ aktiv: true, erstellt: '2024-12-31T23:59:59Z' }, jetzt)).toBe(true);
+    expect(langeUngenutzt({ aktiv: true, erstellt: '2025-01-01T00:00:01Z' }, jetzt)).toBe(false);
+    expect(langeUngenutzt({ aktiv: true, erstellt: '2024-01-01T00:00:00Z', gueltigBis: '2027-01-01' }, jetzt))
+      .toBe(false);
+    expect(heuteInZurich()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

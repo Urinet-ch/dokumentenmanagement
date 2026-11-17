@@ -15,6 +15,16 @@ Funktionalität: API-Tokens in der PWA
     Wenn ich das genutzte API-Token mit Bestätigung widerrufe
     Dann das API-Token ist widerrufen und erhält bei Verwendung HTTP 401
 
+  @req-2.5
+  Szenario: Ablaufdatum eines API-Tokens mit beschriftetem Datumsfeld setzen
+    Angenommen die PWA spricht mit dem Archiv im Testmodus
+    Und ein Bildschirm mit 375 Pixel Breite
+    Und ich bin als «inhaber» im Mandanten «urinet» angemeldet
+    Und im Mandanten «urinet» gibt es ein nie genutztes und ein einmal genutztes API-Token
+    Und ich im Menü «API-Tokens» wähle
+    Wenn ich dem nie genutzten API-Token ein Ablaufdatum gebe
+    Dann sehe ich das Ablaufdatum des API-Tokens und es ist gespeichert
+
   @req-2.20
   Szenariogrundriss: Andere Rollen können API-Tokens nicht verwalten (<rolle>)
     Angenommen Keycloak kennt mich als «<rolle>» im Mandanten «<mandant>»

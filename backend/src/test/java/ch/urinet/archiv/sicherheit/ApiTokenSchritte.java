@@ -28,12 +28,16 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -50,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ApiTokenSchritte {
 
     private static final String VERWALTUNG = "/api/v1/api-tokens";
+    private static final ZoneId ZEITZONE = ZoneId.of("Europe/Zurich");
     private static final String UPLOAD = "/api/v1/dokumente";
     private static final String GENERATOR = "/api/v1/dokumente/generator";
 
@@ -89,6 +94,21 @@ public class ApiTokenSchritte {
         ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant, "Probe " + name, scope);
         merken(name, erstellt.token().text());
         tokenMandant.put(name, mandant);
+    }
+
+    @Angenommen("für «{word}» gibt es das Token «{word}» mit Scope «{word}» und Ablauf in {int} Tagen")
+    public void tokenAnlegenMitAblauf(String mandant, String name, String scope, int tage) {
+        ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant, "Probe " + name, scope,
+                Optional.of(LocalDate.now(ZEITZONE).plusDays(tage)));
+        merken(name, erstellt.token().text());
+        tokenMandant.put(name, mandant);
+    }
+
+    @Angenommen("das Ablaufdatum des Tokens «{word}» liegt in der Vergangenheit")
+    public void tokenAbgelaufen(String name) throws SQLException {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        ausfuehren("update public.api_client set gueltig_bis = ?::timestamptz where id = ?",
+                Instant.now().minusSeconds(1).toString(), id);
     }
 
     @Angenommen("der aktive Mandant «{word}» steht nur im Register")
@@ -171,6 +191,46 @@ public class ApiTokenSchritte {
         }
     }
 
+    @Wenn("«{word}» ein Token «{word}» mit Scope «{word}» und Ablaufdatum «{word}» anlegt")
+    public void perRestAnlegenMitAblauf(String benutzer, String name, String scope, String ablauf) {
+        LocalDate datum = datum(ablauf);
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of("name", "Probe " + name, "scope", scope, "gueltigBis", datum.toString()))
+                .when().post(VERWALTUNG);
+        if (antwort.statusCode() == 201) {
+            merken(name, antwort.path("token"));
+            tokenMandant.put(name, benutzer.substring(benutzer.indexOf('-') + 1));
+        }
+    }
+
+    @Wenn("«{word}» den Ablauf des Tokens «{word}» auf «{word}» setzt")
+    public void ablaufSetzen(String benutzer, String name, String ablauf) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of("gueltigBis", datum(ablauf).toString()))
+                .when().put(VERWALTUNG + "/" + id + "/gueltig-bis");
+    }
+
+    @Wenn("«{word}» den Ablauf des Tokens «{word}» ohne Datum setzt")
+    public void ablaufOhneDatumSetzen(String benutzer, String name) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(Map.of())
+                .when().put(VERWALTUNG + "/" + id + "/gueltig-bis");
+    }
+
+    @Wenn("«{word}» den Ablauf des Tokens «{word}» entfernt")
+    public void ablaufEntfernen(String benutzer, String name) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when()
+                .delete(VERWALTUNG + "/" + id + "/gueltig-bis");
+    }
+
+    @Angenommen("der Stand des Zugriffsprotokolls von «{word}» ist für Ablaufänderungen gemerkt")
+    public void ablaufStandMerken(String mandant) throws SQLException {
+        standMerken(mandant);
+    }
+
     @Wenn("«{word}» die Tokens auflistet")
     public void auflisten(String benutzer) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(VERWALTUNG);
@@ -246,6 +306,12 @@ public class ApiTokenSchritte {
         assertThat(antwort.<String>path("scope")).isNotBlank();
     }
 
+    @Dann("enthält die Antwort das Ablaufdatum «{word}»")
+    public void ablaufdatumInAntwort(String ablauf) {
+        Instant erwartet = datum(ablauf).plusDays(1).atStartOfDay(ZEITZONE).toInstant();
+        assertThat(Instant.parse(antwort.<String>path("gueltigBis"))).isEqualTo(erwartet);
+    }
+
     @Dann("enthält die Liste das Token «{word}» mit aktiv {word}, ohne Geheimnis und ohne Hash")
     public void inListe(String name, String aktiv) {
         assertThat(antwort.statusCode()).isEqualTo(200);
@@ -260,6 +326,23 @@ public class ApiTokenSchritte {
         assertThat(eintrag.get("erstellt")).isNotNull();
         assertThat(antwort.asString()).doesNotContain("argon2");
         geheimnisseFehlenIn(antwort.asString());
+    }
+
+    @Dann("hat das Token «{word}» in der Liste das Ablaufdatum «{word}»")
+    public void ablaufdatumInListe(String name, String ablauf) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        List<Map<String, Object>> liste = antwort.jsonPath().getList("");
+        Map<String, Object> eintrag = liste.stream().filter(e -> id.equals(e.get("id"))).findFirst().orElseThrow();
+        Instant erwartet = datum(ablauf).plusDays(1).atStartOfDay(ZEITZONE).toInstant();
+        assertThat(Instant.parse((String) eintrag.get("gueltigBis"))).isEqualTo(erwartet);
+    }
+
+    @Dann("hat das Token «{word}» in der Liste kein Ablaufdatum")
+    public void keinAblaufdatumInListe(String name) {
+        String id = ApiToken.lesen(tokens.get(name)).orElseThrow().id();
+        List<Map<String, Object>> liste = antwort.jsonPath().getList("");
+        Map<String, Object> eintrag = liste.stream().filter(e -> id.equals(e.get("id"))).findFirst().orElseThrow();
+        assertThat(eintrag).containsEntry("gueltigBis", null);
     }
 
     @Dann("ist beim Token «{word}» die letzte Verwendung eingetragen")
@@ -291,6 +374,23 @@ public class ApiTokenSchritte {
     public void keinTokenEintrag(String mandant) throws SQLException {
         assertThat(abfragen("select benutzer from " + schema(mandant) + ".zugriff_protokoll where id > "
                 + stand.get(mandant) + " and benutzer like 'token:%'")).isEmpty();
+    }
+
+    @Dann("das Zugriffsprotokoll von «{word}» enthält seit dem gemerkten Stand zwei Aktionen «AENDERN» ohne Geheimnis")
+    public void ablaufAenderungenProtokolliert(String mandant) throws SQLException {
+        List<Map<String, String>> eintraege = abfragen("select aktion, details from " + schema(mandant)
+                + ".zugriff_protokoll where id > " + stand.get(mandant) + " and aktion = 'AENDERN'");
+        assertThat(eintraege).hasSize(2);
+        String verwaltet = ApiToken.lesen(tokens.get("verwaltet")).orElseThrow().id();
+        for (Map<String, String> eintrag : eintraege) {
+            assertThat(eintrag.get("details")).as("Details nennen das geänderte Token").contains(verwaltet);
+            for (String token : tokens.values()) {
+                if (eintrag.get("details") != null) {
+                    assertThat(eintrag.get("details"))
+                            .doesNotContain(ApiToken.lesen(token).orElseThrow().geheimnis());
+                }
+            }
+        }
     }
 
     @Dann("kein Logeintrag enthält das Geheimnis eines Tokens")
@@ -340,6 +440,16 @@ public class ApiTokenSchritte {
             assertThat(text).as("gesendeter Wert im Text").doesNotContain(wert);
             ApiToken.lesen(wert).ifPresent(t -> assertThat(text).doesNotContain(t.geheimnis()));
         }
+    }
+
+    private static LocalDate datum(String ablauf) {
+        LocalDate heute = LocalDate.now(ZEITZONE);
+        return switch (ablauf) {
+            case "gestern" -> heute.minusDays(1);
+            case "morgen" -> heute.plusDays(1);
+            case "in-sechs-jahren" -> heute.plusYears(6);
+            default -> throw new IllegalArgumentException("Unbekanntes Ablaufdatum im Testszenario");
+        };
     }
 
     /**

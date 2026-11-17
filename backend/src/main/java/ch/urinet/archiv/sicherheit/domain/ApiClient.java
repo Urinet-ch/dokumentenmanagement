@@ -24,7 +24,7 @@ public record ApiClient(String id, String mandant, String name, ApiTokenScope sc
         Objects.requireNonNull(gueltigBis, "gueltigBis");
         if (scope.webseitenSchluessel() != webseite.isPresent()
                 || scope.webseitenSchluessel() != hoechsteStufe.isPresent()
-                || !scope.webseitenSchluessel() && (gueltigBis.isPresent() || absenderPruefen)
+                || !scope.webseitenSchluessel() && absenderPruefen
                 || webseite.filter(String::isBlank).isPresent()
                 || hoechsteStufe.filter(s -> !s.equals("oeffentlich") && !s.equals("mitglieder")
                         && !s.equals("vorstand")).isPresent()

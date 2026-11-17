@@ -219,6 +219,11 @@ class WebseitenSchluesselVerwaltungTest {
         }
 
         @Override
+        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+            return false;
+        }
+
+        @Override
         public void zuletztSetzen(String id, Instant zeit) {
         }
     }

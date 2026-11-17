@@ -119,6 +119,20 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     }
 
     @Override
+    public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
+                verbindung.prepareStatement("update public.api_client set gueltig_bis = ? "
+                        + "where id = ? and mandant = ? and scope in ('generator', 'import') and aktiv")) {
+            aendern.setObject(1, zeit.map(JdbcApiClientRegister::utc).orElse(null));
+            aendern.setString(2, id);
+            aendern.setString(3, mandant);
+            return aendern.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Ablauf des API-Tokens nicht nachgeführt", e);
+        }
+    }
+
+    @Override
     public void zuletztSetzen(String id, Instant zeit) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
                 verbindung.prepareStatement("update public.api_client set zuletzt = ? where id = ?")) {

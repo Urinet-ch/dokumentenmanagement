@@ -349,5 +349,5 @@ Code kommen: Fehlercodes und A11 (siehe oben) sowie die Stammdaten-Tabelle (Aufg
   im PR dieser Spec nachgetragen).
 
 ## Open Points
-- Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9).
+- [offen: Entscheid Fabian] Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9; spätestens vor Welle 10).
 - Rechte der Geschäftsstelle für A11 bleiben der Entscheid aus Spec 03, 3.5.
