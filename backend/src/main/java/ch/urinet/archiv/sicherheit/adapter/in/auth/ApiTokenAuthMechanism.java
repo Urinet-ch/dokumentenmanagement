@@ -10,9 +10,12 @@ import io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism;
 import io.quarkus.vertx.http.runtime.security.HttpSecurityUtils;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +32,16 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
 
     static final int PRIORITAET = 2000;
     private static final String BEARER = "bearer ";
+    private static final String REAL_IP = "X-Real-Ip";
+    private static final String TRUSTED_PROXY = "X-Forwarded-Trusted-Proxy";
+    private final boolean proxyAddressForwarding;
+
+    @Inject
+    public ApiTokenAuthMechanism(
+            @ConfigProperty(name = "quarkus.http.proxy.proxy-address-forwarding", defaultValue = "false")
+            boolean proxyAddressForwarding) {
+        this.proxyAddressForwarding = proxyAddressForwarding;
+    }
 
     @Override
     public Uni<SecurityIdentity> authenticate(RoutingContext kontext, IdentityProviderManager anbieter) {
@@ -40,12 +53,19 @@ public class ApiTokenAuthMechanism implements HttpAuthenticationMechanism {
         if (token.isEmpty()) {
             return Uni.createFrom().failure(new AuthenticationFailedException("API-Token ungültig"));
         }
-        Optional<String> absender = Optional.ofNullable(kontext.request().remoteAddress())
-                .map(SocketAddress::hostAddress);
+        Optional<String> absender = absender(kontext.request());
         ApiTokenAnfrage anfrage = new ApiTokenAnfrage(token.get(),
                 absender);
         HttpSecurityUtils.setRoutingContextAttribute(anfrage, kontext);
         return anbieter.authenticate(anfrage);
+    }
+
+    private Optional<String> absender(HttpServerRequest anfrage) {
+        SocketAddress verbindungsadresse = anfrage.remoteAddress();
+        if (proxyAddressForwarding && "true".equals(anfrage.headers().get(TRUSTED_PROXY))) {
+            return Optional.ofNullable(anfrage.headers().get(REAL_IP)).map(String::strip).filter(ip -> !ip.isEmpty());
+        }
+        return Optional.ofNullable(verbindungsadresse).map(SocketAddress::hostAddress);
     }
 
     /** Wert nach {@code Bearer }, Gross-/Kleinschreibung des Schemas egal; leer ohne Bearer-Header. */

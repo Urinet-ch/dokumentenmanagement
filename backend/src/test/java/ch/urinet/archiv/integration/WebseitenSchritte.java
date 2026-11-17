@@ -369,7 +369,7 @@ public class WebseitenSchritte {
 
     @Dann("wird die Schlüsselprüfung mit Status 429 und «Retry-After» abgelehnt")
     public void schluesselpruefung429() {
-        assertThat(ProblemDetails.pruefen(antwort, 429)).isEqualTo("ZU_VIELE_ANFRAGEN");
+        assertThat(ProblemDetails.pruefen(antwort, 429, "grund")).isEqualTo("ZU_VIELE_ANFRAGEN");
         assertThat(antwort.header("Retry-After")).isNotBlank();
         assertThat(antwort.jsonPath().getString("grund")).isEqualTo("SCHLUESSELPRUEFUNG");
     }
@@ -381,7 +381,7 @@ public class WebseitenSchritte {
 
     @Wenn("der Erfassungs-Schlüssel mit Quelle «{}» die Probe aufruft")
     public void erfassungsSchluesselVonQuelle(String quelle) {
-        antwort = probe(erfassungsToken, quelle);
+        antwort = probeErfassung(erfassungsToken, quelle);
     }
 
     @Wenn("die Webseite den warmen Schlüssel erneut an der Probe verwendet")
@@ -452,6 +452,11 @@ public class WebseitenSchritte {
     private static Response probe(String token, String quelle) {
         return given().header("Authorization", "Bearer " + token)
                 .header("X-Real-Ip", quelle).when().get("/public/v1/probe");
+    }
+
+    private static Response probeErfassung(String token, String quelle) {
+        return given().header("Authorization", "Bearer " + token)
+                .header("X-Real-Ip", quelle).when().post("/public/v1/probe/erfassung");
     }
 
     private void hashSperreFreigeben() {

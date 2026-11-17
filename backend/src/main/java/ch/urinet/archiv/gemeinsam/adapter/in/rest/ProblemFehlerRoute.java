@@ -65,7 +65,8 @@ public class ProblemFehlerRoute {
             kontext.next();
             return;
         }
-        if (kontext.failure() instanceof ZuVieleAnfragen zuViele) {
+        ZuVieleAnfragen zuViele = zuViele(kontext.failure());
+        if (zuViele != null) {
             kontext.response().putHeader("Retry-After", Long.toString(zuViele.wartezeitSekunden()));
             senden(kontext, ProblemAntwort.mitErweiterung(Fehlercode.ZU_VIELE_ANFRAGEN, "grund",
                     zuViele.grund().name()), false);
@@ -77,6 +78,17 @@ public class ProblemFehlerRoute {
             return;
         }
         kontext.next();
+    }
+
+    private static ZuVieleAnfragen zuViele(Throwable fehler) {
+        if (fehler instanceof ZuVieleAnfragen zuViele) {
+            return zuViele;
+        }
+        if (fehler instanceof AuthenticationCompletionException anmeldung
+                && anmeldung.getCause() instanceof ZuVieleAnfragen zuViele) {
+            return zuViele;
+        }
+        return null;
     }
 
     void grenzePruefen(RoutingContext kontext) {
