@@ -5,7 +5,7 @@
 
 # Stufe «werkzeuge»: JRE und OCR-Werkzeuge ohne Anwendung. Tests und das Profil lokal rufen die Werkzeuge darin auf
 # (archiv.ocr.container-image): docker build --target werkzeuge -t urinet-archiv-werkzeuge:lokal - < backend/src/main/docker/Dockerfile.jvm
-FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:a98128a57de944a72bd31fbc79b898edd5a5864d3652071d5bbd2160ab7d7dce AS werkzeuge
+FROM eclipse-temurin:25.0.5_8-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c AS werkzeuge
 
 # OCRmyPDF mit Tesseract (deu, eng, osd für --rotate-pages), Ghostscript (PDF/A), img2pdf, libheif mit HEVC-Decoder
 # (heif-convert), poppler-utils (pdftotext, pdftoppm) und tini; die Versionsabfragen brechen den Build ab, falls eines fehlt
