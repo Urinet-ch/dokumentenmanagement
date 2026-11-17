@@ -18,6 +18,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 10.1 Auftragsbearbeitungsvertrag und Domain [Fabian]
   - Vorlage `docs/vertrag/avv-vorlage.md` erstellen (Unterauftragnehmer nach Requirement 8.4), mit VHF/GSK abstimmen und unterzeichnen
+  - Umsetzung (Copilot): Vorlage als ausdrücklich nicht rechtlich geprüften Entwurf erstellt; rechtliche Prüfung, Abstimmung mit VHF/GSK und Unterzeichnung bleiben [Fabian]. Der Haken für Aufgabe 10.1 bleibt offen. Offener Punkt A2 (Aufbewahrung Chat-Fragen: Standard 90 Tage gegenüber den VHF/GSK zugesagten 30 Tagen) ist in der Vorlage und im Beiblatt benannt.
   - Entscheide vor Welle 10 einholen: Domain VHF/GSK, `gesetzliche_pflicht` und Standard-Vertraulichkeit je Art, Rechte A11 bis A14 der Geschäftsstelle
   - Domain für das Archiv festlegen ([offen: Domain VHF/GSK – Entscheid vor Welle 10]), DNS einrichten
   - _Anforderungen: 8.4, 2.2, 1.2, 3.5_
