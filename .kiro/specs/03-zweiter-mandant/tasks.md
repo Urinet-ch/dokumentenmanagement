@@ -34,6 +34,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 10.3 Branding pro Mandant [Frontend] [Infra]
   - `GET /api/v1/branding?domain=`, Web-App lädt Name/Logo/Farbe; Keycloak-Theme `vhf-gsk` auf `archiv-auth.apps.urinet.ch`; Traefik-Router (Labels in `deploy/infomaniak/compose.yml`) für die Verbands-Domain, ausgerollt nur über den Deploy-Workflow
   - Umsetzung (PR #228): öffentlicher Branding-Endpunkt und Web-App mit neutralem Fallback; Domains bleiben ausserhalb des Repos konfigurierbar, da die Domain-Entscheidung offen ist. Offen: Keycloak-Theme und Traefik-Router (Deploy). Nachbesserung Review: Quelle ist `archiv.branding.mandanten.*` statt `mandant.branding` (Entscheid in design.md); Domain `archiv.apps.urinet.ch` ist Standard für UriNet, `ARCHIV_BRANDING_VHF_GSK_DOMAIN` muss im Deploy gesetzt werden, sobald die Domain feststeht; Seitentitel und Startseite zeigen den Mandantennamen; Primärfarben ohne WCAG-AA-Kontrast (4,5:1) fallen auf die Standardfarbe zurück; Logos nur auf eigener Origin.
+  - Vorschlag, wartet auf Fabians Prüfung (Rest: Keycloak-Theme `vhf-gsk` und Traefik-Router für die Platzhalter-Subdomain, Einzelheiten in design.md; Haken erst nach Deploy und Prüfung)
   - _Anforderungen: 2.1–2.3_
 
 - [x] 10.4 Erfassung für die Geschäftsstelle [Backend] [Frontend]
