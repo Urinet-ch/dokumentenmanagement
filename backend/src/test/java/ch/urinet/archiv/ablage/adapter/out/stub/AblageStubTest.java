@@ -103,6 +103,21 @@ class AblageStubTest {
         assertThat(stub.versionen(MANDANT, "manifest/", Optional.empty(), 10).versionen()).hasSize(1);
     }
 
+    @Test
+    void speicherbedarfIstJeMandantGetrennt() {
+        AblageStub stub = new AblageStub();
+        MandantCode andererMandant = new MandantCode("vhf-gsk");
+        stub.ablegenManifest(MANDANT, LocalDate.of(2026, 1, 1), ManifestTeil.JSON,
+                "{\"x\":1}".getBytes(StandardCharsets.UTF_8), Optional.empty());
+        stub.ablegenManifest(MANDANT, LocalDate.of(2026, 1, 2), ManifestTeil.JSON,
+                "{\"x\":2}".getBytes(StandardCharsets.UTF_8), Optional.empty());
+        stub.ablegenManifest(andererMandant, LocalDate.of(2026, 1, 1), ManifestTeil.JSON,
+                "{\"x\":3}".getBytes(StandardCharsets.UTF_8), Optional.empty());
+
+        assertThat(stub.speicherbedarf(MANDANT)).isEqualTo(14);
+        assertThat(stub.speicherbedarf(andererMandant)).isEqualTo(7);
+    }
+
     private static AblageStub mitManifesten(int anzahl) {
         AblageStub stub = new AblageStub();
         for (int tag = 1; tag <= anzahl; tag++) {

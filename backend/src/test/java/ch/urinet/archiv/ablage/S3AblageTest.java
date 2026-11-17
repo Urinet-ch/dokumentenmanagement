@@ -754,6 +754,18 @@ class S3AblageTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining(KeinBypassInterceptor.HEADER);
     }
 
+    @Test
+    void speicherbedarfZaehltAlleObjektversionen() {
+        String key = "eingang/2026/" + UUID.randomUUID() + "/original.pdf";
+        verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("aa"));
+        verwaltung.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromString("bbb"));
+        verwaltung.deleteObject(r -> r.bucket(bucket).key(key));
+        verwaltung.putObject(r -> r.bucket(bucket).key("manifest/" + UUID.randomUUID() + ".json"),
+                RequestBody.fromString("cccc"));
+
+        assertThat(ablage().speicherbedarf(mandant)).isEqualTo(9);
+    }
+
     /** Fortsetzung über mehrere Seiten (Req 15.10): jede Version und jede Löschmarke genau einmal. */
     @Test
     void versionenUeberMehrereSeiten() {

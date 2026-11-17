@@ -179,6 +179,9 @@ public interface AblagePort {
      */
     Versionsseite versionen(MandantCode mandant, String praefix, Optional<Versionsseite.Marke> ab, int anzahl);
 
+    /** Summe der Grössen aller gespeicherten Objektversionen im Bucket des Mandanten. */
+    long speicherbedarf(MandantCode mandant);
+
     /** Object-Lock-Angaben einer Version für das Sicherungsinventar; {@code eingang/} hat keine Sperre. */
     Optional<SicherungsSperre> sicherungsSperre(MandantCode mandant, Objektversion version);
 

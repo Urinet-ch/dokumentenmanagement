@@ -34,11 +34,13 @@ public final class Wiederherstellung {
     private static final List<String> PRAEFIXE = List.of("archiv/", "eingang/", "manifest/");
 
     private final WiederherstellungsZiel ziel;
+    private final WiederherstellungsReferenz referenz;
     private final Clock uhr;
 
-    public Wiederherstellung(WiederherstellungsZiel ziel, Clock uhr) {
-        this.ziel = ziel;
-        this.uhr = uhr;
+    public Wiederherstellung(WiederherstellungsZiel ziel, Clock uhr, WiederherstellungsReferenz referenz) {
+        this.ziel = java.util.Objects.requireNonNull(ziel, "ziel");
+        this.referenz = java.util.Objects.requireNonNull(referenz, "referenz");
+        this.uhr = java.util.Objects.requireNonNull(uhr, "uhr");
     }
 
     public Ergebnis wiederherstellen(MandantCode mandant, List<InventarZeile> inventar, Path strom, boolean kappen) {
@@ -160,6 +162,9 @@ public final class Wiederherstellung {
                 }
                 ungesperrt = null;
                 versionen++;
+                if (zeile.schluessel().startsWith("archiv/") || zeile.schluessel().startsWith("eingang/")) {
+                    referenz.versionErsetzt(mandant, zeile.schluessel(), zeile.versionId(), quittung.versionId());
+                }
             }
         } catch (IOException | RuntimeException e) {
             abweichend = 1;
