@@ -101,9 +101,10 @@ public class S3Ablage implements AblagePort {
     private static final Logger LOG = Logger.getLogger(S3Ablage.class);
     private static final String ARCHIV = Ablageort.ARCHIV.praefix() + "/";
     /**
-     * «Keine Sperre» bei {@code GetObjectRetention}: {@code ObjectLockConfigurationNotFoundError} (404) aus dem
-     * Ceph-Quelltext ({@code rgw_common.cc}, nicht live gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration}
-     * (AWS, MinIO mit 400). Jeder andere Fehler, auch {@code NoSuchKey} oder {@code NoSuchVersion}, ist ein Fehler.
+     * Keine Object-Lock-Konfiguration bei {@code GetObjectRetention} oder {@code GetObjectLegalHold}:
+     * {@code ObjectLockConfigurationNotFoundError} (404) aus dem Ceph-Quelltext ({@code rgw_common.cc}, nicht live
+     * gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration} (AWS, MinIO mit 400). Jeder andere Fehler,
+     * auch {@code NoSuchKey} oder {@code NoSuchVersion}, bleibt ein Fehler.
      */
     public static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
             "ObjectLockConfigurationNotFoundError");
@@ -848,13 +849,7 @@ public class S3Ablage implements AblagePort {
                     Optional<ObjectLockRetention> sperre = retention(bucket, version.key(), version.versionId());
                     Optional<Instant> bis = sperre.map(ObjectLockRetention::retainUntilDate)
                             .filter(zeit -> zeit.isAfter(jetzt));
-                    var legalHoldStatus = s3.getObjectLegalHold(
-                            b -> b.bucket(bucket).key(version.key()).versionId(version.versionId())).legalHold();
-                    if (legalHoldStatus == null || legalHoldStatus.status() == null) {
-                        throw new IllegalStateException("Legal Hold für Objektversion nicht prüfbar: "
-                                + version.key());
-                    }
-                    boolean legalHold = legalHoldStatus.status() == ObjectLockLegalHoldStatus.ON;
+                    boolean legalHold = legalHoldAktiv(bucket, version.key(), version.versionId());
                     if (bis.isPresent() || legalHold) {
                         gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(version.key(), version.versionId(),
                                 bis, legalHold));
@@ -880,6 +875,21 @@ public class S3Ablage implements AblagePort {
             }
         }
         return new MandantAblageAbbau(geloescht, loeschbar, gesperrt);
+    }
+
+    private boolean legalHoldAktiv(String bucket, String key, String versionId) {
+        try {
+            var status = s3.getObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(versionId)).legalHold();
+            if (status == null || status.status() == null) {
+                throw new IllegalStateException("Legal Hold für Objektversion nicht prüfbar: " + key);
+            }
+            return status.status() == ObjectLockLegalHoldStatus.ON;
+        } catch (S3Exception e) {
+            if (KEINE_SPERRE.contains(fehlercode(e))) {
+                return false;
+            }
+            throw e;
+        }
     }
 
     @Override

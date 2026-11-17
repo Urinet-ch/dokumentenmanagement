@@ -37,7 +37,6 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.SdkResponse;
 import software.amazon.awssdk.core.interceptor.Context;
@@ -85,7 +84,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Object Lock und Versionierung, ohne Bucket Policy.
  */
 @QuarkusTest
-@Tag("start-2")
 class S3AblageTest {
 
     private static final LocalDate IN_ZEHN_JAHREN = LocalDate.now().plusYears(10);
@@ -233,6 +231,11 @@ class S3AblageTest {
         S3Ablage ablage = ablage();
         DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
         ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
+        Instant ablauf = Instant.now().plus(Duration.ofDays(1));
+        verwaltung.putObjectRetention(b -> b.bucket(bucket)
+                .key(eingang.schluessel().pfad(Ablageort.EINGANG))
+                .versionId(eingang.eingangVersionId())
+                .retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(ablauf)));
         verwaltung.putObjectLegalHold(b -> b.bucket(bucket)
                 .key(eingang.schluessel().pfad(Ablageort.EINGANG))
                 .versionId(eingang.eingangVersionId())
@@ -246,7 +249,7 @@ class S3AblageTest {
         verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
                 .versionId(legalHoldDatei.versionId())
                 .legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON)));
-        Instant jetzt = Instant.now();
+        Instant jetzt = ablauf.plus(Duration.ofDays(1));
 
         var vorschau = ablage.mandantAbbauPlanen(mandant, jetzt);
 
