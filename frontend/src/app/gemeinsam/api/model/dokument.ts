@@ -86,6 +86,14 @@ export interface Dokument {
      * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer
      */
     versionen: Array<DokumentVersion>;
+    /**
+     * Werte nach Klassifikations-Code
+     */
+    klassifikationen: { [key: string]: Array<string>; };
+    /**
+     * Ungültige Klassifikationen, die im Eingangskorb zu korrigieren sind
+     */
+    klassifikationenUngueltig: Array<string>;
 }
 export namespace Dokument {
     export const QuelleEnum = {
