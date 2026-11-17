@@ -178,6 +178,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
+  - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Der Keycloak-Client-Abbau bleibt offen, da kein mandantenspezifischer Client-Lifecycle-Port oder Client im freigegebenen Code besteht; siehe design.md «Mandantenverwaltung». Aufgabe bleibt deshalb offen.
   - Spec 04 ergänzt den Vollexport um den OKF-Export der Wissensbasis (Spec 04, 17.5; Aufgabe 15.5)
   - Spec 05 ergänzt: Der Vollexport enthält je Dokument die Klassifikationen mit Code und Name und die Konfigurationsversion sowie die aktuelle Konfigurationsdatei und alle Konfigurationsversionen (Spec 05 design.md, «Folgeänderungen»)
   - _Anforderungen: 8.2, 8.3, 8.5_
@@ -191,6 +192,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Entscheid zur Form (Review PR #235): «MandantenIsolationIT» ist vorläufig ein Tag-Verbund, keine eigene Klasse. Die Szenarien tragen `@req-1.4` und `@req-9.1` (Lesen, Datei/Stream in beide Richtungen mit Gegenprobe im eigenen Mandanten, Filter, Umleitung, Feed-Referenzen, Chat) bzw. `@req-9.4` (Stufen); der Nachweis ist `grep -rl "@req-1.4" backend/src/test/resources/features`. Eine Matrix `sicherheit/mandanten-isolation.feature` entsteht mit dem Gesamtabschluss von 12.3, wenn 11.10 steht.
   - Noch ohne Nachweis (Lücken): Ablage/S3-Link und Aufträge je Mandant; die älteren Teilnachweise (Download, Export, Suche, Chat intern) tragen noch nicht `@req-1.4`/`@req-9.1` und sind erst mit der Matrix zugeordnet. Aufgabe 11.10 liefert Upload und Statusabruf nach.
   - Nicht umgesetzt: Upload und Statusabruf nach Referenz über die Webseiten-Erfassung sowie direkte Referenzsuche haben keine entsprechenden Endpunkte; keine Platzhalter oder neuen Routen angelegt. Die bestehenden Änderungs-Feeds samt Referenzfilter sind abgedeckt. Eine Kennzahlen-REST-Route für einen Mandanten ist ebenfalls nicht vorhanden. ZAP/Staging-Prüfung und OWASP-Prüfbericht (`docs/abnahme/`) bleiben offen für den Gesamtabschluss von 12.3 (Zuständig: QA, vor dem Livegang von VHF/GSK, nach 11.10 und 11.11); der Haken bleibt deshalb offen.
+  - Stand 17.11.2026 (Review PR #246): OWASP-Prüfbericht liegt unter `docs/abnahme/owasp-api-top10.md` vor (Codebericht, Quellstand `2ccc3ecf`); ZAP-Baseline gegen Staging bleibt offen, Haken bleibt offen. Folgeaufgaben aus dem Bericht: F1 Erfassung mit Grenzen, BOPLA, BFLA, Inventar (11.10); F2 Erschöpfung der Schlüsselprüfung für kalte Schlüssel und Erfassungs-Schlüssel, Drosselung je Quelle (11.6, #241); F3 Budget als harte Obergrenze; F4 Test zum Fail-open-Pfad des Limiters
   - _Anforderungen: 1.4, 9.1, 9.2, 9.4_
 
 - [ ] 12.4 Einführung und Abnahme [Fabian]

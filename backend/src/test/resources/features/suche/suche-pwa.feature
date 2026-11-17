@@ -92,7 +92,7 @@ Funktionalität: Suche und Dokumentansicht im Browser
     Und zeigt die Dokumentansicht «Dokumentart» mit «Ausgangsrechnung»
     Und zeigt die Dokumentansicht «Belegdatum» mit «14.03.2026»
     Und hat die PWA die PDF/A-Adresse von «Rechnung Vereinsfest Seedorf» als JSON angefragt
-    Und zeigt die Vorschau die vorsignierte Adresse als PDF
+    Und zeigt die PDF-Vorschau als sicheren Link
     Und öffnet «PDF/A herunterladen» die vorsignierte Download-Adresse in einem neuen Tab
     Und lässt sich die Seite nicht waagrecht scrollen
     Und liegt kein Token im Browser-Speicher

@@ -7,4 +7,7 @@ package ch.urinet.archiv.mandant.application;
 public interface MandantBucket {
 
     void einrichten(String bucket);
+
+    /** Löscht nur einen leeren Mandanten-Bucket. {@code false}, falls noch Versionen oder Löschmarken enthalten sind. */
+    boolean entfernenWennLeer(String bucket);
 }

@@ -18,4 +18,5 @@ public interface MandantRegister {
 
     /** Zeitpunkt der Anlage; Beginn der Manifest-Kette (Req 15.1). */
     Optional<Instant> erstellt(MandantCode code);
+
 }

@@ -63,7 +63,7 @@ Funktionalität: Metadaten bearbeiten und Versionen in der Dokumentansicht
     Und bietet die Dokumentansicht «Metadaten bearbeiten» nicht an
 
   @req-14.6
-  Szenario: Auf dem Handy zeigt die Dokumentansicht das Vorschaubild der ersten Seite statt des eingebetteten PDF
+  Szenario: Auf dem Handy zeigt die Dokumentansicht das Vorschaubild der ersten Seite statt des PDF-Links
     Angenommen das Browserfenster ist 375 Pixel breit
     Und ich bin als «mitarbeiter» im Mandanten «urinet» angemeldet
     Und ich die Suche über das Menü öffne

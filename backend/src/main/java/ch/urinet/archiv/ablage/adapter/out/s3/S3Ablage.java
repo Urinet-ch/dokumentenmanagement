@@ -16,6 +16,7 @@ import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.ablage.domain.MehrdeutigeVersion;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
@@ -54,6 +55,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
+import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
 import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -99,9 +101,10 @@ public class S3Ablage implements AblagePort {
     private static final Logger LOG = Logger.getLogger(S3Ablage.class);
     private static final String ARCHIV = Ablageort.ARCHIV.praefix() + "/";
     /**
-     * «Keine Sperre» bei {@code GetObjectRetention}: {@code ObjectLockConfigurationNotFoundError} (404) aus dem
-     * Ceph-Quelltext ({@code rgw_common.cc}, nicht live gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration}
-     * (AWS, MinIO mit 400). Jeder andere Fehler, auch {@code NoSuchKey} oder {@code NoSuchVersion}, ist ein Fehler.
+     * Keine Object-Lock-Konfiguration bei {@code GetObjectRetention} oder {@code GetObjectLegalHold}:
+     * {@code ObjectLockConfigurationNotFoundError} (404) aus dem Ceph-Quelltext ({@code rgw_common.cc}, nicht live
+     * gegen Infomaniak geprüft), {@code NoSuchObjectLockConfiguration} (AWS, MinIO mit 400). Jeder andere Fehler,
+     * auch {@code NoSuchKey} oder {@code NoSuchVersion}, bleibt ein Fehler.
      */
     public static final Set<String> KEINE_SPERRE = Set.of("NoSuchObjectLockConfiguration",
             "ObjectLockConfigurationNotFoundError");
@@ -839,6 +842,75 @@ public class S3Ablage implements AblagePort {
     }
 
     @Override
+    public MandantAblageAbbau mandantAbbauen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, true);
+    }
+
+    @Override
+    public MandantAblageAbbau mandantAbbauPlanen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, false);
+    }
+
+    private MandantAblageAbbau mandantAbbau(MandantCode mandant, Instant jetzt, boolean loeschen) {
+        Objects.requireNonNull(jetzt, "jetzt");
+        String bucket = bucket(mandant);
+        List<MandantAblageAbbau.GesperrtesObjekt> gesperrt = new ArrayList<>();
+        int loeschbar = 0;
+        int geloescht = 0;
+        int gesperrtGesamt = 0;
+        try {
+            for (ListObjectVersionsResponse seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).maxKeys(1000))) {
+                for (var version : seite.versions()) {
+                    Optional<ObjectLockRetention> sperre = retention(bucket, version.key(), version.versionId());
+                    Optional<Instant> bis = sperre.map(ObjectLockRetention::retainUntilDate)
+                            .filter(zeit -> zeit.isAfter(jetzt));
+                    boolean legalHold = legalHoldAktiv(bucket, version.key(), version.versionId());
+                    if (bis.isPresent() || legalHold) {
+                        gesperrtGesamt++;
+                        if (gesperrt.size() < MandantAblageAbbau.MAX_AUFGELISTET) {
+                            gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(version.key(), version.versionId(),
+                                    bis, legalHold));
+                        }
+                        continue;
+                    }
+                    loeschbar++;
+                    if (loeschen) {
+                        s3.deleteObject(b -> b.bucket(bucket).key(version.key()).versionId(version.versionId()));
+                        geloescht++;
+                    }
+                }
+                for (var marker : seite.deleteMarkers()) {
+                    loeschbar++;
+                    if (loeschen) {
+                        s3.deleteObject(b -> b.bucket(bucket).key(marker.key()).versionId(marker.versionId()));
+                        geloescht++;
+                    }
+                }
+            }
+        } catch (S3Exception e) {
+            if (!"NoSuchBucket".equals(fehlercode(e)) && e.statusCode() != 404) {
+                throw e;
+            }
+        }
+        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt, gesperrtGesamt);
+    }
+
+    private boolean legalHoldAktiv(String bucket, String key, String versionId) {
+        try {
+            var status = s3.getObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(versionId)).legalHold();
+            if (status == null || status.status() == null) {
+                throw new IllegalStateException("Legal Hold einer Objektversion nicht prüfbar");
+            }
+            return status.status() == ObjectLockLegalHoldStatus.ON;
+        } catch (S3Exception e) {
+            if (KEINE_SPERRE.contains(fehlercode(e))) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public SperrAenderung sperreVerlaengernBis(MandantCode mandant, String schluessel, String versionId,
                                                Instant bis) {
         bereichPruefen(schluessel, versionId);
@@ -930,6 +1002,24 @@ public class S3Ablage implements AblagePort {
             return new VorsignierteUrl(signiert.url().toURI(), signiert.expiration());
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Vorsignierte URL ungültig: " + schluessel, e);
+        }
+    }
+
+    /** Prüft, dass der Export unter {@code exporte/} noch die aktuelle Version mit genau dieser Grösse ist. */
+    @Override
+    public boolean exportVorhanden(MandantCode mandant, String schluessel, String versionId, long groesse) {
+        if (!schluessel.startsWith(Exportdatei.PRAEFIX)) {
+            throw new IllegalArgumentException("Schlüssel nicht unter " + Exportdatei.PRAEFIX);
+        }
+        try {
+            HeadObjectResponse kopf = s3.headObject(b -> b.bucket(bucket(mandant)).key(schluessel));
+            return versionId.equals(kopf.versionId()) && kopf.contentLength() != null
+                    && kopf.contentLength() == groesse;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404 || "NoSuchKey".equals(fehlercode(e)) || "NoSuchBucket".equals(fehlercode(e))) {
+                return false;
+            }
+            throw e;
         }
     }
 
