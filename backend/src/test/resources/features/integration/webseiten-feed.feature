@@ -295,7 +295,7 @@ Funktionalität: Änderungs-Feed der Webseiten-Schnittstelle (Aufgabe 11.9)
     Dann wurde die erste Anfrage zwischen der 41. und der 44. abgelehnt
     Und die Ablehnung ist 429 «ZU_VIELE_ANFRAGEN» mit «Retry-After» zwischen 1 und 3600 Sekunden und dem Grund «ANFRAGEN»
     Wenn der Schlüssel «E» «/public/v1/erfassung/aenderungen» mit wechselnden Clients und Stufen aufruft, bis eine Anfrage abgelehnt wird
-    Dann wurde die erste Anfrage zwischen der 9. und der 12. abgelehnt
+    Dann wurde die erste Anfrage zwischen der 8. und der 11. abgelehnt
     Und die Ablehnung ist 429 «ZU_VIELE_ANFRAGEN» mit «Retry-After» zwischen 1 und 3600 Sekunden und dem Grund «ANFRAGEN»
     Wenn der Schlüssel «F» «/public/v1/erfassung/aenderungen» ohne Header aufgerufen wird
     Dann antwortet die Grenze mit Status 200

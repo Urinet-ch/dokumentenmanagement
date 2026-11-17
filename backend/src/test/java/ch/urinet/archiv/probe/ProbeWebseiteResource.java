@@ -53,17 +53,6 @@ public class ProbeWebseiteResource {
         return Map.of("probe", "erfasst");
     }
 
-    /** Aufgabe 11.11: Beleg für die Grenze «Uploads je Stunde», bis die Erfassung (11.10) einen echten Upload hat. */
-    @POST
-    @Path("/erfassung/upload")
-    @Produces(MediaType.APPLICATION_JSON)
-    @Authenticated
-    @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
-    @WebseitenGrenze(Grenzklasse.UPLOAD)
-    public Map<String, String> hochladen() {
-        return Map.of("probe", "hochgeladen");
-    }
-
     /** Aufgabe 11.11: stuft wie die Suche ein (teure Anfrage), ohne Datenbank. */
     @GET
     @Path("/teuer")

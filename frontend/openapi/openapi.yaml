@@ -387,6 +387,7 @@ components:
           - DRIVE
           - EMAIL
           - ABANINJA
+          - WEBSEITE
         tags:
           type: array
           items:

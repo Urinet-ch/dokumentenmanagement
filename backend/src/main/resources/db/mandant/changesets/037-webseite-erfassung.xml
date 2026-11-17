@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Webseiten-Erfassung: Quelle und Zuordnung der protokollierten Bearbeiter (Spec 03, Req 10.1, 10.9). -->
+    <changeSet id="037-webseite-erfassung" author="archiv">
+        <sql>
+            alter table dokument drop constraint dokument_quelle_ck;
+            alter table dokument add constraint dokument_quelle_ck
+                check (quelle in ('SCAN', 'UPLOAD', 'GENERATOR', 'DRIVE', 'EMAIL', 'ABANINJA', 'WEBSEITE'));
+            alter table zugriff_protokoll add column bearbeiter text
+        </sql>
+        <rollback>
+            <sql>
+                alter table zugriff_protokoll drop column bearbeiter;
+                alter table dokument drop constraint dokument_quelle_ck;
+                alter table dokument add constraint dokument_quelle_ck
+                    check (quelle in ('SCAN', 'UPLOAD', 'GENERATOR', 'DRIVE', 'EMAIL', 'ABANINJA'))
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

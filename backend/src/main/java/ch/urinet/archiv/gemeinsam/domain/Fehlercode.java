@@ -18,6 +18,8 @@ public enum Fehlercode {
             "Den Eintrag gibt es nicht, oder er ist für Sie nicht sichtbar. Bitte prüfen Sie den Link."),
     STATUS_KONFLIKT(409, "Aktion im aktuellen Status nicht möglich",
             "Das Dokument steht in einem Status, in dem diese Aktion nicht möglich ist. Bitte laden Sie es neu."),
+    REFERENZ_VERGEBEN(409, "Referenz vergeben",
+            "Diese Referenz gehört bereits zu einer anderen Datei. Bitte verwenden Sie eine neue Referenz."),
     BELEGNUMMER_VERGEBEN(409, "Belegnummer vergeben",
             "Diese Belegnummer ist schon vergeben. Bitte prüfen Sie die Nummer."),
     FRIST_ABGELAUFEN(409, "Frist abgelaufen",

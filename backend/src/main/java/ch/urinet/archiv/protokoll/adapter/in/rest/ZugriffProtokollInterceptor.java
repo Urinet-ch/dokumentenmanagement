@@ -6,7 +6,9 @@ import ch.urinet.archiv.protokoll.domain.IpAdresse;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.protokoll.domain.ProtokollDetails;
 import ch.urinet.archiv.protokoll.domain.ZugriffEintrag;
+import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.sicherheit.domain.ApiTokenScope;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.vertx.core.http.HttpServerRequest;
@@ -54,7 +56,7 @@ public class ZugriffProtokollInterceptor {
     Object protokollieren(InvocationContext aufruf) throws Exception {
         Protokolliert erklaerung = aufruf.getInterceptorBinding(Protokolliert.class);
         ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(), dokumentId(),
-                ip(), ProtokollDetails.KEINE);
+                ip(), ProtokollDetails.KEINE, bearbeiter());
         return QuarkusTransaction.joiningExisting().call(() -> {
             protokoll.schreiben(eintrag);
             return aufruf.proceed();
@@ -66,7 +68,24 @@ public class ZugriffProtokollInterceptor {
     }
 
     private Optional<String> rolle() {
+        ApiTokenScope scope = identitaet.getAttribute(TokenIdentitaet.SCOPE);
+        if (scope == ApiTokenScope.WEBSEITE_ERFASSUNG) {
+            return Optional.of(Rolle.GESCHAEFTSSTELLE.name());
+        }
         return Rolle.ausRealmRollen(identitaet.getRoles()).map(Rolle::name);
+    }
+
+    private Optional<String> bearbeiter() {
+        String webseite = identitaet.getAttribute(TokenIdentitaet.WEBSEITE);
+        if (webseite == null || !anfrage.isResolvable()) {
+            return Optional.empty();
+        }
+        try {
+            String kennung = anfrage.get().getHeader("X-Archiv-Bearbeiter");
+            return kennung == null ? Optional.empty() : Optional.of(webseite + "/" + kennung);
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
     }
 
     private Optional<UUID> dokumentId() {

@@ -142,6 +142,8 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Idempotenz mit `pg_advisory_xact_lock` auf (Webseite, Referenz) vor der Dublettenprüfung; verworfene Referenz frei; Dublette mit ID nur, wenn sichtbar (Spec 01, 3.4 ergänzt)
   - Neue Changesets `db/mandant`: `webseite_referenz`, `zugriff_protokoll.bearbeiter`, `dokument_version.bearbeiter`, Quelle `WEBSEITE`; Header `X-Archiv-Bearbeiter`; Bearbeiter im Benutzerverzeichnis (Spec 01, 10.10 ergänzt); 409 `REFERENZ_VERGEBEN` (Fehlercode im selben PR in Spec 01 design.md eintragen)
   - Erweitert die Isolationsszenarien (12.3): Upload und Statusabruf nach Referenz über Mandanten- und Webseitengrenze, Erfassungs-Schlüssel gegen Lesewege (`@req-1.4`, `@req-9.1`, `@req-9.4`); diese Wege fehlen in 12.3 «Umsetzung Teil 1», weil es die Endpunkte noch nicht gibt
+  - Umsetzung Teil 1 (PR #253): Upload, Referenzbindung und -sperre, Status/Details, gefilterte Liste, Bearbeitermeldung samt Protokollierung; Changeset 033 wird verwendet, Changeset 037 ergänzt Quelle und Protokollspalte. Die Upload-Grenze prüft den echten Endpunkt. Teil 2 bleibt offen: Bestätigen/Ändern, Veröffentlichen/Zurückziehen, Eingangskorb/Dokumentarten, Dateistream und Wiederholen.
+  - Testnachweis Teil 1: synthetische Szenarien `@req-10.1`–`@req-10.4`, `@req-10.9`, `@req-10.11`–`@req-10.13`, `@req-1.4`, `@req-9.1`, `@req-9.4`, `@req-12.1` und `@req-15.1`; Abdeckung und vollständige Prüfläufe folgen vor dem PR-Review.
   - _Anforderungen: 10.1–10.14, 3.1_
   - _Abhängig von: 11.7, 11.8_
 

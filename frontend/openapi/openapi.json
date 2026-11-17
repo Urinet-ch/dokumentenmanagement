@@ -381,7 +381,7 @@
           },
           "quelle" : {
             "type" : "string",
-            "enum" : [ "SCAN", "UPLOAD", "GENERATOR", "DRIVE", "EMAIL", "ABANINJA" ]
+            "enum" : [ "SCAN", "UPLOAD", "GENERATOR", "DRIVE", "EMAIL", "ABANINJA", "WEBSEITE" ]
           },
           "tags" : {
             "type" : "array",

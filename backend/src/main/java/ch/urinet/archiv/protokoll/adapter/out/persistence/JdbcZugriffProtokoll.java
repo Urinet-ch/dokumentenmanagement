@@ -79,8 +79,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
                             ? Optional.of(VerzeichnisEintrag.ROLLE_API_TOKEN) : eintrag.rolle(),
                             eintrag.aktion() == ProtokollAktion.VERWEIGERT)));
         }
-        String sql = "insert into " + schema + ".zugriff_protokoll (benutzer, rolle, aktion, dokument_id, ip, details) "
-                + "values (?, ?, ?, ?, cast(? as inet), cast(? as jsonb))";
+        String sql = "insert into " + schema + ".zugriff_protokoll "
+                + "(benutzer, rolle, aktion, dokument_id, ip, details, bearbeiter) "
+                + "values (?, ?, ?, ?, cast(? as inet), cast(? as jsonb), ?)";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
             for (ZugriffEintrag eintrag : eintraege) {
@@ -90,6 +91,7 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
                 einfuegen.setObject(4, eintrag.dokumentId().orElse(null), Types.OTHER);
                 einfuegen.setString(5, eintrag.ip().map(IpAdresse::text).orElse(null));
                 einfuegen.setString(6, json(eintrag.details()));
+                einfuegen.setString(7, eintrag.bearbeiter().orElse(null));
                 einfuegen.addBatch();
             }
             einfuegen.executeBatch();
