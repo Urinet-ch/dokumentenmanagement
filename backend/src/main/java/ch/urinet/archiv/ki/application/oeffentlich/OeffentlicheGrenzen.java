@@ -70,15 +70,26 @@ public class OeffentlicheGrenzen {
     public final class Platz {
 
         private final String client;
+        private final String schluessel;
+        private final Instant angenommen;
         private final AtomicBoolean frei = new AtomicBoolean();
 
-        private Platz(String client) {
+        private Platz(String client, String schluessel, Instant angenommen) {
             this.client = client;
+            this.schluessel = schluessel;
+            this.angenommen = angenommen;
         }
 
         public void freigeben() {
             if (frei.compareAndSet(false, true)) {
                 zurueckgeben(client);
+            }
+        }
+
+        /** Gibt den Platz frei und nimmt die Frage aus den Stundenfenstern: eine abgelehnte Frage zählt nicht. */
+        public void verwerfen() {
+            if (frei.compareAndSet(false, true)) {
+                zurueckziehen(client, schluessel, angenommen);
             }
         }
     }
@@ -114,7 +125,7 @@ public class OeffentlicheGrenzen {
         schluesselFenster.addLast(jetzt);
         laufend.merge(client, 1, Integer::sum);
         belegt++;
-        return new Platz(client);
+        return new Platz(client, schluessel, jetzt);
     }
 
     /** Zahl der belegten Plätze (für Tests und Kennzahlen). */
@@ -138,6 +149,19 @@ public class OeffentlicheGrenzen {
     private void aufraeumen(Instant jetzt) {
         Instant start = jetzt.minus(FENSTER);
         fenster.values().removeIf(z -> z.isEmpty() || !z.peekLast().isAfter(start));
+    }
+
+    private synchronized void zurueckziehen(String client, String schluessel, Instant angenommen) {
+        zurueckgeben(client);
+        for (String name : new String[]{"c\n" + client, "w\n" + schluessel}) {
+            ArrayDeque<Instant> zeiten = fenster.get(name);
+            if (zeiten != null) {
+                zeiten.removeLastOccurrence(angenommen);
+                if (zeiten.isEmpty()) {
+                    fenster.remove(name);
+                }
+            }
+        }
     }
 
     private synchronized void zurueckgeben(String client) {
