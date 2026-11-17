@@ -3,6 +3,7 @@ package ch.urinet.archiv.konfiguration.domain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -78,21 +79,83 @@ class KonfigurationTest {
     }
 
     @Test
+    void prueftAlleZusaetzlichenReserviertenPublicParameter() {
+        for (String code : List.of("seit", "max", "referenz", "groesse", "status", "url")) {
+            var klassifikation = new Klassifikation(code, "Fachgebiet", null, List.of(),
+                    false, false, true, true, true);
+            assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(klassifikation)).pruefen())
+                    .as("Klassifikations-Code %s", code)
+                    .extracting(Konfiguration.Befund::code).contains("PARAMETER_RESERVIERT");
+        }
+    }
+
+    @Test
+    void prueftDokumentKlassifikationenUndMeldetBetroffeneCodes() {
+        var klassifikation = new Klassifikation("fachgebiet", "Fachgebiet", null, List.of(
+                new KlassifikationWert("alt", "Alt", null, 0, false),
+                new KlassifikationWert("neu", "Neu", null, 1, true)), false, false, true, false, true);
+        var art = artMitKlassifikationen("MERKBLATT",
+                List.of(new ArtKlassifikation("fachgebiet", true, null)));
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(art), List.of(klassifikation));
+
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT",
+                Map.of("fachgebiet", List.of("alt", "neu"), "unbekannt", List.of("wert")), Map.of()))
+                .containsExactly("fachgebiet", "unbekannt");
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT", Map.of(), Map.of()))
+                .containsExactly("fachgebiet");
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("FEHLT", Map.of(), Map.of()))
+                .containsExactly("art");
+    }
+
+    @Test
+    void erlaubtUnveraenderteInaktiveWerteUndVorbelegungNurBeimArtwechsel() {
+        var klassifikation = new Klassifikation("fachgebiet", "Fachgebiet", null, List.of(
+                new KlassifikationWert("alt", "Alt", null, 0, false),
+                new KlassifikationWert("bau", "Bau", null, 1, true)), false, false, true, false, true);
+        var art = artMitKlassifikationen("MERKBLATT", List.of(
+                new ArtKlassifikation("fachgebiet", false, "bau"),
+                new ArtKlassifikation("zielgruppe", false, "alle")));
+        var konfiguration = new Konfiguration(1, einstellungen(), List.of(art), List.of(klassifikation));
+        Map<String, List<String>> alt = Map.of("fachgebiet", List.of("alt"));
+
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT", alt, alt)).isEmpty();
+        assertThat(konfiguration.ungueltigeDokumentKlassifikationen("MERKBLATT", alt, Map.of()))
+                .containsExactly("fachgebiet");
+        assertThat(konfiguration.beimArtwechselVorbelegen("MERKBLATT", Map.of(
+                "fachgebiet", List.of("alt"), "zielgruppe", List.of(), "entfernt", List.of("wert"))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("fachgebiet", List.of("alt"),
+                        "zielgruppe", List.of("alle")));
+    }
+
+    @Test
     void protokolliertKlassifikationsAenderungenOhneKlartextWerte() {
         var alt = klassifikation("fachgebiet", "Altname", "geheim");
         var neu = klassifikation("fachgebiet", "Neuname", "andererWert");
-        var vorher = new Konfiguration(1, einstellungen(), List.of(), List.of(alt));
-        var nachher = new Konfiguration(2, einstellungen(), List.of(), List.of(neu));
+        var artVorher = artMitKlassifikationen("MERKBLATT",
+                List.of(new ArtKlassifikation("fachgebiet", false, "wert")));
+        var artNachher = artMitKlassifikationen("MERKBLATT",
+                List.of(new ArtKlassifikation("fachgebiet", false, "anderer_wert")));
+        var vorher = new Konfiguration(1, einstellungen(), List.of(artVorher), List.of(alt));
+        var nachher = new Konfiguration(2, einstellungen(), List.of(artNachher), List.of(neu));
 
         assertThat(vorher.aenderungen(nachher))
                 .extracting(Konfiguration.Aenderung::alt)
-                .doesNotContain("Altname", "Neuname", "geheim", "andererWert");
+                .doesNotContain("Altname", "Neuname", "geheim", "andererWert", "wert", "anderer_wert");
+        assertThat(vorher.aenderungen(nachher))
+                .extracting(Konfiguration.Aenderung::neu)
+                .doesNotContain("Altname", "Neuname", "geheim", "andererWert", "wert", "anderer_wert");
     }
 
     private static Konfiguration.Art art(String code, String vertraulichkeit, boolean aktiv, boolean selbstAusgestellt) {
         return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"), "{\"type\":\"object\"}",
                 vertraulichkeit, new Konfiguration.Aufbewahrung(null, null), false, aktiv, selbstAusgestellt,
                 List.of(), null, null, true, List.of(), null, 0);
+    }
+
+    private static Konfiguration.Art artMitKlassifikationen(String code, List<ArtKlassifikation> zuordnungen) {
+        return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"),
+                Konfiguration.OHNE_ZUSATZ, "NORMAL", new Konfiguration.Aufbewahrung(null, null), false, true,
+                false, List.of(), null, null, true, List.of(), null, 0, zuordnungen);
     }
 
     private static Konfiguration.Einstellungen einstellungen() {

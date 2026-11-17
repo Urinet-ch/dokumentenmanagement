@@ -112,6 +112,20 @@
           }
         }
       },
+      "ArtKlassifikation" : {
+        "type" : "object",
+        "properties" : {
+          "klassifikation" : {
+            "type" : "string"
+          },
+          "pflicht" : {
+            "type" : "boolean"
+          },
+          "standardWert" : {
+            "type" : "string"
+          }
+        }
+      },
       "AuszugTeil" : {
         "description" : "Stück der Textstelle; treffer = hervorgehobener Suchbegriff (Req 14.4)",
         "type" : "object",
@@ -162,6 +176,16 @@
             "items" : {
               "type" : "string"
             }
+          },
+          "klassifikationen" : {
+            "type" : [ "object", "null" ],
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            },
+            "description" : "Werte nach Klassifikations-Code"
           },
           "vertraulichkeit" : {
             "type" : [ "string", "null" ],
@@ -383,7 +407,7 @@
       "Dokument" : {
         "description" : "Metadaten eines sichtbaren Dokuments",
         "type" : "object",
-        "required" : [ "id", "eingang", "quelle", "tags", "vertraulichkeit", "status", "fristAbgelaufen", "version", "warnungen", "pdfaFehlt", "unsicher", "versionen" ],
+        "required" : [ "id", "eingang", "quelle", "tags", "vertraulichkeit", "status", "fristAbgelaufen", "version", "warnungen", "pdfaFehlt", "unsicher", "versionen", "klassifikationen", "klassifikationenUngueltig" ],
         "properties" : {
           "id" : {
             "$ref" : "#/components/schemas/UUID"
@@ -548,6 +572,23 @@
               "$ref" : "#/components/schemas/DokumentVersion"
             },
             "description" : "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer"
+          },
+          "klassifikationen" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            },
+            "description" : "Werte nach Klassifikations-Code"
+          },
+          "klassifikationenUngueltig" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Ungültige Klassifikationen, die im Eingangskorb zu korrigieren sind"
           }
         }
       },
@@ -664,6 +705,16 @@
             }, {
               "type" : "null"
             } ]
+          },
+          "klassifikationen" : {
+            "type" : [ "object", "null" ],
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            },
+            "description" : "Werte nach Klassifikations-Code; ersetzt die bisherigen vollständig"
           },
           "grund" : {
             "type" : [ "string", "null" ],
@@ -1185,6 +1236,16 @@
             "format" : "int32",
             "description" : "Ohne Angabe Vorschlag aus Belegdatum (Req 9.6)"
           },
+          "klassifikationen" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            },
+            "description" : "Werte nach Klassifikations-Code"
+          },
           "zusatz" : {
             "description" : "Zusatzfelder nach dem Schema der Art",
             "type" : "object",
@@ -1603,6 +1664,62 @@
       },
       "JsonObjekt" : {
         "type" : "object"
+      },
+      "Klassifikation" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "werte" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KlassifikationWert"
+            }
+          },
+          "mehrfach" : {
+            "type" : "boolean"
+          },
+          "kiVorschlag" : {
+            "type" : "boolean"
+          },
+          "suchfilter" : {
+            "type" : "boolean"
+          },
+          "oeffentlichFilter" : {
+            "type" : "boolean"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "KlassifikationWert" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "beschreibung" : {
+            "type" : "string"
+          },
+          "reihenfolge" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aktiv" : {
+            "type" : "boolean"
+          }
+        }
       },
       "KonfigurationsVersion" : {
         "type" : "object",
@@ -2778,6 +2895,200 @@
           },
           "400" : {
             "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumentarten/{art}/klassifikationen" : {
+      "get" : {
+        "summary" : "Klassifikationen einer Dokumentart auflisten",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "art",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Klassifikation einer Dokumentart zuordnen",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "art",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Zugeordnet"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumentarten/{art}/klassifikationen/{code}" : {
+      "delete" : {
+        "summary" : "Klassifikation einer Dokumentart entfernen",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "art",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Entfernt"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "Zuordnung ändern",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "art",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Geändert",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
           }
         },
         "security" : [ {
@@ -4063,6 +4374,344 @@
           },
           "409" : {
             "description" : "STATUS_KONFLIKT: Lauf nicht im Status VORSCHAU oder gesperrt, weil seine Übernahme gerade läuft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/klassifikationen" : {
+      "get" : {
+        "summary" : "Klassifikationen des Mandanten auflisten",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Aktive und inaktive Klassifikationen und Werte mit Status",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      },
+      "post" : {
+        "summary" : "Klassifikation anlegen",
+        "description" : "If-Match mit Konfigurationsversion ist Pflicht.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Angelegt"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/klassifikationen/{code}" : {
+      "delete" : {
+        "summary" : "Klassifikation löschen",
+        "description" : "Nur ohne Dokumente und Artzuordnungen.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Gelöscht"
+          },
+          "409" : {
+            "description" : "KONFIGURATION_IN_GEBRAUCH"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "Klassifikation ändern oder deaktivieren",
+        "description" : "Code bleibt unverändert. If-Match mit Konfigurationsversion ist Pflicht.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Geändert",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/klassifikationen/{code}/werte" : {
+      "post" : {
+        "summary" : "Wert anlegen",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "description" : "Angelegt"
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/klassifikationen/{code}/werte/{wert}" : {
+      "delete" : {
+        "summary" : "Wert löschen",
+        "description" : "Nur ohne Dokumente.",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "wert",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Gelöscht"
+          },
+          "409" : {
+            "description" : "KONFIGURATION_IN_GEBRAUCH"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "patch" : {
+        "summary" : "Wert ändern oder deaktivieren",
+        "tags" : [ "Konfiguration" ],
+        "parameters" : [ {
+          "name" : "code",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "wert",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "If-Match",
+          "in" : "header",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Geändert",
+            "content" : {
+              "application/json" : {
+                "schema" : { }
+              }
+            }
+          },
+          "422" : {
+            "description" : "KONFIGURATION_UNGUELTIG"
+          },
+          "412" : {
+            "description" : "VERSION_KONFLIKT"
+          },
+          "428" : {
+            "description" : "VERSION_FEHLT"
           },
           "401" : {
             "description" : "Not Authorized"

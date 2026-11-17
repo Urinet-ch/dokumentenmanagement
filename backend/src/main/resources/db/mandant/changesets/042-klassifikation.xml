@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="042-klassifikation" author="copilot">
+        <createTable tableName="klassifikation">
+            <column name="code" type="varchar(40)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="beschreibung" type="text"/>
+            <column name="mehrfach" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ki_vorschlag" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="suchfilter" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="oeffentlich_filter" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <createTable tableName="klassifikation_wert">
+            <column name="klassifikation" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_klassifikation_wert" nullable="false"/>
+            </column>
+            <column name="code" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_klassifikation_wert" nullable="false"/>
+            </column>
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="beschreibung" type="text"/>
+            <column name="reihenfolge" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="klassifikation_wert" baseColumnNames="klassifikation"
+                                 referencedTableName="klassifikation" referencedColumnNames="code"
+                                 constraintName="fk_klassifikation_wert_klassifikation" onDelete="CASCADE"/>
+        <createTable tableName="dokumentart_klassifikation">
+            <column name="art" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_dokumentart_klassifikation" nullable="false"/>
+            </column>
+            <column name="klassifikation" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_dokumentart_klassifikation" nullable="false"/>
+            </column>
+            <column name="pflicht" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+            <column name="standard_wert" type="varchar(40)"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="dokumentart_klassifikation" baseColumnNames="art"
+                                 referencedTableName="dokumentart" referencedColumnNames="code"
+                                 constraintName="fk_dokumentart_klassifikation_art" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="dokumentart_klassifikation" baseColumnNames="klassifikation"
+                                 referencedTableName="klassifikation" referencedColumnNames="code"
+                                 constraintName="fk_dokumentart_klassifikation_klasse" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="dokumentart_klassifikation"
+                                 baseColumnNames="klassifikation,standard_wert"
+                                 referencedTableName="klassifikation_wert" referencedColumnNames="klassifikation,code"
+                                 constraintName="fk_dokumentart_klassifikation_standard"/>
+        <createTable tableName="dokument_klassifikation">
+            <column name="dokument_id" type="uuid">
+                <constraints primaryKey="true" primaryKeyName="pk_dokument_klassifikation" nullable="false"/>
+            </column>
+            <column name="klassifikation" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_dokument_klassifikation" nullable="false"/>
+            </column>
+            <column name="wert" type="varchar(40)">
+                <constraints primaryKey="true" primaryKeyName="pk_dokument_klassifikation" nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="dokument_klassifikation" baseColumnNames="dokument_id"
+                                 referencedTableName="dokument" referencedColumnNames="id"
+                                 constraintName="fk_dokument_klassifikation_dokument" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="dokument_klassifikation"
+                                 baseColumnNames="klassifikation,wert"
+                                 referencedTableName="klassifikation_wert" referencedColumnNames="klassifikation,code"
+                                 constraintName="fk_dokument_klassifikation_wert"/>
+        <createIndex tableName="dokument_klassifikation" indexName="ix_dokument_klassifikation_wert">
+            <column name="klassifikation"/>
+            <column name="wert"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

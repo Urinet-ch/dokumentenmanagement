@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokument.application;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ public record Aenderung(Set<String> gesetzt, String art, String titel, LocalDate
                         String belegnummer, String richtung, BigDecimal betrag, String waehrung, LocalDate faelligkeit,
                         String qrReferenz, String konto, LocalDate gueltigAb, LocalDate gueltigBis,
                         String kuendigungsfrist, LocalDate naechsteFrist, String zusatz, Set<String> zusatzFelder,
-                        String grund) {
+                        String grund, Map<String, List<String>> klassifikationen) {
 
     public static final String ART = "art";
     public static final String TITEL = "titel";
@@ -31,6 +32,7 @@ public record Aenderung(Set<String> gesetzt, String art, String titel, LocalDate
     public static final String WAEHRUNG = "waehrung";
     public static final String GUELTIG_BIS = "gueltigBis";
     public static final String ZUSATZ = "zusatz";
+    public static final String KLASSIFIKATIONEN = "klassifikationen";
 
     /** Felder der Gruppe {@code finanz} (Zahlstatus und AbaNinja-Felder gehören nie dazu, Regel 8). */
     public static final Set<String> FINANZ = Set.of("belegnummer", "richtung", "betrag", WAEHRUNG, "faelligkeit",
@@ -40,7 +42,18 @@ public record Aenderung(Set<String> gesetzt, String art, String titel, LocalDate
     public static final Set<String> NUR_A8 = Set.of(VERTRAULICHKEIT, PERSON);
     public static final Set<String> FELDER = Set.of(ART, TITEL, DATUM, PARTNER, PROJEKT, TAGS, VERTRAULICHKEIT, PERSON,
             GESCHAEFTSJAHR, "belegnummer", "richtung", "betrag", WAEHRUNG, "faelligkeit", "qrReferenz", "konto",
-            "gueltigAb", GUELTIG_BIS, "kuendigungsfrist", "naechsteFrist", ZUSATZ);
+            "gueltigAb", GUELTIG_BIS, "kuendigungsfrist", "naechsteFrist", ZUSATZ, KLASSIFIKATIONEN);
+
+    public Aenderung(Set<String> gesetzt, String art, String titel, LocalDate datum, UUID partnerId, String projekt,
+                     List<String> tags, String vertraulichkeit, String personBenutzer, Integer geschaeftsjahr,
+                     String belegnummer, String richtung, BigDecimal betrag, String waehrung, LocalDate faelligkeit,
+                     String qrReferenz, String konto, LocalDate gueltigAb, LocalDate gueltigBis,
+                     String kuendigungsfrist, LocalDate naechsteFrist, String zusatz, Set<String> zusatzFelder,
+                     String grund) {
+        this(gesetzt, art, titel, datum, partnerId, projekt, tags, vertraulichkeit, personBenutzer, geschaeftsjahr,
+                belegnummer, richtung, betrag, waehrung, faelligkeit, qrReferenz, konto, gueltigAb, gueltigBis,
+                kuendigungsfrist, naechsteFrist, zusatz, zusatzFelder, grund, Map.of());
+    }
 
     public Aenderung {
         gesetzt = Set.copyOf(gesetzt);
@@ -48,6 +61,9 @@ public record Aenderung(Set<String> gesetzt, String art, String titel, LocalDate
             throw new IllegalArgumentException("Unbekanntes Feld in der Änderung");
         }
         zusatzFelder = zusatzFelder == null ? Set.of() : Set.copyOf(zusatzFelder);
+        klassifikationen = klassifikationen == null ? Map.of()
+                : klassifikationen.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey, eintrag -> List.copyOf(eintrag.getValue())));
     }
 
     public boolean hat(String feld) {

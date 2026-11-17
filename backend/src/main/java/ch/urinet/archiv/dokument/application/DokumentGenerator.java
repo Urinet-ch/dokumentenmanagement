@@ -15,6 +15,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
@@ -68,10 +69,12 @@ public class DokumentGenerator {
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
+    private final KlassifikationVerwaltung klassifikationen;
 
     public DokumentGenerator(DokumentErfassen erfassen, DokumentRepository repository, DokumentStatusPort status,
                              DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
-                             MandantEinstellungen einstellungen, AuftragService auftraege) {
+                             MandantEinstellungen einstellungen, AuftragService auftraege,
+                             KlassifikationVerwaltung klassifikationen) {
         this.erfassen = erfassen;
         this.repository = repository;
         this.status = status;
@@ -80,6 +83,7 @@ public class DokumentGenerator {
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
+        this.klassifikationen = klassifikationen;
     }
 
     /**
@@ -113,6 +117,7 @@ public class DokumentGenerator {
             throw new PflichtfelderFehlen(List.of("art"));
         }
         Dokumentart art = DokumentBestaetigen.art(arten, b.art());
+        klassifikationen.dokumentKlassifikationenPruefen(art.code(), b.klassifikationen(), Map.of());
         Optional<Kontakt> partner = anfrage.crmId() == null ? Optional.empty() : kontakte.mitCrmId(anfrage.crmId());
         Bestaetigung mitPartner = mitPartner(b, partner.map(Kontakt::id).orElse(null));
         List<String> fehlen = new ArrayList<>(DokumentBestaetigen.fehlendePflichtfelder(art, mitPartner,
@@ -179,7 +184,7 @@ public class DokumentGenerator {
                         b.waehrung() != null ? b.waehrung() : "CHF", b.faelligkeit(), b.qrReferenz(), b.konto()))
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                        b.naechsteFrist())) : Optional.empty());
+                        b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
         if (!status.generatorMetadaten(id, daten, anfrage.zusatzJson())) {
             throw new IllegalStateException("Generator-Dokument nicht mehr NEU: " + id);
         }
@@ -197,6 +202,6 @@ public class DokumentGenerator {
         return new Bestaetigung(b.art(), b.titel(), b.datum(), partnerId, b.projekt(), b.tags(), b.vertraulichkeit(),
                 b.personBenutzer(), b.geschaeftsjahr(), b.belegnummer(), b.richtung(), b.betrag(), b.waehrung(),
                 b.faelligkeit(), b.qrReferenz(), b.konto(), b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                b.naechsteFrist(), false, false);
+                b.naechsteFrist(), false, false, b.klassifikationen());
     }
 }

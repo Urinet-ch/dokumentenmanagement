@@ -1746,6 +1746,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 409 | `BELEGNUMMER_VERGEBEN` | eigene Art, Belegnummer reserviert (Req 8.9, 11.3) |
 | 409 | `FRIST_ABGELAUFEN` | Bestätigung mit Frist in der Vergangenheit (Req 9.8) |
 | 409 | `DOKUMENTART_IN_GEBRAUCH` | Löschen einer benutzten Art (Req 9.4) |
+| 409 | `KONFIGURATION_IN_GEBRAUCH` | Löschen einer Klassifikation oder eines Werts, der noch an einem Dokument hängt (Spec 05, Req 3.3) |
 | 409 | `DOKUMENTART_EXISTIERT` | Anlegen einer Art mit einem Code, den es im Mandanten schon gibt (Req 9.1; Review PR #40) |
 | 410 | `CURSOR_ABGELAUFEN` | Cursor des Änderungs-Feeds älter als die Aufbewahrung des Feeds (90 Tage); die Webseite lädt ihren Bestand neu und beginnt ohne Cursor (Spec 03, Req 14.4; seit Aufgabe 11.9) |
 | 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4); bei Dokumenten oder Dokumentarten die jeweilige aktuelle Version |
@@ -1757,6 +1758,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `PARTNER_UNBEKANNT` | unbekannte `crmId` (Req 11.7) |
 | 422 | `ZUSATZ_UNGUELTIG` | Zusatzfelder oder Schema ungültig (Req 9.5) |
 | 422 | `KONFIGURATION_UNGUELTIG` | Abbild der Mandantenkonfiguration ist ungültig (Spec 05, Req 1.5) |
+| 422 | `KLASSIFIKATION_UNGUELTIG` | Klassifikationswerte am Dokument passen nicht zur Art (Spec 05, Req 3.5) |
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
 | 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
 | 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |

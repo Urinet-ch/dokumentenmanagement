@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
@@ -122,6 +123,84 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         return List.copyOf(befunde);
     }
 
+    public List<String> ungueltigeDokumentKlassifikationen(String artCode, Map<String, List<String>> werte,
+                                                           Map<String, List<String>> vorher) {
+        if (artCode == null) {
+            return List.of();
+        }
+        Art art = arten.stream().filter(eintrag -> artCode.equals(eintrag.code())).findFirst().orElse(null);
+        if (art == null) {
+            return List.of("art");
+        }
+        Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
+        klassifikationen.forEach(klassifikation ->
+                klassifikationenNachCode.put(klassifikation.code(), klassifikation));
+        Map<String, ArtKlassifikation> zuordnungen = new TreeMap<>();
+        art.klassifikationen().forEach(zuordnung -> zuordnungen.put(zuordnung.klassifikation(), zuordnung));
+        Map<String, List<String>> gesetzt = werte == null ? Map.of() : werte;
+        Map<String, List<String>> alt = vorher == null ? Map.of() : vorher;
+        Set<String> ungueltig = new TreeSet<>();
+
+        for (Map.Entry<String, List<String>> eintrag : gesetzt.entrySet()) {
+            String code = eintrag.getKey();
+            String sichererCode = code != null && KLASSIFIKATIONSCODE.matcher(code).matches()
+                    ? code : "klassifikation";
+            Klassifikation klassifikation = klassifikationenNachCode.get(code);
+            ArtKlassifikation zuordnung = zuordnungen.get(code);
+            List<String> liste = eintrag.getValue();
+            if (zuordnung == null || klassifikation == null || liste == null || liste.size() > 500) {
+                ungueltig.add(sichererCode);
+                continue;
+            }
+            Set<String> neueWerte = new HashSet<>(liste);
+            Set<String> alteWerte = new HashSet<>(alt.getOrDefault(code, List.of()));
+            boolean unveraendert = neueWerte.equals(alteWerte) && neueWerte.size() == liste.size();
+            if (!klassifikation.aktiv() && !unveraendert
+                    || !klassifikation.mehrfach() && liste.size() > 1
+                    || zuordnung.pflicht() && liste.isEmpty()
+                    || neueWerte.size() != liste.size()) {
+                ungueltig.add(sichererCode);
+                continue;
+            }
+            Set<String> aktiveWerte = new HashSet<>();
+            klassifikation.werte().stream().filter(KlassifikationWert::aktiv)
+                    .map(KlassifikationWert::code).forEach(aktiveWerte::add);
+            for (String wert : liste) {
+                if (!aktiveWerte.contains(wert) && (!unveraendert || !alteWerte.contains(wert))) {
+                    ungueltig.add(sichererCode);
+                    break;
+                }
+            }
+        }
+
+        for (ArtKlassifikation zuordnung : zuordnungen.values()) {
+            if (zuordnung.pflicht() && gesetzt.getOrDefault(zuordnung.klassifikation(), List.of()).isEmpty()) {
+                ungueltig.add(zuordnung.klassifikation());
+            }
+        }
+        return List.copyOf(ungueltig);
+    }
+
+    public Map<String, List<String>> beimArtwechselVorbelegen(String artCode, Map<String, List<String>> bisher) {
+        Art art = arten.stream().filter(eintrag -> artCode != null && artCode.equals(eintrag.code()))
+                .findFirst().orElse(null);
+        if (art == null) {
+            return Map.of();
+        }
+        Map<String, List<String>> vorhanden = bisher == null ? Map.of() : bisher;
+        Map<String, List<String>> erlaubt = new TreeMap<>();
+        for (ArtKlassifikation zuordnung : art.klassifikationen()) {
+            List<String> werte = vorhanden.getOrDefault(zuordnung.klassifikation(), List.of());
+            if (werte.isEmpty() && zuordnung.standardWert() != null) {
+                werte = List.of(zuordnung.standardWert());
+            }
+            if (!werte.isEmpty()) {
+                erlaubt.put(zuordnung.klassifikation(), List.copyOf(werte));
+            }
+        }
+        return Map.copyOf(erlaubt);
+    }
+
     private static boolean text(String wert, int max) {
         return wert != null && !wert.isBlank() && wert.length() <= max;
     }
@@ -223,8 +302,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 feld(aenderungen, zuordnungspfad, vorhanden(vorherige), vorhanden(neue));
                 if (vorherige != null && neue != null) {
                     feld(aenderungen, zuordnungspfad + ".pflicht", vorherige.pflicht(), neue.pflicht());
-                    feld(aenderungen, zuordnungspfad + ".standardWert", vorherige.standardWert(),
-                            neue.standardWert());
+                    feld(aenderungen, zuordnungspfad + ".standardWert", gesetzt(vorherige.standardWert()),
+                            gesetzt(neue.standardWert()));
                 }
             }
         }
