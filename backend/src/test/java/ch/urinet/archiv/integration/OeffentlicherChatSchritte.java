@@ -295,6 +295,12 @@ public class OeffentlicherChatSchritte {
         ereignisse = lesen();
     }
 
+    @Wenn("die Webseite mit dem Schlüssel «{word}» mit dem Inhaltstyp «{}» den Rohkörper «{}» sendet")
+    public void rohkoerperMitInhaltstyp(String name, String inhaltstyp, String koerper) {
+        antwort = anfrage(name, "oeffentlich", null).contentType(inhaltstyp).body(koerper).when().post(PFAD);
+        ereignisse = lesen();
+    }
+
     @Wenn("die Webseite mit dem Schlüssel «{word}» eine Frage mit {int} Zeichen stellt")
     public void langeFrage(String name, int zeichen) throws Exception {
         letzterSchluessel = name;
@@ -383,6 +389,11 @@ public class OeffentlicherChatSchritte {
     @Dann("trägt die Chatbot-Antwort den Header «{word}»")
     public void header(String name) {
         assertThat(antwort.headers().hasHeaderWithName(name)).as(antwort.headers().toString()).isTrue();
+    }
+
+    @Dann("trägt die Chatbot-Antwort den Header «{word}» mit dem Wert «{word}»")
+    public void headerMitWert(String name, String wert) {
+        assertThat(antwort.getHeader(name)).contains(wert);
     }
 
     @Dann("trägt die Chatbot-Antwort keinen Header «{word}»")

@@ -31,6 +31,26 @@ const ARTEN: Dokumentart[] = [
     gesetzlichePflicht: true,
     aktiv: true,
   },
+  {
+    code: 'BULLETIN',
+    name: 'Bulletin',
+    gruppen: [],
+    pflichtfelder: ['titel', 'datum'],
+    zusatzSchema: {
+      type: 'object',
+      properties: {
+        zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'mitglieder' },
+        reihe: { type: 'string' },
+        ausgabe: { type: 'string' },
+        jahr: { type: 'integer' },
+        fachgebiet: { type: 'string' },
+        veroeffentlicht: { type: 'boolean', default: false },
+      },
+    },
+    vertraulichkeit: 'NORMAL',
+    gesetzlichePflicht: false,
+    aktiv: true,
+  },
 ];
 
 const DOKUMENT: Dokument = {
@@ -120,6 +140,49 @@ describe('MetadatenFormular (Req 10.1)', () => {
     await fixture.whenStable();
     expect(element.querySelector('[data-test=finanz]')).not.toBeNull();
     expect(element.querySelector('#bearbeiten-zusatz-aktenzeichen')).toBeNull();
+  });
+
+  it('zeigt Zugriffsstufe und Zusatzfelder, Veröffentlichung aber erst nach Archivierung', async () => {
+    const bulletin = {
+      ...DOKUMENT,
+      art: 'BULLETIN',
+      status: 'EINGANGSKORB' as const,
+      zusatz: { zugriff: 'mitglieder', veroeffentlicht: false },
+    };
+    await oeffnen(bulletin);
+    expect(element.querySelector('label[for="bearbeiten-zusatz-zugriff"]')?.textContent).toContain('Zugriffsstufe');
+    expect(element.querySelector('#bearbeiten-zusatz-zugriff option[value="mitglieder"]')?.textContent).toContain(
+      'Mitglieder',
+    );
+    expect(element.querySelector('#bearbeiten-zusatz-veroeffentlicht')).toBeNull();
+
+    TestBed.resetTestingModule();
+    await oeffnen({ ...bulletin, status: 'ARCHIVIERT' });
+    expect(element.querySelector('label[for="bearbeiten-zusatz-veroeffentlicht"]')?.textContent).toContain(
+      'Veröffentlicht',
+    );
+    expect(element.querySelector('#bearbeiten-zusatz-veroeffentlicht')).not.toBeNull();
+  });
+
+  it.each([
+    { vorher: false, wert: 'true', grund: 'Veröffentlichung aktiviert' },
+    { vorher: true, wert: 'false', grund: 'Veröffentlichung zurückgezogen' },
+  ])('veröffentlicht oder zieht eine archivierte Publikation zurück', async ({ vorher, wert, grund }) => {
+    await oeffnen({
+      ...DOKUMENT,
+      art: 'BULLETIN',
+      zusatz: { zugriff: 'mitglieder', veroeffentlicht: vorher },
+    });
+    eingeben('#bearbeiten-zusatz-veroeffentlicht', wert);
+    eingeben('#bearbeiten-grund', grund);
+    await speichern();
+
+    expect(port.aufrufe).toHaveLength(1);
+    expect(port.aufrufe[0].aenderung.zusatz).toEqual({
+      zugriff: 'mitglieder',
+      veroeffentlicht: wert === 'true',
+    });
+    expect(port.aufrufe[0].aenderung.grund).toBe(grund);
   });
 
   it('sucht nach dem Entfernen eines Partners mit demselben Begriff erneut', async () => {

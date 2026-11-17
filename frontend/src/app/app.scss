@@ -28,9 +28,21 @@
 }
 
 .titel {
-  color: var(--urinet-gelb);
+  background-color: var(--brand-primary, var(--urinet-gelb));
+  color: var(--brand-text, var(--urinet-dunkel));
+  border-radius: 4px;
   font: var(--mat-sys-title-large);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.logo {
+  max-width: 8rem;
+  max-height: 2rem;
+  object-fit: contain;
 }
 
 .abstand {
@@ -73,8 +85,8 @@ mat-sidenav {
   min-width: 1.5rem;
   padding: 0 0.4rem;
   border-radius: 0.75rem;
-  background-color: var(--urinet-gelb);
-  color: var(--urinet-dunkel);
+  background-color: var(--brand-primary, var(--urinet-gelb));
+  color: var(--brand-text, var(--urinet-dunkel));
   font-weight: 600;
   text-align: center;
 }

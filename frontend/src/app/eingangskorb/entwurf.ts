@@ -135,11 +135,12 @@ const leerZuNull = (wert: string) => (wert.trim() === '' ? null : wert.trim());
 export function bestaetigungAus(
   entwurf: Entwurf,
   dokument: Dokument,
-  zusatz: { ohnePdfa?: boolean; fristAbgelaufenAkzeptiert?: boolean } = {},
+  zusatz: { ohnePdfa?: boolean; fristAbgelaufenAkzeptiert?: boolean; mitFinanz?: boolean } = {},
 ): Bestaetigung {
   const vertraulichkeit = leerZuNull(
     entwurf.vertraulichkeit,
   ) as Bestaetigung.VertraulichkeitEnum | null;
+  const mitFinanz = zusatz.mitFinanz ?? true;
   return {
     art: entwurf.art,
     titel: leerZuNull(entwurf.titel),
@@ -150,13 +151,17 @@ export function bestaetigungAus(
     ...(vertraulichkeit ? { vertraulichkeit } : {}),
     personBenutzer: dokument.personBenutzer ?? null,
     geschaeftsjahr: dokument.geschaeftsjahr ?? null,
-    belegnummer: leerZuNull(entwurf.belegnummer),
-    richtung: leerZuNull(entwurf.richtung) as Bestaetigung.RichtungEnum | null,
-    betrag: betragLesen(entwurf.betrag),
-    waehrung: leerZuNull(entwurf.waehrung)?.toUpperCase() ?? null,
-    faelligkeit: leerZuNull(entwurf.faelligkeit),
-    qrReferenz: leerZuNull(entwurf.qrReferenz),
-    konto: leerZuNull(wert(dokument, 'konto')),
+    ...(mitFinanz
+      ? {
+          belegnummer: leerZuNull(entwurf.belegnummer),
+          richtung: leerZuNull(entwurf.richtung) as Bestaetigung.RichtungEnum | null,
+          betrag: betragLesen(entwurf.betrag),
+          waehrung: leerZuNull(entwurf.waehrung)?.toUpperCase() ?? null,
+          faelligkeit: leerZuNull(entwurf.faelligkeit),
+          qrReferenz: leerZuNull(entwurf.qrReferenz),
+          konto: leerZuNull(wert(dokument, 'konto')),
+        }
+      : {}),
     gueltigAb: leerZuNull(entwurf.gueltigAb),
     gueltigBis: leerZuNull(entwurf.gueltigBis),
     kuendigungsfrist: leerZuNull(wert(dokument, 'kuendigungsfrist')),
