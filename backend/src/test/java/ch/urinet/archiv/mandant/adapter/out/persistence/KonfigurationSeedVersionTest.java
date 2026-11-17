@@ -237,7 +237,49 @@ class KonfigurationSeedVersionTest {
         }
     }
 
+    @Test
+    void fristmigrationBehaeltArtenDokumentfristenUndSperrenBeiderMandanten() throws Exception {
+        for (String schema : List.of("m_probe_frist_urinet", "m_probe_frist_vhf_gsk")) {
+            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                befehl.execute("create schema " + schema);
+                befehl.execute("set search_path to " + schema);
+                liquibase(verbindung, schema, "001-dokumentart.xml");
+                befehl.execute("""
+                        insert into dokumentart (code, name, vertraulichkeit, aufbewahrung_jahre,
+                            aufbewahrung_ab, gesetzliche_pflicht)
+                        values ('GJ', 'Geschäftsjahr', 'NORMAL', 10, 'GESCHAEFTSJAHR', true),
+                            ('VERTRAG', 'Vertrag', 'INTERN', 5, 'GUELTIG_BIS', false),
+                            ('UNBEFRISTET', 'Unbefristet', 'NORMAL', null, null, true)
+                        """);
+                befehl.execute("create table dokument (id integer primary key, aufbewahren_bis date, sperre_bis date)");
+                befehl.execute("""
+                        insert into dokument values (1, '2036-12-31', '2036-12-31'), (2, null, '2036-11-17')
+                        """);
+                String artenVorher = wert(befehl, "select jsonb_agg(to_jsonb(a) order by code) from dokumentart a");
+                String fristenVorher = wert(befehl, "select jsonb_agg(to_jsonb(d) order by id) from dokument d");
+                verbindung.commit();
+
+                liquibase(verbindung, schema, "042-fristbezuege.xml");
+                verbindung.commit();
+                assertThat(wert(befehl, "select jsonb_agg(to_jsonb(a) - 'aufbewahrung_feld' order by code)"
+                        + " from dokumentart a")).isEqualTo(artenVorher);
+                assertThat(wert(befehl, "select jsonb_agg(to_jsonb(d) order by id) from dokument d"))
+                        .isEqualTo(fristenVorher);
+                assertThat(wert(befehl, "select count(*) from dokumentart where aufbewahrung_feld is not null"))
+                        .isEqualTo("0");
+            } finally {
+                try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+                    befehl.execute("drop schema if exists " + schema + " cascade");
+                }
+            }
+        }
+    }
+
     private static void liquibase040(Connection verbindung, String schema) throws Exception {
+        liquibase(verbindung, schema, "040-dokumentart-konfiguration.xml");
+    }
+
+    private static void liquibase(Connection verbindung, String schema, String datei) throws Exception {
         Database datenbank = DatabaseFactory.getInstance()
                 .findCorrectDatabaseImplementation(new JdbcConnection(verbindung));
         datenbank.setDefaultSchemaName(schema);
@@ -249,7 +291,7 @@ class KonfigurationSeedVersionTest {
                 new CommandScope(UpdateCommandStep.COMMAND_NAME)
                         .addArgumentValue(DbUrlConnectionArgumentsCommandStep.DATABASE_ARG, datenbank)
                         .addArgumentValue(UpdateCommandStep.CHANGELOG_FILE_ARG,
-                                "db/mandant/changesets/040-dokumentart-konfiguration.xml")
+                                "db/mandant/changesets/" + datei)
                         .execute());
     }
 

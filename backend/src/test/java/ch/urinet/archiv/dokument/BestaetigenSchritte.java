@@ -375,6 +375,23 @@ public class BestaetigenSchritte {
         }
     }
 
+    /** Req 4.4: unbefristet nach 6.9, Sperre nur bei gesetzlicher Pflicht (6.12); im Test ist die Dauer gekappt. */
+    @Dann("haben die Archivdateien von «{word}» {word} Sperre")
+    public void sperreGesetzt(String name, String sperre) throws SQLException {
+        Ort ort = ort(name);
+        List<String[]> dateien = archivDateien(ort);
+        assertThat(dateien).isNotEmpty();
+        for (String[] datei : dateien) {
+            Instant bis = sperreOderNull(ort, datei);
+            if ("eine".equals(sperre)) {
+                assertThat(bis).as(datei[0]).isAfter(Instant.now());
+            } else {
+                assertThat(sperre).isEqualTo("keine");
+                assertThat(bis).as(datei[0]).isNull();
+            }
+        }
+    }
+
     @Dann("sind die Sperren der Dateien von «{word}» unverändert")
     public void sperrenUnveraendert(String name) throws SQLException {
         Ort ort = ort(name);
@@ -436,6 +453,15 @@ public class BestaetigenSchritte {
     public void keineVersionen() {
         assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
         assertThat(antwort.jsonPath().getList("versionen")).isEmpty();
+    }
+
+    @Dann("zeigt die Antwort die Warnung «FRISTBEZUG_FEHLT» ohne Dokumentverweis")
+    public void fristwarnung() {
+        List<Map<String, Object>> warnungen = antwort.jsonPath().getList("warnungen");
+        assertThat(warnungen).anySatisfy(warnung -> {
+            assertThat(warnung.get("code")).isEqualTo("FRISTBEZUG_FEHLT");
+            assertThat(warnung.get("vorhandenId")).isNull();
+        });
     }
 
     @Dann("steht im Zugriffsprotokoll für «{word}» {int} Mal «{word}» von «{word}»")
@@ -879,6 +905,17 @@ public class BestaetigenSchritte {
     private Instant sperre(Ort ort, String[] datei) {
         return s3.getObjectRetention(b -> b.bucket(bucket(ort.mandant())).key(datei[0]).versionId(datei[1]))
                 .retention().retainUntilDate();
+    }
+
+    private Instant sperreOderNull(Ort ort, String[] datei) {
+        try {
+            return sperre(ort, datei);
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404 || e.statusCode() == 400) {
+                return null;
+            }
+            throw e;
+        }
     }
 
     private static String fehlerId(String fehlertext) {
