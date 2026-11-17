@@ -89,7 +89,7 @@ public class MandantVollexportAbbauSchritte {
         zip = schreiben(new MandantCode("vhf-gsk"), "vhf");
     }
 
-    @Dann("enthält das ZIP Original, Arbeitsfassung, PDF/A, Metadaten und Manifest")
+    @Dann("enthält das ZIP Original, Arbeitsfassung, PDF\\/A, Metadaten und Manifest")
     public void zipInhalt() throws Exception {
         try (ZipFile z = new ZipFile(zip.toFile())) {
             assertThat(java.util.Collections.list(z.entries()).stream().map(java.util.zip.ZipEntry::getName))
