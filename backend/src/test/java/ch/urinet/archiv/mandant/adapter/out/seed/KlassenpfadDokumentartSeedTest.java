@@ -56,6 +56,19 @@ class KlassenpfadDokumentartSeedTest {
         }
     }
 
+    @Test
+    void falschTypisierteOptionaleSeedFelderBringenAb() throws Exception {
+        for (String inhalt : List.of(
+                art("\"gruppen\": \"finanz\", \"aufbewahrung_jahre\": null, \"gesetzliche_pflicht\": false"),
+                art("\"pflichtfelder\": \"titel\", \"aufbewahrung_jahre\": null, \"gesetzliche_pflicht\": false"),
+                art("\"aufbewahrung_ab\": 7, \"aufbewahrung_jahre\": null, \"gesetzliche_pflicht\": false"),
+                art("\"aktiv\": \"ungültig\", \"aufbewahrung_jahre\": null, \"gesetzliche_pflicht\": false"))) {
+            assertThatThrownBy(() -> KlassenpfadDokumentartSeed.vorlagen(json.readTree(inhalt), "probe")).as(inhalt)
+                    .isInstanceOfSatisfying(MandantFehler.class,
+                            e -> assertThat(e.grund()).isEqualTo(MandantFehler.Grund.SEED_UNGUELTIG));
+        }
+    }
+
     private static String art(String felder) {
         return "{\"dokumentarten\": [{\"code\": \"A\", \"name\": \"A\", \"vertraulichkeit\": \"NORMAL\", " + felder + "}]}";
     }
