@@ -5,11 +5,12 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.ablage.domain.DateiSchluessel;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.integration.adapter.in.kommando.AlteLinksKommando;
 import ch.urinet.archiv.integration.application.webseite.AenderungFeedAufraeumen;
 import ch.urinet.archiv.integration.application.webseite.DateiPlaetze;
+import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.ki.KiWireMock;
 import ch.urinet.archiv.ki.domain.Vektortext;
-import ch.urinet.archiv.integration.domain.webseite.AlteUrl;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -27,12 +28,16 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -84,6 +89,9 @@ public class WebseitenLesenSchritte {
     @Inject
     AenderungFeedAufraeumen aufraeumen;
 
+    @Inject
+    AlteLinksKommando alteLinksKommando;
+
     private record Dok(String mandant, UUID id) {
     }
 
@@ -103,9 +111,19 @@ public class WebseitenLesenSchritte {
     private Response antwort;
     private Response vergleich;
     private boolean embeddingGesetzt;
+    private Path alteLinksCsv;
+    private String alteLinksUrl;
+    private String alteLinksWer;
+    private String alteLinksAusgabe;
+    private String alteLinksFehler;
+    private int alteLinksExitCode;
 
     @After
-    public void aufraeumen() throws SQLException, InterruptedException {
+    public void aufraeumen() throws SQLException, InterruptedException, IOException {
+        if (alteLinksCsv != null) {
+            Files.deleteIfExists(alteLinksCsv);
+            alteLinksCsv = null;
+        }
         offeneStreams.forEach(RohClient::close);
         offeneStreams.clear();
         // der nächste Lauf braucht freie Plätze: die API gibt sie nach dem Abbruch des Clients von selbst frei
@@ -226,6 +244,119 @@ public class WebseitenLesenSchritte {
             throws SQLException {
         zuordnen(eins, mandant, ersteres);
         zuordnen(zwei, mandant, zweites);
+    }
+
+    @Angenommen("das Dokument «{word}» ist unveröffentlicht")
+    public void dokumentUnveroeffentlicht(String name) throws SQLException {
+        veroeffentlicht(name, false);
+    }
+
+    @Angenommen("die CSV-Datei ordnet die URL «{}» dem Dokument «{word}» zu")
+    public void alteLinksCsv(String url, String dokument) throws IOException {
+        alteLinksCsv = Files.createTempFile("webtest-alte-links-", ".csv");
+        alteLinksUrl = AlteUrl.normalisieren(url);
+        alteLinksWer = "webtest-" + UUID.randomUUID();
+        Dok ziel = dokumente.get(dokument);
+        assertThat(ziel).isNotNull();
+        String csvUrl = "\"" + url.replace("\"", "\"\"") + "\"";
+        Files.writeString(alteLinksCsv, "\uFEFFalte_url;dokument_id\r\n" + csvUrl + ";" + ziel.id() + "\r\n",
+                StandardCharsets.UTF_8);
+    }
+
+    @Wenn("der Import alter Links im Mandanten «{word}» als Trockenlauf gestartet wird")
+    public void alteLinksTrockenlauf(String mandant) {
+        alteLinksImportStarten(mandant, false);
+    }
+
+    @Wenn("der Import alter Links im Mandanten «{word}» ausgeführt wird")
+    public void alteLinksAusfuehren(String mandant) {
+        alteLinksImportStarten(mandant, true);
+    }
+
+    @Wenn("die öffentliche Umleitung die importierte alte URL abruft")
+    public void importierteUmleitung() {
+        antwort = anfrage("oeffentlich").queryParam("url", alteLinksUrl).when().get("/public/v1/umleitung");
+    }
+
+    @Dann("meldet der alte-Link-Import die Zeile 2 als «{word}»")
+    public void alteLinksStatus(String status) {
+        assertThat(alteLinksExitCode).as(alteLinksFehler).isZero();
+        assertThat(alteLinksFehler).isEmpty();
+        assertThat(alteLinksAusgabe).contains(" " + alteLinksUrl + ": " + status);
+    }
+
+    @Dann("ist die importierte alte URL im Mandanten «{word}» nicht gespeichert")
+    public void alteUrlNichtGespeichert(String mandant) throws SQLException {
+        assertThat(anzahlAlteUrl(mandant)).isZero();
+    }
+
+    @Dann("ist die importierte alte URL im Mandanten «{word}» einmal gespeichert")
+    public void alteUrlEinmalGespeichert(String mandant) throws SQLException {
+        assertThat(anzahlAlteUrl(mandant)).isEqualTo(1);
+    }
+
+    @Dann("ist die importierte alte URL im Mandanten «{word}» nicht zugeordnet")
+    public void alteUrlNichtZugeordnet(String mandant) throws SQLException {
+        assertThat(anzahlAlteUrl(mandant)).isZero();
+    }
+
+    @Dann("ist der alte-Link-Import einmal im Zugriffsprotokoll erfasst")
+    public void alteLinksProtokolliert() throws SQLException {
+        assertThat(anzahlAlteLinksProtokoll()).isEqualTo(1);
+    }
+
+    @Dann("ist der alte-Link-Import nicht im Zugriffsprotokoll erfasst")
+    public void alteLinksNichtProtokolliert() throws SQLException {
+        assertThat(anzahlAlteLinksProtokoll()).isZero();
+    }
+
+    @Dann("nennt die Umleitung die Dokument-ID von «{word}»")
+    public void umleitungDokumentId(String dokument) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.<String>path("dokumentId")).isEqualTo(dokumente.get(dokument).id().toString());
+    }
+
+    private void alteLinksImportStarten(String mandant, boolean ausfuehren) {
+        List<String> argumente = new ArrayList<>(List.of("importieren", alteLinksCsv.toString(),
+                "--mandant", mandant));
+        if (ausfuehren) {
+            argumente.addAll(List.of("--ausfuehren", "--wer", alteLinksWer, "--grund", "Cucumber-Importtest"));
+        }
+        ByteArrayOutputStream aus = new ByteArrayOutputStream();
+        ByteArrayOutputStream fehler = new ByteArrayOutputStream();
+        try (PrintStream ausgabe = new PrintStream(aus, true, StandardCharsets.UTF_8);
+             PrintStream fehlerausgabe = new PrintStream(fehler, true, StandardCharsets.UTF_8)) {
+            // Das Admin-Kommando braucht wie ein Worker einen eigenen Thread ohne Cucumber-Request-Kontext.
+            alteLinksExitCode = java.util.concurrent.CompletableFuture.supplyAsync(
+                    () -> alteLinksKommando.ausfuehren(argumente, ausgabe, fehlerausgabe)).join();
+        }
+        alteLinksAusgabe = aus.toString(StandardCharsets.UTF_8);
+        alteLinksFehler = fehler.toString(StandardCharsets.UTF_8);
+    }
+
+    private long anzahlAlteUrl(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from " + new MandantCode(mandant).schema() + ".alte_url where url = ?")) {
+            abfrage.setString(1, alteLinksUrl);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                return zeile.getLong(1);
+            }
+        }
+    }
+
+    private long anzahlAlteLinksProtokoll() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select count(*) from m_urinet.zugriff_protokoll where benutzer = ? and aktion = 'AENDERN' "
+                             + "and details ->> 'grund' = 'Cucumber-Importtest'")) {
+            abfrage.setString(1, "cli:" + alteLinksWer);
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                zeile.next();
+                return zeile.getLong(1);
+            }
+        }
     }
 
     private void zuordnen(String url, String mandant, String dokument) throws SQLException {
