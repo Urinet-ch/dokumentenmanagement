@@ -18,7 +18,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - Folgeänderungen in Spec 01–04 und Steering nach design.md «Folgeänderungen» als eigener PR.
   - _Anforderungen: 8.9_
 
-- [ ] 17.2 Konfigurationsversionen und Grundgerüst [Backend]
+- [x] 17.2 Konfigurationsversionen und Grundgerüst [Backend]
   - Modul `konfiguration/`, Changesets `<nnn>-konfiguration-version` und `<nnn>-protokoll-konfiguration`,
     `Konfiguration` und `pruefen()` (Gerüst), Port `MandantEinstellungen`, Cache nach Version, Protokoll
     `KONFIGURATION_AENDERN` neben `REGEL_AENDERN`, `If-Match` mit der Konfigurationsversion (auch für

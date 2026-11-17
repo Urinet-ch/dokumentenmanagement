@@ -425,6 +425,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         versionen: [
           {
             version: 1,
+            konfigurationVersion: 1,
             zeit: '2026-11-09T09:30:00Z',
             geaendertVon: 'sub-inhaber',
             grund: 'Tippfehler',
@@ -609,7 +610,13 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     port.dokument = of({
       ...DOKUMENT,
       versionen: [
-        { version: 1, zeit: '2026-11-09T09:30:00Z', geaendertVon: 'sub-anderer', grund: null },
+        {
+          version: 1,
+          konfigurationVersion: 1,
+          zeit: '2026-11-09T09:30:00Z',
+          geaendertVon: 'sub-anderer',
+          grund: null,
+        },
       ],
     });
     await oeffnen();

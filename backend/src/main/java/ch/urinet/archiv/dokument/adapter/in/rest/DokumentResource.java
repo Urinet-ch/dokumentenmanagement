@@ -204,16 +204,17 @@ public class DokumentResource {
     public record VerwerfenDto(@Schema(required = true, maxLength = 1000) String grund) {
     }
 
-    @Schema(name = "DokumentVersion", description = "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Zeit, "
-            + "Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht")
+    @Schema(name = "DokumentVersion", description = "Gesicherte Fassung der Metadaten (Req 10.1): Nummer, "
+            + "Konfigurationsversion, Zeit, Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht")
     public record VersionDto(
             @Schema(required = true, description = "Version des Dokuments, die diese Fassung gesichert hat") int version,
+            @Schema(required = true, description = "Angewandte Konfigurationsversion") int konfigurationVersion,
             @Schema(required = true, description = "Zeitpunkt der Änderung (UTC)") Instant zeit,
             @Schema(required = true, description = "Benutzer-ID (Keycloak-sub), die geändert hat") String geaendertVon,
             @Schema(nullable = true, description = "Grund der Änderung") String grund) {
 
         static VersionDto aus(Fassung f) {
-            return new VersionDto(f.version(), f.zeit(), f.geaendertVon(), f.grund());
+            return new VersionDto(f.version(), f.konfigurationVersion(), f.zeit(), f.geaendertVon(), f.grund());
         }
     }
 

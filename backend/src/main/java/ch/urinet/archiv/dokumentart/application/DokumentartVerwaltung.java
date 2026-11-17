@@ -7,6 +7,7 @@ import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -25,15 +26,17 @@ public class DokumentartVerwaltung {
     private final DokumentartPruefung pruefung;
     private final DokumentZaehlerPort zaehler;
     private final RegelProtokollPort regelProtokoll;
+    private final KonfigurationVerwaltung konfiguration;
 
     public DokumentartVerwaltung(DokumentartRepository repository, ZusatzSchemaPruefer schemaPruefer,
                                  DokumentartPruefung pruefung, DokumentZaehlerPort zaehler,
-                                 RegelProtokollPort regelProtokoll) {
+                                 RegelProtokollPort regelProtokoll, KonfigurationVerwaltung konfiguration) {
         this.repository = repository;
         this.schemaPruefer = schemaPruefer;
         this.pruefung = pruefung;
         this.zaehler = zaehler;
         this.regelProtokoll = regelProtokoll;
+        this.konfiguration = konfiguration;
     }
 
     public List<Dokumentart> alle() {
@@ -51,7 +54,8 @@ public class DokumentartVerwaltung {
      * Ohne Schema gilt {@link Dokumentart#OHNE_ZUSATZ}. Ein vergebener Code ergibt 409
      * {@code DOKUMENTART_EXISTIERT}.
      */
-    public Dokumentart anlegen(DokumentartAngaben angaben) {
+    public Dokumentart anlegen(DokumentartAngaben angaben, int version, String wer, String grund) {
+        konfiguration.aenderungStarten(version);
         for (Feld pflicht : List.of(Feld.CODE, Feld.NAME, Feld.VERTRAULICHKEIT, Feld.GESETZLICHE_PFLICHT)) {
             if (!angaben.hat(pflicht)) {
                 throw ungueltig();
@@ -75,6 +79,7 @@ public class DokumentartVerwaltung {
             throw new FachFehler(Fehlercode.DOKUMENTART_EXISTIERT);
         }
         repository.anlegen(art);
+        konfiguration.aenderungSpeichern(wer, grund);
         return art;
     }
 
@@ -87,7 +92,8 @@ public class DokumentartVerwaltung {
      * «nein», weniger als 10 Jahre), sie wird dabei nur protokolliert (entschieden von Fabian am 11.11.2026). Sie
      * wirkt auf neue Dokumente und Neuberechnungen nach Req 9.7, bestehende Sperren werden nur verlängert.
      */
-    public Dokumentart aendern(String code, DokumentartAngaben angaben) {
+    public Dokumentart aendern(String code, DokumentartAngaben angaben, int version, String wer, String grund) {
+        konfiguration.aenderungStarten(version);
         Dokumentart bisher = finden(code);
         if (angaben.hat(Feld.CODE) && !code.equals(angaben.code())) {
             throw ungueltig();
@@ -111,16 +117,19 @@ public class DokumentartVerwaltung {
             regelProtokoll.regelGeaendert(bisher, art);
         }
         repository.speichern(art);
+        konfiguration.aenderungSpeichern(wer, grund);
         return art;
     }
 
     /** Löscht eine Art ohne Dokumente; sonst 409 {@code DOKUMENTART_IN_GEBRAUCH}, erlaubt bleibt «inaktiv» (Req 9.4). */
-    public void loeschen(String code) {
+    public void loeschen(String code, int version, String wer, String grund) {
+        konfiguration.aenderungStarten(version);
         finden(code);
         if (zaehler.anzahl(code) > 0) {
             throw new FachFehler(Fehlercode.DOKUMENTART_IN_GEBRAUCH);
         }
         repository.loeschen(code);
+        konfiguration.aenderungSpeichern(wer, grund);
     }
 
     /** Prüft Zusatzwerte (JSON-Objekt) gegen das Schema der Art (Req 9.5); für das Speichern von Dokumenten (2.2). */

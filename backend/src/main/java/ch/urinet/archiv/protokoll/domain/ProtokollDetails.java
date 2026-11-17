@@ -1,6 +1,7 @@
 package ch.urinet.archiv.protokoll.domain;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -8,13 +9,17 @@ import java.util.regex.Pattern;
 /**
  * Inhalt der Spalte {@code details} (jsonb): nur Grund, SHA-256, Fehlercode, bei {@code REGEL_AENDERN} die alte und
  * neue Regel einer Dokumentart, bei {@code SPERRE_KONFLIKT} die bisherige und die neu berechnete Frist, bei den
- * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}) und der Kanal eines Auslösers ohne
+ * Aktionen {@code KONTAKT_*} die Kontakt-IDs und Zahlen ({@link Kontakte}), bei {@code KONFIGURATION_AENDERN} Version
+ * und Quelle ({@link Konfiguration}) und der Kanal eines Auslösers ohne
  * eigenen Endpunkt ({@code kanal}, z. B. {@value #KANAL_CHAT} für das Chat-Werkzeug {@code dokument_zeigen},
- * Spec 02, Aufgabe 7.1a), bei Änderungen an einem API-Token dessen ID ({@code tokenId}, Req 2.20), nie Dokumentinhalte oder Kontaktdaten (Req 9.7, 9.10, 10.2, 16.7, 17.8). Jedes Feld darf
+ * Spec 02, Aufgabe 7.1a), bei Änderungen an einem API-Token dessen ID ({@code tokenId}, Req 2.20), nie Dokument-,
+ * Kontakt- oder Konfigurationsinhalte ausser den geänderten Konfigurationselementen mit alt und neu (Req 9.7, 9.10,
+ * 10.2, 16.7, 17.8; Spec 05, Req 1.3). Jedes Feld darf
  * fehlen ({@code null}); ohne {@code kanal} ist der Eintrag an einem REST-Endpunkt entstanden.
  */
 public record ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
-                               FristKonflikt fristKonflikt, Kontakte kontakte, String kanal, String tokenId) {
+                               FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                               String kanal, String tokenId) {
 
     public static final ProtokollDetails KEINE = new ProtokollDetails(null, null, null);
     private static final Pattern TOKEN_ID = Pattern.compile("^[a-z0-9]{12}$");
@@ -49,21 +54,27 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
     /** Kompatibel zur Form vor {@code tokenId}. */
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                             FristKonflikt fristKonflikt, Kontakte kontakte, String kanal) {
-        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, kanal, null);
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, null, kanal, null);
     }
 
+    /** Kompatibel zu Einträgen ohne Token-ID. */
+    public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
+                            FristKonflikt fristKonflikt, Kontakte kontakte, Konfiguration konfiguration,
+                            String kanal) {
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration, kanal, null);
+    }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode) {
-        this(grund, sha256, fehlercode, null, null, null, null, null);
+        this(grund, sha256, fehlercode, null, null, null, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung) {
-        this(grund, sha256, fehlercode, regelAenderung, null, null, null);
+        this(grund, sha256, fehlercode, regelAenderung, null, null, null, null, null);
     }
 
     public ProtokollDetails(String grund, String sha256, String fehlercode, RegelAenderung regelAenderung,
                             FristKonflikt fristKonflikt) {
-        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null, null);
+        this(grund, sha256, fehlercode, regelAenderung, fristKonflikt, null, null, null, null);
     }
 
     public static ProtokollDetails fehlercode(String fehlercode) {
@@ -80,23 +91,28 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
 
     /** Details eines Eintrags {@code KONTAKT_*} mit Grund (Req 17.8, 17.11, 17.15). */
     public static ProtokollDetails kontakte(String grund, Kontakte kontakte) {
-        return new ProtokollDetails(grund, null, null, null, null, kontakte, null);
+        return new ProtokollDetails(grund, null, null, null, null, kontakte, null, null, null);
+    }
+
+    public static ProtokollDetails konfiguration(String grund, Konfiguration konfiguration) {
+        return new ProtokollDetails(grund, null, null, null, null, null, konfiguration, null, null);
     }
 
     public boolean leer() {
         return grund == null && sha256 == null && fehlercode == null && regelAenderung == null
-                && fristKonflikt == null && kontakte == null && kanal == null && tokenId == null;
+                && fristKonflikt == null && kontakte == null && konfiguration == null && kanal == null
+                && tokenId == null;
     }
 
     /** Dieselben Details mit dem Kanal {@code kanal}. */
     public ProtokollDetails mitKanal(String kanal) {
-        return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, kanal,
-                tokenId);
+        return new ProtokollDetails(grund, sha256, fehlercode, regelAenderung, fristKonflikt, kontakte, konfiguration,
+                kanal, tokenId);
     }
 
     /** Details eines Eintrags zu einem API-Token: dessen ID (kein Geheimnis). */
     public static ProtokollDetails token(String tokenId) {
-        return new ProtokollDetails(null, null, null, null, null, null, null, tokenId);
+        return new ProtokollDetails(null, null, null, null, null, null, null, null, tokenId);
     }
 
     /**
@@ -146,6 +162,29 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
 
         public static Kontakte markieren(UUID kontakt) {
             return new Kontakte(null, null, kontakt, null, null, null);
+        }
+    }
+
+    /** Version, Quelle und geänderte Elemente der Fachkonfiguration mit alten und neuen Werten (Spec 05, Req 1.3). */
+    public record Konfiguration(int version, String quelle, List<Aenderung> aenderungen) {
+        public Konfiguration {
+            if (version < 1 || quelle == null || !CODE.matcher(quelle).matches()) {
+                throw new IllegalArgumentException("Konfigurationsversion oder Quelle ungültig");
+            }
+            aenderungen = aenderungen == null ? List.of() : List.copyOf(aenderungen);
+        }
+
+        public Konfiguration(int version, String quelle) {
+            this(version, quelle, List.of());
+        }
+    }
+
+    /** Ein geändertes Konfigurationselement: Pfad, alter und neuer Wert als Text ({@code null} = nicht vorhanden). */
+    public record Aenderung(String pfad, String alt, String neu) {
+        public Aenderung {
+            if (pfad == null || pfad.isBlank()) {
+                throw new IllegalArgumentException("pfad ist Pflicht");
+            }
         }
     }
 }
