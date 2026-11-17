@@ -63,6 +63,9 @@
         @if (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) {
           <p class="hinweis">{{ texte.hinweisOhneAblauf }}</p>
         }
+        @if (tokenStatus(token) === 'abgelaufen') {
+          <p class="hinweis">{{ texte.hinweisAbgelaufen }}</p>
+        }
         @if (ablaufBearbeitbar(token)) {
           <div class="ablauf">
             <label class="label" [for]="'ablaufdatum-' + token.id">{{ texte.ablaufdatumEingeben }}</label>
