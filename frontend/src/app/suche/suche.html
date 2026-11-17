@@ -214,7 +214,9 @@
     }
     @if (fehler(); as text) {
       <p class="fehler" data-test="fehler">{{ text }}</p>
-      <button mat-button type="button" data-test="wiederholen" (click)="wiederholen()">{{ texte.wiederholen }}</button>
+      @if (wiederholbar()) {
+        <button mat-button type="button" data-test="wiederholen" (click)="wiederholen()">{{ texte.wiederholen }}</button>
+      }
     }
   </div>
 </form>

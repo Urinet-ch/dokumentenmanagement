@@ -81,14 +81,15 @@ describe('Rueckruf', () => {
 
   it.each([
     [0, TEXTE.httpFehler.verbindung],
-    [401, TEXTE.anmeldung.abgelaufen],
-    [403, TEXTE.httpFehler.keinZugriff],
-    [404, TEXTE.httpFehler.nichtGefunden],
-    [409, TEXTE.httpFehler.konflikt],
-    [412, TEXTE.httpFehler.konflikt],
+    [400, TEXTE.anmeldung.fehlgeschlagen],
+    [401, TEXTE.anmeldung.fehlgeschlagen],
+    [403, TEXTE.anmeldung.fehlgeschlagen],
+    [404, TEXTE.anmeldung.fehlgeschlagen],
+    [409, TEXTE.anmeldung.fehlgeschlagen],
+    [412, TEXTE.anmeldung.fehlgeschlagen],
     [429, TEXTE.httpFehler.zuViele(42)],
     [503, TEXTE.httpFehler.server],
-  ] as const)('zeigt bei HTTP %s eine verständliche Meldung mit erneutem Anmelden', async (status, erwartet) => {
+  ] as const)('zeigt bei HTTP %s die passende Meldung mit erneutem Anmelden (400, 401, 403, 404 bleiben «Anmeldung fehlgeschlagen»)', async (status, erwartet) => {
     const antwortFehler = new HttpErrorResponse({
       status,
       headers: status === 429 ? new HttpHeaders({ 'Retry-After': '42' }) : undefined,

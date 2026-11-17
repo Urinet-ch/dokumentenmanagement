@@ -73,6 +73,7 @@ export class Suche {
   protected readonly laeuft = signal(false);
   protected readonly pruefFehler = signal<Pruefung[]>([]);
   protected readonly fehler = signal<string | null>(null);
+  protected readonly wiederholbar = signal(false);
 
   protected readonly darfKontakte = computed(() => this.anmeldung.darf('A6'));
   protected readonly partnerEingabe = signal('');
@@ -221,6 +222,7 @@ export class Suche {
 
   private senden(anfrage: Suchanfrage, fokus: boolean): void {
     this.fehler.set(null);
+    this.wiederholbar.set(false);
     this.laeuft.set(true);
     this.fehlerAnfrage = anfrage;
     this.laufend?.unsubscribe();
@@ -238,6 +240,9 @@ export class Suche {
       error: (fehler: unknown) => {
         this.laeuft.set(false);
         this.fehler.set(meldung(fehler));
+        // 400/401/403/404 liefern beim selben Request wieder dasselbe: «Erneut versuchen» nur bei vorübergehenden Fehlern
+        const status = fehler instanceof HttpErrorResponse ? fehler.status : 0;
+        this.wiederholbar.set(status === 0 || status === 429 || status >= 500);
       },
     });
   }

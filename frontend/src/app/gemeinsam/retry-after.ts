@@ -5,8 +5,11 @@ export function retryAfterSekunden(wert: string | null, jetzt = Date.now()): num
   if (wert === null || wert.trim() === '') {
     return null;
   }
-  const sekunden = /^\d+$/.test(wert.trim())
-    ? Number(wert.trim())
-    : Math.ceil((Date.parse(wert) - jetzt) / 1000);
+  const text = wert.trim();
+  // Alles ausser reinen Ziffern muss ein HTTP-Datum sein (mit Wochentag, Monatsname); sonst liest Date.parse Zahlen als Jahr
+  if (!/^\d+$/.test(text) && !/[A-Za-z]{3}/.test(text)) {
+    return null;
+  }
+  const sekunden = /^\d+$/.test(text) ? Number(text) : Math.ceil((Date.parse(text) - jetzt) / 1000);
   return Number.isNaN(sekunden) ? null : Math.min(RETRY_AFTER_MAX, Math.max(0, sekunden));
 }

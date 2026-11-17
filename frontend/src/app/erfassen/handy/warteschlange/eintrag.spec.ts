@@ -4,6 +4,7 @@ const MELDUNGEN: Meldungen = {
   unbekannt: 'unbekannt',
   wiederholtFehlgeschlagen: 'dreimal',
   fehlercode: { DATEITYP_NICHT_ERLAUBT: 'Dateityp nicht erlaubt' },
+  status: (status) => `Status ${status}`,
 };
 
 const eintrag = (fehlversuche = 0): Eintrag => ({
@@ -62,6 +63,28 @@ describe('bewerten (Req 4.5, 4.6, 4.8)', () => {
     });
     const ohneDetail = bewerten(eintrag(), fehler(400), true, MELDUNGEN);
     expect(ohneDetail).toEqual({ art: 'behalten', eintrag: { ...eintrag(), zustand: 'fehlerhaft', meldung: 'unbekannt' } });
+  });
+
+  it('meldet 403, 404, 409 und 412 ohne Detail mit dem Text zum Status, Detail und Fehlercode haben Vorrang', () => {
+    for (const status of [403, 404, 409, 412]) {
+      expect(bewerten(eintrag(), fehler(status), true, MELDUNGEN)).toEqual({
+        art: 'behalten',
+        eintrag: { ...eintrag(), zustand: 'fehlerhaft', meldung: `Status ${status}` },
+      });
+    }
+    expect(bewerten(eintrag(), fehler(409, { detail: 'Doppelt.' }), true, MELDUNGEN)).toMatchObject({
+      eintrag: { meldung: 'Doppelt.' },
+    });
+  });
+
+  it('wartet bei 429 nach Retry-After, ohne Fehlversuch und ohne «fehlerhaft»; ohne Wert 30 Sekunden', () => {
+    expect(bewerten(eintrag(1), fehler(429, { retryAfter: 90 }), true, MELDUNGEN)).toEqual({
+      art: 'behalten',
+      eintrag: eintrag(1),
+      wartenMs: 90_000,
+    });
+    expect(bewerten(eintrag(), fehler(429, { retryAfter: null }), false, MELDUNGEN)).toMatchObject({ wartenMs: 30_000 });
+    expect(bewerten(eintrag(), fehler(429, { retryAfter: 0 }), true, MELDUNGEN)).toMatchObject({ wartenMs: 30_000 });
   });
 
   it('zählt Netzwerkfehler und 5xx online als Fehlversuch, beim dritten fehlerhaft', () => {

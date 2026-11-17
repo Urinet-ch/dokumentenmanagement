@@ -298,11 +298,6 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
 
     it.each([
       [0, TEXTE.httpFehler.verbindung],
-      [401, TEXTE.anmeldung.abgelaufen],
-      [403, TEXTE.httpFehler.keinZugriff],
-      [404, TEXTE.httpFehler.nichtGefunden],
-      [409, TEXTE.httpFehler.konflikt],
-      [412, TEXTE.httpFehler.konflikt],
       [429, TEXTE.httpFehler.zuViele(42)],
       [503, TEXTE.httpFehler.server],
     ] as const)('zeigt HTTP %s verständlich an und erlaubt das Wiederholen', async (status, erwartet) => {
@@ -322,6 +317,22 @@ describe('Suche (Req 14.1, 14.2, 14.4, 14.7)', () => {
       element.querySelector<HTMLButtonElement>('[data-test=wiederholen]')!.click();
       await fixture.whenStable();
       expect(port.anfragen.at(-1)).toEqual(fehlgeschlageneAnfrage);
+    });
+
+    it.each([
+      [400, TEXTE.suche.fehlerAnfrage],
+      [401, TEXTE.anmeldung.abgelaufen],
+      [403, TEXTE.httpFehler.keinZugriff],
+      [404, TEXTE.httpFehler.nichtGefunden],
+      [409, TEXTE.httpFehler.konflikt],
+      [412, TEXTE.httpFehler.konflikt],
+    ] as const)('zeigt HTTP %s verständlich an, ohne «Erneut versuchen» (derselbe Request scheitert wieder)', async (status, erwartet) => {
+      eingeben('q', 'Miete');
+      await absenden();
+      port.antworten.at(-1)!.error(new HttpErrorResponse({ status }));
+      await fixture.whenStable();
+      expect(element.querySelector('[data-test=fehler]')!.textContent).toBe(erwartet);
+      expect(element.querySelector('[data-test=wiederholen]')).toBeNull();
     });
 
     it('sendet beim Umschalten die zuletzt gesendete Anfrage im neuen Modus ab Seite 0', async () => {

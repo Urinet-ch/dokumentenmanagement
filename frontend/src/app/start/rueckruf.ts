@@ -40,7 +40,9 @@ export class Rueckruf implements OnInit {
     } catch (fehler: unknown) {
       this.fehlgeschlagen.set(true);
       this.fehlermeldung.set(
-        fehler instanceof HttpErrorResponse ? httpFehlerMeldung(fehler) : this.texte.fehlgeschlagen,
+        fehler instanceof HttpErrorResponse && (fehler.status === 0 || fehler.status === 429 || fehler.status >= 500)
+          ? httpFehlerMeldung(fehler)
+          : this.texte.fehlgeschlagen,
       );
       await this.router.navigate([], { replaceUrl: true, queryParams: {} });
     }

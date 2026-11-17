@@ -388,6 +388,20 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(veraltet).toEqual([T.fehlercode['VERSION_KONFLIKT']]);
   });
 
+  it('zeigt bei 409 mit fachlichem Code dessen Text, behält die Eingaben und bietet kein «Neu laden» an', async () => {
+    await zeigen({ ...MIT_VORSCHLAG, partnerId: 'k1' });
+    await klicken(T.aendern);
+    const titel = element.querySelector<HTMLInputElement>('#d1-titel')!;
+    titel.value = 'Bleibt';
+    titel.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    await klicken(T.bestaetigen);
+    await antworten('/api/v1/dokumente/d1/bestaetigen', { fehlercode: 'BELEGNUMMER_VERGEBEN' }, 409, 'Conflict');
+    expect(element.querySelector('[data-test=fehler]')?.textContent).toContain(T.fehlercode['BELEGNUMMER_VERGEBEN']);
+    expect(element.querySelector<HTMLInputElement>('#d1-titel')?.value).toBe('Bleibt');
+    expect(element.querySelector('[data-test=konflikt-neu-laden]')).toBeNull();
+  });
+
   it('zeigt bei 429 Retry-After an und erlaubt das Wiederholen', async () => {
     await zeigen(dokument({ status: 'FEHLER', fehler: 'OCR fehlgeschlagen' }));
     await klicken(T.erneutVerarbeiten);

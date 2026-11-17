@@ -623,6 +623,11 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   }
 
   private meldung(fehler: AktionFehler): string {
+    // 409 mit fachlichem Code: dessen Text statt «Bitte neu laden», denn hier gibt es keinen «Neu laden»-Knopf
+    const fachlich = fehler.status === 409 && fehler.fehlercode ? this.texte.fehlercode[fehler.fehlercode] : undefined;
+    if (fachlich) {
+      return fachlich;
+    }
     if ([0, 401, 403, 404, 409, 412, 429].includes(fehler.status) || fehler.status >= 500) {
       return httpFehlerText(fehler.status, fehler.retryAfter ?? null);
     }
