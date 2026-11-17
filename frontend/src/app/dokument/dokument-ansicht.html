@@ -1,6 +1,8 @@
 <a class="zurueck" routerLink="/suche">← {{ texte.zurueck }}</a>
 
-<p class="meldung" role="status" aria-live="polite" tabindex="-1" data-test="meldung">{{ meldung() }}</p>
+<p class="meldung" role="status" aria-live="polite" tabindex="-1" data-test="meldung">
+  {{ meldung() }}
+</p>
 
 @switch (laden()) {
   @case ('laedt') {
@@ -15,10 +17,16 @@
   @case ('verbindung') {
     <h1>{{ texte.titel }}</h1>
     <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerVerbindung }}</p>
+    <button mat-button type="button" data-test="erneut-laden" (click)="neuLaden()">
+      {{ neuLadenText }}
+    </button>
   }
   @case ('fehler') {
     <h1>{{ texte.titel }}</h1>
     <p role="alert" class="fehler" data-test="fehler">{{ texte.fehlerAllgemein }}</p>
+    <button mat-button type="button" data-test="erneut-laden" (click)="neuLaden()">
+      {{ neuLadenText }}
+    </button>
   }
   @case ('ok') {
     @if (dokument(); as d) {
@@ -39,102 +47,111 @@
               (veraltet)="veraltet($event)"
             />
           } @else {
-          @if (darfBearbeiten()) {
-            <div class="aktionen oben">
-              <button mat-stroked-button type="button" data-test="bearbeiten" (click)="bearbeitenOeffnen()">
-                {{ texte.bearbeiten.knopf }}
-              </button>
-            </div>
-          }
-          <dl>
-            <dt>{{ texte.art }}</dt>
-            <dd data-test="art">{{ artName() }}</dd>
-            @if (d.datum) {
-              <dt>{{ texte.datum }}</dt>
-              <dd data-test="datum">{{ datum(d.datum) }}</dd>
+            @if (darfBearbeiten()) {
+              <div class="aktionen oben">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  data-test="bearbeiten"
+                  (click)="bearbeitenOeffnen()"
+                >
+                  {{ texte.bearbeiten.knopf }}
+                </button>
+              </div>
             }
-            @if (d.partnerId || d.partnerName) {
-              <dt>{{ texte.partner }}</dt>
-              <dd data-test="partner">
-                @if (darfKontakt() && d.partnerId) {
-                  <a [routerLink]="['/kontakte', d.partnerId]" data-test="partner-link">{{ d.partnerName || d.partnerId }}</a>
-                } @else {
-                  {{ d.partnerName || d.partnerId }}
-                }
-              </dd>
-            }
-            @if (d.projekt) {
-              <dt>{{ texte.projekt }}</dt>
-              <dd>{{ d.projekt }}</dd>
-            }
-            @if (d.finanz; as f) {
-              @if (f.belegnummer) {
-                <dt>{{ texte.belegnummer }}</dt>
-                <dd data-test="belegnummer">{{ f.belegnummer }}</dd>
-              }
-              @if (f.richtung) {
-                <dt>{{ texte.richtung }}</dt>
-                <dd>{{ richtungen[f.richtung] || f.richtung }}</dd>
-              }
-              @if (f.betrag !== null && f.betrag !== undefined) {
-                <dt>{{ texte.betrag }}</dt>
-                <dd data-test="betrag">{{ betrag(f.betrag, f.waehrung) }}</dd>
-              }
-              @if (f.faelligkeit) {
-                <dt>{{ texte.faelligkeit }}</dt>
-                <dd>{{ datum(f.faelligkeit) }}</dd>
-              }
-            }
-            @if (d.vertrag; as v) {
-              @if (v.gueltigAb) {
-                <dt>{{ texte.gueltigAb }}</dt>
-                <dd>{{ datum(v.gueltigAb) }}</dd>
-              }
-              @if (v.gueltigBis) {
-                <dt>{{ texte.gueltigBis }}</dt>
-                <dd>{{ datum(v.gueltigBis) }}</dd>
-              }
-            }
-            <dt>{{ texte.eingang }}</dt>
-            <dd>{{ zeitpunkt(d.eingang) }}</dd>
-            @if (d.dateiname) {
-              <dt>{{ texte.dateiname }}</dt>
-              <dd data-test="dateiname"><bdi>{{ d.dateiname }}</bdi></dd>
-            }
-            <dt>{{ texte.quelle }}</dt>
-            <dd>{{ d.quelle }}</dd>
-            <dt>{{ texte.status }}</dt>
-            <dd data-test="status">{{ stati[d.status] || d.status }}</dd>
-            <dt>{{ texte.vertraulichkeit }}</dt>
-            <dd>{{ texte.vertraulichkeiten[d.vertraulichkeit] || d.vertraulichkeit }}</dd>
-            <dt>{{ texte.bestaetigt }}</dt>
-            <dd>{{ d.bestaetigt ? zeitpunkt(d.bestaetigt) : texte.nichtBestaetigt }}</dd>
-            @if (d.geschaeftsjahr) {
-              <dt>{{ texte.geschaeftsjahr }}</dt>
-              <dd>{{ d.geschaeftsjahr }}</dd>
-            }
-            @if (d.tags.length > 0) {
-              <dt>{{ texte.tags }}</dt>
-              <dd>{{ d.tags.join(', ') }}</dd>
-            }
-            @if (d.aufbewahrenBis) {
-              <dt>{{ texte.aufbewahrenBis }}</dt>
-              <dd>{{ datum(d.aufbewahrenBis) }}</dd>
-            }
-            @if (d.sperreBis) {
-              <dt>{{ texte.sperreBis }}</dt>
-              <dd>{{ datum(d.sperreBis) }}</dd>
-            }
-          </dl>
-          @if (zusatz().length > 0) {
-            <h3>{{ texte.zusatz }}</h3>
             <dl>
-              @for (z of zusatz(); track z.name) {
-                <dt>{{ z.name }}</dt>
-                <dd>{{ z.wert }}</dd>
+              <dt>{{ texte.art }}</dt>
+              <dd data-test="art">{{ artName() }}</dd>
+              @if (d.datum) {
+                <dt>{{ texte.datum }}</dt>
+                <dd data-test="datum">{{ datum(d.datum) }}</dd>
+              }
+              @if (d.partnerId || d.partnerName) {
+                <dt>{{ texte.partner }}</dt>
+                <dd data-test="partner">
+                  @if (darfKontakt() && d.partnerId) {
+                    <a [routerLink]="['/kontakte', d.partnerId]" data-test="partner-link">{{
+                      d.partnerName || d.partnerId
+                    }}</a>
+                  } @else {
+                    {{ d.partnerName || d.partnerId }}
+                  }
+                </dd>
+              }
+              @if (d.projekt) {
+                <dt>{{ texte.projekt }}</dt>
+                <dd>{{ d.projekt }}</dd>
+              }
+              @if (d.finanz; as f) {
+                @if (f.belegnummer) {
+                  <dt>{{ texte.belegnummer }}</dt>
+                  <dd data-test="belegnummer">{{ f.belegnummer }}</dd>
+                }
+                @if (f.richtung) {
+                  <dt>{{ texte.richtung }}</dt>
+                  <dd>{{ richtungen[f.richtung] || f.richtung }}</dd>
+                }
+                @if (f.betrag !== null && f.betrag !== undefined) {
+                  <dt>{{ texte.betrag }}</dt>
+                  <dd data-test="betrag">{{ betrag(f.betrag, f.waehrung) }}</dd>
+                }
+                @if (f.faelligkeit) {
+                  <dt>{{ texte.faelligkeit }}</dt>
+                  <dd>{{ datum(f.faelligkeit) }}</dd>
+                }
+              }
+              @if (d.vertrag; as v) {
+                @if (v.gueltigAb) {
+                  <dt>{{ texte.gueltigAb }}</dt>
+                  <dd>{{ datum(v.gueltigAb) }}</dd>
+                }
+                @if (v.gueltigBis) {
+                  <dt>{{ texte.gueltigBis }}</dt>
+                  <dd>{{ datum(v.gueltigBis) }}</dd>
+                }
+              }
+              <dt>{{ texte.eingang }}</dt>
+              <dd>{{ zeitpunkt(d.eingang) }}</dd>
+              @if (d.dateiname) {
+                <dt>{{ texte.dateiname }}</dt>
+                <dd data-test="dateiname">
+                  <bdi>{{ d.dateiname }}</bdi>
+                </dd>
+              }
+              <dt>{{ texte.quelle }}</dt>
+              <dd>{{ d.quelle }}</dd>
+              <dt>{{ texte.status }}</dt>
+              <dd data-test="status">{{ stati[d.status] || d.status }}</dd>
+              <dt>{{ texte.vertraulichkeit }}</dt>
+              <dd>{{ texte.vertraulichkeiten[d.vertraulichkeit] || d.vertraulichkeit }}</dd>
+              <dt>{{ texte.bestaetigt }}</dt>
+              <dd>{{ d.bestaetigt ? zeitpunkt(d.bestaetigt) : texte.nichtBestaetigt }}</dd>
+              @if (d.geschaeftsjahr) {
+                <dt>{{ texte.geschaeftsjahr }}</dt>
+                <dd>{{ d.geschaeftsjahr }}</dd>
+              }
+              @if (d.tags.length > 0) {
+                <dt>{{ texte.tags }}</dt>
+                <dd>{{ d.tags.join(', ') }}</dd>
+              }
+              @if (d.aufbewahrenBis) {
+                <dt>{{ texte.aufbewahrenBis }}</dt>
+                <dd>{{ datum(d.aufbewahrenBis) }}</dd>
+              }
+              @if (d.sperreBis) {
+                <dt>{{ texte.sperreBis }}</dt>
+                <dd>{{ datum(d.sperreBis) }}</dd>
               }
             </dl>
-          }
+            @if (zusatz().length > 0) {
+              <h3>{{ texte.zusatz }}</h3>
+              <dl>
+                @for (z of zusatz(); track z.name) {
+                  <dt>{{ z.name }}</dt>
+                  <dd>{{ z.wert }}</dd>
+                }
+              </dl>
+            }
           }
         </section>
 
@@ -148,18 +165,25 @@
               @if (!breit() && bildUrl(); as url) {
                 <img class="bild" data-test="bild" [src]="url" [alt]="texte.bild(titel())" />
               } @else {
-                <object
+                <a
                   class="pdf"
-                  type="application/pdf"
-                  data-test="vorschau"
+                  data-test="pdf-laden"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [href]="pdfaUrl()"
+                  (click)="pdfaKlick($event)"
                   [attr.aria-label]="texte.vorschauTitel(titel())"
-                  [data]="pdfaRessource()"
                 >
-                  <p>{{ texte.vorschauErsatz }}</p>
-                </object>
+                  {{ texte.pdfOeffnen }}
+                </a>
               }
               <div class="aktionen">
-                <button mat-flat-button type="button" data-test="download" (click)="pdfaHerunterladen()">
+                <button
+                  mat-flat-button
+                  type="button"
+                  data-test="download"
+                  (click)="pdfaHerunterladen()"
+                >
                   {{ texte.herunterladen }}
                 </button>
               </div>
@@ -181,15 +205,30 @@
                 <img class="bild" data-test="bild" [src]="url" [alt]="texte.bild(titel())" />
               }
               <p class="fehler" role="alert">{{ texte.fehlerDatei }}</p>
+              <button
+                mat-button
+                type="button"
+                data-test="vorschau-neu-laden"
+                (click)="vorschauNeuLaden()"
+              >
+                {{ neuLadenText }}
+              </button>
             }
           }
           @if (geholtUrl(); as url) {
             <p class="klein" data-test="datei-bereit">
               {{ texte.oeffnenHinweis }}
-              <a target="_blank" rel="noopener noreferrer" [href]="url" (click)="geholtKlick($event)">{{
-                texte.jetztOeffnen
-              }}</a>
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                [href]="url"
+                (click)="geholtKlick($event)"
+                >{{ texte.jetztOeffnen }}</a
+              >
             </p>
+          }
+          @if (pdfaHinweis()) {
+            <p class="klein" data-test="pdf-bereit">{{ texte.oeffnenHinweis }}</p>
           }
           @if (dateiFehler()) {
             <p class="fehler" role="alert" data-test="datei-fehler">{{ texte.fehlerDatei }}</p>
@@ -207,7 +246,9 @@
             @for (v of d.versionen; track v.version) {
               <li data-test="version">
                 <span class="version">{{ texte.version(v.version) }}</span>
-                <span>{{ zeitpunkt(v.zeit) }}, {{ texte.geaendertVon }} {{ wer(v.geaendertVon) }}</span>
+                <span
+                  >{{ zeitpunkt(v.zeit) }}, {{ texte.geaendertVon }} {{ wer(v.geaendertVon) }}</span
+                >
                 <span class="grund">{{ v.grund || texte.ohneGrund }}</span>
               </li>
             }
