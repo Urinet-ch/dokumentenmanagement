@@ -401,3 +401,43 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
       | /public/v1/filter                 |
       | /public/v1/umleitung?url=/nichts  |
       | /public/v1/dokumente/kein-uuid    |
+
+  @req-4.3 @req-5.10
+  Szenario: CSV-Import ist idempotent, mandantensicher und im Trockenlauf unverändert
+    Angenommen die CSV-Datei ordnet die URL «/alt/import» dem Dokument «b1» zu
+    Wenn der Import alter Links im Mandanten «urinet» als Trockenlauf gestartet wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «ANGELEGT»
+    Und ist die importierte alte URL im Mandanten «urinet» nicht gespeichert
+    Und ist die importierte alte URL im Mandanten «vhf-gsk» nicht zugeordnet
+    Und ist der alte-Link-Import nicht im Zugriffsprotokoll erfasst
+    Wenn der Import alter Links im Mandanten «urinet» ausgeführt wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «ANGELEGT»
+    Und ist die importierte alte URL im Mandanten «urinet» einmal gespeichert
+    Und ist die importierte alte URL im Mandanten «vhf-gsk» nicht zugeordnet
+    Und ist der alte-Link-Import einmal im Zugriffsprotokoll erfasst
+    Wenn der Import alter Links im Mandanten «urinet» ausgeführt wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «SCHON_VORHANDEN»
+    Und ist die importierte alte URL im Mandanten «urinet» einmal gespeichert
+    Und ist der alte-Link-Import einmal im Zugriffsprotokoll erfasst
+    Wenn die öffentliche Umleitung die importierte alte URL abruft
+    Dann nennt die Umleitung die Dokument-ID von «b1»
+
+  @req-4.3 @req-5.10
+  Szenario: Importiert unveröffentlichte Ziele, ohne sie über die Umleitung sichtbar zu machen
+    Angenommen das Dokument «b1» ist unveröffentlicht
+    Und die CSV-Datei ordnet die URL «/alt/unveröffentlicht» dem Dokument «b1» zu
+    Wenn der Import alter Links im Mandanten «urinet» ausgeführt wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «ANGELEGT»
+    Und ist die importierte alte URL im Mandanten «urinet» einmal gespeichert
+    Wenn die öffentliche Umleitung die importierte alte URL abruft
+    Dann antwortet die Lese-Schnittstelle mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+
+  @req-4.3 @req-5.10
+  Szenario: Ein Zieldokument eines anderen Mandanten wird abgelehnt und nichts geschrieben
+    Angenommen die CSV-Datei ordnet die URL «/alt/fremd» dem Dokument «b1» zu
+    Wenn der Import alter Links im Mandanten «vhf-gsk» ausgeführt wird
+    Dann meldet der alte-Link-Import die Zeile 2 als «ABGELEHNT»
+    Und nennt der alte-Link-Import den Grund «Zieldokument existiert nicht im Mandanten»
+    Und ist die importierte alte URL im Mandanten «urinet» nicht gespeichert
+    Und ist die importierte alte URL im Mandanten «vhf-gsk» nicht gespeichert
+    Und ist der alte-Link-Import nicht im Zugriffsprotokoll erfasst

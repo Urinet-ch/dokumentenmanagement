@@ -449,6 +449,11 @@ class MandantAbbauTest {
         }
 
         @Override
+        public void konfigurationSeedAnlegen(String schema) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void gemeinsamesSchemaBerechtigen() {
             throw new UnsupportedOperationException();
         }

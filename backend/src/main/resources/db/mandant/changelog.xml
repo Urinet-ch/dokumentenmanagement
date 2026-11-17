@@ -38,5 +38,7 @@
     <include file="changesets/034-mandant-bericht.xml" relativeToChangelogFile="true"/>
     <include file="changesets/035-mandant-vollexport.xml" relativeToChangelogFile="true"/>
     <include file="changesets/036-webseite-liste-index.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/037-webseite-erfassung.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/037-konfiguration-version.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/038-protokoll-konfiguration.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/039-webseite-erfassung.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -21,6 +21,7 @@ export const ProtokollAktion = {
     Verweigert: 'VERWEIGERT',
     SperreKonflikt: 'SPERRE_KONFLIKT',
     RegelAendern: 'REGEL_AENDERN',
+    KonfigurationAendern: 'KONFIGURATION_AENDERN',
     WissenAnzeigen: 'WISSEN_ANZEIGEN',
     WissenAnnehmen: 'WISSEN_ANNEHMEN',
     WissenVerwerfen: 'WISSEN_VERWERFEN',

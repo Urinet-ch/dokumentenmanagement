@@ -6,6 +6,7 @@ import ch.urinet.archiv.dokument.application.DokumentAenderungPort;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Finanz;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Vertrag;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -33,8 +34,8 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
      * eine Änderung ({@link #VERSION_SICHERN}) und das Umhängen beim Zusammenführen von Kontakten (Req 17.8).
      */
     private static final String FASSUNG_SICHERN = """
-            insert into dokument_version (dokument_id, version, daten, geaendert_von, grund)
-            select d.id, d.version, jsonb_build_object(
+            insert into dokument_version (dokument_id, version, konfiguration_version, daten, geaendert_von, grund)
+            select d.id, d.version, coalesce(d.konfiguration_version, :konfigurationVersion), jsonb_build_object(
                 'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
                 'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
                 'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
@@ -44,6 +45,12 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
     /** Wie {@link DokumentAendern} beim Ändern des Partners: eine Fassung nur bei archivierten Dokumenten. */
     private static final String VERSIONEN_SICHERN_PARTNER = FASSUNG_SICHERN
             + " where d.partner_id = :quelle and d.status = 'ARCHIVIERT'";
+
+    private final KonfigurationVersionsPort konfiguration;
+
+    public PanacheDokumentAenderung(KonfigurationVersionsPort konfiguration) {
+        this.konfiguration = konfiguration;
+    }
 
     @Override
     public Optional<Metadaten> ladenUndSperren(UUID id) {
@@ -71,8 +78,10 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
 
     @Override
     public void versionSichern(UUID id, String benutzer, String grund) {
+        int konfigurationVersion = konfiguration.aktuelleVersion();
         em().createNativeQuery(VERSION_SICHERN).setParameter("id", id).setParameter("benutzer", benutzer)
-                .setParameter("grund", grund).executeUpdate();
+                .setParameter("grund", grund).setParameter("konfigurationVersion", konfigurationVersion)
+                .executeUpdate();
     }
 
     /**
@@ -89,11 +98,14 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
         if (gesperrt.isEmpty()) {
             return List.of();
         }
+        int konfigurationVersion = konfiguration.aktuelleVersion();
         em().createNativeQuery(VERSIONEN_SICHERN_PARTNER).setParameter("quelle", quelle)
-                .setParameter("benutzer", benutzer).setParameter("grund", grund).executeUpdate();
-        em().createNativeQuery("update dokument set partner_id = :ziel, version = version + 1, geaendert = now() "
-                        + "where partner_id = :quelle")
-                .setParameter("ziel", ziel).setParameter("quelle", quelle).executeUpdate();
+                .setParameter("benutzer", benutzer).setParameter("grund", grund)
+                .setParameter("konfigurationVersion", konfigurationVersion).executeUpdate();
+        em().createNativeQuery("update dokument set partner_id = :ziel, version = version + 1, "
+                        + "konfiguration_version = :konfigurationVersion, geaendert = now() where partner_id = :quelle")
+                .setParameter("ziel", ziel).setParameter("quelle", quelle)
+                .setParameter("konfigurationVersion", konfigurationVersion).executeUpdate();
         return List.copyOf(gesperrt);
     }
 
@@ -117,6 +129,7 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
         e.fristAbgelaufen = daten.fristAbgelaufen();
         e.sperreBis = daten.sperreBis();
         e.zusatz = daten.zusatz();
+        e.konfigurationVersion = konfiguration.aktuelleVersion();
         // macht die Zeile immer schmutzig, damit die Version auch bei Änderungen nur an Finanz oder Vertrag steigt
         e.geaendert = OffsetDateTime.now(ZoneOffset.UTC);
         daten.finanz().ifPresent(f -> {

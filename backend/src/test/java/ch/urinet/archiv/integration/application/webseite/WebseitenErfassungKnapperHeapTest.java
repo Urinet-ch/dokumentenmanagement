@@ -16,7 +16,11 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Surefire führt diese Probe mit {@code -Xmx64m} aus; sie nutzt denselben Datei-Reader wie der Webseiten-Upload. */
+/**
+ * Belegt nur den Hash-Pfad ({@code DokumentErfassen.pruefsumme}) mit {@code -Xmx64m}, nicht das Multipart-Spooling der
+ * Resource. Läuft nur in der Surefire-Ausführung «speicher» ({@code mvn surefire:test@speicher}); bei einem gezielten
+ * {@code -Dtest} in der Standard-Ausführung fehlt die Heap-Grenze und die Zusicherung schlägt fehl.
+ */
 class WebseitenErfassungKnapperHeapTest {
 
     private static final long DATEIGROESSE = 96L * 1024 * 1024;

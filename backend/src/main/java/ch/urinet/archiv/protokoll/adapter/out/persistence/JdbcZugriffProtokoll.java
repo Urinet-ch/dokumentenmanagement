@@ -140,6 +140,18 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             zahl(knoten, "verkaufschancen", kontakte.verkaufschancen());
             zahl(knoten, "korrekturbeispiele", kontakte.korrekturbeispiele());
         }
+        ProtokollDetails.Konfiguration konfiguration = details.konfiguration();
+        if (konfiguration != null) {
+            knoten.put("version", konfiguration.version());
+            knoten.put("quelle", konfiguration.quelle());
+            var aenderungen = knoten.putArray("aenderungen");
+            for (ProtokollDetails.Aenderung aenderung : konfiguration.aenderungen()) {
+                ObjectNode eintrag = aenderungen.addObject();
+                eintrag.put("pfad", aenderung.pfad());
+                eintrag.put("alt", aenderung.alt());
+                eintrag.put("neu", aenderung.neu());
+            }
+        }
         try {
             return JSON.writeValueAsString(knoten);
         } catch (JsonProcessingException e) {

@@ -13,12 +13,12 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
 2.17), sonst werden `FehlercodeSpecTest` bzw. `RechtematrixSpecTest` rot.
 
 ## Welle 17 — Modell, Prüfung, Datei
-- [ ] 17.1 Entscheide und Folgeänderungen [Fabian]
-  - [offen: Entscheid Fabian] Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9, spätestens vor Welle 10).
-  - Folgeänderungen in Spec 01–04 und Steering nach design.md «Folgeänderungen» als eigener PR.
+- [x] 17.1 Entscheide und Folgeänderungen [Fabian]
+  - Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9): Stichprobe mit der Geschäftsstelle (Entscheid Fabian 17.11.2026, umgesetzt in Req 8.9 und design.md «KI»).
+  - Folgeänderungen in Spec 01–04 und Steering nach design.md «Folgeänderungen» als eigener PR: umgesetzt mit PR #65.
   - _Anforderungen: 8.9_
 
-- [ ] 17.2 Konfigurationsversionen und Grundgerüst [Backend]
+- [x] 17.2 Konfigurationsversionen und Grundgerüst [Backend]
   - Modul `konfiguration/`, Changesets `<nnn>-konfiguration-version` und `<nnn>-protokoll-konfiguration`,
     `Konfiguration` und `pruefen()` (Gerüst), Port `MandantEinstellungen`, Cache nach Version, Protokoll
     `KONFIGURATION_AENDERN` neben `REGEL_AENDERN`, `If-Match` mit der Konfigurationsversion (auch für

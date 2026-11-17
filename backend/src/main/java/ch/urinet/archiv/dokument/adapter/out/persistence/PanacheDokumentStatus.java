@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.application.DokumentStatusPort;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -25,6 +26,12 @@ import java.util.UUID;
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
 public class PanacheDokumentStatus implements DokumentStatusPort {
+
+    private final KonfigurationVersionsPort konfiguration;
+
+    public PanacheDokumentStatus(KonfigurationVersionsPort konfiguration) {
+        this.konfiguration = konfiguration;
+    }
 
     @Override
     public Optional<Stand> stand(UUID id, boolean sperren) {
@@ -98,6 +105,7 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
             return false;
         }
         e.status = DokumentStatus.ARCHIVIERUNG.name();
+        e.konfigurationVersion = konfiguration.aktuelleVersion();
         e.statusGrund = null;
         e.fehler = null;
         metadatenSchreiben(e, daten);
@@ -116,6 +124,7 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
             return false;
         }
         e.zusatz = zusatzJson;
+        e.konfigurationVersion = konfiguration.aktuelleVersion();
         metadatenSchreiben(e, daten);
         em().flush();
         return true;

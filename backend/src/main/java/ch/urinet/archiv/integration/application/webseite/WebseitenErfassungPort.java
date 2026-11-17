@@ -16,8 +16,6 @@ public interface WebseitenErfassungPort {
 
     void referenzLoeschen(String webseite, String referenz);
 
-    String pruefsumme(UUID dokumentId);
-
     Map<UUID, String> referenzen(String webseite, List<UUID> dokumente);
 
     record Referenz(UUID dokumentId, String sha256, String status) {

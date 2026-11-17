@@ -271,7 +271,7 @@ public class WebseitenErfassungResource {
                 bool(veroeffentlicht), begriff, seite, groesse);
         List<DokumentDto> eintraege = ergebnis.dokumente().stream()
                 .map(d -> dokumentDto(d, ergebnis.referenzen().get(d.id()))).toList();
-        return Response.ok(new ListeDto(eintraege, seite + 1, groesse, ergebnis.gesamt())).build();
+        return Response.ok(new ListeDto(eintraege, seite, groesse, ergebnis.gesamt())).build();
     }
 
     @GET

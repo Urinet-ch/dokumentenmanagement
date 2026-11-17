@@ -5,7 +5,7 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!-- Webseiten-Erfassung: Quelle und Zuordnung der protokollierten Bearbeiter (Spec 03, Req 10.1, 10.9). -->
-    <changeSet id="037-webseite-erfassung" author="archiv">
+    <changeSet id="039-webseite-erfassung" author="archiv">
         <sql>
             alter table dokument drop constraint dokument_quelle_ck;
             alter table dokument add constraint dokument_quelle_ck

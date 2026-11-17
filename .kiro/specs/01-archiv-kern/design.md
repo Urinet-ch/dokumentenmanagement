@@ -231,8 +231,9 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | POST | `/dokumente/{id}/wiederholen` | `FEHLER` → `NEU`, `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` → 202; sonst 409; 412, 428 | A10 |
 | GET | `/eingangskorb` | Status `EINGANGSKORB`, `FEHLER`, `ARCHIVIERUNG_FEHLER`, neueste zuerst | A5 |
 | GET | `/dokumentarten` | aktive und inaktive Arten (Auswahllisten) | alle Rollen |
-| POST, PATCH | `/dokumentarten`, `/dokumentarten/{code}` | anlegen, ändern, `aktiv=false`; 422 `ZUSATZ_UNGUELTIG` bei ungültigem Schema | A11 |
-| DELETE | `/dokumentarten/{code}` | 204; 409 `DOKUMENTART_IN_GEBRAUCH` | A11 |
+| POST, PATCH | `/dokumentarten`, `/dokumentarten/{code}` | anlegen, ändern, `aktiv=false`; `If-Match` der Konfigurationsversion erforderlich (428 `VERSION_FEHLT`, 412 `VERSION_KONFLIKT`); 422 `ZUSATZ_UNGUELTIG` bei ungültigem Schema | A11 |
+| GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Konfigurationsversionen lesen (Spec 05, Req 7.1, 7.2); `ETag` der aktuellen Version | A11 |
+| DELETE | `/dokumentarten/{code}` | `If-Match` der Konfigurationsversion erforderlich (428 `VERSION_FEHLT`, 412 `VERSION_KONFLIKT`); 204; 409 `DOKUMENTART_IN_GEBRAUCH` | A11 |
 | GET | `/protokoll?von=&bis=&benutzer=&dokument=&aktion=&seite=&groesse=` | Zugriffsprotokoll, paginiert (Req 10.5), neueste zuerst, höchstens 100 je Seite; 400 `ANFRAGE_UNGUELTIG` | A13 |
 | GET | `/protokoll/benutzer` | Benutzerverzeichnis (Req 10.10) | A13 |
 | POST | `/protokoll/benutzer/{benutzer}/austritt` | Austritt einer Person → 204; 404 `NICHT_GEFUNDEN`, 409 `STATUS_KONFLIKT` (schon beendet oder API-Token) | A13 |
@@ -1745,7 +1746,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 409 | `DOKUMENTART_IN_GEBRAUCH` | Löschen einer benutzten Art (Req 9.4) |
 | 409 | `DOKUMENTART_EXISTIERT` | Anlegen einer Art mit einem Code, den es im Mandanten schon gibt (Req 9.1; Review PR #40) |
 | 410 | `CURSOR_ABGELAUFEN` | Cursor des Änderungs-Feeds älter als die Aufbewahrung des Feeds (90 Tage); die Webseite lädt ihren Bestand neu und beginnt ohne Cursor (Spec 03, Req 14.4; seit Aufgabe 11.9) |
-| 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4) |
+| 412 | `VERSION_KONFLIKT` | `If-Match` passt nicht (Req 10.4); bei Dokumenten oder Dokumentarten die jeweilige aktuelle Version |
 | 413 | `DATEI_ZU_GROSS` | Datei über 50 MB oder Anfrage über der Gesamtgrenze (Req 3.6); CSV-Import über `archiv.import.max-groesse` (5 MiB, entschieden von Fabian am 11.11.2026) |
 | 415 | `DATEITYP_UNBEKANNT` | Inhalt kein unterstützter Typ (Req 3.3) |
 | 415 | `MEDIENTYP_FALSCH` | `Content-Type` der Anfrage passt nicht zum Endpunkt (Framework, z. B. Text statt JSON); nicht für den Dateityp eines Uploads |
@@ -1753,13 +1754,14 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `PFLICHTFELD_FEHLT` | mit Liste der Felder (Req 8.3, 11.6) |
 | 422 | `PARTNER_UNBEKANNT` | unbekannte `crmId` (Req 11.7) |
 | 422 | `ZUSATZ_UNGUELTIG` | Zusatzfelder oder Schema ungültig (Req 9.5) |
+| 422 | `KONFIGURATION_UNGUELTIG` | Abbild der Mandantenkonfiguration ist ungültig (Spec 05, Req 1.5) |
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
 | 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
 | 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |
 | 422 | `VERTRAULICHKEIT_ZU_TIEF` | Vertraulichkeit einer Wissensseite unter der berechneten Stufe (Spec 04, Req 6.8) |
 | 422 | `VERTRAULICHKEIT_UNGUELTIG` | `PERSONAL` für eine Wissensseite gewählt (Spec 04, Req 6.8) |
 | 422 | `ANALYSE_NICHT_MOEGLICH` | Analyse-Vorschlag aus einem Gespräch mit anderen Werkzeugen als den lesenden für Dokumente und Wissen (Spec 04, Req 12.4) |
-| 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6) |
+| 428 | `VERSION_FEHLT` | ändernde Anfrage ohne `If-Match` (Req 10.6); bei Dokumentarten mit der Konfigurationsversion |
 | 429 | `ZU_VIELE_ANFRAGEN` | Grenze überschritten, mit `Retry-After` in Sekunden: Chat mehr als 100 Fragen in 60 Minuten oder schon eine laufende Frage (Spec 02, Req 5.5; seit Aufgabe 7.3); Spec 03 nutzt denselben Code für die Grenzen der Webseiten-Schnittstelle (Spec 03, design.md «Error Handling») |
 | 429 | `BUDGET` | Token-Budget des öffentlichen Chatbots für den Mandanten im laufenden Monat erschöpft, ohne `Retry-After` (Spec 03, Req 6.4; seit Aufgabe 11.3) |
 | 500 | `INTERNER_FEHLER` | unerwarteter Fehler, auch Protokoll nicht schreibbar (Req 10.8); Antwort nur mit Fehler-ID, Log mit Fehler-ID und den Klassen der Ursachen-Kette (bei `SQLException` mit SQLState), ohne Meldungen |

@@ -18,12 +18,14 @@ import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -65,6 +67,7 @@ public class WebseitenErfassungSchritte {
     private String letzterSchluessel;
     private List<Response> paralleleAntworten = List.of();
     private UUID filterDokument;
+    private long dokumenteVorher;
 
     @After
     public void aufraeumen() throws SQLException {
@@ -100,6 +103,7 @@ public class WebseitenErfassungSchritte {
         letzterSchluessel = null;
         paralleleAntworten = List.of();
         filterDokument = null;
+        dokumenteVorher = 0;
     }
 
     @Angenommen("der Erfassungs-Schlüssel «{word}» für die Webseite «{word}» im Mandanten «{word}» ist angelegt")
@@ -399,11 +403,204 @@ public class WebseitenErfassungSchritte {
         assertThat(letzte.jsonPath().getList("eintraege")).isEmpty();
     }
 
-    @Dann("liefern beide Uploads HTTP 200 oder 202 und dieselbe Dokument-ID")
-    public void beideUploadsGleich() {
-        assertThat(paralleleAntworten).hasSize(2).allSatisfy(a -> assertThat(a.statusCode()).isIn(200, 202));
-        assertThat(paralleleAntworten.getFirst().jsonPath().getString("id"))
-                .isNotNull().isEqualTo(paralleleAntworten.getLast().jsonPath().getString("id"));
+    @Wenn("der Schlüssel «{word}» sendet die Datei «{}» mit Referenz «{}» und zusätzlich den Teil «{word}»")
+    public void zusaetzlicherTeil(String name, String dateiname, String referenz, String teil) {
+        RequestSpecification request = mit(name).header("X-Archiv-Bearbeiter", BEARBEITER);
+        request.multiPart(new MultiPartSpecBuilder(datei(dateiname)).controlName("datei")
+                .fileName(dateiname).mimeType("application/pdf").build());
+        request.multiPart("referenz", referenz);
+        switch (teil) {
+            case "datei" -> request.multiPart(new MultiPartSpecBuilder(datei("zweiter-" + dateiname))
+                    .controlName("datei").fileName("zweiter-" + dateiname).mimeType("application/pdf").build());
+            case "referenz" -> request.multiPart("referenz", referenz + "-b");
+            default -> request.multiPart(teil, "https://example.invalid/datei.pdf");
+        }
+        letzte = request.when().post(PFAD);
+        letzterSchluessel = name;
+        letzteDatei = dateiname;
+        letzteReferenz = referenz;
+    }
+
+    @Wenn("der Schlüssel «{word}» die Datei «{}» mit Referenz «{}» und der Bearbeiterkennung «{}» sendet")
+    public void mitBearbeiterkennung(String name, String dateiname, String referenz, String kennung) {
+        RequestSpecification request = mit(name).header("X-Archiv-Bearbeiter", kennung);
+        request.multiPart(new MultiPartSpecBuilder(datei(dateiname)).controlName("datei")
+                .fileName(dateiname).mimeType("application/pdf").build());
+        request.multiPart("referenz", referenz);
+        letzte = request.when().post(PFAD);
+        letzterSchluessel = name;
+        letzteDatei = dateiname;
+    }
+
+    @Wenn("der Schlüssel «{word}» das Dokument der Referenz «{}» ohne Bearbeiterkennung abruft")
+    public void detailOhneBearbeiter(String name, String referenz) {
+        UUID id = idsJeReferenz.get(schluesselKey(name, referenz));
+        letzte = mit(name).when().get(PFAD + "/" + id);
+        letzterSchluessel = name;
+    }
+
+    @Wenn("das Dokument der Referenz «{}» von «{word}» wird verworfen")
+    public void dokumentVerwerfen(String referenz, String name) throws SQLException {
+        UUID id = idsJeReferenz.get(schluesselKey(name, referenz));
+        String schema = new MandantCode(schluessel.get(name).mandant()).schema();
+        ausfuehren("update " + schema + ".dokument_datei set status = 'VERWORFEN' where dokument_id = ?", id);
+        ausfuehren("update " + schema + ".dokument set status = 'VERWORFEN' where id = ?", id);
+    }
+
+    @Angenommen("das Dokument der Referenz «{}» von «{word}» hat zusätzlich als Seite 2 die Datei «{}»")
+    public void zweiteSeite(String referenz, String name, String dateiname) throws SQLException {
+        UUID id = idsJeReferenz.get(schluesselKey(name, referenz));
+        String sha = HexFormat.of().formatHex(sha256(datei(dateiname)));
+        ausfuehren("insert into " + new MandantCode(schluessel.get(name).mandant()).schema()
+                + ".dokument_datei (dokument_id, nr, rolle, sha256, status) values (?, 2, 'ORIGINAL', ?, 'AKTIV')",
+                id, sha);
+    }
+
+    private static byte[] sha256(byte[] inhalt) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(inhalt);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» zwei Uploads mit Referenz «{}» gleichzeitig sendet, einmal die Datei «{}» und einmal die Datei «{}»")
+    public void gleichzeitigVerschiedeneDateien(String name, String referenz, String datei1, String datei2)
+            throws Exception {
+        parallel(name, datei1, referenz, datei2, referenz);
+    }
+
+    @Wenn("der Schlüssel «{word}» zwei Uploads der Dateien «{}» und «{}» mit den Referenzen «{}» und «{}» gleichzeitig sendet")
+    public void gleichzeitigVerschiedeneReferenzen(String name, String datei1, String datei2, String ref1,
+                                                   String ref2) throws Exception {
+        parallel(name, datei1, ref1, datei2, ref2);
+    }
+
+    private void parallel(String name, String datei1, String ref1, String datei2, String ref2) throws Exception {
+        datei(datei1);
+        datei(datei2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Response> erster = executor.submit(() -> {
+                start.await();
+                return hochladen(name, datei1, ref1, true, false);
+            });
+            Future<Response> zweiter = executor.submit(() -> {
+                start.await();
+                return hochladen(name, datei2, ref2, true, false);
+            });
+            start.countDown();
+            Response a = erster.get(30, TimeUnit.SECONDS);
+            Response b = zweiter.get(30, TimeUnit.SECONDS);
+            paralleleAntworten = List.of(a, b);
+            letzte = b;
+            antwortMerken(name, datei1, ref1, a);
+            antwortMerken(name, datei2, ref2, b);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Angenommen("die Zahl der Dokumente im Mandanten «{word}» wird gemerkt")
+    public void dokumenteMerken(String mandant) throws SQLException {
+        dokumenteVorher = dokumenteZaehlen(mandant);
+    }
+
+    private long dokumenteZaehlen(String mandant) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("select count(*) from "
+                     + new MandantCode(mandant).schema() + ".dokument");
+             ResultSet zeile = befehl.executeQuery()) {
+            zeile.next();
+            return zeile.getLong(1);
+        }
+    }
+
+    @Wenn("der Schlüssel «{word}» die Liste mit dem unzulässigen Filter «dateiname» abruft")
+    public void listeMitDateiname(String name) {
+        letzterSchluessel = name;
+        letzte = mit(name).queryParam("dateiname", "x.pdf").when().get(PFAD);
+    }
+
+    @Wenn("der Schlüssel «{word}» die Liste ohne Filter abruft")
+    public void listeOhneFilter(String name) {
+        letzterSchluessel = name;
+        letzte = mit(name).queryParam("groesse", 100).when().get(PFAD);
+    }
+
+    @Dann("hat der Mandant «{word}» die Dokumentzahl um {int} erhöht")
+    public void dokumenteMehr(String mandant, int anzahl) throws SQLException {
+        assertThat(dokumenteZaehlen(mandant) - dokumenteVorher).isEqualTo(anzahl);
+    }
+
+    @Dann("gibt es in der Referenztabelle für «{word}» und Referenz «{}» genau {int} Eintrag")
+    public void referenzEintraege(String name, String referenz, int anzahl) throws SQLException {
+        Zugang zugang = schluessel.get(name);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("select count(*) from "
+                     + new MandantCode(zugang.mandant()).schema()
+                     + ".webseite_referenz where webseite = ? and referenz = ?")) {
+            befehl.setString(1, zugang.webseite());
+            befehl.setString(2, referenz);
+            try (ResultSet zeile = befehl.executeQuery()) {
+                zeile.next();
+                assertThat(zeile.getLong(1)).isEqualTo(anzahl);
+            }
+        }
+    }
+
+    @Dann("liefern die beiden Uploads genau HTTP {int} und HTTP {int}")
+    public void genauZweiStatus(int erster, int zweiter) {
+        assertThat(paralleleAntworten.stream().map(Response::statusCode).sorted().toList())
+                .isEqualTo(List.of(erster, zweiter).stream().sorted().toList());
+    }
+
+    @Dann("gehören beide Uploads zur selben Dokument-ID")
+    public void beideGleicheId() {
+        List<String> ids = paralleleAntworten.stream().filter(a -> a.statusCode() < 300)
+                .map(a -> a.jsonPath().getString("id")).toList();
+        assertThat(ids).hasSize(paralleleAntworten.size()).doesNotContainNull().containsOnly(ids.getFirst());
+    }
+
+    @Dann("haben die beiden Uploads verschiedene Dokument-IDs")
+    public void beideVerschiedeneIds() {
+        assertThat(paralleleAntworten.stream().map(a -> a.jsonPath().getString("id")).distinct().toList())
+                .hasSize(2).doesNotContainNull();
+    }
+
+    @Dann("enthält die letzte Antwort keine internen Details")
+    public void keineInternenDetails() {
+        assertThat(letzte.asString()).doesNotContain("Exception", "at ch.urinet", "org.postgresql", "select ",
+                "webseite_referenz");
+    }
+
+    @Dann("sind die Dokument-IDs der Referenz «{}» von «{word}» und «{word}» verschieden")
+    public void referenzenVerschieden(String referenz, String a, String b) {
+        assertThat(idsJeReferenz.get(schluesselKey(a, referenz)))
+                .isNotNull().isNotEqualTo(idsJeReferenz.get(schluesselKey(b, referenz)));
+    }
+
+    @Dann("hat die Referenz «{}» von «{word}» ein neues Dokument gegenüber «{}»")
+    public void neuesDokument(String referenz, String name, String frueher) {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(202);
+        assertThat(letzte.jsonPath().getString("id")).isNotNull()
+                .isNotEqualTo(idsJeReferenz.get(schluesselKey(name, frueher)).toString());
+    }
+
+    @Dann("weist die letzte Liste für das Dokument der Referenz «{}» von «{word}» die Referenz aus")
+    public void listeMitReferenz(String referenz, String name) {
+        UUID id = idsJeReferenz.get(schluesselKey(name, referenz));
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        List<Map<String, Object>> eintraege = letzte.jsonPath().getList("eintraege");
+        assertThat(eintraege).filteredOn(e -> id.toString().equals(e.get("id")))
+                .singleElement().satisfies(e -> assertThat(e.get("referenz")).isEqualTo(referenz));
+    }
+
+    @Dann("weist kein Eintrag der letzten Liste die Referenz «{}» aus")
+    public void listeOhneFremdeReferenz(String referenz) {
+        assertThat(letzte.statusCode()).as(letzte.asString()).isEqualTo(200);
+        assertThat(letzte.jsonPath().getList("eintraege.referenz", String.class)).doesNotContain(referenz);
     }
 
     private String schluesselKey(String name, String referenz) {

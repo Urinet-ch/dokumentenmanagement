@@ -149,8 +149,12 @@ class MandantEigentuemerTest {
                     .isTrue();
             befehl.execute("insert into m_probe_version.dokument (id, quelle, erstellt_von, status) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 'UPLOAD', 'probe', 'NEU')");
+            // Version 1 (Migration, leer) und Version 2 (Seed) legt die Provisionierung an; Dokumente erhalten die letzte
+            assertThat(wert(befehl, "select konfiguration_version from m_probe_version.dokument"
+                    + " where id = '00000000-0000-4000-8000-0000000000a1'")).isEqualTo("2");
             befehl.execute("insert into " + tabelle + " (dokument_id, version, daten, geaendert_von, grund) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 0, '{}', 'probe', 'Probe')");
+            assertThat(wert(befehl, "select konfiguration_version from " + tabelle)).isEqualTo("2");
             assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
             verweigert(befehl, "update " + tabelle + " set grund = 'x'");
             verweigert(befehl, "delete from " + tabelle);
@@ -209,7 +213,7 @@ class MandantEigentuemerTest {
     @Test
     void alleNurEinfuegenTabellenSindGeschuetzt() throws Exception {
         List<String> tabellen = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-                "manifest", "manifest_zeitstempel", "protokoll_blatt");
+                "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
         var feld = Class.forName("ch.urinet.archiv.mandant.adapter.out.persistence.LiquibaseMandantDatenbank")
                 .getDeclaredField("NUR_EINFUEGEN");
         feld.setAccessible(true);
@@ -227,6 +231,16 @@ class MandantEigentuemerTest {
                         .as(tabelle).isTrue();
             }
         }
+        String versionen = schema + ".konfiguration_version";
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String sql : List.of("update " + versionen + " set wer = 'geändert'",
+                    "delete from " + versionen)) {
+                assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("nur Einfügen erlaubt");
+            }
+            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo("2");
+        }
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {
             for (String tabelle : tabellen) {
@@ -236,8 +250,10 @@ class MandantEigentuemerTest {
                         + " and not tgisinternal and tgtype & 27 = 27)")).as(tabelle + " UPDATE/DELETE").isTrue();
                 assertThat(wahr(befehl, "exists (select 1 from pg_trigger where tgrelid = " + klasse
                         + " and not tgisinternal and tgtype & 34 = 34)")).as(tabelle + " TRUNCATE").isTrue();
-                assertThatThrownBy(() -> befehl.execute("truncate " + schema + "." + tabelle + " cascade"))
-                        .as(tabelle).isInstanceOf(SQLException.class).hasMessageContaining("nur Einfügen erlaubt");
+                if (!tabelle.equals("konfiguration_version")) {
+                    assertThatThrownBy(() -> befehl.execute("truncate " + schema + "." + tabelle + " cascade"))
+                            .as(tabelle).isInstanceOf(SQLException.class).hasMessageContaining("nur Einfügen erlaubt");
+                }
             }
         }
     }

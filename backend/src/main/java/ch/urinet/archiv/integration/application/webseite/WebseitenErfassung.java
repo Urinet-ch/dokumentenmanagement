@@ -54,8 +54,9 @@ public class WebseitenErfassung {
         referenzPruefen(referenz);
         port.sperren(webseite, referenz);
         Optional<WebseitenErfassungPort.Referenz> bisher = port.referenzFinden(webseite, referenz);
+        // SHA-256 der gesendeten Datei: sie wird an die Referenz gebunden, nicht die einer Seite des vorhandenen Dokuments
+        DokumentErfassen.EmpfangeneDatei empfangen = dokumente.pruefsumme(datei);
         if (bisher.isPresent() && !DokumentStatus.VERWORFEN.name().equals(bisher.get().status())) {
-            DokumentErfassen.EmpfangeneDatei empfangen = dokumente.pruefsumme(datei);
             if (!DateiName.aus(dateiname).gueltig() || hinweis != null && DokumentErfassen.hinweisUngueltig(hinweis)) {
                 throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
             }
@@ -78,7 +79,7 @@ public class WebseitenErfassung {
         }
         if (ergebnis instanceof UploadErgebnis.Angenommen angenommen) {
             UUID id = angenommen.id();
-            port.referenzSetzen(webseite, referenz, id, port.pruefsumme(id));
+            port.referenzSetzen(webseite, referenz, id, empfangen.sha256());
             return new Erfassungsergebnis(lesen.lesen(benutzer, id), referenz, false, false);
         }
         UploadErgebnis.Dublette dublette = (UploadErgebnis.Dublette) ergebnis;
@@ -86,7 +87,7 @@ public class WebseitenErfassung {
             return new Erfassungsergebnis(null, referenz, true, false);
         }
         UUID id = dublette.vorhandenId().orElseThrow();
-        port.referenzSetzen(webseite, referenz, id, port.pruefsumme(id));
+        port.referenzSetzen(webseite, referenz, id, empfangen.sha256());
         return new Erfassungsergebnis(lesen.lesen(benutzer, id), referenz, true, false);
     }
 

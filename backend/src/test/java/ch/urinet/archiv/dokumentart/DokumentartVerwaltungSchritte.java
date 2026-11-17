@@ -73,21 +73,24 @@ public class DokumentartVerwaltungSchritte {
     @Wenn("«{word}» eine Dokumentart anlegt:")
     public void anlegen(String benutzer, String body) {
         benutzt = true;
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON).body(body)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(benutzer))
+                .contentType(ContentType.JSON).body(body)
                 .when().post(PFAD);
     }
 
     @Wenn("«{word}» die Dokumentart «{word}» ändert:")
     public void aendern(String benutzer, String code, String body) {
         benutzt = true;
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON).body(body)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(benutzer))
+                .contentType(ContentType.JSON).body(body)
                 .when().patch(PFAD + "/" + code);
     }
 
     @Wenn("«{word}» die Dokumentart «{word}» löscht")
     public void loeschen(String benutzer, String code) {
         benutzt = true;
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().delete(PFAD + "/" + code);
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(benutzer))
+                .when().delete(PFAD + "/" + code);
     }
 
     @Wenn("«{word}» die Dokumentarten auflistet")
@@ -156,5 +159,11 @@ public class DokumentartVerwaltungSchritte {
             }
             assertThat(String.valueOf(wert)).as(zeile.getKey()).isEqualTo(zeile.getValue());
         }
+    }
+
+    private String etag(String benutzer) {
+        Response stand = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(PFAD);
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        return stand.getHeader("ETag");
     }
 }

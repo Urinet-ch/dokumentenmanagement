@@ -66,6 +66,7 @@ public class MandantProvisionierung {
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,
                 mandantCode.schema(), bucketName, ende, true);
         register.eintragen(mandant);
+        datenbank.konfigurationSeedAnlegen(mandantCode.schema());
         LOG.infof("Mandant %s angelegt (Schema %s, Bucket %s, %d Dokumentarten)", code, mandant.schema(), bucketName,
                 arten.size());
         return mandant;

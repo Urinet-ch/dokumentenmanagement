@@ -99,24 +99,6 @@ public class SqlWebseitenErfassung implements WebseitenErfassungPort {
     }
 
     @Override
-    public String pruefsumme(UUID dokumentId) {
-        String sql = "select sha256 from " + schema()
-                + ".dokument_datei where dokument_id = ? and rolle = 'ORIGINAL' and nr = 1 and status = 'AKTIV'";
-        try (Connection verbindung = datenquelle.get().getConnection();
-             PreparedStatement befehl = verbindung.prepareStatement(sql)) {
-            befehl.setObject(1, dokumentId);
-            try (ResultSet zeile = befehl.executeQuery()) {
-                if (!zeile.next()) {
-                    throw new IllegalStateException("Originaldatei der Webseiten-Referenz fehlt");
-                }
-                return zeile.getString(1);
-            }
-        } catch (SQLException e) {
-            throw new IllegalStateException("Prüfsumme der Webseiten-Referenz nicht gelesen", e);
-        }
-    }
-
-    @Override
     public Map<UUID, String> referenzen(String webseite, List<UUID> dokumente) {
         if (dokumente.isEmpty()) {
             return Map.of();

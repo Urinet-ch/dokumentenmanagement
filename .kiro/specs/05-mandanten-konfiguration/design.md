@@ -90,6 +90,14 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
   Summe aller Texte und Beschreibungen im Prompt höchstens 24'000 Zeichen (Prüfung in `Konfiguration.pruefen`).
   Ohne Abnahme nach Req 8.4 (Schalter `ki_freigegeben` in den KI-Texten, setzt nur der Betreiber mit Verweis auf die
   Abnahme) erzeugt der Worker für den Mandanten keinen Auftrag `KI_VORSCHLAG`; `urinet` startet mit `true`.
+  Abnahme eines Mandanten ohne Golden-Datensatz (Req 8.9, Entscheid Fabian 17.11.2026): Stichprobe mit der
+  Geschäftsstelle, 20 bis 30 echte, repräsentative Dokumente. Die Auswertung liest die Zähler
+  `archiv_ki_feld_bestaetigt_total` und `archiv_ki_feld_korrigiert_total` je Feld und Mandant (Spec 01, design.md
+  «Überwachung»); je Feld gilt: bestätigt plus korrigiert mindestens 20 und korrigiert / (bestätigt plus korrigiert)
+  höchstens 10 %. Weil `ki_freigegeben` nur je Mandant besteht (Tabelle `ki_texte`), müssen alle Felder die Schwelle
+  erreichen; eine Freigabe je Feld wäre eine Erweiterung (Schalter je Feld, nicht entschieden). Hinweis: Die Gauge
+  `archiv_ki_feld_korrekturquote` teilt korrigiert durch bestätigt (Verhältnis, Stand seit Prozessstart) und ist für
+  die Schwelle nicht massgeblich; massgeblich ist der Anteil an den bewerteten Feldern über den Zeitraum der Stichprobe.
 - `dokument/` – `dokument_version` (Spec 01, Aufgabe 3.5) enthält zusätzlich `klassifikationen: {<code>: [<wert>…]}`
   und `konfigurationVersion`; `PATCH /dokumente/{id}` versioniert Änderungen der Klassifikationen (Req 3.7).
 - `suche/` – Filter `klassifikation.<code>=<wert>` (Req 8.5) und Facetten je Wert über `dokument_klassifikation`, im
@@ -268,11 +276,27 @@ alter table dokument add konfiguration_version int null references konfiguration
 -- <nnn>-protokoll-konfiguration
 -- Check der Protokollaktionen neu mit zusätzlich KONFIGURATION_AENDERN (wie 004-protokoll-regel-aendern)
 ```
-Die Migration (Req 9.1) füllt die neuen Spalten aus dem Register des jeweiligen Schemas und legt Version 1 an
-(Quelle `MIGRATION`); spätere Changesets dieser Spec, die Bestand ergänzen (z. B. die Regeln von `urinet` mit dem
-Changeset `<nnn>-regel`), legen je eine weitere Version mit Quelle `MIGRATION` an.
+Die Migration (Req 9.1) weist bestehenden Dokumenten und Dokumentversionen Version 1 zu und legt den Snapshot aus
+Dokumentarten und Mandanteneinstellungen an (Quelle `MIGRATION`). Soweit ein Eintrag im öffentlichen Mandantenregister
+besteht, übernimmt sie daraus die Einstellungen. Bei der Erstprovisionierung ist der Mandant während der
+Schema-Migration noch nicht im öffentlichen Register; Version 1 verwendet dann die dokumentierten Standardwerte.
+BEFORE-INSERT-Trigger setzen bei neuen Dokumenten die aktuelle Konfigurationsversion und übernehmen sie bei einer
+Dokumentversion vom Dokument. Die Trigger qualifizieren die Tabellen über das Schema der betroffenen Zeile. Spätere
+Changesets dieser Spec, die Bestand ergänzen (z. B. die Regeln von `urinet` mit dem Changeset `<nnn>-regel`), legen je
+eine weitere Version mit Quelle `MIGRATION` an.
 `public.mandant.eigene_arten` bleibt als Spalte bestehen (bestehende Changesets bleiben unverändert), wird aber nicht
 mehr gelesen; ein späteres Changeset kann sie entfernen.
+
+Umsetzung 17.2 (Review PR #251): Das Abbild enthält `einstellungen` und `arten`; `zusatzSchema` steht im Abbild als
+kanonischer JSON-Text (Schlüssel sortiert, kompakt), damit Migration (jsonb), Client-Text und Vergleich dieselbe Form
+haben. Das Abbild der Migration und das der App sind gleich aufgebaut (Arten nach Code in Byte-Reihenfolge, leere
+Listen statt `null`, `ohne Schema = {"type":"object","properties":{},"additionalProperties":false}`). Ein neuer
+Mandant erhält Version 1 vom Changeset (leer, Quelle `MIGRATION`) und nach dem Seed Version 2 mit Quelle `SEED`.
+Änderungen an `PATCH /mandant/einstellungen` erzeugen bis 17.7 keine eigene Version; sie gehen in die nächste Version
+ein (die Bindung an `If-Match` kommt mit 17.7). `basisSicherstellen()` legt für Schemas ohne Version 1 diese beim
+ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderung die geänderten Pfade mit alt und neu.
+Die Module `dokumentart` und `konfiguration` hängen über ihre `application`-Schichten gegenseitig voneinander ab
+(bewusste Ausnahme bis 17.3, danach über einen Port für das Arten-Abbild aufzulösen).
 
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
@@ -349,5 +373,6 @@ Code kommen: Fehlercodes und A11 (siehe oben) sowie die Stammdaten-Tabelle (Aufg
   im PR dieser Spec nachgetragen).
 
 ## Open Points
-- [offen: Entscheid Fabian] Verfahren der KI-Abnahme ohne Golden-Datensatz (Req 8.9; spätestens vor Welle 10).
+- [offen: Entscheid Fabian] Weg, die KI-Vorschläge für die Stichprobe vor der Freigabe zu erzeugen und zu bewerten
+  («Probelauf»): Solange `ki_freigegeben = false` gilt, erzeugt der Worker keinen Auftrag `KI_VORSCHLAG` (Req 8.4).
 - Rechte der Geschäftsstelle für A11 bleiben der Entscheid aus Spec 03, 3.5.

@@ -51,6 +51,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
   - Drive-Import mit API-Token vom Scope `import` des Mandanten `vhf-gsk` und Pfad-Mustern (Reihe/Jahr), Bericht mit Lücken in der Nummerierung
   - Tabelle `alte_url` und CSV-Import der alten Links (die Tabelle besteht seit Aufgabe 11.2, Changeset `031-alte-url`; der Import verwendet `AlteUrl.normalisieren` für die Form der URL)
+  - CSV-Teilauftrag dieser PR: Der Drive-Import und die Datenübernahme bleiben [Fabian] zugeordnet; darum bleibt der Haken offen.
   - _Anforderungen: 4.1–4.3_
 
 - [ ] 10.6 Sicherung für Mandant 2 [Infra]
@@ -142,7 +143,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Idempotenz mit `pg_advisory_xact_lock` auf (Webseite, Referenz) vor der Dublettenprüfung; verworfene Referenz frei; Dublette mit ID nur, wenn sichtbar (Spec 01, 3.4 ergänzt)
   - Neue Changesets `db/mandant`: `webseite_referenz`, `zugriff_protokoll.bearbeiter`, `dokument_version.bearbeiter`, Quelle `WEBSEITE`; Header `X-Archiv-Bearbeiter`; Bearbeiter im Benutzerverzeichnis (Spec 01, 10.10 ergänzt); 409 `REFERENZ_VERGEBEN` (Fehlercode im selben PR in Spec 01 design.md eintragen)
   - Erweitert die Isolationsszenarien (12.3): Upload und Statusabruf nach Referenz über Mandanten- und Webseitengrenze, Erfassungs-Schlüssel gegen Lesewege (`@req-1.4`, `@req-9.1`, `@req-9.4`); diese Wege fehlen in 12.3 «Umsetzung Teil 1», weil es die Endpunkte noch nicht gibt
-  - Umsetzung Teil 1 (PR #253): Upload, Referenzbindung und -sperre, Status/Details, gefilterte Liste, Bearbeitermeldung samt Protokollierung; Changeset 033 wird verwendet, Changeset 037 ergänzt Quelle und Protokollspalte. Die Upload-Grenze prüft den echten Endpunkt. Teil 2 bleibt offen: Bestätigen/Ändern, Veröffentlichen/Zurückziehen, Eingangskorb/Dokumentarten, Dateistream und Wiederholen.
+  - Umsetzung Teil 1 (PR #253): Upload, Referenzbindung und -sperre, Status/Details, gefilterte Liste, Bearbeitermeldung samt Protokollierung; Changeset 033 wird verwendet, Changeset 039 ergänzt Quelle und Protokollspalte. Die Upload-Grenze prüft den echten Endpunkt. Teil 2 bleibt offen: Bestätigen/Ändern, Veröffentlichen/Zurückziehen, Eingangskorb/Dokumentarten, Dateistream und Wiederholen.
   - Testnachweis Teil 1: synthetische Szenarien `@req-10.1`–`@req-10.4`, `@req-10.9`, `@req-10.11`–`@req-10.13`, `@req-1.4`, `@req-9.1`, `@req-9.4`, `@req-12.1` und `@req-15.1`, einschliesslich zweier paralleler Uploads derselben Referenz; `ErfassungRechteTest` prüft die Positivliste A1–A8/A10 gegen die Rechtematrix, `WebseitenErfassungKnapperHeapTest` den 96-MiB-Datei-Hash mit 64-MiB-Heap. Vollständige Prüfläufe folgen vor dem PR-Review.
   - _Anforderungen: 10.1–10.14, 3.1_
   - _Abhängig von: 11.7, 11.8_
@@ -151,7 +152,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - Herkunft: Spec-Erweiterung, vorgeschlagen 13.11.2026, entschieden mit dem Merge dieses PR
   - Token-Bucket je Schlüssel (Startwerte in design.md «Grenzen»), Uploads je Stunde, 429 `ZU_VIELE_ANFRAGEN` mit `Retry-After` (Fehlercode im selben PR in Spec 01 design.md eintragen, falls noch nicht eingetragen); Grenze des Chats je Client-Hash bleibt; Startwerte messen
   - Reihenfolge (entschieden 16.11.2026): 11.11 kommt vor dem Livegang der Webseite von VHF/GSK, weil jede öffentliche Suche Embedding und Reranker auslöst; bis dahin nur Urinet und Testmandanten
-  - Umsetzung (Stand: Baustein und Lese-Endpunkte umgesetzt, Haken erst nach den zwei offenen Punkten): `WebseitenGrenzen`, `TokenBucket`, `Grenzklasse`, `WebseitenGrenzenFilter`, `@WebseitenGrenze`, `MicrometerWebseitenGrenzen`; Einstellungen `archiv.webseite.grenzen.*`; strengerer Bucket für die Suche (Startwert 2/s, Spitze 10, Entscheid Fabian offen); Vertrag mit 429 und `Retry-After` an den lesenden Endpunkten; `@req-15.1`/`@req-6.4` in `features/integration/webseiten-grenzen.feature`; Einzelheiten in design.md, «Grenzen». Offen: (1) der Upload-Endpunkt der Erfassung trägt `@WebseitenGrenze(UPLOAD)` (mit 11.10; bis dahin belegt ihn die Probe `/public/v1/probe/erfassung/upload`), (2) Messung der Startwerte am Livegang (Kennzahl `archiv_webseite_grenze_abgelehnt_total`)
+  - Umsetzung (Stand: Baustein und Lese-Endpunkte umgesetzt, Haken erst nach dem offenen Punkt): `WebseitenGrenzen`, `TokenBucket`, `Grenzklasse`, `WebseitenGrenzenFilter`, `@WebseitenGrenze`, `MicrometerWebseitenGrenzen`; Einstellungen `archiv.webseite.grenzen.*`; strengerer Bucket für die Suche (Startwert 2/s, Spitze 10, Entscheid Fabian offen); Vertrag mit 429 und `Retry-After` an den lesenden Endpunkten; `@req-15.1`/`@req-6.4` in `features/integration/webseiten-grenzen.feature`; Einzelheiten in design.md, «Grenzen». Der Upload-Endpunkt der Erfassung trägt `@WebseitenGrenze(UPLOAD)` (PR #253, die Probe entfällt). Offen: Messung der Startwerte am Livegang (Kennzahl `archiv_webseite_grenze_abgelehnt_total`)
   - _Anforderungen: 15.1, 6.4_
   - _Abhängig von: 11.7_
 
@@ -181,7 +182,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
-  - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Der Keycloak-Client-Abbau bleibt offen, da kein mandantenspezifischer Client-Lifecycle-Port oder Client im freigegebenen Code besteht; siehe design.md «Mandantenverwaltung». Aufgabe bleibt deshalb offen.
+  - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Req 8.3 angepasst (Entscheid Fabian 17.11.2026): gemeinsame Realm-Clients bleiben bestehen, der Abbau entfernt den Mandantenzugang, ein Client-Lifecycle-Port entfällt; siehe design.md «Mandantenverwaltung». Folgeaufgabe: Berichtstext in `MandantAbbau`/`MandantKommando` und `MandantAbbauTest` anpassen (Hinweis auf Handschritt statt «nicht entfernt … Req 8.3 offen», Zustand ohne Zusatz) und prüfen, dass der Mandant nach dem Abbau nicht mehr auflösbar ist. Haken bleibt offen, bis auch die Ergänzungen von Spec 04 (OKF-Export, 15.5) und Spec 05 (Klassifikationen und Konfiguration im Vollexport, 17.5/17.7) umgesetzt sind.
   - Spec 04 ergänzt den Vollexport um den OKF-Export der Wissensbasis (Spec 04, 17.5; Aufgabe 15.5)
   - Spec 05 ergänzt: Der Vollexport enthält je Dokument die Klassifikationen mit Code und Name und die Konfigurationsversion sowie die aktuelle Konfigurationsdatei und alle Konfigurationsversionen (Spec 05 design.md, «Folgeänderungen»)
   - _Anforderungen: 8.2, 8.3, 8.5_

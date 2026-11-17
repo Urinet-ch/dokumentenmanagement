@@ -21,6 +21,12 @@ public interface MandantDatenbank {
     /** Spielt die Dokumentarten ein; vorhandene Codes bleiben unverändert. */
     void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten);
 
+    /**
+     * Legt nach dem Seed und dem Registereintrag eine Konfigurationsversion mit Quelle {@code SEED} an, wenn sich das
+     * Abbild von der letzten Version unterscheidet (Spec 05, Req 1.1, 1.3).
+     */
+    void konfigurationSeedAnlegen(String schema);
+
     /** Rechte der App-Rolle auf die Tabellen in {@code public} (nach der Migration von {@code db/public}). */
     void gemeinsamesSchemaBerechtigen();
 }
