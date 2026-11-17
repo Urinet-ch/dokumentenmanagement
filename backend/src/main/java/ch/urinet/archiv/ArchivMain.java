@@ -30,7 +30,8 @@ import java.util.function.BiConsumer;
  * {@code archiv token erstellen urinet Rechnungsgenerator generator} oder
  * {@code archiv embedding nachberechnen urinet}.
  * Exit-Codes des Kommandos: 0 ok, 1 fachlicher Fehler, 2 falscher Aufruf (geprüft, bevor Quarkus startet),
- * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}).
+ * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}),
+ * 4 nur bei {@code mandant abbauen}: Abbau unvollständig (gesperrte Objekte, Schema oder Bucket bleiben; erneut aufrufen).
  */
 @QuarkusMain
 public class ArchivMain implements QuarkusApplication {
@@ -159,7 +160,7 @@ public class ArchivMain implements QuarkusApplication {
         List<String> liste = List.of(argumente);
         List<String> rest = liste.subList(1, liste.size());
         return switch (liste.getFirst()) {
-            case "mandant" -> MandantKommando.lesen(rest).isPresent() ? Optional.empty()
+            case "mandant" -> MandantKommando.gueltig(rest) ? Optional.empty()
                     : Optional.of(MandantKommando.AUFRUF);
             case "token" -> TokenKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(TokenKommando.AUFRUF);

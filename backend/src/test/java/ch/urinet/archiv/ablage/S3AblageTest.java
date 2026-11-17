@@ -48,6 +48,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectVersionsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
+import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 
@@ -223,6 +224,77 @@ class S3AblageTest {
             assertThat(kopie.sperreBis()).isEmpty();
             assertThat(retention(kopie.schluessel(), kopie.versionId())).isEmpty();
         }
+    }
+
+    @Test
+    void abbauVorschauBeachtetAbgelaufeneSperre() {
+        S3Ablage ablage = ablage();
+        DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetische Frist"));
+        Instant ablauf = Instant.now().plus(Duration.ofDays(1));
+        String key = eingang.schluessel().pfad(Ablageort.EINGANG);
+        verwaltung.putObjectRetention(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId())
+                .retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(ablauf)));
+        verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId())
+                .legalHold(h -> h.status(ObjectLockLegalHoldStatus.OFF)));
+        assertThat(s3.getObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(eingang.eingangVersionId()))
+                .legalHold().status()).isEqualTo(ObjectLockLegalHoldStatus.OFF);
+
+        var vorschau = ablage.mandantAbbauPlanen(mandant, ablauf.plus(Duration.ofDays(1)));
+
+        assertThat(vorschau.geloescht()).isZero();
+        assertThat(vorschau.loeschbar()).isEqualTo(1);
+        assertThat(vorschau.gesperrt()).isEmpty();
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).containsExactly(eingang.eingangVersionId());
+    }
+
+    @Test
+    void abbauVorschauUndAusfuehrungBeachtenObjectLock() {
+        S3Ablage ablage = ablage(Optional.of(Duration.ofDays(20L * 366)), Sperrmodus.GOVERNANCE,
+                Optional.of(Duration.ofDays(1)));
+        DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
+        ArchiviertesDokument archiviert = ablage.archivieren(mandant, List.of(eingang),
+                Sperrvorgabe.bis(IN_ZEHN_JAHREN));
+        AbgelegteDatei gesperrt = archiviert.dateien().getFirst();
+        DateiSchluessel legalHoldSchluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        AbgelegteDatei legalHoldDatei = ablage.ablegenEingang(mandant, legalHoldSchluessel,
+                new ByteArrayInputStream(inhalt("synthetischer Legal Hold")), inhalt("synthetischer Legal Hold").length);
+        verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
+                .versionId(legalHoldDatei.versionId())
+                .legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON)));
+        assertThat(s3.getObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
+                .versionId(legalHoldDatei.versionId())).legalHold().status())
+                .isEqualTo(ObjectLockLegalHoldStatus.ON);
+        Instant jetzt = Instant.now();
+
+        var vorschau = ablage.mandantAbbauPlanen(mandant, jetzt);
+
+        assertThat(vorschau.geloescht()).isZero();
+        assertThat(vorschau.gesperrt()).hasSize(2)
+                .anySatisfy(objekt -> {
+                    assertThat(objekt.versionId()).isEqualTo(gesperrt.versionId());
+                    assertThat(objekt.gesperrtBis()).isPresent();
+                })
+                .anySatisfy(objekt -> {
+                    assertThat(objekt.versionId()).isEqualTo(legalHoldDatei.versionId());
+                    assertThat(objekt.legalHold()).isTrue();
+                    assertThat(objekt.gesperrtBis()).isEmpty();
+                });
+        assertThat(vorschau.loeschbar()).isEqualTo(1);
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId)
+                .containsExactlyInAnyOrder(eingang.eingangVersionId(), legalHoldDatei.versionId());
+
+        var ergebnis = ablage.mandantAbbauen(mandant, jetzt);
+
+        assertThat(ergebnis.geloescht()).isEqualTo(1);
+        assertThat(ergebnis.gesperrt()).hasSize(2);
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).contains(legalHoldDatei.versionId());
+        assertThat(ablage.versionen(mandant, "archiv/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).contains(gesperrt.versionId());
     }
 
     @Test
