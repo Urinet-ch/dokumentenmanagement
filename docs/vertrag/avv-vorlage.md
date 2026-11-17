@@ -41,8 +41,12 @@ Bearbeitet werden:
 - Dokumente des Verbandes sowie die dazugehörigen Metadaten und Klassifikationen;
 - Benutzer-, Rollen- und Zugriffsangaben, die für die Mandantentrennung und Berechtigungsprüfung erforderlich sind;
 - Zugriffs- und Änderungseinträge;
-- Chat-Fragen ohne Personenbezug sowie die für den Dienst erforderlichen Nutzungsangaben; die Aufbewahrungsfrist
-  wird je Mandant festgelegt.
+- Chat-Fragen ohne Personenbezug (Frage, Quellen und Tokens) sowie die für den Dienst erforderlichen
+  Nutzungsangaben. Aufbewahrungsfrist der Chat-Fragen: `<Frist, offener Punkt A2>`. **Offener Punkt A2:** Der
+  Systemstandard beträgt 90 Tage (je Mandant einstellbar von 1 bis 365 Tagen; Spec 03, Req 6.5). Dem Verband
+  VHF/GSK sind 30 Tage zugesagt (Entscheid vom 16.11.2026). Zu klären ist, ob im Vertrag 30 Tage stehen und die
+  Mandantenkonfiguration entsprechend auf 30 Tage gesetzt wird. Weicht Spec 02 ab (12 Monate Löschfrist für
+  gespeicherte Chat-Gespräche), ist auch diese Abweichung zu bereinigen.
 
 Betroffene Personen können insbesondere `<zutreffende Gruppen, z. B. Mitglieder, Mitarbeitende, Funktionsträger oder
 Kontaktpersonen; abschliessend festlegen>` sein. Besondere Personendaten sind kein Zweck der Bearbeitung. Falls
@@ -145,11 +149,15 @@ andere Mandanten und deren Daten nicht offenlegen und die Sicherheit des Archivs
 ## 10. Rückgabe und Löschung bei Vertragsende
 
 1. Auf Weisung des Verantwortlichen erstellt UriNet einen Vollexport als ZIP. Er umfasst die Originale,
-   vorhandene Arbeitsfassungen und PDF/A-Dateien, Metadaten als JSON und CSV sowie die Manifeste. Die Übergabe
+   vorhandene Arbeitsfassungen und PDF/A-Dateien, Metadaten als JSON und CSV, die Manifeste, je Dokument die
+   Klassifikationen mit Code und Name samt Konfigurationsversion, die aktuelle Konfigurationsdatei und alle
+   Konfigurationsversionen des Mandanten sowie den OKF-Export der Wissensbasis (Spec 03, Req 8.2). Die Übergabe
    erfolgt an `<Empfänger und sicherer Übergabeweg>`. Der Verantwortliche bestätigt die vollständige Übernahme
    schriftlich.
-2. Nach bestätigter Übergabe wird der Mandant deaktiviert. Nach Ablauf von 30 Tagen werden das Mandantenschema
-   und die Bucket-Inhalte gelöscht, soweit keine Object-Lock-Sperre entgegensteht. Gesperrte Objekte bleiben bis
+2. Nach bestätigter Übergabe wird der Mandant deaktiviert. Nach Ablauf von 30 Tagen werden, vorbehältlich Absatz 3,
+   das Mandantenschema und die Bucket-Inhalte gelöscht, soweit keine Object-Lock-Sperre entgegensteht. Zugleich
+   wird der Mandantenzugang entfernt: Die Zuordnung von Benutzern und Rollen im Archiv besteht nicht mehr. Die
+   gemeinsamen Keycloak-Clients sind nicht mandantenspezifisch und bleiben bestehen. Gesperrte Objekte bleiben bis
    zum Ablauf ihrer Sperre bestehen und werden im Abbau-Bericht mit dem jeweiligen Fristende aufgeführt.
 3. Datenbank-, Realm- und Manifest-Schlüssel-Sicherungsstände werden nach der festgelegten Aufbewahrung
    ausgedünnt: 30 Tagesstände, 12 Monatsstände und 10 Jahresstände. Die Zuwächse der Bucket-Sicherung werden nicht ausgedünnt; sie bleiben
@@ -162,6 +170,11 @@ andere Mandanten und deren Daten nicht offenlegen und die Sicherheit des Archivs
 Die Parteien legen den Zeitpunkt für die Bestätigung des Vollexports und die sichere Übergabe fest:
 `<Verfahren>`. Die Frist von 30 Tagen beginnt mit der bestätigten Übergabe, sofern die Parteien nicht schriftlich
 einen anderen rechtlich geprüften Auslöser festlegen.
+
+Bestätigt der Verantwortliche die Übernahme nicht oder erteilt er nach Vertragsende keine Weisung zum Vollexport, fragt
+UriNet nach und setzt eine Nachfrist von `<Nachfrist>`. Nach deren Ablauf `<Vorgehen, z. B. Abbau auch ohne
+Bestätigung oder erneute Nachfrage; rechtlich zu klären>`. Ohne eine solche Regelung bliebe der Mandant
+unbefristet bestehen.
 
 ## 11. Haftung
 
@@ -197,15 +210,21 @@ Es gilt Schweizer Recht. Gerichtsstand: `<Ort, rechtlich prüfen>`.
 6. Sind Vollexport, schriftliche Übernahmebestätigung, Beginn der 30-Tage-Frist, Object-Lock-Ausnahmen und
    Abbau-Bericht rechtlich und praktisch eindeutig geregelt?
 7. Wie sind die unterschiedlichen Sicherungsfristen zu formulieren, insbesondere die unbefristete Aufbewahrung
-   der Bucket-Zuwächse bis zur geregelten Löschfunktion?
+   der Bucket-Zuwächse bis zur geregelten Löschfunktion? Ist sie mit der Löschpflicht und der Weisung des
+   Verantwortlichen vereinbar, obwohl Ziffer 10 Absatz 2 «gelöscht» zusagt (Vorbehalt Absatz 3)?
 8. Sind Auditverfahren, Kostenregelung, Haftung, anwendbares Recht und Gerichtsstand mit dem Hauptvertrag
    abgestimmt?
-9. Welche weiteren TOM, Nachweise oder vertraglichen Anpassungen sind angesichts der konkreten Daten und
+9. Offener Punkt A2: Welche Aufbewahrungsfrist der Chat-Fragen soll im Vertrag stehen (Systemstandard 90 Tage,
+   dem Verband zugesagt 30 Tage), und ist die Zusage verbindlich, sodass die Mandantenkonfiguration auf 30 Tage
+   zu setzen ist?
+10. Wie ist der Fall zu regeln, dass nach Vertragsende keine Weisung oder keine Übernahmebestätigung erfolgt
+   (Nachfrist, Abbau von Amtes wegen, Löschgrundsatz bei Vertragsende)?
+11. Welche weiteren TOM, Nachweise oder vertraglichen Anpassungen sind angesichts der konkreten Daten und
    Bearbeitungszwecke erforderlich?
 
 ### Verwendete Repository-Grundlagen
 
-- [Spec 03, Requirements 8.2–8.5](../../.kiro/specs/03-zweiter-mandant/requirements.md)
+- [Spec 03, Requirements 6.5 und 8.2–8.5](../../.kiro/specs/03-zweiter-mandant/requirements.md)
 - [Spec 01, Requirement 16](../../.kiro/specs/01-archiv-kern/requirements.md)
 - [Technikregeln](../../.kiro/steering/tech.md)
 - [ADR-002: Schema pro Mandant](../adr/ADR-002-schema-pro-mandant-liquibase.md)
