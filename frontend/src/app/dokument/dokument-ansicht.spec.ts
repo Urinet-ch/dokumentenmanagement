@@ -301,6 +301,32 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(port.aufrufe).toEqual(['pdfa', 'original', 'original']);
   });
 
+  it('öffnet den PDF-Link mit noch gültiger Adresse ohne neuen Abruf', async () => {
+    await oeffnen();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const klick = new MouseEvent('click', { cancelable: true, bubbles: true });
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.dispatchEvent(klick);
+    expect(klick.defaultPrevented).toBe(false);
+    expect(open).not.toHaveBeenCalled();
+    expect(port.ansichten).toEqual(['vorschau']);
+  });
+
+  it('holt beim Klick auf den PDF-Link eine abgelaufene Adresse neu und öffnet die frische', async () => {
+    port.pdfa = of({
+      url: 'https://s3.example/pdfa?sig=alt',
+      gueltigBis: new Date(Date.now() - 1000).toISOString(),
+    });
+    await oeffnen();
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const klick = new MouseEvent('click', { cancelable: true, bubbles: true });
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.dispatchEvent(klick);
+    await fixture.whenStable();
+    expect(klick.defaultPrevented).toBe(true);
+    expect(open).toHaveBeenCalledWith('https://s3.example/pdfa?sig=neu', '_blank', 'noopener,noreferrer');
+    expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
+  });
+
   it('sagt bei 404 nur, dass es das Dokument nicht gibt oder es nicht sichtbar ist (Req 2.3)', async () => {
     port.dokument = throwError(() => new HttpErrorResponse({ status: 404 }));
     await oeffnen();

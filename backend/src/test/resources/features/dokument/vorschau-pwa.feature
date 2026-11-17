@@ -17,6 +17,7 @@ Funktionalität: PDF-Vorschau als geprüfter Link, Download nur auf Klick
     Wenn ich die Dokumentansicht von «Vorschau-Test.pdf» öffne
     Dann sehe ich einen sicheren Link zur PDF-Vorschau
     Und hat die PWA das PDF nicht automatisch abgerufen
+    Und liefert die Ablage beim Öffnen des Links Content-Type «application/pdf» und Content-Disposition «inline»
     Und hat der Browser keine Datei heruntergeladen
 
   @req-14.6

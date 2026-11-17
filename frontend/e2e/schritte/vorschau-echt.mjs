@@ -64,6 +64,19 @@ Then('sehe ich einen sicheren Link zur PDF-Vorschau', async function () {
   assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
 });
 
+// Der Link öffnet die Adresse im neuen Tab; die Ablage muss dort inline darstellen (Req 14.6). Die Adresse wird nur
+// abgerufen, nie ausgegeben.
+Then(
+  /^liefert die Ablage beim Öffnen des Links Content-Type «(.+)» und Content-Disposition «(.+)»$/,
+  async function (typ, disposition) {
+    const adresse = await this.seite.locator('a[data-test=pdf-laden]').getAttribute('href');
+    const antwort = await this.seite.request.get(adresse);
+    assert.equal(antwort.status(), 200);
+    assert.equal(antwort.headers()['content-type'], typ);
+    assert.equal(antwort.headers()['content-disposition']?.split(';')[0], disposition);
+  },
+);
+
 Then('hat die PWA das PDF nicht automatisch abgerufen', async function () {
   assert.equal(this.ablageAntworten.length, 0, 'die PWA hat die PDF-Adresse automatisch abgerufen');
 });

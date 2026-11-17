@@ -330,6 +330,29 @@ export class DokumentAnsicht {
     }
   }
 
+  /** Die Vorschau-Adresse wird beim Öffnen der Ansicht geholt; ist sie beim Klick abgelaufen, wird vor dem Öffnen eine frische geholt. */
+  protected pdfaKlick(ereignis: MouseEvent): void {
+    const pdfa = this.pdfa();
+    if (pdfa && gueltig(pdfa)) {
+      return;
+    }
+    ereignis.preventDefault();
+    this.abos.add(
+      this.port.adresse(this.id(), 'pdfa', 'vorschau').subscribe({
+        next: (adresse) => {
+          const url = sichereAdresse(adresse.url);
+          if (!url) {
+            this.vorschau.set('fehler');
+            return;
+          }
+          this.pdfa.set(adresse);
+          window.open(url, '_blank', 'noopener,noreferrer');
+        },
+        error: () => this.vorschau.set('fehler'),
+      }),
+    );
+  }
+
   private holenUndOeffnen(variante: Variante): void {
     this.dateiFehler.set(false);
     this.geholt.set(null);

@@ -171,6 +171,7 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   [href]="pdfaUrl()"
+        (click)="pdfaKlick($event)"
                   [attr.aria-label]="texte.vorschauTitel(titel())"
                 >
                   {{ texte.pdfOeffnen }}
