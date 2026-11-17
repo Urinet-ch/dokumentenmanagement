@@ -15,7 +15,6 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
@@ -52,7 +51,7 @@ interface Zusatzfeld {
 }
 
 /**
- * Dokumentansicht (Req 14.6): Metadaten, PDF-Vorschau der PDF/A-Fassung und Download über eine vorsignierte Adresse,
+ * Dokumentansicht (Req 14.6): Metadaten, Link zur PDF/A-Fassung und Download über eine vorsignierte Adresse,
  * die beim Öffnen geholt und vom Archiv protokolliert wird; Metadaten bearbeiten mit Grund (A6, Req 10.1) und die
  * gesicherten Fassungen. Das Vorschaubild der ersten Seite ersetzt die PDF-Vorschau auf schmalen Bildschirmen und
  * ohne PDF/A-Fassung.
@@ -66,7 +65,6 @@ interface Zusatzfeld {
 })
 export class DokumentAnsicht {
   private readonly port = inject(DokumentPort);
-  private readonly bereinigen = inject(DomSanitizer);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -76,6 +74,7 @@ export class DokumentAnsicht {
   readonly art = input<string | undefined>();
 
   protected readonly texte = TEXTE.dokument;
+  protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
   protected readonly stati = TEXTE.suche.stati;
   protected readonly datum = datum;
   protected readonly zeitpunkt = zeitpunkt;
@@ -87,10 +86,6 @@ export class DokumentAnsicht {
   protected readonly vorschau = signal<Vorschau>('laedt');
   private readonly pdfa = signal<DownloadAdresse | null>(null);
   protected readonly pdfaUrl = computed(() => sichereAdresse(this.pdfa()?.url));
-  protected readonly pdfaRessource = computed<SafeResourceUrl | null>(() => {
-    const url = this.pdfaUrl();
-    return url ? this.bereinigen.bypassSecurityTrustResourceUrl(url) : null;
-  });
   protected readonly dateiFehler = signal(false);
   /**
    * Zuletzt per Klick geholte Adresse: `window.open` läuft erst nach der Antwort und damit ausserhalb der Klick-Geste;
@@ -127,8 +122,10 @@ export class DokumentAnsicht {
   protected readonly meldung = signal('');
   protected readonly ich = computed(() => this.anmeldung.benutzer()?.id ?? '');
 
-  /** Breiter Bildschirm: PDF im `<object>`; sonst das Vorschaubild, weil Mobilbrowser PDFs oft nicht einbetten. */
-  protected readonly breit = signal(typeof window.matchMedia === 'function' && window.matchMedia(BREIT).matches);
+  /** Auf schmalen Bildschirmen das Vorschaubild statt der PDF-Datei zeigen. */
+  protected readonly breit = signal(
+    typeof window.matchMedia === 'function' && window.matchMedia(BREIT).matches,
+  );
   private readonly bild = signal<{ id: string; url: string } | null>(null);
   protected readonly bildUrl = computed(() => {
     const bild = this.bild();
@@ -152,7 +149,10 @@ export class DokumentAnsicht {
     }
     return Object.entries(z)
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
-      .map(([name, wert]) => ({ name, wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert) }));
+      .map(([name, wert]) => ({
+        name,
+        wert: typeof wert === 'object' ? JSON.stringify(wert) : String(wert),
+      }));
   });
 
   private abos = new Subscription();
@@ -216,6 +216,18 @@ export class DokumentAnsicht {
   protected veraltet(meldung: string): void {
     this.oeffnen(this.id());
     this.melden(meldung);
+  }
+
+  protected neuLaden(): void {
+    this.oeffnen(this.id());
+  }
+
+  protected vorschauNeuLaden(): void {
+    const dokument = this.dokument();
+    if (dokument) {
+      this.vorschau.set('laedt');
+      this.vorschauLaden(dokument.id);
+    }
   }
 
   protected wer(sub: string): string {
