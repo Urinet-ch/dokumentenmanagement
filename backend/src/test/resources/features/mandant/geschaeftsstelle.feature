@@ -45,7 +45,9 @@ Funktionalität: Erfassung durch die Geschäftsstelle
  """
  {"code": "PROBE_DA_HEFT", "name": "Heft Probe", "gruppen": [], "pflichtfelder": ["datum"],
  "zusatzSchema": {"type": "object", "properties": {"reihe": {"type": "string"}, "jahr": {"type": "integer"},
- "zugriff": {"type": "string"}, "veroeffentlicht": {"type": "boolean"}}, "additionalProperties": false},
+ "zugriff": {"type": "string", "enum": ["oeffentlich", "mitglieder", "vorstand"], "default": "mitglieder"},
+ "veroeffentlicht": {"type": "boolean", "default": false}},
+ "required": ["zugriff", "veroeffentlicht"], "additionalProperties": false},
  "vertraulichkeit": "NORMAL", "aufbewahrungJahre": 10, "aufbewahrungAb": "GESCHAEFTSJAHR",
  "gesetzlichePflicht": false}
  """

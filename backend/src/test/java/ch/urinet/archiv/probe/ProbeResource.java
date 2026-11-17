@@ -96,6 +96,9 @@ public class ProbeResource {
         art.name = code;
         art.vertraulichkeit = "NORMAL";
         art.aktiv = true;
+        art.belegnummerMuster = new String[0];
+        art.kiVorschlag = true;
+        art.kiFelder = new String[0];
         art.persist();
     }
 
