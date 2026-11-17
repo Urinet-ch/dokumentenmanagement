@@ -246,6 +246,9 @@ class S3AblageTest {
         DateiSchluessel legalHoldSchluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
         AbgelegteDatei legalHoldDatei = ablage.ablegenEingang(mandant, legalHoldSchluessel,
                 new ByteArrayInputStream(inhalt("synthetischer Legal Hold")), inhalt("synthetischer Legal Hold").length);
+        verwaltung.putObjectRetention(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
+                .versionId(legalHoldDatei.versionId())
+                .retention(r -> r.mode(ObjectLockRetentionMode.GOVERNANCE).retainUntilDate(ablauf)));
         verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
                 .versionId(legalHoldDatei.versionId())
                 .legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON)));
