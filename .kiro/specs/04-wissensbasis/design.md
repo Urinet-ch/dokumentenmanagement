@@ -444,7 +444,9 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
 - Manifest (Req 4.6): `protokoll_blatt` nimmt Blätter von `wissensseite_version` und `wissens_log` auf. Unter
   `protokolle` stehen `dokument_version` und `zugriff_protokoll` immer, die beiden Wissenstabellen nur mit Zeilen im
   Fenster; fehlt ein Wissensschlüssel, hat das Fenster dort keine Zeile. So bleibt ein Manifest ohne Wissenszeilen bei
-  Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab.
+  Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
+  (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
+  INSERT-only, aber nicht gehasht (Review PR #295, K7).
 - Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
   Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
   (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
