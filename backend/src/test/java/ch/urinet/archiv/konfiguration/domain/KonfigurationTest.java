@@ -63,6 +63,32 @@ class KonfigurationTest {
                 .extracting(Konfiguration.Befund::code).containsExactly("WISSENSQUELLE_UNGUELTIG");
     }
 
+    @Test
+    void prueftKlassifikationsCodesReservierteParameterUndArtzuordnungen() {
+        var klassifikation = new Klassifikation("seit", "Fachgebiet", null, List.of(
+                new KlassifikationWert("bad", "Bau", null, 0, true)), true, true, true, true, true);
+        var art = new Konfiguration.Art("MERKBLATT", "Merkblatt", null, List.of("frei"), List.of("titel"),
+                "{\"type\":\"object\"}", "NORMAL", new Konfiguration.Aufbewahrung(null, null), false, true,
+                false, List.of(), null, null, false, List.of(), null, 0,
+                List.of(new ArtKlassifikation("unbekannt", true, null)));
+
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(klassifikation)).pruefen())
+                .extracting(Konfiguration.Befund::code)
+                .containsExactly("PARAMETER_RESERVIERT", "KLASSIFIKATION_UNGUELTIG");
+    }
+
+    @Test
+    void protokolliertKlassifikationsAenderungenOhneKlartextWerte() {
+        var alt = klassifikation("fachgebiet", "Altname", "geheim");
+        var neu = klassifikation("fachgebiet", "Neuname", "andererWert");
+        var vorher = new Konfiguration(1, einstellungen(), List.of(), List.of(alt));
+        var nachher = new Konfiguration(2, einstellungen(), List.of(), List.of(neu));
+
+        assertThat(vorher.aenderungen(nachher))
+                .extracting(Konfiguration.Aenderung::alt)
+                .doesNotContain("Altname", "Neuname", "geheim", "andererWert");
+    }
+
     private static Konfiguration.Art art(String code, String vertraulichkeit, boolean aktiv, boolean selbstAusgestellt) {
         return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"), "{\"type\":\"object\"}",
                 vertraulichkeit, new Konfiguration.Aufbewahrung(null, null), false, aktiv, selbstAusgestellt,
@@ -71,5 +97,11 @@ class KonfigurationTest {
 
     private static Konfiguration.Einstellungen einstellungen() {
         return new Konfiguration.Einstellungen("12-31", new Konfiguration.Kennungen(null, List.of()));
+    }
+
+    private static Klassifikation klassifikation(String code, String name, String wertName) {
+        return new Klassifikation(code, name, null,
+                List.of(new KlassifikationWert("wert", wertName, null, 0, true)),
+                false, false, true, false, true);
     }
 }

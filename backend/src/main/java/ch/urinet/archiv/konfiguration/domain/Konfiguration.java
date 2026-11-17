@@ -8,16 +8,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
-public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
+public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
+                            List<Klassifikation> klassifikationen) {
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
+    private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
+    private static final Set<String> RESERVIERTE_PUBLIC_PARAMETER = Set.of("q", "reihe", "jahr", "ausgabe", "seite",
+            "pro_seite", "id", "sortierung", "gespraech_id", "zugriff", "veroeffentlicht", "seit", "max",
+            "referenz", "groesse", "status", "url");
+
+    public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
+        this(version, einstellungen, arten, List.of());
+    }
 
     /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
     public Konfiguration {
-        arten = arten.stream().sorted(Comparator.comparing(Art::code)).toList();
+        arten = arten == null ? List.of() : arten.stream().sorted(Comparator.comparing(Art::code)).toList();
+        klassifikationen = klassifikationen == null ? List.of()
+                : klassifikationen.stream()
+                        .sorted(Comparator.comparing(Klassifikation::code, Comparator.nullsFirst(String::compareTo)))
+                        .toList();
     }
 
     /** Liefert alle Prüfungen, die ohne die späteren Konfigurationsattribute möglich sind. */
@@ -45,7 +59,75 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             artReferenzPruefen(befunde, nachCode, art, art.ohneZahlungsdatenArt(), "ohneZahlungsdatenArt");
             wissensquellePruefen(befunde, art);
         }
+        Map<String, Klassifikation> klassifikationenNachCode = new TreeMap<>();
+        if (klassifikationen.size() > 50) {
+            befunde.add(new Befund("klassifikationen", "ANZAHL_UNGUELTIG",
+                    "Die Konfiguration enthält zu viele Klassifikationen."));
+        }
+        for (Klassifikation klassifikation : klassifikationen) {
+            String code = klassifikation.code();
+            if (code == null || !KLASSIFIKATIONSCODE.matcher(code).matches()) {
+                befunde.add(new Befund("klassifikationen", "CODE_UNGUELTIG",
+                        "Ein Klassifikations-Code ist ungültig."));
+            } else if (klassifikationenNachCode.putIfAbsent(code, klassifikation) != null) {
+                befunde.add(new Befund("klassifikationen." + code, "CODE_DOPPELT",
+                        "Der Klassifikations-Code kommt mehrfach vor."));
+            }
+            if (!text(klassifikation.name(), 100) || !optionalerText(klassifikation.beschreibung(), 1000)) {
+                befunde.add(new Befund("klassifikationen." + code, "TEXT_UNGUELTIG",
+                        "Name oder Beschreibung der Klassifikation ist ungültig."));
+            }
+            if ("zugriff".equals(code) || "veroeffentlicht".equals(code)
+                    || klassifikation.oeffentlichFilter() && RESERVIERTE_PUBLIC_PARAMETER.contains(code)) {
+                befunde.add(new Befund("klassifikationen." + code, "PARAMETER_RESERVIERT",
+                        "Der Klassifikations-Code ist für ein reserviertes Feld oder einen reservierten Parameter belegt."));
+            }
+            if (klassifikation.werte().size() > 500) {
+                befunde.add(new Befund("klassifikationen." + code + ".werte", "ANZAHL_UNGUELTIG",
+                        "Die Klassifikation enthält zu viele Werte."));
+            }
+            Set<String> wertCodes = new HashSet<>();
+            for (KlassifikationWert wert : klassifikation.werte()) {
+                String wertCode = wert.code();
+                if (wertCode == null || !KLASSIFIKATIONSCODE.matcher(wertCode).matches()) {
+                    befunde.add(new Befund("klassifikationen." + code + ".werte", "CODE_UNGUELTIG",
+                            "Ein Wert-Code ist ungültig."));
+                } else if (!wertCodes.add(wertCode)) {
+                    befunde.add(new Befund("klassifikationen." + code + ".werte." + wertCode, "CODE_DOPPELT",
+                            "Der Wert-Code kommt mehrfach vor."));
+                }
+                if (!text(wert.name(), 100) || !optionalerText(wert.beschreibung(), 1000)) {
+                    befunde.add(new Befund("klassifikationen." + code + ".werte." + wertCode, "TEXT_UNGUELTIG",
+                            "Name oder Beschreibung des Werts ist ungültig."));
+                }
+            }
+        }
+        for (Art art : arten) {
+            Set<String> zugeordnete = new HashSet<>();
+            for (ArtKlassifikation zuordnung : art.klassifikationen()) {
+                Klassifikation klassifikation = klassifikationenNachCode.get(zuordnung.klassifikation());
+                if (!zugeordnete.add(zuordnung.klassifikation()) || klassifikation == null) {
+                    befunde.add(new Befund("arten." + art.code() + ".klassifikationen",
+                            "KLASSIFIKATION_UNGUELTIG", "Eine Klassifikation der Art fehlt oder ist doppelt zugeordnet."));
+                    continue;
+                }
+                if (zuordnung.standardWert() != null && klassifikation.werte().stream()
+                        .noneMatch(wert -> wert.code().equals(zuordnung.standardWert()) && wert.aktiv())) {
+                    befunde.add(new Befund("arten." + art.code() + ".klassifikationen."
+                            + zuordnung.klassifikation(), "STANDARDWERT_UNGUELTIG",
+                            "Der Standardwert fehlt oder ist inaktiv."));
+                }
+            }
+        }
         return List.copyOf(befunde);
+    }
+
+    private static boolean text(String wert, int max) {
+        return wert != null && !wert.isBlank() && wert.length() <= max;
+    }
+
+    private static boolean optionalerText(String wert, int max) {
+        return wert == null || wert.length() <= max;
     }
 
     private static void artReferenzPruefen(List<Befund> befunde, Map<String, Art> arten, Art quelle, String zielCode,
@@ -85,7 +167,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     }
 
     public boolean gleicherInhalt(Konfiguration andere) {
-        return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten);
+        return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten)
+                && klassifikationen.equals(andere.klassifikationen);
     }
 
     public List<Aenderung> aenderungen(Konfiguration neu) {
@@ -129,8 +212,87 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             feld(aenderungen, pfad + "kiFelder", alt.kiFelder(), aktuell.kiFelder());
             feld(aenderungen, pfad + "kiHinweise", alt.kiHinweise(), aktuell.kiHinweise());
             feld(aenderungen, pfad + "reihenfolge", alt.reihenfolge(), aktuell.reihenfolge());
+            Map<String, ArtKlassifikation> alteZuordnungen = artZuordnungen(alt.klassifikationen());
+            Map<String, ArtKlassifikation> neueZuordnungen = artZuordnungen(aktuell.klassifikationen());
+            Set<String> klassen = new java.util.TreeSet<>(alteZuordnungen.keySet());
+            klassen.addAll(neueZuordnungen.keySet());
+            for (String klassifikation : klassen) {
+                ArtKlassifikation vorherige = alteZuordnungen.get(klassifikation);
+                ArtKlassifikation neue = neueZuordnungen.get(klassifikation);
+                String zuordnungspfad = pfad + "klassifikationen." + klassifikation;
+                feld(aenderungen, zuordnungspfad, vorhanden(vorherige), vorhanden(neue));
+                if (vorherige != null && neue != null) {
+                    feld(aenderungen, zuordnungspfad + ".pflicht", vorherige.pflicht(), neue.pflicht());
+                    feld(aenderungen, zuordnungspfad + ".standardWert", vorherige.standardWert(),
+                            neue.standardWert());
+                }
+            }
         }
+        klassifikationAenderungen(aenderungen, klassifikationen, neu.klassifikationen);
         return List.copyOf(aenderungen);
+    }
+
+    private static Map<String, ArtKlassifikation> artZuordnungen(List<ArtKlassifikation> zuordnungen) {
+        Map<String, ArtKlassifikation> ergebnis = new TreeMap<>();
+        zuordnungen.forEach(zuordnung -> ergebnis.put(zuordnung.klassifikation(), zuordnung));
+        return ergebnis;
+    }
+
+    private static void klassifikationAenderungen(List<Aenderung> aenderungen, List<Klassifikation> alt,
+                                                  List<Klassifikation> neu) {
+        Map<String, Klassifikation> vorher = new TreeMap<>();
+        alt.forEach(k -> vorher.put(k.code(), k));
+        Map<String, Klassifikation> nachher = new TreeMap<>();
+        neu.forEach(k -> nachher.put(k.code(), k));
+        Set<String> codes = new java.util.TreeSet<>(vorher.keySet());
+        codes.addAll(nachher.keySet());
+        for (String code : codes) {
+            Klassifikation a = vorher.get(code);
+            Klassifikation n = nachher.get(code);
+            String pfad = "klassifikationen." + code;
+            feld(aenderungen, pfad, vorhanden(a), vorhanden(n));
+            if (a == null || n == null) {
+                continue;
+            }
+            feld(aenderungen, pfad + ".name", gesetzt(a.name()), gesetzt(n.name()));
+            feld(aenderungen, pfad + ".beschreibung", gesetzt(a.beschreibung()), gesetzt(n.beschreibung()));
+            feld(aenderungen, pfad + ".mehrfach", a.mehrfach(), n.mehrfach());
+            feld(aenderungen, pfad + ".kiVorschlag", a.kiVorschlag(), n.kiVorschlag());
+            feld(aenderungen, pfad + ".suchfilter", a.suchfilter(), n.suchfilter());
+            feld(aenderungen, pfad + ".oeffentlichFilter", a.oeffentlichFilter(), n.oeffentlichFilter());
+            feld(aenderungen, pfad + ".aktiv", a.aktiv(), n.aktiv());
+            Map<String, KlassifikationWert> alteWerte = werteNachCode(a.werte());
+            Map<String, KlassifikationWert> neueWerte = werteNachCode(n.werte());
+            Set<String> wertCodes = new java.util.TreeSet<>(alteWerte.keySet());
+            wertCodes.addAll(neueWerte.keySet());
+            for (String wertCode : wertCodes) {
+                KlassifikationWert alterWert = alteWerte.get(wertCode);
+                KlassifikationWert neuerWert = neueWerte.get(wertCode);
+                String wertpfad = pfad + ".werte." + wertCode;
+                feld(aenderungen, wertpfad, vorhanden(alterWert), vorhanden(neuerWert));
+                if (alterWert != null && neuerWert != null) {
+                    feld(aenderungen, wertpfad + ".name", gesetzt(alterWert.name()), gesetzt(neuerWert.name()));
+                    feld(aenderungen, wertpfad + ".beschreibung", gesetzt(alterWert.beschreibung()),
+                            gesetzt(neuerWert.beschreibung()));
+                    feld(aenderungen, wertpfad + ".reihenfolge", alterWert.reihenfolge(), neuerWert.reihenfolge());
+                    feld(aenderungen, wertpfad + ".aktiv", alterWert.aktiv(), neuerWert.aktiv());
+                }
+            }
+        }
+    }
+
+    private static Map<String, KlassifikationWert> werteNachCode(List<KlassifikationWert> werte) {
+        Map<String, KlassifikationWert> ergebnis = new TreeMap<>();
+        werte.forEach(wert -> ergebnis.put(wert.code(), wert));
+        return ergebnis;
+    }
+
+    private static String gesetzt(String wert) {
+        return wert == null || wert.isBlank() ? null : "<gesetzt>";
+    }
+
+    private static String vorhanden(Object wert) {
+        return wert == null ? null : "<vorhanden>";
     }
 
     private static Map<String, Art> nachCode(List<Art> arten) {
@@ -156,12 +318,23 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                       Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv,
                       boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
                       String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
-                      String kiHinweise, int reihenfolge) {
+                      String kiHinweise, int reihenfolge, List<ArtKlassifikation> klassifikationen) {
         public Art(String code, String name, String beschreibung, List<String> gruppen,
                    List<String> pflichtfelder, String zusatzSchema, String vertraulichkeit,
                    Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv) {
             this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
-                    gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0);
+                    gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0, List.of());
+        }
+
+        public Art(String code, String name, String beschreibung, List<String> gruppen,
+                   List<String> pflichtfelder, String zusatzSchema, String vertraulichkeit,
+                   Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv,
+                   boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
+                   String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
+                   String kiHinweise, int reihenfolge) {
+            this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
+                    gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
+                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, List.of());
         }
 
         public Art {
@@ -170,6 +343,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             zusatzSchema = zusatzSchema == null || zusatzSchema.isBlank() ? OHNE_ZUSATZ : zusatzSchema;
             belegnummerMuster = belegnummerMuster == null ? List.of() : List.copyOf(belegnummerMuster);
             kiFelder = kiFelder == null ? List.of() : List.copyOf(kiFelder);
+            klassifikationen = klassifikationen == null ? List.of() : List.copyOf(klassifikationen);
         }
     }
 
