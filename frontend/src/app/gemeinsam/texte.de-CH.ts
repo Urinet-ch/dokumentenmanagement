@@ -891,7 +891,20 @@ export const TEXTE = {
     nieGenutzt: 'Nie genutzt',
     status: 'Status',
     aktiv: 'Aktiv',
+    abgelaufen: 'Abgelaufen',
     widerrufenStatus: 'Widerrufen',
+    ablaufdatum: 'Ablauf',
+    keinAblauf: 'Kein Ablaufdatum',
+    laeuftAbAm: (datum: string | null) => `Läuft ab am ${datum ?? '–'}`,
+    ablaufdatumEingeben: 'Gültig bis einschliesslich',
+    ablaufSpeichern: 'Ablaufdatum speichern',
+    ablaufEntfernen: 'Ablaufdatum entfernen',
+    ablaufGespeichert: 'Das Ablaufdatum wurde gespeichert.',
+    ablaufEntfernt: 'Das Ablaufdatum wurde entfernt.',
+    ablaufdatumUngueltig:
+      'Bitte ein Datum von heute bis höchstens fünf Jahre in die Zukunft wählen.',
+    hinweisOhneAblauf:
+      'Dieses Token hat kein Ablaufdatum und wurde seit mindestens einem Jahr nicht genutzt. Bitte prüfen Sie, ob es noch gebraucht wird.',
     widerrufen: 'Token widerrufen',
     widerrufFrage:
       'Möchten Sie dieses API-Token widerrufen? Es kann danach nicht mehr verwendet werden.',
@@ -906,6 +919,7 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Der Widerruf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
+    fehlerAblauf: 'Das Ablaufdatum konnte nicht geändert werden. Bitte versuchen Sie es später erneut.',
   },
   /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); Menüpunkt seit Aufgabe 7.4b. */
   chat: {

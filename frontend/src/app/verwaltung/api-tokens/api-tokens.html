@@ -40,12 +40,59 @@
             }
           </span>
           <span class="feld">
+            <span class="label">{{ texte.ablaufdatum }}</span>
+            @if (token.gueltigBis) {
+              <span class="wert" [attr.data-status]="tokenStatus(token)">{{
+                texte.laeuftAbAm(ablaufdatumText(token))
+              }}</span>
+            } @else {
+              <span class="wert">{{ texte.keinAblauf }}</span>
+            }
+          </span>
+          <span class="feld">
             <span class="label">{{ texte.status }}</span>
             <span class="wert" [attr.data-status]="tokenStatus(token)">{{
               statusText(token)
             }}</span>
           </span>
         </div>
+        @if (token.aktiv === true && !token.gueltigBis && langeUngenutzt(token)) {
+          <p class="hinweis">{{ texte.hinweisOhneAblauf }}</p>
+        }
+        @if (ablaufBearbeitbar(token)) {
+          <div class="ablauf">
+            <label class="label" [for]="'ablaufdatum-' + token.id">{{ texte.ablaufdatumEingeben }}</label>
+            <input
+              [id]="'ablaufdatum-' + token.id"
+              type="date"
+              [value]="ablaufWert(token)"
+              [min]="heute"
+              [max]="spaetestesAblaufdatum"
+              [disabled]="ablaufLaeuft() !== null"
+              (input)="ablaufdatumAendern(token, $event)"
+            />
+            <div class="knoepfe">
+              <button
+                mat-flat-button
+                type="button"
+                [disabled]="ablaufLaeuft() !== null || !ablaufdatumGueltig(ablaufWert(token), heute)"
+                (click)="ablaufSpeichern(token)"
+              >
+                {{ texte.ablaufSpeichern }}
+              </button>
+              @if (token.gueltigBis) {
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="ablaufLaeuft() !== null"
+                  (click)="ablaufEntfernen(token)"
+                >
+                  {{ texte.ablaufEntfernen }}
+                </button>
+              }
+            </div>
+          </div>
+        }
         @if (token.aktiv === true) {
           @if (bestaetigung() === token.id) {
             <div class="bestaetigung">

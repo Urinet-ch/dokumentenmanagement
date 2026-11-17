@@ -14,6 +14,7 @@ export interface ApiTokenErstellt {
     name?: string;
     scope?: ApiTokenErstellt.ScopeEnum;
     erstellt?: string;
+    gueltigBis?: string | null;
     /**
      * Das Token `ua_<id>_<geheimnis>`; wird nur dieses eine Mal ausgegeben.
      */

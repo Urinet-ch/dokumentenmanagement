@@ -2,16 +2,21 @@ package ch.urinet.archiv.sicherheit.adapter.in.rest;
 
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.Protokolliert;
+import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.ApiClient;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -24,6 +29,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,7 +55,15 @@ public class ApiTokenResource {
     @Schema(name = "ApiTokenNeu")
     public record ApiTokenNeuDto(
             @Schema(required = true, maxLength = 100, description = "Bezeichnung, z. B. «Rechnungsgenerator»") String name,
-            @Schema(required = true, enumeration = {"generator", "import"}) String scope) {
+            @Schema(required = true, enumeration = {"generator", "import"}) String scope,
+            @Schema(format = "date", nullable = true, description = "Gültig bis einschliesslich dieses Tages")
+            LocalDate gueltigBis) {
+    }
+
+    @Schema(name = "ApiTokenAblauf")
+    public record ApiTokenAblaufDto(
+            @Schema(required = true, format = "date", description = "Gültig bis einschliesslich dieses Tages")
+            LocalDate gueltigBis) {
     }
 
     @Schema(name = "ApiToken")
@@ -69,6 +83,7 @@ public class ApiTokenResource {
     @Schema(name = "ApiTokenErstellt")
     public record ApiTokenErstelltDto(String id, String name,
             @Schema(enumeration = {"generator", "import"}) String scope, Instant erstellt,
+            @Schema(nullable = true) Instant gueltigBis,
             @Schema(description = "Das Token `ua_<id>_<geheimnis>`; wird nur dieses eine Mal ausgegeben.") String token) {
     }
 
@@ -91,13 +106,39 @@ public class ApiTokenResource {
     public Response erstellen(ApiTokenNeuDto neu) {
         MandantCode mandant = mandant();
         ApiTokenVerwaltung.Erstellt erstellt = verwaltung.erstellen(mandant.wert(), neu == null ? null : neu.name(),
-                neu == null ? null : neu.scope());
+                neu == null ? null : neu.scope(), Optional.ofNullable(neu == null ? null : neu.gueltigBis()));
         ApiClient client = erstellt.client();
         return Response.status(Response.Status.CREATED)
                 .header("Cache-Control", "no-store")
                 .entity(new ApiTokenErstelltDto(client.id(), client.name(), client.scope().code(), client.erstellt(),
-                        erstellt.token().text()))
+                        client.gueltigBis().orElse(null), erstellt.token().text()))
                 .build();
+    }
+
+    @PUT
+    @Path("/{tokenId}/gueltig-bis")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @ErfordertAktion(Aktion.A14)
+    @RolesAllowed("inhaber")
+    @Protokolliert(aktion = ProtokollAktion.AENDERN)
+    @Operation(summary = "Ablaufdatum eines API-Tokens setzen")
+    @APIResponse(responseCode = "204", description = "Ablaufdatum gesetzt")
+    public void gueltigBisSetzen(@PathParam("tokenId") String tokenId, ApiTokenAblaufDto ablauf) {
+        if (ablauf == null || ablauf.gueltigBis() == null) {
+            throw new FachFehler(Fehlercode.PFLICHTFELD_FEHLT);
+        }
+        verwaltung.gueltigBisSetzen(mandant(), tokenId, ablauf.gueltigBis());
+    }
+
+    @DELETE
+    @Path("/{tokenId}/gueltig-bis")
+    @ErfordertAktion(Aktion.A14)
+    @RolesAllowed("inhaber")
+    @Protokolliert(aktion = ProtokollAktion.AENDERN)
+    @Operation(summary = "Ablaufdatum eines API-Tokens entfernen")
+    @APIResponse(responseCode = "204", description = "Ablaufdatum entfernt")
+    public void gueltigBisEntfernen(@PathParam("tokenId") String tokenId) {
+        verwaltung.gueltigBisEntfernen(mandant(), tokenId);
     }
 
     @DELETE

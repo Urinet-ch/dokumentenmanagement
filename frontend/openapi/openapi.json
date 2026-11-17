@@ -47,6 +47,17 @@
           }
         }
       },
+      "ApiTokenAblauf" : {
+        "type" : "object",
+        "required" : [ "gueltigBis" ],
+        "properties" : {
+          "gueltigBis" : {
+            "description" : "Gültig bis einschliesslich dieses Tages",
+            "type" : "string",
+            "$ref" : "#/components/schemas/LocalDate"
+          }
+        }
+      },
       "ApiTokenErstellt" : {
         "type" : "object",
         "properties" : {
@@ -62,6 +73,14 @@
           },
           "erstellt" : {
             "$ref" : "#/components/schemas/Instant"
+          },
+          "gueltigBis" : {
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/Instant"
+            }, {
+              "type" : "null"
+            } ]
           },
           "token" : {
             "type" : "string",
@@ -81,6 +100,15 @@
           "scope" : {
             "type" : "string",
             "enum" : [ "generator", "import" ]
+          },
+          "gueltigBis" : {
+            "description" : "Gültig bis einschliesslich dieses Tages",
+            "type" : [ "string", "null" ],
+            "anyOf" : [ {
+              "$ref" : "#/components/schemas/LocalDate"
+            }, {
+              "type" : "null"
+            } ]
           }
         }
       },
@@ -2317,6 +2345,73 @@
         "responses" : {
           "204" : {
             "description" : "Widerrufen"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/api-tokens/{tokenId}/gueltig-bis" : {
+      "put" : {
+        "summary" : "Ablaufdatum eines API-Tokens setzen",
+        "tags" : [ "API-Tokens" ],
+        "parameters" : [ {
+          "name" : "tokenId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApiTokenAblauf"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Ablaufdatum gesetzt"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber" ]
+        } ]
+      },
+      "delete" : {
+        "summary" : "Ablaufdatum eines API-Tokens entfernen",
+        "tags" : [ "API-Tokens" ],
+        "parameters" : [ {
+          "name" : "tokenId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "Ablaufdatum entfernt"
           },
           "401" : {
             "description" : "Not Authorized"

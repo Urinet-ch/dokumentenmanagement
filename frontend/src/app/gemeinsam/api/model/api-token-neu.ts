@@ -15,6 +15,10 @@ export interface ApiTokenNeu {
      */
     name: string;
     scope: ApiTokenNeu.ScopeEnum;
+    /**
+     * Gültig bis einschliesslich dieses Tages
+     */
+    gueltigBis?: string | null;
 }
 export namespace ApiTokenNeu {
     export const ScopeEnum = {

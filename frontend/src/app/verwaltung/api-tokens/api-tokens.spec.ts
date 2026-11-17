@@ -20,11 +20,15 @@ describe('API-Token-Übersicht', () => {
   const service = {
     apiV1ApiTokensGet: vi.fn(),
     apiV1ApiTokensTokenIdDelete: vi.fn(),
+    apiV1ApiTokensTokenIdGueltigBisPut: vi.fn(),
+    apiV1ApiTokensTokenIdGueltigBisDelete: vi.fn(),
   };
 
   async function starten(tokens: ApiToken[] = [TOKEN]) {
     service.apiV1ApiTokensGet.mockReset().mockReturnValue(of(tokens));
     service.apiV1ApiTokensTokenIdDelete.mockReset().mockReturnValue(of(undefined));
+    service.apiV1ApiTokensTokenIdGueltigBisPut.mockReset().mockReturnValue(of(undefined));
+    service.apiV1ApiTokensTokenIdGueltigBisDelete.mockReset().mockReturnValue(of(undefined));
     TestBed.configureTestingModule({
       imports: [ApiTokens],
       providers: [{ provide: APITokensService, useValue: service }],
@@ -60,6 +64,50 @@ describe('API-Token-Übersicht', () => {
     await starten([]);
     expect(element.textContent).toContain(TEXTE.apiTokens.keine);
     expect(element.querySelector('[data-test=token]')).toBeNull();
+  });
+
+  it('markiert abgelaufene Tokens und beschriftet das Datumsfeld', async () => {
+    await starten([{ ...TOKEN, gueltigBis: new Date(Date.now() - 1_000).toISOString() }]);
+    expect(zeile().textContent).toContain(TEXTE.apiTokens.abgelaufen);
+    const input = zeile().querySelector<HTMLInputElement>('input[type=date]');
+    const label = zeile().querySelector<HTMLLabelElement>('label');
+    expect(input).not.toBeNull();
+    expect(label?.htmlFor).toBe(input?.id);
+    expect(label?.textContent).toContain(TEXTE.apiTokens.ablaufdatumEingeben);
+  });
+
+  it('warnt bei lange ungenutzten Tokens ohne Ablaufdatum', async () => {
+    await starten([
+      { ...TOKEN, erstellt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1_000).toISOString() },
+    ]);
+    expect(zeile().textContent).toContain(TEXTE.apiTokens.hinweisOhneAblauf);
+  });
+
+  it('setzt ein geprüftes Ablaufdatum über REST und lädt die Übersicht neu', async () => {
+    await starten();
+    const input = zeile().querySelector<HTMLInputElement>('input[type=date]')!;
+    input.value = input.min;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    knopf(zeile(), TEXTE.apiTokens.ablaufSpeichern).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(service.apiV1ApiTokensTokenIdGueltigBisPut).toHaveBeenCalledExactlyOnceWith(TOKEN.id, {
+      gueltigBis: input.min,
+    });
+    expect(service.apiV1ApiTokensGet).toHaveBeenCalledTimes(2);
+    expect(element.textContent).toContain(TEXTE.apiTokens.ablaufGespeichert);
+  });
+
+  it('entfernt ein Ablaufdatum erst durch die ausdrückliche Aktion', async () => {
+    await starten([{ ...TOKEN, gueltigBis: '2027-01-02T00:00:00Z' }]);
+    knopf(zeile(), TEXTE.apiTokens.ablaufEntfernen).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(service.apiV1ApiTokensTokenIdGueltigBisDelete).toHaveBeenCalledExactlyOnceWith(TOKEN.id);
+    expect(element.textContent).toContain(TEXTE.apiTokens.ablaufEntfernt);
   });
 
   it('widerruft erst nach Bestätigung und lädt die Liste neu', async () => {

@@ -439,6 +439,20 @@ class ApiTokenPruefungTest {
         }
 
         @Override
+        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+            Zugang zugang = eintraege.get(id);
+            if (zugang == null || !zugang.client().mandant().equals(mandant)
+                    || zugang.client().scope().webseitenSchluessel()) {
+                return false;
+            }
+            ApiClient client = zugang.client();
+            eintraege.put(id, new Zugang(new ApiClient(client.id(), client.mandant(), client.name(), client.scope(),
+                    client.aktiv(), client.erstellt(), client.zuletzt(), client.webseite(), client.hoechsteStufe(),
+                    zeit, client.absenderPruefen()), zugang.hash()));
+            return true;
+        }
+
+        @Override
         public void zuletztSetzen(String id, Instant zeit) {
             if (zuletztFehler) {
                 throw new IllegalStateException("Datenbank weg: GEHEIM-4711",
