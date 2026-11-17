@@ -51,6 +51,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 - [ ] 10.5 Altbestand übernehmen [Backend] [Fabian]
   - Drive-Import mit API-Token vom Scope `import` des Mandanten `vhf-gsk` und Pfad-Mustern (Reihe/Jahr), Bericht mit Lücken in der Nummerierung
   - Tabelle `alte_url` und CSV-Import der alten Links (die Tabelle besteht seit Aufgabe 11.2, Changeset `031-alte-url`; der Import verwendet `AlteUrl.normalisieren` für die Form der URL)
+  - CSV-Teilauftrag dieser PR: Der Drive-Import und die Datenübernahme bleiben [Fabian] zugeordnet; darum bleibt der Haken offen.
   - _Anforderungen: 4.1–4.3_
 
 - [ ] 10.6 Sicherung für Mandant 2 [Infra]
