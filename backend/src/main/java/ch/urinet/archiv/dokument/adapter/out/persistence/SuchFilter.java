@@ -33,6 +33,12 @@ final class SuchFilter {
         filter(bedingungen, parameter, "f.richtung = :richtung", "richtung",
                 a.richtung() == null ? null : a.richtung().name());
         filter(bedingungen, parameter, "d.geschaeftsjahr = :geschaeftsjahr", "geschaeftsjahr", a.geschaeftsjahr());
+        filter(bedingungen, parameter, "d.zusatz ->> 'jahr' = :jahr", "jahr",
+                a.jahr() == null ? null : a.jahr().toString());
+        if (a.veroeffentlicht() != null) {
+            bedingungen.add("d.zusatz -> 'veroeffentlicht' = cast(:veroeffentlicht as jsonb)");
+            parameter.put("veroeffentlicht", a.veroeffentlicht().toString());
+        }
         filter(bedingungen, parameter, "f.belegnummer = :belegnummer", "belegnummer", a.belegnummer());
         if (a.status() == null) {
             bedingungen.add("d.status <> 'VERWORFEN'");

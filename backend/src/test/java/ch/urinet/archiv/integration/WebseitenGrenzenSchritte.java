@@ -1,5 +1,8 @@
 package ch.urinet.archiv.integration;
 
+import ch.urinet.archiv.ablage.TestAblage;
+import ch.urinet.archiv.dokument.Testdateien;
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -9,6 +12,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.builder.MultiPartSpecBuilder;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -29,6 +33,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class WebseitenGrenzenSchritte {
 
     private static final int OBERGRENZE = 200;
+    private static final byte[] UPLOAD = Testdateien.pdf();
+    private static final String UPLOAD_PFAD = "/public/v1/erfassung/dokumente";
 
     @Inject
     WebseitenSchluesselVerwaltung verwaltung;
@@ -51,6 +59,7 @@ public class WebseitenGrenzenSchritte {
     MeterRegistry registry;
 
     private final Map<String, String> schluessel = new HashMap<>();
+    private final Set<UUID> dokumente = ConcurrentHashMap.newKeySet();
     private final List<String> tokenIds = new ArrayList<>();
     private Response letzte;
     private Response ablehnung;
@@ -59,6 +68,20 @@ public class WebseitenGrenzenSchritte {
 
     @After
     public void grenzenAufraeumen() throws SQLException {
+        if (!dokumente.isEmpty()) {
+            List<UUID> ids = List.copyOf(dokumente);
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement befehl = verbindung.prepareStatement(
+                         "delete from public.auftrag where typ in ('VERARBEITEN', 'KI_VORSCHLAG') "
+                                 + "and nutzlast->>'dokumentId' = any (string_to_array(?, ','))")) {
+                befehl.setString(1, String.join(",", ids.stream().map(UUID::toString).toList()));
+                befehl.executeUpdate();
+            }
+            Testdokumente.loeschen(datenbank.get(), "urinet", ids);
+            TestAblage.loeschen("urinet", "eingang/",
+                    key -> ids.stream().anyMatch(id -> key.contains(id.toString())));
+            dokumente.clear();
+        }
         for (String id : tokenIds) {
             try (Connection verbindung = datenbank.get().getConnection();
                  PreparedStatement befehl = verbindung.prepareStatement("delete from public.api_client where id = ?")) {
@@ -67,6 +90,7 @@ public class WebseitenGrenzenSchritte {
             }
         }
         tokenIds.clear();
+        schluessel.clear();
     }
 
     private void anlegen(String name, String art) {
@@ -74,6 +98,12 @@ public class WebseitenGrenzenSchritte {
                 "lesen".equals(art) ? "oeffentlich" : null, false).token().text();
         tokenIds.add(ApiToken.lesen(text).orElseThrow().id());
         schluessel.put(name, text);
+        if ("erfassung".equals(art)) {
+            Response antwort = mit(name).contentType("application/json")
+                    .body(Map.of("name", "Testperson"))
+                    .when().put("/public/v1/erfassung/bearbeiter/wp:1");
+            assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(204);
+        }
     }
 
     @Angenommen("es gibt den Lese-Schlüssel «{word}» für Grenzen")
@@ -113,14 +143,21 @@ public class WebseitenGrenzenSchritte {
             if (i % 2 == 0) {
                 r = r.header("X-Archiv-Zugriff", "oeffentlich");
             }
-            Response antwort = post ? r.when().post(pfad) : r.when().get(pfad);
+            Response antwort = post && UPLOAD_PFAD.equals(pfad)
+                    ? upload(r, "upload-probe.pdf", "grenzen-" + name)
+                    : post ? r.when().post(pfad) : r.when().get(pfad);
             if (antwort.statusCode() == 429) {
                 ablehnung = antwort;
                 ablehnungNr = i;
                 letzte = antwort;
                 return;
             }
-            assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+            if (post && UPLOAD_PFAD.equals(pfad)) {
+                assertThat(antwort.statusCode()).as(antwort.asString()).isIn(200, 202);
+                dokumentIdMerken(antwort);
+            } else {
+                assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+            }
         }
     }
 
@@ -151,7 +188,12 @@ public class WebseitenGrenzenSchritte {
 
     @Wenn("der Schlüssel «{word}» «{}» ohne Header hochgeladen wird")
     public void ohneHeaderHochladen(String name, String pfad) {
-        letzte = mit(name).when().post(pfad);
+        letzte = UPLOAD_PFAD.equals(pfad)
+                ? upload(mit(name), "upload-probe.pdf", "grenzen-" + name)
+                : mit(name).when().post(pfad);
+        if (UPLOAD_PFAD.equals(pfad) && letzte.statusCode() != 429) {
+            dokumentIdMerken(letzte);
+        }
     }
 
     @Wenn("der Schlüssel «{word}» eine Chat-Frage stellt")
@@ -210,5 +252,20 @@ public class WebseitenGrenzenSchritte {
         Counter z = registry.find("archiv.webseite.grenze.abgelehnt").tag("grund", grund).counter();
         assertThat(z).isNotNull();
         assertThat(z.count()).isGreaterThanOrEqualTo(mindestens);
+    }
+
+    private static Response upload(RequestSpecification request, String dateiname, String referenz) {
+        return request.header("X-Archiv-Bearbeiter", "wp:1")
+                .multiPart(new MultiPartSpecBuilder(UPLOAD).controlName("datei")
+                        .fileName(dateiname).mimeType("application/pdf").build())
+                .multiPart("referenz", referenz)
+                .when().post(UPLOAD_PFAD);
+    }
+
+    private void dokumentIdMerken(Response antwort) {
+        String id = antwort.jsonPath().getString("id");
+        if (id != null) {
+            dokumente.add(UUID.fromString(id));
+        }
     }
 }
