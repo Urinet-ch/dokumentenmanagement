@@ -141,9 +141,9 @@ damit Lohn- und Vertragsdaten geschützt sind.
 | A13 | Zugriffsprotokoll einsehen | erlaubt | 403 | 403 | 403 |
 | A14 | API-Tokens verwalten | erlaubt | 403 | 403 | 403 |
 
-A11 umfasst das Anlegen, Ändern, Deaktivieren und Löschen von Dokumentarten. Lesen der Dokumentarten und der
-Konfigurationsversionen ist kein A11-Verwaltungsrecht; es richtet sich nach den jeweiligen Leserechten (Spec 05,
-Requirement 7).
+A11 umfasst das Anlegen, Ändern, Deaktivieren und Löschen von Dokumentarten. Das Lesen der Dokumentarten ist kein
+A11-Verwaltungsrecht (alle Rollen). Das Lesen früherer Konfigurationsversionen gehört dagegen zu A11 (Spec 05,
+Requirement 7.1 und 7.2).
 
 ¹ `geschaeftsstelle` hat in Phase 1 keinen produktiven Benutzer (Mandant 2, `03-zweiter-mandant`); Dokumentrechte A1 bis A10 wie dort beschrieben. Verwaltungsrechte A11 bis A14: [offen: Rechte der Geschäftsstelle – Entscheid in `03-zweiter-mandant`], bis dahin 403.
 ² eigene: Die Art ist bestätigt und `person_benutzer` ist der Benutzer selbst, oder die Art ist noch nicht bestätigt und er hat das Dokument erfasst (2.21). Ein unbestätigtes Dokument, das ein anderer erfasst hat, ist nicht seines, auch wenn `person_benutzer` er selbst ist (entschieden von Fabian am 11.11.2026).

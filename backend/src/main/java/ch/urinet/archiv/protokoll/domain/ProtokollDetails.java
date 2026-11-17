@@ -1,6 +1,7 @@
 package ch.urinet.archiv.protokoll.domain;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -141,11 +142,25 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         }
     }
 
-    /** Version und Quelle der Fachkonfiguration; Konfigurationswerte werden nicht protokolliert. */
-    public record Konfiguration(int version, String quelle) {
+    /** Version, Quelle und geänderte Elemente der Fachkonfiguration mit alten und neuen Werten (Spec 05, Req 1.3). */
+    public record Konfiguration(int version, String quelle, List<Aenderung> aenderungen) {
         public Konfiguration {
             if (version < 1 || quelle == null || !CODE.matcher(quelle).matches()) {
                 throw new IllegalArgumentException("Konfigurationsversion oder Quelle ungültig");
+            }
+            aenderungen = aenderungen == null ? List.of() : List.copyOf(aenderungen);
+        }
+
+        public Konfiguration(int version, String quelle) {
+            this(version, quelle, List.of());
+        }
+    }
+
+    /** Ein geändertes Konfigurationselement: Pfad, alter und neuer Wert als Text ({@code null} = nicht vorhanden). */
+    public record Aenderung(String pfad, String alt, String neu) {
+        public Aenderung {
+            if (pfad == null || pfad.isBlank()) {
+                throw new IllegalArgumentException("pfad ist Pflicht");
             }
         }
     }

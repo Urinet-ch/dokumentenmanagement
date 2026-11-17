@@ -81,6 +81,25 @@ public class KonfigurationsVersionSchritte {
         etagLesen();
     }
 
+    @Wenn("«{word}» die Dokumentart «{word}» ohne If-Match löscht")
+    public void ohneIfMatchLoeschen(String benutzer, String code) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().delete(DOKUMENTARTEN + "/" + code);
+    }
+
+    @Wenn("«{word}» die Dokumentart «{word}» mit einer veralteten Version löscht")
+    public void veralteteVersionLoeschen(String benutzer, String code) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"0\"").when()
+                .delete(DOKUMENTARTEN + "/" + code);
+    }
+
+    @Wenn("«{word}» die Dokumentart «{word}» mit der aktuellen Version löscht")
+    public void aktuelleVersionLoeschen(String benutzer, String code) {
+        versionVorher = aktuelleNummer(benutzer);
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(benutzer)).when()
+                .delete(DOKUMENTARTEN + "/" + code);
+        etagLesen();
+    }
+
     @Wenn("«{word}» die zuvor aktuelle Konfigurationsversion abruft")
     public void vorherigeVersion(String benutzer) {
         versionAbrufen(benutzer, versionVorher);
@@ -127,7 +146,7 @@ public class KonfigurationsVersionSchritte {
 
     @Dann("ist die Konfigurationsversion unverändert")
     public void versionUnveraendert() {
-        assertThat(letzteVersion).isEqualTo(versionVorher);
+        assertThat(aktuelleNummer("inhaber-urinet")).isEqualTo(versionVorher);
     }
 
     @Dann("ist die Art «{word}» in dieser Version unter dem Namen {string} enthalten")

@@ -29,22 +29,27 @@
                     'version', 1,
                     'einstellungen', jsonb_build_object(
                         'geschaeftsjahrEnde', coalesce(m.geschaeftsjahr_ende, '12-31'),
-                        'kennungen', coalesce(m.kennungen, '{"uid":null,"ibans":[]}'::jsonb)),
+                        'kennungen', jsonb_build_object(
+                             'uid', case when jsonb_typeof(m.kennungen -> 'uid') = 'string'
+                                 and m.kennungen ->> 'uid' &lt;&gt; '' then m.kennungen -> 'uid' end,
+                             'ibans', case when jsonb_typeof(m.kennungen -> 'ibans') = 'array'
+                                 then m.kennungen -> 'ibans' else '[]'::jsonb end)),
                     'arten', coalesce((
                         select jsonb_agg(jsonb_build_object(
                             'code', a.code,
                             'name', a.name,
                             'beschreibung', a.beschreibung,
-                            'gruppen', a.gruppen,
-                            'pflichtfelder', a.pflichtfelder,
-                            'zusatzSchema', a.zusatz_schema,
+                            'gruppen', to_jsonb(coalesce(a.gruppen, '{}'::text[])),
+                            'pflichtfelder', to_jsonb(coalesce(a.pflichtfelder, '{}'::text[])),
+                            'zusatzSchema', to_jsonb(coalesce(a.zusatz_schema::text,
+                                 '{"type":"object","properties":{},"additionalProperties":false}')),
                             'vertraulichkeit', a.vertraulichkeit,
                             'aufbewahrung', jsonb_build_object(
                                 'jahre', a.aufbewahrung_jahre,
                                 'ab', a.aufbewahrung_ab),
                             'gesetzlichePflicht', a.gesetzliche_pflicht,
                             'aktiv', a.aktiv)
-                            order by a.code)
+                            order by a.code collate "C")
                         from dokumentart a), '[]'::jsonb)
                 ) as inhalt
                 from (select current_schema() as schema_name) s

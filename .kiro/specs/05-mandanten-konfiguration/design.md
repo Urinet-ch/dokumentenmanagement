@@ -274,6 +274,17 @@ Changeset `<nnn>-regel`), legen je eine weitere Version mit Quelle `MIGRATION` a
 `public.mandant.eigene_arten` bleibt als Spalte bestehen (bestehende Changesets bleiben unverändert), wird aber nicht
 mehr gelesen; ein späteres Changeset kann sie entfernen.
 
+Umsetzung 17.2 (Review PR #251): Das Abbild enthält `einstellungen` und `arten`; `zusatzSchema` steht im Abbild als
+kanonischer JSON-Text (Schlüssel sortiert, kompakt), damit Migration (jsonb), Client-Text und Vergleich dieselbe Form
+haben. Das Abbild der Migration und das der App sind gleich aufgebaut (Arten nach Code in Byte-Reihenfolge, leere
+Listen statt `null`, `ohne Schema = {"type":"object","properties":{},"additionalProperties":false}`). Ein neuer
+Mandant erhält Version 1 vom Changeset (leer, Quelle `MIGRATION`) und nach dem Seed Version 2 mit Quelle `SEED`.
+Änderungen an `PATCH /mandant/einstellungen` erzeugen bis 17.7 keine eigene Version; sie gehen in die nächste Version
+ein (die Bindung an `If-Match` kommt mit 17.7). `basisSicherstellen()` legt für Schemas ohne Version 1 diese beim
+ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderung die geänderten Pfade mit alt und neu.
+Die Module `dokumentart` und `konfiguration` hängen über ihre `application`-Schichten gegenseitig voneinander ab
+(bewusste Ausnahme bis 17.3, danach über einen Port für das Arten-Abbild aufzulösen).
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.

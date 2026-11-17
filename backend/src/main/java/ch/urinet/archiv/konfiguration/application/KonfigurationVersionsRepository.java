@@ -19,4 +19,10 @@ public interface KonfigurationVersionsRepository {
 
     KonfigurationsVersion anlegen(int nummer, String wer, String grund, KonfigurationQuelle quelle,
                                   Konfiguration inhalt);
+
+    /**
+     * Kanonische Form eines JSON-Texts (Schlüssel sortiert, kompakt): jsonb und Client schreiben dasselbe Schema
+     * verschieden, der Vergleich der Abbilder braucht eine Form.
+     */
+    String kanonisch(String json);
 }

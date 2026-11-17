@@ -149,11 +149,12 @@ class MandantEigentuemerTest {
                     .isTrue();
             befehl.execute("insert into m_probe_version.dokument (id, quelle, erstellt_von, status) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 'UPLOAD', 'probe', 'NEU')");
+            // Version 1 (Migration, leer) und Version 2 (Seed) legt die Provisionierung an; Dokumente erhalten die letzte
             assertThat(wert(befehl, "select konfiguration_version from m_probe_version.dokument"
-                    + " where id = '00000000-0000-4000-8000-0000000000a1'")).isEqualTo("1");
+                    + " where id = '00000000-0000-4000-8000-0000000000a1'")).isEqualTo("2");
             befehl.execute("insert into " + tabelle + " (dokument_id, version, daten, geaendert_von, grund) values "
                     + "('00000000-0000-4000-8000-0000000000a1', 0, '{}', 'probe', 'Probe')");
-            assertThat(wert(befehl, "select konfiguration_version from " + tabelle)).isEqualTo("1");
+            assertThat(wert(befehl, "select konfiguration_version from " + tabelle)).isEqualTo("2");
             assertThat(wert(befehl, "select count(*) from " + tabelle)).isEqualTo("1");
             verweigert(befehl, "update " + tabelle + " set grund = 'x'");
             verweigert(befehl, "delete from " + tabelle);
@@ -238,7 +239,7 @@ class MandantEigentuemerTest {
                 assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
                         .hasMessageContaining("nur Einfügen erlaubt");
             }
-            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo("1");
+            assertThat(wert(befehl, "select count(*) from " + versionen)).isEqualTo("2");
         }
         try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
              Statement befehl = eigentuemer.createStatement()) {

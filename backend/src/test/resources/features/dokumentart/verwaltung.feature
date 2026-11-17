@@ -332,7 +332,7 @@ Funktionalität: Dokumentarten verwalten
     Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
       | benutzer       | rolle   | aktion        | dokument | ip | grund | fehlercode |
       | inhaber-urinet | INHABER | REGEL_AENDERN |          |    |       |            |
-    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Konfigurationseintrag ohne Konfigurationsinhalte
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Konfigurationseintrag mit den geänderten Elementen
     Und der neue Eintrag im Zugriffsprotokoll von «urinet» hält für die Dokumentart «PROBE_DA_REGEL» diese Regeln fest:
       | regel | aufbewahrungJahre | aufbewahrungAb | gesetzlichePflicht |
       | alt   | 10                | GESCHAEFTSJAHR | true               |

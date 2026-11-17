@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration.adapter.out.protokoll;
 
 import ch.urinet.archiv.konfiguration.application.KonfigurationAenderungsProtokoll;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
 import ch.urinet.archiv.protokoll.application.ZugriffProtokoll;
 import ch.urinet.archiv.protokoll.domain.IpAdresse;
@@ -13,6 +14,7 @@ import io.vertx.core.http.HttpServerRequest;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -32,9 +34,11 @@ public class ZugriffKonfigurationAenderungsProtokoll implements KonfigurationAen
     }
 
     @Override
-    public void schreiben(int version, KonfigurationQuelle quelle, String grund) {
+    public void schreiben(int version, KonfigurationQuelle quelle, String grund,
+                          List<Konfiguration.Aenderung> aenderungen) {
         var details = ProtokollDetails.konfiguration(grund,
-                new ProtokollDetails.Konfiguration(version, quelle.name()));
+                new ProtokollDetails.Konfiguration(version, quelle.name(), aenderungen.stream()
+                        .map(a -> new ProtokollDetails.Aenderung(a.pfad(), a.alt(), a.neu())).toList()));
         protokoll.schreiben(new ZugriffEintrag(benutzer(), rolle(), ProtokollAktion.KONFIGURATION_AENDERN,
                 Optional.empty(), ip(), details));
     }

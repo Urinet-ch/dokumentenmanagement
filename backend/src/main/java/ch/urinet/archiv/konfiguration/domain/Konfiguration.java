@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration.domain;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,8 +12,12 @@ import java.util.TreeMap;
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
 public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
 
+    /** Schema einer Art ohne Zusatzfelder. */
+    public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
+
+    /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
     public Konfiguration {
-        arten = List.copyOf(arten);
+        arten = arten.stream().sorted(Comparator.comparing(Art::code)).toList();
     }
 
     /** Liefert alle Prüfungen, die ohne die späteren Konfigurationsattribute möglich sind. */
@@ -84,14 +89,18 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     }
 
     public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {
+        public Einstellungen {
+            kennungen = kennungen == null ? new Kennungen(null, List.of()) : kennungen;
+        }
     }
 
     public record Art(String code, String name, String beschreibung, List<String> gruppen,
                       List<String> pflichtfelder, String zusatzSchema, String vertraulichkeit,
                       Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv) {
         public Art {
-            gruppen = List.copyOf(gruppen);
-            pflichtfelder = List.copyOf(pflichtfelder);
+            gruppen = gruppen == null ? List.of() : List.copyOf(gruppen);
+            pflichtfelder = pflichtfelder == null ? List.of() : List.copyOf(pflichtfelder);
+            zusatzSchema = zusatzSchema == null || zusatzSchema.isBlank() ? OHNE_ZUSATZ : zusatzSchema;
         }
     }
 
@@ -100,7 +109,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public record Kennungen(String uid, List<String> ibans) {
         public Kennungen {
-            ibans = List.copyOf(ibans);
+            ibans = ibans == null ? List.of() : List.copyOf(ibans);
         }
     }
 

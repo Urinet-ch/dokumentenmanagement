@@ -93,8 +93,8 @@ public class ZugriffProtokollSchritte {
         }
     }
 
-    @Dann("das Zugriffsprotokoll von «{word}» hat genau einen neuen Konfigurationseintrag ohne Konfigurationsinhalte")
-    public void konfigurationOhneInhalte(String mandant) throws Exception {
+    @Dann("das Zugriffsprotokoll von «{word}» hat genau einen neuen Konfigurationseintrag mit den geänderten Elementen")
+    public void konfigurationMitAenderungen(String mandant) throws Exception {
         List<Map<String, String>> neu = eintraegeFuerAktion(mandant, "KONFIGURATION_AENDERN");
         assertThat(neu).hasSize(1);
         Map<String, String> eintrag = neu.getFirst();
@@ -102,10 +102,20 @@ public class ZugriffProtokollSchritte {
         assertThat(eintrag.get("rolle")).isEqualTo("INHABER");
         assertThat(eintrag.get("grund")).isEqualTo("Aufbewahrungsregel anpassen");
         JsonNode details = new ObjectMapper().readTree(eintrag.get("details"));
-        assertThat(feldnamen(details)).containsExactlyInAnyOrder("grund", "version", "quelle");
+        assertThat(feldnamen(details)).containsExactlyInAnyOrder("grund", "version", "quelle", "aenderungen");
         assertThat(details.path("grund").asText()).isEqualTo("Aufbewahrungsregel anpassen");
         assertThat(details.path("version").asInt()).isPositive();
         assertThat(details.path("quelle").asText()).isEqualTo("APP");
+        JsonNode jahre = null;
+        for (JsonNode aenderung : details.path("aenderungen")) {
+            assertThat(feldnamen(aenderung)).containsExactlyInAnyOrder("pfad", "alt", "neu");
+            if ("arten.PROBE_DA_REGEL.aufbewahrung.jahre".equals(aenderung.path("pfad").asText())) {
+                jahre = aenderung;
+            }
+        }
+        assertThat(jahre).as("geänderte Aufbewahrungsjahre im Protokoll").isNotNull();
+        assertThat(jahre.path("alt").asText()).isEqualTo("10");
+        assertThat(jahre.path("neu").asText()).isEqualTo("6");
     }
 
     private static List<String> feldnamen(JsonNode knoten) {

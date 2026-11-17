@@ -5,7 +5,11 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationsVersion;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
@@ -28,8 +32,21 @@ public class PanacheKonfigurationVersionsRepository implements KonfigurationVers
 
     private final ObjectMapper json;
 
+    private final ObjectMapper kanonisch;
+
     public PanacheKonfigurationVersionsRepository(ObjectMapper json) {
         this.json = json;
+        this.kanonisch = json.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+    }
+
+    @Override
+    public String kanonisch(String text) {
+        try {
+            return kanonisch.writeValueAsString(kanonisch.readValue(text, Object.class));
+        } catch (JsonProcessingException e) {
+            return text;
+        }
     }
 
     @Override
@@ -73,10 +90,22 @@ public class PanacheKonfigurationVersionsRepository implements KonfigurationVers
         try {
             return new KonfigurationsVersion(eintrag.version, eintrag.zeit.toInstant(), eintrag.wer, eintrag.grund,
                     KonfigurationQuelle.valueOf(eintrag.quelle),
-                    json.readValue(eintrag.inhalt, Konfiguration.class), eintrag.sha256);
+                    lesen(eintrag.inhalt), eintrag.sha256);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Konfigurationsversion nicht lesbar", e);
         }
+    }
+
+    /** Liest ein Abbild; {@code zusatzSchema} als Objekt (jsonb der Migration) oder als Text wird kanonisch. */
+    Konfiguration lesen(String inhalt) throws JsonProcessingException {
+        JsonNode baum = json.readTree(inhalt);
+        for (JsonNode art : baum.path("arten")) {
+            JsonNode schema = art.path("zusatzSchema");
+            if (art instanceof ObjectNode knoten && !schema.isMissingNode() && !schema.isNull()) {
+                knoten.put("zusatzSchema", kanonisch(schema.isTextual() ? schema.asText() : schema.toString()));
+            }
+        }
+        return json.treeToValue(baum, Konfiguration.class);
     }
 
     private String json(Konfiguration inhalt) {

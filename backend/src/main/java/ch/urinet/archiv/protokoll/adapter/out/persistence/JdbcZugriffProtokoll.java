@@ -139,6 +139,13 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
         if (konfiguration != null) {
             knoten.put("version", konfiguration.version());
             knoten.put("quelle", konfiguration.quelle());
+            var aenderungen = knoten.putArray("aenderungen");
+            for (ProtokollDetails.Aenderung aenderung : konfiguration.aenderungen()) {
+                ObjectNode eintrag = aenderungen.addObject();
+                eintrag.put("pfad", aenderung.pfad());
+                eintrag.put("alt", aenderung.alt());
+                eintrag.put("neu", aenderung.neu());
+            }
         }
         try {
             return JSON.writeValueAsString(knoten);

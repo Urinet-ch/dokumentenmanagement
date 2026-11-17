@@ -15,7 +15,7 @@ public enum ProtokollAktion {
      * neuer Regel, ohne Dokument
      */
     REGEL_AENDERN,
-    /** Konfiguration geändert; Details enthalten Version, Quelle und geänderte Konfigurationsfelder. */
+    /** Konfiguration geändert; Details enthalten Version, Quelle und die geänderten Elemente mit alten und neuen Werten. */
     KONFIGURATION_AENDERN,
     WISSEN_ANZEIGEN, WISSEN_ANNEHMEN, WISSEN_VERWERFEN, WISSEN_INGEST, WISSEN_LINT,
     /**

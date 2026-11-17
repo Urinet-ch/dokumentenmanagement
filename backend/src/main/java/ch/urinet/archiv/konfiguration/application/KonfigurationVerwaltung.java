@@ -87,7 +87,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
         KonfigurationsVersion gespeichert = repository.anlegen(neu.version(), wer, grund,
                 KonfigurationQuelle.APP, neu);
         cache.invalidieren(mandantAktuell());
-        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund);
+        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.inhalt().aenderungen(neu));
         return gespeichert.version();
     }
 
@@ -116,12 +116,12 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
         MandantEinstellungen.Werte werte = einstellungen.lesen(mandantAktuell());
         return new Konfiguration(version, new Konfiguration.Einstellungen(werte.geschaeftsjahresende().wert(),
                 new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans())), dokumentarten.alle().stream()
-                .map(KonfigurationVerwaltung::art).toList());
+                .map(this::art).toList());
     }
 
-    private static Konfiguration.Art art(Dokumentart art) {
+    private Konfiguration.Art art(Dokumentart art) {
         return new Konfiguration.Art(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
-                art.zusatzSchema(), art.vertraulichkeit().name(),
+                repository.kanonisch(art.zusatzSchema()), art.vertraulichkeit().name(),
                 new Konfiguration.Aufbewahrung(art.aufbewahrung().jahre(),
                         art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name()),
                 art.gesetzlichePflicht(), art.aktiv());

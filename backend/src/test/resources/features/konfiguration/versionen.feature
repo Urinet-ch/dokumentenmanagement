@@ -73,3 +73,60 @@ Funktionalität: Konfigurationsversionen
       | grund | Konfiguration prüfen  |
     Dann meldet das Archiv Status 200
     Und hat das Dokument «KV» die angewandte Konfigurationsversion im Dokument und in der letzten Fassung
+
+  @req-1.3
+  Szenario: Eine Änderung ohne Unterschied erzeugt keine Version, auch mit Zusatzschema
+    Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
+      """
+      {"code":"PROBE_KONF_NOOP","name":"Probe","vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false,
+       "zusatzSchema":{"type":"object","properties":{"z":{"type":"string"},"a":{"type":"string"}},"additionalProperties":false}}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_KONF_NOOP» mit der aktuellen Version ändert:
+      """
+      {"name":"Probe"}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion unverändert
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_KONF_NOOP» mit der aktuellen Version ändert:
+      """
+      {"name":"Probe geändert"}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion um eins gestiegen
+
+  @req-1.3 @req-1.5
+  Szenario: Löschen verlangt die aktuelle Version und erzeugt genau eine Version
+    Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
+      """
+      {"code":"PROBE_KONF_LOESCHEN","name":"Probe","vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_KONF_LOESCHEN» ohne If-Match löscht
+    Dann antwortet die Konfigurationsverwaltung mit Status 428 und Fehlercode «VERSION_FEHLT»
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_KONF_LOESCHEN» mit einer veralteten Version löscht
+    Dann antwortet die Konfigurationsverwaltung mit Status 412 und Fehlercode «VERSION_KONFLIKT»
+    Wenn «inhaber-urinet» die Dokumentart «PROBE_KONF_LOESCHEN» mit der aktuellen Version löscht
+    Dann antwortet die Konfigurationsverwaltung mit Status 204
+    Und ist die Konfigurationsversion um eins gestiegen
+
+  @req-1.3
+  Szenario: Eine abgelehnte Änderung erzeugt keine Version
+    Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
+      """
+      {"code":"PROBE_KONF_FEHLER","name":"Probe","vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false,
+       "zusatzSchema":{"type":"nichts"}}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «ZUSATZ_UNGUELTIG»
+    Und ist die Konfigurationsversion unverändert
+    Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
+      """
+      {"code":"PROBE_KONF_FEHLER","name":"Probe","vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» eine Dokumentart mit der aktuellen Version anlegt:
+      """
+      {"code":"PROBE_KONF_FEHLER","name":"Doppelt","vertraulichkeit":"NORMAL","aufbewahrungJahre":null,"gesetzlichePflicht":false}
+      """
+    Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «DOKUMENTART_EXISTIERT»
+    Und ist die Konfigurationsversion unverändert

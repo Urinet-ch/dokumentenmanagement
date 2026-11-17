@@ -231,6 +231,7 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | GET | `/eingangskorb` | Status `EINGANGSKORB`, `FEHLER`, `ARCHIVIERUNG_FEHLER`, neueste zuerst | A5 |
 | GET | `/dokumentarten` | aktive und inaktive Arten (Auswahllisten) | alle Rollen |
 | POST, PATCH | `/dokumentarten`, `/dokumentarten/{code}` | anlegen, ändern, `aktiv=false`; `If-Match` der Konfigurationsversion erforderlich (428 `VERSION_FEHLT`, 412 `VERSION_KONFLIKT`); 422 `ZUSATZ_UNGUELTIG` bei ungültigem Schema | A11 |
+| GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Konfigurationsversionen lesen (Spec 05, Req 7.1, 7.2); `ETag` der aktuellen Version | A11 |
 | DELETE | `/dokumentarten/{code}` | `If-Match` der Konfigurationsversion erforderlich (428 `VERSION_FEHLT`, 412 `VERSION_KONFLIKT`); 204; 409 `DOKUMENTART_IN_GEBRAUCH` | A11 |
 | GET | `/protokoll?von=&bis=&benutzer=&dokument=&aktion=&seite=&groesse=` | Zugriffsprotokoll, paginiert (Req 10.5), neueste zuerst, höchstens 100 je Seite; 400 `ANFRAGE_UNGUELTIG` | A13 |
 | GET | `/protokoll/benutzer` | Benutzerverzeichnis (Req 10.10) | A13 |
