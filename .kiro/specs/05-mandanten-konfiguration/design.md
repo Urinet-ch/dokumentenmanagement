@@ -298,6 +298,25 @@ ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderun
 Die Module `dokumentart` und `konfiguration` hängen über ihre `application`-Schichten gegenseitig voneinander ab
 (bewusste Ausnahme bis 17.3, danach über einen Port für das Arten-Abbild aufzulösen).
 
+Umsetzung 17.3: Changeset 040 ergänzt die Dokumentart-Spalten und übernimmt bei bestehenden `urinet`-Arten die
+Ausstellerliste, Nummern-Muster und Umstufungsziele in das Konfigurationsabbild mit Quelle `MIGRATION`. Die
+Übergangs-Seeds `dokumentarten.json` enthalten dieselben Spec-05-Attribute, damit neu provisionierte Mandanten bis
+zur Ablösung des Seed-Formats in 17.7 keine abweichenden Standardwerte erhalten. Danach stammen selbst ausgestellte
+Arten ausschliesslich aus `DokumentartRepository`; `public.mandant.eigene_arten` wird nur noch durch Changeset 040
+gelesen. Belegnummer-Muster werden als JDK-RegEx mit höchstens 1'000 Zeichen geprüft; die Auswertungs-Zeitgrenze gilt
+bei der späteren Laufzeitnutzung in 18.1 (dort mit ReDoS-Test, siehe tasks.md). Weitere Grenzen der Prüfung
+(technische Obergrenzen, nicht aus den Anforderungen): höchstens 200 Arten je Konfiguration (`ANZAHL_UNGUELTIG`) und
+höchstens 20 Belegnummer-Muster je Art (`MUSTER_UNGUELTIG`). Das Changeset heisst 040, weil 039 mit
+`039-webseite-erfassung` (PR #253) schon vergeben ist; der Fremdbezug (`fremdbeleg_art`, `ohne_zahlungsdaten_art`)
+wird in `DokumentartVerwaltung` vorab geprüft: unbekannte Zielart 422 `KONFIGURATION_UNGUELTIG`, Löschen einer Art,
+auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder (Req 2.7): Die Prüfung liegt im Port
+`ZusatzSchemaPruefer.reservierteFelderGueltig` und läuft über `DokumentartPruefung` für jeden Pfad, der Arten
+speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
+`veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
+oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
+`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig (Entscheid Fabian 17.11.2026 für
+VORSTANDSPROTOKOLL, Spec 03 Aufgabe 10.4).
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.

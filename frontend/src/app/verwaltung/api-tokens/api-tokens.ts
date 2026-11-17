@@ -119,6 +119,7 @@ export class ApiTokens implements OnInit {
   protected ablaufBearbeitbar(token: ApiToken): boolean {
     return (
       token.aktiv === true &&
+      tokenStatus(token) !== 'abgelaufen' &&
       !!token.id &&
       (token.scope === 'generator' || token.scope === 'import')
     );
@@ -191,6 +192,13 @@ export class ApiTokens implements OnInit {
           this.problemcode(fehler) === 'ANFRAGE_UNGUELTIG'
         ) {
           this.fehler.set(this.texte.ablaufdatumUngueltig);
+        } else if (
+          fehler instanceof HttpErrorResponse &&
+          fehler.status === 409 &&
+          this.problemcode(fehler) === 'API_TOKEN_ABGELAUFEN'
+        ) {
+          this.laden();
+          this.fehler.set(this.texte.fehlerAblaufAbgelaufen);
         } else if (fehler instanceof HttpErrorResponse && fehler.status === 403) {
           this.fehler.set(this.texte.fehlerRecht);
         } else {

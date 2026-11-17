@@ -19,7 +19,10 @@ import java.util.regex.Pattern;
  */
 public record Dokumentart(String code, String name, String beschreibung, List<String> gruppen,
                           List<String> pflichtfelder, String zusatzSchema, Vertraulichkeit vertraulichkeit,
-                          Aufbewahrungsregel aufbewahrung, boolean gesetzlichePflicht, boolean aktiv) {
+                          Aufbewahrungsregel aufbewahrung, boolean gesetzlichePflicht, boolean aktiv,
+                          boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
+                          String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
+                          String kiHinweise, int reihenfolge) {
 
     public static final int NAME_MAX = 100;
     public static final int BESCHREIBUNG_MAX = 1000;
@@ -38,18 +41,30 @@ public record Dokumentart(String code, String name, String beschreibung, List<St
             Map.entry("konto", "finanz"), Map.entry("gueltig_ab", "vertrag"), Map.entry("gueltig_bis", "vertrag"),
             Map.entry("kuendigungsfrist", "vertrag"), Map.entry("naechste_frist", "vertrag"));
 
+    public Dokumentart(String code, String name, String beschreibung, List<String> gruppen,
+                       List<String> pflichtfelder, String zusatzSchema, Vertraulichkeit vertraulichkeit,
+                       Aufbewahrungsregel aufbewahrung, boolean gesetzlichePflicht, boolean aktiv) {
+        this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
+                gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0);
+    }
+
     public Dokumentart {
         if (!gueltigerCode(code) || !text(name, NAME_MAX) || beschreibung != null && !text(beschreibung, BESCHREIBUNG_MAX)
                 || gruppen == null || pflichtfelder == null || zusatzSchema == null || vertraulichkeit == null
-                || aufbewahrung == null) {
+                || aufbewahrung == null || belegnummerMuster == null || kiFelder == null
+                || kiHinweise != null && !text(kiHinweise, BESCHREIBUNG_MAX)) {
             throw ungueltig();
         }
         name = name.strip();
         beschreibung = beschreibung == null ? null : beschreibung.strip();
         gruppen = List.copyOf(gruppen);
         pflichtfelder = List.copyOf(pflichtfelder);
+        belegnummerMuster = List.copyOf(belegnummerMuster);
+        kiFelder = List.copyOf(kiFelder);
         if (!GRUPPEN.containsAll(gruppen) || new HashSet<>(gruppen).size() != gruppen.size()
-                || new HashSet<>(pflichtfelder).size() != pflichtfelder.size()) {
+                || new HashSet<>(pflichtfelder).size() != pflichtfelder.size()
+                || new HashSet<>(belegnummerMuster).size() != belegnummerMuster.size()
+                || new HashSet<>(kiFelder).size() != kiFelder.size()) {
             throw ungueltig();
         }
         for (String feld : pflichtfelder) {

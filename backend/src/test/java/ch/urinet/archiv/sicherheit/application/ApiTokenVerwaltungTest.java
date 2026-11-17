@@ -31,6 +31,7 @@ class ApiTokenVerwaltungTest {
     private static final String ID = "abcdefghij12";
 
     private final List<Optional<Instant>> gesetzt = new ArrayList<>();
+    private boolean abgelaufen;
 
     private ApiTokenVerwaltung verwaltung(String jetzt) {
         return new ApiTokenVerwaltung(new Register(), new GeheimnisHasher() {
@@ -120,6 +121,20 @@ class ApiTokenVerwaltungTest {
                         f -> assertThat(f.code()).isEqualTo(Fehlercode.PFLICHTFELD_FEHLT));
     }
 
+    @Test
+    void abgelaufenesTokenLaesstSichWederVerlaengernNochEntfristen() {
+        abgelaufen = true;
+        gesetzt.clear();
+        ApiTokenVerwaltung verwaltung = verwaltung("2026-06-10T12:00:00Z");
+
+        assertThatThrownBy(() -> verwaltung.gueltigBisSetzen(MANDANT, ID, LocalDate.parse("2026-06-11")))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        f -> assertThat(f.code()).isEqualTo(Fehlercode.API_TOKEN_ABGELAUFEN));
+        assertThatThrownBy(() -> verwaltung.gueltigBisEntfernen(MANDANT, ID))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        f -> assertThat(f.code()).isEqualTo(Fehlercode.API_TOKEN_ABGELAUFEN));
+    }
+
     private final class Register implements ApiClientRegister {
         @Override
         public Optional<Zugang> finden(String id) {
@@ -146,9 +161,17 @@ class ApiTokenVerwaltungTest {
         }
 
         @Override
-        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit, Instant jetzt) {
+            if (abgelaufen) {
+                return false;
+            }
             gesetzt.add(zeit);
             return true;
+        }
+
+        @Override
+        public boolean apiTokenAbgelaufen(String mandant, String id, Instant jetzt) {
+            return abgelaufen;
         }
 
         @Override

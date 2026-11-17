@@ -40,7 +40,7 @@ public class ApiTokenIdentityProvider implements IdentityProvider<ApiTokenAnfrag
     @Override
     public Uni<SecurityIdentity> authenticate(ApiTokenAnfrage anfrage, AuthenticationRequestContext kontext) {
         return kontext.runBlocking(() -> {
-            ApiClient client = pruefung.pruefen(anfrage.token())
+            ApiClient client = pruefung.pruefen(anfrage.token(), anfrage.absenderIp())
                     .orElseThrow(() -> new AuthenticationFailedException("API-Token abgelehnt"));
             if (client.absenderPruefen() && !absenderPruefung.erlaubt(client.webseite().orElseThrow(),
                     anfrage.absenderIp())) {

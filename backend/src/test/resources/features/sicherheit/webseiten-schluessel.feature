@@ -79,6 +79,20 @@ Funktionalität: Webseiten-Schlüssel (Aufgabe 11.7)
     Wenn die Webseite den warmen Schlüssel erneut an der Probe verwendet
     Dann antwortet die Webseiten-Schnittstelle mit Status 200
 
+  @req-9.2 @req-12.8
+  Szenario: Ungültige Schlüssel einer Quelle blockieren kalte Schlüssel anderer Quellen nicht
+    Angenommen die Schlüsselprüfung lässt je Quelle 10 Prüfungen in Folge zu und füllt sich kaum nach
+    Und es gibt einen kalten Webseiten-Lese-Schlüssel
+    Und es gibt einen Erfassungs-Schlüssel für «probe»
+    Wenn 10 ungültige Schlüssel von Quelle «192.0.2.21» die Probe aufrufen
+    Dann werden alle mit Status 401 abgelehnt
+    Wenn ein weiterer ungültiger Schlüssel von Quelle «192.0.2.21» die Probe aufruft
+    Dann wird die Schlüsselprüfung mit Status 429 und «Retry-After» abgelehnt
+    Wenn der kalte Webseiten-Schlüssel mit Quelle «198.51.100.21» die Probe aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+    Wenn der Erfassungs-Schlüssel mit Quelle «203.0.113.21» die Probe aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 200
+
   # Doppelte Schrägstriche und kodierte Zeichen im internen Pfad prüft WebseitenRouteTest mit rohen Pfaden; Matrix-
   # Parameter (;…) prüft dieses Szenario, weil nur die echte App sie vor der Zuordnung entfernt (Review PR #140).
   Szenariogrundriss: Der interne Pfad der Webseiten-Schnittstelle ist von aussen nicht erreichbar

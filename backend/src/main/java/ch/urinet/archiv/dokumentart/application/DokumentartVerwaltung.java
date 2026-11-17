@@ -73,11 +73,20 @@ public class DokumentartVerwaltung {
                 vertraulichkeit(angaben.vertraulichkeit()),
                 regel(jahre, ab),
                 pflichtwert(angaben.gesetzlichePflicht()),
-                !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()));
-        pruefung.pruefen(art);
+                !angaben.hat(Feld.AKTIV) || pflichtwert(angaben.aktiv()),
+                angaben.hat(Feld.SELBST_AUSGESTELLT) && pflichtwert(angaben.selbstAusgestellt()),
+                angaben.hat(Feld.BELEGNUMMER_MUSTER) ? pflichtwert(angaben.belegnummerMuster()) : List.of(),
+                angaben.hat(Feld.FREMDBELEG_ART) ? angaben.fremdbelegArt() : null,
+                angaben.hat(Feld.OHNE_ZAHLUNGSDATEN_ART) ? angaben.ohneZahlungsdatenArt() : null,
+                !angaben.hat(Feld.KI_VORSCHLAG) || pflichtwert(angaben.kiVorschlag()),
+                angaben.hat(Feld.KI_FELDER) ? pflichtwert(angaben.kiFelder()) : List.of(),
+                angaben.hat(Feld.KI_HINWEISE) ? angaben.kiHinweise() : null,
+                angaben.hat(Feld.REIHENFOLGE) ? pflichtwert(angaben.reihenfolge()) : 0);
+        pruefung.pruefen(art, art.kiFelder());
         if (repository.existiert(art.code())) {
             throw new FachFehler(Fehlercode.DOKUMENTART_EXISTIERT);
         }
+        zielartenPruefen(art);
         repository.anlegen(art);
         konfiguration.aenderungSpeichern(wer, grund);
         return art;
@@ -111,8 +120,20 @@ public class DokumentartVerwaltung {
                 regel(jahre, ab),
                 angaben.hat(Feld.GESETZLICHE_PFLICHT) ? pflichtwert(angaben.gesetzlichePflicht())
                         : bisher.gesetzlichePflicht(),
-                angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv());
-        pruefung.pruefen(art);
+                angaben.hat(Feld.AKTIV) ? pflichtwert(angaben.aktiv()) : bisher.aktiv(),
+                angaben.hat(Feld.SELBST_AUSGESTELLT) ? pflichtwert(angaben.selbstAusgestellt())
+                        : bisher.selbstAusgestellt(),
+                angaben.hat(Feld.BELEGNUMMER_MUSTER) ? pflichtwert(angaben.belegnummerMuster())
+                        : bisher.belegnummerMuster(),
+                angaben.hat(Feld.FREMDBELEG_ART) ? angaben.fremdbelegArt() : bisher.fremdbelegArt(),
+                angaben.hat(Feld.OHNE_ZAHLUNGSDATEN_ART) ? angaben.ohneZahlungsdatenArt()
+                        : bisher.ohneZahlungsdatenArt(),
+                angaben.hat(Feld.KI_VORSCHLAG) ? pflichtwert(angaben.kiVorschlag()) : bisher.kiVorschlag(),
+                angaben.hat(Feld.KI_FELDER) ? pflichtwert(angaben.kiFelder()) : bisher.kiFelder(),
+                angaben.hat(Feld.KI_HINWEISE) ? angaben.kiHinweise() : bisher.kiHinweise(),
+                angaben.hat(Feld.REIHENFOLGE) ? pflichtwert(angaben.reihenfolge()) : bisher.reihenfolge());
+        pruefung.pruefen(art, art.kiFelder());
+        zielartenPruefen(art);
         if (!art.aufbewahrung().equals(bisher.aufbewahrung()) || art.gesetzlichePflicht() != bisher.gesetzlichePflicht()) {
             regelProtokoll.regelGeaendert(bisher, art);
         }
@@ -128,6 +149,11 @@ public class DokumentartVerwaltung {
         if (zaehler.anzahl(code) > 0) {
             throw new FachFehler(Fehlercode.DOKUMENTART_IN_GEBRAUCH);
         }
+        // Fremdschlüssel fremdbeleg_art / ohne_zahlungsdaten_art: vorab fachlich ablehnen statt als DB-Fehler (500)
+        if (repository.alle().stream().anyMatch(andere -> !andere.code().equals(code)
+                && (code.equals(andere.fremdbelegArt()) || code.equals(andere.ohneZahlungsdatenArt())))) {
+            throw new FachFehler(Fehlercode.DOKUMENTART_IN_GEBRAUCH);
+        }
         repository.loeschen(code);
         konfiguration.aenderungSpeichern(wer, grund);
     }
@@ -135,6 +161,15 @@ public class DokumentartVerwaltung {
     /** Prüft Zusatzwerte (JSON-Objekt) gegen das Schema der Art (Req 9.5); für das Speichern von Dokumenten (2.2). */
     public void zusatzPruefen(String code, String werteJson) {
         schemaPruefer.wertePruefen(finden(code).zusatzSchema(), werteJson);
+    }
+
+    /** Ein Verweis auf eine nicht vorhandene Art ergibt 422 {@code KONFIGURATION_UNGUELTIG}, nicht den DB-Fehler. */
+    private void zielartenPruefen(Dokumentart art) {
+        for (String ziel : java.util.Arrays.asList(art.fremdbelegArt(), art.ohneZahlungsdatenArt())) {
+            if (ziel != null && !ziel.equals(art.code()) && !repository.existiert(ziel)) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        }
     }
 
     private static Aufbewahrungsregel regel(Integer jahre, String ab) {
