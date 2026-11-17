@@ -78,11 +78,25 @@ Given(
 Given(
   /^im Mandanten «(.+)» gibt es die Art «(.+)» ohne Pflichtfelder$/,
   async function (mandant, name) {
+    const autorisierung = {
+      authorization: `Bearer ${await echtesToken('inhaber', mandant)}`,
+    };
+    const aktuelleArten = await fetch(`${backend().api}/api/v1/dokumentarten`, {
+      headers: autorisierung,
+    });
+    assert.equal(
+      aktuelleArten.status,
+      200,
+      `Dokumentarten laden: ${aktuelleArten.status} ${await aktuelleArten.text()}`,
+    );
+    const ifMatch = aktuelleArten.headers.get('etag');
+    assert.ok(ifMatch, 'Dokumentarten-Antwort enthält keinen ETag');
     const antwort = await fetch(`${backend().api}/api/v1/dokumentarten`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${await echtesToken('inhaber', mandant)}`,
+        ...autorisierung,
         'content-type': 'application/json',
+        'if-match': ifMatch,
       },
       body: JSON.stringify({
         code: name.toUpperCase().replace(/[^A-Z0-9]+/g, '_'),
