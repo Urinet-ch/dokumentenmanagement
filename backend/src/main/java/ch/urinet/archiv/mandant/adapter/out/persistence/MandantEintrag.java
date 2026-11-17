@@ -42,6 +42,12 @@ public class MandantEintrag extends PanacheEntityBase {
     @Column(name = "vollexport_bestaetigt")
     public UUID vollexportBestaetigt;
 
+    @Column(name = "abbau_wer")
+    public String abbauWer;
+
+    @Column(name = "abbau_grund")
+    public String abbauGrund;
+
     @Column(name = "abbau_abgeschlossen", nullable = false)
     public boolean abbauAbgeschlossen;
 }

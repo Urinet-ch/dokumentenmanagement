@@ -98,9 +98,23 @@ class MandantKommandoTest {
                     assertThat(aufruf.bestaetigtUrinet()).isFalse();
                 });
         assertThat(MandantKommando.gueltig(List.of("abbauen", "urinet", "--nach-export", exportId,
-                "--ausfuehren", "--bestaetigt-urinet"))).isTrue();
+                "--ausfuehren", "--wer", "fabian", "--grund", "Kundenende", "--bestaetigt-urinet"))).isTrue();
         assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
-                "--ausfuehren", "--dry-run"))).isFalse();
+                "--ausfuehren"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "fabian"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "", "--grund", "x"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "a", "--wer", "b", "--grund", "x"))).isFalse();
+        assertThat(MandantKommando.abbauLesen(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--wer", "fabian", "--grund", "Kundenende")))
+                .hasValueSatisfying(a -> assertThat(a.anlass()).hasValueSatisfying(l -> {
+                    assertThat(l.wer()).isEqualTo("fabian");
+                    assertThat(l.grund()).isEqualTo("Kundenende");
+                }));
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--dry-run", "--wer", "a", "--grund", "b"))).isFalse();
         assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", ""))).isFalse();
         assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
                 "--bestaetigt-urinet"))).isFalse();

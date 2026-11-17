@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant.application;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
+import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
 import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MandantAbbauTest {
 
     private static final MandantCode CODE = new MandantCode("vhf-gsk");
+    static final MandantAbbau.Anlass ANLASS = new MandantAbbau.Anlass("tester", "Kundenende");
     private static final UUID EXPORT_ID = UUID.fromString("6d60de8a-0f65-47df-96f2-4c7fe5e381cd");
     private static final Instant START = Instant.parse("2026-01-01T00:00:00Z");
 
@@ -31,7 +33,7 @@ class MandantAbbauTest {
     void trockenlaufAendertNichts() {
         Testaufbau t = new Testaufbau(START);
 
-        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, false, false);
+        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, false, false, ANLASS);
 
         assertThat(bericht.zustand()).isEqualTo(MandantAbbau.Zustand.TROCKENLAUF);
         assertThat(bericht.abbauAb()).isEqualTo(START.plusSeconds(30L * 24 * 60 * 60));
@@ -47,7 +49,7 @@ class MandantAbbauTest {
     void ersterAusfuehrungsschrittDeaktiviertUndStartetFrist() {
         Testaufbau t = new Testaufbau(START);
 
-        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false);
+        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS);
 
         assertThat(bericht.zustand()).isEqualTo(MandantAbbau.Zustand.DEAKTIVIERT);
         assertThat(t.register.status.mandant().aktiv()).isFalse();
@@ -59,9 +61,9 @@ class MandantAbbauTest {
     @Test
     void vorAblaufDerDreissigTageWirdNichtsGeloescht() {
         Testaufbau t = new Testaufbau(START.plusSeconds(29L * 24 * 60 * 60));
-        t.register.deaktivieren(CODE, EXPORT_ID, START);
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
 
-        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false);
+        MandantAbbau.Bericht bericht = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS);
 
         assertThat(bericht.zustand()).isEqualTo(MandantAbbau.Zustand.WARTEFRIST);
         assertThat(t.ablageAufrufe.get()).isZero();
@@ -72,12 +74,12 @@ class MandantAbbauTest {
     @Test
     void gesperrteObjekteBleibenUndWiederholungKannAbschliessen() {
         Testaufbau t = new Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
-        t.register.deaktivieren(CODE, EXPORT_ID, START);
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
         t.bucketEntfernbar = false;
         t.gesperrteObjekte = List.of(new MandantAblageAbbau.GesperrtesObjekt(
                 "manifest/2026-01-01.json", "version-1", START.plusSeconds(365L * 24 * 60 * 60)));
 
-        MandantAbbau.Bericht ersterLauf = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false);
+        MandantAbbau.Bericht ersterLauf = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS);
 
         assertThat(ersterLauf.zustand()).isEqualTo(MandantAbbau.Zustand.ABBAU_UNVOLLSTAENDIG);
         assertThat(ersterLauf.ablage().gesperrt()).hasSize(1);
@@ -86,9 +88,11 @@ class MandantAbbauTest {
 
         t.gesperrteObjekte = List.of();
         t.bucketEntfernbar = true;
-        MandantAbbau.Bericht wiederholung = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false);
+        MandantAbbau.Bericht wiederholung = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS);
 
         assertThat(wiederholung.zustand()).isEqualTo(MandantAbbau.Zustand.ABGESCHLOSSEN);
+        assertThat(wiederholung.keycloakClientEntfernt()).isFalse();
+        assertThat(wiederholung.zustandText()).isEqualTo("ABGESCHLOSSEN (ohne Keycloak-Client)");
         assertThat(t.register.status.abgeschlossen()).isTrue();
         assertThat(t.ablageAufrufe.get()).isEqualTo(2);
     }
@@ -98,7 +102,7 @@ class MandantAbbauTest {
         Testaufbau t = new Testaufbau(START);
         t.exportStatus = MandantVollexportRepository.Status.OFFEN;
 
-        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false))
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
                 .isInstanceOf(MandantFehler.class)
                 .hasMessageContaining("nicht abgeschlossen");
         assertThat(t.register.status.mandant().aktiv()).isTrue();
@@ -109,7 +113,7 @@ class MandantAbbauTest {
         Testaufbau t = new Testaufbau(START);
         t.bestandAnzahl = 4;
 
-        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false))
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
                 .isInstanceOf(MandantFehler.class).hasMessageContaining("veraltet");
         assertThat(t.register.status.mandant().aktiv()).isTrue();
     }
@@ -119,7 +123,7 @@ class MandantAbbauTest {
         Testaufbau t = new Testaufbau(START);
         t.letzteAenderung = Optional.of(START.plusSeconds(1));
 
-        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false))
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
                 .isInstanceOf(MandantFehler.class).hasMessageContaining("geändert");
         assertThat(t.register.status.mandant().aktiv()).isTrue();
     }
@@ -129,10 +133,129 @@ class MandantAbbauTest {
         Testaufbau t = new Testaufbau(START);
         t.zipVorhanden = false;
 
-        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, false, false))
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, false, false, ANLASS))
                 .isInstanceOf(MandantFehler.class).hasMessageContaining("ZIP fehlt");
         assertThat(t.register.status.mandant().aktiv()).isTrue();
         assertThat(t.ablagePlanAufrufe.get()).isZero();
+    }
+
+    private static Testaufbau fristAbgelaufenMitRegister(String schema, String bucket) {
+        Testaufbau t = new Testaufbau(START.plusSeconds(31L * 24 * 60 * 60));
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
+        var alt = t.register.status;
+        t.register.status = new MandantAbbauRegister.Status(new Mandant(CODE, "Test", schema, bucket,
+                alt.mandant().geschaeftsjahresende(), false), alt.deaktiviertAm(), alt.vollexportBestaetigt(), false);
+        return t;
+    }
+
+    @Test
+    void abweichendesSchemaImRegisterBrichtVorJedemLoeschenAb() {
+        Testaufbau t = fristAbgelaufenMitRegister("m_urinet", "bucket-vhf-gsk");
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("weicht");
+        assertThat(t.datenbank.schemaEntfernt).isFalse();
+        assertThat(t.ablageAufrufe.get()).isZero();
+        assertThat(t.register.status.abgeschlossen()).isFalse();
+    }
+
+    @Test
+    void abweichenderBucketImRegisterBrichtVorJedemLoeschenAb() {
+        Testaufbau t = fristAbgelaufenMitRegister("m_vhf_gsk", "bucket-urinet");
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(t.datenbank.schemaEntfernt).isFalse();
+        assertThat(t.ablageAufrufe.get()).isZero();
+        assertThat(t.bucketEntferntAufrufe.get()).isZero();
+    }
+
+    @Test
+    void unbekannterMandantWirdNichtGefundenUndNichtsGeloescht() {
+        Testaufbau t = new Testaufbau(START);
+        t.register.status = null;
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS))
+                .isInstanceOf(MandantFehler.class).hasMessageContaining("nicht gefunden");
+        assertThat(t.datenbank.schemaEntfernt).isFalse();
+        assertThat(t.ablageAufrufe.get()).isZero();
+    }
+
+    @Test
+    void ausfuehrungOhneAnlassWirdAbgelehntUndAnlassIstGeprueft() {
+        Testaufbau t = new Testaufbau(START);
+
+        assertThatThrownBy(() -> t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, null))
+                .isInstanceOf(MandantFehler.class).hasMessageContaining("--wer");
+        assertThat(t.register.status.mandant().aktiv()).isTrue();
+        assertThatThrownBy(() -> new MandantAbbau.Anlass("", "Grund")).isInstanceOf(MandantFehler.class);
+        assertThatThrownBy(() -> new MandantAbbau.Anlass("wer", "a\nb")).isInstanceOf(MandantFehler.class);
+    }
+
+    @Test
+    void mehrGesperrteObjekteAlsAufgelistetBleibenUnvollstaendig() {
+        var liste = new java.util.ArrayList<MandantAblageAbbau.GesperrtesObjekt>();
+        for (int i = 0; i < MandantAblageAbbau.MAX_AUFGELISTET; i++) {
+            liste.add(new MandantAblageAbbau.GesperrtesObjekt("k" + i, "v", START.plusSeconds(1000)));
+        }
+        var abbau = new MandantAblageAbbau(0, 0, liste, 150);
+
+        assertThat(abbau.gesperrt()).hasSize(MandantAblageAbbau.MAX_AUFGELISTET);
+        assertThat(abbau.gesperrtGesamt()).isEqualTo(150);
+        liste.add(liste.getFirst());
+        assertThatThrownBy(() -> new MandantAblageAbbau(0, 0, liste, 200)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static String[] ausgabe(MandantKommando kommando, List<String> args, int[] exit) {
+        var aus = new java.io.ByteArrayOutputStream();
+        var fehler = new java.io.ByteArrayOutputStream();
+        exit[0] = kommando.ausfuehren(args, new java.io.PrintStream(aus, true, java.nio.charset.StandardCharsets.UTF_8),
+                new java.io.PrintStream(fehler, true, java.nio.charset.StandardCharsets.UTF_8));
+        return new String[]{aus.toString(java.nio.charset.StandardCharsets.UTF_8),
+                fehler.toString(java.nio.charset.StandardCharsets.UTF_8)};
+    }
+
+    private static List<String> abbauArgs() {
+        return List.of("abbauen", "vhf-gsk", "--nach-export", EXPORT_ID.toString(), "--ausfuehren",
+                "--wer", "tester", "--grund", "Kundenende");
+    }
+
+    @Test
+    void berichtNenntKeycloakClientHinweiseUndUnvollstaendigerAbbauHatEigenenExitCode() {
+        Testaufbau t = new Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
+        t.bucketEntfernbar = false;
+        t.gesperrteObjekte = List.of(new MandantAblageAbbau.GesperrtesObjekt(
+                "manifest/2026-01-01.json", "version-1", START.plusSeconds(365L * 24 * 60 * 60)));
+        var kommando = new MandantKommando(null, null, null, t.abbau());
+        int[] exit = new int[1];
+
+        String[] ausgabe = ausgabe(kommando, abbauArgs(), exit);
+
+        assertThat(exit[0]).isEqualTo(MandantKommando.EXIT_UNVOLLSTAENDIG).isNotZero();
+        assertThat(ausgabe[0]).contains("ABBAU_UNVOLLSTAENDIG")
+                .contains("Keycloak-Zugang/Client: nicht entfernt (gemeinsame Clients, Req 8.3 offen)")
+                .contains("Gesperrte Objekte: 1").contains("7 Tage").contains("auch gelöscht");
+
+        t.gesperrteObjekte = List.of();
+        t.bucketEntfernbar = true;
+        ausgabe = ausgabe(kommando, abbauArgs(), exit);
+
+        assertThat(exit[0]).isZero();
+        assertThat(ausgabe[0]).contains("ABGESCHLOSSEN (ohne Keycloak-Client)")
+                .contains("Keycloak-Zugang/Client: nicht entfernt");
+    }
+
+    @Test
+    void abweichendesRegisterGibtTechnischenFehlerOhneInhalte() {
+        Testaufbau t = fristAbgelaufenMitRegister("m_urinet", "bucket-vhf-gsk");
+        int[] exit = new int[1];
+
+        String[] ausgabe = ausgabe(new MandantKommando(null, null, null, t.abbau()), abbauArgs(), exit);
+
+        assertThat(exit[0]).isEqualTo(3);
+        assertThat(ausgabe[1]).contains("Technischer Fehler");
+        assertThat(t.datenbank.schemaEntfernt).isFalse();
     }
 
     @Test
@@ -140,7 +263,7 @@ class MandantAbbauTest {
         // 30 Tage nach 2026-01-01T00:00Z ist 2026-01-31T00:00Z, in Zürich 01:00 am selben Tag
         Testaufbau t = new Testaufbau(START);
 
-        assertThat(t.abbau().ausfuehren(CODE, EXPORT_ID, false, false).sicherungsstaendeBis())
+        assertThat(t.abbau().ausfuehren(CODE, EXPORT_ID, false, false, ANLASS).sicherungsstaendeBis())
                 .isEqualTo(java.time.LocalDate.of(2036, 1, 31));
         assertThat(MandantAbbau.sicherungsstaendeBis(Instant.parse("2026-03-15T23:30:00Z")))
                 .isEqualTo(java.time.LocalDate.of(2036, 3, 16));
@@ -154,7 +277,7 @@ class MandantAbbauTest {
                 new Mandant(urinet, "Urinet", "m_urinet", "bucket-urinet", Geschaeftsjahresende.STANDARD, true),
                 Optional.empty(), Optional.empty(), false);
 
-        assertThatThrownBy(() -> t.abbau().ausfuehren(urinet, EXPORT_ID, true, false))
+        assertThatThrownBy(() -> t.abbau().ausfuehren(urinet, EXPORT_ID, true, false, ANLASS))
                 .isInstanceOf(MandantFehler.class)
                 .hasMessageContaining("--bestaetigt-urinet");
         assertThat(t.register.status.mandant().aktiv()).isTrue();
@@ -165,6 +288,7 @@ class MandantAbbauTest {
         final TestDatenbank datenbank = new TestDatenbank();
         final AtomicInteger ablageAufrufe = new AtomicInteger();
         final AtomicInteger ablagePlanAufrufe = new AtomicInteger();
+        final AtomicInteger bucketEntferntAufrufe = new AtomicInteger();
         MandantVollexportRepository.Status exportStatus = MandantVollexportRepository.Status.FERTIG;
         List<MandantAblageAbbau.GesperrtesObjekt> gesperrteObjekte = List.of();
         boolean bucketEntfernbar = true;
@@ -238,10 +362,11 @@ class MandantAbbauTest {
 
                 @Override
                 public boolean entfernenWennLeer(String name) {
+                    bucketEntferntAufrufe.incrementAndGet();
                     return bucketEntfernbar;
                 }
             };
-            return new MandantAbbau(register, exporte, kontext, datenbank, bucket, ablage, uhr);
+            return new MandantAbbau(register, exporte, kontext, datenbank, bucket, ablage, "bucket-", uhr);
         }
     }
 
@@ -274,7 +399,7 @@ class MandantAbbauTest {
         }
 
         @Override
-        public boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt) {
+        public boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt, String wer, String grund) {
             if (status == null) {
                 return false;
             }

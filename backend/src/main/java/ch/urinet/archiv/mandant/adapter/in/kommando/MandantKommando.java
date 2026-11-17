@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant.adapter.in.kommando;
 
 import ch.urinet.archiv.mandant.application.MandantFehler;
+import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.mandant.application.MandantAbbau;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -26,8 +27,15 @@ public class MandantKommando {
             Aufruf: archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
                    archiv mandant export <code>
                    archiv mandant export <code> --download <exportId>
-                   archiv mandant abbauen <code> --nach-export <exportId> [--dry-run|--ausfuehren]
+                   archiv mandant abbauen <code> --nach-export <exportId> [--dry-run | --ausfuehren --wer <name> --grund <text>]
                        [--bestaetigt-urinet]""";
+
+    /** Exit-Code des Abbaus, wenn gesperrte Objekte oder ein nicht entferntes Schema/Bucket bleiben (erneut aufrufen). */
+    public static final int EXIT_UNVOLLSTAENDIG = 4;
+    static final String HINWEIS_SCHEMA = "Hinweis: Das Datenbank-Schema wird auch gelöscht, wenn im Bucket gesperrte "
+            + "Objekte bleiben (beabsichtigt; gesperrte Objekte bleiben bis zum Ablauf der Sperre im Bucket).";
+    static final String HINWEIS_EXPORT = "Hinweis: Das Export-ZIP liegt nur 7 Tage im Bucket und wird mit dem Abbau "
+            + "gelöscht; die 7 Tage laufen vor der 30-Tage-Frist ab. Der Kunde muss das ZIP vorher erhalten haben.";
 
     private final MandantProvisionierung provisionierung;
     private final MandantKontext kontext;
@@ -49,7 +57,8 @@ public class MandantKommando {
     public record ExportAufruf(String code, Optional<UUID> id) {
     }
 
-    public record AbbauAufruf(String code, UUID exportId, boolean ausfuehren, boolean bestaetigtUrinet) {
+    public record AbbauAufruf(String code, UUID exportId, boolean ausfuehren, boolean bestaetigtUrinet,
+                              Optional<MandantAbbau.Anlass> anlass) {
     }
 
     public static boolean gueltig(List<String> argumente) {
@@ -114,8 +123,24 @@ public class MandantKommando {
         boolean ausfuehren = false;
         boolean dryRun = false;
         boolean bestaetigtUrinet = false;
-        for (String option : argumente.subList(4, argumente.size())) {
+        String wer = null;
+        String grund = null;
+        List<String> optionen = argumente.subList(4, argumente.size());
+        for (int i = 0; i < optionen.size(); i++) {
+            String option = optionen.get(i);
             switch (option) {
+                case "--wer", "--grund" -> {
+                    boolean schonGesetzt = option.equals("--wer") ? wer != null : grund != null;
+                    if (schonGesetzt || i + 1 >= optionen.size()) {
+                        return Optional.empty();
+                    }
+                    String wert = optionen.get(++i);
+                    if (option.equals("--wer")) {
+                        wer = wert;
+                    } else {
+                        grund = wert;
+                    }
+                }
                 case "--ausfuehren" -> {
                     if (ausfuehren) {
                         return Optional.empty();
@@ -142,7 +167,18 @@ public class MandantKommando {
         if (ausfuehren && dryRun || bestaetigtUrinet && !argumente.get(1).equals("urinet")) {
             return Optional.empty();
         }
-        return Optional.of(new AbbauAufruf(argumente.get(1), exportId, ausfuehren, bestaetigtUrinet));
+        Optional<MandantAbbau.Anlass> anlass = Optional.empty();
+        if (wer != null || grund != null) {
+            try {
+                anlass = Optional.of(new MandantAbbau.Anlass(wer, grund));
+            } catch (MandantFehler e) {
+                return Optional.empty();
+            }
+        }
+        if (ausfuehren && anlass.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new AbbauAufruf(argumente.get(1), exportId, ausfuehren, bestaetigtUrinet, anlass));
     }
 
     public int ausfuehren(List<String> argumente, PrintStream aus, PrintStream fehler) {
@@ -151,20 +187,30 @@ public class MandantKommando {
             try {
                 AbbauAufruf aufruf = abbauAufruf.get();
                 MandantAbbau.Bericht bericht = abbau.ausfuehren(new MandantCode(aufruf.code()), aufruf.exportId(),
-                        aufruf.ausfuehren(), aufruf.bestaetigtUrinet());
+                        aufruf.ausfuehren(), aufruf.bestaetigtUrinet(), aufruf.anlass().orElse(null));
+                MandantAblageAbbau ablage = bericht.ablage();
                 aus.printf("Mandanten-Abbau: %s%nAbbau frühestens ab: %s%n"
                                 + "Datenbank-Sicherungsstände spätestens bis: %s%n"
                                 + "Dateien in der Zweitkopie: %s%n"
                                 + "Löschbare Objekte: %d%nGelöschte Objekte: %d%n"
-                                + "Schema entfernt: %s%nBucket entfernt: %s%n",
-                        bericht.zustand(), bericht.abbauAb(), bericht.sicherungsstaendeBis(),
-                        MandantAbbau.DATEI_SICHERUNG_AUFBEWAHRUNG, bericht.ablage().loeschbar(),
-                        bericht.geloescht(), bericht.schemaEntfernt(), bericht.bucketEntfernt());
-                bericht.ablage().gesperrt().forEach(objekt -> aus.printf(
+                                + "Schema entfernt: %s%nBucket entfernt: %s%n"
+                                + "Keycloak-Zugang/Client: nicht entfernt (gemeinsame Clients, Req 8.3 offen)%n"
+                                + "Gesperrte Objekte: %d%n",
+                        bericht.zustandText(), bericht.abbauAb(), bericht.sicherungsstaendeBis(),
+                        MandantAbbau.DATEI_SICHERUNG_AUFBEWAHRUNG, ablage.loeschbar(),
+                        bericht.geloescht(), bericht.schemaEntfernt(), bericht.bucketEntfernt(),
+                        ablage.gesperrtGesamt());
+                aus.println(HINWEIS_SCHEMA);
+                aus.println(HINWEIS_EXPORT);
+                ablage.gesperrt().forEach(objekt -> aus.printf(
                         "Gesperrt: %s (Version %s) bis %s%s%n", objekt.schluessel(), objekt.versionId(),
                         objekt.gesperrtBis().map(Object::toString).orElse("unbefristet"),
                         objekt.legalHold() ? " (Legal Hold)" : ""));
-                return 0;
+                if (ablage.gesperrtGesamt() > ablage.gesperrt().size()) {
+                    aus.printf("Weitere gesperrte Objekte nicht aufgelistet: %d%n",
+                            ablage.gesperrtGesamt() - ablage.gesperrt().size());
+                }
+                return bericht.zustand() == MandantAbbau.Zustand.ABBAU_UNVOLLSTAENDIG ? EXIT_UNVOLLSTAENDIG : 0;
             } catch (MandantFehler e) {
                 fehler.println(e.grund() + ": " + e.getMessage());
                 return 1;

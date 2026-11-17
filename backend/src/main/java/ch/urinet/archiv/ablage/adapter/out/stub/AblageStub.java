@@ -380,13 +380,17 @@ public class AblageStub implements AblagePort {
         List<MandantAblageAbbau.GesperrtesObjekt> gesperrt = new ArrayList<>();
         int loeschbar = 0;
         int geloescht = 0;
+        int gesperrtGesamt = 0;
         for (String schluessel : versionen.keySet().stream().filter(k -> k.startsWith(vorsatz)).toList()) {
             List<Version> dateien = versionen.get(schluessel);
             for (var iterator = dateien.iterator(); iterator.hasNext(); ) {
                 Version version = iterator.next();
                 if (version.gesperrt(jetzt)) {
-                    gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(schluessel.substring(vorsatz.length()),
-                            version.versionId(), version.sperreBis()));
+                    gesperrtGesamt++;
+                    if (gesperrt.size() < MandantAblageAbbau.MAX_AUFGELISTET) {
+                        gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(schluessel.substring(vorsatz.length()),
+                                version.versionId(), version.sperreBis()));
+                    }
                     continue;
                 }
                 loeschbar++;
@@ -400,7 +404,7 @@ public class AblageStub implements AblagePort {
                 versionen.remove(schluessel);
             }
         }
-        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt);
+        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt, gesperrtGesamt);
     }
 
     /** Nur für Tests: abgeschnittene Seiten ohne {@code NextVersionIdMarker}, wie ihn ein Object Storage weglassen kann. */

@@ -5,6 +5,7 @@ import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -30,9 +31,35 @@ public class MandantAbbau {
         TROCKENLAUF, DEAKTIVIERT, WARTEFRIST, ABBAU_UNVOLLSTAENDIG, ABGESCHLOSSEN
     }
 
+    /**
+     * Der Keycloak-Zugang wird nie entfernt (gemeinsame Realm-Clients, Spec 03 Req 8.3 offen); darum ist
+     * {@code keycloakClientEntfernt} immer {@code false} und {@code ABGESCHLOSSEN} gilt nur ohne diesen Schritt.
+     */
     public record Bericht(Zustand zustand, Instant abbauAb, LocalDate sicherungsstaendeBis, int geloescht,
                           boolean schemaEntfernt, boolean bucketEntfernt,
-                          MandantAblageAbbau ablage) {
+                          MandantAblageAbbau ablage, boolean keycloakClientEntfernt) {
+        public Bericht(Zustand zustand, Instant abbauAb, LocalDate sicherungsstaendeBis, int geloescht,
+                       boolean schemaEntfernt, boolean bucketEntfernt, MandantAblageAbbau ablage) {
+            this(zustand, abbauAb, sicherungsstaendeBis, geloescht, schemaEntfernt, bucketEntfernt, ablage, false);
+        }
+
+        /** Zustand für die Ausgabe; {@code ABGESCHLOSSEN} nennt die Einschränkung beim Keycloak-Client. */
+        public String zustandText() {
+            return zustand == Zustand.ABGESCHLOSSEN && !keycloakClientEntfernt
+                    ? "ABGESCHLOSSEN (ohne Keycloak-Client)" : zustand.name();
+        }
+    }
+
+    /** Wer den Abbau auslöst und warum (Protokoll, keine Inhalte). */
+    public record Anlass(String wer, String grund) {
+        public Anlass {
+            if (wer == null || !wer.strip().equals(wer) || !wer.matches("[^\\p{Cntrl}]{1,80}")) {
+                throw new MandantFehler(MandantFehler.Grund.ABBAU_UNGUELTIG, "--wer fehlt oder ist ungültig");
+            }
+            if (grund == null || !grund.strip().equals(grund) || !grund.matches("[^\\p{Cntrl}]{1,200}")) {
+                throw new MandantFehler(MandantFehler.Grund.ABBAU_UNGUELTIG, "--grund fehlt oder ist ungültig");
+            }
+        }
     }
 
     private final MandantAbbauRegister register;
@@ -42,15 +69,19 @@ public class MandantAbbau {
     private final MandantBucket bucket;
     private final AblagePort ablage;
     private final Clock uhr;
+    private final String bucketPraefix;
 
     @Inject
     public MandantAbbau(MandantAbbauRegister register, MandantVollexportRepository exporte, MandantKontext kontext,
-                        MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage) {
-        this(register, exporte, kontext, datenbank, bucket, ablage, Clock.systemUTC());
+                        MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage,
+                        @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
+        this(register, exporte, kontext, datenbank, bucket, ablage, bucketPraefix, Clock.systemUTC());
     }
 
     MandantAbbau(MandantAbbauRegister register, MandantVollexportRepository exporte, MandantKontext kontext,
-                 MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage, Clock uhr) {
+                 MandantDatenbank datenbank, MandantBucket bucket, AblagePort ablage, String bucketPraefix,
+                 Clock uhr) {
+        this.bucketPraefix = Objects.requireNonNull(bucketPraefix, "bucketPraefix");
         this.register = Objects.requireNonNull(register, "register");
         this.exporte = Objects.requireNonNull(exporte, "exporte");
         this.kontext = Objects.requireNonNull(kontext, "kontext");
@@ -61,8 +92,11 @@ public class MandantAbbau {
     }
 
     public Bericht ausfuehren(MandantCode code, UUID bestaetigterExport, boolean ausfuehren,
-                              boolean zweiteBestaetigungUrinet) {
+                              boolean zweiteBestaetigungUrinet, Anlass anlass) {
         Objects.requireNonNull(code, "code");
+        if (ausfuehren && anlass == null) {
+            throw fehler("Für die Ausführung sind --wer und --grund erforderlich");
+        }
         Objects.requireNonNull(bestaetigterExport, "bestaetigterExport");
         if (code.wert().equals("urinet") && !zweiteBestaetigungUrinet) {
             throw fehler("Für den Mandanten urinet ist --bestaetigt-urinet erforderlich");
@@ -71,6 +105,7 @@ public class MandantAbbau {
         Instant jetzt = uhr.instant();
         MandantAbbauRegister.Status status = register.status(code)
                 .orElseThrow(() -> fehler("Mandant nicht gefunden: " + code.wert()));
+        registerGegenCodePruefen(code, status);
         bestaetigtenExportPruefen(code, bestaetigterExport, status);
         Instant deaktiviertAm = status.deaktiviertAm().orElse(jetzt);
         Instant abbauAb = deaktiviertAm.plus(FRIST);
@@ -87,7 +122,7 @@ public class MandantAbbau {
                     vorschau);
         }
         if (status.deaktiviertAm().isEmpty()) {
-            if (!register.deaktivieren(code, bestaetigterExport, jetzt)) {
+            if (!register.deaktivieren(code, bestaetigterExport, jetzt, anlass.wer(), anlass.grund())) {
                 throw fehler("Mandant konnte nicht deaktiviert werden: " + code.wert());
             }
             return new Bericht(Zustand.DEAKTIVIERT, abbauAb, sicherungsstaendeBis, 0,
@@ -105,7 +140,7 @@ public class MandantAbbau {
         }
         boolean bucketEntfernt = bucket.entfernenWennLeer(status.mandant().bucket());
         boolean schemaEntfernt = !datenbank.schemaVorhanden(status.mandant().schema());
-        boolean abgeschlossen = bereinigung.gesperrt().isEmpty() && schemaEntfernt && bucketEntfernt;
+        boolean abgeschlossen = bereinigung.gesperrtGesamt() == 0 && schemaEntfernt && bucketEntfernt;
         if (abgeschlossen && !register.abschliessen(code)) {
             throw new IllegalStateException("Mandanten-Abbau konnte nicht abgeschlossen werden");
         }
@@ -120,6 +155,19 @@ public class MandantAbbau {
      */
     public static LocalDate sicherungsstaendeBis(Instant abbauAb) {
         return abbauAb.atZone(ZUERICH).toLocalDate().plusYears(SICHERUNGSJAHRE);
+    }
+
+    /**
+     * Schema und Bucket kommen aus dem Register, geleert wird der Bucket aber aus dem Code des Mandanten: Stimmen
+     * beide nicht überein, bricht der Abbau vor jedem Löschschritt ab (sonst träfe {@code DROP SCHEMA} einen
+     * anderen Mandanten).
+     */
+    private void registerGegenCodePruefen(MandantCode code, MandantAbbauRegister.Status status) {
+        if (!code.equals(status.mandant().code()) || !code.schema().equals(status.mandant().schema())
+                || !code.bucket(bucketPraefix).equals(status.mandant().bucket())) {
+            throw new IllegalStateException(
+                    "Registereintrag des Mandanten weicht von Schema oder Bucket des Mandantencodes ab, Abbau abgebrochen");
+        }
     }
 
     private void bestaetigtenExportPruefen(MandantCode code, UUID exportId, MandantAbbauRegister.Status status) {

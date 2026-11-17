@@ -72,7 +72,11 @@ public class JdbcMandantVollexportRepository implements MandantVollexportReposit
     public Bestand bestand() {
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement abfrage = verbindung.prepareStatement(
-                     "select count(*), max(geaendert) from " + schema() + ".dokument")) {
+                     "select count(*), greatest("
+                             + "(select max(geaendert) from " + schema() + ".dokument), "
+                             + "(select max(empfangen) from " + schema() + ".dokument_datei), "
+                             + "(select max(zeit) from " + schema() + ".dokument_version)) from "
+                             + schema() + ".dokument")) {
             abfrage.setQueryTimeout(ZEITGRENZE_S);
             try (ResultSet zeile = abfrage.executeQuery()) {
                 zeile.next();

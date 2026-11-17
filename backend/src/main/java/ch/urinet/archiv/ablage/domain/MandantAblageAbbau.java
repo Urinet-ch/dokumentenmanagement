@@ -6,13 +6,25 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Result of removing unlocked object versions from one tenant bucket. */
-public record MandantAblageAbbau(int geloescht, int loeschbar, List<GesperrtesObjekt> gesperrt) {
+public record MandantAblageAbbau(int geloescht, int loeschbar, List<GesperrtesObjekt> gesperrt,
+                                 int gesperrtGesamt) {
+
+    /** Obergrenze der einzeln aufgelisteten gesperrten Objekte; darüber zählt nur {@code gesperrtGesamt}. */
+    public static final int MAX_AUFGELISTET = 100;
+
 
     public MandantAblageAbbau {
         if (geloescht < 0 || loeschbar < geloescht) {
             throw new IllegalArgumentException("ungültige Anzahl löschbarer Objekte");
         }
         gesperrt = List.copyOf(gesperrt);
+        if (gesperrt.size() > MAX_AUFGELISTET || gesperrtGesamt < gesperrt.size()) {
+            throw new IllegalArgumentException("ungültige Anzahl gesperrter Objekte");
+        }
+    }
+
+    public MandantAblageAbbau(int geloescht, int loeschbar, List<GesperrtesObjekt> gesperrt) {
+        this(geloescht, loeschbar, gesperrt, gesperrt.size());
     }
 
     public MandantAblageAbbau(int geloescht, List<GesperrtesObjekt> gesperrt) {

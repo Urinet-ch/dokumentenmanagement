@@ -71,7 +71,7 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
 
     @Override
     @Transactional
-    public boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt) {
+    public boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt, String wer, String grund) {
         MandantEintrag eintrag = MandantEintrag.findById(code.wert());
         if (eintrag == null) {
             return false;
@@ -82,6 +82,8 @@ public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegi
         eintrag.aktiv = false;
         eintrag.deaktiviertAm = OffsetDateTime.ofInstant(jetzt, java.time.ZoneOffset.UTC);
         eintrag.vollexportBestaetigt = vollexportId;
+        eintrag.abbauWer = wer;
+        eintrag.abbauGrund = grund;
         return true;
     }
 

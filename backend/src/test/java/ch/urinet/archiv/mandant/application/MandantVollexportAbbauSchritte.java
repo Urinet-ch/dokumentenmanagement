@@ -134,7 +134,7 @@ public class MandantVollexportAbbauSchritte {
     public void veralteterExport() {
         aufbau = new MandantAbbauTest.Testaufbau(START);
         aufbau.bestandAnzahl = aufbau.anzahl + 1;
-        fehler = catchThrowable(() -> aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false));
+        fehler = catchThrowable(() -> aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false, MandantAbbauTest.ANLASS));
     }
 
     @Dann("bricht der Abbau ab und der Mandant bleibt aktiv")
@@ -146,8 +146,8 @@ public class MandantVollexportAbbauSchritte {
     @Wenn("der Abbau 29 Tage nach der Deaktivierung ausgeführt wird")
     public void vorFrist() {
         aufbau = new MandantAbbauTest.Testaufbau(START.plusSeconds(29L * 24 * 60 * 60));
-        aufbau.register.deaktivieren(new MandantCode("vhf-gsk"), EXPORT, START);
-        bericht = aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false);
+        aufbau.register.deaktivieren(new MandantCode("vhf-gsk"), EXPORT, START, "tester", "Kundenende");
+        bericht = aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false, MandantAbbauTest.ANLASS);
     }
 
     @Dann("meldet der Abbau die Wartefrist und löscht nichts")
@@ -160,10 +160,10 @@ public class MandantVollexportAbbauSchritte {
     @Wenn("der Abbau nach 30 Tagen mit einem gesperrten Objekt ausgeführt wird")
     public void nachFristMitSperre() {
         aufbau = new MandantAbbauTest.Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
-        aufbau.register.deaktivieren(new MandantCode("vhf-gsk"), EXPORT, START);
+        aufbau.register.deaktivieren(new MandantCode("vhf-gsk"), EXPORT, START, "tester", "Kundenende");
         aufbau.gesperrteObjekte = List.of(new MandantAblageAbbau.GesperrtesObjekt(
                 "manifest/2026-01-01.json", "version-1", START.plusSeconds(365L * 24 * 60 * 60)));
-        bericht = aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false);
+        bericht = aufbau.abbau().ausfuehren(new MandantCode("vhf-gsk"), EXPORT, true, false, MandantAbbauTest.ANLASS);
     }
 
     @Dann("ist der Abbau unvollständig und listet das gesperrte Objekt auf")

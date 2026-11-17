@@ -16,8 +16,8 @@ public interface MandantAbbauRegister {
 
     Optional<Status> status(MandantCode code);
 
-    /** Deaktiviert den Mandanten und zeichnet die bestätigte Export-ID einmalig auf. */
-    boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt);
+    /** Deaktiviert den Mandanten und zeichnet die bestätigte Export-ID sowie wer und warum einmalig auf. */
+    boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt, String wer, String grund);
 
     /** Markiert den Abbau erst nach Entfernen des Schemas und des leeren Buckets als abgeschlossen. */
     boolean abschliessen(MandantCode code);

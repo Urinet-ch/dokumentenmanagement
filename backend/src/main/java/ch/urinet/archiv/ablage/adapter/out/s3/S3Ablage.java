@@ -857,6 +857,7 @@ public class S3Ablage implements AblagePort {
         List<MandantAblageAbbau.GesperrtesObjekt> gesperrt = new ArrayList<>();
         int loeschbar = 0;
         int geloescht = 0;
+        int gesperrtGesamt = 0;
         try {
             for (ListObjectVersionsResponse seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).maxKeys(1000))) {
                 for (var version : seite.versions()) {
@@ -865,8 +866,11 @@ public class S3Ablage implements AblagePort {
                             .filter(zeit -> zeit.isAfter(jetzt));
                     boolean legalHold = legalHoldAktiv(bucket, version.key(), version.versionId());
                     if (bis.isPresent() || legalHold) {
-                        gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(version.key(), version.versionId(),
-                                bis, legalHold));
+                        gesperrtGesamt++;
+                        if (gesperrt.size() < MandantAblageAbbau.MAX_AUFGELISTET) {
+                            gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(version.key(), version.versionId(),
+                                    bis, legalHold));
+                        }
                         continue;
                     }
                     loeschbar++;
@@ -888,14 +892,14 @@ public class S3Ablage implements AblagePort {
                 throw e;
             }
         }
-        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt);
+        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt, gesperrtGesamt);
     }
 
     private boolean legalHoldAktiv(String bucket, String key, String versionId) {
         try {
             var status = s3.getObjectLegalHold(b -> b.bucket(bucket).key(key).versionId(versionId)).legalHold();
             if (status == null || status.status() == null) {
-                throw new IllegalStateException("Legal Hold für Objektversion nicht prüfbar: " + key);
+                throw new IllegalStateException("Legal Hold einer Objektversion nicht prüfbar");
             }
             return status.status() == ObjectLockLegalHoldStatus.ON;
         } catch (S3Exception e) {
@@ -1001,12 +1005,7 @@ public class S3Ablage implements AblagePort {
         }
     }
 
-    /**
-     * Regel {@value #EXPORT_REGEL}: aktuelle Version nach 7 Tagen ablaufen lassen (im versionierten Bucket wird sie zur
-     * älteren Version), ältere Versionen nach einem weiteren Tag löschen, unvollständige Uploads nach einem Tag.
-     * Liest die bestehende Konfiguration und ersetzt nur diese Regel, weil {@code PutBucketLifecycleConfiguration} die
-     * ganze Konfiguration ersetzt. Sperren berührt die Regel nicht ({@code exporte/} wird nie gesperrt).
-     */
+    /** Prüft, dass der Export unter {@code exporte/} noch die aktuelle Version mit genau dieser Grösse ist. */
     @Override
     public boolean exportVorhanden(MandantCode mandant, String schluessel, String versionId, long groesse) {
         if (!schluessel.startsWith(Exportdatei.PRAEFIX)) {
@@ -1024,6 +1023,12 @@ public class S3Ablage implements AblagePort {
         }
     }
 
+    /**
+     * Regel {@value #EXPORT_REGEL}: aktuelle Version nach 7 Tagen ablaufen lassen (im versionierten Bucket wird sie zur
+     * älteren Version), ältere Versionen nach einem weiteren Tag löschen, unvollständige Uploads nach einem Tag.
+     * Liest die bestehende Konfiguration und ersetzt nur diese Regel, weil {@code PutBucketLifecycleConfiguration} die
+     * ganze Konfiguration ersetzt. Sperren berührt die Regel nicht ({@code exporte/} wird nie gesperrt).
+     */
     @Override
     public void exportLebenszyklusSichern(MandantCode mandant) {
         String bucket = bucket(mandant);

@@ -119,6 +119,26 @@ class MandantVollexportDbTest {
         assertThat(a.dokumente()).isEqualTo(aVorher.dokumente());
     }
 
+    @Test
+    void bestandHebtLetzteAenderungBeiNeuerDateiOhneDokumentUpdate() throws Exception {
+        Set<UUID> ids = dokumenteEinfuegen("m_vhf_gsk", 1);
+        UUID id = ids.iterator().next();
+        var vorher = THREADS.submit(() -> kontext.mit(B, () -> repository.bestand())).get();
+        try (Connection verbindung = datenbank.getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("insert into m_vhf_gsk.dokument_datei "
+                     + "(dokument_id, nr, rolle, sha256, empfangen) values (?, 1, 'ORIGINAL', ?, "
+                     + "clock_timestamp() + interval '1 hour')")) {
+            befehl.setObject(1, id);
+            befehl.setString(2, "a".repeat(64));
+            befehl.executeUpdate();
+        }
+
+        var nachher = THREADS.submit(() -> kontext.mit(B, () -> repository.bestand())).get();
+
+        assertThat(nachher.dokumente()).isEqualTo(vorher.dokumente());
+        assertThat(nachher.letzteAenderung().orElseThrow()).isAfter(vorher.letzteAenderung().orElseThrow());
+    }
+
     private List<UUID> alleIds(MandantCode code) throws Exception {
         return THREADS.submit(() -> kontext.mit(code, () -> {
             List<UUID> ids = new ArrayList<>();

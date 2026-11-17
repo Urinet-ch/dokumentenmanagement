@@ -194,7 +194,7 @@ public class MandantVollexportSchreiber {
         Kopie kopie = ablage.sicherungsKopie(mandant, schluessel, versionId, zip);
         zip.closeEntry();
         if (!kopie.sha256().equalsIgnoreCase(erwartet)) {
-            throw new IllegalStateException("Prüfsumme weicht ab bei Exportdatei " + zipPfad);
+            throw new IllegalStateException("Prüfsumme weicht ab bei einer Exportdatei des Vollexports");
         }
         pruefsumme(pruefsummen, HEX.parseHex(kopie.sha256()), zipPfad);
     }
