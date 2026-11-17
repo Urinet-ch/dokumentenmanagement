@@ -8,6 +8,7 @@ api/dokumentarten.service.ts
 api/dokumente.service.ts
 api/exporte.service.ts
 api/importe.service.ts
+api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
 configuration.ts
@@ -52,6 +53,8 @@ model/import-zeile.ts
 model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
+model/konfigurations-version-detail.ts
+model/konfigurations-version.ts
 model/kontakt-angaben.ts
 model/kontakt-detail.ts
 model/kontakt-eintrag.ts

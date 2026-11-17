@@ -34,6 +34,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -128,7 +129,9 @@ public class DokumentartResource {
     @Operation(summary = "Dokumentarten des Mandanten auflisten (aktive und inaktive)")
     @APIResponse(responseCode = "200", description = "Dokumentarten",
             headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
-                    name = "ETag", description = "Aktuelle Konfigurationsversion für If-Match"))
+                    name = "ETag", description = "Aktuelle Konfigurationsversion für If-Match"),
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(type = SchemaType.ARRAY, implementation = DokumentartDto.class)))
     public Response liste() {
         aufloesung.pruefen();
         int version = konfiguration.aktuelleVersion();
@@ -146,10 +149,13 @@ public class DokumentartResource {
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
     @APIResponse(responseCode = "201", description = "Angelegt", content = @Content(
-            mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DokumentartDto.class)))
+            mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = DokumentartDto.class)),
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"))
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
-    public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch, String body) {
+    public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
+                            String body) {
         aufloesung.pruefen();
         int version = version(ifMatch);
         DokumentartAnfrage anfrage = anfrage(body);
@@ -168,9 +174,15 @@ public class DokumentartResource {
                     + "Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv=false deaktiviert.")
     @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(implementation = DokumentartAenderungDto.class)))
+    @APIResponse(responseCode = "200", description = "Geänderte Dokumentart",
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"),
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = DokumentartDto.class)))
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
-    public Response aendern(@PathParam("code") String code, @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+    public Response aendern(@PathParam("code") String code,
+                            @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                             String body) {
         aufloesung.pruefen();
         int version = version(ifMatch);
@@ -186,10 +198,13 @@ public class DokumentartResource {
     @Operation(summary = "Dokumentart löschen",
             description = "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. "
                     + "Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.")
-    @APIResponse(responseCode = "204", description = "Gelöscht")
+    @APIResponse(responseCode = "204", description = "Gelöscht",
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"))
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
-    public Response loeschen(@PathParam("code") String code, @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch) {
+    public Response loeschen(@PathParam("code") String code,
+                             @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch) {
         aufloesung.pruefen();
         int version = version(ifMatch);
         verwaltung.loeschen(code, version, wer(), null);

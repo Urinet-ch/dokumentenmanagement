@@ -2535,14 +2535,19 @@
         "responses" : {
           "200" : {
             "description" : "Dokumentarten",
-            "content" : {
-              "application/json" : {
-                "schema" : { }
-              }
-            },
             "headers" : {
               "ETag" : {
                 "description" : "Aktuelle Konfigurationsversion für If-Match"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Dokumentart"
+                  }
+                }
               }
             }
           },
@@ -2562,6 +2567,7 @@
         "description" : "If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 DOKUMENTART_EXISTIERT.",
         "tags" : [ "Dokumentarten" ],
         "parameters" : [ {
+          "required" : true,
           "name" : "If-Match",
           "in" : "header",
           "schema" : {
@@ -2581,6 +2587,11 @@
         "responses" : {
           "201" : {
             "description" : "Angelegt",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            },
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -2623,6 +2634,7 @@
             "type" : "string"
           }
         }, {
+          "required" : true,
           "name" : "If-Match",
           "in" : "header",
           "schema" : {
@@ -2631,7 +2643,12 @@
         } ],
         "responses" : {
           "204" : {
-            "description" : "Gelöscht"
+            "description" : "Gelöscht",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            }
           },
           "412" : {
             "description" : "VERSION_KONFLIKT"
@@ -2662,6 +2679,7 @@
             "type" : "string"
           }
         }, {
+          "required" : true,
           "name" : "If-Match",
           "in" : "header",
           "schema" : {
@@ -2679,6 +2697,21 @@
           "required" : true
         },
         "responses" : {
+          "200" : {
+            "description" : "Geänderte Dokumentart",
+            "headers" : {
+              "ETag" : {
+                "description" : "Neue Konfigurationsversion"
+              }
+            },
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Dokumentart"
+                }
+              }
+            }
+          },
           "412" : {
             "description" : "VERSION_KONFLIKT"
           },

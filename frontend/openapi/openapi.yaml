@@ -2449,12 +2449,15 @@ paths:
       responses:
         "200":
           description: Dokumentarten
-          content:
-            application/json:
-              schema: {}
           headers:
             ETag:
               description: Aktuelle Konfigurationsversion für If-Match
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dokumentart"
         "401":
           description: Not Authorized
         "403":
@@ -2473,7 +2476,8 @@ paths:
       tags:
       - Dokumentarten
       parameters:
-      - name: If-Match
+      - required: true
+        name: If-Match
         in: header
         schema:
           type: string
@@ -2486,6 +2490,9 @@ paths:
       responses:
         "201":
           description: Angelegt
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
           content:
             application/json:
               schema:
@@ -2516,13 +2523,17 @@ paths:
         required: true
         schema:
           type: string
-      - name: If-Match
+      - required: true
+        name: If-Match
         in: header
         schema:
           type: string
       responses:
         "204":
           description: Gelöscht
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
         "412":
           description: VERSION_KONFLIKT
         "428":
@@ -2547,7 +2558,8 @@ paths:
         required: true
         schema:
           type: string
-      - name: If-Match
+      - required: true
+        name: If-Match
         in: header
         schema:
           type: string
@@ -2558,6 +2570,15 @@ paths:
               $ref: "#/components/schemas/DokumentartAenderung"
         required: true
       responses:
+        "200":
+          description: Geänderte Dokumentart
+          headers:
+            ETag:
+              description: Neue Konfigurationsversion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dokumentart"
         "412":
           description: VERSION_KONFLIKT
         "428":

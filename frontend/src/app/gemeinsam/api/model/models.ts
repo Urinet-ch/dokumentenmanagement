@@ -37,6 +37,8 @@ export * from './import-zeile';
 export * from './import-zuordnung';
 export * from './import-zuordnung-bestaetigen';
 export * from './import-zuordnung-gespeichert';
+export * from './konfigurations-version';
+export * from './konfigurations-version-detail';
 export * from './kontakt';
 export * from './kontakt-angaben';
 export * from './kontakt-detail';
