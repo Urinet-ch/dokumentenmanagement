@@ -53,6 +53,9 @@ services:
       # Empfänger der Benachrichtigungen an den Inhaber (Aufgabe 5.6, Entscheid Fabian 14.11.2026): keine Geheimnisse, aus
       # der .env des Bundles (der Deploy schreibt sie aus der GitHub-Variable gleichen Namens); leer heisst nur Log
       ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
+      # Domain des Mandanten VHF/GSK für das Branding (Aufgabe 10.3, Vorschlag 17.11.2026): dieselbe Variable wie der Router
+      # unten; bis zur Umstellung auf die Verbandsdomain gilt die Platzhalter-Subdomain
+      ARCHIV_BRANDING_VHF_GSK_DOMAIN: ${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
       # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die
@@ -108,6 +111,42 @@ services:
       traefik.http.middlewares.archiv-drossel-health.ratelimit.average: "2"
       traefik.http.middlewares.archiv-drossel-health.ratelimit.period: 1s
       traefik.http.middlewares.archiv-drossel-health.ratelimit.burst: "10"
+      # Webseiten-Schnittstelle /public/v1/* (Aufgabe 11.6, Req 15.1, design.md «Grenzen», vorgeschlagen 17.11.2026, wartet auf
+      # Prüfung von Fabian): äussere Schicht je Quell-IP vor dem Backend. Ein Webseitenserver ist eine IP, darum liegen die
+      # Werte über den Grenzen je Schlüssel im Backend (Lesen 20/s Spitze 100, Suche 2/s Spitze 10, Erfassung 5/s Spitze 20,
+      # Uploads 120/h): Im Normalfall antwortet das Backend mit 429 ZU_VIELE_ANFRAGEN und Retry-After; Traefik fängt nur
+      # Schlüssel-Raten (viele ungültige Schlüssel je IP, Argon2) und Last vor dem Backend ab. Traefiks eigenes 429 hat
+      # kein Problem Details und kein Retry-After (Clients behandeln jedes 429 als «später wieder»). Zähler je IP im Speicher
+      # von Traefik. Header X-Archiv-Zugriff, -Client, -Bearbeiter: keine Middleware entfernt oder ändert sie, Traefik reicht
+      # alle Request-Header unverändert weiter.
+      traefik.http.middlewares.archiv-public-drossel.ratelimit.average: "50"
+      traefik.http.middlewares.archiv-public-drossel.ratelimit.period: 1s
+      traefik.http.middlewares.archiv-public-drossel.ratelimit.burst: "200"
+      # Suche (Embedding und Reranker) strenger, je IP rund das Doppelte der Grenze je Schlüssel
+      traefik.http.middlewares.archiv-public-suche-drossel.ratelimit.average: "5"
+      traefik.http.middlewares.archiv-public-suche-drossel.ratelimit.period: 1s
+      traefik.http.middlewares.archiv-public-suche-drossel.ratelimit.burst: "20"
+      # gleichzeitige Anfragen je IP: Streams (8 gleichzeitig, Backend) plus Lesen; darüber 429 statt Warteschlange im Backend
+      traefik.http.middlewares.archiv-public-gleichzeitig.inflightreq.amount: "24"
+      # Vorschlag für 11.10 (nicht aktiv): Body-Grösse der Uploads. archiv.upload.max-datei = 50 MB plus Multipart-Rahmen;
+      # das Backend verlangt Content-Length und weist grössere Dateien selbst ab. Das buffering-Middleware puffert den Body
+      # in Traefik (Speicher von Traefik, nicht im Budget Stufe A) und bricht Streaming-Uploads; erst aktivieren, wenn
+      # 11.10 den Upload-Pfad festlegt und Fabian es will, dann auf einem eigenen Router /public/v1/erfassung:
+      #   traefik.http.middlewares.archiv-public-upload.buffering.maxrequestbodybytes: "54525952"   # 52 MiB
+      #   traefik.http.middlewares.archiv-public-upload.buffering.memrequestbodybytes: "1048576"    # darüber auf Platte
+      # eigener Router vor der PWA (deren Regel «alles ausser /api/ und /q/» träfe /public/ sonst auch): Priorität höher
+      traefik.http.routers.archiv-public-suche.rule: Host(`archiv.apps.urinet.ch`) && Path(`/public/v1/suche`)
+      traefik.http.routers.archiv-public-suche.priority: "300"
+      traefik.http.routers.archiv-public-suche.entrypoints: websecure
+      traefik.http.routers.archiv-public-suche.tls.certresolver: le
+      traefik.http.routers.archiv-public-suche.service: archiv
+      traefik.http.routers.archiv-public-suche.middlewares: archiv-public-suche-drossel,archiv-public-drossel,archiv-public-gleichzeitig
+      traefik.http.routers.archiv-public.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/public/`)
+      traefik.http.routers.archiv-public.priority: "200"
+      traefik.http.routers.archiv-public.entrypoints: websecure
+      traefik.http.routers.archiv-public.tls.certresolver: le
+      traefik.http.routers.archiv-public.service: archiv
+      traefik.http.routers.archiv-public.middlewares: archiv-public-drossel,archiv-public-gleichzeitig
       # API
       traefik.http.routers.archiv-api.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/api/`)
       traefik.http.routers.archiv-api.entrypoints: websecure
@@ -120,6 +159,22 @@ services:
       traefik.http.routers.archiv.tls.certresolver: le
       traefik.http.routers.archiv.service: archiv
       traefik.http.routers.archiv.middlewares: archiv-drossel
+      # Mandant VHF/GSK (Aufgabe 10.3, Vorschlag 17.11.2026, wartet auf Prüfung von Fabian): Platzhalter-Subdomain unter der
+      # Archiv-Domain, Hostname aus ARCHIV_HOST_VHF_GSK (.env des Bundles, sonst der Standard). Voraussetzung: DNS-Eintrag
+      # für den Host (sonst scheitert das Zertifikat, die UriNet-Router bleiben unberührt). Umstellung auf die Verbandsdomain
+      # = nur den Wert der Variablen ändern (der Deploy schreibt .env über .github/scripts/schreibe-env.sh). Gleiche Dienste und
+      # Drosselung wie archiv.apps.urinet.ch; ohne /q/ (intern) und ohne /public/ (die Webseiten-Schnittstelle gehört nur
+      # an den Host oben mit ihrer eigenen Drosselung).
+      traefik.http.routers.archiv-vhf-gsk-api.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && PathPrefix(`/api/`)
+      traefik.http.routers.archiv-vhf-gsk-api.entrypoints: websecure
+      traefik.http.routers.archiv-vhf-gsk-api.tls.certresolver: le
+      traefik.http.routers.archiv-vhf-gsk-api.service: archiv
+      traefik.http.routers.archiv-vhf-gsk-api.middlewares: archiv-drossel
+      traefik.http.routers.archiv-vhf-gsk.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`) && !PathPrefix(`/public/`)
+      traefik.http.routers.archiv-vhf-gsk.entrypoints: websecure
+      traefik.http.routers.archiv-vhf-gsk.tls.certresolver: le
+      traefik.http.routers.archiv-vhf-gsk.service: archiv
+      traefik.http.routers.archiv-vhf-gsk.middlewares: archiv-drossel
       # Schlanker öffentlicher Health-Pfad
       traefik.http.routers.archiv-health.rule: Host(`archiv.apps.urinet.ch`) && Path(`/q/health/live`)
       traefik.http.routers.archiv-health.entrypoints: websecure
