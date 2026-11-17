@@ -64,6 +64,7 @@ public class KonfigurationVersionResource {
 
     @GET
     @ErfordertAktion(Aktion.A11)
+    @RolesAllowed("inhaber")
     @Operation(summary = "Konfigurationsversionen auflisten", description = "Nur mit Recht A11.")
     @APIResponse(responseCode = "200", description = "Versionen")
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
@@ -77,6 +78,7 @@ public class KonfigurationVersionResource {
     @GET
     @Path("/{nummer}")
     @ErfordertAktion(Aktion.A11)
+    @RolesAllowed("inhaber")
     @Operation(summary = "Konfigurationsversion ansehen", description = "Das Abbild bleibt unverändert lesbar.")
     @APIResponse(responseCode = "200", description = "Version und vollständiges Abbild")
     @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN")

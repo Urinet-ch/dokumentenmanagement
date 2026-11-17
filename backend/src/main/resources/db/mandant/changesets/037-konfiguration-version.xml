@@ -20,8 +20,8 @@
                     check (sha256 ~ '^[0-9a-f]{64}$')
             );
 
-            alter table dokument add column konfiguration_version int;
-            alter table dokument_version add column konfiguration_version int;
+            alter table dokument add column konfiguration_version int not null default 1;
+            alter table dokument_version add column konfiguration_version int not null default 1;
         </sql>
         <sql>
             with abbild as (
@@ -55,10 +55,8 @@
                 encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
             from abbild;
 
-            update dokument set konfiguration_version = 1
-                where exists (select 1 from konfiguration_version where version = 1);
-            update dokument_version set konfiguration_version = 1
-                where exists (select 1 from konfiguration_version where version = 1);
+            alter table dokument alter column konfiguration_version drop default;
+            alter table dokument_version alter column konfiguration_version drop default;
 
             alter table dokument add constraint dokument_konfiguration_version_fk
                 foreign key (konfiguration_version) references konfiguration_version (version);
