@@ -233,6 +233,10 @@ class S3AblageTest {
         S3Ablage ablage = ablage();
         DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
         ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
+        verwaltung.putObjectLegalHold(b -> b.bucket(bucket)
+                .key(eingang.schluessel().pfad(Ablageort.EINGANG))
+                .versionId(eingang.eingangVersionId())
+                .legalHold(h -> h.status(ObjectLockLegalHoldStatus.OFF)));
         ArchiviertesDokument archiviert = ablage.archivieren(mandant, List.of(eingang),
                 Sperrvorgabe.bis(IN_ZEHN_JAHREN));
         AbgelegteDatei gesperrt = archiviert.dateien().getFirst();
