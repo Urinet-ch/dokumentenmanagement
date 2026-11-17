@@ -5,8 +5,11 @@ import ch.urinet.archiv.mandant.domain.DokumentartVorlage;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,7 +42,10 @@ class KlassenpfadDokumentartSeedTest {
                  "vertraulichkeit": "NORMAL", "aufbewahrung_jahre": null, "gesetzliche_pflicht": false}]}""");
         assertThat(KlassenpfadDokumentartSeed.vorlagen(gueltig, "probe")).extracting(DokumentartVorlage::code)
                 .containsExactly("A");
-        for (String inhalt : List.of(
+    }
+
+    static Stream<String> ungueltigeSeeds() {
+        return Stream.of(
                 "{\"dokumentarten\": [{\"code\": \"A\", \"name\": \"A\", \"vertraulichkeit\": \"NORMAL\", \"farbe\": \"rot\"}]}",
                 "{\"arten\": []}",
                 "{\"dokumentarten\": []}",
@@ -49,11 +55,40 @@ class KlassenpfadDokumentartSeedTest {
                 art("\"aufbewahrung_jahre\": 10, \"gesetzliche_pflicht\": null"),
                 art("\"gesetzliche_pflicht\": true"),
                 art("\"aufbewahrung_jahre\": \"10\", \"gesetzliche_pflicht\": true"),
-                art("\"aufbewahrung_jahre\": 1.5, \"gesetzliche_pflicht\": true"))) {
-            assertThatThrownBy(() -> KlassenpfadDokumentartSeed.vorlagen(json.readTree(inhalt), "probe")).as(inhalt)
-                    .isInstanceOfSatisfying(MandantFehler.class,
-                            e -> assertThat(e.grund()).isEqualTo(MandantFehler.Grund.SEED_UNGUELTIG));
-        }
+                art("\"aufbewahrung_jahre\": 1.5, \"gesetzliche_pflicht\": true"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("ungueltigeSeeds")
+    void ungueltigerSeedBrichtAb(String inhalt) {
+        assertSeedUngueltig(inhalt);
+    }
+
+    static Stream<String> falschTypisierteOptionaleFelder() {
+        String rest = ", \"aufbewahrung_jahre\": null, \"gesetzliche_pflicht\": false";
+        return Stream.of(
+                art("\"gruppen\": \"finanz\"" + rest),
+                art("\"pflichtfelder\": \"titel\"" + rest),
+                art("\"aufbewahrung_ab\": 7" + rest),
+                art("\"aufbewahrung_ab\": \"\"" + rest),
+                art("\"aufbewahrung_ab\": \"  \"" + rest),
+                art("\"aktiv\": \"ungültig\"" + rest),
+                // ausdrückliches null gilt nicht als «fehlt»
+                art("\"gruppen\": null" + rest),
+                art("\"pflichtfelder\": null" + rest),
+                art("\"aktiv\": null" + rest));
+    }
+
+    @ParameterizedTest
+    @MethodSource("falschTypisierteOptionaleFelder")
+    void falschTypisierteOptionaleSeedFelderBringenAb(String inhalt) {
+        assertSeedUngueltig(inhalt);
+    }
+
+    private void assertSeedUngueltig(String inhalt) {
+        assertThatThrownBy(() -> KlassenpfadDokumentartSeed.vorlagen(json.readTree(inhalt), "probe")).as(inhalt)
+                .isInstanceOfSatisfying(MandantFehler.class,
+                        e -> assertThat(e.grund()).isEqualTo(MandantFehler.Grund.SEED_UNGUELTIG));
     }
 
     private static String art(String felder) {
