@@ -39,6 +39,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'NORMAL',
     gesetzlichePflicht: true,
     aktiv: true,
+    selbstAusgestellt: false,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
   {
     code: 'LOHNABRECHNUNG',
@@ -49,6 +54,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'PERSONAL',
     gesetzlichePflicht: true,
     aktiv: true,
+    selbstAusgestellt: true,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
 ];
 
@@ -78,6 +88,11 @@ const VHF_ART: Dokumentart = {
   vertraulichkeit: 'NORMAL',
   gesetzlichePflicht: false,
   aktiv: true,
+  selbstAusgestellt: false,
+  belegnummerMuster: [],
+  kiVorschlag: true,
+  kiFelder: [],
+  reihenfolge: 0,
 };
 
 describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
