@@ -14,7 +14,10 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -23,7 +26,9 @@ import java.time.ZoneId;
  * Zeile je Mandant und Monat
  * (erster Tag, Monat in {@code Europe/Zurich}). Verbrauchen ist ein einziger {@code insert … on conflict do update}, damit
  * gleichzeitige Fragen nichts verlieren. Eine bedingte Aktualisierung reserviert atomar den einzigen laufenden Platz des
- * Monats; jede Anweisung läuft in einer kurzen Transaktion. Ohne Zeile gilt der Standard
+ * Monats; jede Anweisung läuft in einer kurzen Transaktion. Die Reservierung ist ein Lease: {@code laufend_seit} hält den
+ * Beginn, und eine Reservierung, die älter ist als {@code archiv.webseite.chat.reservierung-ablauf}, gilt als verwaist
+ * (Absturz, Deploy oder gescheiterte Freigabe) und wird von der nächsten Frage übernommen. Ohne Zeile gilt der Standard
  * {@code archiv.webseite.chat.monatsbudget-tokens}.
  */
 @ApplicationScoped
@@ -35,17 +40,23 @@ public class JdbcMandantBudget implements MandantBudget {
     private final Instance<AgroalDataSource> datenquelle;
     private final long standard;
     private final Clock uhr;
+    private final Duration ablauf;
 
     @Inject
     public JdbcMandantBudget(Instance<AgroalDataSource> datenquelle,
-                             @ConfigProperty(name = "archiv.webseite.chat.monatsbudget-tokens") long standard) {
-        this(datenquelle, standard, Clock.systemUTC());
+                             @ConfigProperty(name = "archiv.webseite.chat.monatsbudget-tokens") long standard,
+                             @ConfigProperty(name = "archiv.webseite.chat.reservierung-ablauf") Duration ablauf) {
+        this(datenquelle, standard, Clock.systemUTC(), ablauf);
     }
 
-    JdbcMandantBudget(Instance<AgroalDataSource> datenquelle, long standard, Clock uhr) {
+    JdbcMandantBudget(Instance<AgroalDataSource> datenquelle, long standard, Clock uhr, Duration ablauf) {
         if (standard < 0) {
             throw new IllegalArgumentException("archiv.webseite.chat.monatsbudget-tokens darf nicht negativ sein");
         }
+        if (ablauf == null || ablauf.isZero() || ablauf.isNegative()) {
+            throw new IllegalArgumentException("archiv.webseite.chat.reservierung-ablauf muss positiv sein");
+        }
+        this.ablauf = ablauf;
         this.datenquelle = datenquelle;
         this.standard = standard;
         this.uhr = uhr;
@@ -65,15 +76,19 @@ public class JdbcMandantBudget implements MandantBudget {
             anlegen.setLong(3, standard);
             anlegen.executeUpdate();
             try (PreparedStatement reservieren = verbindung.prepareStatement(
-                    "update public.mandant_budget set frage_laufend = true where mandant = ? and monat = ? "
-                            + "and tokens_verbraucht < tokens_max and not frage_laufend");
+                    "update public.mandant_budget set frage_laufend = true, laufend_seit = ? where mandant = ? "
+                            + "and monat = ? and tokens_verbraucht < tokens_max "
+                            + "and (not frage_laufend or laufend_seit is null or laufend_seit < ?)");
                  PreparedStatement abfrage = verbindung.prepareStatement(
                          "select frage_laufend, tokens_verbraucht >= tokens_max from public.mandant_budget "
                                  + "where mandant = ? and monat = ?")) {
                 for (int versuch = 0; versuch < 2; versuch++) {
+                    Instant jetzt = uhr.instant();
                     reservieren.setQueryTimeout(ZEITGRENZE_S);
-                    reservieren.setString(1, mandant.wert());
-                    reservieren.setDate(2, Date.valueOf(monat));
+                    reservieren.setTimestamp(1, Timestamp.from(jetzt));
+                    reservieren.setString(2, mandant.wert());
+                    reservieren.setDate(3, Date.valueOf(monat));
+                    reservieren.setTimestamp(4, Timestamp.from(jetzt.minus(ablauf)));
                     if (reservieren.executeUpdate() == 1) {
                         return new Reservierung(ReservierungsStatus.RESERVIERT, monat);
                     }
@@ -104,7 +119,7 @@ public class JdbcMandantBudget implements MandantBudget {
     public void freigeben(MandantCode mandant, LocalDate monat) {
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement befehl = verbindung.prepareStatement(
-                     "update public.mandant_budget set frage_laufend = false "
+                     "update public.mandant_budget set frage_laufend = false, laufend_seit = null "
                              + "where mandant = ? and monat = ? and frage_laufend")) {
             befehl.setQueryTimeout(ZEITGRENZE_S);
             befehl.setString(1, mandant.wert());

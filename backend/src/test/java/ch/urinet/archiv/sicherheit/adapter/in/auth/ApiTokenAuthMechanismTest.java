@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Welche Bearer-Werte das Archiv selbst prüft und welche an OIDC gehen (Req 2.5). Ohne Mockito: Proxys. */
 class ApiTokenAuthMechanismTest {
 
-    private final ApiTokenAuthMechanism mechanismus = new ApiTokenAuthMechanism();
+    private final ApiTokenAuthMechanism mechanismus = new ApiTokenAuthMechanism(
+            new ch.urinet.archiv.sicherheit.application.QuellAdresse(List.of("198.51.100.0/24")));
     private final List<AuthenticationRequest> anfragen = new ArrayList<>();
     private final IdentityProviderManager anbieter = proxy(IdentityProviderManager.class, (methode, args) -> {
         if (methode.equals("authenticate")) {
@@ -73,6 +74,17 @@ class ApiTokenAuthMechanismTest {
 
         assertThat(anfragen).singleElement().isInstanceOfSatisfying(ApiTokenAnfrage.class,
                 anfrage -> assertThat(anfrage.absenderIp()).contains("192.0.2.10"));
+    }
+
+    @Test
+    void realIpVomVertrauenswuerdigenProxyWirdUebernommen() {
+        ApiToken token = ApiToken.neu(new SecureRandom());
+
+        mechanismus.authenticate(kontext("Bearer " + token.text(), "203.0.113.17",
+                SocketAddress.inetSocketAddress(8080, "198.51.100.4")), anbieter).await().indefinitely();
+
+        assertThat(anfragen).singleElement().isInstanceOfSatisfying(ApiTokenAnfrage.class,
+                anfrage -> assertThat(anfrage.absenderIp()).contains("203.0.113.17"));
     }
 
     private static RoutingContext kontext(String authorization) {

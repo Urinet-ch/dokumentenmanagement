@@ -5,9 +5,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -17,7 +20,7 @@ import java.util.Optional;
 public class ApiTokenPruefGrenzen {
 
     private static final String OHNE_QUELLE = "-";
-    private static final Duration AUFRAEUM_ABSTAND = Duration.ofMinutes(1);
+    private static final Duration AUFRAEUM_ABSTAND = Duration.ofSeconds(5);
     private static final long WARTEZEIT_MAX_SEKUNDEN = 3600;
 
     public record Einstellung(double proSekunde, double spitze, int maxQuellen) {
@@ -67,7 +70,7 @@ public class ApiTokenPruefGrenzen {
         }
     }
 
-    private final Einstellung einstellung;
+    private Einstellung einstellung;
     private final Clock uhr;
     private final Map<String, Bucket> quellen = new HashMap<>();
     private Bucket sammel;
@@ -86,10 +89,23 @@ public class ApiTokenPruefGrenzen {
         this.uhr = uhr;
     }
 
+    /** Aktuelle Einstellung. */
+    public synchronized Einstellung einstellung() {
+        return einstellung;
+    }
+
+    /** Ersetzt die Einstellung und beginnt mit leerer Tabelle; für Tests, die die Grenze gezielt senken. */
+    public synchronized void einstellen(Einstellung neu) {
+        this.einstellung = neu;
+        quellen.clear();
+        sammel = null;
+    }
+
     /** Jede Prüfung ohne gültigen Cache-Treffer nimmt vor der HashSperre eine Marke. */
     public synchronized void pruefen(Optional<String> quelle) {
         Instant jetzt = uhr.instant();
-        String adresse = quelle.filter(wert -> !wert.isBlank()).map(String::strip).orElse(OHNE_QUELLE);
+        String adresse = quelle.filter(wert -> !wert.isBlank()).map(String::strip).map(ApiTokenPruefGrenzen::schluessel)
+                .orElse(OHNE_QUELLE);
         Bucket bucket = bucket(adresse, jetzt);
         long wartezeit = bucket.wartezeitSekunden(jetzt);
         if (wartezeit > 0) {
@@ -97,6 +113,21 @@ public class ApiTokenPruefGrenzen {
                     Math.min(wartezeit, WARTEZEIT_MAX_SEKUNDEN));
         }
         bucket.nehmen();
+    }
+
+    /** IPv6 zählt je /64 (ein Angreifer besitzt ein ganzes Präfix); alles andere unverändert. */
+    static String schluessel(String adresse) {
+        if (adresse.indexOf(':') < 0 || adresse.length() > 45) {
+            return adresse;
+        }
+        try {
+            if (InetAddress.ofLiteral(adresse) instanceof Inet6Address v6) {
+                return HexFormat.of().formatHex(v6.getAddress(), 0, 8) + "/64";
+            }
+        } catch (IllegalArgumentException e) {
+            // keine Adresse: unverändert zählen
+        }
+        return adresse;
     }
 
     private Bucket bucket(String quelle, Instant jetzt) {

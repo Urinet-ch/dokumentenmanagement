@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.sicherheit.ProblemDetails;
 import ch.urinet.archiv.sicherheit.adapter.in.kommando.WebseitenSchluesselKommando;
+import ch.urinet.archiv.sicherheit.application.ApiTokenPruefGrenzen;
 import ch.urinet.archiv.sicherheit.application.ApiTokenVerwaltung;
 import ch.urinet.archiv.sicherheit.application.HashSperre;
 import ch.urinet.archiv.sicherheit.application.WebseitenSchluesselVerwaltung;
@@ -67,6 +68,11 @@ public class WebseitenSchritte {
 
     @Inject
     HashSperre hashSperre;
+
+    @Inject
+    ApiTokenPruefGrenzen pruefGrenzen;
+
+    private ApiTokenPruefGrenzen.Einstellung grenzenVorher;
 
     @Inject
     @ConfigProperty(name = "archiv.webseite.absender-datei")
@@ -369,7 +375,7 @@ public class WebseitenSchritte {
 
     @Dann("wird die Schlüsselprüfung mit Status 429 und «Retry-After» abgelehnt")
     public void schluesselpruefung429() {
-        assertThat(ProblemDetails.pruefen(antwort, 429)).isEqualTo("ZU_VIELE_ANFRAGEN");
+        assertThat(ProblemDetails.pruefen(antwort, 429, "grund")).isEqualTo("ZU_VIELE_ANFRAGEN");
         assertThat(antwort.header("Retry-After")).isNotBlank();
         assertThat(antwort.jsonPath().getString("grund")).isEqualTo("SCHLUESSELPRUEFUNG");
     }
@@ -381,7 +387,8 @@ public class WebseitenSchritte {
 
     @Wenn("der Erfassungs-Schlüssel mit Quelle «{}» die Probe aufruft")
     public void erfassungsSchluesselVonQuelle(String quelle) {
-        antwort = probe(erfassungsToken, quelle);
+        antwort = given().header("Authorization", "Bearer " + erfassungsToken)
+                .header("X-Real-Ip", quelle).when().post("/public/v1/probe/erfassung");
     }
 
     @Wenn("die Webseite den warmen Schlüssel erneut an der Probe verwendet")
@@ -410,8 +417,18 @@ public class WebseitenSchritte {
         assertThat(antwort.headers().hasHeaderWithName("Link")).isFalse();
     }
 
+    @Angenommen("die Schlüsselprüfung lässt je Quelle 10 Prüfungen in Folge zu und füllt sich kaum nach")
+    public void knappeSchluesselpruefung() {
+        grenzenVorher = pruefGrenzen.einstellung();
+        pruefGrenzen.einstellen(new ApiTokenPruefGrenzen.Einstellung(0.01, 10, grenzenVorher.maxQuellen()));
+    }
+
     @After
     public void aufraeumen() throws SQLException, IOException {
+        if (grenzenVorher != null) {
+            pruefGrenzen.einstellen(grenzenVorher);
+            grenzenVorher = null;
+        }
         hashSperreFreigeben();
         Files.deleteIfExists(absenderDatei);
         for (String id : tokenIds) {
