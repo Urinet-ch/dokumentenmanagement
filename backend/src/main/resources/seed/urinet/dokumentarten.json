@@ -12,7 +12,10 @@
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
       "gesetzliche_pflicht": true,
-      "aktiv": true
+      "aktiv": true,
+      "selbst_ausgestellt": true,
+      "belegnummer_muster": ["^\\d{4}-\\d{3}$", "^R\\d{4}$"],
+      "fremdbeleg_art": "LIEFERANTENBELEG"
     },
     {
       "code": "OFFERTE",
@@ -29,7 +32,10 @@
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
       "gesetzliche_pflicht": false,
-      "aktiv": true
+      "aktiv": true,
+      "selbst_ausgestellt": true,
+      "belegnummer_muster": ["^O-\\d{4}-\\d{3}$"],
+      "fremdbeleg_art": "LIEFERANTENBELEG"
     },
     {
       "code": "LIEFERANTENBELEG",
@@ -42,7 +48,9 @@
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
       "gesetzliche_pflicht": true,
-      "aktiv": true
+      "aktiv": true,
+      "belegnummer_muster": ["^F\\d{4}$"],
+      "ohne_zahlungsdaten_art": "QUITTUNG"
     },
     {
       "code": "QUITTUNG",
@@ -75,7 +83,8 @@
       "aufbewahrung_jahre": 10,
       "aufbewahrung_ab": "GESCHAEFTSJAHR",
       "gesetzliche_pflicht": true,
-      "aktiv": true
+      "aktiv": true,
+      "selbst_ausgestellt": true
     },
     {
       "code": "VERTRAG",
