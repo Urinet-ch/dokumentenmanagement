@@ -26,6 +26,15 @@ class KonfigurationTest {
     }
 
     @Test
+    void aenderungToStringGibtKennungenNichtAus() {
+        var kennung = new Konfiguration.Aenderung("einstellungen.kennungen.uid", "PROBE-ALT", "PROBE-NEU");
+        var andere = new Konfiguration.Aenderung("einstellungen.geschaeftsjahrEnde", "06-30", "12-31");
+
+        assertThat(kennung.toString()).doesNotContain("PROBE-ALT").doesNotContain("PROBE-NEU");
+        assertThat(andere.toString()).contains("06-30").contains("12-31");
+    }
+
+    @Test
     void kopiertListenUnveraenderlich() {
         var ibans = new java.util.ArrayList<>(List.of("TEST-IBAN-1"));
         var kennungen = new Konfiguration.Kennungen(null, ibans);

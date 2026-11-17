@@ -325,7 +325,12 @@ weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis au
 Datensparsame Ausnahme bei `einstellungen.kennungen.uid` und `.ibans` (Nachverfolgung 17.2/17.3, Spec 01, 16.7):
 Diese Änderungen enthalten nur `{pfad, aenderung: "geändert"}`, keine alten oder neuen Werte. Bereits
 `ProtokollDetails.Aenderung` entfernt die Werte, bevor sie serialisiert oder als Objekt geloggt werden können.
-Andere Elemente behalten die bisherige Form mit `alt` und `neu`. Das unveränderliche Konfigurationsabbild enthält
+`Konfiguration.Aenderung` überschreibt `toString()` für diese Pfade, damit auch ein Log der Domänenobjekte keine
+Kennungen preisgibt. Andere Elemente behalten die bisherige Form mit `alt` und `neu`.
+Altzeilen: Protokollzeilen `KONFIGURATION_AENDERN` aus der Zeit vor dieser Nachverfolgung können UID und IBAN im
+Klartext als `alt`/`neu` enthalten. Das Zugriffsprotokoll ist nur anfügend (Append-only), darum bleiben sie
+unverändert (Restrisiko, kein UPDATE); ob sie über Aufbewahrungsfristen oder ein Verfahren bereinigt werden,
+entscheidet Fabian. Das unveränderliche Konfigurationsabbild enthält
 die vollständigen Einstellungen weiterhin; dort lässt sich die Änderung mit der protokollierten Version
 nachvollziehen, ohne die Kennungen im Zugriffsprotokoll zu vervielfältigen.
 

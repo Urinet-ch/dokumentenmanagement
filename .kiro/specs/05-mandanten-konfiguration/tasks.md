@@ -24,6 +24,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     `KONFIGURATION_AENDERN` neben `REGEL_AENDERN`, `If-Match` mit der Konfigurationsversion (auch für
     `/dokumentarten`), Version am Dokument und in der Dokumentversion, `GET /konfiguration/versionen[/{n}]`,
     Append-only-Test.
+    Nachverfolgung (PR #290): Req 1.3 maskiert `uid`/`ibans` im Protokoll (design.md «Protokoll»); Nachweis:
+    `ProtokollDetailsTest` und Szenarien `@req-1.3`, `@req-2.7`.
   - _Anforderungen: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Abhängig von: Spec 01: 3.5, 4.7_
 

@@ -183,6 +183,13 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     }
 
     public record Aenderung(String pfad, String alt, String neu) {
+        /** Kennungen (UID, IBAN) nie im Klartext ausgeben (Spec 01, 16.7). */
+        @Override
+        public String toString() {
+            boolean kennung = pfad != null && pfad.startsWith("einstellungen.kennungen.");
+            return kennung ? "Aenderung[pfad=" + pfad + ", geändert]"
+                    : "Aenderung[pfad=" + pfad + ", alt=" + alt + ", neu=" + neu + "]";
+        }
     }
 
     public record Befund(String pfad, String code, String meldung) {
