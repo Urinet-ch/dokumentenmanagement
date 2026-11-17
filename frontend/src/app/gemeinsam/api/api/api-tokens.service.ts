@@ -170,7 +170,7 @@ export class APITokensService extends BaseService {
      * API-Token widerrufen
      * Wirkt sofort; fremde oder unbekannte IDs → 404.
      * @endpoint delete /api/v1/api-tokens/{tokenId}
-     * @param tokenId
+     * @param tokenId ID des API-Tokens
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -228,7 +228,7 @@ export class APITokensService extends BaseService {
     /**
      * Ablaufdatum eines API-Tokens entfernen
      * @endpoint delete /api/v1/api-tokens/{tokenId}/gueltig-bis
-     * @param tokenId
+     * @param tokenId ID des API-Tokens
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -286,8 +286,8 @@ export class APITokensService extends BaseService {
     /**
      * Ablaufdatum eines API-Tokens setzen
      * @endpoint put /api/v1/api-tokens/{tokenId}/gueltig-bis
-     * @param tokenId
-     * @param apiTokenAblauf
+     * @param tokenId ID des API-Tokens
+     * @param apiTokenAblauf Neues Ablaufdatum, gültig bis einschliesslich dieses Tages
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options

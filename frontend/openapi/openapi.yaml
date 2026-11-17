@@ -2274,7 +2274,8 @@ paths:
       tags:
       - API-Tokens
       parameters:
-      - name: tokenId
+      - description: ID des API-Tokens
+        name: tokenId
         in: path
         required: true
         schema:
@@ -2295,12 +2296,14 @@ paths:
       tags:
       - API-Tokens
       parameters:
-      - name: tokenId
+      - description: ID des API-Tokens
+        name: tokenId
         in: path
         required: true
         schema:
           type: string
       requestBody:
+        description: "Neues Ablaufdatum, gültig bis einschliesslich dieses Tages"
         content:
           application/json:
             schema:
@@ -2323,7 +2326,8 @@ paths:
       tags:
       - API-Tokens
       parameters:
-      - name: tokenId
+      - description: ID des API-Tokens
+        name: tokenId
         in: path
         required: true
         schema:

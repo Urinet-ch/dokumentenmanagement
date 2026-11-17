@@ -2335,6 +2335,7 @@
         "description" : "Wirkt sofort; fremde oder unbekannte IDs → 404.",
         "tags" : [ "API-Tokens" ],
         "parameters" : [ {
+          "description" : "ID des API-Tokens",
           "name" : "tokenId",
           "in" : "path",
           "required" : true,
@@ -2363,6 +2364,7 @@
         "summary" : "Ablaufdatum eines API-Tokens setzen",
         "tags" : [ "API-Tokens" ],
         "parameters" : [ {
+          "description" : "ID des API-Tokens",
           "name" : "tokenId",
           "in" : "path",
           "required" : true,
@@ -2371,6 +2373,7 @@
           }
         } ],
         "requestBody" : {
+          "description" : "Neues Ablaufdatum, gültig bis einschliesslich dieses Tages",
           "content" : {
             "application/json" : {
               "schema" : {
@@ -2402,6 +2405,7 @@
         "summary" : "Ablaufdatum eines API-Tokens entfernen",
         "tags" : [ "API-Tokens" ],
         "parameters" : [ {
+          "description" : "ID des API-Tokens",
           "name" : "tokenId",
           "in" : "path",
           "required" : true,
