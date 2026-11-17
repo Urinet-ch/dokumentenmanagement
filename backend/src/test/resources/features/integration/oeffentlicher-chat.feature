@@ -181,6 +181,22 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und nennt die Quelle «A» die echte ID, die Reihe «PROBE_BULLETIN» mit dem Namen «Probe-Bulletin» und die Ausgabe «3/2071»
     Und enthält der Text des Chatbots «Frühling 2071»
 
+  @req-5.7
+  Szenario: Der Chatbot nennt die Seiten der Fundstelle nur, wenn sie im Dokument liegen
+    Angenommen das Embedding-Modell bettet jede Frage des öffentlichen Chatbots gleich ein
+    Und das Chatbot-Dokument «A» hat 12 Seiten und einen Abschnitt nahe der Frage auf den Seiten «7-8»
+    Und das Chatbot-Dokument «B» hat 3 Seiten und einen Abschnitt nahe der Frage auf den Seiten «5-6»
+    Und das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art      | inhalt           | argumente                    | tokens |
+      | 1       | werkzeug | dokumente_suchen | {"frage":"Seilbahnrevision"} | 100/20 |
+      | 2       | text     | Das sind die Publikationen. |                   | 150/30 |
+    Wenn die Webseite mit dem Schlüssel «mitglieder» für den Client «anna» auf der Stufe «mitglieder» fragt: «Was gibt es zur Seilbahnrevision?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und enthält ein Werkzeugergebnis der Anfrage 2 «Probe-Bulletin Seilbahnrevision|"seiten":"7-8"»
+    Und enthält ein Werkzeugergebnis der Anfrage 2 «Probe-Merkblatt Seilbahnrevision Mitglieder»
+    Und enthält kein Werkzeugergebnis der Anfrage 2 «"seiten":"5»
+    Und nennen die Quellen des Chatbots genau die Dokumente «A, B»
+
   @req-6.3
   Szenario: Ohne passende Publikation sagt der Chatbot das und verweist auf die Geschäftsstelle
     Angenommen das simulierte Sprachmodell antwortet nacheinander:
@@ -192,6 +208,15 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und sind die Quellen des Chatbots leer
     Und enthält der Text des Chatbots «Dazu habe ich nichts gefunden.»
     Und enthält der Text des Chatbots «Bitte wenden Sie sich an die Geschäftsstelle.»
+
+  @req-6.1 @req-15.4
+  Szenario: Ein erfolgreicher Chat-Stream wird nicht zwischengespeichert
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt         | argumente | tokens |
+      | 1       | text | Guten Tag.     |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «vorstand» für den Client «anna» auf der Stufe «oeffentlich» fragt: «Hallo?»
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und trägt die Chatbot-Antwort den Header «Cache-Control» mit dem Wert «no-store»
 
   # ---- Grenzen und Budget (Req 6.4)
 
@@ -305,6 +330,18 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Wenn die Webseite mit dem Schlüssel «vorstand» den Rohkörper «keinjson» sendet
     Dann liefert der Chatbot Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und steht in der Chatbot-Antwort weder «keinjson» noch «Exception»
+
+  @req-6.1
+  Szenario: Ein falscher Inhaltstyp wird mit 415 abgelehnt, Zusatzfelder im Körper werden ignoriert und stellen nichts frei
+    Wenn die Webseite mit dem Schlüssel «vorstand» mit dem Inhaltstyp «text/plain» den Rohkörper «{"frage":"Hallo"}» sendet
+    Dann liefert der Chatbot Status 415 und Fehlercode «MEDIENTYP_FALSCH»
+    Und steht in der Chatbot-Antwort weder «Exception» noch «java.»
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt     | argumente | tokens |
+      | 1       | text | Guten Tag. |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «oeffentlich» den Rohkörper «{"frage":"Hallo","stufe":"vorstand","zugriff":"vorstand","mandant":"fremd"}» sendet
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und sind die Quellen des Chatbots leer
 
   @req-6.1
   Szenario: Der Verlauf umfasst Frage und Antwort der letzten Runde und gehört dem Client; eine fremde Gesprächs-ID beginnt ein neues Gespräch

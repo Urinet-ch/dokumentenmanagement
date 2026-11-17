@@ -1,0 +1,78 @@
+package ch.urinet.archiv.dokumentart;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class VhfGskDokumentartSeedTest {
+
+    @Test
+    void seedEnthaeltVerbandsartenOhneFinanzartenUndMitReserviertenFeldern() throws IOException {
+        JsonNode seed;
+        try (var inhalt = Files.newInputStream(Path.of("src/main/resources/seed/vhf-gsk/dokumentarten.json"))) {
+            seed = new ObjectMapper().readTree(inhalt);
+        }
+
+        JsonNode arten = seed.path("dokumentarten");
+        JsonNode hinweise = seed.path("_hinweise");
+        assertThat(arten).hasSize(7);
+        assertThat(arten).extracting(art -> art.path("code").asText())
+                .containsExactlyInAnyOrder("BULLETIN", "NORM_RICHTLINIE", "VORSTANDSPROTOKOLL", "MERKBLATT",
+                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT");
+
+        assertThat(hinweise.path("verband").path("mehrfach").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("suchfilter").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("oeffentlich_filter").asBoolean()).isTrue();
+        assertThat(hinweise.path("verband").path("ki_vorschlag").asBoolean()).isFalse();
+        assertThat(hinweise.path("zugriff").path("nur_manuell").asBoolean()).isTrue();
+        assertThat(hinweise.path("veroeffentlicht").path("ki_vorschlag").asBoolean()).isFalse();
+
+        for (JsonNode art : arten) {
+            List<String> gruppen = new ArrayList<>();
+            art.path("gruppen").forEach(gruppe -> gruppen.add(gruppe.asText()));
+            assertThat(gruppen).as(art.path("code").asText()).doesNotContain("finanz");
+            assertThat(art.path("gesetzliche_pflicht").asBoolean()).as(art.path("code").asText()).isFalse();
+            JsonNode eigenschaften = art.path("zusatz_schema").path("properties");
+            assertThat(eigenschaften.path("verband").path("type").asText()).isEqualTo("array");
+            assertThat(texte(eigenschaften.path("verband").path("items").path("enum")))
+                    .containsExactly("vhf", "gsk");
+            assertThat(texte(eigenschaften.path("zugriff").path("enum")))
+                    .containsExactly("oeffentlich", "mitglieder", "vorstand");
+            assertThat(eigenschaften.path("zugriff").path("default").asText()).isEqualTo("mitglieder");
+            assertThat(texte(art.path("zusatz_schema").path("required")))
+                    .as(art.path("code").asText()).contains("verband", "zugriff", "veroeffentlicht");
+            assertThat(eigenschaften.path("veroeffentlicht").path("default").asBoolean()).isFalse();
+        }
+
+        JsonNode bulletin = finde(arten, "BULLETIN").path("zusatz_schema").path("properties");
+        assertThat(bulletin.has("reihe")).isTrue();
+        assertThat(bulletin.has("ausgabe")).isTrue();
+        assertThat(bulletin.has("jahr")).isTrue();
+        assertThat(bulletin.has("fachgebiet")).isTrue();
+        assertThat(finde(arten, "JAHRESBERICHT").path("zusatz_schema").path("properties").has("jahr")).isTrue();
+        assertThat(finde(arten, "VORSTANDSPROTOKOLL").path("vertraulichkeit").asText()).isEqualTo("INTERN");
+    }
+
+    private static List<String> texte(JsonNode werte) {
+        List<String> ergebnis = new ArrayList<>();
+        werte.forEach(wert -> ergebnis.add(wert.asText()));
+        return ergebnis;
+    }
+
+    private static JsonNode finde(JsonNode arten, String code) {
+        for (JsonNode art : arten) {
+            if (code.equals(art.path("code").asText())) {
+                return art;
+            }
+        }
+        throw new AssertionError("Dokumentart fehlt: " + code);
+    }
+}

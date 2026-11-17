@@ -261,6 +261,7 @@ export async function weiterleiten(welt, { passt = () => true, merken = async ()
       }
       try {
         const url = new URL(anfrage.url());
+        const oeffentlichesBranding = url.pathname === '/api/v1/branding';
         const json = istJson(await anfrage.headerValue('content-type'));
         const eintrag = {
           methode: anfrage.method(),
@@ -272,13 +273,12 @@ export async function weiterleiten(welt, { passt = () => true, merken = async ()
         };
         zustand.anfragen.push(eintrag);
         eintraege.set(anfrage, eintrag);
-        // Die PWA muss das Token der Anmeldung senden; getauscht wird nur dieses.
-        assert.equal(
-          await anfrage.headerValue('authorization'),
-          `Bearer ${welt.keycloak.accessToken}`,
-        );
-        await anfrageWeiterleiten(route, welt.keycloak.benutzer, {
-          tokenTauschen: !zustand.sitzungAbgelaufen,
+        if (!oeffentlichesBranding) {
+          // Die PWA muss für geschützte Endpunkte das Token der Anmeldung senden; getauscht wird nur dieses.
+          assert.equal(await anfrage.headerValue('authorization'), `Bearer ${welt.keycloak.accessToken}`);
+        }
+        await anfrageWeiterleiten(route, welt.keycloak?.benutzer, {
+          tokenTauschen: !oeffentlichesBranding && !zustand.sitzungAbgelaufen,
         });
       } catch (fehler) {
         zustand.fehler ??= fehler;

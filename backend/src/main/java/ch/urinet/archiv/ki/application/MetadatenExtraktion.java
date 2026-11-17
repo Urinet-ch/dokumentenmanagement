@@ -5,6 +5,7 @@ import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungMandant;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
+import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.QrDaten;
 import ch.urinet.archiv.ki.domain.Vorschlag;
 import ch.urinet.archiv.ki.domain.VorschlagNachbearbeitung;
@@ -14,8 +15,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -115,8 +118,9 @@ public class MetadatenExtraktion {
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
         ErfassungMandant mandant = new ErfassungMandant(werte.name(), werte.uid(), werte.ibans(), werte.eigeneArten());
         List<ArtEintrag> arten = arten();
-        String system = ErfassungPrompt.system(mandant.name(),
+        String grundPrompt = ErfassungPrompt.system(mandant.name(),
                 ErfassungPrompt.artListe(arten, mandant.eigeneArten(), mandant.name()));
+        String system = grundPrompt + ErfassungPrompt.mandantenHinweise(eingabe.mandant().wert());
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
         String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
@@ -124,7 +128,7 @@ public class MetadatenExtraktion {
                 ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
                 auswahl);
-        String kennung = ErfassungPrompt.hash(system, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
+        String kennung = ErfassungPrompt.hash(grundPrompt, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
         if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
             LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "
                     + "weichen ab)", eingabe.dokumentId(), kennung, ErfassungPrompt.GATE_KENNUNG);
@@ -137,6 +141,9 @@ public class MetadatenExtraktion {
             case KiPort.Gueltig g -> {
                 Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeite(g.vorschlag(), qr, eingabe.text(),
                         mandant, arten, eingabe.eingang());
+                if (ErfassungPrompt.hatMandantenHinweise(eingabe.mandant().wert())) {
+                    vorschlag = ohneFinanz(vorschlag);
+                }
                 LOG.infof("KI-Vorschlag für Dokument %s (Prompt %s, Nachbearbeitung %s, QR %s, Bildweg %s)",
                         eingabe.dokumentId(), kennung, VorschlagNachbearbeitung.FASSUNG,
                         qr.isPresent(), bild.isPresent());
@@ -154,6 +161,19 @@ public class MetadatenExtraktion {
                 yield Optional.empty();
             }
         };
+    }
+
+    static Vorschlag ohneFinanz(Vorschlag vorschlag) {
+        EnumMap<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
+        sicherheit.putAll(vorschlag.sicherheit());
+        for (Feld feld : List.of(Feld.BELEGNUMMER, Feld.RICHTUNG, Feld.BETRAG, Feld.WAEHRUNG, Feld.FAELLIGKEIT,
+                Feld.QR_REFERENZ)) {
+            sicherheit.remove(feld);
+        }
+        return new Vorschlag(vorschlag.art(), vorschlag.titel(), vorschlag.datum(), vorschlag.partnerName(),
+                vorschlag.partnerUid(), null, vorschlag.partnerEmail(), null, null, null, null, null, null,
+                vorschlag.vertraulichkeit(), vorschlag.tags(), sicherheit, vorschlag.mandantIstAussteller(),
+                vorschlag.umstufung());
     }
 
     /**

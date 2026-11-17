@@ -32,14 +32,14 @@ public class PanacheOeffentlicheDokumente implements OeffentlicheDokumente {
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em().createNativeQuery("select d.id, d.titel, d.art, a.name, "
                         + "d.zusatz ->> 'ausgabe', case when jsonb_typeof(d.zusatz -> 'jahr') = 'number' "
-                        + "then d.zusatz ->> 'jahr' end from dokument d left join dokumentart a on a.code = d.art "
+                        + "then d.zusatz ->> 'jahr' end, d.seiten from dokument d left join dokumentart a on a.code = d.art "
                         + "where d.id in (:ids) and " + FesterFilter.bedingung("d"))
                 .setParameter("ids", List.copyOf(ids))
                 .setParameter(FesterFilter.PARAMETER, FesterFilter.stufen(zugriff)).getResultList();
         List<OeffentlichesDokument> ergebnis = new ArrayList<>(zeilen.size());
         for (Object[] z : zeilen) {
             ergebnis.add(new OeffentlichesDokument((UUID) z[0], (String) z[1], (String) z[2], (String) z[3],
-                    (String) z[4], jahr((String) z[5])));
+                    (String) z[4], jahr((String) z[5]), z[6] == null ? null : ((Number) z[6]).intValue()));
         }
         return List.copyOf(ergebnis);
     }

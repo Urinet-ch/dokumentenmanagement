@@ -8,6 +8,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
 import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
+import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
 import { MENUE } from './gemeinsam/navigation';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -22,6 +23,7 @@ import { TEXTE } from './gemeinsam/texte.de-CH';
 export class App {
   protected readonly texte = TEXTE;
   protected readonly anmeldung = inject(AnmeldungService);
+  protected readonly branding = inject(BrandingService);
   protected readonly zaehler = inject(EingangskorbZaehler);
   private readonly router = inject(Router);
 
