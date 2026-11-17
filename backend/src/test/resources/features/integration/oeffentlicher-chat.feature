@@ -316,6 +316,18 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und steht in der Chatbot-Antwort weder «keinjson» noch «Exception»
 
   @req-6.1
+  Szenario: Ein falscher Inhaltstyp wird mit 415 abgelehnt, Zusatzfelder im Körper werden ignoriert und stellen nichts frei
+    Wenn die Webseite mit dem Schlüssel «vorstand» mit dem Inhaltstyp «text/plain» den Rohkörper «{"frage":"Hallo"}» sendet
+    Dann liefert der Chatbot Status 415 und Fehlercode «MEDIENTYP_FALSCH»
+    Und steht in der Chatbot-Antwort weder «Exception» noch «java.»
+    Angenommen das simulierte Sprachmodell antwortet nacheinander:
+      | antwort | art  | inhalt     | argumente | tokens |
+      | 1       | text | Guten Tag. |           | 5/2    |
+    Wenn die Webseite mit dem Schlüssel «oeffentlich» den Rohkörper «{"frage":"Hallo","stufe":"vorstand","zugriff":"vorstand","mandant":"fremd"}» sendet
+    Dann endet der Stream des Chatbots mit «quellen» und «fertig»
+    Und sind die Quellen des Chatbots leer
+
+  @req-6.1
   Szenario: Der Verlauf umfasst Frage und Antwort der letzten Runde und gehört dem Client; eine fremde Gesprächs-ID beginnt ein neues Gespräch
     Angenommen das simulierte Sprachmodell antwortet nacheinander:
       | antwort | art  | inhalt                    | argumente | tokens |

@@ -254,6 +254,12 @@ public class OeffentlicherChatSchritte {
         ereignisse = lesen();
     }
 
+    @Wenn("die Webseite mit dem Schlüssel «{word}» mit dem Inhaltstyp «{}» den Rohkörper «{}» sendet")
+    public void rohkoerperMitInhaltstyp(String name, String inhaltstyp, String koerper) {
+        antwort = anfrage(name, "oeffentlich", null).contentType(inhaltstyp).body(koerper).when().post(PFAD);
+        ereignisse = lesen();
+    }
+
     @Wenn("die Webseite mit dem Schlüssel «{word}» eine Frage mit {int} Zeichen stellt")
     public void langeFrage(String name, int zeichen) throws Exception {
         letzterSchluessel = name;
