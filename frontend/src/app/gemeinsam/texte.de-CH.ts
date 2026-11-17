@@ -951,6 +951,10 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerAllgemein: 'Der Widerruf ist fehlgeschlagen. Bitte versuchen Sie es später erneut.',
+    hinweisAbgelaufen:
+      'Dieses Token ist abgelaufen und lässt sich nicht verlängern. Bitte widerrufen Sie es und stellen Sie ein neues Token aus.',
+    fehlerAblaufAbgelaufen:
+      'Das Token ist abgelaufen und lässt sich nicht mehr verlängern. Bitte widerrufen Sie es und stellen Sie ein neues Token aus.',
     fehlerAblauf: 'Das Ablaufdatum konnte nicht geändert werden. Bitte versuchen Sie es später erneut.',
   },
   /** Seite «Chat» (Spec 02, Aufgabe 7.4; Req 6.1–6.3, 4.3); Menüpunkt seit Aufgabe 7.4b. */

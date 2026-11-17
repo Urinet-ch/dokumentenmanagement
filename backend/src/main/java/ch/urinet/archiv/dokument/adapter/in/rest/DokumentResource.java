@@ -69,8 +69,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Dokument lesen und herunterladen (A2–A4, Req 1.4, 2.3, 2.21, 14.6); den Eingangskorb liest die
@@ -84,8 +82,6 @@ import java.util.regex.Pattern;
 @Produces(MediaType.APPLICATION_JSON)
 public class DokumentResource {
 
-    // nur ein starkes ETag passt (RFC 9110, If-Match vergleicht stark)
-    private static final Pattern VERSION = Pattern.compile("^\"(\\d{1,9})\"$");
     private static final String SICHERHEIT = "sicherheit";
 
     private static final String GRUND = "grund";
@@ -452,14 +448,7 @@ public class DokumentResource {
      * eine Zahl ohne Anführungszeichen), passt nie → 412.
      */
     static int version(String ifMatch) {
-        if (ifMatch == null || ifMatch.isBlank()) {
-            throw new FachFehler(Fehlercode.VERSION_FEHLT);
-        }
-        Matcher treffer = VERSION.matcher(ifMatch.strip());
-        if (!treffer.matches()) {
-            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
-        }
-        return Integer.parseInt(treffer.group(1));
+        return ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf.version(ifMatch);
     }
 
     @GET

@@ -15,8 +15,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Grenzen je Webseiten-Schlüssel (Spec 03, Req 15.1; design.md «Grenzen»): je Schlüssel-ID (nie je Header-Wert) vier
- * Token-Buckets: Lesen, Suche, Erfassung, Uploads. Eine Anfrage nimmt aus allen Buckets ihrer {@link Grenzklasse} je eine
+ * Grenzen je Webseiten-Schlüssel (Spec 03, Req 15.1; design.md «Grenzen»): je Schlüssel-ID (nie je Header-Wert) fünf
+ * Token-Buckets: Lesen, Suche, Erfassung, Uploads, Prüfdatei. Eine Anfrage nimmt aus allen Buckets ihrer {@link Grenzklasse} je eine
  * Marke, oder aus keinem (eine abgelehnte Anfrage kostet nichts). Die Suche zählt im Bucket «Lesen» mit und hat dazu
  * einen strengeren eigenen; ein Upload zählt im Bucket «Erfassung» mit.
  * <ul>
@@ -40,7 +40,7 @@ public class WebseitenGrenzen {
     /** Grenzwerte (Marken je Sekunde, Spitze) je Bucket. */
     public record Einstellung(double lesenProSekunde, double lesenSpitze, double sucheProSekunde, double sucheSpitze,
                               double erfassungProSekunde, double erfassungSpitze, double uploadsProStunde,
-                              int maxSchluessel) {
+                              double dateiProSekunde, double dateiSpitze, int maxSchluessel) {
         public Einstellung {
             if (maxSchluessel < 1) {
                 throw new IllegalArgumentException("archiv.webseite.grenzen.max-schluessel muss mindestens 1 sein");
@@ -53,6 +53,7 @@ public class WebseitenGrenzen {
         final TokenBucket suche;
         final TokenBucket erfassung;
         final TokenBucket upload;
+        final TokenBucket datei;
         Instant zuletzt;
 
         Eintrag(Einstellung e, Instant jetzt) {
@@ -61,11 +62,14 @@ public class WebseitenGrenzen {
             erfassung = new TokenBucket(e.erfassungSpitze(), e.erfassungProSekunde(), jetzt);
             // Uploads: Fassungsvermögen = Stundenwert, Auffüllung gleichmässig über die Stunde
             upload = new TokenBucket(e.uploadsProStunde(), e.uploadsProStunde() / 3600.0, jetzt);
+            // Prüfdatei: engere Grenze zusätzlich zur Erfassungsgrenze (Öffnen und unmittelbar Wiederholen; Startwert 1/s, Spitze 2)
+            datei = new TokenBucket(e.dateiSpitze(), e.dateiProSekunde(), jetzt);
             zuletzt = jetzt;
         }
 
         boolean leerlauf(Instant jetzt) {
-            return lesen.voll(jetzt) && suche.voll(jetzt) && erfassung.voll(jetzt) && upload.voll(jetzt);
+            return lesen.voll(jetzt) && suche.voll(jetzt) && erfassung.voll(jetzt) && upload.voll(jetzt)
+                    && datei.voll(jetzt);
         }
     }
 
@@ -85,10 +89,12 @@ public class WebseitenGrenzen {
             @ConfigProperty(name = "archiv.webseite.grenzen.erfassung-je-sekunde") double erfassungProSekunde,
             @ConfigProperty(name = "archiv.webseite.grenzen.erfassung-spitze") double erfassungSpitze,
             @ConfigProperty(name = "archiv.webseite.grenzen.uploads-je-stunde") double uploadsProStunde,
+            @ConfigProperty(name = "archiv.webseite.grenzen.datei-je-sekunde") double dateiProSekunde,
+            @ConfigProperty(name = "archiv.webseite.grenzen.datei-spitze") double dateiSpitze,
             @ConfigProperty(name = "archiv.webseite.grenzen.max-schluessel") int maxSchluessel,
             WebseitenGrenzenKennzahl kennzahl) {
         this(new Einstellung(lesenProSekunde, lesenSpitze, sucheProSekunde, sucheSpitze, erfassungProSekunde,
-                erfassungSpitze, uploadsProStunde, maxSchluessel), Clock.systemUTC(), kennzahl);
+                erfassungSpitze, uploadsProStunde, dateiProSekunde, dateiSpitze, maxSchluessel), Clock.systemUTC(), kennzahl);
     }
 
     public WebseitenGrenzen(Einstellung einstellung, Clock uhr, WebseitenGrenzenKennzahl kennzahl) {
@@ -152,6 +158,8 @@ public class WebseitenGrenzen {
             case ERFASSUNG -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN));
             case UPLOAD -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN),
                     new Pruefung(e.upload, ZuVieleAnfragen.Grund.UPLOADS));
+            case DATEI -> java.util.List.of(new Pruefung(e.erfassung, ZuVieleAnfragen.Grund.ANFRAGEN),
+                    new Pruefung(e.datei, ZuVieleAnfragen.Grund.ANFRAGEN));
         };
     }
 

@@ -14,6 +14,8 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
 import dev.langchain4j.service.TokenStream;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -44,6 +46,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
     private final KiVerbrauchPort verbrauch;
     private final MandantBudget budget;
     private final MandantKontext mandanten;
+    private final Counter nutzungSchreibfehler;
     private final Clock uhr;
     private final int runden;
     private final int fenster;
@@ -52,6 +55,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
     public LangChain4jOeffentlicherChatAgent(OeffentlicherAgent agent, ChatModell modell, AgentLaeufe laeufe,
                                              OeffentlicherKontextRegister register, KiVerbrauchPort verbrauch,
                                              MandantBudget budget, MandantKontext mandanten,
+                                             MeterRegistry registry,
                                              @ConfigProperty(name = "archiv.webseite.chat.runden") int runden,
                                              @ConfigProperty(name = "archiv.webseite.chat.fenster") int fenster,
                                              @ConfigProperty(name = "archiv.ki.chat.zeitgrenze") Duration zeitgrenze) {
@@ -66,6 +70,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
         this.verbrauch = verbrauch;
         this.budget = budget;
         this.mandanten = mandanten;
+        nutzungSchreibfehler = Counter.builder("archiv.oeffentlicher_chat.nutzung_schreibfehler").register(registry);
         this.uhr = Clock.systemUTC();
         this.runden = runden;
         this.fenster = fenster;
@@ -113,10 +118,10 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
                 })
                 .onIntermediateResponse(antwort -> {
                     lauf.rundeBeginnt();
-                    modellaufruf(lauf, antwort, false);
+                    modellaufruf(lauf, anfrage, antwort, false);
                 })
                 .onCompleteResponse(antwort -> {
-                    modellaufruf(lauf, antwort, true);
+                    modellaufruf(lauf, anfrage, antwort, true);
                     lauf.ende();
                 })
                 .onError(fehler -> lauf.ausfall(KiFehler.grund(fehler)))
@@ -128,7 +133,7 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
      * Die Schlussantwort trägt die Summe aller Runden; ihr eigener Anteil ist die Summe minus die Tokens der Runden davor
      * (wie im internen Chat, {@link LangChain4jChatAgent#modellaufruf}).
      */
-    void modellaufruf(AgentLauf lauf, ChatResponse antwort, boolean schluss) {
+    void modellaufruf(AgentLauf lauf, OeffentlicheAnfrage anfrage, ChatResponse antwort, boolean schluss) {
         if (lauf.beendet()) {
             return;
         }
@@ -147,11 +152,13 @@ public class LangChain4jOeffentlicherChatAgent implements OeffentlicherChatAgent
             mandanten.mit(lauf.mandant(), () -> verbrauch.erfassen(KiVerbrauchPort.CHAT,
                     new KiPort.Verbrauch(modell.modell(), eigeneEin, eigeneAus)));
         } catch (RuntimeException e) {
+            nutzungSchreibfehler.increment();
             LOG.errorf("Verbrauch des öffentlichen Chats nicht geschrieben: %s", e.getClass().getSimpleName());
         }
         try {
-            budget.verbrauchen(lauf.mandant(), eigeneEin + eigeneAus);
+            budget.verbrauchen(lauf.mandant(), anfrage.budgetMonat(), eigeneEin + eigeneAus);
         } catch (RuntimeException e) {
+            nutzungSchreibfehler.increment();
             LOG.errorf("Budget des öffentlichen Chats nicht geschrieben: %s", e.getClass().getSimpleName());
         }
     }
