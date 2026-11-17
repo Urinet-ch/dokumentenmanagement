@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * {@code X-Real-Ip} (Traefik) zählt nur, wenn der unmittelbare Peer in einem konfigurierten Netz liegt
  * ({@code archiv.api-token.vertrauenswuerdige-proxies}, CIDR-Liste) und der Wert genau eine IPv4- oder IPv6-Adresse ist.
  * Sonst gilt die Verbindungsadresse; ein Client kann die Quelle so nie selbst setzen. Ohne Netze (leere Liste) wird der
- * Header nie ausgewertet. Quarkus' eigene Proxy-Weiterleitung kennt {@code X-Real-Ip} nicht und ist deshalb nicht im Spiel.
+ * Header nie ausgewertet; produktiv warnt der Start, wenn nur Loopback eingetragen ist. Quarkus' eigene Proxy-Weiterleitung kennt {@code X-Real-Ip} nicht und ist deshalb nicht im Spiel.
  */
 @ApplicationScoped
 public class QuellAdresse {
@@ -28,10 +28,12 @@ public class QuellAdresse {
 
     @Inject
     public QuellAdresse(
-            @ConfigProperty(name = "archiv.api-token.vertrauenswuerdige-proxies") Optional<List<String>> netze) {
+            @ConfigProperty(name = "archiv.api-token.vertrauenswuerdige-proxies") Optional<List<String>> netze,
+            @ConfigProperty(name = "quarkus.profile", defaultValue = "prod") String profil) {
         this(netze.orElse(List.of()));
-        if (ohneNetze() && io.quarkus.runtime.LaunchMode.current() == io.quarkus.runtime.LaunchMode.NORMAL) {
-            LOG.warn("Keine vertrauenswürdigen Proxy-Netze gesetzt: Clients hinter dem Proxy teilen eine Quelladresse");
+        if ("prod".equals(profil) && this.netze.stream().allMatch(Netz::loopback)) {
+            LOG.warn("Nur Loopback als vertrauenswürdiges Proxy-Netz: Clients hinter dem Proxy teilen eine Quelladresse "
+                    + "(ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE setzen)");
         }
     }
 
@@ -98,6 +100,14 @@ public class QuellAdresse {
                 }
             }
             return new Netz(bytes, laenge);
+        }
+
+        boolean loopback() {
+            try {
+                return InetAddress.getByAddress(basis).isLoopbackAddress();
+            } catch (java.net.UnknownHostException e) {
+                return false;
+            }
         }
 
         boolean enthaelt(InetAddress kandidat) {
