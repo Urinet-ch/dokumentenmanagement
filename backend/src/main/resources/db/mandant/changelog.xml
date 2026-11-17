@@ -36,9 +36,6 @@
     <include file="changesets/032-webseite-feed.xml" relativeToChangelogFile="true"/>
     <include file="changesets/033-webseite-referenz.xml" relativeToChangelogFile="true"/>
     <include file="changesets/034-mandant-bericht.xml" relativeToChangelogFile="true"/>
-<<<<<<< HEAD
     <include file="changesets/035-mandant-vollexport.xml" relativeToChangelogFile="true"/>
-=======
     <include file="changesets/036-webseite-liste-index.xml" relativeToChangelogFile="true"/>
->>>>>>> origin/main
 </databaseChangeLog>
