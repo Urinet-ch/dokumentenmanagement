@@ -749,7 +749,7 @@ paths:
   /public/v1/erfassung/dokumente/{id}/bestaetigen:
     post:
       summary: "Dokument mit denselben Pflichtfeldern wie die Web-App bestätigen"
-      description: "Felder der Bestätigung der Web-App ohne personBenutzer und dateiname,\
+      description: "Felder der Bestätigung der Web-App ohne dateiname,\
         \ zusätzlich zusatz. zusatz.veroeffentlicht und unbekannte Felder sind 400.\
         \ Zusatz wird atomar mitbestätigt."
       tags:
