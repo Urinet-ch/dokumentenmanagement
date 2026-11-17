@@ -194,12 +194,15 @@ public class MandantKommando {
                                 + "Dateien in der Zweitkopie: %s%n"
                                 + "Löschbare Objekte: %d%nGelöschte Objekte: %d%n"
                                 + "Schema entfernt: %s%nBucket entfernt: %s%n"
-                                + "Keycloak-Zugang/Client: nicht entfernt (gemeinsame Clients, Req 8.3 offen)%n"
+                                + "Mandantenzugang: Mandant deaktiviert, Zuordnung im Archiv entfernt.%n"
+                                + "Keycloak: gemeinsame Clients bleiben bestehen (Req 8.3).%n"
+                                + "Hinweis: mandantenspezifischen Client (z. B. archiv-%s) und Benutzer mit "
+                                + "mandant=%s in der Admin-Konsole von Hand entfernen.%n"
                                 + "Gesperrte Objekte: %d%n",
                         bericht.zustandText(), bericht.abbauAb(), bericht.sicherungsstaendeBis(),
                         MandantAbbau.DATEI_SICHERUNG_AUFBEWAHRUNG, ablage.loeschbar(),
                         bericht.geloescht(), bericht.schemaEntfernt(), bericht.bucketEntfernt(),
-                        ablage.gesperrtGesamt());
+                        aufruf.code(), aufruf.code(), ablage.gesperrtGesamt());
                 aus.println(HINWEIS_SCHEMA);
                 aus.println(HINWEIS_EXPORT);
                 ablage.gesperrt().forEach(objekt -> aus.printf(

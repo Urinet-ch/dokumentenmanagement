@@ -91,10 +91,29 @@ class MandantAbbauTest {
         MandantAbbau.Bericht wiederholung = t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS);
 
         assertThat(wiederholung.zustand()).isEqualTo(MandantAbbau.Zustand.ABGESCHLOSSEN);
-        assertThat(wiederholung.keycloakClientEntfernt()).isFalse();
-        assertThat(wiederholung.zustandText()).isEqualTo("ABGESCHLOSSEN (ohne Keycloak-Client)");
+        assertThat(wiederholung.zustandText()).isEqualTo("ABGESCHLOSSEN");
         assertThat(t.register.status.abgeschlossen()).isTrue();
         assertThat(t.ablageAufrufe.get()).isEqualTo(2);
+    }
+
+    @Test
+    void abgebauterMandantIstNichtMehrAufloesbar() {
+        Testaufbau t = new Testaufbau(START.plusSeconds(30L * 24 * 60 * 60));
+        t.register.deaktivieren(CODE, EXPORT_ID, START, "tester", "Kundenende");
+        // Verzeichnis wie JdbcMandantVerzeichnis: Schema nur, solange der Eintrag aktiv ist
+        MandantVerzeichnis verzeichnis = c -> Optional.of(t.register.status.mandant())
+                .filter(m -> m.code().equals(c) && m.aktiv()).map(m -> m.schema());
+        MandantAusAnmeldung anmeldung = () -> new MandantAusAnmeldung.Gueltig(CODE);
+        MandantAufloesung ausAnmeldung = new MandantAufloesung(
+                new MandantKontext(null, anmeldung, null), anmeldung, verzeichnis);
+
+        assertThat(t.abbau().ausfuehren(CODE, EXPORT_ID, true, false, ANLASS).zustand())
+                .isEqualTo(MandantAbbau.Zustand.ABGESCHLOSSEN);
+
+        assertThat(verzeichnis.aktivesSchema(CODE)).isEmpty();
+        assertThatThrownBy(ausAnmeldung::schema).isInstanceOf(MandantVerweigert.class)
+                .hasMessageContaining("unbekannt oder inaktiv");
+        assertThatThrownBy(ausAnmeldung::pruefen).isInstanceOf(MandantVerweigert.class);
     }
 
     @Test
@@ -234,7 +253,9 @@ class MandantAbbauTest {
 
         assertThat(exit[0]).isEqualTo(MandantKommando.EXIT_UNVOLLSTAENDIG).isNotZero();
         assertThat(ausgabe[0]).contains("ABBAU_UNVOLLSTAENDIG")
-                .contains("Keycloak-Zugang/Client: nicht entfernt (gemeinsame Clients, Req 8.3 offen)")
+                .contains("Mandantenzugang: Mandant deaktiviert, Zuordnung im Archiv entfernt.")
+                .contains("Keycloak: gemeinsame Clients bleiben bestehen (Req 8.3).")
+                .contains("(z. B. archiv-vhf-gsk) und Benutzer mit mandant=vhf-gsk in der Admin-Konsole von Hand entfernen.")
                 .contains("Gesperrte Objekte: 1").contains("7 Tage").contains("auch gelöscht");
 
         t.gesperrteObjekte = List.of();
@@ -242,8 +263,8 @@ class MandantAbbauTest {
         ausgabe = ausgabe(kommando, abbauArgs(), exit);
 
         assertThat(exit[0]).isZero();
-        assertThat(ausgabe[0]).contains("ABGESCHLOSSEN (ohne Keycloak-Client)")
-                .contains("Keycloak-Zugang/Client: nicht entfernt");
+        assertThat(ausgabe[0]).contains("Mandanten-Abbau: ABGESCHLOSSEN%n".formatted())
+                .doesNotContain("ohne Keycloak-Client").doesNotContain("nicht entfernt");
     }
 
     @Test
