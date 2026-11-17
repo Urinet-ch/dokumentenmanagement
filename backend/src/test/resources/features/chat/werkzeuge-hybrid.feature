@@ -26,6 +26,22 @@ Funktionalität: Hybridsuche im Chat-Werkzeug dokumente_suchen (Aufgabe 7.1d)
     Und nennt der Treffer «C_POLICE» im Chat die Seiten "2-3"
     Und erhielt der Reranker im Chat nur Texte von «C_POLICE»
 
+  @req-5.7
+  Szenario: Die Seiten der Fundstelle erscheinen nur, wenn sie im Dokument liegen
+    Angenommen im Mandanten «urinet» liegen diese Hybrid-Chat-Dokumente:
+      | name     | titel    | art          | datum      | text                   | abschnitte | seiten |
+      | C_INNEN  | C_INNEN  | VERSICHERUNG | 2072-03-01 | Police Prämie innen    | 0.1@2-3    | 3      |
+      | C_AUSSEN | C_AUSSEN | VERSICHERUNG | 2072-03-02 | Police Prämie aussen   | 0.1@5-6    | 3      |
+      | C_RAND   | C_RAND   | VERSICHERUNG | 2072-03-03 | Police Prämie am Rand  | 0.1@3-4    | 3      |
+      | C_LEER   | C_LEER   | VERSICHERUNG | 2072-03-04 | Police Prämie ohne Zahl | 0.1@1-2   | -      |
+    Wenn «inhaber-urinet» im Chat mit dokumente_suchen sucht mit:
+      | frage | Unfallversicherung |
+    Dann lauten die Treffer im Chat "C_INNEN, C_AUSSEN, C_RAND, C_LEER"
+    Und nennt der Treffer «C_INNEN» im Chat die Seiten "2-3"
+    Und nennt der Treffer «C_AUSSEN» im Chat die Seiten ""
+    Und nennt der Treffer «C_RAND» im Chat die Seiten "3"
+    Und nennt der Treffer «C_LEER» im Chat die Seiten ""
+
   @req-3.1 @req-2.2
   Szenario: Ein Treffer nur aus dem Volltext hat keine Seiten
     Angenommen im Mandanten «urinet» liegen diese Hybrid-Chat-Dokumente:

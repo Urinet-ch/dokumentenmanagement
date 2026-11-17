@@ -69,6 +69,7 @@ class DokumenteSuchenPartnerTest {
         WerkzeugDaten daten = (WerkzeugDaten) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{WerkzeugDaten.class}, (proxy, m, args) -> switch (m.getName()) {
                     case "bestaetigte" -> Set.of();
+                    case "seiten" -> java.util.Map.of();
                     case "nurLesend" -> null;
                     default -> throw new UnsupportedOperationException(m.getName());
                 });
