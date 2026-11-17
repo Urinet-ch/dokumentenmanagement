@@ -1,5 +1,6 @@
 package ch.urinet.archiv;
 
+import ch.urinet.archiv.integration.adapter.in.kommando.AlteLinksKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailKommando;
 import ch.urinet.archiv.integration.adapter.in.kommando.MailPasswortEingabe;
 import ch.urinet.archiv.mandant.adapter.in.kommando.MandantKommando;
@@ -26,8 +27,9 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet} oder
+ * Ohne Argumente läuft der Dienst; mit Argumenten ein Admin-Kommando wie {@code archiv mandant anlegen urinet},
  * {@code archiv token erstellen urinet Rechnungsgenerator generator} oder
+ * {@code archiv alte-links importieren links.csv --mandant urinet} oder
  * {@code archiv embedding nachberechnen urinet}.
  * Exit-Codes des Kommandos: 0 ok, 1 fachlicher Fehler, 2 falscher Aufruf (geprüft, bevor Quarkus startet),
  * 3 technischer Fehler, auch wenn schon der Start der Anwendung scheitert (z. B. falscher Zugang für {@code archiv_owner}),
@@ -86,6 +88,9 @@ public class ArchivMain implements QuarkusApplication {
 
     @Inject
     MailKommando mail;
+
+    @Inject
+    AlteLinksKommando alteLinks;
 
     @Inject
     EmbeddingKommando embedding;
@@ -174,13 +179,17 @@ public class ArchivMain implements QuarkusApplication {
                     : Optional.of(SicherungKommando.AUFRUF);
             case "mail" -> MailKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(MailKommando.AUFRUF);
+            case "alte-links" -> AlteLinksKommando.lesen(rest).isPresent() ? Optional.empty()
+                    : Optional.of(AlteLinksKommando.AUFRUF);
             case "embedding" -> EmbeddingKommando.lesen(rest).isPresent() ? Optional.empty()
                     : Optional.of(EmbeddingKommando.AUFRUF);
             default -> Optional.of("Unbekanntes Kommando. " + MandantKommando.AUFRUF + System.lineSeparator()
                     + TokenKommando.AUFRUF + System.lineSeparator() + WebseitenSchluesselKommando.AUFRUF
                     + System.lineSeparator() + ManifestKommando.AUFRUF
                     + System.lineSeparator() + SicherungKommando.AUFRUF
-                    + System.lineSeparator() + MailKommando.AUFRUF + System.lineSeparator() + EmbeddingKommando.AUFRUF);
+                    + System.lineSeparator() + MailKommando.AUFRUF
+                    + System.lineSeparator() + AlteLinksKommando.AUFRUF + System.lineSeparator()
+                    + EmbeddingKommando.AUFRUF);
         };
     }
 
@@ -225,6 +234,7 @@ public class ArchivMain implements QuarkusApplication {
                     ? sperrpruefung.ausfuehren(rest, ergebnis, System.err)
                     : sicherung.ausfuehren(rest, ergebnis, System.err);
             case "mail" -> mail.ausfuehren(rest, MailPasswortEingabe::nehmen, System.err);
+            case "alte-links" -> alteLinks.ausfuehren(rest, ergebnis, System.err);
             case "embedding" -> embedding.ausfuehren(rest, ergebnis, System.err);
             default -> mandant.ausfuehren(rest, ergebnis, System.err);
         };
