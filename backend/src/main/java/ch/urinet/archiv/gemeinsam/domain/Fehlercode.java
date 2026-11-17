@@ -16,6 +16,8 @@ public enum Fehlercode {
             "Ihre Rolle erlaubt diese Aktion nicht. Bitte wenden Sie sich an den Inhaber, falls Sie sie brauchen."),
     NICHT_GEFUNDEN(404, "Nicht gefunden",
             "Den Eintrag gibt es nicht, oder er ist für Sie nicht sichtbar. Bitte prüfen Sie den Link."),
+    API_TOKEN_ABGELAUFEN(409, "API-Token abgelaufen",
+            "Ein abgelaufenes API-Token kann nicht reaktiviert werden. Bitte stellen Sie ein neues API-Token aus."),
     STATUS_KONFLIKT(409, "Aktion im aktuellen Status nicht möglich",
             "Das Dokument steht in einem Status, in dem diese Aktion nicht möglich ist. Bitte laden Sie es neu."),
     REFERENZ_VERGEBEN(409, "Referenz vergeben",

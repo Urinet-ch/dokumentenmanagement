@@ -2,8 +2,10 @@ package ch.urinet.archiv.integration.application.webseite;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
+import ch.urinet.archiv.integration.adapter.out.kennzahlen.MicrometerWebseitenGrenzen;
 import ch.urinet.archiv.integration.application.webseite.WebseitenGrenzen.Einstellung;
 import ch.urinet.archiv.integration.domain.webseite.Grenzklasse;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -63,7 +65,7 @@ class WebseitenGrenzenTest {
 
     /** Lesen 1/s Spitze 5, Suche 0.5/s Spitze 2, Erfassung 1/s Spitze 3, Uploads 2 je Stunde, höchstens 3 Schlüssel. */
     private WebseitenGrenzen grenzen() {
-        return new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl);
+        return new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl);
     }
 
     @Test
@@ -159,7 +161,7 @@ class WebseitenGrenzenTest {
 
     @Test
     void dieWartezeitIstAufEineStundeBegrenzt() {
-        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 1, 3), uhr, kennzahl);
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 1, 1, 2, 3), uhr, kennzahl);
         g.pruefen("token:e", Grenzklasse.UPLOAD);
         assertThat(abgelehnt(g, "token:e", Grenzklasse.UPLOAD).wartezeitSekunden()).isEqualTo(3600);
     }
@@ -192,16 +194,29 @@ class WebseitenGrenzenTest {
 
     @Test
     void einFehlerDerPruefungLaesstDieAnfrageDurchUndZaehltInDerKennzahl() {
-        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl);
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl);
         g.pruefen(null, Grenzklasse.LESEN);
         g.pruefen("token:a", null);
         assertThat(kennzahl.ausgefallen).isEqualTo(2);
     }
 
     @Test
+    void internerFehlerLaesstAnfrageDurchUndErhoehtGenauDieAusfallkennzahl() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        WebseitenGrenzen g = new WebseitenGrenzen(new Einstellung(1, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr,
+                new MicrometerWebseitenGrenzen(registry));
+
+        g.pruefen(null, Grenzklasse.LESEN);
+        g.pruefen("token:a", Grenzklasse.LESEN);
+
+        assertThat(registry.get("archiv.webseite.grenze.ausgefallen").counter().count()).isEqualTo(1);
+        assertThat(registry.get("archiv.webseite.grenze.abgelehnt").tag("grund", "ANFRAGEN").counter().count()).isZero();
+    }
+
+    @Test
     void ungueltigeEinstellungBrichtDenStartAbOhneWerteZuNennen() {
-        assertThatThrownBy(() -> new WebseitenGrenzen(new Einstellung(0, 5, 0.5, 2, 1, 3, 2, 3), uhr, kennzahl))
+        assertThatThrownBy(() -> new WebseitenGrenzen(new Einstellung(0, 5, 0.5, 2, 1, 3, 2, 1, 2, 3), uhr, kennzahl))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageNotContaining("0.5");
-        assertThatThrownBy(() -> new Einstellung(1, 5, 1, 2, 1, 3, 2, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Einstellung(1, 5, 1, 2, 1, 3, 2, 1, 2, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 }

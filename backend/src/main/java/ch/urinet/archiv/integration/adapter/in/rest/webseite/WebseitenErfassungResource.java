@@ -488,6 +488,10 @@ public class WebseitenErfassungResource {
             var bestaetigung = parser.bestaetigung(eingabe);
             ch.urinet.archiv.dokument.application.Aenderung zusatz = null;
             if (eingabe.has("zusatz")) {
+                if (bestaetigung.art() == null) {
+                    // wie in der Web-App: fehlende Art ist ein Pflichtfeldfehler, nicht «ZUSATZ_UNGUELTIG»
+                    throw new ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen(java.util.List.of("art"));
+                }
                 ObjectNode patch = json.createObjectNode();
                 patch.set("zusatz", eingabe.get("zusatz"));
                 patch.put("art", bestaetigung.art());

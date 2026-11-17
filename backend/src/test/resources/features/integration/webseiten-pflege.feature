@@ -26,6 +26,16 @@ Funktionalität: Bestätigen und Pflegen über die Webseiten-Schnittstelle
     Dann ist die letzte Antwort HTTP 422 mit «PFLICHTFELD_FEHLT»
     Und ist das Pflegedokument des Schlüssels «A» nach der Ablehnung unverändert
 
+  @req-10.5
+  Szenario: Bestätigen mit Zusatzfeldern ohne Art meldet das Pflichtfeld wie die Web-App
+    Angenommen für den Schlüssel «A» liegt ein Pflegedokument im Status «EINGANGSKORB» vor
+    Wenn der Schlüssel «A» das Pflegedokument mit «bestaetigen» und ETag «aktuell» bearbeitet:
+      """
+      {"zusatz":{"zugriff":"vorstand","jahr":2026}}
+      """
+    Dann ist die letzte Antwort HTTP 422 mit «PFLICHTFELD_FEHLT»
+    Und ist das Pflegedokument des Schlüssels «A» nach der Ablehnung unverändert
+
   @req-10.5 @req-10.6 @req-10.9
   Szenario: Ein gültiger Metadaten-Patch erhält die Veröffentlichung und sichert den Bearbeiter
     Angenommen für den Schlüssel «A» liegt ein Pflegedokument im Status «ARCHIVIERT» vor
@@ -164,6 +174,23 @@ Funktionalität: Bestätigen und Pflegen über die Webseiten-Schnittstelle
     Dann ist die letzte Antwort HTTP 400 mit «ANFRAGE_UNGUELTIG»
     Wenn der Schlüssel «A» die Prüfdatei mit HEAD abruft
     Dann ist die letzte Antwort HTTP 405
+
+  @req-10.5 @req-15.1
+  Szenario: Ein zu grosser JSON-Body der Erfassung wird vor der Resource mit Problem Details abgelehnt
+    Angenommen für den Schlüssel «A» liegt ein Pflegedokument im Status «EINGANGSKORB» vor
+    Wenn der Schlüssel «A» dem Pflegedokument 2 MB JSON als Änderung sendet
+    Dann ist die letzte Antwort HTTP 413 mit «DATEI_ZU_GROSS»
+
+  @req-10.14 @req-15.1
+  Szenario: Die Prüfdatei hat eine engere Grenze, und auch eine abgelehnte Anfrage öffnet keinen Stream
+    Angenommen für den Schlüssel «A» liegt ein Pflegedokument im Status «EINGANGSKORB» vor
+    Wenn der Schlüssel «A» die Prüfdatei des Pflegedokuments abruft
+    Dann ist die letzte Antwort HTTP 200
+    Wenn der Schlüssel «A» die Prüfdatei des Pflegedokuments abruft
+    Dann ist die letzte Antwort HTTP 200
+    Wenn der Schlüssel «A» die Prüfdatei des Pflegedokuments abruft
+    Dann ist die letzte Antwort HTTP 429 mit «ZU_VIELE_ANFRAGEN», «Retry-After» zwischen 1 und 3600 Sekunden und dem Grund «ANFRAGEN»
+    Und sind nach höchstens 5 Sekunden alle Plätze für Streams wieder frei
 
   @req-10.14
   Szenariogrundriss: Zur Prüfung wird das Original ohne Speicheradresse gestreamt

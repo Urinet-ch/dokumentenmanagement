@@ -3,6 +3,7 @@
 Funktionalität: Isolationsmatrix der Webseiten-Erfassung (MandantenIsolationIT, Teil 2)
   Die Matrix ergänzt den bestehenden Tag-Verbund aus webseiten-lesen.feature, webseiten-datei.feature,
   webseiten-feed.feature und oeffentlicher-chat.feature. Deren Stufen-, Feed- und Chat-Gegenproben bleiben bestehen.
+  Die Zugriffsstufen (Req 9.4) belegen diese Szenarien nicht; der Nachweis liegt in den genannten Lese-, Feed- und Chat-Features.
   Sie ersetzt weder die manuellen Staging-Nachweise noch die späteren Erweiterungen von Spec 04 und 05.
 
   Hintergrund:
@@ -21,7 +22,7 @@ Funktionalität: Isolationsmatrix der Webseiten-Erfassung (MandantenIsolationIT,
       | 51  |
       | 61  |
 
-  @req-1.4 @req-9.1 @req-9.2 @req-9.4
+  @req-1.4 @req-9.1 @req-9.2
   Szenariogrundriss: Beide Schlüsselarten sind an jedem automatisch ermittelten Endpunkt getrennt
     Angenommen der Erfassungs-Schlüssel «E» für die Webseite «matrix» im Mandanten «<mandant>» ist angelegt
     Und der Lese-Schlüssel «L» für die Webseite «matrix» im Mandanten «<mandant>» ist angelegt
@@ -56,7 +57,7 @@ Funktionalität: Isolationsmatrix der Webseiten-Erfassung (MandantenIsolationIT,
       | urinet  | vhf-gsk |
       | vhf-gsk | urinet  |
 
-  @req-1.4 @req-9.1 @req-9.4
+  @req-1.4 @req-9.1
   Szenario: Dieselbe Referenz ist je Mandant und Webseite unabhängig belegt
     Angenommen der Erfassungs-Schlüssel «A1» für die Webseite «seite-1» im Mandanten «urinet» ist angelegt
     Und der Erfassungs-Schlüssel «A2» für die Webseite «seite-2» im Mandanten «urinet» ist angelegt
@@ -85,7 +86,7 @@ Funktionalität: Isolationsmatrix der Webseiten-Erfassung (MandantenIsolationIT,
     Dann ist die letzte Antwort HTTP 409 mit «REFERENZ_VERGEBEN»
     Und enthält die letzte Antwort keine internen Details
 
-  @req-1.4 @req-9.1 @req-9.4
+  @req-1.4 @req-9.1
   Szenariogrundriss: Referenzen sind auf Status, Liste und Details nur der eigenen Webseite bekannt
     Angenommen der Erfassungs-Schlüssel «A» für die Webseite «seite-1» im Mandanten «<mandant>» ist angelegt
     Und der Erfassungs-Schlüssel «B» für die Webseite «seite-2» im Mandanten «<mandant>» ist angelegt
@@ -99,7 +100,7 @@ Funktionalität: Isolationsmatrix der Webseiten-Erfassung (MandantenIsolationIT,
       | urinet  |
       | vhf-gsk |
 
-  @req-1.4 @req-9.1 @req-9.4
+  @req-1.4 @req-9.1
   Szenario: Gleiche Bearbeiterkennungen sind je Mandant und Webseite getrennt
     Angenommen der Erfassungs-Schlüssel «A» für die Webseite «matrix» im Mandanten «urinet» ist angelegt
     Und der Erfassungs-Schlüssel «B» für die Webseite «matrix» im Mandanten «vhf-gsk» ist angelegt

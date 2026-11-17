@@ -20,4 +20,7 @@ public interface ZusatzSchemaPruefer {
 
     /** Prüft Zusatzwerte (JSON-Objekt) gegen ein gültiges Schema. */
     void wertePruefen(String schemaJson, String werteJson);
+
+    /** Prüft die festen Definitionen der reservierten Felder, sofern sie im Schema vorkommen. */
+    boolean reservierteFelderGueltig(String schemaJson);
 }

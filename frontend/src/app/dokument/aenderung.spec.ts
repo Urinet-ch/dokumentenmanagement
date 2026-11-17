@@ -20,6 +20,11 @@ const ART = (teil: Partial<Dokumentart> = {}): Dokumentart => ({
   vertraulichkeit: 'NORMAL',
   gesetzlichePflicht: true,
   aktiv: true,
+  selbstAusgestellt: true,
+  belegnummerMuster: [],
+  kiVorschlag: true,
+  kiFelder: [],
+  reihenfolge: 0,
   ...teil,
 });
 

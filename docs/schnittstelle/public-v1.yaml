@@ -1284,12 +1284,15 @@ components:
         grund:
           type: string
           x-erweiterbar: true
-          enum: [STUNDENLIMIT, LAEUFT, ANFRAGEN, SUCHE, UPLOADS]
+          enum: [STUNDENLIMIT, LAEUFT, ANFRAGEN, SUCHE, UPLOADS, SCHLUESSELPRUEFUNG]
           description: |
             Nur bei `ZU_VIELE_ANFRAGEN`: im Chat `STUNDENLIMIT` (Stundengrenze je Client oder Webseite erreicht) oder
-            `LAEUFT` (schon eine Frage dieses Clients läuft, `Retry-After` höchstens 5 Sekunden); an den lesenden
-            Endpunkten `ANFRAGEN` (Grenze des Schlüssels erreicht) oder `SUCHE` (strengere Grenze der Suche erreicht).
-            `UPLOADS` (Uploads je Stunde eines Erfassungs-Schlüssels, mit Aufgabe 11.10).
+            `LAEUFT` (schon eine Frage dieses Clients oder Mandanten läuft, `Retry-After` höchstens 5 Sekunden); an den
+            lesenden Endpunkten `ANFRAGEN` (Grenze des Schlüssels erreicht) oder `SUCHE` (strengere Grenze der Suche
+            erreicht).
+            `UPLOADS` (Uploads je Stunde eines Erfassungs-Schlüssels, mit Aufgabe 11.10) oder
+            `SCHLUESSELPRUEFUNG` (neue API-Token-Prüfungen je Quelladresse; gilt für alle Endpunkte mit API-Token, auch
+            ausserhalb von `/public/`, und kommt vor den Grenzen je Schlüssel).
             Die Grenze gilt je Schlüssel, nicht je Besucher: Wechselnde Werte von `X-Archiv-Client` oder
             `X-Archiv-Zugriff` umgehen sie nicht.
         fehlercode:
