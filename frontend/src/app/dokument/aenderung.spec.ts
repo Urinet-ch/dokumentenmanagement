@@ -1,6 +1,6 @@
 import { Dokument, Dokumentart } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { aenderungAus, feldText, formularAus, formularFeld, zusatzFelder, zusatzGueltig } from './aenderung';
+import { aenderungAus, anzeigeText, feldText, formularAus, formularFeld, zusatzFelder, zusatzGueltig } from './aenderung';
 
 const ART = (teil: Partial<Dokumentart> = {}): Dokumentart => ({
   code: 'OFFERTE',
@@ -283,4 +283,60 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
       aenderung: { zusatz: { verband: ['vhf', 'gsk'], stichworte: [' a\nb', 'c'] }, grund: 'x' },
     });
   });
+});
+
+describe('Anzeigetexte je Enum-Wert (x-labels)', () => {
+  const mit = (labels: unknown, ort: 'eigenschaft' | 'items' = 'eigenschaft') =>
+    zusatzFelder(
+      ART({
+        zusatzSchema: {
+          type: 'object',
+          properties: {
+            verband: {
+              type: 'array',
+              items: { type: 'string', enum: ['vhf', 'gsk'], ...(ort === 'items' ? { 'x-labels': labels } : {}) },
+              ...(ort === 'eigenschaft' ? { 'x-labels': labels } : {}),
+            },
+          },
+        },
+      }),
+    )[0];
+
+  it('liest die Beschriftung an der Eigenschaft und unter items; die Werte bleiben unverändert', () => {
+    for (const ort of ['eigenschaft', 'items'] as const) {
+      const feld = mit({ vhf: 'VHF', gsk: 'GSK' }, ort);
+      expect(feld.optionen).toEqual(['vhf', 'gsk']);
+      expect(anzeigeText(feld, 'vhf')).toBe('VHF');
+      expect(anzeigeText(feld, 'gsk')).toBe('GSK');
+    }
+  });
+
+  it('zeigt ohne Beschriftung den Rohwert (rückwärtskompatibel)', () => {
+    const feld = zusatzFelder(art2())[0];
+    expect(feld.beschriftungen).toBeUndefined();
+    expect(anzeigeText(feld, 'vhf')).toBe('vhf');
+    expect(anzeigeText(undefined, 'vhf')).toBe('vhf');
+    expect(anzeigeText(mit({ vhf: 'VHF' }), 'gsk')).toBe('gsk');
+  });
+
+  it('ignoriert Nicht-Texte, leere und fremde Schlüssel und kürzt auf 80 Zeichen', () => {
+    const feld = mit({ vhf: 5, gsk: '  ', fremd: 'X', __proto__: 'Y', toString: 'Z' });
+    expect(feld.beschriftungen).toBeUndefined();
+    expect(mit('kein Objekt').beschriftungen).toBeUndefined();
+    expect(anzeigeText(mit({ vhf: 'A'.repeat(200) }), 'vhf')).toHaveLength(80);
+    expect(anzeigeText(feld, 'toString')).toBe('toString');
+  });
+
+  it('übernimmt Markup unverändert als Text (angezeigt wird nur als Textknoten)', () => {
+    expect(anzeigeText(mit({ vhf: '<b>VHF</b>' }), 'vhf')).toBe('<b>VHF</b>');
+  });
+
+  function art2() {
+    return ART({
+      zusatzSchema: {
+        type: 'object',
+        properties: { verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] } } },
+      },
+    });
+  }
 });
