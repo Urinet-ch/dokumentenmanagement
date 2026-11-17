@@ -146,6 +146,37 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       (b) => b.textContent?.trim() === text,
     )!;
 
+  it('zeigt Listenwerte mit Anzeigetext aus x-labels, ohne Beschriftung den Rohwert', async () => {
+    const schema = (labels: object) => ({
+      type: 'object',
+      properties: {
+        verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, ...labels },
+      },
+    });
+    port.arten = [{ ...ART, zusatzSchema: schema({ 'x-labels': { vhf: 'VHF', gsk: 'GSK' } }) }];
+    port.dokument = of({ ...DOKUMENT, zusatz: { verband: ['vhf', 'gsk'] } });
+    await oeffnen();
+    expect(element.textContent).toContain('VHF, GSK');
+    expect(element.textContent).not.toContain('vhf');
+  });
+
+  it('zeigt Listenwerte ohne x-labels als Rohwert', async () => {
+    port.arten = [
+      {
+        ...ART,
+        zusatzSchema: {
+          type: 'object',
+          properties: {
+            verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] } },
+          },
+        },
+      },
+    ];
+    port.dokument = of({ ...DOKUMENT, zusatz: { verband: ['vhf', 'gsk'] } });
+    await oeffnen();
+    expect(element.textContent).toContain('vhf, gsk');
+  });
+
   it('zeigt Metadaten, Vorschau und Download-Link der PDF/A-Fassung', async () => {
     await oeffnen();
     expect(element.querySelector('[data-test=titel]')!.textContent).toBe('Rechnung 2026-003');

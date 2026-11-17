@@ -7,7 +7,9 @@ import ch.urinet.archiv.integration.domain.webseite.ErfassungAenderung;
 import ch.urinet.archiv.integration.domain.webseite.FeedSeite;
 import ch.urinet.archiv.integration.domain.webseite.LeseAenderung;
 import ch.urinet.archiv.sicherheit.application.TokenIdentitaet;
+import ch.urinet.archiv.sicherheit.application.WebseitenErfassungAktion;
 import ch.urinet.archiv.sicherheit.application.WebseitenZugang;
+import ch.urinet.archiv.sicherheit.domain.Aktion;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -132,6 +134,7 @@ public class AenderungFeedResource {
     @Path("/erfassung/aenderungen")
     @Authenticated
     @WebseitenZugang(WebseitenZugang.Art.ERFASSUNG)
+    @WebseitenErfassungAktion(Aktion.A2)
     @Operation(summary = "Änderungen der Dokumente des Mandanten (Erfassung)",
             description = "Jede Status- und Metadatenänderung der Dokumente des Mandanten ab dem Cursor mit ID, "
                     + "Referenz, Status, Fehlercode und Version; die Referenz nur für Dokumente der Webseite des "

@@ -2,6 +2,10 @@
 export const TEXTE = {
   appTitel: 'UriNet Archiv',
   willkommen: 'Willkommen im UriNet Archiv.',
+  offlineHinweis: 'Sie sind offline. Daten aus dem Archiv lassen sich erst mit einer Verbindung laden.',
+  updateBereit: 'Eine neue Version ist verfügbar.',
+  updateJetzt: 'Jetzt aktualisieren',
+  updateFehler: 'Die neue Version konnte nicht aktiviert werden. Bitte laden Sie die Seite neu.',
   hauptnavigation: 'Hauptnavigation',
   zumInhalt: 'Zum Inhalt springen',
   menueOeffnen: 'Menü öffnen',
@@ -40,6 +44,20 @@ export const TEXTE = {
       'Ihrem Benutzer ist kein Mandant oder keine Rolle im Archiv zugeordnet. Bitte wenden Sie sich an den Inhaber.',
     funktionen: 'Ihre Funktionen',
   },
+  httpFehler: {
+    verbindung: 'Keine Verbindung zum Archiv. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+    keinZugriff: 'Sie sind für diese Aktion nicht berechtigt.',
+    nichtGefunden: 'Die angeforderten Daten sind nicht mehr vorhanden. Bitte laden Sie die Seite neu.',
+    konflikt: 'Die Daten wurden inzwischen geändert. Bitte laden Sie die aktuelle Version neu.',
+    zuViele: (sekunden: number | null) =>
+      sekunden === null
+        ? 'Zu viele Anfragen. Bitte später erneut versuchen.'
+        : sekunden === 0
+          ? 'Zu viele Anfragen. Bitte versuchen Sie es erneut.'
+          : `Zu viele Anfragen. Bitte in ${sekunden} Sekunden erneut versuchen.`,
+    server: 'Das Archiv ist vorübergehend nicht erreichbar. Bitte versuchen Sie es erneut.',
+    allgemein: 'Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
+  },
   folgt: 'Diese Seite folgt in einer späteren Ausbaustufe.',
   upload: {
     titel: 'Dateien hochladen',
@@ -76,6 +94,7 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerSitzung:
       'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an und laden Sie die Dateien neu hoch.',
+    erneutHochladen: 'Erneut hochladen',
     fehlerAnfrageZuGross:
       'Die Dateien sind zusammen zu gross für einen Upload. Bitte in mehreren Schritten mit weniger Dateien hochladen.',
     fehlerAllgemein: 'Der Upload ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
@@ -274,10 +293,10 @@ export const TEXTE = {
     keineAktion: 'Für dieses Dokument haben Sie hier keine Aktion.',
     fehlercode: {
       STATUS_KONFLIKT:
-        'Das Dokument hat sich inzwischen geändert und ist nicht mehr in diesem Zustand. Der Eingangskorb wurde neu geladen.',
+        'Das Dokument hat sich inzwischen geändert. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
       VERSION_KONFLIKT:
-        'Das Dokument wurde inzwischen von jemand anderem geändert. Der Eingangskorb wurde neu geladen; bitte erneut prüfen.',
-      NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr. Der Eingangskorb wurde neu geladen.',
+        'Das Dokument wurde inzwischen geändert. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
+      NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
       BELEGNUMMER_VERGEBEN:
         'Diese Belegnummer ist für diese Art schon vergeben. Bitte die Belegnummer prüfen und korrigieren.',
       PARTNER_UNBEKANNT:
@@ -375,6 +394,7 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
     fehlerAllgemein: 'Die Suche ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    wiederholen: 'Erneut suchen',
   },
   dokument: {
     titel: 'Dokument',

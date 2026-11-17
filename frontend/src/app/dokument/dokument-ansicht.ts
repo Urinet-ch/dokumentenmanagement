@@ -18,6 +18,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
+import { anzeigeText, zusatzFelder } from './aenderung';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum, zeitpunkt } from '../gemeinsam/format';
@@ -149,13 +150,15 @@ export class DokumentAnsicht {
     if (!z || typeof z !== 'object') {
       return [];
     }
+    const art = this.arten().find((a) => a.code === this.dokument()?.art);
+    const felder = new Map(zusatzFelder(art).map((f) => [f.name, f]));
     return Object.entries(z)
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
       .map(([name, wert]) => ({
         name,
         wert:
           Array.isArray(wert) && wert.every((e) => typeof e !== 'object')
-            ? wert.join(', ')
+            ? wert.map((e) => anzeigeText(felder.get(name), String(e))).join(', ')
             : typeof wert === 'object'
               ? JSON.stringify(wert)
               : String(wert),

@@ -7,7 +7,10 @@ import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,6 +21,10 @@ import java.util.UUID;
  */
 @ApplicationScoped
 public class Berechtigung {
+
+    private static final Set<Aktion> ERFASSUNG_ERLAUBT = Collections.unmodifiableSet(
+            EnumSet.of(Aktion.A1, Aktion.A2, Aktion.A3, Aktion.A4, Aktion.A5, Aktion.A6, Aktion.A7, Aktion.A8,
+                    Aktion.A10));
 
     private final Sichtbarkeit sichtbarkeit;
     private final VerweigerungMelder melder;
@@ -32,6 +39,28 @@ public class Berechtigung {
         if (!Rechtematrix.ergebnis(benutzer.rolle(), aktion).zugaenglich()) {
             verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
         }
+    }
+
+    /** Webseiten-Erfassung ist auf die feste Positivliste A1–A8 und A10 beschränkt (Spec 03, Req 10.8). */
+    public void webseitenErfassung(Benutzer benutzer, Aktion aktion, String dokumentId) {
+        if (benutzer.rolle() != Rolle.GESCHAEFTSSTELLE || !webseitenErfassungErlaubt(aktion)
+                || !Rechtematrix.ergebnis(benutzer.rolle(), aktion).zugaenglich()) {
+            verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
+        }
+        if (aktion.dokumentbezogen() && dokumentId != null) {
+            UUID id;
+            try {
+                id = UUID.fromString(dokumentId);
+            } catch (IllegalArgumentException e) {
+                unbekanntesDokument(benutzer, aktion);
+                return;
+            }
+            dokumentAktion(benutzer, aktion, id);
+        }
+    }
+
+    public static boolean webseitenErfassungErlaubt(Aktion aktion) {
+        return ERFASSUNG_ERLAUBT.contains(aktion);
     }
 
     /** Aktion auf einem Dokument: 404 vor 403, damit eine Antwort nie verrät, dass es ein unsichtbares Dokument gibt. */

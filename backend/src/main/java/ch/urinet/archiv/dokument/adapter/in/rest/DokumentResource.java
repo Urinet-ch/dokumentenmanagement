@@ -254,7 +254,8 @@ public class DokumentResource {
             @Schema(nullable = true) String titel,
             @Schema(nullable = true) LocalDate datum,
             @Schema(required = true) Instant eingang,
-            @Schema(required = true, enumeration = {"SCAN", "UPLOAD", "GENERATOR", "DRIVE", "EMAIL", "ABANINJA"})
+            @Schema(required = true, enumeration = {"SCAN", "UPLOAD", "GENERATOR", "DRIVE", "EMAIL", "ABANINJA",
+                    "WEBSEITE"})
             String quelle,
             @Schema(required = true) List<String> tags,
             @Schema(required = true, enumeration = {"NORMAL", "INTERN", "PERSONAL"},
