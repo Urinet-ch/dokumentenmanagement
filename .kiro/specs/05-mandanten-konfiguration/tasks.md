@@ -37,7 +37,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 2.1, 2.2, 2.6, 2.7, 2.8_
   - _Abhängig von: 17.2_
 
-- [ ] 17.4 Fristbezüge `BELEGDATUM` und `FELD` [Backend]
+- [x] 17.4 Fristbezüge `BELEGDATUM` und `FELD` [Backend]
   - `AufbewahrungAb`, `Fristbezug`, Prüfung des Fristfelds, leeres Feld, Neuberechnung bei Änderung des Bezugsdatums.
   - _Anforderungen: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
   - _Abhängig von: 17.3_

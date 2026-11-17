@@ -438,6 +438,15 @@ public class BestaetigenSchritte {
         assertThat(antwort.jsonPath().getList("versionen")).isEmpty();
     }
 
+    @Dann("zeigt die Antwort die Warnung «FRISTBEZUG_FEHLT» ohne Dokumentverweis")
+    public void fristwarnung() {
+        List<Map<String, Object>> warnungen = antwort.jsonPath().getList("warnungen");
+        assertThat(warnungen).anySatisfy(warnung -> {
+            assertThat(warnung.get("code")).isEqualTo("FRISTBEZUG_FEHLT");
+            assertThat(warnung.get("vorhandenId")).isNull();
+        });
+    }
+
     @Dann("steht im Zugriffsprotokoll für «{word}» {int} Mal «{word}» von «{word}»")
     public void protokolliert(String name, int anzahl, String aktion, String benutzer) throws SQLException {
         Ort ort = ort(name);

@@ -123,7 +123,8 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
         return new Konfiguration.Art(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
                 repository.kanonisch(art.zusatzSchema()), art.vertraulichkeit().name(),
                 new Konfiguration.Aufbewahrung(art.aufbewahrung().jahre(),
-                        art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name()),
+                        art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name(),
+                        art.aufbewahrung().feld()),
                 art.gesetzlichePflicht(), art.aktiv(), art.selbstAusgestellt(), art.belegnummerMuster(),
                 art.fremdbelegArt(), art.ohneZahlungsdatenArt(), art.kiVorschlag(), art.kiFelder(),
                 art.kiHinweise(), art.reihenfolge());

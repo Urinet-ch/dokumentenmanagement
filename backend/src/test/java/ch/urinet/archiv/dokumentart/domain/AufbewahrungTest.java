@@ -175,4 +175,42 @@ class AufbewahrungTest {
     private static MonthDay ende(String mmTt) {
         return MonthDay.parse("--" + mmTt);
     }
+
+    @ParameterizedTest
+    @CsvSource({"2028-02-29,2038-02-28", "2026-03-15,2036-03-15"})
+    void belegdatumGiltTaggenauStattGeschaeftsjahresende(LocalDate datum, LocalDate erwartet) {
+        assertThat(Aufbewahrung.berechne(new Aufbewahrungsregel(10, AufbewahrungAb.BELEGDATUM),
+                datum, Instant.parse("2027-01-02T00:00:00Z"), 2025, null, ende("06-30"), HEUTE).bis())
+                .isEqualTo(erwartet);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"2026-12-31T23:30:00Z,2037-01-01", "2026-06-30T22:30:00Z,2036-07-01"})
+    void belegdatumFehltDannEingangsdatumInZuerich(Instant eingang, LocalDate erwartet) {
+        assertThat(Aufbewahrung.berechne(new Aufbewahrungsregel(10, AufbewahrungAb.BELEGDATUM),
+                null, eingang, null, null, ende("12-31"), HEUTE).bis()).isEqualTo(erwartet);
+    }
+
+    @Test
+    void feldWaehltNurDenKonfiguriertenDatumswertUndFehlendIstUnbefristet() {
+        var regel = new Aufbewahrungsregel(10, AufbewahrungAb.FELD, "sitzungsdatum");
+        var datum = LocalDate.of(2028, 2, 29);
+        assertThat(Aufbewahrung.berechne(regel, HEUTE, Instant.now(), 2025, HEUTE, ende("12-31"), HEUTE,
+                feld -> {
+                    assertThat(feld).isEqualTo("sitzungsdatum");
+                    return datum;
+                }).bis()).isEqualTo(LocalDate.of(2038, 2, 28));
+        assertThat(Aufbewahrung.berechne(regel, HEUTE, Instant.now(), 2025, HEUTE, ende("12-31"), HEUTE,
+                feld -> null)).isEqualTo(new Aufbewahrung(null, false));
+    }
+
+    @Test
+    void feldIstNurBeiFeldBezugErlaubtUndDortPflicht() {
+        assertThatThrownBy(() -> new Aufbewahrungsregel(10, AufbewahrungAb.FELD))
+                .isInstanceOf(FachFehler.class);
+        assertThatThrownBy(() -> new Aufbewahrungsregel(10, AufbewahrungAb.BELEGDATUM, "datum"))
+                .isInstanceOf(FachFehler.class);
+        assertThatThrownBy(() -> new Aufbewahrungsregel(10, AufbewahrungAb.FELD, ""))
+                .isInstanceOf(FachFehler.class);
+    }
 }

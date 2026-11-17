@@ -59,6 +59,15 @@ public record Aufbewahrung(LocalDate bis, boolean fristAbgelaufen) {
     public static Aufbewahrung berechne(Aufbewahrungsregel regel, LocalDate belegdatum, Instant eingang,
                                         Integer geschaeftsjahr, LocalDate gueltigBis, MonthDay gjEnde,
                                         LocalDate heute) {
+        return berechne(regel, belegdatum, eingang, geschaeftsjahr, gueltigBis, gjEnde, heute,
+                feld -> {
+                    throw new IllegalStateException("FELD benötigt einen Fristbezug");
+                });
+    }
+
+    public static Aufbewahrung berechne(Aufbewahrungsregel regel, LocalDate belegdatum, Instant eingang,
+                                        Integer geschaeftsjahr, LocalDate gueltigBis, MonthDay gjEnde,
+                                        LocalDate heute, Fristbezug bezug) {
         Objects.requireNonNull(regel, "regel");
         Objects.requireNonNull(gjEnde, "gjEnde");
         Objects.requireNonNull(heute, "heute");
@@ -76,6 +85,17 @@ public record Aufbewahrung(LocalDate bis, boolean fristAbgelaufen) {
             }
             // plusYears setzt den 29.02. im Nicht-Schaltjahr auf den 28.02. (Art. 77 Abs. 3 OR)
             case GUELTIG_BIS -> gueltigBis == null ? null : plusJahre(gueltigBis, regel.jahre());
+            case BELEGDATUM -> {
+                if (belegdatum == null && eingang == null) {
+                    throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+                }
+                yield plusJahre(belegdatum != null ? belegdatum : LocalDate.ofInstant(eingang, ZUERICH),
+                        regel.jahre());
+            }
+            case FELD -> {
+                LocalDate datum = bezug.datum(regel.feld());
+                yield datum == null ? null : plusJahre(datum, regel.jahre());
+            }
         };
         return new Aufbewahrung(bis, bis != null && bis.isBefore(heute));
     }
