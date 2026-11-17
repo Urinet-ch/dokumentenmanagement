@@ -123,20 +123,26 @@ public class ApiTokenVerwaltung {
     public void gueltigBisSetzen(MandantCode mandant, String id, LocalDate datum) {
         Instant ablauf = ablauf(Optional.ofNullable(datum))
                 .orElseThrow(() -> new FachFehler(Fehlercode.PFLICHTFELD_FEHLT));
-        if (!ApiToken.gueltigeId(id)
-                || !register.apiTokenGueltigkeitSetzen(mandant.wert(), id, Optional.of(ablauf))) {
-            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
-        }
+        gueltigkeitAendern(mandant, id, Optional.of(ablauf));
         LOG.infof("Ablauf des API-Tokens geändert: id=%s mandant=%s gueltigBis=%s", id, mandant.wert(),
                 ablauf.toString());
     }
 
     @Transactional
     public void gueltigBisEntfernen(MandantCode mandant, String id) {
-        if (!ApiToken.gueltigeId(id) || !register.apiTokenGueltigkeitSetzen(mandant.wert(), id, Optional.empty())) {
+        gueltigkeitAendern(mandant, id, Optional.empty());
+        LOG.infof("Ablauf des API-Tokens entfernt: id=%s mandant=%s", id, mandant.wert());
+    }
+
+    private void gueltigkeitAendern(MandantCode mandant, String id, Optional<Instant> zeit) {
+        Instant jetzt = uhr.instant();
+        if (!ApiToken.gueltigeId(id)
+                || !register.apiTokenGueltigkeitSetzen(mandant.wert(), id, zeit, jetzt)) {
+            if (ApiToken.gueltigeId(id) && register.apiTokenAbgelaufen(mandant.wert(), id, jetzt)) {
+                throw new FachFehler(Fehlercode.API_TOKEN_ABGELAUFEN);
+            }
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
-        LOG.infof("Ablauf des API-Tokens entfernt: id=%s mandant=%s", id, mandant.wert());
     }
 
     private Optional<Instant> ablauf(Optional<LocalDate> datum) {

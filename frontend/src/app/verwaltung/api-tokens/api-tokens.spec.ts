@@ -69,9 +69,13 @@ describe('API-Token-Übersicht', () => {
     expect(element.querySelector('[data-test=token]')).toBeNull();
   });
 
-  it('markiert abgelaufene Tokens und beschriftet das Datumsfeld', async () => {
+  it('markiert abgelaufene Tokens', async () => {
     await starten([{ ...TOKEN, gueltigBis: new Date(Date.now() - 1_000).toISOString() }]);
     expect(zeile().textContent).toContain(TEXTE.apiTokens.abgelaufen);
+  });
+
+  it('beschriftet das Datumsfeld aktiver Tokens', async () => {
+    await starten();
     const input = zeile().querySelector<HTMLInputElement>('input[type=date]');
     const label = zeile().querySelector<HTMLLabelElement>('label');
     expect(input).not.toBeNull();
@@ -111,6 +115,30 @@ describe('API-Token-Übersicht', () => {
 
     expect(service.apiV1ApiTokensTokenIdGueltigBisDelete).toHaveBeenCalledExactlyOnceWith(TOKEN.id);
     expect(element.textContent).toContain(TEXTE.apiTokens.ablaufEntfernt);
+  });
+
+  it('bietet für abgelaufene Tokens keine Ablaufänderung an und verweist auf Neuausstellung', async () => {
+    await starten([{ ...TOKEN, gueltigBis: '2020-01-02T00:00:00Z' }]);
+
+    expect(zeile().querySelector('input[type=date]')).toBeNull();
+    expect(zeile().textContent).toContain(TEXTE.apiTokens.hinweisAbgelaufen);
+  });
+
+  it('ordnet 409 API_TOKEN_ABGELAUFEN einer eigenen Meldung zu und lädt neu', async () => {
+    await starten([{ ...TOKEN, gueltigBis: '2027-01-02T00:00:00Z' }]);
+    service.apiV1ApiTokensTokenIdGueltigBisDelete.mockReturnValue(
+      throwError(
+        () => new HttpErrorResponse({ status: 409, error: { fehlercode: 'API_TOKEN_ABGELAUFEN' } }),
+      ),
+    );
+    knopf(zeile(), TEXTE.apiTokens.ablaufEntfernen).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.apiTokens.fehlerAblaufAbgelaufen,
+    );
+    expect(service.apiV1ApiTokensGet).toHaveBeenCalledTimes(2);
   });
 
   it('ermöglicht erneutes Laden nach einem Serverfehler', async () => {

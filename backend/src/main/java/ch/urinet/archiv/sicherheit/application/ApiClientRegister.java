@@ -26,8 +26,11 @@ public interface ApiClientRegister {
      */
     boolean gueltigBisSetzen(String mandant, String id, Instant zeit);
 
-    /** Setzt oder entfernt das Ablaufdatum eines aktiven generator/import-Tokens im eigenen Mandanten. */
-    boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit);
+    /** Setzt oder entfernt das Ablaufdatum eines aktiven, nicht abgelaufenen generator/import-Tokens im Mandanten. */
+    boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit, Instant jetzt);
+
+    /** Prüft, ob ein aktives generator/import-Token im Mandanten zum angegebenen Zeitpunkt abgelaufen ist. */
+    boolean apiTokenAbgelaufen(String mandant, String id, Instant jetzt);
 
     void zuletztSetzen(String id, Instant zeit);
 
