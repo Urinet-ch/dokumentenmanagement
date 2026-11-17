@@ -15,6 +15,9 @@ public interface MandantDatenbank {
 
     boolean schemaVorhanden(String schema);
 
+    /** Entfernt genau das validierte Mandanten-Schema nach abgelaufener Abbaufrist. */
+    void schemaEntfernen(String schema);
+
     /** Spielt die Dokumentarten ein; vorhandene Codes bleiben unverändert. */
     void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten);
 

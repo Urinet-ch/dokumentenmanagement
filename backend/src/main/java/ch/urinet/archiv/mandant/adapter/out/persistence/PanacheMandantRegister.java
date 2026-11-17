@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant.adapter.out.persistence;
 
 import ch.urinet.archiv.mandant.application.MandantRegister;
+import ch.urinet.archiv.mandant.application.MandantAbbauRegister;
 import ch.urinet.archiv.mandant.domain.Geschaeftsjahresende;
 import ch.urinet.archiv.mandant.domain.Mandant;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -9,13 +10,15 @@ import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Register in {@code public.mandant}; auch beim Start und im Admin-Kommando, darum mit eigenem Request-Kontext (Tenant-Resolver). */
 @ApplicationScoped
 @ActivateRequestContext
-public class PanacheMandantRegister implements MandantRegister {
+public class PanacheMandantRegister implements MandantRegister, MandantAbbauRegister {
 
     @Override
     @Transactional
@@ -50,5 +53,47 @@ public class PanacheMandantRegister implements MandantRegister {
     public Optional<Instant> erstellt(MandantCode code) {
         MandantEintrag eintrag = MandantEintrag.findById(code.wert());
         return eintrag == null ? Optional.empty() : Optional.of(eintrag.erstellt.toInstant());
+    }
+
+    @Override
+    @Transactional
+    public Optional<MandantAbbauRegister.Status> status(MandantCode code) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        if (eintrag == null) {
+            return Optional.empty();
+        }
+        Mandant mandant = new Mandant(code, eintrag.name, eintrag.schemaName, eintrag.bucket,
+                new Geschaeftsjahresende(eintrag.geschaeftsjahrEnde), eintrag.aktiv);
+        return Optional.of(new MandantAbbauRegister.Status(mandant,
+                Optional.ofNullable(eintrag.deaktiviertAm).map(OffsetDateTime::toInstant),
+                Optional.ofNullable(eintrag.vollexportBestaetigt), eintrag.abbauAbgeschlossen));
+    }
+
+    @Override
+    @Transactional
+    public boolean deaktivieren(MandantCode code, UUID vollexportId, Instant jetzt) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        if (eintrag == null) {
+            return false;
+        }
+        if (!eintrag.aktiv) {
+            return vollexportId.equals(eintrag.vollexportBestaetigt);
+        }
+        eintrag.aktiv = false;
+        eintrag.deaktiviertAm = OffsetDateTime.ofInstant(jetzt, java.time.ZoneOffset.UTC);
+        eintrag.vollexportBestaetigt = vollexportId;
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public boolean abschliessen(MandantCode code) {
+        MandantEintrag eintrag = MandantEintrag.findById(code.wert());
+        if (eintrag == null || eintrag.aktiv || eintrag.deaktiviertAm == null
+                || eintrag.vollexportBestaetigt == null) {
+            return false;
+        }
+        eintrag.abbauAbgeschlossen = true;
+        return true;
     }
 }

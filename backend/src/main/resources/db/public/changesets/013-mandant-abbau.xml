@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="013-mandant-abbau" author="archiv">
+        <addColumn tableName="mandant">
+            <column name="deaktiviert_am" type="timestamptz"/>
+            <column name="vollexport_bestaetigt" type="uuid"/>
+            <column name="abbau_abgeschlossen" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <sql>
+            alter table mandant add constraint mandant_abbau_status_ck
+                check (not aktiv or (deaktiviert_am is null and vollexport_bestaetigt is null
+                    and not abbau_abgeschlossen));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

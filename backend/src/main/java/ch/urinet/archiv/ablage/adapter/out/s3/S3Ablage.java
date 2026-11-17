@@ -16,6 +16,7 @@ import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.ablage.domain.MehrdeutigeVersion;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
@@ -54,6 +55,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
+import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
 import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -822,6 +824,62 @@ public class S3Ablage implements AblagePort {
             }
             throw e;
         }
+    }
+
+    @Override
+    public MandantAblageAbbau mandantAbbauen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, true);
+    }
+
+    @Override
+    public MandantAblageAbbau mandantAbbauPlanen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, false);
+    }
+
+    private MandantAblageAbbau mandantAbbau(MandantCode mandant, Instant jetzt, boolean loeschen) {
+        Objects.requireNonNull(jetzt, "jetzt");
+        String bucket = bucket(mandant);
+        List<MandantAblageAbbau.GesperrtesObjekt> gesperrt = new ArrayList<>();
+        int loeschbar = 0;
+        int geloescht = 0;
+        try {
+            for (ListObjectVersionsResponse seite : s3.listObjectVersionsPaginator(b -> b.bucket(bucket).maxKeys(1000))) {
+                for (var version : seite.versions()) {
+                    Optional<ObjectLockRetention> sperre = retention(bucket, version.key(), version.versionId());
+                    Optional<Instant> bis = sperre.map(ObjectLockRetention::retainUntilDate)
+                            .filter(zeit -> zeit.isAfter(jetzt));
+                    var legalHoldStatus = s3.getObjectLegalHold(
+                            b -> b.bucket(bucket).key(version.key()).versionId(version.versionId())).legalHold();
+                    if (legalHoldStatus == null || legalHoldStatus.status() == null) {
+                        throw new IllegalStateException("Legal Hold für Objektversion nicht prüfbar: "
+                                + version.key());
+                    }
+                    boolean legalHold = legalHoldStatus.status() == ObjectLockLegalHoldStatus.ON;
+                    if (bis.isPresent() || legalHold) {
+                        gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(version.key(), version.versionId(),
+                                bis, legalHold));
+                        continue;
+                    }
+                    loeschbar++;
+                    if (loeschen) {
+                        s3.deleteObject(b -> b.bucket(bucket).key(version.key()).versionId(version.versionId()));
+                        geloescht++;
+                    }
+                }
+                for (var marker : seite.deleteMarkers()) {
+                    loeschbar++;
+                    if (loeschen) {
+                        s3.deleteObject(b -> b.bucket(bucket).key(marker.key()).versionId(marker.versionId()));
+                        geloescht++;
+                    }
+                }
+            }
+        } catch (S3Exception e) {
+            if (!"NoSuchBucket".equals(fehlercode(e)) && e.statusCode() != 404) {
+                throw e;
+            }
+        }
+        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt);
     }
 
     @Override

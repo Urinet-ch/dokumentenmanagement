@@ -88,4 +88,21 @@ class MandantKommandoTest {
         assertThat(MandantKommando.gueltig(List.of("export", ""))).isFalse();
         assertThat(MandantKommando.gueltig(List.of("export", "vhf-gsk", "--download", "ungueltig"))).isFalse();
     }
+
+    @Test
+    void abbauIstStandardmaessigTrockenlaufUndVerlangtExpliziteBestaetigung() {
+        String exportId = "bc9b7ac8-0ddd-4ab8-9850-27a7f598f0d7";
+        assertThat(MandantKommando.abbauLesen(List.of("abbauen", "vhf-gsk", "--nach-export", exportId)))
+                .hasValueSatisfying(aufruf -> {
+                    assertThat(aufruf.ausfuehren()).isFalse();
+                    assertThat(aufruf.bestaetigtUrinet()).isFalse();
+                });
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "urinet", "--nach-export", exportId,
+                "--ausfuehren", "--bestaetigt-urinet"))).isTrue();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--ausfuehren", "--dry-run"))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", ""))).isFalse();
+        assertThat(MandantKommando.gueltig(List.of("abbauen", "vhf-gsk", "--nach-export", exportId,
+                "--bestaetigt-urinet"))).isFalse();
+    }
 }

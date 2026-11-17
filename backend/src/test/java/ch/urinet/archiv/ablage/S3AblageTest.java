@@ -37,6 +37,7 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.SdkResponse;
 import software.amazon.awssdk.core.interceptor.Context;
@@ -48,6 +49,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectVersionsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetention;
 import software.amazon.awssdk.services.s3.model.ObjectLockRetentionMode;
+import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 
@@ -83,6 +85,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Object Lock und Versionierung, ohne Bucket Policy.
  */
 @QuarkusTest
+@Tag("start-2")
 class S3AblageTest {
 
     private static final LocalDate IN_ZEHN_JAHREN = LocalDate.now().plusYears(10);
@@ -223,6 +226,45 @@ class S3AblageTest {
             assertThat(kopie.sperreBis()).isEmpty();
             assertThat(retention(kopie.schluessel(), kopie.versionId())).isEmpty();
         }
+    }
+
+    @Test
+    void abbauVorschauUndAusfuehrungBeachtenObjectLock() {
+        S3Ablage ablage = ablage();
+        DateiSchluessel schluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        ZuArchivieren eingang = eingang(ablage, schluessel, inhalt("synthetischer Beleg"));
+        ArchiviertesDokument archiviert = ablage.archivieren(mandant, List.of(eingang),
+                Sperrvorgabe.bis(IN_ZEHN_JAHREN));
+        AbgelegteDatei gesperrt = archiviert.dateien().getFirst();
+        DateiSchluessel legalHoldSchluessel = DateiSchluessel.original(2026, UUID.randomUUID(), 1, "pdf");
+        AbgelegteDatei legalHoldDatei = ablage.ablegenEingang(mandant, legalHoldSchluessel,
+                new ByteArrayInputStream(inhalt("synthetischer Legal Hold")), inhalt("synthetischer Legal Hold").length);
+        verwaltung.putObjectLegalHold(b -> b.bucket(bucket).key(legalHoldDatei.schluessel())
+                .versionId(legalHoldDatei.versionId())
+                .legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON)));
+        Instant jetzt = Instant.now();
+
+        var vorschau = ablage.mandantAbbauPlanen(mandant, jetzt);
+
+        assertThat(vorschau.geloescht()).isZero();
+        assertThat(vorschau.loeschbar()).isEqualTo(1);
+        assertThat(vorschau.gesperrt()).hasSize(2)
+                .anySatisfy(objekt -> assertThat(objekt.versionId()).isEqualTo(gesperrt.versionId()))
+                .anySatisfy(objekt -> {
+                    assertThat(objekt.versionId()).isEqualTo(legalHoldDatei.versionId());
+                    assertThat(objekt.legalHold()).isTrue();
+                    assertThat(objekt.gesperrtBis()).isEmpty();
+                });
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen()).hasSize(1);
+
+        var ergebnis = ablage.mandantAbbauen(mandant, jetzt);
+
+        assertThat(ergebnis.geloescht()).isEqualTo(1);
+        assertThat(ergebnis.gesperrt()).hasSize(2);
+        assertThat(ablage.versionen(mandant, "eingang/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).contains(legalHoldDatei.versionId());
+        assertThat(ablage.versionen(mandant, "archiv/", Optional.empty(), 10).versionen())
+                .extracting(Objektversion::versionId).contains(gesperrt.versionId());
     }
 
     @Test

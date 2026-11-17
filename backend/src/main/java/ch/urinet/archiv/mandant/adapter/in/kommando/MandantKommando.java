@@ -1,6 +1,7 @@
 package ch.urinet.archiv.mandant.adapter.in.kommando;
 
 import ch.urinet.archiv.mandant.application.MandantFehler;
+import ch.urinet.archiv.mandant.application.MandantAbbau;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexport;
@@ -24,17 +25,21 @@ public class MandantKommando {
     public static final String AUFRUF = """
             Aufruf: archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT]
                    archiv mandant export <code>
-                   archiv mandant export <code> --download <exportId>""";
+                   archiv mandant export <code> --download <exportId>
+                   archiv mandant abbauen <code> --nach-export <exportId> [--dry-run|--ausfuehren]
+                       [--bestaetigt-urinet]""";
 
     private final MandantProvisionierung provisionierung;
     private final MandantKontext kontext;
     private final MandantVollexport vollexport;
+    private final MandantAbbau abbau;
 
     public MandantKommando(MandantProvisionierung provisionierung, MandantKontext kontext,
-                           MandantVollexport vollexport) {
+                           MandantVollexport vollexport, MandantAbbau abbau) {
         this.provisionierung = provisionierung;
         this.kontext = kontext;
         this.vollexport = vollexport;
+        this.abbau = abbau;
     }
 
     /** Gelesener Aufruf; {@code name} und {@code ende} sind optional. */
@@ -44,8 +49,12 @@ public class MandantKommando {
     public record ExportAufruf(String code, Optional<UUID> id) {
     }
 
+    public record AbbauAufruf(String code, UUID exportId, boolean ausfuehren, boolean bestaetigtUrinet) {
+    }
+
     public static boolean gueltig(List<String> argumente) {
-        return lesen(argumente).isPresent() || exportLesen(argumente).isPresent();
+        return lesen(argumente).isPresent() || exportLesen(argumente).isPresent()
+                || abbauLesen(argumente).isPresent();
     }
 
     /** Prüft die Argumente nach {@code mandant}, ohne die Anwendung zu brauchen; leer bei falschem Aufruf. */
@@ -88,7 +97,82 @@ public class MandantKommando {
         return Optional.empty();
     }
 
+    /** Liest den Abbau-Aufruf; ohne --ausfuehren bleibt er ein Trockenlauf. */
+    public static Optional<AbbauAufruf> abbauLesen(List<String> argumente) {
+        if (argumente.size() < 4 || !argumente.getFirst().equals("abbauen")
+                || !argumente.get(2).equals("--nach-export") || argumente.get(1).isBlank()
+                || argumente.get(3).isBlank()) {
+            return Optional.empty();
+        }
+        UUID exportId;
+        try {
+            new MandantCode(argumente.get(1));
+            exportId = UUID.fromString(argumente.get(3));
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+        boolean ausfuehren = false;
+        boolean dryRun = false;
+        boolean bestaetigtUrinet = false;
+        for (String option : argumente.subList(4, argumente.size())) {
+            switch (option) {
+                case "--ausfuehren" -> {
+                    if (ausfuehren) {
+                        return Optional.empty();
+                    }
+                    ausfuehren = true;
+                }
+                case "--dry-run" -> {
+                    if (dryRun) {
+                        return Optional.empty();
+                    }
+                    dryRun = true;
+                }
+                case "--bestaetigt-urinet" -> {
+                    if (bestaetigtUrinet) {
+                        return Optional.empty();
+                    }
+                    bestaetigtUrinet = true;
+                }
+                default -> {
+                    return Optional.empty();
+                }
+            }
+        }
+        if (ausfuehren && dryRun || bestaetigtUrinet && !argumente.get(1).equals("urinet")) {
+            return Optional.empty();
+        }
+        return Optional.of(new AbbauAufruf(argumente.get(1), exportId, ausfuehren, bestaetigtUrinet));
+    }
+
     public int ausfuehren(List<String> argumente, PrintStream aus, PrintStream fehler) {
+        Optional<AbbauAufruf> abbauAufruf = abbauLesen(argumente);
+        if (abbauAufruf.isPresent()) {
+            try {
+                AbbauAufruf aufruf = abbauAufruf.get();
+                MandantAbbau.Bericht bericht = abbau.ausfuehren(new MandantCode(aufruf.code()), aufruf.exportId(),
+                        aufruf.ausfuehren(), aufruf.bestaetigtUrinet());
+                aus.printf("Mandanten-Abbau: %s%nAbbau frühestens ab: %s%n"
+                                + "Datenbank-Sicherungsstände spätestens bis: %s%n"
+                                + "Dateien in der Zweitkopie: %s%n"
+                                + "Löschbare Objekte: %d%nGelöschte Objekte: %d%n"
+                                + "Schema entfernt: %s%nBucket entfernt: %s%n",
+                        bericht.zustand(), bericht.abbauAb(), bericht.sicherungsstaendeBis(),
+                        MandantAbbau.DATEI_SICHERUNG_AUFBEWAHRUNG, bericht.ablage().loeschbar(),
+                        bericht.geloescht(), bericht.schemaEntfernt(), bericht.bucketEntfernt());
+                bericht.ablage().gesperrt().forEach(objekt -> aus.printf(
+                        "Gesperrt: %s (Version %s) bis %s%s%n", objekt.schluessel(), objekt.versionId(),
+                        objekt.gesperrtBis().map(Object::toString).orElse("unbefristet"),
+                        objekt.legalHold() ? " (Legal Hold)" : ""));
+                return 0;
+            } catch (MandantFehler e) {
+                fehler.println(e.grund() + ": " + e.getMessage());
+                return 1;
+            } catch (RuntimeException e) {
+                fehler.println("Technischer Fehler: " + e.getMessage());
+                return 3;
+            }
+        }
         Optional<ExportAufruf> exportAufruf = exportLesen(argumente);
         if (exportAufruf.isPresent()) {
             try {

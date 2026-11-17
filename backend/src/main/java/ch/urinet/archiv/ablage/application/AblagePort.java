@@ -10,6 +10,7 @@ import ch.urinet.archiv.ablage.domain.DateiStrom;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
 import ch.urinet.archiv.ablage.domain.SicherungsSperre;
@@ -35,8 +36,8 @@ import java.util.UUID;
 /**
  * Driven Port der Ablage im Object Storage (design.md «Ablage»; ADR-011, Req 16.13): Adapter {@code S3Ablage}, Dev-Stub
  * im Dateisystem über {@code archiv.ablage.stub}. Der Bucket folgt aus dem Mandanten ({@code <präfix><code>}).
- * Kein Aufruf setzt den Bypass-Header, keiner verkürzt eine Sperre, keiner überschreibt oder
- * löscht eine Datei unter {@code archiv/} oder {@code manifest/} (Req 6.5).
+ * Kein Aufruf setzt den Bypass-Header, verkürzt eine Sperre oder überschreibt eine archivierte Datei. Beim expliziten
+ * Mandanten-Abbau werden nur Versionen ohne aktive Object-Lock-Sperre gelöscht.
  */
 public interface AblagePort {
 
@@ -226,4 +227,13 @@ public interface AblagePort {
      * unvollständige Uploads); andere Regeln des Buckets bleiben unverändert. Idempotent.
      */
     void exportLebenszyklusSichern(MandantCode mandant);
+
+    /**
+     * Entfernt alle nicht gesperrten Versionen und Löschmarken aus dem Bucket dieses Mandanten. Aktive Object-Lock-
+     * Sperren unter {@code archiv/} und {@code manifest/} bleiben erhalten; ein Bypass wird nie verwendet.
+     */
+    MandantAblageAbbau mandantAbbauen(MandantCode mandant, Instant jetzt);
+
+    /** Vorschau des Mandanten-Abbaus ohne Veränderungen: zählt löschbare Versionen und listet aktive Sperren. */
+    MandantAblageAbbau mandantAbbauPlanen(MandantCode mandant, Instant jetzt);
 }

@@ -6,6 +6,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.BucketVersioningStatus;
 import software.amazon.awssdk.services.s3.model.ObjectLockEnabled;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /**
  * Bucket mit Object Lock und Versionierung, ohne Standard-Aufbewahrung (sonst wäre {@code eingang/} gesperrt), und
@@ -37,6 +38,23 @@ public class S3MandantBucket implements MandantBucket {
         }
         s3.putBucketVersioning(b -> b.bucket(bucket).versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
         s3.putBucketPolicy(b -> b.bucket(bucket).policy(policy(bucket)));
+    }
+
+    @Override
+    public boolean entfernenWennLeer(String bucket) {
+        try {
+            s3.deleteBucket(b -> b.bucket(bucket));
+            return true;
+        } catch (S3Exception e) {
+            String code = e.awsErrorDetails() == null ? null : e.awsErrorDetails().errorCode();
+            if ("NoSuchBucket".equals(code) || e.statusCode() == 404) {
+                return true;
+            }
+            if ("BucketNotEmpty".equals(code)) {
+                return false;
+            }
+            throw e;
+        }
     }
 
     static String policy(String bucket) {

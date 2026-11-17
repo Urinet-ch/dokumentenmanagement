@@ -14,6 +14,7 @@ import ch.urinet.archiv.ablage.domain.Exportdatei;
 import ch.urinet.archiv.ablage.domain.Kopie;
 import ch.urinet.archiv.ablage.domain.ManifestDatei;
 import ch.urinet.archiv.ablage.domain.ManifestTeil;
+import ch.urinet.archiv.ablage.domain.MandantAblageAbbau;
 import ch.urinet.archiv.ablage.domain.Objektversion;
 import ch.urinet.archiv.ablage.domain.Pruefsumme;
 import ch.urinet.archiv.ablage.domain.SperrAenderung;
@@ -352,6 +353,44 @@ public class AblageStub implements AblagePort {
             return true;
         }
         throw new IllegalArgumentException("Version fehlt: " + schluessel);
+    }
+
+    @Override
+    public synchronized MandantAblageAbbau mandantAbbauen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, true);
+    }
+
+    @Override
+    public synchronized MandantAblageAbbau mandantAbbauPlanen(MandantCode mandant, Instant jetzt) {
+        return mandantAbbau(mandant, jetzt, false);
+    }
+
+    private MandantAblageAbbau mandantAbbau(MandantCode mandant, Instant jetzt, boolean loeschen) {
+        String vorsatz = mandant.wert() + "/";
+        List<MandantAblageAbbau.GesperrtesObjekt> gesperrt = new ArrayList<>();
+        int loeschbar = 0;
+        int geloescht = 0;
+        for (String schluessel : versionen.keySet().stream().filter(k -> k.startsWith(vorsatz)).toList()) {
+            List<Version> dateien = versionen.get(schluessel);
+            for (var iterator = dateien.iterator(); iterator.hasNext(); ) {
+                Version version = iterator.next();
+                if (version.gesperrt(jetzt)) {
+                    gesperrt.add(new MandantAblageAbbau.GesperrtesObjekt(schluessel.substring(vorsatz.length()),
+                            version.versionId(), version.sperreBis()));
+                    continue;
+                }
+                loeschbar++;
+                if (loeschen) {
+                    loeschen(version.datei());
+                    iterator.remove();
+                    geloescht++;
+                }
+            }
+            if (loeschen && dateien.isEmpty()) {
+                versionen.remove(schluessel);
+            }
+        }
+        return new MandantAblageAbbau(geloescht, loeschbar, gesperrt);
     }
 
     /** Nur für Tests: abgeschnittene Seiten ohne {@code NextVersionIdMarker}, wie ihn ein Object Storage weglassen kann. */

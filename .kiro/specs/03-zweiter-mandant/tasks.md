@@ -169,6 +169,7 @@ und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 12.2 Vollexport und Abbau [Backend]
   - `MANDANT_EXPORT` (alle Jahre, Original + Arbeitsfassung + PDF/A, Metadaten JSON/CSV, Manifeste); Kommando `mandant abbauen` mit 30-Tage-Frist, Liste gesperrter Objekte und Ablaufdatum der Sicherungsstände
+  - Teilstand PR #239: Vollexport und wiederholbarer Abbau mit Trockenlauf, Bestätigung, Sperrprüfung und Bericht umgesetzt. Der Keycloak-Client-Abbau bleibt offen, da kein mandantenspezifischer Client-Lifecycle-Port oder Client im freigegebenen Code besteht; siehe design.md «Mandantenverwaltung». Aufgabe bleibt deshalb offen.
   - Spec 04 ergänzt den Vollexport um den OKF-Export der Wissensbasis (Spec 04, 17.5; Aufgabe 15.5)
   - Spec 05 ergänzt: Der Vollexport enthält je Dokument die Klassifikationen mit Code und Name und die Konfigurationsversion sowie die aktuelle Konfigurationsdatei und alle Konfigurationsversionen (Spec 05 design.md, «Folgeänderungen»)
   - _Anforderungen: 8.2, 8.3, 8.5_
