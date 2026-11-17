@@ -35,5 +35,5 @@
     <include file="changesets/031-alte-url.xml" relativeToChangelogFile="true"/>
     <include file="changesets/032-webseite-feed.xml" relativeToChangelogFile="true"/>
     <include file="changesets/033-webseite-referenz.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/034-webseite-liste-index.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/036-webseite-liste-index.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

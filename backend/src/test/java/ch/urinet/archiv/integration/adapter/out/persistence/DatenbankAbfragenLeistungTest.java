@@ -126,6 +126,8 @@ class DatenbankAbfragenLeistungTest {
             assertThat(dauerFeed).isLessThan(30_000);
 
             String listenPlan = planListen(mandant, arten.get(i));
+            String reihePlan = planListenNurReihe(mandant, arten.get(i), false);
+            String reiheOhneIndexPlan = planListenNurReihe(mandant, arten.get(i), true);
             String feedPlan = planFeed(mandant);
             String volltextPlan = planVolltext(mandant);
             String vektorPlan = planVektor(mandant);
@@ -137,7 +139,14 @@ class DatenbankAbfragenLeistungTest {
             System.out.println("Volltextplan " + mandant.wert() + ":\n" + volltextPlan);
             System.out.println("Vektorplan " + mandant.wert() + ":\n" + vektorPlan);
             System.out.println("Exportplan " + mandant.wert() + ":\n" + exportPlan);
+            System.out.println("Reiheplan mit Index " + mandant.wert() + ":\n" + reihePlan);
+            System.out.println("Reiheplan ohne Index (Gegenlauf, drop index in Transaktion) " + mandant.wert()
+                    + ":\n" + reiheOhneIndexPlan);
             assertThat(listenPlan).contains("dokument_webseite_liste_ix");
+            // Nachher: der Index liefert die Reihenfolge, kein Sort. Vorher: Seq Scan mit Sort.
+            assertThat(reihePlan).contains("dokument_webseite_liste_ix").doesNotContain("Sort");
+            assertThat(reiheOhneIndexPlan).doesNotContain("dokument_webseite_liste_ix")
+                    .contains("Seq Scan").contains("Sort");
             assertThat(feedPlan).contains("webseite_aenderung_xid_ix");
             assertThat(volltextPlan).contains("dokument_volltext_ohne_dateiname_ix");
             assertThat(vektorPlan).contains("chunk_embedding_hnsw");
@@ -299,6 +308,18 @@ class DatenbankAbfragenLeistungTest {
         });
     }
 
+    /** Nur Reihe, Sortierung DATUM_AB; mit {@code ohneIndex} läuft der Plan nach {@code drop index} (Rollback). */
+    private String planListenNurReihe(MandantCode mandant, String art, boolean ohneIndex) throws SQLException {
+        String sql = "select d.id from " + mandant.schema() + ".dokument d where "
+                + "d.status = 'ARCHIVIERT' and d.vertraulichkeit = 'NORMAL' and d.bestaetigt is not null "
+                + "and d.zusatz -> 'veroeffentlicht' = 'true'::jsonb and d.art = ? "
+                + "and d.zusatz ->> 'zugriff' = any(array['oeffentlich','mitglieder']) "
+                + "order by d.datum desc nulls last, d.id limit 10";
+        List<String> vorher = ohneIndex
+                ? List.of("drop index " + mandant.schema() + ".dokument_webseite_liste_ix") : List.of();
+        return plan("explain " + sql, statement -> statement.setString(1, art), false, vorher);
+    }
+
     private String planFeed(MandantCode mandant) throws SQLException {
         String sql = "select e.id from " + mandant.schema() + ".webseite_aenderung e "
                 + "where (e.xid, e.id) > (?::xid8, ?) and e.xid < pg_snapshot_xmin(pg_current_snapshot()) "
@@ -346,9 +367,19 @@ class DatenbankAbfragenLeistungTest {
     }
 
     private String plan(String sql, SqlBinder binder, boolean erzwingeIndex) throws SQLException {
+        return plan(sql, binder, erzwingeIndex, List.of());
+    }
+
+    private String plan(String sql, SqlBinder binder, boolean erzwingeIndex, List<String> vorher)
+            throws SQLException {
         try (Connection verbindung = datenbank.get().getConnection()) {
             verbindung.setAutoCommit(false);
             try {
+                for (String anweisung : vorher) {
+                    try (Statement vorbereitung = verbindung.createStatement()) {
+                        vorbereitung.execute(anweisung);
+                    }
+                }
                 if (erzwingeIndex) {
                     try (Statement einstellung = verbindung.createStatement()) {
                         einstellung.execute("set local enable_seqscan = off");
