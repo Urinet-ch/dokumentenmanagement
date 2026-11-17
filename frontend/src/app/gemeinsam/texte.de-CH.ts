@@ -94,6 +94,7 @@ export const TEXTE = {
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.',
     fehlerSitzung:
       'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an und laden Sie die Dateien neu hoch.',
+    erneutHochladen: 'Erneut hochladen',
     fehlerAnfrageZuGross:
       'Die Dateien sind zusammen zu gross für einen Upload. Bitte in mehreren Schritten mit weniger Dateien hochladen.',
     fehlerAllgemein: 'Der Upload ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
@@ -292,10 +293,10 @@ export const TEXTE = {
     keineAktion: 'Für dieses Dokument haben Sie hier keine Aktion.',
     fehlercode: {
       STATUS_KONFLIKT:
-        'Das Dokument hat sich inzwischen geändert und ist nicht mehr in diesem Zustand. Der Eingangskorb wurde neu geladen.',
+        'Das Dokument hat sich inzwischen geändert. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
       VERSION_KONFLIKT:
-        'Das Dokument wurde inzwischen von jemand anderem geändert. Der Eingangskorb wurde neu geladen; bitte erneut prüfen.',
-      NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr. Der Eingangskorb wurde neu geladen.',
+        'Das Dokument wurde inzwischen geändert. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
+      NICHT_GEFUNDEN: 'Das Dokument gibt es nicht mehr. Ihre Eingaben bleiben erhalten. Sie können den Eingangskorb neu laden.',
       BELEGNUMMER_VERGEBEN:
         'Diese Belegnummer ist für diese Art schon vergeben. Bitte die Belegnummer prüfen und korrigieren.',
       PARTNER_UNBEKANNT:
@@ -393,6 +394,7 @@ export const TEXTE = {
     fehlerVerbindung:
       'Keine Verbindung zum Archiv. Bitte prüfen Sie die Verbindung und suchen Sie erneut.',
     fehlerAllgemein: 'Die Suche ist fehlgeschlagen. Bitte versuchen Sie es erneut.',
+    wiederholen: 'Erneut suchen',
   },
   dokument: {
     titel: 'Dokument',

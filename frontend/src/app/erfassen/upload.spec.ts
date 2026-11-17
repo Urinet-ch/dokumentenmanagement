@@ -55,7 +55,11 @@ describe('Upload (Req 3.1, 3.3–3.8)', () => {
   const checkbox = () => element.querySelector<HTMLInputElement>('input[type=checkbox]')!;
 
   async function senden(...ereignisse: UploadEreignis[]) {
-    knopf(TEXTE.upload.hochladen).click();
+    [...element.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) =>
+        new Set<string>([TEXTE.upload.hochladen, TEXTE.upload.erneutHochladen]).has(button.textContent?.trim() ?? ''),
+      )!
+      .click();
     await fixture.whenStable();
     for (const ereignis of ereignisse) {
       port.antwort.next(ereignis);
@@ -154,11 +158,36 @@ describe('Upload (Req 3.1, 3.3–3.8)', () => {
     await senden({ typ: 'fehler', fehler: { status: 413, fehlercode: 'DATEI_ZU_GROSS' } });
     expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.upload.fehlerAnfrageZuGross);
     expect(namen()).toEqual(['a.pdf']);
-    expect(knopf(TEXTE.upload.hochladen).disabled).toBe(false);
+    expect(knopf(TEXTE.upload.erneutHochladen).disabled).toBe(false);
 
     port.antwort = new Subject();
     await senden({ typ: 'fehler', fehler: { status: 0 } });
-    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.upload.fehlerVerbindung);
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.httpFehler.verbindung);
+  });
+
+  it.each([
+    [0, TEXTE.httpFehler.verbindung, null],
+    [401, TEXTE.anmeldung.abgelaufen, null],
+    [403, TEXTE.httpFehler.keinZugriff, null],
+    [404, TEXTE.httpFehler.nichtGefunden, null],
+    [409, TEXTE.httpFehler.konflikt, null],
+    [412, TEXTE.httpFehler.konflikt, null],
+    [429, TEXTE.httpFehler.zuViele(42), 42],
+    [503, TEXTE.httpFehler.server, null],
+  ])('zeigt bei HTTP %s eine verständliche Meldung und behält die Datei', async (status, erwartet, retryAfter) => {
+    await waehlen(pdf('wiederholen.pdf'));
+    await senden({
+      typ: 'fehler',
+      fehler: { status, ...(retryAfter === null ? {} : { retryAfter }) },
+    });
+
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(erwartet);
+    expect(namen()).toEqual(['wiederholen.pdf']);
+    expect(knopf(TEXTE.upload.erneutHochladen).disabled).toBe(false);
+    knopf(TEXTE.upload.erneutHochladen).click();
+    await fixture.whenStable();
+    expect(port.aufrufe).toHaveLength(2);
+    expect(element.querySelector('[role=alert]')).toBeNull();
   });
 
   it('beginnt mit «Weitere Dateien erfassen» eine neue Liste', async () => {

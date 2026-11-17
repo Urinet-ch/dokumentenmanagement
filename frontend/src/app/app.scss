@@ -4,6 +4,18 @@
   height: 100%;
 }
 
+.pwa-hinweis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.25rem 1rem;
+  background: var(--urinet-karte);
+  color: var(--urinet-hell);
+  text-align: center;
+}
+
 .sprunglink {
   position: absolute;
   left: -10000px;

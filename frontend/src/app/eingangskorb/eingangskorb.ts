@@ -14,6 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { Dokument, Dokumentart, DokumentartenService, DokumenteService } from '../gemeinsam/api';
 import { EingangskorbZaehler } from '../gemeinsam/eingangskorb-zaehler';
+import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { EingangskorbKarte } from './eingangskorb-karte';
 
@@ -39,26 +40,36 @@ export class Eingangskorb implements OnInit {
   protected readonly eintraege = signal<readonly Dokument[]>([]);
   protected readonly gesamt = signal(0);
   protected readonly laedt = signal(true);
-  protected readonly fehlerLaden = signal(false);
+  protected readonly fehlerLaden = signal<string | null>(null);
+  protected readonly fehlerArten = signal<string | null>(null);
+  protected readonly fehlerWeitere = signal(false);
   protected readonly meldung = signal('');
   protected readonly arten = signal<ReadonlyMap<string, Dokumentart>>(new Map());
   private seite = 0;
 
   ngOnInit(): void {
     this.laden();
+    this.ladenArten();
+  }
+
+  protected ladenArten(): void {
     this.artenApi
       .apiV1DokumentartenGet()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (arten) => this.arten.set(new Map(arten.map((a) => [a.code, a]))),
-        error: () => this.arten.set(new Map()),
+        next: (arten) => {
+          this.arten.set(new Map(arten.map((a) => [a.code, a])));
+          this.fehlerArten.set(null);
+        },
+        error: (fehler: unknown) => this.fehlerArten.set(httpFehlerMeldung(fehler)),
       });
   }
 
   protected laden(weitere = false): void {
     const seite = weitere ? this.seite + 1 : 0;
     this.laedt.set(true);
-    this.fehlerLaden.set(false);
+    this.fehlerLaden.set(null);
+    this.fehlerWeitere.set(weitere);
     this.api
       .apiV1EingangskorbGet(GROESSE, seite)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -75,10 +86,11 @@ export class Eingangskorb implements OnInit {
           });
           this.gesamt.set(antwort.gesamt);
           this.laedt.set(false);
+          this.fehlerWeitere.set(false);
         },
-        error: () => {
+        error: (fehler: unknown) => {
           this.laedt.set(false);
-          this.fehlerLaden.set(true);
+          this.fehlerLaden.set(httpFehlerMeldung(fehler));
         },
       });
   }

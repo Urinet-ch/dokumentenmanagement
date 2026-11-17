@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { TEXTE } from './texte.de-CH';
 import { httpFehlerMeldung, httpFehlerText } from './http-fehler';
+import { retryAfterSekunden } from './retry-after';
 
 describe('httpFehlerMeldung', () => {
   it.each([
@@ -16,7 +17,7 @@ describe('httpFehlerMeldung', () => {
     expect(httpFehlerText(status)).toBe(erwartet);
   });
 
-  it('liest Retry-After als Sekunden und HTTP-Datum', () => {
+  it('liest Retry-After als Sekunden und zeigt die Wartezeit an', () => {
     expect(
       httpFehlerMeldung(
         new HttpErrorResponse({
@@ -25,14 +26,13 @@ describe('httpFehlerMeldung', () => {
         }),
       ),
     ).toBe(TEXTE.httpFehler.zuViele(42));
-    expect(
-      httpFehlerMeldung(
-        new HttpErrorResponse({
-          status: 429,
-          headers: new HttpHeaders({ 'Retry-After': 'Sat, 14 Nov 2026 08:10:00 GMT' }),
-        }),
-      ),
-    ).toContain('Zu viele Anfragen.');
+  });
+
+  it('liest HTTP-Daten deterministisch und begrenzt die Wartezeit', () => {
+    const jetzt = Date.parse('Sat, 14 Nov 2026 08:09:18 GMT');
+    expect(retryAfterSekunden('Sat, 14 Nov 2026 08:10:00 GMT', jetzt)).toBe(42);
+    expect(retryAfterSekunden('99999', jetzt)).toBe(3600);
+    expect(retryAfterSekunden('keine Zeit', jetzt)).toBeNull();
   });
 
   it('fällt bei ungültigen oder unbekannten Fehlern auf eine verständliche Meldung zurück', () => {
