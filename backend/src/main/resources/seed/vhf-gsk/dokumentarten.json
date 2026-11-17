@@ -90,7 +90,7 @@
           "zugriff": {
             "type": "string",
             "enum": ["oeffentlich", "mitglieder", "vorstand"],
-            "default": "mitglieder"
+            "default": "vorstand"
           },
           "veroeffentlicht": {"type": "boolean", "default": false}
         },
