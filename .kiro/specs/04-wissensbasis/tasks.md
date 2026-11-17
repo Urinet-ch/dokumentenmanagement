@@ -18,7 +18,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - ADR-013 per Merge freigeben; die Folgeänderungen nach design.md, Abschnitt «Folgeänderungen in anderen Dokumenten» (Spec 01/02/03, `product.md`, `structure.md`, `tech.md`, `umsetzungsplan.md`, `docs/adr/README.md`, Nachträge zu ADR-006, ADR-009 und ADR-011) nach dem Merge von PR #15 als eigenen PR veranlassen (PR #16 ist gemergt); darin auch die neuen Fehlercodes in die abschliessende Code-Liste von Spec 01
   - _Anforderungen: 2.3, 5.7, 12.1, 13.4, 13.6, 18.1_
 
-- [ ] 13.2 Dokumentart Wissensquelle [Backend]
+- [x] 13.2 Dokumentart Wissensquelle [Backend]
   - Seed-Teil `seed/_alle/dokumentarten-wissen.json` nach design.md, beim Anlegen jedes Mandanten eingelesen, nur anlegen, wenn der Code fehlt; für `vhf-gsk` mit `zugriff` und `veroeffentlicht` (Spec 03, Aufgabe 10.2); `WissensquelleSeedTest`; `DokumentartSeedTest` aus Spec 01 unverändert
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)

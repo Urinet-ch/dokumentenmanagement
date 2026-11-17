@@ -120,6 +120,11 @@ public class ExportSchritte {
         zip = null;
     }
 
+    @After("@spec-04 and @req-1.6")
+    public void wissensquelleAufraeumen() throws SQLException {
+        aufraeumen();
+    }
+
     @Angenommen("im Mandanten «{word}» gibt es keinen offenen Export")
     public void keinOffenerExport(String mandant) throws SQLException {
         ausfuehren("delete from " + schema(mandant) + ".export");

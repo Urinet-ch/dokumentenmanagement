@@ -233,6 +233,20 @@ public class ManifestSchritte {
         dokumente.put(alias + "/" + name, id);
     }
 
+    @Angenommen("im Mandanten «{word}» wurde die Wissensquelle «{word}» am «{word}» um «{word}» archiviert")
+    public void wissensquelle(String alias, String name, String datum, String uhrzeit) throws SQLException {
+        dokument(alias, name, datum, uhrzeit, "31.12.2036");
+        UUID id = dokumente.get(alias + "/" + name);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
+                     verbindung.prepareStatement("update " + schema(alias)
+                             + ".dokument set art = 'WISSENSQUELLE', titel = 'Probe Wissensquelle', datum = ?, "
+                             + "aufbewahren_bis = null where id = ?")) {
+            aendern.setObject(1, LocalDate.parse(datum, DATUM));
+            aendern.setObject(2, id);
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
     /**
      * Setzt den gespeicherten Dateinamen in {@code dokument.dateiname} (Req 3.12, Aufgabe 4.10, Changeset
      * {@code 015-dokument-dateiname}); das Manifest darf ihn trotzdem nicht enthalten.
