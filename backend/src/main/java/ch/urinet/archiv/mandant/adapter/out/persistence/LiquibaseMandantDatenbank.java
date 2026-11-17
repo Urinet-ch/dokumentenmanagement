@@ -40,7 +40,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
      * ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
      */
     static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-            "manifest", "manifest_zeitstempel", "protokoll_blatt");
+            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;
@@ -135,6 +135,67 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
             einfuegen.executeBatch();
         } catch (SQLException e) {
             throw new IllegalStateException("Dokumentarten für " + schema + " nicht eingespielt", e);
+        }
+    }
+
+    /**
+     * Gleicher Aufbau wie das Abbild in Changeset {@code 037-konfiguration-version}; die Nummer ist die nächste freie,
+     * und es entsteht nur eine Version, wenn sich das Abbild (ohne Nummer) von der letzten unterscheidet.
+     */
+    static final String SEED_VERSION = """
+            with naechste as (select coalesce(max(version), 0) + 1 as nummer from konfiguration_version),
+            abbild as (
+                select n.nummer, jsonb_build_object(
+                    'version', n.nummer,
+                    'einstellungen', jsonb_build_object(
+                        'geschaeftsjahrEnde', coalesce(m.geschaeftsjahr_ende, '12-31'),
+                        'kennungen', jsonb_build_object(
+                            'uid', case when jsonb_typeof(m.kennungen -> 'uid') = 'string'
+                                and m.kennungen ->> 'uid' <> '' then m.kennungen -> 'uid' end,
+                            'ibans', case when jsonb_typeof(m.kennungen -> 'ibans') = 'array'
+                                then m.kennungen -> 'ibans' else '[]'::jsonb end)),
+                    'arten', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'code', a.code,
+                            'name', a.name,
+                            'beschreibung', a.beschreibung,
+                            'gruppen', to_jsonb(coalesce(a.gruppen, '{}'::text[])),
+                            'pflichtfelder', to_jsonb(coalesce(a.pflichtfelder, '{}'::text[])),
+                            'zusatzSchema', to_jsonb(coalesce(a.zusatz_schema::text,
+                                '{"type":"object","properties":{},"additionalProperties":false}')),
+                            'vertraulichkeit', a.vertraulichkeit,
+                            'aufbewahrung', jsonb_build_object(
+                                'jahre', a.aufbewahrung_jahre,
+                                'ab', a.aufbewahrung_ab),
+                            'gesetzlichePflicht', a.gesetzliche_pflicht,
+                            'aktiv', a.aktiv)
+                            order by a.code collate "C")
+                        from dokumentart a), '[]'::jsonb)
+                ) as inhalt
+                from naechste n, (select current_schema() as schema_name) s
+                left join public.mandant m on m.schema_name = s.schema_name
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select nummer, 'system:seed', null, 'SEED', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild
+            where (inhalt - 'version') is distinct from (
+                select inhalt - 'version' from konfiguration_version order by version desc limit 1)
+            """;
+
+    @Override
+    public void konfigurationSeedAnlegen(String schema) {
+        pruefen(schema);
+        try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+            verbindung.setAutoCommit(true);
+            befehl.execute("set search_path to " + schema);
+            try {
+                befehl.execute(SEED_VERSION);
+            } finally {
+                befehl.execute("reset search_path");
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Konfigurationsversion für " + schema + " nicht angelegt", e);
         }
     }
 

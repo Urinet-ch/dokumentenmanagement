@@ -10,13 +10,17 @@
 
 
 /**
- * Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Zeit, Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht
+ * Gesicherte Fassung der Metadaten (Req 10.1): Nummer, Konfigurationsversion, Zeit, Benutzer und Grund; die früheren Werte selbst liefert das Archiv nicht
  */
 export interface DokumentVersion { 
     /**
      * Version des Dokuments, die diese Fassung gesichert hat
      */
     version: number;
+    /**
+     * Angewandte Konfigurationsversion
+     */
+    konfigurationVersion: number;
     /**
      * Zeitpunkt der Änderung (UTC)
      */

@@ -35,6 +35,9 @@ public class DokumentVersionEintrag extends PanacheEntityBase {
     @Column(name = "version", nullable = false)
     public int version;
 
+    @Column(name = "konfiguration_version", nullable = false)
+    public Integer konfigurationVersion;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "daten", nullable = false, columnDefinition = "jsonb")
     public String daten;

@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** {@code details} nur mit Grund, SHA-256, Fehlercode und Regeländerung (Req 9.10, 10.2). */
+/** {@code details} enthält keine Dokument-, Kontakt- oder Konfigurationsinhalte (Req 9.10, 10.2, 17.2). */
 class ProtokollDetailsTest {
 
     @Test

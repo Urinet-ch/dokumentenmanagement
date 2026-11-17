@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="038-protokoll-konfiguration" author="archiv">
+        <sql>
+            alter table zugriff_protokoll drop constraint zugriff_protokoll_aktion_ck;
+            alter table zugriff_protokoll add constraint zugriff_protokoll_aktion_ck
+                check (aktion in ('ERFASSEN', 'ANZEIGEN', 'HERUNTERLADEN', 'AENDERN', 'BESTAETIGEN', 'VERWERFEN',
+                    'WIEDERHOLEN', 'EXPORTIEREN', 'VERWEIGERT', 'SPERRE_KONFLIKT', 'REGEL_AENDERN',
+                    'KONFIGURATION_AENDERN', 'WISSEN_ANZEIGEN', 'WISSEN_ANNEHMEN', 'WISSEN_VERWERFEN',
+                    'WISSEN_INGEST', 'WISSEN_LINT', 'KONTAKT_ZUSAMMENFUEHREN', 'KONTAKT_INAKTIV', 'KONTAKT_AKTIV'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

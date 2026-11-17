@@ -24,6 +24,10 @@ export interface DokumentartAenderung {
     aufbewahrungAb?: DokumentartAenderung.AufbewahrungAbEnum | null;
     gesetzlichePflicht?: boolean;
     aktiv?: boolean;
+    /**
+     * Änderungsgrund für das Zugriffsprotokoll
+     */
+    grund?: string | null;
 }
 export namespace DokumentartAenderung {
     export const VertraulichkeitEnum = {

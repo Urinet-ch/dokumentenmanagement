@@ -39,22 +39,29 @@ export class DokumentartenService extends BaseService {
 
     /**
      * Dokumentart löschen
-     * Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.
+     * If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. Nur ohne Dokumente (auch verworfene); sonst 409 DOKUMENTART_IN_GEBRAUCH.
      * @endpoint delete /api/v1/dokumentarten/{code}
      * @param code 
+     * @param ifMatch 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumentartenCodeDelete(code: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1DokumentartenCodeDelete(code: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1DokumentartenCodeDelete(code: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1DokumentartenCodeDelete(code: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumentartenCodeDelete(code: string, ifMatch: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1DokumentartenCodeDelete(code: string, ifMatch: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1DokumentartenCodeDelete(code: string, ifMatch: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1DokumentartenCodeDelete(code: string, ifMatch: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (code === null || code === undefined) {
             throw new Error('Required parameter code was null or undefined when calling apiV1DokumentartenCodeDelete.');
         }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1DokumentartenCodeDelete.');
+        }
 
         let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
 
         // authentication (SecurityScheme) required
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
@@ -98,26 +105,33 @@ export class DokumentartenService extends BaseService {
 
     /**
      * Dokumentart ändern oder deaktivieren
-     * Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv&#x3D;false deaktiviert.
+     * If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. Angegebene Felder ersetzen die bisherigen; der Code bleibt. aktiv&#x3D;false deaktiviert.
      * @endpoint patch /api/v1/dokumentarten/{code}
      * @param code 
+     * @param ifMatch 
      * @param dokumentartAenderung 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumentartenCodePatch(code: string, dokumentartAenderung: DokumentartAenderung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Dokumentart>;
-    public apiV1DokumentartenCodePatch(code: string, dokumentartAenderung: DokumentartAenderung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Dokumentart>>;
-    public apiV1DokumentartenCodePatch(code: string, dokumentartAenderung: DokumentartAenderung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Dokumentart>>;
-    public apiV1DokumentartenCodePatch(code: string, dokumentartAenderung: DokumentartAenderung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumentartenCodePatch(code: string, ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Dokumentart>;
+    public apiV1DokumentartenCodePatch(code: string, ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Dokumentart>>;
+    public apiV1DokumentartenCodePatch(code: string, ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Dokumentart>>;
+    public apiV1DokumentartenCodePatch(code: string, ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (code === null || code === undefined) {
             throw new Error('Required parameter code was null or undefined when calling apiV1DokumentartenCodePatch.');
+        }
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1DokumentartenCodePatch.');
         }
         if (dokumentartAenderung === null || dokumentartAenderung === undefined) {
             throw new Error('Required parameter dokumentartAenderung was null or undefined when calling apiV1DokumentartenCodePatch.');
         }
 
         let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
 
         // authentication (SecurityScheme) required
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
@@ -227,22 +241,29 @@ export class DokumentartenService extends BaseService {
 
     /**
      * Dokumentart anlegen
-     * Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 DOKUMENTART_EXISTIERT.
+     * If-Match mit der Konfigurationsversion ist Pflicht; fehlt → 428, veraltet → 412. Ungültiges Zusatz-Schema → 422 ZUSATZ_UNGUELTIG; vergebener Code → 409 DOKUMENTART_EXISTIERT.
      * @endpoint post /api/v1/dokumentarten
+     * @param ifMatch 
      * @param dokumentartAenderung 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1DokumentartenPost(dokumentartAenderung: DokumentartAenderung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Dokumentart>;
-    public apiV1DokumentartenPost(dokumentartAenderung: DokumentartAenderung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Dokumentart>>;
-    public apiV1DokumentartenPost(dokumentartAenderung: DokumentartAenderung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Dokumentart>>;
-    public apiV1DokumentartenPost(dokumentartAenderung: DokumentartAenderung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1DokumentartenPost(ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Dokumentart>;
+    public apiV1DokumentartenPost(ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Dokumentart>>;
+    public apiV1DokumentartenPost(ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Dokumentart>>;
+    public apiV1DokumentartenPost(ifMatch: string, dokumentartAenderung: DokumentartAenderung, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (ifMatch === null || ifMatch === undefined) {
+            throw new Error('Required parameter ifMatch was null or undefined when calling apiV1DokumentartenPost.');
+        }
         if (dokumentartAenderung === null || dokumentartAenderung === undefined) {
             throw new Error('Required parameter dokumentartAenderung was null or undefined when calling apiV1DokumentartenPost.');
         }
 
         let localVarHeaders = this.defaultHeaders;
+        if (ifMatch !== undefined && ifMatch !== null) {
+            localVarHeaders = localVarHeaders.set('If-Match', String(ifMatch));
+        }
 
         // authentication (SecurityScheme) required
         localVarHeaders = this.configuration.addCredentialToHeaders('SecurityScheme', 'Authorization', localVarHeaders, 'Bearer ');
