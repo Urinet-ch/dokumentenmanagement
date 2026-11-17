@@ -39,7 +39,7 @@ Ohne Verbindung zeigt das Archiv: «Erfassung gespeichert. Sie wird hochgeladen,
 
 ## Pflichtangaben prüfen
 
-Beim Bestätigen im Eingangskorb ist nur der Titel Pflicht. Für das spätere Veröffentlichen verlangt das Schema der Dokumentart zusätzlich diese Angaben (das Archiv prüft sie erst beim Speichern von «Veröffentlicht» = «Ja»):
+Die Angaben der Dokumentart stehen im Eingangskorb unter «Angaben zur Dokumentart». Pflichtfelder sind mit einem Stern markiert. Das Archiv verlangt sie schon beim Bestätigen; fehlt eine, meldet es zum Beispiel «Bitte ergänzen: Verband.» und das Dokument bleibt im Eingangskorb. Diese Angaben verlangt das Schema der Dokumentart:
 
 | Dokumentart | Zusatzangaben laut Schema |
 | --- | --- |
@@ -51,14 +51,16 @@ Beim Bestätigen im Eingangskorb ist nur der Titel Pflicht. Für das spätere Ve
 | Formular | Verband |
 | Sonstiges | Verband |
 
-Beim Bulletin sind die Fachgebiete «Bad», «Eis», «Technik», «Recht» und «Allgemein». Als Verbände sind VHF und GSK vorgesehen; mindestens einer muss gesetzt sein. Die «Zugriffsstufe» wählen Sie im Eingangskorb (vorbelegt), «Veröffentlicht» steht dort nicht zur Wahl: Neue Dokumente sind nach dem Bestätigen immer unveröffentlicht und erhalten die Einstellung erst unter «Metadaten bearbeiten».
+Beim Bulletin sind die Fachgebiete «Bad», «Eis», «Technik», «Recht» und «Allgemein».
 
-**Wichtig:** Das Zusatzfeld «Verband» ist derzeit nicht in der Eingabemaske vorhanden. Das Bestätigen funktioniert auch ohne Verband. Das Veröffentlichen («Veröffentlicht» = «Ja») schlägt aber mit «Ein Zusatzfeld passt nicht zur Art. Bitte die Zusatzfelder prüfen.» fehl, solange der Verband fehlt. Tragen Sie keinen geratenen Wert ein. Wenden Sie sich an [Kontaktstelle Geschäftsstelle einsetzen].
+**Verband wählen:** «Verband» ist eine Mehrfachauswahl mit den Kontrollkästchen «vhf» und «gsk». Setzen Sie ein Häkchen bei jedem Verband, zu dem das Dokument gehört; mindestens einer ist nötig (Hinweis unter dem Feld: «Mindestens einen Wert auswählen.»). Ohne Auswahl lässt sich das Dokument nicht bestätigen und das Archiv meldet «Bitte ergänzen: Verband.». Wählen Sie nicht auf Verdacht: Ist unklar, zu welchem Verband ein Dokument gehört, fragen Sie bei [Kontaktstelle Geschäftsstelle einsetzen] nach. Dasselbe Feld finden Sie bei «Metadaten bearbeiten»; dort wird ein Speichern ohne Verband ebenfalls abgelehnt.
+
+Die «Zugriffsstufe» wählen Sie im Eingangskorb. «Veröffentlicht» steht dort nicht zur Wahl: Neue Dokumente sind nach dem Bestätigen immer unveröffentlicht und erhalten die Einstellung erst unter «Metadaten bearbeiten».
 
 ## Eingangskorb prüfen und bestätigen
 
 1. Öffnen Sie «Eingangskorb». Neue Dokumente stehen zuerst.
-2. Öffnen Sie «Angaben ändern» und prüfen Sie Art, Titel und angezeigte Angaben.
+2. Öffnen Sie «Angaben ändern» und prüfen Sie Art, Titel und angezeigte Angaben, auch die Zusatzangaben wie «Verband».
 3. Prüfen Sie jeden mit «bitte prüfen» markierten KI-Vorschlag. Korrigieren Sie falsche Angaben.
 4. Wählen Sie die passende «Zugriffsstufe»:
 
@@ -68,7 +70,7 @@ Beim Bulletin sind die Fachgebiete «Bad», «Eis», «Technik», «Recht» und 
 | Mitglieder | Für Mitglieder, einschliesslich Vorstand |
 | Vorstand | Nur für den Vorstand |
 
-Die Stufe ist vorbelegt: «Mitglieder», bei «Vorstandsprotokoll» «Vorstand». Prüfen Sie die Stufe trotzdem bei jedem Dokument und wählen Sie sie bewusst.
+Das Feld kann vorbelegt sein. Verlassen Sie sich nicht darauf: Prüfen Sie die Stufe bei jedem Dokument und wählen Sie sie bewusst, auch beim «Vorstandsprotokoll».
 
 **Achtung:** «Öffentlich» zusammen mit «Veröffentlicht» = «Ja» macht ein Dokument für alle Besucher der Webseite sichtbar. Wählen Sie im Zweifel die engere Stufe und fragen Sie bei [Kontaktstelle Geschäftsstelle einsetzen] nach.
 5. Wählen Sie «Bestätigen». Das Archiv meldet «[Titel]» bestätigt, wird archiviert. Das Dokument ist danach noch nicht veröffentlicht. Warten Sie, bis die Archivierung abgeschlossen ist.
@@ -77,7 +79,7 @@ Die Stufe ist vorbelegt: «Mitglieder», bei «Vorstandsprotokoll» «Vorstand»
 
 ## Veröffentlichen oder zurückziehen
 
-1. Suchen Sie das archivierte Dokument über «Suche» und öffnen Sie es. Kontrollieren Sie vorher die Zugriffsstufe: Eine falsche Stufe wirkt sofort, sobald «Veröffentlicht» auf «Ja» steht.
+1. Suchen Sie das archivierte Dokument über «Suche» und öffnen Sie es. Die Datei selbst sehen Sie nicht eingebettet; «PDF öffnen» öffnet sie. Kontrollieren Sie vorher die Zugriffsstufe: Eine falsche Stufe wirkt sofort, sobald «Veröffentlicht» auf «Ja» steht.
 2. Wählen Sie «Metadaten bearbeiten».
 3. Setzen Sie «Veröffentlicht» auf «Ja», um es für die Web-Schnittstelle freizugeben. Zum Zurückziehen setzen Sie das Feld auf «Nein».
 4. Geben Sie bei «Grund der Änderung» einen kurzen Grund ein und wählen Sie «Änderungen speichern».
@@ -94,7 +96,8 @@ Nach dem Zurückziehen liefert die Schnittstelle das Dokument nicht mehr aus. Wa
 - **Datei nicht lesbar:** Bei «Die Datei ist leer oder beschädigt. Bitte prüfen und erneut hochladen.» prüfen Sie die Datei und erstellen Sie einen neuen Scan oder Export. Laden Sie die neue Datei hoch.
 - **Dateityp oder Grösse:** Bei «Dieser Dateityp wird nicht unterstützt» verwenden Sie PDF, JPEG, PNG, HEIC/HEIF oder TIFF. Bei «Die Datei ist grösser als 50 MB. Bitte verkleinern oder aufteilen.» verkleinern oder teilen Sie die Datei.
 - **«Für diese Aktion fehlt Ihnen das Recht.»:** Prüfen Sie, ob Sie mit dem richtigen Benutzer angemeldet sind. Wenden Sie sich an [Kontaktstelle Geschäftsstelle einsetzen], wenn die Meldung bleibt.
-- **«Ein Zusatzfeld passt nicht zur Art. Bitte die Zusatzfelder prüfen.»:** Beim Veröffentlichen fehlt eine Zusatzangabe, meist der «Verband». Die aktuelle Eingabemaske bietet dieses Feld nicht an. Setzen Sie «Veröffentlicht» nicht auf «Ja» und melden Sie es an [Kontaktstelle Geschäftsstelle einsetzen].
+- **«Bitte ergänzen: Verband.»** (oder ein anderes Feld): Beim Bestätigen fehlt eine Pflichtangabe. Ergänzen Sie sie im Eingangskorb unter «Angaben zur Dokumentart», beim Verband mit mindestens einem Kontrollkästchen.
+- **«Ein Zusatzfeld passt nicht zur Art. Bitte die Zusatzfelder prüfen.»:** Eine Zusatzangabe passt nicht zur Dokumentart. Prüfen Sie die Angaben bei «Metadaten bearbeiten». Wenn die Meldung bleibt, setzen Sie «Veröffentlicht» nicht auf «Ja» und melden Sie es an [Kontaktstelle Geschäftsstelle einsetzen].
 
 ## Bildschirmfotos ergänzen
 
