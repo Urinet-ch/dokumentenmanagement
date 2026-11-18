@@ -73,6 +73,7 @@ public final class WissensPruefung {
         }
 
         pruefeQuellen(seite, kontext, befunde);
+        pruefeWissensquelle(seite, kontext, markdown.fussnoten(), befunde);
         for (String fussnote : markdown.fussnoten()) {
             if (!schluessel(seite.quellen()).contains(fussnote)) {
                 befunde.add(new Befund(Code.FUSSNOTE_OHNE_QUELLE, "Die Fussnote «" + fussnote
@@ -211,6 +212,43 @@ public final class WissensPruefung {
                 befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
                         "Ein Quellenauszug darf hoechstens 300 Zeichen lang sein."));
             }
+        }
+    }
+
+    /**
+     * Die Wissensquelle einer Quelle-Seite gilt wie eine Dokumentquelle (Requirement 2.7, bei jedem Anlass). Damit
+     * die Hülle sie enthält, muss die Quelle-Seite mindestens eine Fussnote auf einen Quelleneintrag zu ihr tragen.
+     */
+    private static void pruefeWissensquelle(Wissensseite seite, Kontext kontext, Set<String> fussnoten,
+                                            List<Befund> befunde) {
+        UUID wissensquelleId = seite.wissensquelleId();
+        if (wissensquelleId == null) {
+            return;
+        }
+        if (seite.typ() != null && seite.typ() != Seitentyp.QUELLE) {
+            befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
+                    "Nur eine Seite vom Typ «Quelle» verweist auf eine Wissensquelle."));
+        }
+        DokumentQuelle dokument = kontext.dokumente().get(wissensquelleId);
+        if (dokument == null || !dokument.gleicherMandant()) {
+            befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
+                    "Die Wissensquelle fehlt im Mandanten oder ist nicht archiviert."));
+            return;
+        }
+        if (dokument.personal()) {
+            befunde.add(new Befund(Code.QUELLE_PERSONAL,
+                    "PERSONAL-Dokumente dürfen nicht als Wissensquelle verwendet werden."));
+        }
+        if (!dokument.archiviert()) {
+            befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
+                    "Die Wissensquelle fehlt im Mandanten oder ist nicht archiviert."));
+            return;
+        }
+        if (seite.typ() == Seitentyp.QUELLE && seite.quellen().stream()
+                .noneMatch(quelle -> wissensquelleId.equals(quelle.dokumentId()) && quelle.schluessel() != null
+                        && fussnoten.contains(quelle.schluessel()))) {
+            befunde.add(new Befund(Code.QUELLE_UNGUELTIG,
+                    "Die Quelle-Seite belegt keine Aussage mit ihrer Wissensquelle."));
         }
     }
 

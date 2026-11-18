@@ -68,6 +68,18 @@ Funktionalität: Wissensseitenmodell prüfen
     Wenn das Seitenmodell geprüft wird
     Dann enthält die Prüfung den Befund «QUELLE_PERSONAL»
 
+  @req-2.6
+  Szenario: Pflichtabschnitte unter «Berührte Seiten» brauchen trotzdem Fussnoten
+    Angenommen eine Quellen-Seite mit unbelegten Pflichtabschnitten unter «Berührte Seiten»
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «AUSSAGE_OHNE_BELEG»
+
+  @req-2.7
+  Szenario: Eine PERSONAL-Wissensquelle ist auch ohne Fussnote auf sie nicht annehmbar
+    Angenommen eine Quelle-Seite zu einer PERSONAL-Wissensquelle mit Fussnoten auf ein anderes Dokument
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «QUELLE_PERSONAL»
+
   @req-2.7
   Szenario: Eine Fussnote ohne Quelleneintrag ist nicht annehmbar
     Angenommen eine Seite mit einer Fussnote ohne Quelleneintrag

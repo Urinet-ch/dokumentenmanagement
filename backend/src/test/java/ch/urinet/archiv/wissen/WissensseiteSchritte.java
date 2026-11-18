@@ -23,6 +23,7 @@ public class WissensseiteSchritte {
 
     private static final UUID DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000201");
     private static final UUID QUELLSEITE = UUID.fromString("00000000-0000-0000-0000-000000000202");
+    private static final UUID ANDERES_DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000203");
     private static final Seitentext PDF = new Seitentext(List.of("Erste Seite", "Wörtlicher Auszug"));
 
     private Wissensseite seite;
@@ -62,7 +63,30 @@ public class WissensseiteSchritte {
     @Angenommen("eine Wissensquellen-Seite mit passendem Monatsordner")
     public void quellenSeite() {
         seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,
-                "## Zusammenfassung\n## Kernaussagen\n## Berührte Seiten", quelleneintrag(), DOKUMENT);
+                "## Zusammenfassung\nKurz.[^q1]\n## Kernaussagen\nFakt.[^q1]\n## Berührte Seiten\n- Konzept",
+                quelleneintrag(), DOKUMENT);
+        kontext = kontextMitDokument(false);
+    }
+
+    @Angenommen("eine Quelle-Seite zu einer PERSONAL-Wissensquelle mit Fussnoten auf ein anderes Dokument")
+    public void personalWissensquelle() {
+        seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,
+                "## Zusammenfassung\nKurz.[^q1]\n## Kernaussagen\nFakt.[^q1]\n## Berührte Seiten\n- Konzept",
+                List.of(new Quelleneintrag("q1", ANDERES_DOKUMENT, 1, null, null, null)), DOKUMENT);
+        WissensPruefung.DokumentQuelle wissensquelle = new WissensPruefung.DokumentQuelle(true, true, true, 2,
+                LocalDate.of(2026, 3, 5), Optional.of(PDF));
+        WissensPruefung.DokumentQuelle anderes = new WissensPruefung.DokumentQuelle(true, true, false, 2,
+                LocalDate.of(2026, 3, 5), Optional.of(PDF));
+        kontext = new WissensPruefung.Kontext(20_000, null, Set.of(),
+                Map.of(DOKUMENT, wissensquelle, ANDERES_DOKUMENT, anderes), Set.of(), Set.of(), Set.of(), Set.of(),
+                false, false, false, null, null);
+    }
+
+    @Angenommen("eine Quellen-Seite mit unbelegten Pflichtabschnitten unter «Berührte Seiten»")
+    public void unbelegteUnterabschnitte() {
+        seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,
+                "# Berührte Seiten\n## Zusammenfassung\nUnbelegt.\n\n## Kernaussagen\nUnbelegt.[^q1]",
+                quelleneintrag(), DOKUMENT);
         kontext = kontextMitDokument(false);
     }
 

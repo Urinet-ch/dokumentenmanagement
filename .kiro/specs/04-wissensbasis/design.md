@@ -71,9 +71,9 @@ flowchart LR
 | `FUSSNOTE_OHNE_QUELLE` | Label ohne Quelleneintrag |
 | `FUSSNOTE_DEFINITION` | Fussnoten-Definition `[^label]: …` im Inhalt; die Quelle steht nur im Quelleneintrag (Umsetzung 13.4) |
 | `AUSSAGE_OHNE_BELEG` | Absatz, Listenpunkt oder Codeblock ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
-| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben |
+| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben; Wissensquelle einer Quelle-Seite fehlt, fremd, nicht archiviert oder ohne Fussnote auf sie, Wissensquelle an einer Seite anderen Typs (Umsetzung 13.4) |
 | `SEITE_FEHLT` | Dokumentquelle ohne PDF-Seite (z. B. aus einem Analyse-Vorschlag, Requirement 12.4) |
-| `QUELLE_PERSONAL` | Dokument einer Quelle hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
+| `QUELLE_PERSONAL` | Dokument einer Quelle oder Wissensquelle einer Quelle-Seite hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
 | `STUFE_UEBERBLICK` | Änderung an `ueberblick` mit wirksamer Vertraulichkeit über `NORMAL` (Requirement 11.8) |
 | `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum, Silbentrennung und Unicode NFKC normalisiert, Gross-/Kleinschreibung unverändert) nicht auf der angegebenen PDF-Seite vor |
@@ -136,6 +136,19 @@ flowchart LR
     (`[Titel][k]`, `[k][]`, `[k]`) ein Befund (Nachbesserung Review PR #298, Kopf 197a8883).
   - Offene Klammern zählen nur innerhalb eines Absatzes zur Verschachtelung; eine Leerzeile setzt Klammer- und
     Inline-Code-Zähler zurück.
+  - Die Wissensquelle einer Seite vom Typ `Quelle` (`wissensquelle_id`) prüft `WissensPruefung` wie eine
+    Dokumentquelle (Requirement 2.7, bei jedem Anlass): fehlt sie im Kontext, ist sie fremd oder nicht archiviert,
+    gilt `QUELLE_UNGUELTIG`, ist sie `PERSONAL`, `QUELLE_PERSONAL` (bei fremdem Dokument nur `QUELLE_UNGUELTIG`).
+    Eine `wissensquelle_id` an einer Seite anderen Typs ist `QUELLE_UNGUELTIG` (Datenmodell: «nur Typ Quelle»).
+    Eine Quelle-Seite muss mindestens eine Fussnote auf einen Quelleneintrag zu ihrer Wissensquelle tragen, sonst
+    `QUELLE_UNGUELTIG`: Die Hülle besteht nur aus den Quelleneinträgen, und die Quelle-Seite beruht auf ihrer
+    Wissensquelle (Glossar «Hülle», Requirement 2.3, 11.2); ohne diesen Eintrag richtete sich ihre Sichtbarkeit
+    nicht nach der Wissensquelle (Nachbesserung Review PR #298, Kopf 42587e8f, M1).
+  - Die Ausnahme von der Belegpflicht für «Offene Fragen» und «Berührte Seiten» gilt nur bis zur nächsten
+    Überschrift beliebiger Ebene; ein Unterabschnitt (z. B. «Kernaussagen» unter «Berührte Seiten») ist wieder
+    belegpflichtig (Requirement 2.6; Nachbesserung Review PR #298, Kopf 42587e8f, S1).
+  - Aufgabe 13.4 liefert die Links aus dem Inhalt als `Ergebnis.links`; das Schreiben nach `wissensseite_link`
+    folgt mit der Freigabe (Schritt «Quelleneinträge, Links und Hüllen neu schreiben», Aufgabe 14.2).
   - Tika bringt `commonmark` mit `commonmark-ext-gfm-tables` und `-strikethrough` in Version `0.31.0` mit;
     `dependencyManagement` hebt alle commonmark-Artefakte auf `${commonmark.version}` (`0.32.0`), damit keine
     gemischten Versionen auf dem Klassenpfad liegen.

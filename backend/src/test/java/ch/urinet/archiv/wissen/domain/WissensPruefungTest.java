@@ -16,6 +16,7 @@ class WissensPruefungTest {
 
     private static final UUID DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID QUELLSEITE = UUID.fromString("00000000-0000-0000-0000-000000000102");
+    private static final UUID ANDERES_DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000103");
     private static final LocalDate DOKUMENTDATUM = LocalDate.of(2026, 3, 5);
     private static final Seitentext PDF = new Seitentext(List.of("Erste Seite", "Wörtlicher Auszug"));
 
@@ -378,6 +379,93 @@ class WissensPruefungTest {
         Wissensseite normal = seite("konzepte/frist", Seitentyp.KONZEPT,
                 "Siehe [Konzept](/konzepte/a).[^q1]", quelle);
         assertThat(codes(pruefen(normal, kontextMitDokument(false)))).isEmpty();
+    }
+
+    @Test
+    void personalWissensquelleEinerQuelleSeiteWirdAbgelehnt() {
+        WissensPruefung.DokumentQuelle personal = new WissensPruefung.DokumentQuelle(true, true, true, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+
+        assertThat(codes(pruefen(quellenSeiteMitFremdenFussnoten(), kontextMitWissensquelle(personal))))
+                .contains(WissensPruefung.Code.QUELLE_PERSONAL);
+    }
+
+    @Test
+    void wissensquelleAusFremdemMandantenWirdAbgelehnt() {
+        WissensPruefung.DokumentQuelle fremd = new WissensPruefung.DokumentQuelle(false, true, true, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+
+        assertThat(codes(pruefen(quellenSeiteMitFremdenFussnoten(), kontextMitWissensquelle(fremd))))
+                .contains(WissensPruefung.Code.QUELLE_UNGUELTIG)
+                .doesNotContain(WissensPruefung.Code.QUELLE_PERSONAL);
+    }
+
+    @Test
+    void nichtArchivierteWissensquelleWirdAbgelehnt() {
+        WissensPruefung.DokumentQuelle nichtArchiviert = new WissensPruefung.DokumentQuelle(true, false, false, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+
+        assertThat(codes(pruefen(quellenSeiteMitFremdenFussnoten(), kontextMitWissensquelle(nichtArchiviert))))
+                .contains(WissensPruefung.Code.QUELLE_UNGUELTIG);
+    }
+
+    @Test
+    void wissensquelleIstNurBeiQuelleSeitenZulaessigUndWirdGeprueft() {
+        Wissensseite konzept = new Wissensseite(null, "konzepte/arbeit", Seitentyp.KONZEPT, "Titel",
+                "Kurze Beschreibung", List.of(), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", ANDERES_DOKUMENT, 1, null, null, null)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Fakt.[^q1]", 1, null, null, null, null, false, false,
+                DOKUMENT);
+        WissensPruefung.DokumentQuelle personal = new WissensPruefung.DokumentQuelle(true, true, true, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+        WissensPruefung.DokumentQuelle normal = new WissensPruefung.DokumentQuelle(true, true, false, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+
+        assertThat(codes(pruefen(konzept, kontextMitWissensquelle(personal))))
+                .contains(WissensPruefung.Code.QUELLE_UNGUELTIG, WissensPruefung.Code.QUELLE_PERSONAL);
+        assertThat(codes(pruefen(konzept, kontextMitWissensquelle(normal))))
+                .containsExactly(WissensPruefung.Code.QUELLE_UNGUELTIG);
+    }
+
+    @Test
+    void quelleSeiteMussIhreWissensquelleMitFussnoteBelegen() {
+        WissensPruefung.DokumentQuelle normal = new WissensPruefung.DokumentQuelle(true, true, false, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+        Wissensseite mitWissensquelle = quellenSeite("## Zusammenfassung\nKurz.[^q1]\n"
+                + "## Kernaussagen\nFakt.[^q2]\n## Berührte Seiten\n- Konzept",
+                List.of(new Quelleneintrag("q1", ANDERES_DOKUMENT, 1, null, null, null),
+                        new Quelleneintrag("q2", DOKUMENT, 1, null, null, null)));
+
+        assertThat(codes(pruefen(quellenSeiteMitFremdenFussnoten(), kontextMitWissensquelle(normal))))
+                .containsExactly(WissensPruefung.Code.QUELLE_UNGUELTIG);
+        assertThat(codes(pruefen(mitWissensquelle, kontextMitWissensquelle(normal)))).isEmpty();
+    }
+
+    @Test
+    void unterabschnittEinesAusgenommenenAbschnittsBrauchtFussnoten() {
+        Wissensseite seite = quellenSeite("# Berührte Seiten\n## Zusammenfassung\nUnbelegt.\n\n"
+                + "## Kernaussagen\nUnbelegt.", List.of());
+        Wissensseite ueberblick = seite("ueberblick", Seitentyp.SYNTHESE,
+                "# Offene Fragen\n## Gesamtbild\nUnbelegt.", List.of());
+
+        assertThat(codes(pruefen(seite, kontextMitDokument(false))))
+                .contains(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+        assertThat(codes(pruefen(ueberblick, stufenKontext(Wissensseite.Vertraulichkeit.NORMAL))))
+                .contains(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+    }
+
+    private static Wissensseite quellenSeiteMitFremdenFussnoten() {
+        return quellenSeite("## Zusammenfassung\nKurz.[^q1]\n"
+                        + "## Kernaussagen\nFakt.[^q1]\n## Berührte Seiten\n- Konzept",
+                List.of(new Quelleneintrag("q1", ANDERES_DOKUMENT, 1, null, null, null)));
+    }
+
+    private static WissensPruefung.Kontext kontextMitWissensquelle(WissensPruefung.DokumentQuelle wissensquelle) {
+        WissensPruefung.DokumentQuelle anderes = new WissensPruefung.DokumentQuelle(true, true, false, 2,
+                DOKUMENTDATUM, Optional.of(PDF));
+        return new WissensPruefung.Kontext(20_000, null, Set.of(),
+                Map.of(DOKUMENT, wissensquelle, ANDERES_DOKUMENT, anderes), Set.of(), Set.of(), Set.of(),
+                Set.of(), false, false, false, null, null);
     }
 
     private static WissensPruefung.Kontext stufenKontext(Wissensseite.Vertraulichkeit wirksam) {

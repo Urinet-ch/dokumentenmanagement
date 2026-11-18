@@ -102,8 +102,8 @@ public final class WissensMarkdown {
                 abschnitte.add(titel);
                 untersuchen(kind, false, false, false, laenge, links, fussnoten, aussagen, merkmale);
             } else {
-                boolean ausgenommen = abschnittstitel.stream()
-                        .anyMatch(WissensMarkdown::abschnittOhneBeleg);
+                boolean ausgenommen = !abschnittstitel.isEmpty()
+                        && abschnittOhneBeleg(abschnittstitel.peek());
                 untersuchen(kind, false, false, ausgenommen, laenge, links, fussnoten, aussagen, merkmale);
             }
         }
