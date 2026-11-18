@@ -31,7 +31,7 @@ public final class Testdokumente {
 
     private static final List<String> TABELLEN = List.of("chunk", "dokument_version", "dokument_datei",
             "dokument_finanz", "dokument_vertrag", "belegnummer_eigen", "ki_beispiel", "alte_url",
-            "webseite_referenz", "webseite_aenderung", "dokument_klassifikation", "dokument");
+            "webseite_referenz", "webseite_aenderung", "dokument_klassifikation", "wissens_entwurf", "dokument");
 
     /** Angaben eines Testdokuments; {@code bestaetigt = false} heisst Art unbestätigt. */
     public record Angaben(String mandant, String art, String vertraulichkeit, boolean bestaetigt, String erstelltVon,

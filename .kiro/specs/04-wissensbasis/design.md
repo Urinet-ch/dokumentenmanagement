@@ -201,8 +201,8 @@ flowchart LR
   `ARCHIVIEREN` verkettet. `wissen/application` reiht bei Art `WISSENSQUELLE` in derselben Transaktion `WISSEN_INGEST`
   mit `{entwurfId}` ein bzw. setzt `quelle_pruefen`; ein Absturz verliert so keinen Ingest, und der Zugriff zwischen
   Fachbereichen läuft nur über `application` (ADR-011). Manuell: `POST /dokumente/{id}/wissen-ingest` (A16).
-- Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT` oder `OFFEN`, entsteht
-  der neue als `WARTEND` ohne Auftrag. Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
+- Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT`, `OFFEN` oder `WARTEND`,
+  entsteht der neue als `WARTEND` ohne Auftrag; ein neuer Start überholt so keinen wartenden (Review PR #307). Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
   Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. Erzwungen über einen
   partiellen Unique-Index auf eine Konstante (siehe Data Models).
 - Der Entwurf (`anlass = INGEST`) hält den Fortschritt in `schritt`; jeder Teilauftrag macht höchstens einen
@@ -213,6 +213,41 @@ flowchart LR
   Schätzung je Schritt mit Ein- und Ausgabe:
   `(Zeichen Text + Index + ueberblick + 2 × max-seiten × seite-max-zeichen + Anzahl Aufrufe × Systemprompt) / 3 × 1.3`
   Tokens. Ein WireMock-Szenario vergleicht die Schätzung mit `wissens_entwurf.tokens_*`.
+- Zwischenstand 14.1a (PR #307, nachgebessert nach Review): `WissenIngestStarten` implementiert `DokumentEreignisse`
+  in `wissen/application`, damit der fachbereichsübergreifende Zugriff über `application` läuft. Umgesetzt sind Start
+  (automatisch nach `ARCHIVIERT`, manuell über A16), Vorprüfung, Schätzung und Budgets; die Teilaufträge folgen in 14.1b.
+  - Ohne Handler für `WISSEN_INGEST` endet ein Start, der alle Prüfungen besteht, als Entwurf `FEHLER` mit dem Hinweis
+    «Die Ingest-Verarbeitung ist noch nicht verfügbar. Die Wissensquelle ist archiviert; der Ingest lässt sich
+    wiederholen.», ohne Auftrag. So entstehen vor 14.1b keine KI-Aufrufe ohne Benutzer. 14.1b holt diese Quellen nach
+    (Ingest-Entwürfe `FEHLER` mit genau diesem Hinweis, ohne neueren Ingest-Entwurf desselben Dokuments) und prüft beim
+    Hochstufen `WARTEND` → `IN_ARBEIT` das Monatsbudget erneut; bis dahin reserviert ein wartender Entwurf nichts.
+  - Prüfreihenfolge (wie «Rechte und Abläufe»): 404 (Dokument fehlt oder ist nach A2–A4 unsichtbar; A16 ist dafür
+    dokumentbezogen wie A2–A10, `ZugangFilter`), 403 (Rolle ohne A16), 409 `STATUS_KONFLIKT` (nicht `ARCHIVIERT`, dann
+    Ingest desselben Dokuments `WARTEND` oder `IN_ARBEIT`; ein `OFFEN`-Entwurf blockiert nicht, 5.10 und 5.13),
+    422 `KEINE_WISSENSQUELLE`, 400 `ANFRAGE_UNGUELTIG` (Seitenbereich ausserhalb `1..seiten` oder umgekehrt; fehlt
+    `seiteVon`, gilt 1), dann Vorprüfung nach 5.6, Monatsbudget, Schätzung. Der automatische Start prüft nur Art
+    `WISSENSQUELLE` und überspringt ein Dokument mit laufendem oder wartendem Ingest ohne Fehler.
+  - Seiten nach `Seitentext.von(volltext, seiten)` wie Suche und Chat: pdftotext schliesst jede Seite mit `\f` ab, ein
+    fehlender Abschluss der letzten Seite ist zulässig; passt die Zahl nicht, ist das Hindernis «keine Seitenangaben
+    möglich». Hindernisse schreiben den Grund nur in `wissens_entwurf.hinweis` (`FEHLER`); `dokument.hinweis` und die
+    Metadaten der Wissensquelle bleiben unverändert (Req 1.4, Regel 2). Angezeigt wird der Grund an der Wissensquelle
+    aus ihrem jüngsten Ingest-Entwurf (Lese-DTO in 14.2, Oberfläche in 14.5).
+  - Schätzung (`WissenIngestSchaetzung`) wörtlich nach der Formel oben: Text = Zeichen des gewählten Seitenbereichs,
+    Index = `index-max-zeichen`, `ueberblick` = `seite-max-zeichen` (nur bei `NORMAL`), `2 × max-seiten ×
+    seite-max-zeichen`, Aufrufe = Abschnitte (an Seitengrenzen gepackt, höchstens `abschnitt-zeichen`) + `max-seiten`
+    + 2 (`PLANUNG`, `QUELLE`). Den Systemprompt baut erst 14.1b; bis dahin steht `werkzeug-max-zeichen` als
+    Platzhalter für seine Länge. Mit den Startwerten ergibt schon eine einseitige `NORMAL`-Quelle mit wenig Text rund 388'000 Tokens, also
+    mehr als `budget-tokens` 300'000. Fabian entschied am 18.11.2026, den Startwert auf 600'000 anzuheben; damit
+    bleibt für eine kleine `NORMAL`-Quelle rund 212'000 Tokens Reserve. `wissens_einstellung.budget_tokens` hat
+    Vorrang vor der Konfiguration.
+  - Monatsbudget im Kalendermonat `Europe/Zurich` (Grenzen als UTC-Zeitpunkte), `wissens_einstellung` vor
+    `archiv.wissen.monatsbudget-tokens`. Streng ausgelegt: Ist der Rest kleiner als die Schätzung, gilt das Budget als
+    erschöpft (manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` «Budget erschöpft»).
+  - Der automatische Start läuft in der Transaktion von `ARCHIVIEREN`; die Art liest `ArchivierungSpeichern` in dieser
+    Transaktion. Scheitert die Vorprüfung technisch (z. B. Zeitgrenze der Verbrauchssumme), rollt die Archivierung
+    zurück und `ARCHIVIEREN` wird nach Spec 01 wiederholt; ein fachliches Hindernis ist dagegen ein Entwurf `FEHLER`.
+  - Systemakteur der Entwürfe aus dem automatischen Start: `process:wissen-ingest` («Akteure»).
+  - Die Zeitgrenze `archiv.auftrag.zeitgrenze.WISSEN_INGEST` stand schon vor 14.1a in `application.properties`.
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:
@@ -696,7 +731,7 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 | `archiv.wissen.index-max-zeichen` | 60'000 |
 | `archiv.wissen.seite-max-zeichen` | 20'000 |
 | `archiv.wissen.werkzeug-max-zeichen` | 12'000 |
-| `archiv.wissen.budget-tokens` | 300'000 (entschieden von Fabian am 09.11.2026) |
+| `archiv.wissen.budget-tokens` | 600'000 (entschieden von Fabian am 18.11.2026) |
 | `archiv.wissen.lint-budget-tokens` | 100'000 |
 | `archiv.wissen.monatsbudget-tokens` | 1'000'000 je Mandant und Kalendermonat (entschieden von Fabian am 09.11.2026) |
 | `archiv.wissen.lint-zeitplan` | `0 0 4 ? * SUN` (Europe/Zurich) |
@@ -1099,7 +1134,7 @@ Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
    `KEINE_WISSENSQUELLE` (Requirement 5.7). Das Design bleibt vorbereitet: Der Ingest braucht nur ein archiviertes
    Dokument mit Volltext, PDF/A mit Seitentrennern und Vertraulichkeit ≠ `PERSONAL`; der Ausschluss aus dem
    Jahresexport (Requirement 1.6) gilt nur für die Art `WISSENSQUELLE`.
-5. Tokenbudget je Ingest: Startwert 300'000 Tokens, konfigurierbar (Requirement 13.4).
+5. Tokenbudget je Ingest: Startwert 600'000 Tokens (Entscheid Fabian, 18.11.2026), konfigurierbar (Requirement 13.4).
 6. Gate Phase 4: 5 Wissensquellen, mindestens 47 von 50 Fussnoten belegt, mindestens 14 von 15 Fragen korrekt mit Seite und Quelldokument beantwortet
    (Requirement 18.1–18.4).
 7. `WISSENSQUELLE` nur von Hand wählbar; ein KI-Vorschlag der Art bleibt Option (Requirement 1.5).
