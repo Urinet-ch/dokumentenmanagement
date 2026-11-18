@@ -16,7 +16,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** In {@code prod} bricht ein eingeschalteter Dev-Stub den Start ab (Req 16.13, Startprüfung der Port-Auswahl). */
-@Tag("start-1")
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(PortAuswahlStartTest.ProdMitAblageStub.class)
 class PortAuswahlStartTest {

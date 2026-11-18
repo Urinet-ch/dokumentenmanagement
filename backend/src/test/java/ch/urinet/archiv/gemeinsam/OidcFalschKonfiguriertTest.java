@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.containsString;
  * 11.11.2026, PR #42 P42-1): Die Readiness meldet DOWN, damit der Deploy-Workflow zurückrollt; im Betrieb beendet sich
  * die API nach der Frist mit Exit-Code 75.
  */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(OidcFalschKonfiguriertTest.FalscherRealm.class)
 class OidcFalschKonfiguriertTest {

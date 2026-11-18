@@ -12,7 +12,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 
 /** Ohne aktive Datasource (z. B. ohne JDBC-URL) meldet die Readiness DOWN statt UP (Aufgabe 1.2). */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(BereitschaftOhneDatasourceTest.OhneDatasource.class)
 class BereitschaftOhneDatasourceTest {

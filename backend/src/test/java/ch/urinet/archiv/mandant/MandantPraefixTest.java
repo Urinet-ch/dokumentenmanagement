@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Die Provisionierung nimmt den Präfix aus {@code archiv.ablage.bucket-praefix} (Req 6.11, Stufe A). */
-@Tag("start-3")
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(MandantPraefixTest.StufeA.class)
 class MandantPraefixTest {

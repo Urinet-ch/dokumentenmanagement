@@ -28,7 +28,7 @@ import static org.hamcrest.Matchers.containsString;
  * nach dem Signal ({@link ManifestPlanenAttrappe}; Review PR #113). DOWN vor dem Signal zeigt
  * {@code SchemaBereitschaftCheckTest}.
  */
-@Tag("start-2")
+@Tag("start-4")
 @QuarkusTest
 @TestProfile(JobsVorMigrationTest.TaktVorMigration.class)
 class JobsVorMigrationTest {

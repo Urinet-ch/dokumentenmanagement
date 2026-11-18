@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Scheitert schon der Start (falscher Zugang für den Eigentümer), endet das Admin-Kommando mit 3, nicht mit 1. */
-@Tag("start-1")
+@Tag("start-3")
 @QuarkusMainTest
 @TestProfile(MandantKommandoStartfehlerTest.FalscherEigentuemer.class)
 class MandantKommandoStartfehlerTest {

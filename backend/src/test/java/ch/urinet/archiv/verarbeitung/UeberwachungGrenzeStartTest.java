@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ausfallen. Über das Admin-Kommando wie {@code WartezeitNegativStartTest}, weil der Dienst bei gelungenem Start nie
  * endet; der unbekannte Mandant lässt einen trotzdem gelungenen Start mit Exit 1 statt 3 enden.
  */
-@Tag("start-3")
+@Tag("start-4")
 @QuarkusMainTest
 @TestProfile(UeberwachungGrenzeStartTest.Einstellung.class)
 class UeberwachungGrenzeStartTest {

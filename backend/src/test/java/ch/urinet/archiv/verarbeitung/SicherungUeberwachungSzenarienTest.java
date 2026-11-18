@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /** Isolierter Cucumber-Lauf mit eingeschalteter Sicherungsüberwachung und eigenem Dev-Services-Datenbanknamen. */
-@Tag("start-3")
+@Tag("start-2")
 @QuarkusTest
 @TestProfile(SicherungUeberwachungSzenarienTest.SicherungAktiv.class)
 @CucumberOptions(features = "classpath:features/verarbeitung/ueberwachung.feature", glue = "ch.urinet.archiv",

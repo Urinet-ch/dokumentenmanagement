@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Tag("start-1")
+@Tag("start-4")
 @QuarkusMainTest
 @TestProfile(AblageStufePWorkerStartTest.WorkerMitUngueltigerStufeP.class)
 class AblageStufePWorkerStartTest {

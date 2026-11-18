@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code /run/secrets} zeigt {@code smallrye.config.source.file.locations} auf Attrappen unter
  * {@code src/test/resources/secrets-test/}. Ohne {@code smallrye-config-source-file-system} startet das nicht.
  */
-@Tag("start-2")
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(SecretDateienTest.ProdMitSecretDateien.class)
 public class SecretDateienTest {

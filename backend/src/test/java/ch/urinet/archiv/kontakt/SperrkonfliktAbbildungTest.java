@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Die reine Abbildung der Ursachen-Kette prüft {@code ProblemAbbildungTest}. Nachweis zu Req 17.12 und 17.16
  * (design.md «Fehlerbehandlung»).
  */
-@Tag("start-2")
+@Tag("start-3")
 @TestProfile(SperrkonfliktAbbildungTest.SperrtestProfil.class)
 @QuarkusTest
 class SperrkonfliktAbbildungTest {

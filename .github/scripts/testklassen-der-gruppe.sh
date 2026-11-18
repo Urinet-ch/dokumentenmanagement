@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Listet Testquellen für Surefire (-Dsurefire.includesFile bzw. -Dsurefire.excludesFile) nach Gruppen-Tag der Klasse (ci.yml):
-#   testklassen-der-gruppe.sh <gruppe>   die Klassen mit @Tag("<gruppe>")
+#   testklassen-der-gruppe.sh <tag>[,<tag>...]   die Klassen mit einem dieser @Tag
 #   testklassen-der-gruppe.sh --alle     alle Klassen mit einer Gruppe (start-N oder szenarien-N)
 # Warum nicht nur -Dgroups: JUnit filtert Tags erst nach der Suche; Quarkus baut dabei für jedes Testprofil jeder gefundenen
 # Klasse die Anwendung (je ~6 s), auch für Klassen, die der Job gar nicht ausführt (~2 min je Job). Mit der Liste sucht
@@ -12,7 +12,8 @@ quellen="$(cd "$(dirname "$0")/../../backend/src/test/java" && pwd)"
 if [ "${1:-}" = "--alle" ]; then
   muster='^@Tag\("(start|szenarien)-[0-9]+"\)$'
 else
-  muster="^@Tag\\(\"${1:?Gruppe fehlt}\"\\)\$"
+  tags="${1:?Gruppe fehlt}"
+  muster="^@Tag\\(\"(${tags//,/|})\"\\)\$"
 fi
 ergebnis=$(cd "$quellen" && grep -rlE --include='*.java' "$muster" . | sed 's|^\./||' | sort)
 [ -n "$ergebnis" ] || { echo "Keine Testklasse mit ${1}" >&2; exit 1; }

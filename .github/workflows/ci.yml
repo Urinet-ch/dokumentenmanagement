@@ -99,14 +99,14 @@ jobs:
           mvn -B -ntp -f backend/pom.xml test -Dtest="$SPEC_TESTS" -Dsurefire.failIfNoSpecifiedTests=false \
             -Dquarkus.quinoa=false
 
-  # Die Backend-Tests laufen in sechs parallelen Jobs (Entscheid Fabian 13.11.2026: drei Jobs statt einem mit 22 min;
+  # Die Backend-Tests laufen in fünf parallelen Jobs (Entscheid Fabian 13.11.2026: drei Jobs statt einem mit 22 min;
   # Aufteilung nach gemessener Laufzeit seit 18.11.2026, Lauf 44252904177: längster Job 14 min): «backend» (alles ohne
-  # Gruppe, dazu ArchUnit, Abdeckung @req, SpotBugs), zwei Szenario-Gruppen (die Runner SzenarienTest und SzenarienRestTest
-  # teilen die Cucumber-Szenarien über Tags, SzenarienShards) und drei Startgruppen. Klassen mit eigenem Quarkus-Start
-  # (Profil, Main-Test) tragen genau eine Startgruppe @Tag("start-1") bis @Tag("start-3"), alle anderen keine
-  # (StartGruppenTest). «testzahl» prüft, dass jede Testklasse in genau einem Job lief; SzenarienShardTest, dass jedes
-  # Szenario in genau einem Szenario-Runner läuft. Das Artefakt für Browser-Szenarien und Docker baut «build» ohne
-  # Tests; lokal deckt «mvn verify» weiterhin alles in einem Lauf ab.
+  # Gruppe, dazu ArchUnit, Abdeckung @req, SpotBugs) und vier Gruppen. Klassen mit eigenem Quarkus-Start (Profil,
+  # Main-Test) tragen genau eine Startgruppe @Tag("start-1") bis @Tag("start-4"), alle anderen keine (StartGruppenTest);
+  # die Cucumber-Szenarien teilen sich zwei Runner (SzenarienTest, SzenarienRestTest, Tags szenarien-1/-2; Aufteilung der
+  # Szenarien über Tags in SzenarienShards), die je einer Gruppe zugeordnet sind. «testzahl» prüft, dass jede Testklasse in
+  # genau einem Job lief; SzenarienShardTest, dass jedes Szenario in genau einem Szenario-Runner läuft. Das Artefakt für
+  # Browser-Szenarien und Docker baut «build» ohne Tests; lokal deckt «mvn verify» weiterhin alles in einem Lauf ab.
   build:
     name: Build (Quinoa, OpenAPI, Liquibase, Drive-Import)
     if: needs.art.outputs.nur-spec != 'true'
@@ -187,8 +187,10 @@ jobs:
         run: nohup setsid .github/scripts/lade-devservices-images.sh > /dev/null 2>&1 &
       - name: mvn verify (JUnit, ArchUnit, Abdeckung @req, SpotBugs) ohne Gruppen
         run: |
+          .github/scripts/testklassen-der-gruppe.sh --alle > "$RUNNER_TEMP/gruppenklassen.txt"
           mvn -B -ntp -f backend/pom.xml verify -Dquarkus.quinoa=false \
-            -DexcludedGroups=szenarien-1,szenarien-2,start-1,start-2,start-3
+            -DexcludedGroups=szenarien-1,szenarien-2,start-1,start-2,start-3,start-4 \
+            -Dsurefire.excludesFile="$RUNNER_TEMP/gruppenklassen.txt"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
@@ -197,17 +199,21 @@ jobs:
           retention-days: 3
 
   gruppen:
-    name: Backend-Gruppe (${{ matrix.gruppe }})
+    name: Backend-Gruppe (${{ matrix.name }})
     if: needs.art.outputs.nur-spec != 'true'
     needs: art
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        # Gruppenliste synchron halten mit -DexcludedGroups (Job backend), den Argumenten der Testzahl-Prüfung,
-        # GRUPPEN in StartGruppenTest und den @Tag der Szenario-Runner. Start-Gruppen nach gemessener Laufzeit
-        # gefüllt (je etwa 340 s), die beiden Szenario-Gruppen je etwa 230 s
-        gruppe: [szenarien-1, szenarien-2, start-1, start-2, start-3]
+        # Tags synchron halten mit -DexcludedGroups (Job backend), GRUPPEN in StartGruppenTest und den @Tag der
+        # Szenario-Runner; jedes Tag in genau einer Gruppe (prüft «testzahl»). Start-Gruppen nach gemessener Laufzeit
+        # gefüllt (je etwa 415 s samt Szenario-Runner, Messung 18.11.2026)
+        include:
+          - {name: gruppe-1, tags: 'start-1,szenarien-2'}
+          - {name: gruppe-2, tags: 'start-2,szenarien-1'}
+          - {name: gruppe-3, tags: 'start-3'}
+          - {name: gruppe-4, tags: 'start-4'}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -219,14 +225,19 @@ jobs:
           cache: maven
       - name: Devservices-Images vorladen (parallel zum Kompilieren)
         run: nohup setsid .github/scripts/lade-devservices-images.sh > /dev/null 2>&1 &
-      - name: mvn test (nur Gruppe ${{ matrix.gruppe }})
+      - name: mvn test (nur ${{ matrix.name }}, Tags ${{ matrix.tags }})
         env:
-          GRUPPE: ${{ matrix.gruppe }}
-        run: mvn -B -ntp -f backend/pom.xml test -Dgroups="$GRUPPE" -Dquarkus.quinoa=false
+          GRUPPE: ${{ matrix.tags }}
+        # includesFile: Surefire sucht nur die Klassen der Gruppe (sonst baut Quarkus beim Suchen die Anwendung für jedes
+        # Testprofil des Moduls, ~2 min); -Dgroups bleibt als zweite Sicherung
+        run: |
+          .github/scripts/testklassen-der-gruppe.sh "$GRUPPE" > "$RUNNER_TEMP/klassen.txt"
+          mvn -B -ntp -f backend/pom.xml test -Dgroups="$GRUPPE" -Dsurefire.includesFile="$RUNNER_TEMP/klassen.txt" \
+            -Dquarkus.quinoa=false
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
-          name: surefire-${{ matrix.gruppe }}
+          name: surefire-${{ matrix.name }}
           path: backend/target/surefire-reports/TEST-*.xml
           retention-days: 3
 
@@ -245,8 +256,8 @@ jobs:
           path: berichte
       - run: |
           python3 .github/scripts/pruefe-testaufteilung.py backend/src/test/java backend=berichte/surefire-backend \
-            szenarien-1=berichte/surefire-szenarien-1 szenarien-2=berichte/surefire-szenarien-2 \
-            start-1=berichte/surefire-start-1 start-2=berichte/surefire-start-2 start-3=berichte/surefire-start-3
+            gruppe-1=berichte/surefire-gruppe-1 gruppe-2=berichte/surefire-gruppe-2 \
+            gruppe-3=berichte/surefire-gruppe-3 gruppe-4=berichte/surefire-gruppe-4
 
   frontend:
     name: Frontend (ng test)

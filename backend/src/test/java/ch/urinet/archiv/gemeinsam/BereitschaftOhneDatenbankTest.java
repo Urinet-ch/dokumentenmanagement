@@ -12,7 +12,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 
 /** Readiness meldet DOWN, solange die Datenbank nicht erreichbar ist (Aufgabe 1.2). */
-@Tag("start-2")
+@Tag("start-4")
 @QuarkusTest
 @TestProfile(BereitschaftOhneDatenbankTest.OhneDatenbank.class)
 class BereitschaftOhneDatenbankTest {

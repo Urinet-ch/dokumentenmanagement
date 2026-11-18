@@ -37,7 +37,7 @@ import static org.hamcrest.Matchers.containsString;
  * Neustart heilt erst eine angemeldete Anfrage den Tenant – die kommt hinter Traefik nicht, solange die API unhealthy
  * ist; darum der Wächter.
  */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(OidcNichtErreichbarTest.OhneKeycloak.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
