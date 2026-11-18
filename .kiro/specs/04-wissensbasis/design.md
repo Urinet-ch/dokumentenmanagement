@@ -360,7 +360,7 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 
 | Aktion | Endpunkt bzw. Auslöser |
 | --- | --- |
-| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/versionen/{n}`, `GET /wissensentwuerfe/{id}` |
+| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/wissensseiten?pfad=…`, `/versionen/{n}`, `/diff`, `/eingehend`, `GET /wissensentwuerfe/{id}` |
 | `WISSEN_ANNEHMEN` | `…/annehmen` (Seite, Entwurf, Basisversion, neue Version) |
 | `WISSEN_VERWERFEN` | `…/verwerfen` (mit Grund) |
 | `WISSEN_INGEST` | `POST /dokumente/{id}/wissen-ingest` (mit Dokument-ID) |
@@ -610,7 +610,8 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Benutzer sichtbar sind; unsichtbare Versionen bleiben auf ihre Nummer beschränkt. Einzelseiten, Versionen, Diff,
   eingehende Links und Log bleiben privat und tragen ETags, wo eine einzelne Fassung abgerufen wird.
 - Das Log erzeugt Anzeigetexte aus den strukturierten Feldern und sichtbaren Seiten, nie aus `angaben`; Einträge ohne
-  sichtbare Seite werden ausgelassen. Index und Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge.
+  sichtbare Seite werden ausgelassen. Der Index und das Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge;
+  ein Seitenabruf über `?pfad=` protokolliert die Seiten-ID wie `GET /wissensseiten/{id}`.
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 

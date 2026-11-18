@@ -16,6 +16,7 @@ import ch.urinet.archiv.wissen.domain.Seitentyp;
 import ch.urinet.archiv.wissen.domain.Wissensseite;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -51,11 +52,14 @@ public class WissensseiteResource {
     private static final int MAX_OFFSET = 100_000;
 
     private final WissenLesen lesen;
+    private final WissensseiteAbrufProtokoll abrufProtokoll;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
 
-    public WissensseiteResource(WissenLesen lesen, MandantAufloesung aufloesung, SecurityIdentity identitaet) {
+    public WissensseiteResource(WissenLesen lesen, WissensseiteAbrufProtokoll abrufProtokoll,
+                                MandantAufloesung aufloesung, SecurityIdentity identitaet) {
         this.lesen = lesen;
+        this.abrufProtokoll = abrufProtokoll;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
     }
@@ -123,6 +127,7 @@ public class WissensseiteResource {
                     + "Mit pfad wird stattdessen eine einzelne Seite abgerufen.")
     @APIResponse(responseCode = "200", description = "Index oder Seite")
     @APIResponse(responseCode = "400", description = "Ungültiger Filter oder Pagingwert")
+    @Transactional
     public Response index(
             @QueryParam("typ") String typ,
             @QueryParam("tag") String tag,
@@ -138,7 +143,9 @@ public class WissensseiteResource {
             if (pfad.isBlank() || pfad.length() > 200) {
                 throw ungueltigeAnfrage();
             }
-            return seitenAntwort(benutzer, lesen.seite(benutzer, pfad));
+            Wissensseite seite = lesen.seite(benutzer, pfad);
+            abrufProtokoll.protokollieren(seite.id());
+            return seitenAntwort(benutzer, seite);
         }
         Seitentyp seitentyp = seitentyp(typ);
         String suchbegriff = textFilter(q, 200);

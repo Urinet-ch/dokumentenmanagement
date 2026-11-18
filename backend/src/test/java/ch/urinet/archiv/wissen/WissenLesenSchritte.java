@@ -218,7 +218,7 @@ public class WissenLesenSchritte {
             listen.setObject(1, probeBeginn);
             try (var zeilen = angezeigt.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
-                assertThat(zeilen.getLong(1)).isPositive();
+                assertThat(zeilen.getLong(1)).isEqualTo(4);
             }
             try (var zeilen = verweigert.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
