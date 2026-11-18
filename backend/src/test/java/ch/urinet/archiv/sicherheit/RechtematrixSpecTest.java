@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RechtematrixSpecTest {
 
     private static final Path REQUIREMENTS = Path.of("../.kiro/specs/01-archiv-kern/requirements.md");
+    private static final Path WISSEN_REQUIREMENTS = Path.of("../.kiro/specs/04-wissensbasis/requirements.md");
     private static final Pattern ZEILE = Pattern.compile("^\\| (A\\d+) \\|.*");
     private static final Pattern TRENNZEILE = Pattern.compile("^\\|( --- \\|)+$");
     private static final List<String> KOPF = List.of("Nr.", "Aktion", "`inhaber`", "`mitarbeiter`", "`treuhaender`",
@@ -33,7 +34,11 @@ class RechtematrixSpecTest {
 
     @Test
     void domainEntsprichtDerSpec() throws IOException {
-        Map<Aktion, Map<Rolle, Ergebnis>> spec = lesen(Files.readAllLines(REQUIREMENTS));
+        Map<Aktion, Map<Rolle, Ergebnis>> spec = new java.util.LinkedHashMap<>(
+                lesen(Files.readAllLines(REQUIREMENTS)));
+        Map<Aktion, Map<Rolle, Ergebnis>> wissen = lesen(Files.readAllLines(WISSEN_REQUIREMENTS));
+        assertThat(spec.keySet()).doesNotContainAnyElementsOf(wissen.keySet());
+        spec.putAll(wissen);
 
         assertThat(spec.keySet()).containsExactly(Aktion.values());
         spec.forEach((aktion, zeile) -> zeile.forEach((rolle, ergebnis) ->

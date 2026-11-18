@@ -1,12 +1,13 @@
 package ch.urinet.archiv.dokumentart.adapter.out.schema;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaException;
 import com.networknt.schema.SchemaLocation;
@@ -31,6 +32,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -43,6 +46,7 @@ import java.util.Set;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * {@link ZusatzSchemaPruefer} mit networknt json-schema-validator (Draft 2020-12, {@code format} als Prüfung, Req 9.5).
@@ -255,6 +259,42 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
+    public Map<String, String> feldTypen(String schemaJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            try {
+                geprueft(schemaJson);
+                JsonNode schema = StrengesJson.lesen(schemaJson);
+                JsonNode properties = schema.path("properties");
+                Map<String, String> typen = new LinkedHashMap<>();
+                properties.fields().forEachRemaining(eintrag -> {
+                    JsonNode definition = definition(schema, eintrag.getValue());
+                    String typ = definition.path("type").asText();
+                    if ("string".equals(typ) && "date".equals(definition.path("format").asText())) {
+                        typ = "date";
+                    }
+                    typen.put(eintrag.getKey(), typ);
+                });
+                return Collections.unmodifiableMap(typen);
+            } catch (JsonProcessingException e) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        });
+    }
+
+    private static JsonNode definition(JsonNode schema, JsonNode definition) {
+        Set<String> gesehen = new LinkedHashSet<>();
+        JsonNode aktuelle = definition;
+        while (aktuelle.isObject() && aktuelle.path("$ref").isTextual()) {
+            String verweis = aktuelle.path("$ref").textValue();
+            if (!verweis.startsWith("#/") || !gesehen.add(verweis)) {
+                return aktuelle;
+            }
+            aktuelle = schema.at(JsonPointer.compile(verweis.substring(1)));
+        }
+        return aktuelle;
+    }
+
+    @Override
     public Set<String> seedSchemaPruefen(String schemaJson) {
         return mitFrist(seedZeitgrenzeNanos, () -> geprueft(schemaJson).felder());
     }
@@ -265,6 +305,191 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             werteGegen(schemaJson, werteJson);
             return null;
         });
+    }
+
+    @Override
+    public Map<String, Object> werteLesen(String werteJson) {
+        if (werteJson == null || werteJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode werte = StrengesJson.lesenGenau(werteJson);
+            if (werte == null) {
+                return Map.of();
+            }
+            if (!werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            Map<String, Object> ergebnis = new LinkedHashMap<>();
+            werte.fields().forEachRemaining(eintrag -> ergebnis.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(ergebnis);
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+        }
+    }
+
+    private static Object javaWert(JsonNode wert) {
+        if (wert.isNull()) {
+            return null;
+        }
+        if (wert.isObject()) {
+            Map<String, Object> objekt = new LinkedHashMap<>();
+            wert.fields().forEachRemaining(eintrag -> objekt.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(objekt);
+        }
+        if (wert.isArray()) {
+            List<Object> liste = new ArrayList<>();
+            wert.forEach(element -> liste.add(javaWert(element)));
+            return Collections.unmodifiableList(liste);
+        }
+        if (wert.isNumber()) {
+            return wert.numberValue();
+        }
+        if (wert.isBoolean()) {
+            return wert.booleanValue();
+        }
+        return wert.textValue();
+    }
+
+    @Override
+    public boolean reservierteFelderGueltig(String schemaJson) {
+        try {
+            JsonNode schema = StrengesJson.lesen(schemaJson);
+            if (schema == null || !schema.isObject()) {
+                return false;
+            }
+            // Reservierte Felder nur direkt unter «properties» der Wurzel: Wer sie über patternProperties, allOf/anyOf/
+            // oneOf/if-then-else, $ref/$defs o. ä. definiert, würde die Prüfung umgehen.
+            ObjectNode ohneProperties = ((ObjectNode) schema).deepCopy();
+            ohneProperties.remove("properties");
+            ohneProperties.remove("required");
+            ohneProperties.remove("patternProperties");
+            String rest = ohneProperties.toString();
+            if (rest.contains("\"zugriff\"") || rest.contains("\"veroeffentlicht\"")
+                    || patternProperties(schema.path("patternProperties"))) {
+                return false;
+            }
+            JsonNode properties = schema.path("properties");
+            if (properties.isMissingNode()) {
+                return true;
+            }
+            if (!properties.isObject()) {
+                return false;
+            }
+            // Standard von zugriff: «mitglieder» oder «vorstand», für jede Art und wegen Req 2.9 ohne Art-Code;
+            // «oeffentlich» nie (Spec 05, Req 2.7, Entscheid Fabian 18.11.2026; Spec 03 design.md
+            // «Reservierte Felder»).
+            return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
+                    List.of("oeffentlich", "mitglieder", "vorstand"), List.of("mitglieder", "vorstand"))
+                    && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",
+                    List.of(), List.of());
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean datumsfeldGueltig(String schemaJson, String feld) {
+        try {
+            JsonNode eigenschaft = StrengesJson.lesen(schemaJson).path("properties").path(feld);
+            return eigenschaft.isObject() && "string".equals(eigenschaft.path("type").asText())
+                    && "date".equals(eigenschaft.path("format").asText());
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
+    }
+
+    @Override
+    public LocalDate datumswert(String werteJson, String feld) {
+        if (werteJson == null) {
+            return null;
+        }
+        try {
+            JsonNode werte = StrengesJson.lesen(werteJson);
+            if (werte == null || !werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            JsonNode wert = werte.path(feld);
+            if (wert.isMissingNode() || wert.isNull() || wert.isTextual() && wert.textValue().isBlank()) {
+                return null;
+            }
+            if (!wert.isTextual()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            return LocalDate.parse(wert.textValue());
+        } catch (JsonProcessingException | DateTimeParseException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+        }
+    }
+
+    private static boolean reserviertesFeldGueltig(JsonNode properties, JsonNode required, String name, String typ,
+                                                    List<String> werte, List<String> standardWerte) {
+        JsonNode eigenschaft = properties.get(name);
+        if (eigenschaft == null) {
+            return true;
+        }
+        if (!eigenschaft.isObject() || !typ.equals(eigenschaft.path("type").asText())
+                || !standardGueltig(eigenschaft.get("default"), standardWerte) || !required(required, name)) {
+            return false;
+        }
+        JsonNode enumWerte = eigenschaft.get("enum");
+        if (!werte.isEmpty()) {
+            if (enumWerte == null || !enumWerte.isArray() || enumWerte.size() != werte.size()) {
+                return false;
+            }
+            for (int i = 0; i < werte.size(); i++) {
+                if (!enumWerte.get(i).isTextual() || !werte.get(i).equals(enumWerte.get(i).asText())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (enumWerte == null) {
+            return true;
+        }
+        return enumWerte.isArray() && enumWerte.size() == 2 && enumWerte.get(0).isBoolean()
+                && enumWerte.get(1).isBoolean() && enumWerte.get(0).booleanValue() != enumWerte.get(1).booleanValue();
+    }
+
+    /** Trifft ein Schlüssel von patternProperties eines der reservierten Felder (oder ist er kein gültiges Muster)? */
+    private static boolean patternProperties(JsonNode muster) {
+        if (!muster.isObject()) {
+            return !muster.isMissingNode();
+        }
+        for (Iterator<String> it = muster.fieldNames(); it.hasNext(); ) {
+            try {
+                Pattern p = Pattern.compile(it.next());
+                if (p.matcher("zugriff").find() || p.matcher("veroeffentlicht").find()) {
+                    return true;
+                }
+            } catch (PatternSyntaxException e) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Typgenau: Text aus {@code standardWerte}; ohne Liste der JSON-Wahrheitswert {@code false} (kein String). */
+    private static boolean standardGueltig(JsonNode standard, List<String> standardWerte) {
+        if (standard == null) {
+            return false;
+        }
+        if (standardWerte.isEmpty()) {
+            return standard.isBoolean() && !standard.booleanValue();
+        }
+        return standard.isTextual() && standardWerte.contains(standard.textValue());
+    }
+
+    private static boolean required(JsonNode required, String feld) {
+        if (!required.isArray()) {
+            return false;
+        }
+        for (JsonNode eintrag : required) {
+            if (feld.equals(eintrag.asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void werteGegen(String schemaJson, String werteJson) {

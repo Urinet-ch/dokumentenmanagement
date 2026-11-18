@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Die Seed-Frist gilt nur im Seed-Weg (Review PR #81, S3): {@link DokumentartPruefung#pruefen} (API) prüft mit
@@ -24,11 +25,17 @@ class DokumentartPruefungTest {
             false, true);
 
     private final List<String> aufrufe = new ArrayList<>();
+    private boolean reservierteFelderGueltig = true;
     private final DokumentartPruefung pruefung = new DokumentartPruefung(new ZusatzSchemaPruefer() {
         @Override
         public Set<String> schemaPruefen(String schemaJson) {
             aufrufe.add("schemaPruefen");
             return Set.of();
+        }
+
+        @Override
+        public java.util.Map<String, String> feldTypen(String schemaJson) {
+            return java.util.Map.of();
         }
 
         @Override
@@ -41,17 +48,55 @@ class DokumentartPruefungTest {
         public void wertePruefen(String schemaJson, String werteJson) {
             aufrufe.add("wertePruefen");
         }
+
+        @Override
+        public java.util.Map<String, Object> werteLesen(String werteJson) {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public boolean reservierteFelderGueltig(String schemaJson) {
+            aufrufe.add("reservierteFelderGueltig");
+            return reservierteFelderGueltig;
+        }
+
+        @Override
+        public boolean datumsfeldGueltig(String schemaJson, String feld) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.time.LocalDate datumswert(String werteJson, String feld) {
+            throw new UnsupportedOperationException();
+        }
     });
 
     @Test
     void apiPrueftMitDerFristDerApi() {
         pruefung.pruefen(ART);
-        assertThat(aufrufe).containsExactly("schemaPruefen");
+        assertThat(aufrufe).containsExactly("schemaPruefen", "reservierteFelderGueltig");
     }
 
     @Test
     void seedPrueftMitDerSeedFrist() {
         pruefung.seedPruefen(ART);
-        assertThat(aufrufe).containsExactly("seedSchemaPruefen");
+        assertThat(aufrufe).containsExactly("seedSchemaPruefen", "reservierteFelderGueltig");
+    }
+
+    @Test
+    void kiFelderMuessenSchemafelderSein() {
+        assertThatThrownBy(() -> pruefung.pruefen(ART, List.of("unbekannt")))
+                .isInstanceOfSatisfying(ch.urinet.archiv.gemeinsam.domain.FachFehler.class,
+                        fehler -> assertThat(fehler.code())
+                                .isEqualTo(ch.urinet.archiv.gemeinsam.domain.Fehlercode.KONFIGURATION_UNGUELTIG));
+    }
+
+    @Test
+    void reservierteFelderMuessenGueltigSein() {
+        reservierteFelderGueltig = false;
+        assertThatThrownBy(() -> pruefung.pruefen(ART))
+                .isInstanceOfSatisfying(ch.urinet.archiv.gemeinsam.domain.FachFehler.class,
+                        fehler -> assertThat(fehler.code())
+                                .isEqualTo(ch.urinet.archiv.gemeinsam.domain.Fehlercode.KONFIGURATION_UNGUELTIG));
     }
 }

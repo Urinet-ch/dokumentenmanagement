@@ -15,6 +15,8 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
@@ -68,10 +70,13 @@ public class DokumentGenerator {
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
+    private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentGenerator(DokumentErfassen erfassen, DokumentRepository repository, DokumentStatusPort status,
                              DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
-                             MandantEinstellungen einstellungen, AuftragService auftraege) {
+                             MandantEinstellungen einstellungen, AuftragService auftraege,
+                             KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung) {
         this.erfassen = erfassen;
         this.repository = repository;
         this.status = status;
@@ -80,6 +85,8 @@ public class DokumentGenerator {
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
+        this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /**
@@ -96,7 +103,11 @@ public class DokumentGenerator {
     }
 
     /** @param neu {@code false} bei einer Dublette (200 statt 202, Req 11.8) */
-    public record Ergebnis(UUID id, DokumentStatus status, boolean neu) {
+    public record Ergebnis(UUID id, DokumentStatus status, boolean neu,
+                           List<RegelPruefung.Warnung> warnungen) {
+        public Ergebnis {
+            warnungen = List.copyOf(warnungen);
+        }
     }
 
     /**
@@ -113,6 +124,7 @@ public class DokumentGenerator {
             throw new PflichtfelderFehlen(List.of("art"));
         }
         Dokumentart art = DokumentBestaetigen.art(arten, b.art());
+        klassifikationen.dokumentKlassifikationenPruefen(art.code(), b.klassifikationen(), Map.of());
         Optional<Kontakt> partner = anfrage.crmId() == null ? Optional.empty() : kontakte.mitCrmId(anfrage.crmId());
         Bestaetigung mitPartner = mitPartner(b, partner.map(Kontakt::id).orElse(null));
         List<String> fehlen = new ArrayList<>(DokumentBestaetigen.fehlendePflichtfelder(art, mitPartner,
@@ -146,8 +158,11 @@ public class DokumentGenerator {
             DokumentStatus stand = status.stand(vorhanden.get(), false).map(DokumentStatusPort.Stand::status)
                     .orElseThrow(() -> new IllegalStateException("Dublette ohne Dokument: " + vorhanden.get()));
             LOG.infof("Generator: Dublette sha256=%s vorhanden=%s", pdf.sha256(), vorhanden.get());
-            return new Ergebnis(vorhanden.get(), stand, false);
+            return new Ergebnis(vorhanden.get(), stand, false, List.of());
         }
+        List<RegelPruefung.Warnung> warnungen = regelPruefung.pruefen(art.code(),
+                RegelMetadaten.aus(mitPartner, art.vertraulichkeit().name(), art.gruppen().contains("finanz"),
+                        regelPruefung.zusatzWerte(anfrage.zusatzJson())), null, null);
 
         MandantEinstellungen.Werte mandant = einstellungen.lesen(aufloesung.pruefen());
         boolean finanz = art.gruppen().contains("finanz");
@@ -163,7 +178,8 @@ public class DokumentGenerator {
                 : Aufbewahrung.geschaeftsjahrVorschlagen(b.datum(), eingang, gjEnde);
         boolean vertrag = art.gruppen().contains("vertrag");
         Aufbewahrung aufbewahrung = Aufbewahrung.berechne(art.aufbewahrung(), b.datum(), eingang, geschaeftsjahr,
-                vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(anfrage.zusatzJson()));
         if (aufbewahrung.fristAbgelaufen()) {
             LOG.infof("Generator: Frist abgelaufen sha256=%s art=%s", pdf.sha256(), art.code());
             throw new FachFehler(Fehlercode.FRIST_ABGELAUFEN);
@@ -179,7 +195,7 @@ public class DokumentGenerator {
                         b.waehrung() != null ? b.waehrung() : "CHF", b.faelligkeit(), b.qrReferenz(), b.konto()))
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                        b.naechsteFrist())) : Optional.empty());
+                        b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
         if (!status.generatorMetadaten(id, daten, anfrage.zusatzJson())) {
             throw new IllegalStateException("Generator-Dokument nicht mehr NEU: " + id);
         }
@@ -190,13 +206,13 @@ public class DokumentGenerator {
         auftraege.einreihen(DokumentErfassen.VERARBEITEN,
                 new Nutzlast(Map.of(DokumentErfassen.NUTZLAST_DOKUMENT, id, OHNE_KI, true)));
         LOG.infof("Generator: angenommen dokument=%s art=%s", id, art.code());
-        return new Ergebnis(id, DokumentStatus.NEU, true);
+        return new Ergebnis(id, DokumentStatus.NEU, true, warnungen);
     }
 
     private static Bestaetigung mitPartner(Bestaetigung b, UUID partnerId) {
         return new Bestaetigung(b.art(), b.titel(), b.datum(), partnerId, b.projekt(), b.tags(), b.vertraulichkeit(),
                 b.personBenutzer(), b.geschaeftsjahr(), b.belegnummer(), b.richtung(), b.betrag(), b.waehrung(),
                 b.faelligkeit(), b.qrReferenz(), b.konto(), b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                b.naechsteFrist(), false, false);
+                b.naechsteFrist(), false, false, b.klassifikationen());
     }
 }

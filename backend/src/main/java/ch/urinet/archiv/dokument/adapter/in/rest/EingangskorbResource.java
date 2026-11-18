@@ -2,8 +2,10 @@ package ch.urinet.archiv.dokument.adapter.in.rest;
 
 import ch.urinet.archiv.dokument.adapter.in.rest.DokumentResource.DokumentDto;
 import ch.urinet.archiv.dokument.application.DokumentLesen;
+import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import ch.urinet.archiv.dokument.application.Seite;
 import ch.urinet.archiv.dokument.domain.Dokument;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
@@ -37,13 +39,18 @@ public class EingangskorbResource {
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
+    private final DokumentKlassifikationenPort klassifikationen;
+    private final KlassifikationVerwaltung klassifikationVerwaltung;
 
     public EingangskorbResource(DokumentLesen lesen, MandantAufloesung aufloesung, SecurityIdentity identitaet,
-                                ObjectMapper json) {
+                                ObjectMapper json, DokumentKlassifikationenPort klassifikationen,
+                                KlassifikationVerwaltung klassifikationVerwaltung) {
         this.lesen = lesen;
         this.aufloesung = aufloesung;
         this.identitaet = identitaet;
         this.json = json;
+        this.klassifikationen = klassifikationen;
+        this.klassifikationVerwaltung = klassifikationVerwaltung;
     }
 
     @Schema(name = "EingangskorbSeite")
@@ -64,9 +71,14 @@ public class EingangskorbResource {
         aufloesung.pruefen();
         Benutzer benutzer = DokumentResource.benutzer(identitaet);
         Seite<Dokument> treffer = lesen.eingangskorb(benutzer, seite, groesse);
-        return new EingangskorbDto(treffer.eintraege().stream()
-                .map(d -> DokumentResource.dto(d, json, lesen.warnungen(benutzer, d), lesen.schwelle(),
-                        List.of())).toList(),
+        var regeln = lesen.regeln();
+        return new EingangskorbDto(treffer.eintraege().stream().map(d -> {
+            var werte = klassifikationen.laden(d.id());
+            return DokumentResource.dto(d, json, lesen.warnungen(benutzer, d, werte, regeln), lesen.schwelle(),
+                    List.of(), werte,
+                    klassifikationVerwaltung.markierteDokumentKlassifikationen(d.art(), werte,
+                            d.bestaetigt() != null));
+        }).toList(),
                 treffer.gesamt(), seite, groesse);
     }
 }

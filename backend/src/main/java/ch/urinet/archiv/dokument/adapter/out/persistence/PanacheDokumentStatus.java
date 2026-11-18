@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.application.DokumentStatusPort;
+import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,9 +29,12 @@ import java.util.UUID;
 public class PanacheDokumentStatus implements DokumentStatusPort {
 
     private final KonfigurationVersionsPort konfiguration;
+    private final DokumentKlassifikationenPort klassifikationen;
 
-    public PanacheDokumentStatus(KonfigurationVersionsPort konfiguration) {
+    public PanacheDokumentStatus(KonfigurationVersionsPort konfiguration,
+                                 DokumentKlassifikationenPort klassifikationen) {
         this.konfiguration = konfiguration;
+        this.klassifikationen = klassifikationen;
     }
 
     @Override
@@ -109,6 +113,7 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
         e.statusGrund = null;
         e.fehler = null;
         metadatenSchreiben(e, daten);
+        klassifikationen.ersetzen(id, daten.klassifikationen());
         em().flush();
         return true;
     }
@@ -126,6 +131,7 @@ public class PanacheDokumentStatus implements DokumentStatusPort {
         e.zusatz = zusatzJson;
         e.konfigurationVersion = konfiguration.aktuelleVersion();
         metadatenSchreiben(e, daten);
+        klassifikationen.ersetzen(id, daten.klassifikationen());
         em().flush();
         return true;
     }

@@ -60,8 +60,17 @@ public class PanacheDokumentartRepository implements DokumentartRepository {
         eintrag.vertraulichkeit = art.vertraulichkeit().name();
         eintrag.aufbewahrungJahre = art.aufbewahrung().jahre();
         eintrag.aufbewahrungAb = art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name();
+        eintrag.aufbewahrungFeld = art.aufbewahrung().feld();
         eintrag.gesetzlichePflicht = art.gesetzlichePflicht();
         eintrag.aktiv = art.aktiv();
+        eintrag.selbstAusgestellt = art.selbstAusgestellt();
+        eintrag.belegnummerMuster = art.belegnummerMuster().toArray(String[]::new);
+        eintrag.fremdbelegArt = art.fremdbelegArt();
+        eintrag.ohneZahlungsdatenArt = art.ohneZahlungsdatenArt();
+        eintrag.kiVorschlag = art.kiVorschlag();
+        eintrag.kiFelder = art.kiFelder().toArray(String[]::new);
+        eintrag.kiHinweise = art.kiHinweise();
+        eintrag.reihenfolge = art.reihenfolge();
     }
 
     /** Eine gespeicherte Art, die die Regeln verletzt, ist ein Serverfehler (500), keine ungültige Anfrage. */
@@ -78,8 +87,9 @@ public class PanacheDokumentartRepository implements DokumentartRepository {
                 e.zusatzSchema == null ? Dokumentart.OHNE_ZUSATZ : e.zusatzSchema,
                 Vertraulichkeit.valueOf(e.vertraulichkeit),
                 new Aufbewahrungsregel(e.aufbewahrungJahre,
-                        e.aufbewahrungAb == null ? null : AufbewahrungAb.valueOf(e.aufbewahrungAb)),
-                e.gesetzlichePflicht, e.aktiv);
+                        e.aufbewahrungAb == null ? null : AufbewahrungAb.valueOf(e.aufbewahrungAb), e.aufbewahrungFeld),
+                e.gesetzlichePflicht, e.aktiv, e.selbstAusgestellt, liste(e.belegnummerMuster),
+                e.fremdbelegArt, e.ohneZahlungsdatenArt, e.kiVorschlag, liste(e.kiFelder), e.kiHinweise, e.reihenfolge);
     }
 
     private static List<String> liste(String[] werte) {

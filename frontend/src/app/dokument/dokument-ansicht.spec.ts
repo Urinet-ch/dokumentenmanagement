@@ -35,6 +35,8 @@ const DOKUMENT: Dokument = {
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
 };
 
 const ART: Dokumentart = {
@@ -46,6 +48,11 @@ const ART: Dokumentart = {
   vertraulichkeit: 'NORMAL',
   gesetzlichePflicht: true,
   aktiv: true,
+  selbstAusgestellt: true,
+  belegnummerMuster: [],
+  kiVorschlag: true,
+  kiFelder: [],
+  reihenfolge: 0,
 };
 
 class DokumentAttrappe extends DokumentPort {

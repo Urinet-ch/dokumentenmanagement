@@ -46,6 +46,17 @@ class DokumentBestaetigenTest {
                 null, betrag, "CHF", null, null, null, null, null, null, null, false, false);
     }
 
+    @Test
+    void bestandOhneFristfeldWirdBestaetigtAberGeneratorVerlangtEsWeiterhin() {
+        var art = new Dokumentart("PROBE_FRIST", "Probe", null, List.of("frei"), List.of("titel", "zusatz.sitzung"),
+                Dokumentart.OHNE_ZUSATZ, Vertraulichkeit.NORMAL,
+                new Aufbewahrungsregel(10, AufbewahrungAb.FELD, "sitzung"), true, true);
+        assertThatCode(() -> DokumentBestaetigen.pflichtfelderPruefen(art,
+                bestaetigung("Probe", null), stand(Set.of()))).doesNotThrowAnyException();
+        assertThat(DokumentBestaetigen.fehlendePflichtfelder(art, bestaetigung("Probe", null), Set.of()))
+                .containsExactly("zusatz.sitzung");
+    }
+
     private static Stand stand(Set<String> zusatz) {
         return new Stand(UUID.randomUUID(), DokumentStatus.EINGANGSKORB, 1, Instant.now(), false, zusatz, List.of());
     }

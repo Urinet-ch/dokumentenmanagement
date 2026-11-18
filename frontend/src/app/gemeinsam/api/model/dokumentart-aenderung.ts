@@ -22,8 +22,17 @@ export interface DokumentartAenderung {
     vertraulichkeit?: DokumentartAenderung.VertraulichkeitEnum;
     aufbewahrungJahre?: number | null;
     aufbewahrungAb?: DokumentartAenderung.AufbewahrungAbEnum | null;
+    aufbewahrungFeld?: string | null;
     gesetzlichePflicht?: boolean;
     aktiv?: boolean;
+    selbstAusgestellt?: boolean;
+    belegnummerMuster?: Array<string>;
+    fremdbelegArt?: string;
+    ohneZahlungsdatenArt?: string;
+    kiVorschlag?: boolean;
+    kiFelder?: Array<string>;
+    kiHinweise?: string | null;
+    reihenfolge?: number;
     /**
      * Änderungsgrund für das Zugriffsprotokoll
      */
@@ -39,6 +48,8 @@ export namespace DokumentartAenderung {
     export const AufbewahrungAbEnum = {
         Geschaeftsjahr: 'GESCHAEFTSJAHR',
         GueltigBis: 'GUELTIG_BIS',
+        Belegdatum: 'BELEGDATUM',
+        Feld: 'FELD',
     } as const;
     export type AufbewahrungAbEnum = typeof AufbewahrungAbEnum[keyof typeof AufbewahrungAbEnum];
 }

@@ -208,6 +208,11 @@ public class ManifestSchritte {
     @Angenommen("im Mandanten «{word}» wurde das Dokument «{word}» am «{word}» um «{word}» archiviert, aufzubewahren bis «{word}»")
     public void dokument(String alias, String name, String datum, String uhrzeit, String aufbewahrenBis)
             throws SQLException {
+        archiviertesDokument(alias, name, datum, uhrzeit, LocalDate.parse(aufbewahrenBis, DATUM));
+    }
+
+    private void archiviertesDokument(String alias, String name, String datum, String uhrzeit, LocalDate aufbewahrenBis)
+            throws SQLException {
         UUID id = UUID.randomUUID();
         String schema = schema(alias);
         try (Connection v = datenbank.get().getConnection()) {
@@ -215,7 +220,7 @@ public class ManifestSchritte {
                     + "erstellt_von, status, archiviert, aufbewahren_bis) values (?, 'UPLOAD', 'test', 'ARCHIVIERT', ?, ?)")) {
                 p.setObject(1, id);
                 p.setTimestamp(2, Timestamp.from(zeit(datum, uhrzeit)));
-                p.setObject(3, LocalDate.parse(aufbewahrenBis, DATUM));
+                p.setObject(3, aufbewahrenBis, java.sql.Types.DATE);
                 p.executeUpdate();
             }
             for (String rolle : List.of("ORIGINAL", "ARBEITSFASSUNG")) {
@@ -231,6 +236,20 @@ public class ManifestSchritte {
             }
         }
         dokumente.put(alias + "/" + name, id);
+    }
+
+    @Angenommen("im Mandanten «{word}» wurde die Wissensquelle «{word}» am «{word}» um «{word}» archiviert")
+    public void wissensquelle(String alias, String name, String datum, String uhrzeit) throws SQLException {
+        archiviertesDokument(alias, name, datum, uhrzeit, null);
+        UUID id = dokumente.get(alias + "/" + name);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement aendern =
+                     verbindung.prepareStatement("update " + schema(alias)
+                             + ".dokument set art = 'WISSENSQUELLE', titel = 'Probe Wissensquelle', datum = ? "
+                             + "where id = ?")) {
+            aendern.setObject(1, LocalDate.parse(datum, DATUM));
+            aendern.setObject(2, id);
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
     }
 
     /**

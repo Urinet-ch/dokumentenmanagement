@@ -25,6 +25,8 @@ function dokument(angaben: Partial<Dokument> = {}): Dokument {
     pdfaFehlt: false,
     unsicher: [],
     versionen: [],
+    klassifikationen: {},
+    klassifikationenUngueltig: [],
     ...angaben,
   };
 }
@@ -39,6 +41,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'NORMAL',
     gesetzlichePflicht: true,
     aktiv: true,
+    selbstAusgestellt: false,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
   {
     code: 'LOHNABRECHNUNG',
@@ -49,6 +56,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'PERSONAL',
     gesetzlichePflicht: true,
     aktiv: true,
+    selbstAusgestellt: true,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
 ];
 
@@ -78,6 +90,11 @@ const VHF_ART: Dokumentart = {
   vertraulichkeit: 'NORMAL',
   gesetzlichePflicht: false,
   aktiv: true,
+  selbstAusgestellt: false,
+  belegnummerMuster: [],
+  kiVorschlag: true,
+  kiFelder: [],
+  reihenfolge: 0,
 };
 
 describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
@@ -208,6 +225,29 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       [...element.querySelectorAll<HTMLSelectElement>('#d1-zusatz-zugriff option')].map((o) => o.value),
     ).toEqual(['', 'oeffentlich', 'mitglieder', 'vorstand']);
     expect(element.querySelector('#d1-betrag')).toBeNull();
+  });
+
+  it('belegt die Zugriffsstufe mit dem Standard vorstand der Art vor, nicht mit dem KI-Vorschlag (Spec 05, Req 2.7; Spec 03, Req 3.3)', async () => {
+    const vorstandsArt: Dokumentart = {
+      ...VHF_ART,
+      code: 'PROBE_VORSTAND',
+      name: 'Probe Vorstand',
+      zusatzSchema: {
+        type: 'object',
+        properties: {
+          ...(VHF_ART.zusatzSchema as { properties: Record<string, unknown> }).properties,
+          zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'vorstand' },
+        },
+      },
+    };
+    await zeigen(
+      dokument({ art: 'PROBE_VORSTAND', vorschlag: { zugriff: 'mitglieder' } }),
+      'geschaeftsstelle',
+      [vorstandsArt],
+    );
+    await klicken(T.aendern);
+
+    expect(element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')?.value).toBe('vorstand');
   });
 
   it('speichert Zusatzfelder vor der Bestätigung und setzt veroeffentlicht nicht durch die KI', async () => {

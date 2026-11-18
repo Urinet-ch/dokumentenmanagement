@@ -20,6 +20,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'NORMAL',
     gesetzlichePflicht: false,
     aktiv: true,
+    selbstAusgestellt: false,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
   {
     code: 'QUITTUNG',
@@ -30,6 +35,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'INTERN',
     gesetzlichePflicht: true,
     aktiv: true,
+    selbstAusgestellt: false,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
   {
     code: 'BULLETIN',
@@ -51,6 +61,11 @@ const ARTEN: Dokumentart[] = [
     vertraulichkeit: 'NORMAL',
     gesetzlichePflicht: false,
     aktiv: true,
+    selbstAusgestellt: false,
+    belegnummerMuster: [],
+    kiVorschlag: true,
+    kiFelder: [],
+    reihenfolge: 0,
   },
 ];
 
@@ -72,6 +87,8 @@ const DOKUMENT: Dokument = {
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
 };
 
 class Attrappe extends DokumentPort {

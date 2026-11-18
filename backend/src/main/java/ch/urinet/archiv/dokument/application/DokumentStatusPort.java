@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -92,7 +93,16 @@ public interface DokumentStatusPort {
     record Bestaetigt(String art, String titel, LocalDate datum, UUID partnerId, String partnerName, String projekt,
                       List<String> tags, String vertraulichkeit, String personBenutzer, String bestaetigtVon,
                       int geschaeftsjahr, LocalDate aufbewahrenBis, boolean fristAbgelaufen,
-                      Optional<Finanz> finanz, Optional<Vertrag> vertrag) {
+                      Optional<Finanz> finanz, Optional<Vertrag> vertrag,
+                      Map<String, List<String>> klassifikationen) {
+        public Bestaetigt(String art, String titel, LocalDate datum, UUID partnerId, String partnerName, String projekt,
+                          List<String> tags, String vertraulichkeit, String personBenutzer, String bestaetigtVon,
+                          int geschaeftsjahr, LocalDate aufbewahrenBis, boolean fristAbgelaufen,
+                          Optional<Finanz> finanz, Optional<Vertrag> vertrag) {
+            this(art, titel, datum, partnerId, partnerName, projekt, tags, vertraulichkeit, personBenutzer,
+                    bestaetigtVon, geschaeftsjahr, aufbewahrenBis, fristAbgelaufen, finanz, vertrag, Map.of());
+        }
+
         public Bestaetigt {
             Objects.requireNonNull(art, "art");
             Objects.requireNonNull(vertraulichkeit, "vertraulichkeit");
@@ -100,6 +110,9 @@ public interface DokumentStatusPort {
             tags = tags == null ? List.of() : List.copyOf(tags);
             Objects.requireNonNull(finanz, "finanz");
             Objects.requireNonNull(vertrag, "vertrag");
+            klassifikationen = klassifikationen == null ? Map.of()
+                    : klassifikationen.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                            Map.Entry::getKey, eintrag -> List.copyOf(eintrag.getValue())));
         }
     }
 

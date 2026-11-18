@@ -16,6 +16,8 @@ public enum Fehlercode {
             "Ihre Rolle erlaubt diese Aktion nicht. Bitte wenden Sie sich an den Inhaber, falls Sie sie brauchen."),
     NICHT_GEFUNDEN(404, "Nicht gefunden",
             "Den Eintrag gibt es nicht, oder er ist für Sie nicht sichtbar. Bitte prüfen Sie den Link."),
+    API_TOKEN_ABGELAUFEN(409, "API-Token abgelaufen",
+            "Ein abgelaufenes API-Token kann nicht reaktiviert werden. Bitte stellen Sie ein neues API-Token aus."),
     STATUS_KONFLIKT(409, "Aktion im aktuellen Status nicht möglich",
             "Das Dokument steht in einem Status, in dem diese Aktion nicht möglich ist. Bitte laden Sie es neu."),
     REFERENZ_VERGEBEN(409, "Referenz vergeben",
@@ -26,6 +28,8 @@ public enum Fehlercode {
             "Die Aufbewahrungsfrist liegt in der Vergangenheit. Bitte prüfen Sie Datum und Dokumentart."),
     DOKUMENTART_IN_GEBRAUCH(409, "Dokumentart in Gebrauch",
             "Die Dokumentart wird noch verwendet und kann nicht gelöscht werden. Sie können sie deaktivieren."),
+    KONFIGURATION_IN_GEBRAUCH(409, "Konfiguration in Gebrauch",
+            "Die Klassifikation oder der Wert wird noch verwendet und kann nicht gelöscht werden. Sie können ihn deaktivieren."),
     DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
             "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
                     + "bestehende Art."),
@@ -51,6 +55,10 @@ public enum Fehlercode {
             "Die Zusatzfelder passen nicht zur Dokumentart. Bitte prüfen Sie die Angaben."),
     KONFIGURATION_UNGUELTIG(422, "Konfiguration ungültig",
             "Die Konfiguration ist ungültig. Bitte prüfen Sie die angegebenen Werte."),
+    KLASSIFIKATION_UNGUELTIG(422, "Klassifikation ungültig",
+            "Die Klassifikationen passen nicht zur Dokumentart. Bitte prüfen Sie die Werte."),
+    REGEL_VERLETZT(422, "Dokumentregel verletzt",
+            "Die Angaben verletzen eine Dokumentregel. Bitte prüfen Sie die genannten Regeln."),
     CSV_UNGUELTIG(422, "CSV-Datei ungültig",
             "Die CSV-Datei hat nicht das erwartete Format (UTF-8 oder Windows-1252, Semikolon oder Komma), mehr als "
                     + "10'000 Datenzeilen, mehr als 1'000 Spalten, einen zu langen Spaltennamen oder keine Spalte "

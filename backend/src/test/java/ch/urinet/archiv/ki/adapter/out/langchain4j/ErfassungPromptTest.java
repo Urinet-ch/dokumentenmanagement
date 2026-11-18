@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.adapter.out.langchain4j;
 import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadDokumentartSeed;
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.DokumentartVorlage;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,28 +53,42 @@ class ErfassungPromptTest {
     }
 
     /**
-     * Produktpfad (Review PR #93): Arten aus dem Seed des Mandanten {@code urinet}, gefiltert und geordnet wie in
-     * {@code MetadatenExtraktion.arten()}, eigene Arten aus {@code application.properties}, Antwortschema und Codes aus
-     * dem Adapter. Weicht der Text ab, warnt das Archiv bei jedem Aufruf; hier bricht der Build.
+     * Produktpfad (Review PR #93): Arten und selbst ausgestellte Arten aus dem Seed des Mandanten {@code urinet},
+     * gefiltert und geordnet wie in {@code MetadatenExtraktion.arten()}, Antwortschema und Codes aus dem Adapter.
+     * Weicht der Text ab, warnt das Archiv bei jedem Aufruf; hier bricht der Build.
      */
     @Test
     void produktpfadMitSeedUrinetErgibtDieGateKennung() throws Exception {
-        List<ArtEintrag> aktiv = new KlassenpfadDokumentartSeed(new ObjectMapper()).lesen(new MandantCode("urinet"))
+        var vorlagen = new KlassenpfadDokumentartSeed(new ObjectMapper()).lesen(new MandantCode("urinet"));
+        List<ArtEintrag> aktiv = vorlagen
                 .stream()
                 .filter(DokumentartVorlage::aktiv)
                 .map(v -> new ArtEintrag(v.code(), v.name(), v.vertraulichkeit()))
                 .toList();
         List<ArtEintrag> arten = ErfassungPrompt.schemaArten(aktiv, LangChain4jKiAdapter.codes());
-        Properties properties = new Properties();
-        try (var ein = getClass().getResourceAsStream("/application.properties")) {
-            properties.load(new InputStreamReader(ein, StandardCharsets.UTF_8));
-        }
-        Set<String> eigene = Set.of(properties.getProperty("archiv.mandant.urinet.eigene-arten").split(","));
+        Set<String> eigene = vorlagen.stream().filter(DokumentartVorlage::selbstAusgestellt)
+                .map(DokumentartVorlage::code).collect(java.util.stream.Collectors.toSet());
+        assertThat(eigene).isEqualTo(EIGENE);
 
         String system = ErfassungPrompt.system(MANDANT, ErfassungPrompt.artListe(arten, eigene, MANDANT));
 
         assertThat(ErfassungPrompt.hash(system, LangChain4jKiAdapter.schema(), LangChain4jKiAdapter.codes(),
                 ErfassungPrompt.BILDWEG)).isEqualTo(ErfassungPrompt.GATE_KENNUNG);
+    }
+
+    @Test
+    void wissensquelleWirdNichtAlsKiVorschlagAufgefuehrt() {
+        var json = new ObjectMapper();
+        var vorlagen = new KlassenpfadDokumentartSeed(json).lesen(new MandantCode("urinet"));
+        var wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen();
+        List<ArtEintrag> alle = java.util.stream.Stream.concat(vorlagen.stream(), java.util.stream.Stream.of(wissensquelle))
+                .filter(DokumentartVorlage::aktiv)
+                .map(v -> new ArtEintrag(v.code(), v.name(), v.vertraulichkeit()))
+                .toList();
+
+        assertThat(wissensquelle.kiVorschlag()).isFalse();
+        assertThat(ErfassungPrompt.schemaArten(alle, LangChain4jKiAdapter.codes()))
+                .extracting(ArtEintrag::code).doesNotContain("WISSENSQUELLE");
     }
 
     @Test

@@ -1,0 +1,25 @@
+{
+  "_quelle": "Spec 04, Requirement 1.1",
+  "dokumentarten": [
+    {
+      "code": "WISSENSQUELLE",
+      "name": "Wissensquelle",
+      "beschreibung": "Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "datum"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "herausgeber": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true,
+      "ki_vorschlag": false,
+      "ki_felder": []
+    }
+  ]
+}

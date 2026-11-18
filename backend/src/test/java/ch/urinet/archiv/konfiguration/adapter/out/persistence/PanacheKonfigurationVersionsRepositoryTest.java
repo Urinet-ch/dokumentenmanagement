@@ -4,6 +4,9 @@ import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Abbild der Migration (jsonb-Objekt, {@code null}-Listen, fehlende IBANs) bleibt lesbar und gleicht dem der App. */
@@ -46,5 +49,50 @@ class PanacheKonfigurationVersionsRepositoryTest {
 
         assertThat(repository.kanonisch(jsonb)).isEqualTo(repository.kanonisch(client))
                 .isEqualTo(repository.kanonisch(umsortiert));
+    }
+
+    @Test
+    void liestRegelnAusEinemVersionsabbild() throws Exception {
+        String abbild = """
+                {"version":2,
+                 "einstellungen":{"geschaeftsjahrEnde":"12-31","kennungen":{"uid":null,"ibans":[]}},
+                 "arten":[],"klassifikationen":[],
+                 "regeln":[{"code":"monat_erwartet","art":"BANK","typ":"ERWARTET",
+                   "parameter":{"je":"MONAT","datum":"BELEGDATUM"},
+                   "schwere":"WARNUNG","meldung":"Bankbeleg fehlt.","aktiv":true}]}
+                """;
+
+        Konfiguration gelesen = repository.lesen(abbild);
+
+        assertThat(gelesen.regeln()).singleElement().satisfies(regel -> {
+            assertThat(regel.code()).isEqualTo("monat_erwartet");
+            assertThat(regel.typisierteParameter())
+                    .isEqualTo(new ch.urinet.archiv.konfiguration.domain.Regel.Erwartet(
+                            "MONAT", "BELEGDATUM", null, null));
+        });
+    }
+
+    @Test
+    void typenDerZusatzfelderGehoerenNichtInsAbbild() throws Exception {
+        ObjectMapper mitAusschluss = new ObjectMapper();
+        new KonfigurationJson().customize(mitAusschluss);
+        var app = new PanacheKonfigurationVersionsRepository(mitAusschluss);
+        var art = new Konfiguration.Art("BANK", "Bank", null, List.of("frei"), List.of("titel"),
+                app.kanonisch("{\"type\":\"object\",\"properties\":{\"periode\":{\"type\":\"string\","
+                        + "\"format\":\"date\"}}}"), "NORMAL", new Konfiguration.Aufbewahrung(null, null), false,
+                true, false, List.of(), null, null, true, List.of(), null, 0, List.of(), Map.of("periode", "date"));
+        var konfiguration = new Konfiguration(2, new Konfiguration.Einstellungen("12-31",
+                new Konfiguration.Kennungen(null, List.of())), List.of(art), List.of(), List.of());
+
+        String abbild = mitAusschluss.writeValueAsString(konfiguration);
+        // Abbilder, die die App vor dieser Änderung schrieb, tragen die Typen noch; sie werden beim Lesen übergangen.
+        String frueher = abbild.replace("\"arten\":[{",
+                "\"arten\":[{\"zusatzFeldTypen\":{\"periode\":\"date\"},");
+
+        assertThat(abbild).doesNotContain("zusatzFeldTypen");
+        Konfiguration ausApp = app.lesen(abbild);
+        assertThat(ausApp.arten().getFirst().zusatzFeldTypen()).isEmpty();
+        assertThat(ausApp.gleicherInhalt(app.lesen(frueher))).isTrue();
+        assertThat(ausApp.arten().getFirst().mitZusatzFeldTypen(Map.of("periode", "date"))).isEqualTo(art);
     }
 }

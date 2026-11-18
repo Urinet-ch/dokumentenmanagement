@@ -71,7 +71,10 @@ damit ein Verband andere Kategorien, Fristen und Regeln erhält als eine Firma, 
    Konfigurationsdatei), DANN SOLL das Archiv in derselben Transaktion eine neue Konfigurationsversion mit dem
    vollständigen Abbild, SHA-256, Zeit, Benutzer bzw. Betreiber und Quelle (`APP`, `DATEI`, `SEED`, `KOMMANDO`,
    `MIGRATION`) anlegen und
-   die Änderung mit Version, alten und neuen Werten der geänderten Elemente im Zugriffsprotokoll festhalten;
+   die Änderung mit Version, alten und neuen Werten der geänderten Elemente im Zugriffsprotokoll festhalten (ausser bei Kennungen
+   `uid` und `ibans`: dort nur Feldname und «geändert», keine Werte; geändert 18.11.2026, bisher alte und neue Werte
+   auch der Kennungen, Grund Datensparsamkeit; vorgeschlagen 18.11.2026 in PR #290, entschieden mit dem Merge von
+   PR #290);
    scheitert einer der Schritte, SOLL keine Änderung wirksam sein (wie Spec 01, 10.8). Eine Änderung ohne
    Unterschied zum aktuellen Stand SOLL keine Version erzeugen.
 4. WENN ein Dokument bestätigt, über einen Generator archiviert oder in seinen Metadaten geändert wird, DANN SOLL
@@ -127,6 +130,10 @@ im Code stehen.
    Spec 03, 3.7 ergänzt dieses Kriterium (13.11.2026, entschieden von Fabian, E-C): Massgeblich ist die Tabelle
    «Reservierte Felder» in Spec 03 design.md; `zugriff` hat die Werte `oeffentlich`, `mitglieder`, `vorstand`
    (String), `veroeffentlicht` ist ein JSON-Wahrheitswert (umgesetzt in Spec 05, Aufgabe 17.3).
+   Als Standard von `zugriff` sind `mitglieder` und `vorstand` zulässig, für jede Art; `oeffentlich` nie (geändert
+   18.11.2026, entschieden von Fabian in PR #290, Punkt 3; bisher Standard nur wie Spec 03 design.md: `mitglieder`,
+   als einzige Ausnahme `vorstand` für `VORSTANDSPROTOKOLL`). `vorstand` ist die engste Stufe (restriktiv); Req 2.9
+   (kein Art-Code im Code) verbietet, die Prüfung an einzelne Arten zu binden.
 8. FALLS `fremdbeleg_art` oder `ohne_zahlungsdaten_art` auf eine inaktive Art oder auf eine Art mit niedrigerer
    Standard-Vertraulichkeit (`NORMAL` < `INTERN` < `PERSONAL`) verweist, DANN SOLL das Archiv die Konfiguration
    mit HTTP 422 `KONFIGURATION_UNGUELTIG` ablehnen.
@@ -198,7 +205,8 @@ Jahr nur einmal vorkommt, damit Fehler beim Erfassen auffallen, ohne dass dafür
      Klassifikation einen genannten Wert hat;
    - `EINDEUTIG`: Die Kombination der genannten Felder kommt in der Art (bzw. allen Arten) höchstens einmal unter
      den bestätigten Dokumenten vor (Status `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, auch über einen
-     Generator archivierte), ohne das geprüfte Dokument selbst; leere Werte zählen nicht;
+     Generator archivierte, sowie vom Generator angenommene, noch nicht archivierte Dokumente in `NEU`, `VERARBEITUNG`
+     und `FEHLER`; ergänzt 18.11.2026, entschieden von Fabian), ohne das geprüfte Dokument selbst; leere Werte zählen nicht;
    - `FOLGE`: Ein ganzzahliges Feld oder die Gruppe `nr` eines Belegnummer-Musters bildet je Art und Zeitraum
      (`GESCHAEFTSJAHR`, ein ganzzahliges Jahresfeld der Art oder `GESAMT`) über die bestätigten Dokumente eine
      lückenlose Folge; der Bericht nach einem Import (Spec 03, 4.2) zählt zusätzlich die Dokumente dieses Imports im

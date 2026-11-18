@@ -93,6 +93,17 @@ Funktionalität: API-Tokens für Skripte
     Und kein Logeintrag enthält das Geheimnis eines Tokens
 
   @req-2.5
+  Szenario: Ein abgelaufenes Token wird nicht reaktiviert
+    Angenommen für «urinet» gibt es das Token «abgelaufen» mit Scope «import» und Ablauf in 30 Tagen
+    Und das Ablaufdatum des Tokens «abgelaufen» liegt in der Vergangenheit
+    Wenn «inhaber-urinet» den Ablauf des Tokens «abgelaufen» auf «morgen» setzt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 409 und Fehlercode «API_TOKEN_ABGELAUFEN»
+    Wenn «inhaber-urinet» den Ablauf des Tokens «abgelaufen» entfernt
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 409 und Fehlercode «API_TOKEN_ABGELAUFEN»
+    Wenn das Token «abgelaufen» an «/api/v1/dokumente» sendet
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 401 und Fehlercode «NICHT_ANGEMELDET»
+
+  @req-2.5
   Szenario: Ein Token ist an seinen Mandanten gebunden
     Angenommen für «vhf-gsk» gibt es das Token «vhf» mit Scope «import»
     Und für «vhf-gsk» gibt es das Token «vhf-generator» mit Scope «generator»

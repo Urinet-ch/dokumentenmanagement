@@ -6,9 +6,12 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.sicherheit.domain.ApiToken;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
@@ -19,11 +22,13 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,14 +37,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code archiv.api-token.parallele-pruefungen} (2) Vergleiche laufen gleichzeitig, auch für unbekannte IDs; wer keinen
  * Platz erhält, bekommt sofort 503 {@code UEBERLASTET} mit {@code Retry-After}, unter {@code /public/} zusätzlich mit
  * {@code Cache-Control: no-store} (Spec 03, Req 15.2 und 15.4). Health-Check und OIDC bleiben erreichbar.
- * Den Höchststand zählt {@link ZaehlenderHasher}.
+ * Den Höchststand zählt {@link ZaehlenderHasher}. Die synthetische Quelladresse ist pro Anfrage eindeutig, damit die
+ * Rate-Limiter-Buckets anderer Szenarien die Prüfung nicht beeinflussen.
  */
 @QuarkusTest
+@Tag("start-2")
+@TestProfile(ApiTokenUeberlastTest.LasttestProfil.class)
 class ApiTokenUeberlastTest {
+
+    public static class LasttestProfil implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of(
+                    "archiv.api-token.grenzen.pro-sekunde", "1000",
+                    "archiv.api-token.grenzen.spitze", "1000");
+        }
+    }
 
     private static final int ANFRAGEN = 50;
     private static final int PARALLELE_PRUEFUNGEN = 2;
     private static final Duration SCHNELL = Duration.ofSeconds(2);
+    private static final AtomicInteger QUELLEN_ZAEHLER = new AtomicInteger();
 
     @TestHTTPResource("/")
     URI basis;
@@ -150,7 +168,8 @@ class ApiTokenUeberlastTest {
 
     private HttpRequest.Builder anfrage(String pfad, String token) {
         return HttpRequest.newBuilder(basis.resolve(pfad)).timeout(Duration.ofSeconds(20))
-                .header("Authorization", "Bearer " + token);
+                .header("Authorization", "Bearer " + token)
+                .header("X-Real-Ip", "198.51.100." + (QUELLEN_ZAEHLER.getAndIncrement() % 254 + 1));
     }
 
     private HttpResponse<String> senden(HttpRequest.Builder anfrage) {

@@ -44,6 +44,7 @@ public class ApiTokenPruefung {
 
     private final ApiClientRegister register;
     private final GeheimnisHasher hasher;
+    private final ApiTokenPruefGrenzen pruefGrenzen;
     private final PruefCacheSignierer cacheSignierer;
     private final Clock uhr;
     private final HashSperre sperre;
@@ -54,21 +55,32 @@ public class ApiTokenPruefung {
 
     @Inject
     public ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, HashSperre sperre,
-                           PruefCacheSignierer cacheSignierer,
+                           ApiTokenPruefGrenzen pruefGrenzen, PruefCacheSignierer cacheSignierer,
                            @ConfigProperty(name = "archiv.webseite.pruef-cache", defaultValue = "PT5M")
                            Duration cacheDauer) {
-        this(register, hasher, Clock.systemUTC(), sperre, cacheDauer, cacheSignierer);
+        this(register, hasher, Clock.systemUTC(), sperre, pruefGrenzen, cacheDauer, cacheSignierer);
     }
 
     ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
                      PruefCacheSignierer cacheSignierer) {
-        this(register, hasher, uhr, sperre, Duration.ofMinutes(5), cacheSignierer);
+        this(register, hasher, uhr, sperre, testGrenzen(uhr), Duration.ofMinutes(5), cacheSignierer);
     }
 
     ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
                      Duration cacheDauer, PruefCacheSignierer cacheSignierer) {
+        this(register, hasher, uhr, sperre, testGrenzen(uhr), cacheDauer, cacheSignierer);
+    }
+
+    ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
+                     ApiTokenPruefGrenzen pruefGrenzen, PruefCacheSignierer cacheSignierer) {
+        this(register, hasher, uhr, sperre, pruefGrenzen, Duration.ofMinutes(5), cacheSignierer);
+    }
+
+    ApiTokenPruefung(ApiClientRegister register, GeheimnisHasher hasher, Clock uhr, HashSperre sperre,
+                     ApiTokenPruefGrenzen pruefGrenzen, Duration cacheDauer, PruefCacheSignierer cacheSignierer) {
         this.register = register;
         this.hasher = hasher;
+        this.pruefGrenzen = pruefGrenzen;
         this.cacheSignierer = cacheSignierer;
         this.uhr = uhr;
         this.sperre = sperre;
@@ -84,8 +96,13 @@ public class ApiTokenPruefung {
      * @throws FachFehler {@code UEBERLASTET}, wenn innerhalb der Wartezeit kein Platz für den Vergleich frei wird
      */
     public Optional<ApiClient> pruefen(ApiToken token) {
+        return pruefen(token, Optional.empty());
+    }
+
+    public Optional<ApiClient> pruefen(ApiToken token, Optional<String> quelle) {
         Optional<ApiClientRegister.Zugang> zugang = register.finden(token.id());
         if (zugang.isEmpty()) {
+            pruefGrenzen.pruefen(quelle);
             String attrappeHash = attrappeBerechnen();
             sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), attrappeHash));
             return Optional.empty();
@@ -94,6 +111,7 @@ public class ApiTokenPruefung {
         boolean passt = cacheTreffer(client, token.geheimnis());
         boolean ausCache = passt;
         if (!passt) {
+            pruefGrenzen.pruefen(quelle);
             passt = sperre.ausfuehren(() -> hasher.pruefen(token.geheimnis(), zugang.get().hash()));
         }
         Instant jetzt = uhr.instant();
@@ -177,5 +195,9 @@ public class ApiTokenPruefung {
     }
 
     private record CacheEintrag(byte[] geheimnisHmac, Instant ablauf) {
+    }
+
+    private static ApiTokenPruefGrenzen testGrenzen(Clock uhr) {
+        return new ApiTokenPruefGrenzen(new ApiTokenPruefGrenzen.Einstellung(1_000_000, 1_000_000, 10000), uhr);
     }
 }

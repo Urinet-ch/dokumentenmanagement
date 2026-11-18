@@ -34,8 +34,23 @@ export interface Dokumentart {
      */
     aufbewahrungJahre?: number | null;
     aufbewahrungAb?: Dokumentart.AufbewahrungAbEnum | null;
+    /**
+     * Pflichtiges Zusatzfeld vom Typ string mit format date; nur bei FELD
+     */
+    aufbewahrungFeld?: string | null;
     gesetzlichePflicht: boolean;
     aktiv: boolean;
+    selbstAusgestellt: boolean;
+    /**
+     * JDK-reguläre Ausdrücke; höchstens 20 Muster mit je 1\'000 Zeichen
+     */
+    belegnummerMuster: Array<string>;
+    fremdbelegArt?: string | null;
+    ohneZahlungsdatenArt?: string | null;
+    kiVorschlag: boolean;
+    kiFelder: Array<string>;
+    kiHinweise?: string | null;
+    reihenfolge: number;
 }
 export namespace Dokumentart {
     export const VertraulichkeitEnum = {
@@ -47,6 +62,8 @@ export namespace Dokumentart {
     export const AufbewahrungAbEnum = {
         Geschaeftsjahr: 'GESCHAEFTSJAHR',
         GueltigBis: 'GUELTIG_BIS',
+        Belegdatum: 'BELEGDATUM',
+        Feld: 'FELD',
     } as const;
     export type AufbewahrungAbEnum = typeof AufbewahrungAbEnum[keyof typeof AufbewahrungAbEnum];
 }

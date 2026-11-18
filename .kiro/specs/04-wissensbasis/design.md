@@ -65,19 +65,22 @@ flowchart LR
 
 | Befund | Regel |
 | --- | --- |
-| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen) fehlen oder sind ungültig |
+| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen), Status oder Vertraulichkeit fehlen oder sind ungültig |
+| `SCHLAGWORT_UNGUELTIG` | Schlagwort ist nicht kleingeschriebenes kebab-case |
 | `PFAD_UNGUELTIG` | `ueberblick` oder `<ordner>/<name>` mit Name `[a-z0-9]+(-[a-z0-9]+)*`, Ordner passt zum Typ, Name nicht `index`/`log`, bei `NEU` nicht vergeben (auch nicht von einer für den Kontext unsichtbaren Seite) |
 | `FUSSNOTE_OHNE_QUELLE` | Label ohne Quelleneintrag |
-| `AUSSAGE_OHNE_BELEG` | Absatz oder Listenpunkt ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
-| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, oder Seite ausserhalb `1..dokument.seiten` |
+| `FUSSNOTE_DEFINITION` | Fussnoten-Definition `[^label]: …` im Inhalt; die Quelle steht nur im Quelleneintrag (Umsetzung 13.4) |
+| `AUSSAGE_OHNE_BELEG` | Absatz, Listenpunkt oder Codeblock ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
+| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben; Wissensquelle einer Quelle-Seite fehlt, fremd, nicht archiviert oder ohne Fussnote auf sie, Wissensquelle an einer Seite anderen Typs (Umsetzung 13.4) |
 | `SEITE_FEHLT` | Dokumentquelle ohne PDF-Seite (z. B. aus einem Analyse-Vorschlag, Requirement 12.4) |
-| `QUELLE_PERSONAL` | Dokument einer Quelle hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
+| `QUELLE_PERSONAL` | Dokument einer Quelle oder Wissensquelle einer Quelle-Seite hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
 | `STUFE_UEBERBLICK` | Änderung an `ueberblick` mit wirksamer Vertraulichkeit über `NORMAL` (Requirement 11.8) |
-| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum und Silbentrennung normalisiert) nicht auf der angegebenen PDF-Seite vor |
-| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]` |
+| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum, Silbentrennung und Unicode NFKC normalisiert, Gross-/Kleinschreibung unverändert) nicht auf der angegebenen PDF-Seite vor |
+| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]`, Link-Referenzdefinition `[x]: …` (auch unbenutzt) und damit jeder Referenzlink (Umsetzung 13.4) |
 | `AUSSAGE_ENTFERNT` | Quellenschlüssel der Basisversion fehlt in der neuen Fassung und nicht unter «entfernte Aussagen» (ein Grund nach Requirement 7.3 gilt als Begründung) |
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
+| `MARKDOWN_ZU_TIEF` | Markdown überschreitet die feste Grenze von 64 Verschachtelungsebenen |
 | Hinweis `ABSCHNITT_FEHLT` | Pflichtabschnitte nach Requirement 2.8 |
 | Hinweis `HOEHERE_STUFE_VORHANDEN` | geplanter Pfad von einer Seite höherer Vertraulichkeit belegt (Requirement 5.12), nur für A17 sichtbar |
 | Hinweis `STUFE_STEIGT` | Annahme erhöht die wirksame Vertraulichkeit der Seite dauerhaft (Requirement 6.8) |
@@ -88,6 +91,72 @@ flowchart LR
   liefert die PDF-Seiten der PDF/A-Fassung (1-basiert); darauf beruhen Abschnitte,
   Seitenangaben und Auszugsprüfung. Bei `pdfa_fehlt` (Tika-Text ohne `\f`) oder wenn die Zahl der Seiten nicht
   `dokument.seiten` entspricht, gibt es keinen Ingest (Requirement 5.6).
+
+#### Umsetzung 13.4
+- `commonmark` und `commonmark-ext-footnotes` verwenden gemeinsam Version `0.32.0` (beide Artefakte in Maven Central
+  geprüft). `WissensMarkdown` wertet Fussnoten, Abschnitte, Aussagen und Links am selben CommonMark-Baum aus, den es
+  darstellt. Rohes HTML wird escaped; externe oder ungültige Linkziele erhalten kein `href`, Bilder kein `src`.
+- Interne Linkziele sind nur `ueberblick` und `/<ordner>/<name>` aus den sechs festen Seitentypen; gespeichert wird
+  der Pfad ohne führenden Schrägstrich für `wissensseite_link`. Die Markdown-Eingabe hat eine harte Grenze von
+  200'000 Zeichen und maximal 64 Verschachtelungsebenen; zusätzlich gilt der konfigurierte Seitenhöchstwert.
+- `WissensPruefung` erhält Dokument- und Seitenreferenzen sowie Basisversion und Ingest-Kontext als Eingabe. Sie bleibt
+  deterministisch und framework-frei; PDF-Seiten und Auszüge werden über `Seitentext` geprüft.
+- Nachbesserung Review PR #298:
+  - Fussnoten stehen im Inhalt nur als Verweis `[^label]` (Format von Requirement 2.7). Damit commonmark-java auch
+    ohne Definition einen Fussnotenverweis erkennt, hängt `WissensMarkdown` vor dem Parsen je Label eine
+    synthetische, leere Definition an; die Darstellung zeigt dort nur das Label, die Quellenliste kommt aus den
+    Quelleneinträgen. Jedes Label mit Verweis zählt, auch neben bekannten Labels und in Widerspruchsblöcken.
+    Definitionen im Inhalt selbst sind ein Befund `FUSSNOTE_DEFINITION` und werden nicht dargestellt, damit kein
+    unbelegter Text über eine Fussnote in die Seite kommt. Labels werden wie geschrieben verglichen.
+  - Vor Vorprüfung und Parsen werden die Zeilenenden vereinheitlicht (`\r\n` und `\r` → `\n`), weil CommonMark
+    auch ein einzelnes `\r` als Zeilenende wertet; die Grössengrenze gilt für den Inhalt wie gespeichert. Ob eine
+    Definition synthetisch ist, entscheidet ihre Eingabeposition (`SourceSpan.getInputIndex()` hinter dem Inhalt),
+    nicht die Zeilennummer (Nachbesserung Review PR #298, Kopf e819aaa4).
+  - Fenced und eingerückte Codeblöcke ausserhalb von Widerspruchsblöcken und den ausgenommenen Abschnitten zählen
+    als Aussage, auch in Listenpunkten; ohne Fussnote gilt `AUSSAGE_OHNE_BELEG`. Ein Listenpunkt ist mit der
+    Fussnote seines ersten Absatzes belegt; jeder weitere Absatz und Codeblock darin (auch in einem Blockzitat im
+    Listenpunkt) ist eine eigene Aussage (Requirement 2.6: «jeder Absatz und jeder Listenpunkt»).
+  - Die Beschreibung ist «ein Satz», wenn kein `!` oder `?` mit Folgetext und kein Punkt mit Leerraum und folgendem
+    Grossbuchstaben vorkommt; ausgenommen sind Punkte nach Zahlen, Einzelbuchstaben (z. B. «z. B.») und einer
+    festen Liste deutscher Abkürzungen («Art.», «gem.», «Hrn.», «Jan.», …). `BreakIterator` entfällt, weil es
+    Abkürzungen als Satzende wertete.
+  - Die Auszugsprüfung bleibt case-sensitiv (wörtlicher Auszug nach Requirement 2.7); normalisiert werden nur
+    Leerraum, Silbentrennung und Unicode NFKC.
+  - Die wirksame Vertraulichkeit nach Annahme berechnet `WissensGraph.wirksameStufeNachAnnahme` (Aufgabe 13.5:
+    Dokumente der Fassung, Hüllen ihrer Quellseiten, Mindeststufe, Kontextstufe); `FreigabeDienst` (14.2) ruft sie
+    auf und übergibt das Ergebnis als `Kontext.wirksameVertraulichkeit`. Als Seitenstufe übergibt 14.2 die
+    Mindeststufe der Seite, nicht die gespeicherte wirksame Stufe, damit eine Änderung, die eine interne Quelle
+    entfernt, nicht am alten Wert hängen bleibt (Review PR #300, M1). Die Prüfung nimmt das Maximum aus
+    Seitenstufe und diesem Wert. Für `ueberblick` gilt `STUFE_UEBERBLICK`, wenn die wirksame Stufe über `NORMAL`
+    liegt oder nicht übergeben wurde (fail closed); `STUFE_STEIGT` vergleicht dieselbe wirksame Stufe.
+  - Ein Blockzitat mit der Marke «⚠️ Widerspruch:» gilt nur dann als Widerspruchsblock (und ist von der
+    Belegpflicht ausgenommen), wenn es Fussnoten auf mindestens zwei verschiedene Labels enthält (Glossar: «mit den
+    Quellen beider Aussagen», Requirement 7.1); sonst zählen seine Absätze, Listenpunkte und Codeblöcke als Aussagen
+    nach Requirement 2.6 (Nachbesserung Review PR #298, Kopf 197a8883).
+  - Link-Referenzdefinitionen `[x]: ziel "Titel"` sind ein Befund `LINK_UNGUELTIG`, auch unbenutzt: Requirement 3.5
+    erlaubt nur `[Titel](/pfad)`, und eine Definition trägt sonst externe Ziele (Requirement 3.7) oder unsichtbaren,
+    unbelegten Titeltext in den gespeicherten Inhalt (Suche, Chunks). Damit ist auch jeder Referenzlink
+    (`[Titel][k]`, `[k][]`, `[k]`) ein Befund (Nachbesserung Review PR #298, Kopf 197a8883).
+  - Offene Klammern zählen nur innerhalb eines Absatzes zur Verschachtelung; eine Leerzeile setzt Klammer- und
+    Inline-Code-Zähler zurück.
+  - Die Wissensquelle einer Seite vom Typ `Quelle` (`wissensquelle_id`) prüft `WissensPruefung` wie eine
+    Dokumentquelle (Requirement 2.7, bei jedem Anlass): fehlt sie im Kontext, ist sie fremd oder nicht archiviert,
+    gilt `QUELLE_UNGUELTIG`, ist sie `PERSONAL`, `QUELLE_PERSONAL` (bei fremdem Dokument nur `QUELLE_UNGUELTIG`).
+    Eine `wissensquelle_id` an einer Seite anderen Typs ist `QUELLE_UNGUELTIG` (Datenmodell: «nur Typ Quelle»).
+    Eine Quelle-Seite muss mindestens eine Fussnote auf einen Quelleneintrag zu ihrer Wissensquelle tragen, sonst
+    `QUELLE_UNGUELTIG`: Die Hülle besteht nur aus den Quelleneinträgen, und die Quelle-Seite beruht auf ihrer
+    Wissensquelle (Glossar «Hülle», Requirement 2.3, 11.2); ohne diesen Eintrag richtete sich ihre Sichtbarkeit
+    nicht nach der Wissensquelle (Nachbesserung Review PR #298, Kopf 42587e8f, M1).
+  - Die Ausnahme von der Belegpflicht für «Offene Fragen» und «Berührte Seiten» gilt nur bis zur nächsten
+    Überschrift beliebiger Ebene; ein Unterabschnitt (z. B. «Kernaussagen» unter «Berührte Seiten») ist wieder
+    belegpflichtig (Requirement 2.6; Nachbesserung Review PR #298, Kopf 42587e8f, S1).
+  - Aufgabe 13.4 liefert die Links aus dem Inhalt als `Ergebnis.links`; das Schreiben nach `wissensseite_link`
+    folgt mit der Freigabe (Schritt «Quelleneinträge, Links und Hüllen neu schreiben», Aufgabe 14.2).
+  - Tika bringt `commonmark` mit `commonmark-ext-gfm-tables` und `-strikethrough` in Version `0.31.0` mit;
+    `dependencyManagement` hebt alle commonmark-Artefakte auf `${commonmark.version}` (`0.32.0`), damit keine
+    gemischten Versionen auf dem Klassenpfad liegen.
+- Die allgemeine ArchUnit-Regel für framework-freie Domain-Typen bleibt bestehen; nur `WissensMarkdown` und seine
+  inneren Typen dürfen zusätzlich von `org.commonmark` abhängen. Eine eigene ArchUnit-Regel hält diese Ausnahme eng.
 
 ### Sichtbarkeit und Hülle (`wissen/application`)
 - `wissensseite_dokument` speichert die Hülle der aktuellen Version: direkte Dokumentquellen plus die Hüllen der
@@ -112,8 +181,10 @@ flowchart LR
   Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument` und der Mindeststufe aus `daten`.
   Unsichtbare Versionen erscheinen in der Liste nur als Nummer; `/versionen/{n}` antwortet mit 404, `/diff` nur,
   wenn beide Versionen sichtbar sind.
-- `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Ingest-Kontext nach Requirement 5.5,
-  Lint-Paare nach 10.4). `QuelldokumentBeobachter` reagiert auf `DokumentEreignisse.geaendert` (siehe Ingest),
+- `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Lint-Paare nach 10.4). Für den
+  Ingest-Kontext nach Requirement 5.5 und die Kontextstufe nach 11.7 bestimmt der Ingest die Stufe live (Hülle über
+  `WissensGraph`, aktuelle Dokumentstufe), damit eine noch nicht nachgezogene Neuberechnung nichts preisgibt
+  (Review PR #300, S3). `QuelldokumentBeobachter` reagiert auf `DokumentEreignisse.geaendert` (siehe Ingest),
   berechnet die Stufe neu (nie unter `vertraulichkeit_mindest`) und setzt `quelle_pruefen` (Requirement 15.1).
   Wird ein Dokument der Hülle `PERSONAL` (A8), bleibt die Seite über den Hüllenfilter nur noch für die Berechtigten
   nach A4 sichtbar, trägt «Quelle prüfen» und ist vom Lint mit KI ausgenommen; die nächste Änderung hat den Befund
@@ -352,6 +423,17 @@ die Pflichtfelder `titel` und `datum`, «unbefristet», `gesetzliche_pflicht = n
 jeder Konfiguration fest. Zusatzfelder (auch als Pflicht, z. B. `zusatz.zugriff`) und Klassifikationen darf ein
 Mandant ergänzen.
 
+**Umsetzung 13.2 (PR #297):** Bis Spec 05, Aufgabe 17.7 ist `seed/vhf-gsk/dokumentarten.json` die Konfiguration von
+`vhf-gsk`; dort steht `WISSENSQUELLE` mit `herausgeber`, `zugriff` (Pflicht, Standard `mitglieder`), `veroeffentlicht`
+(Pflicht, Standard `false`) und wie alle Arten des Mandanten mit `verband` (Spec 03, 1.6), darum legt der Seed-Teil sie
+dort nicht an. `SeedPruefung` lehnt beim Anlegen eines Mandanten eine `WISSENSQUELLE` aus dem Seed des Mandanten ab,
+die von den festen Eigenschaften abweicht (`SEED_UNGUELTIG`; gleiche Regel wie `WISSENSQUELLE_UNGUELTIG` der
+Konfiguration). Mandanten, die vor 13.2 angelegt wurden, erhalten die Art über das Changeset
+`044-wissensquelle-bestand` mit denselben Werten wie aus dem Seed (in `m_vhf_gsk` mit den Feldern oben) und eine neue
+Version der Konfiguration (`MIGRATION`); ein neues Schema hat beim Migrieren noch keine Arten und übergeht es
+(`MARK_RAN`). Der Jahresexport schliesst nur `WISSENSQUELLE` aus (`art is distinct from`), Dokumente ohne Art bleiben
+wie bisher drin. Req 1.4 weisen erst Ingest, Freigabe und Lint nach (14.x).
+
 | Code | Name | Gruppen | Pflichtfelder | Zusatz | Vertraulichkeit | Aufbewahrung | `gesetzliche_pflicht` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `WISSENSQUELLE` | Wissensquelle | `frei` | `titel`, `datum` | `herausgeber` (Text, optional) | `NORMAL` | unbefristet | nein |
@@ -434,6 +516,89 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
                     monatsbudget_tokens int null)        -- null = Startwert archiv.wissen.monatsbudget-tokens (Req 13.6)
   -- überschreibt die Startwerte je Mandant (A19); null = Startwert; Wert ≤ 0 → 422 (Req 13.6)
 ```
+
+### Umsetzung 13.3 (PR #295, Teil)
+- Changeset `043-wissen-datenmodell` legt alle Tabellen oben an. Abweichungen vom Entwurf, alle strenger:
+  `wissensseite_version_dokument` und `wissensseite_chunk` verweisen mit `(seite_id, version)` auf
+  `wissensseite_version`; Werte wie Typ, Status, Aktion, Vertraulichkeit, `version >= 1` und `daten` als JSON-Objekt
+  sind Check-Constraints; die Trigger verweigern neben `UPDATE` und `DELETE` auch `TRUNCATE`, und INSERT-only gilt
+  auch für `wissensseite_version_dokument` (`archiv_app` dort nur `INSERT`/`SELECT`).
+- Manifest (Req 4.6): `protokoll_blatt` nimmt Blätter von `wissensseite_version` und `wissens_log` auf. Unter
+  `protokolle` stehen `dokument_version` und `zugriff_protokoll` immer, die beiden Wissenstabellen nur mit Zeilen im
+  Fenster; fehlt ein Wissensschlüssel, hat das Fenster dort keine Zeile. So bleibt ein Manifest ohne Wissenszeilen bei
+  Deploy und Rollback gleich, und `wiederverwenden` (Spec 01, Req 15.6) bricht nicht ab. Die Quellenbezüge
+  (`wissensseite_version_dokument`) stehen nicht im Manifest, weil Req 4.6 nur Versionen und Log nennt; sie sind
+  INSERT-only, aber nicht gehasht (Review PR #295, K7).
+- Req 4.7 ist offen: In der Sicherung ist die Wissensbasis ohne eigenen Schritt, weil `taeglich.sh` die ganze
+  Archiv-Datenbank mit `pg_dump` sichert. Die Restore-Probe im Repo stellt aber nur Bucket-Objekte wieder her
+  (`archiv sicherung wiederherstellen` und `sperren-pruefen`); `pg_dump` in eine leere Datenbank einspielen und mit der Quelle
+  vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
+  Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
+  Nachweis (Review PR #295, M1).
+
+### Umsetzung 13.5 (PR #300)
+- `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe
+  Quellketten terminieren ohne Rekursion. Die wirksame Stufe ist das Maximum aus Hülldokumenten und Mindeststufe.
+- `WissenHuelleDienst` speichert aktuelle Hüllen und Hüllen je Version in einer Transaktion. Bei einer Änderung der
+  Dokument-Sichtbarkeit berechnet er alle Seiten mit diesem Dokument in der aktuellen Hülle neu; die Mindeststufe
+  bleibt dabei erhalten. Auch für `ueberblick` speichert die Neuberechnung die wirksame Stufe nach 11.1 (also
+  `INTERN`, sobald die Hülle ein internes Dokument enthält; Requirement 11.9, entschieden von Fabian am
+  18.11.2026). Requirement 11.8 gilt damit nur, solange alle Dokumente der Hülle `NORMAL` sind; der Befund
+  `STUFE_UEBERBLICK` gehört zur `WissensPruefung` (13.4, 14.2) und gilt für jede Änderung, deren wirksame Stufe nach
+  Annahme über `NORMAL` liegt, auch wenn die Übersicht schon `INTERN` ist (vorsichtige Auslegung).
+- Folgen für eine `INTERN` gewordene Übersicht (Requirement 11.9), ohne neue Regel: Ein Ingest einer
+  `NORMAL`-Wissensquelle sieht sie nicht (5.5, 5.11); plant er `ueberblick` neu, ergibt das `PFAD_UNGUELTIG` und den
+  Hinweis `HOEHERE_STUFE_VORHANDEN` (5.12, von Hand zusammenführen). Zurück zu `NORMAL` führt (a) die Rückstufung
+  des Dokuments, weil die Neuberechnung die unberührte Mindeststufe `NORMAL` nimmt, oder (b) eine manuelle Änderung
+  (6.9), die die interne Quelle entfernt; deren wirksame Stufe nach Annahme ist `NORMAL`, also kein Befund.
+- Neuberechnungen (`versionFreigeben`, `dokumentSichtbarkeitGeaendert`) sperren vor dem Lesen des Graphen den
+  Mandanten mit `pg_advisory_xact_lock(hashtextextended(current_schema() || ':wissen-huelle', 0))`; parallele Läufe
+  im selben Mandanten laufen damit nacheinander und schreiben keine veraltete Stufe zurück. Die Freigabe (14.2) ruft
+  zuerst `WissenHuelleDienst.sperren()` (nur innerhalb einer laufenden Transaktion), schreibt dann Seite, Version
+  und Quelleneinträge und ruft `versionFreigeben` in derselben Transaktion (die Sperre ist dort reentrant). So
+  nehmen parallele Freigaben die Sperren in derselben Reihenfolge; ein Test mit zwei parallelen Freigaben gehört zu
+  14.2 (Review PR #300, S2).
+- `WissenSichtbarkeit` wertet A15 und A2/A3 aus. Dokumente werden je Anfrage über
+  `DokumentRepository.sichtbar(..., Sichtregel.fuer(benutzer))` geprüft, damit dieselbe Sichtregel wie im
+  Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Abweichung vom Abschnitt «Sichtbarkeit und
+  Hülle»: Der Filter läuft in 13.5 in Java (je Hülldokument eine Abfrage), nicht als SQL-Prädikat. Für Index,
+  Zähler und Paging ersetzt Aufgabe 13.6 ihn durch ein Prädikat an der Abfrage von `wissensseite`; bis dahin gibt
+  es keine Liste mit Zähler oder Paging. Fail-closed für aktuelle Seiten (Review PR #300, S2 auf 651f9fd6 und
+  ebc9d0b6): Die Lesestrecke prüft die gespeicherte Hülle **vereinigt** mit der live aus `wissensseite_quelle`
+  berechneten Hülle (transitiv über Quellseiten, rekursive Abfrage mit `UNION`, zyklensicher); jedes dieser
+  Dokumente muss für den Benutzer sichtbar sein. Zusätzlich gilt eine Seite als `INTERN`, wenn
+  `vertraulichkeit_mindest` oder die gespeicherte `vertraulichkeit` nicht `NORMAL` ist, wenn sie Quelleneinträge,
+  aber keine Zeile in `wissensseite_dokument` hat, oder wenn ein live erreichbares Dokument nicht in ihrer
+  gespeicherten Hülle steht (Freigabe oder Quelländerung ohne Neuberechnung: die gespeicherte Stufe ist dann
+  veraltet). Folge der ersten Regel: Eine Seite, die nur Quellseiten ohne Dokumente zitiert (auch ein
+  dokumentfreier Zyklus), hat keine Hüllenzeilen und bleibt `INTERN` (fail-closed, wie die Version ohne Hülle).
+  Bewusste Verschärfung gegenüber «nach A2 bis A4»: Die gespeicherte Stufe macht aus `PERSONAL` und unbestätigten
+  Hülldokumenten `INTERN`; eine Seite, deren Hülle nur das eigene `PERSONAL`-Dokument eines `mitarbeiter` enthält,
+  sieht dieser darum nicht (kein Abfluss, nur strenger). Das SQL-Prädikat aus 13.6 übernimmt diese Regeln.
+- Mindeststufen zitierter Quellseiten fliessen nicht in die wirksame Stufe der zitierenden Seite ein (Hülle nach
+  Glossar und 11.1 nur aus Archivdokumenten; `WissensGraph.wirksameStufe`, `wirksameStufeNachAnnahme`). Ob sie es
+  sollen (z. B. `ueberblick` zitiert eine von Hand auf `INTERN` gesetzte Seite ohne internes Dokument), ist ein
+  Produktentscheid und offen (Review PR #300, ebc9d0b6, S2/K1); vor 14.2 zu klären.
+- Versionen: Eine Version ist nur sichtbar, wenn die aktuelle Seite sichtbar ist **und** die Version selbst sichtbar
+  ist (Req 11.2, 4.4; Review PR #300, M1). Die Version verwendet ihre eigene Hülle aus
+  `wissensseite_version_dokument` und die Mindeststufe aus `wissensseite_version.daten`, Schlüssel
+  `vertraulichkeit_mindest` (Werte `NORMAL`, `INTERN`; die Freigabe in 14.x schreibt diesen Schlüssel). Fehlt der
+  Schlüssel, ist der Wert unbekannt oder hat die Version keine Zeile in `wissensseite_version_dokument`, gilt sie
+  fail-closed als `INTERN`. Eine unbekannte Stufe in `wissensseite` gilt ebenfalls als `INTERN`.
+- `Berechtigung.wissensseitenAktion` akzeptiert nur A15–A19 und prüft Sichtbarkeit vor dem Recht (404 vor 403).
+  `Berechtigung.wissensentwurfLesen` gibt A17 Vollzugriff, A18 auf eigene Analysevorschläge nur Status, Entscheid
+  und Grund; fremde Vorschläge und Vorschläge für `treuhaender` bleiben 403. Verweigerungen für Wissensseiten
+  enthalten keine Dokument-ID oder Seiteninhalte. A19 bleibt für `geschaeftsstelle` verboten.
+- Cucumber prüft mit synthetischen IDs in `urinet` und `vhf-gsk` dieselben Seiten- und Dokument-IDs, alle vier Rollen,
+  Zyklen, manuelle Erhöhung, Neuberechnung und Sichtbarkeit einer älteren Version. Für die Mandantentrennung legt
+  jeder Durchgang in derselben Transaktion zusätzlich Daten im anderen Schema an (gleiche IDs, dort `INTERN`, und
+  eine Seite nur im anderen Mandanten) und prüft kreuzweise, dass Hülle, Stufe und Seite des anderen Mandanten
+  nicht wirken. Die Szenarien laufen im eigenen Runner `WissenSichtbarkeitSzenarienTest` (Tag
+  `@wissen-sichtbarkeit`), weil sie Daten direkt per JDBC in beide Schemas schreiben und mit Rollback aufräumen.
+  Das Szenario zur Übersicht legt in `urinet` eine Seite mit dem Pfad `ueberblick` an (Pfad eindeutig,
+  `wissensseite_pfad_uk`); es setzt voraus, dass kein anderer Test dort `ueberblick` committet (Review PR #300, K5). Eine Lese-API für Seiten, Log oder
+  Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
+  bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

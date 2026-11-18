@@ -17,7 +17,7 @@
         <!-- Quarkus 3.40 LTS; 3.40.1.2 ist das aktuelle Patch-Release (CVE-Fixes) -->
         <quarkus.platform.version>3.40.1.2</quarkus.platform.version>
         <quinoa.version>2.9.3</quinoa.version>
-        <quarkus-cucumber.version>1.4.0</quarkus-cucumber.version>
+        <quarkus-cucumber.version>1.5.0</quarkus-cucumber.version>
         <archunit.version>1.5.1</archunit.version>
         <assertj.version>3.27.7</assertj.version>
         <pdfbox.version>3.0.8</pdfbox.version>
@@ -25,17 +25,18 @@
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.1</surefire-plugin.version>
         <spotbugs-plugin.version>4.10.5.0</spotbugs-plugin.version>
-        <build-helper-plugin.version>3.7.0</build-helper-plugin.version>
+        <build-helper-plugin.version>3.8.0</build-helper-plugin.version>
         <!-- 3.x braucht Jackson 3 (tools.jackson) neben dem Jackson 2 von Quarkus; nur der Schema-Prüfer nutzt es (Jackson3Baum).
              Jackson 3 kommt nur transitiv über diese Bibliothek (Version bestimmt sie, Dependabot hebt es nicht selbst):
              Sicherheitsmeldungen zu tools.jackson betreffen darum dieses Update (Review PR #83, Kann 3). -->
         <json-schema-validator.version>3.0.9</json-schema-validator.version>
         <tika.version>4.2.0</tika.version>
         <commons-csv.version>1.14.1</commons-csv.version>
+        <commonmark.version>0.32.0</commonmark.version>
         <icu4j.version>79.1</icu4j.version>
         <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11): dieselbe Version wie im Golden-Lauf (spikes/golden-lauf) -->
         <zxing.version>3.5.4</zxing.version>
-        <wiremock.version>3.13.0</wiremock.version>
+        <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
     </properties>
 
@@ -67,7 +68,19 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>33.7.2-jre</version>
+                <version>33.8.0-jre</version>
+            </dependency>
+            <!-- Tika bringt commonmark samt GFM-Erweiterungen in einer älteren Version mit; alle commonmark-Artefakte
+                 laufen auf derselben Version wie Parser und Fussnoten der Wissensbasis (Review PR #298, Soll 5). -->
+            <dependency>
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark-ext-gfm-tables</artifactId>
+                <version>${commonmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark-ext-gfm-strikethrough</artifactId>
+                <version>${commonmark.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -154,6 +167,16 @@
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
             <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-footnotes</artifactId>
+            <version>${commonmark.version}</version>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.amazonservices</groupId>

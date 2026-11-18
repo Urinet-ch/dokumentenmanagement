@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 public class LiquibaseMandantDatenbank implements MandantDatenbank {
 
     static final String CHANGELOG = "db/mandant/changelog.xml";
+    static final String REGELN_SEED = "db/mandant/seed/regel-urinet.sql";
     // Namen gehen als Bezeichner in SQL ein; nur dieses Muster ist erlaubt
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final Pattern ROLLE = Pattern.compile("^[a-z_][a-z0-9_]*$");
@@ -40,7 +41,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
      * ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
      */
     static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
+            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version", "wissensseite_version",
+            "wissensseite_version_dokument", "wissens_log");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;
@@ -110,29 +112,57 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
     public void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten) {
         pruefen(schema);
         String sql = "insert into " + schema + ".dokumentart (code, name, gruppen, pflichtfelder, zusatz_schema, "
-                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung) "
-                + "values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?) on conflict (code) do nothing";
+                + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung, "
+                + "selbst_ausgestellt, belegnummer_muster, fremdbeleg_art, ohne_zahlungsdaten_art, ki_vorschlag, "
+                + "ki_felder, ki_hinweise, reihenfolge, aufbewahrung_feld) values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, "
+                + "?, null, null, ?, ?, ?, ?, ?) on conflict (code) do nothing returning code";
+        String referenzenAktualisieren = "update " + schema
+                + ".dokumentart set fremdbeleg_art = ?, ohne_zahlungsdaten_art = ? where code = ?";
         try (Connection verbindung = eigentuemer.oeffnen(); PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
-            verbindung.setAutoCommit(true);
-            for (DokumentartVorlage art : arten) {
-                einfuegen.setString(1, art.code());
-                einfuegen.setString(2, art.name());
-                einfuegen.setArray(3, verbindung.createArrayOf("text", art.gruppen().toArray()));
-                einfuegen.setArray(4, verbindung.createArrayOf("text", art.pflichtfelder().toArray()));
-                einfuegen.setString(5, art.zusatzSchemaJson());
-                einfuegen.setString(6, art.vertraulichkeit());
-                if (art.aufbewahrungJahre() == null) {
-                    einfuegen.setNull(7, Types.INTEGER);
-                } else {
-                    einfuegen.setInt(7, art.aufbewahrungJahre());
+            verbindung.setAutoCommit(false);
+            try (PreparedStatement referenzen = verbindung.prepareStatement(referenzenAktualisieren)) {
+                for (DokumentartVorlage art : arten) {
+                    einfuegen.setString(1, art.code());
+                    einfuegen.setString(2, art.name());
+                    einfuegen.setArray(3, verbindung.createArrayOf("text", art.gruppen().toArray()));
+                    einfuegen.setArray(4, verbindung.createArrayOf("text", art.pflichtfelder().toArray()));
+                    einfuegen.setString(5, art.zusatzSchemaJson());
+                    einfuegen.setString(6, art.vertraulichkeit());
+                    if (art.aufbewahrungJahre() == null) {
+                        einfuegen.setNull(7, Types.INTEGER);
+                    } else {
+                        einfuegen.setInt(7, art.aufbewahrungJahre());
+                    }
+                    einfuegen.setString(8, art.aufbewahrungAb());
+                    einfuegen.setBoolean(9, art.gesetzlichePflicht());
+                    einfuegen.setBoolean(10, art.aktiv());
+                    einfuegen.setString(11, art.beschreibung());
+                    einfuegen.setBoolean(12, art.selbstAusgestellt());
+                    einfuegen.setArray(13, verbindung.createArrayOf("text", art.belegnummerMuster().toArray()));
+                    einfuegen.setBoolean(14, art.kiVorschlag());
+                    einfuegen.setArray(15, verbindung.createArrayOf("text", art.kiFelder().toArray()));
+                    einfuegen.setString(16, art.kiHinweise());
+                    einfuegen.setInt(17, art.reihenfolge());
+                    einfuegen.setString(18, art.aufbewahrungFeld());
+                    try (ResultSet eingefuegt = einfuegen.executeQuery()) {
+                        if (eingefuegt.next()) {
+                            referenzen.setString(1, art.fremdbelegArt());
+                            referenzen.setString(2, art.ohneZahlungsdatenArt());
+                            referenzen.setString(3, art.code());
+                            referenzen.addBatch();
+                        }
+                    }
                 }
-                einfuegen.setString(8, art.aufbewahrungAb());
-                einfuegen.setBoolean(9, art.gesetzlichePflicht());
-                einfuegen.setBoolean(10, art.aktiv());
-                einfuegen.setString(11, art.beschreibung());
-                einfuegen.addBatch();
+                referenzen.executeBatch();
+            } catch (SQLException e) {
+                try {
+                    verbindung.rollback();
+                } catch (SQLException rollbackFehler) {
+                    e.addSuppressed(rollbackFehler);
+                }
+                throw e;
             }
-            einfuegen.executeBatch();
+            verbindung.commit();
         } catch (SQLException e) {
             throw new IllegalStateException("Dokumentarten für " + schema + " nicht eingespielt", e);
         }
@@ -166,11 +196,31 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                             'vertraulichkeit', a.vertraulichkeit,
                             'aufbewahrung', jsonb_build_object(
                                 'jahre', a.aufbewahrung_jahre,
-                                'ab', a.aufbewahrung_ab),
+                                'ab', a.aufbewahrung_ab)
+                                || jsonb_strip_nulls(jsonb_build_object('feld', a.aufbewahrung_feld)),
                             'gesetzlichePflicht', a.gesetzliche_pflicht,
-                            'aktiv', a.aktiv)
+                            'aktiv', a.aktiv,
+                            'selbstAusgestellt', a.selbst_ausgestellt,
+                            'belegnummerMuster', to_jsonb(coalesce(a.belegnummer_muster, '{}'::text[])),
+                            'fremdbelegArt', a.fremdbeleg_art,
+                            'ohneZahlungsdatenArt', a.ohne_zahlungsdaten_art,
+                            'kiVorschlag', a.ki_vorschlag,
+                            'kiFelder', to_jsonb(coalesce(a.ki_felder, '{}'::text[])),
+                            'kiHinweise', a.ki_hinweise,
+                            'reihenfolge', a.reihenfolge)
                             order by a.code collate "C")
-                        from dokumentart a), '[]'::jsonb)
+                        from dokumentart a), '[]'::jsonb),
+                    'regeln', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'code', r.code,
+                            'art', r.art,
+                            'typ', r.typ,
+                            'parameter', r.parameter,
+                            'schwere', r.schwere,
+                            'meldung', r.meldung,
+                            'aktiv', r.aktiv)
+                            order by r.code collate "C")
+                        from regel r), '[]'::jsonb)
                 ) as inhalt
                 from naechste n, (select current_schema() as schema_name) s
                 left join public.mandant m on m.schema_name = s.schema_name
@@ -182,6 +232,31 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
             where (inhalt - 'version') is distinct from (
                 select inhalt - 'version' from konfiguration_version order by version desc limit 1)
             """;
+
+    @Override
+    public void regelnEinspielen(String schema) {
+        pruefen(schema);
+        String sql;
+        try (java.io.InputStream ein = LiquibaseMandantDatenbank.class.getClassLoader().getResourceAsStream(REGELN_SEED)) {
+            if (ein == null) {
+                throw new IllegalStateException("Seed der Regeln fehlt: " + REGELN_SEED);
+            }
+            sql = new String(ein.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Seed der Regeln nicht lesbar", e);
+        }
+        try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+            verbindung.setAutoCommit(true);
+            befehl.execute("set search_path to " + schema);
+            try {
+                befehl.execute(sql);
+            } finally {
+                befehl.execute("reset search_path");
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Regeln für " + schema + " nicht eingespielt", e);
+        }
+    }
 
     @Override
     public void konfigurationSeedAnlegen(String schema) {

@@ -285,11 +285,103 @@ flowchart LR
   - Test-Aufbau: `TestChatAgent` (`@Mock`) delegiert im Verhalten `ECHT` an den echten Adapter; `KiWireMock` liefert gestreamte Antworten (`chatFolge`, `chatFehler`, `chatVerzoegert`, `chatAnfragen` für das Request-Journal). `agent.feature` prüft über `POST /api/v1/chat` mit zwei Mandanten und den Rollen `inhaber`, `mitarbeiter`, `treuhaender` (Szenarien siehe Datei). Mit 7.1b (`kennzahl`, `offene_posten`, im Merge dieses PR) prüft das Szenario `@req-3.2`, dass die Zahl aus `kennzahl` unverändert in der Antwort steht und das Werkzeugergebnis (Datenstand) die Quelle ist; die Liste der angebotenen Werkzeuge hängt vom Mandanten ab (`Funktionen.finanzVerfuegbar()`). `WerkzeugeNurLesendTest` führt dafür auch `Funktionen.finanzVerfuegbar` in der Liste der lesenden Ports.
 - Umsetzung (Aufgabe 7.1c, 14.11.2026, PR #161; `vollstaendigkeit` mit Übergangsquelle, E2):
   - Port: `Lueckenbericht.erstellen(mandant, geschaeftsjahr, sicht)` (`ki.application.chat`) liefert `Bericht{geschaeftsjahr, kategorien[], belege}`; `Kategorie{regel: FOLGE|ERWARTET, art, je?: MONAT, belege, ohneZuordnung?, reihenGesamt, reihen[≤50]}`, `Reihe{gruppe?, ab?, hoechste?, vorhanden, anzahlFehlend, fehlend[≤100]}`. Das ist die Form von `FOLGE` (fehlende Nummern) und `ERWARTET` (Zeiträume ohne Dokument) aus Spec 05, design.md «Regeltypen»; Spec 05, Aufgabe 17.6 tauscht nur den Adapter `KonfigurierteLuecken` (`ki.adapter.out.chat`) aus. Reine Logik in `ki.domain.chat.Nummernfolge` und `Monatsluecken`; die Abfragen liegen als `belegnummern`, `monate`, `belege` im Port `WerkzeugDaten` (Adapter `PanacheWerkzeugDaten`, mit Sichtfilter, nur `ARCHIVIERT` mit `bestaetigt`).
+  - Abgelöst durch Spec 05, Aufgabe 17.6 (PR #304): Die Schlüssel `archiv.mandant.<code>.luecken.*` sind entfernt; die Regeln stehen als `FOLGE` und `ERWARTET` in der Konfiguration des Mandanten (Spec 05 design.md «Regeltypen», Seed für `urinet`), der Port `Lueckenbericht` und das Werkzeug bleiben. Der folgende Punkt beschreibt den Übergang bis dahin.
   - Konfiguration je Mandant (Übergang, keine Art-Codes im Java), Schlüssel `archiv.mandant.<code>.luecken.`: `folge` (`ART:Muster`, Strichpunkt als Trenner, Muster mit der Gruppe `nr` und optional `jahr`), `erwartet-monatlich` (`ART:BELEGDATUM` oder `ART:zusatz.<feld>`), `gruppe` (`ART:PARTNER` oder `ART:zusatz.<feld>`), `nur-monat` (`ART:zusatz.<feld>`, Format `JJJJ-MM`). Für `urinet`: `AUSGANGSRECHNUNG` mit `^(?<jahr>\d{4})-(?<nr>\d{3})$`; `LOHNABRECHNUNG` (Bezug `BELEGDATUM`, je `zusatz.person`, nur `zusatz.periode` `JJJJ-MM`) und `BANK` (Bezug `zusatz.periode_bis`, je Partner). Ungültige Einträge brechen mit einer Meldung ohne Wert ab; ein Mandant ohne Einträge hat keine Kategorien, und die Antwort sagt das ausdrücklich (`hinweis`), statt Vollständigkeit zu behaupten.
   - Semantik: `FOLGE` zählt die Belegnummern (`dokument_finanz.belegnummer`) des Geschäftsjahres, die ganz auf das Muster passen und dessen `jahr` dem Geschäftsjahr entspricht (Altbestand ausserhalb des Musters wird ignoriert), und meldet die fehlenden `nr` von 1 bis zur höchsten, in der Form der vorhandenen (`2026-003`). `ERWARTET` meldet die Monate ohne Dokument vom ersten Monat mit einem Dokument der Reihe (aus allen Jahren) bis zum letzten abgeschlossenen Monat (Zeitzone Europa/Zürich), begrenzt auf die ganzen Monate des Geschäftsjahres (nach Geschäftsjahresende des Mandanten); vor dem ersten Beleg nie eine Lücke. Reihen mit den meisten Lücken stehen zuerst.
   - Werkzeug: `vollstaendigkeit(geschaeftsjahr)` (2000 bis nächstes Kalenderjahr, sonst `ungültiger Parameter: geschaeftsjahr`) antwortet `{geschaeftsjahr, kategorien, nichtGeprueft: ["Lieferantenbelege ohne Archivdokument: nur mit AbaNinja"], datenstand: {zeitpunkt, anzahl}, hinweis?}`; `datenstand.anzahl` sind alle bestätigten Belege der in den Regeln genannten Arten unter der Sicht. `WerkzeugAuswahl.angeboten` nimmt es auf, wenn `vollstaendigkeitErlaubt(sicht)` (A3 und A4 uneingeschränkt, aus `Sichtregel`, keine Rollennamen); `VollstaendigkeitAbfrage` prüft dasselbe nochmals. Ein nicht angebotenes Werkzeug antwortet `{"fehler":"Werkzeug nicht verfügbar"}`.
   - Auslegungen: Mehrere Personen bzw. Konten: `LOHNABRECHNUNG` je Person getrennt (`zusatz.person`), `BANK` je Partner getrennt; ein Beleg ohne Wert im Gruppierungsfeld begründet und schliesst keine Lücke und wird als `ohneZuordnung` gezählt. Mehrere Konten bei derselben Bank sind damit eine Reihe (ein Auszug eines Kontos deckt den Monat), bis Spec 05 ein Kontofeld kennt. Bei Geschäftsjahresende ≠ 31.12. folgt `FOLGE` weiter dem Jahr in der Nummer; Nummern anderer Jahre zählen nicht, nichts wird dazuerfunden. Gruppiert wird nach einem stabilen Schlüssel, nicht nach dem Anzeigenamen (`Monatszeile.schluessel`: Kontakt-ID, sonst der normalisierte Name `lower(btrim(...))`, bei `zusatz.<feld>` der normalisierte Wert); Namens- und Schreibvarianten desselben Partners oder derselben Person ergeben eine Reihe, angezeigt wird bei Varianten der alphabetisch kleinste Name. Hat ein Geschäftsjahr bei `ERWARTET` keine ganzen Monate, trägt `Kategorie.hinweis` den Grund und die Kategorie ist nicht geprüft (keine leere Reihe als «vollständig» lesen). Bei `FOLGE` richtet sich die Ziffernbreite der Nummer nach dem Minimum der vorhandenen Nummern.
   - Tests: JUnit `NummernfolgeTest`, `MonatslueckenTest`, `KonfigurierteLueckenTest`, `VollstaendigkeitAbfrageTest`, `WerkzeugAuswahlTest` (Regel aus der Rechtematrix); Szenarien `vollstaendigkeit.feature` (`@req-3.6`, `@req-4.2`, `@req-5.2`; zwei Mandanten, `inhaber`, `treuhaender`, `geschaeftsstelle`, `mitarbeiter`).
+
+### Entwurf O.3 MCP-Server (C3) – entfällt, Notiz
+
+**Status:** **O.3 und Requirement 14 entfallen (Entscheid Fabian 18.11.2026)**; der Abschnitt bleibt nur als Notiz für
+den Fall eines zugelassenen Modell- oder MCP-Clients und ist kein aktiver Plan. Frühere Fassung: Entwurf, ungeprüft und
+nicht freigegeben; der Abschnitt war eine Entscheidungsvorlage, nichts davon ist implementiert oder für den Betrieb
+freigegeben. Entscheide 1 und 3 sind am 17.11.2026 gefallen; die Folge von Entscheid 1 für Requirement 14
+(Requirement 14.11) ist am 18.11.2026 entschieden: O.3 und Requirement 14 entfallen wie O.1/O.2. Sätze mit «soll»,
+«Empfehlung» oder «Testplan» beschreiben den früheren Entwurf, keine Aufgabe.
+
+#### Grenze und Transport
+
+Der MCP-Adapter soll nur die bestehenden lesenden Chat-Werkzeuge anbieten. Er soll `ArchivAgent` nicht als
+MCP-Proxy aufrufen: Das würde Fragen und Werkzeugergebnisse an ein Modell weiterreichen und könnte eine fremde
+Modellverarbeitung ermöglichen. Stattdessen soll der Adapter die bestehenden Anwendungsfälle und
+`WerkzeugAuswahl.angeboten(kontext)` wiederverwenden. Eine zweite Abfrage- oder Berechtigungslogik, freies SQL und
+schreibende Werkzeuge sind ausgeschlossen.
+
+**Empfehlung:** Streamable HTTP als Adapter in der bestehenden API, über HTTPS und ohne separaten Listener oder
+zusätzlichen Host. So kann der Adapter dieselbe geprüfte Identität, `MandantKontext`, `WerkzeugKontext`,
+Sichtregel und kurzen lesenden Transaktionen wie der Chat verwenden. Eine lokale `stdio`-Brücke wäre nur ein
+zusätzlicher Client, müsste die Werkzeuge über neue REST-Endpunkte nachbilden und hätte keinen Zugriff auf die
+Anwendungskontexte; sie ist für die erste Umsetzung nicht empfohlen. Transport und genaue MCP-Protokollversion
+bleiben Entscheid von Fabian.
+
+#### Identität, Token und Rechte
+
+Ein Token muss genau einer Person und einem Mandanten zugeordnet sein. Die Serveridentität stammt ausschliesslich
+aus der verifizierten Tokenbindung; MCP-Parameter dürfen weder Person noch Mandant überschreiben. Die vorhandenen
+API-Tokens `generator` und `import` sind mandantengebunden und nicht gleichwertig mit einem persönlichen
+MCP-Token; sie werden nicht wiederverwendet.
+
+**Empfehlung:** eigener Scope `mcp`, Tokengeheimnis nur einmal ausgeben und gehasht speichern, Ablaufdatum und
+Widerruf unterstützen, Aktivität bei jedem Aufruf prüfen. A14 gewährt heute nur dem `inhaber` die Tokenverwaltung.
+Entschieden von Fabian am 17.11.2026 (Entscheid 3): Ausgabe und Widerruf nur durch den `inhaber` über A14;
+Tokenidentität ist die Zielperson; Selbstverwaltung nur nach separatem Entscheid.
+Ein widerrufenes Token muss beim nächsten Aufruf abgelehnt werden; der genaue Token- und Sitzungsmechanismus ist
+vor der Umsetzung zu entscheiden.
+
+Feste Allowlist, jeweils nur wenn das Werkzeug nach bestehenden Regeln angeboten wird:
+
+| MCP-Werkzeug | Freigabe und Begrenzung |
+| --- | --- |
+| `dokumente_suchen`, `dokument_zeigen`, `fristen` | Gemäss Spec 02, Requirement 3 und der Sichtregel der Person; keine Dateinamen, `dokument_zeigen` höchstens 4'000 Zeichen |
+| `kennzahl`, `offene_posten` | Nur bei verfügbaren Finanzfunktionen des Mandanten und mit denselben Rollen- und Sichtprüfungen wie im Chat |
+| `vollstaendigkeit` | Nur für Rollen, die A3 und A4 uneingeschränkt sehen, wie `WerkzeugAuswahl` es für den Chat vorsieht |
+| `wissen_index`, `wissen_seite_zeigen` | Nur gemäss Spec 04, Requirement 8 und deren Rechteprüfung |
+
+Nicht freigegeben sind Upload, Bestätigen, Ändern, Verwerfen, Verwaltung, Export, Tokenverwaltung, beliebige
+Werkzeugnamen, SQL und andere Funktionen, die in dieser Tabelle nicht stehen. Die Allowlist wird serverseitig
+festgelegt; der MCP-Client oder ein Modell darf sie nicht erweitern. Jedes Werkzeug prüft die Berechtigung erneut.
+Unsichtbare Dokumente bleiben nicht unterscheidbar von nicht vorhandenen (404). Antworten verwenden ausschliesslich
+die bestehenden Werkzeugverträge; Dateinamen, lokale Pfade, Objekt- oder S3-Schlüssel und zusätzliche
+Personendaten werden nicht ergänzt.
+
+#### Grenzen, Protokoll und Bedrohungen
+
+Das bestehende Limit aus Requirement 5.5 (100 Chat-Fragen pro Stunde je Benutzer) gilt nicht automatisch für
+direkte MCP-Werkzeugaufrufe. O.3 braucht ein eigenes Limit je Token und zusätzlich je Benutzer; Überschreitungen
+liefern 429 `ZU_VIELE_ANFRAGEN` mit `Retry-After`, ohne das Werkzeug auszuführen. Startwerte und Burst-Grenze sind
+offen. **Empfehlung:** die bestehende Grenze von 100 Aufrufen pro Stunde je Benutzer als Obergrenze übernehmen und
+zusätzlich einen niedrigeren konfigurierbaren Spitzenwert je Token festlegen.
+
+Jeder authentifizierte Werkzeugaufruf wird append-only in `zugriff_protokoll` erfasst: Zeit, Mandant, Benutzer-
+(Token als `token:<id>`, Benutzerverzeichnis nach Req 10.10), Werkzeug, Berechtigungs-/Ergebnisstatus (verweigert: `VERWEIGERT`) und die ID gelieferter Dokumente oder Wissensseiten. Der Eintrag entsteht synchron in derselben Transaktion vor der Lieferung, bei Fehler gibt es kein Ergebnis (fail-closed). `dokument_zeigen` schreibt wie E4 `ANZEIGEN` mit Dokument-ID, IP und `details` `{"kanal":"MCP"}`. Frage, Antwort, Dokumenttext, übrige Parameterwerte und
+Tokengeheimnis gehören weder ins Zugriffsprotokoll noch in Anwendungslogs. Die Aufbewahrung folgt Spec 01,
+Requirement 10.9; eine zweite Gesprächshistorie wird nicht angelegt.
+
+| Bedrohung | Vorgeschlagene Kontrolle | Restrisiko / Entscheid |
+| --- | --- | --- |
+| Prompt-Injection im Dokumenttext | Dokumenttext ist nicht vertrauenswürdige Ausgabe. Feste Allowlist, nur lesende Werkzeuge, keine Modell-Anweisungen aus Dokumenten und Berechtigungsprüfung bei jedem Aufruf. | Ein Client-Modell kann Text fehlinterpretieren; serverseitig bleiben Rechte und Lesbarkeit begrenzt. |
+| Gestohlenes Token | Enger Scope `mcp`, Benutzerbindung, Hash statt Geheimnis, Ablauf, sofortiger Widerruf, keine Ausgabe in Logs/URLs, TLS und Limits je Token. | Gültige Token erlauben bis zum Widerruf alle für die Person freigegebenen MCP-Lesezugriffe. |
+| Datenabfluss an fremdes Modell | Der MCP-Server ruft selbst kein Modell auf. Tool-Antworten dürfen nur an ein gemäss `tech.md` zugelassenes Modell fliessen. | Der Server kann nicht kontrollieren, wohin ein externer MCP-Client seine Antworten weiterleitet. Nutzung mit Cloud-Claude oder einem anderen fremden Modell wäre mit der Datenregel unvereinbar; vor Produktivfreigabe braucht es einen manuellen Nachweis. |
+| Mandanten- oder Rechteumgehung | Identität aus verifiziertem Token; kein Mandant-/Benutzerparameter; dieselben `WerkzeugAuswahl`-, Sicht- und Fachprüfungen wie im Chat. | Tests müssen je zwei Mandanten und alle betroffenen Rollen einschliessen. |
+
+#### Betrieb, Tests und Aufwand
+
+- **Lokal:** Entwicklung und Protokolltests nur mit synthetischen Testdaten; das Profil `lokal` ist kein Produktionsnachweis.
+- **Stufe A:** höchstens Funktionstest mit synthetischen Testdaten (anonymisierte Echtdaten nur mit Nachweis durch Fabian, `tech.md`) und Test-Tokens; keine echten Belege oder Personendaten.
+- **Stufe B:** frühestens nach Entscheiden, Datenschutz-/Modellfluss-Nachweis und Freigabe durch Fabian. Wenn kein datenschutzkonformer MCP-Client feststeht, bleibt O.3 deaktiviert.
+- **Testplan:** Protokoll-Handshake und Fehlerformate; gültiges, ungültiges, abgelaufenes und widerrufenes Token; Tokenbindung an Benutzer und Mandant; Allowlist je Rolle und Mandantenfunktion; A2–A4, 404 und zwei Mandanten; keine schreibenden Aktionen; Grenzen und `Retry-After`; append-only Protokoll ohne Inhalte oder Geheimnisse; synthetisches Dokument mit Prompt-Injection-Anweisung; Nachweis, dass der Server keine Modellanfrage auslöst. Für freigegebene Kriterien kommen Szenarien mit `@spec-02`/`@req-14.x` und JUnit-Tests nach den Konventionen von `tech.md` hinzu.
+- **Schätzung:** vorläufig 5–8 Personentage: Authentifizierung und Tokenbindung 1–2, Adapter und Werkzeug-Allowlist 2–3, Grenzen/Protokollierung 1, Integrationstests und Sicherheitsnachweis 1–2. Nicht enthalten sind ein Entscheid zu Fremdmodellnutzung, neue Rechte oder ein zusätzlicher Deploy-Client.
+
+#### Entscheide für Fabian (mit Empfehlung, Stand 17.11.2026)
+
+1. **Darf Claude Inhalte echter Archivdokumente erhalten?** Empfehlung: keine Weitergabe an Claude-/andere Cloud-Modelle; O.3 nur mit einem nach `tech.md` zugelassenen Modell freigeben. Falls C3 zwingend Cloud-Claude meint, nicht produktiv umsetzen. **Entschieden von Fabian am 17.11.2026:** Antwort «nein» – keine Weitergabe von Archivinhalten an Claude oder andere Cloud-Modelle. **Folge entschieden von Fabian am 18.11.2026:** Requirement 14 und O.3 entfallen (Requirement 14.11, Ast «nein»); der Ast der Empfehlung «O.3 mit einem nach `tech.md` zugelassenen Modell weiterführen» ist nicht gewählt. Eine Umsetzung bräuchte einen neuen Entscheid und eine neue Aufgabe.
+2. **Transport und Betriebsort?** Empfehlung: Streamable HTTP im bestehenden API-Adapter; lokal und Stufe A nur mit synthetischen Daten, Produktivbetrieb frühestens auf Stufe B.
+3. **Wer stellt persönliche MCP-Tokens aus und widerruft sie?** Empfehlung: für den ersten Entwurf nur der `inhaber` über A14; Tokenidentität bleibt die Zielperson. Selbstverwaltung erst nach separatem Entscheid zu Rechten und Oberfläche. **Entschieden von Fabian am 17.11.2026: Empfehlung übernommen.** Ausgabe und Widerruf nur durch den `inhaber` über A14; Tokenidentität bleibt die Zielperson; Selbstverwaltung nur nach separatem Entscheid. Folge: Die `geschaeftsstelle` im Mandanten `vhf-gsk` kann keine MCP-Tokens ausstellen (heute 403; A14 nach Spec 01, Requirement 2, Fussnote ¹); eine spätere Erweiterung von A14 für sie gälte nicht für MCP-Tokens, dafür bräuchte es einen eigenen Entscheid. Eine Rechteerweiterung ist damit nicht verbunden.
+4. **Welche Tokenlaufzeit und Limits?** Empfehlung: begrenzte Laufzeit, sofortige Widerrufswirkung, höchstens 100 Werkzeugaufrufe je Benutzer und Stunde plus ein tieferer Spitzenwert je Token; genaue Werte vor Implementierung messen und festlegen. Das Limit zählt je Werkzeugaufruf (nicht je Frage) und getrennt vom Chat-Limit nach Requirement 5.5, damit MCP den Chat nicht sperrt.
+5. **Ist ein zusätzlicher gemeinsamer OIDC-Client nötig?** Empfehlung: keine Mandanten-Clients; falls OAuth für den MCP-Transport nötig ist, nur ein gemeinsamer Client nach gesonderter Konfiguration und Prüfung.
+6. **Protokollwert für MCP:** `kanal` `MCP` in `details` von `ANZEIGEN` oder Erweiterung von `zugriff_protokoll_aktion_ck`? Empfehlung: nur `kanal`, keine neue Aktion.
 
 ### Jahresexport (`export`)
 - `POST /api/v1/exporte {geschaeftsjahr}` → Auftrag `EXPORT_JAHR` → ZIP stromweise (`ZipOutputStream`) nach S3 `exporte/<id>.zip` (ohne Sperre, Lebenszyklus 7 Tage) → `GET /api/v1/exporte/{id}` liefert vorsignierte URL (24 h).

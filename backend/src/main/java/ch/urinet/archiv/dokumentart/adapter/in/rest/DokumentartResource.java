@@ -1,10 +1,10 @@
 package ch.urinet.archiv.dokumentart.adapter.in.rest;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben.Feld;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;
@@ -70,7 +70,14 @@ public class DokumentartResource {
             Map.entry("zusatzSchema", Feld.ZUSATZ_SCHEMA), Map.entry("vertraulichkeit", Feld.VERTRAULICHKEIT),
             Map.entry("aufbewahrungJahre", Feld.AUFBEWAHRUNG_JAHRE),
             Map.entry("aufbewahrungAb", Feld.AUFBEWAHRUNG_AB),
-            Map.entry("gesetzlichePflicht", Feld.GESETZLICHE_PFLICHT), Map.entry("aktiv", Feld.AKTIV));
+            Map.entry("aufbewahrungFeld", Feld.AUFBEWAHRUNG_FELD),
+            Map.entry("gesetzlichePflicht", Feld.GESETZLICHE_PFLICHT), Map.entry("aktiv", Feld.AKTIV),
+            Map.entry("selbstAusgestellt", Feld.SELBST_AUSGESTELLT),
+            Map.entry("belegnummerMuster", Feld.BELEGNUMMER_MUSTER),
+            Map.entry("fremdbelegArt", Feld.FREMDBELEG_ART),
+            Map.entry("ohneZahlungsdatenArt", Feld.OHNE_ZAHLUNGSDATEN_ART),
+            Map.entry("kiVorschlag", Feld.KI_VORSCHLAG), Map.entry("kiFelder", Feld.KI_FELDER),
+            Map.entry("kiHinweise", Feld.KI_HINWEISE), Map.entry("reihenfolge", Feld.REIHENFOLGE));
 
     private final DokumentartVerwaltung verwaltung;
     private final MandantAufloesung aufloesung;
@@ -100,10 +107,21 @@ public class DokumentartResource {
             @Schema(required = true, enumeration = {"NORMAL", "INTERN", "PERSONAL"}) String vertraulichkeit,
             @Schema(nullable = true, minimum = "1", maximum = "100", description = "null = unbefristet")
             Integer aufbewahrungJahre,
-            @Schema(nullable = true, enumeration = {"GESCHAEFTSJAHR", "GUELTIG_BIS"})
+            @Schema(nullable = true, enumeration = {"GESCHAEFTSJAHR", "GUELTIG_BIS", "BELEGDATUM", "FELD"})
             String aufbewahrungAb,
+            @Schema(nullable = true, description = "Pflichtiges Zusatzfeld vom Typ string mit format date; nur bei FELD")
+            String aufbewahrungFeld,
             @Schema(required = true) boolean gesetzlichePflicht,
-            @Schema(required = true) boolean aktiv) {
+            @Schema(required = true) boolean aktiv,
+            @Schema(required = true) boolean selbstAusgestellt,
+            @Schema(required = true, description = "JDK-reguläre Ausdrücke; höchstens 20 Muster mit je 1'000 Zeichen")
+            List<String> belegnummerMuster,
+            @Schema(nullable = true) String fremdbelegArt,
+            @Schema(nullable = true) String ohneZahlungsdatenArt,
+            @Schema(required = true) boolean kiVorschlag,
+            @Schema(required = true) List<String> kiFelder,
+            @Schema(nullable = true, maxLength = Dokumentart.BESCHREIBUNG_MAX) String kiHinweise,
+            @Schema(required = true) int reihenfolge) {
     }
 
     @Schema(name = "DokumentartAenderung",
@@ -116,9 +134,14 @@ public class DokumentartResource {
             @Schema(type = SchemaType.OBJECT) JsonNode zusatzSchema,
             @Schema(enumeration = {"NORMAL", "INTERN", "PERSONAL"}) String vertraulichkeit,
             @Schema(nullable = true, minimum = "1", maximum = "100") Integer aufbewahrungJahre,
-            @Schema(nullable = true, enumeration = {"GESCHAEFTSJAHR", "GUELTIG_BIS"})
+            @Schema(nullable = true, enumeration = {"GESCHAEFTSJAHR", "GUELTIG_BIS", "BELEGDATUM", "FELD"})
             String aufbewahrungAb,
+            @Schema(nullable = true) String aufbewahrungFeld,
             Boolean gesetzlichePflicht, Boolean aktiv,
+            Boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
+            String ohneZahlungsdatenArt, Boolean kiVorschlag, List<String> kiFelder,
+            @Schema(nullable = true, maxLength = Dokumentart.BESCHREIBUNG_MAX) String kiHinweise,
+            Integer reihenfolge,
             @Schema(nullable = true, maxLength = GRUND_MAX, description = "Änderungsgrund für das Zugriffsprotokoll")
             String grund) {
     }
@@ -220,8 +243,10 @@ public class DokumentartResource {
         }
         return new DokumentartDto(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
                 schema, art.vertraulichkeit().name(), art.aufbewahrung().jahre(),
-                art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name(), art.gesetzlichePflicht(),
-                art.aktiv());
+                art.aufbewahrung().ab() == null ? null : art.aufbewahrung().ab().name(), art.aufbewahrung().feld(),
+                art.gesetzlichePflicht(),
+                    art.aktiv(), art.selbstAusgestellt(), art.belegnummerMuster(), art.fremdbelegArt(),
+                    art.ohneZahlungsdatenArt(), art.kiVorschlag(), art.kiFelder(), art.kiHinweise(), art.reihenfolge());
     }
 
     private static DokumentartAnfrage anfrage(String text) {
@@ -259,7 +284,14 @@ public class DokumentartResource {
                 wert(body, "aufbewahrungJahre", JsonNode::intValue, JsonNode::isInt),
                 text(body, "aufbewahrungAb"),
                 wert(body, "gesetzlichePflicht", JsonNode::booleanValue, JsonNode::isBoolean),
-                wert(body, "aktiv", JsonNode::booleanValue, JsonNode::isBoolean)), grund == null ? null : grund.strip());
+                wert(body, "aktiv", JsonNode::booleanValue, JsonNode::isBoolean),
+                wert(body, "selbstAusgestellt", JsonNode::booleanValue, JsonNode::isBoolean),
+                liste(body, "belegnummerMuster"), text(body, "fremdbelegArt"),
+                text(body, "ohneZahlungsdatenArt"),
+                wert(body, "kiVorschlag", JsonNode::booleanValue, JsonNode::isBoolean),
+                liste(body, "kiFelder"), text(body, "kiHinweise"),
+                wert(body, "reihenfolge", JsonNode::intValue, JsonNode::isInt),
+                text(body, "aufbewahrungFeld")), grund == null ? null : grund.strip());
     }
 
     private String wer() {

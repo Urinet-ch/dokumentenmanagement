@@ -119,6 +119,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | --- | --- | --- | --- |
 | GET | `/klassifikationen` | aktive und inaktive Klassifikationen und Werte mit `aktiv` (Req 7.2) | alle Rollen |
 | POST, PATCH, DELETE | `/klassifikationen[/{code}]`, `/klassifikationen/{code}/werte[/{wert}]` | anlegen, ändern, deaktivieren, löschen; 409 `KONFIGURATION_IN_GEBRAUCH`, 422 `KONFIGURATION_UNGUELTIG`, 412, 428 | A11 |
+| GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET, POST, PATCH, DELETE | `/regeln[/{code}]` | Regeln pflegen; POST/PATCH melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
@@ -215,15 +216,50 @@ Beispiel (nur das Format; die Werte für `vhf-gsk` legt Spec 03 fest):
 | `PFLICHT_WENN` | `wenn: {feld, gleich}`, `dann: [feld…]` | Hat `wenn.feld` den Wert `gleich` (bei Klassifikationen: enthält), müssen alle `dann`-Felder gesetzt sein | Bestätigen, Generator, Import, Änderung |
 | `EINDEUTIG` | `felder: [feld…]`, optional `ueberAlleArten` | Kein zweites bestätigtes Dokument mit gleichen Werten in allen Feldern (Req 5.1) | wie oben |
 | `FOLGE` | `feld` (ganzzahlig) oder `muster: true` (Gruppe `nr` des Belegnummer-Musters), `zeitraum`: `GESCHAEFTSJAHR`, `{feld}` (ganzzahliges Jahresfeld) oder `GESAMT`, `beginn` (Standard 1) | Fehlende Nummern zwischen `beginn` und dem Höchstwert je Zeitraum | Lückenbericht |
-| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art) | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art | Lückenbericht |
+| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art), `nurMonat`: `zusatz.<feld>` im Format `JJJJ-MM`, optional `gruppe` (nur `je: MONAT`): `PARTNER` oder `zusatz.<feld>` | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art (bei `gruppe` je Gruppe) | Lückenbericht |
 
 Grundmenge von `FOLGE` und `ERWARTET` sind die bestätigten Dokumente; der Bericht im Importlauf nach Spec 03, 4.2
 zählt serverseitig zusätzlich die Dokumente dieses Laufs im Eingangskorb.
+Die `FOLGE`-Auswertung verarbeitet insgesamt höchstens 10'000 Belegnummern pro Bericht und prüft je Regel innerhalb
+von `archiv.dokumentart.muster-zeitgrenze`; Belegnummern über 64 Zeichen gelten als ausserhalb des Musters. Bei
+überschrittener Grenze bricht das Werkzeug ab, statt einen unvollständigen Bericht als vollständig auszugeben.
+
+`nurMonat` schliesst Dokumente aus, deren Zusatzfeld nicht dem Format `JJJJ-MM` entspricht. Ohne `gruppe` gibt es eine
+Monatsreihe je Dokumentart; mit `gruppe` eine Reihe je Partner bzw. je Wert des Zusatzfelds (Gross-/Kleinschreibung und
+Leerzeichen am Rand gleich), jede ab ihrem ersten Dokument, wie in Spec 02 design.md (Aufgabe 7.1c) für den Übergang
+festgelegt (Umsetzung 17.6, Nachbesserung Review PR #304: ohne `gruppe` gingen Lücken einer Person oder eines Kontos
+unter, sobald eine andere den Monat abdeckte). Den Bericht sehen nur Rollen, die A3 und A4 voll sehen (Req 5.4).
+`ab` setzt den Beginn auch dann, wenn schon frühere Dokumente vorliegen. `je: JAHR` ordnet die Dokumente nach dem Tag
+des Bezugs dem Geschäftsjahr zu (Geschäftsjahresende der Einstellungen) und prüft nur abgeschlossene Geschäftsjahre.
 
 Für `urinet` schreibt der Seed die Lücken aus Spec 02 design.md (`vollstaendigkeit`) als Regeln: `FOLGE` mit
 `muster: true` auf `AUSGANGSRECHNUNG` (Muster `^(?<jahr>\d{4})-(?<nr>\d{3})$`, Zeitraum `GESCHAEFTSJAHR`) sowie
-`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`) und `BANK` (`datum: zusatz.periode_bis`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
+`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`, `nurMonat: zusatz.periode`,
+`gruppe: zusatz.person`) und `BANK` (`datum: zusatz.periode_bis`, `gruppe: PARTNER`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
 die Tabelle `belegnummer_eigen` (Spec 01, 8.9), jetzt über `selbst_ausgestellt`.
+
+Umsetzung 17.6 (Nachbesserung Review PR #304):
+- Grundmenge von `EINDEUTIG`: Dokumente mit `bestaetigt` im Status `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER` oder
+  `ARCHIVIERT`, dazu Generator-Dokumente (`quelle = GENERATOR`) schon in `NEU`, `VERARBEITUNG` und `FEHLER`. Der
+  Generator setzt `bestaetigt` bei der Annahme, archiviert aber erst im Worker; ohne diese Erweiterung kämen zwei
+  gleiche Aufrufe vor dem Worker beide durch (auch «Wiederholen» kann ein Dokument in `FEHLER` noch archivieren).
+  Die Erweiterung geht über die Statusliste in Req 5.1 hinaus (im PR unter «Offen für Fabian»).
+- Schreibpfade (Bestätigen, Ändern, Generator, Drive-Import) nehmen je Mandant, Art, Feldern und Werten eine
+  Advisory-Sperre der Transaktion, damit zwei gleichzeitige Vorgänge nicht beide durchkommen. Der Lesepfad
+  (Warnungen im Eingangskorb und in der Einzelansicht) prüft ohne Sperre und lädt die Regeln einmal je Seite.
+- Vor der Prüfung setzt das Archiv dieselben Standardwerte wie beim Speichern (Vertraulichkeit der Art, Währung `CHF`
+  bei Finanzarten), damit `PFLICHT_WENN` auf diese Felder nicht am fehlenden Wert scheitert.
+- `PFLICHT_WENN` vergleicht Zahlen nach Wert (`1` = `1.0`); ein leeres `dann` ist ungültig. Mehrfachwerte (`tags`,
+  Klassifikationen) werden nach Codepoints sortiert verglichen, wie `collate "C"` in der Datenbank.
+- Eine `EINDEUTIG`-Warnung im Lesepfad zeigt ohne ID und Werte, dass ein weiteres bestätigtes Dokument mit gleichen
+  Werten existiert, auch wenn der Leser es nicht sieht. Das ist bewusst so und entspricht dem Schreibpfad (HTTP 422
+  nennt dieselbe Tatsache) und Spec 01, 2.3 bei `BELEGNUMMER_BEKANNT`; Req 5.2 verlangt nur, keine IDs und Werte zu
+  nennen.
+- `FOLGE` mit `muster: true` nimmt das erste Belegnummer-Muster der Art mit einer Gruppe `nr`.
+- Rollback auf das Vorgänger-Release: Es kennt `regeln` in der Konfigurationsversion nicht und schreibt bei einer
+  Konfigurationsänderung eine Version ohne Regeln. Nach dem erneuten Wechsel gelten die Regeln erst wieder mit der
+  nächsten Konfigurationsänderung (das Abbild liest sie aus der Tabelle `regel`, die erhalten bleibt); es gehen keine
+  Daten verloren, und die Seed-Regeln von `urinet` haben nur Schwere `WARNUNG`.
 
 ## Data Models (neu, `db/mandant`)
 Changeset-Nummern: die nächste freie Nummer in `db/mandant/changesets/` zum Zeitpunkt der Aufgabe; unten nur die
@@ -298,9 +334,83 @@ ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderun
 Die Module `dokumentart` und `konfiguration` hängen über ihre `application`-Schichten gegenseitig voneinander ab
 (bewusste Ausnahme bis 17.3, danach über einen Port für das Arten-Abbild aufzulösen).
 
+Umsetzung 17.3: Changeset 040 ergänzt die Dokumentart-Spalten und übernimmt bei bestehenden `urinet`-Arten die
+Ausstellerliste, Nummern-Muster und Umstufungsziele in das Konfigurationsabbild mit Quelle `MIGRATION`. Die
+Übergangs-Seeds `dokumentarten.json` enthalten dieselben Spec-05-Attribute, damit neu provisionierte Mandanten bis
+zur Ablösung des Seed-Formats in 17.7 keine abweichenden Standardwerte erhalten. Danach stammen selbst ausgestellte
+Arten ausschliesslich aus `DokumentartRepository`; `public.mandant.eigene_arten` wird nur noch durch Changeset 040
+gelesen. Belegnummer-Muster werden als JDK-RegEx mit höchstens 1'000 Zeichen geprüft; die Auswertungs-Zeitgrenze gilt
+bei der späteren Laufzeitnutzung in 18.1 (dort mit ReDoS-Test, siehe tasks.md). Weitere Grenzen der Prüfung
+(technische Obergrenzen, nicht aus den Anforderungen): höchstens 200 Arten je Konfiguration (`ANZAHL_UNGUELTIG`) und
+höchstens 20 Belegnummer-Muster je Art (`MUSTER_UNGUELTIG`). Das Changeset heisst 040, weil 039 mit
+`039-webseite-erfassung` (PR #253) schon vergeben ist; der Fremdbezug (`fremdbeleg_art`, `ohne_zahlungsdaten_art`)
+wird in `DokumentartVerwaltung` vorab geprüft: unbekannte Zielart 422 `KONFIGURATION_UNGUELTIG`, Löschen einer Art,
+auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder (Req 2.7): Die Prüfung liegt im Port
+`ZusatzSchemaPruefer.reservierteFelderGueltig` und läuft über `DokumentartPruefung` für jeden Pfad, der Arten
+speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
+`veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
+oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder`
+oder `vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig, für jede Art (Req 2.7,
+Entscheid Fabian 18.11.2026, PR #290, Punkt 3); wegen Req 2.9 bindet die Prüfung den Startwert von
+`VORSTANDSPROTOKOLL` im Seed `vhf-gsk` (Aufgabe 10.4, Entscheid Fabian 17.11.2026) nicht an einen Art-Code. Die
+Vorbelegung der Auswahl im Eingangskorb mit dem Standard der Art belegt `eingangskorb-karte.spec.ts` (PR #301).
+
+Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
+Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
+in `Europe/Zurich`, auch beim Jahreswechsel und während der Sommerzeit. Alle taggenauen Bezüge verwenden
+`LocalDate.plusYears`: Der 29. Februar wird im Nicht-Schaltjahr zum 28. Februar (wie bisher bei `GUELTIG_BIS`).
+`Fristbezug` liefert das benannte Zusatzdatum ohne JSON-Abhängigkeit in der Domain. Das Feld steht ohne Präfix
+`zusatz.` in `aufbewahrungFeld` (API) bzw. `aufbewahrung_feld` (Datenbank und Übergangs-Seed); es muss direkt unter
+`properties` als `string` mit `format: date` definiert und in `pflichtfelder` als `zusatz.<feld>` enthalten sein.
+Schema- und Seed-Prüfung nutzen dafür denselben Port `ZusatzSchemaPruefer`; `Konfiguration.pruefen` prüft die
+fachliche Pflichtfeld-Zuordnung.
+
+Fehlend, `null` oder leer bedeutet bei vorhandenen Dokumenten unbefristet, nicht ein Ersatzdatum. Der Eingangskorb
+und die Dokumentantwort führen dann `FRISTBEZUG_FEHLT` ohne Dokumentverweis, auch nach Bestätigung oder einem
+Artwechsel; andere Pflichtfelder bleiben unverändert verpflichtend. Der Generator verlangt bei neuen Dokumenten
+weiter sämtliche Pflichtfelder. Ungültige, nicht leere Datumswerte ergeben `ZUSATZ_UNGUELTIG`, keinen stillen
+Rückfall. Ein Wechsel der Art darf das Fristfeld leer lassen; das Entfernen eines bereits vorhandenen Pflichtwerts
+derselben Art bleibt nach Spec 01, 8.3 verboten. Eine Änderung des Zusatzdatums löst dieselbe Neuberechnung wie das
+Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als Konflikt protokollieren, ohne beides
+übernehmen. Änderungen anderer Zusatzfelder lösen keine Fristneuberechnung aus. Die bestehende Sperrpflege bleibt
+unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
+und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
+
+Umsetzung 17.5 (Review PR #289): `klassifikationenUngueltig` bedeutet in Eingangskorb und Einzelabruf dasselbe: die
+Klassifikationen, an denen die nächste Speicherung nach der gültigen Version scheitern würde (Req 1.7). Unbestätigt
+gilt die Prüfung der Bestätigung (inaktive, gelöschte, der Art nicht zugeordnete Werte, mehrere Werte bei einer
+einfachen Klassifikation); fehlende Pflicht-Werte zählen nicht, sie kommen mit der Bestätigung. Bestätigt gilt die
+Prüfung der Änderung (behaltene inaktive Werte erlaubt, fehlende Pflicht-Werte zählen). Das Protokoll nennt bei Name,
+Beschreibung und Standardwert von Klassifikationen alten und neuen Wert im Klartext wie bei Arten (Req 1.3); Werte
+an Dokumenten stehen nie darin. Eine Zuordnung zu einer unbekannten Art ergibt 404 `NICHT_GEFUNDEN`. Namen von
+Klassifikationen und Werten enthalten keine Steuerzeichen, Beschreibungen nur Zeilenumbruch und Tabulator.
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.
+Datensparsame Ausnahme bei `einstellungen.kennungen.uid` und `.ibans` (Req 1.3, geändert 18.11.2026, vorgeschlagen
+in PR #290, entschieden mit dessen Merge): Diese Änderungen enthalten nur `{pfad, aenderung: "geändert"}`, keine alten
+oder neuen Werte. Grund ist die Datensparsamkeit: Die Kennungen stehen vollständig im unveränderlichen
+Konfigurationsabbild und müssen im Zugriffsprotokoll nicht vervielfältigt werden (Spec 01, 16.7 regelt Datenstandort
+und CI-Logs, nicht dieses Protokoll, und trägt die Ausnahme nicht). Die Regel steht an einer Stelle:
+`Konfiguration.Aenderung.ohneWerte()` (alle Pfade unter `einstellungen.kennungen.`), der Adapter
+`ZugriffKonfigurationAenderungsProtokoll` gibt das Merkmal an `ProtokollDetails.Aenderung` weiter, das die Werte vor
+jeder Serialisierung entfernt; die Protokoll-Domain kennt keine Konfigurationspfade. `toString()` von
+`Konfiguration.Aenderung` und `Konfiguration.Kennungen` gibt UID und IBANs nicht aus. Andere Elemente behalten die
+bisherige Form mit `alt` und `neu`.
+Altzeilen: Protokollzeilen `KONFIGURATION_AENDERN` aus der Zeit vor PR #290 können UID und IBAN im Klartext als
+`alt`/`neu` enthalten (bisher nur Stufe A mit Testdaten). Das Zugriffsprotokoll ist nur anfügend (Append-only,
+Aufbewahrung nach Spec 01, 10.9), darum bleiben sie unverändert (kein UPDATE). Ob sie bereinigt werden, ist offen
+für Fabian (PR #290). Das unveränderliche Konfigurationsabbild enthält die vollständigen Einstellungen weiterhin; dort
+lässt sich die Änderung mit der protokollierten Version nachvollziehen.
+
+Nachweise der Nachverfolgung: `KonfigurationMigrationTest` migriert zwei getrennte synthetische Mandantenschemas
+mit allen echten Changesets bis 036, legt Bestand an und führt erst dann 037 aus. Dokumente, Fassungen und
+Einstellungen bleiben erhalten, ihre Version verweist auf das mit gültigem SHA-256 lesbare Migrationsabbild.
+Der Dokumentarten-Seed ist bereits eine JDBC-Transaktion einschliesslich des nachgelagerten Referenz-Batches;
+`DokumentartSeedIdempotenzTest` belegt jetzt Abbruch nach der ersten Art sowie Abbruch im Referenz-Batch, vollständigen
+Rollback, erfolgreiche Wiederholung und Unverändertheit eines zweiten Mandanten. Keine Änderung alter Changesets
+und keine zusätzliche Transaktionslogik für einen bereits atomaren Schritt.
 
 ## Error Handling (neue Codes)
 | Status | Code | Wann |

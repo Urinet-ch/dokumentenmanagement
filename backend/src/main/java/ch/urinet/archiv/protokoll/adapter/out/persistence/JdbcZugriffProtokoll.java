@@ -148,8 +148,12 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             for (ProtokollDetails.Aenderung aenderung : konfiguration.aenderungen()) {
                 ObjectNode eintrag = aenderungen.addObject();
                 eintrag.put("pfad", aenderung.pfad());
-                eintrag.put("alt", aenderung.alt());
-                eintrag.put("neu", aenderung.neu());
+                if (aenderung.ohneWerte()) {
+                    eintrag.put("aenderung", "geändert");
+                } else {
+                    eintrag.put("alt", aenderung.alt());
+                    eintrag.put("neu", aenderung.neu());
+                }
             }
         }
         try {
@@ -174,6 +178,9 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
     private static void regel(ObjectNode knoten, ProtokollDetails.Regel regel) {
         knoten.put("aufbewahrungJahre", regel.aufbewahrungJahre());
         knoten.put("aufbewahrungAb", regel.aufbewahrungAb());
+        if (regel.aufbewahrungFeld() != null) {
+            knoten.put("aufbewahrungFeld", regel.aufbewahrungFeld());
+        }
         knoten.put("gesetzlichePflicht", regel.gesetzlichePflicht());
     }
 }

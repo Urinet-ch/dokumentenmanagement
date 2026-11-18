@@ -47,9 +47,38 @@ public class DokumentartEintrag extends PanacheEntityBase {
     @Column(name = "aufbewahrung_ab")
     public String aufbewahrungAb;
 
+    @Column(name = "aufbewahrung_feld")
+    public String aufbewahrungFeld;
+
     @Column(name = "gesetzliche_pflicht", nullable = false)
     public boolean gesetzlichePflicht;
 
     @Column(name = "aktiv", nullable = false)
     public boolean aktiv;
+
+    @Column(name = "selbst_ausgestellt", nullable = false)
+    public boolean selbstAusgestellt;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "belegnummer_muster", nullable = false, columnDefinition = "text[]")
+    public String[] belegnummerMuster;
+
+    @Column(name = "fremdbeleg_art")
+    public String fremdbelegArt;
+
+    @Column(name = "ohne_zahlungsdaten_art")
+    public String ohneZahlungsdatenArt;
+
+    @Column(name = "ki_vorschlag", nullable = false)
+    public boolean kiVorschlag;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "ki_felder", nullable = false, columnDefinition = "text[]")
+    public String[] kiFelder;
+
+    @Column(name = "ki_hinweise")
+    public String kiHinweise;
+
+    @Column(name = "reihenfolge", nullable = false)
+    public int reihenfolge;
 }

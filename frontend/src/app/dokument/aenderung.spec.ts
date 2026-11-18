@@ -20,6 +20,11 @@ const ART = (teil: Partial<Dokumentart> = {}): Dokumentart => ({
   vertraulichkeit: 'NORMAL',
   gesetzlichePflicht: true,
   aktiv: true,
+  selbstAusgestellt: true,
+  belegnummerMuster: [],
+  kiVorschlag: true,
+  kiFelder: [],
+  reihenfolge: 0,
   ...teil,
 });
 
@@ -42,6 +47,8 @@ const DOKUMENT = (teil: Partial<Dokument> = {}): Dokument => ({
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
   ...teil,
 });
 

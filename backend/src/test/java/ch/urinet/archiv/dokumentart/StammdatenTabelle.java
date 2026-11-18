@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 
 /**
  * Stammdaten-Tabelle der Dokumentarten in design.md (Req 9.2, P6) und ihr Gegenstück im Seed. Felder mit {@code _} am
- * Anfang fallen weg, {@code zusatz_schema} steht nur im Seed; jedes andere Seed-Feld ohne Spalte macht den Vergleich rot.
+ * Anfang fallen weg, {@code zusatz_schema} und Spec-05-Attribute stehen nur im Seed; sonstige Felder ohne Spalte machen
+ * den Vergleich rot. Die Spec-05-Werte werden separat geprüft.
  */
 final class StammdatenTabelle {
 
@@ -30,7 +31,9 @@ final class StammdatenTabelle {
     private static final Pattern CODE = Pattern.compile("^`([A-Z_]+)`$");
     private static final String LEER = "–";
     private static final Set<String> SEED_FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder", "zusatz_schema",
-            "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv");
+            "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht", "aktiv",
+            "selbst_ausgestellt", "belegnummer_muster", "fremdbeleg_art", "ohne_zahlungsdaten_art", "ki_vorschlag",
+            "ki_felder", "ki_hinweise", "reihenfolge");
 
     /**
      * Eine Zeile der Tabelle; {@code jahre} und {@code ab} sind {@code null} bei «unbefristet» bzw. «–»,
