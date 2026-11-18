@@ -69,15 +69,17 @@ public final class WissensMarkdown {
         if (maxZeichen < 1) {
             throw new IllegalArgumentException("Die maximale Markdown-Laenge muss positiv sein.");
         }
-        String text = markdown == null ? "" : markdown;
-        if (zeichen(text) > maxZeichen || zeichen(text) > MAX_EINGABE_ZEICHEN) {
+        String roh = markdown == null ? "" : markdown;
+        if (zeichen(roh) > maxZeichen || zeichen(roh) > MAX_EINGABE_ZEICHEN) {
             return Analyse.abgelehnt(true, false);
         }
+        // CommonMark wertet auch ein einzelnes \r als Zeilenende; Vorprüfung und Parser sehen dieselbe Fassung.
+        String text = roh.replace("\r\n", "\n").replace('\r', '\n');
         if (tiefeUeberschritten(text)) {
             return Analyse.abgelehnt(false, true);
         }
 
-        int zeilen = zeilen(text);
+        int laenge = text.length();
         Node dokument = PARSER.parse(text + fussnotenDefinitionen(text));
         Set<String> links = new TreeSet<>();
         Set<String> fussnoten = new TreeSet<>();
@@ -97,11 +99,11 @@ public final class WissensMarkdown {
                 ueberschriften.push(ueberschrift.getLevel());
                 abschnittstitel.push(titel);
                 abschnitte.add(titel);
-                untersuchen(kind, false, false, false, false, zeilen, links, fussnoten, aussagen, merkmale);
+                untersuchen(kind, false, false, false, laenge, links, fussnoten, aussagen, merkmale);
             } else {
                 boolean ausgenommen = abschnittstitel.stream()
                         .anyMatch(WissensMarkdown::abschnittOhneBeleg);
-                untersuchen(kind, false, false, false, ausgenommen, zeilen, links, fussnoten, aussagen, merkmale);
+                untersuchen(kind, false, false, ausgenommen, laenge, links, fussnoten, aussagen, merkmale);
             }
         }
         if (merkmale.zuTief) {
@@ -141,25 +143,15 @@ public final class WissensMarkdown {
         return definitionen.toString();
     }
 
-    private static int zeilen(String text) {
-        int zeilen = 1;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') {
-                zeilen++;
-            }
-        }
-        return zeilen;
+    private static boolean ergaenzt(Node definition, int laenge) {
+        return !definition.getSourceSpans().isEmpty() && definition.getSourceSpans().get(0).getInputIndex() >= laenge;
     }
 
-    private static boolean ergaenzt(Node definition, int zeilen) {
-        return !definition.getSourceSpans().isEmpty() && definition.getSourceSpans().get(0).getLineIndex() >= zeilen;
-    }
-
-    private static void untersuchen(Node wurzel, boolean inListenpunkt, boolean widerspruch,
-                                   boolean inFussnote, boolean aussagenAusgenommen, int zeilen, Set<String> links,
+    private static void untersuchen(Node wurzel, boolean widerspruch,
+                                   boolean inFussnote, boolean aussagenAusgenommen, int laenge, Set<String> links,
                                    Set<String> fussnoten, List<Aussage> aussagen, Merkmale merkmale) {
         Deque<Besuch> offen = new ArrayDeque<>();
-        offen.push(new Besuch(wurzel, 0, inListenpunkt, widerspruch, inFussnote, aussagenAusgenommen));
+        offen.push(new Besuch(wurzel, 0, widerspruch, inFussnote, aussagenAusgenommen));
         while (!offen.isEmpty()) {
             Besuch besuch = offen.pop();
             Node node = besuch.node();
@@ -172,7 +164,6 @@ public final class WissensMarkdown {
                     || node instanceof BlockQuote blockQuote && widerspruchsblock(blockQuote);
             boolean fussnotenDefinition = besuch.inFussnote()
                     || node instanceof FootnoteDefinition;
-            boolean listenpunkt = besuch.inListenpunkt() || node instanceof ListItem;
 
             if (node instanceof HtmlInline || node instanceof HtmlBlock) {
                 merkmale.html = true;
@@ -192,7 +183,7 @@ public final class WissensMarkdown {
                 fussnoten.add(reference.getLabel());
             }
             if (node instanceof FootnoteDefinition definition) {
-                if (ergaenzt(definition, zeilen)) {
+                if (ergaenzt(definition, laenge)) {
                     definition.appendChild(absatz(definition.getLabel()));
                 } else {
                     merkmale.eigeneDefinitionen.add(definition);
@@ -202,18 +193,21 @@ public final class WissensMarkdown {
                 merkmale.wikilink = true;
             }
             if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
-                    && node instanceof Paragraph paragraph && !listenpunkt) {
+                    && node instanceof Paragraph paragraph && !ersterAbsatzImListenpunkt(paragraph)) {
                 aussagen.add(new Aussage(text(paragraph), fussnotenIn(paragraph)));
             } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
                     && node instanceof ListItem item) {
-                aussagen.add(new Aussage(text(item), fussnotenIn(item)));
-            } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition && !listenpunkt
+                // Der Listenpunkt ist mit seinem ersten Absatz belegt; weitere Absätze zählen einzeln.
+                Node erster = item.getFirstChild();
+                aussagen.add(new Aussage(text(item),
+                        fussnotenIn(erster instanceof Paragraph ? erster : item)));
+            } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
                     && (node instanceof FencedCodeBlock || node instanceof IndentedCodeBlock)) {
                 aussagen.add(new Aussage(codeText(node), Set.of()));
             }
 
             for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
-                offen.push(new Besuch(kind, besuch.tiefe() + 1, listenpunkt, blockZitat, fussnotenDefinition,
+                offen.push(new Besuch(kind, besuch.tiefe() + 1, blockZitat, fussnotenDefinition,
                         besuch.aussagenAusgenommen()));
             }
         }
@@ -236,6 +230,10 @@ public final class WissensMarkdown {
             }
         }
         return Collections.unmodifiableSet(schluessel);
+    }
+
+    private static boolean ersterAbsatzImListenpunkt(Paragraph absatz) {
+        return absatz.getParent() instanceof ListItem && absatz.getPrevious() == null;
     }
 
     private static Paragraph absatz(String label) {
@@ -465,7 +463,7 @@ public final class WissensMarkdown {
         }
     }
 
-    private record Besuch(Node node, int tiefe, boolean inListenpunkt, boolean widerspruch, boolean inFussnote,
+    private record Besuch(Node node, int tiefe, boolean widerspruch, boolean inFussnote,
                           boolean aussagenAusgenommen) {
     }
 

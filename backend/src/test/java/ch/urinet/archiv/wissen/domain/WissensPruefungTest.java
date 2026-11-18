@@ -246,6 +246,44 @@ class WissensPruefungTest {
     }
 
     @Test
+    void eigeneFussnotenDefinitionWirdBeiJedemZeilenendeGemeldet() {
+        List<Quelleneintrag> quelle = List.of(new Quelleneintrag("q1", DOKUMENT, 1, null, null, null),
+                new Quelleneintrag("q2", DOKUMENT, 1, null, null, null));
+
+        for (String inhalt : List.of(
+                "Fakt.[^q1]\r\r[^q1]: Erfundene Behauptung",
+                "Fakt.[^q1]\r\rMehr.[^q2]\r\r[^q2]: Unbelegt",
+                "Fakt.[^q1]\r\r[^q1]: Erfundene Behauptung\r\r    Noch ein Absatz",
+                "Fakt.[^q1]\r\r[^q2]: Unreferenziert",
+                "Fakt.[^q1]\r\n\r\n[^q1]: Erfundene Behauptung")) {
+            Wissensseite seite = seite("konzepte/frist", Seitentyp.KONZEPT, inhalt, quelle);
+
+            assertThat(codes(pruefen(seite, kontextMitDokument(false))))
+                    .as(inhalt.replace("\r", "\\r"))
+                    .containsExactly(WissensPruefung.Code.FUSSNOTE_DEFINITION);
+        }
+    }
+
+    @Test
+    void weitereAbsaetzeUndCodebloeckeImListenpunktBrauchenEigeneFussnote() {
+        List<Quelleneintrag> quelle = List.of(new Quelleneintrag("q1", DOKUMENT, 1, null, null, null));
+
+        for (String inhalt : List.of(
+                "- Fakt.[^q1]\n\n  Unbelegter zweiter Absatz.",
+                "- Unbelegter erster Absatz.\n\n  Fakt.[^q1]",
+                "- Fakt.[^q1]\n\n  ```\n  Unbelegte Frist\n  ```",
+                "- Fakt.[^q1]\n\n  > Unbelegtes Zitat.")) {
+            Wissensseite seite = seite("konzepte/frist", Seitentyp.KONZEPT, inhalt, quelle);
+
+            assertThat(codes(pruefen(seite, kontextMitDokument(false))))
+                    .as(inhalt).containsExactly(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+        }
+        Wissensseite belegt = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "- Fakt.[^q1]\n\n  Zweiter Fakt.[^q1]\n- Kurz.[^q1]", quelle);
+        assertThat(pruefen(belegt, kontextMitDokument(false)).befunde()).isEmpty();
+    }
+
+    @Test
     void codeblockOhneFussnoteIstUnbelegteAussage() {
         Wissensseite seite = seite("konzepte/frist", Seitentyp.KONZEPT,
                 "Fakt.[^q1]\n\n```\nUnbelegte Behauptung: Frist 1. April\n```",

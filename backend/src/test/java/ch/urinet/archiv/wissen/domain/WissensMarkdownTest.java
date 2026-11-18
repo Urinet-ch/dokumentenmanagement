@@ -78,6 +78,16 @@ class WissensMarkdownTest {
     }
 
     @Test
+    void eigeneFussnotenDefinitionMitWagenruecklaufWirdNichtDargestellt() {
+        WissensMarkdown.Analyse analyse = WissensMarkdown.analysieren(
+                "Aussage.[^q1]\r\r[^q1]: Unbelegte Zusatzbehauptung\r\r    Zweiter Absatz", 20_000);
+
+        assertThat(analyse.fussnotenDefinition()).isTrue();
+        assertThat(analyse.html()).contains("footnote-ref")
+                .doesNotContain("Zusatzbehauptung", "Zweiter Absatz");
+    }
+
+    @Test
     void fussnotenInCodeZaehlenNicht() {
         WissensMarkdown.Analyse analyse = WissensMarkdown.analysieren("Text `[^q1]`", 20_000);
 
@@ -87,7 +97,7 @@ class WissensMarkdownTest {
     }
 
     @Test
-    void codebloeckeAusserhalbVonListenSindAussagen() {
+    void codebloeckeSindAussagen() {
         WissensMarkdown.Analyse analyse = WissensMarkdown.analysieren(
                 "Fakt.[^q1]\n\n```\nUnbelegte Frist\n```\n\n    Eingerueckt unbelegt", 20_000);
 
@@ -103,6 +113,7 @@ class WissensMarkdownTest {
         String einAbsatz = "(".repeat(WissensMarkdown.MAX_VERSCHACHTELUNG + 1) + "Text";
 
         assertThat(WissensMarkdown.analysieren(absaetze, 20_000).zuTief()).isFalse();
+        assertThat(WissensMarkdown.analysieren(absaetze.replace('\n', '\r'), 20_000).zuTief()).isFalse();
         assertThat(WissensMarkdown.analysieren(einAbsatz, 20_000).zuTief()).isTrue();
     }
 

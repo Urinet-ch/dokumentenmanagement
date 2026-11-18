@@ -80,7 +80,9 @@ public final class WissensPruefung {
         }
         if (markdown.aussagen().stream().anyMatch(aussage -> aussage.fussnoten().isEmpty())) {
             befunde.add(new Befund(Code.AUSSAGE_OHNE_BELEG,
-                    "Mindestens ein Absatz, Listenpunkt oder Codeblock hat keine Fussnote."));
+                    "Mindestens ein Absatz oder Listenpunkt hat keine Fussnote; Codeblöcke sind nur in "
+                            + "Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» "
+                            + "zulässig."));
         }
         if (kontext.ingest() && !kontext.veralten()
                 && Collections.disjoint(markdown.fussnoten(), kontext.kernaussagenSchluessel())) {

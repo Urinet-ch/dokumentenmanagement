@@ -108,8 +108,14 @@ flowchart LR
     Quelleneinträgen. Jedes Label mit Verweis zählt, auch neben bekannten Labels und in Widerspruchsblöcken.
     Definitionen im Inhalt selbst sind ein Befund `FUSSNOTE_DEFINITION` und werden nicht dargestellt, damit kein
     unbelegter Text über eine Fussnote in die Seite kommt. Labels werden wie geschrieben verglichen.
-  - Fenced und eingerückte Codeblöcke ausserhalb von Listenpunkten, Widerspruchsblöcken und den ausgenommenen
-    Abschnitten zählen als Aussage; ohne Fussnote gilt `AUSSAGE_OHNE_BELEG`.
+  - Vor Vorprüfung und Parsen werden die Zeilenenden vereinheitlicht (`\r\n` und `\r` → `\n`), weil CommonMark
+    auch ein einzelnes `\r` als Zeilenende wertet; die Grössengrenze gilt für den Inhalt wie gespeichert. Ob eine
+    Definition synthetisch ist, entscheidet ihre Eingabeposition (`SourceSpan.getInputIndex()` hinter dem Inhalt),
+    nicht die Zeilennummer (Nachbesserung Review PR #298, Kopf e819aaa4).
+  - Fenced und eingerückte Codeblöcke ausserhalb von Widerspruchsblöcken und den ausgenommenen Abschnitten zählen
+    als Aussage, auch in Listenpunkten; ohne Fussnote gilt `AUSSAGE_OHNE_BELEG`. Ein Listenpunkt ist mit der
+    Fussnote seines ersten Absatzes belegt; jeder weitere Absatz und Codeblock darin (auch in einem Blockzitat im
+    Listenpunkt) ist eine eigene Aussage (Requirement 2.6: «jeder Absatz und jeder Listenpunkt»).
   - Die Beschreibung ist «ein Satz», wenn kein `!` oder `?` mit Folgetext und kein Punkt mit Leerraum und folgendem
     Grossbuchstaben vorkommt; ausgenommen sind Punkte nach Zahlen, Einzelbuchstaben (z. B. «z. B.») und einer
     festen Liste deutscher Abkürzungen («Art.», «gem.», «Hrn.», «Jan.», …). `BreakIterator` entfällt, weil es
