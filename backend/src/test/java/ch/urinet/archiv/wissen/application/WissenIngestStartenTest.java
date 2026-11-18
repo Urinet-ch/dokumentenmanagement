@@ -10,6 +10,7 @@ import ch.urinet.archiv.wissen.application.WissenIngestPort.NeuerEntwurf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Quelle;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -22,10 +23,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WissenIngestStartenTest {
 
     private static final UUID DOKUMENT_ID = UUID.randomUUID();
+    /** Startwerte aus design.md, «Konfiguration und Aufträge». */
+    private static final WissenKonfiguration STARTWERTE = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
+            20_000, 12_000, 300_000, 1_000_000);
+    /** Wie die Startwerte, aber mit Budgets, unter denen eine kurze Quelle durchgeht (Req 13.4). */
+    private static final WissenKonfiguration GROSSES_BUDGET = new WissenKonfiguration("test-modell", 30_000, 15,
+            60_000, 20_000, 12_000, 1_000_000, 10_000_000);
 
     @Test
     void reihtDenErstenManuellenIngestAlsAuftragEin() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, auftraege)
@@ -33,6 +40,7 @@ class WissenIngestStartenTest {
 
         assertThat(ergebnis.status()).isEqualTo("IN_ARBEIT");
         assertThat(ergebnis.geschaetzteTokens()).isPositive();
+        assertThat(ergebnis.hinweis()).isNull();
         assertThat(speicher.entwurf).satisfies(entwurf -> {
             assertThat(entwurf.erstelltVon()).isEqualTo("benutzer-id");
             assertThat(entwurf.status()).isEqualTo("IN_ARBEIT");
@@ -46,14 +54,14 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void archivierteWissensquelleStartetAutomatisch() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+    void archivierteWissensquelleStartetAutomatischMitSystemakteur() {
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
         starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
 
         assertThat(speicher.entwurf).satisfies(entwurf -> {
-            assertThat(entwurf.erstelltVon()).isEqualTo("system:archivierung");
+            assertThat(entwurf.erstelltVon()).isEqualTo("process:wissen-ingest");
             assertThat(entwurf.status()).isEqualTo("IN_ARBEIT");
         });
         assertThat(auftraege.eingereiht).hasSize(1);
@@ -61,31 +69,42 @@ class WissenIngestStartenTest {
 
     @Test
     void andereDokumentartLoestKeinenAutomatischenIngestAus() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
         starten(speicher, auftraege).archiviert(DOKUMENT_ID, "QUITTUNG");
 
+        assertThat(speicher.geladen).isFalse();
         assertThat(speicher.entwurf).isNull();
         assertThat(auftraege.eingereiht).isEmpty();
     }
 
     @Test
-    void automatischerStartOhneHandlerSpeichertFehlerhinweisStattOffenemAuftrag() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+    void automatischerStartPrueftDieArtAusDerDatenbank() {
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                null, null));
+
+        starten(speicher, new Auftraege(true)).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+
+        assertThat(speicher.entwurf).isNull();
+    }
+
+    @Test
+    void ohneHandlerEntstehtEinFehlerentwurfMitStabilemHinweis() {
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(false);
 
         starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
 
         assertThat(speicher.entwurf.status()).isEqualTo("FEHLER");
-        assertThat(speicher.entwurf.hinweis()).contains("noch nicht verfügbar");
-        assertThat(speicher.hinweis).contains("noch nicht verfügbar");
+        assertThat(speicher.entwurf.schritt()).isNull();
+        assertThat(speicher.entwurf.hinweis()).isEqualTo(WissenIngestStarten.HANDLER_FEHLT);
         assertThat(auftraege.eingereiht).isEmpty();
     }
 
     @Test
     void stelltZweitenIngestAlsWartendZurueck() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         speicher.aktiverIngest = true;
         Auftraege auftraege = new Auftraege(true);
 
@@ -98,22 +117,49 @@ class WissenIngestStartenTest {
     }
 
     @Test
-    void schliesstPersonalquelleOhneAuftragUndMitDokumenthinweisAb() {
-        Speicher speicher = new Speicher(quelle("PERSONAL", 2));
+    void personalquelleWirdOhneAuftragMitGrundImEntwurfAbgeschlossen() {
+        Speicher speicher = new Speicher(quelle("PERSONAL"));
         Auftraege auftraege = new Auftraege(true);
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, auftraege)
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id");
 
         assertThat(ergebnis.status()).isEqualTo("FEHLER");
-        assertThat(ergebnis.hinweis()).contains("Personalunterlagen");
-        assertThat(speicher.hinweis).isEqualTo(ergebnis.hinweis());
+        assertThat(ergebnis.hinweis()).isEqualTo("nicht in die Wissensbasis übernommen – Vertraulichkeit PERSONAL");
+        assertThat(speicher.entwurf.hinweis()).isEqualTo(ergebnis.hinweis());
         assertThat(auftraege.eingereiht).isEmpty();
     }
 
     @Test
+    void seitenzahlOhnePassendeSeitentrennerVerhindertDenIngest() {
+        // zwei Seiten im Volltext, drei im Dokument (Req 5.6)
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 3,
+                true, null, null));
+        Auftraege auftraege = new Auftraege(true);
+
+        WissenIngestStarten.Ergebnis ergebnis = starten(speicher, auftraege)
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id");
+
+        assertThat(ergebnis.status()).isEqualTo("FEHLER");
+        assertThat(ergebnis.hinweis())
+                .isEqualTo("nicht in die Wissensbasis übernommen – keine Seitenangaben möglich");
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
+    void fehlendePdfaVerhindertDenIngest() {
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2,
+                false, null, null));
+
+        WissenIngestStarten.Ergebnis ergebnis = starten(speicher, new Auftraege(true))
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id");
+
+        assertThat(ergebnis.hinweis()).endsWith("keine Seitenangaben möglich");
+    }
+
+    @Test
     void normalisiertEinSeitenendeOhneStartseiteFuerDenEntwurf() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+        Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
         starten(speicher, auftraege).manuell(DOKUMENT_ID, null, 1, "benutzer-id");
@@ -125,7 +171,7 @@ class WissenIngestStartenTest {
 
     @Test
     void lehntUmgekehrtenSeitenbereichAb() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
+        Speicher speicher = new Speicher(quelle("NORMAL"));
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true))
                 .manuell(DOKUMENT_ID, 2, 1, "benutzer-id"))
@@ -135,9 +181,93 @@ class WissenIngestStartenTest {
     }
 
     @Test
+    void unbekannteQuelleIst404() {
+        Speicher speicher = new Speicher(null);
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, null, null, "b"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.NICHT_GEFUNDEN));
+    }
+
+    @Test
+    void statusKonfliktKommtVorFalscherArtUndUngueltigemSeitenbereich() {
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "EINGANGSKORB", "NORMAL", "eins\fzwei\f", 2, true,
+                null, null));
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+    }
+
+    @Test
+    void laufenderIngestKommtVorFalscherArt() {
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                null, null));
+        speicher.laufend = true;
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, null, null, "b"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.STATUS_KONFLIKT));
+    }
+
+    @Test
+    void falscheArtKommtVorUngueltigemSeitenbereich() {
+        Speicher speicher = new Speicher(quelle("QUITTUNG", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                null, null));
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, 2, 1, "b"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.KEINE_WISSENSQUELLE));
+    }
+
+    @Test
+    void automatischerStartUebergehtLaufendenIngestOhneNeuenEntwurf() {
+        Speicher speicher = new Speicher(quelle("NORMAL"));
+        speicher.laufend = true;
+
+        starten(speicher, new Auftraege(true)).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+
+        assertThat(speicher.entwurf).isNull();
+    }
+
+    @Test
+    void schaetzungUeberDemBudgetDerKonfigurationVerhindertDenIngest() {
+        // Mit den Startwerten liegt schon eine kurze Quelle über budget-tokens (design.md, «Zwischenstand 14.1a»)
+        Speicher speicher = new Speicher(quelle("NORMAL"));
+        Auftraege auftraege = new Auftraege(true);
+
+        WissenIngestStarten.Ergebnis ergebnis = new WissenIngestStarten(speicher, STARTWERTE, auftraege)
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id");
+
+        assertThat(ergebnis.status()).isEqualTo("FEHLER");
+        assertThat(ergebnis.geschaetzteTokens()).isGreaterThan(300_000);
+        assertThat(ergebnis.hinweis()).matches("Die Unterlage ist für einen Durchgang zu gross \\(geschätzt "
+                + "\\d{3}'\\d{3} Tokens\\)\\. Bitte einen Seitenbereich wählen\\.");
+        assertThat(speicher.entwurf.hinweis()).isEqualTo(ergebnis.hinweis());
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
+    void budgetDerEinstellungenGehtDerKonfigurationVor() {
+        Speicher hoch = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                1_000_000, null));
+        Speicher tief = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                1_000, null));
+
+        WissenIngestStarten.Ergebnis durch = new WissenIngestStarten(hoch, STARTWERTE, new Auftraege(true))
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id");
+        WissenIngestStarten.Ergebnis zuGross = starten(tief, new Auftraege(true))
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id");
+
+        assertThat(durch.status()).isEqualTo("IN_ARBEIT");
+        assertThat(zuGross.status()).isEqualTo("FEHLER");
+        assertThat(zuGross.hinweis()).contains("zu gross");
+    }
+
+    @Test
     void meldetErschoepftesMonatsbudgetBeimManuellenStartAls429() {
-        Speicher speicher = new Speicher(quelle("NORMAL", 2));
-        speicher.verbrauch = 1_000_000;
+        Speicher speicher = new Speicher(quelle("NORMAL"));
+        speicher.verbrauch = 10_000_000;
 
         assertThatThrownBy(() -> starten(speicher, new Auftraege(true))
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id"))
@@ -146,21 +276,85 @@ class WissenIngestStartenTest {
         assertThat(speicher.entwurf).isNull();
     }
 
-    private static WissenIngestStarten starten(Speicher speicher, Auftraege auftraege) {
-        WissenKonfiguration konfiguration = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
-                20_000, 12_000, 300_000, 1_000_000);
-        return new WissenIngestStarten(speicher, konfiguration, auftraege);
+    @Test
+    void restbudgetUnterDerSchaetzungGiltAlsErschoepft() {
+        Speicher speicher = new Speicher(quelle("NORMAL"));
+        speicher.verbrauch = 10_000_000 - 100_000;
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true))
+                .manuell(DOKUMENT_ID, null, null, "benutzer-id"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
+    }
+
+    private static Quelle quelle(String art, String status, String vertraulichkeit, String volltext, int seiten,
+                                 boolean pdfaVorhanden, Integer budgetTokens, Integer monatsbudgetTokens) {
+        return new Quelle(art, status, vertraulichkeit, true, volltext, seiten, pdfaVorhanden, budgetTokens,
+                monatsbudgetTokens);
     }
 
     private static Quelle quelle(String vertraulichkeit, int seiten) {
-        String volltext = "Seite eins\fSeite zwei";
-        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, true, volltext, seiten, true, null, null);
+        StringBuilder volltext = new StringBuilder();
+        for (int seite = 1; seite <= seiten; seite++) {
+            volltext.append("Seite ").append(seite).append('\f');
+        }
+        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, true, volltext.toString(), seiten,
+                true, null, null);
+    }
+
+    @Test
+    void erschoepftesMonatsbudgetErgibtBeimAutomatischenStartEinenFehlerentwurf() {
+        Speicher speicher = new Speicher(quelle("NORMAL"));
+        speicher.verbrauch = 10_000_000;
+        Auftraege auftraege = new Auftraege(true);
+
+        starten(speicher, auftraege).archiviert(DOKUMENT_ID, "WISSENSQUELLE");
+
+        assertThat(speicher.entwurf.status()).isEqualTo("FEHLER");
+        assertThat(speicher.entwurf.hinweis()).isEqualTo("Budget erschöpft");
+        assertThat(auftraege.eingereiht).isEmpty();
+    }
+
+    @Test
+    void monatsbudgetDerEinstellungenGehtDerKonfigurationVor() {
+        Speicher speicher = new Speicher(quelle("WISSENSQUELLE", "ARCHIVIERT", "NORMAL", "eins\fzwei\f", 2, true,
+                null, 100));
+
+        assertThatThrownBy(() -> starten(speicher, new Auftraege(true)).manuell(DOKUMENT_ID, null, null, "b"))
+                .isInstanceOfSatisfying(FachFehler.class,
+                        fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.BUDGET));
+    }
+
+    @Test
+    void monatsgrenzenFolgenDerZeitzoneZuerich() {
+        // 31.10.2026 23:30 UTC ist in Zürich schon der 1. November (00:30 MEZ)
+        WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.parse("2026-10-31T23:30:00Z"));
+
+        assertThat(monat.von()).isEqualTo(Instant.parse("2026-10-31T23:00:00Z"));
+        assertThat(monat.bis()).isEqualTo(Instant.parse("2026-11-30T23:00:00Z"));
+    }
+
+    @Test
+    void monatsgrenzenBeruecksichtigenDieSommerzeit() {
+        WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.parse("2026-07-15T12:00:00Z"));
+
+        assertThat(monat.von()).isEqualTo(Instant.parse("2026-06-30T22:00:00Z"));
+        assertThat(monat.bis()).isEqualTo(Instant.parse("2026-07-31T22:00:00Z"));
+    }
+
+    private static WissenIngestStarten starten(Speicher speicher, Auftraege auftraege) {
+        return new WissenIngestStarten(speicher, GROSSES_BUDGET, auftraege);
+    }
+
+    private static Quelle quelle(String vertraulichkeit) {
+        return quelle(vertraulichkeit, 2);
     }
 
     private static final class Speicher implements WissenIngestPort {
         private final Quelle quelle;
         private NeuerEntwurf entwurf;
-        private String hinweis;
+        private boolean geladen;
+        private boolean laufend;
         private boolean aktiverIngest;
         private long verbrauch;
 
@@ -170,12 +364,13 @@ class WissenIngestStartenTest {
 
         @Override
         public Optional<Quelle> quelleLaden(UUID dokumentId) {
-            return Optional.of(quelle);
+            geladen = true;
+            return Optional.ofNullable(quelle);
         }
 
         @Override
-        public boolean entwurfFuerDokumentOffen(UUID dokumentId) {
-            return false;
+        public boolean entwurfFuerDokumentLaufend(UUID dokumentId) {
+            return laufend;
         }
 
         @Override
@@ -190,12 +385,7 @@ class WissenIngestStartenTest {
         }
 
         @Override
-        public void dokumentHinweisSetzen(UUID dokumentId, String hinweis) {
-            this.hinweis = hinweis;
-        }
-
-        @Override
-        public long verbrauchImZeitraum(java.time.Instant von, java.time.Instant bis) {
+        public long verbrauchImZeitraum(Instant von, Instant bis) {
             return verbrauch;
         }
 
@@ -259,7 +449,12 @@ class WissenIngestStartenTest {
         }
 
         @Override
-        public Optional<UUID> wartendenAktivieren() {
+        public int handlerFehltNachholen(String hinweis) {
+            return 0;
+        }
+
+        @Override
+        public Optional<UUID> wartendenAktivieren(long monatsbudgetTokens, Instant von, Instant bis) {
             return Optional.empty();
         }
     }

@@ -27,8 +27,6 @@ import java.text.Normalizer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -564,11 +562,9 @@ public class WissenIngestVerarbeiten {
                 return new KiErgebnis(null, tokensEin, tokensAus, true, monatsbudgetErreicht, false);
             }
             int maxAusgabe = (int) Math.min(Integer.MAX_VALUE, frei - eingabeObergrenze);
-            YearMonth monat = YearMonth.now(ZoneOffset.UTC);
-            Instant monatsbeginn = monat.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-            Instant folgemonat = monat.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
             var reservierung = speichern.budgetReservieren(lauf.entwurfId(), frei, budget, monatsbudget,
-                    monatsbeginn, folgemonat);
+                    monat.von(), monat.bis());
             if (!reservierung.reserviert()) {
                 return new KiErgebnis(null, tokensEin, tokensAus, true,
                         reservierung.monatsbudgetErschoepft(), false);

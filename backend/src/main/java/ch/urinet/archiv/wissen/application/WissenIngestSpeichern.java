@@ -16,8 +16,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -87,10 +85,8 @@ public class WissenIngestSpeichern {
             });
         }
         Map<UUID, WissensPruefung.DokumentQuelle> dokumentQuellen = port.dokumentQuellenLaden(quellenDokumente);
-        YearMonth monat = YearMonth.now(ZoneOffset.UTC);
-        Instant von = monat.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant bis = monat.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        long monatsverbrauch = port.verbrauchImZeitraum(von, bis);
+        WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
+        long monatsverbrauch = port.verbrauchImZeitraum(monat.von(), monat.bis());
         return Optional.of(new Stand(daten, graph, seiten, personalDokumente, fassungen, dokumentQuellen,
                 monatsverbrauch, quelleStufe));
     }
@@ -166,7 +162,6 @@ public class WissenIngestSpeichern {
         aenderungen.forEach(port::aenderungAnlegen);
         port.entwurfSchliessen(entwurfId, erwartet, "OFFEN", fortschritt, tokensEin, tokensAus,
                 unvollstaendig, hinweis);
-        wartendenIngestEinreihen(auftrag);
     }
 
     @Transactional
@@ -198,17 +193,33 @@ public class WissenIngestSpeichern {
         wartendenIngestEinreihen(null);
     }
 
+    @Transactional
+    public int handlerFehltNachholen() {
+        int anzahl = port.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT);
+        if (anzahl > 0) {
+            wartendenIngestEinreihen(null);
+        }
+        return anzahl;
+    }
+
+    @Transactional
+    public void wartendenIngestStarten() {
+        wartendenIngestEinreihen(null);
+    }
+
     private void wartendenIngestEinreihen(Auftrag vorgaenger) {
-        port.wartendenAktivieren().ifPresent(id -> {
-            if (!auftraege.offenMit(WissenIngestStarten.TYP, WissenIngestStarten.NUTZLAST_ENTWURF_ID, id)) {
-                Map<String, Object> nutzlast = new LinkedHashMap<>();
-                nutzlast.put(WissenIngestStarten.NUTZLAST_ENTWURF_ID, id);
-                if (vorgaenger != null) {
-                    nutzlast.put(VORGAENGER_ID, vorgaenger.id());
-                }
-                auftraege.einreihen(WissenIngestStarten.TYP, new Nutzlast(nutzlast));
-            }
-        });
+        WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
+        port.wartendenAktivieren(konfiguration.ingest().monatsbudgetTokens(), monat.von(), monat.bis())
+                .ifPresent(id -> {
+                    if (!auftraege.offenMit(WissenIngestStarten.TYP, WissenIngestStarten.NUTZLAST_ENTWURF_ID, id)) {
+                        Map<String, Object> nutzlast = new LinkedHashMap<>();
+                        nutzlast.put(WissenIngestStarten.NUTZLAST_ENTWURF_ID, id);
+                        if (vorgaenger != null) {
+                            nutzlast.put(VORGAENGER_ID, vorgaenger.id());
+                        }
+                        auftraege.einreihen(WissenIngestStarten.TYP, new Nutzlast(nutzlast));
+                    }
+                });
     }
 
     private void folgeauftragEinreihen(Auftrag vorgaenger, UUID entwurfId) {

@@ -211,10 +211,40 @@ flowchart LR
   Schätzung je Schritt mit Ein- und Ausgabe:
   `(Zeichen Text + Index + ueberblick + 2 × max-seiten × seite-max-zeichen + Anzahl Aufrufe × Systemprompt) / 3 × 1.3`
   Tokens. Ein WireMock-Szenario vergleicht die Schätzung mit `wissens_entwurf.tokens_*`.
-- Zwischenstand 14.1a: `WissenIngestStarten` implementiert `DokumentEreignisse` in `wissen/application`, damit der
-  fachbereichsübergreifende Zugriff über `application` läuft. Bis 14.1b einen Handler für `WISSEN_INGEST` bereitstellt,
-  speichert ein automatischer Start einen `FEHLER`-Entwurf samt Hinweis statt eines dauerhaft offenen Auftrags;
-  14.1b ersetzt diesen Zwischenstand durch die Verarbeitung der Teilaufträge.
+- Zwischenstand 14.1a (PR #307, nachgebessert nach Review): `WissenIngestStarten` implementiert `DokumentEreignisse`
+  in `wissen/application`, damit der fachbereichsübergreifende Zugriff über `application` läuft. Umgesetzt sind Start
+  (automatisch nach `ARCHIVIERT`, manuell über A16), Vorprüfung, Schätzung und Budgets; die Teilaufträge folgen in 14.1b.
+  - Ohne Handler für `WISSEN_INGEST` endet ein Start, der alle Prüfungen besteht, als Entwurf `FEHLER` mit dem Hinweis
+    «Die Ingest-Verarbeitung ist noch nicht verfügbar. Die Wissensquelle ist archiviert; der Ingest lässt sich
+    wiederholen.», ohne Auftrag. So entstehen vor 14.1b keine KI-Aufrufe ohne Benutzer. 14.1b holt diese Quellen nach
+    (Ingest-Entwürfe `FEHLER` mit genau diesem Hinweis, ohne neueren Ingest-Entwurf desselben Dokuments) und prüft beim
+    Hochstufen `WARTEND` → `IN_ARBEIT` das Monatsbudget erneut; bis dahin reserviert ein wartender Entwurf nichts.
+  - Prüfreihenfolge (wie «Rechte und Abläufe»): 404 (Dokument fehlt oder ist nach A2–A4 unsichtbar; A16 ist dafür
+    dokumentbezogen wie A2–A10, `ZugangFilter`), 403 (Rolle ohne A16), 409 `STATUS_KONFLIKT` (nicht `ARCHIVIERT`, dann
+    Ingest desselben Dokuments `WARTEND` oder `IN_ARBEIT`; ein `OFFEN`-Entwurf blockiert nicht, 5.10 und 5.13),
+    422 `KEINE_WISSENSQUELLE`, 400 `ANFRAGE_UNGUELTIG` (Seitenbereich ausserhalb `1..seiten` oder umgekehrt; fehlt
+    `seiteVon`, gilt 1), dann Vorprüfung nach 5.6, Monatsbudget, Schätzung. Der automatische Start prüft nur Art
+    `WISSENSQUELLE` und überspringt ein Dokument mit laufendem oder wartendem Ingest ohne Fehler.
+  - Seiten nach `Seitentext.von(volltext, seiten)` wie Suche und Chat: pdftotext schliesst jede Seite mit `\f` ab, ein
+    fehlender Abschluss der letzten Seite ist zulässig; passt die Zahl nicht, ist das Hindernis «keine Seitenangaben
+    möglich». Hindernisse schreiben den Grund nur in `wissens_entwurf.hinweis` (`FEHLER`); `dokument.hinweis` und die
+    Metadaten der Wissensquelle bleiben unverändert (Req 1.4, Regel 2). Angezeigt wird der Grund an der Wissensquelle
+    aus ihrem jüngsten Ingest-Entwurf (Lese-DTO in 14.2, Oberfläche in 14.5).
+  - Schätzung (`WissenIngestSchaetzung`) wörtlich nach der Formel oben: Text = Zeichen des gewählten Seitenbereichs,
+    Index = `index-max-zeichen`, `ueberblick` = `seite-max-zeichen` (nur bei `NORMAL`), `2 × max-seiten ×
+    seite-max-zeichen`, Aufrufe = Abschnitte (an Seitengrenzen gepackt, höchstens `abschnitt-zeichen`) + `max-seiten`
+    + 2 (`PLANUNG`, `QUELLE`). Den Systemprompt baut erst 14.1b; bis dahin steht `werkzeug-max-zeichen` als
+    Platzhalter für seine Länge. Mit den Startwerten ergibt schon eine einseitige `NORMAL`-Quelle mit wenig Text rund 388'000 Tokens, also
+    mehr als `budget-tokens` 300'000: Jede Quelle endet mit dem Hinweis «zu gross», bis Fabian Formel oder Startwert
+    entscheidet (offen im PR #307); `wissens_einstellung.budget_tokens` hat Vorrang vor der Konfiguration.
+  - Monatsbudget im Kalendermonat `Europe/Zurich` (Grenzen als UTC-Zeitpunkte), `wissens_einstellung` vor
+    `archiv.wissen.monatsbudget-tokens`. Streng ausgelegt: Ist der Rest kleiner als die Schätzung, gilt das Budget als
+    erschöpft (manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` «Budget erschöpft»).
+  - Der automatische Start läuft in der Transaktion von `ARCHIVIEREN`; die Art liest `ArchivierungSpeichern` in dieser
+    Transaktion. Scheitert die Vorprüfung technisch (z. B. Zeitgrenze der Verbrauchssumme), rollt die Archivierung
+    zurück und `ARCHIVIEREN` wird nach Spec 01 wiederholt; ein fachliches Hindernis ist dagegen ein Entwurf `FEHLER`.
+  - Systemakteur der Entwürfe aus dem automatischen Start: `process:wissen-ingest` («Akteure»).
+  - Die Zeitgrenze `archiv.auftrag.zeitgrenze.WISSEN_INGEST` stand schon vor 14.1a in `application.properties`.
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:

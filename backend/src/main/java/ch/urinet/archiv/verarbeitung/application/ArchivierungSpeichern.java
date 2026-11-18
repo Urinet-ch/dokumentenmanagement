@@ -37,18 +37,19 @@ public class ArchivierungSpeichern {
     }
 
     /**
-     * Hält die Archivierung fest und reiht in derselben Transaktion {@code EMBEDDING} ein (Spec 02, Req 2.1), sobald es
-     * dafür einen Handler gibt.
+     * Hält die Archivierung fest, meldet sie mit der in dieser Transaktion gelesenen Art an {@link DokumentEreignisse}
+     * (Spec 04, Req 5.1) und reiht in derselben Transaktion {@code EMBEDDING} ein (Spec 02, Req 2.1), sobald es dafür
+     * einen Handler gibt.
      *
      * @return {@code false}, wenn das Dokument nicht mehr in {@code ARCHIVIERUNG} ist (nichts geschrieben)
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean festhalten(Auftrag auftrag, UUID id, String art, List<Archiviert> dateien, LocalDate sperreBis) {
+    public boolean festhalten(Auftrag auftrag, UUID id, List<Archiviert> dateien, LocalDate sperreBis) {
         auftraege.anspruchSichern(auftrag);
         if (!dokumente.festhalten(id, dateien, sperreBis)) {
             return false;
         }
-        ereignisse.archiviert(id, art);
+        ereignisse.archiviert(id, dokumente.laden(id).map(Archivierungsstand::art).orElse(null));
         if (auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)) {
             auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
         }

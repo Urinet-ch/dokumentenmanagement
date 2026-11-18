@@ -94,7 +94,7 @@ public class ArchivierenHandler implements AuftragHandler {
                 stand.fristAbgelaufen());
         try {
             ablageService.archivieren(mandant, zuordnungen.stream().map(Zuordnung::datei).toList(), vorgabe,
-                    archiviert -> festhalten(auftrag, id, stand.art(), zuordnungen, archiviert));
+                    archiviert -> festhalten(auftrag, id, zuordnungen, archiviert));
         } catch (ArchivierungAbgebrochen e) {
             UUID fehlerId = UUID.randomUUID();
             LOG.errorf("Archivierung von Dokument %s abgebrochen: %s (fehler-id=%s)", id, e.grund(), fehlerId);
@@ -128,8 +128,7 @@ public class ArchivierenHandler implements AuftragHandler {
         return sperre.map(i -> i.minusNanos(1).atZone(ZUERICH).toLocalDate());
     }
 
-    private void festhalten(Auftrag auftrag, UUID id, String art, List<Zuordnung> zuordnungen,
-                            ArchiviertesDokument archiviert) {
+    private void festhalten(Auftrag auftrag, UUID id, List<Zuordnung> zuordnungen, ArchiviertesDokument archiviert) {
         List<AbgelegteDatei> dateien = archiviert.dateien();
         if (dateien.size() != zuordnungen.size()) {
             throw new IllegalStateException("Archivierung von " + id + " lieferte " + dateien.size() + " statt "
@@ -145,7 +144,7 @@ public class ArchivierenHandler implements AuftragHandler {
             }
             ergebnis.add(new Archiviert(z.rolle(), z.nr(), d.schluessel(), d.versionId()));
         }
-        if (!speichern.festhalten(auftrag, id, art, ergebnis, sperreBis(archiviert.sperreBis()).orElse(null))) {
+        if (!speichern.festhalten(auftrag, id, ergebnis, sperreBis(archiviert.sperreBis()).orElse(null))) {
             // eingang/ bleibt, damit ein späterer Versuch (Wiederholen) die Dateien noch findet
             throw new IllegalStateException("Dokument " + id + " nicht mehr in ARCHIVIERUNG");
         }

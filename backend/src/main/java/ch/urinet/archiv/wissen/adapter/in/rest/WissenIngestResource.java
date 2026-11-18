@@ -5,7 +5,6 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
 import ch.urinet.archiv.protokoll.domain.ProtokollAktion;
-import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
@@ -28,7 +27,10 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 import java.util.UUID;
 
-/** Manueller Ingest-Start (A16); der Mandant stammt ausschliesslich aus der verifizierten Anmeldung. */
+/**
+ * Manueller Ingest-Start (A16); der Mandant stammt ausschliesslich aus der verifizierten Anmeldung. A16 ist
+ * dokumentbezogen: Der Zugangfilter prüft zuerst die Sichtbarkeit der Quelle (404), dann das Recht (403).
+ */
 @Path("/dokumente/{id}/wissen-ingest")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -36,14 +38,12 @@ public class WissenIngestResource {
 
     private final WissenIngestStarten ingest;
     private final MandantAufloesung aufloesung;
-    private final Berechtigung berechtigung;
     private final SecurityIdentity identitaet;
 
     public WissenIngestResource(WissenIngestStarten ingest, MandantAufloesung aufloesung,
-                                Berechtigung berechtigung, SecurityIdentity identitaet) {
+                                SecurityIdentity identitaet) {
         this.ingest = ingest;
         this.aufloesung = aufloesung;
-        this.berechtigung = berechtigung;
         this.identitaet = identitaet;
     }
 
@@ -62,7 +62,7 @@ public class WissenIngestResource {
 
     @POST
     @ErfordertAktion(Aktion.A16)
-    @RolesAllowed({"inhaber", "geschaeftsstelle"})
+    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Protokolliert(aktion = ProtokollAktion.WISSEN_INGEST)
     @Operation(summary = "Ingest einer Wissensquelle starten",
             description = "Reiht den Ingest einer archivierten Wissensquelle ein. Optional kann ein PDF-Seitenbereich "
@@ -73,13 +73,15 @@ public class WissenIngestResource {
     @APIResponse(responseCode = "202", description = "Ingest eingereiht oder mit Vorprüfungshinweis abgeschlossen",
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(implementation = AuftragDto.class)))
-    @APIResponse(responseCode = "409", description = "Ingest läuft oder wartet bereits für dieses Dokument")
-    @APIResponse(responseCode = "422", description = "Dokument ist keine Wissensquelle oder Seitenbereich ungültig")
+    @APIResponse(responseCode = "400", description = "Seitenbereich ungültig")
+    @APIResponse(responseCode = "403", description = "Rolle darf keinen Ingest starten")
+    @APIResponse(responseCode = "404", description = "Dokument unbekannt oder nicht sichtbar")
+    @APIResponse(responseCode = "409", description = "Dokument nicht archiviert, oder Ingest läuft oder wartet bereits")
+    @APIResponse(responseCode = "422", description = "Dokument ist keine Wissensquelle")
     @APIResponse(responseCode = "429", description = "Monatsbudget der Wissensbasis erschöpft")
     public Response starten(@PathParam("id") UUID id, StartDto angaben) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
-        berechtigung.dokumentAktion(benutzer, Aktion.A16, id);
         WissenIngestStarten.Ergebnis ergebnis = ingest.manuell(id,
                 angaben == null ? null : angaben.seiteVon(),
                 angaben == null ? null : angaben.seiteBis(),

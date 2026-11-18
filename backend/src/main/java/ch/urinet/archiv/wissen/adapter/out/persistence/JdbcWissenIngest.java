@@ -69,13 +69,13 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
-    public boolean entwurfFuerDokumentOffen(UUID dokumentId) {
+    public boolean entwurfFuerDokumentLaufend(UUID dokumentId) {
         zeitgrenze();
         return em().createNativeQuery("""
                         select exists (
                             select 1 from wissens_entwurf
                             where anlass = 'INGEST' and dokument_id = :id
-                                and status in ('WARTEND', 'IN_ARBEIT', 'OFFEN'))""")
+                                and status in ('WARTEND', 'IN_ARBEIT'))""")
                 .setParameter("id", dokumentId).getSingleResult().equals(Boolean.TRUE);
     }
 
@@ -110,18 +110,6 @@ public class JdbcWissenIngest implements WissenIngestPort {
                 .setParameter("erstelltVon", entwurf.erstelltVon())
                 .executeUpdate();
         return entwurf.id();
-    }
-
-    @Override
-    public void dokumentHinweisSetzen(UUID dokumentId, String hinweis) {
-        zeitgrenze();
-        em().createNativeQuery("""
-                        update dokument set hinweis = case
-                            when hinweis is null or hinweis = '' then :hinweis
-                            when position(:hinweis in hinweis) > 0 then hinweis
-                            else hinweis || E'\\n' || :hinweis end
-                        where id = :id and status = 'ARCHIVIERT'""")
-                .setParameter("hinweis", hinweis).setParameter("id", dokumentId).executeUpdate();
     }
 
     @Override
@@ -432,8 +420,38 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
-    public Optional<UUID> wartendenAktivieren() {
+    public int handlerFehltNachholen(String hinweis) {
         zeitgrenze();
+        return em().createNativeQuery("""
+                        update wissens_entwurf alt
+                        set status = 'WARTEND', schritt = 'KERNAUSSAGEN', kernaussagen = null,
+                            ingest_daten = '{}'::jsonb, tokens_ein = 0, tokens_aus = 0,
+                            unvollstaendig = false, hinweis = null, abgeschlossen = null
+                        where alt.anlass = 'INGEST' and alt.status = 'FEHLER' and alt.dokument_id is not null
+                            and alt.hinweis = :hinweis
+                            and not exists (
+                                select 1 from wissens_entwurf neu
+                                where neu.anlass = 'INGEST' and neu.dokument_id = alt.dokument_id
+                                    and (neu.erstellt, neu.id) > (alt.erstellt, alt.id)
+                            )""")
+                .setParameter("hinweis", hinweis)
+                .executeUpdate();
+    }
+
+    @Override
+    public Optional<UUID> wartendenAktivieren(long monatsbudgetTokens, Instant von, Instant bis) {
+        zeitgrenze();
+        em().createNativeQuery("select pg_advisory_xact_lock(hashtextextended(current_schema() "
+                        + "|| ':wissen-ingest-queue', 0))")
+                .getSingleResult();
+        boolean aktiverIngest = em().createNativeQuery("""
+                        select exists (
+                            select 1 from wissens_entwurf
+                            where anlass = 'INGEST' and status in ('IN_ARBEIT', 'OFFEN'))""")
+                .getSingleResult().equals(Boolean.TRUE);
+        if (aktiverIngest) {
+            return Optional.empty();
+        }
         @SuppressWarnings("unchecked")
         List<Object> ids = em().createNativeQuery("""
                         select id from wissens_entwurf
@@ -442,6 +460,34 @@ public class JdbcWissenIngest implements WissenIngestPort {
                         for update skip locked limit 1""")
                 .getResultList();
         if (ids.isEmpty()) {
+            return Optional.empty();
+        }
+        em().createNativeQuery("select pg_advisory_xact_lock(hashtextextended(current_schema() "
+                        + "|| ':wissen-budget', 0))")
+                .getSingleResult();
+        long budget = zahl(em().createNativeQuery("""
+                        select coalesce((select monatsbudget_tokens from wissens_einstellung where id = 1),
+                            :standard)""")
+                .setParameter("standard", monatsbudgetTokens)
+                .getSingleResult());
+        long verbraucht = zahl(em().createNativeQuery("""
+                        select least(coalesce(sum(tokens_ein::numeric + tokens_aus::numeric), 0),
+                            9223372036854775807)::bigint
+                        from ki_verbrauch
+                        where zweck in (%s) and zeit >= :von and zeit < :bis
+                        """.formatted(WISSEN_ZWECKE))
+                .setParameter("von", von).setParameter("bis", bis)
+                .getSingleResult());
+        long reserviert = zahl(em().createNativeQuery("""
+                        select least(coalesce(sum(tokens::numeric), 0), 9223372036854775807)::bigint
+                        from ki_verbrauch_reservierung where ablauf > current_timestamp""")
+                .getSingleResult());
+        if (addiere(verbraucht, reserviert) >= budget) {
+            em().createNativeQuery("""
+                            update wissens_entwurf set status = 'FEHLER', schritt = null,
+                                hinweis = 'Budget erschöpft', abgeschlossen = clock_timestamp()
+                            where anlass = 'INGEST' and status = 'WARTEND'""")
+                    .executeUpdate();
             return Optional.empty();
         }
         UUID id = uuid(ids.getFirst());
