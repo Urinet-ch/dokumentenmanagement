@@ -227,6 +227,29 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(element.querySelector('#d1-betrag')).toBeNull();
   });
 
+  it('belegt die Zugriffsstufe mit dem Standard vorstand der Art vor, nicht mit dem KI-Vorschlag (Spec 05, Req 2.7; Spec 03, Req 3.3)', async () => {
+    const vorstandsArt: Dokumentart = {
+      ...VHF_ART,
+      code: 'PROBE_VORSTAND',
+      name: 'Probe Vorstand',
+      zusatzSchema: {
+        type: 'object',
+        properties: {
+          ...(VHF_ART.zusatzSchema as { properties: Record<string, unknown> }).properties,
+          zugriff: { type: 'string', enum: ['oeffentlich', 'mitglieder', 'vorstand'], default: 'vorstand' },
+        },
+      },
+    };
+    await zeigen(
+      dokument({ art: 'PROBE_VORSTAND', vorschlag: { zugriff: 'mitglieder' } }),
+      'geschaeftsstelle',
+      [vorstandsArt],
+    );
+    await klicken(T.aendern);
+
+    expect(element.querySelector<HTMLSelectElement>('#d1-zusatz-zugriff')?.value).toBe('vorstand');
+  });
+
   it('speichert Zusatzfelder vor der Bestätigung und setzt veroeffentlicht nicht durch die KI', async () => {
     await zeigen(
       dokument({

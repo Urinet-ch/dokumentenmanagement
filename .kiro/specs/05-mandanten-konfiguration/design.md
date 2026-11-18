@@ -314,10 +314,11 @@ auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder 
 `ZusatzSchemaPruefer.reservierteFelderGueltig` und läuft über `DokumentartPruefung` für jeden Pfad, der Arten
 speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
 `veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
-oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
-`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig, für jede Art (Req 2.7, Entscheid
-Fabian 18.11.2026, PR #290, Punkt 3); wegen Req 2.9 bindet die Prüfung den Startwert von `VORSTANDSPROTOKOLL` im Seed
-`vhf-gsk` (Aufgabe 10.4, Entscheid Fabian 17.11.2026) nicht an einen Art-Code.
+oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder`
+oder `vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig, für jede Art (Req 2.7,
+Entscheid Fabian 18.11.2026, PR #290, Punkt 3); wegen Req 2.9 bindet die Prüfung den Startwert von
+`VORSTANDSPROTOKOLL` im Seed `vhf-gsk` (Aufgabe 10.4, Entscheid Fabian 17.11.2026) nicht an einen Art-Code. Die
+Vorbelegung der Auswahl im Eingangskorb mit dem Standard der Art belegt `eingangskorb-karte.spec.ts` (PR #301).
 
 Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
 Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
