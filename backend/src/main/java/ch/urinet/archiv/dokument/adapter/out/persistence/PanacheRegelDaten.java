@@ -1,12 +1,15 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.konfiguration.application.RegelDatenPort;
+import ch.urinet.archiv.konfiguration.application.RegelVerletzungsZaehler;
+import ch.urinet.archiv.konfiguration.domain.Regel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
@@ -16,7 +19,7 @@ import java.util.UUID;
 
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
-public class PanacheRegelDaten implements RegelDatenPort {
+public class PanacheRegelDaten implements RegelDatenPort, RegelVerletzungsZaehler {
 
     private static final Map<String, String> FELDER = Map.ofEntries(
             Map.entry("titel", "to_jsonb(d.titel)"),
@@ -99,6 +102,91 @@ public class PanacheRegelDaten implements RegelDatenPort {
             }
         }
         return (Boolean) abfrage.getSingleResult();
+    }
+
+    @Override
+    public long anzahlBetroffeneDokumente(Regel regel) {
+        Regel.Parameter parameter = regel.typisierteParameter();
+        if (parameter instanceof Regel.PflichtWenn pflicht) {
+            return pflichtVerletzungen(regel, pflicht);
+        }
+        if (parameter instanceof Regel.Eindeutig eindeutig) {
+            return eindeutigVerletzungen(regel, eindeutig);
+        }
+        // FOLGE und ERWARTET melden Lücken, keine Verletzung eines einzelnen Dokuments.
+        return 0;
+    }
+
+    private long pflichtVerletzungen(Regel regel, Regel.PflichtWenn pflicht) {
+        String wenn = ausdruck(pflicht.wennFeld(), 0);
+        List<String> fehlende = new ArrayList<>();
+        for (int i = 0; i < pflicht.dann().size(); i++) {
+            fehlende.add(leer(ausdruck(pflicht.dann().get(i), i + 1)));
+        }
+        String bedingung = "case when jsonb_typeof(" + wenn + ") = 'array' then "
+                + "exists (select 1 from jsonb_array_elements(" + wenn + ") as items(value) "
+                + "where value = cast(:gleich as jsonb)) else " + wenn
+                + " = cast(:gleich as jsonb) end";
+        String sql = "select count(*) " + dokumenteVonRegel(regel)
+                + " and (" + bedingung + ") and (" + String.join(" or ", fehlende) + ")";
+        Query abfrage = entityManager().createNativeQuery(sql)
+                .setParameter("gleich", serialisieren(List.of(pflicht.gleich())));
+        felderBinden(abfrage, pflicht.felder());
+        return ((Number) abfrage.getSingleResult()).longValue();
+    }
+
+    private long eindeutigVerletzungen(Regel regel, Regel.Eindeutig eindeutig) {
+        List<String> ausdruecke = new ArrayList<>(eindeutig.felder().size());
+        List<String> vorhanden = new ArrayList<>(eindeutig.felder().size());
+        for (int i = 0; i < eindeutig.felder().size(); i++) {
+            String ausdruck = ausdruck(eindeutig.felder().get(i), i);
+            ausdruecke.add(ausdruck);
+            vorhanden.add(leer(ausdruck));
+        }
+        String artFilter = regel.art() == null || eindeutig.ueberAlleArten() ? ""
+                : " and d.art = :art";
+        String sql = "select coalesce(sum(anzahl), 0) from (select count(*) as anzahl "
+                + dokumenteVonRegel(regel, artFilter) + " and " + String.join(" and ", vorhanden)
+                + " group by jsonb_build_array(" + String.join(", ", ausdruecke) + ") having count(*) > 1) "
+                + "doppelte";
+        Query abfrage = entityManager().createNativeQuery(sql);
+        felderBinden(abfrage, eindeutig.felder());
+        if (!artFilter.isEmpty()) {
+            abfrage.setParameter("art", regel.art());
+        }
+        return ((Number) abfrage.getSingleResult()).longValue();
+    }
+
+    private static String dokumenteVonRegel(Regel regel) {
+        return dokumenteVonRegel(regel, regel.art() == null ? "" : " and d.art = :art");
+    }
+
+    private static String dokumenteVonRegel(Regel regel, String artFilter) {
+        return """
+                from dokument d
+                left join dokument_finanz f on f.dokument_id = d.id
+                left join dokument_vertrag v on v.dokument_id = d.id
+                where d.bestaetigt is not null
+                and (d.status in ('ARCHIVIERUNG', 'ARCHIVIERUNG_FEHLER', 'ARCHIVIERT')
+                    or d.quelle = 'GENERATOR' and d.status in ('NEU', 'VERARBEITUNG', 'FEHLER'))"""
+                + artFilter;
+    }
+
+    private static String leer(String ausdruck) {
+        return "(" + ausdruck + " is null or " + ausdruck + " = 'null'::jsonb or " + ausdruck
+                + " in ('\"\"'::jsonb, '[]'::jsonb, '{}'::jsonb) or (jsonb_typeof(" + ausdruck
+                + ") = 'string' and " + ausdruck + " #>> '{}' ~ '^[[:space:]]*$'))";
+    }
+
+    private static void felderBinden(Query abfrage, List<String> felder) {
+        for (int i = 0; i < felder.size(); i++) {
+            String feld = felder.get(i);
+            if (feld.startsWith("zusatz.")) {
+                abfrage.setParameter("feld" + i, feld.substring("zusatz.".length()));
+            } else if (feld.startsWith("klassifikation.")) {
+                abfrage.setParameter("feld" + i, feld.substring("klassifikation.".length()));
+            }
+        }
     }
 
     private static String ausdruck(String feld, int index) {
