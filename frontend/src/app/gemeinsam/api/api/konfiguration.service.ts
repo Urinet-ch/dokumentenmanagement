@@ -106,8 +106,8 @@ export class KonfigurationService extends BaseService {
      * @endpoint patch /api/v1/dokumentarten/{art}/klassifikationen/{code}
      * @param art 
      * @param code 
-     * @param body
-     * @param ifMatch
+     * @param body 
+     * @param ifMatch 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -245,7 +245,7 @@ export class KonfigurationService extends BaseService {
      * Klassifikation einer Dokumentart zuordnen
      * @endpoint post /api/v1/dokumentarten/{art}/klassifikationen
      * @param art 
-     * @param body
+     * @param body 
      * @param ifMatch 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
@@ -924,8 +924,8 @@ export class KonfigurationService extends BaseService {
      * KI-Texte ändern
      * kiFreigegeben kann nur der Betreiber setzen.
      * @endpoint patch /api/v1/konfiguration/ki-texte
-     * @param body
-     * @param ifMatch
+     * @param body 
+     * @param ifMatch 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -998,7 +998,7 @@ export class KonfigurationService extends BaseService {
      * Konfigurationsdatei prüfen
      * Prüft die Datei, ohne Änderungen vorzunehmen.
      * @endpoint post /api/v1/konfiguration/pruefen
-     * @param body
+     * @param body 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -1068,9 +1068,9 @@ export class KonfigurationService extends BaseService {
      * Konfigurationsdatei einspielen
      * Einspielen verlangt If-Match und eine passende basisVersion in der Datei.
      * @endpoint put /api/v1/konfiguration
-     * @param body
-     * @param ifMatch
-     * @param xAenderungsgrund
+     * @param body 
+     * @param ifMatch 
+     * @param xAenderungsgrund 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
@@ -1146,7 +1146,7 @@ export class KonfigurationService extends BaseService {
      * Konfigurationsdatei vergleichen
      * Vergleicht die Datei mit dem aktuellen Stand.
      * @endpoint post /api/v1/konfiguration/vergleichen
-     * @param body
+     * @param body 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
