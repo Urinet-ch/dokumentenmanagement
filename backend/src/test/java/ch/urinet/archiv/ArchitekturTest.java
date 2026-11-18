@@ -39,6 +39,7 @@ class ArchitekturTest {
 
     static final String WURZEL = "ch.urinet.archiv";
     static final String GEMEINSAM = "gemeinsam";
+    private static final String WISSENSMARKDOWN = "^ch\\.urinet\\.archiv\\.wissen\\.domain\\.WissensMarkdown(\\$.*)?$";
     private static final Pattern PAKET = Pattern.compile("^ch\\.urinet\\.archiv\\.([a-z]+)\\.(domain|application|adapter)(\\..*)?$");
     private static final Map<String, Set<String>> ERLAUBT_EIGENER_BEREICH = Map.of(
             "domain", Set.of("domain"),
@@ -65,11 +66,22 @@ class ArchitekturTest {
             .orShould().dependOnClassesThat().haveFullyQualifiedName("io.vertx.core.http.HttpClient")
             .because("das Archiv ruft keine Webseite auf (Spec 03, Req 14.5)");
 
-    /** {@code domain} hängt nur vom JDK und von Domain-Typen ab: kein Quarkus, Jakarta, JPA, Hibernate oder Jackson. */
+    /** {@code domain} hängt nur vom JDK und von Domain-Typen ab; CommonMark ist auf den Markdown-Parser begrenzt. */
     @ArchTest
     static final ArchRule domainOhneFramework = classes().that().resideInAPackage("ch.urinet.archiv..domain..")
+            .and(DescribedPredicate.describe("nicht WissensMarkdown oder dessen innere Typen",
+                    klasse -> !klasse.getName().matches(WISSENSMARKDOWN)))
             .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv..domain..")
             .because("die Domain ist framework-frei (tech.md Regel 12, structure.md)");
+
+    @ArchTest
+    static final ArchRule wissensMarkdownNurCommonmark = classes()
+            .that().resideInAPackage("ch.urinet.archiv.wissen.domain..")
+            .and(DescribedPredicate.describe("WissensMarkdown oder dessen innere Typen",
+                    klasse -> klasse.getName().matches(WISSENSMARKDOWN)))
+            .should().onlyDependOnClassesThat().resideInAnyPackage("java..", "ch.urinet.archiv..domain..",
+                    "org.commonmark..")
+            .because("CommonMark ist nur die Parser-Bibliothek von WissensMarkdown, kein Framework");
 
     /**
      * {@code application} hängt nur von {@code domain} (und Ports anderer {@code application}) ab; zulässig sind die
