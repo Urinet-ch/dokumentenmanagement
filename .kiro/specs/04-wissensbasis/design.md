@@ -65,11 +65,12 @@ flowchart LR
 
 | Befund | Regel |
 | --- | --- |
-| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen) fehlen oder sind ungültig |
+| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen), Status oder Vertraulichkeit fehlen oder sind ungültig |
+| `SCHLAGWORT_UNGUELTIG` | Schlagwort ist nicht kleingeschriebenes kebab-case |
 | `PFAD_UNGUELTIG` | `ueberblick` oder `<ordner>/<name>` mit Name `[a-z0-9]+(-[a-z0-9]+)*`, Ordner passt zum Typ, Name nicht `index`/`log`, bei `NEU` nicht vergeben (auch nicht von einer für den Kontext unsichtbaren Seite) |
 | `FUSSNOTE_OHNE_QUELLE` | Label ohne Quelleneintrag |
 | `AUSSAGE_OHNE_BELEG` | Absatz oder Listenpunkt ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
-| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, oder Seite ausserhalb `1..dokument.seiten` |
+| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben |
 | `SEITE_FEHLT` | Dokumentquelle ohne PDF-Seite (z. B. aus einem Analyse-Vorschlag, Requirement 12.4) |
 | `QUELLE_PERSONAL` | Dokument einer Quelle hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
@@ -78,6 +79,7 @@ flowchart LR
 | `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]` |
 | `AUSSAGE_ENTFERNT` | Quellenschlüssel der Basisversion fehlt in der neuen Fassung und nicht unter «entfernte Aussagen» (ein Grund nach Requirement 7.3 gilt als Begründung) |
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
+| `MARKDOWN_ZU_TIEF` | Markdown überschreitet die feste Grenze von 64 Verschachtelungsebenen |
 | Hinweis `ABSCHNITT_FEHLT` | Pflichtabschnitte nach Requirement 2.8 |
 | Hinweis `HOEHERE_STUFE_VORHANDEN` | geplanter Pfad von einer Seite höherer Vertraulichkeit belegt (Requirement 5.12), nur für A17 sichtbar |
 | Hinweis `STUFE_STEIGT` | Annahme erhöht die wirksame Vertraulichkeit der Seite dauerhaft (Requirement 6.8) |
@@ -88,6 +90,18 @@ flowchart LR
   liefert die PDF-Seiten der PDF/A-Fassung (1-basiert); darauf beruhen Abschnitte,
   Seitenangaben und Auszugsprüfung. Bei `pdfa_fehlt` (Tika-Text ohne `\f`) oder wenn die Zahl der Seiten nicht
   `dokument.seiten` entspricht, gibt es keinen Ingest (Requirement 5.6).
+
+#### Umsetzung 13.4
+- `commonmark` und `commonmark-ext-footnotes` verwenden gemeinsam Version `0.32.0` (beide Artefakte in Maven Central
+  geprüft). `WissensMarkdown` wertet Fussnoten, Abschnitte, Aussagen und Links am selben CommonMark-Baum aus, den es
+  darstellt. Rohes HTML wird escaped; externe oder ungültige Linkziele erhalten kein `href`, Bilder kein `src`.
+- Interne Linkziele sind nur `ueberblick` und `/<ordner>/<name>` aus den sechs festen Seitentypen; gespeichert wird
+  der Pfad ohne führenden Schrägstrich für `wissensseite_link`. Die Markdown-Eingabe hat eine harte Grenze von
+  200'000 Zeichen und maximal 64 Verschachtelungsebenen; zusätzlich gilt der konfigurierte Seitenhöchstwert.
+- `WissensPruefung` erhält Dokument- und Seitenreferenzen sowie Basisversion und Ingest-Kontext als Eingabe. Sie bleibt
+  deterministisch und framework-frei; PDF-Seiten und Auszüge werden über `Seitentext` geprüft.
+- Die allgemeine ArchUnit-Regel für framework-freie Domain-Typen bleibt bestehen; nur `WissensMarkdown` und seine
+  inneren Typen dürfen zusätzlich von `org.commonmark` abhängen. Eine eigene ArchUnit-Regel hält diese Ausnahme eng.
 
 ### Sichtbarkeit und Hülle (`wissen/application`)
 - `wissensseite_dokument` speichert die Hülle der aktuellen Version: direkte Dokumentquellen plus die Hüllen der

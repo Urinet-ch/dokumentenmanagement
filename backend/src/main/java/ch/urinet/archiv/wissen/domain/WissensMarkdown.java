@@ -1,0 +1,404 @@
+package ch.urinet.archiv.wissen.domain;
+
+import org.commonmark.Extension;
+import org.commonmark.ext.footnotes.FootnoteDefinition;
+import org.commonmark.ext.footnotes.FootnoteReference;
+import org.commonmark.ext.footnotes.FootnotesExtension;
+import org.commonmark.node.BlockQuote;
+import org.commonmark.node.Code;
+import org.commonmark.node.FencedCodeBlock;
+import org.commonmark.node.HardLineBreak;
+import org.commonmark.node.Heading;
+import org.commonmark.node.HtmlBlock;
+import org.commonmark.node.HtmlInline;
+import org.commonmark.node.Image;
+import org.commonmark.node.IndentedCodeBlock;
+import org.commonmark.node.Link;
+import org.commonmark.node.ListItem;
+import org.commonmark.node.Node;
+import org.commonmark.node.Paragraph;
+import org.commonmark.node.SoftLineBreak;
+import org.commonmark.node.Text;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
+public final class WissensMarkdown {
+
+    public static final int MAX_VERSCHACHTELUNG = 64;
+    public static final int MAX_EINGABE_ZEICHEN = 200_000;
+    private static final Set<String> ORDNER = Set.of("quellen", "konzepte", "akteure", "projekte", "analysen");
+
+    private static final List<Extension> EXTENSIONS = List.of(FootnotesExtension.create());
+    private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS).build();
+    private static final HtmlRenderer RENDERER = HtmlRenderer.builder()
+            .extensions(EXTENSIONS)
+            .escapeHtml(true)
+            .sanitizeUrls(true)
+            .attributeProviderFactory(context -> (node, tagName, attribute) -> {
+                if (node instanceof Link link) {
+                    String pfad = internerPfad(link.getDestination());
+                    attribute.remove("href");
+                    if (pfad != null) {
+                        attribute.put("href", "/wissen/" + pfad);
+                    }
+                } else if (node instanceof Image) {
+                    attribute.remove("src");
+                    attribute.remove("srcset");
+                }
+            })
+            .build();
+
+    private WissensMarkdown() {
+    }
+
+    public static Analyse analysieren(String markdown, int maxZeichen) {
+        if (maxZeichen < 1) {
+            throw new IllegalArgumentException("Die maximale Markdown-Laenge muss positiv sein.");
+        }
+        String text = markdown == null ? "" : markdown;
+        if (zeichen(text) > maxZeichen || zeichen(text) > MAX_EINGABE_ZEICHEN) {
+            return Analyse.abgelehnt(true, false);
+        }
+        if (tiefeUeberschritten(text)) {
+            return Analyse.abgelehnt(false, true);
+        }
+
+        Node dokument = PARSER.parse(text);
+        Set<String> links = new TreeSet<>();
+        Set<String> fussnoten = new TreeSet<>();
+        Set<String> abschnitte = new TreeSet<>();
+        List<Aussage> aussagen = new ArrayList<>();
+        Merkmale merkmale = new Merkmale();
+
+        Deque<Integer> ueberschriften = new ArrayDeque<>();
+        Deque<String> abschnittstitel = new ArrayDeque<>();
+        for (Node kind = dokument.getFirstChild(); kind != null; kind = kind.getNext()) {
+            if (kind instanceof Heading ueberschrift) {
+                while (!ueberschriften.isEmpty() && ueberschriften.peek() >= ueberschrift.getLevel()) {
+                    ueberschriften.pop();
+                    abschnittstitel.pop();
+                }
+                String titel = text(ueberschrift).strip();
+                ueberschriften.push(ueberschrift.getLevel());
+                abschnittstitel.push(titel);
+                abschnitte.add(titel);
+                untersuchen(kind, false, false, false, false, links, fussnoten, aussagen, merkmale);
+            } else {
+                boolean ausgenommen = abschnittstitel.stream()
+                        .anyMatch(WissensMarkdown::abschnittOhneBeleg);
+                untersuchen(kind, false, false, false, ausgenommen, links, fussnoten, aussagen, merkmale);
+            }
+        }
+        if (merkmale.zuTief) {
+            return Analyse.abgelehnt(false, true);
+        }
+        return new Analyse(rendern(dokument), links, fussnoten, abschnitte, aussagen, merkmale.html,
+                merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink, false, false);
+    }
+
+    public static String darstellen(String markdown) {
+        Analyse analyse = analysieren(markdown, MAX_EINGABE_ZEICHEN);
+        if (analyse.zuGross() || analyse.zuTief()) {
+            throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
+        }
+        return analyse.html();
+    }
+
+    private static String rendern(Node dokument) {
+        return RENDERER.render(dokument);
+    }
+
+    private static void untersuchen(Node wurzel, boolean inListenpunkt, boolean widerspruch,
+                                   boolean inFussnote, boolean aussagenAusgenommen, Set<String> links, Set<String> fussnoten,
+                                   List<Aussage> aussagen, Merkmale merkmale) {
+        Deque<Besuch> offen = new ArrayDeque<>();
+        offen.push(new Besuch(wurzel, 0, inListenpunkt, widerspruch, inFussnote, aussagenAusgenommen));
+        while (!offen.isEmpty()) {
+            Besuch besuch = offen.pop();
+            Node node = besuch.node();
+            if (besuch.tiefe() > MAX_VERSCHACHTELUNG) {
+                merkmale.zuTief = true;
+                continue;
+            }
+
+            boolean blockZitat = besuch.widerspruch()
+                    || node instanceof BlockQuote blockQuote && widerspruchsblock(blockQuote);
+            boolean fussnotenDefinition = besuch.inFussnote()
+                    || node instanceof FootnoteDefinition;
+            boolean listenpunkt = besuch.inListenpunkt() || node instanceof ListItem;
+
+            if (node instanceof HtmlInline || node instanceof HtmlBlock) {
+                merkmale.html = true;
+            }
+            if (node instanceof Image) {
+                merkmale.bild = true;
+            }
+            if (node instanceof Link link) {
+                String pfad = internerPfad(link.getDestination());
+                if (pfad == null) {
+                    merkmale.ungueltigerLink = true;
+                } else {
+                    links.add(pfad);
+                }
+            }
+            if (node instanceof FootnoteReference reference) {
+                fussnoten.add(reference.getLabel());
+            }
+            if (node instanceof Text literal && !codeElternteil(node) && literal.getLiteral().contains("[[")) {
+                merkmale.wikilink = true;
+            }
+            if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
+                    && node instanceof Paragraph paragraph && !listenpunkt) {
+                aussagen.add(new Aussage(text(paragraph), fussnotenIn(paragraph)));
+            } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
+                    && node instanceof ListItem item) {
+                aussagen.add(new Aussage(text(item), fussnotenIn(item)));
+            }
+
+            for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
+                offen.push(new Besuch(kind, besuch.tiefe() + 1, listenpunkt, blockZitat, fussnotenDefinition,
+                        besuch.aussagenAusgenommen()));
+            }
+        }
+    }
+
+    private static Set<String> fussnotenIn(Node wurzel) {
+        Set<String> schluessel = new LinkedHashSet<>();
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(wurzel);
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node != wurzel && node instanceof ListItem) {
+                continue;
+            }
+            if (node instanceof FootnoteReference reference) {
+                schluessel.add(reference.getLabel());
+            }
+            for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
+                offen.push(kind);
+            }
+        }
+        return Collections.unmodifiableSet(schluessel);
+    }
+
+    private static boolean codeElternteil(Node node) {
+        for (Node eltern = node.getParent(); eltern != null; eltern = eltern.getParent()) {
+            if (eltern instanceof Code || eltern instanceof FencedCodeBlock || eltern instanceof IndentedCodeBlock) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean widerspruchsblock(BlockQuote blockQuote) {
+        for (Node kind = blockQuote.getFirstChild(); kind != null; kind = kind.getNext()) {
+            String inhalt = text(kind).stripLeading();
+            if (!inhalt.isBlank()) {
+                return inhalt.startsWith("⚠️ Widerspruch:");
+            }
+        }
+        return false;
+    }
+
+    private static boolean abschnittOhneBeleg(String titel) {
+        return titel.equalsIgnoreCase("Offene Fragen") || titel.equalsIgnoreCase("Berührte Seiten");
+    }
+
+    private static String text(Node wurzel) {
+        StringBuilder text = new StringBuilder();
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(wurzel);
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof Text literal) {
+                text.append(literal.getLiteral());
+            } else if (node instanceof Code code) {
+                text.append(code.getLiteral());
+            } else if (node instanceof SoftLineBreak || node instanceof HardLineBreak) {
+                text.append(' ');
+            }
+            for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
+                offen.push(kind);
+            }
+        }
+        return text.toString();
+    }
+
+    private static String internerPfad(String ziel) {
+        if (ziel == null || ziel.length() < 2 || ziel.charAt(0) != '/' || ziel.charAt(1) == '/'
+                || ziel.indexOf('?') >= 0 || ziel.indexOf('#') >= 0 || ziel.indexOf('%') >= 0
+                || ziel.indexOf('\\') >= 0) {
+            return null;
+        }
+        String pfad = ziel.substring(1);
+        int trenner = pfad.indexOf('/');
+        if (trenner < 0) {
+            return pfad.equals("ueberblick") ? pfad : null;
+        }
+        if (pfad.indexOf('/', trenner + 1) >= 0
+                || !ORDNER.contains(pfad.substring(0, trenner))
+                || !gueltigesSegment(pfad, trenner + 1, pfad.length())
+                || pfad.substring(trenner + 1).equals("index")
+                || pfad.substring(trenner + 1).equals("log")) {
+            return null;
+        }
+        return pfad;
+    }
+
+    private static boolean gueltigesSegment(String pfad, int von, int bis) {
+        if (von == bis || pfad.charAt(von) == '-' || pfad.charAt(bis - 1) == '-') {
+            return false;
+        }
+        for (int i = von; i < bis; i++) {
+            char zeichen = pfad.charAt(i);
+            if (!(zeichen >= 'a' && zeichen <= 'z' || zeichen >= '0' && zeichen <= '9' || zeichen == '-')
+                    || zeichen == '-' && i > von && pfad.charAt(i - 1) == '-') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int zeichen(String text) {
+        return text.codePointCount(0, text.length());
+    }
+
+    private static boolean tiefeUeberschritten(String markdown) {
+        int klammertiefe = 0;
+        int zeilenanfang = 0;
+        char zaun = 0;
+        int inlineCodeTicks = 0;
+        while (zeilenanfang <= markdown.length()) {
+            int zeilenende = markdown.indexOf('\n', zeilenanfang);
+            if (zeilenende < 0) {
+                zeilenende = markdown.length();
+            }
+            int cursor = zeilenanfang;
+            while (cursor < zeilenende && markdown.charAt(cursor) == ' ') {
+                cursor++;
+            }
+            if (istListenanfang(markdown, cursor, zeilenende)
+                    && (cursor - zeilenanfang) / 2 > MAX_VERSCHACHTELUNG) {
+                return true;
+            }
+            if (cursor - zeilenanfang > 3) {
+                zeilenanfang = zeilenende + 1;
+                continue;
+            }
+            if (cursor + 2 < zeilenende && (markdown.startsWith("```", cursor) || markdown.startsWith("~~~", cursor))) {
+                char kandidat = markdown.charAt(cursor);
+                if (zaun == 0) {
+                    zaun = kandidat;
+                } else if (zaun == kandidat) {
+                    zaun = 0;
+                }
+                zeilenanfang = zeilenende + 1;
+                continue;
+            }
+            if (zaun != 0) {
+                zeilenanfang = zeilenende + 1;
+                continue;
+            }
+
+            int blockZitatTiefe = 0;
+            while (cursor < zeilenende && markdown.charAt(cursor) == '>') {
+                if (++blockZitatTiefe > MAX_VERSCHACHTELUNG) {
+                    return true;
+                }
+                cursor++;
+                if (cursor < zeilenende && markdown.charAt(cursor) == ' ') {
+                    cursor++;
+                }
+            }
+            for (int i = cursor; i < zeilenende; i++) {
+                char zeichen = markdown.charAt(i);
+                if (zeichen == '\\') {
+                    i++;
+                    continue;
+                }
+                if (zeichen == '`') {
+                    int run = 1;
+                    while (i + run < zeilenende && markdown.charAt(i + run) == '`') {
+                        run++;
+                    }
+                    if (inlineCodeTicks == 0) {
+                        inlineCodeTicks = run;
+                    } else if (inlineCodeTicks == run) {
+                        inlineCodeTicks = 0;
+                    }
+                    i += run - 1;
+                } else if (inlineCodeTicks == 0) {
+                    if (zeichen == '[' || zeichen == '(') {
+                        if (++klammertiefe > MAX_VERSCHACHTELUNG) {
+                            return true;
+                        }
+                    } else if ((zeichen == ']' || zeichen == ')') && klammertiefe > 0) {
+                        klammertiefe--;
+                    }
+                }
+            }
+            zeilenanfang = zeilenende + 1;
+        }
+        return false;
+    }
+
+    private static boolean istListenanfang(String text, int cursor, int ende) {
+        if (cursor >= ende) {
+            return false;
+        }
+        char zeichen = text.charAt(cursor);
+        if (zeichen == '-' || zeichen == '*' || zeichen == '+') {
+            return cursor + 1 < ende && Character.isWhitespace(text.charAt(cursor + 1));
+        }
+        int zahlEnde = cursor;
+        while (zahlEnde < ende && text.charAt(zahlEnde) >= '0' && text.charAt(zahlEnde) <= '9') {
+            zahlEnde++;
+        }
+        return zahlEnde > cursor && zahlEnde + 1 < ende
+                && (text.charAt(zahlEnde) == '.' || text.charAt(zahlEnde) == ')')
+                && Character.isWhitespace(text.charAt(zahlEnde + 1));
+    }
+
+    public record Aussage(String text, Set<String> fussnoten) {
+        public Aussage {
+            fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
+        }
+    }
+
+    public record Analyse(String html, Set<String> links, Set<String> fussnoten, Set<String> abschnitte,
+                          List<Aussage> aussagen, boolean htmlVorhanden, boolean bildVorhanden,
+                          boolean ungueltigerLink, boolean wikilink, boolean zuGross, boolean zuTief) {
+        public Analyse {
+            links = Collections.unmodifiableSet(new LinkedHashSet<>(links));
+            fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
+            abschnitte = Collections.unmodifiableSet(new LinkedHashSet<>(abschnitte));
+            aussagen = List.copyOf(aussagen);
+        }
+
+        private static Analyse abgelehnt(boolean zuGross, boolean zuTief) {
+            return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false,
+                    zuGross, zuTief);
+        }
+    }
+
+    private record Besuch(Node node, int tiefe, boolean inListenpunkt, boolean widerspruch, boolean inFussnote,
+                          boolean aussagenAusgenommen) {
+    }
+
+    private static final class Merkmale {
+        private boolean html;
+        private boolean bild;
+        private boolean ungueltigerLink;
+        private boolean wikilink;
+        private boolean zuTief;
+    }
+}

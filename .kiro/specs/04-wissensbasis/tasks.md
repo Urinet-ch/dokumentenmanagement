@@ -34,7 +34,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Teil erledigt (PR #295): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest (Req 4.1–4.3, 4.6); `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. Offen: Req 4.7, der Vergleich von Anzahl Seiten und Versionen in der Restore-Probe; er braucht die Restore-Kette mit Datenbank-Restore aus Spec 01, Aufgabe 5.12 (design.md, «Umsetzung 13.3»). 13.9 weisen die Ingest- und Freigabepfade nach (14.x)
   - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
 
-- [ ] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
+- [x] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
   - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext (besteht seit Spec 02, Aufgabe 6.3, als `gemeinsam/domain/Seitentext`; wiederverwenden, nicht neu bauen)
   - `WissensPruefung` mit allen Befunden aus design.md, als reine Domain-Logik mit JUnit-Tests; Links aus dem Inhalt nach `wissensseite_link`
   - _Anforderungen: 2.1–2.8, 3.5, 3.7_
