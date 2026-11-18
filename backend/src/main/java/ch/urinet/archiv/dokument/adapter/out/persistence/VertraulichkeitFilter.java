@@ -1,13 +1,13 @@
 package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.integration.application.webseite.FesterFilter;
+import ch.urinet.archiv.sicherheit.application.SichtregelSql;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Übersetzt die {@link Sichtregel} in ein HQL-Prädikat auf {@link DokumentEintrag} (ohne Alias, für Panache) oder in
@@ -29,7 +29,6 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
     }
 
     private static final Spalten HQL = new Spalten("bestaetigt", "erstelltVon", "vertraulichkeit", "personBenutzer");
-    private static final Pattern ALIAS = Pattern.compile("^[a-z][a-z0-9_]{0,15}$");
 
     /** HQL-Prädikat auf {@link DokumentEintrag} ohne Alias. */
     static VertraulichkeitFilter fuer(Sichtregel regel) {
@@ -42,11 +41,8 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
 
     /** SQL-Prädikat auf {@code dokument} unter dem Alias {@code alias} (fester Bezeichner, nie Benutzereingabe). */
     static VertraulichkeitFilter sql(Sichtregel regel, String alias) {
-        if (!ALIAS.matcher(alias).matches()) {
-            throw new IllegalArgumentException("Ungültiger Alias");
-        }
-        VertraulichkeitFilter sicht = bauen(regel, new Spalten(alias + ".bestaetigt", alias + ".erstellt_von",
-                alias + ".vertraulichkeit", alias + ".person_benutzer"));
+        SichtregelSql.Ausdruck ausdruck = SichtregelSql.dokument(regel, alias);
+        VertraulichkeitFilter sicht = new VertraulichkeitFilter(ausdruck.bedingung(), ausdruck.parameter());
         return regel.webseite() == null ? sicht : webseite(sicht, regel.webseite(), alias);
     }
 

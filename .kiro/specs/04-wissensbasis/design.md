@@ -569,6 +569,20 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
   bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
 
+### Umsetzung 13.6
+- `WissenLesen` und `PanacheWissenLesenRepository` liefern Index mit sichtbarkeitsgefiltertem Zähler und Paging,
+  Seite, Versionen, Diff, eingehende Links und Log. Die SQL-Prädikate für aktuelle Seiten, Versionen und Quelldokumente
+  verwenden die gemeinsame Sichtregel; Sortierung und Zähler werden vor dem Paging angewandt.
+- Quelleneinträge und eingehende Links enthalten nur sichtbare Seiten und Dokumente. Beim Rendern interner Markdown-
+  Links werden fehlende und unsichtbare Ziele gleich als «Seite nicht vorhanden» ohne Linktitel ausgegeben.
+- Versionen zeigen Erzeuger, Freigeber, Entwurf samt Anlass und auslösendes Dokument nur, wenn diese Angaben für den
+  Benutzer sichtbar sind; unsichtbare Versionen bleiben auf ihre Nummer beschränkt. Einzelseiten, Versionen, Diff,
+  eingehende Links und Log bleiben privat und tragen ETags, wo eine einzelne Fassung abgerufen wird.
+- Das Log erzeugt Anzeigetexte aus den strukturierten Feldern und sichtbaren Seiten, nie aus `angaben`; Einträge ohne
+  sichtbare Seite werden ausgelassen. Index und Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge.
+- Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
+  Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
+
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).
   Danach Entwurf `FEHLER` mit Hinweis «Die Wissensquelle konnte nicht verarbeitet werden. Sie ist archiviert; der

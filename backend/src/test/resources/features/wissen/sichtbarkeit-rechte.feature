@@ -32,3 +32,9 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Wenn eine Übersicht aus einer normalen Quelle freigegeben wird und die Quelle danach intern wird
     Dann ist die gespeicherte Vertraulichkeit der Übersicht zuerst NORMAL und alle Rollen mit Recht A15 sehen sie
     Und speichert die Neuberechnung danach die wirksame Vertraulichkeit INTERN und «mitarbeiter» sieht die Übersicht nicht
+
+  @req-3.1 @req-3.2 @req-3.3 @req-3.4 @req-3.6 @req-3.8 @req-4.4 @req-4.5 @req-14.2 @req-14.4 @req-14.5 @req-14.6
+  Szenario: Leseendpunkte filtern Index, Seiten, Versionen, Links und Log nach Sichtbarkeit
+    Angenommen synthetische Wissensleseproben sind angelegt
+    Wenn «mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft
+    Dann verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten
