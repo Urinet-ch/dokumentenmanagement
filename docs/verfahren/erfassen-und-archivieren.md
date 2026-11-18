@@ -8,7 +8,8 @@ Diese Beschreibung fasst den in Spec 01 festgelegten Ablauf vom Eingang eines Be
 Prüfung und Wiederherstellung zusammen. Sie ist erst nach Prüfung und Freigabe verbindlich.
 Das Archiv speichert eine digitale Kopie; Papieroriginale werden nach dem Scan aufbewahrt und nicht
 vernichtet (Req 16.6; Konzeptentscheid E5).
-Dokumente der Art «WISSENSQUELLE» und Wissensseiten sind keine Buchungsbelege oder Geschäftsbücher nach GeBüV.
+Dokumente der Art «WISSENSQUELLE» und Wissensseiten sind keine Buchungsbelege oder Geschäftsbücher nach GeBüV und
+nicht aufbewahrungspflichtig; sie werden ohne Sperre abgelegt und gehören nicht in den Jahresexport (Spec 04, 1.3, 1.6).
 
 | Rolle | Aufgabe und Grenze |
 | --- | --- |

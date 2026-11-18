@@ -41,18 +41,28 @@ public class WissensquelleSchritte {
         }
     }
 
-    @Dann("hat der Mandant «{word}» die Wissensquelle mit dem Titel «{}» und Standdatum «{word}» unverändert archiviert")
-    public void archivierteQuelleUnveraendert(String mandant, String titel, String datum) throws SQLException {
+    @Dann("verlangt die WISSENSQUELLE von «{word}» «{word}» mit der Vorgabe «{word}» und «{word}» mit der Vorgabe «{word}»")
+    public void reservierteFelder(String mandant, String erstes, String erstesVorgabe, String zweites,
+                                  String zweitesVorgabe) throws SQLException {
         String schema = new MandantCode(mandant).schema();
         try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement abfrage =
-                     verbindung.prepareStatement("select count(*) from " + schema
-                             + ".dokument where art = 'WISSENSQUELLE' and titel = ? and datum = ? "
-                             + "and status = 'ARCHIVIERT' and aufbewahren_bis is null")) {
-            abfrage.setString(1, titel);
-            abfrage.setObject(2, java.time.LocalDate.parse(datum, java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+                     verbindung.prepareStatement("select jsonb_exists(zusatz_schema -> 'required', ?), "
+                             + "zusatz_schema -> 'properties' -> ? ->> 'default', "
+                             + "jsonb_exists(zusatz_schema -> 'required', ?), "
+                             + "zusatz_schema -> 'properties' -> ? ->> 'default', "
+                             + "zusatz_schema ->> 'additionalProperties' "
+                             + "from " + schema + ".dokumentart where code = 'WISSENSQUELLE'")) {
+            abfrage.setString(1, erstes);
+            abfrage.setString(2, erstes);
+            abfrage.setString(3, zweites);
+            abfrage.setString(4, zweites);
             try (ResultSet zeile = abfrage.executeQuery()) {
                 assertThat(zeile.next()).isTrue();
-                assertThat(zeile.getLong(1)).isEqualTo(1);
+                assertThat(zeile.getBoolean(1)).as(erstes + " Pflicht").isTrue();
+                assertThat(zeile.getString(2)).isEqualTo(erstesVorgabe);
+                assertThat(zeile.getBoolean(3)).as(zweites + " Pflicht").isTrue();
+                assertThat(zeile.getString(4)).isEqualTo(zweitesVorgabe);
+                assertThat(zeile.getString(5)).isEqualTo("false");
             }
         }
     }

@@ -7,11 +7,16 @@ Funktionalität: Dokumentart Wissensquelle
     Angenommen der Mandant «mf-wissensquelle» ist am «10.01.2026» angelegt
     Dann hat der Mandant «mf-wissensquelle» die Dokumentart WISSENSQUELLE mit den gemeinsamen Vorgaben
     Angenommen im Mandanten «mf-wissensquelle» wurde die Wissensquelle «WQ» am «10.01.2026» um «09:15» archiviert
-    Dann hat der Mandant «mf-wissensquelle» die Wissensquelle mit dem Titel «Probe Wissensquelle» und Standdatum «10.01.2026» unverändert archiviert
     Wenn der Manifest-Lauf für «mf-wissensquelle» bis «10.01.2026» läuft
     Dann das Manifest «10.01.2026» von «mf-wissensquelle» enthält das Dokument «WQ» mit den Varianten «original,arbeitsfassung» samt SHA-256 und Versions-ID
 
-  @req-1.2 @req-1.4 @req-1.5
+  @req-1.1
+  Szenario: Im Mandanten «vhf-gsk» trägt die Wissensquelle zusätzlich die reservierten Felder der Webseiten-Schnittstelle
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Dann hat der Mandant «vhf-gsk» die Dokumentart WISSENSQUELLE mit den gemeinsamen Vorgaben
+    Und verlangt die WISSENSQUELLE von «vhf-gsk» «zugriff» mit der Vorgabe «mitglieder» und «veroeffentlicht» mit der Vorgabe «false»
+
+  @req-1.2 @req-1.5
   Szenario: Der Inhaber wählt die Wissensquelle von Hand und archiviert sie ohne Sperre
     Angenommen die Archivierung ist bereit
     Und im Mandanten «urinet» liegt das Dokument «WQ_HAND» im Status «EINGANGSKORB», erfasst von «inhaber-urinet»
@@ -30,15 +35,17 @@ Funktionalität: Dokumentart Wissensquelle
     Und ist der Eingang von «WQ_HAND» leer
 
   @req-1.6
-  Szenario: Wissensquellen sind nicht Teil des Jahresexports
+  Szenario: Wissensquellen sind nicht Teil des Jahresexports, die Belege desselben Jahres schon
     Angenommen im Mandanten «urinet» gibt es keinen offenen Export
     Und im Mandanten «urinet» liegen diese Belege:
-      | name     | art           | datum      | jahr | status     | partner | belegnummer | richtung | betrag | vertraulichkeit | pdfa_fehlt |
-      | WQ_EXPORT | WISSENSQUELLE | 2025-03-14 | 2025 | ARCHIVIERT |         |             | AUSGABE  | 0.00   | NORMAL          | nein       |
+      | name      | art           | datum      | jahr | status     | partner           | belegnummer | richtung | betrag | vertraulichkeit | pdfa_fehlt |
+      | WQ_EXPORT | WISSENSQUELLE | 2025-03-14 | 2025 | ARCHIVIERT |                   |             |          |        | NORMAL          | nein       |
+      | B_NORMAL  | QUITTUNG      | 2025-04-02 | 2025 | ARCHIVIERT | Bäckerei Beispiel |             | AUSGABE  | 12.00  | NORMAL          | nein       |
     Wenn «inhaber-urinet» den Jahresexport 2025 anfordert
     Und der Worker die Aufträge abarbeitet
-    Dann ist der Export «FERTIG» mit 0 Belegen
+    Dann ist der Export «FERTIG» mit 1 Belegen
     Und das ZIP enthält genau diese Dateien:
-      | datei             |
-      | belegliste.csv    |
-      | pruefsummen.sha256 |
+      | datei                                                    |
+      | belege/2025-04-02_QUITTUNG_{B_NORMAL}_Baeckerei-Beispiel.pdf |
+      | belegliste.csv                                           |
+      | pruefsummen.sha256                                       |

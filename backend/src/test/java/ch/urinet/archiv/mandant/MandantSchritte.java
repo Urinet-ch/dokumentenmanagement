@@ -146,6 +146,7 @@ public class MandantSchritte {
         try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
             json.readTree(inhalt).path("dokumentarten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
+        assertThat(erwartet).hasSize(11);
         String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();
         if (!erwartet.contains(wissensquelle)) {
             erwartet.add(wissensquelle);

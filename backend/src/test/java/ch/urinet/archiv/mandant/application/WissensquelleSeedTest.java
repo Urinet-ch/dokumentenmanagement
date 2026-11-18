@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WissensquelleSeedTest {
 
@@ -57,8 +58,8 @@ class WissensquelleSeedTest {
 
     @Test
     void vorhandeneWissensquelleAusMandantenSeedWirdNichtUeberschrieben() {
-        DokumentartVorlage angepasst = new DokumentartVorlage("WISSENSQUELLE", "Mandanteneigener Name", null,
-                List.of("frei"), List.of("titel", "datum"), null, "NORMAL", null, null, false, false);
+        DokumentartVorlage angepasst = wissensquelle("Mandanteneigener Name", List.of("titel", "datum", "partner"),
+                null, false);
         var wissensquellenSeedLesen = new AtomicBoolean();
 
         List<DokumentartVorlage> ergebnis = MandantProvisionierung.mitWissensquelleWennFehlt(List.of(angepasst), () -> {
@@ -68,5 +69,38 @@ class WissensquelleSeedTest {
 
         assertThat(ergebnis).containsExactly(angepasst);
         assertThat(wissensquellenSeedLesen).isFalse();
+    }
+
+    @Test
+    void wissensquellenAusDenSeedsHaltenDieFestenEigenschaften() {
+        assertThat(SeedPruefung.wissensquelleFest(seed.lesen())).isTrue();
+        var vhf = new KlassenpfadDokumentartSeed(json).lesen(new MandantCode("vhf-gsk"));
+        assertThat(vhf).filteredOn(v -> v.code().equals("WISSENSQUELLE")).singleElement()
+                .matches(SeedPruefung::wissensquelleFest);
+        assertThat(SeedPruefung.wissensquelleFest(wissensquelle("Eigen", List.of("titel", "datum", "partner"),
+                null, false))).isTrue();
+    }
+
+    @Test
+    void mandantenSeedMitAbweichenderWissensquelleWirdAbgelehnt() {
+        List<DokumentartVorlage> abweichend = List.of(
+                wissensquelle("Mit KI", List.of("titel", "datum"), null, true),
+                wissensquelle("Mit Frist", List.of("titel", "datum"), 10, false),
+                wissensquelle("Ohne Datum", List.of("titel"), null, false));
+
+        for (DokumentartVorlage art : abweichend) {
+            assertThat(SeedPruefung.wissensquelleFest(art)).as(art.name()).isFalse();
+            // die feste Prüfung läuft vor der Schema-Prüfung, darum ohne DokumentartPruefung
+            assertThatThrownBy(() -> new SeedPruefung(null).pruefen(new MandantCode("mf-wq"), List.of(art)))
+                    .isInstanceOfSatisfying(MandantFehler.class,
+                            f -> assertThat(f.grund()).isEqualTo(MandantFehler.Grund.SEED_UNGUELTIG));
+        }
+    }
+
+    private static DokumentartVorlage wissensquelle(String name, List<String> pflichtfelder, Integer jahre,
+                                                    boolean kiVorschlag) {
+        return new DokumentartVorlage("WISSENSQUELLE", name, null, List.of("frei"), pflichtfelder, null, "NORMAL",
+                jahre, jahre == null ? null : "BELEGDATUM", jahre != null, true, false, List.of(), null, null,
+                kiVorschlag, List.of(), null, 0, null);
     }
 }
