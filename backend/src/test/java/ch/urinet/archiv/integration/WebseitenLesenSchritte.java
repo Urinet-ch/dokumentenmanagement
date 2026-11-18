@@ -675,35 +675,11 @@ public class WebseitenLesenSchritte {
         }
     }
 
-    /**
-     * Liest langsam und misst den Heap in der Mitte. Der Leerlauf im %test-Profil (PT3S) ist knapp: stockt die
-     * Auslieferung auf einem überlasteten CI-Läufer (Garbage Collection der Messung, Object Storage) länger als das,
-     * beendet die API den Stream zu Recht vorzeitig. Das Szenario prüft Vollständigkeit und Speicher, nicht den
-     * Leerlauf (den prüft das Szenario mit dem nur angelesenen Stream); darum wird ein vorzeitig beendeter Versuch
-     * nach Freigabe der Plätze höchstens zweimal wiederholt.
-     */
+    /** Liest langsam und misst den Heap in der Mitte. */
     @Wenn("der Webseiten-Lesezugang «{word}» die Datei von «{word}» mit der Stufe «{word}» langsam liest")
     public void langsamLesen(String name, String dokument, String stufe) throws IOException, InterruptedException {
         assertThat(schluessel).containsKey(name);
-        for (int versuch = 1; versuch <= 3; versuch++) {
-            try {
-                langsamLesenEinmal(name, dokument, stufe);
-                if (gelesenBytes == streamKopf.laenge()) {
-                    return;
-                }
-            } catch (IOException e) {
-                // Abbruch der Verbindung (z. B. Reset statt sauberem Ende) zählt wie ein vorzeitiges Ende
-                if (versuch == 3) {
-                    throw e;
-                }
-            }
-            // Wiederholung sichtbar machen, damit die Häufigkeit der Flakiness in CI-Läufen erkennbar bleibt
-            System.out.println("langsamLesen: Versuch " + versuch + " vorzeitig beendet nach " + gelesenBytes + " Bytes, wiederhole");
-            long bis = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
-            while (plaetze.belegt() > 0 && System.nanoTime() < bis) {
-                Thread.sleep(50);
-            }
-        }
+        langsamLesenEinmal(name, dokument, stufe);
     }
 
     private void langsamLesenEinmal(String name, String dokument, String stufe) throws IOException, InterruptedException {
@@ -727,7 +703,7 @@ public class WebseitenLesenSchritte {
                 gelesenBytes += n;
                 Thread.sleep(3); // gedrosselter Client: rund 20 MB/s
                 if (!gemessen && gelesenBytes >= messpunkt) {
-                    // der Client steht, die Hälfte ist weg: was die API jetzt noch hält, ist ihr Puffer, nicht die Datei
+                    // Der isolierte Messfall hat ein längeres Leerlauflimit für die Heap-Messung mit GC.
                     gc();
                     heapZuwachs = laufzeit.totalMemory() - laufzeit.freeMemory() - vorher;
                     gemessen = true;
