@@ -30,6 +30,8 @@ function dokument(angaben: Partial<Dokument> = {}): Dokument {
     pdfaFehlt: false,
     unsicher: [],
     versionen: [],
+    klassifikationen: {},
+    klassifikationenUngueltig: [],
     ...angaben,
   };
 }

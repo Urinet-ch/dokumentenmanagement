@@ -2,6 +2,7 @@ package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.KlassifikationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
@@ -30,6 +31,10 @@ public class ProblemAbbildung {
 
     @ServerExceptionMapper
     public Response fachFehler(FachFehler fehler) {
+        if (fehler instanceof KlassifikationUngueltig klassifikation) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "klassifikationen",
+                    klassifikation.klassifikationen())).build();
+        }
         if (fehler instanceof PflichtfelderFehlen fehlen) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "felder", fehlen.felder())).build();
         }

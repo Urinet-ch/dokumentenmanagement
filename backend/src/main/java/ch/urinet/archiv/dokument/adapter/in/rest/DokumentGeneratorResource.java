@@ -107,6 +107,8 @@ public class DokumentGeneratorResource {
                                         List<String> tags, String projekt,
                                         @Schema(description = "Ohne Angabe Vorschlag aus Belegdatum (Req 9.6)")
                                         Integer geschaeftsjahr,
+                                        @Schema(type = SchemaType.OBJECT, description = "Werte nach Klassifikations-Code")
+                                        java.util.Map<String, List<String>> klassifikationen,
                                         @Schema(type = SchemaType.OBJECT,
                                                 description = "Zusatzfelder nach dem Schema der Art")
                                         JsonNode zusatz) {
@@ -187,7 +189,8 @@ public class DokumentGeneratorResource {
         Bestaetigung angaben = new Bestaetigung(m.art(), m.titel(), m.datum(), null, m.projekt(), m.tags(),
                 m.vertraulichkeit(), m.personBenutzer(), m.geschaeftsjahr(), f.belegnummer(), f.richtung(), f.betrag(),
                 f.waehrung(), f.faelligkeit(), f.qrReferenz(), f.konto(), v.gueltigAb(), v.gueltigBis(),
-                v.kuendigungsfrist(), v.naechsteFrist(), false, false);
+                v.kuendigungsfrist(), v.naechsteFrist(), false, false,
+                DokumentResource.klassifikationen(m.klassifikationen()));
         JsonNode zusatz = m.zusatz() == null || m.zusatz().isNull() ? null : m.zusatz();
         return new DokumentGenerator.Anfrage(angaben, m.partner() == null ? null : m.partner().crmId(),
                 ZusatzJson.text(zusatz), zusatzFelder(zusatz));

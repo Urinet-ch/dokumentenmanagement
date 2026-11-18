@@ -1,5 +1,6 @@
 package ch.urinet.archiv.dokumentart.adapter.out.schema;
 
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import com.fasterxml.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.BigIntegerNode;
@@ -17,7 +18,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Überträgt einen Baum aus Jackson 2 (strenger Leser {@code StrengesJson}) in Jackson 3, das json-schema-validator ab
+ * Überträgt einen Baum aus Jackson 2 (strenger Leser {@link StrengesJson}) in Jackson 3, das json-schema-validator ab
  * 3.0 verlangt. Knotenart und Zahlentyp bleiben gleich (ein {@code double} bleibt {@code DoubleNode}, kein
  * {@code DecimalNode}), damit die Bibliothek dieselben Werte sieht wie mit 2.0.8 und die Prüfung beim Lesen
  * (doppelte Schlüssel, Zeichen nach dem Wert) nur an einer Stelle liegt. Die Tiefe ist vorher begrenzt.

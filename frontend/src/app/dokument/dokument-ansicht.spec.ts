@@ -35,6 +35,8 @@ const DOKUMENT: Dokument = {
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
 };
 
 const ART: Dokumentart = {

@@ -26,6 +26,10 @@ export interface Bestaetigung {
     projekt?: string | null;
     tags?: Array<string> | null;
     /**
+     * Werte nach Klassifikations-Code
+     */
+    klassifikationen?: { [key: string]: Array<string>; } | null;
+    /**
      * Fehlt sie, gilt die Standardvertraulichkeit der Art
      */
     vertraulichkeit?: Bestaetigung.VertraulichkeitEnum | null;
