@@ -56,7 +56,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 1.7, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 8.6_
   - _Abhängig von: 17.3; Spec 01: 4.7_
 
-- [ ] 17.6 Regeln und Lückenbericht [Backend]
+- [x] 17.6 Regeln und Lückenbericht [Backend]
   - Übergangsquelle in Spec 02, 7.1c (Port `Lueckenbericht`, Adapter `KonfigurierteLuecken` aus der Konfiguration); 17.6 ersetzt den Adapter hinter demselben Port, das Werkzeug `vollstaendigkeit` ändert sich nicht
   - Changeset `<nnn>-regel`, Regeltypen, `RegelPruefung` in Bestätigen, Ändern, Generator und Drive-Import,
     bestehende Verletzungen als Warnung, `Lueckenbericht` mit Recht nach 5.4, Meldung betroffener Dokumente,

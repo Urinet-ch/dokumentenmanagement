@@ -15,7 +15,6 @@ import liquibase.resource.ClassLoaderResourceAccessor;
 import liquibase.ui.LoggerUIService;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -33,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ohne Unterschied legt keine weitere an. Das Abbild trägt {@code zusatzSchema} auch aus jsonb als Text.
  */
 @QuarkusTest
-@Tag("start-1")
 class KonfigurationSeedVersionTest {
 
     private static final String SCHEMA = "m_probe_konf_seed";

@@ -4,6 +4,7 @@ import ch.urinet.archiv.konfiguration.application.RegelDatenPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -37,13 +38,17 @@ public class PanacheRegelDaten implements RegelDatenPort {
             Map.entry("kuendigungsfrist", "to_jsonb(v.kuendigungsfrist)"),
             Map.entry("naechste_frist", "to_jsonb(v.naechste_frist)"));
 
-    private final EntityManager em;
+    private final Instance<EntityManager> em;
     private final ObjectMapper json;
 
     @Inject
-    public PanacheRegelDaten(EntityManager em, ObjectMapper json) {
+    public PanacheRegelDaten(Instance<EntityManager> em, ObjectMapper json) {
         this.em = em;
         this.json = json;
+    }
+
+    private EntityManager entityManager() {
+        return em.get();
     }
 
     @Override
@@ -61,7 +66,7 @@ public class PanacheRegelDaten implements RegelDatenPort {
                 + (ueberAlleArten ? "" : "and d.art = :art ")
                 + (dokumentId == null ? "" : "and d.id <> :dokumentId ")
                 + "and jsonb_build_array(" + String.join(", ", ausdruecke) + ") = cast(:werte as jsonb))";
-        var abfrage = em.createNativeQuery(sql)
+        var abfrage = entityManager().createNativeQuery(sql)
                 .setParameter("werte", serialisieren(werte));
         if (!ueberAlleArten) {
             abfrage.setParameter("art", art);
