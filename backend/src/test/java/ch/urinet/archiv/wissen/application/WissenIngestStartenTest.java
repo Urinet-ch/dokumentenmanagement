@@ -104,7 +104,7 @@ class WissenIngestStartenTest {
     @Test
     void stelltZweitenIngestAlsWartendZurueck() {
         Speicher speicher = new Speicher(quelle("NORMAL"));
-        speicher.aktiverIngest = true;
+        speicher.warteschlangeBelegt = true;
         Auftraege auftraege = new Auftraege(true);
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, auftraege)
@@ -340,7 +340,7 @@ class WissenIngestStartenTest {
         private NeuerEntwurf entwurf;
         private boolean geladen;
         private boolean laufend;
-        private boolean aktiverIngest;
+        private boolean warteschlangeBelegt;
         private long verbrauch;
 
         private Speicher(Quelle quelle) {
@@ -359,8 +359,8 @@ class WissenIngestStartenTest {
         }
 
         @Override
-        public boolean hatAktivenIngest() {
-            return aktiverIngest;
+        public boolean warteschlangeBelegt() {
+            return warteschlangeBelegt;
         }
 
         @Override

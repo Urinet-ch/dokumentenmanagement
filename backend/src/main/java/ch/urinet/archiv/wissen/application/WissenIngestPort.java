@@ -12,7 +12,11 @@ public interface WissenIngestPort {
     /** Ein Ingest-Entwurf des Dokuments läuft oder wartet ({@code IN_ARBEIT}, {@code WARTEND}; Req 5.10). */
     boolean entwurfFuerDokumentLaufend(UUID dokumentId);
 
-    boolean hatAktivenIngest();
+    /**
+     * Die Warteschlange des Mandanten ist belegt: ein Ingest-Entwurf ist aktiv ({@code IN_ARBEIT}, {@code OFFEN}) oder
+     * wartet ({@code WARTEND}). Ein neuer Start reiht sich dann hinten ein und überholt keinen wartenden (Req 5.13).
+     */
+    boolean warteschlangeBelegt();
 
     UUID entwurfAnlegen(NeuerEntwurf entwurf);
 

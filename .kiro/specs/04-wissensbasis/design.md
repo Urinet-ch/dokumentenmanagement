@@ -199,8 +199,8 @@ flowchart LR
   `ARCHIVIEREN` verkettet. `wissen/application` reiht bei Art `WISSENSQUELLE` in derselben Transaktion `WISSEN_INGEST`
   mit `{entwurfId}` ein bzw. setzt `quelle_pruefen`; ein Absturz verliert so keinen Ingest, und der Zugriff zwischen
   Fachbereichen läuft nur über `application` (ADR-011). Manuell: `POST /dokumente/{id}/wissen-ingest` (A16).
-- Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT` oder `OFFEN`, entsteht
-  der neue als `WARTEND` ohne Auftrag. Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
+- Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT`, `OFFEN` oder `WARTEND`,
+  entsteht der neue als `WARTEND` ohne Auftrag; ein neuer Start überholt so keinen wartenden (Review PR #307). Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
   Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. Erzwungen über einen
   partiellen Unique-Index auf eine Konstante (siehe Data Models).
 - Der Entwurf (`anlass = INGEST`) hält den Fortschritt in `schritt`; jeder Teilauftrag macht höchstens einen

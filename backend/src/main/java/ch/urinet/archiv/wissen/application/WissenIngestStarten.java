@@ -133,7 +133,7 @@ public class WissenIngestStarten implements DokumentEreignisse {
         if (hinweis != null) {
             status = "FEHLER";
         } else {
-            status = port.hatAktivenIngest() ? "WARTEND" : "IN_ARBEIT";
+            status = port.warteschlangeBelegt() ? "WARTEND" : "IN_ARBEIT";
         }
         UUID entwurfId = UUID.randomUUID();
         String schritt = status.equals("FEHLER") ? null : "KERNAUSSAGEN";

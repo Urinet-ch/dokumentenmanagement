@@ -113,14 +113,23 @@ class JdbcWissenIngestTest {
     }
 
     @Test
-    void aktiverIngestJeMandant() throws SQLException {
-        boolean zweiterVorher = im(ZWEITER, () -> ingest.hatAktivenIngest());
-        assumeFalse(im(URINET, () -> ingest.hatAktivenIngest()), "urinet hat schon einen aktiven Ingest");
+    void warteschlangeJeMandantNurMitWartendInArbeitOderOffenBelegt() throws SQLException {
+        boolean zweiterVorher = im(ZWEITER, () -> ingest.warteschlangeBelegt());
+        assumeFalse(im(URINET, () -> ingest.warteschlangeBelegt()),
+                "urinet hat schon einen Ingest in der Warteschlange");
 
-        entwurf(URINET, quelle(URINET), "OFFEN");
+        for (String status : List.of("ERLEDIGT", "FEHLER", "ABGELEHNT")) {
+            entwurf(URINET, quelle(URINET), status);
+        }
+        assertThat(im(URINET, () -> ingest.warteschlangeBelegt())).isFalse();
 
-        assertThat(im(URINET, () -> ingest.hatAktivenIngest())).isTrue();
-        assertThat(im(ZWEITER, () -> ingest.hatAktivenIngest())).isEqualTo(zweiterVorher);
+        // ein WARTEND ohne aktiven Entwurf belegt die Warteschlange ebenfalls (Req 5.13, Reihenfolge der Auslösung)
+        for (String status : List.of("WARTEND", "IN_ARBEIT", "OFFEN")) {
+            UUID id = entwurf(URINET, quelle(URINET), status);
+            assertThat(im(URINET, () -> ingest.warteschlangeBelegt())).as(status).isTrue();
+            assertThat(im(ZWEITER, () -> ingest.warteschlangeBelegt())).as(status).isEqualTo(zweiterVorher);
+            ausfuehren("delete from " + URINET.schema() + ".wissens_entwurf where id = ?", id);
+        }
     }
 
     @Test
@@ -156,9 +165,11 @@ class JdbcWissenIngestTest {
         return id;
     }
 
-    private void entwurf(MandantCode code, UUID dokument, String status) throws SQLException {
+    private UUID entwurf(MandantCode code, UUID dokument, String status) throws SQLException {
+        UUID id = UUID.randomUUID();
         ausfuehren("insert into " + code.schema() + ".wissens_entwurf (id, anlass, dokument_id, status, erstellt_von, "
-                + "erstellt) values (?, 'INGEST', ?, ?, 'probe', now())", UUID.randomUUID(), dokument, status);
+                + "erstellt) values (?, 'INGEST', ?, ?, 'probe', now())", id, dokument, status);
+        return id;
     }
 
     private void verbrauch(MandantCode code, String zweck, int tokens, Instant zeit) throws SQLException {
