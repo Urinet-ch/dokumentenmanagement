@@ -3,6 +3,7 @@ package ch.urinet.archiv.verarbeitung.application;
 import ch.urinet.archiv.dokument.application.DokumentArchivierungPort;
 import ch.urinet.archiv.dokument.application.DokumentArchivierungPort.Archiviert;
 import ch.urinet.archiv.dokument.application.DokumentArchivierungPort.Archivierungsstand;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -20,10 +21,13 @@ import java.util.UUID;
 public class ArchivierungSpeichern {
 
     private final DokumentArchivierungPort dokumente;
+    private final DokumentEreignisse ereignisse;
     private final AuftragService auftraege;
 
-    public ArchivierungSpeichern(DokumentArchivierungPort dokumente, AuftragService auftraege) {
+    public ArchivierungSpeichern(DokumentArchivierungPort dokumente, DokumentEreignisse ereignisse,
+                                 AuftragService auftraege) {
         this.dokumente = dokumente;
+        this.ereignisse = ereignisse;
         this.auftraege = auftraege;
     }
 
@@ -33,8 +37,9 @@ public class ArchivierungSpeichern {
     }
 
     /**
-     * Hält die Archivierung fest und reiht in derselben Transaktion {@code EMBEDDING} ein (Spec 02, Req 2.1), sobald es
-     * dafür einen Handler gibt.
+     * Hält die Archivierung fest, meldet sie mit der in dieser Transaktion gelesenen Art an {@link DokumentEreignisse}
+     * (Spec 04, Req 5.1) und reiht in derselben Transaktion {@code EMBEDDING} ein (Spec 02, Req 2.1), sobald es dafür
+     * einen Handler gibt.
      *
      * @return {@code false}, wenn das Dokument nicht mehr in {@code ARCHIVIERUNG} ist (nichts geschrieben)
      */
@@ -44,6 +49,7 @@ public class ArchivierungSpeichern {
         if (!dokumente.festhalten(id, dateien, sperreBis)) {
             return false;
         }
+        ereignisse.archiviert(id, dokumente.laden(id).map(Archivierungsstand::art).orElse(null));
         if (auftraege.hatHandler(EmbeddingSpeichern.EMBEDDING)) {
             auftraege.einreihen(EmbeddingSpeichern.EMBEDDING, EmbeddingSpeichern.einzeln(id));
         }

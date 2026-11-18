@@ -18,4 +18,6 @@ export * from './kontakte.service';
 import { KontakteService } from './kontakte.service';
 export * from './protokoll.service';
 import { ProtokollService } from './protokoll.service';
-export const APIS = [APITokensService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService];
+export * from './wissen-ingest-resource.service';
+import { WissenIngestResourceService } from './wissen-ingest-resource.service';
+export const APIS = [APITokensService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService];

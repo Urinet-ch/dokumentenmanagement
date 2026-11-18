@@ -63,3 +63,5 @@ export * from './upload-fehler';
 export * from './verwerfen';
 export * from './verzeichnis-eintrag';
 export * from './warnung';
+export * from './wissen-ingest-auftrag';
+export * from './wissen-ingest-start';

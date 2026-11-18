@@ -33,7 +33,7 @@ public class PanacheDokumentArchivierung implements DokumentArchivierungPort {
         zeitgrenze();
         @SuppressWarnings("unchecked")
         List<Object[]> zeilen = em().createNativeQuery("""
-                        select d.status, d.eingang, coalesce(a.gesetzliche_pflicht, true), d.aufbewahren_bis,
+                        select d.status, d.art, d.eingang, coalesce(a.gesetzliche_pflicht, true), d.aufbewahren_bis,
                             d.frist_abgelaufen, d.pdfa_fehlt, d.s3_pdfa, d.s3_version_pdfa, d.sha256_pdfa
                         from dokument d left join dokumentart a on a.code = d.art
                         where d.id = :id""")
@@ -51,10 +51,10 @@ public class PanacheDokumentArchivierung implements DokumentArchivierungPort {
                 .map(z -> new Datei(DateiRolle.valueOf((String) z[0]), ((Number) z[1]).intValue(), (String) z[2],
                         (String) z[3], (String) z[4], (String) z[5]))
                 .toList();
-        Optional<Datei> pdfa = d[6] == null && d[7] == null && d[8] == null ? Optional.empty()
-                : Optional.of(new Datei(DateiRolle.PDFA, 1, PDF, (String) d[6], (String) d[7], (String) d[8]));
-        return Optional.of(new Archivierungsstand(id, DokumentStatus.valueOf((String) d[0]), zeitpunkt(d[1]),
-                (Boolean) d[2], datum(d[3]), (Boolean) d[4], dateien, (Boolean) d[5], pdfa));
+        Optional<Datei> pdfa = d[7] == null && d[8] == null && d[9] == null ? Optional.empty()
+                : Optional.of(new Datei(DateiRolle.PDFA, 1, PDF, (String) d[7], (String) d[8], (String) d[9]));
+        return Optional.of(new Archivierungsstand(id, DokumentStatus.valueOf((String) d[0]), (String) d[1],
+                zeitpunkt(d[2]), (Boolean) d[3], datum(d[4]), (Boolean) d[5], dateien, (Boolean) d[6], pdfa));
     }
 
     @Override
