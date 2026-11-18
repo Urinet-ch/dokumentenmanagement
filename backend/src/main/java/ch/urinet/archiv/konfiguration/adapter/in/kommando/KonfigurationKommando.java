@@ -209,8 +209,7 @@ public class KonfigurationKommando {
 
     private int einspielen(Aufruf aufruf, PrintStream aus) throws IOException {
         String datei = dateiLesen(aufruf.datei().orElseThrow());
-        int version = kontext.mit(aufruf.mandant(), verwaltung::aktuelleVersion);
-        Ergebnis ergebnis = kontext.mit(aufruf.mandant(), () -> verwaltung.einspielen(datei, version,
+        Ergebnis ergebnis = kontext.mit(aufruf.mandant(), () -> verwaltung.einspielen(datei,
                 "betreiber:" + aufruf.wer(), aufruf.grund()));
         if (aufruf.json()) {
             aus.println(json.writeValueAsString(ergebnis));
