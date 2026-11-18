@@ -27,6 +27,31 @@ class KonfigurationTest {
     }
 
     @Test
+    void aenderungToStringGibtKennungenNichtAus() {
+        var kennung = new Konfiguration.Aenderung("einstellungen.kennungen.uid", "PROBE-ALT", "PROBE-NEU");
+        var andere = new Konfiguration.Aenderung("einstellungen.geschaeftsjahrEnde", "06-30", "12-31");
+
+        assertThat(kennung.toString()).doesNotContain("PROBE-ALT").doesNotContain("PROBE-NEU");
+        assertThat(andere.toString()).contains("06-30").contains("12-31");
+    }
+
+    /** Die Pfade, die {@link Konfiguration#aenderungen} für Kennungen liefert, gelten als ohne Werte (Req 1.3). */
+    @Test
+    void geaenderteKennungenSindGenauDieAenderungenOhneWerte() {
+        var vorher = new Konfiguration(1, new Konfiguration.Einstellungen("12-31",
+                new Konfiguration.Kennungen("PROBE-UID-ALT", List.of("PROBE-IBAN-ALT"))), List.of());
+        var nachher = new Konfiguration(2, new Konfiguration.Einstellungen("06-30",
+                new Konfiguration.Kennungen("PROBE-UID-NEU", List.of("PROBE-IBAN-NEU"))), List.of());
+
+        var aenderungen = vorher.aenderungen(nachher);
+
+        assertThat(aenderungen).extracting(Konfiguration.Aenderung::pfad).containsExactly(
+                "einstellungen.geschaeftsjahrEnde", "einstellungen.kennungen.uid", "einstellungen.kennungen.ibans");
+        assertThat(aenderungen).extracting(Konfiguration.Aenderung::ohneWerte).containsExactly(false, true, true);
+        assertThat(aenderungen.toString() + nachher).doesNotContain("PROBE-UID", "PROBE-IBAN");
+    }
+
+    @Test
     void kopiertListenUnveraenderlich() {
         var ibans = new java.util.ArrayList<>(List.of("TEST-IBAN-1"));
         var kennungen = new Konfiguration.Kennungen(null, ibans);
