@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -226,6 +227,59 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     /** Das simulierte Chat-Modell antwortet erst nach {@code millis} ms (über der Zeitgrenze des Agenten). */
     public static void chatVerzoegert(ChatAntwort antwort, int millis) {
         client().register(gestreamt().willReturn(strom(antwort).withFixedDelay(millis)));
+    }
+
+    /** Antworten auf die nicht gestreamten JSON-Schema-Aufrufe des Wissens-Ingests, in der angegebenen Reihenfolge. */
+    public static void wissenFolge(List<String> inhalte) {
+        wissenFolge(inhalte, 0);
+    }
+
+    /** Wie {@link #wissenFolge(List)}; verzögert optional die erste Antwort für Warteschlangen-Szenarien. */
+    public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis) {
+        wissenFolge(inhalte, ersteVerzoegerungMillis, 100, 50);
+    }
+
+    /** Wie {@link #wissenFolge(List, int)}; setzt den simulierten Verbrauch je Antwort. */
+    public static void wissenFolge(List<String> inhalte, int ersteVerzoegerungMillis,
+                                   int tokensEin, int tokensAus) {
+        WireMock modell = client();
+        for (int i = 0; i < inhalte.size(); i++) {
+            boolean letzte = i == inhalte.size() - 1;
+            ResponseDefinitionBuilder antwort = okJson(wissenAntwort(inhalte.get(i), tokensEin, tokensAus));
+            if (i == 0 && ersteVerzoegerungMillis > 0) {
+                antwort.withFixedDelay(ersteVerzoegerungMillis);
+            }
+            var stub = post(urlPathEqualTo(CHAT_PFAD))
+                    .withRequestBody(matchingJsonPath("$.response_format.json_schema.name",
+                            matching("wissen_ingest_.*")))
+                    .atPriority(5)
+                    .inScenario("wissen-ingest")
+                    .whenScenarioStateIs(i == 0 ? com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED
+                            : "antwort-" + i)
+                    .willReturn(antwort);
+            if (!letzte) {
+                stub.willSetStateTo("antwort-" + (i + 1));
+            }
+            modell.register(stub);
+        }
+    }
+
+    /** JSON-Anfragen aller vier Wissens-Ingest-Schritte aus dem WireMock-Journal. */
+    public static List<String> wissenAnfragen() {
+        return client().find(RequestPatternBuilder.newRequestPattern(
+                        com.github.tomakehurst.wiremock.http.RequestMethod.POST, urlPathEqualTo(CHAT_PFAD))
+                .withRequestBody(matchingJsonPath("$.response_format.json_schema.name",
+                        matching("wissen_ingest_.*"))))
+                .stream().map(LoggedRequest::getBodyAsString).toList();
+    }
+
+    private static String wissenAntwort(String inhalt, int tokensEin, int tokensAus) {
+        return """
+                {"id":"wissen-test","object":"chat.completion","created":1773565200,
+                 "model":"google/gemma-4-31B-it",
+                 "choices":[{"index":0,"message":{"role":"assistant","content":%s},"finish_reason":"stop"}],
+                 "usage":{"prompt_tokens":%d,"completion_tokens":%d,"total_tokens":%d}}
+                """.formatted(jsonText(inhalt), tokensEin, tokensAus, tokensEin + tokensAus);
     }
 
     /** Gestreamte Anfragen an das Chat-Modell im Journal, älteste zuerst, als JSON-Text. */

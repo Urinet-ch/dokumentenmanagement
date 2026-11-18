@@ -16,6 +16,9 @@ public interface KiPort {
     /** Ein Aufruf; eine Ausnahme gibt es nicht, jeder Fehler ist eine {@link Antwort}. */
     Antwort metadaten(Anfrage anfrage);
 
+    /** Ein strukturierter Einzelaufruf für einen Ingest-Schritt der Wissensbasis. */
+    WissensAntwort wissensIngest(WissensAnfrage anfrage);
+
     /** Antwortschema als Text, so wie es das Modell erhält; Teil der Kennung der Prompt-Fassung. */
     String antwortschema();
 
@@ -81,5 +84,90 @@ public interface KiPort {
 
     /** Tokens eines Aufrufs für {@code ki_verbrauch} (design.md «KI»). */
     record Verbrauch(String modell, long tokensEin, long tokensAus) {
+    }
+
+    enum WissensSchritt {
+        KERNAUSSAGEN,
+        PLANUNG,
+        SEITE,
+        QUELLE
+    }
+
+    record WissensAnfrage(WissensSchritt schritt, String modell, String systemPrompt, String nachricht,
+                          int maxAusgabeTokens) {
+        public WissensAnfrage {
+            Objects.requireNonNull(schritt, "schritt");
+            Objects.requireNonNull(modell, "modell");
+            Objects.requireNonNull(systemPrompt, "systemPrompt");
+            Objects.requireNonNull(nachricht, "nachricht");
+            if (modell.isBlank() || maxAusgabeTokens < 1) {
+                throw new IllegalArgumentException("Ungültige Anfrage für den Wissens-Ingest");
+            }
+        }
+    }
+
+    sealed interface WissensAntwort permits WissensGueltig, WissensSchemafehler, WissensAusfall,
+            WissensOhneZugang {
+        Verbrauch verbrauch();
+    }
+
+    record WissensGueltig(WissensInhalt inhalt, Verbrauch verbrauch) implements WissensAntwort {
+    }
+
+    record WissensSchemafehler(String grund, Verbrauch verbrauch) implements WissensAntwort {
+    }
+
+    record WissensAusfall(String grund, Verbrauch verbrauch) implements WissensAntwort {
+    }
+
+    record WissensOhneZugang(Verbrauch verbrauch) implements WissensAntwort {
+    }
+
+    sealed interface WissensInhalt permits Kernaussagen, Planung, Seite, Quelle {
+    }
+
+    record Kernaussagen(List<Aussage> aussagen) implements WissensInhalt {
+        public Kernaussagen {
+            aussagen = aussagen == null ? List.of() : List.copyOf(aussagen);
+        }
+    }
+
+    record Aussage(Integer nr, String text, List<Integer> seiten, String auszug) {
+    }
+
+    record Planung(List<Plan> seiten) implements WissensInhalt {
+        public Planung {
+            seiten = seiten == null ? List.of() : List.copyOf(seiten);
+        }
+    }
+
+    record Plan(String pfad, String aktion, String typ, String grund, List<Integer> aussagen) {
+    }
+
+    record Seite(String titel, String beschreibung, List<String> tags, String inhalt,
+                 List<Widerspruch> widersprueche, List<EntfernteAussage> entfernteAussagen, String begruendung)
+            implements WissensInhalt {
+        public Seite {
+            tags = tags == null ? List.of() : List.copyOf(tags);
+            widersprueche = widersprueche == null ? List.of() : List.copyOf(widersprueche);
+            entfernteAussagen = entfernteAussagen == null ? List.of() : List.copyOf(entfernteAussagen);
+        }
+    }
+
+    record Widerspruch(String bestehend, String neu, String text) {
+    }
+
+    record EntfernteAussage(String schluessel, String begruendung) {
+    }
+
+    record Quelle(String titel, String beschreibung, List<String> tags, List<Zusammenfassung> zusammenfassung)
+            implements WissensInhalt {
+        public Quelle {
+            tags = tags == null ? List.of() : List.copyOf(tags);
+            zusammenfassung = zusammenfassung == null ? List.of() : List.copyOf(zusammenfassung);
+        }
+    }
+
+    record Zusammenfassung(String text, List<Integer> aussagen) {
     }
 }

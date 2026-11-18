@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 04, Aufgabe 14.1b: Teilauftragsfortschritt bleibt atomar mit dem Auftrag erhalten. -->
+    <changeSet id="048-wissen-ingest-fortschritt" author="archiv">
+        <sql>
+            alter table wissens_entwurf
+                add column ingest_daten jsonb not null default '{}'::jsonb
+                constraint wissens_entwurf_ingest_daten_ck check (jsonb_typeof(ingest_daten) = 'object');
+        </sql>
+        <rollback>
+            <sql>
+                alter table wissens_entwurf drop column if exists ingest_daten;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -9,6 +9,9 @@ import com.networknt.schema.SpecificationVersion;
 import dev.langchain4j.internal.JsonSchemaElementUtils;
 import dev.langchain4j.service.output.JsonSchemas;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 /**
  * Prüft die Rohantwort des Modells gegen das strikte Antwortschema, wie es im {@code response_format} hinausgeht (Req
  * 7.3): alle Felder {@code required}, {@code additionalProperties: false}, Typen und Enums. LangChain4j selbst füllt
@@ -16,17 +19,20 @@ import dev.langchain4j.service.output.JsonSchemas;
  */
 public final class AntwortSchema {
 
-    private static final Schema SCHEMA = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
-            .getSchema(json(), InputFormat.JSON);
+    private static final ConcurrentMap<Class<?>, Schema> SCHEMAS = new ConcurrentHashMap<>();
 
     private AntwortSchema() {
     }
 
     /** Strikte Fassung des Antwortschemas als JSON (gleich dem {@code json_schema.schema} der Anfrage). */
     public static String json() {
+        return json(MetadatenVorschlag.class);
+    }
+
+    static String json(Class<?> antworttyp) {
         try {
             return new ObjectMapper().writeValueAsString(JsonSchemaElementUtils.toMap(
-                    JsonSchemas.jsonSchemaFrom(MetadatenVorschlag.class).orElseThrow().rootElement(), true));
+                    JsonSchemas.jsonSchemaFrom(antworttyp).orElseThrow().rootElement(), true));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Antwortschema nicht serialisierbar", e);
         }
@@ -34,13 +40,24 @@ public final class AntwortSchema {
 
     /** {@code true}, wenn der Text gültiges JSON nach dem strikten Schema ist; leerer Text oder {@code null} nie. */
     static boolean gueltig(String roh) {
+        return gueltig(roh, MetadatenVorschlag.class);
+    }
+
+    /** Prüft die Rohantwort gegen das Antwortschema des jeweiligen KI-Aufrufs. */
+    static boolean gueltig(String roh, Class<?> antworttyp) {
         if (roh == null || roh.isBlank()) {
             return false;
         }
         try {
-            return SCHEMA.validate(roh, InputFormat.JSON).isEmpty();
+            return SCHEMAS.computeIfAbsent(antworttyp, AntwortSchema::schema).validate(roh, InputFormat.JSON)
+                    .isEmpty();
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    private static Schema schema(Class<?> antworttyp) {
+        return SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
+                .getSchema(json(antworttyp), InputFormat.JSON);
     }
 }

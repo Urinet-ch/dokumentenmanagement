@@ -5,6 +5,7 @@ import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
+import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -64,7 +65,9 @@ class JdbcWissenIngestTest {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Map<MandantCode, List<UUID>> dokumente = new HashMap<>();
+    private final Map<MandantCode, List<UUID>> entwuerfe = new HashMap<>();
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
+    private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
 
     @BeforeEach
     void mandanten() throws SQLException {
@@ -73,7 +76,9 @@ class JdbcWissenIngestTest {
                 provisionierung.anlegen(code.wert(), null, null);
             }
             dokumente.put(code, new ArrayList<>());
+            entwuerfe.put(code, new ArrayList<>());
             verbrauch.put(code, new ArrayList<>());
+            monatsbudgets.put(code, monatsbudget(code));
         }
     }
 
@@ -81,8 +86,18 @@ class JdbcWissenIngestTest {
     void aufraeumen() throws SQLException {
         worker.shutdown();
         for (MandantCode code : List.of(URINET, ZWEITER)) {
+            for (UUID id : entwuerfe.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissens_entwurf where id = ?", id);
+            }
             for (Long id : verbrauch.get(code)) {
                 ausfuehren("delete from " + code.schema() + ".ki_verbrauch where id = ?", id);
+            }
+            Monatsbudget vorher = monatsbudgets.get(code);
+            if (vorher.vorhanden()) {
+                ausfuehren("update " + code.schema() + ".wissens_einstellung set monatsbudget_tokens = ? where id = 1",
+                        vorher.wert());
+            } else {
+                ausfuehren("delete from " + code.schema() + ".wissens_einstellung where id = 1");
             }
             Testdokumente.loeschen(datenbank.get(), code.wert(), dokumente.get(code));
         }
@@ -148,12 +163,53 @@ class JdbcWissenIngestTest {
     void entwurfLandetImEigenenSchema() throws SQLException {
         UUID dokument = quelle(ZWEITER);
         UUID id = UUID.randomUUID();
+        entwuerfe.get(ZWEITER).add(id);
         im(ZWEITER, () -> ingest.entwurfAnlegen(new WissenIngestPort.NeuerEntwurf(id, dokument, 1, 2, "FEHLER",
                 "KERNAUSSAGEN", "test-modell", "process:wissen-ingest", "Probe")));
 
         assertThat(anzahl("select count(*) from " + ZWEITER.schema() + ".wissens_entwurf where id = ?", id))
                 .isEqualTo(1);
         assertThat(anzahl("select count(*) from " + URINET.schema() + ".wissens_entwurf where id = ?", id)).isZero();
+    }
+
+    @Test
+    void wartenderIngestWirdBeiAusgeschoepftemMonatsbudgetMitFehlerAbgeschlossen() throws SQLException {
+        UUID entwurf = entwurf(URINET, quelle(URINET), "WARTEND");
+        verbrauch(URINET, "WISSEN_INGEST", 1_000, VON.plusSeconds(60));
+        monatsbudgetSetzen(URINET, 1_000);
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000, VON, BIS))).isEmpty();
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "FEHLER")
+                .containsEntry("hinweis", "Budget erschöpft");
+    }
+
+    @Test
+    void wartenderIngestWirdNichtBeiOffenemIngestAktiviert() throws SQLException {
+        UUID wartend = entwurf(URINET, quelle(URINET), "WARTEND");
+        entwurf(URINET, quelle(URINET), "OFFEN");
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000_000, VON, BIS))).isEmpty();
+        assertThat(zeile(URINET, wartend)).containsEntry("status", "WARTEND");
+    }
+
+    @Test
+    void wartenderIngestWirdBeiVerfuegbaremBudgetAktiviert() throws SQLException {
+        UUID wartend = entwurf(URINET, quelle(URINET), "WARTEND");
+
+        assertThat(im(URINET, () -> ingest.wartendenAktivieren(1_000_000, VON, BIS))).contains(wartend);
+        assertThat(zeile(URINET, wartend)).containsEntry("status", "IN_ARBEIT");
+    }
+
+    @Test
+    void holtNurHandlerFehltEntwuerfeOhneNeuerenIngestNach() throws SQLException {
+        UUID alt = entwurf(URINET, quelle(URINET), "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
+        UUID neuer = entwurf(URINET, quelle(URINET), "FEHLER", "Neuerer Entwurf");
+        ausfuehren("update " + URINET.schema() + ".wissens_entwurf set erstellt = erstellt + interval '1 second' "
+                + "where id = ?", neuer);
+
+        assertThat(im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT))).isEqualTo(1);
+        assertThat(zeile(URINET, alt)).containsEntry("status", "WARTEND").containsEntry("hinweis", null);
+        assertThat(zeile(URINET, neuer)).containsEntry("status", "FEHLER");
     }
 
     private UUID quelle(MandantCode code) throws SQLException {
@@ -166,10 +222,50 @@ class JdbcWissenIngestTest {
     }
 
     private UUID entwurf(MandantCode code, UUID dokument, String status) throws SQLException {
+        return entwurf(code, dokument, status, null);
+    }
+
+    private UUID entwurf(MandantCode code, UUID dokument, String status, String hinweis) throws SQLException {
         UUID id = UUID.randomUUID();
-        ausfuehren("insert into " + code.schema() + ".wissens_entwurf (id, anlass, dokument_id, status, erstellt_von, "
-                + "erstellt) values (?, 'INGEST', ?, ?, 'probe', now())", id, dokument, status);
+        entwuerfe.get(code).add(id);
+        ausfuehren("insert into " + code.schema()
+                        + ".wissens_entwurf (id, anlass, dokument_id, status, schritt, hinweis, erstellt_von, erstellt) "
+                        + "values (?, 'INGEST', ?, ?, case when ? = 'WARTEND' then 'KERNAUSSAGEN' end, ?, 'probe', now())",
+                id, dokument, status, status, hinweis);
         return id;
+    }
+
+    private void monatsbudgetSetzen(MandantCode code, int tokens) throws SQLException {
+        ausfuehren("update " + code.schema() + ".wissens_einstellung set monatsbudget_tokens = ? where id = 1",
+                tokens);
+    }
+
+    private Monatsbudget monatsbudget(MandantCode code) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select monatsbudget_tokens from " + code.schema() + ".wissens_einstellung where id = 1");
+             ResultSet ergebnis = abfrage.executeQuery()) {
+            if (!ergebnis.next()) {
+                return new Monatsbudget(false, null);
+            }
+            int wert = ergebnis.getInt(1);
+            return new Monatsbudget(true, ergebnis.wasNull() ? null : wert);
+        }
+    }
+
+    private Map<String, Object> zeile(MandantCode code, UUID id) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select status, hinweis from " + code.schema()
+                     + ".wissens_entwurf where id = ?")) {
+            abfrage.setObject(1, id);
+            try (ResultSet ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                Map<String, Object> werte = new HashMap<>();
+                werte.put("status", ergebnis.getString(1));
+                werte.put("hinweis", ergebnis.getString(2));
+                return werte;
+            }
+        }
     }
 
     private void verbrauch(MandantCode code, String zweck, int tokens, Instant zeit) throws SQLException {
@@ -227,5 +323,8 @@ class JdbcWissenIngestTest {
                 return zeile.next();
             }
         }
+    }
+
+    private record Monatsbudget(boolean vorhanden, Integer wert) {
     }
 }

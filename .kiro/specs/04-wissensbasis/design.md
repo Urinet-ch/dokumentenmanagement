@@ -203,13 +203,22 @@ flowchart LR
   Fachbereichen läuft nur über `application` (ADR-011). Manuell: `POST /dokumente/{id}/wissen-ingest` (A16).
 - Reihenfolge je Mandant (Requirement 5.13): Gibt es schon einen Ingest-Entwurf `IN_ARBEIT`, `OFFEN` oder `WARTEND`,
   entsteht der neue als `WARTEND` ohne Auftrag; ein neuer Start überholt so keinen wartenden (Review PR #307). Wird ein Ingest-Entwurf `ERLEDIGT`, `FEHLER` oder `ABGELEHNT`, setzt dieselbe
-  Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. Erzwungen über einen
-  partiellen Unique-Index auf eine Konstante (siehe Data Models).
+  Transaktion den ältesten `WARTEND` auf `IN_ARBEIT` und reiht seinen ersten Teilauftrag ein. 14.1b stellt dafür
+  `WissenIngestSpeichern.wartendenIngestStarten()` bereit; Fehlerabschlüsse rufen es auf, und 14.2 ruft es beim
+  Annehmen oder Verwerfen eines Entwurfs auf. Erzwungen über einen partiellen Unique-Index auf eine Konstante (siehe
+  Data Models).
 - Der Entwurf (`anlass = INGEST`) hält den Fortschritt in `schritt`; jeder Teilauftrag macht höchstens einen
   KI-Aufruf und reiht den nächsten ein (Requirement 13.7).
+- Wartende Ingests reservieren kein Monatsbudget. Beim Hochstufen sperrt `JdbcWissenIngest` die mandanteneigene
+  Warteschlange und das Budget, prüft erneut `IN_ARBEIT`/`OFFEN`, wählt den ältesten wartenden Entwurf und berechnet
+  Verbrauch sowie aktive Reservierungen im Zürcher Kalendermonat. Ist das Monatsbudget erschöpft, enden die wartenden
+  Entwürfe mit `FEHLER` und dem Hinweis «Budget erschöpft» statt eines neuen KI-Auftrags.
 - Vorprüfung ohne KI: Art, Vertraulichkeit ≠ `PERSONAL`, Volltext vorhanden, PDF/A vorhanden und Zahl der
   `\f`-Seiten = `dokument.seiten`, kein laufender oder wartender Ingest desselben Dokuments (Requirement 5.6, 5.7,
   5.10), Monatsbudget der Wissensbasis (Requirement 13.6) und Schätzung gegen `budget-tokens` (Requirement 13.4).
+  Die archivierte Vertraulichkeit ist die Grenze für Personendaten: eine als `PERSONAL` eingestufte Quelle wird vor
+  jedem KI-Aufruf abgelehnt. Es gibt keine automatische Erkennung von Personendaten in anders eingestuften
+  Volltexten; deren korrekte Einstufung erfolgt bei der Dokumenterfassung.
   Schätzung je Schritt mit Ein- und Ausgabe:
   `(Zeichen Text + Index + ueberblick + 2 × max-seiten × seite-max-zeichen + Anzahl Aufrufe × Systemprompt) / 3 × 1.3`
   Tokens. Ein WireMock-Szenario vergleicht die Schätzung mit `wissens_entwurf.tokens_*`.
@@ -248,6 +257,12 @@ flowchart LR
     zurück und `ARCHIVIEREN` wird nach Spec 01 wiederholt; ein fachliches Hindernis ist dagegen ein Entwurf `FEHLER`.
   - Systemakteur der Entwürfe aus dem automatischen Start: `process:wissen-ingest` («Akteure»).
   - Die Zeitgrenze `archiv.auftrag.zeitgrenze.WISSEN_INGEST` stand schon vor 14.1a in `application.properties`.
+- Umsetzung 14.1b (PR #312): `WissenIngestNachholen` reaktiviert beim Worker-Start einmalig alte
+  `HANDLER_FEHLT`-Entwürfe, wenn kein neuerer Ingest desselben Dokuments existiert; danach läuft die normale
+  Warteschlange. Bei einem Fehler in einem Mandanten wird die Wiederherstellung protokolliert und im nächsten Takt
+  erneut versucht. Der Indexloader begrenzt Suchtreffer auf höchstens 40 Zeilen und schliesst `ueberblick` bei
+  `INTERN` auch als Index-Metadaten aus. Monatsverbrauch, Reservierungen und Ingest-Schritte verwenden dasselbe
+  Monatsfenster `Europe/Zurich`.
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:
@@ -278,7 +293,11 @@ flowchart LR
   `unvollstaendig = true` (Requirement 13.5). Monatsbudget: Summe `ki_verbrauch` mit Zweck `WISSEN_*` im Monat gegen
   `wissens_einstellung.monatsbudget_tokens`, sonst den Startwert `archiv.wissen.monatsbudget-tokens` (1'000'000); `public.mandant_budget` (Chatbot, Spec 03) wird
   weder gelesen noch geschrieben. Erschöpft: manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` mit Hinweis «Budget
-  erschöpft» (Requirement 13.6).
+  erschöpft» (Requirement 13.6). Vor jedem Ingest-KI-Aufruf reserviert `ki_verbrauch_reservierung` die höchstmögliche
+  Tokenzahl in einer Transaktion mit mandantenspezifischer Advisory-Sperre; `ki_verbrauch.ingest_entwurf_id`
+  ordnet auch fehlgeschlagene Versuche dem Entwurf zu. Nach protokolliertem Verbrauch wird die Reservierung freigegeben;
+  bleibt die Protokollierung aus, läuft sie nach fünf Minuten ab. So zählen parallele Aufträge und Wiederholungen in
+  die harte Monats- und Ingest-Grenze.
 
 ### Entwurf und Freigabe (`wissen/application`)
 - `DiffDienst`: zeilenbasiert über Markdown (java-diff-utils), dazu Felddiff (Titel, Beschreibung, Schlagwörter,
