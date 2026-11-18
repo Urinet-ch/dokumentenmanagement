@@ -63,7 +63,8 @@ class SzenarienShardTest {
                 List.of("@spec-07", "@req-9.9"),            // neues Spec-Tag: Shard 2
                 List.of("@spec-01", "@browser"),            // nie im Backend
                 List.of("@spec-02", "@sicherung"),          // nie im Backend
-                List.of("@spec-03", "@mandant-bericht"));  // nie im Backend
+                List.of("@spec-03", "@mandant-bericht"),   // nie im Backend
+                List.of("@spec-04", "@wissen-sichtbarkeit")); // eigene Klasse
 
         assertThat(fehler(szenarien)).isEmpty();
         assertThat(szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_2)::evaluate)).hasSize(3);

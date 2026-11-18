@@ -122,8 +122,11 @@ flowchart LR
     Abkürzungen als Satzende wertete.
   - Die Auszugsprüfung bleibt case-sensitiv (wörtlicher Auszug nach Requirement 2.7); normalisiert werden nur
     Leerraum, Silbentrennung und Unicode NFKC.
-  - Die wirksame Vertraulichkeit nach Annahme berechnet die Anwendungsschicht (Aufgabe 13.5, inkl. Quellen und
-    Annahme-Vorschlägen) und übergibt sie als `Kontext.wirksameVertraulichkeit`; die Prüfung nimmt das Maximum aus
+  - Die wirksame Vertraulichkeit nach Annahme berechnet `WissensGraph.wirksameStufeNachAnnahme` (Aufgabe 13.5:
+    Dokumente der Fassung, Hüllen ihrer Quellseiten, Mindeststufe, Kontextstufe); `FreigabeDienst` (14.2) ruft sie
+    auf und übergibt das Ergebnis als `Kontext.wirksameVertraulichkeit`. Als Seitenstufe übergibt 14.2 die
+    Mindeststufe der Seite, nicht die gespeicherte wirksame Stufe, damit eine Änderung, die eine interne Quelle
+    entfernt, nicht am alten Wert hängen bleibt (Review PR #300, M1). Die Prüfung nimmt das Maximum aus
     Seitenstufe und diesem Wert. Für `ueberblick` gilt `STUFE_UEBERBLICK`, wenn die wirksame Stufe über `NORMAL`
     liegt oder nicht übergeben wurde (fail closed); `STUFE_STEIGT` vergleicht dieselbe wirksame Stufe.
   - Ein Blockzitat mit der Marke «⚠️ Widerspruch:» gilt nur dann als Widerspruchsblock (und ist von der
@@ -178,8 +181,10 @@ flowchart LR
   Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument` und der Mindeststufe aus `daten`.
   Unsichtbare Versionen erscheinen in der Liste nur als Nummer; `/versionen/{n}` antwortet mit 404, `/diff` nur,
   wenn beide Versionen sichtbar sind.
-- `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Ingest-Kontext nach Requirement 5.5,
-  Lint-Paare nach 10.4). `QuelldokumentBeobachter` reagiert auf `DokumentEreignisse.geaendert` (siehe Ingest),
+- `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Lint-Paare nach 10.4). Für den
+  Ingest-Kontext nach Requirement 5.5 und die Kontextstufe nach 11.7 bestimmt der Ingest die Stufe live (Hülle über
+  `WissensGraph`, aktuelle Dokumentstufe), damit eine noch nicht nachgezogene Neuberechnung nichts preisgibt
+  (Review PR #300, S3). `QuelldokumentBeobachter` reagiert auf `DokumentEreignisse.geaendert` (siehe Ingest),
   berechnet die Stufe neu (nie unter `vertraulichkeit_mindest`) und setzt `quelle_pruefen` (Requirement 15.1).
   Wird ein Dokument der Hülle `PERSONAL` (A8), bleibt die Seite über den Hüllenfilter nur noch für die Berechtigten
   nach A4 sichtbar, trägt «Quelle prüfen» und ist vom Lint mit KI ausgenommen; die nächste Änderung hat den Befund
@@ -530,6 +535,70 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   vergleichen kommt erst mit Spec 01, Aufgabe 5.12. Der Vergleich von Anzahl Seiten und Versionen folgt mit dieser
   Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
   Nachweis (Review PR #295, M1).
+
+### Umsetzung 13.5 (PR #300)
+- `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe
+  Quellketten terminieren ohne Rekursion. Die wirksame Stufe ist das Maximum aus Hülldokumenten und Mindeststufe.
+- `WissenHuelleDienst` speichert aktuelle Hüllen und Hüllen je Version in einer Transaktion. Bei einer Änderung der
+  Dokument-Sichtbarkeit berechnet er alle Seiten mit diesem Dokument in der aktuellen Hülle neu; die Mindeststufe
+  bleibt dabei erhalten. Auch für `ueberblick` speichert die Neuberechnung die wirksame Stufe nach 11.1 (also
+  `INTERN`, sobald die Hülle ein internes Dokument enthält; Requirement 11.9, entschieden von Fabian am
+  18.11.2026). Requirement 11.8 gilt damit nur, solange alle Dokumente der Hülle `NORMAL` sind; der Befund
+  `STUFE_UEBERBLICK` gehört zur `WissensPruefung` (13.4, 14.2) und gilt für jede Änderung, deren wirksame Stufe nach
+  Annahme über `NORMAL` liegt, auch wenn die Übersicht schon `INTERN` ist (vorsichtige Auslegung).
+- Folgen für eine `INTERN` gewordene Übersicht (Requirement 11.9), ohne neue Regel: Ein Ingest einer
+  `NORMAL`-Wissensquelle sieht sie nicht (5.5, 5.11); plant er `ueberblick` neu, ergibt das `PFAD_UNGUELTIG` und den
+  Hinweis `HOEHERE_STUFE_VORHANDEN` (5.12, von Hand zusammenführen). Zurück zu `NORMAL` führt (a) die Rückstufung
+  des Dokuments, weil die Neuberechnung die unberührte Mindeststufe `NORMAL` nimmt, oder (b) eine manuelle Änderung
+  (6.9), die die interne Quelle entfernt; deren wirksame Stufe nach Annahme ist `NORMAL`, also kein Befund.
+- Neuberechnungen (`versionFreigeben`, `dokumentSichtbarkeitGeaendert`) sperren vor dem Lesen des Graphen den
+  Mandanten mit `pg_advisory_xact_lock(hashtextextended(current_schema() || ':wissen-huelle', 0))`; parallele Läufe
+  im selben Mandanten laufen damit nacheinander und schreiben keine veraltete Stufe zurück. Die Freigabe (14.2) ruft
+  zuerst `WissenHuelleDienst.sperren()` (nur innerhalb einer laufenden Transaktion), schreibt dann Seite, Version
+  und Quelleneinträge und ruft `versionFreigeben` in derselben Transaktion (die Sperre ist dort reentrant). So
+  nehmen parallele Freigaben die Sperren in derselben Reihenfolge; ein Test mit zwei parallelen Freigaben gehört zu
+  14.2 (Review PR #300, S2).
+- `WissenSichtbarkeit` wertet A15 und A2/A3 aus. Dokumente werden je Anfrage über
+  `DokumentRepository.sichtbar(..., Sichtregel.fuer(benutzer))` geprüft, damit dieselbe Sichtregel wie im
+  Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Abweichung vom Abschnitt «Sichtbarkeit und
+  Hülle»: Der Filter läuft in 13.5 in Java (je Hülldokument eine Abfrage), nicht als SQL-Prädikat. Für Index,
+  Zähler und Paging ersetzt Aufgabe 13.6 ihn durch ein Prädikat an der Abfrage von `wissensseite`; bis dahin gibt
+  es keine Liste mit Zähler oder Paging. Fail-closed für aktuelle Seiten (Review PR #300, S2 auf 651f9fd6 und
+  ebc9d0b6): Die Lesestrecke prüft die gespeicherte Hülle **vereinigt** mit der live aus `wissensseite_quelle`
+  berechneten Hülle (transitiv über Quellseiten, rekursive Abfrage mit `UNION`, zyklensicher); jedes dieser
+  Dokumente muss für den Benutzer sichtbar sein. Zusätzlich gilt eine Seite als `INTERN`, wenn
+  `vertraulichkeit_mindest` oder die gespeicherte `vertraulichkeit` nicht `NORMAL` ist, wenn sie Quelleneinträge,
+  aber keine Zeile in `wissensseite_dokument` hat, oder wenn ein live erreichbares Dokument nicht in ihrer
+  gespeicherten Hülle steht (Freigabe oder Quelländerung ohne Neuberechnung: die gespeicherte Stufe ist dann
+  veraltet). Folge der ersten Regel: Eine Seite, die nur Quellseiten ohne Dokumente zitiert (auch ein
+  dokumentfreier Zyklus), hat keine Hüllenzeilen und bleibt `INTERN` (fail-closed, wie die Version ohne Hülle).
+  Bewusste Verschärfung gegenüber «nach A2 bis A4»: Die gespeicherte Stufe macht aus `PERSONAL` und unbestätigten
+  Hülldokumenten `INTERN`; eine Seite, deren Hülle nur das eigene `PERSONAL`-Dokument eines `mitarbeiter` enthält,
+  sieht dieser darum nicht (kein Abfluss, nur strenger). Das SQL-Prädikat aus 13.6 übernimmt diese Regeln.
+- Mindeststufen zitierter Quellseiten fliessen nicht in die wirksame Stufe der zitierenden Seite ein (Hülle nach
+  Glossar und 11.1 nur aus Archivdokumenten; `WissensGraph.wirksameStufe`, `wirksameStufeNachAnnahme`). Ob sie es
+  sollen (z. B. `ueberblick` zitiert eine von Hand auf `INTERN` gesetzte Seite ohne internes Dokument), ist ein
+  Produktentscheid und offen (Review PR #300, ebc9d0b6, S2/K1); vor 14.2 zu klären.
+- Versionen: Eine Version ist nur sichtbar, wenn die aktuelle Seite sichtbar ist **und** die Version selbst sichtbar
+  ist (Req 11.2, 4.4; Review PR #300, M1). Die Version verwendet ihre eigene Hülle aus
+  `wissensseite_version_dokument` und die Mindeststufe aus `wissensseite_version.daten`, Schlüssel
+  `vertraulichkeit_mindest` (Werte `NORMAL`, `INTERN`; die Freigabe in 14.x schreibt diesen Schlüssel). Fehlt der
+  Schlüssel, ist der Wert unbekannt oder hat die Version keine Zeile in `wissensseite_version_dokument`, gilt sie
+  fail-closed als `INTERN`. Eine unbekannte Stufe in `wissensseite` gilt ebenfalls als `INTERN`.
+- `Berechtigung.wissensseitenAktion` akzeptiert nur A15–A19 und prüft Sichtbarkeit vor dem Recht (404 vor 403).
+  `Berechtigung.wissensentwurfLesen` gibt A17 Vollzugriff, A18 auf eigene Analysevorschläge nur Status, Entscheid
+  und Grund; fremde Vorschläge und Vorschläge für `treuhaender` bleiben 403. Verweigerungen für Wissensseiten
+  enthalten keine Dokument-ID oder Seiteninhalte. A19 bleibt für `geschaeftsstelle` verboten.
+- Cucumber prüft mit synthetischen IDs in `urinet` und `vhf-gsk` dieselben Seiten- und Dokument-IDs, alle vier Rollen,
+  Zyklen, manuelle Erhöhung, Neuberechnung und Sichtbarkeit einer älteren Version. Für die Mandantentrennung legt
+  jeder Durchgang in derselben Transaktion zusätzlich Daten im anderen Schema an (gleiche IDs, dort `INTERN`, und
+  eine Seite nur im anderen Mandanten) und prüft kreuzweise, dass Hülle, Stufe und Seite des anderen Mandanten
+  nicht wirken. Die Szenarien laufen im eigenen Runner `WissenSichtbarkeitSzenarienTest` (Tag
+  `@wissen-sichtbarkeit`), weil sie Daten direkt per JDBC in beide Schemas schreiben und mit Rollback aufräumen.
+  Das Szenario zur Übersicht legt in `urinet` eine Seite mit dem Pfad `ueberblick` an (Pfad eindeutig,
+  `wissensseite_pfad_uk`); es setzt voraus, dass kein anderer Test dort `ueberblick` committet (Review PR #300, K5). Eine Lese-API für Seiten, Log oder
+  Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
+  bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).
