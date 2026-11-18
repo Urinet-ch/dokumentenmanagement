@@ -59,6 +59,7 @@ public class WissenHuelleDienst {
         for (UUID seiteId : seiten) {
             Set<UUID> dokumente = graph.dokumente(seiteId);
             repository.aktuelleHuelleSetzen(seiteId, dokumente);
+            repository.mindeststufeAnheben(seiteId, graph.mindeststufeMitQuellen(seiteId));
             repository.vertraulichkeitSetzen(seiteId, graph.wirksameStufe(seiteId, dokumente));
         }
     }

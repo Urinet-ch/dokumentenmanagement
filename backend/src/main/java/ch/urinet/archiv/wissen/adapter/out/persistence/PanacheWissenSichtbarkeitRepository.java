@@ -69,8 +69,13 @@ public class PanacheWissenSichtbarkeitRepository implements WissenSichtbarkeitRe
     private static final String AKTUELLE_SEITE = AKTUELLE.formatted("where s.id = :seiteId");
 
     private static final String VERSION = """
-            select v.seite_id, coalesce(v.daten ->> 'vertraulichkeit_mindest', 'INTERN'), h.dokument_id
+            select v.seite_id,
+                   case when coalesce(v.daten ->> 'vertraulichkeit_mindest', 'INTERN') <> 'NORMAL'
+                              or coalesce(s.vertraulichkeit_mindest, 'INTERN') <> 'NORMAL'
+                        then 'INTERN' else 'NORMAL' end,
+                   h.dokument_id
             from wissensseite_version v
+            join wissensseite s on s.id = v.seite_id
             left join wissensseite_version_dokument h
               on h.seite_id = v.seite_id and h.version = v.version
             where v.seite_id = :seiteId and v.version = :version

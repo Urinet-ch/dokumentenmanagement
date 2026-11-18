@@ -33,6 +33,12 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Dann ist die gespeicherte Vertraulichkeit der Übersicht zuerst NORMAL und alle Rollen mit Recht A15 sehen sie
     Und speichert die Neuberechnung danach die wirksame Vertraulichkeit INTERN und «mitarbeiter» sieht die Übersicht nicht
 
+  @req-11.10
+  Szenario: Eine zitierte interne Mindeststufe bleibt über die Quellkette erhalten
+    Wenn eine dreiseitige Zitierkette mit einer internen Mindeststufe freigegeben und die Quelle herabgestuft wird
+    Dann bleibt die Mindeststufe der zitierenden Seite INTERN
+    Und sehen nur Rollen mit Recht A3 die zitierende Seite im Index, in der Einzelansicht und in der Version
+
   @req-11.8
   Szenario: Eine Änderung, die die Übersicht über NORMAL einstufen würde, erhält einen Befund
     Wenn für die Übersicht eine Fassung mit einer intern eingestuften Quellseite und eine Fassung mit einer normalen Quellseite geprüft werden

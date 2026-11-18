@@ -80,6 +80,8 @@ public class WissenSichtbarkeitSchritte {
     private final Map<String, String> uebersichtStufen = new HashMap<>();
     private final Map<String, WissensStufe> fassungStufen = new HashMap<>();
     private final Map<String, Set<WissensPruefung.Code>> fassungBefunde = new HashMap<>();
+    private final Map<String, Boolean> zitatSichtbarkeit = new HashMap<>();
+    private String zitatMindeststufe;
 
     @Wenn("rekursive Wissenshüllen und Sichtbarkeit in beiden Mandanten bei gleichzeitigen Daten des anderen Mandanten geprüft werden")
     public void sichtbarkeitPruefen() throws Exception {
@@ -261,6 +263,73 @@ public class WissenSichtbarkeitSchritte {
         assertThat(uebersichtStufen).containsEntry("intern", "INTERN");
         for (Rolle rolle : ROLLEN) {
             assertThat(sichtbarkeiten).containsEntry("ueberblick/intern/" + rolle.code(), rolle != Rolle.MITARBEITER);
+        }
+    }
+
+    @Wenn("eine dreiseitige Zitierkette mit einer internen Mindeststufe freigegeben und die Quelle herabgestuft wird")
+    public void zitierteMindeststufeNeuberechnen() throws Exception {
+        imMandantenKontext("vhf-gsk", () -> {
+            String schema = new MandantCode("vhf-gsk").schema();
+            UUID ersteSeite = UUID.randomUUID();
+            UUID zweiteSeite = UUID.randomUUID();
+            UUID quelle = UUID.randomUUID();
+            UUID quellDokument = UUID.randomUUID();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, quellDokument, "NORMAL");
+                seiteEinfuegen(verbindung, schema, quelle, "zitate/quelle", "INTERN");
+                seiteEinfuegen(verbindung, schema, zweiteSeite, "zitate/mitte", "NORMAL");
+                seiteEinfuegen(verbindung, schema, ersteSeite, "zitate/ziel", "NORMAL");
+                quellEintragen(verbindung, schema, quelle, "dokument", quellDokument, null);
+                quellEintragen(verbindung, schema, zweiteSeite, "quelle", null, quelle);
+                quellEintragen(verbindung, schema, ersteSeite, "quelle", null, zweiteSeite);
+                for (UUID id : List.of(quelle, zweiteSeite, ersteSeite)) {
+                    versionEinfuegen(verbindung, schema, id, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                }
+            }
+            huellen.versionFreigeben(quelle, 1);
+            huellen.versionFreigeben(zweiteSeite, 1);
+            huellen.versionFreigeben(ersteSeite, 1);
+
+            // Simuliert eine spätere Senkung der Quellstufe; geerbte Mindeststufen bleiben monoton.
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement p = verbindung.prepareStatement(
+                         "update " + schema + ".wissensseite set vertraulichkeit_mindest = 'NORMAL' where id = ?")) {
+                p.setObject(1, quelle);
+                p.executeUpdate();
+            }
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                versionEinfuegen(verbindung, schema, quelle, 2,
+                        "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+            }
+            huellen.versionFreigeben(quelle, 2);
+
+            zitatMindeststufe = mindeststufeLesen("vhf-gsk", ersteSeite);
+            for (Rolle rolle : ROLLEN) {
+                String schluessel = rolle.code();
+                Benutzer benutzer = benutzer(rolle);
+                zitatSichtbarkeit.put(schluessel + "/einzeln",
+                        sichtbarkeit.aktuelleSeiteSichtbar(benutzer, ersteSeite));
+                zitatSichtbarkeit.put(schluessel + "/index",
+                        sichtbarkeit.sichtbareSeiten(benutzer).contains(ersteSeite));
+                zitatSichtbarkeit.put(schluessel + "/version",
+                        sichtbarkeit.versionSichtbar(benutzer, ersteSeite, 1));
+            }
+        });
+    }
+
+    @Dann("bleibt die Mindeststufe der zitierenden Seite INTERN")
+    public void zitierendeMindeststufeBleibtIntern() {
+        assertThat(zitatMindeststufe).isEqualTo("INTERN");
+    }
+
+    @Dann("sehen nur Rollen mit Recht A3 die zitierende Seite im Index, in der Einzelansicht und in der Version")
+    public void zitierteSeiteNurMitA3Sichtbar() {
+        for (Rolle rolle : ROLLEN) {
+            boolean erwartet = rolle != Rolle.MITARBEITER;
+            assertThat(zitatSichtbarkeit).as(rolle.code())
+                    .containsEntry(rolle.code() + "/einzeln", erwartet)
+                    .containsEntry(rolle.code() + "/index", erwartet)
+                    .containsEntry(rolle.code() + "/version", erwartet);
         }
     }
 
@@ -633,6 +702,19 @@ public class WissenSichtbarkeitSchritte {
                      "select vertraulichkeit from " + schema + ".wissensseite where id = ?")) {
             p.setObject(1, seiteId);
             try (ResultSet rs = p.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                return rs.getString(1);
+            }
+        }
+    }
+
+    private String mindeststufeLesen(String code, UUID seiteId) throws Exception {
+        String schema = new MandantCode(code).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement(
+                     "select vertraulichkeit_mindest from " + schema + ".wissensseite where id = ?")) {
+            abfrage.setObject(1, seiteId);
+            try (ResultSet rs = abfrage.executeQuery()) {
                 assertThat(rs.next()).isTrue();
                 return rs.getString(1);
             }
