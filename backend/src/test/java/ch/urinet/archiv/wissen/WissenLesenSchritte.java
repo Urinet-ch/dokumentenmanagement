@@ -33,6 +33,7 @@ public class WissenLesenSchritte {
     private final UUID interneQuelle = UUID.randomUUID();
     private final UUID wissensquelle = UUID.randomUUID();
     private final UUID entwurf = UUID.randomUUID();
+    private final UUID interneEntwurf = UUID.randomUUID();
     private final UUID normaleSeite = UUID.randomUUID();
     private final UUID zweiteNormaleSeite = UUID.randomUUID();
     private final UUID interneSeite = UUID.randomUUID();
@@ -52,8 +53,12 @@ public class WissenLesenSchritte {
     private Response sichtbareVersionAntwort;
     private Response interneVersion;
     private Response diff;
+    private Response sichtbarerDiff;
     private Response eingehend;
     private Response log;
+    private Response logErsteSeite;
+    private Response logZweiteSeite;
+    private List<Response> ungueltigeCursor;
 
     @Angenommen("synthetische Wissensleseproben sind angelegt")
     public void probeAnlegen() throws Exception {
@@ -92,12 +97,23 @@ public class WissenLesenSchritte {
             huelle(verbindung, SCHEMA, quellenSeite, wissensquelle);
             huelle(verbindung, SCHEMA, verweisendeSeite, wissensquelle);
             entwurf(verbindung, SCHEMA, entwurf, normaleQuelle);
-            version(verbindung, normaleSeite, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}", null);
-            version(verbindung, normaleSeite, 2, "{\"vertraulichkeit_mindest\":\"NORMAL\"}", entwurf);
+            entwurf(verbindung, SCHEMA, interneEntwurf, interneQuelle);
+            String normal = "{\"vertraulichkeit_mindest\":\"NORMAL\"}";
+            version(verbindung, normaleSeite, 1, normal, null, "Synthetischer Inhalt");
+            version(verbindung, normaleSeite, 2, normal, entwurf, "Kopf\nAlte Aussage\nFuss");
+            version(verbindung, normaleSeite, 3, normal, null, "Kopf\nNeue Aussage\nFuss");
             versionsHuelle(verbindung, normaleSeite, 1, interneQuelle);
             versionsHuelle(verbindung, normaleSeite, 2, normaleQuelle);
-            log(verbindung, new UUID[]{normaleSeite, interneSeite}, "synthetic_log_payload_" + kennung);
-            log(verbindung, new UUID[]{interneSeite}, "hidden_log_payload_" + kennung);
+            versionsHuelle(verbindung, normaleSeite, 3, normaleQuelle);
+            aktuelleVersion(verbindung, normaleSeite, 3);
+            log(verbindung, SCHEMA, new UUID[]{normaleSeite, interneSeite}, "synthetic_log_payload_" + kennung,
+                    "human:probe-a-" + kennung, entwurf);
+            log(verbindung, SCHEMA, new UUID[]{normaleSeite}, "intern_entwurf_payload_" + kennung,
+                    "human:probe-b-" + kennung, interneEntwurf);
+            log(verbindung, SCHEMA, new UUID[]{interneSeite}, "hidden_log_payload_" + kennung,
+                    "human:probe-c-" + kennung, null);
+            log(verbindung, ANDERER_SCHEMA, new UUID[]{normaleSeite}, "fremd_log_payload_" + kennung,
+                    "human:fremd-" + kennung, null);
             inhalt(verbindung, SCHEMA, normaleSeite, "Aussage.[^q1]\n"
                     + "[Interne Seite](/konzepte/leseprobe-intern-" + kennung + ") "
                     + "[Fehlende Seite](/konzepte/leseprobe-fehlt-" + kennung + ") "
@@ -125,10 +141,24 @@ public class WissenLesenSchritte {
                 .then().extract().response();
         diff = get("/api/v1/wissensseiten/" + normaleSeite + "/diff?von=1&bis=2")
                 .then().extract().response();
+        sichtbarerDiff = get("/api/v1/wissensseiten/" + normaleSeite + "/diff?von=2&bis=3")
+                .then().extract().response();
         eingehend = get("/api/v1/wissensseiten/" + quellenSeite + "/eingehend")
                 .then().extract().response();
         log = get("/api/v1/wissensbasis/log?groesse=100")
                 .then().extract().response();
+        logErsteSeite = get("/api/v1/wissensbasis/log?groesse=1")
+                .then().extract().response();
+        logZweiteSeite = get("/api/v1/wissensbasis/log?groesse=1&vor="
+                + logErsteSeite.jsonPath().getString("naechstesVor")).then().extract().response();
+        ungueltigeCursor = java.util.stream.Stream.of("eAox", "!!!", cursor("+300000-01-01T00:00:00Z\n1"),
+                        cursor("2026-01-01T00:00:00Z\n0"), cursor("2026-01-01T00:00:00Z"))
+                .map(vor -> get("/api/v1/wissensbasis/log?vor=" + vor).then().extract().response()).toList();
+    }
+
+    private static String cursor(String wert) {
+        return java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(wert.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Dann("verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten")
@@ -144,7 +174,7 @@ public class WissenLesenSchritte {
         assertThat((String) indexZweiteSeite.jsonPath()
                 .getMap("gruppen.find { it.typ == 'Konzept' }.seiten[0]").get("status")).isEqualTo("VERALTET");
 
-        seite.then().statusCode(200).header("ETag", "\"" + 2 + "\"");
+        seite.then().statusCode(200).header("ETag", "\"" + 3 + "\"");
         assertThat(seite.jsonPath().getString("titel")).isEqualTo("Normale Leseprobe " + kennung);
         seitePerPfad.then().statusCode(200);
         interneSeiteAntwort.then().statusCode(404);
@@ -154,7 +184,7 @@ public class WissenLesenSchritte {
 
         versionen.then().statusCode(200);
         List<Map<String, Object>> versionZeilen = versionen.jsonPath().getList("versionen");
-        assertThat(versionZeilen).hasSize(2);
+        assertThat(versionZeilen).hasSize(3);
         Map<String, Object> versteckteVersion = versionZeilen.stream()
                 .filter(row -> ((Number) row.get("nummer")).intValue() == 1).findFirst().orElseThrow();
         assertThat(versteckteVersion).containsOnlyKeys("nummer");
@@ -172,6 +202,11 @@ public class WissenLesenSchritte {
                 .isEqualTo(normaleQuelle.toString());
         interneVersion.then().statusCode(404);
         diff.then().statusCode(404);
+        sichtbarerDiff.then().statusCode(200).header("ETag", "\"2-3\"");
+        assertThat(sichtbarerDiff.jsonPath().getList("vorher", String.class)).containsExactly("Kopf");
+        assertThat(sichtbarerDiff.jsonPath().getList("entfernt", String.class)).containsExactly("Alte Aussage");
+        assertThat(sichtbarerDiff.jsonPath().getList("hinzugefuegt", String.class)).containsExactly("Neue Aussage");
+        assertThat(sichtbarerDiff.jsonPath().getList("nachher", String.class)).containsExactly("Fuss");
 
         eingehend.then().statusCode(200);
         assertThat(eingehend.jsonPath().getList("pfad", String.class)).contains("konzepte/leseprobe-verweis-" + kennung);
@@ -181,10 +216,32 @@ public class WissenLesenSchritte {
         assertThat(logText).contains("Normale Leseprobe " + kennung)
                 .doesNotContain(interneSeiteTitel, "synthetic_log_payload_" + kennung,
                         "hidden_log_payload_" + kennung);
-        assertThat(logText).doesNotContain(interneSeite.toString());
+        assertThat(logText).doesNotContain(interneSeite.toString(), interneEntwurf.toString(),
+                "human:probe-c-" + kennung, "human:fremd-" + kennung, "fremd_log_payload_" + kennung,
+                "intern_entwurf_payload_" + kennung);
+        Map<String, Object> mitEntwurf = logEintrag(log, "human:probe-a-" + kennung);
+        assertThat(mitEntwurf).containsEntry("entwurfId", entwurf.toString());
+        Map<String, Object> mitInternemEntwurf = logEintrag(log, "human:probe-b-" + kennung);
+        assertThat(mitInternemEntwurf.get("entwurfId")).isNull();
+
+        logErsteSeite.then().statusCode(200);
+        assertThat(logErsteSeite.jsonPath().getList("eintraege.akteur", String.class))
+                .containsExactly("human:probe-b-" + kennung);
+        logZweiteSeite.then().statusCode(200);
+        assertThat(logZweiteSeite.jsonPath().getList("eintraege.akteur", String.class))
+                .containsExactly("human:probe-a-" + kennung);
+        for (Response ungueltig : ungueltigeCursor) {
+            assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(ungueltig, 400))
+                    .isEqualTo("ANFRAGE_UNGUELTIG");
+        }
         assertThat(seite.jsonPath().getString("inhaltHtml")).contains("Sichtbare Seite", "Seite nicht vorhanden")
                 .doesNotContain("Interne Seite", "Fehlende Seite");
         zugriffsprotokollPruefen();
+    }
+
+    private static Map<String, Object> logEintrag(Response antwort, String akteur) {
+        List<Map<String, Object>> eintraege = antwort.jsonPath().getList("eintraege");
+        return eintraege.stream().filter(e -> akteur.equals(e.get("akteur"))).findFirst().orElseThrow();
     }
 
     private Response get(String path) {
@@ -199,7 +256,7 @@ public class WissenLesenSchritte {
                      """);
              PreparedStatement verweigert = verbindung.prepareStatement("""
                      select count(*) from m_urinet.zugriff_protokoll
-                     where aktion = 'VERWEIGERT' and rolle = 'MITARBEITER'
+                     where aktion = 'VERWEIGERT' and rolle = 'MITARBEITER' and details ->> 'grund' = 'A15'
                        and details ->> 'fehlercode' = 'NICHT_GEFUNDEN' and zeit >= ?
                      """);
              PreparedStatement details = verbindung.prepareStatement("""
@@ -216,13 +273,20 @@ public class WissenLesenSchritte {
             verweigert.setObject(1, probeBeginn);
             details.setObject(1, probeBeginn);
             listen.setObject(1, probeBeginn);
+            // Seite, ?pfad=, Versionen, Version 2 und Diff 2–3; Fehlgriffe (404) rollen ihren Eintrag zurück
             try (var zeilen = angezeigt.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
-                assertThat(zeilen.getLong(1)).isEqualTo(4);
+                assertThat(zeilen.getLong(1)).isEqualTo(5);
             }
+            angezeigt.setObject(1, quellenSeite);
+            try (var zeilen = angezeigt.executeQuery()) {
+                assertThat(zeilen.next()).isTrue();
+                assertThat(zeilen.getLong(1)).isEqualTo(1);
+            }
+            // interne Seite, Version 1 und Diff 1–2
             try (var zeilen = verweigert.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
-                assertThat(zeilen.getLong(1)).isPositive();
+                assertThat(zeilen.getLong(1)).isEqualTo(3);
             }
             try (var zeilen = details.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
@@ -296,18 +360,28 @@ public class WissenLesenSchritte {
         }
     }
 
-    private static void version(Connection verbindung, UUID seite, int nummer, String daten, UUID entwurf)
-            throws Exception {
+    private static void version(Connection verbindung, UUID seite, int nummer, String daten, UUID entwurf,
+                                String inhalt) throws Exception {
         try (PreparedStatement query = verbindung.prepareStatement("""
                 insert into m_urinet.wissensseite_version
                     (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit, entwurf_id)
-                values (?, ?, cast(? as jsonb), 'Synthetischer Inhalt', 'human:probe', 'human:probe', ?, ?)
+                values (?, ?, cast(? as jsonb), ?, 'human:probe', 'human:probe', ?, ?)
                 """)) {
             query.setObject(1, seite);
             query.setInt(2, nummer);
             query.setString(3, daten);
-            query.setObject(4, OffsetDateTime.now(ZoneOffset.UTC));
-            query.setObject(5, entwurf);
+            query.setString(4, inhalt);
+            query.setObject(5, OffsetDateTime.now(ZoneOffset.UTC));
+            query.setObject(6, entwurf);
+            query.executeUpdate();
+        }
+    }
+
+    private static void aktuelleVersion(Connection verbindung, UUID seite, int nummer) throws Exception {
+        try (PreparedStatement query = verbindung.prepareStatement(
+                "update m_urinet.wissensseite set version = ? where id = ?")) {
+            query.setInt(1, nummer);
+            query.setObject(2, seite);
             query.executeUpdate();
         }
     }
@@ -357,16 +431,18 @@ public class WissenLesenSchritte {
         }
     }
 
-    private void log(Connection verbindung, UUID[] seiten, String angaben) throws Exception {
+    private static void log(Connection verbindung, String schema, UUID[] seiten, String angaben, String akteur,
+                            UUID entwurfId) throws Exception {
         String uuidArray = "{" + String.join(",", java.util.Arrays.stream(seiten).map(UUID::toString).toList()) + "}";
         try (PreparedStatement query = verbindung.prepareStatement("""
-                insert into m_urinet.wissens_log (zeit, aktion, akteur, seiten, angaben)
-                values (?, 'UPDATE', ?, cast(? as uuid[]), cast(? as jsonb))
-                """)) {
+                insert into %s.wissens_log (zeit, aktion, akteur, seiten, angaben, entwurf_id)
+                values (?, 'UPDATE', ?, cast(? as uuid[]), cast(? as jsonb), ?)
+                """.formatted(schema))) {
             query.setObject(1, OffsetDateTime.now(ZoneOffset.UTC));
-            query.setString(2, "human:probe-" + kennung);
+            query.setString(2, akteur);
             query.setString(3, uuidArray);
             query.setString(4, "{\"probe\":\"" + angaben + "\"}");
+            query.setObject(5, entwurfId);
             query.executeUpdate();
         }
     }

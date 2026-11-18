@@ -611,7 +611,12 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   eingehende Links und Log bleiben privat und tragen ETags, wo eine einzelne Fassung abgerufen wird.
 - Das Log erzeugt Anzeigetexte aus den strukturierten Feldern und sichtbaren Seiten, nie aus `angaben`; Einträge ohne
   sichtbare Seite werden ausgelassen. Der Index und das Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge;
-  ein Seitenabruf über `?pfad=` protokolliert die Seiten-ID wie `GET /wissensseiten/{id}`.
+  ein Seitenabruf über `?pfad=` protokolliert die Seiten-ID wie `GET /wissensseiten/{id}`. Die `entwurfId` eines
+  Logeintrags erscheint nur, wenn das auslösende Dokument des Entwurfs sichtbar ist (gleiche Regel wie bei den
+  Versionen). Ein Log-Cursor `vor`, der sich nicht dekodieren lässt, eine ID kleiner 1 oder eine Zeit ausserhalb
+  0001–9999 enthält, ergibt 400 `ANFRAGE_UNGUELTIG` (Review PR #311).
+- Version und Diff entscheiden über 404 aus dem Ergebnis der Abfrage mit Sichtprädikat; ändert sich die Sichtbarkeit
+  zwischen Prüfung und Abfrage, bleibt es bei 404 statt eines Serverfehlers (Review PR #311).
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 

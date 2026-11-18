@@ -16,6 +16,29 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Und sieht «mitarbeiter» dann auch die frühere normale Version der Seite nicht mehr
     Und sehen nach der Änderung der Quelle nur die Rollen mit Recht A3 die internen Seiten und Versionen
 
+  @req-12.1
+  Szenariogrundriss: API-Tokens erreichen die Wissensbasis nicht
+    Angenommen für «urinet» gibt es das Token «<scope>» mit Scope «<scope>»
+    Wenn das Token «<scope>» <methode> «<pfad>» mit einem leeren JSON-Objekt aufruft
+    Dann antwortet das Archiv auf die Token-Anfrage mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+
+    Beispiele:
+      | scope     | methode | pfad                                                                        |
+      | generator | GET     | /api/v1/wissensseiten                                                       |
+      | import    | GET     | /api/v1/wissensseiten/00000000-0000-4000-8000-000000000001                  |
+      | generator | GET     | /api/v1/wissensbasis/log                                                    |
+      | import    | GET     | /api/v1/wissensseiten/00000000-0000-4000-8000-000000000001/diff?von=1&bis=2 |
+
+  @req-12.1
+  Szenariogrundriss: Webseiten-Schlüssel erreichen die Wissensbasis nicht
+    Wenn «<schluessel>» GET «<pfad>» aufruft
+    Dann antwortet die Webseiten-Schnittstelle mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+
+    Beispiele:
+      | schluessel         | pfad                     |
+      | webseite           | /api/v1/wissensseiten    |
+      | webseite-erfassung | /api/v1/wissensbasis/log |
+
   @req-12.1 @req-12.2
   Szenario: Schreibende Aktionen der Wissensbasis bleiben auf Inhaber und Geschäftsstelle beschränkt
     Angenommen die Rollen der Wissensbasis sind geprüft

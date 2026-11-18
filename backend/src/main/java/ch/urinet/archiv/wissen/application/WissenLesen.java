@@ -59,21 +59,27 @@ public class WissenLesen {
 
     @Transactional
     public WissenLesenRepository.WissensVersion version(Benutzer benutzer, UUID seiteId, int nummer) {
-        boolean sichtbar = sichtbarkeit.versionSichtbar(benutzer, seiteId, nummer);
-        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, sichtbar);
-        return repository.version(seiteId, nummer, Sichtregel.fuer(benutzer)).orElseThrow();
+        Optional<WissenLesenRepository.WissensVersion> version = sichtbareVersion(benutzer, seiteId, nummer);
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, version.isPresent());
+        return version.orElseThrow();
     }
 
     @Transactional
     public Diff diff(Benutzer benutzer, UUID seiteId, int von, int bis) {
-        boolean sichtbar = sichtbarkeit.versionSichtbar(benutzer, seiteId, von)
-                && sichtbarkeit.versionSichtbar(benutzer, seiteId, bis);
-        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, sichtbar);
-        WissenLesenRepository repository = this.repository;
-        Sichtregel regel = Sichtregel.fuer(benutzer);
-        WissenLesenRepository.WissensVersion alt = repository.version(seiteId, von, regel).orElseThrow();
-        WissenLesenRepository.WissensVersion neu = repository.version(seiteId, bis, regel).orElseThrow();
-        return Diff.aus(alt, neu);
+        Optional<WissenLesenRepository.WissensVersion> alt = sichtbareVersion(benutzer, seiteId, von);
+        Optional<WissenLesenRepository.WissensVersion> neu = alt.isPresent()
+                ? sichtbareVersion(benutzer, seiteId, bis) : Optional.empty();
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, neu.isPresent());
+        return Diff.aus(alt.orElseThrow(), neu.orElseThrow());
+    }
+
+    /** Die Abfrage enthält das Sichtprädikat; ihr Ergebnis entscheidet, damit eine Änderung dazwischen kein 500 ergibt. */
+    private Optional<WissenLesenRepository.WissensVersion> sichtbareVersion(Benutzer benutzer, UUID seiteId,
+                                                                            int nummer) {
+        if (!sichtbarkeit.versionSichtbar(benutzer, seiteId, nummer)) {
+            return Optional.empty();
+        }
+        return repository.version(seiteId, nummer, Sichtregel.fuer(benutzer));
     }
 
     @Transactional

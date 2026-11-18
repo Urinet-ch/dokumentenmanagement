@@ -270,8 +270,11 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                        case when l.dokument_id is not null and exists (
                            select 1 from dokument d where d.id = l.dokument_id and %s
                        ) then l.dokument_id end,
-                       l.entwurf_id
+                       case when e.id is not null and (e.dokument_id is null or exists (
+                           select 1 from dokument d where d.id = e.dokument_id and %s
+                       )) then l.entwurf_id end
                 from wissens_log l
+                left join wissens_entwurf e on e.id = l.entwurf_id
                 where exists (
                     select p.seite_id from unnest(l.seiten) as p(seite_id)
                     join wissensseite s on s.id = p.seite_id
@@ -280,7 +283,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                   %s
                 order by l.zeit desc, l.id desc
                 limit :limit
-                """.formatted(sicht.bedingung(), dokumentSicht.bedingung(), sicht.bedingung(), cursor));
+                """.formatted(sicht.bedingung(), dokumentSicht.bedingung(), dokumentSicht.bedingung(),
+                sicht.bedingung(), cursor));
         parameter.forEach(query::setParameter);
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();

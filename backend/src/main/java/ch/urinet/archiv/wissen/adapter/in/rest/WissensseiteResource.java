@@ -34,6 +34,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -50,6 +51,9 @@ public class WissensseiteResource {
     private static final int LOG_STANDARD = 50;
     private static final int LOG_MAX = 100;
     private static final int MAX_OFFSET = 100_000;
+    // innerhalb des Wertebereichs von PostgreSQL timestamptz, sonst scheitert erst die Abfrage (500)
+    private static final Instant CURSOR_MIN = Instant.parse("0001-01-01T00:00:00Z");
+    private static final Instant CURSOR_MAX = Instant.parse("9999-12-31T23:59:59Z");
 
     private final WissenLesen lesen;
     private final WissensseiteAbrufProtokoll abrufProtokoll;
@@ -386,11 +390,11 @@ public class WissensseiteResource {
             }
             Instant zeit = Instant.parse(teile[0]);
             long id = Long.parseLong(teile[1]);
-            if (id < 1) {
+            if (id < 1 || zeit.isBefore(CURSOR_MIN) || zeit.isAfter(CURSOR_MAX)) {
                 throw ungueltigeAnfrage();
             }
             return new WissenLesenRepository.LogCursor(zeit, id);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | DateTimeException e) {
             throw ungueltigeAnfrage();
         }
     }
