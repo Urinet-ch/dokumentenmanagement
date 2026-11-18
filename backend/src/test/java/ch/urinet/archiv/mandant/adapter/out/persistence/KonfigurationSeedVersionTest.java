@@ -228,11 +228,11 @@ class KonfigurationSeedVersionTest {
                         where v.version = 2 and r ->> 'code' = 'lohnabrechnung_erwartet'
                         """)).isEqualTo("zusatz.periode");
                 assertThat(wert(befehl, """
-                        select bool_and(not ((r -> 'parameter') ? 'gruppe'))
+                        select string_agg(r ->> 'code' || '=' || (r -> 'parameter' ->> 'gruppe'), ',' order by r ->> 'code')
                         from konfiguration_version v, jsonb_array_elements(v.inhalt -> 'regeln') r
                         where v.version = 2 and r ->> 'code' in (
                             'lohnabrechnung_erwartet', 'bankbeleg_erwartet')
-                        """)).isEqualTo("t");
+                        """)).isEqualTo("bankbeleg_erwartet=PARTNER,lohnabrechnung_erwartet=zusatz.person");
                 assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
                         + "from konfiguration_version where version = 2")).isEqualTo("t");
             }

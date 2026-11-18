@@ -44,8 +44,10 @@ public class RegelPruefung {
             if (!verletzt(regel, parameter, werte, dokumentId)) {
                 continue;
             }
-            boolean geaendert = vorher == null || parameter.felder().stream()
-                    .anyMatch(feld -> !Objects.deepEquals(vorher.get(feld), werte.get(feld)));
+            // Ein Artwechsel macht die Regel erst anwendbar und gilt darum als Änderung aller Regelfelder (Req 5.3)
+            boolean geaendert = vorher == null || !Objects.equals(vorher.get("art"), werte.get("art"))
+                    || parameter.felder().stream().anyMatch(feld -> !Objects.equals(
+                    normalisiert(feld, vorher.get(feld)), normalisiert(feld, werte.get(feld))));
             String schwere = geaendert ? regel.schwere() : "WARNUNG";
             if ("FEHLER".equals(schwere)) {
                 fehler.add(new RegelVerletzt.Befund(regel.code(), regel.meldung()));
@@ -67,13 +69,22 @@ public class RegelPruefung {
             return gilt && pflicht.dann().stream().anyMatch(feld -> !vorhanden(werte.get(feld)));
         }
         Regel.Eindeutig eindeutig = (Regel.Eindeutig) parameter;
-        List<Object> werteDerFelder = eindeutig.felder().stream().map(werte::get).toList();
+        List<Object> werteDerFelder = eindeutig.felder().stream().map(feld -> normalisiert(feld, werte.get(feld)))
+                .toList();
         if (werteDerFelder.stream().anyMatch(wert -> !vorhanden(wert))) {
             return false;
         }
         return daten.eindeutig(regel.art(), regel.art() == null || eindeutig.ueberAlleArten(),
                 eindeutig.felder(), werteDerFelder,
                 dokumentId);
+    }
+
+    // Mehrfachwerte (Tags, Klassifikationen) gelten als Menge: sortiert und ohne Duplikate, wie in der Datenbank
+    static Object normalisiert(String feld, Object wert) {
+        if (("tags".equals(feld) || feld.startsWith("klassifikation.")) && wert instanceof List<?> liste) {
+            return liste.stream().filter(Objects::nonNull).map(String::valueOf).distinct().sorted().toList();
+        }
+        return wert;
     }
 
     private static boolean vorhanden(Object wert) {

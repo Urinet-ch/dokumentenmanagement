@@ -1,7 +1,9 @@
 package ch.urinet.archiv.ki.adapter.out.chat;
 
 import ch.urinet.archiv.ki.application.chat.Lueckenbericht;
+import ch.urinet.archiv.ki.application.chat.WerkzeugAuswahl;
 import ch.urinet.archiv.ki.application.chat.WerkzeugDaten;
+import ch.urinet.archiv.ki.application.chat.WerkzeugFehler;
 import ch.urinet.archiv.ki.domain.chat.Monatsluecken;
 import ch.urinet.archiv.ki.domain.chat.Nummernfolge;
 import ch.urinet.archiv.ki.domain.chat.Nummernfolge.ZeitgrenzeUeberschritten;
@@ -18,9 +20,11 @@ import org.jboss.logging.Logger;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.MonthDay;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,7 +47,7 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                          String zeitraumFeld, int beginn) {
     }
 
-    private record Monatlich(String art, String bezug, YearMonth ab, String nurMonat) {
+    private record Monatlich(String art, String bezug, YearMonth ab, String nurMonat, String gruppe) {
     }
 
     private final WerkzeugDaten daten;
@@ -91,6 +95,10 @@ public class KonfigurierteLuecken implements Lueckenbericht {
 
     @Override
     public Bericht erstellen(MandantCode mandant, int geschaeftsjahr, Sichtregel sicht) {
+        // Verteidigung in der Tiefe (Req 5.4): auch ohne Werkzeugauswahl nur für Rollen, die A3 und A4 voll sehen
+        if (!WerkzeugAuswahl.vollstaendigkeitErlaubt(sicht)) {
+            throw new WerkzeugFehler(WerkzeugFehler.NICHT_VERFUEGBAR);
+        }
         return erstellenAusRegeln(geschaeftsjahr, sicht, konfigurationLesen.aktuell());
     }
 
@@ -117,11 +125,12 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                     if ("MONAT".equals(erwartet.je())) {
                         kategorien.add(monatlich(new Monatlich(art.code(), bezug(erwartet.datum()),
                                         erwartet.ab() == null ? null : YearMonth.from(LocalDate.parse(erwartet.ab())),
-                                        erwartet.nurMonat()),
+                                        erwartet.nurMonat(), erwartet.gruppe()),
                                 spanne(konfiguration, geschaeftsjahr),
                                 YearMonth.from(LocalDate.now(uhr)).minusMonths(1), sicht));
                     } else {
-                        kategorien.add(jahrlich(art.code(), erwartet, geschaeftsjahr, sicht));
+                        kategorien.add(jahrlich(art.code(), erwartet, geschaeftsjahr, geschaeftsjahrEnde(konfiguration),
+                                sicht));
                     }
                 }
             }
@@ -165,27 +174,49 @@ public class KonfigurierteLuecken implements Lueckenbericht {
 
     private Kategorie monatlich(Monatlich regel, Monatsluecken.Spanne spanne, YearMonth letzter, Sichtregel sicht) {
         List<WerkzeugDaten.Monatszeile> zeilen = daten.monate(
-                new WerkzeugDaten.Monatsquelle(regel.art(), regel.bezug(), null, regel.nurMonat()), sicht);
-        Set<YearMonth> monate = new HashSet<>();
+                new WerkzeugDaten.Monatsquelle(regel.art(), regel.bezug(), regel.gruppe(), regel.nurMonat()), sicht);
+        Map<String, Set<YearMonth>> monateJeSchluessel = new LinkedHashMap<>();
+        Map<String, String> anzeigeJeSchluessel = new LinkedHashMap<>();
         long belege = 0;
+        long ohneZuordnung = 0;
         for (WerkzeugDaten.Monatszeile z : zeilen) {
             belege += z.belege();
-            monate.add(z.monat());
+            if (z.schluessel() == null) {
+                ohneZuordnung += z.belege();
+            } else {
+                monateJeSchluessel.computeIfAbsent(z.schluessel(), g -> new HashSet<>()).add(z.monat());
+                if (z.gruppe() != null) {
+                    anzeigeJeSchluessel.merge(z.schluessel(), z.gruppe(),
+                            (vorhanden, neu) -> vorhanden.compareTo(neu) <= 0 ? vorhanden : neu);
+                }
+            }
+        }
+        // ohne Gruppierung und ohne Dokument gibt es mit «ab» trotzdem eine Reihe (alle Monate ab «ab» fehlen)
+        if (regel.gruppe() == null && monateJeSchluessel.isEmpty() && regel.ab() != null) {
+            monateJeSchluessel.put("", new HashSet<>());
         }
         List<Reihe> reihen = new ArrayList<>();
         boolean monateZuPruefen = spanne != null && !letzter.isBefore(spanne.erster());
-        if (monateZuPruefen && (!monate.isEmpty() || regel.ab() != null)) {
-            Monatsluecken.Ergebnis e = Monatsluecken.pruefen(monate, spanne, letzter, regel.ab());
-            if (!e.fehlend().isEmpty()) {
-                long vorhanden = monate.stream()
+        if (monateZuPruefen) {
+            for (Map.Entry<String, Set<YearMonth>> eintrag : monateJeSchluessel.entrySet()) {
+                Monatsluecken.Ergebnis e = Monatsluecken.pruefen(eintrag.getValue(), spanne, letzter, regel.ab());
+                YearMonth beginn = regel.ab() != null ? regel.ab() : e.erster();
+                if (beginn.isAfter(spanne.letzter())) {
+                    continue;
+                }
+                long vorhanden = eintrag.getValue().stream()
                         .filter(m -> !m.isBefore(spanne.erster()) && !m.isAfter(spanne.letzter())).count();
                 List<String> fehlend = e.fehlend().stream().limit(Reihe.FEHLEND_MAX).map(YearMonth::toString).toList();
-                reihen.add(new Reihe(null, e.erster() == null ? regel.ab().toString() : e.erster().toString(), null,
-                        vorhanden, e.fehlend().size(), fehlend));
+                String gruppe = anzeigeJeSchluessel.get(eintrag.getKey());
+                reihen.add(new Reihe(gruppe == null || gruppe.isEmpty() ? null : gruppe,
+                        beginn.toString(), null, vorhanden, e.fehlend().size(), fehlend));
             }
         }
+        reihen.sort(Comparator.comparingLong(Reihe::anzahlFehlend).reversed()
+                .thenComparing(r -> r.gruppe() == null ? "" : r.gruppe(), String.CASE_INSENSITIVE_ORDER));
+        List<Reihe> sichtbar = reihen.size() > Kategorie.REIHEN_MAX ? reihen.subList(0, Kategorie.REIHEN_MAX) : reihen;
         return new Kategorie(Regel.ERWARTET, regel.art(), "MONAT", monateZuPruefen ? null : KEINE_MONATE, belege,
-                null, reihen.size(), reihen);
+                ohneZuordnung == 0 ? null : ohneZuordnung, reihen.size(), sichtbar);
     }
 
     private Monatsluecken.Spanne spanne(Konfiguration konfiguration, int geschaeftsjahr) {
@@ -195,25 +226,38 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                 .orElse(null);
     }
 
+    private static MonthDay geschaeftsjahrEnde(Konfiguration konfiguration) {
+        return new Geschaeftsjahresende(konfiguration.einstellungen().geschaeftsjahrEnde()).monatTag();
+    }
+
+    /** Geschäftsjahr eines Tages, benannt nach dem Kalenderjahr seines Endes. */
+    static int geschaeftsjahrDes(LocalDate tag, MonthDay ende) {
+        return MonthDay.from(tag).isAfter(ende) ? tag.getYear() + 1 : tag.getYear();
+    }
+
+    /**
+     * Geschäftsjahre ohne Dokument (Spec 05, Req 5.1, design.md «Regeltypen»): ab {@code ab} oder dem ersten Geschäftsjahr
+     * mit einem bestätigten Dokument bis zum letzten abgeschlossenen Geschäftsjahr, höchstens bis zum angefragten.
+     */
     private Kategorie jahrlich(String art, ch.urinet.archiv.konfiguration.domain.Regel.Erwartet regel,
-                               int geschaeftsjahr, Sichtregel sicht) {
-        List<WerkzeugDaten.Monatszeile> zeilen = daten.monate(
-                new WerkzeugDaten.Monatsquelle(art, bezug(regel.datum()), null, null), sicht);
+                               int geschaeftsjahr, MonthDay ende, Sichtregel sicht) {
+        List<WerkzeugDaten.Jahreszeile> zeilen = daten.jahre(
+                new WerkzeugDaten.Monatsquelle(art, bezug(regel.datum()), null, null), ende, sicht);
         Set<Integer> vorhanden = new HashSet<>();
-        LocalDate start = regel.ab() == null ? null : LocalDate.parse(regel.ab());
-        for (WerkzeugDaten.Monatszeile zeile : zeilen) {
-            LocalDate datum = zeile.monat().atDay(1);
-            if ((start == null || !datum.isBefore(start)) && zeile.monat().getYear() <= geschaeftsjahr) {
-                vorhanden.add(zeile.monat().getYear());
-            }
+        zeilen.forEach(z -> vorhanden.add(z.geschaeftsjahr()));
+        long belege = zeilen.stream().mapToLong(WerkzeugDaten.Jahreszeile::belege).sum();
+        Integer erster = regel.ab() != null ? Integer.valueOf(geschaeftsjahrDes(LocalDate.parse(regel.ab()), ende))
+                : vorhanden.stream().min(Integer::compareTo).orElse(null);
+        LocalDate heute = LocalDate.now(uhr);
+        int letzterAbgeschlossen = geschaeftsjahrDes(heute, ende) - 1;
+        int bis = Math.min(geschaeftsjahr, letzterAbgeschlossen);
+        if (erster == null || erster > bis) {
+            return new Kategorie(Regel.ERWARTET, art, "JAHR", null, belege, null, 0, List.of());
         }
-        int erster = start == null
-                ? vorhanden.stream().min(Integer::compareTo).orElse(geschaeftsjahr)
-                : start.getYear();
         List<String> fehlend = new ArrayList<>();
         long fehlendGesamt = 0;
         long jahreVorhanden = 0;
-        for (int jahr = erster; jahr <= geschaeftsjahr; jahr++) {
+        for (int jahr = erster; jahr <= bis; jahr++) {
             if (vorhanden.contains(jahr)) {
                 jahreVorhanden++;
             } else {
@@ -223,10 +267,8 @@ public class KonfigurierteLuecken implements Lueckenbericht {
                 }
             }
         }
-        List<Reihe> reihen = fehlendGesamt == 0 ? List.of()
-                : List.of(new Reihe(null, Integer.toString(erster), Integer.toString(geschaeftsjahr),
-                        jahreVorhanden, fehlendGesamt, fehlend));
-        long belege = zeilen.stream().mapToLong(WerkzeugDaten.Monatszeile::belege).sum();
+        List<Reihe> reihen = List.of(new Reihe(null, Integer.toString(erster), Integer.toString(bis),
+                jahreVorhanden, fehlendGesamt, fehlend));
         return new Kategorie(Regel.ERWARTET, art, "JAHR", null, belege, null, reihen.size(), reihen);
     }
 

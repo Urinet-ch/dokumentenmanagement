@@ -26,7 +26,7 @@
         </createTable>
         <addForeignKeyConstraint baseTableName="regel" baseColumnNames="art"
                                  referencedTableName="dokumentart" referencedColumnNames="code"
-                                 constraintName="fk_regel_art" onDelete="CASCADE"/>
+                                 constraintName="fk_regel_art" onDelete="RESTRICT"/>
         <sql>
             alter table regel add constraint regel_typ_ck
                 check (typ in ('PFLICHT_WENN', 'EINDEUTIG', 'FOLGE', 'ERWARTET'));
@@ -44,24 +44,7 @@
                 and code = 'AUSGANGSRECHNUNG'
                 and belegnummer_muster = array['^\d{4}-\d{3}$', '^R\d{4}$']::text[];
         </sql>
-        <sql>
-            insert into regel (code, art, typ, parameter, schwere, meldung, aktiv)
-            select seed.code, art.code, seed.typ, seed.parameter, 'WARNUNG', seed.meldung, true
-            from (values
-                ('ausgangsrechnung_folge', 'AUSGANGSRECHNUNG', 'FOLGE',
-                    '{"muster":true,"zeitraum":"GESCHAEFTSJAHR","beginn":1}'::jsonb,
-                    'Die Ausgangsrechnungsnummernfolge weist eine Lücke auf.'),
-                ('lohnabrechnung_erwartet', 'LOHNABRECHNUNG', 'ERWARTET',
-                    '{"je":"MONAT","datum":"BELEGDATUM","nurMonat":"zusatz.periode"}'::jsonb,
-                    'Für einen Monat fehlt eine bestätigte Lohnabrechnung.'),
-                ('bankbeleg_erwartet', 'BANK', 'ERWARTET',
-                    '{"je":"MONAT","datum":"zusatz.periode_bis"}'::jsonb,
-                    'Für einen Monat fehlt ein bestätigter Bankbeleg.')
-            ) as seed(code, art, typ, parameter, meldung)
-            join dokumentart art on art.code = seed.art
-            where current_schema() = 'm_urinet'
-            on conflict (code) do nothing;
-        </sql>
+        <sqlFile path="db/mandant/seed/regel-urinet.sql" splitStatements="false" stripComments="true"/>
         <sql>
             with aktuelle as (
                 select inhalt from konfiguration_version order by version desc limit 1

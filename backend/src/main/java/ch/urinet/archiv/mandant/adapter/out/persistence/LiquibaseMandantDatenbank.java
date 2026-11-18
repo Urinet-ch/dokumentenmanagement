@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 public class LiquibaseMandantDatenbank implements MandantDatenbank {
 
     static final String CHANGELOG = "db/mandant/changelog.xml";
+    static final String REGELN_SEED = "db/mandant/seed/regel-urinet.sql";
     // Namen gehen als Bezeichner in SQL ein; nur dieses Muster ist erlaubt
     private static final Pattern SCHEMA = Pattern.compile("^m_[a-z0-9_]+$");
     private static final Pattern ROLLE = Pattern.compile("^[a-z_][a-z0-9_]*$");
@@ -231,6 +232,31 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
             where (inhalt - 'version') is distinct from (
                 select inhalt - 'version' from konfiguration_version order by version desc limit 1)
             """;
+
+    @Override
+    public void regelnEinspielen(String schema) {
+        pruefen(schema);
+        String sql;
+        try (java.io.InputStream ein = LiquibaseMandantDatenbank.class.getClassLoader().getResourceAsStream(REGELN_SEED)) {
+            if (ein == null) {
+                throw new IllegalStateException("Seed der Regeln fehlt: " + REGELN_SEED);
+            }
+            sql = new String(ein.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Seed der Regeln nicht lesbar", e);
+        }
+        try (Connection verbindung = eigentuemer.oeffnen(); Statement befehl = verbindung.createStatement()) {
+            verbindung.setAutoCommit(true);
+            befehl.execute("set search_path to " + schema);
+            try {
+                befehl.execute(sql);
+            } finally {
+                befehl.execute("reset search_path");
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Regeln für " + schema + " nicht eingespielt", e);
+        }
+    }
 
     @Override
     public void konfigurationSeedAnlegen(String schema) {

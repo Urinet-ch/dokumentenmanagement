@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -132,6 +133,128 @@ class RegelbasierteLueckenTest {
         assertThatThrownBy(() -> new KonfigurierteLuecken(daten, () -> config)
                 .erstellen(new MandantCode("urinet"), 2026, SICHT))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    private static Konfiguration mitRegel(String art, Map<String, Object> parameter, String geschaeftsjahrEnde) {
+        Regel regel = new Regel("erwartet", art, "ERWARTET", parameter, "WARNUNG", "Beleg fehlt", true);
+        Konfiguration.Art eintrag = new Konfiguration.Art(art, art, null, List.of(), List.of(),
+                null, "NORMAL", new Konfiguration.Aufbewahrung(null, "BELEGDATUM"), false, true);
+        return new Konfiguration(1,
+                new Konfiguration.Einstellungen(geschaeftsjahrEnde, new Konfiguration.Kennungen(null, List.of())),
+                List.of(eintrag), List.of(), List.of(regel));
+    }
+
+    private static WerkzeugDaten daten(List<WerkzeugDaten.Monatszeile> monate, List<WerkzeugDaten.Jahreszeile> jahre,
+                                       Object[] aufruf) {
+        return (WerkzeugDaten) java.lang.reflect.Proxy.newProxyInstance(
+                RegelbasierteLueckenTest.class.getClassLoader(), new Class<?>[]{WerkzeugDaten.class},
+                (proxy, methode, args) -> switch (methode.getName()) {
+                    case "monate" -> {
+                        aufruf[0] = args[0];
+                        yield monate;
+                    }
+                    case "jahre" -> {
+                        aufruf[0] = args[0];
+                        aufruf[1] = args[1];
+                        yield jahre;
+                    }
+                    case "belege" -> 0L;
+                    default -> throw new UnsupportedOperationException(methode.getName());
+                });
+    }
+
+    private static WerkzeugDaten.Monatszeile zeile(String schluessel, String gruppe, String monat) {
+        return new WerkzeugDaten.Monatszeile(schluessel, gruppe, YearMonth.parse(monat), 1);
+    }
+
+    @Test
+    void erwarteteMonateMitGruppeErgebenEineReiheJeGruppe() {
+        Konfiguration config = mitRegel("LOHN",
+                Map.of("je", "MONAT", "datum", "BELEGDATUM", "gruppe", "zusatz.person"), "12-31");
+        Object[] aufruf = new Object[2];
+        WerkzeugDaten daten = daten(List.of(zeile("anna", "Anna", "2026-01"), zeile("anna", "Anna", "2026-02"),
+                zeile("beat", "Beat", "2026-01"), zeile("beat", "Beat", "2026-03"),
+                zeile(null, null, "2026-02")), List.of(), aufruf);
+        Clock uhr = Clock.fixed(Instant.parse("2026-04-10T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Kategorie kategorie = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst();
+
+        assertThat(aufruf[0]).isEqualTo(new WerkzeugDaten.Monatsquelle("LOHN", WerkzeugDaten.BELEGDATUM,
+                "zusatz.person", null));
+        assertThat(kategorie.ohneZuordnung()).isEqualTo(1L);
+        assertThat(kategorie.reihen()).extracting(Lueckenbericht.Reihe::gruppe).containsExactly("Anna", "Beat");
+        assertThat(kategorie.reihen()).extracting(Lueckenbericht.Reihe::fehlend)
+                .containsExactly(List.of("2026-03"), List.of("2026-02"));
+    }
+
+    @Test
+    void abVorDemErstenBelegZaehltDieMonateDazwischenAlsLuecke() {
+        Konfiguration config = mitRegel("LOHN", Map.of("je", "MONAT", "datum", "BELEGDATUM", "ab", "2026-01-01"),
+                "12-31");
+        WerkzeugDaten daten = daten(List.of(zeile("", "", "2026-03"), zeile("", "", "2026-04")), List.of(),
+                new Object[2]);
+        Clock uhr = Clock.fixed(Instant.parse("2026-06-10T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Reihe reihe = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst().reihen().getFirst();
+
+        assertThat(reihe.ab()).isEqualTo("2026-01");
+        assertThat(reihe.fehlend()).containsExactly("2026-01", "2026-02", "2026-05");
+    }
+
+    @Test
+    void erwarteteJahreOhneDokumentUndOhneAbErgebenKeineReihe() {
+        Konfiguration config = mitRegel("JAHRESBERICHT", Map.of("je", "JAHR", "datum", "BELEGDATUM"), "12-31");
+        Clock uhr = Clock.fixed(Instant.parse("2027-03-01T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Kategorie kategorie = new KonfigurierteLuecken(daten(List.of(), List.of(), new Object[2]),
+                () -> config, uhr).erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst();
+
+        assertThat(kategorie.reihen()).isEmpty();
+    }
+
+    @Test
+    void erwarteteJahrePruefenNurAbgeschlosseneGeschaeftsjahre() {
+        Konfiguration config = mitRegel("JAHRESBERICHT", Map.of("je", "JAHR", "datum", "BELEGDATUM"), "12-31");
+        WerkzeugDaten daten = daten(List.of(), List.of(new WerkzeugDaten.Jahreszeile(2023, 1)), new Object[2]);
+        Clock uhr = Clock.fixed(Instant.parse("2026-11-18T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Reihe reihe = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst().reihen().getFirst();
+
+        // 2026 läuft noch: geprüft bis 2025
+        assertThat(reihe.hoechste()).isEqualTo("2025");
+        assertThat(reihe.fehlend()).containsExactly("2024", "2025");
+    }
+
+    @Test
+    void erwarteteJahreFolgenDemGeschaeftsjahresende() {
+        Konfiguration config = mitRegel("JAHRESBERICHT",
+                Map.of("je", "JAHR", "datum", "BELEGDATUM", "ab", "2024-08-15"), "06-30");
+        Object[] aufruf = new Object[2];
+        WerkzeugDaten daten = daten(List.of(), List.of(new WerkzeugDaten.Jahreszeile(2025, 1)), aufruf);
+        Clock uhr = Clock.fixed(Instant.parse("2026-07-10T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Reihe reihe = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst().reihen().getFirst();
+
+        assertThat(aufruf[1]).isEqualTo(java.time.MonthDay.of(6, 30));
+        // 15.08.2024 gehört zum Geschäftsjahr 2025 (01.07.2024–30.06.2025); 2026 ist am 10.07.2026 abgeschlossen
+        assertThat(reihe.ab()).isEqualTo("2025");
+        assertThat(reihe.fehlend()).containsExactly("2026");
+        assertThat(KonfigurierteLuecken.geschaeftsjahrDes(java.time.LocalDate.of(2024, 6, 30),
+                java.time.MonthDay.of(6, 30))).isEqualTo(2024);
+    }
+
+    @Test
+    void berichtVerweigertRollenOhneVolleSichtAufA3UndA4() {
+        Konfiguration config = mitRegel("LOHN", Map.of("je", "MONAT", "datum", "BELEGDATUM"), "12-31");
+        Sichtregel mitarbeiter = Sichtregel.fuer(new Benutzer("joel", Rolle.MITARBEITER));
+
+        assertThatThrownBy(() -> new KonfigurierteLuecken(daten(List.of(), List.of(), new Object[2]), () -> config)
+                .erstellen(new MandantCode("urinet"), 2026, mitarbeiter))
+                .isInstanceOf(ch.urinet.archiv.ki.application.chat.WerkzeugFehler.class);
     }
 
     private static Object throwUnsupported(String methode) {

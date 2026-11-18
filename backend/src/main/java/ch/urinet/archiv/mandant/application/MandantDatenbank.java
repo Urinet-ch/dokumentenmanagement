@@ -22,6 +22,12 @@ public interface MandantDatenbank {
     void dokumentartenEinspielen(String schema, List<DokumentartVorlage> arten);
 
     /**
+     * Spielt nach den Dokumentarten die Seed-Regeln des Mandanten ein (Spec 05, Aufgabe 17.6; dieselbe SQL wie
+     * Changeset 046, das bei der Provisionierung vor den Dokumentarten läuft); vorhandene Codes bleiben unverändert.
+     */
+    void regelnEinspielen(String schema);
+
+    /**
      * Legt nach dem Seed und dem Registereintrag eine Konfigurationsversion mit Quelle {@code SEED} an, wenn sich das
      * Abbild von der letzten Version unterscheidet (Spec 05, Req 1.1, 1.3).
      */

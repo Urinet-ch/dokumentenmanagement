@@ -151,7 +151,7 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
         Map<String, Object> parameter = new HashMap<>(sicht.parameter());
         parameter.put("art", quelle.art());
         String monat;
-        String bedingung = BESTAETIGT + " and d.art = :art and " + sicht.bedingung();
+        String bedingung = REGEL_BESTAETIGT + " and d.art = :art and " + sicht.bedingung();
         if (quelle.bezug().equals(BELEGDATUM)) {
             monat = "to_char(d.datum, 'YYYY-MM')";
             bedingung += " and d.datum is not null";
@@ -192,12 +192,45 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
     }
 
     @Override
+    public List<Jahreszeile> jahre(Monatsquelle quelle, java.time.MonthDay ende, Sichtregel regel) {
+        if (quelle.gruppe() != null) {
+            throw new IllegalArgumentException("Jahresreihen ohne Gruppe");
+        }
+        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
+        Map<String, Object> parameter = new HashMap<>(sicht.parameter());
+        parameter.put("art", quelle.art());
+        parameter.put("ende", String.format("%02d-%02d", ende.getMonthValue(), ende.getDayOfMonth()));
+        String tag;
+        String bedingung = REGEL_BESTAETIGT + " and d.art = :art and " + sicht.bedingung();
+        if (quelle.bezug().equals(BELEGDATUM)) {
+            tag = "to_char(d.datum, 'YYYY-MM-DD')";
+            bedingung += " and d.datum is not null";
+        } else {
+            tag = "substr(d.zusatz ->> :bezug, 1, 10)";
+            bedingung += " and (d.zusatz ->> :bezug) ~ " + DATUM;
+            parameter.put("bezug", feld(quelle.bezug()));
+        }
+        String jahr = "cast(substr(" + tag + ", 1, 4) as integer) + case when substr(" + tag
+                + ", 6, 5) > :ende then 1 else 0 end";
+        Query abfrage = em().createNativeQuery("select " + jahr + " as jahr, count(*) from dokument d where "
+                + bedingung + " group by 1 order by 1");
+        parameter.forEach(abfrage::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = abfrage.getResultList();
+        List<Jahreszeile> ergebnis = new ArrayList<>();
+        for (Object[] z : zeilen) {
+            ergebnis.add(new Jahreszeile(((Number) z[0]).intValue(), ((Number) z[1]).longValue()));
+        }
+        return ergebnis;
+    }
+
+    @Override
     public long belege(Collection<String> arten, Sichtregel regel) {
         if (arten.isEmpty()) {
             return 0;
         }
         VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
-        Query abfrage = em().createNativeQuery("select count(*) from dokument d where " + BESTAETIGT
+        Query abfrage = em().createNativeQuery("select count(*) from dokument d where " + REGEL_BESTAETIGT
                 + " and d.art in (:arten) and " + sicht.bedingung());
         sicht.parameter().forEach(abfrage::setParameter);
         return ((Number) abfrage.setParameter("arten", List.copyOf(arten)).getSingleResult()).longValue();

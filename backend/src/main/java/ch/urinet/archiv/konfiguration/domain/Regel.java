@@ -68,15 +68,23 @@ public record Regel(String code, String art, String typ, Map<String, Object> par
         }
     }
 
-    public record Erwartet(String je, String datum, String ab, String nurMonat) implements Parameter {
+    /** {@code gruppe}: getrennte Reihen je Partner ({@code PARTNER}) oder je Wert eines Zusatzfelds. */
+    public record Erwartet(String je, String datum, String ab, String nurMonat, String gruppe) implements Parameter {
+        public Erwartet(String je, String datum, String ab, String nurMonat) {
+            this(je, datum, ab, nurMonat, null);
+        }
+
         @Override
         public List<String> felder() {
-            List<String> felder = new ArrayList<>(2);
+            List<String> felder = new ArrayList<>(3);
             if (datum != null && !"BELEGDATUM".equals(datum)) {
                 felder.add(datum);
             }
             if (nurMonat != null) {
                 felder.add(nurMonat);
+            }
+            if (gruppe != null && gruppe.startsWith("zusatz.")) {
+                felder.add(gruppe);
             }
             return List.copyOf(felder);
         }
@@ -146,7 +154,7 @@ public record Regel(String code, String art, String typ, Map<String, Object> par
     }
 
     private static Erwartet erwartet(Map<String, Object> p) {
-        schluesselOptional(p, Set.of("je", "datum"), Set.of("ab", "nurMonat"));
+        schluesselOptional(p, Set.of("je", "datum"), Set.of("ab", "nurMonat", "gruppe"));
         String je = text(p.get("je"));
         if (!"MONAT".equals(je) && !"JAHR".equals(je)) {
             throw ungueltig();
@@ -167,10 +175,15 @@ public record Regel(String code, String art, String typ, Map<String, Object> par
         if (nurMonat != null && (!feldGueltig(nurMonat) || !nurMonat.startsWith("zusatz."))) {
             throw ungueltig();
         }
-        if ("JAHR".equals(je) && nurMonat != null) {
+        String gruppe = p.containsKey("gruppe") ? text(p.get("gruppe")) : null;
+        if (gruppe != null && !"PARTNER".equals(gruppe)
+                && (!feldGueltig(gruppe) || !gruppe.startsWith("zusatz."))) {
             throw ungueltig();
         }
-        return new Erwartet(je, datum, ab, nurMonat);
+        if ("JAHR".equals(je) && (nurMonat != null || gruppe != null)) {
+            throw ungueltig();
+        }
+        return new Erwartet(je, datum, ab, nurMonat, gruppe);
     }
 
     private static Map<String, Object> objekt(Object wert) {

@@ -104,12 +104,12 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         MandantCode mandant = mandantAktuell();
         Optional<KonfigurationsVersion> aktuell = repository.aktuell();
         if (aktuell.isPresent()) {
-            return aktuell.get();
+            return mitFeldTypen(aktuell.get());
         }
         repository.sperren();
         aktuell = repository.aktuell();
         if (aktuell.isPresent()) {
-            return aktuell.get();
+            return mitFeldTypen(aktuell.get());
         }
         Konfiguration initial = abbild(1);
         if (!initial.pruefen().isEmpty()) {
@@ -119,6 +119,19 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
                 KonfigurationQuelle.MIGRATION, initial);
         cache.invalidieren(mandant);
         return angelegt;
+    }
+
+    /**
+     * Die Typen der Zusatzfelder gehören nicht ins gespeicherte Abbild; sie werden beim Lesen aus dem Zusatz-Schema
+     * abgeleitet, damit Abbilder aus Migration und App gleich sind und Regeln mit {@code zusatz.} prüfbar bleiben.
+     */
+    private KonfigurationsVersion mitFeldTypen(KonfigurationsVersion stand) {
+        Konfiguration inhalt = stand.inhalt();
+        Konfiguration ergaenzt = new Konfiguration(inhalt.version(), inhalt.einstellungen(), inhalt.arten().stream()
+                .map(art -> art.mitZusatzFeldTypen(zusatzSchema.feldTypen(art.zusatzSchema()))).toList(),
+                inhalt.klassifikationen(), inhalt.regeln());
+        return new KonfigurationsVersion(stand.version(), stand.zeit(), stand.wer(), stand.grund(), stand.quelle(),
+                ergaenzt, stand.sha256());
     }
 
     private Konfiguration abbild(int version) {

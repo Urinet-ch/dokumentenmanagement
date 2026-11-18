@@ -19,6 +19,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
@@ -125,13 +126,18 @@ public class DokumentLesen {
      * nach Bestätigung oder Artwechsel angezeigt (Spec 05, Req 4.4).
      */
     public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument) {
+        return warnungen(benutzer, dokument, dokument.art() == null ? Map.of() : klassifikationen.laden(dokument.id()));
+    }
+
+    /** Wie {@link #warnungen(Benutzer, Dokument)} mit schon geladenen Klassifikationen (Liste im Eingangskorb). */
+    public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument, Map<String, List<String>> klassifikationsWerte) {
         List<Warnung> warnungen = new ArrayList<>();
         if (dokument.art() != null) {
             var regel = arten.finden(dokument.art()).aufbewahrung();
             if (regel.ab() == AufbewahrungAb.FELD && fristfeldLeer(dokument, regel.feld())) {
                 warnungen.add(new Warnung(Warnung.FRISTBEZUG_FEHLT, null));
             }
-            var werte = RegelMetadaten.aus(dokument, klassifikationen.laden(dokument.id()),
+            var werte = RegelMetadaten.aus(dokument, klassifikationsWerte,
                     regelPruefung.zusatzWerte(dokument.zusatz()));
             regelPruefung.pruefen(dokument.art(), werte, werte, dokument.id()).forEach(w ->
                     warnungen.add(new Warnung(w.code(), null, w.meldung())));

@@ -48,6 +48,23 @@ class RegelTest {
     }
 
     @Test
+    void erwartetKenntDieGruppeJePartnerOderZusatzfeldNurJeMonat() {
+        assertThat(regel("ERWARTET", Map.of("je", "MONAT", "datum", "BELEGDATUM", "gruppe", "zusatz.person"))
+                .typisierteParameter())
+                .isEqualTo(new Regel.Erwartet("MONAT", "BELEGDATUM", null, null, "zusatz.person"));
+        assertThat(regel("ERWARTET", Map.of("je", "MONAT", "datum", "zusatz.periode_bis", "gruppe", "PARTNER"))
+                .typisierteParameter().felder()).containsExactly("zusatz.periode_bis");
+        assertThat(regel("ERWARTET", Map.of("je", "MONAT", "datum", "BELEGDATUM", "gruppe", "zusatz.person"))
+                .typisierteParameter().felder()).contains("zusatz.person");
+        assertThatThrownBy(() -> regel("ERWARTET", Map.of(
+                "je", "MONAT", "datum", "BELEGDATUM", "gruppe", "titel")).typisierteParameter())
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> regel("ERWARTET", Map.of(
+                "je", "JAHR", "datum", "BELEGDATUM", "gruppe", "PARTNER")).typisierteParameter())
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void kopiertParameterRekursivUnveraenderlich() {
         var felder = new ArrayList<>(List.of("titel"));
         var parameter = new java.util.HashMap<String, Object>();

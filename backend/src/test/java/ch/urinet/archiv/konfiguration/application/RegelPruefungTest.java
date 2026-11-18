@@ -47,6 +47,43 @@ class RegelPruefungTest {
                 .isInstanceOf(RegelVerletzt.class);
     }
 
+    @Test
+    void artwechselGiltAlsAenderungDerRegelfelder() {
+        Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
+                Map.of("felder", List.of("belegnummer")), "FEHLER", "Nummer bereits erfasst.", true);
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> true);
+        Map<String, Object> vorher = Map.of("art", "QUITTUNG", "belegnummer", "R1");
+        Map<String, Object> nachher = Map.of("art", "RECHNUNG", "belegnummer", "R1");
+
+        assertThatThrownBy(() -> pruefung.pruefen("RECHNUNG", nachher, vorher, UUID.randomUUID()))
+                .isInstanceOf(RegelVerletzt.class);
+        assertThat(pruefung.pruefen("RECHNUNG", nachher, nachher, UUID.randomUUID()))
+                .containsExactly(new RegelPruefung.Warnung("einmalig", "Nummer bereits erfasst."));
+    }
+
+    @Test
+    void mehrfachwerteWerdenSortiertUndOhneDuplikateVerglichen() {
+        Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
+                Map.of("felder", List.of("klassifikation.fachgebiet", "tags")), "FEHLER", "Doppelt.", true);
+        List<List<Object>> gepruefteWerte = new java.util.ArrayList<>();
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> {
+            gepruefteWerte.add(werte);
+            return false;
+        });
+        Map<String, Object> vorher = Map.of("art", "RECHNUNG", "klassifikation.fachgebiet", List.of("a", "b"),
+                "tags", List.of("x"));
+        Map<String, Object> nachher = Map.of("art", "RECHNUNG", "klassifikation.fachgebiet",
+                List.of("b", "a", "b"), "tags", List.of("x"));
+
+        assertThat(pruefung.pruefen("RECHNUNG", nachher, vorher, UUID.randomUUID())).isEmpty();
+        assertThat(gepruefteWerte).containsExactly(List.of(List.of("a", "b"), List.of("x")));
+
+        RegelPruefung verletzt = pruefung(List.of(regel), (art, alle, felder, werte, id) -> true);
+        assertThat(verletzt.pruefen("RECHNUNG", nachher, vorher, UUID.randomUUID()))
+                .as("gleiche Menge in anderer Reihenfolge ist keine Änderung")
+                .containsExactly(new RegelPruefung.Warnung("einmalig", "Doppelt."));
+    }
+
     private static RegelPruefung pruefung(List<Regel> regeln, RegelDatenPort daten) {
         Konfiguration abbild = new Konfiguration(1, new Konfiguration.Einstellungen("12-31", null),
                 List.of(), List.of(), regeln);

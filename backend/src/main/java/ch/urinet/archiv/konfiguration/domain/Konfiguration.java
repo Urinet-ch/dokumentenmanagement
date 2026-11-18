@@ -184,8 +184,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
             List<Art> betroffeneArten = regel.art() == null
                     ? arten : List.of(artenNachCode.get(regel.art()));
+            // geschaeftsjahr ist nur als Folge- oder Zeitraumfeld einer FOLGE lesbar, nicht in den übrigen Regeltypen.
             if (parameter.felder().stream().anyMatch(feld ->
-                    betroffeneArten.stream().anyMatch(art -> !regelFeldVorhanden(art, feld)))) {
+                    !(parameter instanceof Regel.Folge && "geschaeftsjahr".equals(feld))
+                    && betroffeneArten.stream().anyMatch(art -> !regelFeldVorhanden(art, feld)))) {
                 befunde.add(new Befund(pfad + ".parameter", "REGEL_FELD_UNGUELTIG",
                         "Ein Feld der Regel ist in der Dokumentart nicht verfügbar."));
             }
@@ -622,6 +624,13 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             kiFelder = kiFelder == null ? List.of() : List.copyOf(kiFelder);
             klassifikationen = klassifikationen == null ? List.of() : List.copyOf(klassifikationen);
             zusatzFeldTypen = zusatzFeldTypen == null ? Map.of() : Map.copyOf(zusatzFeldTypen);
+        }
+
+        /** Typen der Zusatzfelder aus dem Schema; abgeleitet, nicht Teil des gespeicherten Abbilds. */
+        public Art mitZusatzFeldTypen(Map<String, String> typen) {
+            return new Art(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit,
+                    aufbewahrung, gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
+                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, klassifikationen, typen);
         }
     }
 

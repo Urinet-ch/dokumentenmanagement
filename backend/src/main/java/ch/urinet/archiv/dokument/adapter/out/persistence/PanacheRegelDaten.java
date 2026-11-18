@@ -23,7 +23,8 @@ public class PanacheRegelDaten implements RegelDatenPort {
             Map.entry("datum", "to_jsonb(d.datum)"),
             Map.entry("partner", "to_jsonb(d.partner_id)"),
             Map.entry("projekt", "to_jsonb(d.projekt)"),
-            Map.entry("tags", "to_jsonb(d.tags)"),
+            Map.entry("tags", "(select coalesce(jsonb_agg(t order by t collate \"C\"), '[]'::jsonb) "
+                    + "from (select distinct unnest(d.tags) t) tags)"),
             Map.entry("vertraulichkeit", "to_jsonb(d.vertraulichkeit)"),
             Map.entry("person_benutzer", "to_jsonb(d.person_benutzer)"),
             Map.entry("belegnummer", "to_jsonb(f.belegnummer)"),
@@ -37,6 +38,9 @@ public class PanacheRegelDaten implements RegelDatenPort {
             Map.entry("gueltig_bis", "to_jsonb(v.gueltig_bis)"),
             Map.entry("kuendigungsfrist", "to_jsonb(v.kuendigungsfrist)"),
             Map.entry("naechste_frist", "to_jsonb(v.naechste_frist)"));
+
+    private static final String SPERRE = "select 1 from pg_advisory_xact_lock(hashtextextended("
+            + "'regel:' || current_schema() || ':' || :schluessel, 0))";
 
     private final Instance<EntityManager> em;
     private final ObjectMapper json;
@@ -58,6 +62,12 @@ public class PanacheRegelDaten implements RegelDatenPort {
         for (int i = 0; i < felder.size(); i++) {
             ausdruecke.add(ausdruck(felder.get(i), i));
         }
+        String werteJson = serialisieren(werte);
+        // Prüfen und Speichern sind nicht atomar: gleiche Werte derselben Regel werden bis zum Commit serialisiert
+        entityManager().createNativeQuery(SPERRE)
+                .setParameter("schluessel", (ueberAlleArten ? "*" : art) + ":" + String.join(",", felder) + ":"
+                        + werteJson)
+                .getSingleResult();
         String sql = "select exists (select 1 from dokument d "
                 + "left join dokument_finanz f on f.dokument_id = d.id "
                 + "left join dokument_vertrag v on v.dokument_id = d.id "
@@ -67,7 +77,7 @@ public class PanacheRegelDaten implements RegelDatenPort {
                 + (dokumentId == null ? "" : "and d.id <> :dokumentId ")
                 + "and jsonb_build_array(" + String.join(", ", ausdruecke) + ") = cast(:werte as jsonb))";
         var abfrage = entityManager().createNativeQuery(sql)
-                .setParameter("werte", serialisieren(werte));
+                .setParameter("werte", werteJson);
         if (!ueberAlleArten) {
             abfrage.setParameter("art", art);
         }
@@ -90,7 +100,7 @@ public class PanacheRegelDaten implements RegelDatenPort {
             return "d.zusatz -> :feld" + index;
         }
         if (feld.startsWith("klassifikation.")) {
-            return "(select coalesce(jsonb_agg(k.wert order by k.wert), '[]'::jsonb) "
+            return "(select coalesce(jsonb_agg(k.wert order by k.wert collate \"C\"), '[]'::jsonb) "
                     + "from dokument_klassifikation k where k.dokument_id = d.id "
                     + "and k.klassifikation = :feld" + index + ")";
         }

@@ -68,4 +68,11 @@ class MonatslueckenTest {
         assertThat(e.erster()).isNull();
         assertThat(e.fehlend()).isEmpty();
     }
+
+    @Test
+    void abVorDemErstenDokumentLegtDenBeginnFest() {
+        Monatsluecken.Ergebnis e = Monatsluecken.pruefen(Set.of(YearMonth.of(2026, 4)), JAHR_2026,
+                YearMonth.of(2026, 5), YearMonth.of(2026, 2));
+        assertThat(e.fehlend()).containsExactly(YearMonth.of(2026, 2), YearMonth.of(2026, 3), YearMonth.of(2026, 5));
+    }
 }

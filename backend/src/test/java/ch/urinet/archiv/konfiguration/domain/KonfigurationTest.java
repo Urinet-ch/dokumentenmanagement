@@ -227,6 +227,20 @@ class KonfigurationTest {
     }
 
     @Test
+    void geschaeftsjahrNurAlsFeldEinerFolge() {
+        var art = art("MERKBLATT", "NORMAL", true, false);
+        var folge = new Regel("folge", "MERKBLATT", "FOLGE",
+                Map.of("feld", "geschaeftsjahr", "zeitraum", Map.of("feld", "geschaeftsjahr")),
+                "WARNUNG", "Folge prüfen.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(folge)).pruefen()).isEmpty();
+
+        var eindeutig = new Regel("eindeutig", "MERKBLATT", "EINDEUTIG", Map.of("felder", List.of("geschaeftsjahr")),
+                "WARNUNG", "Doppelt.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(eindeutig)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("REGEL_FELD_UNGUELTIG");
+    }
+
+    @Test
     void beruecksichtigtRegelnBeimVersionsvergleichUndProtokolliertIhreAenderungen() {
         var art = art("MERKBLATT", "NORMAL", true, false);
         var vorherRegel = new Regel("pflicht", "MERKBLATT", "PFLICHT_WENN",

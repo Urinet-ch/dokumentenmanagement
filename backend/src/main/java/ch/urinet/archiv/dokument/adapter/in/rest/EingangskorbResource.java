@@ -73,7 +73,7 @@ public class EingangskorbResource {
         Seite<Dokument> treffer = lesen.eingangskorb(benutzer, seite, groesse);
         return new EingangskorbDto(treffer.eintraege().stream().map(d -> {
             var werte = klassifikationen.laden(d.id());
-            return DokumentResource.dto(d, json, lesen.warnungen(benutzer, d), lesen.schwelle(), List.of(), werte,
+            return DokumentResource.dto(d, json, lesen.warnungen(benutzer, d, werte), lesen.schwelle(), List.of(), werte,
                     klassifikationVerwaltung.markierteDokumentKlassifikationen(d.art(), werte,
                             d.bestaetigt() != null));
         }).toList(),

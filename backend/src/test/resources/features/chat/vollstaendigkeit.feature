@@ -2,13 +2,13 @@
 @spec-02
 Funktionalität: Werkzeug vollstaendigkeit: Lücken in Nummernfolgen und Monaten (Aufgabe 7.1c)
   Das Werkzeug «vollstaendigkeit» ist eine reine Java-Methode; die Szenarien rufen sie ohne Sprachmodell über CDI auf,
-  jeden Aufruf in einem eigenen Thread ohne Anmeldung. Die aktiven Regeln des Mandanten bestimmen Nummernfolge und
-  erwartete Monate je Dokumentart. Alle Daten sind synthetisch und liegen im Jahr 2003, das übrige Szenarien nicht
-  benutzen; die Monate sind damit sicher abgeschlossen.
+  jeden Aufruf in einem eigenen Thread ohne Anmeldung. Die Regeln je Mandant stehen in der Konfiguration (Übergang, bis
+  Spec 05, 17.6 den Lückenbericht liefert): Nummernfolge der Ausgangsrechnungen, Lohnabrechnungen je Person und
+  Kontoauszüge je Partner, je Monat ab dem ersten Beleg. Alle Daten sind synthetisch und liegen im Jahr 2003, das
+  übrige Szenarien nicht benutzen; die Monate sind damit sicher abgeschlossen.
 
   Hintergrund:
     Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
-    Und im Mandanten «urinet» sind die Seed-Regeln für den Lückenbericht eingerichtet
     Und im Mandanten «urinet» gibt es für die Lückenprüfung die Kontakte «Kantonalbank Eichenau» und «Raiffeisen Birkenfeld»
 
   @req-3.6
@@ -25,10 +25,13 @@ Funktionalität: Werkzeug vollstaendigkeit: Lücken in Nummernfolgen und Monaten
     Und im Mandanten «urinet» liegen bestätigte Kontoauszüge des Partners «Raiffeisen Birkenfeld» für die Monate «2003-01, 2003-02, 2003-03, 2003-04, 2003-05, 2003-06, 2003-07, 2003-08, 2003-09, 2003-10, 2003-11, 2003-12»
     Wenn «inhaber-urinet» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
     Dann fehlen bei den Ausgangsrechnungen die Nummern «2003-003, 2003-005, 2003-006»
-    Und fehlen bei der Art «LOHNABRECHNUNG» die Monate «2003-03»
-    Und beginnt die Reihe der Art «LOHNABRECHNUNG» mit dem Monat «2003-01»
-    Und hat die Art «BANK» keine fehlenden Monate
-    Und enthält der Bericht keine Personennamen
+    Und fehlen bei der Art «LOHNABRECHNUNG» für «Anna Weidmatt» die Monate «2003-03»
+    Und beginnt die Reihe der Art «LOHNABRECHNUNG» für «Anna Weidmatt» mit dem Monat «2003-01»
+    Und hat die Art «LOHNABRECHNUNG» für «Clara Moosbrugger» keine fehlenden Monate
+    Und beginnt die Reihe der Art «LOHNABRECHNUNG» für «Clara Moosbrugger» mit dem Monat «2003-05»
+    Und hat die Art «LOHNABRECHNUNG» keine Reihe für «Beat Rinderli»
+    Und fehlen bei der Art «BANK» für «Kantonalbank Eichenau» die Monate «2003-03, 2003-08»
+    Und hat die Art «BANK» für «Raiffeisen Birkenfeld» keine fehlenden Monate
     Und nennt die Antwort die ausdrückliche Lücke «Lieferantenbelege ohne Archivdokument: nur mit AbaNinja»
     Und liefern «inhaber-urinet», «treuhaender-urinet» und «geschaeftsstelle-urinet» dieselben Lücken
 
@@ -64,13 +67,13 @@ Funktionalität: Werkzeug vollstaendigkeit: Lücken in Nummernfolgen und Monaten
       | LOHNABRECHNUNG   | PERSONAL        | 2003-03-31 |             | 2003-03 | Anna Weidmatt | EINGANGSKORB | nein       |
     Wenn «inhaber-urinet» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
     Dann fehlen bei den Ausgangsrechnungen die Nummern «2003-003»
-    Und fehlen bei der Art «LOHNABRECHNUNG» die Monate «2003-03»
+    Und fehlen bei der Art «LOHNABRECHNUNG» für «Anna Weidmatt» die Monate «2003-03»
     Und nennt der Datenstand die Zahl der bestätigten Belege der Arten «AUSGANGSRECHNUNG, LOHNABRECHNUNG, BANK» im Mandanten «urinet»
     Wenn «inhaber-vhf-gsk» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
     Dann hat die Antwort keine Kategorien und den Hinweis «Für diesen Mandanten sind keine Regeln für Lücken eingerichtet»
 
   @req-3.6
-  Szenario: Bestätigte Monatsbelege derselben Art ergeben eine gemeinsame Reihe
+  Szenario: Namens- und Schreibvarianten desselben Partners und derselben Person ergeben eine durchgehende Reihe
     Angenommen im Mandanten «urinet» liegen bestätigte Kontoauszüge des Partners «Kantonalbank Eichenau» für die Monate «2003-01, 2003-02, 2003-05, 2003-06, 2003-07, 2003-08, 2003-09, 2003-10, 2003-11, 2003-12»
     Und im Mandanten «urinet» liegen bestätigte Kontoauszüge unter dem Namen «Kantonalbank Eichenau AG» des Partners «Kantonalbank Eichenau» für die Monate «2003-03, 2003-04»
     Und im Mandanten «urinet» liegen bestätigte Lohnabrechnungen der Person «Anna Weidmatt» für die Monate «2003-01, 2003-02, 2003-05, 2003-06, 2003-07, 2003-08, 2003-09, 2003-10, 2003-11, 2003-12»
@@ -79,5 +82,7 @@ Funktionalität: Werkzeug vollstaendigkeit: Lücken in Nummernfolgen und Monaten
       | LOHNABRECHNUNG | PERSONAL        | 2003-03-31 |             | 2003-03 | anna weidmatt   | ARCHIVIERT | ja         |
       | LOHNABRECHNUNG | PERSONAL        | 2003-04-30 |             | 2003-04 | Anna Weidmatt   | ARCHIVIERT | ja         |
     Wenn «inhaber-urinet» im Chat die Vollständigkeit für das Geschäftsjahr «2003» abfragt
-    Dann hat die Art «BANK» keine fehlenden Monate
-    Und hat die Art «LOHNABRECHNUNG» keine fehlenden Monate
+    Dann hat die Art «BANK» für «Kantonalbank Eichenau» keine fehlenden Monate
+    Und beginnt die Reihe der Art «BANK» für «Kantonalbank Eichenau» mit dem Monat «2003-01»
+    Und hat die Art «LOHNABRECHNUNG» für «Anna Weidmatt» keine fehlenden Monate
+    Und beginnt die Reihe der Art «LOHNABRECHNUNG» für «Anna Weidmatt» mit dem Monat «2003-01»

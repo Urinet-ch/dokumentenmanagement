@@ -57,12 +57,21 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Abhängig von: 17.3; Spec 01: 4.7_
 
 - [x] 17.6 Regeln und Lückenbericht [Backend]
-  - Übergangsquelle in Spec 02, 7.1c (Port `Lueckenbericht`, Adapter `KonfigurierteLuecken` aus der Konfiguration); 17.6 ersetzt den Adapter hinter demselben Port, das Werkzeug `vollstaendigkeit` ändert sich nicht
+  - Übergangsquelle in Spec 02, 7.1c (Port `Lueckenbericht`, Adapter `KonfigurierteLuecken` aus der Konfiguration); 17.6 ersetzt den Adapter hinter demselben Port. Das Werkzeug `vollstaendigkeit` behält Name, Parameter und Antwortform; neu sind Reihen je Geschäftsjahr (`ERWARTET` mit `je` `JAHR`) und die Gruppierung `gruppe` aus den Regeln (design.md «Regeltypen»)
   - Changeset `<nnn>-regel`, Regeltypen, `RegelPruefung` in Bestätigen, Ändern, Generator und Drive-Import,
-    bestehende Verletzungen als Warnung, `Lueckenbericht` mit Recht nach 5.4, Meldung betroffener Dokumente,
-    Regeln von `urinet` per Changeset (Version mit Quelle `MIGRATION`).
-  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
+    bestehende Verletzungen als Warnung, `Lueckenbericht` mit Recht nach 5.4 (im Chat), Regeln von `urinet` per
+    Changeset (Version mit Quelle `MIGRATION`) und bei der Provisionierung.
+  - Aufgeteilt in der Nachbesserung von PR #304: Die Meldung betroffener Dokumente (5.6) und die REST-Endpunkte
+    folgen in 17.8.
+  - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 5.5, 5.7_
   - _Abhängig von: 17.5; Spec 01: 3.4, 3.5, 4.7, 4.8_
+
+- [ ] 17.8 Regeln über die REST-Schnittstelle und betroffene Dokumente [Backend]
+  - Aus 17.6 abgetrennt (Nachbesserung PR #304): Endpunkte `/regeln` (Anlegen, Ändern, Aktivieren mit neuer
+    Konfigurationsversion) mit `betroffeneDokumente` beim Anlegen, Verschärfen oder Aktivieren (5.6) und
+    `GET /berichte/luecken` mit HTTP 403 für Rollen ohne uneingeschränkte Sicht (5.4); OpenAPI im selben PR.
+  - _Anforderungen: 5.4, 5.6_
+  - _Abhängig von: 17.6_
 
 - [ ] 17.7 Konfigurationsdatei, Admin-Kommando und Seeds [Backend]
   - Schema-Datei, Export, Prüfen, Vergleichen, Einspielen (ganz oder gar nicht, Basisversion, Rundlauf),
