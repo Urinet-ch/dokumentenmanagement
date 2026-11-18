@@ -235,8 +235,9 @@ flowchart LR
     seite-max-zeichen`, Aufrufe = Abschnitte (an Seitengrenzen gepackt, höchstens `abschnitt-zeichen`) + `max-seiten`
     + 2 (`PLANUNG`, `QUELLE`). Den Systemprompt baut erst 14.1b; bis dahin steht `werkzeug-max-zeichen` als
     Platzhalter für seine Länge. Mit den Startwerten ergibt schon eine einseitige `NORMAL`-Quelle mit wenig Text rund 388'000 Tokens, also
-    mehr als `budget-tokens` 300'000: Jede Quelle endet mit dem Hinweis «zu gross», bis Fabian Formel oder Startwert
-    entscheidet (offen im PR #307); `wissens_einstellung.budget_tokens` hat Vorrang vor der Konfiguration.
+    mehr als `budget-tokens` 300'000. Fabian entschied am 18.11.2026, den Startwert auf 600'000 anzuheben; damit
+    bleibt für eine kleine `NORMAL`-Quelle rund 212'000 Tokens Reserve. `wissens_einstellung.budget_tokens` hat
+    Vorrang vor der Konfiguration.
   - Monatsbudget im Kalendermonat `Europe/Zurich` (Grenzen als UTC-Zeitpunkte), `wissens_einstellung` vor
     `archiv.wissen.monatsbudget-tokens`. Streng ausgelegt: Ist der Rest kleiner als die Schätzung, gilt das Budget als
     erschöpft (manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` «Budget erschöpft»).
@@ -423,7 +424,7 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 | `archiv.wissen.index-max-zeichen` | 60'000 |
 | `archiv.wissen.seite-max-zeichen` | 20'000 |
 | `archiv.wissen.werkzeug-max-zeichen` | 12'000 |
-| `archiv.wissen.budget-tokens` | 300'000 (entschieden von Fabian am 09.11.2026) |
+| `archiv.wissen.budget-tokens` | 600'000 (entschieden von Fabian am 18.11.2026) |
 | `archiv.wissen.lint-budget-tokens` | 100'000 |
 | `archiv.wissen.monatsbudget-tokens` | 1'000'000 je Mandant und Kalendermonat (entschieden von Fabian am 09.11.2026) |
 | `archiv.wissen.lint-zeitplan` | `0 0 4 ? * SUN` (Europe/Zurich) |
@@ -807,7 +808,7 @@ Entschieden von Fabian am 09.11.2026 (alle Empfehlungen übernommen):
    `KEINE_WISSENSQUELLE` (Requirement 5.7). Das Design bleibt vorbereitet: Der Ingest braucht nur ein archiviertes
    Dokument mit Volltext, PDF/A mit Seitentrennern und Vertraulichkeit ≠ `PERSONAL`; der Ausschluss aus dem
    Jahresexport (Requirement 1.6) gilt nur für die Art `WISSENSQUELLE`.
-5. Tokenbudget je Ingest: Startwert 300'000 Tokens, konfigurierbar (Requirement 13.4).
+5. Tokenbudget je Ingest: Startwert 600'000 Tokens (Entscheid Fabian, 18.11.2026), konfigurierbar (Requirement 13.4).
 6. Gate Phase 4: 5 Wissensquellen, mindestens 47 von 50 Fussnoten belegt, mindestens 14 von 15 Fragen korrekt mit Seite und Quelldokument beantwortet
    (Requirement 18.1–18.4).
 7. `WISSENSQUELLE` nur von Hand wählbar; ein KI-Vorschlag der Art bleibt Option (Requirement 1.5).

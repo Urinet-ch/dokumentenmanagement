@@ -20,7 +20,7 @@ class WissenKonfigurationTest {
         }
 
         assertThat(properties.getProperty("archiv.wissen.modell")).isEqualTo("${archiv.ki.chat-modell}");
-        assertThat(properties.getProperty("archiv.wissen.budget-tokens")).isEqualTo("300000");
+        assertThat(properties.getProperty("archiv.wissen.budget-tokens")).isEqualTo("600000");
         assertThat(properties.getProperty("archiv.wissen.monatsbudget-tokens")).isEqualTo("1000000");
         assertThat(properties.containsKey("archiv.wissen.basis-url")).isFalse();
     }
@@ -28,6 +28,6 @@ class WissenKonfigurationTest {
     @Test
     void leeresModellWirdBeimStartAbgelehnt() {
         assertThatIllegalStateException().isThrownBy(() -> new WissenKonfiguration("", 30_000, 15, 60_000,
-                20_000, 12_000, 300_000, 1_000_000));
+                20_000, 12_000, 600_000, 1_000_000));
     }
 }
