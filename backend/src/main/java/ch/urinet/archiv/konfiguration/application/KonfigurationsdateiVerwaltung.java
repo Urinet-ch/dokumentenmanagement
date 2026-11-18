@@ -116,7 +116,7 @@ public class KonfigurationsdateiVerwaltung {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
         }
         speichern(analyse.ziel());
-        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI);
+        int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI, aktuell);
         return new Ergebnis(version, analyse.aenderungen());
     }
 
@@ -158,9 +158,10 @@ public class KonfigurationsdateiVerwaltung {
             throw new KonfigurationUngueltig(befunde);
         }
         konfiguration.aenderungStarten(erwarteteVersion);
-        KiTexte alt = kiTexte.lesen();
+        Konfiguration vorher = aktuellMitLiveKiTexte();
+        KiTexte alt = vorher.kiTexte();
         kiTexte.speichern(new KiTexte(rolle, feldregeln, alt.kiFreigegeben()));
-        return konfiguration.aenderungSpeichern(wer, grund);
+        return konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.APP, vorher);
     }
 
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {

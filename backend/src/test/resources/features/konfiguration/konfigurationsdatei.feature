@@ -56,6 +56,26 @@ Funktionalität: Konfigurationsdatei
     Wenn «inhaber-urinet» die KI-Texte liest
     Dann ist die KI laut KI-Texte-Endpunkt freigegeben
 
+  @req-1.3 @req-7.6
+  Szenario: Eine Änderung der KI-Texte wird nach einem alten Snapshot versioniert
+    Angenommen die letzte Konfigurationsversion von «urinet» enthält keine KI-Texte
+    Wenn «inhaber-urinet» die KI-Texte liest
+    Und «inhaber-urinet» die KI-Texte mit der aktuellen Version ändert
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion um eins gestiegen
+    Und nennt der letzte Eintrag «KONFIGURATION_AENDERN» im Protokoll von «urinet» den Text «kiTexte.rolle»
+
+  @req-1.3 @req-6.1
+  Szenario: Eine Dateiänderung der KI-Texte wird nach einem alten Snapshot versioniert
+    Angenommen die letzte Konfigurationsversion von «urinet» enthält keine KI-Texte
+    Wenn «inhaber-urinet» die KI-Texte liest
+    Und «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei der KI-Rollentext geändert wird
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion um eins gestiegen
+    Und nennt der letzte Eintrag «KONFIGURATION_AENDERN» im Protokoll von «urinet» den Text «kiTexte.rolle»
+
   @req-6.3
   Szenario: Eine ungültige Konfiguration wird vor dem Schreiben abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
