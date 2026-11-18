@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code public} entsteht kein {@code databasechangelog}. Mit DB-Devservice; die Prüfung vorher nur beim
  * {@code StartupEvent} liess Liquibase zuerst laufen (Gegenprobe im PR).
  */
-@Tag("start-4")
+@Tag("start-3")
 @QuarkusMainTest
 @TestProfile(SecretEigentuemerFehltTest.ProdOhneDbOwner.class)
 class SecretEigentuemerFehltTest {

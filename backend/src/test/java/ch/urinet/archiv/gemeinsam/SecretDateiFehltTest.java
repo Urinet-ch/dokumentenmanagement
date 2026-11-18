@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Fehlt in {@code prod} eine Secret-Datei ({@code archiv_db_app}), bricht der Start ab, statt mit leerem Passwort
  * weiterzulaufen (fail closed, tech.md Regel 7). Über das Admin-Kommando, weil der Dienst bei gelungenem Start nie endet.
  */
-@Tag("start-3")
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(SecretDateiFehltTest.ProdOhneDbApp.class)
 class SecretDateiFehltTest {

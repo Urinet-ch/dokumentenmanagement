@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Prod-Pfad der DB-Rollen (Req 1.7, design.md «Secrets und Konfiguration»): Liquibase und Provisionierung mit
  * {@code archiv_owner} über eine eigene Verbindung, die App mit {@code archiv_app} nur mit DML-Rechten.
  */
-@Tag("start-2")
+@Tag("start-4")
 @QuarkusTest
 @TestProfile(MandantEigentuemerTest.ProdRollen.class)
 class MandantEigentuemerTest {

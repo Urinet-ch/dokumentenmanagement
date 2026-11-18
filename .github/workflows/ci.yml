@@ -208,10 +208,10 @@ jobs:
       matrix:
         # Tags synchron halten mit -DexcludedGroups (Job backend), GRUPPEN in StartGruppenTest und den @Tag der
         # Szenario-Runner; jedes Tag in genau einer Gruppe (prüft «testzahl»). Start-Gruppen nach gemessener Laufzeit
-        # gefüllt (je etwa 415 s samt Szenario-Runner, Messung 18.11.2026)
+        # gefüllt (je etwa 410 s samt Szenario-Runner, Mittel zweier Läufe 18.11.2026)
         include:
-          - {name: gruppe-1, tags: 'start-1,szenarien-2'}
-          - {name: gruppe-2, tags: 'start-2,szenarien-1'}
+          - {name: gruppe-1, tags: 'start-1,szenarien-1'}
+          - {name: gruppe-2, tags: 'start-2,szenarien-2'}
           - {name: gruppe-3, tags: 'start-3'}
           - {name: gruppe-4, tags: 'start-4'}
     steps:

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * zählt jede Zeile des Konsolen-Logs zu stdout, auch mit {@code quarkus.log.console.stderr=true}; das Log geht in
  * diesem Test darum in eine Datei, und stdout wird ungefiltert geprüft.
  */
-@Tag("start-4")
+@Tag("start-3")
 @QuarkusMainTest
 @TestProfile(TokenKommandoStartTest.LogInDatei.class)
 class TokenKommandoStartTest {

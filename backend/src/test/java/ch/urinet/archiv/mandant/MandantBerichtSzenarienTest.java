@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /** Isolierter Cucumber-Lauf für den monatlichen Mandantenbericht. */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @QuarkusTestResource(TsaTestRessource.class)
 @TestProfile(MandantBerichtSzenarienTest.BerichtProfil.class)

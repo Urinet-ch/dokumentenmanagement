@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.containsString;
  * (Aufgabe 1.9, entschieden von Fabian am 11.11.2026, PR #42 P42-1): Readiness UP samt OIDC-Tenant, der Wächter
  * beendet nichts, gültige Tokens gelten.
  */
-@Tag("start-4")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(OidcBereitschaftTest.MitKeycloak.class)
 class OidcBereitschaftTest {
