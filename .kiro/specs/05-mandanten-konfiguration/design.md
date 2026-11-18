@@ -231,8 +231,10 @@ eine Version `MIGRATION` mit den KI-Texten an, wenn das letzte Abbild keine hat.
 aller Klassifikationen mit `kiVorschlag` samt Werten (auch inaktive, strenger als der tatsächliche Prompt); Befund
 `kiTexte` mit Code `TEXTE_ZU_LANG`. Vor dem Löschen wegfallender Werte oder Klassifikationen setzt das Einspielen
 Standardwerte, die auf sie zeigen, auf `null`; danach schreibt es die Zuordnungen der Datei. Export und `ETag` stammen
-aus demselben Stand. `PATCH /konfiguration/ki-texte` antwortet bei zu langen Texten oder fehlendem Grund mit 422
-`KONFIGURATION_UNGUELTIG` samt `befunde[]`.
+aus demselben Stand. Bei einer KI-Textänderung wird das Vorher-Abbild vor dem Schreiben gesichert und für Version,
+Diff und Zugriffsprotokoll verwendet; das gilt für `PATCH /konfiguration/ki-texte` und das Einspielen einer Datei,
+auch wenn die letzte gespeicherte Version noch kein `kiTexte` enthält. Der Patch antwortet bei zu langen Texten oder
+fehlendem Grund mit 422 `KONFIGURATION_UNGUELTIG` samt `befunde[]`.
 
 ## Regeltypen
 | Typ | Parameter | Prüfung | Wann |

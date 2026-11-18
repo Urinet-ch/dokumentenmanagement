@@ -94,9 +94,16 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     }
 
     public int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle) {
-        KonfigurationsVersion vorher = mitFeldTypen(basisSicherstellen());
+        Konfiguration vorher = mitFeldTypen(basisSicherstellen()).inhalt();
+        return aenderungSpeichern(wer, grund, quelle, vorher);
+    }
+
+    int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle, Konfiguration vorher) {
+        if (basisSicherstellen().version() != vorher.version()) {
+            throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
+        }
         Konfiguration neu = abbild(vorher.version() + 1);
-        if (vorher.inhalt().gleicherInhalt(neu)) {
+        if (vorher.gleicherInhalt(neu)) {
             return vorher.version();
         }
         if (!neu.pruefen().isEmpty()) {
@@ -105,7 +112,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         KonfigurationsVersion gespeichert = repository.anlegen(neu.version(), wer, grund,
                 quelle, neu);
         cache.invalidieren(mandantAktuell());
-        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.inhalt().aenderungen(neu));
+        protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.aenderungen(neu));
         return gespeichert.version();
     }
 

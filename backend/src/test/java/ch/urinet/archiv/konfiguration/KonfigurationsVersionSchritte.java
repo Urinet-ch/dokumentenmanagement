@@ -235,6 +235,7 @@ public class KonfigurationsVersionSchritte {
 
     @Wenn("«{word}» die KI-Texte mit der aktuellen Version ändert")
     public void kiTexteMitAktuellerVersionAendern(String benutzer) {
+        kiTexteWiederherstellen = true;
         versionVorher = aktuelleNummer(benutzer);
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", etag(benutzer))
                 .contentType(ContentType.JSON)
@@ -397,6 +398,7 @@ public class KonfigurationsVersionSchritte {
 
     @Wenn("in der Datei der KI-Rollentext geändert wird")
     public void kiRollentextAendern() {
+        kiTexteWiederherstellen = true;
         ((ObjectNode) datei.path("kiTexte")).put("rolle", "Synthetische Testrolle");
     }
 
