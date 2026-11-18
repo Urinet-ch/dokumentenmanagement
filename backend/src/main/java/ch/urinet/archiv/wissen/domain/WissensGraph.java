@@ -8,15 +8,13 @@ import java.util.Set;
 import java.util.UUID;
 
 public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<UUID>> quellseitenJeSeite,
-                           Map<UUID, WissensStufe> dokumentStufen, Map<UUID, WissensStufe> mindeststufen,
-                           Map<UUID, String> pfade) {
+                           Map<UUID, WissensStufe> dokumentStufen, Map<UUID, WissensStufe> mindeststufen) {
 
     public WissensGraph {
         dokumenteJeSeite = kopieren(dokumenteJeSeite);
         quellseitenJeSeite = kopieren(quellseitenJeSeite);
         dokumentStufen = Map.copyOf(dokumentStufen);
         mindeststufen = Map.copyOf(mindeststufen);
-        pfade = Map.copyOf(pfade);
     }
 
     public boolean kenntSeite(UUID seiteId) {
@@ -64,8 +62,25 @@ public record WissensGraph(Map<UUID, Set<UUID>> dokumenteJeSeite, Map<UUID, Set<
         return stufe;
     }
 
-    public boolean istUeberblick(UUID seiteId) {
-        return "ueberblick".equals(pfade.get(seiteId));
+    /**
+     * Wirksame Stufe einer vorgeschlagenen Fassung vor der Annahme (Req 11.1, 6.8): Maximum aus den Dokumenten der
+     * Fassung, den Hüllen ihrer Quellseiten, der Mindeststufe der Seite und der Kontextstufe der Änderung (11.7).
+     * Unbekannte Dokumente und Quellseiten gelten als INTERN.
+     */
+    public WissensStufe wirksameStufeNachAnnahme(Set<UUID> dokumente, Set<UUID> quellseiten,
+                                                 WissensStufe mindeststufe, WissensStufe kontextstufe) {
+        WissensStufe stufe = mindeststufe.hoechste(kontextstufe);
+        Set<UUID> huelle = new HashSet<>(dokumente);
+        for (UUID quellseite : quellseiten) {
+            if (!kenntSeite(quellseite)) {
+                return WissensStufe.INTERN;
+            }
+            huelle.addAll(dokumente(quellseite));
+        }
+        for (UUID dokumentId : huelle) {
+            stufe = stufe.hoechste(dokumentStufen.getOrDefault(dokumentId, WissensStufe.INTERN));
+        }
+        return stufe;
     }
 
     private static Map<UUID, Set<UUID>> kopieren(Map<UUID, Set<UUID>> quelle) {

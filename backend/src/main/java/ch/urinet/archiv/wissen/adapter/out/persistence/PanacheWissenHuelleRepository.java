@@ -50,12 +50,8 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
         }
 
         Map<UUID, WissensStufe> mindeststufen = new HashMap<>();
-        Map<UUID, String> pfade = new HashMap<>();
-        for (Object[] zeile : zeilen(
-                "select id, pfad, vertraulichkeit_mindest from wissensseite")) {
-            UUID seiteId = uuid(zeile[0]);
-            pfade.put(seiteId, (String) zeile[1]);
-            mindeststufen.put(seiteId, WissensStufe.valueOf((String) zeile[2]));
+        for (Object[] zeile : zeilen("select id, vertraulichkeit_mindest from wissensseite")) {
+            mindeststufen.put(uuid(zeile[0]), WissensStufe.valueOf((String) zeile[1]));
         }
 
         Map<UUID, WissensStufe> dokumentStufen = new HashMap<>();
@@ -70,7 +66,7 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
             dokumentStufen.put(uuid(zeile[0]), WissensStufe.valueOf((String) zeile[1]));
         }
 
-        return new WissensGraph(dokumenteJeSeite, quellseitenJeSeite, dokumentStufen, mindeststufen, pfade);
+        return new WissensGraph(dokumenteJeSeite, quellseitenJeSeite, dokumentStufen, mindeststufen);
     }
 
     @Override

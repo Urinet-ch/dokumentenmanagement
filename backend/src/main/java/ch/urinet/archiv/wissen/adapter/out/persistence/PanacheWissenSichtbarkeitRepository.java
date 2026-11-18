@@ -21,19 +21,30 @@ import java.util.UUID;
 @ApplicationScoped
 public class PanacheWissenSichtbarkeitRepository implements WissenSichtbarkeitRepository {
 
+    // Untergrenze der aktuellen Seite (fail-closed): NORMAL nur, wenn Mindeststufe und gespeicherte wirksame Stufe
+    // NORMAL sind und die Seite eine gespeicherte Hülle hat, sobald sie Quelleneinträge auf Dokumente oder Seiten
+    // trägt. Fehlen die Hüllenzeilen (Freigabe ohne Neuberechnung), gilt die Seite als INTERN.
+    private static final String AKTUELLE_UNTERGRENZE = """
+            case when s.vertraulichkeit_mindest = 'NORMAL' and s.vertraulichkeit = 'NORMAL'
+                      and (exists (select 1 from wissensseite_dokument d where d.seite_id = s.id)
+                           or not exists (select 1 from wissensseite_quelle q where q.seite_id = s.id
+                                          and (q.dokument_id is not null or q.quell_seite_id is not null)))
+                 then 'NORMAL' else 'INTERN' end
+            """;
+
     private static final String AKTUELLE_SEITEN = """
-            select s.id, s.vertraulichkeit_mindest, h.dokument_id
+            select s.id, %s, h.dokument_id
             from wissensseite s
             left join wissensseite_dokument h on h.seite_id = s.id
             order by s.id
-            """;
+            """.formatted(AKTUELLE_UNTERGRENZE);
 
     private static final String AKTUELLE_SEITE = """
-            select s.id, s.vertraulichkeit_mindest, h.dokument_id
+            select s.id, %s, h.dokument_id
             from wissensseite s
             left join wissensseite_dokument h on h.seite_id = s.id
             where s.id = :seiteId
-            """;
+            """.formatted(AKTUELLE_UNTERGRENZE);
 
     private static final String VERSION = """
             select v.seite_id, coalesce(v.daten ->> 'vertraulichkeit_mindest', 'INTERN'), h.dokument_id

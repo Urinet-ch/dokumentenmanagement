@@ -16,6 +16,16 @@ public class WissenHuelleDienst {
         this.repository = repository;
     }
 
+    /**
+     * Sperrt die Neuberechnung der Hüllen im Mandanten bis zum Ende der laufenden Transaktion. Die Freigabe (14.2)
+     * ruft das vor dem Schreiben von Seite und Version auf, damit parallele Freigaben die Sperren in derselben
+     * Reihenfolge nehmen; {@link #versionFreigeben} folgt in derselben Transaktion.
+     */
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void sperren() {
+        repository.sperren();
+    }
+
     @Transactional
     public Set<UUID> versionFreigeben(UUID seiteId, int version) {
         if (version < 1) {
