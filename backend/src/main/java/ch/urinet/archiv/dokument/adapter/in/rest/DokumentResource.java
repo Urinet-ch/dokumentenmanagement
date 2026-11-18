@@ -8,6 +8,7 @@ import ch.urinet.archiv.dokument.application.Bestaetigung;
 import ch.urinet.archiv.dokument.application.DokumentAendern;
 import ch.urinet.archiv.dokument.application.DokumentBestaetigen;
 import ch.urinet.archiv.dokument.application.DokumentDatei;
+import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import ch.urinet.archiv.dokument.application.DokumentLesen;
 import ch.urinet.archiv.dokument.application.DokumentVerwerfen;
 import ch.urinet.archiv.dokument.application.DokumentWiederholen;
@@ -20,6 +21,7 @@ import ch.urinet.archiv.dokument.domain.DokumentVertrag;
 import ch.urinet.archiv.dokument.domain.KiSicherheit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.application.Protokolliert;
@@ -96,11 +98,15 @@ public class DokumentResource {
     private final Berechtigung berechtigung;
     private final SecurityIdentity identitaet;
     private final ObjectMapper json;
+    private final DokumentKlassifikationenPort klassifikationen;
+    private final KlassifikationVerwaltung klassifikationVerwaltung;
 
     public DokumentResource(DokumentLesen lesen, DokumentDatei datei, DokumentAendern aendern,
                             DokumentBestaetigen bestaetigen, DokumentVerwerfen verwerfen,
                             DokumentWiederholen wiederholen, MandantAufloesung aufloesung,
-                            Berechtigung berechtigung, SecurityIdentity identitaet, ObjectMapper json) {
+                            Berechtigung berechtigung, SecurityIdentity identitaet, ObjectMapper json,
+                            DokumentKlassifikationenPort klassifikationen,
+                            KlassifikationVerwaltung klassifikationVerwaltung) {
         this.lesen = lesen;
         this.datei = datei;
         this.aendern = aendern;
@@ -111,6 +117,8 @@ public class DokumentResource {
         this.berechtigung = berechtigung;
         this.identitaet = identitaet;
         this.json = json;
+        this.klassifikationen = klassifikationen;
+        this.klassifikationVerwaltung = klassifikationVerwaltung;
     }
 
     @Schema(name = "Warnung", description = "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)")
@@ -134,6 +142,8 @@ public class DokumentResource {
             @Schema(nullable = true, description = "ID eines Kontakts des Mandanten") UUID partnerId,
             @Schema(nullable = true) String projekt,
             @Schema(nullable = true) List<String> tags,
+            @Schema(nullable = true, type = SchemaType.OBJECT, description = "Werte nach Klassifikations-Code")
+            Map<String, List<String>> klassifikationen,
             @Schema(nullable = true, enumeration = {"NORMAL", "INTERN", "PERSONAL"},
                     description = "Fehlt sie, gilt die Standardvertraulichkeit der Art") String vertraulichkeit,
             @Schema(nullable = true) String personBenutzer,
@@ -159,7 +169,8 @@ public class DokumentResource {
         Bestaetigung bestaetigung() {
             return new Bestaetigung(art, titel, datum, partnerId, projekt, tags, vertraulichkeit, personBenutzer,
                     geschaeftsjahr, belegnummer, richtung, betrag, waehrung, faelligkeit, qrReferenz, konto, gueltigAb,
-                    gueltigBis, kuendigungsfrist, naechsteFrist, ohnePdfa, fristAbgelaufenAkzeptiert);
+                    gueltigBis, kuendigungsfrist, naechsteFrist, ohnePdfa, fristAbgelaufenAkzeptiert,
+                    DokumentResource.klassifikationen(klassifikationen));
         }
     }
 
@@ -192,6 +203,8 @@ public class DokumentResource {
             @Schema(nullable = true) LocalDate naechsteFrist,
             @Schema(nullable = true, type = SchemaType.OBJECT, description = "Zusatzfelder nach dem Schema der Art; "
                     + "ersetzt die bisherigen vollständig") JsonNode zusatz,
+            @Schema(nullable = true, type = SchemaType.OBJECT, description = "Werte nach Klassifikations-Code; "
+                    + "ersetzt die bisherigen vollständig") Map<String, List<String>> klassifikationen,
             @Schema(nullable = true, maxLength = DokumentAendern.GRUND_MAX,
                     description = "Grund der Änderung; bei ARCHIVIERT Pflicht (Req 10.1)") String grund) {
     }
@@ -289,7 +302,14 @@ public class DokumentResource {
             @Schema(nullable = true) FinanzDto finanz,
             @Schema(nullable = true) VertragDto vertrag,
             @Schema(required = true, description = "Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim "
-                    + "einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer") List<VersionDto> versionen) {
+                    + "einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer") List<VersionDto> versionen,
+            @Schema(required = true, description = "Werte nach Klassifikations-Code") Map<String, List<String>>
+                    klassifikationen,
+            @Schema(required = true, description = "Codes der Klassifikationen, an denen die nächste Speicherung nach "
+                    + "der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. "
+                    + "Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; "
+                    + "fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern")
+                    List<String> klassifikationenUngueltig) {
     }
 
     @GET
@@ -308,7 +328,10 @@ public class DokumentResource {
         Benutzer benutzer = benutzer(identitaet);
         DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
         Dokument dokument = ansicht.dokument();
-        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
+        Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
+        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -352,7 +375,10 @@ public class DokumentResource {
         });
         DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
         Dokument dokument = ansicht.dokument();
-        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
+        Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
+        return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -400,7 +426,10 @@ public class DokumentResource {
         bestaetigen.bestaetigen(benutzer, id, version, angaben.bestaetigung());
         DokumentLesen.Ansicht ansicht = lesen.ansicht(benutzer, id);
         Dokument dokument = ansicht.dokument();
-        return Response.accepted(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen()))
+        Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
+        return Response.accepted(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -633,6 +662,9 @@ public class DokumentResource {
                 }
             });
         }
+        if (gesetzt.contains(Aenderung.KLASSIFIKATIONEN) && d.klassifikationen() == null) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
         String grund = d.grund();
         if (grund != null && grund.length() > DokumentAendern.GRUND_MAX) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
@@ -641,7 +673,8 @@ public class DokumentResource {
                 d.tags(), text(d.vertraulichkeit()), text(d.personBenutzer()), d.geschaeftsjahr(),
                 text(d.belegnummer()), text(d.richtung()), d.betrag(), text(d.waehrung()), d.faelligkeit(),
                 text(d.qrReferenz()), text(d.konto()), d.gueltigAb(), d.gueltigBis(), text(d.kuendigungsfrist()),
-                d.naechsteFrist(), ZusatzJson.text(zusatz), zusatzFelder, grund);
+                d.naechsteFrist(), ZusatzJson.text(zusatz), zusatzFelder, grund,
+                klassifikationen(d.klassifikationen()));
     }
 
     /** Ein leerer Text leert das Feld wie {@code null}. */
@@ -656,7 +689,8 @@ public class DokumentResource {
     }
 
     static DokumentDto dto(Dokument d, ObjectMapper json, List<Warnung> warnungen, BigDecimal schwelle,
-                           List<Fassung> fassungen) {
+                           List<Fassung> fassungen, Map<String, List<String>> klassifikationen,
+                           List<String> klassifikationenUngueltig) {
         boolean eingangskorb = DokumentStatus.EINGANGSKORB_STATUS.contains(d.status());
         JsonNode vorschlag = eingangskorb ? lesenJson(d, d.kiVorschlag(), "ki_vorschlag", json) : null;
         List<String> unsicher = eingangskorb
@@ -668,7 +702,25 @@ public class DokumentResource {
                 warnungen.stream().map(WarnungDto::aus).toList(), d.fehler(), d.pdfaFehlt(), d.seiten(),
                 d.partnerId(), d.partnerName(), vorschlag, unsicher, d.projekt(), d.personBenutzer(), d.dateiname(),
                 FinanzDto.aus(d.finanz()), VertragDto.aus(d.vertrag()),
-                fassungen.stream().map(VersionDto::aus).toList());
+                fassungen.stream().map(VersionDto::aus).toList(), klassifikationen, klassifikationenUngueltig);
+    }
+
+    static Map<String, List<String>> klassifikationen(Map<String, List<String>> eingabe) {
+        if (eingabe == null) {
+            return Map.of();
+        }
+        if (eingabe.size() > 50) {
+            throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+        }
+        Map<String, List<String>> kopie = new HashMap<>();
+        eingabe.forEach((code, werte) -> {
+            if (code == null || code.length() > 40 || werte == null || werte.size() > 500
+                    || werte.stream().anyMatch(wert -> wert == null || wert.length() > 40)) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
+            kopie.put(code, List.copyOf(werte));
+        });
+        return Map.copyOf(kopie);
     }
 
     // Vorgeschlagen ist jedes Feld mit Wert; die Sicherheit steht in ki_sicherheit, sonst im Vorschlag selbst

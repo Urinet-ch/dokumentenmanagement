@@ -1,10 +1,10 @@
 package ch.urinet.archiv.dokumentart.adapter.in.rest;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben;
 import ch.urinet.archiv.dokumentart.application.DokumentartAngaben.Feld;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVerwaltung;

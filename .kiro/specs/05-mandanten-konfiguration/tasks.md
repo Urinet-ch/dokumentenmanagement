@@ -42,7 +42,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
   - _Abhängig von: 17.3_
 
-- [ ] 17.5 Klassifikationen [Backend]
+- [x] 17.5 Klassifikationen [Backend]
   - Changeset `<nnn>-klassifikation`, Domain, REST, Zuordnung zu Arten, Prüfung an Dokumenten, Artwechsel,
     Versionierung, reservierte Parameternamen der öffentlichen Schnittstelle, Kennzeichnung ungültiger Werte im
     Eingangskorb nach einer Konfigurationsänderung.

@@ -18,6 +18,7 @@ import ch.urinet.archiv.ki.application.KiBeispielPort;
 import ch.urinet.archiv.ki.application.KorrekturLernen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -71,11 +72,12 @@ public class DokumentBestaetigen {
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
     private final KorrekturLernen lernen;
+    private final KlassifikationVerwaltung klassifikationen;
 
     public DokumentBestaetigen(DokumentRepository repository, DokumentStatusPort status, FristKennzeichen frist,
                                DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                                MandantEinstellungen einstellungen, AuftragService auftraege,
-                               KorrekturLernen lernen) {
+                               KorrekturLernen lernen, KlassifikationVerwaltung klassifikationen) {
         this.repository = repository;
         this.status = status;
         this.frist = frist;
@@ -85,6 +87,7 @@ public class DokumentBestaetigen {
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
         this.lernen = lernen;
+        this.klassifikationen = klassifikationen;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -102,6 +105,7 @@ public class DokumentBestaetigen {
             throw new PflichtfelderFehlen(List.of("art"));
         }
         Dokumentart art = art(arten, b.art());
+        klassifikationen.dokumentKlassifikationenPruefen(art.code(), b.klassifikationen(), Map.of());
         pflichtfelderPruefen(art, b, stand);
         if (stand.pdfaFehlt() && !b.ohnePdfa()) {
             throw new PflichtfelderFehlen(List.of("ohnePdfa"));
@@ -140,7 +144,7 @@ public class DokumentBestaetigen {
                         b.waehrung() != null ? b.waehrung() : "CHF", b.faelligkeit(), b.qrReferenz(), b.konto()))
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                        b.naechsteFrist())) : Optional.empty());
+                        b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
         Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)

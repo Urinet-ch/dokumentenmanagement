@@ -34,6 +34,10 @@ export interface GeneratorMetadaten {
      */
     geschaeftsjahr?: number;
     /**
+     * Werte nach Klassifikations-Code
+     */
+    klassifikationen?: { [key: string]: Array<string>; };
+    /**
      * Zusatzfelder nach dem Schema der Art
      */
     zusatz?: object;

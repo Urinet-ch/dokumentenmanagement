@@ -119,6 +119,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | --- | --- | --- | --- |
 | GET | `/klassifikationen` | aktive und inaktive Klassifikationen und Werte mit `aktiv` (Req 7.2) | alle Rollen |
 | POST, PATCH, DELETE | `/klassifikationen[/{code}]`, `/klassifikationen/{code}/werte[/{wert}]` | anlegen, ändern, deaktivieren, löschen; 409 `KONFIGURATION_IN_GEBRAUCH`, 422 `KONFIGURATION_UNGUELTIG`, 412, 428 | A11 |
+| GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET, POST, PATCH, DELETE | `/regeln[/{code}]` | Regeln pflegen; POST/PATCH melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
@@ -337,6 +338,15 @@ Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als K
 übernehmen. Änderungen anderer Zusatzfelder lösen keine Fristneuberechnung aus. Die bestehende Sperrpflege bleibt
 unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
 und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
+
+Umsetzung 17.5 (Review PR #289): `klassifikationenUngueltig` bedeutet in Eingangskorb und Einzelabruf dasselbe: die
+Klassifikationen, an denen die nächste Speicherung nach der gültigen Version scheitern würde (Req 1.7). Unbestätigt
+gilt die Prüfung der Bestätigung (inaktive, gelöschte, der Art nicht zugeordnete Werte, mehrere Werte bei einer
+einfachen Klassifikation); fehlende Pflicht-Werte zählen nicht, sie kommen mit der Bestätigung. Bestätigt gilt die
+Prüfung der Änderung (behaltene inaktive Werte erlaubt, fehlende Pflicht-Werte zählen). Das Protokoll nennt bei Name,
+Beschreibung und Standardwert von Klassifikationen alten und neuen Wert im Klartext wie bei Arten (Req 1.3); Werte
+an Dokumenten stehen nie darin. Eine Zuordnung zu einer unbekannten Art ergibt 404 `NICHT_GEFUNDEN`. Namen von
+Klassifikationen und Werten enthalten keine Steuerzeichen, Beschreibungen nur Zeilenumbruch und Tabulator.
 
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
