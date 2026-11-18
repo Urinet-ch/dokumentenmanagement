@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 04, Aufgabe 14.1b: gleichzeitige Ingest-Aufträge reservieren ihr Budget atomar. -->
+    <changeSet id="049-wissen-budget-reservierung" author="archiv">
+        <sql>
+            alter table ki_verbrauch add column ingest_entwurf_id uuid;
+            alter table ki_verbrauch add constraint ki_verbrauch_ingest_entwurf_fk
+                foreign key (ingest_entwurf_id) references wissens_entwurf(id) on delete set null;
+            create index ki_verbrauch_ingest_entwurf_ix
+                on ki_verbrauch (ingest_entwurf_id) where zweck = 'WISSEN_INGEST';
+
+            create table ki_verbrauch_reservierung (
+                id uuid primary key,
+                entwurf_id uuid not null references wissens_entwurf(id) on delete cascade,
+                tokens bigint not null check (tokens > 0),
+                ablauf timestamp with time zone not null
+            );
+            create index ki_verbrauch_reservierung_ablauf_ix on ki_verbrauch_reservierung (ablauf);
+            create index ki_verbrauch_reservierung_entwurf_ix on ki_verbrauch_reservierung (entwurf_id, ablauf);
+        </sql>
+        <rollback>
+            <sql>
+                drop table if exists ki_verbrauch_reservierung;
+                drop index if exists ki_verbrauch_ingest_entwurf_ix;
+                alter table ki_verbrauch drop constraint if exists ki_verbrauch_ingest_entwurf_fk;
+                alter table ki_verbrauch drop column if exists ingest_entwurf_id;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

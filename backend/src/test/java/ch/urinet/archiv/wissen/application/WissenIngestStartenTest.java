@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
 import ch.urinet.archiv.verarbeitung.domain.AuftragTyp;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
+import ch.urinet.archiv.wissen.application.WissenIngestPort.BudgetReservierung;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.NeuerEntwurf;
 import ch.urinet.archiv.wissen.application.WissenIngestPort.Quelle;
 import org.junit.jupiter.api.Test;
@@ -153,7 +154,7 @@ class WissenIngestStartenTest {
 
     private static Quelle quelle(String vertraulichkeit, int seiten) {
         String volltext = "Seite eins\fSeite zwei";
-        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, volltext, seiten, true, null, null);
+        return new Quelle("WISSENSQUELLE", "ARCHIVIERT", vertraulichkeit, true, volltext, seiten, true, null, null);
     }
 
     private static final class Speicher implements WissenIngestPort {
@@ -196,6 +197,70 @@ class WissenIngestStartenTest {
         @Override
         public long verbrauchImZeitraum(java.time.Instant von, java.time.Instant bis) {
             return verbrauch;
+        }
+
+        @Override
+        public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
+                                                    long monatsbudgetTokens, java.time.Instant von,
+                                                    java.time.Instant bis) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void budgetFreigeben(UUID reservierungId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Lauf> laufLaden(UUID entwurfId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<SeitenMetadaten> seitenMetadatenLaden() {
+            return List.of();
+        }
+
+        @Override
+        public java.util.Set<UUID> personalDokumenteLaden(java.util.Set<UUID> dokumentIds) {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public java.util.Map<UUID, ch.urinet.archiv.wissen.domain.WissensPruefung.DokumentQuelle>
+        dokumentQuellenLaden(java.util.Set<UUID> dokumentIds) {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public List<SeitenMetadaten> seitenIndexLaden(java.util.Set<UUID> seiteIds, String suchtext) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<SeitenFassung> seiteLaden(UUID seiteId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void aenderungAnlegen(NeueAenderung aenderung) {
+        }
+
+        @Override
+        public void fortschrittSichern(UUID entwurfId, String erwarteterSchritt, String neuerSchritt,
+                                       Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                       boolean unvollstaendig, String hinweis) {
+        }
+
+        @Override
+        public void entwurfSchliessen(UUID entwurfId, String erwarteterSchritt, String status,
+                                      Fortschritt fortschritt, long tokensEin, long tokensAus,
+                                      boolean unvollstaendig, String hinweis) {
+        }
+
+        @Override
+        public Optional<UUID> wartendenAktivieren() {
+            return Optional.empty();
         }
     }
 

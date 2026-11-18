@@ -245,7 +245,11 @@ flowchart LR
   `unvollstaendig = true` (Requirement 13.5). Monatsbudget: Summe `ki_verbrauch` mit Zweck `WISSEN_*` im Monat gegen
   `wissens_einstellung.monatsbudget_tokens`, sonst den Startwert `archiv.wissen.monatsbudget-tokens` (1'000'000); `public.mandant_budget` (Chatbot, Spec 03) wird
   weder gelesen noch geschrieben. Erschöpft: manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` mit Hinweis «Budget
-  erschöpft» (Requirement 13.6).
+  erschöpft» (Requirement 13.6). Vor jedem Ingest-KI-Aufruf reserviert `ki_verbrauch_reservierung` die höchstmögliche
+  Tokenzahl in einer Transaktion mit mandantenspezifischer Advisory-Sperre; `ki_verbrauch.ingest_entwurf_id`
+  ordnet auch fehlgeschlagene Versuche dem Entwurf zu. Nach protokolliertem Verbrauch wird die Reservierung freigegeben;
+  bleibt die Protokollierung aus, läuft sie nach fünf Minuten ab. So zählen parallele Aufträge und Wiederholungen in
+  die harte Monats- und Ingest-Grenze.
 
 ### Entwurf und Freigabe (`wissen/application`)
 - `DiffDienst`: zeilenbasiert über Markdown (java-diff-utils), dazu Felddiff (Titel, Beschreibung, Schlagwörter,

@@ -11,6 +11,7 @@ import jakarta.transaction.Transactional;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -34,17 +35,25 @@ public class JdbcKiVerbrauch implements KiVerbrauchPort {
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void erfassen(String zweck, KiPort.Verbrauch verbrauch) {
+        erfassen(zweck, verbrauch, null);
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void erfassen(String zweck, KiPort.Verbrauch verbrauch, UUID ingestEntwurfId) {
         String schema = aufloesung.schema();
         if (!SCHEMA.matcher(schema).matches()) {
             throw new IllegalStateException("KI-Verbrauch ohne Mandanten-Schema");
         }
-        String sql = "insert into " + schema + ".ki_verbrauch (zweck, modell, tokens_ein, tokens_aus) values (?, ?, ?, ?)";
+        String sql = "insert into " + schema + ".ki_verbrauch "
+                + "(zweck, modell, tokens_ein, tokens_aus, ingest_entwurf_id) values (?, ?, ?, ?, ?)";
         try (Connection verbindung = datenquelle.get().getConnection();
              PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
             einfuegen.setString(1, zweck);
             einfuegen.setString(2, verbrauch.modell());
             einfuegen.setInt(3, (int) Math.min(Integer.MAX_VALUE, Math.max(0, verbrauch.tokensEin())));
             einfuegen.setInt(4, (int) Math.min(Integer.MAX_VALUE, Math.max(0, verbrauch.tokensAus())));
+            einfuegen.setObject(5, ingestEntwurfId);
             einfuegen.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException("KI-Verbrauch nicht geschrieben", e);

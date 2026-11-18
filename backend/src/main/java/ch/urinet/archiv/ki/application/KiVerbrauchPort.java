@@ -1,5 +1,7 @@
 package ch.urinet.archiv.ki.application;
 
+import java.util.UUID;
+
 /**
  * Driven Port für {@code ki_verbrauch} im Schema des Mandanten aus dem Kontext (design.md «KI»): eine Zeile je Aufruf
  * des Sprachmodells, des Embedding-Modells bzw. des Rerankers, in einer eigenen Transaktion, damit der Verbrauch auch bei einem
@@ -29,4 +31,11 @@ public interface KiVerbrauchPort {
     String CHAT = "CHAT";
 
     void erfassen(String zweck, KiPort.Verbrauch verbrauch);
+
+    default void erfassen(String zweck, KiPort.Verbrauch verbrauch, UUID ingestEntwurfId) {
+        if (ingestEntwurfId != null) {
+            throw new UnsupportedOperationException("Ingest-Verbrauch muss dem Entwurf zugeordnet werden");
+        }
+        erfassen(zweck, verbrauch);
+    }
 }
