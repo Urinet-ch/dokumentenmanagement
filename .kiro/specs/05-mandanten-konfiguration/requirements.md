@@ -205,7 +205,8 @@ Jahr nur einmal vorkommt, damit Fehler beim Erfassen auffallen, ohne dass dafür
      Klassifikation einen genannten Wert hat;
    - `EINDEUTIG`: Die Kombination der genannten Felder kommt in der Art (bzw. allen Arten) höchstens einmal unter
      den bestätigten Dokumenten vor (Status `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`, auch über einen
-     Generator archivierte), ohne das geprüfte Dokument selbst; leere Werte zählen nicht;
+     Generator archivierte, sowie vom Generator angenommene, noch nicht archivierte Dokumente in `NEU`, `VERARBEITUNG`
+     und `FEHLER`; ergänzt 18.11.2026, entschieden von Fabian), ohne das geprüfte Dokument selbst; leere Werte zählen nicht;
    - `FOLGE`: Ein ganzzahliges Feld oder die Gruppe `nr` eines Belegnummer-Musters bildet je Art und Zeitraum
      (`GESCHAEFTSJAHR`, ein ganzzahliges Jahresfeld der Art oder `GESAMT`) über die bestätigten Dokumente eine
      lückenlose Folge; der Bericht nach einem Import (Spec 03, 4.2) zählt zusätzlich die Dokumente dieses Imports im

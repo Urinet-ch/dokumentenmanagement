@@ -34,7 +34,7 @@ Funktionalität: Mandantenspezifische Dokumentart-Attribute
     Wenn «inhaber-urinet» die Dokumentarten auflistet
     Dann enthält die Liste der Dokumentarten «AUSGANGSRECHNUNG» mit diesen Werten:
       | selbstAusgestellt | true                                        |
-      | belegnummerMuster | [^\d{4}-\d{3}$, ^R\d{4}$]                  |
+      | belegnummerMuster | [^(?<jahr>\d{4})-(?<nr>\d{3})$, ^R(?<nr>\d{4})$] |
       | fremdbelegArt     | LIEFERANTENBELEG                            |
     Und enthält die Liste der Dokumentarten «OFFERTE» mit diesen Werten:
       | selbstAusgestellt | true                         |

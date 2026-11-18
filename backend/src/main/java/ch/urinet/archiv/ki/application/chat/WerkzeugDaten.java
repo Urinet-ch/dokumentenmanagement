@@ -49,6 +49,12 @@ public interface WerkzeugDaten {
      */
     List<String> belegnummern(String art, int geschaeftsjahr, Sichtregel regel);
 
+    /** Werte einer Folgenregel aus bestätigten Dokumenten, gefiltert nach Art, Feld und Zeitraum. */
+    List<String> folgewerte(Folgequelle quelle, Sichtregel regel, int hoechstens);
+
+    record Folgequelle(String art, String feld, boolean muster, String zeitraum, String zeitraumFeld, int periode) {
+    }
+
     /**
      * Wie ein Dokument einer Monatsreihe zugeordnet wird: {@code bezug} ist {@code BELEGDATUM} oder
      * {@code zusatz.<feld>} (Datum {@code JJJJ-MM-TT}); {@code gruppe} ist {@code null} (keine Gruppierung),
@@ -67,10 +73,22 @@ public interface WerkzeugDaten {
     record Monatszeile(String schluessel, String gruppe, YearMonth monat, long belege) {
     }
 
-    /** Die Monate mit Dokumenten (alle Jahre) der bestätigten, archivierten Dokumente der Art, unter der Sichtregel. */
+    /**
+     * Die Monate mit Dokumenten (alle Jahre) der bestätigten Dokumente der Art (Grundmenge der Regeln, auch in
+     * Archivierung), unter der Sichtregel.
+     */
     List<Monatszeile> monate(Monatsquelle quelle, Sichtregel regel);
 
-    /** Zahl der bestätigten, archivierten Dokumente der Arten unter der Sichtregel. */
+    /**
+     * Die Geschäftsjahre (benannt nach dem Kalenderjahr ihres Endes {@code ende}) mit Dokumenten der Quelle, zugeordnet
+     * nach dem Tag des Bezugs; Grundmenge wie {@link #monate}. {@code gruppe} der Quelle muss {@code null} sein.
+     */
+    List<Jahreszeile> jahre(Monatsquelle quelle, java.time.MonthDay ende, Sichtregel regel);
+
+    record Jahreszeile(int geschaeftsjahr, long belege) {
+    }
+
+    /** Zahl der bestätigten Dokumente der Arten (Grundmenge wie {@link #monate}) unter der Sichtregel. */
     long belege(Collection<String> arten, Sichtregel regel);
 
     /** Gültigkeit aus dem Zusatzfeld {@code feld} der Dokumente der Art {@code art} (Datum {@code JJJJ-MM-TT}). */

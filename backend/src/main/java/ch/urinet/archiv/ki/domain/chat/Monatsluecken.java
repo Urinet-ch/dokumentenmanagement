@@ -45,11 +45,19 @@ public final class Monatsluecken {
      * @param letzterAbgeschlossen letzter Monat, der vorbei ist
      */
     public static Ergebnis pruefen(Set<YearMonth> vorhanden, Spanne spanne, YearMonth letzterAbgeschlossen) {
-        if (vorhanden.isEmpty()) {
+        return pruefen(vorhanden, spanne, letzterAbgeschlossen, null);
+    }
+
+    /** Wie oben, aber ab {@code ab} statt ab dem ersten Dokument, wenn {@code ab} gesetzt ist. */
+    public static Ergebnis pruefen(Set<YearMonth> vorhanden, Spanne spanne, YearMonth letzterAbgeschlossen,
+                                   YearMonth ab) {
+        if (vorhanden.isEmpty() && ab == null) {
             return new Ergebnis(null, List.of());
         }
-        YearMonth erster = vorhanden.stream().min(YearMonth::compareTo).orElseThrow();
-        YearMonth von = erster.isAfter(spanne.erster()) ? erster : spanne.erster();
+        YearMonth erster = vorhanden.stream().min(YearMonth::compareTo).orElse(null);
+        // «ab» legt den Beginn fest, auch wenn schon frühere Dokumente vorliegen (Spec 05, design.md «Regeltypen»)
+        YearMonth beginn = ab != null ? ab : erster;
+        YearMonth von = beginn.isAfter(spanne.erster()) ? beginn : spanne.erster();
         YearMonth bis = letzterAbgeschlossen.isBefore(spanne.letzter()) ? letzterAbgeschlossen : spanne.letzter();
         List<YearMonth> fehlend = new ArrayList<>();
         for (YearMonth m = von; !m.isAfter(bis); m = m.plusMonths(1)) {

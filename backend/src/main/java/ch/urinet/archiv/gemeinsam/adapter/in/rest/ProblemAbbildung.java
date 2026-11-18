@@ -6,6 +6,7 @@ import ch.urinet.archiv.gemeinsam.domain.KlassifikationUngueltig;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen;
+import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import io.quarkus.oidc.OIDCException;
@@ -34,6 +35,9 @@ public class ProblemAbbildung {
         if (fehler instanceof KlassifikationUngueltig klassifikation) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "klassifikationen",
                     klassifikation.klassifikationen())).build();
+        }
+        if (fehler instanceof RegelVerletzt regel) {
+            return builder(ProblemAntwort.mitErweiterung(fehler.code(), "regeln", regel.regeln())).build();
         }
         if (fehler instanceof PflichtfelderFehlen fehlen) {
             return builder(ProblemAntwort.mitErweiterung(fehler.code(), "felder", fehlen.felder())).build();

@@ -20,6 +20,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -84,12 +85,13 @@ public class DokumentAendern {
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
     private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentAendern(DokumentRepository repository, DokumentAenderungPort port, DokumentStatusPort status,
                            SperrKonfliktProtokollPort konfliktProtokoll, AblagePort ablage,
                            DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                            MandantEinstellungen einstellungen, AuftragService auftraege,
-                           KlassifikationVerwaltung klassifikationen) {
+                           KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung) {
         this.repository = repository;
         this.port = port;
         this.status = status;
@@ -101,6 +103,7 @@ public class DokumentAendern {
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
         this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /**
@@ -159,6 +162,9 @@ public class DokumentAendern {
         if (archiviert) {
             pflichtfelderPruefen(neueArt, alt, neu, artGewechselt);
         }
+        regelPruefung.pruefen(artCode,
+                RegelMetadaten.aus(neu, regelPruefung.zusatzWerte(neu.zusatz())),
+                RegelMetadaten.aus(alt, regelPruefung.zusatzWerte(alt.zusatz())), id);
 
         MandantCode mandant = aufloesung.pruefen();
         if (archiviert && (a.hat("belegnummer") || artGewechselt)) {
