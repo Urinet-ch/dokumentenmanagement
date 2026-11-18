@@ -9,6 +9,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,7 +79,7 @@ public class PanacheWissenSichtbarkeitRepository implements WissenSichtbarkeitRe
         Map<UUID, Akkumulator> gesammelt = new LinkedHashMap<>();
         for (Object[] zeile : zeilen(query)) {
             UUID id = uuid(zeile[0]);
-            WissensStufe mindeststufe = WissensStufe.valueOf((String) zeile[1]);
+            WissensStufe mindeststufe = stufe(zeile[1]);
             Akkumulator huelle = gesammelt.computeIfAbsent(id, ignored -> new Akkumulator(mindeststufe));
             if (zeile[2] != null) {
                 huelle.dokumente.add(uuid(zeile[2]));
@@ -87,7 +88,12 @@ public class PanacheWissenSichtbarkeitRepository implements WissenSichtbarkeitRe
         Map<UUID, WissensHuelleZugriff> result = new LinkedHashMap<>();
         gesammelt.forEach((id, huelle) -> result.put(id,
                 new WissensHuelleZugriff(id, huelle.mindeststufe, huelle.dokumente)));
-        return Map.copyOf(result);
+        return Collections.unmodifiableMap(result);
+    }
+
+    // Unbekannte Werte gelten fail-closed als INTERN.
+    private static WissensStufe stufe(Object wert) {
+        return WissensStufe.NORMAL.name().equals(wert) ? WissensStufe.NORMAL : WissensStufe.INTERN;
     }
 
     private static List<Object[]> zeilen(Query query) {

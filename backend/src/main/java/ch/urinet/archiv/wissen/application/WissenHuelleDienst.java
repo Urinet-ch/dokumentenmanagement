@@ -1,7 +1,6 @@
 package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.wissen.domain.WissensGraph;
-import ch.urinet.archiv.wissen.domain.WissensStufe;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -22,6 +21,7 @@ public class WissenHuelleDienst {
         if (version < 1) {
             throw new IllegalArgumentException("Ungültige Wissensseitenversion");
         }
+        repository.sperren();
         WissensGraph graph = repository.graphLaden();
         if (!graph.kenntSeite(seiteId)) {
             throw new IllegalArgumentException("Wissensseite nicht vorhanden");
@@ -35,6 +35,7 @@ public class WissenHuelleDienst {
 
     @Transactional
     public Set<UUID> dokumentSichtbarkeitGeaendert(UUID dokumentId) {
+        repository.sperren();
         Set<UUID> betroffene = repository.seitenMitDokument(dokumentId);
         if (betroffene.isEmpty()) {
             return Set.of();
@@ -48,10 +49,7 @@ public class WissenHuelleDienst {
         for (UUID seiteId : seiten) {
             Set<UUID> dokumente = graph.dokumente(seiteId);
             repository.aktuelleHuelleSetzen(seiteId, dokumente);
-            WissensStufe stufe = graph.wirksameStufe(seiteId, dokumente);
-            if (!graph.istUeberblick(seiteId) || stufe == WissensStufe.NORMAL) {
-                repository.vertraulichkeitSetzen(seiteId, stufe);
-            }
+            repository.vertraulichkeitSetzen(seiteId, graph.wirksameStufe(seiteId, dokumente));
         }
     }
 }

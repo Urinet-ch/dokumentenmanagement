@@ -41,26 +41,62 @@ class WissenSichtbarkeitTest {
 
     @Test
     void versionssichtbarkeitVerwendetDieEigeneHuelleUndMindeststufe() {
+        WissenSichtbarkeit sichtbar = versionen(
+                Optional.of(new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))),
+                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.INTERN, Set.of(DOKUMENT)));
+
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isFalse();
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.TREUHAENDER), SEITE_NORMAL, 1)).isTrue();
+    }
+
+    @Test
+    void versionEinerUnsichtbarenSeiteBleibtUnsichtbarAuchWennSieSelbstNormalIst() {
+        WissenSichtbarkeit sichtbar = versionen(
+                Optional.of(new WissensHuelleZugriff(SEITE_INTERN, WissensStufe.INTERN, Set.of(DOKUMENT))),
+                new WissensHuelleZugriff(SEITE_INTERN, WissensStufe.NORMAL, Set.of(DOKUMENT)));
+
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_INTERN, 1)).isFalse();
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.INHABER), SEITE_INTERN, 1)).isTrue();
+    }
+
+    @Test
+    void versionOhneAktuelleSeiteIstFuerNiemandenSichtbar() {
+        WissenSichtbarkeit sichtbar = versionen(Optional.empty(),
+                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT)));
+
+        for (Rolle rolle : Rolle.values()) {
+            assertThat(sichtbar.versionSichtbar(benutzer(rolle), SEITE_NORMAL, 1)).as(rolle.code()).isFalse();
+        }
+    }
+
+    @Test
+    void versionOhneGespeicherteHuelleGiltAlsIntern() {
+        WissenSichtbarkeit sichtbar = versionen(
+                Optional.of(new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))),
+                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of()));
+
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isFalse();
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.GESCHAEFTSSTELLE), SEITE_NORMAL, 1)).isTrue();
+    }
+
+    private static WissenSichtbarkeit versionen(Optional<WissensHuelleZugriff> seite, WissensHuelleZugriff version) {
         WissenSichtbarkeitRepository repository = new WissenSichtbarkeitRepository() {
             @Override
             public List<WissensHuelleZugriff> aktuelleSeiten() {
-                return List.of();
+                return seite.stream().toList();
             }
 
             @Override
             public Optional<WissensHuelleZugriff> aktuelleSeite(UUID seiteId) {
-                return Optional.empty();
+                return seite.filter(s -> s.seiteId().equals(seiteId));
             }
 
             @Override
             public Optional<WissensHuelleZugriff> version(UUID seiteId, int nummer) {
-                return Optional.of(new WissensHuelleZugriff(seiteId, WissensStufe.INTERN, Set.of(DOKUMENT)));
+                return Optional.of(version).filter(v -> v.seiteId().equals(seiteId));
             }
         };
-        WissenSichtbarkeit sichtbar = new WissenSichtbarkeit(repository, (benutzer, dokumentId) -> true);
-
-        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isFalse();
-        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.TREUHAENDER), SEITE_NORMAL, 1)).isTrue();
+        return new WissenSichtbarkeit(repository, (benutzer, dokumentId) -> true);
     }
 
     private static WissenSichtbarkeit sichtbarkeit(List<WissensHuelleZugriff> seiten, Set<UUID> sichtbareDokumente) {

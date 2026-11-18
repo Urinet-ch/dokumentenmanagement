@@ -29,6 +29,13 @@ public class PanacheWissenHuelleRepository implements WissenHuelleRepository {
     }
 
     @Override
+    public void sperren() {
+        entityManager().createNativeQuery(
+                        "select 1 from pg_advisory_xact_lock(hashtextextended(current_schema() || ':wissen-huelle', 0))")
+                .getResultList();
+    }
+
+    @Override
     public WissensGraph graphLaden() {
         Map<UUID, Set<UUID>> dokumenteJeSeite = new HashMap<>();
         Map<UUID, Set<UUID>> quellseitenJeSeite = new HashMap<>();

@@ -61,31 +61,36 @@ public class WissenSichtbarkeitSchritte {
     private final UUID seite = UUID.randomUUID();
     private final UUID quellseite = UUID.randomUUID();
     private final UUID dokument = UUID.randomUUID();
+    private final UUID fremdeSeite = UUID.randomUUID();
     private final Map<String, Boolean> sichtbarkeiten = new HashMap<>();
     private final Map<String, Integer> huellenGroessen = new HashMap<>();
-    private String uebersichtStufe;
+    private final Map<String, Object> isolation = new HashMap<>();
+    private final Map<String, String> uebersichtStufen = new HashMap<>();
 
-    @Wenn("rekursive Wissenshüllen und Sichtbarkeit in beiden Mandanten geprüft werden")
+    @Wenn("rekursive Wissenshüllen und Sichtbarkeit in beiden Mandanten bei gleichzeitigen Daten des anderen Mandanten geprüft werden")
     public void sichtbarkeitPruefen() throws Exception {
         for (String code : List.of("urinet", "vhf-gsk")) {
+            String anderer = code.equals("urinet") ? "vhf-gsk" : "urinet";
             imMandantenKontext(code, () -> {
                 testdatenAnlegen(code);
+                fremdeDatenAnlegen(anderer);
                 huellen.versionFreigeben(seite, 1);
                 huellen.versionFreigeben(seite, 2);
                 huellenGroessen.put(code + "/seite", huellengroesse(code, seite));
                 huellenGroessen.put(code + "/quellseite", huellengroesse(code, quellseite));
+                isolationErfassen(code, anderer);
                 rollenSichtbarkeitErfassen(code, "normal", seite, null);
                 rollenSichtbarkeitErfassen(code, "normal", quellseite, null);
                 rollenSichtbarkeitErfassen(code, "version-ohne-stufe", seite, 2);
+                rollenSichtbarkeitErfassen(code, "version-ohne-huelle", seite, 3);
 
                 if (code.equals("vhf-gsk")) {
                     mindeststufeManuellErhoehen();
                     huellen.dokumentSichtbarkeitGeaendert(dokument);
                     rollenSichtbarkeitErfassen(code, "mindeststufe", seite, null);
-                    sichtbarkeiten.put(schluessel(code, "version-normal", seite, Rolle.MITARBEITER),
-                            sichtbarkeit.versionSichtbar(benutzer(Rolle.MITARBEITER), seite, 1));
+                    rollenSichtbarkeitErfassen(code, "version-normal", seite, 1);
 
-                    quellvertraulichkeitErhoehen();
+                    quellvertraulichkeitErhoehen(code, dokument);
                     huellen.dokumentSichtbarkeitGeaendert(dokument);
                     rollenSichtbarkeitErfassen(code, "quelle-intern", seite, null);
                     rollenSichtbarkeitErfassen(code, "quelle-intern", quellseite, null);
@@ -103,6 +108,17 @@ public class WissenSichtbarkeitSchritte {
                 .containsEntry("vhf-gsk/quellseite", 1);
     }
 
+    @Dann("wirken Hülle, Vertraulichkeit und Seiten des anderen Mandanten nicht im eigenen Mandanten")
+    public void mandantenGetrennt() {
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            assertThat(isolation).as(code)
+                    .containsEntry(code + "/fremde-huelle", 0)
+                    .containsEntry(code + "/fremde-stufe", "INTERN")
+                    .containsEntry(code + "/eigene-stufe", "NORMAL")
+                    .containsEntry(code + "/fremde-seite", false);
+        }
+    }
+
     @Dann("sehen alle vier Rollen die normalen Seiten beider Mandanten")
     public void alleRollenSehenNormaleSeiten() {
         for (String code : List.of("urinet", "vhf-gsk")) {
@@ -117,13 +133,12 @@ public class WissenSichtbarkeitSchritte {
 
     @Dann("ist eine Version ohne gespeicherte Mindeststufe nur für Rollen mit Recht A3 sichtbar")
     public void versionOhneMindeststufe() {
-        for (String code : List.of("urinet", "vhf-gsk")) {
-            for (Rolle rolle : ROLLEN) {
-                boolean erwartet = rolle != Rolle.MITARBEITER;
-                assertThat(sichtbarkeiten).containsEntry(
-                        schluessel(code, "version-ohne-stufe", seite, rolle), erwartet);
-            }
-        }
+        versionNurMitA3("version-ohne-stufe");
+    }
+
+    @Dann("ist eine Version ohne gespeicherte Hülle nur für Rollen mit Recht A3 sichtbar")
+    public void versionOhneHuelle() {
+        versionNurMitA3("version-ohne-huelle");
     }
 
     @Dann("sieht «mitarbeiter» im Mandanten «{word}» nach manueller Erhöhung und Neuberechnung die aktuelle Seite nicht")
@@ -134,10 +149,12 @@ public class WissenSichtbarkeitSchritte {
         }
     }
 
-    @Dann("sieht «mitarbeiter» die frühere normale Version weiterhin, bis sich die Sichtbarkeit ihrer Quelle ändert")
-    public void alteVersionBleibtSichtbar() {
-        assertThat(sichtbarkeiten).containsEntry(
-                schluessel("vhf-gsk", "version-normal", seite, Rolle.MITARBEITER), true);
+    @Dann("sieht «mitarbeiter» dann auch die frühere normale Version der Seite nicht mehr")
+    public void alteVersionFolgtDerSeite() {
+        for (Rolle rolle : ROLLEN) {
+            assertThat(sichtbarkeiten).as(rolle.code()).containsEntry(
+                    schluessel("vhf-gsk", "version-normal", seite, rolle), rolle != Rolle.MITARBEITER);
+        }
     }
 
     @Dann("sehen nach der Änderung der Quelle nur die Rollen mit Recht A3 die internen Seiten und Versionen")
@@ -187,51 +204,49 @@ public class WissenSichtbarkeitSchritte {
                 .isEqualTo(Ergebnis.VERBOTEN);
     }
 
-    @Wenn("eine Übersicht mit einer internen Quelle neu berechnet wird")
+    @Wenn("eine Übersicht aus einer normalen Quelle freigegeben wird und die Quelle danach intern wird")
     public void uebersichtNeuBerechnen() throws Exception {
         imMandantenKontext("urinet", () -> {
             UUID uebersicht = UUID.randomUUID();
-            UUID interneQuelle = UUID.randomUUID();
+            UUID quelle = UUID.randomUUID();
             String schema = new MandantCode("urinet").schema();
             try (Connection verbindung = datenbank.get().getConnection()) {
-                try (PreparedStatement p = verbindung.prepareStatement("""
-                        insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status, bestaetigt,
-                                                 bestaetigt_von)
-                        values (?, 'UPLOAD', 'INTERN', 'synthetisch', 'ARCHIVIERT', ?, 'inhaber')
-                        """.formatted(schema))) {
-                    p.setObject(1, interneQuelle);
-                    p.setObject(2, ZEIT);
-                    p.executeUpdate();
-                }
-                seiteEinfuegen(verbindung, schema, uebersicht, "ueberblick");
-                quellEintragen(verbindung, schema, uebersicht, "intern", interneQuelle, null);
-                try (PreparedStatement p = verbindung.prepareStatement("""
-                        insert into %s.wissensseite_version
-                            (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit)
-                        values (?, 1, '{"vertraulichkeit_mindest":"NORMAL"}', 'synthetischer Inhalt',
-                                'human:probe', 'human:probe', ?)
-                        """.formatted(schema))) {
-                    p.setObject(1, uebersicht);
-                    p.setObject(2, ZEIT);
-                    p.executeUpdate();
-                }
+                dokumentEinfuegen(verbindung, schema, quelle, "NORMAL");
+                seiteEinfuegen(verbindung, schema, uebersicht, "ueberblick", "NORMAL");
+                quellEintragen(verbindung, schema, uebersicht, "quelle", quelle, null);
+                versionEinfuegen(verbindung, schema, uebersicht, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
             }
             huellen.versionFreigeben(uebersicht, 1);
-            try (Connection verbindung = datenbank.get().getConnection();
-                 PreparedStatement p = verbindung.prepareStatement(
-                         "select vertraulichkeit from " + schema + ".wissensseite where id = ?")) {
-                p.setObject(1, uebersicht);
-                try (ResultSet rs = p.executeQuery()) {
-                    assertThat(rs.next()).isTrue();
-                    uebersichtStufe = rs.getString(1);
-                }
+            uebersichtStufen.put("normal", stufeLesen("urinet", uebersicht));
+            for (Rolle rolle : ROLLEN) {
+                sichtbarkeiten.put("ueberblick/normal/" + rolle.code(),
+                        sichtbarkeit.aktuelleSeiteSichtbar(benutzer(rolle), uebersicht));
+            }
+
+            quellvertraulichkeitErhoehen("urinet", quelle);
+            huellen.dokumentSichtbarkeitGeaendert(quelle);
+            uebersichtStufen.put("intern", stufeLesen("urinet", uebersicht));
+            for (Rolle rolle : ROLLEN) {
+                sichtbarkeiten.put("ueberblick/intern/" + rolle.code(),
+                        sichtbarkeit.aktuelleSeiteSichtbar(benutzer(rolle), uebersicht));
             }
         });
     }
 
-    @Dann("bleibt die gespeicherte Vertraulichkeit der Übersicht NORMAL")
-    public void uebersichtBleibtNormal() {
-        assertThat(uebersichtStufe).isEqualTo("NORMAL");
+    @Dann("ist die gespeicherte Vertraulichkeit der Übersicht zuerst NORMAL und alle Rollen mit Recht A15 sehen sie")
+    public void uebersichtNormal() {
+        assertThat(uebersichtStufen).containsEntry("normal", "NORMAL");
+        for (Rolle rolle : ROLLEN) {
+            assertThat(sichtbarkeiten).containsEntry("ueberblick/normal/" + rolle.code(), true);
+        }
+    }
+
+    @Dann("speichert die Neuberechnung danach die wirksame Vertraulichkeit INTERN und «mitarbeiter» sieht die Übersicht nicht")
+    public void uebersichtWirksamIntern() {
+        assertThat(uebersichtStufen).containsEntry("intern", "INTERN");
+        for (Rolle rolle : ROLLEN) {
+            assertThat(sichtbarkeiten).containsEntry("ueberblick/intern/" + rolle.code(), rolle != Rolle.MITARBEITER);
+        }
     }
 
     private void imMandantenKontext(String code, GepruefteArbeit arbeit) throws Exception {
@@ -258,59 +273,94 @@ public class WissenSichtbarkeitSchritte {
     private void testdatenAnlegen(String code) throws Exception {
         String schema = new MandantCode(code).schema();
         try (Connection verbindung = datenbank.get().getConnection()) {
-            try (PreparedStatement p = verbindung.prepareStatement("""
-                    insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status, bestaetigt,
-                                             bestaetigt_von)
-                    values (?, 'UPLOAD', 'NORMAL', 'synthetisch', 'ARCHIVIERT', ?, 'inhaber')
-                    """.formatted(schema))) {
-                p.setObject(1, dokument);
-                p.setObject(2, ZEIT);
-                p.executeUpdate();
-            }
-            seiteEinfuegen(verbindung, schema, seite, "probe/" + UUID.randomUUID());
-            seiteEinfuegen(verbindung, schema, quellseite, "probe/" + UUID.randomUUID());
+            dokumentEinfuegen(verbindung, schema, dokument, "NORMAL");
+            seiteEinfuegen(verbindung, schema, seite, "probe/" + UUID.randomUUID(), "NORMAL");
+            seiteEinfuegen(verbindung, schema, quellseite, "probe/" + UUID.randomUUID(), "NORMAL");
             quellEintragen(verbindung, schema, seite, "dokument", dokument, null);
             quellEintragen(verbindung, schema, seite, "zyklus", null, quellseite);
             quellEintragen(verbindung, schema, quellseite, "zyklus", null, seite);
-            try (PreparedStatement p = verbindung.prepareStatement("""
-                    insert into %s.wissensseite_version
-                        (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit)
-                    values (?, 1, '{"vertraulichkeit_mindest":"NORMAL"}', 'synthetischer Inhalt',
-                            'human:probe', 'human:probe', ?)
-                    """.formatted(schema))) {
-                p.setObject(1, seite);
-                p.setObject(2, ZEIT);
-                p.executeUpdate();
-            }
-            try (PreparedStatement p = verbindung.prepareStatement("""
-                    insert into %s.wissensseite_version
-                        (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit)
-                    values (?, 2, '{}', 'synthetischer Inhalt', 'human:probe', 'human:probe', ?)
-                    """.formatted(schema))) {
-                p.setObject(1, seite);
-                p.setObject(2, ZEIT);
-                p.executeUpdate();
+            versionEinfuegen(verbindung, schema, seite, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+            versionEinfuegen(verbindung, schema, seite, 2, "{}");
+            versionEinfuegen(verbindung, schema, seite, 3, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+        }
+    }
+
+    // Gleiche IDs im anderen Mandanten, aber intern eingestuft; dazu eine Seite, die es nur dort gibt.
+    private void fremdeDatenAnlegen(String code) throws Exception {
+        String schema = new MandantCode(code).schema();
+        try (Connection verbindung = datenbank.get().getConnection()) {
+            dokumentEinfuegen(verbindung, schema, dokument, "INTERN");
+            seiteEinfuegen(verbindung, schema, seite, "probe/" + UUID.randomUUID(), "INTERN");
+            seiteEinfuegen(verbindung, schema, fremdeSeite, "probe/" + UUID.randomUUID(), "NORMAL");
+            quellEintragen(verbindung, schema, seite, "dokument", dokument, null);
+        }
+    }
+
+    private void isolationErfassen(String code, String anderer) throws Exception {
+        isolation.put(code + "/fremde-huelle", huellengroesse(anderer, seite));
+        isolation.put(code + "/fremde-stufe", stufeLesen(anderer, seite));
+        isolation.put(code + "/eigene-stufe", stufeLesen(code, seite));
+        isolation.put(code + "/fremde-seite", sichtbarkeit.aktuelleSeiteSichtbar(benutzer(Rolle.INHABER), fremdeSeite));
+    }
+
+    private void versionNurMitA3(String phase) {
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            for (Rolle rolle : ROLLEN) {
+                assertThat(sichtbarkeiten).as(code + " " + rolle.code())
+                        .containsEntry(schluessel(code, phase, seite, rolle), rolle != Rolle.MITARBEITER);
             }
         }
     }
 
-    private void seiteEinfuegen(Connection verbindung, String schema, UUID id, String pfad) throws Exception {
+    private static void dokumentEinfuegen(Connection verbindung, String schema, UUID id, String vertraulichkeit)
+            throws Exception {
         try (PreparedStatement p = verbindung.prepareStatement("""
-                insert into %s.wissensseite
-                    (id, pfad, typ, titel, beschreibung, vertraulichkeit, vertraulichkeit_mindest, inhalt, version,
-                     erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
-                values (?, ?, 'Konzept', 'Synthetische Probe', 'Beschreibung', 'NORMAL', 'NORMAL',
-                        'synthetischer Inhalt', 1, 'human:probe', ?, 'human:probe', ?)
+                insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status, bestaetigt,
+                                         bestaetigt_von)
+                values (?, 'UPLOAD', ?, 'synthetisch', 'ARCHIVIERT', ?, 'inhaber')
                 """.formatted(schema))) {
             p.setObject(1, id);
-            p.setString(2, pfad);
+            p.setString(2, vertraulichkeit);
             p.setObject(3, ZEIT);
+            p.executeUpdate();
+        }
+    }
+
+    private static void versionEinfuegen(Connection verbindung, String schema, UUID seiteId, int version,
+                                         String daten) throws Exception {
+        try (PreparedStatement p = verbindung.prepareStatement("""
+                insert into %s.wissensseite_version
+                    (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit)
+                values (?, ?, cast(? as jsonb), 'synthetischer Inhalt', 'human:probe', 'human:probe', ?)
+                """.formatted(schema))) {
+            p.setObject(1, seiteId);
+            p.setInt(2, version);
+            p.setString(3, daten);
             p.setObject(4, ZEIT);
             p.executeUpdate();
         }
     }
 
-    private void quellEintragen(Connection verbindung, String schema, UUID seiteId, String schluessel,
+    private static void seiteEinfuegen(Connection verbindung, String schema, UUID id, String pfad, String stufe)
+            throws Exception {
+        try (PreparedStatement p = verbindung.prepareStatement("""
+                insert into %s.wissensseite
+                    (id, pfad, typ, titel, beschreibung, vertraulichkeit, vertraulichkeit_mindest, inhalt, version,
+                     erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am)
+                values (?, ?, 'Konzept', 'Synthetische Probe', 'Beschreibung', ?, ?,
+                        'synthetischer Inhalt', 1, 'human:probe', ?, 'human:probe', ?)
+                """.formatted(schema))) {
+            p.setObject(1, id);
+            p.setString(2, pfad);
+            p.setString(3, stufe);
+            p.setString(4, stufe);
+            p.setObject(5, ZEIT);
+            p.setObject(6, ZEIT);
+            p.executeUpdate();
+        }
+    }
+
+    private static void quellEintragen(Connection verbindung, String schema, UUID seiteId, String schluessel,
                                 UUID dokumentId, UUID quellseiteId) throws Exception {
         try (PreparedStatement p = verbindung.prepareStatement("""
                 insert into %s.wissensseite_quelle
@@ -340,13 +390,26 @@ public class WissenSichtbarkeitSchritte {
         }
     }
 
-    private void quellvertraulichkeitErhoehen() throws Exception {
-        String schema = new MandantCode("vhf-gsk").schema();
+    private void quellvertraulichkeitErhoehen(String code, UUID dokumentId) throws Exception {
+        String schema = new MandantCode(code).schema();
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement p = verbindung.prepareStatement(
                      "update " + schema + ".dokument set vertraulichkeit = 'INTERN' where id = ?")) {
-            p.setObject(1, dokument);
+            p.setObject(1, dokumentId);
             p.executeUpdate();
+        }
+    }
+
+    private String stufeLesen(String code, UUID seiteId) throws Exception {
+        String schema = new MandantCode(code).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement p = verbindung.prepareStatement(
+                     "select vertraulichkeit from " + schema + ".wissensseite where id = ?")) {
+            p.setObject(1, seiteId);
+            try (ResultSet rs = p.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                return rs.getString(1);
+            }
         }
     }
 

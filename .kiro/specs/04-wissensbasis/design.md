@@ -536,17 +536,36 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Quellketten terminieren ohne Rekursion. Die wirksame Stufe ist das Maximum aus Hülldokumenten und Mindeststufe.
 - `WissenHuelleDienst` speichert aktuelle Hüllen und Hüllen je Version in einer Transaktion. Bei einer Änderung der
   Dokument-Sichtbarkeit berechnet er alle Seiten mit diesem Dokument in der aktuellen Hülle neu; die Mindeststufe
-  bleibt dabei erhalten. `ueberblick` wird durch eine Neuberechnung nicht auf `INTERN` gesetzt.
+  bleibt dabei erhalten. Auch für `ueberblick` speichert die Neuberechnung die wirksame Stufe nach 11.1 (also
+  `INTERN`, sobald die Hülle ein internes Dokument enthält; Review PR #300, M2, vorsichtige Auslegung). Ob eine
+  Übersicht bei einer Dokumentänderung stattdessen `NORMAL` bleibt und nur einen Befund nach 11.8 erhält, ist ein
+  offener Entscheid für Fabian (Konflikt 11.1 gegen 11.8); der Befund `STUFE_UEBERBLICK` gehört zur
+  `WissensPruefung` (13.4, 14.2).
+- Neuberechnungen (`versionFreigeben`, `dokumentSichtbarkeitGeaendert`) sperren vor dem Lesen des Graphen den
+  Mandanten mit `pg_advisory_xact_lock(hashtextextended(current_schema() || ':wissen-huelle', 0))`; parallele Läufe
+  im selben Mandanten laufen damit nacheinander und schreiben keine veraltete Stufe zurück.
 - `WissenSichtbarkeit` wertet A15 und A2/A3 aus. Dokumente werden je Anfrage über
   `DokumentRepository.sichtbar(..., Sichtregel.fuer(benutzer))` geprüft, damit dieselbe Sichtregel wie im
-  Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Versionen verwenden ihre
-  eigene Hülle und Mindeststufe aus `daten`; fehlt diese Stufe, gilt fail-closed `INTERN`.
+  Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Abweichung vom Abschnitt «Sichtbarkeit und
+  Hülle»: Der Filter läuft in 13.5 in Java (je Hülldokument eine Abfrage), nicht als SQL-Prädikat. Für Index,
+  Zähler und Paging ersetzt Aufgabe 13.6 ihn durch ein Prädikat an der Abfrage von `wissensseite`; bis dahin gibt
+  es keine Liste mit Zähler oder Paging.
+- Versionen: Eine Version ist nur sichtbar, wenn die aktuelle Seite sichtbar ist **und** die Version selbst sichtbar
+  ist (Req 11.2, 4.4; Review PR #300, M1). Die Version verwendet ihre eigene Hülle aus
+  `wissensseite_version_dokument` und die Mindeststufe aus `wissensseite_version.daten`, Schlüssel
+  `vertraulichkeit_mindest` (Werte `NORMAL`, `INTERN`; die Freigabe in 14.x schreibt diesen Schlüssel). Fehlt der
+  Schlüssel, ist der Wert unbekannt oder hat die Version keine Zeile in `wissensseite_version_dokument`, gilt sie
+  fail-closed als `INTERN`. Eine unbekannte Stufe in `wissensseite` gilt ebenfalls als `INTERN`.
 - `Berechtigung.wissensseitenAktion` akzeptiert nur A15–A19 und prüft Sichtbarkeit vor dem Recht (404 vor 403).
   `Berechtigung.wissensentwurfLesen` gibt A17 Vollzugriff, A18 auf eigene Analysevorschläge nur Status, Entscheid
   und Grund; fremde Vorschläge und Vorschläge für `treuhaender` bleiben 403. Verweigerungen für Wissensseiten
   enthalten keine Dokument-ID oder Seiteninhalte. A19 bleibt für `geschaeftsstelle` verboten.
 - Cucumber prüft mit synthetischen IDs in `urinet` und `vhf-gsk` dieselben Seiten- und Dokument-IDs, alle vier Rollen,
-  Zyklen, manuelle Erhöhung, Neuberechnung und Sichtbarkeit einer älteren Version. Eine Lese-API für Seiten, Log oder
+  Zyklen, manuelle Erhöhung, Neuberechnung und Sichtbarkeit einer älteren Version. Für die Mandantentrennung legt
+  jeder Durchgang in derselben Transaktion zusätzlich Daten im anderen Schema an (gleiche IDs, dort `INTERN`, und
+  eine Seite nur im anderen Mandanten) und prüft kreuzweise, dass Hülle, Stufe und Seite des anderen Mandanten
+  nicht wirken. Die Szenarien laufen im eigenen Runner `WissenSichtbarkeitSzenarienTest` (Tag
+  `@wissen-sichtbarkeit`), weil sie Daten direkt per JDBC in beide Schemas schreiben und mit Rollback aufräumen. Eine Lese-API für Seiten, Log oder
   Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
   bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
 

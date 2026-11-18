@@ -46,10 +46,12 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Aktionen A15–A19 in `Berechtigung`, 404 vor 403, A19 für `geschaeftsstelle` 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
   - _Anforderungen: 11.1–11.3, 11.5, 11.8, 12.1–12.3_
   - _Abhängig von: 13.3_
+  - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) kommt mit 13.4/14.2. Ob eine Übersicht bei einer Dokumentänderung `NORMAL` bleibt (11.8) oder die wirksame Stufe erhält (11.1, so umgesetzt), ist offen für Fabian. Der Nachweis von 12.2/12.3 über einen Endpunkt folgt mit 13.6 bzw. dem Entwurfszugriff in 14.x.
 
 - [ ] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
   - Zugriffsprotokoll `WISSEN_ANZEIGEN` und `VERWEIGERT`, ohne Inhalte
+  - Sichtbarkeit als SQL-Prädikat an den Abfragen von `wissensseite` (Zähler und Paging verraten nichts); ersetzt den Java-Filter aus 13.5 (design.md, «Umsetzung 13.5»)
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
 
