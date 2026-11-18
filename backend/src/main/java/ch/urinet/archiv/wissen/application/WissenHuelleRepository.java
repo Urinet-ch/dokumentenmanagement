@@ -8,6 +8,9 @@ import java.util.UUID;
 
 public interface WissenHuelleRepository {
 
+    /** Serialisiert Neuberechnungen der Hüllen im Mandanten bis zum Ende der Transaktion. */
+    void sperren();
+
     WissensGraph graphLaden();
 
     Set<UUID> seitenMitDokument(UUID dokumentId);

@@ -8,7 +8,7 @@ import ch.urinet.archiv.wissen.domain.WissensStufe;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -34,8 +34,18 @@ public class WissenSichtbarkeit {
         return repository.aktuelleSeite(seiteId).filter(huelle -> sichtbar(benutzer, huelle)).isPresent();
     }
 
+    /** Eine Version ist nur sichtbar, wenn die Seite selbst und die Version nach Hülle und Mindeststufe sichtbar sind. */
     public boolean versionSichtbar(Benutzer benutzer, UUID seiteId, int nummer) {
-        return repository.version(seiteId, nummer).filter(huelle -> sichtbar(benutzer, huelle)).isPresent();
+        return aktuelleSeiteSichtbar(benutzer, seiteId)
+                && repository.version(seiteId, nummer).map(WissenSichtbarkeit::ohneHuelleIntern)
+                        .filter(huelle -> sichtbar(benutzer, huelle)).isPresent();
+    }
+
+    // Fehlende Hüllenzeilen lassen sich nicht von einer leeren Hülle unterscheiden; die Version gilt dann als INTERN.
+    private static WissensHuelleZugriff ohneHuelleIntern(WissensHuelleZugriff huelle) {
+        return huelle.dokumente().isEmpty()
+                ? new WissensHuelleZugriff(huelle.seiteId(), WissensStufe.INTERN, Set.of())
+                : huelle;
     }
 
     private boolean sichtbar(Benutzer benutzer, WissensHuelleZugriff huelle) {

@@ -4,8 +4,10 @@ import ch.urinet.archiv.wissen.domain.WissensGraph;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -36,7 +38,7 @@ class WissenHuelleDienstTest {
     }
 
     @Test
-    void ueberblickBleibtNormalAuchWennEineHuelleHoeherWaere() {
+    void ueberblickSpeichertDieWirksameStufeAuchWennSieUeberNormalSteigt() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
                 Map.of(DOKUMENT, WissensStufe.INTERN), Map.of(SEITE, WissensStufe.NORMAL),
@@ -45,8 +47,23 @@ class WissenHuelleDienstTest {
         new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
 
         assertThat(repository.aktuelle).containsEntry(SEITE, Set.of(DOKUMENT));
-        assertThat(repository.stufen).doesNotContainKey(SEITE);
+        assertThat(repository.stufen).containsEntry(SEITE, WissensStufe.INTERN);
         assertThat(repository.versionen).containsEntry(SEITE, Set.of(DOKUMENT));
+    }
+
+    @Test
+    void neuberechnungSperrtDenMandantenBevorSieDenGraphenLiest() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
+                Map.of(DOKUMENT, WissensStufe.NORMAL), Map.of(SEITE, WissensStufe.NORMAL),
+                Map.of(SEITE, "konzepte/arbeit")));
+        repository.mitDokument.add(SEITE);
+
+        WissenHuelleDienst dienst = new WissenHuelleDienst(repository);
+        dienst.versionFreigeben(SEITE, 1);
+        dienst.dokumentSichtbarkeitGeaendert(DOKUMENT);
+
+        assertThat(repository.aufrufe).containsExactly("sperren", "graph", "sperren", "seiten", "graph");
     }
 
     @Test
@@ -71,18 +88,26 @@ class WissenHuelleDienstTest {
         private final Map<UUID, WissensStufe> stufen = new HashMap<>();
         private final Map<UUID, Set<UUID>> versionen = new HashMap<>();
         private final Set<UUID> mitDokument = new HashSet<>();
+        private final List<String> aufrufe = new ArrayList<>();
 
         private TestRepository(WissensGraph graph) {
             this.graph = graph;
         }
 
         @Override
+        public void sperren() {
+            aufrufe.add("sperren");
+        }
+
+        @Override
         public WissensGraph graphLaden() {
+            aufrufe.add("graph");
             return graph;
         }
 
         @Override
         public Set<UUID> seitenMitDokument(UUID dokumentId) {
+            aufrufe.add("seiten");
             return mitDokument;
         }
 

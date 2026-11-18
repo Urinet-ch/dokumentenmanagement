@@ -27,6 +27,9 @@ public class Berechtigung {
         NUR_STATUS_ENTSCHEID_GRUND
     }
 
+    private static final Set<Aktion> WISSEN_AKTIONEN = Collections.unmodifiableSet(
+            EnumSet.of(Aktion.A15, Aktion.A16, Aktion.A17, Aktion.A18, Aktion.A19));
+
     private static final Set<Aktion> ERFASSUNG_ERLAUBT = Collections.unmodifiableSet(
             EnumSet.of(Aktion.A1, Aktion.A2, Aktion.A3, Aktion.A4, Aktion.A5, Aktion.A6, Aktion.A7, Aktion.A8,
                     Aktion.A10));
@@ -48,7 +51,7 @@ public class Berechtigung {
 
     /** Wissensseitenaktion: Sichtbarkeit wird vor dem Recht geprüft, ohne Seiteninhalte ins Zugriffsprotokoll zu schreiben. */
     public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
-        if (aktion.compareTo(Aktion.A15) < 0 || aktion.compareTo(Aktion.A19) > 0) {
+        if (!WISSEN_AKTIONEN.contains(aktion)) {
             throw new IllegalArgumentException("Keine Wissensbasis-Aktion");
         }
         Ergebnis ergebnis = Rechtematrix.ergebnis(benutzer.rolle(), aktion);
