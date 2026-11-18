@@ -1,0 +1,79 @@
+package ch.urinet.archiv.wissen.application;
+
+import ch.urinet.archiv.sicherheit.domain.Sichtregel;
+import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface WissenLesenRepository {
+
+    IndexErgebnis index(Sichtregel sichtregel, IndexAnfrage anfrage);
+
+    Optional<Wissensseite> seite(UUID id, Sichtregel sichtregel);
+
+    Optional<Wissensseite> seite(String pfad, Sichtregel sichtregel);
+
+    Set<String> sichtbarePfade(Sichtregel sichtregel, Set<String> pfade);
+
+    List<VersionZeile> versionen(UUID seiteId, Sichtregel sichtregel);
+
+    Optional<WissensVersion> version(UUID seiteId, int nummer, Sichtregel sichtregel);
+
+    List<IndexZeile> eingehend(UUID seiteId, Sichtregel sichtregel);
+
+    LogSeite log(Sichtregel sichtregel, LogCursor vor, int groesse);
+
+    record IndexAnfrage(Seitentyp typ, String tag, String q, int offset, int groesse) {
+    }
+
+    record IndexZeile(UUID id, Seitentyp typ, String pfad, String titel, String beschreibung, String status) {
+    }
+
+    record IndexErgebnis(List<IndexZeile> seiten, long gesamt) {
+        public IndexErgebnis {
+            seiten = List.copyOf(seiten);
+        }
+    }
+
+    record VersionZeile(int nummer, Optional<WissensVersion> version) {
+        public VersionZeile {
+            version = Optional.ofNullable(version).orElse(Optional.empty());
+        }
+    }
+
+    record WissensVersion(int nummer, Map<String, Object> daten, String inhalt, String erzeugtVon,
+                          String freigegebenVon, Instant zeit, String grund, UUID entwurfId, String entwurfAnlass,
+                          UUID dokumentId) {
+        public WissensVersion {
+            daten = Collections.unmodifiableMap(new LinkedHashMap<>(daten));
+        }
+    }
+
+    record SeiteVerweis(UUID id, String pfad, String titel) {
+    }
+
+    record LogEintrag(long id, Instant zeit, String aktion, String akteur, List<SeiteVerweis> seiten,
+                      UUID dokumentId, UUID entwurfId) {
+        public LogEintrag {
+            seiten = List.copyOf(seiten);
+        }
+    }
+
+    record LogCursor(Instant zeit, long id) {
+    }
+
+    record LogSeite(List<LogEintrag> eintraege, Optional<LogCursor> naechsterCursor) {
+        public LogSeite {
+            eintraege = List.copyOf(eintraege);
+            naechsterCursor = Optional.ofNullable(naechsterCursor).orElse(Optional.empty());
+        }
+    }
+}

@@ -26,7 +26,7 @@ import java.util.UUID;
 /**
  * Prüft jede Anfrage an einen Endpunkt, bevor Daten gelesen werden (Req 1.3, 2.2, 2.6): gültiger, aktiver Mandant aus
  * dem Token, eine Archiv-Rolle (die stärkste gilt) und – bei {@link ErfordertAktion} – das Recht der Aktion nach der
- * Rechtematrix. Bei dokumentbezogenen Aktionen (A2–A10), ausser bei {@link NichtDokumentbezogen}, mit Pfad-Parameter
+ * Rechtematrix. Bei dokumentbezogenen Aktionen (A2–A10, A16), ausser bei {@link NichtDokumentbezogen}, mit Pfad-Parameter
  * {@code id} gilt 404 vor 403
  * ({@link Berechtigung#dokumentAktion}); {@code @RolesAllowed} lässt dort alle Archiv-Rollen zu. Ein Endpunkt ohne
  * Erklärung ({@link ErfordertAktion}, {@link AlleArchivRollen}, {@link Oeffentlich}) antwortet 403 (fail closed);
