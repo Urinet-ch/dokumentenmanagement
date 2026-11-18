@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * den Schalter scheitert derselbe Aufruf schon beim Start. Die Prüfung selbst ohne Datenbank deckt
  * {@code ManifestPruefenTest} ({@code ohneDatenbank…}).
  */
-@Tag("start-2")
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(ManifestKommandoOhneDatenbankTest.KeineDatenbank.class)
 class ManifestKommandoOhneDatenbankTest {

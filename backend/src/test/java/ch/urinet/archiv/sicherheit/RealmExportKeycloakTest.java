@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Client oder Ablauf, und die API nimmt nur Tokens mit Audience {@code archiv-api} an. Gegenprobe:
  * {@code mvn verify -Dtest=RealmExportKeycloakTest -Darchiv.realm-export=<alter Export>} muss rot werden.
  */
-@Tag("start-2")
+@Tag("start-1")
 @QuarkusTest
 @TestProfile(RealmExportKeycloakTest.MitExport.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

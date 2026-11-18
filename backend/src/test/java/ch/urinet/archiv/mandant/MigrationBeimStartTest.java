@@ -17,7 +17,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Der echte Start der API migriert aktive Mandanten, deren Changesets fehlen (design.md «Mandant», Req 1.5). */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(MigrationBeimStartTest.MitStartMandant.class)
 class MigrationBeimStartTest {

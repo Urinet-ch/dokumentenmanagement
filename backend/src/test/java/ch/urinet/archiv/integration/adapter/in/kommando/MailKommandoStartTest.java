@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * mehr an («Passwort fehlt»). Die {@link Tastatur} dieses Tests liefert das Passwort darum nur, solange der Leser noch
  * vor {@code Quarkus.run} steht, und sonst eine leere Zeile; das Kommando gelingt also nur, wenn es vor dem Start liest.
  */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusMainTest
 class MailKommandoStartTest {
 

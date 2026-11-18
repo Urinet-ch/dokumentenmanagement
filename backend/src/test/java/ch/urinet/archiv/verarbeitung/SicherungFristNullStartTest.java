@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Eine Sicherungsfrist von null bricht den Start ab (Aufgabe 5.6). */
-@Tag("start-2")
+@Tag("start-1")
 @QuarkusMainTest
 @TestProfile(SicherungFristNullStartTest.Einstellung.class)
 class SicherungFristNullStartTest {

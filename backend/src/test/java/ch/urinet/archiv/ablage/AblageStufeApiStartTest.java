@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Stufen-Prüfung der Ablage (Req 6.11, tasks.md 2.3): Ab Stufe B bricht der Start der API ab, wenn Manifeste nicht in
  * COMPLIANCE gesperrt würden. Der Dienst startet ohne Argumente; gelänge der Start, endete der Test nicht.
  */
-@Tag("start-1")
+@Tag("start-2")
 @QuarkusMainTest
 @TestProfile(AblageStufeApiStartTest.ApiStufeBGovernance.class)
 class AblageStufeApiStartTest {
