@@ -563,10 +563,22 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Abweichung vom Abschnitt «Sichtbarkeit und
   Hülle»: Der Filter läuft in 13.5 in Java (je Hülldokument eine Abfrage), nicht als SQL-Prädikat. Für Index,
   Zähler und Paging ersetzt Aufgabe 13.6 ihn durch ein Prädikat an der Abfrage von `wissensseite`; bis dahin gibt
-  es keine Liste mit Zähler oder Paging. Fail-closed für aktuelle Seiten (Review PR #300, S2): Eine Seite gilt als
-  `INTERN`, wenn `vertraulichkeit_mindest` oder die gespeicherte `vertraulichkeit` nicht `NORMAL` ist oder wenn sie
-  Quelleneinträge auf Dokumente oder Seiten hat, aber keine Zeile in `wissensseite_dokument` (Freigabe ohne
-  Neuberechnung). Das SQL-Prädikat aus 13.6 übernimmt diese Regel.
+  es keine Liste mit Zähler oder Paging. Fail-closed für aktuelle Seiten (Review PR #300, S2 auf 651f9fd6 und
+  ebc9d0b6): Die Lesestrecke prüft die gespeicherte Hülle **vereinigt** mit der live aus `wissensseite_quelle`
+  berechneten Hülle (transitiv über Quellseiten, rekursive Abfrage mit `UNION`, zyklensicher); jedes dieser
+  Dokumente muss für den Benutzer sichtbar sein. Zusätzlich gilt eine Seite als `INTERN`, wenn
+  `vertraulichkeit_mindest` oder die gespeicherte `vertraulichkeit` nicht `NORMAL` ist, wenn sie Quelleneinträge,
+  aber keine Zeile in `wissensseite_dokument` hat, oder wenn ein live erreichbares Dokument nicht in ihrer
+  gespeicherten Hülle steht (Freigabe oder Quelländerung ohne Neuberechnung: die gespeicherte Stufe ist dann
+  veraltet). Folge der ersten Regel: Eine Seite, die nur Quellseiten ohne Dokumente zitiert (auch ein
+  dokumentfreier Zyklus), hat keine Hüllenzeilen und bleibt `INTERN` (fail-closed, wie die Version ohne Hülle).
+  Bewusste Verschärfung gegenüber «nach A2 bis A4»: Die gespeicherte Stufe macht aus `PERSONAL` und unbestätigten
+  Hülldokumenten `INTERN`; eine Seite, deren Hülle nur das eigene `PERSONAL`-Dokument eines `mitarbeiter` enthält,
+  sieht dieser darum nicht (kein Abfluss, nur strenger). Das SQL-Prädikat aus 13.6 übernimmt diese Regeln.
+- Mindeststufen zitierter Quellseiten fliessen nicht in die wirksame Stufe der zitierenden Seite ein (Hülle nach
+  Glossar und 11.1 nur aus Archivdokumenten; `WissensGraph.wirksameStufe`, `wirksameStufeNachAnnahme`). Ob sie es
+  sollen (z. B. `ueberblick` zitiert eine von Hand auf `INTERN` gesetzte Seite ohne internes Dokument), ist ein
+  Produktentscheid und offen (Review PR #300, ebc9d0b6, S2/K1); vor 14.2 zu klären.
 - Versionen: Eine Version ist nur sichtbar, wenn die aktuelle Seite sichtbar ist **und** die Version selbst sichtbar
   ist (Req 11.2, 4.4; Review PR #300, M1). Die Version verwendet ihre eigene Hülle aus
   `wissensseite_version_dokument` und die Mindeststufe aus `wissensseite_version.daten`, Schlüssel

@@ -43,3 +43,16 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
   Szenario: Eine aktuelle Seite mit Quellen, aber ohne gespeicherte Hülle, ist nur für Rollen mit Recht A3 sichtbar
     Wenn eine normale Seite mit einer Quelle ohne gespeicherte Hülle gelesen wird
     Dann sehen nur die Rollen mit Recht A3 die Seite ohne Hülle
+
+  @req-11.2 @req-11.5
+  Szenario: Neue Quellen ausserhalb der gespeicherten Hülle werden ohne Neuberechnung nach dem Live-Stand geprüft
+    Wenn nach der Freigabe neue Quellen ausserhalb der gespeicherten Hülle ohne Neuberechnung eingetragen werden
+    Dann sehen vor der Änderung alle Rollen mit Recht A15 die Seiten
+    Und sieht «mitarbeiter» die Seite mit einem neuen normalen Dokument danach nicht, einzeln und in der Liste
+    Und sieht «mitarbeiter» die Seite nicht, deren zitierte Quellseite ein neues Dokument erhalten hat
+    Und sieht «treuhaender» die Seite mit einem neuen unbestätigten Dokument nicht, «inhaber» und «geschaeftsstelle» sehen sie
+
+  @req-11.2
+  Szenario: Eine Seite mit gespeicherter wirksamer Vertraulichkeit INTERN ist nur für Rollen mit Recht A3 sichtbar
+    Wenn eine Seite mit Mindeststufe NORMAL, normaler Hülle und gespeicherter Vertraulichkeit INTERN gelesen wird
+    Dann sehen nur die Rollen mit Recht A3 die intern gespeicherte Seite, einzeln und in der Liste

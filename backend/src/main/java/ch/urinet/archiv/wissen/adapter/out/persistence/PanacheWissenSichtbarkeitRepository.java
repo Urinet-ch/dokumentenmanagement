@@ -21,30 +21,52 @@ import java.util.UUID;
 @ApplicationScoped
 public class PanacheWissenSichtbarkeitRepository implements WissenSichtbarkeitRepository {
 
-    // Untergrenze der aktuellen Seite (fail-closed): NORMAL nur, wenn Mindeststufe und gespeicherte wirksame Stufe
-    // NORMAL sind und die Seite eine gespeicherte Hülle hat, sobald sie Quelleneinträge auf Dokumente oder Seiten
-    // trägt. Fehlen die Hüllenzeilen (Freigabe ohne Neuberechnung), gilt die Seite als INTERN.
-    private static final String AKTUELLE_UNTERGRENZE = """
-            case when s.vertraulichkeit_mindest = 'NORMAL' and s.vertraulichkeit = 'NORMAL'
-                      and (exists (select 1 from wissensseite_dokument d where d.seite_id = s.id)
-                           or not exists (select 1 from wissensseite_quelle q where q.seite_id = s.id
-                                          and (q.dokument_id is not null or q.quell_seite_id is not null)))
-                 then 'NORMAL' else 'INTERN' end
+    // Lesestrecke der aktuellen Seite (fail-closed). Die Hülle für die Dokumentprüfung ist die gespeicherte Hülle
+    // vereinigt mit der live aus wissensseite_quelle berechneten (transitiv über Quellseiten, zyklensicher über
+    // UNION). Die Untergrenze ist NORMAL nur, wenn Mindeststufe und gespeicherte wirksame Stufe NORMAL sind, die Seite
+    // mit Quelleneinträgen gespeicherte Hüllenzeilen hat und jedes live erreichbare Dokument in der gespeicherten
+    // Hülle steht. Sonst ist die gespeicherte Stufe veraltet (Freigabe oder Quelländerung ohne Neuberechnung), und die
+    // Seite gilt als INTERN.
+    private static final String AKTUELLE = """
+            with recursive erreichbar(start_id, seite_id) as (
+                select s.id, s.id from wissensseite s %1$s
+                union
+                select e.start_id, q.quell_seite_id
+                from erreichbar e
+                join wissensseite_quelle q on q.seite_id = e.seite_id
+                where q.quell_seite_id is not null
+            ),
+            live(seite_id, dokument_id) as (
+                select distinct e.start_id, q.dokument_id
+                from erreichbar e
+                join wissensseite_quelle q on q.seite_id = e.seite_id
+                where q.dokument_id is not null
+            ),
+            huelle(seite_id, dokument_id) as (
+                select d.seite_id, d.dokument_id from wissensseite_dokument d
+                where d.seite_id in (select start_id from erreichbar)
+                union
+                select l.seite_id, l.dokument_id from live l
+            )
+            select s.id,
+                   case when s.vertraulichkeit_mindest = 'NORMAL' and s.vertraulichkeit = 'NORMAL'
+                             and (exists (select 1 from wissensseite_dokument d where d.seite_id = s.id)
+                                  or not exists (select 1 from wissensseite_quelle q where q.seite_id = s.id))
+                             and not exists (select 1 from live l where l.seite_id = s.id
+                                             and not exists (select 1 from wissensseite_dokument d
+                                                             where d.seite_id = l.seite_id
+                                                               and d.dokument_id = l.dokument_id))
+                        then 'NORMAL' else 'INTERN' end,
+                   h.dokument_id
+            from wissensseite s
+            left join huelle h on h.seite_id = s.id
+            %1$s
+            order by s.id
             """;
 
-    private static final String AKTUELLE_SEITEN = """
-            select s.id, %s, h.dokument_id
-            from wissensseite s
-            left join wissensseite_dokument h on h.seite_id = s.id
-            order by s.id
-            """.formatted(AKTUELLE_UNTERGRENZE);
+    private static final String AKTUELLE_SEITEN = AKTUELLE.formatted("");
 
-    private static final String AKTUELLE_SEITE = """
-            select s.id, %s, h.dokument_id
-            from wissensseite s
-            left join wissensseite_dokument h on h.seite_id = s.id
-            where s.id = :seiteId
-            """.formatted(AKTUELLE_UNTERGRENZE);
+    private static final String AKTUELLE_SEITE = AKTUELLE.formatted("where s.id = :seiteId");
 
     private static final String VERSION = """
             select v.seite_id, coalesce(v.daten ->> 'vertraulichkeit_mindest', 'INTERN'), h.dokument_id

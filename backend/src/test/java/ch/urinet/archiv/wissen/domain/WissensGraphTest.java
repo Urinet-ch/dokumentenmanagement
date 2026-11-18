@@ -94,5 +94,7 @@ class WissensGraphTest {
                 WissensStufe.INTERN, WissensStufe.NORMAL)).isEqualTo(WissensStufe.INTERN);
         assertThat(graph.wirksameStufeNachAnnahme(Set.of(), Set.of(SEITE_A),
                 WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekannte Quellseite").isEqualTo(WissensStufe.INTERN);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(UUID.randomUUID()), Set.of(),
+                WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekanntes Dokument").isEqualTo(WissensStufe.INTERN);
     }
 }

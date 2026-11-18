@@ -330,6 +330,122 @@ public class WissenSichtbarkeitSchritte {
         }
     }
 
+    @Wenn("nach der Freigabe neue Quellen ausserhalb der gespeicherten Hülle ohne Neuberechnung eingetragen werden")
+    public void neueQuellenOhneNeuberechnung() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            String schema = new MandantCode("urinet").schema();
+            UUID alt = UUID.randomUUID();
+            UUID neuNormal = UUID.randomUUID();
+            UUID neuInQuellseite = UUID.randomUUID();
+            UUID unbestaetigt = UUID.randomUUID();
+            UUID direkt = UUID.randomUUID();
+            UUID zitierend = UUID.randomUUID();
+            UUID zitiert = UUID.randomUUID();
+            UUID mitUnbestaetigtem = UUID.randomUUID();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, alt, "NORMAL");
+                dokumentEinfuegen(verbindung, schema, neuNormal, "NORMAL");
+                dokumentEinfuegen(verbindung, schema, neuInQuellseite, "NORMAL");
+                unbestaetigtesDokumentEinfuegen(verbindung, schema, unbestaetigt);
+                for (UUID id : List.of(direkt, zitierend, zitiert, mitUnbestaetigtem)) {
+                    seiteEinfuegen(verbindung, schema, id, "probe/" + UUID.randomUUID(), "NORMAL");
+                    versionEinfuegen(verbindung, schema, id, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                }
+                quellEintragen(verbindung, schema, direkt, "alt", alt, null);
+                quellEintragen(verbindung, schema, zitiert, "alt", alt, null);
+                quellEintragen(verbindung, schema, zitierend, "zitat", null, zitiert);
+                quellEintragen(verbindung, schema, mitUnbestaetigtem, "alt", alt, null);
+            }
+            for (UUID id : List.of(zitiert, direkt, zitierend, mitUnbestaetigtem)) {
+                huellen.versionFreigeben(id, 1);
+            }
+            for (UUID id : List.of(direkt, zitierend, mitUnbestaetigtem)) {
+                liveSichtbarkeitErfassen("vorher", id);
+            }
+
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                quellEintragen(verbindung, schema, direkt, "neu", neuNormal, null);
+                quellEintragen(verbindung, schema, zitiert, "neu", neuInQuellseite, null);
+                quellEintragen(verbindung, schema, mitUnbestaetigtem, "neu", unbestaetigt, null);
+            }
+            liveSichtbarkeitErfassen("direkt", direkt);
+            liveSichtbarkeitErfassen("zitierend", zitierend);
+            liveSichtbarkeitErfassen("unbestaetigt", mitUnbestaetigtem);
+        });
+    }
+
+    @Dann("sehen vor der Änderung alle Rollen mit Recht A15 die Seiten")
+    public void liveVorher() {
+        assertThat(liveErfasst("vorher")).hasSize(3 * ROLLEN.size() * 2).doesNotContainValue(false);
+    }
+
+    @Dann("sieht «mitarbeiter» die Seite mit einem neuen normalen Dokument danach nicht, einzeln und in der Liste")
+    public void liveDirekt() {
+        liveNurOhne("direkt", Set.of(Rolle.MITARBEITER));
+    }
+
+    @Dann("sieht «mitarbeiter» die Seite nicht, deren zitierte Quellseite ein neues Dokument erhalten hat")
+    public void liveZitierend() {
+        liveNurOhne("zitierend", Set.of(Rolle.MITARBEITER));
+    }
+
+    @Dann("sieht «treuhaender» die Seite mit einem neuen unbestätigten Dokument nicht, «inhaber» und «geschaeftsstelle» sehen sie")
+    public void liveUnbestaetigt() {
+        liveNurOhne("unbestaetigt", Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER));
+    }
+
+    @Wenn("eine Seite mit Mindeststufe NORMAL, normaler Hülle und gespeicherter Vertraulichkeit INTERN gelesen wird")
+    public void internGespeicherteSeiteLesen() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            String schema = new MandantCode("urinet").schema();
+            UUID quelle = UUID.randomUUID();
+            UUID id = UUID.randomUUID();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, quelle, "NORMAL");
+                seiteEinfuegen(verbindung, schema, id, "probe/" + UUID.randomUUID(), "NORMAL");
+                quellEintragen(verbindung, schema, id, "quelle", quelle, null);
+                versionEinfuegen(verbindung, schema, id, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+            }
+            huellen.versionFreigeben(id, 1);
+            liveSichtbarkeitErfassen("gespeichert-normal", id);
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement p = verbindung.prepareStatement(
+                         "update " + schema + ".wissensseite set vertraulichkeit = 'INTERN' where id = ?")) {
+                p.setObject(1, id);
+                p.executeUpdate();
+            }
+            liveSichtbarkeitErfassen("gespeichert-intern", id);
+        });
+    }
+
+    @Dann("sehen nur die Rollen mit Recht A3 die intern gespeicherte Seite, einzeln und in der Liste")
+    public void internGespeicherteSeiteNurMitA3() {
+        liveNurOhne("gespeichert-normal", Set.of());
+        liveNurOhne("gespeichert-intern", Set.of(Rolle.MITARBEITER));
+    }
+
+    private void liveSichtbarkeitErfassen(String phase, UUID seiteId) {
+        for (Rolle rolle : ROLLEN) {
+            String basis = "live/" + phase + "/" + seiteId + "/" + rolle.code();
+            sichtbarkeiten.put(basis + "/einzeln", sichtbarkeit.aktuelleSeiteSichtbar(benutzer(rolle), seiteId));
+            sichtbarkeiten.put(basis + "/liste", sichtbarkeit.sichtbareSeiten(benutzer(rolle)).contains(seiteId));
+        }
+    }
+
+    private Map<String, Boolean> liveErfasst(String phase) {
+        return sichtbarkeiten.entrySet().stream()
+                .filter(e -> e.getKey().startsWith("live/" + phase + "/"))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private void liveNurOhne(String phase, Set<Rolle> ohne) {
+        Map<String, Boolean> erfasst = liveErfasst(phase);
+        assertThat(erfasst).as(phase).hasSize(ROLLEN.size() * 2);
+        erfasst.forEach((schluessel, sichtbar) -> assertThat(sichtbar).as(schluessel)
+                .isEqualTo(ohne.stream().noneMatch(rolle -> schluessel.endsWith("/" + rolle.code() + "/einzeln")
+                        || schluessel.endsWith("/" + rolle.code() + "/liste"))));
+    }
+
     // Vorgabe für 14.2: Seitenstufe der Prüfung ist die Mindeststufe, die wirksame Stufe kommt aus dem Graphen.
     private void fassungPruefen(String name, WissensGraph graph, UUID quellseiteId, Set<UUID> seiten) {
         WissensStufe wirksam = graph.wirksameStufeNachAnnahme(Set.of(), Set.of(quellseiteId),
@@ -420,6 +536,18 @@ public class WissenSichtbarkeitSchritte {
             p.setObject(1, id);
             p.setString(2, vertraulichkeit);
             p.setObject(3, ZEIT);
+            p.executeUpdate();
+        }
+    }
+
+    // Ohne bestätigte Art: nur für Rollen mit Recht A7 und den Erfasser sichtbar (Spec 01, Req 2).
+    private static void unbestaetigtesDokumentEinfuegen(Connection verbindung, String schema, UUID id)
+            throws Exception {
+        try (PreparedStatement p = verbindung.prepareStatement("""
+                insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status)
+                values (?, 'UPLOAD', 'NORMAL', 'synthetisch', 'EINGANGSKORB')
+                """.formatted(schema))) {
+            p.setObject(1, id);
             p.executeUpdate();
         }
     }
