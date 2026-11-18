@@ -127,6 +127,8 @@ im Code stehen.
    Spec 03, 3.7 ergänzt dieses Kriterium (13.11.2026, entschieden von Fabian, E-C): Massgeblich ist die Tabelle
    «Reservierte Felder» in Spec 03 design.md; `zugriff` hat die Werte `oeffentlich`, `mitglieder`, `vorstand`
    (String), `veroeffentlicht` ist ein JSON-Wahrheitswert (umgesetzt in Spec 05, Aufgabe 17.3).
+   Entscheid Fabian 18.11.2026: Der Standard `vorstand` ist für jede Art zulässig (engste Stufe, restriktiv); Spec 03 nennt als
+   Beispiel `VORSTANDSPROTOKOLL`, Req 2.9 (kein Art-Code im Code) verbietet aber eine Bindung der Prüfung an einzelne Arten.
 8. FALLS `fremdbeleg_art` oder `ohne_zahlungsdaten_art` auf eine inaktive Art oder auf eine Art mit niedrigerer
    Standard-Vertraulichkeit (`NORMAL` < `INTERN` < `PERSONAL`) verweist, DANN SOLL das Archiv die Konfiguration
    mit HTTP 422 `KONFIGURATION_UNGUELTIG` ablehnen.
