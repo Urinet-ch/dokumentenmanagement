@@ -147,7 +147,7 @@ damit ich mich auf ihn verlassen kann.
 1. Das Archiv-Projekt SOLL eine Prüfliste mit den 7 Beispielfragen aus `product.md` und mindestens 13 weiteren Fragen mit erwarteter Antwort und erwarteten Quellen verwenden; weil die erwarteten Antworten echte Geschäftsdaten enthalten, SOLL sie wie der Golden-Datensatz (Spec 01, 0.1) nur ausserhalb des Repositorys unter `ARCHIV_GOLDEN_DIR` liegen, im Repository nur Schema und Test.
 2. WENN beim Lauf der Prüfliste gegen den Produktivbestand alle 7 Beispielfragen und mindestens 18 von 20 Fragen insgesamt korrekt und mit Quelle beantwortet werden, DANN SOLL das Gate «Phase 2 bestanden» gelten. Der Lauf erfolgt nur manuell, nie in der CI. Nachweis: manuell [Fabian].
 
-### Requirement 14: MCP-Schnittstelle für Archiv-Werkzeuge (C3) — **entfällt (Entscheid 18.11.2026: keine Weitergabe von Archivinhalten an Cloud-Modelle, kein zugelassener MCP-Client; nicht umsetzen)**
+### Requirement 14: MCP-Schnittstelle für Archiv-Werkzeuge (C3) — **entfällt (Entscheid 18.11.2026, folgt aus Entscheid 1 vom 17.11.2026: keine Weitergabe von Archivinhalten an Cloud-Modelle, kein zugelassener MCP-Client; nicht umsetzen)**
 **Status:** Entfällt (Entscheid Fabian 18.11.2026). Der frühere Entwurf bleibt als Notiz in `design.md` («Entwurf O.3»); eine Umsetzung bräuchte einen neuen Entscheid zu einem nach `tech.md` zugelassenen Modell- oder MCP-Client.
 
 **User Story:** Als berechtigte Person möchte ich die lesenden Archiv-Werkzeuge über einen MCP-Client nutzen,
