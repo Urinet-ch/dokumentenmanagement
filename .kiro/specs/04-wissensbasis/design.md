@@ -924,6 +924,11 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   0001–9999 enthält, ergibt 400 `ANFRAGE_UNGUELTIG` (Review PR #311).
 - Version und Diff entscheiden über 404 aus dem Ergebnis der Abfrage mit Sichtprädikat; ändert sich die Sichtbarkeit
   zwischen Prüfung und Abfrage, bleibt es bei 404 statt eines Serverfehlers (Review PR #311).
+- Eine Seiten-ID im Pfad, die keine UUID ist, gilt wie eine unsichtbare Seite: 404 `NICHT_GEFUNDEN` über
+  `Berechtigung.wissensseitenAktion` und damit ein `VERWEIGERT`-Eintrag (Req 14.4; Review PR #311).
+- Die Dokumentensicht entsteht für SQL (Suche, Wissensbasis) und HQL (Dokumentlisten) aus derselben Quelle
+  `SichtregelSql.praedikat` mit Spaltennamen je Sprache; `VertraulichkeitFilterTest` vergleicht beide für alle Regeln
+  (Review PR #311).
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 

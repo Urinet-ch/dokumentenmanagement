@@ -8,8 +8,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** SQL-Prädikat für die Dokumentensicht gemäss {@link Sichtregel}. */
+/**
+ * Prädikat für die Dokumentensicht gemäss {@link Sichtregel} (Req 2.3, 2.21). Einzige Quelle für SQL (Suche,
+ * Wissensbasis) und HQL (Dokumentlisten): Die Sprachen unterscheiden sich nur in den Spaltennamen.
+ */
 public final class SichtregelSql {
+
+    /** Spaltennamen je Sprache: HQL-Attribute der Entität oder SQL-Spalten mit Alias; feste Bezeichner. */
+    public record Spalten(String bestaetigt, String erstelltVon, String vertraulichkeit, String personBenutzer) {
+        public Spalten {
+            for (String spalte : List.of(bestaetigt, erstelltVon, vertraulichkeit, personBenutzer)) {
+                if (!SPALTE.matcher(spalte).matches()) {
+                    throw new IllegalArgumentException("Ungültige Spalte");
+                }
+            }
+        }
+
+        /** SQL-Spalten der Tabelle {@code dokument} unter dem Alias {@code alias}. */
+        public static Spalten sql(String alias) {
+            if (!ALIAS.matcher(alias).matches()) {
+                throw new IllegalArgumentException("Ungültiger Alias");
+            }
+            return new Spalten(alias + ".bestaetigt", alias + ".erstellt_von", alias + ".vertraulichkeit",
+                    alias + ".person_benutzer");
+        }
+    }
 
     public record Ausdruck(String bedingung, Map<String, Object> parameter) {
         public Ausdruck {
@@ -18,24 +41,29 @@ public final class SichtregelSql {
     }
 
     private static final Pattern ALIAS = Pattern.compile("^[a-z][a-z0-9_]{0,15}$");
+    private static final Pattern SPALTE = Pattern.compile("^([a-z][a-z0-9_]{0,15}\\.)?[a-zA-Z][a-zA-Z0-9_]{0,30}$");
 
     private SichtregelSql() {
     }
 
+    /** SQL-Prädikat auf {@code dokument} unter dem Alias {@code alias}. */
     public static Ausdruck dokument(Sichtregel regel, String alias) {
-        if (!ALIAS.matcher(alias).matches()) {
-            throw new IllegalArgumentException("Ungültiger Alias");
-        }
+        return praedikat(regel, Spalten.sql(alias));
+    }
+
+    /** Prädikat über die angegebenen Spalten; der feste Filter der Webseite gehört nicht dazu. */
+    public static Ausdruck praedikat(Sichtregel regel, Spalten spalten) {
         Map<String, Object> parameter = new HashMap<>();
         if (regel.uneingeschraenkt()) {
             return new Ausdruck("1 = 1", parameter);
         }
 
-        String bestaetigt = alias + ".bestaetigt";
-        String erstelltVon = alias + ".erstellt_von";
-        String vertraulichkeit = alias + ".vertraulichkeit";
-        String personBenutzer = alias + ".person_benutzer";
+        String bestaetigt = spalten.bestaetigt();
+        String erstelltVon = spalten.erstelltVon();
+        String vertraulichkeit = spalten.vertraulichkeit();
+        String personBenutzer = spalten.personBenutzer();
 
+        // Unbestätigte Art wirkt als PERSONAL (Req 2.21, Fussnote ², design.md «Sicherheit»)
         String unbestaetigt = switch (regel.unbestaetigt()) {
             case ALLE -> bestaetigt + " is null";
             case ERFASSTE -> {

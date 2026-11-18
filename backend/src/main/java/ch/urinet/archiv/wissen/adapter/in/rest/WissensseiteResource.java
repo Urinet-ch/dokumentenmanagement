@@ -131,6 +131,7 @@ public class WissensseiteResource {
                     + "Mit pfad wird stattdessen eine einzelne Seite abgerufen.")
     @APIResponse(responseCode = "200", description = "Index oder Seite")
     @APIResponse(responseCode = "400", description = "Ungültiger Filter oder Pagingwert")
+    @APIResponse(responseCode = "404", description = "Seite zum Pfad nicht vorhanden")
     @Transactional
     public Response index(
             @QueryParam("typ") String typ,
@@ -175,7 +176,7 @@ public class WissensseiteResource {
     public Response seite(@PathParam("id") String id) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
-        return seitenAntwort(benutzer, lesen.seite(benutzer, uuid(id)));
+        return seitenAntwort(benutzer, lesen.seite(benutzer, uuid(benutzer, id)));
     }
 
     @GET
@@ -190,7 +191,7 @@ public class WissensseiteResource {
     public Response versionen(@PathParam("id") String id) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
-        List<VersionDto> versionen = lesen.versionen(benutzer, uuid(id)).stream()
+        List<VersionDto> versionen = lesen.versionen(benutzer, uuid(benutzer, id)).stream()
                 .map(zeile -> zeile.version().map(version -> dto(benutzer, version))
                         .orElseGet(() -> new VersionDto(zeile.nummer(), null, null, null, null, null, null, null,
                                 null, null)))
@@ -210,7 +211,8 @@ public class WissensseiteResource {
     public Response version(@PathParam("id") String id, @PathParam("nummer") String nummer) {
         aufloesung.pruefen();
         Benutzer benutzer = benutzer();
-        WissenLesenRepository.WissensVersion version = lesen.version(benutzer, uuid(id), positiveZahl(nummer));
+        WissenLesenRepository.WissensVersion version =
+                lesen.version(benutzer, uuid(benutzer, id), positiveZahl(nummer));
         return privateAntwort(dto(benutzer, version)).tag(new EntityTag(Integer.toString(version.nummer()))).build();
     }
 
@@ -225,7 +227,8 @@ public class WissensseiteResource {
     @APIResponse(responseCode = "404", description = "Seite oder Version nicht vorhanden")
     public Response diff(@PathParam("id") String id, @QueryParam("von") String von, @QueryParam("bis") String bis) {
         aufloesung.pruefen();
-        WissenLesen.Diff diff = lesen.diff(benutzer(), uuid(id), positiveZahl(von), positiveZahl(bis));
+        Benutzer benutzer = benutzer();
+        WissenLesen.Diff diff = lesen.diff(benutzer, uuid(benutzer, id), positiveZahl(von), positiveZahl(bis));
         return privateAntwort(new DiffDto(diff.von(), diff.bis(), diff.vorher(), diff.entfernt(),
                 diff.hinzugefuegt(), diff.nachher()))
                 .tag(new EntityTag(diff.von() + "-" + diff.bis())).build();
@@ -241,7 +244,8 @@ public class WissensseiteResource {
     @APIResponse(responseCode = "404", description = "Seite nicht vorhanden")
     public Response eingehend(@PathParam("id") String id) {
         aufloesung.pruefen();
-        return privateAntwort(lesen.eingehend(benutzer(), uuid(id)).stream()
+        Benutzer benutzer = benutzer();
+        return privateAntwort(lesen.eingehend(benutzer, uuid(benutzer, id)).stream()
                 .map(WissensseiteResource::dto).toList()).build();
     }
 
@@ -370,10 +374,12 @@ public class WissensseiteResource {
         }
     }
 
-    private static UUID uuid(String wert) {
+    /** Eine ungültige Seiten-ID gilt wie eine unsichtbare Seite: 404 mit {@code VERWEIGERT} (Req 14.4). */
+    private UUID uuid(Benutzer benutzer, String wert) {
         try {
             return UUID.fromString(wert);
         } catch (IllegalArgumentException | NullPointerException e) {
+            lesen.ungueltigeSeitenId(benutzer);
             throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
         }
     }

@@ -36,6 +36,11 @@ public class WissenLesen {
         return IndexErgebnis.gruppieren(treffer, offset, groesse);
     }
 
+    /** Eine ungültige Seiten-ID gilt wie eine unsichtbare Seite als nicht vorhanden (404, {@code VERWEIGERT}). */
+    public void ungueltigeSeitenId(Benutzer benutzer) {
+        berechtigung.wissensseitenAktion(benutzer, Aktion.A15, false);
+    }
+
     @Transactional
     public Wissensseite seite(Benutzer benutzer, UUID id) {
         Optional<Wissensseite> seite = repository.seite(id, Sichtregel.fuer(benutzer));

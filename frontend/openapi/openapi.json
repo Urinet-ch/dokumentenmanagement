@@ -5876,6 +5876,9 @@
           "400" : {
             "description" : "Ungültiger Filter oder Pagingwert"
           },
+          "404" : {
+            "description" : "Seite zum Pfad nicht vorhanden"
+          },
           "401" : {
             "description" : "Not Authorized"
           },

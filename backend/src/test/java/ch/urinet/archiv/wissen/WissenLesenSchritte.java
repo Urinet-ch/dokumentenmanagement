@@ -59,6 +59,7 @@ public class WissenLesenSchritte {
     private Response logErsteSeite;
     private Response logZweiteSeite;
     private List<Response> ungueltigeCursor;
+    private List<Response> ungueltigeIds;
 
     @Angenommen("synthetische Wissensleseproben sind angelegt")
     public void probeAnlegen() throws Exception {
@@ -154,6 +155,9 @@ public class WissenLesenSchritte {
         ungueltigeCursor = java.util.stream.Stream.of("eAox", "!!!", cursor("+300000-01-01T00:00:00Z\n1"),
                         cursor("2026-01-01T00:00:00Z\n0"), cursor("2026-01-01T00:00:00Z"))
                 .map(vor -> get("/api/v1/wissensbasis/log?vor=" + vor).then().extract().response()).toList();
+        ungueltigeIds = java.util.stream.Stream.of("", "/versionen", "/versionen/1", "/diff?von=1&bis=2",
+                        "/eingehend")
+                .map(rest -> get("/api/v1/wissensseiten/keine-uuid" + rest).then().extract().response()).toList();
     }
 
     private static String cursor(String wert) {
@@ -234,6 +238,10 @@ public class WissenLesenSchritte {
             assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(ungueltig, 400))
                     .isEqualTo("ANFRAGE_UNGUELTIG");
         }
+        for (Response ungueltig : ungueltigeIds) {
+            assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(ungueltig, 404))
+                    .isEqualTo("NICHT_GEFUNDEN");
+        }
         assertThat(seite.jsonPath().getString("inhaltHtml")).contains("Sichtbare Seite", "Seite nicht vorhanden")
                 .doesNotContain("Interne Seite", "Fehlende Seite");
         zugriffsprotokollPruefen();
@@ -283,10 +291,10 @@ public class WissenLesenSchritte {
                 assertThat(zeilen.next()).isTrue();
                 assertThat(zeilen.getLong(1)).isEqualTo(1);
             }
-            // interne Seite, Version 1 und Diff 1–2
+            // interne Seite, Version 1 und Diff 1–2, dazu je Endpunkt mit {id} eine ungültige ID (Req 14.4)
             try (var zeilen = verweigert.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
-                assertThat(zeilen.getLong(1)).isEqualTo(3);
+                assertThat(zeilen.getLong(1)).isEqualTo(8);
             }
             try (var zeilen = details.executeQuery()) {
                 assertThat(zeilen.next()).isTrue();
