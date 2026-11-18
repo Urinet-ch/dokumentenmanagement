@@ -42,4 +42,16 @@ class ProtokollDetailsTest {
         assertThatThrownBy(() -> new ProtokollDetails.Regel(10, "ab Beleg", true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void kennungswerteWerdenSchonVorSerialisierungUndToStringEntfernt() {
+        var aenderung = new ProtokollDetails.Aenderung("einstellungen.kennungen.uid",
+                "synthetisch-alt", "synthetisch-neu", true);
+        assertThat(aenderung.alt()).isNull();
+        assertThat(aenderung.neu()).isNull();
+        assertThat(aenderung.toString()).doesNotContain("synthetisch-alt", "synthetisch-neu");
+        var anderesFeld = new ProtokollDetails.Aenderung("arten.PROBE.name", null, "geändert");
+        assertThat(anderesFeld.ohneWerte()).isFalse();
+        assertThat(anderesFeld.neu()).isEqualTo("geändert");
+    }
 }
