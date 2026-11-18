@@ -1,0 +1,134 @@
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17-trixie
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+      - archiv_db_owner
+      - archiv_db_app
+      - keycloak_db
+    volumes:
+      - ${ARCHIV_RESTORE_TMP:?}/postgres:/var/lib/postgresql/data
+      - ./restore-db-init.sh:/docker-entrypoint-initdb.d/10-restore-test.sh:ro
+    ports:
+      - 127.0.0.1::5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest@sha256:59953701f8f8d0de81aab456f0b0b6c0a1804119415559bf7ede79d944108879
+    command: ["server", "/tmp/daten"]
+    environment:
+      MINIO_ROOT_USER: archiv-dev
+      MINIO_ROOT_PASSWORD: archiv-dev-zugang
+    volumes:
+      - ${ARCHIV_RESTORE_TMP:?}/minio:/tmp/daten
+    ports:
+      - 127.0.0.1::9000
+
+  kc:
+    image: archiv:restore-roundtrip-kc
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: archiv-admin
+      KC_HOSTNAME: http://kc:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    secrets:
+      - keycloak_db
+      - keycloak_admin
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1::9000
+
+  api:
+    image: archiv:restore-roundtrip
+    environment:
+      SMALLRYE_CONFIG_SOURCE_FILE_LOCATIONS: /run/secrets
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
+      QUARKUS_OIDC_AUTH_SERVER_URL: http://kc:8080/realms/urinet-archiv
+      QUARKUS_S3_ENDPOINT_OVERRIDE: http://minio:9000
+      QUARKUS_S3_AWS_REGION: us-east-1
+      QUARKUS_HTTP_HOST: 0.0.0.0
+      ARCHIV_ROLLE: api
+      ARCHIV_STUFE: A
+      ARCHIV_ABLAGE_BUCKET_PRAEFIX: urinet-archiv-a-
+      ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
+      ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: GOVERNANCE
+    secrets:
+      - archiv_db_app
+      - archiv_db_owner
+      - s3_app_zugang_id
+      - s3_app_zugang_geheimnis
+      - infomaniak_ai_token
+      - archiv_manifest_key
+      - keycloak_db
+      - keycloak_admin
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      kc:
+        condition: service_started
+    ports:
+      - 127.0.0.1::8080
+
+  kc_restore:
+    image: archiv:restore-roundtrip-kc
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: db
+      KC_DB_URL_DATABASE: keycloak_restore
+      KC_DB_USERNAME: keycloak
+      KC_BOOTSTRAP_ADMIN_USERNAME: archiv-admin
+      KC_HOSTNAME: http://kc_restore:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    secrets:
+      - keycloak_db
+      - keycloak_admin
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1::8080
+      - 127.0.0.1::9000
+
+secrets:
+  postgres_password:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/postgres_password
+  archiv_db_owner:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/archiv_db_owner
+  archiv_db_app:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/archiv_db_app
+  s3_app_zugang_id:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/s3_app_zugang_id
+  s3_app_zugang_geheimnis:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/s3_app_zugang_geheimnis
+  infomaniak_ai_token:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/infomaniak_ai_token
+  archiv_manifest_key:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/archiv_manifest_key
+  keycloak_db:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_db
+  keycloak_admin:
+    file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_admin
+
+networks:
+  default:
+    internal: true

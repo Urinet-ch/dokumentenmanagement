@@ -114,25 +114,23 @@ Der lokale Prüflauf erstellt keine Verbindung zu einem Sicherungsanbieter und v
 deploy/backup/restore-uebung-lokal.sh
 ```
 
-Voraussetzungen sind Docker, Maven, `age`, `age-keygen` und die lokal vorhandenen Dev-Service-Images. Der Lauf prüft
-`taeglich.sh` mit Docker-Attrappen und zwei temporären `age`-Identitäten. Der echte-`age`-Teil entschlüsselt mit beiden
-Wegwerf-Schlüsseln, weist den falschen Schlüssel zurück und prüft eine manipulierte `SHA256SUMS`-Datei. Anschliessend
-starten die Quarkus-Tests PostgreSQL und MinIO lokal, legen synthetische Dokumente an, stellen den Bucket in einen
-neuen leeren `urinet-archiv-p-`-Bucket wieder her und prüfen Dokument-IDs, Prüfsummen, abrufbare Dateien, die
-aktualisierten Versionsreferenzen sowie Manifest-Export über Schlüssel und SHA-256. Fehlende Manifest-Teile,
-Hashabweichungen und zusätzliche Versionen werden zurückgewiesen. `archiv manifest pruefen` prüft das signierte
-Manifest nach dem Restore im Ziel-Bucket; die Zeitstempelprüfung verwendet dabei eine synthetische TSA-Attrappe ohne
-Netzaufruf. Die S3-Tests prüfen zusätzlich Inventar, Object Lock und Sperrfristen. Die Tests entfernen ihre
-Wegwerf-Buckets und Dev Services selbst; das Skript verwendet keinen `docker compose down -v`- oder `prune`-Befehl.
+Voraussetzungen sind Docker, Maven, `age`, `age-keygen`, OpenSSL, `curl` und die lokal vorhandenen Images für
+PostgreSQL/pgvector, Keycloak, Java und MinIO. Das Skript erzeugt eigene Wegwerf-Schlüssel und synthetische Zugangsdaten,
+startet einen Compose-Stack mit internem Netzwerk und führt den echten `taeglich.sh`-Export aus. Es prüft `SHA256SUMS`,
+weist einen falschen Schlüssel und eine manipulierte Prüfsumme zurück und entschlüsselt das Paket mit beiden
+Wegwerf-Schlüsseln.
 
-Der Lauf bleibt eine lokale Teilprobe, kein vollständiger Restore des täglichen Sicherungspakets: Der Shelltest führt
-`taeglich.sh` mit Docker-Attrappen aus; sein erzeugter Export wird nicht an den S3-Roundtrip-Test übergeben. Der
-Roundtrip prüft synthetische Dokumentzeilen und Dateien im Test-PostgreSQL sowie einen getrennten S3-Ziel-Bucket, aber
-keinen `pg_dump`-/Keycloak-Realm-Restore in eine zweite Datenbank und keinen API-Start gegen diese zweite Datenbank.
-Der vollständige manuelle Restore-Nachweis bleibt damit offen und ist Aufgabe 5.12 in `tasks.md` (Export entschlüsseln,
-in neue Datenbank und neuen Bucket einspielen, Archiv dagegen starten, Dokumentliste vergleichen). Die Manifest-
-Versions-IDs in der Datenbank (`manifest`, `manifest_zeitstempel`) bleiben nach dem Restore Quellenachweise; das
-Prüfwerkzeug und die Exporte lesen Manifestteile über Schlüssel und SHA-256 statt über diese veralteten IDs.
+Der Lauf spielt den Archiv- und Keycloak-Dump in neue Datenbanken ein. Danach startet er Keycloak mit der
+wiederhergestellten Datenbank und prüft den Realm. Der Bucket-Strom wird mit `archiv sicherung wiederherstellen`
+in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
+vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
+Dokumentanzahl, IDs, SHA-256 und Lesbarkeit der Dateien. `archiv manifest pruefen` validiert danach das signierte
+Manifest im Ziel-Bucket anhand der Schlüssel und SHA-256, nicht anhand der alten S3-Versions-IDs. Die
+Zeitstempelprüfung verwendet eine synthetische TSA-Attrappe ohne Netzaufruf.
+
+Alle Daten liegen in einem temporären Verzeichnis. Beim Beenden entfernt das Skript nur den Compose-Stack mit seinem
+eigenen Projektnamen und das temporäre Verzeichnis; es verwendet weder `down -v` noch `prune`. Die Übung ist ein
+lokaler Funktionstest mit synthetischen Daten und ersetzt nicht die Restore-Probe auf der VPS im Infra-Repository.
 
 Die Orchestrierung lässt sich ohne Docker und Maven mit Attrappen prüfen:
 
