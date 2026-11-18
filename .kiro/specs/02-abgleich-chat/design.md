@@ -293,9 +293,9 @@ flowchart LR
 
 ### Entwurf O.3 MCP-Server (C3)
 
-**Status:** Entwurf, ungeprüft und nicht freigegeben. O.3 bleibt optional und unabgehakt. Der Abschnitt ist eine
+**Status:** **O.3 und Requirement 14 entfallen (Entscheid Fabian 18.11.2026)**; der Abschnitt bleibt als Notiz für den Fall eines zugelassenen Modell- oder MCP-Clients. Frühere Fassung: Entwurf, ungeprüft und nicht freigegeben. Der Abschnitt ist eine
 Entscheidungsvorlage; nichts davon ist implementiert oder für den Betrieb freigegeben. Entscheide 1 und 3 sind am
-17.11.2026 gefallen; die Folge von Entscheid 1 für Requirement 14 (Requirement 14.11) ist offen, siehe unten.
+17.11.2026 gefallen; die Folge von Entscheid 1 für Requirement 14 (Requirement 14.11) ist am 18.11.2026 entschieden: O.3 und Requirement 14 entfallen wie O.1/O.2.
 
 #### Grenze und Transport
 
