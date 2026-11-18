@@ -23,6 +23,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -77,8 +78,8 @@ public class OeffentlicheFragen {
     private final WerkzeugDaten daten;
     private final MandantKontext kontext;
     private final MandantEinstellungen einstellungen;
+    private final Config konfiguration;
     private final int maxFrage;
-    private final String kontakt;
     private final Clock uhr = Clock.systemUTC();
     private final ExecutorService ausfuehrung = Executors.newThreadPerTaskExecutor(
             Thread.ofPlatform().name("oeffentlicher-chat-", 0).daemon().factory());
@@ -87,9 +88,8 @@ public class OeffentlicheFragen {
     public OeffentlicheFragen(OeffentlicherChatAgentPort agent, OeffentlicheGrenzen grenzen, MandantBudget budget,
                               OeffentlicheGespraeche gespraeche, OeffentlicheFragenSpeicher speicher,
                               OeffentlicheDokumente dokumente, WerkzeugTransaktion transaktion, WerkzeugDaten daten,
-                              MandantKontext kontext, MandantEinstellungen einstellungen,
-                              @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage,
-                              @ConfigProperty(name = "archiv.webseite.chat.geschaeftsstelle") Optional<String> kontakt) {
+                              MandantKontext kontext, MandantEinstellungen einstellungen, Config konfiguration,
+                              @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage) {
         if (maxFrage < 1) {
             throw new IllegalArgumentException("archiv.webseite.chat.max-frage muss mindestens 1 sein");
         }
@@ -103,8 +103,8 @@ public class OeffentlicheFragen {
         this.daten = daten;
         this.kontext = kontext;
         this.einstellungen = einstellungen;
+        this.konfiguration = konfiguration;
         this.maxFrage = maxFrage;
-        this.kontakt = kontakt.map(String::strip).filter(k -> !k.isEmpty()).map(k -> " (" + k + ")").orElse("");
     }
 
     /** Angenommene Frage: Gespräch, Anfrage an den Agenten und belegter Platz (bis {@link #starten} ihn freigibt). */
@@ -249,7 +249,7 @@ public class OeffentlicheFragen {
         }
         String text = antwort.inhalt();
         if (quellen.isEmpty()) {
-            text = KEIN_TREFFER.formatted(kontakt);
+            text = KEIN_TREFFER.formatted(kontakt(anfrage.mandant()));
         }
         if (!text.isBlank()) {
             strom.accept(new OeffentlicheAusgabe.Text(text));
@@ -269,6 +269,12 @@ public class OeffentlicheFragen {
         } catch (RuntimeException e) {
             LOG.warnf("Öffentlicher Chat: Ausgabe nach dem Speichern gescheitert, ursache=%s", Ursachen.kette(e));
         }
+    }
+
+    private String kontakt(MandantCode mandant) {
+        return konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".chat.geschaeftsstelle",
+                String.class).map(OeffentlicheFragen::ohneSteuerzeichen).filter(k -> !k.isEmpty())
+                .map(k -> " (" + k + ")").orElse("");
     }
 
     /**
