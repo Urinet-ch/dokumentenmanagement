@@ -34,6 +34,11 @@ class DokumentartPruefungTest {
         }
 
         @Override
+        public java.util.Map<String, String> feldTypen(String schemaJson) {
+            return java.util.Map.of();
+        }
+
+        @Override
         public Set<String> seedSchemaPruefen(String schemaJson) {
             aufrufe.add("seedSchemaPruefen");
             return Set.of();
@@ -42,6 +47,11 @@ class DokumentartPruefungTest {
         @Override
         public void wertePruefen(String schemaJson, String werteJson) {
             aufrufe.add("wertePruefen");
+        }
+
+        @Override
+        public java.util.Map<String, Object> werteLesen(String werteJson) {
+            return java.util.Map.of();
         }
 
         @Override

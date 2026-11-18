@@ -1163,6 +1163,13 @@
           "status" : {
             "type" : "string",
             "description" : "NEU bei 202, sonst der aktuelle Status des vorhandenen Dokuments"
+          },
+          "warnungen" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Warnung"
+            },
+            "description" : "Warnungen aus konfigurierten Dokumentregeln"
           }
         }
       },
@@ -2457,7 +2464,7 @@
         "properties" : {
           "code" : {
             "type" : "string",
-            "enum" : [ "BELEGNUMMER_BEKANNT", "FRISTBEZUG_FEHLT" ]
+            "description" : "Warntyp oder Code einer konfigurierten Dokumentregel"
           },
           "vorhandenId" : {
             "description" : "Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist",
@@ -2467,6 +2474,10 @@
             }, {
               "type" : "null"
             } ]
+          },
+          "meldung" : {
+            "type" : [ "string", "null" ],
+            "description" : "Meldung der Dokumentregel"
           }
         }
       },

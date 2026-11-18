@@ -10,11 +10,13 @@ import ch.urinet.archiv.dokumentart.domain.Fristbezug;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,8 +61,32 @@ class DokumentLesenWarnungenTest {
             public Fristbezug fristbezug(String zusatzJson) {
                 return bezug;
             }
+
         };
-        var lesen = new DokumentLesen(null, null, null, null, null, BigDecimal.ONE, arten);
+        var klassifikationen = new DokumentKlassifikationenPort() {
+            @Override
+            public Map<String, List<String>> laden(UUID dokumentId) {
+                return Map.of();
+            }
+
+            @Override
+            public void ersetzen(UUID dokumentId, Map<String, List<String>> werte) {
+                throw new UnsupportedOperationException();
+            }
+        };
+        var regelPruefung = new RegelPruefung(null, null, null) {
+            @Override
+            public Map<String, Object> zusatzWerte(String json) {
+                return Map.of();
+            }
+
+            @Override
+            public List<ch.urinet.archiv.konfiguration.domain.Regel> regeln() {
+                return List.of();
+            }
+        };
+        var lesen = new DokumentLesen(null, null, null, null, null, BigDecimal.ONE, arten,
+                klassifikationen, regelPruefung);
         Dokument dokument = new Dokument(UUID.randomUUID(), "PROBE", null, null, null, null, null, null, null, null,
                 DokumentStatus.ARCHIVIERT, null, null, null, null, false, "{}", 1, null, false, null, null, null,
                 null, null, null, null, null, null);

@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Warnung } from './warnung';
 
 
 export interface GeneratorAntwort { 
@@ -15,5 +16,9 @@ export interface GeneratorAntwort {
      * NEU bei 202, sonst der aktuelle Status des vorhandenen Dokuments
      */
     status: string;
+    /**
+     * Warnungen aus konfigurierten Dokumentregeln
+     */
+    warnungen?: Array<Warnung>;
 }
 

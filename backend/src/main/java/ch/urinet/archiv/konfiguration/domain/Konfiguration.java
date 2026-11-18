@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
 public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
-                            List<Klassifikation> klassifikationen) {
+                            List<Klassifikation> klassifikationen, List<Regel> regeln) {
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
@@ -23,7 +23,12 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             "referenz", "groesse", "status", "url");
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
-        this(version, einstellungen, arten, List.of());
+        this(version, einstellungen, arten, List.of(), List.of());
+    }
+
+    public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
+                         List<Klassifikation> klassifikationen) {
+        this(version, einstellungen, arten, klassifikationen, List.of());
     }
 
     /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
@@ -32,6 +37,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         klassifikationen = klassifikationen == null ? List.of()
                 : klassifikationen.stream()
                         .sorted(Comparator.comparing(Klassifikation::code, Comparator.nullsFirst(String::compareTo)))
+                        .toList();
+        regeln = regeln == null ? List.of()
+                : regeln.stream().sorted(Comparator.comparing(Regel::code, Comparator.nullsFirst(String::compareTo)))
                         .toList();
     }
 
@@ -132,7 +140,140 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 }
             }
         }
+        regelnPruefen(befunde, nachCode);
         return List.copyOf(befunde);
+    }
+
+    private void regelnPruefen(List<Befund> befunde, Map<String, Art> artenNachCode) {
+        if (regeln.size() > 200) {
+            befunde.add(new Befund("regeln", "ANZAHL_UNGUELTIG", "Die Konfiguration enthält zu viele Regeln."));
+        }
+        Set<String> codes = new HashSet<>();
+        for (Regel regel : regeln) {
+            String pfad = regel.code() != null && KLASSIFIKATIONSCODE.matcher(regel.code()).matches()
+                    ? "regeln." + regel.code() : "regeln";
+            if (regel.code() == null || !KLASSIFIKATIONSCODE.matcher(regel.code()).matches()) {
+                befunde.add(new Befund(pfad, "CODE_UNGUELTIG", "Ein Regel-Code ist ungültig."));
+            } else if (!codes.add(regel.code())) {
+                befunde.add(new Befund(pfad, "CODE_DOPPELT", "Der Regel-Code kommt mehrfach vor."));
+            }
+            if (!text(regel.meldung(), 300)) {
+                befunde.add(new Befund(pfad + ".meldung", "TEXT_UNGUELTIG", "Die Regelmeldung ist ungültig."));
+            }
+            if (!"FEHLER".equals(regel.schwere()) && !"WARNUNG".equals(regel.schwere())) {
+                befunde.add(new Befund(pfad + ".schwere", "SCHWERE_UNGUELTIG",
+                        "Die Regelschwere muss FEHLER oder WARNUNG sein."));
+            }
+            if (regel.art() != null && !artenNachCode.containsKey(regel.art())) {
+                befunde.add(new Befund(pfad + ".art", "REGEL_ART_UNGUELTIG",
+                        "Die Dokumentart der Regel fehlt."));
+                continue;
+            }
+            Regel.Parameter parameter;
+            try {
+                parameter = regel.typisierteParameter();
+            } catch (IllegalArgumentException e) {
+                befunde.add(new Befund(pfad + ".parameter", "REGEL_PARAMETER_UNGUELTIG",
+                        "Die Regelparameter passen nicht zum Regeltyp."));
+                continue;
+            }
+            if (parameter.felder().stream().anyMatch(feld -> !Regel.feldGueltig(feld))) {
+                befunde.add(new Befund(pfad + ".parameter", "REGEL_FELD_UNGUELTIG",
+                        "Ein Feldname der Regel ist ungültig."));
+                continue;
+            }
+            List<Art> betroffeneArten = regel.art() == null
+                    ? arten : List.of(artenNachCode.get(regel.art()));
+            // geschaeftsjahr ist nur als Folge- oder Zeitraumfeld einer FOLGE lesbar, nicht in den übrigen Regeltypen.
+            if (parameter.felder().stream().anyMatch(feld ->
+                    !(parameter instanceof Regel.Folge && "geschaeftsjahr".equals(feld))
+                    && betroffeneArten.stream().anyMatch(art -> !regelFeldVorhanden(art, feld)))) {
+                befunde.add(new Befund(pfad + ".parameter", "REGEL_FELD_UNGUELTIG",
+                        "Ein Feld der Regel ist in der Dokumentart nicht verfügbar."));
+            }
+            if (parameter instanceof Regel.Folge folge
+                    && (!folge.muster() && betroffeneArten.stream().anyMatch(art ->
+                    !regelGanzzahlFeld(art, folge.feld()))
+                    || folge.zeitraum() == Regel.Zeitraum.FELD && betroffeneArten.stream().anyMatch(art ->
+                    !regelGanzzahlFeld(art, folge.zeitraumFeld())))) {
+                befunde.add(new Befund(pfad + ".parameter", "REGEL_FELD_UNGUELTIG",
+                        "Ein Folgefeld muss ganzzahlig sein."));
+            }
+            if (parameter instanceof Regel.Erwartet erwartet
+                    && !expectedDatum(erwartet.datum(), betroffeneArten)) {
+                befunde.add(new Befund(pfad + ".parameter.datum", "REGEL_FELD_UNGUELTIG",
+                        "Das Bezugsfeld der erwarteten Regel muss ein Datumsfeld sein."));
+            }
+            if (parameter instanceof Regel.Folge folge && folge.muster()
+                    && betroffeneArten.stream().anyMatch(art -> art.belegnummerMuster().stream()
+                    .noneMatch(Konfiguration::nummernMusterMitNr))) {
+                befunde.add(new Befund(pfad + ".parameter.muster", "REGEL_MUSTER_UNGUELTIG",
+                        "Die Dokumentart hat kein Belegnummer-Muster mit einer Gruppe nr."));
+            }
+        }
+    }
+
+    private static boolean regelFeldVorhanden(Art art, String feld) {
+        if (feld.startsWith("zusatz.")) {
+            return art.zusatzFeldTypen().containsKey(feld.substring("zusatz.".length()));
+        }
+        if (feld.startsWith("klassifikation.")) {
+            String code = feld.substring("klassifikation.".length());
+            return art.klassifikationen().stream().anyMatch(zuordnung -> code.equals(zuordnung.klassifikation()));
+        }
+        if (art.pflichtfelder().contains(feld)) {
+            return true;
+        }
+        return switch (feld) {
+            case "belegnummer", "richtung", "betrag", "waehrung", "faelligkeit", "qr_referenz", "konto" ->
+                    art.gruppen().contains("finanz");
+            case "gueltig_ab", "gueltig_bis", "kuendigungsfrist", "naechste_frist" ->
+                    art.gruppen().contains("vertrag");
+            case "partner", "projekt" -> true;
+            case "titel", "datum", "vertraulichkeit", "person_benutzer", "tags" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean regelGanzzahlFeld(Art art, String feld) {
+        if ("geschaeftsjahr".equals(feld)) {
+            return true;
+        }
+        return feld.startsWith("zusatz.")
+                && "integer".equals(art.zusatzFeldTypen().get(feld.substring("zusatz.".length())));
+    }
+
+    private static boolean expectedDatum(String feld, List<Art> arten) {
+        if ("BELEGDATUM".equals(feld)) {
+            return true;
+        }
+        return feld.startsWith("zusatz.") && arten.stream().allMatch(art ->
+                "date".equals(art.zusatzFeldTypen().get(feld.substring("zusatz.".length()))));
+    }
+
+    private static boolean nummernMusterMitNr(String muster) {
+        try {
+            java.util.regex.Pattern.compile(muster);
+            boolean escape = false;
+            boolean klasse = false;
+            for (int i = 0; i < muster.length(); i++) {
+                char zeichen = muster.charAt(i);
+                if (escape) {
+                    escape = false;
+                } else if (zeichen == '\\') {
+                    escape = true;
+                } else if (zeichen == '[') {
+                    klasse = true;
+                } else if (zeichen == ']') {
+                    klasse = false;
+                } else if (!klasse && muster.startsWith("(?<nr>", i)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (java.util.regex.PatternSyntaxException e) {
+            return false;
+        }
     }
 
     public List<String> ungueltigeDokumentKlassifikationen(String artCode, Map<String, List<String>> werte,
@@ -271,7 +412,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public boolean gleicherInhalt(Konfiguration andere) {
         return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten)
-                && klassifikationen.equals(andere.klassifikationen);
+                && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln);
     }
 
     public List<Aenderung> aenderungen(Konfiguration neu) {
@@ -333,7 +474,32 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             }
         }
         klassifikationAenderungen(aenderungen, klassifikationen, neu.klassifikationen);
+        regelAenderungen(aenderungen, regeln, neu.regeln);
         return List.copyOf(aenderungen);
+    }
+
+    private static void regelAenderungen(List<Aenderung> aenderungen, List<Regel> alt, List<Regel> neu) {
+        Map<String, Regel> vorher = new TreeMap<>();
+        alt.forEach(regel -> vorher.put(regel.code(), regel));
+        Map<String, Regel> nachher = new TreeMap<>();
+        neu.forEach(regel -> nachher.put(regel.code(), regel));
+        Set<String> codes = new java.util.TreeSet<>(vorher.keySet());
+        codes.addAll(nachher.keySet());
+        for (String code : codes) {
+            Regel a = vorher.get(code);
+            Regel n = nachher.get(code);
+            String pfad = "regeln." + code;
+            feld(aenderungen, pfad, vorhanden(a), vorhanden(n));
+            if (a == null || n == null) {
+                continue;
+            }
+            feld(aenderungen, pfad + ".art", a.art(), n.art());
+            feld(aenderungen, pfad + ".typ", a.typ(), n.typ());
+            feld(aenderungen, pfad + ".parameter", a.parameter(), n.parameter());
+            feld(aenderungen, pfad + ".schwere", a.schwere(), n.schwere());
+            feld(aenderungen, pfad + ".meldung", a.meldung(), n.meldung());
+            feld(aenderungen, pfad + ".aktiv", a.aktiv(), n.aktiv());
+        }
     }
 
     private static Map<String, ArtKlassifikation> artZuordnungen(List<ArtKlassifikation> zuordnungen) {
@@ -418,12 +584,25 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                       Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv,
                       boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
                       String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
-                      String kiHinweise, int reihenfolge, List<ArtKlassifikation> klassifikationen) {
+                      String kiHinweise, int reihenfolge, List<ArtKlassifikation> klassifikationen,
+                      Map<String, String> zusatzFeldTypen) {
+        public Art(String code, String name, String beschreibung, List<String> gruppen,
+                   List<String> pflichtfelder, String zusatzSchema, String vertraulichkeit,
+                   Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv,
+                   boolean selbstAusgestellt, List<String> belegnummerMuster, String fremdbelegArt,
+                   String ohneZahlungsdatenArt, boolean kiVorschlag, List<String> kiFelder,
+                   String kiHinweise, int reihenfolge, List<ArtKlassifikation> klassifikationen) {
+            this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
+                    gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
+                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, klassifikationen, Map.of());
+        }
+
         public Art(String code, String name, String beschreibung, List<String> gruppen,
                    List<String> pflichtfelder, String zusatzSchema, String vertraulichkeit,
                    Aufbewahrung aufbewahrung, boolean gesetzlichePflicht, boolean aktiv) {
             this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
-                    gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0, List.of());
+                    gesetzlichePflicht, aktiv, false, List.of(), null, null, true, List.of(), null, 0, List.of(),
+                    Map.of());
         }
 
         public Art(String code, String name, String beschreibung, List<String> gruppen,
@@ -434,7 +613,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                    String kiHinweise, int reihenfolge) {
             this(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit, aufbewahrung,
                     gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
-                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, List.of());
+                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, List.of(), Map.of());
         }
 
         public Art {
@@ -444,6 +623,14 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             belegnummerMuster = belegnummerMuster == null ? List.of() : List.copyOf(belegnummerMuster);
             kiFelder = kiFelder == null ? List.of() : List.copyOf(kiFelder);
             klassifikationen = klassifikationen == null ? List.of() : List.copyOf(klassifikationen);
+            zusatzFeldTypen = zusatzFeldTypen == null ? Map.of() : Map.copyOf(zusatzFeldTypen);
+        }
+
+        /** Typen der Zusatzfelder aus dem Schema; abgeleitet, nicht Teil des gespeicherten Abbilds. */
+        public Art mitZusatzFeldTypen(Map<String, String> typen) {
+            return new Art(code, name, beschreibung, gruppen, pflichtfelder, zusatzSchema, vertraulichkeit,
+                    aufbewahrung, gesetzlichePflicht, aktiv, selbstAusgestellt, belegnummerMuster, fremdbelegArt,
+                    ohneZahlungsdatenArt, kiVorschlag, kiFelder, kiHinweise, reihenfolge, klassifikationen, typen);
         }
     }
 

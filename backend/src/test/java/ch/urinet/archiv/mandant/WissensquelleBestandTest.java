@@ -44,7 +44,7 @@ class WissensquelleBestandTest {
         anlegenWennFehlt(MANDANT);
         String s = MANDANT.schema();
         String ausSeed = wissensquelle(s);
-        String vorherKonfiguration = wert("select (inhalt - 'version')::text from " + s
+        String vorherKonfiguration = wert("select ((inhalt - 'version') - 'regeln')::text from " + s
                 + ".konfiguration_version order by version desc limit 1");
         // Stand vor 13.2: Konfiguration ohne die Art
         ausfuehren("insert into " + s + ".konfiguration_version (version, wer, grund, quelle, inhalt, sha256) "
@@ -52,7 +52,8 @@ class WissensquelleBestandTest {
                 + "encode(sha256(convert_to(i.inhalt::text, 'UTF8')), 'hex') from " + s + ".konfiguration_version k, "
                 + "lateral (select jsonb_set(k.inhalt, '{version}', to_jsonb(k.version + 1)) || jsonb_build_object("
                 + "'arten', (select coalesce(jsonb_agg(a order by a ->> 'code' collate \"C\"), '[]'::jsonb) "
-                + "from jsonb_array_elements(k.inhalt -> 'arten') a where a ->> 'code' <> 'WISSENSQUELLE')) as inhalt) i "
+                + "from jsonb_array_elements(k.inhalt -> 'arten') a where a ->> 'code' <> 'WISSENSQUELLE')) "
+                + "- 'regeln' as inhalt) i "
                 + "order by k.version desc limit 1");
         bestandOhneWissensquelle(s);
 
