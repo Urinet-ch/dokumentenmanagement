@@ -19,6 +19,7 @@ import org.commonmark.node.Node;
 import org.commonmark.node.Paragraph;
 import org.commonmark.node.SoftLineBreak;
 import org.commonmark.node.Text;
+import org.commonmark.parser.IncludeSourceSpans;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 
@@ -30,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class WissensMarkdown {
 
@@ -38,7 +41,9 @@ public final class WissensMarkdown {
     private static final Set<String> ORDNER = Set.of("quellen", "konzepte", "akteure", "projekte", "analysen");
 
     private static final List<Extension> EXTENSIONS = List.of(FootnotesExtension.create());
-    private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS).build();
+    private static final Pattern FUSSNOTE = Pattern.compile("\\[\\^([^\\s\\[\\]\\\\]+)]");
+    private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS)
+            .includeSourceSpans(IncludeSourceSpans.BLOCKS).build();
     private static final HtmlRenderer RENDERER = HtmlRenderer.builder()
             .extensions(EXTENSIONS)
             .escapeHtml(true)
@@ -72,7 +77,8 @@ public final class WissensMarkdown {
             return Analyse.abgelehnt(false, true);
         }
 
-        Node dokument = PARSER.parse(text);
+        int zeilen = zeilen(text);
+        Node dokument = PARSER.parse(text + fussnotenDefinitionen(text));
         Set<String> links = new TreeSet<>();
         Set<String> fussnoten = new TreeSet<>();
         Set<String> abschnitte = new TreeSet<>();
@@ -91,18 +97,20 @@ public final class WissensMarkdown {
                 ueberschriften.push(ueberschrift.getLevel());
                 abschnittstitel.push(titel);
                 abschnitte.add(titel);
-                untersuchen(kind, false, false, false, false, links, fussnoten, aussagen, merkmale);
+                untersuchen(kind, false, false, false, false, zeilen, links, fussnoten, aussagen, merkmale);
             } else {
                 boolean ausgenommen = abschnittstitel.stream()
                         .anyMatch(WissensMarkdown::abschnittOhneBeleg);
-                untersuchen(kind, false, false, false, ausgenommen, links, fussnoten, aussagen, merkmale);
+                untersuchen(kind, false, false, false, ausgenommen, zeilen, links, fussnoten, aussagen, merkmale);
             }
         }
         if (merkmale.zuTief) {
             return Analyse.abgelehnt(false, true);
         }
+        merkmale.eigeneDefinitionen.forEach(Node::unlink);
         return new Analyse(rendern(dokument), links, fussnoten, abschnitte, aussagen, merkmale.html,
-                merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink, false, false);
+                merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink,
+                !merkmale.eigeneDefinitionen.isEmpty(), false, false);
     }
 
     public static String darstellen(String markdown) {
@@ -117,9 +125,39 @@ public final class WissensMarkdown {
         return RENDERER.render(dokument);
     }
 
+    /**
+     * Requirement 2.6 schreibt Fussnoten als {@code Aussage.[^schluessel]} ohne Definition im Inhalt; die Quelle
+     * steht im Quelleneintrag. commonmark erkennt eine Fussnote aber nur mit Definition, darum wird für jedes
+     * Label eine leere Definition hinter dem Inhalt ergänzt.
+     */
+    private static String fussnotenDefinitionen(String text) {
+        Set<String> labels = new LinkedHashSet<>();
+        Matcher treffer = FUSSNOTE.matcher(text);
+        while (treffer.find()) {
+            labels.add(treffer.group(1));
+        }
+        StringBuilder definitionen = new StringBuilder("\n\n");
+        labels.forEach(label -> definitionen.append("[^").append(label).append("]:\n\n"));
+        return definitionen.toString();
+    }
+
+    private static int zeilen(String text) {
+        int zeilen = 1;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                zeilen++;
+            }
+        }
+        return zeilen;
+    }
+
+    private static boolean ergaenzt(Node definition, int zeilen) {
+        return !definition.getSourceSpans().isEmpty() && definition.getSourceSpans().get(0).getLineIndex() >= zeilen;
+    }
+
     private static void untersuchen(Node wurzel, boolean inListenpunkt, boolean widerspruch,
-                                   boolean inFussnote, boolean aussagenAusgenommen, Set<String> links, Set<String> fussnoten,
-                                   List<Aussage> aussagen, Merkmale merkmale) {
+                                   boolean inFussnote, boolean aussagenAusgenommen, int zeilen, Set<String> links,
+                                   Set<String> fussnoten, List<Aussage> aussagen, Merkmale merkmale) {
         Deque<Besuch> offen = new ArrayDeque<>();
         offen.push(new Besuch(wurzel, 0, inListenpunkt, widerspruch, inFussnote, aussagenAusgenommen));
         while (!offen.isEmpty()) {
@@ -153,6 +191,13 @@ public final class WissensMarkdown {
             if (node instanceof FootnoteReference reference) {
                 fussnoten.add(reference.getLabel());
             }
+            if (node instanceof FootnoteDefinition definition) {
+                if (ergaenzt(definition, zeilen)) {
+                    definition.appendChild(absatz(definition.getLabel()));
+                } else {
+                    merkmale.eigeneDefinitionen.add(definition);
+                }
+            }
             if (node instanceof Text literal && !codeElternteil(node) && literal.getLiteral().contains("[[")) {
                 merkmale.wikilink = true;
             }
@@ -162,6 +207,9 @@ public final class WissensMarkdown {
             } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition
                     && node instanceof ListItem item) {
                 aussagen.add(new Aussage(text(item), fussnotenIn(item)));
+            } else if (!besuch.aussagenAusgenommen() && !blockZitat && !fussnotenDefinition && !listenpunkt
+                    && (node instanceof FencedCodeBlock || node instanceof IndentedCodeBlock)) {
+                aussagen.add(new Aussage(codeText(node), Set.of()));
             }
 
             for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
@@ -188,6 +236,16 @@ public final class WissensMarkdown {
             }
         }
         return Collections.unmodifiableSet(schluessel);
+    }
+
+    private static Paragraph absatz(String label) {
+        Paragraph absatz = new Paragraph();
+        absatz.appendChild(new Text(label));
+        return absatz;
+    }
+
+    private static String codeText(Node node) {
+        return node instanceof FencedCodeBlock code ? code.getLiteral() : ((IndentedCodeBlock) node).getLiteral();
     }
 
     private static boolean codeElternteil(Node node) {
@@ -286,6 +344,13 @@ public final class WissensMarkdown {
             while (cursor < zeilenende && markdown.charAt(cursor) == ' ') {
                 cursor++;
             }
+            if (zaun == 0 && leer(markdown, cursor, zeilenende)) {
+                // Links und Code-Spans reichen nie über eine Leerzeile; offene Klammern davor zählen nicht mehr.
+                klammertiefe = 0;
+                inlineCodeTicks = 0;
+                zeilenanfang = zeilenende + 1;
+                continue;
+            }
             if (istListenanfang(markdown, cursor, zeilenende)
                     && (cursor - zeilenanfang) / 2 > MAX_VERSCHACHTELUNG) {
                 return true;
@@ -351,6 +416,15 @@ public final class WissensMarkdown {
         return false;
     }
 
+    private static boolean leer(String text, int von, int bis) {
+        for (int i = von; i < bis; i++) {
+            if (!Character.isWhitespace(text.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean istListenanfang(String text, int cursor, int ende) {
         if (cursor >= ende) {
             return false;
@@ -376,7 +450,8 @@ public final class WissensMarkdown {
 
     public record Analyse(String html, Set<String> links, Set<String> fussnoten, Set<String> abschnitte,
                           List<Aussage> aussagen, boolean htmlVorhanden, boolean bildVorhanden,
-                          boolean ungueltigerLink, boolean wikilink, boolean zuGross, boolean zuTief) {
+                          boolean ungueltigerLink, boolean wikilink, boolean fussnotenDefinition, boolean zuGross,
+                          boolean zuTief) {
         public Analyse {
             links = Collections.unmodifiableSet(new LinkedHashSet<>(links));
             fussnoten = Collections.unmodifiableSet(new LinkedHashSet<>(fussnoten));
@@ -385,7 +460,7 @@ public final class WissensMarkdown {
         }
 
         private static Analyse abgelehnt(boolean zuGross, boolean zuTief) {
-            return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false,
+            return new Analyse("", Set.of(), Set.of(), Set.of(), List.of(), false, false, false, false, false,
                     zuGross, zuTief);
         }
     }
@@ -400,5 +475,6 @@ public final class WissensMarkdown {
         private boolean ungueltigerLink;
         private boolean wikilink;
         private boolean zuTief;
+        private final List<Node> eigeneDefinitionen = new ArrayList<>();
     }
 }

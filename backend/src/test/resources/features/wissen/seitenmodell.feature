@@ -8,11 +8,23 @@ Funktionalität: Wissensseitenmodell prüfen
     Wenn das Seitenmodell geprüft wird
     Dann ist die Seite annehmbar
 
+  @req-2.1
+  Szenario: Ein Pfad ausserhalb des Typordners wird abgelehnt
+    Angenommen eine neue Konzeptseite im Ordner «akteure»
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «PFAD_UNGUELTIG»
+
   @req-2.2
   Szenario: Eine Seite hat ihre erforderlichen Felder
     Angenommen eine neue Seite mit allen erforderlichen Seitenfeldern
     Wenn das Seitenmodell geprüft wird
     Dann ist die Seite annehmbar
+
+  @req-2.2
+  Szenario: Eine Seite ohne Beschreibung ist nicht annehmbar
+    Angenommen eine neue Seite ohne Beschreibung
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «FELD_FEHLT»
 
   @req-2.3
   Szenario: Die Wissensquellen-Seite verwendet ihren Typordner und Dokumentmonat
@@ -44,6 +56,12 @@ Funktionalität: Wissensseitenmodell prüfen
     Wenn das Seitenmodell geprüft wird
     Dann enthält die Prüfung den Befund «QUELLE_PERSONAL»
 
+  @req-2.7
+  Szenario: Eine Fussnote ohne Quelleneintrag ist nicht annehmbar
+    Angenommen eine Seite mit einer Fussnote ohne Quelleneintrag
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «FUSSNOTE_OHNE_QUELLE»
+
   @req-2.8
   Szenario: Fehlende Pflichtabschnitte werden als Hinweis angezeigt
     Angenommen eine Quellen-Seite ohne Pflichtabschnitte
@@ -51,10 +69,10 @@ Funktionalität: Wissensseitenmodell prüfen
     Dann enthält die Prüfung den Hinweis «ABSCHNITT_FEHLT»
 
   @req-3.5
-  Szenario: Ein normaler Markdown-Link wird als Seitenlink gespeichert
+  Szenario: Ein normaler Markdown-Link wird als Seitenlink extrahiert
     Angenommen Markdown mit einem internen Seitenlink
     Wenn das Seitenmodell geprüft wird
-    Dann wird der Seitenlink «quellen/2026-03-handbuch» gespeichert
+    Dann wird der Seitenlink «quellen/2026-03-handbuch» extrahiert
 
   @req-3.7
   Szenario: Externe Links, Bilder und HTML werden abgelehnt und sicher dargestellt

@@ -70,6 +70,18 @@
                 <artifactId>guava</artifactId>
                 <version>33.7.2-jre</version>
             </dependency>
+            <!-- Tika bringt commonmark samt GFM-Erweiterungen in einer älteren Version mit; alle commonmark-Artefakte
+                 laufen auf derselben Version wie Parser und Fussnoten der Wissensbasis (Review PR #298, Soll 5). -->
+            <dependency>
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark-ext-gfm-tables</artifactId>
+                <version>${commonmark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark-ext-gfm-strikethrough</artifactId>
+                <version>${commonmark.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

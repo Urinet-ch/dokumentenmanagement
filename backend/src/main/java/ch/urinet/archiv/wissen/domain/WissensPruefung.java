@@ -2,7 +2,6 @@ package ch.urinet.archiv.wissen.domain;
 
 import ch.urinet.archiv.gemeinsam.domain.Seitentext;
 
-import java.text.BreakIterator;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -23,6 +22,11 @@ public final class WissensPruefung {
     public static final int AUSZUG_MAX_ZEICHEN = 300;
     public static final int SEITE_MAX_ZEICHEN_STARTWERT = 20_000;
     private static final DateTimeFormatter QUELLENMONAT = DateTimeFormatter.ofPattern("uuuu-MM");
+    private static final Set<String> ABKUERZUNGEN = Set.of("abs", "abt", "allg", "anm", "apr", "art", "aufl",
+            "aug", "ausg", "bd", "bspw", "bzw", "ca", "dez", "dr", "etc", "evtl", "exkl", "feb", "ff", "fr", "gem", "ggf",
+            "hr", "hrn", "hrsg", "inkl", "jan", "jh", "jul", "jun", "kap", "lit", "max", "min", "mio", "mrd", "mt",
+            "mär", "nov", "nr", "okt", "prof", "resp", "sep", "sept", "sog", "st", "std", "stk", "str", "tel",
+            "usw", "vgl", "ziff", "zit", "zzgl");
 
     private WissensPruefung() {
     }
@@ -61,6 +65,11 @@ public final class WissensPruefung {
             befunde.add(new Befund(Code.LINK_UNGUELTIG,
                     "Externe Links, Bilder, HTML und Wikilinks sind nicht zulässig."));
         }
+        if (markdown.fussnotenDefinition()) {
+            befunde.add(new Befund(Code.FUSSNOTE_DEFINITION,
+                    "Fussnoten-Definitionen «[^…]: …» sind im Inhalt nicht zulässig; die Quelle gehört in den "
+                            + "Quelleneintrag."));
+        }
 
         pruefeQuellen(seite, kontext, befunde);
         for (String fussnote : markdown.fussnoten()) {
@@ -71,7 +80,7 @@ public final class WissensPruefung {
         }
         if (markdown.aussagen().stream().anyMatch(aussage -> aussage.fussnoten().isEmpty())) {
             befunde.add(new Befund(Code.AUSSAGE_OHNE_BELEG,
-                    "Mindestens ein Absatz oder Listenpunkt hat keine Fussnote."));
+                    "Mindestens ein Absatz, Listenpunkt oder Codeblock hat keine Fussnote."));
         }
         if (kontext.ingest() && !kontext.veralten()
                 && Collections.disjoint(markdown.fussnoten(), kontext.kernaussagenSchluessel())) {
@@ -89,18 +98,30 @@ public final class WissensPruefung {
         }
 
         pruefeAbschnitte(seite, markdown, hinweise);
-        if ("ueberblick".equals(seite.pfad()) && seite.vertraulichkeit() != null
-                && seite.vertraulichkeit() != Wissensseite.Vertraulichkeit.NORMAL) {
+        Wissensseite.Vertraulichkeit wirksam = wirksam(seite, kontext);
+        if ("ueberblick".equals(seite.pfad())
+                && (kontext.wirksameVertraulichkeit() == null || wirksam != Wissensseite.Vertraulichkeit.NORMAL)) {
             befunde.add(new Befund(Code.STUFE_UEBERBLICK,
-                    "Die Seite «ueberblick» muss die Vertraulichkeit NORMAL behalten."));
+                    "Die Seite «ueberblick» muss die wirksame Vertraulichkeit NORMAL behalten."));
         }
-        if (kontext.bisherigeVertraulichkeit() != null && seite.vertraulichkeit() != null
-                && rang(seite.vertraulichkeit()) > rang(kontext.bisherigeVertraulichkeit())) {
+        if (kontext.bisherigeVertraulichkeit() != null && wirksam != null
+                && rang(wirksam) > rang(kontext.bisherigeVertraulichkeit())) {
             hinweise.add(new Hinweis(Hinweiscode.STUFE_STEIGT,
                     "Die Annahme erhöht die Vertraulichkeit der Seite dauerhaft."));
         }
 
         return new Ergebnis(befunde, hinweise, markdown.links());
+    }
+
+    private static Wissensseite.Vertraulichkeit wirksam(Wissensseite seite, Kontext kontext) {
+        if (seite.vertraulichkeit() == null) {
+            return kontext.wirksameVertraulichkeit();
+        }
+        if (kontext.wirksameVertraulichkeit() == null) {
+            return seite.vertraulichkeit();
+        }
+        return rang(seite.vertraulichkeit()) >= rang(kontext.wirksameVertraulichkeit())
+                ? seite.vertraulichkeit() : kontext.wirksameVertraulichkeit();
     }
 
     private static void pruefePfad(Wissensseite seite, Kontext kontext, List<Befund> befunde,
@@ -243,7 +264,7 @@ public final class WissensPruefung {
     }
 
     private static String normalisieren(String text) {
-        String normalisiert = Normalizer.normalize(text, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+        String normalisiert = Normalizer.normalize(text, Normalizer.Form.NFKC);
         StringBuilder ergebnis = new StringBuilder(normalisiert.length());
         boolean leerraum = true;
         for (int i = 0; i < normalisiert.length(); i++) {
@@ -300,17 +321,43 @@ public final class WissensPruefung {
         if (!textGueltig(beschreibung) || zeichen(beschreibung) > BESCHREIBUNG_MAX_ZEICHEN) {
             return false;
         }
-        String text = beschreibung.strip();
-        BreakIterator saetze = BreakIterator.getSentenceInstance(Locale.forLanguageTag("de-CH"));
-        saetze.setText(text);
-        int anzahl = 0;
-        for (int start = saetze.first(), ende = saetze.next(); ende != BreakIterator.DONE;
-             start = ende, ende = saetze.next()) {
-            if (!text.substring(start, ende).isBlank()) {
-                anzahl++;
+        return einSatz(beschreibung.strip());
+    }
+
+    /**
+     * Ein Satzende ist «!» oder «?» mit weiterem Text dahinter, oder ein Punkt mit Leerraum und Grossbuchstaben
+     * dahinter, ausser nach einer Zahl, einem einzelnen Buchstaben («z. B.») oder einer bekannten Abkürzung.
+     */
+    private static boolean einSatz(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char zeichen = text.charAt(i);
+            if (zeichen != '.' && zeichen != '!' && zeichen != '?') {
+                continue;
+            }
+            int weiter = i + 1;
+            while (weiter < text.length() && Character.isWhitespace(text.charAt(weiter))) {
+                weiter++;
+            }
+            if (weiter == i + 1 || weiter >= text.length()) {
+                continue;
+            }
+            if (zeichen != '.') {
+                return false;
+            }
+            if (!Character.isUpperCase(text.codePointAt(weiter))) {
+                continue;
+            }
+            int anfang = i;
+            while (anfang > 0 && Character.isLetterOrDigit(text.charAt(anfang - 1))) {
+                anfang--;
+            }
+            String wort = text.substring(anfang, i);
+            if (wort.length() != 1 && !wort.chars().allMatch(Character::isDigit)
+                    && !ABKUERZUNGEN.contains(wort.toLowerCase(Locale.ROOT))) {
+                return false;
             }
         }
-        return anzahl == 1;
+        return true;
     }
 
     private static boolean kebab(String wert) {
@@ -347,6 +394,7 @@ public final class WissensPruefung {
         SCHLAGWORT_UNGUELTIG,
         PFAD_UNGUELTIG,
         FUSSNOTE_OHNE_QUELLE,
+        FUSSNOTE_DEFINITION,
         AUSSAGE_OHNE_BELEG,
         QUELLE_UNGUELTIG,
         SEITE_FEHLT,
@@ -395,7 +443,8 @@ public final class WissensPruefung {
                           Map<UUID, DokumentQuelle> dokumente, Set<UUID> seitenIds,
                           Set<String> basisQuellenSchluessel, Set<String> entfernteAussagen,
                           Set<String> kernaussagenSchluessel, boolean ingest, boolean veralten,
-                          boolean pfadHoehereStufe, Wissensseite.Vertraulichkeit bisherigeVertraulichkeit) {
+                          boolean pfadHoehereStufe, Wissensseite.Vertraulichkeit bisherigeVertraulichkeit,
+                          Wissensseite.Vertraulichkeit wirksameVertraulichkeit) {
 
         public Kontext {
             if (maxZeichen < 1) {
@@ -411,7 +460,7 @@ public final class WissensPruefung {
 
         public static Kontext leer() {
             return new Kontext(SEITE_MAX_ZEICHEN_STARTWERT, null, Set.of(), Map.of(), Set.of(), Set.of(),
-                    Set.of(), Set.of(), false, false, false, null);
+                    Set.of(), Set.of(), false, false, false, null, null);
         }
     }
 }

@@ -39,6 +39,26 @@ public class WissensseiteSchritte {
         seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT, "", List.of(), null);
     }
 
+    @Angenommen("eine neue Konzeptseite im Ordner «akteure»")
+    public void konzeptseiteImFalschenOrdner() {
+        seite = seite("akteure/aufbewahrung", Seitentyp.KONZEPT, "", List.of(), null);
+    }
+
+    @Angenommen("eine neue Seite ohne Beschreibung")
+    public void ohneBeschreibung() {
+        Wissensseite basis = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT, "", List.of(), null);
+        seite = new Wissensseite(null, basis.pfad(), basis.typ(), basis.titel(), " ", basis.tags(), basis.status(),
+                null, basis.quellen(), basis.vertraulichkeit(), basis.inhalt(), 1, basis.erzeugtVon(), null,
+                basis.freigegebenVon(), null, false, false, null);
+    }
+
+    @Angenommen("eine Seite mit einer Fussnote ohne Quelleneintrag")
+    public void fussnoteOhneQuelle() {
+        seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT, "Aussage.[^q1] Weitere.[^q-fehlt]",
+                quelleneintrag(), null);
+        kontext = kontextMitDokument(false);
+    }
+
     @Angenommen("eine Wissensquellen-Seite mit passendem Monatsordner")
     public void quellenSeite() {
         seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,
@@ -54,7 +74,7 @@ public class WissensseiteSchritte {
     @Angenommen("eine Seite mit einer PDF-Quelle auf Seite 2 von 2")
     public void pdfQuelleMitSeitenangabe() {
         seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT,
-                "Aussage.[^q1]\n\n[^q1]: Quelle",
+                "Aussage.[^q1]",
                 List.of(new Quelleneintrag("q1", DOKUMENT, 2, 2, "Wörtlicher Auszug", null)), null);
         kontext = kontextMitDokument(false);
     }
@@ -68,7 +88,7 @@ public class WissensseiteSchritte {
     public void personalQuelle() {
         seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,
                 "## Zusammenfassung\nKurz.[^q1]\n## Kernaussagen\nFakt.[^q1]\n"
-                        + "## Berührte Seiten\n- Konzept\n\n[^q1]: Quelle",
+                        + "## Berührte Seiten\n- Konzept",
                 quelleneintrag(), DOKUMENT);
         kontext = kontextMitDokument(true);
     }
@@ -82,7 +102,7 @@ public class WissensseiteSchritte {
     @Angenommen("Markdown mit einem internen Seitenlink")
     public void internerSeitenlink() {
         seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT,
-                "Siehe [Quelle](/quellen/2026-03-handbuch).[^q1]\n\n[^q1]: Quelle",
+                "Siehe [Quelle](/quellen/2026-03-handbuch).[^q1]",
                 quelleneintrag(), null);
         kontext = kontextMitDokument(false);
     }
@@ -116,8 +136,8 @@ public class WissensseiteSchritte {
                 .contains(WissensPruefung.Hinweiscode.valueOf(code));
     }
 
-    @Dann("wird der Seitenlink «{word}» gespeichert")
-    public void linkGespeichert(String pfad) {
+    @Dann("wird der Seitenlink «{word}» extrahiert")
+    public void linkExtrahiert(String pfad) {
         assertThat(ergebnis.links()).contains(pfad);
     }
 
@@ -142,6 +162,6 @@ public class WissensseiteSchritte {
         WissensPruefung.DokumentQuelle quelle = new WissensPruefung.DokumentQuelle(true, true, personal, 2,
                 LocalDate.of(2026, 3, 5), Optional.of(PDF));
         return new WissensPruefung.Kontext(20_000, null, Set.of(), Map.of(DOKUMENT, quelle), Set.of(QUELLSEITE),
-                Set.of(), Set.of(), Set.of(), false, false, false, null);
+                Set.of(), Set.of(), Set.of(), false, false, false, null, null);
     }
 }

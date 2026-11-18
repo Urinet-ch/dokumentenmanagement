@@ -69,13 +69,14 @@ flowchart LR
 | `SCHLAGWORT_UNGUELTIG` | Schlagwort ist nicht kleingeschriebenes kebab-case |
 | `PFAD_UNGUELTIG` | `ueberblick` oder `<ordner>/<name>` mit Name `[a-z0-9]+(-[a-z0-9]+)*`, Ordner passt zum Typ, Name nicht `index`/`log`, bei `NEU` nicht vergeben (auch nicht von einer für den Kontext unsichtbaren Seite) |
 | `FUSSNOTE_OHNE_QUELLE` | Label ohne Quelleneintrag |
-| `AUSSAGE_OHNE_BELEG` | Absatz oder Listenpunkt ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
+| `FUSSNOTE_DEFINITION` | Fussnoten-Definition `[^label]: …` im Inhalt; die Quelle steht nur im Quelleneintrag (Umsetzung 13.4) |
+| `AUSSAGE_OHNE_BELEG` | Absatz, Listenpunkt oder Codeblock ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
 | `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben |
 | `SEITE_FEHLT` | Dokumentquelle ohne PDF-Seite (z. B. aus einem Analyse-Vorschlag, Requirement 12.4) |
 | `QUELLE_PERSONAL` | Dokument einer Quelle hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
 | `STUFE_UEBERBLICK` | Änderung an `ueberblick` mit wirksamer Vertraulichkeit über `NORMAL` (Requirement 11.8) |
-| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum und Silbentrennung normalisiert) nicht auf der angegebenen PDF-Seite vor |
+| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum, Silbentrennung und Unicode NFKC normalisiert, Gross-/Kleinschreibung unverändert) nicht auf der angegebenen PDF-Seite vor |
 | `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]` |
 | `AUSSAGE_ENTFERNT` | Quellenschlüssel der Basisversion fehlt in der neuen Fassung und nicht unter «entfernte Aussagen» (ein Grund nach Requirement 7.3 gilt als Begründung) |
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
@@ -100,6 +101,30 @@ flowchart LR
   200'000 Zeichen und maximal 64 Verschachtelungsebenen; zusätzlich gilt der konfigurierte Seitenhöchstwert.
 - `WissensPruefung` erhält Dokument- und Seitenreferenzen sowie Basisversion und Ingest-Kontext als Eingabe. Sie bleibt
   deterministisch und framework-frei; PDF-Seiten und Auszüge werden über `Seitentext` geprüft.
+- Nachbesserung Review PR #298:
+  - Fussnoten stehen im Inhalt nur als Verweis `[^label]` (Format von Requirement 2.7). Damit commonmark-java auch
+    ohne Definition einen Fussnotenverweis erkennt, hängt `WissensMarkdown` vor dem Parsen je Label eine
+    synthetische, leere Definition an; die Darstellung zeigt dort nur das Label, die Quellenliste kommt aus den
+    Quelleneinträgen. Jedes Label mit Verweis zählt, auch neben bekannten Labels und in Widerspruchsblöcken.
+    Definitionen im Inhalt selbst sind ein Befund `FUSSNOTE_DEFINITION` und werden nicht dargestellt, damit kein
+    unbelegter Text über eine Fussnote in die Seite kommt. Labels werden wie geschrieben verglichen.
+  - Fenced und eingerückte Codeblöcke ausserhalb von Listenpunkten, Widerspruchsblöcken und den ausgenommenen
+    Abschnitten zählen als Aussage; ohne Fussnote gilt `AUSSAGE_OHNE_BELEG`.
+  - Die Beschreibung ist «ein Satz», wenn kein `!` oder `?` mit Folgetext und kein Punkt mit Leerraum und folgendem
+    Grossbuchstaben vorkommt; ausgenommen sind Punkte nach Zahlen, Einzelbuchstaben (z. B. «z. B.») und einer
+    festen Liste deutscher Abkürzungen («Art.», «gem.», «Hrn.», «Jan.», …). `BreakIterator` entfällt, weil es
+    Abkürzungen als Satzende wertete.
+  - Die Auszugsprüfung bleibt case-sensitiv (wörtlicher Auszug nach Requirement 2.7); normalisiert werden nur
+    Leerraum, Silbentrennung und Unicode NFKC.
+  - Die wirksame Vertraulichkeit nach Annahme berechnet die Anwendungsschicht (Aufgabe 13.5, inkl. Quellen und
+    Annahme-Vorschlägen) und übergibt sie als `Kontext.wirksameVertraulichkeit`; die Prüfung nimmt das Maximum aus
+    Seitenstufe und diesem Wert. Für `ueberblick` gilt `STUFE_UEBERBLICK`, wenn die wirksame Stufe über `NORMAL`
+    liegt oder nicht übergeben wurde (fail closed); `STUFE_STEIGT` vergleicht dieselbe wirksame Stufe.
+  - Offene Klammern zählen nur innerhalb eines Absatzes zur Verschachtelung; eine Leerzeile setzt Klammer- und
+    Inline-Code-Zähler zurück.
+  - Tika bringt `commonmark` mit `commonmark-ext-gfm-tables` und `-strikethrough` in Version `0.31.0` mit;
+    `dependencyManagement` hebt alle commonmark-Artefakte auf `${commonmark.version}` (`0.32.0`), damit keine
+    gemischten Versionen auf dem Klassenpfad liegen.
 - Die allgemeine ArchUnit-Regel für framework-freie Domain-Typen bleibt bestehen; nur `WissensMarkdown` und seine
   inneren Typen dürfen zusätzlich von `org.commonmark` abhängen. Eine eigene ArchUnit-Regel hält diese Ausnahme eng.
 
