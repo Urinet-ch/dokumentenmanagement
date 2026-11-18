@@ -50,6 +50,18 @@ Funktionalität: Wissensseitenmodell prüfen
     Wenn das Seitenmodell geprüft wird
     Dann enthält die Prüfung den Befund «AUSSAGE_OHNE_BELEG»
 
+  @req-2.6
+  Szenario: Ein Widerspruchsblock ohne die Quellen beider Aussagen ist nicht annehmbar
+    Angenommen eine Seite mit einem Widerspruchsblock ohne Fussnoten
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «AUSSAGE_OHNE_BELEG»
+
+  @req-2.6
+  Szenario: Ein Widerspruchsblock mit den Quellen beider Aussagen ist annehmbar
+    Angenommen eine Seite mit einem Widerspruchsblock mit Fussnoten auf zwei Quellen
+    Wenn das Seitenmodell geprüft wird
+    Dann ist die Seite annehmbar
+
   @req-2.7
   Szenario: Ein PERSONAL-Dokument ist keine Wissensquelle
     Angenommen eine Seite mit einer PERSONAL-Dokumentquelle
@@ -80,3 +92,9 @@ Funktionalität: Wissensseitenmodell prüfen
     Wenn das Seitenmodell geprüft wird
     Dann enthält die Prüfung den Befund «LINK_UNGUELTIG»
     Und wird HTML sicher dargestellt
+
+  @req-3.5 @req-3.7
+  Szenario: Link-Referenzdefinitionen und Referenzlinks werden gemeldet
+    Angenommen Markdown mit einem Referenzlink und einer Link-Referenzdefinition auf eine externe Adresse
+    Wenn das Seitenmodell geprüft wird
+    Dann enthält die Prüfung den Befund «LINK_UNGUELTIG»

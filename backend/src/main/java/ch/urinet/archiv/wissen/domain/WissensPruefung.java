@@ -63,7 +63,8 @@ public final class WissensPruefung {
         if (markdown.htmlVorhanden() || markdown.bildVorhanden() || markdown.ungueltigerLink()
                 || markdown.wikilink()) {
             befunde.add(new Befund(Code.LINK_UNGUELTIG,
-                    "Externe Links, Bilder, HTML und Wikilinks sind nicht zulässig."));
+                    "Externe Links, Bilder, HTML, Wikilinks und Link-Referenzen «[x]: …» sind nicht zulässig; "
+                            + "Seiten verlinken nur mit «[Titel](/pfad)»."));
         }
         if (markdown.fussnotenDefinition()) {
             befunde.add(new Befund(Code.FUSSNOTE_DEFINITION,

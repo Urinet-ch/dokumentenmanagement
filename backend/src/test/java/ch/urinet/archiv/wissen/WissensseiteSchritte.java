@@ -84,6 +84,30 @@ public class WissensseiteSchritte {
         seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT, "Eine unbelegte Aussage.", List.of(), null);
     }
 
+    @Angenommen("eine Seite mit einem Widerspruchsblock ohne Fussnoten")
+    public void widerspruchsblockOhneFussnoten() {
+        seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT,
+                "## Thema\n\n> ⚠️ Widerspruch: Erfundene Behauptung.\n>\n> Noch eine.\n", List.of(), null);
+    }
+
+    @Angenommen("eine Seite mit einem Widerspruchsblock mit Fussnoten auf zwei Quellen")
+    public void widerspruchsblockMitZweiQuellen() {
+        seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT,
+                "Fakt.[^q1]\n\n> ⚠️ Widerspruch: Die Angaben unterscheiden sich.\n>\n"
+                        + "> Quelle eins nennt zehn Jahre.[^q1]\n>\n> Quelle zwei nennt elf Jahre.[^q2]\n",
+                List.of(new Quelleneintrag("q1", DOKUMENT, 1, null, null, null),
+                        new Quelleneintrag("q2", DOKUMENT, 2, null, null, null)), null);
+        kontext = kontextMitDokument(false);
+    }
+
+    @Angenommen("Markdown mit einem Referenzlink und einer Link-Referenzdefinition auf eine externe Adresse")
+    public void linkReferenzdefinition() {
+        seite = seite("konzepte/aufbewahrung", Seitentyp.KONZEPT,
+                "Siehe [Konzept][k].[^q1]\n\n[k]: /konzepte/a\n[x]: https://example.invalid \"Unsichtbar\"",
+                quelleneintrag(), null);
+        kontext = kontextMitDokument(false);
+    }
+
     @Angenommen("eine Seite mit einer PERSONAL-Dokumentquelle")
     public void personalQuelle() {
         seite = seite("quellen/2026-03-handbuch", Seitentyp.QUELLE,

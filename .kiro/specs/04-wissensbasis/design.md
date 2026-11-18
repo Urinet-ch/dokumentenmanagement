@@ -77,7 +77,7 @@ flowchart LR
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
 | `STUFE_UEBERBLICK` | Änderung an `ueberblick` mit wirksamer Vertraulichkeit über `NORMAL` (Requirement 11.8) |
 | `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum, Silbentrennung und Unicode NFKC normalisiert, Gross-/Kleinschreibung unverändert) nicht auf der angegebenen PDF-Seite vor |
-| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]` |
+| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]`, Link-Referenzdefinition `[x]: …` (auch unbenutzt) und damit jeder Referenzlink (Umsetzung 13.4) |
 | `AUSSAGE_ENTFERNT` | Quellenschlüssel der Basisversion fehlt in der neuen Fassung und nicht unter «entfernte Aussagen» (ein Grund nach Requirement 7.3 gilt als Begründung) |
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
 | `MARKDOWN_ZU_TIEF` | Markdown überschreitet die feste Grenze von 64 Verschachtelungsebenen |
@@ -126,6 +126,14 @@ flowchart LR
     Annahme-Vorschlägen) und übergibt sie als `Kontext.wirksameVertraulichkeit`; die Prüfung nimmt das Maximum aus
     Seitenstufe und diesem Wert. Für `ueberblick` gilt `STUFE_UEBERBLICK`, wenn die wirksame Stufe über `NORMAL`
     liegt oder nicht übergeben wurde (fail closed); `STUFE_STEIGT` vergleicht dieselbe wirksame Stufe.
+  - Ein Blockzitat mit der Marke «⚠️ Widerspruch:» gilt nur dann als Widerspruchsblock (und ist von der
+    Belegpflicht ausgenommen), wenn es Fussnoten auf mindestens zwei verschiedene Labels enthält (Glossar: «mit den
+    Quellen beider Aussagen», Requirement 7.1); sonst zählen seine Absätze, Listenpunkte und Codeblöcke als Aussagen
+    nach Requirement 2.6 (Nachbesserung Review PR #298, Kopf 197a8883).
+  - Link-Referenzdefinitionen `[x]: ziel "Titel"` sind ein Befund `LINK_UNGUELTIG`, auch unbenutzt: Requirement 3.5
+    erlaubt nur `[Titel](/pfad)`, und eine Definition trägt sonst externe Ziele (Requirement 3.7) oder unsichtbaren,
+    unbelegten Titeltext in den gespeicherten Inhalt (Suche, Chunks). Damit ist auch jeder Referenzlink
+    (`[Titel][k]`, `[k][]`, `[k]`) ein Befund (Nachbesserung Review PR #298, Kopf 197a8883).
   - Offene Klammern zählen nur innerhalb eines Absatzes zur Verschachtelung; eine Leerzeile setzt Klammer- und
     Inline-Code-Zähler zurück.
   - Tika bringt `commonmark` mit `commonmark-ext-gfm-tables` und `-strikethrough` in Version `0.31.0` mit;

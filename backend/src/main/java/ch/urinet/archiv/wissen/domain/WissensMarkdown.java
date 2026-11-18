@@ -14,6 +14,7 @@ import org.commonmark.node.HtmlInline;
 import org.commonmark.node.Image;
 import org.commonmark.node.IndentedCodeBlock;
 import org.commonmark.node.Link;
+import org.commonmark.node.LinkReferenceDefinition;
 import org.commonmark.node.ListItem;
 import org.commonmark.node.Node;
 import org.commonmark.node.Paragraph;
@@ -171,6 +172,10 @@ public final class WissensMarkdown {
             if (node instanceof Image) {
                 merkmale.bild = true;
             }
+            if (node instanceof LinkReferenceDefinition) {
+                // Requirement 3.5 erlaubt nur «[Titel](/pfad)»; Definitionen tragen sonst unsichtbaren Text und Ziele.
+                merkmale.ungueltigerLink = true;
+            }
             if (node instanceof Link link) {
                 String pfad = internerPfad(link.getDestination());
                 if (pfad == null) {
@@ -255,14 +260,35 @@ public final class WissensMarkdown {
         return false;
     }
 
+    /**
+     * Ein Widerspruchsblock ist nach dem Glossar von Spec 04 ein markierter Abschnitt «mit den Quellen beider
+     * Aussagen»: Nur ein Blockzitat mit der Marke und Fussnoten auf mindestens zwei verschiedene Labels ist von der
+     * Belegpflicht ausgenommen; sonst zählen seine Absätze und Listenpunkte als Aussagen.
+     */
     private static boolean widerspruchsblock(BlockQuote blockQuote) {
         for (Node kind = blockQuote.getFirstChild(); kind != null; kind = kind.getNext()) {
             String inhalt = text(kind).stripLeading();
             if (!inhalt.isBlank()) {
-                return inhalt.startsWith("⚠️ Widerspruch:");
+                return inhalt.startsWith("⚠️ Widerspruch:") && alleFussnotenIn(blockQuote).size() >= 2;
             }
         }
         return false;
+    }
+
+    private static Set<String> alleFussnotenIn(Node wurzel) {
+        Set<String> schluessel = new LinkedHashSet<>();
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(wurzel);
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            if (node instanceof FootnoteReference reference) {
+                schluessel.add(reference.getLabel());
+            }
+            for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
+                offen.push(kind);
+            }
+        }
+        return schluessel;
     }
 
     private static boolean abschnittOhneBeleg(String titel) {

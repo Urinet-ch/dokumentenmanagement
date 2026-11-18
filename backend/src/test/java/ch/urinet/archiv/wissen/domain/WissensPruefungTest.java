@@ -331,6 +331,55 @@ class WissensPruefungTest {
                 .contains(WissensPruefung.Hinweiscode.STUFE_STEIGT);
     }
 
+    @Test
+    void widerspruchsblockBrauchtFussnotenAufZweiQuellen() {
+        List<Quelleneintrag> quellen = List.of(new Quelleneintrag("q-a", DOKUMENT, 1, null, null, null),
+                new Quelleneintrag("q-b", DOKUMENT, 2, null, null, null));
+        Wissensseite ohneQuelle = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "## Thema\n\n> ⚠️ Widerspruch: Erfundene Behauptung.\n>\n> Noch eine.\n>\n> - Liste ohne Beleg\n",
+                List.of());
+        Wissensseite nurMarke = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "> ⚠️ Widerspruch:\n>\n> Erfundener Absatz.\n", List.of());
+        Wissensseite eineQuelle = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "> ⚠️ Widerspruch: Frist 31. März.[^q-a]\n>\n> Frist 30. April.[^q-a]\n>\n> Unbelegt.\n", quellen);
+        Wissensseite zweiQuellen = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "Fakt.[^q-a]\n\n> ⚠️ Widerspruch: Die Angaben zur Frist unterscheiden sich.\n>\n"
+                        + "> - Quelle A nennt den 31. März.[^q-a]\n> - Quelle B nennt den 30. April.[^q-b]\n",
+                quellen);
+
+        assertThat(codes(pruefen(ohneQuelle, WissensPruefung.Kontext.leer())))
+                .containsExactly(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+        assertThat(codes(pruefen(nurMarke, WissensPruefung.Kontext.leer())))
+                .containsExactly(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+        assertThat(codes(pruefen(eineQuelle, kontextMitDokument(false))))
+                .containsExactly(WissensPruefung.Code.AUSSAGE_OHNE_BELEG);
+        assertThat(codes(pruefen(zweiQuellen, kontextMitDokument(false)))).isEmpty();
+    }
+
+    @Test
+    void linkReferenzdefinitionenUndReferenzlinksWerdenGemeldet() {
+        List<Quelleneintrag> quelle = List.of(new Quelleneintrag("q1", DOKUMENT, 1, null, null, null));
+        List<String> inhalte = List.of(
+                "Fakt.[^q1]\n\n[x]: https://evil.example",
+                "Fakt.[^q1]\n\n[x]: mailto:a@b.ch",
+                "Fakt.[^q1]\n\n[bild]: https://evil.example/a.png",
+                "Fakt.[^q1]\n\n[x]: /konzepte/a \"Die Prämie beträgt CHF 0\"",
+                "Fakt.[^q1]\n\n[^q1\n]: Unbelegt",
+                "[x]: /konzepte/a \"Unsichtbar\"\n[y]: /konzepte/b",
+                "Siehe [Konzept][k].[^q1]\n\n[k]: /konzepte/a",
+                "Siehe [k][].[^q1]\n\n[k]: /konzepte/a",
+                "Siehe [k].[^q1]\n\n- Punkt.[^q1]\n\n  [k]: /konzepte/a");
+
+        for (String inhalt : inhalte) {
+            Wissensseite seite = seite("konzepte/frist", Seitentyp.KONZEPT, inhalt, quelle);
+            assertThat(codes(pruefen(seite, kontextMitDokument(false)))).as(inhalt)
+                    .contains(WissensPruefung.Code.LINK_UNGUELTIG);
+        }
+        Wissensseite normal = seite("konzepte/frist", Seitentyp.KONZEPT,
+                "Siehe [Konzept](/konzepte/a).[^q1]", quelle);
+        assertThat(codes(pruefen(normal, kontextMitDokument(false)))).isEmpty();
+    }
+
     private static WissensPruefung.Kontext stufenKontext(Wissensseite.Vertraulichkeit wirksam) {
         return new WissensPruefung.Kontext(20_000, null, Set.of(), Map.of(), Set.of(QUELLSEITE), Set.of(),
                 Set.of(), Set.of(), false, false, false, Wissensseite.Vertraulichkeit.NORMAL, wirksam);
