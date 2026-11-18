@@ -16,7 +16,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Wenn «treuhaender-urinet» den Ingest für «BELEG» startet
     Dann antwortet der Ingest-Endpunkt mit Status 403
 
-  @req-5.3 @req-5.8 @req-13.7
+  @req-5.3 @req-5.8 @req-13.3 @req-13.7
   Szenario: Alle vier Ingest-Teilaufträge erstellen einen Entwurf
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
@@ -40,6 +40,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
   Szenario: Eine Personalunterlage erreicht die KI nicht
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «PERSONAL» der Art «WISSENSQUELLE»
     Und das Dokument «PERSONAL» hat Seitentext und eine PDF/A-Fassung
+    Und das Dokument «PERSONAL» enthält synthetische Personendaten
     Und das Dokument «PERSONAL» hat Vertraulichkeit «PERSONAL»
     Und WireMock ist zurückgesetzt
     Wenn «inhaber-urinet» den Ingest für «PERSONAL» startet
@@ -66,7 +67,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Dann antwortet der Ingest-Endpunkt mit Status 202
     Und der Ingest-Entwurf ist mit einem KI-Aufruf «OFFEN» und unvollständig
 
-  @req-5.3 @req-5.8 @req-13.8
+  @req-5.3 @req-5.8 @req-11.6 @req-13.8
   Szenario: Eine Prompt-Injection im Dokumenttext ändert weder Regeln noch Freigabe
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
     Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
@@ -78,6 +79,69 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
     Und mindestens eine Entwurfsänderung hat einen Befund
     Und die KI erhält die Schutzregel und die Anweisung nur als Dokumenttext
+
+  @req-5.4
+  Szenario: Ein grosser Index wird auf höchstens 40 passende Zeilen eingegrenzt
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» enthält mehr als 40 passende Seiten
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten für alle vier Ingest-Schritte
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die Planung übergibt höchstens 40 Indexzeilen
+
+  @req-5.5
+  Szenario: Eine normale Quelle sieht keine Seiten höherer Vertraulichkeit
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis enthält eine Seite «konzepte/normale-probe» mit Stufe «NORMAL» und Marker «NORMAL_SEITE_MARKER»
+    Und die Wissensbasis enthält eine Seite «konzepte/interne-probe» mit Stufe «INTERN» und Marker «INTERN_SEITE_MARKER»
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten für alle vier Ingest-Schritte
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die KI erhält den Marker «NORMAL_SEITE_MARKER» und nicht «INTERN_SEITE_MARKER»
+
+  @req-5.9 @req-13.8
+  Szenario: Eine ungültige Planung nach der Nachfrage schliesst den Ingest mit Fehler ab
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert nach der Nachfrage eine ungültige Planung
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest endet nach einer ungültigen Planung mit «FEHLER»
+
+  @req-5.11 @req-11.7
+  Szenario: Eine interne Quelle liest den Überblick nicht und stuft den Entwurf intern ein
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «INTERN» und 2 Seiten
+    Und das Dokument «QUELLE» hat ein Belegdatum
+    Und die Wissensbasis enthält eine Seite «ueberblick» mit Stufe «NORMAL» und Marker «UEBERBLICK_MARKER»
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten ohne Überblicksschritt
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit drei KI-Aufrufen «OFFEN»
+    Und die KI erhält den Marker «UEBERBLICK_MARKER» nicht
+    Und hat der Ingest keine Änderung für den Pfad «ueberblick»
+    Und der Ingest-Hinweis enthält den Text "Überblick nicht aktualisiert"
+    Und die Änderung hat die Kontextstufe «INTERN»
+
+  @req-5.12
+  Szenario: Eine geplante Seite gibt keinen Inhalt einer unsichtbaren höheren Seite preis
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensbasis enthält eine Seite «konzepte/interner-pfad» mit Stufe «INTERN» und Marker «GEHEIMER_SEITENINHALT»
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock plant die Seite «konzepte/interner-pfad»
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und die KI erhält den Marker «GEHEIMER_SEITENINHALT» nicht
+    Und die Änderung hat den Befund «PFAD_UNGUELTIG» und Hinweis «HOEHERE_STUFE_VORHANDEN»
 
   @req-5.13 @req-13.7
   Szenario: Ein zweiter Ingest wartet auf den Abschluss der ersten Wissensquelle
@@ -133,7 +197,7 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Dann antwortet der Ingest-Endpunkt mit Status 400 und Fehlercode «ANFRAGE_UNGUELTIG»
     Und hat «QUELLE» keinen neuen Ingest-Entwurf
 
-  @req-5.2 @req-5.8
+  @req-5.2 @req-5.8 @req-14.3
   Szenario: Ein zulässiger Start reiht einen Ingest-Auftrag ein und wird protokolliert
     Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «NORMAL» und 3 Seiten
     Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens

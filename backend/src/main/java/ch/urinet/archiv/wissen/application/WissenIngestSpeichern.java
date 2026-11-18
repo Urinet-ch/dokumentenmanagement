@@ -95,14 +95,16 @@ public class WissenIngestSpeichern {
     public List<SeitenMetadaten> indexLaden(UUID entwurfId, String suchtext) {
         Stand stand = laden(entwurfId, Set.of()).orElseThrow(
                 () -> new IllegalStateException("Ingest-Entwurf nicht gefunden"));
-        List<SeitenMetadaten> sichtbar = sichtbareSeiten(stand);
+        List<SeitenMetadaten> sichtbar = sichtbareSeiten(stand).stream()
+                .filter(seite -> stand.quellStufe() != WissensStufe.INTERN || !"ueberblick".equals(seite.pfad()))
+                .toList();
         Set<UUID> ids = sichtbar.stream().map(SeitenMetadaten::id)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         int maxZeichen = konfiguration.ingest().indexMaxZeichen();
         List<SeitenMetadaten> index = sichtbar;
         if (index.stream().mapToInt(WissenIngestSpeichern::indexZeichen).sum() > maxZeichen) {
             index = port.seitenIndexLaden(ids, suchtext).stream()
-                    .filter(seite -> ids.contains(seite.id())).toList();
+                    .filter(seite -> ids.contains(seite.id())).limit(40).toList();
         }
         List<SeitenMetadaten> begrenzt = new ArrayList<>();
         int zeichen = 0;
