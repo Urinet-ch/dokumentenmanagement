@@ -22,6 +22,11 @@ import java.util.UUID;
 @ApplicationScoped
 public class Berechtigung {
 
+    public enum Wissensentwurfszugriff {
+        VOLL,
+        NUR_STATUS_ENTSCHEID_GRUND
+    }
+
     private static final Set<Aktion> ERFASSUNG_ERLAUBT = Collections.unmodifiableSet(
             EnumSet.of(Aktion.A1, Aktion.A2, Aktion.A3, Aktion.A4, Aktion.A5, Aktion.A6, Aktion.A7, Aktion.A8,
                     Aktion.A10));
@@ -39,6 +44,32 @@ public class Berechtigung {
         if (!Rechtematrix.ergebnis(benutzer.rolle(), aktion).zugaenglich()) {
             verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
         }
+    }
+
+    /** Wissensseitenaktion: Sichtbarkeit wird vor dem Recht geprüft, ohne Seiteninhalte ins Zugriffsprotokoll zu schreiben. */
+    public void wissensseitenAktion(Benutzer benutzer, Aktion aktion, boolean sichtbar) {
+        if (aktion.compareTo(Aktion.A15) < 0 || aktion.compareTo(Aktion.A19) > 0) {
+            throw new IllegalArgumentException("Keine Wissensbasis-Aktion");
+        }
+        Ergebnis ergebnis = Rechtematrix.ergebnis(benutzer.rolle(), aktion);
+        if (!sichtbar || ergebnis == Ergebnis.NICHT_SICHTBAR) {
+            verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.NICHT_GEFUNDEN);
+        }
+        if (!ergebnis.zugaenglich()) {
+            verweigern(benutzer, aktion, Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
+        }
+    }
+
+    /** A18 erlaubt nur Status, Entscheid und Grund des eigenen Analysevorschlags; A17 gewährt Vollzugriff. */
+    public Wissensentwurfszugriff wissensentwurfLesen(Benutzer benutzer, Optional<String> vorschlagender) {
+        if (Rechtematrix.ergebnis(benutzer.rolle(), Aktion.A17).zugaenglich()) {
+            return Wissensentwurfszugriff.VOLL;
+        }
+        if (Rechtematrix.ergebnis(benutzer.rolle(), Aktion.A18).zugaenglich()
+                && vorschlagender.filter(benutzer.id()::equals).isPresent()) {
+            return Wissensentwurfszugriff.NUR_STATUS_ENTSCHEID_GRUND;
+        }
+        throw verweigerung(benutzer, Aktion.A18, Optional.empty(), Verweigerung.Grund.NICHT_ERLAUBT);
     }
 
     /** Webseiten-Erfassung ist auf die feste Positivliste A1–A8 und A10 beschränkt (Spec 03, Req 10.8). */
@@ -93,12 +124,24 @@ public class Berechtigung {
     }
 
     private void verweigern(Benutzer benutzer, Aktion aktion, Optional<UUID> dokumentId, Verweigerung.Grund grund) {
-        verweigern(Optional.of(benutzer.id()), Optional.of(benutzer.rolle()), Optional.of(aktion), dokumentId, grund);
+        throw verweigerung(Optional.of(benutzer.id()), Optional.of(benutzer.rolle()), Optional.of(aktion),
+                dokumentId, grund);
     }
 
     private void verweigern(Optional<String> benutzerId, Optional<Rolle> rolle, Optional<Aktion> aktion,
                             Optional<UUID> dokumentId, Verweigerung.Grund grund) {
+        throw verweigerung(benutzerId, rolle, aktion, dokumentId, grund);
+    }
+
+    private Verweigerung verweigerung(Benutzer benutzer, Aktion aktion, Optional<UUID> dokumentId,
+                                      Verweigerung.Grund grund) {
+        return verweigerung(Optional.of(benutzer.id()), Optional.of(benutzer.rolle()), Optional.of(aktion),
+                dokumentId, grund);
+    }
+
+    private Verweigerung verweigerung(Optional<String> benutzerId, Optional<Rolle> rolle, Optional<Aktion> aktion,
+                                      Optional<UUID> dokumentId, Verweigerung.Grund grund) {
         melder.verweigert(benutzerId, rolle, aktion, dokumentId, grund);
-        throw new Verweigerung(grund);
+        return new Verweigerung(grund);
     }
 }

@@ -18,7 +18,12 @@ public enum Aktion {
     A11("Dokumentarten verwalten"),
     A12("Kontakte ändern, CSV-Import"),
     A13("Zugriffsprotokoll einsehen"),
-    A14("API-Tokens verwalten");
+    A14("API-Tokens verwalten"),
+    A15("Wissensseiten, Index, Versionen und Log lesen (Sichtbarkeit nach 11.2)"),
+    A16("Ingest einer Wissensquelle starten oder wiederholen"),
+    A17("Entwürfe einsehen, Seiten von Hand ändern, Änderungen annehmen oder verwerfen, Lint starten"),
+    A18("Chat-Antwort als Analyse vorschlagen, Status eigener Vorschläge sehen"),
+    A19("Wissensbasis verwalten (Einstellungen, OKF-Export)");
 
     private final String bezeichnung;
 

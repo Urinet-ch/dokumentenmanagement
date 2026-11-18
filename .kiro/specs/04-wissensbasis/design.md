@@ -465,6 +465,25 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   Kette; bis dahin bleibt 13.3 offen. Ein Szenario, das nach einem Bucket-Restore dieselbe Datenbank zählt, wäre kein
   Nachweis (Review PR #295, M1).
 
+### Umsetzung 13.5 (PR #300)
+- `WissensGraph` berechnet aktuelle Hüllen und abhängige Seiten iterativ mit Besuchsmenge; Zyklen und tiefe
+  Quellketten terminieren ohne Rekursion. Die wirksame Stufe ist das Maximum aus Hülldokumenten und Mindeststufe.
+- `WissenHuelleDienst` speichert aktuelle Hüllen und Hüllen je Version in einer Transaktion. Bei einer Änderung der
+  Dokument-Sichtbarkeit berechnet er alle Seiten mit diesem Dokument in der aktuellen Hülle neu; die Mindeststufe
+  bleibt dabei erhalten. `ueberblick` wird durch eine Neuberechnung nicht auf `INTERN` gesetzt.
+- `WissenSichtbarkeit` wertet A15 und A2/A3 aus. Dokumente werden je Anfrage über
+  `DokumentRepository.sichtbar(..., Sichtregel.fuer(benutzer))` geprüft, damit dieselbe Sichtregel wie im
+  Dokumentarchiv gilt, ohne den bestehenden Filter zu duplizieren. Versionen verwenden ihre
+  eigene Hülle und Mindeststufe aus `daten`; fehlt diese Stufe, gilt fail-closed `INTERN`.
+- `Berechtigung.wissensseitenAktion` akzeptiert nur A15–A19 und prüft Sichtbarkeit vor dem Recht (404 vor 403).
+  `Berechtigung.wissensentwurfLesen` gibt A17 Vollzugriff, A18 auf eigene Analysevorschläge nur Status, Entscheid
+  und Grund; fremde Vorschläge und Vorschläge für `treuhaender` bleiben 403. Verweigerungen für Wissensseiten
+  enthalten keine Dokument-ID oder Seiteninhalte. A19 bleibt für `geschaeftsstelle` verboten.
+- Cucumber prüft mit synthetischen IDs in `urinet` und `vhf-gsk` dieselben Seiten- und Dokument-IDs, alle vier Rollen,
+  Zyklen, manuelle Erhöhung, Neuberechnung und Sichtbarkeit einer älteren Version. Eine Lese-API für Seiten, Log oder
+  Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
+  bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
+
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).
   Danach Entwurf `FEHLER` mit Hinweis «Die Wissensquelle konnte nicht verarbeitet werden. Sie ist archiviert; der

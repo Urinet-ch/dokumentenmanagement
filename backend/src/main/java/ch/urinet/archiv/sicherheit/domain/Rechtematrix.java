@@ -38,6 +38,11 @@ public final class Rechtematrix {
         zeile(Aktion.A12, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         zeile(Aktion.A13, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         zeile(Aktion.A14, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A15, ERLAUBT, ERLAUBT, NUR_LESEND, ERLAUBT);
+        zeile(Aktion.A16, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
+        zeile(Aktion.A17, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
+        zeile(Aktion.A18, ERLAUBT, ERLAUBT, VERBOTEN, ERLAUBT);
+        zeile(Aktion.A19, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         if (ZEILEN.size() != Aktion.values().length) {
             throw new IllegalStateException("Rechtematrix unvollständig");
         }

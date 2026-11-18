@@ -41,7 +41,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 2.1–2.8, 3.5, 3.7_
   - _Abhängig von: 13.3_
 
-- [ ] 13.5 Sichtbarkeit und Rechte [Backend]
+- [x] 13.5 Sichtbarkeit und Rechte [Backend]
   - Hülle (`wissensseite_dokument`, rekursiv mit Zyklen) und Hülle je Version (`wissensseite_version_dokument`), wirksame Vertraulichkeit = max(Hülle, Mindeststufe), `WissenSichtbarkeit` auf Basis des `VertraulichkeitFilter` inkl. Mindeststufe
   - Aktionen A15–A19 in `Berechtigung`, 404 vor 403, A19 für `geschaeftsstelle` 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
   - _Anforderungen: 11.1–11.3, 11.5, 11.8, 12.1–12.3_
