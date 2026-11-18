@@ -37,10 +37,13 @@ public class KlassifikationenSchritte {
     private record Dokument(String mandant, UUID id) {
     }
 
+    private record Eigene(String mandant, String code) {
+    }
+
     @Inject
     Instance<AgroalDataSource> datenbank;
 
-    private final List<String> eigeneKlassifikationen = new ArrayList<>();
+    private final List<Eigene> eigeneKlassifikationen = new ArrayList<>();
     private final List<Zuordnung> eigeneZuordnungen = new ArrayList<>();
     private final Map<String, Dokument> dokumente = new LinkedHashMap<>();
     private Response antwort;
@@ -49,7 +52,7 @@ public class KlassifikationenSchritte {
     @Wenn("«{word}» legt die Klassifikation mit dem aktuellen Stand an:")
     public void anlegen(String benutzer, String body) {
         String code = io.restassured.path.json.JsonPath.from(body).getString("code");
-        eigeneKlassifikationen.add(code);
+        eigeneKlassifikationen.add(new Eigene(mandant(benutzer), code));
         antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(body)
                 .when().post("/api/v1/klassifikationen");
     }
@@ -60,6 +63,42 @@ public class KlassifikationenSchritte {
         antwort = mitVersion(benutzer).contentType(ContentType.JSON)
                 .body(Map.of("klassifikation", klassifikation, "pflicht", false, "standardWert", standardWert))
                 .when().post("/api/v1/dokumentarten/" + art + "/klassifikationen");
+    }
+
+    @Wenn("«{word}» ordnet die Klassifikation «{word}» der Dokumentart «{word}» als Pflicht ohne Standardwert zu")
+    public void alsPflichtZuordnen(String benutzer, String klassifikation, String art) {
+        eigeneZuordnungen.add(new Zuordnung(mandant(benutzer), art, klassifikation));
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON)
+                .body(Map.of("klassifikation", klassifikation, "pflicht", true))
+                .when().post("/api/v1/dokumentarten/" + art + "/klassifikationen");
+    }
+
+    @Wenn("«{word}» setzt den Standardwert der Klassifikation «{word}» der Dokumentart «{word}» auf «{word}»")
+    public void standardwertSetzen(String benutzer, String klassifikation, String art, String standardWert) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("standardWert", standardWert))
+                .when().patch("/api/v1/dokumentarten/" + art + "/klassifikationen/" + klassifikation);
+    }
+
+    @Wenn("«{word}» benennt die Klassifikation «{word}» in «{word}» um")
+    public void klassifikationUmbenennen(String benutzer, String code, String name) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("name", name))
+                .when().patch("/api/v1/klassifikationen/" + code);
+    }
+
+    @Wenn("«{word}» benennt den Wert «{word}» der Klassifikation «{word}» in «{word}» um")
+    public void wertUmbenennen(String benutzer, String wert, String code, String name) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("name", name))
+                .when().patch("/api/v1/klassifikationen/" + code + "/werte/" + wert);
+    }
+
+    @Wenn("«{word}» liest die Klassifikationen")
+    public void klassifikationenLesen(String benutzer) {
+        antwort = gegeben(benutzer).when().get("/api/v1/klassifikationen");
+    }
+
+    @Wenn("«{word}» liest den Eingangskorb")
+    public void eingangskorbLesen(String benutzer) {
+        antwort = gegeben(benutzer).queryParam("groesse", 100).when().get("/api/v1/eingangskorb");
     }
 
     @Wenn("«{word}» entfernt den Standardwert «{word}» der Klassifikation «{word}» von der Dokumentart «{word}»")
@@ -228,6 +267,52 @@ public class KlassifikationenSchritte {
         assertThat(antwort.jsonPath().<String>getList("klassifikationenUngueltig")).contains(code);
     }
 
+    @Dann("ist keine Klassifikation des Dokuments «{word}» ungültig")
+    public void dokumentKlassifikationenGueltig(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().<String>getList("klassifikationenUngueltig")).isEmpty();
+    }
+
+    @Dann("ist im Eingangskorb die Klassifikation «{word}» des Dokuments «{word}» ungültig")
+    public void eingangskorbKlassifikationUngueltig(String code, String name) {
+        assertThat(eingangskorbMarkierung(name)).contains(code);
+    }
+
+    @Dann("ist im Eingangskorb keine Klassifikation des Dokuments «{word}» ungültig")
+    public void eingangskorbKlassifikationenGueltig(String name) {
+        assertThat(eingangskorbMarkierung(name)).isEmpty();
+    }
+
+    @Dann("fehlt die Klassifikation «{word}» in der Liste")
+    public void klassifikationFehlt(String code) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().<String>getList("code")).doesNotContain(code);
+    }
+
+    @Dann("steht im letzten Konfigurationseintrag von «{word}» die Änderung «{word}» von «{word}» auf «{word}»")
+    public void konfigurationseintrag(String mandant, String pfad, String alt, String neu) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select details::text from "
+                     + new MandantCode(mandant).schema() + ".zugriff_protokoll "
+                     + "where aktion = 'KONFIGURATION_AENDERN' order by id desc limit 1")) {
+            try (var ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).as("Konfigurationseintrag").isTrue();
+                var aenderungen = io.restassured.path.json.JsonPath.from(ergebnis.getString(1))
+                        .<Map<String, String>>getList("aenderungen");
+                assertThat(aenderungen).contains(Map.of("pfad", pfad, "alt", alt, "neu", neu));
+            }
+        }
+    }
+
+    private List<String> eingangskorbMarkierung(String name) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        List<String> markierung = antwort.jsonPath().getList("eintraege.findAll { it.id == '"
+                + dokument(name).id() + "' }.klassifikationenUngueltig.flatten()");
+        List<String> ids = antwort.jsonPath().getList("eintraege.id");
+        assertThat(ids).as("Dokument im Eingangskorb").contains(dokument(name).id().toString());
+        return markierung;
+    }
+
     @Dann("bleibt die letzte Fassung des Dokuments «{word}» bei der Klassifikation «{word}» auf dem Wert «{word}»")
     public void klassifikationInLetzterFassung(String name, String code, String wert) throws SQLException {
         Dokument dokument = dokument(name);
@@ -274,11 +359,14 @@ public class KlassifikationenSchritte {
                             + zuordnung.klassifikation());
             assertThat(loeschen.statusCode()).as(loeschen.asString()).isIn(204, 404);
         }
-        for (String code : eigeneKlassifikationen.reversed()) {
-            Response loeschen = mitVersion("inhaber-urinet").delete("/api/v1/klassifikationen/" + code);
+        for (Eigene eigene : eigeneKlassifikationen.reversed()) {
+            Response loeschen = mitVersion("inhaber-" + eigene.mandant())
+                    .delete("/api/v1/klassifikationen/" + eigene.code());
             assertThat(loeschen.statusCode()).as(loeschen.asString()).isIn(204, 404);
         }
         dokumente.clear();
+        eigeneKlassifikationen.clear();
+        eigeneZuordnungen.clear();
     }
 
     private io.restassured.specification.RequestSpecification mitVersion(String benutzer) {

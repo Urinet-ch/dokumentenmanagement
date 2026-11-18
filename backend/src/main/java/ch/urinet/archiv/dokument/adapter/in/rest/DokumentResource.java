@@ -305,7 +305,10 @@ public class DokumentResource {
                     + "einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer") List<VersionDto> versionen,
             @Schema(required = true, description = "Werte nach Klassifikations-Code") Map<String, List<String>>
                     klassifikationen,
-            @Schema(required = true, description = "Ungültige Klassifikationen, die im Eingangskorb zu korrigieren sind")
+            @Schema(required = true, description = "Codes der Klassifikationen, an denen die nächste Speicherung nach "
+                    + "der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. "
+                    + "Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; "
+                    + "fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern")
                     List<String> klassifikationenUngueltig) {
     }
 
@@ -327,8 +330,8 @@ public class DokumentResource {
         Dokument dokument = ansicht.dokument();
         Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
         return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
-                klassifikationswerte, klassifikationVerwaltung.ungueltigeDokumentKlassifikationen(dokument.art(),
-                        klassifikationswerte, klassifikationswerte)))
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -374,8 +377,8 @@ public class DokumentResource {
         Dokument dokument = ansicht.dokument();
         Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
         return Response.ok(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
-                klassifikationswerte, klassifikationVerwaltung.ungueltigeDokumentKlassifikationen(dokument.art(),
-                        klassifikationswerte, klassifikationswerte)))
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 
@@ -425,8 +428,8 @@ public class DokumentResource {
         Dokument dokument = ansicht.dokument();
         Map<String, List<String>> klassifikationswerte = klassifikationen.laden(id);
         return Response.accepted(dto(dokument, json, ansicht.warnungen(), lesen.schwelle(), ansicht.fassungen(),
-                klassifikationswerte, klassifikationVerwaltung.ungueltigeDokumentKlassifikationen(dokument.art(),
-                        klassifikationswerte, klassifikationswerte)))
+                klassifikationswerte, klassifikationVerwaltung.markierteDokumentKlassifikationen(dokument.art(),
+                        klassifikationswerte, dokument.bestaetigt() != null)))
                 .tag(new EntityTag(Integer.toString(dokument.version()))).build();
     }
 

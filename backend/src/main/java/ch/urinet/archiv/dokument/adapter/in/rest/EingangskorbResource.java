@@ -74,7 +74,8 @@ public class EingangskorbResource {
         return new EingangskorbDto(treffer.eintraege().stream().map(d -> {
             var werte = klassifikationen.laden(d.id());
             return DokumentResource.dto(d, json, lesen.warnungen(benutzer, d), lesen.schwelle(), List.of(), werte,
-                    klassifikationVerwaltung.veralteteDokumentKlassifikationen(d.art(), werte, werte));
+                    klassifikationVerwaltung.markierteDokumentKlassifikationen(d.art(), werte,
+                            d.bestaetigt() != null));
         }).toList(),
                 treffer.gesamt(), seite, groesse);
     }

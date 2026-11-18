@@ -129,22 +129,22 @@ class KonfigurationTest {
     }
 
     @Test
-    void protokolliertKlassifikationsAenderungenOhneKlartextWerte() {
-        var alt = klassifikation("fachgebiet", "Altname", "geheim");
-        var neu = klassifikation("fachgebiet", "Neuname", "andererWert");
+    void protokolliertUmbenennungUndStandardwertMitAltemUndNeuemWert() {
+        var alt = klassifikation("fachgebiet", "Altname", "Bau");
+        var neu = klassifikation("fachgebiet", "Neuname", "Hochbau");
         var artVorher = artMitKlassifikationen("MERKBLATT",
-                List.of(new ArtKlassifikation("fachgebiet", false, "wert")));
+                List.of(new ArtKlassifikation("fachgebiet", false, "bau")));
         var artNachher = artMitKlassifikationen("MERKBLATT",
-                List.of(new ArtKlassifikation("fachgebiet", false, "anderer_wert")));
+                List.of(new ArtKlassifikation("fachgebiet", false, "elektro")));
         var vorher = new Konfiguration(1, einstellungen(), List.of(artVorher), List.of(alt));
         var nachher = new Konfiguration(2, einstellungen(), List.of(artNachher), List.of(neu));
 
-        assertThat(vorher.aenderungen(nachher))
-                .extracting(Konfiguration.Aenderung::alt)
-                .doesNotContain("Altname", "Neuname", "geheim", "andererWert", "wert", "anderer_wert");
-        assertThat(vorher.aenderungen(nachher))
-                .extracting(Konfiguration.Aenderung::neu)
-                .doesNotContain("Altname", "Neuname", "geheim", "andererWert", "wert", "anderer_wert");
+        assertThat(vorher.gleicherInhalt(nachher)).isFalse();
+        assertThat(vorher.aenderungen(nachher)).containsExactlyInAnyOrder(
+                new Konfiguration.Aenderung("arten.MERKBLATT.klassifikationen.fachgebiet.standardWert",
+                        "bau", "elektro"),
+                new Konfiguration.Aenderung("klassifikationen.fachgebiet.name", "Altname", "Neuname"),
+                new Konfiguration.Aenderung("klassifikationen.fachgebiet.werte.wert.name", "Bau", "Hochbau"));
     }
 
     private static Konfiguration.Art art(String code, String vertraulichkeit, boolean aktiv, boolean selbstAusgestellt) {
@@ -241,6 +241,26 @@ class KonfigurationTest {
         }
         assertThat(new Konfiguration(1, einstellungen(), List.of(),
                 List.of(klassifikation("a".repeat(40), "Name", "Wert"))).pruefen()).isEmpty();
+    }
+
+    @Test
+    void lehntSteuerzeichenInNamenAbUndErlaubtZeilenumbruchInBeschreibungen() {
+        for (String name : List.of("Fach\ngebiet", "Fach\u0007gebiet", "Fach\u0085gebiet")) {
+            assertThat(new Konfiguration(1, einstellungen(), List.of(),
+                    List.of(klassifikation("fachgebiet", name, "Wert"))).pruefen())
+                    .extracting(Konfiguration.Befund::code).contains("TEXT_UNGUELTIG");
+            assertThat(new Konfiguration(1, einstellungen(), List.of(),
+                    List.of(klassifikation("fachgebiet", "Fachgebiet", name))).pruefen())
+                    .extracting(Konfiguration.Befund::code).contains("TEXT_UNGUELTIG");
+        }
+        var mitBeschreibung = new Klassifikation("fachgebiet", "Fachgebiet", "Zeile 1\r\n\tZeile 2",
+                List.of(new KlassifikationWert("wert", "Wert", "Zeile 1\nZeile 2", 0, true)),
+                false, false, true, false, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(mitBeschreibung)).pruefen()).isEmpty();
+        var steuerzeichen = new Klassifikation("fachgebiet", "Fachgebiet", "Text\u001b[0m",
+                List.of(new KlassifikationWert("wert", "Wert", null, 0, true)), false, false, true, false, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(steuerzeichen)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("TEXT_UNGUELTIG");
     }
 
     private static Konfiguration.Einstellungen einstellungen() {

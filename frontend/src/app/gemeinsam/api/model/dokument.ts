@@ -91,7 +91,7 @@ export interface Dokument {
      */
     klassifikationen: { [key: string]: Array<string>; };
     /**
-     * Ungültige Klassifikationen, die im Eingangskorb zu korrigieren sind
+     * Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern
      */
     klassifikationenUngueltig: Array<string>;
 }

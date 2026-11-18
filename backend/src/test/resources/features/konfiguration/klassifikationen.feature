@@ -57,6 +57,11 @@ Funktionalität: Klassifikationen je Mandant
     Dann antwortet die Klassifikationsverwaltung mit Status 200
     Wenn «inhaber-urinet» liest das Dokument «Klassifikation-alt»
     Dann enthält das Dokument «Klassifikation-alt» die Klassifikation «fachgebiet» mit dem Wert «bau»
+    Und ist keine Klassifikation des Dokuments «Klassifikation-alt» ungültig
+    Wenn «inhaber-urinet» liest das Dokument «Eingangskorb-klasse»
+    Dann ist die Klassifikation «fachgebiet» des Dokuments «Eingangskorb-klasse» ungültig
+    Wenn «inhaber-urinet» liest den Eingangskorb
+    Dann ist im Eingangskorb die Klassifikation «fachgebiet» des Dokuments «Eingangskorb-klasse» ungültig
     Wenn «inhaber-urinet» ändert die Klassifikationen des Dokuments «Klassifikation-alt» auf:
       """
       {"fachgebiet":["bau"]}
@@ -71,6 +76,24 @@ Funktionalität: Klassifikationen je Mandant
     Dann antwortet die Klassifikationsverwaltung mit Status 204
     Wenn «inhaber-urinet» liest das Dokument «Eingangskorb-klasse»
     Dann ist die Klassifikation «fachgebiet» des Dokuments «Eingangskorb-klasse» ungültig
+    Wenn «inhaber-urinet» liest den Eingangskorb
+    Dann ist im Eingangskorb die Klassifikation «fachgebiet» des Dokuments «Eingangskorb-klasse» ungültig
+
+  @req-1.7
+  Szenario: Eine fehlende Pflicht-Klassifikation gilt im Eingangskorb nicht als ungültiger Wert
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» als Pflicht ohne Standardwert zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Angenommen «inhaber-urinet» legt ein Dokument «Eingangskorb-pflicht» der Art «PROJEKTDOKUMENT» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «EINGANGSKORB» an
+    Wenn «inhaber-urinet» liest das Dokument «Eingangskorb-pflicht»
+    Dann ist keine Klassifikation des Dokuments «Eingangskorb-pflicht» ungültig
+    Wenn «inhaber-urinet» liest den Eingangskorb
+    Dann ist im Eingangskorb keine Klassifikation des Dokuments «Eingangskorb-pflicht» ungültig
 
   @req-3.5
   Szenario: Eine Klassifikation wird beim Bestätigen geprüft
@@ -210,3 +233,76 @@ Funktionalität: Klassifikationen je Mandant
       | status |
       | url |
       | dateiname |
+
+  @req-3.4
+  Szenario: Eine Zuordnung zu einer unbekannten Dokumentart gibt es nicht
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «GIBT_ES_NICHT» mit dem Standardwert «bau» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+
+  @req-1.3
+  Szenario: Umbenennungen und ein neuer Standardwert stehen mit altem und neuem Wert im Zugriffsprotokoll
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"},{"code":"elektro","name":"Elektro"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» benennt die Klassifikation «fachgebiet» in «Themengebiet» um
+    Dann antwortet die Klassifikationsverwaltung mit Status 200
+    Und steht im letzten Konfigurationseintrag von «urinet» die Änderung «klassifikationen.fachgebiet.name» von «Fachgebiet» auf «Themengebiet»
+    Wenn «inhaber-urinet» benennt den Wert «bau» der Klassifikation «fachgebiet» in «Hochbau» um
+    Dann antwortet die Klassifikationsverwaltung mit Status 200
+    Und steht im letzten Konfigurationseintrag von «urinet» die Änderung «klassifikationen.fachgebiet.werte.bau.name» von «Bau» auf «Hochbau»
+    Wenn «inhaber-urinet» setzt den Standardwert der Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» auf «elektro»
+    Dann antwortet die Klassifikationsverwaltung mit Status 200
+    Und steht im letzten Konfigurationseintrag von «urinet» die Änderung «arten.PROJEKTDOKUMENT.klassifikationen.fachgebiet.standardWert» von «bau» auf «elektro»
+
+  @req-1.2
+  Szenario: Klassifikationen, Zuordnungen und Dokumentwerte bleiben im eigenen Mandanten
+    Wenn «inhaber-urinet» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet","werte":[{"code":"bau","name":"Bau"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-urinet» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROJEKTDOKUMENT» mit dem Standardwert «bau» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Angenommen «inhaber-urinet» legt ein Dokument «Trennung-urinet» der Art «PROJEKTDOKUMENT» mit der Klassifikation «fachgebiet» und dem Wert «bau» im Status «ARCHIVIERT» an
+    Und «inhaber-vhf-gsk» legt ein Dokument «Trennung-vhf» der Art «PROBE_VHF_BULLETIN» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Wenn «inhaber-vhf-gsk» liest die Klassifikationen
+    Dann fehlt die Klassifikation «fachgebiet» in der Liste
+    Wenn «inhaber-vhf-gsk» deaktiviert den Wert «bau» der Klassifikation «fachgebiet»
+    Dann antwortet die Klassifikationsverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn «inhaber-vhf-gsk» versucht, die Klassifikation «fachgebiet» zu löschen
+    Dann antwortet die Klassifikationsverwaltung mit Status 404 und Fehlercode «NICHT_GEFUNDEN»
+    Wenn «inhaber-vhf-gsk» liest das Dokument «Trennung-urinet»
+    Dann antwortet die Klassifikationsverwaltung mit Status 404
+    Wenn «inhaber-vhf-gsk» legt die Klassifikation mit dem aktuellen Stand an:
+      """
+      {"code":"fachgebiet","name":"Fachgebiet VHF","werte":[{"code":"statik","name":"Statik"}],
+       "mehrfach":false,"kiVorschlag":false,"suchfilter":true,"oeffentlichFilter":false}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-vhf-gsk» ordnet die Klassifikation «fachgebiet» der Dokumentart «PROBE_VHF_BULLETIN» mit dem Standardwert «statik» zu
+    Dann antwortet die Klassifikationsverwaltung mit Status 201
+    Wenn «inhaber-vhf-gsk» ändert die Klassifikationen des Dokuments «Trennung-vhf» auf:
+      """
+      {"fachgebiet":["bau"]}
+      """
+    Dann antwortet die Klassifikationsverwaltung mit Status 422 und Fehlercode «KLASSIFIKATION_UNGUELTIG»
+    Wenn «inhaber-vhf-gsk» entfernt die Zuordnung «fachgebiet» von der Dokumentart «PROBE_VHF_BULLETIN»
+    Dann antwortet die Klassifikationsverwaltung mit Status 204
+    Wenn «inhaber-vhf-gsk» versucht, die Klassifikation «fachgebiet» zu löschen
+    Dann antwortet die Klassifikationsverwaltung mit Status 204
+    Wenn «inhaber-urinet» versucht, die Klassifikation «fachgebiet» zu löschen
+    Dann antwortet die Klassifikationsverwaltung mit Status 409 und Fehlercode «KONFIGURATION_IN_GEBRAUCH»
+    Wenn «inhaber-urinet» liest das Dokument «Trennung-urinet»
+    Dann enthält das Dokument «Trennung-urinet» die Klassifikation «fachgebiet» mit dem Wert «bau»

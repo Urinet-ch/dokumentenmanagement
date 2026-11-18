@@ -223,11 +223,14 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     }
 
     private static boolean text(String wert, int max) {
-        return wert != null && !wert.isBlank() && wert.length() <= max;
+        return wert != null && !wert.isBlank() && wert.length() <= max
+                && wert.codePoints().noneMatch(c -> Character.getType(c) == Character.CONTROL);
     }
 
+    /** Beschreibungen dürfen Zeilenumbrüche und Tabulatoren enthalten, sonst keine Steuerzeichen. */
     private static boolean optionalerText(String wert, int max) {
-        return wert == null || wert.length() <= max;
+        return wert == null || wert.length() <= max && wert.codePoints().noneMatch(c ->
+                Character.getType(c) == Character.CONTROL && c != '\n' && c != '\r' && c != '\t');
     }
 
     private static void artReferenzPruefen(List<Befund> befunde, Map<String, Art> arten, Art quelle, String zielCode,
@@ -324,8 +327,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 feld(aenderungen, zuordnungspfad, vorhanden(vorherige), vorhanden(neue));
                 if (vorherige != null && neue != null) {
                     feld(aenderungen, zuordnungspfad + ".pflicht", vorherige.pflicht(), neue.pflicht());
-                    feld(aenderungen, zuordnungspfad + ".standardWert", gesetzt(vorherige.standardWert()),
-                            gesetzt(neue.standardWert()));
+                    feld(aenderungen, zuordnungspfad + ".standardWert", vorherige.standardWert(),
+                            neue.standardWert());
                 }
             }
         }
@@ -355,8 +358,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             if (a == null || n == null) {
                 continue;
             }
-            feld(aenderungen, pfad + ".name", gesetzt(a.name()), gesetzt(n.name()));
-            feld(aenderungen, pfad + ".beschreibung", gesetzt(a.beschreibung()), gesetzt(n.beschreibung()));
+            feld(aenderungen, pfad + ".name", a.name(), n.name());
+            feld(aenderungen, pfad + ".beschreibung", a.beschreibung(), n.beschreibung());
             feld(aenderungen, pfad + ".mehrfach", a.mehrfach(), n.mehrfach());
             feld(aenderungen, pfad + ".kiVorschlag", a.kiVorschlag(), n.kiVorschlag());
             feld(aenderungen, pfad + ".suchfilter", a.suchfilter(), n.suchfilter());
@@ -372,9 +375,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 String wertpfad = pfad + ".werte." + wertCode;
                 feld(aenderungen, wertpfad, vorhanden(alterWert), vorhanden(neuerWert));
                 if (alterWert != null && neuerWert != null) {
-                    feld(aenderungen, wertpfad + ".name", gesetzt(alterWert.name()), gesetzt(neuerWert.name()));
-                    feld(aenderungen, wertpfad + ".beschreibung", gesetzt(alterWert.beschreibung()),
-                            gesetzt(neuerWert.beschreibung()));
+                    feld(aenderungen, wertpfad + ".name", alterWert.name(), neuerWert.name());
+                    feld(aenderungen, wertpfad + ".beschreibung", alterWert.beschreibung(),
+                            neuerWert.beschreibung());
                     feld(aenderungen, wertpfad + ".reihenfolge", alterWert.reihenfolge(), neuerWert.reihenfolge());
                     feld(aenderungen, wertpfad + ".aktiv", alterWert.aktiv(), neuerWert.aktiv());
                 }
@@ -386,10 +389,6 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         Map<String, KlassifikationWert> ergebnis = new TreeMap<>();
         werte.forEach(wert -> ergebnis.put(wert.code(), wert));
         return ergebnis;
-    }
-
-    private static String gesetzt(String wert) {
-        return wert == null || wert.isBlank() ? null : "<gesetzt>";
     }
 
     private static String vorhanden(Object wert) {

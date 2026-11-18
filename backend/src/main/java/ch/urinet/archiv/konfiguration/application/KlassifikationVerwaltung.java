@@ -136,7 +136,10 @@ public class KlassifikationVerwaltung {
     public ArtKlassifikation artKlassifikationAnlegen(String art, ArtKlassifikation zuordnung, int version,
                                                        String wer, String grund) {
         konfiguration.aenderungStarten(version);
-        if (!dokumentarten.existiert(art) || repository.zugeordnet(art, zuordnung.klassifikation())) {
+        if (!dokumentarten.existiert(art)) {
+            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
+        }
+        if (repository.zugeordnet(art, zuordnung.klassifikation())) {
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
         aendernGesperrt(wer, grund, aktuell -> mitArtZuordnung(aktuell, art, zuordnung),
@@ -144,18 +147,6 @@ public class KlassifikationVerwaltung {
         return repository.zuordnungen(art).stream()
                 .filter(eintrag -> eintrag.klassifikation().equals(zuordnung.klassifikation()))
                 .findFirst().orElseThrow();
-    }
-
-    public ArtKlassifikation artKlassifikationAendern(String art, String code, ArtKlassifikation zuordnung,
-                                                       int version, String wer, String grund) {
-        konfiguration.aenderungStarten(version);
-        if (!repository.zugeordnet(art, code) || !code.equals(zuordnung.klassifikation())) {
-            throw new FachFehler(Fehlercode.NICHT_GEFUNDEN);
-        }
-        aendernGesperrt(wer, grund, aktuell -> mitArtZuordnungErsetzt(aktuell, art, zuordnung),
-                () -> repository.zuordnungSpeichern(art, zuordnung));
-        return repository.zuordnungen(art).stream()
-                .filter(eintrag -> eintrag.klassifikation().equals(code)).findFirst().orElseThrow();
     }
 
     public ArtKlassifikation artKlassifikationAendern(String art, String code, boolean pflicht,
@@ -195,9 +186,17 @@ public class KlassifikationVerwaltung {
         return konfiguration.aktuell().ungueltigeDokumentKlassifikationen(art, werte, vorher);
     }
 
-    public List<String> veralteteDokumentKlassifikationen(String art, Map<String, List<String>> werte,
-                                                          Map<String, List<String>> vorher) {
-        return konfiguration.aktuell().veralteteDokumentKlassifikationen(art, werte, vorher);
+    /**
+     * Kennzeichnung {@code klassifikationenUngueltig} in Eingangskorb und Einzelabruf (Req 1.7): die Klassifikationen,
+     * an denen die nächste Speicherung nach der gültigen Version scheitern würde. Unbestätigt prüft die Bestätigung
+     * ohne «vorher» (inaktive Werte zählen); fehlende Werte kommen dort erst mit der Bestätigung und zählen nicht.
+     * Bestätigt gilt die Prüfung der Änderung (behaltene inaktive Werte erlaubt, fehlende Pflicht-Werte zählen).
+     */
+    public List<String> markierteDokumentKlassifikationen(String art, Map<String, List<String>> werte,
+                                                          boolean bestaetigt) {
+        Konfiguration aktuell = konfiguration.aktuell();
+        return bestaetigt ? aktuell.ungueltigeDokumentKlassifikationen(art, werte, werte)
+                : aktuell.veralteteDokumentKlassifikationen(art, werte, Map.of());
     }
 
     public Map<String, List<String>> beimArtwechselVorbelegen(String art, Map<String, List<String>> bisher) {

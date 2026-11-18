@@ -339,6 +339,15 @@ Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als K
 unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
 und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
 
+Umsetzung 17.5 (Review PR #289): `klassifikationenUngueltig` bedeutet in Eingangskorb und Einzelabruf dasselbe: die
+Klassifikationen, an denen die nächste Speicherung nach der gültigen Version scheitern würde (Req 1.7). Unbestätigt
+gilt die Prüfung der Bestätigung (inaktive, gelöschte, der Art nicht zugeordnete Werte, mehrere Werte bei einer
+einfachen Klassifikation); fehlende Pflicht-Werte zählen nicht, sie kommen mit der Bestätigung. Bestätigt gilt die
+Prüfung der Änderung (behaltene inaktive Werte erlaubt, fehlende Pflicht-Werte zählen). Das Protokoll nennt bei Name,
+Beschreibung und Standardwert von Klassifikationen alten und neuen Wert im Klartext wie bei Arten (Req 1.3); Werte
+an Dokumenten stehen nie darin. Eine Zuordnung zu einer unbekannten Art ergibt 404 `NICHT_GEFUNDEN`. Namen von
+Klassifikationen und Werten enthalten keine Steuerzeichen, Beschreibungen nur Zeilenumbruch und Tabulator.
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.
