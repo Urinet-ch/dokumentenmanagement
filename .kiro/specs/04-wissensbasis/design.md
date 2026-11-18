@@ -211,6 +211,10 @@ flowchart LR
   Schätzung je Schritt mit Ein- und Ausgabe:
   `(Zeichen Text + Index + ueberblick + 2 × max-seiten × seite-max-zeichen + Anzahl Aufrufe × Systemprompt) / 3 × 1.3`
   Tokens. Ein WireMock-Szenario vergleicht die Schätzung mit `wissens_entwurf.tokens_*`.
+- Zwischenstand 14.1a: `WissenIngestStarten` implementiert `DokumentEreignisse` in `wissen/application`, damit der
+  fachbereichsübergreifende Zugriff über `application` läuft. Bis 14.1b einen Handler für `WISSEN_INGEST` bereitstellt,
+  speichert ein automatischer Start einen `FEHLER`-Entwurf samt Hinweis statt eines dauerhaft offenen Auftrags;
+  14.1b ersetzt diesen Zwischenstand durch die Verarbeitung der Teilaufträge.
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:

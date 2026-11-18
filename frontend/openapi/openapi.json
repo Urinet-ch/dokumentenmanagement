@@ -2469,6 +2469,42 @@
             } ]
           }
         }
+      },
+      "WissenIngestAuftrag" : {
+        "description" : "Eingereihter Ingest-Entwurf.",
+        "type" : "object",
+        "properties" : {
+          "entwurfId" : {
+            "$ref" : "#/components/schemas/UUID"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "IN_ARBEIT", "WARTEND", "FEHLER" ]
+          },
+          "geschaetzteTokens" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "hinweis" : {
+            "type" : [ "string", "null" ]
+          }
+        }
+      },
+      "WissenIngestStart" : {
+        "description" : "Optionaler PDF-Seitenbereich für einen manuellen Ingest.",
+        "type" : "object",
+        "properties" : {
+          "seiteVon" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "seiteBis" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32",
+            "minimum" : 1
+          }
+        }
       }
     },
     "securitySchemes" : {
@@ -3923,6 +3959,64 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
+        } ]
+      }
+    },
+    "/api/v1/dokumente/{id}/wissen-ingest" : {
+      "post" : {
+        "summary" : "Ingest einer Wissensquelle starten",
+        "description" : "Reiht den Ingest einer archivierten Wissensquelle ein. Optional kann ein PDF-Seitenbereich angegeben werden. Personalunterlagen, fehlender Volltext, fehlende PDF/A oder nicht passende Seitenangaben werden ohne KI-Aufruf als Entwurf mit Hinweis festgehalten.",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/components/schemas/UUID"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WissenIngestStart"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Ingest eingereiht oder mit Vorprüfungshinweis abgeschlossen",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WissenIngestAuftrag"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Ingest läuft oder wartet bereits für dieses Dokument"
+          },
+          "422" : {
+            "description" : "Dokument ist keine Wissensquelle oder Seitenbereich ungültig"
+          },
+          "429" : {
+            "description" : "Monatsbudget der Wissensbasis erschöpft"
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          },
+          "400" : {
+            "description" : "Bad Request"
+          }
+        },
+        "tags" : [ "Wissen Ingest Resource" ],
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "geschaeftsstelle" ]
         } ]
       }
     },
