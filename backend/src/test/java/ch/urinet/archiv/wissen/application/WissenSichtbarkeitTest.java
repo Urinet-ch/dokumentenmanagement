@@ -2,12 +2,9 @@ package ch.urinet.archiv.wissen.application;
 
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
-import ch.urinet.archiv.wissen.domain.WissensStufe;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,13 +13,10 @@ class WissenSichtbarkeitTest {
 
     private static final UUID SEITE_NORMAL = UUID.fromString("00000000-0000-0000-0000-000000000301");
     private static final UUID SEITE_INTERN = UUID.fromString("00000000-0000-0000-0000-000000000302");
-    private static final UUID DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000303");
 
     @Test
     void mindeststufeInternIstFuerMitarbeitendeUnsichtbarFuerAlleAnderenSichtbar() {
-        WissenSichtbarkeit sichtbar = sichtbarkeit(List.of(
-                new WissensHuelleZugriff(SEITE_INTERN, WissensStufe.INTERN, Set.of(DOKUMENT)),
-                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))), Set.of(DOKUMENT));
+        WissenSichtbarkeit sichtbar = sichtbarkeit();
 
         assertThat(sichtbar.aktuelleSeiteSichtbar(benutzer(Rolle.INHABER), SEITE_INTERN)).isTrue();
         assertThat(sichtbar.aktuelleSeiteSichtbar(benutzer(Rolle.MITARBEITER), SEITE_INTERN)).isFalse();
@@ -31,29 +25,25 @@ class WissenSichtbarkeitTest {
     }
 
     @Test
-    void unsichtbaresDokumentVerstecktDieGanzeSeiteUndWirdNichtGelistet() {
-        WissenSichtbarkeit sichtbar = sichtbarkeit(List.of(
-                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))), Set.of());
+    void sichtbareSeiteWirdFuerMitarbeitendeGelistet() {
+        WissenSichtbarkeit sichtbar = sichtbarkeit();
 
-        assertThat(sichtbar.aktuelleSeiteSichtbar(benutzer(Rolle.INHABER), SEITE_NORMAL)).isFalse();
-        assertThat(sichtbar.sichtbareSeiten(benutzer(Rolle.INHABER))).isEmpty();
+        assertThat(sichtbar.aktuelleSeiteSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL)).isTrue();
+        assertThat(sichtbar.sichtbareSeiten(benutzer(Rolle.MITARBEITER))).contains(SEITE_NORMAL);
     }
 
     @Test
     void versionssichtbarkeitVerwendetDieEigeneHuelleUndMindeststufe() {
-        WissenSichtbarkeit sichtbar = versionen(
-                Optional.of(new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))),
-                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.INTERN, Set.of(DOKUMENT)));
+        WissenSichtbarkeit sichtbar = sichtbarkeit();
 
-        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isFalse();
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isTrue();
+        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_INTERN, 1)).isFalse();
         assertThat(sichtbar.versionSichtbar(benutzer(Rolle.TREUHAENDER), SEITE_NORMAL, 1)).isTrue();
     }
 
     @Test
     void versionEinerUnsichtbarenSeiteBleibtUnsichtbarAuchWennSieSelbstNormalIst() {
-        WissenSichtbarkeit sichtbar = versionen(
-                Optional.of(new WissensHuelleZugriff(SEITE_INTERN, WissensStufe.INTERN, Set.of(DOKUMENT))),
-                new WissensHuelleZugriff(SEITE_INTERN, WissensStufe.NORMAL, Set.of(DOKUMENT)));
+        WissenSichtbarkeit sichtbar = sichtbarkeit();
 
         assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_INTERN, 1)).isFalse();
         assertThat(sichtbar.versionSichtbar(benutzer(Rolle.INHABER), SEITE_INTERN, 1)).isTrue();
@@ -61,62 +51,50 @@ class WissenSichtbarkeitTest {
 
     @Test
     void versionOhneAktuelleSeiteIstFuerNiemandenSichtbar() {
-        WissenSichtbarkeit sichtbar = versionen(Optional.empty(),
-                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT)));
+        WissenSichtbarkeitRepository repository = new WissenSichtbarkeitRepository() {
+            @Override
+            public List<UUID> sichtbareSeiten(ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return List.of();
+            }
 
+            @Override
+            public boolean aktuelleSeiteSichtbar(UUID seiteId,
+                    ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return false;
+            }
+
+            @Override
+            public boolean versionSichtbar(UUID seiteId, int nummer,
+                    ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return false;
+            }
+        };
+        WissenSichtbarkeit sichtbar = new WissenSichtbarkeit(repository);
         for (Rolle rolle : Rolle.values()) {
             assertThat(sichtbar.versionSichtbar(benutzer(rolle), SEITE_NORMAL, 1)).as(rolle.code()).isFalse();
         }
     }
 
-    @Test
-    void versionOhneGespeicherteHuelleGiltAlsIntern() {
-        WissenSichtbarkeit sichtbar = versionen(
-                Optional.of(new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of(DOKUMENT))),
-                new WissensHuelleZugriff(SEITE_NORMAL, WissensStufe.NORMAL, Set.of()));
-
-        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.MITARBEITER), SEITE_NORMAL, 1)).isFalse();
-        assertThat(sichtbar.versionSichtbar(benutzer(Rolle.GESCHAEFTSSTELLE), SEITE_NORMAL, 1)).isTrue();
-    }
-
-    private static WissenSichtbarkeit versionen(Optional<WissensHuelleZugriff> seite, WissensHuelleZugriff version) {
+    private static WissenSichtbarkeit sichtbarkeit() {
         WissenSichtbarkeitRepository repository = new WissenSichtbarkeitRepository() {
             @Override
-            public List<WissensHuelleZugriff> aktuelleSeiten() {
-                return seite.stream().toList();
+            public List<UUID> sichtbareSeiten(ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return regel.intern() ? List.of(SEITE_NORMAL, SEITE_INTERN) : List.of(SEITE_NORMAL);
             }
 
             @Override
-            public Optional<WissensHuelleZugriff> aktuelleSeite(UUID seiteId) {
-                return seite.filter(s -> s.seiteId().equals(seiteId));
+            public boolean aktuelleSeiteSichtbar(UUID seiteId,
+                    ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return seiteId.equals(SEITE_NORMAL) || (seiteId.equals(SEITE_INTERN) && regel.intern());
             }
 
             @Override
-            public Optional<WissensHuelleZugriff> version(UUID seiteId, int nummer) {
-                return Optional.of(version).filter(v -> v.seiteId().equals(seiteId));
+            public boolean versionSichtbar(UUID seiteId, int nummer,
+                    ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
+                return aktuelleSeiteSichtbar(seiteId, regel);
             }
         };
-        return new WissenSichtbarkeit(repository, (benutzer, dokumentId) -> true);
-    }
-
-    private static WissenSichtbarkeit sichtbarkeit(List<WissensHuelleZugriff> seiten, Set<UUID> sichtbareDokumente) {
-        WissenSichtbarkeitRepository repository = new WissenSichtbarkeitRepository() {
-            @Override
-            public List<WissensHuelleZugriff> aktuelleSeiten() {
-                return seiten;
-            }
-
-            @Override
-            public Optional<WissensHuelleZugriff> aktuelleSeite(UUID seiteId) {
-                return seiten.stream().filter(s -> s.seiteId().equals(seiteId)).findFirst();
-            }
-
-            @Override
-            public Optional<WissensHuelleZugriff> version(UUID seiteId, int nummer) {
-                return aktuelleSeite(seiteId);
-            }
-        };
-        return new WissenSichtbarkeit(repository, (benutzer, dokumentId) -> sichtbareDokumente.contains(dokumentId));
+        return new WissenSichtbarkeit(repository);
     }
 
     private static Benutzer benutzer(Rolle rolle) {
