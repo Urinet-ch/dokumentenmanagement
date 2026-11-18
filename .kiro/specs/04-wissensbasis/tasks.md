@@ -65,6 +65,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - `archiv.wissen.*` (Modell über `archiv.ki.basis-url`, kein eigener URL-Schlüssel); `ki_verbrauch` mit neuen Zwecken; Zeitgrenzen der neuen Auftragstypen
   - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 300'000 und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
   - Prompt-Injection-PDF: Ergebnis nur als Entwurf mit Befunden
+  - Teil erledigt (PR #307, 14.1a): Port `DokumentEreignisse` in der Archivierungstransaktion, `POST /dokumente/{id}/wissen-ingest` mit Seitenbereich (A16, 404 vor 403), Vorprüfung, Schätzung, Monatsbudget (Kalendermonat Zürich), Reihenfolge `WARTEND`/`IN_ARBEIT`, Changeset `047-wissen-ingest-indizes`, Szenarien `features/wissen/ingest.feature`, `JdbcWissenIngestTest` (design.md, «Zwischenstand 14.1a»). Rest 14.1b: Handler und Teilaufträge, WireMock-Szenarien, Nachholen der Quellen mit Zwischenstand-Hinweis, erneute Prüfung des Monatsbudgets beim Hochstufen `WARTEND` → `IN_ARBEIT`; offen für Fabian: Schätzformel gegen Startwert `budget-tokens`
   - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
 

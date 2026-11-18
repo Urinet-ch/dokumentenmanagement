@@ -3643,23 +3643,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WissenIngestAuftrag"
+        "400":
+          description: Seitenbereich ungültig
+        "403":
+          description: Rolle darf keinen Ingest starten
+        "404":
+          description: Dokument unbekannt oder nicht sichtbar
         "409":
-          description: Ingest läuft oder wartet bereits für dieses Dokument
+          description: "Dokument nicht archiviert, oder Ingest läuft oder wartet bereits"
         "422":
-          description: Dokument ist keine Wissensquelle oder Seitenbereich ungültig
+          description: Dokument ist keine Wissensquelle
         "429":
           description: Monatsbudget der Wissensbasis erschöpft
         "401":
           description: Not Authorized
-        "403":
-          description: Not Allowed
-        "400":
-          description: Bad Request
       tags:
       - Wissen Ingest Resource
       security:
       - SecurityScheme:
         - inhaber
+        - mitarbeiter
+        - treuhaender
         - geschaeftsstelle
   /api/v1/eingangskorb:
     get:

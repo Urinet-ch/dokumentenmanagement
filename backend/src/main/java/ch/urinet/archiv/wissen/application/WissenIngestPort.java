@@ -9,14 +9,14 @@ public interface WissenIngestPort {
 
     Optional<Quelle> quelleLaden(UUID dokumentId);
 
-    boolean entwurfFuerDokumentOffen(UUID dokumentId);
+    /** Ein Ingest-Entwurf des Dokuments läuft oder wartet ({@code IN_ARBEIT}, {@code WARTEND}; Req 5.10). */
+    boolean entwurfFuerDokumentLaufend(UUID dokumentId);
 
     boolean hatAktivenIngest();
 
     UUID entwurfAnlegen(NeuerEntwurf entwurf);
 
-    void dokumentHinweisSetzen(UUID dokumentId, String hinweis);
-
+    /** Summe der Tokens aus {@code ki_verbrauch} mit Zweck {@code WISSEN_*} im Zeitraum [von, bis) (Req 13.6). */
     long verbrauchImZeitraum(Instant von, Instant bis);
 
     record Quelle(String art, String status, String vertraulichkeit, String volltext, Integer seiten,

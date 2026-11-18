@@ -49,13 +49,13 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
-    public boolean entwurfFuerDokumentOffen(UUID dokumentId) {
+    public boolean entwurfFuerDokumentLaufend(UUID dokumentId) {
         zeitgrenze();
         return em().createNativeQuery("""
                         select exists (
                             select 1 from wissens_entwurf
                             where anlass = 'INGEST' and dokument_id = :id
-                                and status in ('WARTEND', 'IN_ARBEIT', 'OFFEN'))""")
+                                and status in ('WARTEND', 'IN_ARBEIT'))""")
                 .setParameter("id", dokumentId).getSingleResult().equals(Boolean.TRUE);
     }
 
@@ -90,18 +90,6 @@ public class JdbcWissenIngest implements WissenIngestPort {
                 .setParameter("erstelltVon", entwurf.erstelltVon())
                 .executeUpdate();
         return entwurf.id();
-    }
-
-    @Override
-    public void dokumentHinweisSetzen(UUID dokumentId, String hinweis) {
-        zeitgrenze();
-        em().createNativeQuery("""
-                        update dokument set hinweis = case
-                            when hinweis is null or hinweis = '' then :hinweis
-                            when position(:hinweis in hinweis) > 0 then hinweis
-                            else hinweis || E'\\n' || :hinweis end
-                        where id = :id and status = 'ARCHIVIERT'""")
-                .setParameter("hinweis", hinweis).setParameter("id", dokumentId).executeUpdate();
     }
 
     @Override
