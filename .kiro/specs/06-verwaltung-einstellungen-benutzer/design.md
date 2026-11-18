@@ -1,0 +1,490 @@
+# Design Document — 06 Einstellungen, Benutzer und Berechtigungen verwalten
+
+## Overview
+Der Inhaber eines Mandanten pflegt in der Web-App (1) die Einstellungen seines Mandanten, (2) seine Benutzer und (3) deren
+Rollen. Dieses Design legt fest, **wo jede Einstellung lebt** (drei Klassen), **wie die Benutzerverwaltung an Keycloak
+angebunden ist** (Admin-REST-API mit eigenem, eng geschnittenem Dienstkonto; ADR-015) und **welche Regeln** verhindern, dass
+daraus ein Weg für Rechteausweitung, Mandantenüberschreitung oder Kontoübernahme wird. Alles Bestehende bleibt massgebend:
+Rollen und Rechtematrix (Spec 01, 2.2 und 2.6), Mandant nur aus dem Token (Regel 1), Protokolle anfügend (Regel 4),
+Konfiguration je Mandant mit Versionen (Spec 05), Benutzerverzeichnis (Spec 01, 10.10).
+
+Warum eine neue Spec und nicht eine Erweiterung von Spec 05: Spec 05 regelt die *fachliche Ordnung* eines Mandanten
+(Dokumentarten, Klassifikationen, Regeln); Benutzer und Rollen sind Identität und Sicherheit, hängen an Keycloak und an
+einem eigenen Bedrohungsmodell und haben keine Konfigurationsversionen. Gemeinsam ist nur die Mechanik der
+Einstellungen (Abschnitt `einstellungen` der Konfiguration); die steht in Spec 05 und wird hier nur erweitert, nicht
+nachgebaut. Spec 05 erhält dafür Verweise (Folgeänderungen), keinen Umbau.
+
+## Architektur und Entscheid (ADR-015)
+```mermaid
+flowchart LR
+  PWA[Web-App /verwaltung/…] -->|Bearer, Mandant aus Token| API[Archiv-API\nbenutzer/ + konfiguration/]
+  API -->|Abschnitt einstellungen,\nVersionen, Protokoll| DB[(PostgreSQL\nSchema m_code)]
+  API -->|Client-Credentials,\nintern http://kc:8080\nZeitgrenze 5 s| KC[Keycloak\nRealm urinet-archiv]
+  KC -->|Einmal-Link per E-Mail| MAIL[(SMTP)]
+  BET[Betreiber\nAdmin-Kommando] -->|dasselbe Dienstkonto| KC
+  USER[Eingeladene Person] -->|Link, Passwort, TOTP| KC
+```
+Keycloak bleibt Identitätsquelle (Benutzer, Zugangsdaten, TOTP, Rollen, Attribut `mandant`). Das Archiv ruft die
+Admin-API nur über den Client `archiv-verwaltung` auf; die Mandantentrennung erzwingt das Archiv, indem es den Mandanten
+aus dem Token nimmt und jeden Zielbenutzer vor jeder Aktion auf `mandant` prüft.
+
+### Verglichene Alternativen
+| Option | Vorteile | Nachteile | Entscheid |
+| --- | --- | --- | --- |
+| **A. Admin-REST-API mit eigenem Dienstkonto, Trennung im Archiv** | Keycloak bleibt Quelle (MFA, Passwort-Hashing, Einladung, Ereignisse); kein zweiter Identitätsspeicher; passt zum bestehenden Attribut `mandant`; kein Wegwerf-JVM mehr für Benutzer (spart bis 256 MiB Spitze auf Stufe A) | Das Dienstkonto kann technisch Benutzer **aller** Mandanten ändern; die Trennung hängt am Archiv-Code | **gewählt**, mit Härtung (Blast-Radius unten) |
+| B. Keycloak «Organizations» je Mandant | eingebautes Mandantenmodell, Einladungsfluss, Anmeldung je Organisation | Admin-Rechte für Organisationen sind grob (voraussichtlich Realm-Ebene, in Aufgabe 19.1 zu prüfen); der Claim `mandant` (Regel 1) wird durch den Claim `organization` ersetzt, ein Benutzer kann in mehreren Organisationen sein (heute: genau ein Wert); Umbau von Realm, `AnmeldungMandantAdapter`, Tests und Spec 03, 8.3; zusätzliche Tabellen und Caches in Keycloak (400 MiB auf Stufe A) | abgelehnt; erneut prüfen ab drei Mandanten oder mit mandantenspezifischen Identity Providers |
+| C. Gruppe je Mandant, Zugriff über feingranulare Admin-Rechte (FGAP v2) | Keycloak erzwingt die Trennung selbst, wenn ein Dienstkonto je Mandant besteht | Zweite Wahrheit neben dem Attribut `mandant` (Gruppe und Attribut können auseinanderlaufen); ein Dienstkonto je Mandant widerspricht Spec 03, 8.3 (keine mandantenspezifischen Clients) und vervielfacht Secrets; FGAP v2 ist komplex im Betrieb | abgelehnt; FGAP v2 nur als Härtung für die Rollenzuweisung (unten) |
+| D. Nur Betreiber (heute: `kcadm.sh`) | kein neues Dienstkonto, kein neuer Angriffsweg | Betreiber als Engpass, Passwort im Terminal, kein Protokoll im Archiv, Fehlerrisiko von Hand | bleibt als Notfallweg und für den ersten Inhaber eines Mandanten |
+| E. Admin-Konsole von Keycloak öffentlich, Inhaber als delegierter Admin | keine Eigenentwicklung | öffentliche Admin-Oberfläche (Spec 01 schliesst das aus), Inhaber erhält Realm-Rechte, kein Protokoll im Archiv, Mandantentrennung nur über FGAP | abgelehnt |
+| F. Benutzerspeicher im Archiv (eigener Identity Provider) | volle Kontrolle | eigene Passwort-, MFA-, Reset-Logik; ADR-001 und Spec 01, 2.1 bleiben bei Keycloak | abgelehnt |
+
+### Blast Radius: die Archiv-API wird kompromittiert
+Wer die API übernimmt, hat die Datenbankrolle `archiv_app` (alle Mandanten-Schemas) und die S3-Schlüssel der Anwendung; die
+Dokumente sind dann ohnehin lesbar. Das Dienstkonto fügt **neue** Möglichkeiten hinzu, die hier eingegrenzt werden:
+
+| Möglichkeit mit dem Dienstkonto | Eingrenzung | Restrisiko |
+| --- | --- | --- |
+| Benutzer anlegen, auch mit Rolle `inhaber`, in jedem Mandanten | nur `manage-users`; Alarm bei jeder Vergabe von `inhaber` (6.7); täglicher Abgleich meldet jede Rolle `inhaber` ohne Vorgang im Protokoll (6.5); Keycloak-Admin-Ereignisse als zweite Spur (6.9) | Einbruch bleibt bis zum Alarm unbemerkt (höchstens Minuten bis 24 h) |
+| Passwörter setzen, Zugangsdaten zurücksetzen, Benutzer übernehmen | das Archiv ruft `reset-password` nie auf (ArchUnit); technisch erlaubt `manage-users` es dennoch; Ereignisse (Admin-Ereignisse) und Abgleich erfassen Änderungen von Zugangsdaten | wie oben |
+| Realm, Clients, Identity Provider, Authentifizierungsflüsse, Redirect-URIs ändern | **nicht möglich**: Dienstkonto ohne `manage-realm`, `manage-clients`, `manage-identity-providers`, `manage-authorization`, `realm-admin`; kein Zugang zum Realm `master` | keines |
+| Sich selbst oder anderen Realm-Admin-Rechte geben | Rollenzuweisung (Realm-Rollen) auf die vier Archiv-Rollen begrenzen: Das Archiv sendet nur diese; Härtung mit feingranularen Admin-Rechten (FGAP v2, Recht `map-roles` nur auf diese vier Rollen), in Aufgabe 19.1 gegen Keycloak 26.8.2 zu prüfen | ohne FGAP v2: Archiv-Code ist die einzige Sperre |
+| Benutzer massenhaft löschen oder sperren (Verfügbarkeit) | Raten, Höchstzahl, Alarm (6.6, 6.7); Notfallweg Betreiber; Sicherung enthält die Keycloak-Datenbank (Spec 01, Plattform und Betrieb) | Wiederherstellung aus der Sicherung nötig |
+| Geheimnis des Dienstkontos entwenden | nur Datei `/run/secrets/keycloak_verwaltung_secret`, kein Umgebungswert, nie im Log; Rotation über den definierten Weg (19.3, 21.5); Admin-API nur im internen Netz erreichbar, nicht öffentlich | wer den Container übernimmt, hat das Geheimnis |
+
+Fazit: Der Zugewinn eines Angreifers ist begrenzt auf Persistenz und Sperren im Realm der Archiv-Benutzer. Der Betreiber
+behält den Keycloak-Admin (Realm `master`, nur intern) als Notfallweg. Eine Härtung durch Signatur statt Secret
+(`private_key_jwt`) bleibt eine spätere Option, solange die Secret-Datei-Konvention gilt.
+
+### Speicherbedarf auf Stufe A
+Keycloak läuft dort mit `mem_limit` 400 MiB und `-Xmx96m`. Option A belastet es nur durch einzelne Admin-Aufrufe
+(Seiten von höchstens 50 Benutzern, höchstens 2 gleichzeitig). Die Anbindung im API-Container nutzt den JDK-HTTP-Client
+und Jackson ohne Keycloak-Bibliothek (Heap-Zuwachs höchstens 4 MiB, Requirement 5.10). Die Wegwerf-Container mit
+`kcadm.sh` (256 MiB) entfallen für Benutzer; das senkt die Spitze der VPS. Option B bräuchte zusätzliche Caches und
+Tabellen in Keycloak, Option C je Mandant ein Dienstkonto samt Token-Caches; beides ohne Nutzen für zwei Mandanten.
+
+## Inventar der Einstellungen
+Stand: `application.properties` (Präfixe `archiv.*`), Umgebung und Compose, Konfiguration je Mandant (Spec 05),
+`wissens_einstellung` (Spec 04), `public.mandant` und `public.mandant_budget` (Spec 01 und 03). Klassen: **(a)** im
+Betrieb in der App änderbar, je Mandant, mit Versionen, Prüfung und Protokoll; **(b)** nur über Deployment oder
+Konfigurationsdatei; **(c)** Geheimnis. `EinstellungsInventarTest` (Requirement 1.1) prüft die Präfixe dieser Tabelle gegen
+`application.properties`.
+
+### Klasse (a): in der App änderbar (Einstellungskatalog)
+| Einstellung | Heute | Grenzen und Standard | riskant | Recht | Begründung der Klasse |
+| --- | --- | --- | --- | --- | --- |
+| `geschaeftsjahrEnde` | `public.mandant`, Spec 05 | gültiges Datum `MM-TT`, Standard `12-31` | ja | A20 | betrifft nur den Mandanten; wirkt auf Fristen künftiger Bestätigungen, nicht auf Sperren (Regel 2); schon Teil der Konfiguration (Spec 05, 1.1) |
+| `kennungen.uid`, `kennungen.ibans` | `public.mandant`, Spec 05 | UID im Format der UID-Nummer, höchstens 20 IBAN, Standard leer | nein | A20 | prägt den KI-Prompt über Hinweise; Personenbezug minimal; im Protokoll nur «geändert» (Spec 05, 1.3) |
+| `branding.name` | `archiv.branding.mandanten.<code>.name` | 1 bis 60 Zeichen, ohne Steuerzeichen und Markup, Standard der Instanz | nein | A20 | nur Darstellung; **nicht** `public.mandant.name` (geht in den Prompt, an Gate 0 gebunden, bleibt (b)) |
+| `branding.primaerfarbe` | `archiv.branding.mandanten.<code>.primaerfarbe` | `#rrggbb`, Kontrast zu `#05070c` mindestens 4.5:1, Standard `#eeb111` | nein | A20 | nur Darstellung; die bestehende Branding-Prüfung (`BrandingPruefung`) bleibt |
+| `chat.aufbewahrungMonate` | `archiv.chat.aufbewahrung` (`P12M`, alle Mandanten) | ganze Zahl 1 bis 60, Standard 12 | ja, wenn kürzer | A20 | Datenschutz je Mandant (Fragen im internen Chat); eigene Daten des Mandanten |
+| `webseitenChat.aufbewahrungTage` | `archiv.mandant.<code>.chat-aufbewahrung-tage`, Standard `archiv.webseite.chat.aufbewahrung-tage` | ganze Zahl 1 bis 365, Standard 90 (`vhf-gsk` 30, Spec 03, 6.5) | ja, wenn kürzer | A20 | Datenschutz je Mandant; Grenzen schon in Spec 03 |
+| `wissen.budgetTokens` | `wissens_einstellung`, `archiv.wissen.budget-tokens` | 10'000 bis 5'000'000, Standard 600'000 | nein | A19 | Budget je Ingest des Mandanten; Obergrenze schützt die Kosten |
+| `wissen.lintBudgetTokens` | `wissens_einstellung`, `archiv.wissen.lint-budget-tokens` | 10'000 bis 1'000'000, Standard 100'000 | nein | A19 | wie oben |
+| `wissen.monatsbudgetTokens` | `wissens_einstellung`, `archiv.wissen.monatsbudget-tokens` | 100'000 bis 20'000'000, Standard 1'000'000 | ja, wenn über dem Doppelten des Standards | A19 | Kosten des Betreibers; Erhöhung braucht Bestätigung |
+| `wissen.lintZeitplan` | `wissens_einstellung`, `archiv.wissen.lint-zeitplan` | Wochentag und Stunde (0 bis 23), Standard Sonntag 04:00 (Europe/Zurich) | nein | A19 | Zeitpunkt, keine Last-Grenze; freier Cron-Text bleibt (b), damit kein Mandant die Instanz mit Aufträgen belegt |
+| Dokumentarten, Klassifikationen, Regeln, KI-Texte | Spec 05 | wie Spec 05 | wie Spec 05 | A11 | schon eigene Mechanik in Spec 05; die Seite verweist nur dorthin |
+
+### Klasse (b): nur über Deployment oder Konfiguration
+| Einstellung (Präfix) | Wo | Begründung |
+| --- | --- | --- |
+| `archiv.rolle`, `archiv.stufe`, `archiv.db.*`, `archiv.secrets.*`, `quarkus.*` | `application.properties`, Compose | bestimmen die Laufart und den Start; ein Fehler legt die Instanz still |
+| JVM-Optionen, `mem_limit`, `cpus`, Traefik-Labels und Raten je Quelladresse, Netze | Compose, Infra-Repo | Speicherbudget der Stufen A und B; gilt für alle Mandanten gemeinsam |
+| `archiv.ablage.*` (Bucket-Präfix, Sperrmodus, URL-Gültigkeit, Stub) | Konfiguration | Unveränderbarkeit nach GeBüV (ADR-007); darf kein Mandant lockern |
+| `archiv.ki.*` (Basis-URL, Produkt-ID, Modelle, Reranker, Chat-Runden, Temperatur, Zeitgrenzen, Stubs) | Konfiguration | Datenstandort (Regel 6), Gate 0 und Golden-Lauf (Modellwechsel braucht neuen Lauf), Kosten |
+| `archiv.tsa.*`, `archiv.manifest.*`, `archiv.prueflauf.*` | Konfiguration | Nachweis nach GeBüV, gemeinsame Dienste |
+| `archiv.worker.*`, `archiv.auftrag.*` (Zeitgrenzen), `archiv.ocr.*`, `archiv.arbeit.*`, `archiv.upload.*`, `archiv.import.*`, `archiv.http.*`, `archiv.suche.*`, `archiv.export.*`, `archiv.abgleich.*`, `archiv.dokumentart.*` (Zeitgrenzen) | Konfiguration | Ressourcen und Schutz der Instanz (Speicherbudget, Zeitgrenzen); wirken auf alle Mandanten |
+| `archiv.api-token.*`, `archiv.webseite.*` (Grenzen je Schlüssel, Streams, Absender-Datei, Rotation) und `archiv.webseite.chat.*` (Raten, Gespräche, Fenster) | Konfiguration und Betriebsdatei | Schutz vor Überlast und Missbrauch; ein Mandant darf seine eigene Grenze nicht anheben; Webseiten-Schlüssel legt und rotiert der Betreiber (Spec 03, 12.3) |
+| `archiv.chat.*` (Raten je Benutzer, Gleichzeitigkeit, Aufräumzeit) | Konfiguration | Schutz der Instanz |
+| `archiv.mail.*` (Postfach, Intervall, Ordner, Grössen) | Konfiguration | ein Postfach und ein Abrufer je Instanz (Spec 02) |
+| `archiv.ueberwachung.*`, `archiv.oidc.waechter.*`, `archiv.kennzahlen.*`, `archiv.mandant.bericht.*` | Konfiguration | Betrieb und Alarmschwellen der Instanz |
+| `archiv.benachrichtigung.empfaenger.<code>` | Umgebung `ARCHIV_ALARM_EMPFAENGER_<CODE>` | E-Mail-Adressen sind Personendaten und gehören nicht in unveränderliche Konfigurationsversionen; Umleiten der Alarme wäre ein Missbrauchsweg (Entscheid Fabian offen, Open Points) |
+| `archiv.branding.mandanten.<code>.domain`, `…logo-url` | Konfiguration, Traefik | Domain ist DNS und Router; eine fremde Logo-URL wäre ein Tracking- und Phishing-Weg |
+| `archiv.mandant.<code>.fristen.*`, `….kennzahl.*` | Konfiguration | fachliche Werte von `urinet`; Kandidaten für Spec 05, nicht für diese Spec |
+| `public.mandant.name`, `public.mandant.verwaltung_rollen`, `public.mandant_budget` (Monatsbudget öffentlicher Chat) | Datenbank, Admin-Kommando | Name geht in den Prompt (Gate 0); Rollensatz und Kostenhoheit gehören dem Betreiber; die Oberfläche zeigt Budget und Verbrauch nur lesend |
+| `ki_freigegeben` | Admin-Kommando (Spec 05, 8.4) | gebunden an die Abnahme; nie über die Oberfläche |
+| Rollen und Rechtematrix | Code (`Rechtematrix`) | Quelle der Wahrheit; Änderung ist ein Release mit Test |
+| Realm-Konfiguration von Keycloak (Flows, TOTP, Passwort-Richtlinie, Clients, SMTP) | Realm-Export, `kcadm.sh` | Sicherheit des Zugangs; nur Betreiber |
+| `archiv.verwaltung.*` (Zeitgrenzen, Raten, Gültigkeiten, Höchstzahl) | Konfiguration | Schutz vor Missbrauch der Verwaltung selbst (Tabelle unten) |
+
+### Klasse (c): Geheimnisse (nie in der Oberfläche)
+| Geheimnis | Datei unter `/run/secrets/` | Rotation |
+| --- | --- | --- |
+| Datenbank (`archiv_db_*`, `keycloak_db`), Keycloak-Admin (`keycloak_admin`) | siehe Spec 01 | GitHub-Secret, Deploy; Notfallunterlagen |
+| S3-App-Schlüssel (`s3_app_zugang_*`) | Spec 01 | neuer Schlüssel im Projekt, GitHub-Secret, Deploy |
+| KI-Token (`infomaniak_ai_token`), Zeitstempel (`tsa_zugang`) | Spec 01 | wie oben |
+| Manifest-Schlüssel (`archiv_manifest_key`), Datenschlüssel (`archiv_data_key`) | Spec 01 | nur mit Plan (Schlüsselwechsel des Manifests, Neuverschlüsselung) |
+| Postfach (`archiv_smtp_passwort`), SMTP von Keycloak (`keycloak_smtp_passwort`, neu) | Spec 01, diese Spec | Passwort im Postfach ändern, GitHub-Secret, Deploy |
+| Google (`google_client_secret`) | Spec 01, O.8 | wie oben |
+| **Dienstkonto (`keycloak_verwaltung_secret`, neu)** | diese Spec | Keycloak erzeugt ein neues Client-Secret (`kcadm.sh` im Wegwerf-Container), GitHub-Secret `KEYCLOAK_VERWALTUNG_SECRET`, Deploy; danach altes ungültig; Ablauf in `docs/` (Aufgabe 21.5); Keycloak kann zwei Secrets mit Überlappung führen (Secret-Rotation, in 19.1 prüfen) |
+| API-Tokens, Webseiten-Schlüssel | nur Hash in der Datenbank (Spec 01, 2.5) | widerrufen und neu ausstellen (A14, Betreiber-Kommando) |
+Die Oberfläche zeigt für kein Geheimnis einen Status; das Fehlen meldet nur die Startprüfung.
+
+## Components and Interfaces
+```
+backend/src/main/java/ch/urinet/archiv/
+  benutzer/                      (neu, hexagonal)
+    domain/      Benutzer, Benutzerstatus, Vergaberegeln (Eskalationsschutz, letzter Inhaber), Vorgang, Antrag
+    application/ BenutzerVerwaltung (Use Cases), Abgleich, StepUp, VerwaltungGrenzen
+    adapter/in/rest/   BenutzerResource, RollenResource, AntragResource
+    adapter/in/kommando/ InhaberEinladen, BenutzerAbgleichen   (Admin-Kommando, Spec 01, 1.3)
+    adapter/out/keycloak/ KeycloakAdminAdapter (Port IdentitaetsDienst)
+    adapter/out/persistence/ JdbcBenutzerStatus, JdbcVerwaltungAntrag, JdbcVorgangsSperre, JdbcTokenWiderruf
+  konfiguration/                 (Spec 05, hier erweitert)
+    domain/      Einstellungskatalog, Einstellung (Typ, Grenzen, Standard, Risiko, Recht), Auswirkung
+    application/ EinstellungenVerwaltung (lesen, vorschau, aendern, zuruecksetzen)
+    adapter/in/rest/ MandantEinstellungenResource (erweitert)
+  sicherheit/                    (Spec 01, hier erweitert)
+    domain/Rechtematrix, Aktion (A20–A23), RechteUebersicht
+    adapter/in/rest/ ZugangFilter (+ Token-Widerruf, Step-up), SicherheitsHeader
+```
+- **Port `IdentitaetsDienst`** (`benutzer/application`, driven): `benutzerSuchen(mandant, q, seite)`, `benutzerLesen(id)`,
+  `anlegen(Benutzer, rolle)`, `aktualisieren(id, Aenderung)`, `rolleSetzen(id, rolle)`, `aktivieren(id, boolean)`,
+  `einladen(id, aktionen, gueltigkeit)`, `sitzungenBeenden(id)`, `otpEntfernen(id)`, `sperreAufheben(id)`,
+  `googleLoesen(id)`, `loeschen(id)`, `inhaberZaehlen(mandant)`. Ein Dev-Stub (Speicher) für Tests ohne Keycloak; der
+  Adapter hat eine **Positivliste** der Aufrufe (Pfad und Methode); `KeycloakAdminPositivlisteTest` bricht ab bei jedem
+  anderen Pfad, insbesondere `reset-password`, `impersonation`, `/clients`, `/identity-provider`, `/authentication`,
+  `/components`, `/partial-import`, Rollen-Definitionen und `client-secret`.
+- **Aufrufe an Keycloak** (Realm `urinet-archiv`): `POST /protocol/openid-connect/token` (Client-Credentials, Token bis
+  30 Sekunden vor Ablauf wiederverwendet, ein Abruf gleichzeitig); `GET /admin/realms/…/users?q=mandant:<m>&max=50`,
+  `GET/POST/PUT/DELETE …/users[/{id}]`, `GET/POST/DELETE …/users/{id}/role-mappings/realm`, `GET …/roles/{rolle}/users`,
+  `PUT …/users/{id}/execute-actions-email?lifespan=&client_id=&redirect_uri=`, `POST …/users/{id}/logout`,
+  `GET/DELETE …/users/{id}/credentials[/{credId}]` (nur Typ `otp`), `GET/DELETE …/users/{id}/federated-identity/google`,
+  `DELETE …/attack-detection/brute-force/users/{id}`. Interne Adresse und Aussteller des Tokens sind in Aufgabe 19.1 zu
+  prüfen (`KC_HOSTNAME` zeigt auf die öffentliche Adresse; für den internen Weg nötigenfalls
+  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC`).
+- **Zeitgrenzen** (`archiv.verwaltung.keycloak.*`, Klasse (b)): Verbindung 2 s, Anfrage 5 s; zwei gleichzeitige Aufrufe
+  (`Semaphore`, Wartezeit 200 ms, sonst 503 `UEBERLASTET`); Schreibaufrufe nie wiederholt; Leseaufrufe höchstens einmal nach
+  200 ms; Schutzschalter nach 3 Fehlern in Folge innerhalb 30 s für 30 s (ohne Bibliothek, ein Zähler und ein Zeitstempel).
+  Keine Ausnahme der Keycloak-Meldungen in Antworten oder Logs (Requirement 5.6).
+- **Detail-Health:** Prüfung `identitaetsdienst` (Token holbar, Dienstkonto gültig); sie beeinflusst die Readiness der API
+  nicht (Requirement 5.8).
+
+### Vorgänge und Protokoll (Absicht und Abschluss)
+Ein Vorgang mit Wirkung in Keycloak lässt sich nicht in der Datenbank-Transaktion zurückrollen. Darum:
+1. Prüfungen in Reihenfolge: Anmeldung, Recht (A20 bis A23), Step-up, `If-Match`, Rate (aus dem Protokoll gezählt),
+   Formregeln, Ziel im Mandanten (404), Eskalationsschutz (403), Statusautomat und letzter Inhaber (409).
+2. Vorgangssperre des Mandanten holen (`public.verwaltung_vorgang`, ein Eintrag je Mandant, Ablauf nach 15 s); belegt:
+   409 `STATUS_KONFLIKT`.
+3. Transaktion 1: Protokolleintrag `phase=ANGEFRAGT` (mit `vorgangId`); Commit. Scheitert er: 500, Keycloak wird nicht
+   aufgerufen (Spec 01, 10.8).
+4. Aufrufe an Keycloak (mit Zeitgrenze); bei Fehler Kompensation (z. B. neu angelegten Benutzer entfernen).
+5. Transaktion 2: Protokolleintrag `phase=ABGESCHLOSSEN` oder `FEHLGESCHLAGEN` (bzw. `UNKLAR`, wenn die Kompensation
+   scheitert), Benutzerverzeichnis (`ANLAGE`, `AUSTRITT`), `benutzer_status`, Antrag, Token-Widerruf.
+6. Vorgangssperre freigeben (auch bei Fehler; sonst läuft sie nach 15 s ab).
+Der Abgleich (täglich, beim Start des Workers) findet Einträge `ANGEFRAGT` ohne Abschluss nach 5 Minuten, liest den
+Zustand in Keycloak und schreibt den Abschluss `UNKLAR` mit Alarm; er ändert nie etwas in Keycloak.
+
+### Statusautomat
+| Von \ Aktion | einladen | sperren | entsperren | deaktivieren | reaktivieren | löschen | Zugang zurücksetzen |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `EINGELADEN` | erneut senden | ja | – | ja | – | – | ja |
+| `AKTIV` | – | ja | – | ja | – | – | ja |
+| `GESPERRT` | – | – | ja | ja | – | – | – |
+| `DEAKTIVIERT` | – | – | – | – | ja (wird `EINGELADEN`) | ja, nach Frist | – |
+`AKTIV` entsteht nur, wenn der Benutzer den Ablauf der Einladung beendet hat (Keycloak: keine erforderlichen Aktionen mehr
+offen). Der Status ergibt sich aus Keycloak (`enabled`, erforderliche Aktionen, Zugangsdaten) und `benutzer_status`
+(Art der Sperre, Grund, seit). Eine Sperre durch fehlgeschlagene Anmeldungen (Keycloak, 5 Fehlversuche) zeigt die
+Verwaltung als «vorübergehend gesperrt»; «Entsperren» hebt sie auf (3.8).
+
+### Token-Widerruf
+`public.token_widerruf(benutzer, ab)`: Das Archiv setzt `ab` = jetzt nach der Wirkung in Keycloak (Requirement 4.9).
+`ZugangFilter` lehnt nach der Rollenprüfung jedes Access-Token einer Benutzeranmeldung mit `iat` < `ab` mit 401
+`NICHT_ANGEMELDET` ab; die Abfrage ist ein Primärschlüssel-Zugriff mit Zwischenspeicher von höchstens
+`archiv.verwaltung.widerruf-cache` (Standard 3 s, höchstens 5 s). Zeilen älter als 1 Tag räumt der Worker ab (die
+Lebensdauer des Access-Tokens beträgt 5 Minuten, Realm). Das Archiv liest `iat` aus dem JWT; API-Tokens sind nicht betroffen.
+
+### Step-up (Requirement 7.2)
+Erforderlich für: Benutzer anlegen, Rolle ändern, entsperren, reaktivieren, Zugang zurücksetzen, E-Mail ändern,
+Google-Verknüpfung lösen, löschen, Antrag bestätigen (Vier-Augen), Änderung riskanter Einstellungen (mit Bestätigung) und das
+Einspielen einer Konfigurationsdatei mit riskanten Änderungen. **Nicht** erforderlich (nur schützende oder umkehrbare
+Richtung): Lesen, sperren, deaktivieren, Einladung erneut senden. `StepUp` liest den Claim `auth_time` des Access-Tokens
+(Protokoll-Mapper im Client `archiv-pwa`, in 19.1 zu prüfen). Ist die Anmeldung älter als
+`archiv.verwaltung.step-up-gueltigkeit` (Standard `PT5M`, höchstens `PT15M`) oder fehlt der Claim, antwortet das Archiv mit
+401 `STEP_UP_NOETIG` und `WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="…", max_age="300"`
+(Muster RFC 9470). Die App leitet mit `max_age=0` und `prompt=login` zu Keycloak; der Browser-Flow
+`browser-totp-pflicht` verlangt dann Passwort und TOTP (der Cookie-Zweig greift bei `prompt=login` nicht; Nachweis im
+Test gegen echtes Keycloak).
+
+### Abgleich
+`Abgleich` liest die Benutzer des Mandanten (Seiten zu 50), gleicht mit `benutzer_status`, dem Benutzerverzeichnis und dem
+Protokoll ab und meldet die Abweichungen nach Requirement 6.5 als `BENUTZER_ABWEICHUNG` (Code: `ROLLE_OHNE_VORGANG`,
+`MEHRERE_ROLLEN`, `KEIN_MANDANT`, `MEHRERE_MANDANTEN`, `FREMDE_ROLLE`, `VORGANG_OFFEN`, `BENUTZER_FEHLT`). Er läuft im
+Worker täglich 01:20 (`archiv.verwaltung.abgleich.zeitplan`, Europe/Zurich) und als Admin-Kommando (Requirement 9.2); er
+verändert nie Keycloak.
+
+## Einstellungen (Mechanik, Katalog, Schnittstelle)
+**Eine Mechanik.** Der Abschnitt `einstellungen` des Konfigurationsabbilds (Spec 05) wächst um `branding`, `chat`,
+`webseitenChat` und `wissen`; fehlt ein Wert, gilt der Standard des Katalogs.
+```json
+"einstellungen": {
+  "geschaeftsjahrEnde": "12-31",
+  "kennungen": { "uid": null, "ibans": [] },
+  "branding": { "name": null, "primaerfarbe": null },
+  "chat": { "aufbewahrungMonate": null },
+  "webseitenChat": { "aufbewahrungTage": null },
+  "wissen": { "budgetTokens": null, "lintBudgetTokens": null, "monatsbudgetTokens": null,
+              "lintZeitplan": { "wochentag": null, "stunde": null } }
+}
+```
+`null` heisst «Standard». Der Einstellungskatalog (`Einstellungskatalog`, Domain) ist die einzige Quelle: Er erzeugt den
+Teil `einstellungen` von `konfiguration.schema.json` (`EinstellungskatalogSchemaTest` prüft, dass beide übereinstimmen),
+die Prüfung in `Konfiguration.pruefen` (Pfad, Code, Meldung, wie Spec 05), die Vorschau (`Auswirkung`) und die Oberfläche.
+Konfigurationsdatei, Export, Vergleich, Versionen, `If-Match`, Rundlauf und Protokoll `KONFIGURATION_AENDERN` gelten
+unverändert; neu ist nur die Bestätigung riskanter Änderungen und die erweiterte Prüfung.
+
+**Schnittstelle** (Erweiterung von `GET/PATCH /mandant/einstellungen`, Spec 01 und 05; die Form der bestehenden Felder
+bleibt, neue Felder kommen flach dazu; die genaue Form legt Aufgabe 20.2 gegen den Stand von Spec 05, 17.3 fest):
+
+| Methode | Pfad | Zweck | Recht |
+| --- | --- | --- | --- |
+| GET | `/mandant/einstellungen` | Katalog mit Werten, Block `betrieb` (nur lesen), `ETag` = Konfigurationsversion | A20 (je Gruppe A19, A11) |
+| PATCH | `/mandant/einstellungen?bestaetigt=<schluessel,…>` | Änderung als JSON Merge Patch (RFC 7396, `null` = Standard); `If-Match` Pflicht; 409 `BESTAETIGUNG_NOETIG`, 412, 428, 422 `KONFIGURATION_UNGUELTIG`, 401 `STEP_UP_NOETIG` | A20 (je Gruppe A19) |
+| POST | `/mandant/einstellungen/vorschau` | prüft und liefert die Auswirkung, ändert nichts | wie PATCH |
+| POST | `/mandant/einstellungen/zuruecksetzen` | `{ "gruppe": … }` auf Standard oder `{ "version": n }` auf den Stand der `einstellungen.*` jener Version; neue Version, Quelle `APP` | A20 |
+| GET, PUT | `/wissensbasis/einstellungen` | wie bisher (Spec 04), nach derselben Mechanik; `If-Match` mit der Konfigurationsversion | A19 |
+| GET | `/konfiguration/versionen[/{n}]` | Verlauf; die Seite der Einstellungen zeigt nur `einstellungen.*`, Kennungen ohne Werte | A11 |
+
+**Auswirkung** (`Auswirkung`, Beispiele): kürzere Aufbewahrung: «Beim nächsten Aufräumlauf werden N Fragen gelöscht» (Zahl aus
+der Datenbank, Text deutsch); `geschaeftsjahrEnde`: «Gilt für künftig bestätigte Dokumente; bereits archivierte Fristen und
+Sperren bleiben»; Monatsbudget über dem Doppelten: «Mögliche Kosten bis CHF …» (Richtwert aus Spec 01, KI-Kosten). Die
+Auswirkung ist reine Anzeige; die Prüfung entscheidet nie nach ihr.
+
+**Wirkung im Betrieb.** Die Dienste lesen die Werte nicht aus `application.properties`, sondern über den Port
+`MandantEinstellungen` (Spec 05) mit Zwischenspeicher nach Konfigurationsversion; der Wert aus der Eigenschaft ist der
+Standard, bis die Migration ihn übernommen hat (Requirement 1.4, 1.5). Die Eigenschaften `archiv.chat.aufbewahrung`,
+`archiv.mandant.<code>.chat-aufbewahrung-tage` und `archiv.branding.mandanten.<code>.{name,primaerfarbe}` bleiben als
+Startwerte bestehen (kein Löschen, kein Bruch bestehender Umgebungen).
+
+## Benutzer und Rollen (Schnittstelle)
+Alle Pfade unter `/api/v1`; JSON; Fehler als Problem Details; Mandant nur aus dem Token; jeder Zielbenutzer wird auf
+`mandant` geprüft (fremd oder unbekannt: 404 `NICHT_GEFUNDEN`).
+
+| Methode | Pfad | Zweck | Recht | Step-up |
+| --- | --- | --- | --- | --- |
+| GET | `/rollen` | Rollen des Mandanten mit Beschreibung und Rechte-Übersicht je Rolle | A21 | nein |
+| GET | `/benutzer?q=&seite=&groesse=` | Liste des Mandanten (höchstens 50) | A21 | nein |
+| GET | `/benutzer/{id}` | Detail mit Status, TOTP, Google, `ETag` | A21 | nein |
+| GET | `/benutzer/{id}/rechte` | Rechte-Übersicht aus der Rechtematrix | A21 | nein |
+| POST | `/benutzer` | anlegen und einladen: `{benutzername, email, vorname, nachname, rolle}` → 201 | A22 und A23 | ja |
+| PATCH | `/benutzer/{id}` | `{email, vorname, nachname}`; `If-Match` | A22 | ja bei E-Mail |
+| PUT | `/benutzer/{id}/rolle` | `{rolle}`; `If-Match` | A23 | ja |
+| POST | `/benutzer/{id}/einladung` | Einladung erneut senden | A22 | nein |
+| POST | `/benutzer/{id}/sperren` | `{grund}` | A22 | nein |
+| POST | `/benutzer/{id}/entsperren` | | A22 | ja |
+| POST | `/benutzer/{id}/deaktivieren` | `{grund}` | A22 | nein |
+| POST | `/benutzer/{id}/reaktivieren` | | A22 | ja |
+| POST | `/benutzer/{id}/zugang-zuruecksetzen` | | A22 | ja |
+| DELETE | `/benutzer/{id}/google-verknuepfung` | WO O.8 | A22 | ja |
+| GET | `/benutzer/{id}/loeschvorschau` | Zahl Protokolleinträge und Dokumente mit Verweis | A22 | nein |
+| POST | `/benutzer/{id}/loeschen` | `{grund}` | A22 | ja |
+| GET | `/benutzer/antraege` | offene Anträge (Vier-Augen) | A21 | nein |
+| POST | `/benutzer/antraege/{id}/bestaetigen`, `/ablehnen`, `/zurueckziehen` | durch einen zweiten Inhaber bzw. den Antragsteller | A23 | ja bei bestätigen |
+Jede Methode trägt `@ErfordertAktion(Aktion.A2x)`; `EndpunktWaechterTest` erzwingt das und verbietet an diesen Pfaden
+jeden Parameter `mandant`. Antworten tragen `Cache-Control: no-store`.
+
+### Eskalationsschutz (`Vergaberegeln`, Domain, framework-frei)
+- Vergebbar ist eine Rolle, die zum Satz des Mandanten (`verwaltung_rollen`) gehört und in der Rangfolge `inhaber`,
+  `geschaeftsstelle`, `mitarbeiter`, `treuhaender` nicht über der Rolle des Akteurs steht; wer die Rolle `inhaber` hat,
+  vergibt jede Rolle des Satzes. Wer keine A23 hat, vergibt nichts (A22 allein reicht nicht).
+- Niemand ändert die eigene Rolle und sperrt, deaktiviert, löscht oder setzt sich selbst zurück; Passwort und TOTP pflegt jeder
+  im Kontoportal.
+- Die Rolle `inhaber` vergibt nur ein Inhaber, mit Step-up und Alarm-Mail; ab zwei aktiven Inhabern mit Bestätigung durch
+  den zweiten (Antrag, `verwaltung_antrag`).
+- Letzter Inhaber: Vor jedem Vorgang, der einen Inhaber entfernt, zählt das Archiv die aktiven Inhaber des Mandanten
+  (Keycloak, gefiltert nach `mandant`) unter der Vorgangssperre.
+- Rollen ausserhalb der vier und Benutzer mit solchen Rollen fasst das Archiv nicht an; es zeigt sie nicht als verwaltbar
+  (Abweichung `FREMDE_ROLLE`).
+- Das Attribut `mandant` setzt nur das Anlegen (aus dem Token des Akteurs) und nie wieder jemand über die Verwaltung.
+
+### Einladung (Ablauf)
+Anlegen → Rolle setzen → `execute-actions-email` mit `VERIFY_EMAIL`, `UPDATE_PASSWORD`, `CONFIGURE_TOTP`, `lifespan` 24 h,
+`client_id=archiv-pwa`, Weiterleitung auf die App. Die Person erhält die E-Mail von Keycloak (Absender aus dem Realm), setzt
+Passwort (Richtlinie 12 Zeichen) und richtet TOTP ein; erst danach ist sie `AKTIV`. Das Archiv sieht und speichert den Link nie.
+Scheitert ein Schritt, kompensiert das Archiv (Requirement 3.7, 5.7). Ein Passwort «vergessen» gibt es nicht (Realm: kein
+Zurücksetzen durch den Benutzer, `resetPasswordAllowed=false`); der Inhaber setzt den Zugang zurück (3.13).
+
+### Löschen und Datenschutz (revDSG)
+Deaktivieren ist der Standard; es entfernt keine Daten. Löschen entfernt nur den Keycloak-Benutzer (E-Mail, Namen,
+Zugangsdaten, Verknüpfungen), nach Frist (30 Tage), Begründung und Step-up. Das Zugriffsprotokoll und das
+Benutzerverzeichnis (Kennung, Benutzername, Rolle) bleiben, weil sie nach Art. 957 ff. OR und GeBüV Nachweis dessen sind,
+wer Buchführungsbelege erfasst, geändert oder gesehen hat (Spec 01, 10.9) und nur Kennung und Benutzernamen enthalten (der
+Anzeigename gelangt bewusst nicht ins Verzeichnis, Spec 01, 10.10). Verweise `erstellt_von` und `person_benutzer` bleiben.
+**Pseudonymisierung** (Benutzername im Verzeichnis nach Ablauf ersetzen) wurde geprüft und ist hier **nicht** vorgesehen:
+Sie widerspräche der Regel 4 (keine Pseudonymisierung vor der Löschfunktion, Spec 01, 9.9) und liesse sich nach dem Löschen
+nicht mehr rückgängig machen; sie gehört zur Löschfunktion nach Ablauf der Aufbewahrung. Die Zuordnung der Rechtsgrundlagen
+(Art. 6 und 32 revDSG, Aufbewahrungspflicht) ist keine juristische Prüfung; sie braucht die Bestätigung von Fabian bzw. des
+Datenschutzberaters (Open Points). Ein gelöschter Benutzername wird nie wieder vergeben (Prüfung gegen das Verzeichnis), damit
+ein neuer Benutzer nie als früherer erscheint.
+
+## Realm-Änderungen (Keycloak, Betreiber)
+Mit Aufgabe 19.2 (Export und Tests) und 19.3 (Stufe A, [Fabian]); bestehende Anmeldung und Benutzer bleiben unverändert:
+1. Client `archiv-verwaltung`: vertraulich, Dienstkonto an, Standard-Fluss und Direct Grant aus, Secret `${KEYCLOAK_VERWALTUNG_SECRET}`
+   (Platzhalter, wie bei Google); Rollen des Dienstkontos `query-users`, `view-users`, `manage-users` (Client
+   `realm-management`); keine weiteren. Härtung (FGAP v2, `map-roles` nur auf die vier Archiv-Rollen) nach dem Spike 19.1.
+2. SMTP des Realms (Host, Port, Absender `archiv@urinet.ch`, Anzeigename «UriNet Archiv», Zugang als Secret
+   `keycloak_smtp_passwort`); ohne SMTP kann Keycloak keine Einladung senden.
+3. Passwort-Richtlinie `length(12) and notUsername and notEmail`.
+4. Access-Token-Lebensdauer ausdrücklich 300 s; Lebensdauer von Aktions-Links des Admins 86'400 s
+   (`actionTokenGeneratedByAdminLifespan`).
+5. Ereignisse: `eventsEnabled`, `adminEventsEnabled` (ohne Objekt-Darstellung), Aufbewahrung 400 Tage (34'560'000 s); mit
+   den Ereignissen von O.8 zusammen.
+6. Anzeige: E-Mail-Texte und Theme auf Deutsch (Aufgabe 20.8); Benutzerprofil unverändert (E-Mail, Benutzername und
+   `mandant` nur Admin).
+7. `auth_time` im Access-Token von `archiv-pwa` (Mapper, falls nicht schon vorhanden).
+Auf bestehenden Instanzen (Stufe A) legt Aufgabe 19.3 diese Änderungen einmalig per `kcadm.sh` im Wegwerf-Container an (der
+Realm-Import wirkt nur beim ersten Start); der Export bleibt die Quelle für Stufe B.
+
+## Data Models
+`db/public` (neue Changesets, bestehende unverändert):
+```
+mandant:                + verwaltung_rollen text[] not null default '{inhaber,mitarbeiter,treuhaender}'
+verwaltung_vorgang(mandant text pk, vorgang_id uuid, bis timestamptz)           -- Vorgangssperre (Lease)
+token_widerruf(benutzer text pk, ab timestamptz)                                -- Zeile mit Upsert; Aufräumen nach 1 Tag
+```
+`db/mandant` je Mandant:
+```
+benutzer_status(benutzer text pk, art text check (art in ('GESPERRT','DEAKTIVIERT')), seit timestamptz,
+                grund text, von text)                      -- Zeile entfällt beim Entsperren und Reaktivieren; Verlauf steht im Protokoll
+verwaltung_antrag(id uuid pk, art text check (art in ('INHABER_ROLLE','LOESCHEN')), ziel text, rolle text null,
+                  grund text, beantragt_von text, beantragt_am timestamptz, gueltig_bis timestamptz,
+                  status text check (status in ('OFFEN','BESTAETIGT','ABGELEHNT','ABGELAUFEN','ZURUECKGEZOGEN')),
+                  entschieden_von text null, entschieden_am timestamptz null)
+benutzer_verzeichnis:   anlass erhält die Werte ANLAGE und UEBERNAHME (Check-Constraint per neuem Changeset)
+zugriff_protokoll:      aktion erhält die Werte BENUTZER_ANLEGEN, BENUTZER_AENDERN, BENUTZER_LOESCHEN, ROLLE_ZUWEISEN,
+                        BENUTZER_ANTRAG, BENUTZER_ABWEICHUNG (Check-Constraint per neuem Changeset, falls vorhanden)
+```
+Es gibt keine Tabelle mit E-Mail, Namen oder Zugangsdaten. `benutzer_status` und `verwaltung_antrag` enthalten nur
+Kennungen (`sub`) und Texte der Inhaber (Grund). Der Konfigurationsabbild-Abschnitt `einstellungen` steht oben.
+
+## Error Handling (neue Codes)
+Die Aufgabe, die einen Code einführt, trägt ihn im selben PR in die Tabelle in Spec 01 design.md («Error Handling») und ins
+Enum `Fehlercode` ein (`FehlercodeSpecTest`); diese Spec ändert die Tabelle nicht selbst.
+
+| Status | Code | Wann |
+| --- | --- | --- |
+| 401 | `STEP_UP_NOETIG` | Aktion mit Step-up, letzte Anmeldung zu alt oder `auth_time` fehlt (Requirement 7.2); mit `WWW-Authenticate` |
+| 403 | `ESKALATION_VERBOTEN` | Rolle über der eigenen, nicht im Satz des Mandanten, eigene Rolle ändern, sich selbst sperren, deaktivieren, löschen oder zurücksetzen (Requirement 4.6) |
+| 409 | `LETZTER_INHABER` | Vorgang liesse den Mandanten ohne aktiven Inhaber (Requirement 4.7) |
+| 409 | `BENUTZER_EXISTIERT` | Benutzername oder E-Mail vergeben oder Benutzername je einer anderen Kennung zugeordnet; ohne Angabe des Felds (Requirement 3.4) |
+| 409 | `BESTAETIGUNG_NOETIG` | riskante Einstellung ohne Bestätigung; mit `auswirkung` (Requirement 2.6, 2.10) |
+| 502 | `IDENTITAETSDIENST_FEHLER` | Keycloak antwortet unerwartet (4xx, auch 401 oder 403 des Dienstkontos); löst Alarm aus (Requirement 5.6) |
+| 503 | `IDENTITAETSDIENST_NICHT_ERREICHBAR` | Keycloak nicht erreichbar, Zeit überschritten, 5xx oder Schutzschalter offen; mit `Retry-After` (Requirement 5.5, 5.6) |
+Bestehende Codes: 401 `NICHT_ANGEMELDET`, 403 `NICHT_ERLAUBT`, 404 `NICHT_GEFUNDEN`, 409 `STATUS_KONFLIKT`, 412
+`VERSION_KONFLIKT`, 413, 415 `MEDIENTYP_FALSCH`, 422 `KONFIGURATION_UNGUELTIG`, 428 `VERSION_FEHLT`, 429
+`ZU_VIELE_ANFRAGEN` (mit `grund = VERWALTUNG`), 503 `UEBERLASTET`.
+
+## Bedrohungsmodell (Pflicht)
+| Bedrohung | Szenario | Massnahme | Restrisiko | Nachweis |
+| --- | --- | --- | --- | --- |
+| Rechteausweitung | `mitarbeiter` oder Inhaber eines Mandanten erhöht sich oder andere über die eigene Rolle hinaus; Rolle `inhaber` unbemerkt vergeben | Rechtematrix A20 bis A23 nur `inhaber`; Eskalationsschutz (4.6); nur vier Rollen, nur Satz des Mandanten (4.3, 4.4); Alarm bei `inhaber` (6.7); Vier-Augen ab zwei Inhabern (4.11); Abgleich (6.5) | Inhaber vergibt Inhaber an Komplizen; sichtbar im Alarm und im Protokoll | `EskalationTest`, Szenarien 4.2 bis 4.7 |
+| Mandantenüberschreitung | Inhaber von Mandant A sieht oder ändert Benutzer von Mandant B (ID-Raten, Suche, Einladung mit fremdem `mandant`) | `mandant` nur aus dem Token; Prüfung des Zielbenutzers vor jeder Aktion; Antwort 404; Filter nach jeder Keycloak-Antwort (5.9); Attribut `mandant` nie änderbar; UUID als ID | Namenskollision realm-weit (siehe Enumeration) | `VerwaltungIsolationIT`, `EndpunktWaechterTest` |
+| Kontoübernahme über Einladungslinks | Link in fremdem Postfach, Link wiederverwendet, abgefangene Mail | Link einmal gültig, 24 h; nur an hinterlegte Adresse; Passwort und TOTP im selben Ablauf; Archiv kennt den Link nie; erneutes Senden begrenzt (3 in 24 h); Status «Einladung offen seit» | Wer das Postfach beherrscht, übernimmt den Zugang bis zum Ablauf; frühere Links bleiben bis zum Ablauf gültig | Szenario mit Mailpit, 3.2, 3.6, 7.4 |
+| Übernahme über die E-Mail-Adresse | Inhaber-Sitzung gestohlen, Adresse eines Benutzers geändert, Zugang zurückgesetzt | Adresse nur durch die Verwaltung (Profil: Benutzer nicht), Step-up, Bestätigung der neuen Adresse, Mitteilung an die alte, Rate (3 Mails in 24 h), Alarm bei Häufung | gestohlene Sitzung nach Step-up (Passwort und TOTP gestohlen) | 3.13, 3.14, 7.2 |
+| Fehlender zweiter Faktor | Verwaltungsaktion mit Sitzung ohne frische TOTP-Anmeldung; Benutzer ohne TOTP | TOTP für alle Anmeldungen (Spec 01, 2.1); Step-up mit `auth_time` und `prompt=login`; API-Tokens nie für die Verwaltung | `auth_time` stimmt nur, wenn Keycloak korrekt konfiguriert ist (Test gegen echtes Keycloak) | 7.2, 7.3, `ExportKeycloak` |
+| Geheimnis des Dienstkontos | Secret im Log, Repository oder Umgebung | Secret-Datei, kein Umgebungswert, `SecretPruefung`, Log ohne Werte, Rotationsweg, Dienstkonto ohne Realm-Admin, interne Adresse | Container-Übernahme | 5.4, `RealmExportTest`, Rotationsprobe |
+| Enumeration | Inhaber probiert Benutzernamen, um Mitglieder anderer Mandanten zu erkennen | Gleiche Antwort 404; `BENUTZER_EXISTIERT` ohne Feld und Mandant; Raten, Protokoll | Ja/Nein-Antwort für Namen im Realm bleibt für einen Inhaber ermittelbar | 7.5, 6.6 |
+| Kosten und Überlast | Massenhaftes Anlegen, Mailflut, Keycloak-Aufrufe | Höchstzahl 25, 10 Anlagen je Stunde, 3 Mails je Benutzer in 24 h, 2 gleichzeitige Aufrufe, Zeitgrenzen, Schutzschalter, Body ≤ 8 KiB | begrenzt | 3.5, 5.5, 6.6, 7.6 |
+| CSRF und Clickjacking | Fremde Seite löst Verwaltungsaktion aus oder blendet die Seite ein | Bearer-Token statt Cookie (kein CSRF); nur `application/json`; `frame-ancestors 'none'`, `X-Frame-Options: DENY`; `no-store` | Token im Speicher des Browsers (XSS) siehe Spec 01 | 7.7 |
+| Protokollintegrität | Verwaltungsaktion ohne Spur, Protokoll nachträglich geändert | Absicht vor Wirkung (6.4); nur anfügend; Abgleich findet fehlende Abschlüsse; Rechte der DB-Rolle unverändert; Admin-Ereignisse von Keycloak als zweite Spur | Keycloak-Ereignisse liegen in einer Datenbank, die der Betreiber kontrolliert | 6.4, 6.8, `KeinLoeschpfadTest` |
+| Ausfall oder Fehlverhalten von Keycloak | Zeitüberschreitung, halber Zustand, Wiederholungssturm | Zeitgrenzen, Kompensation, keine automatische Wiederholung von Schreibaufrufen, Schutzschalter, klare Fehler, Detail-Health | Vorgang `UNKLAR` bis zum Abgleich | 5.5 bis 5.8 |
+| Missbrauch durch Betreiber-Kommando | Admin-Kommando umgeht Schutz | gleiche Formregeln, Protokoll `betreiber:<name>`, nur im Wegwerf-Container mit Secret-Dateien | Betreiber ist vertraut | 9.1 |
+
+## Oberfläche (Frontend)
+- Routen: `/verwaltung/einstellungen`, `/verwaltung/benutzer`, `/verwaltung/benutzer/:id`; Menüpunkte «Einstellungen» (A20 oder
+  A19 oder A11, je nach Gruppe) und «Benutzer» (A21), nach Muster von Spec 01 («Die Oberfläche blendet nur aus, die API
+  prüft»). Ein Benutzer ohne Recht sieht bei Direktaufruf die Standardseite «Nicht gefunden» (kein Rechte-Hinweis).
+- Ordner `frontend/src/app/verwaltung/` (Einstellungen, Benutzer); Texte in `texte.de-CH.ts`; Komponenten standalone mit
+  Signals und OnPush; Angular Material; 375 px, Karten statt Tabellen; Statusmeldungen als `role="status"`.
+- Einstellungen: Gruppen als Abschnitte, je Feld Hilfetext, Grenzen, Standard, «wirksam ab», «auf Standard»; ein Knopf
+  «Vorschau» zeigt die Auswirkung (`/vorschau`); riskante Änderungen öffnen den Dialog der Auswirkung; Verlauf mit Vergleich.
+- Benutzer: Liste mit Status (Text und Symbol), Karte je Benutzer; Detail mit Rechte-Übersicht (gruppiert:
+  Dokumente lesen, erfassen und bestätigen, Verwalten, Wissensbasis), Aktionen je nach Status, Hinweis auf API-Tokens. Dialoge nach
+  Requirement 8.4; Löschen mit Eingabe des Benutzernamens.
+- Fehlermatrix nach Requirement 8.5; `STEP_UP_NOETIG`: Weiterleitung zu Keycloak mit `max_age=0` und `prompt=login`, danach genau
+  eine Wiederholung. Keine Offline-Warteschlange für Verwaltungsaktionen.
+
+## Admin-Kommando (Ergänzung zu Spec 01, 1.3)
+```
+archiv mandant anlegen <code> [--name <name>] [--geschaeftsjahr-ende MM-TT] [--rollen <rolle,…>]
+archiv mandant inhaber-einladen <code> --benutzer <name> --email <adresse> --vorname <v> --nachname <n> --wer <name>
+archiv benutzer abgleichen <code> [--pruefen] [--json]
+```
+`mandant anlegen` bekommt nur die Option `--rollen` (Satz der vergebbaren Rollen, setzt `verwaltung_rollen`) und legt nie
+einen Benutzer an. `inhaber-einladen` ruft denselben Anwendungsfall `BenutzerVerwaltung.anlegen` wie die API, mit Akteur
+`betreiber:<name>` (ohne Eskalationsschutz und Step-up, mit Formregeln, Höchstzahl, Protokoll, Alarm); Ausgabe nur die
+Benutzerkennung, nie ein Passwort oder Link. `abgleichen` siehe Requirement 9.2. Das Dienstkonto braucht in diesem Weg die Secret-Datei
+`keycloak_verwaltung_secret` im Wegwerf-Container (Compose-Dienst `api`). Der Notweg `kcadm.sh` aus dem README bleibt bestehen,
+wenn Dienstkonto oder SMTP nicht bereit sind.
+
+## Migration und Inbetriebnahme
+1. Realm-Änderungen und Dienstkonto auf Stufe A (19.3, [Fabian]); Realm-Export für Stufe B (19.2).
+2. Migration der Datenbank (Changesets); Einstellungen: Werte aus Eigenschaften und `wissens_einstellung` in die Konfiguration
+   (Version, Quelle `MIGRATION`), Verhalten unverändert (Requirement 1.5).
+3. Abgleich für `urinet` (`archiv benutzer abgleichen urinet`): nimmt `fabian`, Mitarbeiter und Treuhänder in das
+   Benutzerverzeichnis auf (`UEBERNAHME`) und meldet Abweichungen; Keycloak bleibt unverändert (21.2, [Fabian]).
+4. Neue Mandanten: `mandant anlegen` → `inhaber-einladen`; die weiteren Benutzer lädt der Inhaber in der App ein.
+5. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
+   per `kcadm.sh`.
+
+## Testing Strategy
+- JUnit ohne Quarkus: `Vergaberegeln`, `BenutzerStatusTest` (alle Paare), `EskalationTest` (vier Rollen als Akteur × vier als
+  Ziel × vier als vergebene Rolle, auch selbst), `LetzterInhaberTest` (auch parallel), `RechteUebersichtTest` (jede Zelle
+  gegen `Rechtematrix`), `EinstellungskatalogTest` (Grenzen, Standard, nur Klasse (a)), `EinstellungskatalogSchemaTest`,
+  `EinstellungsInventarTest`, `VerwaltungProtokollTest` (kein Klartext), `KeycloakAdminPositivlisteTest`, `RollenGrenzeTest`,
+  `KeinLoeschpfadTest` (erweitert), `SicherheitsHeaderTest`, `RealmExportTest` (Client, Rollen, Richtlinien, Ereignisse, kein
+  Secret).
+- Szenarien (Cucumber, `@spec-06`, `@req-<x.y>`) unter `features/verwaltung/`; Keycloak-Dev-Service mit dem Test-Realm (Dienstkonto
+  ergänzt) und Mailpit (Dev-Service) für die Einladung; WireMock für Ausfälle von Keycloak (Zeitüberschreitung, 5xx, 401 des
+  Dienstkontos, Schutzschalter).
+- `VerwaltungIsolationIT`: zwei Mandanten (`urinet`, `vhf-gsk`), vier Rollen, alle Endpunkte der Verwaltung, auch
+  Direktaufruf mit fremder ID, Suche, Protokoll, Antrag und Einladung.
+- `ExportKeycloak` (Testcontainers): Dienstkonto hat nur die Rollen nach 5.2; Step-up mit `prompt=login` verlangt Passwort und
+  TOTP; `auth_time` im Token; Lebensdauer 300 s.
+- Browser (Playwright): Seiten ab 375 px, Dialoge, Fehlermatrix, `axe`; die Einladung bis zum Link nur im Test mit Mailpit.
+- Migrationstest `EinstellungenMigrationTest` mit zwei Schemas; `BenutzerMigrationTest` (neue Changesets, Rollback).
+
+## Folgeänderungen (in diesem PR nur als Verweise, Umsetzung in den Aufgaben)
+| Wo | Änderung |
+| --- | --- |
+| Spec 01, requirements.md 2.6 | Absatz nach der Tabelle: Zeilen A20 bis A23 stehen in Spec 06, Requirement 4.1 (Tabelle bleibt unverändert; Test mit 19.5) |
+| Spec 01, design.md | mit der jeweiligen Aufgabe: Fehlercodes (Tabelle), Aktionen (Tabelle Protokoll), `anlass`, Dienstkonto in «Sicherheit», Secret `keycloak_verwaltung_secret` in «Secrets und Konfiguration» |
+| Spec 03, 3.5 | Entscheid der Rechte der Geschäftsstelle umfasst A20 bis A23 (Open Point) |
+| Spec 04, design.md `/wissensbasis/einstellungen` | Nachtrag: nach Spec 06, 2.13 gleiche Mechanik wie die Konfiguration (Entscheid offen) |
+| Spec 05, requirements.md 7.6 und design.md | Verweis: `einstellungen.*` wächst nach Spec 06; Seiten der Verwaltung unter `/verwaltung/…` ergänzt Spec 06 (18.3 bleibt) |
+| `tech.md` | Tag `@spec-06`; Dienstkonto und Secret `keycloak_verwaltung_secret` im Abschnitt Secrets |
+| `docs/umsetzungsplan.md` | Zeile Spec 06, Wellen 19 bis 21 |
+| `docs/adr/` | ADR-015 |
+| README | Hinweis zu «Benutzer in Keycloak anlegen» (Notweg) |
+
+## Abgelehnte Optionen
+- **Einzelne Rechte statt Rollen vergeben:** abgelehnt. Die Rechtematrix ist jede Zeile ein testbares Kriterium (ADR-009);
+  frei kombinierte Rechte vervielfachen die Prüffälle (A1 bis A23 × Kombinationen), erschweren die Sicht «Was darf diese
+  Person?» und öffnen einen Weg, sensible Rechte unbemerkt zu verteilen. Spätere Option: ein zusätzlicher Rollenname im
+  Code mit eigener Matrix-Spalte, nie ein freies Recht.
+- **Passwort oder Einmalpasswort über das Archiv anzeigen:** abgelehnt (heutiges Muster mit `kcadm.sh`): ein Passwort wäre
+  im Browser, im Log und im Verlauf sichtbar.
+- **Alarm-Empfänger in der Oberfläche (Klasse (a)):** zurückgestellt (Open Points); E-Mail-Adressen wären Personendaten in
+  unveränderlichen Versionen. Möglich später als Verweis auf Benutzer statt Adresse.
+- **Lesen früherer Versionen für alle Rollen:** abgelehnt; wie Spec 05, 7.2.
+- **Benutzer-Import (CSV):** abgelehnt; Kosten und Missbrauch (Requirement 7.6), zwei bis drei Benutzer je Mandant.
+- **Löschen ohne Frist oder mit Pseudonymisierung der Protokolle:** abgelehnt (siehe «Löschen und Datenschutz»).
+- **Selbstregistrierung und «Passwort vergessen» durch den Benutzer:** bleiben aus (Spec 01).
+- **Verknüpfen von Google-Konten durch das Archiv:** abgelehnt; es bräuchte die Google-Kennung `sub`; bleibt bei O.8.
+
+## Open Points
+- [offen: Entscheid Fabian] Benutzerverwaltung im Mandanten `vhf-gsk` (kein Benutzer mit Rolle `inhaber`, Spec 03, 3.5;
+  Requirement 4.1, Fussnote). Empfehlung: Betreiber verwaltet `vhf-gsk` per Admin-Kommando, A20 bis A23 für `geschaeftsstelle`
+  403, bis Spec 03, 3.5 entscheidet.
+- [offen: Entscheid Fabian] Löschfrist 30 Tage und keine Pseudonymisierung der Protokolle (Rechtsgrundlagen revDSG und GeBüV
+  durch Fabian oder den Datenschutzberater bestätigen). Empfehlung: 30 Tage, Deaktivieren als Standard, Pseudonymisierung
+  nur mit der Löschfunktion (Spec 01, 9.9).
+- [offen: Entscheid Fabian] Einstellungen der Wissensbasis (A19) in die Konfigurationsversion überführen (Requirement 2.13).
+  Empfehlung: ja, solange `PUT /wissensbasis/einstellungen` noch nicht umgesetzt ist (heute liest nur der Ingest die Tabelle
+  `wissens_einstellung`); sonst Aufgabe 20.3 mit Migration.
+- [offen: Entscheid Fabian] Alarm-Empfänger und Monatsbudget des öffentlichen Chats bleiben beim Betreiber (Klasse (b)).
+  Empfehlung: ja (Personendaten, Kostenhoheit).
+- Aufgabe 19.1 klärt gegen Keycloak 26.8.2: feingranulare Admin-Rechte (`map-roles`) für das Dienstkonto, interne Adresse und
+  Aussteller des Tokens, Rotation des Client-Secrets mit Überlappung, `auth_time` im Access-Token, Verhalten von
+  `prompt=login` mit dem Cookie-Zweig des Browser-Flows, Aufruf `execute-actions-email` ohne vorhandenes Passwort.
+- Grenzwerte (Katalog, Raten, Gültigkeiten) sind Vorschläge; sie gelten mit dem Merge dieses PR und sind Klasse (b), also ohne
+  Codeänderung, nur per Konfiguration und Deploy anpassbar (`archiv.verwaltung.*`).
