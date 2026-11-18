@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Backend-Tests über die CI-Jobs vollständig (ci.yml, Job «testzahl»; Entscheid Fabian 13.11.2026).
 
-Die Backend-Tests laufen in drei Jobs: ohne eigenen Quarkus-Start, Startgruppe start-1, Startgruppe start-2
-(StartGruppenTest). Aus den Surefire-Berichten (TEST-*.xml) der Jobs wird geprüft: Jede Testklasse des Moduls lief in
+Die Backend-Tests laufen in fünf Jobs: ohne Gruppe (Job «backend») und vier Gruppen aus Startgruppen start-1 bis start-4
+(StartGruppenTest) und den zwei Szenario-Runnern SzenarienTest und SzenarienRestTest (teilen die Cucumber-Szenarien
+über Tags; jedes Szenario genau einmal beweist SzenarienShardTest, hier gilt weiter: jede Klasse in genau einem Job). Aus den Surefire-Berichten (TEST-*.xml) der Jobs wird geprüft: Jede Testklasse des Moduls lief in
 genau einem Job, kein Job ist leer, kein Test ist fehlgeschlagen. Testklasse heisst: Datei unter <testquellen> nach den
 Mustern von Surefire (Test*, *Test, *Tests, *TestCase), nicht abstrakt, mit mindestens einem Test (JUnit, ArchUnit oder
 Cucumber). Die Zahlen je Job gehen auch in die Zusammenfassung des Laufs (GITHUB_STEP_SUMMARY).

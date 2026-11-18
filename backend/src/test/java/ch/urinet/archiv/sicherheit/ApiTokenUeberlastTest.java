@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Rate-Limiter-Buckets anderer Szenarien die Prüfung nicht beeinflussen.
  */
 @QuarkusTest
-@Tag("start-1")
+@Tag("start-2")
 @TestProfile(ApiTokenUeberlastTest.LasttestProfil.class)
 class ApiTokenUeberlastTest {
 
