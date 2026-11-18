@@ -2527,6 +2527,206 @@ components:
           - "null"
           format: int32
           minimum: 1
+    WissensIndex:
+      type: object
+      properties:
+        gruppen:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexGruppe"
+        gesamt:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+          format: int32
+        groesse:
+          type: integer
+          format: int32
+    WissensIndexGruppe:
+      type: object
+      properties:
+        typ:
+          type: string
+        seiten:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensIndexZeile"
+    WissensIndexZeile:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        status:
+          type: string
+    WissensLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        zeit:
+          $ref: "#/components/schemas/Instant"
+        aktion:
+          type: string
+        akteur:
+          type: string
+        seiten:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensLogVerweis"
+        text:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        entwurfId:
+          $ref: "#/components/schemas/UUID"
+    WissensLogSeite:
+      type: object
+      properties:
+        eintraege:
+          type: array
+          items:
+            $ref: "#/components/schemas/WissensLog"
+        naechstesVor:
+          type: string
+    WissensLogVerweis:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        titel:
+          type: string
+    Wissensdiff:
+      type: object
+      properties:
+        von:
+          type: integer
+          format: int32
+        bis:
+          type: integer
+          format: int32
+        vorher:
+          type: array
+          items:
+            type: string
+        entfernt:
+          type: array
+          items:
+            type: string
+        hinzugefuegt:
+          type: array
+          items:
+            type: string
+        nachher:
+          type: array
+          items:
+            type: string
+    Wissensquelleneintrag:
+      type: object
+      properties:
+        schluessel:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+        seiteVon:
+          type: integer
+          format: int32
+        seiteBis:
+          type: integer
+          format: int32
+        auszug:
+          type: string
+        quellSeiteId:
+          $ref: "#/components/schemas/UUID"
+    Wissensseite:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        pfad:
+          type: string
+        typ:
+          type: string
+        titel:
+          type: string
+        beschreibung:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        veraltetAb:
+          $ref: "#/components/schemas/LocalDate"
+        vertraulichkeit:
+          type: string
+        quellen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Wissensquelleneintrag"
+        inhaltHtml:
+          type: string
+        version:
+          type: integer
+          format: int32
+        erzeugtVon:
+          type: string
+        erzeugtAm:
+          $ref: "#/components/schemas/Instant"
+        freigegebenVon:
+          type: string
+        freigegebenAm:
+          $ref: "#/components/schemas/Instant"
+        quellePruefen:
+          type: boolean
+        widerspruchOffen:
+          type: boolean
+        wissensquelleId:
+          $ref: "#/components/schemas/UUID"
+    Wissensversion:
+      type: object
+      properties:
+        nummer:
+          type: integer
+          format: int32
+        daten:
+          type: object
+          additionalProperties: {}
+        inhaltHtml:
+          type: string
+        erzeugtVon:
+          type: string
+        freigegebenVon:
+          type: string
+        zeit:
+          $ref: "#/components/schemas/Instant"
+        grund:
+          type: string
+        entwurfId:
+          $ref: "#/components/schemas/UUID"
+        entwurfAnlass:
+          type: string
+        dokumentId:
+          $ref: "#/components/schemas/UUID"
+    Wissensversionen:
+      type: object
+      properties:
+        versionen:
+          type: array
+          items:
+            $ref: "#/components/schemas/Wissensversion"
   securitySchemes:
     SecurityScheme:
       type: openIdConnect
@@ -2544,6 +2744,7 @@ tags:
 - name: Konfiguration
 - name: Kontakte
 - name: Protokoll
+- name: Wissensbasis
 paths:
   /api/v1/api-tokens:
     get:
@@ -5070,6 +5271,259 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+  /api/v1/wissensbasis/log:
+    get:
+      summary: Wissensbasis-Log
+      description: Neueste Einträge zuerst; Einträge ohne sichtbare Seite werden ausgelassen.
+      tags:
+      - Wissensbasis
+      parameters:
+      - schema:
+          type: integer
+          default: 50
+        name: groesse
+        in: query
+      - description: Cursor aus dem vorherigen Ergebnis
+        name: vor
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Gefilterte Logseite
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Ungültiger Cursor oder Pagingwert
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten:
+    get:
+      summary: Wissensseiten-Index
+      description: Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur
+        sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
+      tags:
+      - Wissensbasis
+      parameters:
+      - schema:
+          type: integer
+          default: 50
+        name: groesse
+        in: query
+      - schema:
+          type: integer
+          default: 0
+        name: offset
+        in: query
+      - name: pfad
+        in: query
+        schema:
+          type: string
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: typ
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Index oder Seite
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Ungültiger Filter oder Pagingwert
+        "404":
+          description: Seite zum Pfad nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}:
+    get:
+      summary: Wissensseite abrufen
+      description: Sichtbare Seite mit gerendertem Inhalt und ETag.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Seite
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/diff:
+    get:
+      summary: Zwei sichtbare Wissensseitenversionen vergleichen
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bis
+        in: query
+        schema:
+          type: string
+      - name: von
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Diff mit ETag
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Version fehlt oder ist ungültig
+        "404":
+          description: Seite oder Version nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/eingehend:
+    get:
+      summary: Eingehende Wissensseiten-Links
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "Sichtbare Seiten, die auf die Seite verweisen"
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/versionen:
+    get:
+      summary: Versionen einer Wissensseite
+      description: Unsichtbare Versionen erscheinen ausschliesslich mit ihrer Nummer.
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Versionen
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Seite nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
+  /api/v1/wissensseiten/{id}/versionen/{nummer}:
+    get:
+      summary: Wissensseitenversion abrufen
+      description: "Antwortet mit 404, wenn die Seite oder ihre Version unsichtbar\
+        \ ist."
+      tags:
+      - Wissensbasis
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: nummer
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Version mit ETag
+          content:
+            application/json:
+              schema: {}
+        "404":
+          description: Version nicht vorhanden
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      security:
+      - SecurityScheme:
+        - inhaber
+        - mitarbeiter
+        - treuhaender
+        - geschaeftsstelle
 info:
   title: UriNet Archiv API
   version: v1
