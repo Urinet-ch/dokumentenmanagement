@@ -11,6 +11,7 @@ api/importe.service.ts
 api/konfiguration.service.ts
 api/kontakte.service.ts
 api/protokoll.service.ts
+api/wissen-ingest-resource.service.ts
 api/wissensbasis.service.ts
 configuration.ts
 encoder.ts
@@ -81,6 +82,8 @@ model/upload-fehler.ts
 model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/warnung.ts
+model/wissen-ingest-auftrag.ts
+model/wissen-ingest-start.ts
 model/wissens-index-gruppe.ts
 model/wissens-index-zeile.ts
 model/wissens-index.ts

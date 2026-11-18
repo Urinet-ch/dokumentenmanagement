@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 04, Aufgabe 14.1: Monatsbudget und ältester wartender Ingest werden je Mandant effizient abgefragt. -->
+    <changeSet id="047-wissen-ingest-indizes" author="archiv">
+        <sql>
+            create index ki_verbrauch_wissen_zeit_ix on ki_verbrauch (zweck, zeit)
+                where zweck in ('WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING');
+            create index wissens_entwurf_wartend_ix on wissens_entwurf (erstellt, id)
+                where anlass = 'INGEST' and status = 'WARTEND';
+        </sql>
+        <rollback>
+            <sql>
+                drop index if exists wissens_entwurf_wartend_ix;
+                drop index if exists ki_verbrauch_wissen_zeit_ix;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

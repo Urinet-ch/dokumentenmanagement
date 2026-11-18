@@ -40,7 +40,7 @@ public interface DokumentArchivierungPort {
      * @param pdfaFehlt          ohne PDF/A bestätigt (Req 5.9)
      * @param pdfa               PDF/A, solange abgelegt; leer bei {@code pdfa_fehlt}
      */
-    record Archivierungsstand(UUID id, DokumentStatus status, Instant eingang, boolean gesetzlichePflicht,
+    record Archivierungsstand(UUID id, DokumentStatus status, String art, Instant eingang, boolean gesetzlichePflicht,
                               LocalDate aufbewahrenBis, boolean fristAbgelaufen, List<Datei> dateien,
                               boolean pdfaFehlt, Optional<Datei> pdfa) {
         public Archivierungsstand {
