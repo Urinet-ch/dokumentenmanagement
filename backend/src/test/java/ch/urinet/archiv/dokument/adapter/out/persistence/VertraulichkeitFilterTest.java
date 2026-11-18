@@ -60,6 +60,23 @@ class VertraulichkeitFilterTest {
     }
 
     @Test
+    void inhaberUndGeschaeftsstelleSehenAlles() {
+        for (Rolle rolle : List.of(Rolle.INHABER, Rolle.GESCHAEFTSSTELLE)) {
+            VertraulichkeitFilter hql = VertraulichkeitFilter.fuer(Sichtregel.fuer(new Benutzer("u-1", rolle)));
+            assertThat(hql.bedingung()).as(rolle.name()).isEqualTo("1 = 1");
+            assertThat(hql.parameter()).as(rolle.name()).isEmpty();
+        }
+    }
+
+    @Test
+    void treuhaenderSiehtAlleBestaetigtenStufenAberKeineUnbestaetigten() {
+        VertraulichkeitFilter hql = VertraulichkeitFilter.fuer(Sichtregel.fuer(new Benutzer("u-1", Rolle.TREUHAENDER)));
+        assertThat(hql.bedingung()).isEqualTo("(1 = 0 or (bestaetigt is not null and (vertraulichkeit = 'NORMAL'"
+                + " or vertraulichkeit = 'INTERN' or vertraulichkeit = 'PERSONAL')))");
+        assertThat(hql.parameter()).isEmpty();
+    }
+
+    @Test
     void spaltenNehmenNurFesteBezeichner() {
         assertThatThrownBy(() -> new SichtregelSql.Spalten("bestaetigt", "erstelltVon", "x or 1=1", "personBenutzer"))
                 .isInstanceOf(IllegalArgumentException.class);
