@@ -50,5 +50,4 @@
     <include file="changesets/046-regel.xml" relativeToChangelogFile="true"/>
     <include file="changesets/047-wissen-ingest-indizes.xml" relativeToChangelogFile="true"/>
     <include file="changesets/048-ki-texte.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/049-ki-texte-version.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -17,6 +17,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
+    private static final long PROMPT_ZEICHEN_MAX = 24_000;
     private static final Pattern GESCHAEFTSJAHR_ENDE = Pattern.compile("^\\d{2}-\\d{2}$");
     private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
     private static final Set<String> RESERVIERTE_PUBLIC_PARAMETER = Set.of("q", "reihe", "jahr", "ausgabe", "seite",
@@ -50,6 +51,14 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         kiTexte = kiTexte == null ? KiTexte.LEER : kiTexte;
     }
 
+    /**
+     * {@code true}, wenn das Abbild keine KI-Texte enthielt (gespeichert vor Changeset 048): Der Konstruktor ersetzt
+     * {@code null} durch genau die Instanz {@link KiTexte#LEER}, gelesene oder gebaute KI-Texte sind eigene Instanzen.
+     */
+    public boolean ohneKiTexte() {
+        return kiTexte == KiTexte.LEER;
+    }
+
     /** Liefert alle Prüfungen, die ohne die späteren Konfigurationsattribute möglich sind. */
     public List<Befund> pruefen() {
         List<Befund> befunde = new ArrayList<>();
@@ -58,6 +67,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
         if (codepunkte(kiTexte.rolle()) > 8000 || codepunkte(kiTexte.feldregeln()) > 8000) {
             befunde.add(new Befund("kiTexte", "TEXT_ZU_LANG", "Ein KI-Text überschreitet 8'000 Zeichen."));
+        }
+        if (promptZeichen() > PROMPT_ZEICHEN_MAX) {
+            befunde.add(new Befund("kiTexte", "TEXTE_ZU_LANG",
+                    "Die Texte im KI-Prompt überschreiten zusammen 24'000 Zeichen."));
         }
         if (arten.size() > 200) {
             befunde.add(new Befund("arten", "ANZAHL_UNGUELTIG", "Die Konfiguration enthält zu viele Dokumentarten."));
@@ -606,6 +619,33 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     private static int codepunkte(String wert) {
         return wert.codePointCount(0, wert.length());
+    }
+
+    /**
+     * Alle Texte, die in den KI-Prompt gelangen (design.md, «Grenzen gegen zu lange Prompts»): KI-Texte sowie Namen,
+     * Beschreibungen und Hinweise der Arten und Klassifikationen (mit Werten), die die KI vorschlagen darf.
+     */
+    private long promptZeichen() {
+        long summe = (long) codepunkte(kiTexte.rolle()) + codepunkte(kiTexte.feldregeln());
+        for (Art art : arten) {
+            if (art.kiVorschlag()) {
+                summe += codepunkteOderNull(art.name()) + codepunkteOderNull(art.beschreibung())
+                        + codepunkteOderNull(art.kiHinweise());
+            }
+        }
+        for (Klassifikation klasse : klassifikationen) {
+            if (klasse.kiVorschlag()) {
+                summe += codepunkteOderNull(klasse.name()) + codepunkteOderNull(klasse.beschreibung());
+                for (KlassifikationWert wert : klasse.werte()) {
+                    summe += codepunkteOderNull(wert.name()) + codepunkteOderNull(wert.beschreibung());
+                }
+            }
+        }
+        return summe;
+    }
+
+    private static int codepunkteOderNull(String wert) {
+        return wert == null ? 0 : codepunkte(wert);
     }
 
     public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {

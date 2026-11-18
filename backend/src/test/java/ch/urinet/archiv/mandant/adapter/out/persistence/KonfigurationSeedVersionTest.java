@@ -70,70 +70,24 @@ class KonfigurationSeedVersionTest {
         datenbank.konfigurationSeedAnlegen(SCHEMA);
 
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("3");
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".konfiguration_version")).isEqualTo("2");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 1"))
                     .isEqualTo("MIGRATION");
             assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 2"))
-                    .isEqualTo("MIGRATION");
-            assertThat(wert(befehl, "select quelle from " + SCHEMA + ".konfiguration_version where version = 3"))
                     .isEqualTo("SEED");
             assertThat(wert(befehl, "select inhalt #>> '{arten,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("SEED_A");
+                    + ".konfiguration_version where version = 2")).isEqualTo("SEED_A");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,1,zusatzSchema}') from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("string");
+                    + ".konfiguration_version where version = 2")).isEqualTo("string");
             assertThat(wert(befehl, "select jsonb_typeof(inhalt #> '{arten,0,gruppen}') from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("array");
+                    + ".konfiguration_version where version = 2")).isEqualTo("array");
             assertThat(wert(befehl, "select inhalt #>> '{regeln,0,code}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("seed_folge");
+                    + ".konfiguration_version where version = 2")).isEqualTo("seed_folge");
             assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("true");
-            assertThat(wert(befehl, "select inhalt #>> '{kiTexte,rolle}' from " + SCHEMA
-                    + ".konfiguration_version where version = 3")).isEqualTo("Synthetische Rolle");
-        }
-    }
-
-    @Test
-    void changeset049ErgaenztLiveKiTexteInAltemVersionsabbild() throws Exception {
-        try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-            befehl.execute("drop schema if exists " + KI_MIGRATION_SCHEMA + " cascade");
-            befehl.execute("create schema " + KI_MIGRATION_SCHEMA);
-            befehl.execute("set search_path to " + KI_MIGRATION_SCHEMA);
-            befehl.execute("""
-                    create table konfiguration_version (
-                        version integer primary key, wer text not null, grund text, quelle text not null,
-                        inhalt jsonb not null, sha256 varchar(64) not null)
-                    """);
-            befehl.execute("""
-                    create table ki_texte (
-                        id integer primary key, rolle text not null, feldregeln text not null,
-                        ki_freigegeben boolean not null)
-                    """);
-            befehl.execute("""
-                    insert into konfiguration_version values (7, 'system:migration', null, 'MIGRATION',
-                        '{"version":7,"marker":"vorher"}', 'alter-hash')
-                    """);
-            befehl.execute("insert into ki_texte values (1, 'Rolle', 'Feldregeln', true)");
-
-            liquibase(verbindung, KI_MIGRATION_SCHEMA, "049-ki-texte-version.xml");
-            verbindung.commit();
-
-            assertThat(wert(befehl, "select count(*) from konfiguration_version")).isEqualTo("2");
-            assertThat(wert(befehl, "select inhalt ->> 'marker' from konfiguration_version where version = 7"))
-                    .isEqualTo("vorher");
-            assertThat(wert(befehl, "select quelle from konfiguration_version where version = 8"))
-                    .isEqualTo("MIGRATION");
-            assertThat(wert(befehl, "select inhalt #>> '{kiTexte,rolle}' from konfiguration_version where version = 8"))
-                    .isEqualTo("Rolle");
-            assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' "
-                    + "from konfiguration_version where version = 8")).isEqualTo("true");
-            assertThat(wert(befehl, """
-                    select sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
-                    from konfiguration_version where version = 8
-                    """)).isEqualTo("t");
-        } finally {
-            try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
-                befehl.execute("drop schema if exists " + KI_MIGRATION_SCHEMA + " cascade");
-            }
+                    + ".konfiguration_version where version = 2")).isEqualTo("true");
+            // 048-ki-texte-version lief ohne Arten: keine Zusatzversion vor dem Seed
+            assertThat(wert(befehl, "select inhalt -> 'kiTexte' is null from " + SCHEMA
+                    + ".konfiguration_version where version = 1")).isEqualTo("t");
         }
     }
 
@@ -290,6 +244,21 @@ class KonfigurationSeedVersionTest {
                         """)).isEqualTo("bankbeleg_erwartet=PARTNER,lohnabrechnung_erwartet=zusatz.person");
                 assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
                         + "from konfiguration_version where version = 2")).isEqualTo("t");
+
+                // 048: Abbild ohne kiTexte erhält die Freigabe aus ki_texte (Req 6.6, 8.4)
+                liquibase(verbindung, "m_urinet", "048-ki-texte.xml");
+                verbindung.commit();
+
+                assertThat(wert(befehl, "select max(version) from konfiguration_version")).isEqualTo("3");
+                assertThat(wert(befehl, "select quelle from konfiguration_version where version = 3"))
+                        .isEqualTo("MIGRATION");
+                assertThat(wert(befehl, "select inhalt #>> '{kiTexte,kiFreigegeben}' "
+                        + "from konfiguration_version where version = 3")).isEqualTo("true");
+                assertThat(wert(befehl, "select (inhalt - 'version' - 'kiTexte') = (select inhalt - 'version' "
+                        + "from konfiguration_version where version = 2) from konfiguration_version where version = 3"))
+                        .isEqualTo("t");
+                assertThat(wert(befehl, "select (sha256 = encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')) "
+                        + "from konfiguration_version where version = 3")).isEqualTo("t");
             }
         } finally {
             try (Connection verwaltung = verbinden(null); Statement befehl = verwaltung.createStatement()) {

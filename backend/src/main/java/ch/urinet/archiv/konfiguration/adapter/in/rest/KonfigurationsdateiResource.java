@@ -88,9 +88,9 @@ public class KonfigurationsdateiResource {
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
     public Response exportieren() {
         aufloesung.pruefen();
-        String datei = verwaltung.exportieren();
-        return Response.ok(datei, MediaType.APPLICATION_JSON_TYPE)
-                .tag(new EntityTag(Integer.toString(verwaltung.aktuelleVersion()))).build();
+        KonfigurationsdateiVerwaltung.Export export = verwaltung.exportieren();
+        return Response.ok(export.datei(), MediaType.APPLICATION_JSON_TYPE)
+                .tag(new EntityTag(Integer.toString(export.version()))).build();
     }
 
     @POST

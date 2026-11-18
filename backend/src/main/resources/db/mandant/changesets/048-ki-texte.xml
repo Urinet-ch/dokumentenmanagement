@@ -27,4 +27,29 @@
             insert into ki_texte (id, rolle, feldregeln, ki_freigegeben) values (1, '', '', current_schema() = 'm_urinet');
         </sql>
     </changeSet>
+    <!-- Abbilder vor 048 kennen kiTexte nicht; ohne diese Version gälte die KI beim Einspielen einer Datei als
+         nicht freigegeben (Req 6.6, 8.4). Frisch angelegte Mandanten (noch ohne Arten) erhalten sie mit dem Seed. -->
+    <changeSet id="048-ki-texte-version" author="archiv">
+        <sql>
+            with aktuelle as (
+                select inhalt from konfiguration_version order by version desc limit 1
+            ),
+            naechste as (
+                select coalesce(max(version), 0) + 1 as version from konfiguration_version
+            ),
+            abbild as (
+                select n.version, a.inhalt || jsonb_build_object('version', n.version, 'kiTexte', (
+                    select jsonb_build_object('rolle', t.rolle, 'feldregeln', t.feldregeln,
+                        'kiFreigegeben', t.ki_freigegeben)
+                    from ki_texte t where t.id = 1)) as inhalt
+                from aktuelle a, naechste n
+                where (a.inhalt -> 'kiTexte') is null
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select version, 'system:migration', null, 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild
+            where exists (select 1 from dokumentart);
+        </sql>
+    </changeSet>
 </databaseChangeLog>
