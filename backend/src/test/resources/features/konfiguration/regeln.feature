@@ -22,6 +22,55 @@ Funktionalität: Regeln je Mandant
     Und wird der Vorgang nicht abgelehnt
 
   @req-5.4
+  Szenario: Der REST-Lückenbericht ist nur für Rollen mit uneingeschränkter Sicht verfügbar
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» den Lückenbericht für das Geschäftsjahr «2003» abruft
+    Dann antwortet der Lückenbericht mit Status 200
+    Wenn «treuhaender-urinet» den Lückenbericht für das Geschäftsjahr «2003» abruft
+    Dann antwortet der Lückenbericht mit Status 200
+    Wenn «geschaeftsstelle-vhf-gsk» den Lückenbericht für das Geschäftsjahr «2003» abruft
+    Dann antwortet der Lückenbericht mit Status 200
+    Wenn «mitarbeiter-urinet» den Lückenbericht für das Geschäftsjahr «2003» abruft
+    Dann antwortet der Lückenbericht mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+
+  @req-5.6
+  Szenario: Neue und aktivierte Regeln melden bestätigte Verstösse, ohne archivierte Dokumente zu ändern
+    Angenommen die Mandanten «urinet» und «vhf-gsk» sind angelegt
+    Wenn «inhaber-urinet» eine Dokumentart anlegt:
+      """
+      {"code": "PROBE_DA_REGEL", "name": "Regelprobe", "vertraulichkeit": "NORMAL", "aufbewahrungJahre": null,
+       "gesetzlichePflicht": false,
+       "zusatzSchema": {"type": "object", "properties": {"referenz": {"type": "string", "maxLength": 40}}}}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Angenommen «inhaber-urinet» legt ein Dokument «Regel Alt 1» der Art «PROBE_DA_REGEL» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und das Dokument «Regel Alt 1» hat das Zusatzfeld «referenz» mit dem Wert «R-1»
+    Und das Dokument «Regel Alt 1» hat den Titel «Gilt»
+    Und «inhaber-urinet» legt ein Dokument «Regel Alt 2» der Art «PROBE_DA_REGEL» mit der Klassifikation «ohne» und dem Wert «ohne» im Status «ARCHIVIERT» an
+    Und das Dokument «Regel Alt 2» hat das Zusatzfeld «referenz» mit dem Wert «R-1»
+    Und das Dokument «Regel Alt 2» hat den Titel «Gilt»
+    Wenn «inhaber-urinet» eine Regel mit dem aktuellen Stand anlegt:
+      """
+      {"code":"probe_datum_pflicht","art":"PROBE_DA_REGEL","typ":"PFLICHT_WENN",
+       "parameter":{"wenn":{"feld":"titel","gleich":"Gilt"},"dann":["datum"]},
+       "schwere":"FEHLER","meldung":"Belegdatum fehlt."}
+      """
+    Dann antwortet die Regelverwaltung mit Status 201
+    Und meldet die Regelverwaltung 2 betroffene Dokumente
+    Wenn «inhaber-urinet» eine Regel mit dem aktuellen Stand anlegt:
+      """
+      {"code":"probe_referenz_eindeutig","art":"PROBE_DA_REGEL","typ":"EINDEUTIG",
+       "parameter":{"felder":["zusatz.referenz"]},"schwere":"FEHLER",
+       "meldung":"Referenz bereits verwendet.","aktiv":false}
+      """
+    Dann antwortet die Regelverwaltung mit Status 201
+    Und meldet die Regelverwaltung 2 betroffene Dokumente
+    Wenn «inhaber-urinet» aktiviert die Regel «probe_referenz_eindeutig»
+    Dann antwortet die Regelverwaltung mit Status 200
+    Und meldet die Regelverwaltung 2 betroffene Dokumente
+    Und sind im Mandanten «urinet» weiterhin 2 bestätigte Dokumente der Art «PROBE_DA_REGEL» archiviert
+
+  @req-5.4
   Szenario: Der Lückenbericht bleibt Rollen mit uneingeschränkter Sicht vorbehalten
     Dann wird «inhaber-urinet» das Werkzeug vollstaendigkeit angeboten
     Und wird «treuhaender-urinet» das Werkzeug vollstaendigkeit angeboten

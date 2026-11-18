@@ -9,11 +9,13 @@ import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.Regel;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.ProblemDetails;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
+import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -58,6 +60,7 @@ public class RegelnSchritte {
     private List<Regel.Parameter> typisierteRegeln = List.of();
     private List<RegelPruefung.Warnung> warnungen = List.of();
     private RegelVerletzt fehler;
+    private Response antwort;
 
     @Wenn("die vier Regeltypen der Konfiguration aufgebaut werden")
     public void regeltypenAufbauen() {
@@ -179,6 +182,59 @@ public class RegelnSchritte {
         }
     }
 
+    @Wenn("«{word}» eine Regel mit dem aktuellen Stand anlegt:")
+    public void regelAnlegen(String benutzer, String body) {
+        String code = io.restassured.path.json.JsonPath.from(body).getString("code");
+        String mandant = mandant(benutzer);
+        eingerichtet.add(new Eingerichtet(mandant, code));
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(body).post("/api/v1/regeln");
+    }
+
+    @Wenn("«{word}» aktiviert die Regel «{word}»")
+    public void regelAktivieren(String benutzer, String code) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("aktiv", true))
+                .patch("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» den Lückenbericht für das Geschäftsjahr «{int}» abruft")
+    public void lueckenberichtAbrufen(String benutzer, int geschaeftsjahr) {
+        antwort = gegeben(benutzer).queryParam("geschaeftsjahr", geschaeftsjahr).get("/api/v1/berichte/luecken");
+    }
+
+    @Dann("antwortet der Lückenbericht mit Status {int}")
+    public void lueckenberichtStatus(int status) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);
+    }
+
+    @Dann("antwortet der Lückenbericht mit Status {int} und Fehlercode «{word}»")
+    public void lueckenberichtFehler(int status, String code) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
+    }
+
+    @Dann("antwortet die Regelverwaltung mit Status {int}")
+    public void regelStatus(int status) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(status);
+    }
+
+    @Dann("meldet die Regelverwaltung {long} betroffene Dokumente")
+    public void betroffeneDokumente(long anzahl) {
+        assertThat(antwort.jsonPath().getLong("betroffeneDokumente")).isEqualTo(anzahl);
+    }
+
+    @Dann("sind im Mandanten «{word}» weiterhin {long} bestätigte Dokumente der Art «{word}» archiviert")
+    public void dokumenteUnveraendert(String mandant, long anzahl, String art) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select count(*) from "
+                     + new MandantCode(mandant).schema()
+                     + ".dokument where art = ? and bestaetigt is not null and status = 'ARCHIVIERT'")) {
+            abfrage.setString(1, art);
+            try (var ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getLong(1)).isEqualTo(anzahl);
+            }
+        }
+    }
+
     @Dann("enthält die aktuelle Konfiguration von «{word}» die Regeln «{}»")
     public void regelnInKonfiguration(String mandant, String codes) throws SQLException {
         assertThat(regelnDerAktuellenVersion(mandant)).containsAll(List.of(codes.split(",\\s*")));
@@ -239,5 +295,19 @@ public class RegelnSchritte {
                 befehl.execute("reset search_path");
             }
         }
+    }
+
+    private static io.restassured.specification.RequestSpecification mitVersion(String benutzer) {
+        Response stand = gegeben(benutzer).get("/api/v1/regeln");
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        return gegeben(benutzer).header("If-Match", stand.getHeader("ETag"));
+    }
+
+    private static io.restassured.specification.RequestSpecification gegeben(String benutzer) {
+        return given().auth().oauth2(Testanmeldung.token(benutzer));
+    }
+
+    private static String mandant(String benutzer) {
+        return benutzer.substring(benutzer.indexOf('-') + 1);
     }
 }

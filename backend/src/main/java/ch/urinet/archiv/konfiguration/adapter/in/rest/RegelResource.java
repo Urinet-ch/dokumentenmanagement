@@ -29,7 +29,11 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -70,7 +74,9 @@ public class RegelResource {
 
     @Schema(name = "Regel")
     public record RegelDto(String code, String art, String typ, Map<String, Object> parameter, String schwere,
-                           String meldung, boolean aktiv, Long betroffeneDokumente) {
+                           String meldung, boolean aktiv,
+                           @Schema(nullable = true, description = "Zahl bestätigter Dokumente, die die Regel verletzen")
+                           Long betroffeneDokumente) {
 
         static RegelDto aus(Regel regel, Long betroffeneDokumente) {
             return new RegelDto(regel.code(), regel.art(), regel.typ(), regel.parameter(), regel.schwere(),
@@ -78,11 +84,34 @@ public class RegelResource {
         }
     }
 
+    @Schema(name = "RegelAnlegen")
+    public record RegelAnlegenDto(
+            @Schema(required = true, pattern = "^[a-z][a-z0-9_]{0,39}$") String code,
+            @Schema(nullable = true) String art,
+            @Schema(required = true, enumeration = {"PFLICHT_WENN", "EINDEUTIG", "FOLGE", "ERWARTET"}) String typ,
+            @Schema(required = true, type = SchemaType.OBJECT) Map<String, Object> parameter,
+            @Schema(required = true, enumeration = {"FEHLER", "WARNUNG"}) String schwere,
+            @Schema(required = true) String meldung, Boolean aktiv,
+            @Schema(nullable = true, maxLength = GRUND_MAX) String grund) {
+    }
+
+    @Schema(name = "RegelAenderung")
+    public record RegelAenderungDto(@Schema(nullable = true) String art,
+            @Schema(enumeration = {"PFLICHT_WENN", "EINDEUTIG", "FOLGE", "ERWARTET"}) String typ,
+            @Schema(type = SchemaType.OBJECT) Map<String, Object> parameter,
+            @Schema(enumeration = {"FEHLER", "WARNUNG"}) String schwere, String meldung, Boolean aktiv,
+            @Schema(nullable = true, maxLength = GRUND_MAX) String grund) {
+    }
+
     @GET
     @AlleArchivRollen
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Regeln des Mandanten auflisten")
-    @APIResponse(responseCode = "200", description = "Aktive und inaktive Regeln")
+    @APIResponse(responseCode = "200", description = "Aktive und inaktive Regeln",
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Aktuelle Konfigurationsversion für If-Match"),
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(type = SchemaType.ARRAY, implementation = RegelDto.class)))
     public Response liste() {
         aufloesung.pruefen();
         return Response.ok(verwaltung.alle().stream().map(regel -> RegelDto.aus(regel, null)).toList())
@@ -94,12 +123,19 @@ public class RegelResource {
     @ErfordertAktion(Aktion.A11)
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentregel anlegen", description = "If-Match mit Konfigurationsversion ist Pflicht.")
-    @APIResponse(responseCode = "201", description = "Angelegt; betroffeneDokumente zählt bestätigte Verstösse.")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = RegelAnlegenDto.class)))
+    @APIResponse(responseCode = "201", description = "Angelegt; betroffeneDokumente zählt bestätigte Verstösse.",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = RegelDto.class)),
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"))
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
-    public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch, String body) {
+    public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
+                            String body) {
         aufloesung.pruefen();
         JsonNode objekt = objekt(body, ANLAGEFELDER);
         Regel neu = new Regel(erforderlichText(objekt, "code"), text(objekt, "art"), erforderlichText(objekt, "typ"),
@@ -118,14 +154,20 @@ public class RegelResource {
     @RolesAllowed("inhaber")
     @Operation(summary = "Dokumentregel ändern, aktivieren oder deaktivieren",
             description = "Code bleibt unverändert. If-Match mit Konfigurationsversion ist Pflicht.")
-    @APIResponse(responseCode = "200", description = "Geändert")
+    @RequestBody(required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = RegelAenderungDto.class)))
+    @APIResponse(responseCode = "200", description = "Geändert",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = RegelDto.class)),
+            headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
+                    name = "ETag", description = "Neue Konfigurationsversion"))
     @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
     @APIResponse(responseCode = "404", description = "NICHT_GEFUNDEN")
     @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
     @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
     public Response aendern(@PathParam("code") String code,
-                            @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch, String body) {
+                            @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
+                            String body) {
         aufloesung.pruefen();
         JsonNode objekt = objekt(body, AENDERUNGSFELDER);
         Set<String> gesetzt = gesetzteFelder(objekt, AENDERUNGSFELDER);

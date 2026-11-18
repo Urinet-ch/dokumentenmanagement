@@ -67,7 +67,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 5.5, 5.7_
   - _Abhängig von: 17.5; Spec 01: 3.4, 3.5, 4.7, 4.8_
 
-- [ ] 17.8 Regeln über die REST-Schnittstelle und betroffene Dokumente [Backend]
+- [x] 17.8 Regeln über die REST-Schnittstelle und betroffene Dokumente [Backend]
   - Aus 17.6 abgetrennt (Nachbesserung PR #304): Endpunkte `/regeln` (Anlegen, Ändern, Aktivieren mit neuer
     Konfigurationsversion) mit `betroffeneDokumente` beim Anlegen, Verschärfen oder Aktivieren (5.6) und
     `GET /berichte/luecken` mit HTTP 403 für Rollen ohne uneingeschränkte Sicht (5.4); OpenAPI im selben PR.
