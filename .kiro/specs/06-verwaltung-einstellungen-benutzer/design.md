@@ -32,8 +32,8 @@ aus dem Token nimmt und jeden Zielbenutzer vor jeder Aktion auf `mandant` prüft
 | Option | Vorteile | Nachteile | Entscheid |
 | --- | --- | --- | --- |
 | **A. Admin-REST-API mit eigenem Dienstkonto, Trennung im Archiv** | Keycloak bleibt Quelle (MFA, Passwort-Hashing, Einladung, Ereignisse); kein zweiter Identitätsspeicher; passt zum bestehenden Attribut `mandant`; kein Wegwerf-JVM mehr für Benutzer (spart bis 256 MiB Spitze auf Stufe A) | Das Dienstkonto kann technisch Benutzer **aller** Mandanten ändern; die Trennung hängt am Archiv-Code | **gewählt**, mit Härtung (Blast-Radius unten) |
-| B. Keycloak «Organizations» je Mandant | eingebautes Mandantenmodell, Einladungsfluss, Anmeldung je Organisation | Admin-Rechte für Organisationen sind grob (voraussichtlich Realm-Ebene, in Aufgabe 19.1 zu prüfen); der Claim `mandant` (Regel 1) wird durch den Claim `organization` ersetzt, ein Benutzer kann in mehreren Organisationen sein (heute: genau ein Wert); Umbau von Realm, `AnmeldungMandantAdapter`, Tests und Spec 03, 8.3; zusätzliche Tabellen und Caches in Keycloak (400 MiB auf Stufe A) | abgelehnt; erneut prüfen ab drei Mandanten oder mit mandantenspezifischen Identity Providers |
-| C. Gruppe je Mandant, Zugriff über feingranulare Admin-Rechte (FGAP v2) | Keycloak erzwingt die Trennung selbst, wenn ein Dienstkonto je Mandant besteht | Zweite Wahrheit neben dem Attribut `mandant` (Gruppe und Attribut können auseinanderlaufen); ein Dienstkonto je Mandant widerspricht Spec 03, 8.3 (keine mandantenspezifischen Clients) und vervielfacht Secrets; FGAP v2 ist komplex im Betrieb | abgelehnt; FGAP v2 nur als Härtung für die Rollenzuweisung (unten) |
+| B. Keycloak «Organizations» je Mandant | eingebautes Mandantenmodell, Einladungsfluss, Anmeldung je Organisation | Admin-Rechte für Organisationen sind grob (voraussichtlich Realm-Ebene, in Aufgabe 19.1 zu prüfen); der Claim `mandant` (Regel 1) wird durch den Claim `organization` ersetzt, ein Benutzer kann in mehreren Organisationen sein (heute: genau ein Wert); Umbau von Realm, `AnmeldungMandantAdapter`, Tests und Spec 03, 2.3; zusätzliche Tabellen und Caches in Keycloak (400 MiB auf Stufe A) | abgelehnt; erneut prüfen ab drei Mandanten oder mit mandantenspezifischen Identity Providers |
+| C. Gruppe je Mandant, Zugriff über feingranulare Admin-Rechte (FGAP v2) | Keycloak erzwingt die Trennung selbst, wenn ein Dienstkonto je Mandant besteht | Zweite Wahrheit neben dem Attribut `mandant` (Gruppe und Attribut können auseinanderlaufen); ein Dienstkonto je Mandant widerspricht Spec 03, 2.3 (keine mandantenspezifischen Clients) und vervielfacht Secrets; FGAP v2 ist komplex im Betrieb | abgelehnt; FGAP v2 nur als Härtung für die Rollenzuweisung (unten) |
 | D. Nur Betreiber (heute: `kcadm.sh`) | kein neues Dienstkonto, kein neuer Angriffsweg | Betreiber als Engpass, Passwort im Terminal, kein Protokoll im Archiv, Fehlerrisiko von Hand | bleibt als Notfallweg und für den ersten Inhaber eines Mandanten |
 | E. Admin-Konsole von Keycloak öffentlich, Inhaber als delegierter Admin | keine Eigenentwicklung | öffentliche Admin-Oberfläche (Spec 01 schliesst das aus), Inhaber erhält Realm-Rechte, kein Protokoll im Archiv, Mandantentrennung nur über FGAP | abgelehnt |
 | F. Benutzerspeicher im Archiv (eigener Identity Provider) | volle Kontrolle | eigene Passwort-, MFA-, Reset-Logik; ADR-001 und Spec 01, 2.1 bleiben bei Keycloak | abgelehnt |
@@ -423,7 +423,11 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 3. Abgleich für `urinet` (`archiv benutzer abgleichen urinet`): nimmt `fabian`, Mitarbeiter und Treuhänder in das
    Benutzerverzeichnis auf (`UEBERNAHME`) und meldet Abweichungen; Keycloak bleibt unverändert (21.2, [Fabian]).
 4. Neue Mandanten: `mandant anlegen` → `inhaber-einladen`; die weiteren Benutzer lädt der Inhaber in der App ein.
-5. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
+5. Mandantenabbau (Spec 03, 8.3): Der Betreiber-Schritt «Mandant deaktivieren» deaktiviert zusätzlich alle Keycloak-Benutzer
+   des Mandanten und beendet ihre Sitzungen (`archiv mandant benutzer-sperren <code>`); `MandantVerweigert` (403) wirkt ohnehin
+   sofort. Nach der Frist von 30 Tagen löscht der Abbau die Keycloak-Benutzer des Mandanten; Protokoll und Benutzerverzeichnis
+   bleiben mit dem Schema (Aufbewahrung, Spec 01, 10.9). Der Abgleich meldet Benutzer eines inaktiven Mandanten, die noch aktiv sind.
+6. Rückfall: Die Verwaltung lässt sich abschalten (`archiv.verwaltung.aktiv=false`, Klasse (b)); Endpunkte antworten 404, Betrieb wie bisher
    per `kcadm.sh`.
 
 ## Testing Strategy

@@ -170,9 +170,10 @@ auf Server oder Secrets aus der Sitzung.
 
 ## Welle 21 — Admin-Kommando, Migration, Tests und Abnahme
 - [ ] 21.1 Admin-Kommando [Backend]
-  - `archiv mandant anlegen … --rollen`, `archiv mandant inhaber-einladen`, `archiv benutzer abgleichen [--pruefen]`
-    (Exit-Codes, `--json`), Protokoll `betreiber:<name>`; README-Abschnitt «Admin-Kommandos auf der VPS» ergänzt.
-  - _Anforderungen: 4.4, 9.1, 9.2_
+  - `archiv mandant anlegen … --rollen`, `archiv mandant inhaber-einladen`, `archiv benutzer abgleichen [--pruefen]`,
+    `archiv mandant benutzer-sperren <code>` für den Mandantenabbau (Exit-Codes, `--json`), Protokoll `betreiber:<name>`;
+    README-Abschnitt «Admin-Kommandos auf der VPS» ergänzt.
+  - _Anforderungen: 4.4, 9.1, 9.2, 9.8_
   - _Abhängig von: 19.7, 19.13_
 
 - [ ] 21.2 Migration der heutigen Benutzer [Fabian]

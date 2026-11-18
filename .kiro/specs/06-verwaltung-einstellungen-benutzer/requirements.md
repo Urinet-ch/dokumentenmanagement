@@ -499,6 +499,13 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
    Rotationsprobe des Dienstkonto-Geheimnisses, Lösen der Google-Verknüpfung WO O.8). Nachweis: Dokument und manuell
    [Fabian].
 
+8. WENN der Betreiber einen Mandanten deaktiviert (Mandantenabbau, Spec 03, 8.3), DANN SOLL das Archiv mit einem Schritt des
+   Admin-Kommandos (`archiv mandant benutzer-sperren <code>`) alle Benutzer des Mandanten in Keycloak deaktivieren und deren
+   Sitzungen beenden, nach der Frist von 30 Tagen die Keycloak-Benutzer des Mandanten löschen und Zugriffsprotokoll und
+   Benutzerverzeichnis nur zusammen mit dem Schema nach Spec 01, 10.9 behandeln; der Abgleich SOLL aktive Benutzer eines
+   inaktiven Mandanten melden. Verwaltungsaufrufe eines inaktiven Mandanten antworten mit HTTP 403 `MANDANT_FEHLT`
+   (Spec 01, 1.3).
+
 ---
 
 ## Rückverfolgung Auftrag → Spec
@@ -509,4 +516,4 @@ einen ersten Inhaber ohne Passwort im Terminal erhalten, damit Betrieb und Abnah
 | Berechtigungen verteilen (Rollen, Eskalationsschutz, letzter Inhaber, Rechte-Übersicht) | 4 |
 | Protokoll, Fehlerfälle, Grenzen, Alarm | 5, 6 |
 | Sicherheit und Bedrohungsmodell | 5, 7 (design.md «Bedrohungsmodell») |
-| Inbetriebnahme, Migration, Tests, Abnahme | 9 |
+| Inbetriebnahme, Migration, Tests, Abnahme, Mandantenabbau | 9 |
