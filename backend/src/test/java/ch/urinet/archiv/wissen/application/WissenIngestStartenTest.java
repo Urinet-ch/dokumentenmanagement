@@ -25,7 +25,7 @@ class WissenIngestStartenTest {
     private static final UUID DOKUMENT_ID = UUID.randomUUID();
     /** Startwerte aus design.md, «Konfiguration und Aufträge». */
     private static final WissenKonfiguration STARTWERTE = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
-            20_000, 12_000, 300_000, 1_000_000);
+            20_000, 12_000, 600_000, 1_000_000);
     /** Wie die Startwerte, aber mit Budgets, unter denen eine kurze Quelle durchgeht (Req 13.4). */
     private static final WissenKonfiguration GROSSES_BUDGET = new WissenKonfiguration("test-modell", 30_000, 15,
             60_000, 20_000, 12_000, 1_000_000, 10_000_000);
@@ -105,7 +105,7 @@ class WissenIngestStartenTest {
     @Test
     void stelltZweitenIngestAlsWartendZurueck() {
         Speicher speicher = new Speicher(quelle("NORMAL"));
-        speicher.aktiverIngest = true;
+        speicher.warteschlangeBelegt = true;
         Auftraege auftraege = new Auftraege(true);
 
         WissenIngestStarten.Ergebnis ergebnis = starten(speicher, auftraege)
@@ -232,11 +232,12 @@ class WissenIngestStartenTest {
 
     @Test
     void schaetzungUeberDemBudgetDerKonfigurationVerhindertDenIngest() {
-        // Mit den Startwerten liegt schon eine kurze Quelle über budget-tokens (design.md, «Zwischenstand 14.1a»)
+        WissenKonfiguration kleinesBudget = new WissenKonfiguration("test-modell", 30_000, 15, 60_000,
+                20_000, 12_000, 300_000, 1_000_000);
         Speicher speicher = new Speicher(quelle("NORMAL"));
         Auftraege auftraege = new Auftraege(true);
 
-        WissenIngestStarten.Ergebnis ergebnis = new WissenIngestStarten(speicher, STARTWERTE, auftraege)
+        WissenIngestStarten.Ergebnis ergebnis = new WissenIngestStarten(speicher, kleinesBudget, auftraege)
                 .manuell(DOKUMENT_ID, null, null, "benutzer-id");
 
         assertThat(ergebnis.status()).isEqualTo("FEHLER");
@@ -355,7 +356,7 @@ class WissenIngestStartenTest {
         private NeuerEntwurf entwurf;
         private boolean geladen;
         private boolean laufend;
-        private boolean aktiverIngest;
+        private boolean warteschlangeBelegt;
         private long verbrauch;
 
         private Speicher(Quelle quelle) {
@@ -374,8 +375,8 @@ class WissenIngestStartenTest {
         }
 
         @Override
-        public boolean hatAktivenIngest() {
-            return aktiverIngest;
+        public boolean warteschlangeBelegt() {
+            return warteschlangeBelegt;
         }
 
         @Override

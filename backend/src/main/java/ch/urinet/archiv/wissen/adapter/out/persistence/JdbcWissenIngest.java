@@ -80,12 +80,12 @@ public class JdbcWissenIngest implements WissenIngestPort {
     }
 
     @Override
-    public boolean hatAktivenIngest() {
+    public boolean warteschlangeBelegt() {
         zeitgrenze();
         return em().createNativeQuery("""
                         select exists (
                             select 1 from wissens_entwurf
-                            where anlass = 'INGEST' and status in ('IN_ARBEIT', 'OFFEN'))""")
+                            where anlass = 'INGEST' and status in ('WARTEND', 'IN_ARBEIT', 'OFFEN'))""")
                 .getSingleResult().equals(Boolean.TRUE);
     }
 

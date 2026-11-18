@@ -110,7 +110,16 @@ aufgebaut ist (Auftrag 09.11.2026, Spec 04). Kräfte und Randbedingungen:
   ADR-011; siehe Spec 04, design.md, Abschnitt «Folgeänderungen in anderen Dokumenten».
 - **Tests:** Ingest in der CI nur mit WireMock; Abnahme (Gate Phase 4) nur manuell auf Stufe B (tech.md Regel 6).
 
+## Nachtrag 18.11.2026 (Import eines Wissenspakets)
+Spec 04, Requirement 19 (entschieden von Fabian am 18.11.2026): Neben Ingest, Lint, manuellem Entwurf und Analyse gibt es den
+Anlass `IMPORT`: Wissen, das ausserhalb des Archivs erarbeitet wurde (lokal oder mit Claude Code, Copilot CLI), kommt als
+ZIP im OKF-Format in die Wissensbasis, wird ohne KI geprüft (inkl. Auszugsprüfung gegen den Volltext der Quelle,
+Zuordnung der Quellen per SHA-256) und nur als Entwurf angelegt. Der Grundsatz bleibt: Die Wissensbasis ändert nur ein
+Mensch durch Freigabe je Änderung. Die betrachtete Alternative 4 (KI schreibt direkt) bleibt abgelehnt; ein Paket kann
+weder `verified` noch Status noch Vertraulichkeit setzen. Abgelehnt sind ein Quellen-Export aus dem Archiv und ein Import
+per API-Token (Spec 04, design.md, «Abgelehnte Optionen»).
+
 ## Verweise
-- Spec 04, Requirements 1–18; Spec 01, 1.5, 2.3, 2.6, 5.9, 6.12, 7, 10.3, 10.8, 15.1, 16.6; Spec 02, 2.1–2.5, 3.1, 4.1, 5.3, 7.1; Spec 03, 1.2, 6.4
+- Spec 04, Requirements 1–19; Spec 01, 1.5, 2.3, 2.6, 5.9, 6.12, 7, 10.3, 10.8, 15.1, 16.6; Spec 02, 2.1–2.5, 3.1, 4.1, 5.3, 7.1; Spec 03, 1.2, 6.4
 - ADR-002, ADR-003, ADR-006, ADR-008, ADR-009, ADR-010, ADR-011, ADR-012
 - Open Knowledge Format v0.2 (Spezifikation `llm-wiki/OKF-SPEC.md` im Repository `ai-entwicklung`, ausserhalb dieses Repositorys)

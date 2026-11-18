@@ -63,9 +63,9 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Port `DokumentEreignisse` nach design.md (Ergänzung zu Spec 01, in derselben Transaktion); Auftrag `WISSEN_INGEST` nach `ARCHIVIERT` und über `POST /dokumente/{id}/wissen-ingest` (Seitenbereich); höchstens ein Ingest je Mandant `IN_ARBEIT`/`OFFEN`, weitere `WARTEND`; Vorprüfung (Art, `PERSONAL`, Volltext, PDF/A und `\f`-Seiten, laufender oder wartender Ingest, Schätzung mit Ein- und Ausgabe, Monatsbudget der Wissensbasis)
   - Teilaufträge `KERNAUSSAGEN`, `PLANUNG`, `SEITE`, `QUELLE` mit je einem Aufruf über `KiPort` und JSON-Schema, `ABSCHLUSS` ohne Aufruf; Auszugsprüfung; Ingest-Kontext nur bis zur Stufe der Wissensquelle, `ueberblick` nur bei `NORMAL`; die Stufe für 5.5 und 11.7 live über `WissensGraph` und die aktuelle Dokumentstufe, nicht aus `wissensseite.vertraulichkeit` (design.md, «Sichtbarkeit und Hülle»); belegter Pfad höherer Stufe → Befund und Hinweis; Kontextstufe je Änderung; Eingrenzung grosser Indizes über die Volltextsuche (Vektor folgt in 15.1)
   - `archiv.wissen.*` (Modell über `archiv.ki.basis-url`, kein eigener URL-Schlüssel); `ki_verbrauch` mit neuen Zwecken; Zeitgrenzen der neuen Auftragstypen
-  - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 300'000 und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
+  - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 600'000 (Entscheid Fabian, 18.11.2026) und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
   - Prompt-Injection-PDF: Ergebnis nur als Entwurf mit Befunden
-  - Teil erledigt (PR #307, 14.1a): Port `DokumentEreignisse` in der Archivierungstransaktion, `POST /dokumente/{id}/wissen-ingest` mit Seitenbereich (A16, 404 vor 403), Vorprüfung, Schätzung, Monatsbudget (Kalendermonat Zürich), Reihenfolge `WARTEND`/`IN_ARBEIT`, Changeset `047-wissen-ingest-indizes`, Szenarien `features/wissen/ingest.feature`, `JdbcWissenIngestTest` (design.md, «Zwischenstand 14.1a»). Rest 14.1b: Handler und Teilaufträge, WireMock-Szenarien, Nachholen der Quellen mit Zwischenstand-Hinweis, erneute Prüfung des Monatsbudgets beim Hochstufen `WARTEND` → `IN_ARBEIT`; offen für Fabian: Schätzformel gegen Startwert `budget-tokens`
+  - Teil erledigt (PR #307, 14.1a): Port `DokumentEreignisse` in der Archivierungstransaktion, `POST /dokumente/{id}/wissen-ingest` mit Seitenbereich (A16, 404 vor 403), Vorprüfung, Schätzung, Monatsbudget (Kalendermonat Zürich), Reihenfolge `WARTEND`/`IN_ARBEIT` (neuer Start `WARTEND`, solange ein Ingest-Entwurf `WARTEND`, `IN_ARBEIT` oder `OFFEN` ist), Changeset `047-wissen-ingest-indizes`, Szenarien `features/wissen/ingest.feature`, `JdbcWissenIngestTest` (design.md, «Zwischenstand 14.1a»). Rest 14.1b: Handler und Teilaufträge, WireMock-Szenarien, Nachholen der Quellen mit Zwischenstand-Hinweis, erneute Prüfung des Monatsbudgets beim Hochstufen `WARTEND` → `IN_ARBEIT`. Entscheid Fabian vom 18.11.2026 zur Schätzformel gegen `budget-tokens`: Startwert 600'000 in PR #307 umgesetzt.
   - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
 
@@ -132,13 +132,38 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 17.1–17.5, 14.3_
   - _Abhängig von: 13.6_
 
+- [ ] 15.6 Import eines Wissenspakets als Entwurf [Backend]
+  - `WissensPaketLeser` und `PaketKopf`/`PaketSeite` in `wissen/domain/paket` (nur im Speicher lesen; Grenzen, Pfadnormalisierung, Symlinks, Zip-Bombe über gezählte Bytes; Frontmatter über den YAML-Ereignisstrom ohne Tags, Anker, Aliase; Konfiguration `archiv.wissen.import.*` und `archiv.wissen.instanz-id`); ArchUnit-Regel `wissenDomainOhneFramework`
+  - `WissensImport` und `QuellenAufloeser` in `wissen/application` (Zuordnung per SHA-256 über den Lesezugriff auf `dokument/application`, nur Art `WISSENSQUELLE`, `ARCHIVIERT`, sichtbar; Ergebnis `UNBEKANNT` für unbekannt, andere Art, unsichtbar, fremder Mandant); neue Befunde `QUELLE_UNBEKANNT`, `AUSZUG_FEHLT`, `AUSZUG_NICHT_PRUEFBAR`, `CLOUD_STUFE_UNZULAESSIG` und Ergebnistyp `NICHT_PRUEFBAR` in `WissensPruefung`; Auszugsprüfung mit `Seitentext` wie beim Ingest
+  - REST `POST /wissensentwuerfe/import` (multipart, 201/400/403/409/413/415/422) und `POST /wissensentwuerfe/{id}/neu-pruefen` (A17, nur OIDC); Anlass `IMPORT`, Spalten `paket_sha256` (eindeutig) und `paket_angaben`, Changeset; Akteur `extern:<erzeugt_von>`; Zugriffsprotokoll `WISSEN_IMPORT`; Logeintrag `IMPORT` beim Abschluss; «neu erzeugen» für `IMPORT` nicht angeboten
+  - Fehlercode `PAKET_UNGUELTIG` (422) in Enum `Fehlercode` und in die Tabelle von Spec 01, design.md (FehlercodeSpecTest); Schlüssel in `tech.md`; OKF-Export (15.5) um `paket.yaml`, `sha256`, `seite`, `auszug`, `erzeugt_von`, `basis_version` ergänzen (Rundlauf-Test: Export einer lokalen Instanz besteht den Import-Leser)
+  - Beispielpakete unter `backend/src/test/resources/wissen-pakete/` (gültig, je Befund, je Angriff nach design.md, «Sicherheit und Bedrohungsmodell») und `PaketRegelnGleichheitTest`; Szenarien `@req-19.x` unter `features/wissen/`; Isolationsszenario mit zweitem Mandanten (fremde Prüfsumme); Logs nur mit IDs (Test über Log-Ausgabe)
+  - Abgrenzung: kein KI-Aufruf, keine Oberfläche (15.8), kein Prüfwerkzeug (15.7); offener Punkt 19-a (Ingest bei Quellen nur für ein Paket) ist hier nur umzusetzen, wenn Fabian ihn entschieden hat
+  - _Anforderungen: 19.1–19.23, 19.26, 14.3, 17.2_
+  - _Abhängig von: 14.2 (Entwurf, Diff, Freigabe, manueller Entwurf), 15.5 (OKF-Export, Paketformat)_
+
+- [ ] 15.7 Prüfwerkzeug `wissen_paket` [Backend]
+  - `tools/wissen_paket` (Java 25, picocli, Shade-Jar, SpotBugs wie `tools/drive_import`), Kommandos `validate` und `bauen`, Option `--quellen`; bindet den Quelltext von `wissen/domain` und `gemeinsam/domain/Seitentext*` per `build-helper-maven-plugin` ein (design.md, «Prüfwerkzeug»); `OfflineKontext`; Bericht nur mit Befund-Codes und Pfaden (`--json`), Rückgabewert 0/1; reproduzierbares ZIP; kein Netz, keine Zugangsdaten
+  - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
+  - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
+  - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
+  - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
+  - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
+
+- [ ] 15.8 Oberfläche Import [Frontend]
+  - Route `/wissen/entwuerfe/import` (Upload, Prüfbericht mit Zählern und Befunden je Seite, Link zum Entwurf); Entwurfsansicht für Anlass `IMPORT` mit Herkunft, Quellenzuordnung und Auszugsprüfung je Quelle, Hinweis zur Regel für Cloud-Modelle, Aktion «Prüfung wiederholen»; kein gesammeltes Annehmen
+  - 375 px, WCAG 2.1 AA (axe), Texte nur in `texte.de-CH.ts`; Szenarien mit Cucumber.js + Playwright; `mitarbeiter` sieht die Route nicht
+  - _Anforderungen: 19.28, 16.3, 16.4, 16.7_
+  - _Abhängig von: 14.6 (Oberfläche Entwürfe), 15.6 (Endpunkt)_
+
 ## Welle 16 — Abnahme Phase 4
 
 - [ ] 16.1 Sicherheits- und Isolationstests [QA]
   - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern
-  - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen; Befunde beheben
-  - _Anforderungen: 11.5, 11.6, 18.5_
-  - _Abhängig von: 15.1–15.5_
+  - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen, auch über Pakete (Import, 15.6); Befunde beheben
+  - Import in die Isolation einbeziehen (`@req-19.29`): zwei Mandanten, alle Rollen und API-Token; Paket mit der SHA-256 eines Dokuments des anderen Mandanten, Zip-Slip, Symlink, Zip-Bombe, YAML mit Tag und Alias, Rohhtml, externer Link und `cloud` mit `INTERN` je abgelehnt bzw. mit Befund (Beispielpakete aus 15.6)
+  - _Anforderungen: 11.5, 11.6, 18.5, 19.29_
+  - _Abhängig von: 15.1–15.8_
 
 - [ ] 16.2 Prüfliste und Gate [Fabian] [QA]
   - `wissen-pruefliste.yaml` (Wissensquellen, Fussnoten-Stichprobe, Fragen mit erwarteten Seiten und Quelldokumenten) nur unter `ARCHIV_GOLDEN_DIR`; im Repo nur Schema und Test `WissenPrueflisteIT`
@@ -148,11 +173,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 16.1_
 
 ## Optionen
-Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort.
+Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
 
 - [ ]* O.4 Wissensseiten für Verbandsmitglieder VHF/GSK [Backend]
   - öffentliche Schnittstelle und Chatbot (Spec 03) um freigegebene Seiten mit Hülle nur aus veröffentlichten `NORMAL`-Dokumenten erweitern; ändert Spec 03, 6.1
   - Spec 03 ergänzt (Spec 03, 3.7; 13.11.2026): Die Zugriffsstufe einer Seite wäre die höchste Stufe ihrer Hülle (drei Stufen); die Erweiterung wäre additiv im Vertrag `public-v1` (Spec 03, 11.3)
-- [ ]* O.5 Import eines OKF-Bundles als Entwurf [Backend]
-  - z. B. ein bestehendes LLM-Wiki; Quellen ohne Archivdokument werden als Befund markiert
+- [ ]* O.5 Import eines OKF-Bundles als Entwurf [Backend] — **übernommen in 15.6 bis 15.8 (Entscheid Fabian 18.11.2026, Requirement 19)**; nicht als Option umsetzen
+  - z. B. ein bestehendes LLM-Wiki; Quellen ohne Archivdokument werden als Befund `QUELLE_UNBEKANNT` markiert (Zuordnung über SHA-256, 19.13, 19.14)
 - [ ]* O.6 Wissenswerkzeuge im MCP-Server (O.3) [Backend] — **entfällt (folgt aus Spec 02, O.3, Entscheid 18.11.2026)** (nicht umsetzen)
