@@ -458,7 +458,7 @@ wenn Dienstkonto oder SMTP nicht bereit sind.
 | `tech.md` | Tag `@spec-06`; Dienstkonto und Secret `keycloak_verwaltung_secret` im Abschnitt Secrets |
 | `docs/umsetzungsplan.md` | Zeile Spec 06, Wellen 19 bis 21 |
 | `docs/adr/` | ADR-015 |
-| README | Hinweis zu «Benutzer in Keycloak anlegen» (Notweg) |
+| README | Hinweis zu «Benutzer in Keycloak anlegen» (Notweg) mit Aufgabe 21.5 (bewusst nicht in diesem PR: eine Änderung an `README.md` erzwingt den vollen CI-Lauf statt «nur Spec») |
 
 ## Abgelehnte Optionen
 - **Einzelne Rechte statt Rollen vergeben:** abgelehnt. Die Rechtematrix ist jede Zeile ein testbares Kriterium (ADR-009);
