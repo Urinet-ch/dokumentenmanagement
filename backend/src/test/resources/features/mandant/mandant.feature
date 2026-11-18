@@ -14,7 +14,7 @@ Funktionalität: Mandanten anlegen und migrieren
   @req-1.5
   Szenario: Der Seed des Mandanten wird ohne Entwurfsfelder eingespielt
     Wenn der Betreiber die Mandanten «urinet» und «probe» anlegt
-    Dann enthält das Schema «m_urinet» genau die Dokumentarten aus «seed/urinet/dokumentarten.json» und den Seed-Teil der Wissensquelle
+    Dann enthält das Schema «m_urinet» genau die Dokumentarten aus «seed/urinet/konfiguration.json» und den Seed-Teil der Wissensquelle
 
   @req-1.5
   Szenario: Ohne Seed wird kein Mandant angelegt

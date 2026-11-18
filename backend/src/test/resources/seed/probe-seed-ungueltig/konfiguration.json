@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "PROBE_ZYKLUS",
+      "name": "Probe mit zyklischem Schema",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "$ref": "#"
+      }
+    }
+  ],
+  "regeln": [],
+  "_zweck": "Synthetischer Seed nur für Tests (Review PR #40): Das Zusatz-Schema verweist ohne Fortschritt auf sich selbst; die Provisionierung muss mit SEED_UNGUELTIG abbrechen, bevor sie etwas anlegt"
+}

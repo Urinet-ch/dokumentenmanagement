@@ -127,6 +127,15 @@ public class KonfigurationsdateiVerwaltung {
                 aktuell.klassifikationen(), aktuell.regeln(), texte);
     }
 
+    public int seedEinspielen(Konfiguration seed) {
+        if (!seed.pruefen().isEmpty()) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
+        konfiguration.aenderungStarten(konfiguration.aktuelleVersion());
+        speichern(seed);
+        return konfiguration.aenderungSpeichern("system:seed", null, KonfigurationQuelle.SEED);
+    }
+
     public KiTexte kiTexte() {
         return kiTexte.lesen();
     }
