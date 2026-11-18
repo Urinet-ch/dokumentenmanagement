@@ -11,6 +11,9 @@ mkdir -p "$bin"
 export MOCK_LOG="$temp/commands.log"
 export MOCK_BACKUP_TEST="$repo_root/deploy/backup/test/taeglich-test.sh"
 export MOCK_TAEGLICH_SCRIPT="$repo_root/deploy/backup/taeglich.sh"
+export MOCK_COMPOSE_FILE="$repo_root/deploy/backup/test/restore-compose.yml"
+export MOCK_API_DOCKERFILE="$repo_root/backend/src/main/docker/Dockerfile.jvm"
+export MOCK_KEYCLOAK_DOCKERFILE="$repo_root/deploy/infomaniak/keycloak/Dockerfile"
 : > "$MOCK_LOG"
 
 cat > "$bin/bash" <<'MOCK'
@@ -49,8 +52,30 @@ printf 'docker %s\n' "$*" >> "$MOCK_LOG"
 if [[ ${1:-} == info || ${1:-} == build ]]; then
   exit 0
 fi
-if [[ ${1:-} == image && ${2:-} == inspect ]]; then
+if [[ ${1:-} == compose && " $* " == *" config --images "* ]]; then
+  awk '$1 == "image:" { print $2 }' "$MOCK_COMPOSE_FILE"
   exit 0
+fi
+if [[ ${1:-} == image && ${2:-} == inspect ]]; then
+  image=${3:-}
+  case "$image" in
+    archiv:restore-roundtrip|archiv:restore-roundtrip-kc) exit 1 ;;
+  esac
+  if awk '$1 == "image:" { print $2 }' "$MOCK_COMPOSE_FILE" | grep -Fxq "$image"; then
+    exit 0
+  fi
+  if awk '
+    $1 == "FROM" {
+      pos = 2
+      if ($pos ~ /^--/) pos++
+      image = $pos
+      if (image != "scratch" && !(image in stages)) print image
+      if ($(pos + 1) == "AS") stages[$(pos + 2)] = 1
+    }
+  ' "$MOCK_API_DOCKERFILE" "$MOCK_KEYCLOAK_DOCKERFILE" | grep -Fxq "$image"; then
+    exit 0
+  fi
+  exit 1
 fi
 if [[ ${1:-} == inspect ]]; then
   printf 'healthy\n'
@@ -60,7 +85,13 @@ if [[ ${1:-} == compose ]]; then
   case " $* " in
     *" ps --quiet db "*) printf 'mock-container\n' ;;
     *" port db 5432 "*) printf '127.0.0.1:25432\n' ;;
-    *" port minio 9000 "*) printf '127.0.0.1:29000\n' ;;
+    *" port minio 9000 "*)
+      if [[ ${MOCK_INVALID_PORT:-0} == 1 ]]; then
+        printf 'invalid IP:0\n'
+      else
+        printf '127.0.0.1:29000\n'
+      fi
+      ;;
     *" port kc 9000 "*) printf '127.0.0.1:29001\n' ;;
     *" port api 8080 "*) printf '127.0.0.1:28080\n' ;;
     *" port kc_restore 9000 "*) printf '127.0.0.1:29002\n' ;;
@@ -82,10 +113,12 @@ MOCK
 
 cat > "$bin/age-keygen" <<'MOCK'
 #!/bin/bash
-if [[ ${1:-} == -o ]]; then
+if [[ ${1:-} == -o && $# -eq 2 ]]; then
   printf 'synthetic identity\n' > "$2"
-elif [[ ${1:-} == -y ]]; then
+elif [[ ${1:-} == -y && $# -eq 2 && -f $2 ]]; then
   printf 'age1synthetic\n'
+else
+  exit 2
 fi
 MOCK
 
@@ -128,6 +161,22 @@ assert() {
   fi
 }
 
+for service in db minio kc api kc_restore; do
+  if ! awk -v service="$service" '
+    $0 == "  " service ":" { in_service = 1; next }
+    in_service && /^[^ ]/ { in_service = 0 }
+    in_service && $0 == "      - restore-host" { found = 1 }
+    END { exit !found }
+  ' "$MOCK_COMPOSE_FILE"; then
+    printf 'Dienst %s muss für Loopback-Porttests am restore-host-Netz hängen.\n' "$service" >&2
+    exit 1
+  fi
+done
+if ! grep -Fq '    internal: true' "$MOCK_COMPOSE_FILE" || ! grep -Fq '  restore-host:' "$MOCK_COMPOSE_FILE"; then
+  printf 'Compose muss ein internes Servicenetz und ein separates Host-Portnetz definieren.\n' >&2
+  exit 1
+fi
+
 if ! "$script" >"$temp/erfolg.stdout" 2>"$temp/erfolg.stderr"; then
   cat "$temp/erfolg.stderr" >&2
   exit 1
@@ -166,3 +215,13 @@ if grep -q '^OK      Vollständiger lokaler Sicherungs-Roundtrip abgeschlossen' 
   printf 'Der Übungslauf wurde trotz Testfehler als abgeschlossen gemeldet.\n' >&2
   exit 1
 fi
+
+: > "$MOCK_LOG"
+if MOCK_INVALID_PORT=1 "$script" >"$temp/port.stdout" 2>"$temp/port.stderr"; then
+  printf 'Ein ungültiger Compose-Host-Port hätte den Übungslauf abbrechen müssen.\n' >&2
+  exit 1
+else
+  status=$?
+  assert test "$status" -eq 3
+fi
+assert grep -Fq 'Compose lieferte keinen gültigen Host-Port für minio:9000.' "$temp/port.stderr"

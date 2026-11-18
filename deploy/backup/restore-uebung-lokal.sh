@@ -73,16 +73,40 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-for image in \
-  pgvector/pgvector:0.8.7-pg17-trixie \
-  quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0 \
-  eclipse-temurin:25.0.5_8-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c \
-  cgr.dev/chainguard/minio:latest@sha256:59953701f8f8d0de81aab456f8b0b6c0a1804119415559bf7ede79d944108879; do
+image_pruefen() {
+  local image=$1
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     printf 'FEHLER  Lokales Test-Image fehlt: %s\n' "$image" >&2
     exit 2
   fi
-done
+}
+
+if ! compose_images=$(compose config --images); then
+  printf 'FEHLER  Compose-Images konnten nicht ermittelt werden.\n' >&2
+  exit 2
+fi
+while IFS= read -r image; do
+  case "$image" in
+    archiv:restore-roundtrip|archiv:restore-roundtrip-kc) continue ;;
+  esac
+  image_pruefen "$image"
+done <<< "$compose_images"
+
+if ! build_images=$(awk '
+  $1 == "FROM" {
+    pos = 2
+    if ($pos ~ /^--/) pos++
+    image = $pos
+    if (image != "scratch" && !(image in stages)) print image
+    if ($(pos + 1) == "AS") stages[$(pos + 2)] = 1
+  }
+' "$backend/src/main/docker/Dockerfile.jvm" "$repo_root/deploy/infomaniak/keycloak/Dockerfile"); then
+  printf 'FEHLER  Basis-Images der Test-Dockerfiles konnten nicht ermittelt werden.\n' >&2
+  exit 2
+fi
+while IFS= read -r image; do
+  [[ -n $image ]] && image_pruefen "$image"
+done <<< "$build_images"
 
 mkdir -p "$temp/secrets" "$temp/postgres" "$temp/minio" "$temp/backup" \
   "$temp/entschluesselt" "$temp/entschluesselt-probe"
@@ -108,8 +132,8 @@ chmod 444 "$temp"/secrets/*
 age-keygen -o "$temp/sicherung.agekey" >/dev/null 2>&1
 age-keygen -o "$temp/probe.agekey" >/dev/null 2>&1
 age-keygen -o "$temp/falsch.agekey" >/dev/null 2>&1
-sicherung_empfaenger=$(age-keygen -y -i "$temp/sicherung.agekey")
-probe_empfaenger=$(age-keygen -y -i "$temp/probe.agekey")
+sicherung_empfaenger=$(age-keygen -y "$temp/sicherung.agekey")
+probe_empfaenger=$(age-keygen -y "$temp/probe.agekey")
 
 start=$SECONDS
 if bash "$repo_root/deploy/backup/test/taeglich-test.sh" >"$temp/taeglich-shelltest.log" 2>&1; then
@@ -172,9 +196,11 @@ start_dienste() {
 }
 
 dienstport() {
-  local adresse
-  adresse=$(compose port "$1" "$2") || fehler "Compose-Port konnte nicht gelesen werden."
-  printf '%s\n' "${adresse##*:}"
+  local dienst=$1 port_container=$2 adresse port
+  adresse=$(compose port "$dienst" "$port_container") || fehler "Compose-Port konnte nicht gelesen werden."
+  port=${adresse##*:}
+  [[ $port =~ ^[1-9][0-9]*$ ]] || fehler "Compose lieferte keinen gültigen Host-Port für $dienst:$port_container."
+  printf '%s\n' "$port"
 }
 
 warte_url() {

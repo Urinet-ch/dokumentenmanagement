@@ -116,7 +116,8 @@ deploy/backup/restore-uebung-lokal.sh
 
 Voraussetzungen sind Docker, Maven, `age`, `age-keygen`, OpenSSL, `curl` und die lokal vorhandenen Images für
 PostgreSQL/pgvector, Keycloak, Java und MinIO. Das Skript erzeugt eigene Wegwerf-Schlüssel und synthetische Zugangsdaten,
-startet einen Compose-Stack mit internem Netzwerk und führt den echten `taeglich.sh`-Export aus. Es prüft `SHA256SUMS`,
+startet einen Compose-Stack mit internem Servicenetz und einem getrennten Bridge-Netz für Loopback-Ports und führt den
+echten `taeglich.sh`-Export aus. Die veröffentlichten Ports sind ausschliesslich an `127.0.0.1` gebunden. Es prüft `SHA256SUMS`,
 weist einen falschen Schlüssel und eine manipulierte Prüfsumme zurück und entschlüsselt das Paket mit beiden
 Wegwerf-Schlüsseln.
 
