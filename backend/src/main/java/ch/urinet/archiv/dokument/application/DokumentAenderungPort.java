@@ -8,6 +8,7 @@ import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -27,11 +28,25 @@ public interface DokumentAenderungPort {
                      LocalDate datum, UUID partnerId, String partnerName, String projekt, List<String> tags,
                      String vertraulichkeit, String personBenutzer, Integer geschaeftsjahr, LocalDate aufbewahrenBis,
                      boolean fristAbgelaufen, LocalDate sperreBis, String zusatz, Set<String> zusatzFelder,
-                     Optional<Finanz> finanz, Optional<Vertrag> vertrag) {
+                     Optional<Finanz> finanz, Optional<Vertrag> vertrag,
+                     Map<String, List<String>> klassifikationen) {
+
+        public Metadaten(UUID id, DokumentStatus status, int version, Instant eingang, String art, String titel,
+                         LocalDate datum, UUID partnerId, String partnerName, String projekt, List<String> tags,
+                         String vertraulichkeit, String personBenutzer, Integer geschaeftsjahr,
+                         LocalDate aufbewahrenBis, boolean fristAbgelaufen, LocalDate sperreBis, String zusatz,
+                         Set<String> zusatzFelder, Optional<Finanz> finanz, Optional<Vertrag> vertrag) {
+            this(id, status, version, eingang, art, titel, datum, partnerId, partnerName, projekt, tags,
+                    vertraulichkeit, personBenutzer, geschaeftsjahr, aufbewahrenBis, fristAbgelaufen, sperreBis,
+                    zusatz, zusatzFelder, finanz, vertrag, Map.of());
+        }
 
         public Metadaten {
             tags = tags == null ? List.of() : List.copyOf(tags);
             zusatzFelder = Set.copyOf(zusatzFelder);
+            klassifikationen = klassifikationen == null ? Map.of()
+                    : klassifikationen.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                            Map.Entry::getKey, eintrag -> List.copyOf(eintrag.getValue())));
         }
     }
 

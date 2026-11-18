@@ -28,6 +28,8 @@ public enum Fehlercode {
             "Die Aufbewahrungsfrist liegt in der Vergangenheit. Bitte prüfen Sie Datum und Dokumentart."),
     DOKUMENTART_IN_GEBRAUCH(409, "Dokumentart in Gebrauch",
             "Die Dokumentart wird noch verwendet und kann nicht gelöscht werden. Sie können sie deaktivieren."),
+    KONFIGURATION_IN_GEBRAUCH(409, "Konfiguration in Gebrauch",
+            "Die Klassifikation oder der Wert wird noch verwendet und kann nicht gelöscht werden. Sie können ihn deaktivieren."),
     DOKUMENTART_EXISTIERT(409, "Dokumentart existiert",
             "Diesen Code hat schon eine Dokumentart. Bitte wählen Sie einen anderen Code oder ändern Sie die "
                     + "bestehende Art."),
@@ -53,6 +55,8 @@ public enum Fehlercode {
             "Die Zusatzfelder passen nicht zur Dokumentart. Bitte prüfen Sie die Angaben."),
     KONFIGURATION_UNGUELTIG(422, "Konfiguration ungültig",
             "Die Konfiguration ist ungültig. Bitte prüfen Sie die angegebenen Werte."),
+    KLASSIFIKATION_UNGUELTIG(422, "Klassifikation ungültig",
+            "Die Klassifikationen passen nicht zur Dokumentart. Bitte prüfen Sie die Werte."),
     CSV_UNGUELTIG(422, "CSV-Datei ungültig",
             "Die CSV-Datei hat nicht das erwartete Format (UTF-8 oder Windows-1252, Semikolon oder Komma), mehr als "
                     + "10'000 Datenzeilen, mehr als 1'000 Spalten, einen zu langen Spaltennamen oder keine Spalte "

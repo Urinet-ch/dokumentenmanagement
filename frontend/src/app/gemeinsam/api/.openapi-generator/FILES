@@ -18,6 +18,7 @@ model/api-token-ablauf.ts
 model/api-token-erstellt.ts
 model/api-token-neu.ts
 model/api-token.ts
+model/art-klassifikation.ts
 model/auszug-teil.ts
 model/bestaetigung.ts
 model/branding-dto.ts
@@ -54,6 +55,8 @@ model/import-zeile.ts
 model/import-zuordnung-bestaetigen.ts
 model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
+model/klassifikation-wert.ts
+model/klassifikation.ts
 model/konfigurations-version-detail.ts
 model/konfigurations-version.ts
 model/kontakt-angaben.ts

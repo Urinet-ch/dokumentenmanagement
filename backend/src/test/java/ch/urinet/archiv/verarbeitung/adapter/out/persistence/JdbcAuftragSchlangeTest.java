@@ -1,10 +1,13 @@
 package ch.urinet.archiv.verarbeitung.adapter.out.persistence;
 
+import ch.urinet.archiv.gemeinsam.ProdZeitgrenzen;
 import ch.urinet.archiv.gemeinsam.domain.Ursachen;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,5 +36,16 @@ class JdbcAuftragSchlangeTest {
         RuntimeException fehler = JdbcAuftragSchlange.fehler("Auftrag nicht gespeichert",
                 new SQLException("Schlüssel (kunde)=(FC Beispiel) existiert bereits", "23505"));
         assertThat(Ursachen.kette(fehler)).contains("[sqlstate=23505]").doesNotContain("FC Beispiel");
+    }
+
+    /** Die Wartezeiten gelten für jeden Auftragstyp, darum gegen die kürzeste Auftragszeitgrenze (Review PR #266, S1). */
+    @Test
+    void queryTimeoutDerAnspruchspruefungLiegtUnterJederAuftragszeitgrenze() throws IOException {
+        Map.Entry<String, Duration> kuerzeste = ProdZeitgrenzen.laden().kuerzesteAuftragszeitgrenze();
+
+        assertThat(Duration.ofSeconds(JdbcAuftragSchlange.ANSPRUCH_WARTEZEIT_SEKUNDEN)).as(kuerzeste.getKey())
+                .isLessThan(kuerzeste.getValue());
+        assertThat(Duration.ofSeconds(JdbcAuftragSchlange.SPERR_WARTEZEIT_SEKUNDEN)).as(kuerzeste.getKey())
+                .isLessThan(kuerzeste.getValue());
     }
 }

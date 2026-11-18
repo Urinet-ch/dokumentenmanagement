@@ -1,6 +1,7 @@
 package ch.urinet.archiv.kontakt;
 
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentAenderung;
+import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsPort;
 import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Alternative;
@@ -26,8 +27,9 @@ public class SperrReihenfolgeHaken extends PanacheDokumentAenderung {
     private static volatile CountDownLatch dokumentGesperrt;
 
     @Inject
-    public SperrReihenfolgeHaken(KonfigurationVersionsPort konfiguration) {
-        super(konfiguration);
+    public SperrReihenfolgeHaken(KonfigurationVersionsPort konfiguration,
+                                 DokumentKlassifikationenPort klassifikationen) {
+        super(konfiguration, klassifikationen);
     }
 
     /** Stellt die Riegel für einen Lauf scharf. */

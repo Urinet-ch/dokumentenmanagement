@@ -24,6 +24,9 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     `KONFIGURATION_AENDERN` neben `REGEL_AENDERN`, `If-Match` mit der Konfigurationsversion (auch für
     `/dokumentarten`), Version am Dokument und in der Dokumentversion, `GET /konfiguration/versionen[/{n}]`,
     Append-only-Test.
+    Nachverfolgung (PR #290): Req 1.3 maskiert `uid`/`ibans` im Protokoll (design.md «Protokoll»); Nachweis:
+    `ProtokollDetailsTest`, `KonfigurationTest`, Szenarien `@req-1.3` in `nachverfolgung.feature` (auch über
+    die Verwaltung), `KonfigurationMigrationTest` (Changeset 037), `DokumentartSeedIdempotenzTest` (Seed-Abbruch).
   - _Anforderungen: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Abhängig von: Spec 01: 3.5, 4.7_
 
@@ -34,6 +37,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     `WISSENSQUELLE` (sobald Spec 04: 13.2 umgesetzt ist, vorher mit Test-Art), reservierte Felder.
   - Spec 03 ergänzt: reservierte Felder nach Spec 03 design.md «Reservierte Felder» (`zugriff` mit drei Stufen,
     `veroeffentlicht` als JSON-Wahrheitswert) (Spec 03, Req 3.7)
+    Nachverfolgung (PR #290): Standard `vorstand` für jede Art, `oeffentlich` abgelehnt; Nachweis: Szenarien
+    `@req-2.7` in `nachverfolgung.feature`.
   - _Anforderungen: 2.1, 2.2, 2.6, 2.7, 2.8_
   - _Abhängig von: 17.2_
 
@@ -42,7 +47,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
   - _Abhängig von: 17.3_
 
-- [ ] 17.5 Klassifikationen [Backend]
+- [x] 17.5 Klassifikationen [Backend]
   - Changeset `<nnn>-klassifikation`, Domain, REST, Zuordnung zu Arten, Prüfung an Dokumenten, Artwechsel,
     Versionierung, reservierte Parameternamen der öffentlichen Schnittstelle, Kennzeichnung ungültiger Werte im
     Eingangskorb nach einer Konfigurationsänderung.

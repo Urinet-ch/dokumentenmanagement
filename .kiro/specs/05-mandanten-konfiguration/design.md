@@ -119,6 +119,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | --- | --- | --- | --- |
 | GET | `/klassifikationen` | aktive und inaktive Klassifikationen und Werte mit `aktiv` (Req 7.2) | alle Rollen |
 | POST, PATCH, DELETE | `/klassifikationen[/{code}]`, `/klassifikationen/{code}/werte[/{wert}]` | anlegen, ändern, deaktivieren, löschen; 409 `KONFIGURATION_IN_GEBRAUCH`, 422 `KONFIGURATION_UNGUELTIG`, 412, 428 | A11 |
+| GET, POST, PATCH, DELETE | `/dokumentarten/{art}/klassifikationen[/{code}]` | Klassifikationen einer Art zuordnen mit `pflicht` und `standardWert` (Req 3.4); GET alle Rollen, Schreiben A11 (`inhaber`); `If-Match` Pflicht; 404 `NICHT_GEFUNDEN`, 422 `KONFIGURATION_UNGUELTIG` (u. a. inaktive Klassifikation als Pflicht oder mit Standardwert), 412, 428 | alle Rollen (GET), A11 |
 | GET, POST, PATCH, DELETE | `/regeln[/{code}]` | Regeln pflegen; POST/PATCH melden `betroffeneDokumente` (Req 5.6); 412, 428 | A11 |
 | GET, PATCH | `/konfiguration/ki-texte` | Rolle, Feldregeln, `ki_freigegeben` (nur lesen; setzt das Admin-Kommando) | A11 |
 | GET | `/konfiguration` | Export der aktuellen Konfiguration als Konfigurationsdatei; `ETag` = Version | A11 |
@@ -314,8 +315,11 @@ auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder 
 speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
 `veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
 oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
-`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig (Entscheid Fabian 17.11.2026 für
-VORSTANDSPROTOKOLL, Spec 03 Aufgabe 10.4).
+`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig: Spec 03 design.md nennt als
+Standard `mitglieder` («Reservierte Felder») und als einzige Ausnahme `VORSTANDSPROTOKOLL` mit `vorstand` (Aufgabe
+10.4, Entscheid Fabian 17.11.2026); wegen Req 2.9 bindet die Prüfung diese Ausnahme nicht an einen Art-Code, sie gilt
+also für jede Art. Das ist weiter als der Wortlaut von Req 2.7 (Richtung restriktiv, `vorstand` ist die engste Stufe);
+die Bestätigung ist in PR #290 offen für Fabian.
 
 Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
 Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
@@ -338,9 +342,41 @@ Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als K
 unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
 und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
 
+Umsetzung 17.5 (Review PR #289): `klassifikationenUngueltig` bedeutet in Eingangskorb und Einzelabruf dasselbe: die
+Klassifikationen, an denen die nächste Speicherung nach der gültigen Version scheitern würde (Req 1.7). Unbestätigt
+gilt die Prüfung der Bestätigung (inaktive, gelöschte, der Art nicht zugeordnete Werte, mehrere Werte bei einer
+einfachen Klassifikation); fehlende Pflicht-Werte zählen nicht, sie kommen mit der Bestätigung. Bestätigt gilt die
+Prüfung der Änderung (behaltene inaktive Werte erlaubt, fehlende Pflicht-Werte zählen). Das Protokoll nennt bei Name,
+Beschreibung und Standardwert von Klassifikationen alten und neuen Wert im Klartext wie bei Arten (Req 1.3); Werte
+an Dokumenten stehen nie darin. Eine Zuordnung zu einer unbekannten Art ergibt 404 `NICHT_GEFUNDEN`. Namen von
+Klassifikationen und Werten enthalten keine Steuerzeichen, Beschreibungen nur Zeilenumbruch und Tabulator.
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.
+Datensparsame Ausnahme bei `einstellungen.kennungen.uid` und `.ibans` (Req 1.3, geändert 18.11.2026, vorgeschlagen
+in PR #290, entschieden mit dessen Merge): Diese Änderungen enthalten nur `{pfad, aenderung: "geändert"}`, keine alten
+oder neuen Werte. Grund ist die Datensparsamkeit: Die Kennungen stehen vollständig im unveränderlichen
+Konfigurationsabbild und müssen im Zugriffsprotokoll nicht vervielfältigt werden (Spec 01, 16.7 regelt Datenstandort
+und CI-Logs, nicht dieses Protokoll, und trägt die Ausnahme nicht). Die Regel steht an einer Stelle:
+`Konfiguration.Aenderung.ohneWerte()` (alle Pfade unter `einstellungen.kennungen.`), der Adapter
+`ZugriffKonfigurationAenderungsProtokoll` gibt das Merkmal an `ProtokollDetails.Aenderung` weiter, das die Werte vor
+jeder Serialisierung entfernt; die Protokoll-Domain kennt keine Konfigurationspfade. `toString()` von
+`Konfiguration.Aenderung` und `Konfiguration.Kennungen` gibt UID und IBANs nicht aus. Andere Elemente behalten die
+bisherige Form mit `alt` und `neu`.
+Altzeilen: Protokollzeilen `KONFIGURATION_AENDERN` aus der Zeit vor PR #290 können UID und IBAN im Klartext als
+`alt`/`neu` enthalten (bisher nur Stufe A mit Testdaten). Das Zugriffsprotokoll ist nur anfügend (Append-only,
+Aufbewahrung nach Spec 01, 10.9), darum bleiben sie unverändert (kein UPDATE). Ob sie bereinigt werden, ist offen
+für Fabian (PR #290). Das unveränderliche Konfigurationsabbild enthält die vollständigen Einstellungen weiterhin; dort
+lässt sich die Änderung mit der protokollierten Version nachvollziehen.
+
+Nachweise der Nachverfolgung: `KonfigurationMigrationTest` migriert zwei getrennte synthetische Mandantenschemas
+mit allen echten Changesets bis 036, legt Bestand an und führt erst dann 037 aus. Dokumente, Fassungen und
+Einstellungen bleiben erhalten, ihre Version verweist auf das mit gültigem SHA-256 lesbare Migrationsabbild.
+Der Dokumentarten-Seed ist bereits eine JDBC-Transaktion einschliesslich des nachgelagerten Referenz-Batches;
+`DokumentartSeedIdempotenzTest` belegt jetzt Abbruch nach der ersten Art sowie Abbruch im Referenz-Batch, vollständigen
+Rollback, erfolgreiche Wiederholung und Unverändertheit eines zweiten Mandanten. Keine Änderung alter Changesets
+und keine zusätzliche Transaktionslogik für einen bereits atomaren Schritt.
 
 ## Error Handling (neue Codes)
 | Status | Code | Wann |

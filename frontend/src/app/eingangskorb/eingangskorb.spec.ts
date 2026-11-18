@@ -26,6 +26,8 @@ const dokument = (id: string, titel: string): Dokument => ({
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
   art: 'QUITTUNG',
 });
 

@@ -87,6 +87,8 @@ const DOKUMENT: Dokument = {
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
 };
 
 class Attrappe extends DokumentPort {

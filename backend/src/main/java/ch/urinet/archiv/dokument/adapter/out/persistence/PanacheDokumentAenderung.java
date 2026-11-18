@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 import ch.urinet.archiv.ablage.domain.AbgelegteDatei;
 import ch.urinet.archiv.dokument.application.DokumentAendern;
 import ch.urinet.archiv.dokument.application.DokumentAenderungPort;
+import ch.urinet.archiv.dokument.application.DokumentKlassifikationenPort;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Finanz;
 import ch.urinet.archiv.dokument.application.DokumentStatusPort.Vertrag;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
@@ -38,8 +39,11 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
             select d.id, d.version, coalesce(d.konfiguration_version, :konfigurationVersion), jsonb_build_object(
                 'dokument', to_jsonb(d) - 'volltext' - 'volltext_tsv',
                 'finanz', (select to_jsonb(f) - 'dokument_id' from dokument_finanz f where f.dokument_id = d.id),
-                'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id)),
-                :benutzer, :grund, :bearbeiter
+                'vertrag', (select to_jsonb(v) - 'dokument_id' from dokument_vertrag v where v.dokument_id = d.id),
+                'klassifikationen', coalesce((select jsonb_object_agg(k.klassifikation, k.werte) from (
+                    select klassifikation, jsonb_agg(wert order by wert) as werte from dokument_klassifikation
+                    where dokument_id = d.id group by klassifikation
+                ) k), '{}'::jsonb)), :benutzer, :grund, :bearbeiter
             from dokument d""";
     private static final String VERSION_SICHERN = FASSUNG_SICHERN + " where d.id = :id";
     /** Wie {@link DokumentAendern} beim Ändern des Partners: eine Fassung nur bei archivierten Dokumenten. */
@@ -47,12 +51,15 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
             + " where d.partner_id = :quelle and d.status = 'ARCHIVIERT'";
 
     private final KonfigurationVersionsPort konfiguration;
+    private final DokumentKlassifikationenPort klassifikationen;
 
     @jakarta.inject.Inject
     jakarta.enterprise.inject.Instance<ch.urinet.archiv.dokument.application.FassungsBearbeiter> bearbeiter;
 
-    public PanacheDokumentAenderung(KonfigurationVersionsPort konfiguration) {
+    public PanacheDokumentAenderung(KonfigurationVersionsPort konfiguration,
+                                    DokumentKlassifikationenPort klassifikationen) {
         this.konfiguration = konfiguration;
+        this.klassifikationen = klassifikationen;
     }
 
     @Override
@@ -76,7 +83,7 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
                 e.art, e.titel, e.datum, e.partnerId, e.partnerName, e.projekt,
                 e.tags == null ? List.of() : Arrays.asList(e.tags), e.vertraulichkeit, e.personBenutzer,
                 e.geschaeftsjahr, e.aufbewahrenBis, e.fristAbgelaufen, e.sperreBis, e.zusatz, Set.copyOf(zusatzFelder),
-                finanz, vertrag));
+                finanz, vertrag, klassifikationen.laden(id)));
     }
 
     @Override
@@ -173,6 +180,7 @@ public class PanacheDokumentAenderung implements DokumentAenderungPort {
                 em().persist(z);
             }
         });
+        klassifikationen.ersetzen(daten.id(), daten.klassifikationen());
         em().flush();
         return e.version;
     }
