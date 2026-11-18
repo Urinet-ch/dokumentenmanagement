@@ -62,6 +62,30 @@ public class KonfigurationsVersionSchritte {
     private boolean dateiWiederherstellen;
     private final Map<String, Integer> gemerkteVersionen = new java.util.HashMap<>();
 
+    @Angenommen("die letzte Konfigurationsversion im Mandanten «urinet» enthält kein KI-Texte-Abbild")
+    public void letzteVersionOhneKiTexteAbbild() throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("""
+                     with aktuell as (
+                         select inhalt from m_urinet.konfiguration_version order by version desc limit 1
+                     ),
+                     naechste as (
+                         select coalesce(max(version), 0) + 1 as version from m_urinet.konfiguration_version
+                     ),
+                     abbild as (
+                         select n.version,
+                             jsonb_set(a.inhalt - 'kiTexte', '{version}', to_jsonb(n.version), true) as inhalt
+                         from aktuell a cross join naechste n
+                     )
+                     insert into m_urinet.konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+                     select version, 'system:test', null, 'MIGRATION', inhalt,
+                         encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+                     from abbild
+                     """)) {
+            befehl.executeUpdate();
+        }
+    }
+
     @Wenn("«{word}» die Konfigurationsversionen auflistet")
     public void versionenAuflisten(String benutzer) {
         antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(VERSIONEN);
@@ -340,6 +364,11 @@ public class KonfigurationsVersionSchritte {
     @Wenn("in der Datei das Geschäftsjahresende «{word}» steht")
     public void geschaeftsjahrEnde(String datum) {
         ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
+    }
+
+    @Wenn("in der Datei der KI-Rollentext geändert wird")
+    public void kiRollentextAendern() {
+        ((ObjectNode) datei.path("kiTexte")).put("rolle", "Synthetische Testrolle");
     }
 
     @Wenn("«{word}» die geänderte Konfigurationsdatei einspielt")

@@ -42,6 +42,17 @@ Funktionalität: Konfigurationsdatei
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Und ist die Konfigurationsversion unverändert
 
+  @req-6.6
+  Szenario: Ein alter Snapshot darf die Live-KI-Freigabe beim Dateieinspielen nicht zurücksetzen
+    Angenommen die letzte Konfigurationsversion im Mandanten «urinet» enthält kein KI-Texte-Abbild
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei der KI-Rollentext geändert wird
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion um eins gestiegen
+    Wenn «inhaber-urinet» die KI-Texte liest
+    Dann ist die KI laut KI-Texte-Endpunkt freigegeben
+
   @req-6.3
   Szenario: Eine ungültige Konfiguration wird vor dem Schreiben abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert

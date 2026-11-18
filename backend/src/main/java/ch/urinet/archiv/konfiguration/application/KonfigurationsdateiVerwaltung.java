@@ -68,7 +68,7 @@ public class KonfigurationsdateiVerwaltung {
     }
 
     public String exportieren() {
-        return codec.schreiben(konfiguration.aktuell());
+        return codec.schreiben(aktuellMitLiveKiTexte());
     }
 
     public int aktuelleVersion() {
@@ -77,7 +77,7 @@ public class KonfigurationsdateiVerwaltung {
 
     /** Schemaverletzungen erscheinen wie die übrigen Prüfungen als Befunde (Spec 05, Req 6.2). */
     public Analyse pruefen(String text) {
-        Konfiguration aktuell = konfiguration.aktuell();
+        Konfiguration aktuell = aktuellMitLiveKiTexte();
         KonfigurationsdateiCodec.Datei datei;
         try {
             datei = codec.lesen(text);
@@ -103,7 +103,7 @@ public class KonfigurationsdateiVerwaltung {
                     "BASISVERSION_FEHLT", "Die Datei nennt keine basisVersion; bitte zuerst exportieren.")));
         }
         konfiguration.dateiAenderungStarten(datei.basisVersion());
-        Konfiguration aktuell = konfiguration.aktuell();
+        Konfiguration aktuell = aktuellMitLiveKiTexte();
         Analyse analyse = analysieren(aktuell, datei);
         if (!analyse.befunde().isEmpty()) {
             throw new KonfigurationUngueltig(analyse.befunde().stream()
@@ -116,6 +116,13 @@ public class KonfigurationsdateiVerwaltung {
         speichern(analyse.ziel());
         int version = konfiguration.aenderungSpeichern(wer, grund, KonfigurationQuelle.DATEI);
         return new Ergebnis(version, analyse.aenderungen());
+    }
+
+    private Konfiguration aktuellMitLiveKiTexte() {
+        Konfiguration aktuell = konfiguration.aktuell();
+        KiTexte texte = kiTexte.lesen();
+        return new Konfiguration(aktuell.version(), aktuell.einstellungen(), aktuell.arten(),
+                aktuell.klassifikationen(), aktuell.regeln(), texte);
     }
 
     public KiTexte kiTexte() {
@@ -265,7 +272,9 @@ public class KonfigurationsdateiVerwaltung {
             }
         }
         einstellungenSpeichern.speichern(ziel.einstellungen());
-        kiTexte.speichern(ziel.kiTexte());
+        KiTexte live = kiTexte.lesen();
+        kiTexte.speichern(new KiTexte(ziel.kiTexte().rolle(), ziel.kiTexte().feldregeln(),
+                live.kiFreigegeben()));
     }
 
     private void zuordnungenSpeichern(Konfiguration ziel, Set<String> alteArten,

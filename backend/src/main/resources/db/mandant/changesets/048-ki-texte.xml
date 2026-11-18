@@ -3,7 +3,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="047-ki-texte" author="archiv">
+    <changeSet id="048-ki-texte" author="archiv">
         <createTable tableName="ki_texte">
             <column name="id" type="integer">
                 <constraints primaryKey="true" nullable="false"/>

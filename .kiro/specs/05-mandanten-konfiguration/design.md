@@ -152,8 +152,9 @@ Version und Protokoll tragen `wer = 'betreiber:<name>'` und den Grund.
 Schema `backend/src/main/resources/konfiguration/konfiguration.schema.json` (JSON Schema 2020-12). Felder mit `_`
 am Anfang sind Kommentare; das Archiv ignoriert sie beim Einspielen und exportiert sie nicht (Req 6.5). Unbekannte
 Felder sind ungültig. Beim Export setzt das Archiv `basisVersion` auf die aktuelle Version; der Seed hat keine.
-`kiFreigegeben` wird exportiert, beim Einspielen aber nur geprüft: Weicht der Wert vom aktuellen ab, lehnt das Archiv
-die Datei ab (Req 6.6); nur der Seed (Version 1) und `ki-freigeben` setzen ihn. Der Seed eines Mandanten enthält
+`kiFreigegeben` stammt aus der Live-Tabelle `ki_texte` und wird in den aktuellen Versions-Snapshot und Export
+übernommen. Beim Einspielen wird der Wert nur geprüft; weicht er vom Live-Wert ab, lehnt das Archiv die Datei ab und
+bewahrt beim Speichern den Live-Wert (Req 6.6). Nur der Seed und `ki-freigeben` setzen ihn. Der Seed eines Mandanten enthält
 `WISSENSQUELLE` nicht; sie kommt aus dem Seed-Teil `_alle`, und Prüfung und Vergleich laufen über beide zusammen
 (Req 6.7, 9.2). Der Export enthält `WISSENSQUELLE` mit den Ergänzungen des Mandanten.
 
@@ -337,7 +338,8 @@ Umsetzung 17.2 (Review PR #251): Das Abbild enthält `einstellungen` und `arten`
 kanonischer JSON-Text (Schlüssel sortiert, kompakt), damit Migration (jsonb), Client-Text und Vergleich dieselbe Form
 haben. Das Abbild der Migration und das der App sind gleich aufgebaut (Arten nach Code in Byte-Reihenfolge, leere
 Listen statt `null`, `ohne Schema = {"type":"object","properties":{},"additionalProperties":false}`). Ein neuer
-Mandant erhält Version 1 vom Changeset (leer, Quelle `MIGRATION`) und nach dem Seed Version 2 mit Quelle `SEED`.
+Mandant erhält Version 1 vom Changeset; spätere Changesets, die das Abbild ergänzen (u. a. KI-Texte), können weitere
+Versionen mit Quelle `MIGRATION` anfügen. Nach dem Seed kommt die nächste Version mit Quelle `SEED`.
 Änderungen an `PATCH /mandant/einstellungen` erzeugen bis 17.7 keine eigene Version; sie gehen in die nächste Version
 ein (die Bindung an `If-Match` kommt mit 17.7). `basisSicherstellen()` legt für Schemas ohne Version 1 diese beim
 ersten Zugriff an (Quelle `MIGRATION`). Das Zugriffsprotokoll trägt je Änderung die geänderten Pfade mit alt und neu.
