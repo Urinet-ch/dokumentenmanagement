@@ -123,5 +123,7 @@ Optionale Aufgaben tragen die Nummern `O.<n>` (ohne Welle), damit sie nicht mit 
 - [ ]* O.1 Eigene Rechnungen nach AbaNinja importieren (I4) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus)
   - Generator-Dokumente der Art Ausgangsrechnung per PDF-Import an AbaNinja senden, AbaNinja-UUID speichern
 - [ ]* O.2 Bankbewegungen für «bezahlt am» (I5) [Backend] — **entfällt, Entscheid 15.11.2026** (setzt AbaNinja voraus; bestätigt von Fabian am 16.11.2026)
-- [ ]* O.3 MCP-Server für Claude (C3) [Backend]
+- [ ]* O.3 MCP-Server für Claude (C3) [Backend] — **entfällt, Entscheid 18.11.2026** (nicht umsetzen)
   - Werkzeuge aus 7.1 als MCP-Server (nur lesend), Token pro Benutzer, gleiche Schutzregeln
+  - Status: **entfällt (Entscheid Fabian 18.11.2026)**. Nach Entscheid 1 vom 17.11.2026 (keine Weitergabe von Archivinhalten an Cloud-Modelle) gibt es heute keinen zugelassenen MCP-Client; O.3 und Requirement 14 entfallen wie O.1/O.2, nicht umsetzen. Der Entwurf in design.md («Entwurf O.3») bleibt als Notiz für den Fall, dass ein nach `tech.md` zugelassener Modell- oder MCP-Client entschieden wird (dann neuer Entscheid und neue Aufgabe)
+  - _Anforderungen: 14.1–14.11_

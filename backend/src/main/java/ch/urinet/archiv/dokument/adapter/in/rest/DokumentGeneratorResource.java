@@ -107,6 +107,8 @@ public class DokumentGeneratorResource {
                                         List<String> tags, String projekt,
                                         @Schema(description = "Ohne Angabe Vorschlag aus Belegdatum (Req 9.6)")
                                         Integer geschaeftsjahr,
+                                        @Schema(type = SchemaType.OBJECT, description = "Werte nach Klassifikations-Code")
+                                        java.util.Map<String, List<String>> klassifikationen,
                                         @Schema(type = SchemaType.OBJECT,
                                                 description = "Zusatzfelder nach dem Schema der Art")
                                         JsonNode zusatz) {
@@ -115,7 +117,9 @@ public class DokumentGeneratorResource {
     @Schema(name = "GeneratorAntwort")
     public record GeneratorAntwortDto(@Schema(required = true) UUID id,
                                       @Schema(required = true, description = "NEU bei 202, sonst der aktuelle Status "
-                                              + "des vorhandenen Dokuments") String status) {
+                                              + "des vorhandenen Dokuments") String status,
+                                      @Schema(description = "Warnungen aus konfigurierten Dokumentregeln")
+                                      List<DokumentResource.WarnungDto> warnungen) {
     }
 
     @POST
@@ -163,7 +167,9 @@ public class DokumentGeneratorResource {
         // die Metadaten erst nach der Prüfsumme lesen (Regel 3)
         DokumentGenerator.Ergebnis ergebnis = generator.annehmen(principal, datei.uploadedFile(),
                 datei.fileName(), () -> anfrage(metadaten));
-        GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name());
+        List<DokumentResource.WarnungDto> warnungen = ergebnis.warnungen().stream()
+                .map(w -> new DokumentResource.WarnungDto(w.code(), null, w.meldung())).toList();
+        GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name(), warnungen);
         if (!ergebnis.neu()) {
             return Response.ok(antwort).type(MediaType.APPLICATION_JSON_TYPE).build();
         }
@@ -187,7 +193,8 @@ public class DokumentGeneratorResource {
         Bestaetigung angaben = new Bestaetigung(m.art(), m.titel(), m.datum(), null, m.projekt(), m.tags(),
                 m.vertraulichkeit(), m.personBenutzer(), m.geschaeftsjahr(), f.belegnummer(), f.richtung(), f.betrag(),
                 f.waehrung(), f.faelligkeit(), f.qrReferenz(), f.konto(), v.gueltigAb(), v.gueltigBis(),
-                v.kuendigungsfrist(), v.naechsteFrist(), false, false);
+                v.kuendigungsfrist(), v.naechsteFrist(), false, false,
+                DokumentResource.klassifikationen(m.klassifikationen()));
         JsonNode zusatz = m.zusatz() == null || m.zusatz().isNull() ? null : m.zusatz();
         return new DokumentGenerator.Anfrage(angaben, m.partner() == null ? null : m.partner().crmId(),
                 ZusatzJson.text(zusatz), zusatzFelder(zusatz));

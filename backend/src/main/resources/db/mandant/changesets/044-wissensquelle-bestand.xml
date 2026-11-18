@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Spec 04, Aufgabe 13.2 (Nachbesserung Review PR #297): Bestehende Mandanten erhalten die Art WISSENSQUELLE wie
+         neue Mandanten aus dem Seed (seed/_alle/dokumentarten-wissen.json; vhf-gsk aus seed/vhf-gsk/dokumentarten.json
+         mit den reservierten Feldern, Spec 03). Ein neues Schema hat beim Migrieren noch keine Arten (die Provisionierung
+         spielt den Seed danach ein), darum MARK_RAN; ebenso, wenn die Art schon besteht. Danach eine neue Version der
+         Konfiguration wie in 040, nur wenn sich das Abbild von der letzten Version unterscheidet. -->
+    <changeSet id="044-wissensquelle-bestand" author="archiv">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="1">
+                select case when exists (select 1 from dokumentart)
+                    and not exists (select 1 from dokumentart where code = 'WISSENSQUELLE') then 1 else 0 end
+            </sqlCheck>
+        </preConditions>
+        <sql>
+            insert into dokumentart (code, name, beschreibung, gruppen, pflichtfelder, zusatz_schema, vertraulichkeit,
+                aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, selbst_ausgestellt,
+                belegnummer_muster, ki_vorschlag, ki_felder, reihenfolge)
+            values ('WISSENSQUELLE', 'Wissensquelle',
+                'Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.',
+                array['frei']::text[], array['titel', 'datum']::text[],
+                case when current_schema() = 'm_vhf_gsk' then '{
+                    "type": "object",
+                    "properties": {
+                        "herausgeber": {"type": "string", "minLength": 1},
+                        "verband": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["vhf", "gsk"]},
+                            "x-labels": {"vhf": "VHF", "gsk": "GSK"},
+                            "minItems": 1,
+                            "uniqueItems": true
+                        },
+                        "zugriff": {
+                            "type": "string",
+                            "enum": ["oeffentlich", "mitglieder", "vorstand"],
+                            "default": "mitglieder"
+                        },
+                        "veroeffentlicht": {"type": "boolean", "default": false}
+                    },
+                    "required": ["verband", "zugriff", "veroeffentlicht"],
+                    "additionalProperties": false
+                }'::jsonb else '{
+                    "type": "object",
+                    "properties": {"herausgeber": {"type": "string", "minLength": 1}},
+                    "additionalProperties": false
+                }'::jsonb end,
+                'NORMAL', null, null, false, true, false, '{}'::text[], false, '{}'::text[], 0);
+        </sql>
+        <sql>
+            with naechste as (
+                select coalesce(max(version), 0) + 1 as nummer
+                from konfiguration_version
+            ),
+            abbild as (
+                select n.nummer, jsonb_build_object(
+                    'version', n.nummer,
+                    'einstellungen', jsonb_build_object(
+                        'geschaeftsjahrEnde', coalesce(m.geschaeftsjahr_ende, '12-31'),
+                        'kennungen', jsonb_build_object(
+                            'uid', case when jsonb_typeof(m.kennungen -> 'uid') = 'string'
+                                and m.kennungen ->> 'uid' &lt;&gt; '' then m.kennungen -> 'uid' end,
+                            'ibans', case when jsonb_typeof(m.kennungen -> 'ibans') = 'array'
+                                then m.kennungen -> 'ibans' else '[]'::jsonb end)),
+                    'arten', coalesce((
+                        select jsonb_agg(jsonb_build_object(
+                            'code', a.code,
+                            'name', a.name,
+                            'beschreibung', a.beschreibung,
+                            'gruppen', to_jsonb(coalesce(a.gruppen, '{}'::text[])),
+                            'pflichtfelder', to_jsonb(coalesce(a.pflichtfelder, '{}'::text[])),
+                            'zusatzSchema', to_jsonb(coalesce(a.zusatz_schema::text,
+                                '{"type":"object","properties":{},"additionalProperties":false}')),
+                            'vertraulichkeit', a.vertraulichkeit,
+                            'aufbewahrung', jsonb_build_object(
+                                'jahre', a.aufbewahrung_jahre,
+                                'ab', a.aufbewahrung_ab)
+                                || jsonb_strip_nulls(jsonb_build_object('feld', a.aufbewahrung_feld)),
+                            'gesetzlichePflicht', a.gesetzliche_pflicht,
+                            'aktiv', a.aktiv,
+                            'selbstAusgestellt', a.selbst_ausgestellt,
+                            'belegnummerMuster', to_jsonb(coalesce(a.belegnummer_muster, '{}'::text[])),
+                            'fremdbelegArt', a.fremdbeleg_art,
+                            'ohneZahlungsdatenArt', a.ohne_zahlungsdaten_art,
+                            'kiVorschlag', a.ki_vorschlag,
+                            'kiFelder', to_jsonb(coalesce(a.ki_felder, '{}'::text[])),
+                            'kiHinweise', a.ki_hinweise,
+                            'reihenfolge', a.reihenfolge)
+                            order by a.code collate "C")
+                        from dokumentart a), '[]'::jsonb)
+                ) as inhalt
+                from naechste n
+                left join public.mandant m on m.schema_name = current_schema()
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select nummer, 'system:migration', null, 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild
+            where (inhalt - 'version') is distinct from (
+                select inhalt - 'version' from konfiguration_version order by version desc limit 1);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -46,7 +46,7 @@ export interface Dokument {
      */
     version: number;
     /**
-     * Nur im Eingangskorb, sonst leer (Req 8.10)
+     * Belegnummer-Warnungen im Eingangskorb; fehlender Fristbezug auch nach Bestätigung oder Artwechsel (Spec 05, Req 4.4)
      */
     warnungen: Array<Warnung>;
     /**
@@ -86,6 +86,14 @@ export interface Dokument {
      * Gesicherte Fassungen, neueste zuerst (Req 10.1); nur beim einzelnen Dokument (GET, PATCH und Bestätigen), im Eingangskorb leer
      */
     versionen: Array<DokumentVersion>;
+    /**
+     * Werte nach Klassifikations-Code
+     */
+    klassifikationen: { [key: string]: Array<string>; };
+    /**
+     * Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern
+     */
+    klassifikationenUngueltig: Array<string>;
 }
 export namespace Dokument {
     export const QuelleEnum = {

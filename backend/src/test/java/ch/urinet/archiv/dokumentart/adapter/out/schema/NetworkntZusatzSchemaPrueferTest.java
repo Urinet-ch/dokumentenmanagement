@@ -79,6 +79,57 @@ class NetworkntZusatzSchemaPrueferTest {
                 "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"type\":\"object\"}")).isEmpty();
     }
 
+    @Test
+    void zusatzSchemaFeldtypenWerdenFuerRegelnAbgebildet() {
+        assertThat(pruefer.feldTypen(SCHEMA))
+                .containsEntry("periode", "string")
+                .containsEntry("faellig", "date")
+                .containsEntry("betrag", "number");
+        assertThat(pruefer.feldTypen("{\"type\":\"object\"}")).isEmpty();
+    }
+
+    @Test
+    void zusatzwerteWerdenStrengUndMitKommazahlenAlsBigDecimalGelesen() {
+        assertThat(pruefer.werteLesen(null)).isEmpty();
+        assertThat(pruefer.werteLesen(" ")).isEmpty();
+        var werte = pruefer.werteLesen("{\"betrag\":1.25,\"liste\":[null,true]}");
+        assertThat(werte.get("betrag")).isInstanceOf(java.math.BigDecimal.class);
+        List<?> liste = (List<?>) werte.get("liste");
+        assertThat(liste).hasSize(2);
+        assertThat(liste.get(0)).isNull();
+        assertThat(liste.get(1)).isEqualTo(true);
+        assertThatThrownBy(() -> pruefer.werteLesen("{\"a\":1,\"a\":2}"))
+                .isInstanceOf(FachFehler.class)
+                .extracting(f -> ((FachFehler) f).code()).isEqualTo(Fehlercode.ZUSATZ_UNGUELTIG);
+    }
+
+    @Test
+    void fristfeldMussEinDirektesDatumsfeldSein() {
+        assertThat(pruefer.datumsfeldGueltig(SCHEMA, "faellig")).isTrue();
+        assertThat(pruefer.datumsfeldGueltig(SCHEMA, "periode")).isFalse();
+        assertThat(pruefer.datumsfeldGueltig(SCHEMA, "betrag")).isFalse();
+        assertThat(pruefer.datumsfeldGueltig(SCHEMA, "fehlt")).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"d\":null}", "{\"d\":\"\"}", "{\"d\":\"  \"}"})
+    void fehlenderFristwertIstUnbefristet(String werte) {
+        assertThat(pruefer.datumswert(werte, "d")).isNull();
+        assertThat(pruefer.datumswert(null, "d")).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"d\":20260101}", "{\"d\":\"2026-02-30\"}", "{\"d\":\"kein Datum\"}", "[]"})
+    void ungueltigerFristwertWirdNichtZuUnbefristet(String werte) {
+        assertUngueltig(() -> pruefer.datumswert(werte, "d"));
+    }
+
+    @Test
+    void fristwertWirdAlsDatumGelesen() {
+        assertThat(pruefer.datumswert("{\"d\":\"2028-02-29\"}", "d"))
+                .isEqualTo(java.time.LocalDate.of(2028, 2, 29));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "",

@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokument.application;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -20,7 +21,18 @@ public record Bestaetigung(String art, String titel, LocalDate datum, UUID partn
                            String belegnummer, String richtung, BigDecimal betrag, String waehrung,
                            LocalDate faelligkeit, String qrReferenz, String konto, LocalDate gueltigAb,
                            LocalDate gueltigBis, String kuendigungsfrist, LocalDate naechsteFrist, boolean ohnePdfa,
-                           boolean fristAbgelaufenAkzeptiert) {
+                           boolean fristAbgelaufenAkzeptiert, Map<String, List<String>> klassifikationen) {
+
+    public Bestaetigung(String art, String titel, LocalDate datum, UUID partnerId, String projekt,
+                        List<String> tags, String vertraulichkeit, String personBenutzer, Integer geschaeftsjahr,
+                        String belegnummer, String richtung, BigDecimal betrag, String waehrung,
+                        LocalDate faelligkeit, String qrReferenz, String konto, LocalDate gueltigAb,
+                        LocalDate gueltigBis, String kuendigungsfrist, LocalDate naechsteFrist, boolean ohnePdfa,
+                        boolean fristAbgelaufenAkzeptiert) {
+        this(art, titel, datum, partnerId, projekt, tags, vertraulichkeit, personBenutzer, geschaeftsjahr,
+                belegnummer, richtung, betrag, waehrung, faelligkeit, qrReferenz, konto, gueltigAb, gueltigBis,
+                kuendigungsfrist, naechsteFrist, ohnePdfa, fristAbgelaufenAkzeptiert, Map.of());
+    }
 
     public Bestaetigung {
         art = leer(art);
@@ -36,6 +48,15 @@ public record Bestaetigung(String art, String titel, LocalDate datum, UUID partn
         qrReferenz = leer(qrReferenz);
         konto = leer(konto);
         kuendigungsfrist = leer(kuendigungsfrist);
+        klassifikationen = kopieren(klassifikationen);
+    }
+
+    private static Map<String, List<String>> kopieren(Map<String, List<String>> klassifikationen) {
+        if (klassifikationen == null) {
+            return Map.of();
+        }
+        return klassifikationen.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                Map.Entry::getKey, eintrag -> List.copyOf(eintrag.getValue())));
     }
 
     private static String leer(String text) {

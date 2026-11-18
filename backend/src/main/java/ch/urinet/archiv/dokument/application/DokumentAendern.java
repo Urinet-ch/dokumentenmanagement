@@ -11,6 +11,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung.Neuberechnung;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
@@ -18,6 +19,8 @@ import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -34,6 +37,7 @@ import java.time.LocalDate;
 import java.time.MonthDay;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -80,11 +84,14 @@ public class DokumentAendern {
     private final MandantAufloesung aufloesung;
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
+    private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentAendern(DokumentRepository repository, DokumentAenderungPort port, DokumentStatusPort status,
                            SperrKonfliktProtokollPort konfliktProtokoll, AblagePort ablage,
                            DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
-                           MandantEinstellungen einstellungen, AuftragService auftraege) {
+                           MandantEinstellungen einstellungen, AuftragService auftraege,
+                           KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung) {
         this.repository = repository;
         this.port = port;
         this.status = status;
@@ -95,6 +102,8 @@ public class DokumentAendern {
         this.aufloesung = aufloesung;
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
+        this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /**
@@ -131,6 +140,12 @@ public class DokumentAendern {
         Dokumentart neueArt = artCode == null ? null
                 : a.hat(Aenderung.ART) ? aktiveArt(artCode) : arten.finden(artCode);
         boolean artGewechselt = !Objects.equals(artCode, alt.art());
+        Map<String, List<String>> dokumentKlassifikationen = a.hat(Aenderung.KLASSIFIKATIONEN)
+                ? a.klassifikationen() : alt.klassifikationen();
+        if (artGewechselt) {
+            dokumentKlassifikationen = klassifikationen.beimArtwechselVorbelegen(artCode, dokumentKlassifikationen);
+        }
+        klassifikationen.dokumentKlassifikationenPruefen(artCode, dokumentKlassifikationen, alt.klassifikationen());
         gruppenPruefen(a, neueArt);
         String partnerName = !a.hat(Aenderung.PARTNER) ? alt.partnerName() : a.partnerId() == null ? null
                 : DokumentBestaetigen.partnerName(kontakte, a.partnerId(), alt.partnerId());
@@ -143,10 +158,13 @@ public class DokumentAendern {
             arten.zusatzPruefen(neueArt.code(), zusatz);
         }
 
-        Metadaten neu = zusammenfuehren(alt, a, partnerName, zusatz);
+        Metadaten neu = zusammenfuehren(alt, a, partnerName, zusatz, dokumentKlassifikationen);
         if (archiviert) {
             pflichtfelderPruefen(neueArt, alt, neu, artGewechselt);
         }
+        regelPruefung.pruefen(artCode,
+                RegelMetadaten.aus(neu, regelPruefung.zusatzWerte(neu.zusatz())),
+                RegelMetadaten.aus(alt, regelPruefung.zusatzWerte(alt.zusatz())), id);
 
         MandantCode mandant = aufloesung.pruefen();
         if (archiviert && (a.hat("belegnummer") || artGewechselt)) {
@@ -216,7 +234,8 @@ public class DokumentAendern {
         }
     }
 
-    private static Metadaten zusammenfuehren(Metadaten alt, Aenderung a, String partnerName, String zusatz) {
+    private static Metadaten zusammenfuehren(Metadaten alt, Aenderung a, String partnerName, String zusatz,
+                                             Map<String, List<String>> klassifikationen) {
         Optional<Finanz> finanz = alt.finanz();
         if (a.hatEines(Aenderung.FINANZ)) {
             Finanz f = alt.finanz().orElse(new Finanz(null, null, null, "CHF", null, null, null));
@@ -243,7 +262,7 @@ public class DokumentAendern {
                 wert(a, Aenderung.PERSON, a.personBenutzer(), alt.personBenutzer()),
                 wert(a, Aenderung.GESCHAEFTSJAHR, a.geschaeftsjahr(), alt.geschaeftsjahr()), alt.aufbewahrenBis(),
                 alt.fristAbgelaufen(), alt.sperreBis(), zusatz,
-                a.hat(Aenderung.ZUSATZ) ? a.zusatzFelder() : alt.zusatzFelder(), finanz, vertrag);
+                a.hat(Aenderung.ZUSATZ) ? a.zusatzFelder() : alt.zusatzFelder(), finanz, vertrag, klassifikationen);
     }
 
     private static <T> T wert(Aenderung a, String feld, T neu, T bisher) {
@@ -260,7 +279,9 @@ public class DokumentAendern {
         }
         List<String> fehlen = new ArrayList<>();
         for (String feld : art.pflichtfelder()) {
-            if (!vorhanden(feld, neu) && (artGewechselt || vorhanden(feld, alt))) {
+            boolean leeresFristfeldBeimArtwechsel = artGewechselt && art.aufbewahrung().ab() == AufbewahrungAb.FELD
+                    && feld.equals(Dokumentart.ZUSATZ + art.aufbewahrung().feld());
+            if (!leeresFristfeldBeimArtwechsel && !vorhanden(feld, neu) && (artGewechselt || vorhanden(feld, alt))) {
                 fehlen.add(feld);
             }
         }
@@ -319,7 +340,10 @@ public class DokumentAendern {
     private Metadaten fristUndSperre(UUID id, Aenderung a, Metadaten alt, Metadaten neu, Dokumentart art,
                                      boolean artGewechselt, MandantCode mandant) {
         boolean ausloeser = a.hat(Aenderung.DATUM) || artGewechselt || a.hat(Aenderung.GESCHAEFTSJAHR)
-                || a.hat(Aenderung.GUELTIG_BIS);
+                || a.hat(Aenderung.GUELTIG_BIS)
+                || a.hat(Aenderung.ZUSATZ) && art != null && art.aufbewahrung().ab() == AufbewahrungAb.FELD
+                && !java.util.Objects.equals(arten.fristbezug(alt.zusatz()).datum(art.aufbewahrung().feld()),
+                        arten.fristbezug(neu.zusatz()).datum(art.aufbewahrung().feld()));
         if (!ausloeser || art == null) {
             return neu;
         }
@@ -327,7 +351,8 @@ public class DokumentAendern {
         boolean vertrag = art.gruppen().contains(VERTRAG);
         LocalDate gueltigBis = vertrag ? neu.vertrag().map(Vertrag::gueltigBis).orElse(null) : null;
         Aufbewahrung berechnet = Aufbewahrung.berechne(art.aufbewahrung(), neu.datum(), alt.eingang(),
-                neu.geschaeftsjahr(), gueltigBis, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                neu.geschaeftsjahr(), gueltigBis, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(neu.zusatz()));
         boolean altPflicht = alt.art() != null
                 && (artGewechselt ? arten.finden(alt.art()).gesetzlichePflicht() : art.gesetzlichePflicht());
         boolean gesperrt = altPflicht || art.gesetzlichePflicht() || alt.sperreBis() != null;
@@ -361,7 +386,7 @@ public class DokumentAendern {
         return new Metadaten(neu.id(), neu.status(), neu.version(), neu.eingang(), neu.art(), neu.titel(),
                 neu.datum(), neu.partnerId(), neu.partnerName(), neu.projekt(), neu.tags(), neu.vertraulichkeit(),
                 neu.personBenutzer(), neu.geschaeftsjahr(), bis, abgelaufen, sperreBis, neu.zusatz(),
-                neu.zusatzFelder(), neu.finanz(), neu.vertrag());
+                neu.zusatzFelder(), neu.finanz(), neu.vertrag(), neu.klassifikationen());
     }
 
     /** Letzter gesperrter Tag in Europe/Zurich über alle Dateien: die Sperre läuft bis zum Beginn des Folgetags. */

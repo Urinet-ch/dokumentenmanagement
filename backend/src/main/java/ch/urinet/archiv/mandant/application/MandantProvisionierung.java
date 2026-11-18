@@ -8,6 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,18 +26,21 @@ public class MandantProvisionierung {
     private final MandantDatenbank datenbank;
     private final MandantBucket bucket;
     private final DokumentartSeed seed;
+    private final WissensquelleSeed wissensquelleSeed;
     private final MandantSchemaPruefung schemaPruefung;
     private final SeedPruefung seedPruefung;
     private final String bucketPraefix;
 
     public MandantProvisionierung(MandantRegister register, MandantDatenbank datenbank, MandantBucket bucket,
-                                  DokumentartSeed seed, MandantSchemaPruefung schemaPruefung,
+                                  DokumentartSeed seed, WissensquelleSeed wissensquelleSeed,
+                                  MandantSchemaPruefung schemaPruefung,
                                   SeedPruefung seedPruefung,
                                   @ConfigProperty(name = "archiv.ablage.bucket-praefix") String bucketPraefix) {
         this.register = register;
         this.datenbank = datenbank;
         this.bucket = bucket;
         this.seed = seed;
+        this.wissensquelleSeed = wissensquelleSeed;
         this.schemaPruefung = schemaPruefung;
         this.seedPruefung = seedPruefung;
         this.bucketPraefix = bucketPraefix;
@@ -57,10 +61,11 @@ public class MandantProvisionierung {
         if (register.existiert(mandantCode)) {
             throw new MandantFehler(MandantFehler.Grund.MANDANT_EXISTIERT, "Mandant existiert schon: " + code);
         }
-        List<DokumentartVorlage> arten = seed.lesen(mandantCode);
+        List<DokumentartVorlage> arten = mitWissensquelleWennFehlt(seed.lesen(mandantCode), wissensquelleSeed);
         seedPruefung.pruefen(mandantCode, arten);
         datenbank.schemaAnlegen(mandantCode.schema());
         datenbank.dokumentartenEinspielen(mandantCode.schema(), arten);
+        datenbank.regelnEinspielen(mandantCode.schema());
         schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,
@@ -70,5 +75,15 @@ public class MandantProvisionierung {
         LOG.infof("Mandant %s angelegt (Schema %s, Bucket %s, %d Dokumentarten)", code, mandant.schema(), bucketName,
                 arten.size());
         return mandant;
+    }
+
+    static List<DokumentartVorlage> mitWissensquelleWennFehlt(List<DokumentartVorlage> arten,
+                                                              WissensquelleSeed wissensquelleSeed) {
+        if (arten.stream().anyMatch(art -> "WISSENSQUELLE".equals(art.code()))) {
+            return List.copyOf(arten);
+        }
+        List<DokumentartVorlage> erweitert = new ArrayList<>(arten);
+        erweitert.add(wissensquelleSeed.lesen());
+        return List.copyOf(erweitert);
     }
 }

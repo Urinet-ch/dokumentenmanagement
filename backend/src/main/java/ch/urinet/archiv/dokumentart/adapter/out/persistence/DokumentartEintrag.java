@@ -47,6 +47,9 @@ public class DokumentartEintrag extends PanacheEntityBase {
     @Column(name = "aufbewahrung_ab")
     public String aufbewahrungAb;
 
+    @Column(name = "aufbewahrung_feld")
+    public String aufbewahrungFeld;
+
     @Column(name = "gesetzliche_pflicht", nullable = false)
     public boolean gesetzlichePflicht;
 

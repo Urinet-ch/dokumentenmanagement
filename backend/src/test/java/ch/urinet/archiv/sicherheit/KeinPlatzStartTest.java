@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * weil der Dienst bei gelungenem Start nie endet; der unbekannte Mandant lässt einen trotzdem gelungenen Start mit
  * Exit 1 statt 3 enden, ohne etwas anzulegen.
  */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusMainTest
 @TestProfile(KeinPlatzStartTest.Einstellung.class)
 class KeinPlatzStartTest {

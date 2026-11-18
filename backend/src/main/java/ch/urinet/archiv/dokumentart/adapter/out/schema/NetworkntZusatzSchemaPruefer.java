@@ -1,7 +1,7 @@
 package ch.urinet.archiv.dokumentart.adapter.out.schema;
 
-import ch.urinet.archiv.dokumentart.adapter.StrengesJson;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
+import ch.urinet.archiv.gemeinsam.adapter.StrengesJson;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,6 +32,8 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -257,6 +259,42 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
+    public Map<String, String> feldTypen(String schemaJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            try {
+                geprueft(schemaJson);
+                JsonNode schema = StrengesJson.lesen(schemaJson);
+                JsonNode properties = schema.path("properties");
+                Map<String, String> typen = new LinkedHashMap<>();
+                properties.fields().forEachRemaining(eintrag -> {
+                    JsonNode definition = definition(schema, eintrag.getValue());
+                    String typ = definition.path("type").asText();
+                    if ("string".equals(typ) && "date".equals(definition.path("format").asText())) {
+                        typ = "date";
+                    }
+                    typen.put(eintrag.getKey(), typ);
+                });
+                return Collections.unmodifiableMap(typen);
+            } catch (JsonProcessingException e) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        });
+    }
+
+    private static JsonNode definition(JsonNode schema, JsonNode definition) {
+        Set<String> gesehen = new LinkedHashSet<>();
+        JsonNode aktuelle = definition;
+        while (aktuelle.isObject() && aktuelle.path("$ref").isTextual()) {
+            String verweis = aktuelle.path("$ref").textValue();
+            if (!verweis.startsWith("#/") || !gesehen.add(verweis)) {
+                return aktuelle;
+            }
+            aktuelle = schema.at(JsonPointer.compile(verweis.substring(1)));
+        }
+        return aktuelle;
+    }
+
+    @Override
     public Set<String> seedSchemaPruefen(String schemaJson) {
         return mitFrist(seedZeitgrenzeNanos, () -> geprueft(schemaJson).felder());
     }
@@ -267,6 +305,50 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             werteGegen(schemaJson, werteJson);
             return null;
         });
+    }
+
+    @Override
+    public Map<String, Object> werteLesen(String werteJson) {
+        if (werteJson == null || werteJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode werte = StrengesJson.lesenGenau(werteJson);
+            if (werte == null) {
+                return Map.of();
+            }
+            if (!werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            Map<String, Object> ergebnis = new LinkedHashMap<>();
+            werte.fields().forEachRemaining(eintrag -> ergebnis.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(ergebnis);
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+        }
+    }
+
+    private static Object javaWert(JsonNode wert) {
+        if (wert.isNull()) {
+            return null;
+        }
+        if (wert.isObject()) {
+            Map<String, Object> objekt = new LinkedHashMap<>();
+            wert.fields().forEachRemaining(eintrag -> objekt.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(objekt);
+        }
+        if (wert.isArray()) {
+            List<Object> liste = new ArrayList<>();
+            wert.forEach(element -> liste.add(javaWert(element)));
+            return Collections.unmodifiableList(liste);
+        }
+        if (wert.isNumber()) {
+            return wert.numberValue();
+        }
+        if (wert.isBoolean()) {
+            return wert.booleanValue();
+        }
+        return wert.textValue();
     }
 
     @Override
@@ -294,14 +376,49 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             if (!properties.isObject()) {
                 return false;
             }
-            // Standard von zugriff: nie «oeffentlich»; «mitglieder» (Spec 03) oder «vorstand» (z. B. VORSTANDSPROTOKOLL,
-            // Entscheid Fabian 17.11.2026), ohne Art-Code in der Programmlogik (Req 2.9)
+            // Standard von zugriff: «mitglieder» oder «vorstand», für jede Art und wegen Req 2.9 ohne Art-Code;
+            // «oeffentlich» nie (Spec 05, Req 2.7, Entscheid Fabian 18.11.2026; Spec 03 design.md
+            // «Reservierte Felder»).
             return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
                     List.of("oeffentlich", "mitglieder", "vorstand"), List.of("mitglieder", "vorstand"))
                     && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",
                     List.of(), List.of());
         } catch (JsonProcessingException e) {
             return false;
+        }
+    }
+
+    @Override
+    public boolean datumsfeldGueltig(String schemaJson, String feld) {
+        try {
+            JsonNode eigenschaft = StrengesJson.lesen(schemaJson).path("properties").path(feld);
+            return eigenschaft.isObject() && "string".equals(eigenschaft.path("type").asText())
+                    && "date".equals(eigenschaft.path("format").asText());
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        }
+    }
+
+    @Override
+    public LocalDate datumswert(String werteJson, String feld) {
+        if (werteJson == null) {
+            return null;
+        }
+        try {
+            JsonNode werte = StrengesJson.lesen(werteJson);
+            if (werte == null || !werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            JsonNode wert = werte.path(feld);
+            if (wert.isMissingNode() || wert.isNull() || wert.isTextual() && wert.textValue().isBlank()) {
+                return null;
+            }
+            if (!wert.isTextual()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            return LocalDate.parse(wert.textValue());
+        } catch (JsonProcessingException | DateTimeParseException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
         }
     }
 

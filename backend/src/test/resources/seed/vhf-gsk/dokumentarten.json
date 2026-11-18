@@ -12,6 +12,41 @@
       "aufbewahrung_ab": null,
       "gesetzliche_pflicht": false,
       "aktiv": true
+    },
+    {
+      "code": "WISSENSQUELLE",
+      "name": "Wissensquelle",
+      "beschreibung": "Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient.",
+      "gruppen": ["frei"],
+      "pflichtfelder": ["titel", "datum"],
+      "zusatz_schema": {
+        "type": "object",
+        "properties": {
+          "herausgeber": {"type": "string", "minLength": 1},
+          "verband": {
+            "type": "array",
+            "items": {"type": "string", "enum": ["vhf", "gsk"]},
+            "x-labels": {"vhf": "VHF", "gsk": "GSK"},
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": ["oeffentlich", "mitglieder", "vorstand"],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {"type": "boolean", "default": false}
+        },
+        "required": ["verband", "zugriff", "veroeffentlicht"],
+        "additionalProperties": false
+      },
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung_jahre": null,
+      "aufbewahrung_ab": null,
+      "gesetzliche_pflicht": false,
+      "aktiv": true,
+      "ki_vorschlag": false,
+      "ki_felder": []
     }
   ]
 }

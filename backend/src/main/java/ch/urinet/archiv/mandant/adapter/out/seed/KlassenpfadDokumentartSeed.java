@@ -24,7 +24,7 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
     private static final Set<String> FELDER = Set.of("code", "name", "beschreibung", "gruppen", "pflichtfelder",
             "zusatz_schema", "vertraulichkeit", "aufbewahrung_jahre", "aufbewahrung_ab", "gesetzliche_pflicht",
             "aktiv", "selbst_ausgestellt", "belegnummer_muster", "fremdbeleg_art", "ohne_zahlungsdaten_art",
-            "ki_vorschlag", "ki_felder", "ki_hinweise", "reihenfolge");
+            "ki_vorschlag", "ki_felder", "ki_hinweise", "reihenfolge", "aufbewahrung_feld");
 
     private final ObjectMapper json;
 
@@ -78,7 +78,8 @@ public class KlassenpfadDokumentartSeed implements DokumentartSeed {
                     boolesch(art, "ki_vorschlag", true, pfad),
                     liste(art, "ki_felder", pfad),
                     optionalText(art, "ki_hinweise", pfad),
-                    ganzzahl(art, "reihenfolge", 0, pfad)));
+                    ganzzahl(art, "reihenfolge", 0, pfad),
+                    optionalText(art, "aufbewahrung_feld", pfad)));
         }
         return ergebnis;
     }

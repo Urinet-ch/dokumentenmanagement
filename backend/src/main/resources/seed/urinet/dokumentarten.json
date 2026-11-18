@@ -14,7 +14,7 @@
       "gesetzliche_pflicht": true,
       "aktiv": true,
       "selbst_ausgestellt": true,
-      "belegnummer_muster": ["^\\d{4}-\\d{3}$", "^R\\d{4}$"],
+      "belegnummer_muster": ["^(?<jahr>\\d{4})-(?<nr>\\d{3})$", "^R(?<nr>\\d{4})$"],
       "fremdbeleg_art": "LIEFERANTENBELEG"
     },
     {

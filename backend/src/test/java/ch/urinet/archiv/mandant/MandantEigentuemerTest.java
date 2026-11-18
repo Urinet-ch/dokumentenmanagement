@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Prod-Pfad der DB-Rollen (Req 1.7, design.md «Secrets und Konfiguration»): Liquibase und Provisionierung mit
  * {@code archiv_owner} über eine eigene Verbindung, die App mit {@code archiv_app} nur mit DML-Rechten.
  */
-@Tag("start-2")
+@Tag("start-4")
 @QuarkusTest
 @TestProfile(MandantEigentuemerTest.ProdRollen.class)
 class MandantEigentuemerTest {
@@ -205,6 +206,59 @@ class MandantEigentuemerTest {
         }
     }
 
+    @Test
+    void wissenVersionenUndLogNurEinfuegen() throws SQLException {
+        String schema = "m_probe_wissen_" + UUID.randomUUID().toString().replace("-", "");
+        datenbank.schemaAnlegen(schema);
+        String seiteId = "00000000-0000-4000-8000-0000000000b1";
+        String dokumentId = "00000000-0000-4000-8000-0000000000b2";
+        List<String> tabellen = List.of("wissensseite_version", "wissensseite_version_dokument", "wissens_log");
+        try (Connection app = verbinden("archiv_app", "app-nur-test"); Statement befehl = app.createStatement()) {
+            befehl.execute("insert into " + schema + ".dokument (id, quelle, erstellt_von, status) values "
+                    + "('" + dokumentId + "', 'UPLOAD', 'probe', 'NEU')");
+            befehl.execute("insert into " + schema + ".wissensseite "
+                    + "(id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, erzeugt_von, erzeugt_am, "
+                    + "freigegeben_von, freigegeben_am) values ('" + seiteId + "', 'probe/wissen', 'Konzept', "
+                    + "'Probe', 'Probe', 'NORMAL', 'synthetischer Inhalt', 1, 'probe', clock_timestamp(), 'probe', "
+                    + "clock_timestamp())");
+            befehl.execute("insert into " + schema + ".wissensseite_version "
+                    + "(seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) values "
+                    + "('" + seiteId + "', 1, '{}', 'synthetischer Inhalt', 'probe', 'probe', clock_timestamp())");
+            befehl.execute("insert into " + schema + ".wissensseite_version_dokument (seite_id, version, dokument_id) "
+                    + "values ('" + seiteId + "', 1, '" + dokumentId + "')");
+            befehl.execute("insert into " + schema + ".wissens_log (zeit, aktion, akteur, seiten) values "
+                    + "(clock_timestamp(), 'CREATION', 'probe', array['" + seiteId + "']::uuid[])");
+
+            for (String tabelle : tabellen) {
+                String voll = schema + "." + tabelle;
+                assertThat(wahr(befehl, "has_table_privilege('" + voll + "', 'INSERT')")).as(tabelle).isTrue();
+                assertThat(wahr(befehl, "has_table_privilege('" + voll + "', 'SELECT')")).as(tabelle).isTrue();
+                for (String recht : List.of("UPDATE", "DELETE", "TRUNCATE")) {
+                    assertThat(wahr(befehl, "has_table_privilege('" + voll + "', '" + recht + "')"))
+                            .as(tabelle + " " + recht).isFalse();
+                }
+                verweigert(befehl, "delete from " + voll);
+                verweigert(befehl, "truncate " + voll);
+                verweigert(befehl, "update " + voll + " set " + (tabelle.equals("wissensseite_version_dokument")
+                        ? "version = version" : "zeit = zeit"));
+            }
+        }
+        try (Connection eigentuemer = verbinden("archiv_owner", "owner-nur-test");
+             Statement befehl = eigentuemer.createStatement()) {
+            for (String tabelle : tabellen) {
+                String voll = schema + "." + tabelle;
+                String truncate = "truncate " + voll
+                        + (tabelle.equals("wissensseite_version") ? " cascade" : "");
+                for (String sql : List.of("delete from " + voll, truncate,
+                        "update " + voll + " set " + (tabelle.equals("wissensseite_version_dokument")
+                                ? "version = version" : "zeit = zeit"))) {
+                    assertThatThrownBy(() -> befehl.execute(sql)).as(sql).isInstanceOf(SQLException.class)
+                            .hasMessageContaining("nur Einfügen erlaubt");
+                }
+            }
+        }
+    }
+
     /**
      * Alle Tabellen mit «nur Einfügen» (Req 10.3, 15.1; Review PR #87, S-g): {@code archiv_app} hat weder UPDATE,
      * DELETE noch TRUNCATE, und für den Eigentümer gilt ein Zeilen-Trigger auf UPDATE und DELETE sowie ein Trigger auf
@@ -213,7 +267,8 @@ class MandantEigentuemerTest {
     @Test
     void alleNurEinfuegenTabellenSindGeschuetzt() throws Exception {
         List<String> tabellen = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-                "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
+                "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version",
+                "wissensseite_version", "wissensseite_version_dokument", "wissens_log");
         var feld = Class.forName("ch.urinet.archiv.mandant.adapter.out.persistence.LiquibaseMandantDatenbank")
                 .getDeclaredField("NUR_EINFUEGEN");
         feld.setAccessible(true);

@@ -35,7 +35,7 @@ Vertraulichkeit (`NORMAL` | `INTERN` | `PERSONAL`):
 
 Verbindlich ist die Matrix Rolle × Aktion in Requirement 2 von Spec 01; jede Zeile ist ein testbares Kriterium.
 Die Wissensbasis (Spec 04) gibt der `inhaber` frei, im Mandanten `vhf-gsk` die `geschaeftsstelle` (Recht A17;
-Zeilen A15–A19 in Spec 04, Requirement 12.1).
+Zeilen A15–A19 in Spec 04, Requirement 12.1). Wissen darf auch lokal erarbeitet und als Paket importiert werden; wirksam wird es erst durch dieselbe Freigabe (Spec 04, Requirement 19).
 
 ## Mandanten
 - Mandant 1: `urinet` (ab Phase 1).

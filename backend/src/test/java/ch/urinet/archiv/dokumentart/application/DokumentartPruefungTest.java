@@ -34,6 +34,11 @@ class DokumentartPruefungTest {
         }
 
         @Override
+        public java.util.Map<String, String> feldTypen(String schemaJson) {
+            return java.util.Map.of();
+        }
+
+        @Override
         public Set<String> seedSchemaPruefen(String schemaJson) {
             aufrufe.add("seedSchemaPruefen");
             return Set.of();
@@ -45,9 +50,24 @@ class DokumentartPruefungTest {
         }
 
         @Override
+        public java.util.Map<String, Object> werteLesen(String werteJson) {
+            return java.util.Map.of();
+        }
+
+        @Override
         public boolean reservierteFelderGueltig(String schemaJson) {
             aufrufe.add("reservierteFelderGueltig");
             return reservierteFelderGueltig;
+        }
+
+        @Override
+        public boolean datumsfeldGueltig(String schemaJson, String feld) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public java.time.LocalDate datumswert(String werteJson, String feld) {
+            throw new UnsupportedOperationException();
         }
     });
 

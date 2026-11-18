@@ -23,6 +23,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)
   - Spec 05 ergänzt: Die Ergänzung für `vhf-gsk` (`zugriff`, `veroeffentlicht`) kommt aus der Konfiguration von `vhf-gsk`, nicht aus dem Seed-Teil; `WISSENSQUELLE` trägt fest `ki_vorschlag = nein` (Spec 05, Req 2.6; Aufgabe 17.3)
+  - Teil erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Offen: Req 1.4, nachgewiesen erst mit Ingest, Freigabe und Lint (14.x)
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
@@ -31,23 +32,28 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Liquibase-Changesets (`db/mandant`) für alle Tabellen aus design.md; Trigger INSERT-only auf `wissensseite_version` und `wissens_log`, `archiv_app` dort nur `INSERT`/`SELECT`
   - Manifest um Zeilen von `wissensseite_version` und `wissens_log` erweitern; Restore-Probe vergleicht Anzahl Seiten und Versionen
   - Logs nur mit IDs (Test über Log-Ausgabe)
+  - Teil erledigt (PR #295): Paket, Changeset `043-wissen-datenmodell`, Rechte und INSERT-only, Manifest (Req 4.1–4.3, 4.6); `public` nur über `auftrag` prüft die allgemeine ArchUnit-Regel `publicNurUeberAuftrag`. Offen: Req 4.7, der Vergleich von Anzahl Seiten und Versionen in der Restore-Probe; er braucht die Restore-Kette mit Datenbank-Restore aus Spec 01, Aufgabe 5.12 (design.md, «Umsetzung 13.3»). 13.9 weisen die Ingest- und Freigabepfade nach (14.x)
   - _Anforderungen: 4.1–4.3, 4.6, 4.7, 13.9_
 
-- [ ] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
+- [x] 13.4 Seitenmodell, Markdown und Prüfung [Backend]
   - `Wissensseite`, `Quelleneintrag`, `Seitentyp`; `WissensMarkdown` (commonmark-java, Footnotes, ohne HTML); `Seitentext` aus `\f`-getrenntem Volltext (besteht seit Spec 02, Aufgabe 6.3, als `gemeinsam/domain/Seitentext`; wiederverwenden, nicht neu bauen)
   - `WissensPruefung` mit allen Befunden aus design.md, als reine Domain-Logik mit JUnit-Tests; Links aus dem Inhalt nach `wissensseite_link`
   - _Anforderungen: 2.1–2.8, 3.5, 3.7_
   - _Abhängig von: 13.3_
 
-- [ ] 13.5 Sichtbarkeit und Rechte [Backend]
+- [x] 13.5 Sichtbarkeit und Rechte [Backend]
   - Hülle (`wissensseite_dokument`, rekursiv mit Zyklen) und Hülle je Version (`wissensseite_version_dokument`), wirksame Vertraulichkeit = max(Hülle, Mindeststufe), `WissenSichtbarkeit` auf Basis des `VertraulichkeitFilter` inkl. Mindeststufe
   - Aktionen A15–A19 in `Berechtigung`, 404 vor 403, A19 für `geschaeftsstelle` 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
-  - _Anforderungen: 11.1–11.3, 11.5, 11.8, 12.1–12.3_
+  - _Anforderungen: 11.1–11.3, 11.5, 11.8, 11.9, 12.1–12.3_
   - _Abhängig von: 13.3_
+  - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) liegt in `WissensPruefung` (13.4), die wirksame Stufe nach Annahme in `WissensGraph.wirksameStufeNachAnnahme` (13.5), der Aufruf bei jedem Annehmen kommt mit 14.2. Eine Übersicht erhält bei einer Dokumentänderung die wirksame Stufe (11.9, entschieden von Fabian am 18.11.2026). Der Nachweis von 12.2/12.3 über einen Endpunkt folgt mit 13.6 bzw. dem Entwurfszugriff in 14.x.
 
 - [ ] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
   - Zugriffsprotokoll `WISSEN_ANZEIGEN` und `VERWEIGERT`, ohne Inhalte
+  - Sichtbarkeit als SQL-Prädikat an den Abfragen von `wissensseite` (Zähler und Paging verraten nichts); ersetzt den Java-Filter aus 13.5 (design.md, «Umsetzung 13.5»), inkl. fail-closed bei Quellen ohne gespeicherte Hülle und bei live erreichbaren Dokumenten ausserhalb der gespeicherten Hülle (Review PR #300, ebc9d0b6, S2)
+  - Wissens-Endpunkte nur für OIDC-Benutzer; API-Tokens (auch Webseiten-Schlüssel mit Rolle `geschaeftsstelle`) erhalten A15–A19 nicht über die Rolle (Review PR #300, ebc9d0b6, K4)
+  - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4)
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
 
@@ -55,7 +61,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 14.1 Ingest-Aufträge [Backend]
   - Port `DokumentEreignisse` nach design.md (Ergänzung zu Spec 01, in derselben Transaktion); Auftrag `WISSEN_INGEST` nach `ARCHIVIERT` und über `POST /dokumente/{id}/wissen-ingest` (Seitenbereich); höchstens ein Ingest je Mandant `IN_ARBEIT`/`OFFEN`, weitere `WARTEND`; Vorprüfung (Art, `PERSONAL`, Volltext, PDF/A und `\f`-Seiten, laufender oder wartender Ingest, Schätzung mit Ein- und Ausgabe, Monatsbudget der Wissensbasis)
-  - Teilaufträge `KERNAUSSAGEN`, `PLANUNG`, `SEITE`, `QUELLE` mit je einem Aufruf über `KiPort` und JSON-Schema, `ABSCHLUSS` ohne Aufruf; Auszugsprüfung; Ingest-Kontext nur bis zur Stufe der Wissensquelle, `ueberblick` nur bei `NORMAL`; belegter Pfad höherer Stufe → Befund und Hinweis; Kontextstufe je Änderung; Eingrenzung grosser Indizes über die Volltextsuche (Vektor folgt in 15.1)
+  - Teilaufträge `KERNAUSSAGEN`, `PLANUNG`, `SEITE`, `QUELLE` mit je einem Aufruf über `KiPort` und JSON-Schema, `ABSCHLUSS` ohne Aufruf; Auszugsprüfung; Ingest-Kontext nur bis zur Stufe der Wissensquelle, `ueberblick` nur bei `NORMAL`; die Stufe für 5.5 und 11.7 live über `WissensGraph` und die aktuelle Dokumentstufe, nicht aus `wissensseite.vertraulichkeit` (design.md, «Sichtbarkeit und Hülle»); belegter Pfad höherer Stufe → Befund und Hinweis; Kontextstufe je Änderung; Eingrenzung grosser Indizes über die Volltextsuche (Vektor folgt in 15.1)
   - `archiv.wissen.*` (Modell über `archiv.ki.basis-url`, kein eigener URL-Schlüssel); `ki_verbrauch` mit neuen Zwecken; Zeitgrenzen der neuen Auftragstypen
   - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 300'000 und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
   - Prompt-Injection-PDF: Ergebnis nur als Entwurf mit Befunden
@@ -66,6 +72,9 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - `DiffDienst` (java-diff-utils, Felddiff), `FreigabeDienst` mit `If-Match`, 412/428, `WissensPruefung` bei jedem Annehmen, Befund 422, Vertraulichkeit nicht senkbar und nur bis `INTERN` erhöhbar (Mindeststufe), kein gesammeltes Annehmen, «neu erzeugen»; Kernaussagen im Ingest-Entwurf
   - Transaktion: Seite, Version, Hülle der Version, Quelleneinträge, Links, Hüllen, Log, Zugriffsprotokoll `WISSEN_ANNEHMEN`/`WISSEN_VERWERFEN`, Auftrag `WISSEN_EMBEDDING` (nur einreihen; Handler in 15.1, bis dahin bleibt der Auftrag wartend, der Test prüft nur das Einreihen); Start des nächsten wartenden Ingest
   - manueller Entwurf `POST /wissensentwuerfe`; Felder nach 7.6 nur vom System
+  - wirksame Stufe nach Annahme über `WissensGraph.wirksameStufeNachAnnahme` als `Kontext.wirksameVertraulichkeit`, Seitenstufe = Mindeststufe; zuerst `WissenHuelleDienst.sperren()`, dann Seite und Version, dann `versionFreigeben` in derselben Transaktion; Test mit zwei parallelen Freigaben (Review PR #300, S1, S2)
+  - Szenario `@req-12.3` über den Entwurfszugriff: eigener Analysevorschlag ohne Fassung und Diff (Review PR #300, S4)
+  - Szenario `@req-11.8` Ende zu Ende: Annehmen einer Fassung von `ueberblick`, deren wirksame Stufe über `NORMAL` liegt, ergibt 422 mit dem Befund `STUFE_UEBERBLICK` (Review PR #300, ebc9d0b6, K3); vorher klären, ob Mindeststufen zitierter Quellseiten in die wirksame Stufe einfliessen (design.md, «Umsetzung 13.5»)
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 
@@ -122,13 +131,38 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 17.1–17.5, 14.3_
   - _Abhängig von: 13.6_
 
+- [ ] 15.6 Import eines Wissenspakets als Entwurf [Backend]
+  - `WissensPaketLeser` und `PaketKopf`/`PaketSeite` in `wissen/domain/paket` (nur im Speicher lesen; Grenzen, Pfadnormalisierung, Symlinks, Zip-Bombe über gezählte Bytes; Frontmatter über den YAML-Ereignisstrom ohne Tags, Anker, Aliase; Konfiguration `archiv.wissen.import.*` und `archiv.wissen.instanz-id`); ArchUnit-Regel `wissenDomainOhneFramework`
+  - `WissensImport` und `QuellenAufloeser` in `wissen/application` (Zuordnung per SHA-256 über den Lesezugriff auf `dokument/application`, nur Art `WISSENSQUELLE`, `ARCHIVIERT`, sichtbar; Ergebnis `UNBEKANNT` für unbekannt, andere Art, unsichtbar, fremder Mandant); neue Befunde `QUELLE_UNBEKANNT`, `AUSZUG_FEHLT`, `AUSZUG_NICHT_PRUEFBAR`, `CLOUD_STUFE_UNZULAESSIG` und Ergebnistyp `NICHT_PRUEFBAR` in `WissensPruefung`; Auszugsprüfung mit `Seitentext` wie beim Ingest
+  - REST `POST /wissensentwuerfe/import` (multipart, 201/400/403/409/413/415/422) und `POST /wissensentwuerfe/{id}/neu-pruefen` (A17, nur OIDC); Anlass `IMPORT`, Spalten `paket_sha256` (eindeutig) und `paket_angaben`, Changeset; Akteur `extern:<erzeugt_von>`; Zugriffsprotokoll `WISSEN_IMPORT`; Logeintrag `IMPORT` beim Abschluss; «neu erzeugen» für `IMPORT` nicht angeboten
+  - Fehlercode `PAKET_UNGUELTIG` (422) in Enum `Fehlercode` und in die Tabelle von Spec 01, design.md (FehlercodeSpecTest); Schlüssel in `tech.md`; OKF-Export (15.5) um `paket.yaml`, `sha256`, `seite`, `auszug`, `erzeugt_von`, `basis_version` ergänzen (Rundlauf-Test: Export einer lokalen Instanz besteht den Import-Leser)
+  - Beispielpakete unter `backend/src/test/resources/wissen-pakete/` (gültig, je Befund, je Angriff nach design.md, «Sicherheit und Bedrohungsmodell») und `PaketRegelnGleichheitTest`; Szenarien `@req-19.x` unter `features/wissen/`; Isolationsszenario mit zweitem Mandanten (fremde Prüfsumme); Logs nur mit IDs (Test über Log-Ausgabe)
+  - Abgrenzung: kein KI-Aufruf, keine Oberfläche (15.8), kein Prüfwerkzeug (15.7); offener Punkt 19-a (Ingest bei Quellen nur für ein Paket) ist hier nur umzusetzen, wenn Fabian ihn entschieden hat
+  - _Anforderungen: 19.1–19.23, 19.26, 14.3, 17.2_
+  - _Abhängig von: 14.2 (Entwurf, Diff, Freigabe, manueller Entwurf), 15.5 (OKF-Export, Paketformat)_
+
+- [ ] 15.7 Prüfwerkzeug `wissen_paket` [Backend]
+  - `tools/wissen_paket` (Java 25, picocli, Shade-Jar, SpotBugs wie `tools/drive_import`), Kommandos `validate` und `bauen`, Option `--quellen`; bindet den Quelltext von `wissen/domain` und `gemeinsam/domain/Seitentext*` per `build-helper-maven-plugin` ein (design.md, «Prüfwerkzeug»); `OfflineKontext`; Bericht nur mit Befund-Codes und Pfaden (`--json`), Rückgabewert 0/1; reproduzierbares ZIP; kein Netz, keine Zugangsdaten
+  - CI: eigener Schritt für `tools/wissen_paket` und Pfadfilter für Änderungen an `wissen/domain`; `README.md` des Werkzeugs
+  - `PaketRegelnGleichheitTest` (JUnit, Nachweis für 19.27): dieselben Beispielpakete wie 15.6 ergeben dieselben Befund-Listen; Test, dass das Werkzeug keine Netzverbindung aufbaut und keine Datei ausser dem Ausgabe-ZIP schreibt
+  - Abgrenzung: nur das Paketformat und die Domain-Regeln aus 13.4/15.6 werden gebraucht, nicht der Endpunkt; Aufgabe 15.6 und 15.7 dürfen parallel laufen, sobald `WissensPaketLeser` steht (Klasse aus 15.6, zuerst mergen)
+  - _Anforderungen: 19.1–19.4, 19.6–19.8, 19.15, 19.25, 19.27_
+  - _Abhängig von: 13.4 (`WissensPruefung`), Paketformat aus 15.6 (`WissensPaketLeser`)_
+
+- [ ] 15.8 Oberfläche Import [Frontend]
+  - Route `/wissen/entwuerfe/import` (Upload, Prüfbericht mit Zählern und Befunden je Seite, Link zum Entwurf); Entwurfsansicht für Anlass `IMPORT` mit Herkunft, Quellenzuordnung und Auszugsprüfung je Quelle, Hinweis zur Regel für Cloud-Modelle, Aktion «Prüfung wiederholen»; kein gesammeltes Annehmen
+  - 375 px, WCAG 2.1 AA (axe), Texte nur in `texte.de-CH.ts`; Szenarien mit Cucumber.js + Playwright; `mitarbeiter` sieht die Route nicht
+  - _Anforderungen: 19.28, 16.3, 16.4, 16.7_
+  - _Abhängig von: 14.6 (Oberfläche Entwürfe), 15.6 (Endpunkt)_
+
 ## Welle 16 — Abnahme Phase 4
 
 - [ ] 16.1 Sicherheits- und Isolationstests [QA]
   - Szenario `@req-18.5` mit zwei Mandanten und allen Rollen über Index, Seiten, Suche, Log, Entwürfe, Chat-Werkzeuge und Export; `MandantenIsolationIT` (Spec 03) um die Wissensbasis erweitern
-  - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen; Befunde beheben
-  - _Anforderungen: 11.5, 11.6, 18.5_
-  - _Abhängig von: 15.1–15.5_
+  - Prompt-Injection-Prüfung aus 14.1 über alle Wege wiederholen, auch über Pakete (Import, 15.6); Befunde beheben
+  - Import in die Isolation einbeziehen (`@req-19.29`): zwei Mandanten, alle Rollen und API-Token; Paket mit der SHA-256 eines Dokuments des anderen Mandanten, Zip-Slip, Symlink, Zip-Bombe, YAML mit Tag und Alias, Rohhtml, externer Link und `cloud` mit `INTERN` je abgelehnt bzw. mit Befund (Beispielpakete aus 15.6)
+  - _Anforderungen: 11.5, 11.6, 18.5, 19.29_
+  - _Abhängig von: 15.1–15.8_
 
 - [ ] 16.2 Prüfliste und Gate [Fabian] [QA]
   - `wissen-pruefliste.yaml` (Wissensquellen, Fussnoten-Stichprobe, Fragen mit erwarteten Seiten und Quelldokumenten) nur unter `ARCHIV_GOLDEN_DIR`; im Repo nur Schema und Test `WissenPrueflisteIT`
@@ -138,11 +172,11 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 16.1_
 
 ## Optionen
-Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort.
+Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort. O.5 ist seit dem 18.11.2026 in den Plan übernommen (15.6 bis 15.8).
 
 - [ ]* O.4 Wissensseiten für Verbandsmitglieder VHF/GSK [Backend]
   - öffentliche Schnittstelle und Chatbot (Spec 03) um freigegebene Seiten mit Hülle nur aus veröffentlichten `NORMAL`-Dokumenten erweitern; ändert Spec 03, 6.1
   - Spec 03 ergänzt (Spec 03, 3.7; 13.11.2026): Die Zugriffsstufe einer Seite wäre die höchste Stufe ihrer Hülle (drei Stufen); die Erweiterung wäre additiv im Vertrag `public-v1` (Spec 03, 11.3)
-- [ ]* O.5 Import eines OKF-Bundles als Entwurf [Backend]
-  - z. B. ein bestehendes LLM-Wiki; Quellen ohne Archivdokument werden als Befund markiert
-- [ ]* O.6 Wissenswerkzeuge im MCP-Server (O.3) [Backend]
+- [ ]* O.5 Import eines OKF-Bundles als Entwurf [Backend] — **übernommen in 15.6 bis 15.8 (Entscheid Fabian 18.11.2026, Requirement 19)**; nicht als Option umsetzen
+  - z. B. ein bestehendes LLM-Wiki; Quellen ohne Archivdokument werden als Befund `QUELLE_UNBEKANNT` markiert (Zuordnung über SHA-256, 19.13, 19.14)
+- [ ]* O.6 Wissenswerkzeuge im MCP-Server (O.3) [Backend] — **entfällt (folgt aus Spec 02, O.3, Entscheid 18.11.2026)** (nicht umsetzen)

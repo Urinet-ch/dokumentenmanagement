@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Eine negative Sicherungsfrist bricht den Start ab (Aufgabe 5.6). */
-@Tag("start-1")
+@Tag("start-3")
 @QuarkusMainTest
 @TestProfile(SicherungFristNegativStartTest.Einstellung.class)
 class SicherungFristNegativStartTest {

@@ -47,6 +47,8 @@ const DOKUMENT = (teil: Partial<Dokument> = {}): Dokument => ({
   pdfaFehlt: false,
   unsicher: [],
   versionen: [],
+  klassifikationen: {},
+  klassifikationenUngueltig: [],
   ...teil,
 });
 

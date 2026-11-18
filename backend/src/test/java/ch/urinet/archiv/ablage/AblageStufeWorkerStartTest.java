@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Stufen-Prüfung der Ablage (Req 6.11, tasks.md 2.3): Ohne {@code archiv.stufe} gilt Stufe B; eine Höchstfrist für
  * {@code archiv/} bricht dann auch den Start des Workers ab, unabhängig vom Profil.
  */
-@Tag("start-1")
+@Tag("start-4")
 @QuarkusMainTest
 @TestProfile(AblageStufeWorkerStartTest.WorkerOhneStufeMitHoechstfrist.class)
 class AblageStufeWorkerStartTest {

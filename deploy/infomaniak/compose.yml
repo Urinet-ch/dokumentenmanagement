@@ -53,17 +53,27 @@ services:
       # Empfänger der Benachrichtigungen an den Inhaber (Aufgabe 5.6, Entscheid Fabian 14.11.2026): keine Geheimnisse, aus
       # der .env des Bundles (der Deploy schreibt sie aus der GitHub-Variable gleichen Namens); leer heisst nur Log
       ARCHIV_ALARM_EMPFAENGER_URINET: ${ARCHIV_ALARM_EMPFAENGER_URINET:-}
-      # Domain des Mandanten VHF/GSK für das Branding (Aufgabe 10.3, Vorschlag 17.11.2026): dieselbe Variable wie der Router
-      # unten; bis zur Umstellung auf die Verbandsdomain gilt die Platzhalter-Subdomain
-      ARCHIV_BRANDING_VHF_GSK_DOMAIN: ${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}
+      # Domain des Mandanten VHF/GSK für das Branding (Aufgabe 10.3, Vorschlag 17.11.2026): dieselbe Variable soll später
+      # der Router des Hosts lesen (vorerst keiner, siehe Labels unten); Standard ist der Platzhalter-Name
+      ARCHIV_BRANDING_VHF_GSK_DOMAIN: ${ARCHIV_HOST_VHF_GSK:-archiv-vhf-gsk.apps.urinet.ch}
+      # Quelladresse für Prüfgrenze und Absenderprüfung (Review PR #258): X-Real-Ip von Traefik gilt nur, wenn der Peer in
+      # diesem Netz liegt. Standard: der Adressbereich der Docker-Bridge-Netze (kein Betriebsdetail); ein engeres Netz
+      # kommt über ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE in der .env des Bundles
+      ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE: ${ARCHIV_VERTRAUENSWUERDIGE_PROXY_NETZE:-172.16.0.0/12}
       QUARKUS_DATASOURCE_JDBC_MAX_SIZE: "8"
       # Metaspace 192m (15.11.2026, Messung im PR fix/metaspace-messung): schon im Leerlauf 111 MiB committed, nach dem
       # ersten Jahresexport samt Mailversand 118 MiB (Plateau, danach rund 25 KiB je Export); mit 112m beendet sich die
       # JVM beim ersten Export mit OutOfMemoryError: Metaspace, 128m liess nur 10 MiB Luft für alles, was in Betrieb dazukommt
+      # -XX:UseAVX=2 (18.11.2026, CVE-2026-114938, Speicherfehler im Base64-Decoder der Java-Laufzeit): sperrt den
+      # AVX-512-Codepfad, den der Fehler braucht (betroffen: x86-64 mit AVX-512 VBMI). Die heutige VPS (AMD EPYC Zen 2) hat
+      # kein AVX-512; die Option schützt auch, falls Stufe B auf eine CPU mit AVX-512 zieht. Nur hier, nicht im Dockerfile:
+      # auf ARM (lokale Entwicklung) ist die Option unbekannt. Entfernen erst mit einem Basis-Image, das das Update vom
+      # 17.11.2026 enthält (Temurin ab dem Update nach 25.0.5+8, Keycloak-Image mit neuerem OpenJDK als 21.0.13).
       JAVA_OPTS_APPEND: >-
         -Djava.util.logging.manager=org.jboss.logmanager.LogManager
         -Xmx112m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m
         -Xss512k -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError
+        -XX:UseAVX=2
     secrets:
       - archiv_db_app
       - archiv_db_owner
@@ -134,15 +144,17 @@ services:
       # 11.10 den Upload-Pfad festlegt und Fabian es will, dann auf einem eigenen Router /public/v1/erfassung:
       #   traefik.http.middlewares.archiv-public-upload.buffering.maxrequestbodybytes: "54525952"   # 52 MiB
       #   traefik.http.middlewares.archiv-public-upload.buffering.memrequestbodybytes: "1048576"    # darüber auf Platte
-      # eigener Router vor der PWA (deren Regel «alles ausser /api/ und /q/» träfe /public/ sonst auch): Priorität höher
-      traefik.http.routers.archiv-public-suche.rule: Host(`archiv.apps.urinet.ch`) && Path(`/public/v1/suche`)
-      traefik.http.routers.archiv-public-suche.priority: "300"
+      # eigene Router für /public/: die Regeln aller Router eines Hosts schliessen sich gegenseitig aus, weil die
+      # Compose-Policy der VPS kein priority erlaubt (ohne priority entschiede sonst die Regellänge); die PWA schliesst
+      # /public/ aus. Ein weiterer Router unter /public/ (z. B. /public/v1/erfassung mit 11.10) braucht darum den
+      # Ausschluss seines Pfads in archiv-public. Suche auch mit Schrägstrich am Ende, sonst liefe sie ohne Suche-Drossel.
+      # DeployHaertungTest prüft die Zuordnung Host × Pfad.
+      traefik.http.routers.archiv-public-suche.rule: Host(`archiv.apps.urinet.ch`) && (Path(`/public/v1/suche`) || Path(`/public/v1/suche/`))
       traefik.http.routers.archiv-public-suche.entrypoints: websecure
       traefik.http.routers.archiv-public-suche.tls.certresolver: le
       traefik.http.routers.archiv-public-suche.service: archiv
       traefik.http.routers.archiv-public-suche.middlewares: archiv-public-suche-drossel,archiv-public-drossel,archiv-public-gleichzeitig
-      traefik.http.routers.archiv-public.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/public/`)
-      traefik.http.routers.archiv-public.priority: "200"
+      traefik.http.routers.archiv-public.rule: Host(`archiv.apps.urinet.ch`) && PathPrefix(`/public/`) && !Path(`/public/v1/suche`) && !Path(`/public/v1/suche/`)
       traefik.http.routers.archiv-public.entrypoints: websecure
       traefik.http.routers.archiv-public.tls.certresolver: le
       traefik.http.routers.archiv-public.service: archiv
@@ -153,28 +165,15 @@ services:
       traefik.http.routers.archiv-api.tls.certresolver: le
       traefik.http.routers.archiv-api.service: archiv
       traefik.http.routers.archiv-api.middlewares: archiv-drossel
-      # PWA: alles ausser /api/ und /q/ (Readiness und Kennzahlen bleiben intern, Req 16.4)
-      traefik.http.routers.archiv.rule: Host(`archiv.apps.urinet.ch`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`)
+      # PWA: alles ausser /api/, /q/ und /public/ (Readiness und Kennzahlen bleiben intern, Req 16.4)
+      traefik.http.routers.archiv.rule: Host(`archiv.apps.urinet.ch`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`) && !PathPrefix(`/public/`)
       traefik.http.routers.archiv.entrypoints: websecure
       traefik.http.routers.archiv.tls.certresolver: le
       traefik.http.routers.archiv.service: archiv
       traefik.http.routers.archiv.middlewares: archiv-drossel
-      # Mandant VHF/GSK (Aufgabe 10.3, Vorschlag 17.11.2026, wartet auf Prüfung von Fabian): Platzhalter-Subdomain unter der
-      # Archiv-Domain, Hostname aus ARCHIV_HOST_VHF_GSK (.env des Bundles, sonst der Standard). Voraussetzung: DNS-Eintrag
-      # für den Host (sonst scheitert das Zertifikat, die UriNet-Router bleiben unberührt). Umstellung auf die Verbandsdomain
-      # = nur den Wert der Variablen ändern (der Deploy schreibt .env über .github/scripts/schreibe-env.sh). Gleiche Dienste und
-      # Drosselung wie archiv.apps.urinet.ch; ohne /q/ (intern) und ohne /public/ (die Webseiten-Schnittstelle gehört nur
-      # an den Host oben mit ihrer eigenen Drosselung).
-      traefik.http.routers.archiv-vhf-gsk-api.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && PathPrefix(`/api/`)
-      traefik.http.routers.archiv-vhf-gsk-api.entrypoints: websecure
-      traefik.http.routers.archiv-vhf-gsk-api.tls.certresolver: le
-      traefik.http.routers.archiv-vhf-gsk-api.service: archiv
-      traefik.http.routers.archiv-vhf-gsk-api.middlewares: archiv-drossel
-      traefik.http.routers.archiv-vhf-gsk.rule: Host(`${ARCHIV_HOST_VHF_GSK:-vhf-gsk.archiv.apps.urinet.ch}`) && !PathPrefix(`/api/`) && !PathPrefix(`/q/`) && !PathPrefix(`/public/`)
-      traefik.http.routers.archiv-vhf-gsk.entrypoints: websecure
-      traefik.http.routers.archiv-vhf-gsk.tls.certresolver: le
-      traefik.http.routers.archiv-vhf-gsk.service: archiv
-      traefik.http.routers.archiv-vhf-gsk.middlewares: archiv-drossel
+      # Mandant VHF/GSK (Aufgabe 10.3): vorerst kein Router (Review PR #299, M1). Ein Router machte seinen Host mit dem
+      # Deploy öffentlich, einen dritten neben archiv.… und archiv-auth.… (tech.md «Erreichbarkeit», ADR-010 P15); er
+      # kommt erst mit einem Entscheid von Fabian in einem eigenen PR (Spec 03, design.md, «Vorschlag Rest von 10.3»).
       # Schlanker öffentlicher Health-Pfad
       traefik.http.routers.archiv-health.rule: Host(`archiv.apps.urinet.ch`) && Path(`/q/health/live`)
       traefik.http.routers.archiv-health.entrypoints: websecure
@@ -254,6 +253,7 @@ services:
         -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ReservedCodeCacheSize=32m
         -XX:MaxDirectMemorySize=32m -Xss512k
         -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom
+        -XX:UseAVX=2
         -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.err.encoding=UTF-8
         -Djdk.tls.rejectClientInitiatedRenegotiation=true
     secrets:

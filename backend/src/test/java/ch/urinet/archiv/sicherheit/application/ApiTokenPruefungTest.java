@@ -187,6 +187,81 @@ class ApiTokenPruefungTest {
     }
 
     @Test
+    void falscheSchluesselEinerQuelleBelegenNichtDauerhaftDieHashSperreOderAndereQuellen() {
+        ApiTokenPruefGrenzen grenzen = new ApiTokenPruefGrenzen(
+                new ApiTokenPruefGrenzen.Einstellung(1, 2, 10), uhr);
+        ApiTokenPruefung pruefungMitGrenzen = new ApiTokenPruefung(register, hasher, uhr,
+                new HashSperre(1, Duration.ZERO), grenzen, SIGNIERER);
+        Optional<String> quelleA = Optional.of("192.0.2.1");
+        Optional<String> quelleB = Optional.of("192.0.2.2");
+
+        assertThat(pruefungMitGrenzen.pruefen(ApiToken.neu(zufall), quelleA)).isEmpty();
+        assertThat(pruefungMitGrenzen.pruefen(ApiToken.neu(zufall), quelleA)).isEmpty();
+        assertThatThrownBy(() -> pruefungMitGrenzen.pruefen(ApiToken.neu(zufall), quelleA))
+                .isInstanceOfSatisfying(ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.class, e -> {
+                    assertThat(e.code()).isEqualTo(Fehlercode.ZU_VIELE_ANFRAGEN);
+                    assertThat(e.grund()).isEqualTo(ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.Grund.SCHLUESSELPRUEFUNG);
+                    assertThat(e.wartezeitSekunden()).isEqualTo(1);
+                });
+        assertThat(hasher.vergleiche).isEqualTo(2);
+
+        ApiToken website = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+        ApiToken erfassung = register.anlegenErfassung(ApiToken.neu(zufall));
+        assertThat(pruefungMitGrenzen.pruefen(website, quelleB)).isPresent();
+        assertThat(pruefungMitGrenzen.pruefen(erfassung, quelleB)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(4);
+
+        uhr.weiter(Duration.ofSeconds(2));
+        ApiToken kalterSchluessel = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+        assertThat(pruefungMitGrenzen.pruefen(kalterSchluessel, quelleA)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(5);
+    }
+
+    @Test
+    void warmerWebseitenSchluesselBleibtBeiErschoepfterQuellgrenzeErreichbar() {
+        ApiTokenPruefGrenzen grenzen = new ApiTokenPruefGrenzen(
+                new ApiTokenPruefGrenzen.Einstellung(1, 2, 10), uhr);
+        ApiTokenPruefung pruefungMitGrenzen = new ApiTokenPruefung(register, hasher, uhr,
+                new HashSperre(1, Duration.ZERO), grenzen, SIGNIERER);
+        Optional<String> quelle = Optional.of("192.0.2.3");
+        ApiToken website = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
+
+        assertThat(pruefungMitGrenzen.pruefen(website, quelle)).isPresent();
+        assertThat(pruefungMitGrenzen.pruefen(ApiToken.neu(zufall), quelle)).isEmpty();
+        assertThatThrownBy(() -> pruefungMitGrenzen.pruefen(ApiToken.neu(zufall), quelle))
+                .isInstanceOf(ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.class);
+        int vergleiche = hasher.vergleiche;
+
+        assertThat(pruefungMitGrenzen.pruefen(website, quelle)).isPresent();
+        assertThat(hasher.vergleiche).isEqualTo(vergleiche);
+    }
+
+    @Test
+    void quellenTabelleBleibtBegrenztUndEntferntNurErholteBuckets() {
+        ApiTokenPruefGrenzen grenzen = new ApiTokenPruefGrenzen(
+                new ApiTokenPruefGrenzen.Einstellung(0.01, 2, 1), uhr);
+        Optional<String> quelleA = Optional.of("192.0.2.10");
+        Optional<String> quelleB = Optional.of("192.0.2.11");
+
+        grenzen.pruefen(quelleA);
+        grenzen.pruefen(quelleA);
+        uhr.weiter(Duration.ofMinutes(1));
+        grenzen.pruefen(quelleB);
+        grenzen.pruefen(quelleB);
+
+        assertThat(grenzen.quellen()).isEqualTo(1);
+        assertThatThrownBy(() -> grenzen.pruefen(quelleB))
+                .isInstanceOf(ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.class);
+        assertThatThrownBy(() -> grenzen.pruefen(quelleA))
+                .as("teilweise erholter Quell-Bucket wird nicht verdrängt")
+                .isInstanceOf(ch.urinet.archiv.gemeinsam.domain.ZuVieleAnfragen.class);
+
+        uhr.weiter(Duration.ofSeconds(140));
+        grenzen.pruefen(Optional.of("192.0.2.12"));
+        assertThat(grenzen.quellen()).isEqualTo(1);
+    }
+
+    @Test
     void widerrufUndAblaufWirkenTrotzPruefCacheSofort() {
         ApiToken widerruf = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.empty());
         ApiToken ablauf = register.anlegenWebseite(ApiToken.neu(zufall), true, Optional.of(START.plusSeconds(30)));
@@ -397,6 +472,13 @@ class ApiTokenPruefungTest {
             return token;
         }
 
+        ApiToken anlegenErfassung(ApiToken token) {
+            ApiClient client = new ApiClient(token.id(), "urinet", "Probe", ApiTokenScope.WEBSEITE_ERFASSUNG, true,
+                    START, Optional.empty(), Optional.of("probe"), Optional.of("vorstand"), Optional.empty(), false);
+            eintraege.put(token.id(), new Zugang(client, "hash:" + token.geheimnis()));
+            return token;
+        }
+
         void aktivSetzen(String id, boolean aktiv) {
             Zugang zugang = eintraege.get(id);
             ApiClient client = zugang.client();
@@ -439,10 +521,11 @@ class ApiTokenPruefungTest {
         }
 
         @Override
-        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+        public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit, Instant jetzt) {
             Zugang zugang = eintraege.get(id);
             if (zugang == null || !zugang.client().mandant().equals(mandant)
-                    || zugang.client().scope().webseitenSchluessel()) {
+                    || zugang.client().scope().webseitenSchluessel()
+                    || zugang.client().gueltigBis().filter(ablauf -> !ablauf.isAfter(jetzt)).isPresent()) {
                 return false;
             }
             ApiClient client = zugang.client();
@@ -450,6 +533,14 @@ class ApiTokenPruefungTest {
                     client.aktiv(), client.erstellt(), client.zuletzt(), client.webseite(), client.hoechsteStufe(),
                     zeit, client.absenderPruefen()), zugang.hash()));
             return true;
+        }
+
+        @Override
+        public boolean apiTokenAbgelaufen(String mandant, String id, Instant jetzt) {
+            Zugang zugang = eintraege.get(id);
+            return zugang != null && zugang.client().mandant().equals(mandant) && zugang.client().aktiv()
+                    && !zugang.client().scope().webseitenSchluessel()
+                    && zugang.client().gueltigBis().filter(ablauf -> !ablauf.isAfter(jetzt)).isPresent();
         }
 
         @Override

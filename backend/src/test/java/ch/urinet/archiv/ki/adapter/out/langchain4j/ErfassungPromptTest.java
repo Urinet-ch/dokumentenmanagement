@@ -3,6 +3,7 @@ package ch.urinet.archiv.ki.adapter.out.langchain4j;
 import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadDokumentartSeed;
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.domain.DokumentartVorlage;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,6 +74,21 @@ class ErfassungPromptTest {
 
         assertThat(ErfassungPrompt.hash(system, LangChain4jKiAdapter.schema(), LangChain4jKiAdapter.codes(),
                 ErfassungPrompt.BILDWEG)).isEqualTo(ErfassungPrompt.GATE_KENNUNG);
+    }
+
+    @Test
+    void wissensquelleWirdNichtAlsKiVorschlagAufgefuehrt() {
+        var json = new ObjectMapper();
+        var vorlagen = new KlassenpfadDokumentartSeed(json).lesen(new MandantCode("urinet"));
+        var wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen();
+        List<ArtEintrag> alle = java.util.stream.Stream.concat(vorlagen.stream(), java.util.stream.Stream.of(wissensquelle))
+                .filter(DokumentartVorlage::aktiv)
+                .map(v -> new ArtEintrag(v.code(), v.name(), v.vertraulichkeit()))
+                .toList();
+
+        assertThat(wissensquelle.kiVorschlag()).isFalse();
+        assertThat(ErfassungPrompt.schemaArten(alle, LangChain4jKiAdapter.codes()))
+                .extracting(ArtEintrag::code).doesNotContain("WISSENSQUELLE");
     }
 
     @Test

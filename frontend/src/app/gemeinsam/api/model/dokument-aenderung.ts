@@ -53,6 +53,10 @@ export interface DokumentAenderung {
      */
     zusatz?: object | null;
     /**
+     * Werte nach Klassifikations-Code; ersetzt die bisherigen vollständig
+     */
+    klassifikationen?: { [key: string]: Array<string>; } | null;
+    /**
      * Grund der Änderung; bei ARCHIVIERT Pflicht (Req 10.1)
      */
     grund?: string | null;

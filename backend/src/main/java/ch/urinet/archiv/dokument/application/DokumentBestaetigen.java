@@ -8,6 +8,7 @@ import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrung;
+import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -17,6 +18,8 @@ import ch.urinet.archiv.ki.application.KiBeispielPort;
 import ch.urinet.archiv.ki.application.KorrekturLernen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
+import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -70,11 +73,14 @@ public class DokumentBestaetigen {
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
     private final KorrekturLernen lernen;
+    private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentBestaetigen(DokumentRepository repository, DokumentStatusPort status, FristKennzeichen frist,
                                DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                                MandantEinstellungen einstellungen, AuftragService auftraege,
-                               KorrekturLernen lernen) {
+                               KorrekturLernen lernen, KlassifikationVerwaltung klassifikationen,
+                               RegelPruefung regelPruefung) {
         this.repository = repository;
         this.status = status;
         this.frist = frist;
@@ -84,6 +90,8 @@ public class DokumentBestaetigen {
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
         this.lernen = lernen;
+        this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -101,6 +109,7 @@ public class DokumentBestaetigen {
             throw new PflichtfelderFehlen(List.of("art"));
         }
         Dokumentart art = art(arten, b.art());
+        klassifikationen.dokumentKlassifikationenPruefen(art.code(), b.klassifikationen(), Map.of());
         pflichtfelderPruefen(art, b, stand);
         if (stand.pdfaFehlt() && !b.ohnePdfa()) {
             throw new PflichtfelderFehlen(List.of("ohnePdfa"));
@@ -124,7 +133,8 @@ public class DokumentBestaetigen {
                 : Aufbewahrung.geschaeftsjahrVorschlagen(b.datum(), stand.eingang(), gjEnde);
         boolean vertrag = art.gruppen().contains("vertrag");
         Aufbewahrung aufbewahrung = Aufbewahrung.berechne(art.aufbewahrung(), b.datum(), stand.eingang(),
-                geschaeftsjahr, vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH));
+                geschaeftsjahr, vertrag ? b.gueltigBis() : null, gjEnde, LocalDate.now(Aufbewahrung.ZUERICH),
+                arten.fristbezug(dokument.zusatz()));
         if (aufbewahrung.fristAbgelaufen() && !b.fristAbgelaufenAkzeptiert()) {
             frist.markieren(id);
             throw new FachFehler(Fehlercode.FRIST_ABGELAUFEN);
@@ -138,7 +148,9 @@ public class DokumentBestaetigen {
                         b.waehrung() != null ? b.waehrung() : "CHF", b.faelligkeit(), b.qrReferenz(), b.konto()))
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
-                        b.naechsteFrist())) : Optional.empty());
+                        b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
+        regelPruefung.pruefen(art.code(), RegelMetadaten.aus(b, art.vertraulichkeit().name(), finanz,
+                regelPruefung.zusatzWerte(dokument.zusatz())), null, id);
         Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)
@@ -179,7 +191,11 @@ public class DokumentBestaetigen {
 
     /** Req 8.3: alle fehlenden Pflichtfelder der Art, in der Reihenfolge der Art; nur Namen, nie Werte. */
     static void pflichtfelderPruefen(Dokumentart art, Bestaetigung b, Stand stand) {
-        List<String> fehlen = fehlendePflichtfelder(art, b, stand.zusatzFelder());
+        List<String> fehlen = new ArrayList<>(fehlendePflichtfelder(art, b, stand.zusatzFelder()));
+        if (art.aufbewahrung().ab() == AufbewahrungAb.FELD) {
+            // Bestand und Artwechsel bleiben mit Warnung unbefristet (Spec 05, Req 4.4).
+            fehlen.remove(Dokumentart.ZUSATZ + art.aufbewahrung().feld());
+        }
         if (!fehlen.isEmpty()) {
             throw new PflichtfelderFehlen(fehlen);
         }

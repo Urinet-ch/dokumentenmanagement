@@ -2,10 +2,13 @@ package ch.urinet.archiv.ki.domain.chat;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Spec 02, Req 3.6 (Aufgabe 7.1c): fehlende Nummern einer Folge nach dem Belegnummer-Muster. */
 class NummernfolgeTest {
@@ -77,5 +80,22 @@ class NummernfolgeTest {
         Nummernfolge.Ergebnis e = Nummernfolge.pruefen(weit, null, List.of("1", "3", "9999999999", "9".repeat(80)), 10);
         assertThat(e.vorhanden()).isEqualTo(2);
         assertThat(e.fehlend()).containsExactly("2");
+    }
+
+    @Test
+    void rueckfallreichesMusterWirdAnDerZeitgrenzeAbgebrochen() {
+        AtomicLong uhr = new AtomicLong();
+        Pattern rueckfallreich = Pattern.compile("^(?<nr>(a+)+)b$");
+
+        assertThatThrownBy(() -> Nummernfolge.pruefen(rueckfallreich, null, List.of("a".repeat(63) + "c"),
+                1, 100, new Nummernfolge.Frist(Duration.ofNanos(1), uhr::getAndIncrement)))
+                .isInstanceOf(Nummernfolge.ZeitgrenzeUeberschritten.class);
+    }
+
+    @Test
+    void zuVieleBelegnummernWerdenVorDerMusterpruefungAbgelehnt() {
+        assertThatThrownBy(() -> Nummernfolge.pruefen(MUSTER, 2026,
+                java.util.Collections.nCopies(Nummernfolge.BELEGNUMMERN_MAX + 1, "2026-001"), 100))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

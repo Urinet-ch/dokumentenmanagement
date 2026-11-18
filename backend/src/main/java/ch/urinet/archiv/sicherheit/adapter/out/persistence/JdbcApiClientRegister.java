@@ -119,16 +119,35 @@ public class JdbcApiClientRegister implements ApiClientRegister {
     }
 
     @Override
-    public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit) {
+    public boolean apiTokenGueltigkeitSetzen(String mandant, String id, Optional<Instant> zeit, Instant jetzt) {
         try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement aendern =
                 verbindung.prepareStatement("update public.api_client set gueltig_bis = ? "
-                        + "where id = ? and mandant = ? and scope in ('generator', 'import') and aktiv")) {
+                        + "where id = ? and mandant = ? and scope in ('generator', 'import') and aktiv "
+                        + "and (gueltig_bis is null or gueltig_bis > ?)")) {
             aendern.setObject(1, zeit.map(JdbcApiClientRegister::utc).orElse(null));
             aendern.setString(2, id);
             aendern.setString(3, mandant);
+            aendern.setObject(4, utc(jetzt));
             return aendern.executeUpdate() == 1;
         } catch (SQLException e) {
             throw new IllegalStateException("Ablauf des API-Tokens nicht nachgeführt", e);
+        }
+    }
+
+    @Override
+    public boolean apiTokenAbgelaufen(String mandant, String id, Instant jetzt) {
+        try (Connection verbindung = datenquelle.get().getConnection(); PreparedStatement abfrage =
+                verbindung.prepareStatement("select exists (select 1 from public.api_client "
+                        + "where id = ? and mandant = ? and scope in ('generator', 'import') and aktiv "
+                        + "and gueltig_bis <= ?)")) {
+            abfrage.setString(1, id);
+            abfrage.setString(2, mandant);
+            abfrage.setObject(3, utc(jetzt));
+            try (ResultSet zeile = abfrage.executeQuery()) {
+                return zeile.next() && zeile.getBoolean(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Ablauf des API-Tokens nicht lesbar", e);
         }
     }
 

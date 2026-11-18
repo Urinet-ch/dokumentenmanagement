@@ -1,4 +1,4 @@
-package ch.urinet.archiv.dokumentart.adapter;
+package ch.urinet.archiv.gemeinsam.adapter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -8,8 +8,8 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
 /**
- * Strenger JSON-Leser der Dokumentarten (Body der Resource und Zusatz-Schemas): Doppelte Schlüssel und Zeichen nach
- * dem JSON-Wert sind ungültig, statt dass der letzte Schlüssel still gewinnt.
+ * Strenger JSON-Leser: Doppelte Schlüssel und Zeichen nach dem JSON-Wert sind ungültig, statt dass der letzte Schlüssel
+ * still gewinnt.
  */
 public final class StrengesJson {
 
@@ -29,8 +29,8 @@ public final class StrengesJson {
     }
 
     /**
-     * Wie {@link #lesen}, aber Kommazahlen als {@code BigDecimal}: für Zusatzwerte, damit der Prüfer genau die Zahl
-     * prüft, die gespeichert wird (Req 9.5, Review PR #95).
+     * Wie {@link #lesen}, aber Kommazahlen als {@code BigDecimal}, damit die Prüfung genau den gespeicherten Wert
+     * verwendet.
      */
     public static JsonNode lesenGenau(String text) throws JsonProcessingException {
         return wert(LESER_GENAU.readTree(text));
