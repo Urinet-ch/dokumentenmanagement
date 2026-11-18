@@ -67,6 +67,10 @@ public final class WissensMarkdown {
     }
 
     public static Analyse analysieren(String markdown, int maxZeichen) {
+        return analysieren(markdown, maxZeichen, null);
+    }
+
+    private static Analyse analysieren(String markdown, int maxZeichen, Set<String> sichtbarePfade) {
         if (maxZeichen < 1) {
             throw new IllegalArgumentException("Die maximale Markdown-Laenge muss positiv sein.");
         }
@@ -111,7 +115,7 @@ public final class WissensMarkdown {
             return Analyse.abgelehnt(false, true);
         }
         merkmale.eigeneDefinitionen.forEach(Node::unlink);
-        return new Analyse(rendern(dokument), links, fussnoten, abschnitte, aussagen, merkmale.html,
+        return new Analyse(rendern(dokument, sichtbarePfade), links, fussnoten, abschnitte, aussagen, merkmale.html,
                 merkmale.bild, merkmale.ungueltigerLink, merkmale.wikilink,
                 !merkmale.eigeneDefinitionen.isEmpty(), false, false);
     }
@@ -124,7 +128,35 @@ public final class WissensMarkdown {
         return analyse.html();
     }
 
-    private static String rendern(Node dokument) {
+    public static String darstellen(String markdown, Set<String> sichtbarePfade) {
+        Analyse analyse = analysieren(markdown, MAX_EINGABE_ZEICHEN, Set.copyOf(sichtbarePfade));
+        if (analyse.zuGross() || analyse.zuTief()) {
+            throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
+        }
+        return analyse.html();
+    }
+
+    private static String rendern(Node dokument, Set<String> sichtbarePfade) {
+        if (sichtbarePfade != null) {
+            Deque<Node> stapel = new ArrayDeque<>();
+            stapel.push(dokument);
+            while (!stapel.isEmpty()) {
+                Node parent = stapel.pop();
+                for (Node kind = parent.getFirstChild(); kind != null;) {
+                    Node nachfolger = kind.getNext();
+                    if (kind instanceof Link link) {
+                        String pfad = internerPfad(link.getDestination());
+                        if (pfad != null && !sichtbarePfade.contains(pfad)) {
+                            link.insertBefore(new Text("Seite nicht vorhanden"));
+                            link.unlink();
+                        }
+                    } else {
+                        stapel.push(kind);
+                    }
+                    kind = nachfolger;
+                }
+            }
+        }
         return RENDERER.render(dokument);
     }
 

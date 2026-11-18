@@ -1,11 +1,10 @@
 package ch.urinet.archiv;
 
 /**
- * Aufteilung der Backend-Szenarien auf zwei CI-Jobs ({@code .github/workflows/ci.yml}, Jobs «Backend-Szenarien»):
- * {@link SzenarienTest} läuft die Szenarien mit {@link #ABGRENZUNG}, {@link SzenarienRestTest} alle übrigen. Der zweite
- * Ausdruck ist das Komplement des ersten, nicht eine eigene Liste: Ein Szenario ohne oder mit neuem Spec-Tag landet im
- * Rest, nichts geht verloren. {@code SzenarienShardTest} beweist, dass jedes Szenario genau einmal läuft. Das Tag
- * trennt die Laufzeit ungefähr hälftig (Surefire-Berichte der CI); bei Schieflage hier anpassen.
+ * Aufteilung der Backend-Szenarien: {@link SzenarienTest} läuft die Szenarien mit {@link #ABGRENZUNG},
+ * {@link SzenarienRestTest} alle übrigen ausser dem isolierten Webseiten-Messfall. {@link #SHARD_3} läuft in
+ * {@link ch.urinet.archiv.integration.WebseitenDateiMessfallTest}, damit dessen verlängertes Leerlauflimit die übrigen
+ * Webseiten-Szenarien nicht beeinflusst. {@code SzenarienShardTest} beweist, dass jedes Szenario genau einmal läuft.
  */
 public final class SzenarienShards {
 
@@ -19,8 +18,12 @@ public final class SzenarienShards {
     /** Tag-Ausdruck, der Shard 1 von Shard 2 trennt. */
     public static final String ABGRENZUNG = "@spec-01";
 
-    public static final String SHARD_1 = AUSGENOMMEN + " and " + ABGRENZUNG;
-    public static final String SHARD_2 = AUSGENOMMEN + " and not (" + ABGRENZUNG + ")";
+    private static final String STANDARD = AUSGENOMMEN + " and not @webseiten-datei-messfall";
+
+    public static final String SHARD_1 = STANDARD + " and " + ABGRENZUNG;
+    public static final String SHARD_2 = STANDARD + " and not (" + ABGRENZUNG + ")";
+
+    public static final String SHARD_3 = "@webseiten-datei-messfall";
 
     private SzenarienShards() {
     }

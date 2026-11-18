@@ -12,8 +12,9 @@ import java.lang.annotation.Target;
 /**
  * Protokolliert den Aufruf einer Resource-Methode synchron in derselben Transaktion wie die Aktion (Req 10.2, 10.8):
  * Der Eintrag entsteht vor der Aktion; scheitert er, wird die Aktion nicht ausgeführt bzw. zurückgerollt (500). Die
- * Dokument-ID kommt aus dem Pfad-Parameter {@code id}. {@code EndpunktWaechterTest} verlangt die Annotation an jedem
- * Endpunkt der Tabelle in design.md «Protokoll und Manifest».
+ * ID kommt standardmässig aus dem Pfad-Parameter {@code id}; bei {@link #idArgument()} aus dem Methodenargument am
+ * angegebenen Index. {@code EndpunktWaechterTest} verlangt die Annotation an jedem Endpunkt der Tabelle in design.md
+ * «Protokoll und Manifest».
  */
 @InterceptorBinding
 @Retention(RetentionPolicy.RUNTIME)
@@ -22,4 +23,7 @@ public @interface Protokolliert {
 
     @Nonbinding
     ProtokollAktion aktion();
+
+    @Nonbinding
+    int idArgument() default -1;
 }
