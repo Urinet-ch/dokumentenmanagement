@@ -52,6 +52,8 @@ import java.util.UUID;
 public class OeffentlicherChatResource {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    static final String CHAT_HINWEIS = "Antworten werden automatisch aus Verbandsdokumenten erstellt. Massgebend "
+            + "sind die verlinkten Originaldokumente; für verbindliche Auskünfte wenden Sie sich bitte an die Geschäftsstelle.";
 
     private final OeffentlicheFragen fragen;
     private final MandantAufloesung aufloesung;
@@ -82,10 +84,11 @@ public class OeffentlicherChatResource {
     @Operation(summary = "Frage an den öffentlichen Chatbot",
             description = "Antwort als Server-Sent Events mit benannten Ereignissen, JSON in data: «werkzeug» "
                     + "{werkzeug} je Werkzeugaufruf, «text» {delta}, genau ein «quellen» [{dokumentId, titel, reihe "
-                    + "{code, name}, ausgabe}] vor «fertig» {gespraechId}; «fehler» {meldung, gespraechId} mit festem "
+                    + "{code, name}, ausgabe, jahr, fundstelle {seite}}] vor «fertig» {gespraechId, hinweis}; "
+                    + "«fehler» {meldung, gespraechId} mit festem "
                     + "Text beendet den Stream ohne «fertig». Der Chatbot antwortet nur aus veröffentlichten Dokumenten "
-                    + "bis zur gemeldeten Stufe; findet er keine passende Publikation, sagt er das und verweist auf die "
-                    + "Geschäftsstelle (und «quellen» ist leer). Die Links auf die Dokumentseiten bildet die Webseite aus "
+                    + "bis zur gemeldeten Stufe; ohne passende Quelle wird keine Modellantwort ausgegeben und «quellen» "
+                    + "ist leer. Die Webseite zeigt «hinweis» unter dem Chatfenster und bildet Dokumentlinks aus "
                     + "dokumentId. Vor dem Stream: 400 ANFRAGE_UNGUELTIG, 403 NICHT_ERLAUBT, 429 ZU_VIELE_ANFRAGEN mit "
                     + "Retry-After und dem Feld grund (STUNDENLIMIT: mehr als 20 Fragen je Client oder je Webseite in "
                     + "60 Minuten; LAEUFT: schon eine Frage des Clients, Retry-After 5 s) oder 429 BUDGET (Monatsbudget "
@@ -162,7 +165,7 @@ public class OeffentlicherChatResource {
             case OeffentlicheAusgabe.Text t -> JSON.createObjectNode().put("delta", t.delta()).toString();
             case OeffentlicheAusgabe.Quellen q -> quellen(q).toString();
             case OeffentlicheAusgabe.Fertig f -> JSON.createObjectNode().put("gespraechId", f.gespraechId().toString())
-                    .toString();
+                    .put("hinweis", CHAT_HINWEIS).toString();
             case OeffentlicheAusgabe.Fehler f -> JSON.createObjectNode().put("meldung", f.meldung())
                     .put("gespraechId", f.gespraechId().toString()).toString();
         };
@@ -179,6 +182,16 @@ public class OeffentlicherChatResource {
                 knoten.putNull("ausgabe");
             } else {
                 knoten.put("ausgabe", quelle.ausgabe());
+            }
+            if (quelle.jahr() == null) {
+                knoten.putNull("jahr");
+            } else {
+                knoten.put("jahr", quelle.jahr());
+            }
+            if (quelle.seite() == null) {
+                knoten.putNull("fundstelle");
+            } else {
+                knoten.putObject("fundstelle").put("seite", quelle.seite());
             }
         }
         return liste;

@@ -69,10 +69,14 @@ public sealed interface ChatEreignis {
     }
 
     /** Dokument in einem Werkzeugergebnis. */
-    record QuellDokument(UUID id, String titel) {
+    record QuellDokument(UUID id, String titel, String seite) {
         public QuellDokument {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(titel, "titel");
+        }
+
+        public QuellDokument(UUID id, String titel) {
+            this(id, titel, null);
         }
     }
 

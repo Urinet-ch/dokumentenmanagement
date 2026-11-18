@@ -57,13 +57,17 @@ paths:
 
         Antwort als Server-Sent Events (`text/event-stream`) mit benannten Ereignissen, JSON in `data:`:
         - `werkzeug` `{werkzeug}`: je Werkzeugaufruf (nur zur Anzeige «sucht …»).
-        - `text` `{delta}`: Teil der Antwort. Ohne passende Publikation sagt der Chatbot das und verweist auf die
-          Geschäftsstelle; `quellen` ist dann leer.
-        - `quellen` `[{dokumentId, titel, reihe {code, name}, ausgabe}]`: genau einmal, unmittelbar vor `fertig`. Die
-          Quellen stammen aus den Werkzeugergebnissen und sind über den festen Filter geprüft; nie Stufe, Status oder
-          Dateiname. Den Link auf die Dokumentseite bildet die Webseite aus `dokumentId`.
-        - `fertig` `{gespraechId}`: Ende der Antwort. Das Gespräch lebt höchstens 30 Minuten im Speicher des Archivs, nur
-          für denselben Client; eine unbekannte, fremde oder abgelaufene ID beginnt ein neues Gespräch.
+        - `text` `{delta}`: Teil der Antwort. Der Text wird erst nach der Quellenprüfung ausgegeben. Ohne passende
+          Publikation erscheint ausschliesslich der feste Hinweis, dass kein Beleg gefunden wurde; `quellen` ist leer.
+        - `quellen` `[{dokumentId, titel, reihe {code, name}, ausgabe, jahr, fundstelle {seite}}]`: genau einmal,
+          unmittelbar vor `fertig`. `jahr` und `fundstelle` können `null` sein. Die Quellen stammen aus den
+          Werkzeugergebnissen und sind über den festen Filter geprüft; nie Stufe, Status oder Dateiname. Den Link auf die
+          Dokumentseite bildet die Webseite aus `dokumentId`.
+        - `fertig` `{gespraechId, hinweis}`: Ende der Antwort. Die Webseite zeigt `hinweis` unter dem Chatfenster:
+          «Antworten werden automatisch aus Verbandsdokumenten erstellt. Massgebend sind die verlinkten
+          Originaldokumente; für verbindliche Auskünfte wenden Sie sich bitte an die Geschäftsstelle.» Das Gespräch
+          lebt höchstens 30 Minuten im Speicher des Archivs, nur für denselben Client; eine unbekannte, fremde oder
+          abgelaufene ID beginnt ein neues Gespräch.
         - `fehler` `{meldung, gespraechId}`: fester Text, beendet den Stream ohne `fertig`.
 
         Grenzen: höchstens 20 Fragen je Client (`X-Archiv-Client`) und Stunde, dazu eine Grenze je Webseite und eine

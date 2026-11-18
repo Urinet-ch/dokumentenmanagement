@@ -25,6 +25,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.options;
 
@@ -100,6 +101,18 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static MappingBuilder standardReranker() {
         return post(urlPathEqualTo(RERANKER_PFAD)).atPriority(10)
                 .willReturn(ResponseDefinitionBuilder.responseDefinition().withTransformers(RERANKER_ANTWORT));
+    }
+
+    /** Simuliert einen festen Score für alle Treffer des Rerankers. */
+    public static void rerankerMitRelevanz(double relevanz) {
+        if (!Double.isFinite(relevanz) || relevanz < 0 || relevanz > 1) {
+            throw new IllegalArgumentException("Relevanz muss zwischen 0 und 1 liegen");
+        }
+        int tokens = RERANKER_TOKENS_JE_TEXT;
+        String antwort = "{\"id\":\"score-test\",\"model\":\"" + RERANKER_MODELL + "\",\"usage\":"
+                + "{\"prompt_tokens\":" + tokens + ",\"total_tokens\":" + tokens + "},\"results\":["
+                + "{\"index\":0,\"relevance_score\":" + relevanz + "}]}";
+        client().register(post(urlPathEqualTo(RERANKER_PFAD)).atPriority(1).willReturn(okJson(antwort)));
     }
 
     // ---- Chat-Modell (gestreamt) -------------------------------------------------------------------------------
@@ -265,6 +278,33 @@ public final class KiWireMock implements QuarkusTestResourceLifecycleManager {
     public static WireMock client() {
         int port = ConfigProvider.getConfig().getValue("archiv.ki.wiremock-port", Integer.class);
         return new WireMock("localhost", port);
+    }
+
+    /** {@code top_n} des letzten Aufrufs, ohne Suchfrage oder Texte auszugeben. */
+    public static int letzterRerankerTopN() {
+        List<LoggedRequest> anfragen = client().find(postRequestedFor(urlPathEqualTo(RERANKER_PFAD)));
+        if (anfragen.isEmpty()) {
+            throw new IllegalStateException("Reranker wurde nicht aufgerufen");
+        }
+        try {
+            return new ObjectMapper().readTree(anfragen.getLast().getBodyAsString()).path("top_n").asInt(-1);
+        } catch (IOException e) {
+            throw new IllegalStateException("Reranker-Anfrage nicht lesbar", e);
+        }
+    }
+
+    /** Score des letzten Reranker-Aufrufs; prüft, dass ein Szenario-Stub tatsächlich geantwortet hat. */
+    public static double letzterRerankerScore() {
+        ServeEvent ereignis = client().getServeEvents().stream()
+                .filter(e -> RERANKER_PFAD.equals(e.getRequest().getUrl()))
+                .reduce((a, b) -> b)
+                .orElseThrow(() -> new IllegalStateException("Reranker wurde nicht aufgerufen"));
+        try {
+            return new ObjectMapper().readTree(ereignis.getResponse().getBodyAsString()).path("results").path(0)
+                    .path("relevance_score").asDouble(Double.NaN);
+        } catch (IOException e) {
+            throw new IllegalStateException("Reranker-Antwort nicht lesbar", e);
+        }
     }
 
     /** Antwort im Format von {@code POST /embeddings} (OpenAI-kompatibel) zu den Eingaben der Anfrage. */

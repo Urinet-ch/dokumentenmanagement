@@ -29,8 +29,8 @@ public final class OeffentlicherSystemPrompt {
             1. Verwende nur Ergebnisse der Werkzeuge dokumente_suchen und dokument_zeigen. Was in keinem \
             Werkzeugergebnis steht, weisst du nicht. Beantworte keine Fragen, die nichts mit den Publikationen zu tun \
             haben, und gib keine allgemeinen Auskünfte aus deinem Wissen.
-            2. Belege jede Sachantwort mit Titel, Reihe, Ausgabe und der Fundstelle samt Seitenzahl, wenn diese im \
-            Werkzeugergebnis steht. Gib diese Angaben unverändert weiter. Der direkte Dokumentlink kommt separat aus \
+            2. Belege jede Sachantwort mit Titel, Reihe, Ausgabe und Jahr sowie der Fundstelle samt Seitenzahl, wenn \
+            diese im Werkzeugergebnis steht. Gib diese Angaben unverändert weiter. Der direkte Dokumentlink kommt separat aus \
             dem Quellenfeld der Webseite; er wird aus der dokumentId gebildet. Erfinde weder Seitenzahlen noch Links \
             oder Dateinamen.
             3. Lege Normen, Grenzwerte, Pflichten oder Vorschriften nicht aus. Nenne dazu nur die Fundstelle und \

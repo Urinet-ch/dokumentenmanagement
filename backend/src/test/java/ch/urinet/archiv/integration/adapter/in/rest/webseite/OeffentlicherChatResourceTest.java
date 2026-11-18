@@ -39,20 +39,24 @@ class OeffentlicherChatResourceTest {
     @Test
     void ereignisseAlsJson() {
         UUID id = UUID.fromString("00000000-0000-4000-8000-000000000001");
+        assertThat(OeffentlicherChatResource.CHAT_HINWEIS)
+                .contains("automatisch aus Verbandsdokumenten", "Massgebend", "verlinkten Originaldokumente");
         assertThat(OeffentlicherChatResource.daten(new OeffentlicheAusgabe.Werkzeug("dokumente_suchen")))
                 .isEqualTo("{\"werkzeug\":\"dokumente_suchen\"}");
         assertThat(OeffentlicherChatResource.daten(new OeffentlicheAusgabe.Text("Grüezi \"du\"")))
                 .isEqualTo("{\"delta\":\"Grüezi \\\"du\\\"\"}");
         assertThat(OeffentlicherChatResource.daten(new OeffentlicheAusgabe.Fertig(id)))
-                .isEqualTo("{\"gespraechId\":\"" + id + "\"}");
+                .isEqualTo("{\"gespraechId\":\"" + id + "\",\"hinweis\":\""
+                        + OeffentlicherChatResource.CHAT_HINWEIS + "\"}");
         assertThat(OeffentlicherChatResource.daten(new OeffentlicheAusgabe.Fehler("Fest", id)))
                 .isEqualTo("{\"meldung\":\"Fest\",\"gespraechId\":\"" + id + "\"}");
         assertThat(OeffentlicherChatResource.daten(new OeffentlicheAusgabe.Quellen(List.of(
-                new OeffentlicheQuelle(id, "Titel", "BULLETIN", "Bulletin", "3/2071"),
+                new OeffentlicheQuelle(id, "Titel", "BULLETIN", "Bulletin", "3/2071", 2071, "7-8"),
                 new OeffentlicheQuelle(id, "Ohne", "MERKBLATT", "Merkblatt", null)))))
                 .isEqualTo("[{\"dokumentId\":\"" + id + "\",\"titel\":\"Titel\",\"reihe\":{\"code\":\"BULLETIN\","
-                        + "\"name\":\"Bulletin\"},\"ausgabe\":\"3/2071\"},{\"dokumentId\":\"" + id
-                        + "\",\"titel\":\"Ohne\",\"reihe\":{\"code\":\"MERKBLATT\",\"name\":\"Merkblatt\"},\"ausgabe\":null}]");
+                        + "\"name\":\"Bulletin\"},\"ausgabe\":\"3/2071\",\"jahr\":2071,\"fundstelle\":{\"seite\":\"7-8\"}},"
+                        + "{\"dokumentId\":\"" + id + "\",\"titel\":\"Ohne\",\"reihe\":{\"code\":\"MERKBLATT\","
+                        + "\"name\":\"Merkblatt\"},\"ausgabe\":null,\"jahr\":null,\"fundstelle\":null}]");
     }
 
     @Test

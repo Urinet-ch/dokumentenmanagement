@@ -17,7 +17,7 @@ class OeffentlicherSystemPromptTest {
         assertThat(prompt).contains("Auskunftsassistent auf der Webseite von «Verband Probe»")
                 .contains("Heute ist der 14.03.2071")
                 .contains("Verwende nur Ergebnisse der Werkzeuge dokumente_suchen und dokument_zeigen")
-                .contains("Belege jede Sachantwort mit Titel, Reihe, Ausgabe und der Fundstelle samt Seitenzahl")
+                .contains("Belege jede Sachantwort mit Titel, Reihe, Ausgabe und Jahr sowie der Fundstelle samt Seitenzahl")
                 .contains("Lege Normen, Grenzwerte, Pflichten oder Vorschriften nicht aus")
                 .contains("beantworte die Sachfrage nicht")
                 .contains("verweise auf die Geschäftsstelle")

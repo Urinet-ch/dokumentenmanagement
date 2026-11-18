@@ -11,10 +11,12 @@ import ch.urinet.archiv.suche.application.SuchePort;
 import ch.urinet.archiv.suche.domain.AuszugTeil;
 import ch.urinet.archiv.suche.domain.Fundstelle;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
+import ch.urinet.archiv.suche.domain.Hybridtreffer;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
 import ch.urinet.archiv.suche.domain.Suchergebnis;
 import ch.urinet.archiv.suche.domain.Suchtreffer;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.util.LinkedHashMap;
@@ -75,14 +77,20 @@ public class OeffentlicheAbfragen {
     private final OeffentlicheDokumente dokumente;
     private final WerkzeugDaten daten;
     private final WerkzeugTransaktion transaktion;
+    private final double minRelevanz;
 
     public OeffentlicheAbfragen(SuchePort suche, HybridSuche hybrid, OeffentlicheDokumente dokumente,
-                                WerkzeugDaten daten, WerkzeugTransaktion transaktion) {
+                                WerkzeugDaten daten, WerkzeugTransaktion transaktion,
+                                @ConfigProperty(name = "archiv.webseite.chat.min-relevanz") double minRelevanz) {
+        if (!Double.isFinite(minRelevanz) || minRelevanz < 0 || minRelevanz > 1) {
+            throw new IllegalArgumentException("archiv.webseite.chat.min-relevanz muss zwischen 0 und 1 liegen");
+        }
         this.suche = suche;
         this.hybrid = hybrid;
         this.dokumente = dokumente;
         this.daten = daten;
         this.transaktion = transaktion;
+        this.minRelevanz = minRelevanz;
     }
 
     /** {@code dokumente_suchen}: Parameter des Modells werden geprüft, bevor die Datenbank etwas sieht. */
@@ -113,7 +121,7 @@ public class OeffentlicheAbfragen {
         boolean degradiert;
         long gesamt;
         if (ergebnis != null) {
-            treffer = ergebnis.treffer().stream().map(h -> {
+            treffer = belegteTreffer(ergebnis, begriff, minRelevanz).stream().map(h -> {
                 if (h.fundstelle() != null) {
                     fundstellen.put(h.treffer().id(), h.fundstelle());
                 }
@@ -141,6 +149,13 @@ public class OeffentlicheAbfragen {
         long verworfen = treffer.size() - ergebnisse.size();
         return new Antwort(ergebnisse, Math.max(ergebnisse.size(), gesamt - verworfen),
                 degradiert ? NUR_VOLLTEXT : null, degradiert ? Boolean.TRUE : null);
+    }
+
+    static List<Hybridtreffer> belegteTreffer(Hybridergebnis ergebnis, String begriff, double minRelevanz) {
+        // Ohne Modellbewertung bleibt nur die exakte Dokumentnummer als deterministischer Beleg.
+        return ergebnis.treffer().stream().filter(h -> h.relevanz() != null
+                ? h.relevanz() >= minRelevanz
+                : begriff.equals(h.treffer().belegnummer())).toList();
     }
 
     /** {@code dokument_zeigen}: ID nach der Zuordnung der Gesprächsnummer; nur Dokumente, die der Filter liefert. */

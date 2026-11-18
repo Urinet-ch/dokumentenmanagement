@@ -22,6 +22,7 @@ import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -211,6 +212,27 @@ public class OeffentlicherChatSchritte {
                         + Vektortext.text(frage) + "}],\"model\":\"bge_multilingual_gemma2\",\"usage\":{"
                         + "\"prompt_tokens\":" + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":"
                         + KiWireMock.TOKENS_JE_TEXT + "}}")));
+    }
+
+    @Angenommen("der Reranker bewertet Treffer mit dem Score 0.1")
+    public void rerankerBewertung() {
+        KiWireMock.rerankerMitRelevanz(0.1);
+    }
+
+    @Dann("hat der öffentliche Reranker top_n {int} erhalten")
+    public void rerankerTopN(int topN) {
+        assertThat(KiWireMock.letzterRerankerTopN()).isEqualTo(topN);
+    }
+
+    @Dann("hat der öffentliche Reranker den Score 0.1 zurückgegeben")
+    public void rerankerScore() {
+        assertThat(KiWireMock.letzterRerankerScore()).isEqualTo(0.1);
+    }
+
+    @Dann("liegt die konfigurierte Mindestrelevanz des öffentlichen Chats über 0.1")
+    public void mindestrelevanz() {
+        assertThat(ConfigProvider.getConfig().getValue("archiv.webseite.chat.min-relevanz", Double.class))
+                .isGreaterThan(0.1);
     }
 
     /** Setzt {@code dokument.seiten} und legt einen Abschnitt nahe der Frage mit dem Seitenbereich «von-bis» an. */
@@ -591,8 +613,15 @@ public class OeffentlicherChatSchritte {
         });
     }
 
-    @Dann("nennt die Quelle «{word}» die echte ID, die Reihe «{word}» mit dem Namen «{}» und die Ausgabe «{}»")
-    public void quelleDetails(String name, String reiheCode, String reiheName, String ausgabe) {
+    @Dann("enthält das fertig-Ereignis einen Hinweis zur massgebenden Quelle")
+    public void hinweisImFertigEreignis() {
+        JsonNode fertig = ereignisse.stream().filter(e -> "fertig".equals(e.name())).findFirst().orElseThrow().daten();
+        assertThat(fertig.path("hinweis").asText()).contains("automatisch aus Verbandsdokumenten", "Massgebend",
+                "Originaldokumente");
+    }
+
+    @Dann("nennt die Quelle «{word}» die echte ID, die Reihe «{word}» mit dem Namen «{}», Ausgabe «{}», Jahr {int} und Fundstellenseite «{}»")
+    public void quelleDetails(String name, String reiheCode, String reiheName, String ausgabe, int jahr, String seite) {
         Dokument d = dokumente.get(name);
         JsonNode quelle = quellenKnoten().stream().filter(q -> q.path("titel").asText().equals(d.titel())).findFirst()
                 .orElseThrow();
@@ -600,6 +629,8 @@ public class OeffentlicherChatSchritte {
         assertThat(quelle.path("reihe").path("code").asText()).isEqualTo(reiheCode);
         assertThat(quelle.path("reihe").path("name").asText()).isEqualTo(reiheName);
         assertThat(quelle.path("ausgabe").asText()).isEqualTo(ausgabe);
+        assertThat(quelle.path("jahr").asInt()).isEqualTo(jahr);
+        assertThat(quelle.path("fundstelle").path("seite").asText()).isEqualTo(seite);
     }
 
     private List<JsonNode> quellenKnoten() {
@@ -659,6 +690,16 @@ public class OeffentlicherChatSchritte {
         String[] teile = zeile.getFirst().split("\\|", 2);
         assertThat(Integer.parseInt(teile[0])).isEqualTo(tokens);
         assertThat(teile[1]).contains(dokumente.get(name).id().toString()).contains(dokumente.get(name).titel());
+    }
+
+    @Dann("speichert die Quelle von «{word}» Jahr {int} und Fundstellenseite «{}»")
+    public void gespeicherteFundstelle(String name, int jahr, String seite) throws Exception {
+        String roh = texte("select quellen::text from " + schema("urinet")
+                + ".oeffentliche_frage order by id desc limit 1").getFirst();
+        JsonNode quelle = JSON.readTree(roh).get(0);
+        assertThat(quelle.path("dokumentId").asText()).isEqualTo(dokumente.get(name).id().toString());
+        assertThat(quelle.path("jahr").asInt()).isEqualTo(jahr);
+        assertThat(quelle.path("fundstelle").path("seite").asText()).isEqualTo(seite);
     }
 
     @Dann("enthält die Tabelle der öffentlichen Fragen von «{word}» weder den Client «{word}» noch die IP «{}» und nur die Spalten «{}»")
