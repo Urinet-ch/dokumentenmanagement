@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="047-ki-texte" author="archiv">
+        <createTable tableName="ki_texte">
+            <column name="id" type="integer">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="rolle" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="feldregeln" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ki_freigegeben" type="boolean">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql>
+            alter table ki_texte add constraint ki_texte_einzel_ck check (id = 1);
+            alter table ki_texte add constraint ki_texte_rolle_laenge_ck
+                check (char_length(rolle) &lt;= 8000);
+            alter table ki_texte add constraint ki_texte_feldregeln_laenge_ck
+                check (char_length(feldregeln) &lt;= 8000);
+            insert into ki_texte (id, rolle, feldregeln, ki_freigegeben) values (1, '', '', false);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

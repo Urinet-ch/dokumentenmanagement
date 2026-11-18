@@ -24,6 +24,7 @@ import java.util.Optional;
 public class KonfigurationVerwaltung implements KonfigurationVersionsPort, KonfigurationLesen {
 
     private final KonfigurationVersionsRepository repository;
+    private final KiTexteRepository kiTexteRepository;
     private final KonfigurationCache cache;
     private final DokumentartRepository dokumentarten;
     private final ZusatzSchemaPruefer zusatzSchema;
@@ -35,11 +36,13 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     private final KonfigurationAenderungsProtokoll protokoll;
 
     public KonfigurationVerwaltung(KonfigurationVersionsRepository repository, KonfigurationCache cache,
+                                   KiTexteRepository kiTexteRepository,
                                    DokumentartRepository dokumentarten, ZusatzSchemaPruefer zusatzSchema,
                                    KlassifikationRepository klassifikationen, RegelRepository regeln,
                                    MandantEinstellungen einstellungen, MandantAufloesung aufloesung,
                                    MandantKontext kontext, KonfigurationAenderungsProtokoll protokoll) {
         this.repository = repository;
+        this.kiTexteRepository = kiTexteRepository;
         this.cache = cache;
         this.dokumentarten = dokumentarten;
         this.zusatzSchema = zusatzSchema;
@@ -87,6 +90,10 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     }
 
     public int aenderungSpeichern(String wer, String grund) {
+        return aenderungSpeichern(wer, grund, KonfigurationQuelle.APP);
+    }
+
+    public int aenderungSpeichern(String wer, String grund, KonfigurationQuelle quelle) {
         KonfigurationsVersion vorher = mitFeldTypen(basisSicherstellen());
         Konfiguration neu = abbild(vorher.version() + 1);
         if (vorher.inhalt().gleicherInhalt(neu)) {
@@ -96,10 +103,17 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
             throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
         }
         KonfigurationsVersion gespeichert = repository.anlegen(neu.version(), wer, grund,
-                KonfigurationQuelle.APP, neu);
+                quelle, neu);
         cache.invalidieren(mandantAktuell());
         protokoll.schreiben(gespeichert.version(), gespeichert.quelle(), grund, vorher.inhalt().aenderungen(neu));
         return gespeichert.version();
+    }
+
+    public void dateiAenderungStarten(int basisVersion) {
+        repository.sperren();
+        if (basisSicherstellen().version() != basisVersion) {
+            throw new FachFehler(Fehlercode.KONFIGURATION_VERALTET);
+        }
     }
 
     /** Gespeicherte Version, ohne die abgeleiteten Feldtypen ({@link #mitFeldTypen}). */
@@ -132,7 +146,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         Konfiguration inhalt = stand.inhalt();
         Konfiguration ergaenzt = new Konfiguration(inhalt.version(), inhalt.einstellungen(), inhalt.arten().stream()
                 .map(art -> art.mitZusatzFeldTypen(zusatzSchema.feldTypen(art.zusatzSchema()))).toList(),
-                inhalt.klassifikationen(), inhalt.regeln());
+                inhalt.klassifikationen(), inhalt.regeln(), inhalt.kiTexte());
         return new KonfigurationsVersion(stand.version(), stand.zeit(), stand.wer(), stand.grund(), stand.quelle(),
                 ergaenzt, stand.sha256());
     }
@@ -141,7 +155,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         MandantEinstellungen.Werte werte = einstellungen.lesen(mandantAktuell());
         return new Konfiguration(version, new Konfiguration.Einstellungen(werte.geschaeftsjahresende().wert(),
                 new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans())), dokumentarten.alle().stream()
-                .map(this::art).toList(), klassifikationen.alle(), regeln.alle());
+                .map(this::art).toList(), klassifikationen.alle(), regeln.alle(), kiTexteRepository.lesen());
     }
 
     private Konfiguration.Art art(Dokumentart art) {

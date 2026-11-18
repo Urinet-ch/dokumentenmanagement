@@ -26,6 +26,9 @@ public interface ZusatzSchemaPruefer {
     /** Prüft Zusatzwerte (JSON-Objekt) gegen ein gültiges Schema. */
     void wertePruefen(String schemaJson, String werteJson);
 
+    /** Prüft eine Konfigurationsdatei bis 1 MiB gegen das gespeicherte Schema. */
+    void konfigurationPruefen(String schemaJson, String dateiJson);
+
     /** Liest ein bereits geprüftes Zusatzobjekt als unveränderliche Werte für deklarative Regeln. */
     Map<String, Object> werteLesen(String werteJson);
 

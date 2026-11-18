@@ -48,6 +48,10 @@ class KonfigurationsdateiSchemaTest {
                     "code": "protokoll_eindeutig", "art": "PROTOKOLL", "typ": "EINDEUTIG",
                     "parameter": { "felder": ["zusatz.sitzung"] }, "schwere": "FEHLER",
                     "meldung": "Dieses Protokoll ist bereits erfasst."
+                  }, {
+                    "code": "protokoll_erwartet", "art": "PROTOKOLL", "typ": "ERWARTET",
+                    "parameter": { "je": "MONAT", "datum": "BELEGDATUM" }, "schwere": "WARNUNG",
+                    "meldung": "Ein Protokoll fehlt."
                   }]
                 }
                 """;

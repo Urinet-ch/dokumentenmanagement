@@ -90,6 +90,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
 
     static final int MAX_SCHEMA_BYTES = 16 * 1024;
     static final int MAX_WERTE_BYTES = 64 * 1024;
+    static final int MAX_KONFIGURATION_BYTES = 1024 * 1024;
     static final int MAX_TIEFE = 10;
     static final int MAX_MUSTER_ZEICHEN = 1_000;
     private static final int CACHE_GROESSE = 32;
@@ -239,9 +240,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     private void aufwaermen() {
         mitFrist(AUFWAERMEN_NANOS, () -> {
             geprueft(AUFWAERMEN_SCHEMA);
-            werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_GUELTIG);
+            werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_GUELTIG, MAX_WERTE_BYTES);
             try {
-                werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_UNGUELTIG);
+                werteGegen(AUFWAERMEN_SCHEMA, AUFWAERMEN_UNGUELTIG, MAX_WERTE_BYTES);
             } catch (FachFehler erwartet) {
                 // ungültige Werte: der Fehlerweg soll ebenfalls warm sein
             }
@@ -302,7 +303,25 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     @Override
     public void wertePruefen(String schemaJson, String werteJson) {
         mitFrist(zeitgrenzeNanos, () -> {
-            werteGegen(schemaJson, werteJson);
+            werteGegen(schemaJson, werteJson, MAX_WERTE_BYTES);
+            return null;
+        });
+    }
+
+    @Override
+    public void konfigurationPruefen(String schemaJson, String dateiJson) {
+        mitFrist(zeitgrenzeNanos, () -> {
+            JsonNode datei = lesen(dateiJson, MAX_KONFIGURATION_BYTES, true);
+            if (!datei.isObject() || tiefe(datei) > MAX_TIEFE) {
+                throw ungueltig();
+            }
+            try {
+                if (!geprueft(schemaJson).kompiliert().validate(Jackson3Baum.wert(datei)).isEmpty()) {
+                    throw ungueltig();
+                }
+            } catch (RuntimeException | StackOverflowError e) {
+                throw ungueltig();
+            }
             return null;
         });
     }
@@ -492,9 +511,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
         return false;
     }
 
-    private void werteGegen(String schemaJson, String werteJson) {
+    private void werteGegen(String schemaJson, String werteJson, int maxBytes) {
         // genau (BigDecimal), damit geprüft wird, was gespeichert wird (Review PR #95)
-        JsonNode werte = lesen(werteJson, MAX_WERTE_BYTES, true);
+        JsonNode werte = lesen(werteJson, maxBytes, true);
         if (!werte.isObject() || tiefe(werte) > MAX_TIEFE) {
             throw ungueltig();
         }

@@ -50,6 +50,11 @@ class DokumentartPruefungTest {
         }
 
         @Override
+        public void konfigurationPruefen(String schemaJson, String dateiJson) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public java.util.Map<String, Object> werteLesen(String werteJson) {
             return java.util.Map.of();
         }

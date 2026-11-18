@@ -7,4 +7,6 @@ import java.util.List;
 public interface RegelRepository {
 
     List<Regel> alle();
+
+    void ersetzen(List<Regel> regeln);
 }

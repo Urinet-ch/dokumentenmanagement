@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /** Unveränderliches Abbild der fachlichen Konfiguration eines Mandanten. */
 public record Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
-                            List<Klassifikation> klassifikationen, List<Regel> regeln) {
+                            List<Klassifikation> klassifikationen, List<Regel> regeln, KiTexte kiTexte) {
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
@@ -23,12 +23,17 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
             "referenz", "groesse", "status", "url");
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten) {
-        this(version, einstellungen, arten, List.of(), List.of());
+        this(version, einstellungen, arten, List.of(), List.of(), KiTexte.LEER);
     }
 
     public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
                          List<Klassifikation> klassifikationen) {
-        this(version, einstellungen, arten, klassifikationen, List.of());
+        this(version, einstellungen, arten, klassifikationen, List.of(), KiTexte.LEER);
+    }
+
+    public Konfiguration(int version, Einstellungen einstellungen, List<Art> arten,
+                         List<Klassifikation> klassifikationen, List<Regel> regeln) {
+        this(version, einstellungen, arten, klassifikationen, regeln, KiTexte.LEER);
     }
 
     /** Die Arten stehen nach Code sortiert, damit Abbilder aus Migration und App gleich aufgebaut sind. */
@@ -41,6 +46,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         regeln = regeln == null ? List.of()
                 : regeln.stream().sorted(Comparator.comparing(Regel::code, Comparator.nullsFirst(String::compareTo)))
                         .toList();
+        kiTexte = kiTexte == null ? KiTexte.LEER : kiTexte;
     }
 
     /** Liefert alle Prüfungen, die ohne die späteren Konfigurationsattribute möglich sind. */
@@ -48,6 +54,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         List<Befund> befunde = new ArrayList<>();
         if (version < 1) {
             befunde.add(new Befund("version", "VERSION_UNGUELTIG", "Die Konfigurationsversion muss positiv sein."));
+        }
+        if (codepunkte(kiTexte.rolle()) > 8000 || codepunkte(kiTexte.feldregeln()) > 8000) {
+            befunde.add(new Befund("kiTexte", "TEXT_ZU_LANG", "Ein KI-Text überschreitet 8'000 Zeichen."));
         }
         if (arten.size() > 200) {
             befunde.add(new Befund("arten", "ANZAHL_UNGUELTIG", "Die Konfiguration enthält zu viele Dokumentarten."));
@@ -412,7 +421,8 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     public boolean gleicherInhalt(Konfiguration andere) {
         return andere != null && einstellungen.equals(andere.einstellungen) && arten.equals(andere.arten)
-                && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln);
+                && klassifikationen.equals(andere.klassifikationen) && regeln.equals(andere.regeln)
+                && kiTexte.equals(andere.kiTexte);
     }
 
     public List<Aenderung> aenderungen(Konfiguration neu) {
@@ -423,6 +433,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
                 neu.einstellungen.kennungen().uid());
         feld(aenderungen, "einstellungen.kennungen.ibans", einstellungen.kennungen().ibans(),
                 neu.einstellungen.kennungen().ibans());
+        feld(aenderungen, "kiTexte.rolle", kiTexte.rolle(), neu.kiTexte.rolle());
+        feld(aenderungen, "kiTexte.feldregeln", kiTexte.feldregeln(), neu.kiTexte.feldregeln());
+        feld(aenderungen, "kiTexte.kiFreigegeben", kiTexte.kiFreigegeben(), neu.kiTexte.kiFreigegeben());
 
         Map<String, Art> vorher = nachCode(arten);
         Map<String, Art> nachher = nachCode(neu.arten);
@@ -573,9 +586,23 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
     }
 
+    private static int codepunkte(String wert) {
+        return wert.codePointCount(0, wert.length());
+    }
+
     public record Einstellungen(String geschaeftsjahrEnde, Kennungen kennungen) {
         public Einstellungen {
             kennungen = kennungen == null ? new Kennungen(null, List.of()) : kennungen;
+        }
+
+    }
+
+    public record KiTexte(String rolle, String feldregeln, boolean kiFreigegeben) {
+        public static final KiTexte LEER = new KiTexte("", "", false);
+
+        public KiTexte {
+            rolle = rolle == null ? "" : rolle;
+            feldregeln = feldregeln == null ? "" : feldregeln;
         }
     }
 
@@ -658,9 +685,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
      */
     public record Aenderung(String pfad, String alt, String neu) {
         private static final String KENNUNGEN = "einstellungen.kennungen.";
+        private static final String KI_TEXTE = "kiTexte.";
 
         public boolean ohneWerte() {
-            return pfad != null && pfad.startsWith(KENNUNGEN);
+            return pfad != null && (pfad.startsWith(KENNUNGEN) || pfad.startsWith(KI_TEXTE));
         }
 
         @Override

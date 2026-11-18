@@ -326,7 +326,7 @@
       "properties": {
         "je": { "enum": ["MONAT", "JAHR"] },
         "datum": {
-          "oneOf": [
+          "anyOf": [
             { "const": "BELEGDATUM" },
             { "type": "string", "minLength": 1, "maxLength": 100 }
           ]
