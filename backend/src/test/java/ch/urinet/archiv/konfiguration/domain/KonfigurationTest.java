@@ -172,6 +172,91 @@ class KonfigurationTest {
                 new Konfiguration.Aenderung("klassifikationen.fachgebiet.werte.wert.name", "Bau", "Hochbau"));
     }
 
+    @Test
+    void prueftRegelparameterArtUndFeldbezug() {
+        var gueltig = new Regel("pflicht", "MERKBLATT", "PFLICHT_WENN",
+                Map.of("wenn", Map.of("feld", "titel", "gleich", "Test"), "dann", List.of("datum")),
+                "FEHLER", "Datum ist erforderlich.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art("MERKBLATT", "NORMAL", true, false)),
+                List.of(), List.of(gueltig)).pruefen()).isEmpty();
+
+        var ungueltig = new Regel("pflicht", "FEHLT", "PFLICHT_WENN",
+                Map.of("wenn", Map.of("feld", "unbekannt", "gleich", "Test"), "dann", List.of("datum")),
+                "KRITISCH", "", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art("MERKBLATT", "NORMAL", true, false)),
+                List.of(), List.of(ungueltig)).pruefen())
+                .extracting(Konfiguration.Befund::code)
+                .containsExactly("TEXT_UNGUELTIG", "SCHWERE_UNGUELTIG", "REGEL_ART_UNGUELTIG");
+    }
+
+    @Test
+    void validiertRegelfelderGegenZusatzschemaUndMustergruppe() {
+        var art = new Konfiguration.Art("RECHNUNG", "Rechnung", null, List.of("finanz", "frei"),
+                List.of("titel"), "{\"type\":\"object\"}", "NORMAL",
+                new Konfiguration.Aufbewahrung(null, null), false, true, true,
+                List.of("^R(?<nr>\\\\d+)$"), null, null, true, List.of(), null, 0, List.of(),
+                Map.of("jahr", "integer", "periode", "date"));
+        var folge = new Regel("folge", "RECHNUNG", "FOLGE",
+                Map.of("feld", "zusatz.jahr", "zeitraum", Map.of("feld", "zusatz.jahr")),
+                "WARNUNG", "Folge prüfen.", true);
+        var erwartet = new Regel("erwartet", "RECHNUNG", "ERWARTET",
+                Map.of("je", "MONAT", "datum", "zusatz.periode", "nurMonat", "zusatz.periode"),
+                "WARNUNG", "Monat fehlt.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(folge, erwartet)).pruefen())
+                .isEmpty();
+
+        var falscheFolge = new Regel("folge", "RECHNUNG", "FOLGE",
+                Map.of("feld", "zusatz.periode", "zeitraum", "GESAMT"),
+                "WARNUNG", "Folge prüfen.", true);
+        var falschesErwartet = new Regel("erwartet", "RECHNUNG", "ERWARTET",
+                Map.of("je", "MONAT", "datum", "zusatz.jahr", "nurMonat", "zusatz.unbekannt"),
+                "WARNUNG", "Monat fehlt.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(),
+                List.of(falscheFolge, falschesErwartet)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("REGEL_FELD_UNGUELTIG");
+
+        var ohneNr = new Konfiguration.Art("RECHNUNG", "Rechnung", null, List.of("finanz"),
+                List.of("titel"), "{\"type\":\"object\"}", "NORMAL",
+                new Konfiguration.Aufbewahrung(null, null), false, true, true,
+                List.of("^R\\\\d+$"), null, null, true, List.of(), null, 0);
+        var musterFolge = new Regel("folge", "RECHNUNG", "FOLGE",
+                Map.of("muster", true, "zeitraum", "GESCHAEFTSJAHR"),
+                "WARNUNG", "Folge prüfen.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(ohneNr), List.of(), List.of(musterFolge)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("REGEL_MUSTER_UNGUELTIG");
+    }
+
+    @Test
+    void geschaeftsjahrNurAlsFeldEinerFolge() {
+        var art = art("MERKBLATT", "NORMAL", true, false);
+        var folge = new Regel("folge", "MERKBLATT", "FOLGE",
+                Map.of("feld", "geschaeftsjahr", "zeitraum", Map.of("feld", "geschaeftsjahr")),
+                "WARNUNG", "Folge prüfen.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(folge)).pruefen()).isEmpty();
+
+        var eindeutig = new Regel("eindeutig", "MERKBLATT", "EINDEUTIG", Map.of("felder", List.of("geschaeftsjahr")),
+                "WARNUNG", "Doppelt.", true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(eindeutig)).pruefen())
+                .extracting(Konfiguration.Befund::code).contains("REGEL_FELD_UNGUELTIG");
+    }
+
+    @Test
+    void beruecksichtigtRegelnBeimVersionsvergleichUndProtokolliertIhreAenderungen() {
+        var art = art("MERKBLATT", "NORMAL", true, false);
+        var vorherRegel = new Regel("pflicht", "MERKBLATT", "PFLICHT_WENN",
+                Map.of("wenn", Map.of("feld", "titel", "gleich", "Test"), "dann", List.of("datum")),
+                "WARNUNG", "Meldung.", true);
+        var nachherRegel = new Regel("pflicht", "MERKBLATT", "PFLICHT_WENN",
+                Map.of("wenn", Map.of("feld", "titel", "gleich", "Test"), "dann", List.of("datum")),
+                "FEHLER", "Meldung.", true);
+        var vorher = new Konfiguration(1, einstellungen(), List.of(art), List.of(), List.of(vorherRegel));
+        var nachher = new Konfiguration(2, einstellungen(), List.of(art), List.of(), List.of(nachherRegel));
+
+        assertThat(vorher.gleicherInhalt(nachher)).isFalse();
+        assertThat(vorher.aenderungen(nachher))
+                .contains(new Konfiguration.Aenderung("regeln.pflicht.schwere", "WARNUNG", "FEHLER"));
+    }
+
     private static Konfiguration.Art art(String code, String vertraulichkeit, boolean aktiv, boolean selbstAusgestellt) {
         return new Konfiguration.Art(code, code, null, List.of("frei"), List.of("titel"), "{\"type\":\"object\"}",
                 vertraulichkeit, new Konfiguration.Aufbewahrung(null, null), false, aktiv, selbstAusgestellt,

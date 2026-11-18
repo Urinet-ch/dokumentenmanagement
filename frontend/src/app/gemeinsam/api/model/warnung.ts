@@ -13,18 +13,17 @@
  * Hinweis, der die Bestätigung nicht verhindert (Req 8.10)
  */
 export interface Warnung { 
-    code: Warnung.CodeEnum;
+    /**
+     * Warntyp oder Code einer konfigurierten Dokumentregel
+     */
+    code: string;
     /**
      * Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist
      */
     vorhandenId?: string | null;
+    /**
+     * Meldung der Dokumentregel
+     */
+    meldung?: string | null;
 }
-export namespace Warnung {
-    export const CodeEnum = {
-        BelegnummerBekannt: 'BELEGNUMMER_BEKANNT',
-        FristbezugFehlt: 'FRISTBEZUG_FEHLT',
-    } as const;
-    export type CodeEnum = typeof CodeEnum[keyof typeof CodeEnum];
-}
-
 

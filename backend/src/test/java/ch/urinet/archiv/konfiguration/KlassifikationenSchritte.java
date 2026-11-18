@@ -169,6 +169,45 @@ public class KlassifikationenSchritte {
         }
     }
 
+    @Angenommen("das Dokument «{word}» hat das Zusatzfeld «{word}» mit dem Wert «{word}»")
+    public void zusatzSetzen(String name, String feld, String wert) throws SQLException {
+        Dokument dokument = dokument(name);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement aendern = verbindung.prepareStatement("update "
+                     + new MandantCode(dokument.mandant()).schema() + ".dokument set zusatz = "
+                     + "coalesce(zusatz, '{}'::jsonb) || jsonb_build_object(?::text, ?::text) where id = ?")) {
+            aendern.setString(1, feld);
+            aendern.setString(2, wert);
+            aendern.setObject(3, dokument.id());
+            assertThat(aendern.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    @Wenn("«{word}» ändert den Titel des Dokuments «{word}» auf «{}»")
+    public void titelAendern(String benutzer, String name, String titel) {
+        Response stand = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());
+        assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+        antwort = gegeben(benutzer).header("If-Match", stand.getHeader("ETag")).contentType(ContentType.JSON)
+                .body(Map.of("titel", titel, "projekt", "Probe", "grund", "Titel korrigieren"))
+                .when().patch("/api/v1/dokumente/" + dokument(name).id());
+    }
+
+    @Dann("nennt die Antwort der Klassifikationsverwaltung die verletzte Regel «{word}» ohne das Dokument «{word}»")
+    public void verletzteRegel(String code, String vorhanden) {
+        assertThat(antwort.jsonPath().<String>getList("regeln.code")).as(antwort.asString()).containsExactly(code);
+        assertThat(antwort.asString()).doesNotContain(dokument(vorhanden).id().toString());
+    }
+
+    @Dann("enthält die Antwort der Klassifikationsverwaltung die Warnung «{word}»")
+    public void warnungInAntwort(String code) {
+        assertThat(antwort.jsonPath().<String>getList("warnungen.code")).as(antwort.asString()).contains(code);
+    }
+
+    @Dann("enthält die Antwort der Klassifikationsverwaltung keine Warnung")
+    public void keineWarnung() {
+        assertThat(antwort.jsonPath().<String>getList("warnungen")).as(antwort.asString()).isNullOrEmpty();
+    }
+
     @Wenn("«{word}» liest das Dokument «{word}»")
     public void dokumentLesen(String benutzer, String name) {
         antwort = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());

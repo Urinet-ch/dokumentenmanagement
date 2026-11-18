@@ -117,7 +117,9 @@ public class DokumentGeneratorResource {
     @Schema(name = "GeneratorAntwort")
     public record GeneratorAntwortDto(@Schema(required = true) UUID id,
                                       @Schema(required = true, description = "NEU bei 202, sonst der aktuelle Status "
-                                              + "des vorhandenen Dokuments") String status) {
+                                              + "des vorhandenen Dokuments") String status,
+                                      @Schema(description = "Warnungen aus konfigurierten Dokumentregeln")
+                                      List<DokumentResource.WarnungDto> warnungen) {
     }
 
     @POST
@@ -165,7 +167,9 @@ public class DokumentGeneratorResource {
         // die Metadaten erst nach der Prüfsumme lesen (Regel 3)
         DokumentGenerator.Ergebnis ergebnis = generator.annehmen(principal, datei.uploadedFile(),
                 datei.fileName(), () -> anfrage(metadaten));
-        GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name());
+        List<DokumentResource.WarnungDto> warnungen = ergebnis.warnungen().stream()
+                .map(w -> new DokumentResource.WarnungDto(w.code(), null, w.meldung())).toList();
+        GeneratorAntwortDto antwort = new GeneratorAntwortDto(ergebnis.id(), ergebnis.status().name(), warnungen);
         if (!ergebnis.neu()) {
             return Response.ok(antwort).type(MediaType.APPLICATION_JSON_TYPE).build();
         }

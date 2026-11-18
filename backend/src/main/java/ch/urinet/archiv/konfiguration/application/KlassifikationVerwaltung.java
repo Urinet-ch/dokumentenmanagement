@@ -221,7 +221,8 @@ public class KlassifikationVerwaltung {
     }
 
     private static Konfiguration mitKlassifikationen(Konfiguration aktuell, List<Klassifikation> klassifikationen) {
-        return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), aktuell.arten(), klassifikationen);
+        return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), aktuell.arten(), klassifikationen,
+                aktuell.regeln());
     }
 
     private static Konfiguration mitErsetzterKlassifikation(Konfiguration aktuell, Klassifikation neu) {
@@ -246,7 +247,7 @@ public class KlassifikationVerwaltung {
             return mitArtKlassifikationen(art, zuordnungen);
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen());
+                aktuell.klassifikationen(), aktuell.regeln());
     }
 
     private static Konfiguration ohneArtZuordnung(Konfiguration aktuell, String artCode, String code) {
@@ -258,7 +259,7 @@ public class KlassifikationVerwaltung {
                     .filter(zuordnung -> !zuordnung.klassifikation().equals(code)).toList());
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen());
+                aktuell.klassifikationen(), aktuell.regeln());
     }
 
     private static Konfiguration mitArtZuordnungErsetzt(Konfiguration aktuell, String artCode,
@@ -271,7 +272,7 @@ public class KlassifikationVerwaltung {
                     .map(alt -> alt.klassifikation().equals(neu.klassifikation()) ? neu : alt).toList());
         }).toList();
         return new Konfiguration(aktuell.version() + 1, aktuell.einstellungen(), arten,
-                aktuell.klassifikationen());
+                aktuell.klassifikationen(), aktuell.regeln());
     }
 
     private static Konfiguration.Art mitArtKlassifikationen(Konfiguration.Art art,
@@ -279,7 +280,8 @@ public class KlassifikationVerwaltung {
         return new Konfiguration.Art(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
                 art.zusatzSchema(), art.vertraulichkeit(), art.aufbewahrung(), art.gesetzlichePflicht(), art.aktiv(),
                 art.selbstAusgestellt(), art.belegnummerMuster(), art.fremdbelegArt(), art.ohneZahlungsdatenArt(),
-                art.kiVorschlag(), art.kiFelder(), art.kiHinweise(), art.reihenfolge(), zuordnungen);
+                art.kiVorschlag(), art.kiFelder(), art.kiHinweise(), art.reihenfolge(), zuordnungen,
+                art.zusatzFeldTypen());
     }
 
     private static List<Klassifikation> ergaenzen(List<Klassifikation> klassifikationen, Klassifikation neu) {

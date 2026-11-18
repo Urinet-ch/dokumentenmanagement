@@ -123,12 +123,13 @@ public class DokumentResource {
 
     @Schema(name = "Warnung", description = "Hinweis, der die Bestätigung nicht verhindert (Req 8.10)")
     public record WarnungDto(
-            @Schema(required = true, enumeration = {"BELEGNUMMER_BEKANNT", "FRISTBEZUG_FEHLT"}) String code,
+            @Schema(required = true, description = "Warntyp oder Code einer konfigurierten Dokumentregel") String code,
             @Schema(nullable = true, description = "Vorhandenes Dokument; fehlt, wenn es nicht sichtbar ist")
-            UUID vorhandenId) {
+            UUID vorhandenId,
+            @Schema(nullable = true, description = "Meldung der Dokumentregel") String meldung) {
 
         static WarnungDto aus(Warnung w) {
-            return new WarnungDto(w.code(), w.vorhandenId());
+            return new WarnungDto(w.code(), w.vorhandenId(), w.meldung());
         }
     }
 

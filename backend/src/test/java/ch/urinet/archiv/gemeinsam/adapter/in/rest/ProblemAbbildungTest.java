@@ -1,6 +1,7 @@
 package ch.urinet.archiv.gemeinsam.adapter.in.rest;
 
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.RegelVerletzt;
 import jakarta.persistence.PersistenceException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,18 @@ class ProblemAbbildungTest {
     void fremderSqlStateBleibtEinInternerFehler() {
         pruefen(new SQLException("synthetischer Constraint-Fehler", "23505"),
                 500, Fehlercode.INTERNER_FEHLER);
+    }
+
+    @Test
+    void regelverletzungEnthaeltNurDieRegelcodesUndMeldungen() {
+        var fehler = new RegelVerletzt(java.util.List.of(
+                new RegelVerletzt.Befund("datum_pflicht", "Belegdatum fehlt.")));
+        try (Response antwort = abbildung.fachFehler(fehler)) {
+            assertThat(antwort.getStatus()).isEqualTo(422);
+            assertThat(antwort.getEntity()).asString()
+                    .contains("\"fehlercode\":\"REGEL_VERLETZT\"")
+                    .contains("\"regeln\":[{\"code\":\"datum_pflicht\",\"meldung\":\"Belegdatum fehlt.\"}]");
+        }
     }
 
     @Test
