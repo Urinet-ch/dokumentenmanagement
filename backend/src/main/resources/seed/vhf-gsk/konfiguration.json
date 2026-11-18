@@ -1,0 +1,559 @@
+{
+  "format": 1,
+  "einstellungen": {
+    "geschaeftsjahrEnde": "12-31",
+    "kennungen": {
+      "uid": null,
+      "ibans": []
+    }
+  },
+  "kiTexte": {
+    "rolle": "",
+    "feldregeln": "",
+    "kiFreigegeben": false
+  },
+  "klassifikationen": [],
+  "arten": [
+    {
+      "code": "BULLETIN",
+      "name": "Bulletin",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "reihe": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ausgabe": {
+            "type": "string",
+            "minLength": 1
+          },
+          "jahr": {
+            "type": "integer"
+          },
+          "fachgebiet": {
+            "type": "string",
+            "enum": [
+              "Bad",
+              "Eis",
+              "Technik",
+              "Recht",
+              "Allgemein"
+            ]
+          },
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "reihe",
+          "ausgabe",
+          "jahr",
+          "fachgebiet",
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Bulletin des Verbands mit Angaben zu Reihe, Ausgabe, Jahr und Fachgebiet."
+    },
+    {
+      "code": "NORM_RICHTLINIE",
+      "name": "Norm oder Richtlinie",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Normen und Richtlinien des Verbands."
+    },
+    {
+      "code": "VORSTANDSPROTOKOLL",
+      "name": "Vorstandsprotokoll",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "INTERN",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "vorstand"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Protokoll einer Sitzung des Vorstands."
+    },
+    {
+      "code": "JAHRESBERICHT",
+      "name": "Jahresbericht",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "jahr": {
+            "type": "integer"
+          },
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "jahr",
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Jahresbericht des Verbands."
+    },
+    {
+      "code": "MERKBLATT",
+      "name": "Merkblatt",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Merkblatt für Mitglieder oder die Öffentlichkeit."
+    },
+    {
+      "code": "FORMULAR",
+      "name": "Formular",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Formular des Verbands."
+    },
+    {
+      "code": "SONSTIGES",
+      "name": "Sonstiges",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": true,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Sonstige Dokumente des Verbands."
+    },
+    {
+      "code": "WISSENSQUELLE",
+      "name": "Wissensquelle",
+      "gruppen": [
+        "frei"
+      ],
+      "pflichtfelder": [
+        "titel",
+        "datum"
+      ],
+      "vertraulichkeit": "NORMAL",
+      "aufbewahrung": {
+        "jahre": null,
+        "ab": null
+      },
+      "gesetzlichePflicht": false,
+      "aktiv": true,
+      "selbstAusgestellt": false,
+      "belegnummerMuster": [],
+      "kiVorschlag": false,
+      "kiFelder": [],
+      "reihenfolge": 0,
+      "zusatzSchema": {
+        "type": "object",
+        "properties": {
+          "herausgeber": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verband": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vhf",
+                "gsk"
+              ]
+            },
+            "x-labels": {
+              "vhf": "VHF",
+              "gsk": "GSK"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "zugriff": {
+            "type": "string",
+            "enum": [
+              "oeffentlich",
+              "mitglieder",
+              "vorstand"
+            ],
+            "default": "mitglieder"
+          },
+          "veroeffentlicht": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "verband",
+          "zugriff",
+          "veroeffentlicht"
+        ],
+        "additionalProperties": false
+      },
+      "beschreibung": "Fachunterlage, deren Inhalt als Quelle für die Wissensbasis dient."
+    }
+  ],
+  "regeln": [],
+  "_quelle": "Spec 03, Aufgabe 10.2. Werte für Vertraulichkeit und gesetzliche Pflicht vorsichtig ausgelegt.",
+  "_hinweise": "{\"verband\":{\"mehrfach\":true,\"suchfilter\":true,\"oeffentlich_filter\":true,\"ki_vorschlag\":false},\"zugriff\":{\"standard\":\"mitglieder\",\"nur_manuell\":true},\"veroeffentlicht\":{\"standard\":false,\"ki_vorschlag\":false}}"
+}

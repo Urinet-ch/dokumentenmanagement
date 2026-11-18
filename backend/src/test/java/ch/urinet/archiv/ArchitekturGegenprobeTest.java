@@ -101,7 +101,7 @@ class ArchitekturGegenprobeTest {
                      ch.urinet.archiv.mandant.application.SeedPruefung seed) {
             pruefer.seedSchemaPruefen("{}");
             pruefung.seedPruefen(null);
-            seed.pruefen(null, null);
+            seed.pruefen(null, (ch.urinet.archiv.konfiguration.domain.Konfiguration) null);
         }
     }
 

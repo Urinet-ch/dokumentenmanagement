@@ -196,9 +196,10 @@ class NurSpecTest {
 
     /** Hilfsklassen, die Specs lesen: Nutzer ohne Eintrag in SPEC_TESTS nur mit Grund. */
     private static final java.util.Map<String, String> NUTZER_AUSSERHALB = java.util.Map.of(
-            // Cucumber-Schritt «Seed = Tabelle in design.md» über die Datenbank; das JUnit-Gegenstück DokumentartSeedTest
-            // prüft Seed gegen Tabelle ohne Start
+            // Cucumber-Schritt und KonfigurationSeedTest nutzen die Tabelle; der alte Name bleibt als CI-Kompatibilität
+            // in SPEC_TESTS und erbt die Prüfungen aus KonfigurationSeedTest.
             "DokumentartSchritte", "DokumentartSeedTest",
+            "KonfigurationSeedTest", "DokumentartSeedTest",
             // Cucumber-Schritt «Abdeckung @req»; ReqAbdeckungTest.repositoryIstAbgedeckt prüft dasselbe ohne Start
             "GemeinsamSchritte", "ReqAbdeckungTest");
 

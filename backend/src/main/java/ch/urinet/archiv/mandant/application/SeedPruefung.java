@@ -7,6 +7,8 @@ import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration.Art;
 import ch.urinet.archiv.mandant.domain.DokumentartVorlage;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,6 +30,21 @@ public class SeedPruefung {
         this.pruefung = pruefung;
     }
 
+    public void pruefen(MandantCode mandant, Konfiguration konfiguration) {
+        if (!konfiguration.pruefen().isEmpty()) {
+            throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG,
+                    "Konfigurationsseed für Mandant " + mandant.wert() + " ist ungültig");
+        }
+        for (Art art : konfiguration.arten()) {
+            try {
+                pruefung.seedPruefen(art(art));
+            } catch (FachFehler e) {
+                throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG, "Seed für Mandant " + mandant.wert()
+                        + ": Dokumentart " + art.code() + " ist ungültig (" + e.code().name() + ")", e);
+            }
+        }
+    }
+
     public void pruefen(MandantCode mandant, List<DokumentartVorlage> vorlagen) {
         for (DokumentartVorlage vorlage : vorlagen) {
             if (!wissensquelleFest(vorlage)) {
@@ -41,6 +58,16 @@ public class SeedPruefung {
                         + ": Dokumentart " + vorlage.code() + " ist ungültig (" + e.code().name() + ")", e);
             }
         }
+    }
+
+    private static Dokumentart art(Art v) {
+        AufbewahrungAb ab = v.aufbewahrung().ab() == null ? null
+                : AufbewahrungAb.aus(v.aufbewahrung().ab()).orElseThrow(SeedPruefung::ungueltig);
+        return new Dokumentart(v.code(), v.name(), v.beschreibung(), v.gruppen(), v.pflichtfelder(),
+                v.zusatzSchema(), Vertraulichkeit.aus(v.vertraulichkeit()).orElseThrow(SeedPruefung::ungueltig),
+                new Aufbewahrungsregel(v.aufbewahrung().jahre(), ab, v.aufbewahrung().feld()),
+                v.gesetzlichePflicht(), v.aktiv(), v.selbstAusgestellt(), v.belegnummerMuster(), v.fremdbelegArt(),
+                v.ohneZahlungsdatenArt(), v.kiVorschlag(), v.kiFelder(), v.kiHinweise(), v.reihenfolge());
     }
 
     /**
