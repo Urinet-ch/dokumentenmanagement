@@ -16,6 +16,7 @@ import ch.urinet.archiv.gemeinsam.domain.PflichtfelderFehlen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.verarbeitung.application.AuftragService;
@@ -70,11 +71,12 @@ public class DokumentGenerator {
     private final MandantEinstellungen einstellungen;
     private final AuftragService auftraege;
     private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentGenerator(DokumentErfassen erfassen, DokumentRepository repository, DokumentStatusPort status,
                              DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                              MandantEinstellungen einstellungen, AuftragService auftraege,
-                             KlassifikationVerwaltung klassifikationen) {
+                             KlassifikationVerwaltung klassifikationen, RegelPruefung regelPruefung) {
         this.erfassen = erfassen;
         this.repository = repository;
         this.status = status;
@@ -84,6 +86,7 @@ public class DokumentGenerator {
         this.einstellungen = einstellungen;
         this.auftraege = auftraege;
         this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /**
@@ -100,7 +103,11 @@ public class DokumentGenerator {
     }
 
     /** @param neu {@code false} bei einer Dublette (200 statt 202, Req 11.8) */
-    public record Ergebnis(UUID id, DokumentStatus status, boolean neu) {
+    public record Ergebnis(UUID id, DokumentStatus status, boolean neu,
+                           List<RegelPruefung.Warnung> warnungen) {
+        public Ergebnis {
+            warnungen = List.copyOf(warnungen);
+        }
     }
 
     /**
@@ -151,8 +158,10 @@ public class DokumentGenerator {
             DokumentStatus stand = status.stand(vorhanden.get(), false).map(DokumentStatusPort.Stand::status)
                     .orElseThrow(() -> new IllegalStateException("Dublette ohne Dokument: " + vorhanden.get()));
             LOG.infof("Generator: Dublette sha256=%s vorhanden=%s", pdf.sha256(), vorhanden.get());
-            return new Ergebnis(vorhanden.get(), stand, false);
+            return new Ergebnis(vorhanden.get(), stand, false, List.of());
         }
+        List<RegelPruefung.Warnung> warnungen = regelPruefung.pruefen(art.code(),
+                RegelMetadaten.aus(mitPartner, regelPruefung.zusatzWerte(anfrage.zusatzJson())), null, null);
 
         MandantEinstellungen.Werte mandant = einstellungen.lesen(aufloesung.pruefen());
         boolean finanz = art.gruppen().contains("finanz");
@@ -196,7 +205,7 @@ public class DokumentGenerator {
         auftraege.einreihen(DokumentErfassen.VERARBEITEN,
                 new Nutzlast(Map.of(DokumentErfassen.NUTZLAST_DOKUMENT, id, OHNE_KI, true)));
         LOG.infof("Generator: angenommen dokument=%s art=%s", id, art.code());
-        return new Ergebnis(id, DokumentStatus.NEU, true);
+        return new Ergebnis(id, DokumentStatus.NEU, true, warnungen);
     }
 
     private static Bestaetigung mitPartner(Bestaetigung b, UUID partnerId) {

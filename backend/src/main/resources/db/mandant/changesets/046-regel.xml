@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="046-regel" author="copilot">
+        <createTable tableName="regel">
+            <column name="code" type="varchar(40)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="art" type="varchar(40)"/>
+            <column name="typ" type="varchar(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="parameter" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+            <column name="schwere" type="varchar(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="meldung" type="varchar(300)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="aktiv" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="regel" baseColumnNames="art"
+                                 referencedTableName="dokumentart" referencedColumnNames="code"
+                                 constraintName="fk_regel_art" onDelete="CASCADE"/>
+        <sql>
+            alter table regel add constraint regel_typ_ck
+                check (typ in ('PFLICHT_WENN', 'EINDEUTIG', 'FOLGE', 'ERWARTET'));
+            alter table regel add constraint regel_parameter_ck
+                check (jsonb_typeof(parameter) = 'object');
+            alter table regel add constraint regel_schwere_ck
+                check (schwere in ('FEHLER', 'WARNUNG'));
+            alter table regel add constraint regel_code_ck
+                check (code ~ '^[a-z][a-z0-9_]{0,39}$');
+        </sql>
+        <sql>
+            update dokumentart
+            set belegnummer_muster = array['^(?&lt;jahr&gt;\d{4})-(?&lt;nr&gt;\d{3})$', '^R(?&lt;nr&gt;\d{4})$']::text[]
+            where current_schema() = 'm_urinet'
+                and code = 'AUSGANGSRECHNUNG'
+                and belegnummer_muster = array['^\d{4}-\d{3}$', '^R\d{4}$']::text[];
+        </sql>
+        <sql>
+            insert into regel (code, art, typ, parameter, schwere, meldung, aktiv)
+            select seed.code, art.code, seed.typ, seed.parameter, 'WARNUNG', seed.meldung, true
+            from (values
+                ('ausgangsrechnung_folge', 'AUSGANGSRECHNUNG', 'FOLGE',
+                    '{"muster":true,"zeitraum":"GESCHAEFTSJAHR","beginn":1}'::jsonb,
+                    'Die Ausgangsrechnungsnummernfolge weist eine Lücke auf.'),
+                ('lohnabrechnung_erwartet', 'LOHNABRECHNUNG', 'ERWARTET',
+                    '{"je":"MONAT","datum":"BELEGDATUM","nurMonat":"zusatz.periode"}'::jsonb,
+                    'Für einen Monat fehlt eine bestätigte Lohnabrechnung.'),
+                ('bankbeleg_erwartet', 'BANK', 'ERWARTET',
+                    '{"je":"MONAT","datum":"zusatz.periode_bis"}'::jsonb,
+                    'Für einen Monat fehlt ein bestätigter Bankbeleg.')
+            ) as seed(code, art, typ, parameter, meldung)
+            join dokumentart art on art.code = seed.art
+            where current_schema() = 'm_urinet'
+            on conflict (code) do nothing;
+        </sql>
+        <sql>
+            with aktuelle as (
+                select inhalt from konfiguration_version order by version desc limit 1
+            ),
+            arten as (
+                select jsonb_agg(
+                    case
+                        when art.wert ->> 'code' = 'AUSGANGSRECHNUNG'
+                            and art.wert -> 'belegnummerMuster' =
+                                to_jsonb(array['^\d{4}-\d{3}$', '^R\d{4}$']::text[])
+                        then jsonb_set(art.wert, '{belegnummerMuster}',
+                            to_jsonb(array[
+                                '^(?&lt;jahr&gt;\d{4})-(?&lt;nr&gt;\d{3})$', '^R(?&lt;nr&gt;\d{4})$'
+                            ]::text[]))
+                        else art.wert
+                    end order by art.position) as wert
+                from aktuelle a
+                cross join lateral jsonb_array_elements(a.inhalt -> 'arten')
+                    with ordinality as art(wert, position)
+            ),
+            parameter as (
+                select coalesce(jsonb_agg(jsonb_build_object(
+                    'code', code, 'art', art, 'typ', typ, 'parameter', parameter,
+                    'schwere', schwere, 'meldung', meldung, 'aktiv', aktiv)
+                    order by code collate "C"), '[]'::jsonb) as regeln
+                from regel
+            ),
+            naechste as (
+                select coalesce(max(version), 0) + 1 as version from konfiguration_version
+            ),
+            abbild as (
+                select n.version, jsonb_set(
+                    a.inhalt || jsonb_build_object('version', n.version, 'regeln', p.regeln),
+                    '{arten}', coalesce(arten.wert, a.inhalt -> 'arten')) as inhalt
+                from aktuelle a, arten, parameter p, naechste n
+            )
+            insert into konfiguration_version (version, wer, grund, quelle, inhalt, sha256)
+            select version, 'system:migration', null, 'MIGRATION', inhalt,
+                encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+            from abbild
+            where (select regeln from parameter) &lt;&gt; '[]'::jsonb
+                and (inhalt - 'version') is distinct from (
+                    select inhalt - 'version' from konfiguration_version order by version desc limit 1);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

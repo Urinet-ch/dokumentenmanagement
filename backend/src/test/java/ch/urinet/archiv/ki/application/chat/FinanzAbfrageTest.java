@@ -69,6 +69,12 @@ class FinanzAbfrageTest {
         }
 
         @Override
+        public List<String> folgewerte(Folgequelle quelle, ch.urinet.archiv.sicherheit.domain.Sichtregel regel,
+                                       int hoechstens) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<Monatszeile> monate(Monatsquelle quelle, ch.urinet.archiv.sicherheit.domain.Sichtregel regel) {
             throw new UnsupportedOperationException();
         }

@@ -3,6 +3,7 @@ package ch.urinet.archiv.dokument.application;
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -39,11 +40,14 @@ public class DokumentLesen {
     private final AblagePort ablage;
     private final BigDecimal schwelle;
     private final DokumentartVerwaltung arten;
+    private final DokumentKlassifikationenPort klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentLesen(DokumentRepository repository, DokumentStatusPort status, MandantAufloesung aufloesung,
                          MandantEinstellungen einstellungen, AblagePort ablage,
                          @ConfigProperty(name = "archiv.ki.schwelle") BigDecimal schwelle,
-                         DokumentartVerwaltung arten) {
+                         DokumentartVerwaltung arten, DokumentKlassifikationenPort klassifikationen,
+                         RegelPruefung regelPruefung) {
         this.repository = repository;
         this.status = status;
         this.aufloesung = aufloesung;
@@ -51,6 +55,8 @@ public class DokumentLesen {
         this.ablage = ablage;
         this.schwelle = schwelle;
         this.arten = arten;
+        this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /** Sicherheit, unter der ein Feld des KI-Vorschlags «bitte prüfen» zeigt (Req 7.6). */
@@ -125,6 +131,10 @@ public class DokumentLesen {
             if (regel.ab() == AufbewahrungAb.FELD && fristfeldLeer(dokument, regel.feld())) {
                 warnungen.add(new Warnung(Warnung.FRISTBEZUG_FEHLT, null));
             }
+            var werte = RegelMetadaten.aus(dokument, klassifikationen.laden(dokument.id()),
+                    regelPruefung.zusatzWerte(dokument.zusatz()));
+            regelPruefung.pruefen(dokument.art(), werte, werte, dokument.id()).forEach(w ->
+                    warnungen.add(new Warnung(w.code(), null, w.meldung())));
         }
         if (!DokumentStatus.EINGANGSKORB_STATUS.contains(dokument.status()) || dokument.art() == null
                 || einstellungen.lesen(aufloesung.pruefen()).eigeneArten().contains(dokument.art())) {

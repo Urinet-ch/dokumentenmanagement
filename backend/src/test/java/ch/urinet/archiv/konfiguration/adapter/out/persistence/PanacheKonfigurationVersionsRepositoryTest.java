@@ -47,4 +47,25 @@ class PanacheKonfigurationVersionsRepositoryTest {
         assertThat(repository.kanonisch(jsonb)).isEqualTo(repository.kanonisch(client))
                 .isEqualTo(repository.kanonisch(umsortiert));
     }
+
+    @Test
+    void liestRegelnAusEinemVersionsabbild() throws Exception {
+        String abbild = """
+                {"version":2,
+                 "einstellungen":{"geschaeftsjahrEnde":"12-31","kennungen":{"uid":null,"ibans":[]}},
+                 "arten":[],"klassifikationen":[],
+                 "regeln":[{"code":"monat_erwartet","art":"BANK","typ":"ERWARTET",
+                   "parameter":{"je":"MONAT","datum":"BELEGDATUM"},
+                   "schwere":"WARNUNG","meldung":"Bankbeleg fehlt.","aktiv":true}]}
+                """;
+
+        Konfiguration gelesen = repository.lesen(abbild);
+
+        assertThat(gelesen.regeln()).singleElement().satisfies(regel -> {
+            assertThat(regel.code()).isEqualTo("monat_erwartet");
+            assertThat(regel.typisierteParameter())
+                    .isEqualTo(new ch.urinet.archiv.konfiguration.domain.Regel.Erwartet(
+                            "MONAT", "BELEGDATUM", null, null));
+        });
+    }
 }

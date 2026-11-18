@@ -5,6 +5,7 @@ import io.quarkiverse.cucumber.CucumberOptions;
 import io.quarkiverse.cucumber.CucumberQuarkusTest;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Tag;
 
 /**
  * Java-Runner für die Backend-Szenarien unter {@code features/<fachbereich>/} (tech.md, Tests und Qualität).
@@ -13,6 +14,7 @@ import io.quarkus.test.junit.QuarkusTest;
  */
 @QuarkusTest
 @QuarkusTestResource(TsaTestRessource.class)
+@Tag("start-1")
 @CucumberOptions(features = "classpath:features", glue = "ch.urinet.archiv",
         tags = "not @browser and not @sicherung and not @mandant-bericht")
 public class SzenarienTest extends CucumberQuarkusTest {

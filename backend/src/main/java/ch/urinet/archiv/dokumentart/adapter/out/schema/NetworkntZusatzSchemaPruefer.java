@@ -259,6 +259,42 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
+    public Map<String, String> feldTypen(String schemaJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
+            try {
+                geprueft(schemaJson);
+                JsonNode schema = StrengesJson.lesen(schemaJson);
+                JsonNode properties = schema.path("properties");
+                Map<String, String> typen = new LinkedHashMap<>();
+                properties.fields().forEachRemaining(eintrag -> {
+                    JsonNode definition = definition(schema, eintrag.getValue());
+                    String typ = definition.path("type").asText();
+                    if ("string".equals(typ) && "date".equals(definition.path("format").asText())) {
+                        typ = "date";
+                    }
+                    typen.put(eintrag.getKey(), typ);
+                });
+                return Collections.unmodifiableMap(typen);
+            } catch (JsonProcessingException e) {
+                throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            }
+        });
+    }
+
+    private static JsonNode definition(JsonNode schema, JsonNode definition) {
+        Set<String> gesehen = new LinkedHashSet<>();
+        JsonNode aktuelle = definition;
+        while (aktuelle.isObject() && aktuelle.path("$ref").isTextual()) {
+            String verweis = aktuelle.path("$ref").textValue();
+            if (!verweis.startsWith("#/") || !gesehen.add(verweis)) {
+                return aktuelle;
+            }
+            aktuelle = schema.at(JsonPointer.compile(verweis.substring(1)));
+        }
+        return aktuelle;
+    }
+
+    @Override
     public Set<String> seedSchemaPruefen(String schemaJson) {
         return mitFrist(seedZeitgrenzeNanos, () -> geprueft(schemaJson).felder());
     }
@@ -269,6 +305,50 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             werteGegen(schemaJson, werteJson);
             return null;
         });
+    }
+
+    @Override
+    public Map<String, Object> werteLesen(String werteJson) {
+        if (werteJson == null || werteJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            JsonNode werte = StrengesJson.lesenGenau(werteJson);
+            if (werte == null) {
+                return Map.of();
+            }
+            if (!werte.isObject()) {
+                throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+            }
+            Map<String, Object> ergebnis = new LinkedHashMap<>();
+            werte.fields().forEachRemaining(eintrag -> ergebnis.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(ergebnis);
+        } catch (JsonProcessingException e) {
+            throw new FachFehler(Fehlercode.ZUSATZ_UNGUELTIG);
+        }
+    }
+
+    private static Object javaWert(JsonNode wert) {
+        if (wert.isNull()) {
+            return null;
+        }
+        if (wert.isObject()) {
+            Map<String, Object> objekt = new LinkedHashMap<>();
+            wert.fields().forEachRemaining(eintrag -> objekt.put(eintrag.getKey(), javaWert(eintrag.getValue())));
+            return Collections.unmodifiableMap(objekt);
+        }
+        if (wert.isArray()) {
+            List<Object> liste = new ArrayList<>();
+            wert.forEach(element -> liste.add(javaWert(element)));
+            return Collections.unmodifiableList(liste);
+        }
+        if (wert.isNumber()) {
+            return wert.numberValue();
+        }
+        if (wert.isBoolean()) {
+            return wert.booleanValue();
+        }
+        return wert.textValue();
     }
 
     @Override

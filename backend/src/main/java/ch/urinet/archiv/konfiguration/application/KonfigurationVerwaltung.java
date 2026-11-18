@@ -1,6 +1,7 @@
 package ch.urinet.archiv.konfiguration.application;
 
 import ch.urinet.archiv.dokumentart.application.DokumentartRepository;
+import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration.Kennungen;
 import ch.urinet.archiv.konfiguration.domain.KonfigurationQuelle;
@@ -20,25 +21,30 @@ import java.util.Optional;
 
 @ApplicationScoped
 @Transactional
-public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
+public class KonfigurationVerwaltung implements KonfigurationVersionsPort, KonfigurationLesen {
 
     private final KonfigurationVersionsRepository repository;
     private final KonfigurationCache cache;
     private final DokumentartRepository dokumentarten;
+    private final ZusatzSchemaPruefer zusatzSchema;
     private final KlassifikationRepository klassifikationen;
+    private final RegelRepository regeln;
     private final MandantEinstellungen einstellungen;
     private final MandantAufloesung aufloesung;
     private final MandantKontext kontext;
     private final KonfigurationAenderungsProtokoll protokoll;
 
     public KonfigurationVerwaltung(KonfigurationVersionsRepository repository, KonfigurationCache cache,
-                                   DokumentartRepository dokumentarten, KlassifikationRepository klassifikationen,
+                                   DokumentartRepository dokumentarten, ZusatzSchemaPruefer zusatzSchema,
+                                   KlassifikationRepository klassifikationen, RegelRepository regeln,
                                    MandantEinstellungen einstellungen, MandantAufloesung aufloesung,
                                    MandantKontext kontext, KonfigurationAenderungsProtokoll protokoll) {
         this.repository = repository;
         this.cache = cache;
         this.dokumentarten = dokumentarten;
+        this.zusatzSchema = zusatzSchema;
         this.klassifikationen = klassifikationen;
+        this.regeln = regeln;
         this.einstellungen = einstellungen;
         this.aufloesung = aufloesung;
         this.kontext = kontext;
@@ -50,6 +56,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
         return basisSicherstellen().version();
     }
 
+    @Override
     public Konfiguration aktuell() {
         MandantCode mandant = mandantAktuell();
         KonfigurationsVersion stand = basisSicherstellen();
@@ -118,7 +125,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
         MandantEinstellungen.Werte werte = einstellungen.lesen(mandantAktuell());
         return new Konfiguration(version, new Konfiguration.Einstellungen(werte.geschaeftsjahresende().wert(),
                 new Kennungen(werte.uid().isBlank() ? null : werte.uid(), werte.ibans())), dokumentarten.alle().stream()
-                .map(this::art).toList(), klassifikationen.alle());
+                .map(this::art).toList(), klassifikationen.alle(), regeln.alle());
     }
 
     private Konfiguration.Art art(Dokumentart art) {
@@ -129,7 +136,8 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort {
                         art.aufbewahrung().feld()),
                 art.gesetzlichePflicht(), art.aktiv(), art.selbstAusgestellt(), art.belegnummerMuster(),
                 art.fremdbelegArt(), art.ohneZahlungsdatenArt(), art.kiVorschlag(), art.kiFelder(),
-                art.kiHinweise(), art.reihenfolge(), klassifikationen.zuordnungen(art.code()));
+                art.kiHinweise(), art.reihenfolge(), klassifikationen.zuordnungen(art.code()),
+                zusatzSchema.feldTypen(art.zusatzSchema()));
     }
 
     private MandantCode mandantAktuell() {

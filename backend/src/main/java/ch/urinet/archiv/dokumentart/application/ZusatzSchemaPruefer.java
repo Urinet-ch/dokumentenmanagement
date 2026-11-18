@@ -1,6 +1,7 @@
 package ch.urinet.archiv.dokumentart.application;
 
 import java.util.Set;
+import java.util.Map;
 import java.time.LocalDate;
 
 /**
@@ -13,6 +14,9 @@ public interface ZusatzSchemaPruefer {
     /** Prüft das Schema und liefert die Namen der Zusatzfelder ({@code properties} der obersten Ebene). */
     Set<String> schemaPruefen(String schemaJson);
 
+    /** JSON-Typen der direkten Schemafelder; {@code format: date} wird als {@code date} ausgewiesen. */
+    Map<String, String> feldTypen(String schemaJson);
+
     /**
      * Wie {@link #schemaPruefen}, aber für den Seed eines Mandanten (Admin-Kommando, Quelle im Repo) mit der eigenen,
      * grösseren Frist {@code archiv.dokumentart.seed-zeitgrenze}.
@@ -21,6 +25,9 @@ public interface ZusatzSchemaPruefer {
 
     /** Prüft Zusatzwerte (JSON-Objekt) gegen ein gültiges Schema. */
     void wertePruefen(String schemaJson, String werteJson);
+
+    /** Liest ein bereits geprüftes Zusatzobjekt als unveränderliche Werte für deklarative Regeln. */
+    Map<String, Object> werteLesen(String werteJson);
 
     /** Prüft die festen Definitionen der reservierten Felder, sofern sie im Schema vorkommen. */
     boolean reservierteFelderGueltig(String schemaJson);

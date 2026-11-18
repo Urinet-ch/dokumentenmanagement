@@ -57,6 +57,8 @@ public enum Fehlercode {
             "Die Konfiguration ist ungültig. Bitte prüfen Sie die angegebenen Werte."),
     KLASSIFIKATION_UNGUELTIG(422, "Klassifikation ungültig",
             "Die Klassifikationen passen nicht zur Dokumentart. Bitte prüfen Sie die Werte."),
+    REGEL_VERLETZT(422, "Dokumentregel verletzt",
+            "Die Angaben verletzen eine Dokumentregel. Bitte prüfen Sie die genannten Regeln."),
     CSV_UNGUELTIG(422, "CSV-Datei ungültig",
             "Die CSV-Datei hat nicht das erwartete Format (UTF-8 oder Windows-1252, Semikolon oder Komma), mehr als "
                     + "10'000 Datenzeilen, mehr als 1'000 Spalten, einen zu langen Spaltennamen oder keine Spalte "

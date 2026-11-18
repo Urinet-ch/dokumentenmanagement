@@ -34,6 +34,8 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
     private static final String DATUM = "'^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}$'";
     private static final String MONAT = "'^[0-9]{4}-(0[1-9]|1[0-2])$'";
     private static final String BESTAETIGT = "d.status = 'ARCHIVIERT' and d.bestaetigt is not null";
+    private static final String REGEL_BESTAETIGT = "d.status in ('ARCHIVIERUNG','ARCHIVIERUNG_FEHLER','ARCHIVIERT') "
+            + "and d.bestaetigt is not null";
     private static final String ZUSATZ = "zusatz.";
     private static final java.util.regex.Pattern FELD = java.util.regex.Pattern.compile("^[a-z][a-z0-9_]{0,62}$");
 
@@ -88,6 +90,58 @@ public class PanacheWerkzeugDaten implements WerkzeugDaten {
         sicht.parameter().forEach(abfrage::setParameter);
         @SuppressWarnings("unchecked")
         List<String> zeilen = abfrage.setParameter("art", art).setParameter("gj", geschaeftsjahr).getResultList();
+        return zeilen;
+    }
+
+    @Override
+    public List<String> folgewerte(Folgequelle quelle, Sichtregel regel, int hoechstens) {
+        if (hoechstens < 1) {
+            throw new IllegalArgumentException("Folgenlimit ungültig");
+        }
+        VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
+        Map<String, Object> parameter = new HashMap<>(sicht.parameter());
+        parameter.put("art", quelle.art());
+        String wert;
+        if (quelle.muster()) {
+            wert = "f.belegnummer";
+        } else if ("geschaeftsjahr".equals(quelle.feld())) {
+            wert = "cast(d.geschaeftsjahr as text)";
+        } else if (quelle.feld() != null && quelle.feld().startsWith(ZUSATZ)) {
+            wert = "d.zusatz ->> :feld";
+            parameter.put("feld", feld(quelle.feld()));
+        } else {
+            throw new IllegalArgumentException("Folgenfeld ungültig");
+        }
+        String joins = quelle.muster() ? " join dokument_finanz f on f.dokument_id = d.id" : "";
+        String bedingung = REGEL_BESTAETIGT + " and d.art = :art and " + sicht.bedingung();
+        if (quelle.zeitraum().equals("GESCHAEFTSJAHR")) {
+            bedingung += " and d.geschaeftsjahr = :periode";
+            parameter.put("periode", quelle.periode());
+        } else if (quelle.zeitraum().equals("FELD")) {
+            String zeitraum;
+            if ("geschaeftsjahr".equals(quelle.zeitraumFeld())) {
+                zeitraum = "cast(d.geschaeftsjahr as text)";
+            } else if (quelle.zeitraumFeld() != null && quelle.zeitraumFeld().startsWith(ZUSATZ)) {
+                zeitraum = "d.zusatz ->> :zeitraumFeld";
+                parameter.put("zeitraumFeld", feld(quelle.zeitraumFeld()));
+            } else {
+                throw new IllegalArgumentException("Folgenzeitraum ungültig");
+            }
+            bedingung += " and " + zeitraum + " = :periode";
+            parameter.put("periode", Integer.toString(quelle.periode()));
+        } else if (!quelle.zeitraum().equals("GESAMT")) {
+            throw new IllegalArgumentException("Folgenzeitraum ungültig");
+        }
+        if (!quelle.muster()) {
+            bedingung += " and " + wert + " ~ '^[0-9]+$'";
+        } else {
+            bedingung += " and " + wert + " is not null and btrim(" + wert + ") <> ''";
+        }
+        Query abfrage = em().createNativeQuery("select " + wert + " from dokument d" + joins + " where " + bedingung);
+        parameter.forEach(abfrage::setParameter);
+        abfrage.setMaxResults(hoechstens);
+        @SuppressWarnings("unchecked")
+        List<String> zeilen = abfrage.getResultList();
         return zeilen;
     }
 

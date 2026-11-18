@@ -49,6 +49,12 @@ public interface WerkzeugDaten {
      */
     List<String> belegnummern(String art, int geschaeftsjahr, Sichtregel regel);
 
+    /** Werte einer Folgenregel aus bestätigten Dokumenten, gefiltert nach Art, Feld und Zeitraum. */
+    List<String> folgewerte(Folgequelle quelle, Sichtregel regel, int hoechstens);
+
+    record Folgequelle(String art, String feld, boolean muster, String zeitraum, String zeitraumFeld, int periode) {
+    }
+
     /**
      * Wie ein Dokument einer Monatsreihe zugeordnet wird: {@code bezug} ist {@code BELEGDATUM} oder
      * {@code zusatz.<feld>} (Datum {@code JJJJ-MM-TT}); {@code gruppe} ist {@code null} (keine Gruppierung),

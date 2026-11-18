@@ -216,14 +216,22 @@ Beispiel (nur das Format; die Werte für `vhf-gsk` legt Spec 03 fest):
 | `PFLICHT_WENN` | `wenn: {feld, gleich}`, `dann: [feld…]` | Hat `wenn.feld` den Wert `gleich` (bei Klassifikationen: enthält), müssen alle `dann`-Felder gesetzt sein | Bestätigen, Generator, Import, Änderung |
 | `EINDEUTIG` | `felder: [feld…]`, optional `ueberAlleArten` | Kein zweites bestätigtes Dokument mit gleichen Werten in allen Feldern (Req 5.1) | wie oben |
 | `FOLGE` | `feld` (ganzzahlig) oder `muster: true` (Gruppe `nr` des Belegnummer-Musters), `zeitraum`: `GESCHAEFTSJAHR`, `{feld}` (ganzzahliges Jahresfeld) oder `GESAMT`, `beginn` (Standard 1) | Fehlende Nummern zwischen `beginn` und dem Höchstwert je Zeitraum | Lückenbericht |
-| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art) | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art | Lückenbericht |
+| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art), `nurMonat`: `zusatz.<feld>` im Format `JJJJ-MM` | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art | Lückenbericht |
 
 Grundmenge von `FOLGE` und `ERWARTET` sind die bestätigten Dokumente; der Bericht im Importlauf nach Spec 03, 4.2
 zählt serverseitig zusätzlich die Dokumente dieses Laufs im Eingangskorb.
+Die `FOLGE`-Auswertung verarbeitet insgesamt höchstens 10'000 Belegnummern pro Bericht und prüft je Regel innerhalb
+von `archiv.dokumentart.muster-zeitgrenze`; Belegnummern über 64 Zeichen gelten als ausserhalb des Musters. Bei
+überschrittener Grenze bricht das Werkzeug ab, statt einen unvollständigen Bericht als vollständig auszugeben.
+
+`nurMonat` schliesst Dokumente aus, deren Zusatzfeld nicht dem Format `JJJJ-MM` entspricht. Monatsreihen werden pro
+Dokumentart aggregiert; der Bericht gibt keine Personennamen oder andere Gruppierungswerte zurück. Vollständige Reihen
+erscheinen nicht als Lücken.
 
 Für `urinet` schreibt der Seed die Lücken aus Spec 02 design.md (`vollstaendigkeit`) als Regeln: `FOLGE` mit
 `muster: true` auf `AUSGANGSRECHNUNG` (Muster `^(?<jahr>\d{4})-(?<nr>\d{3})$`, Zeitraum `GESCHAEFTSJAHR`) sowie
-`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`) und `BANK` (`datum: zusatz.periode_bis`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
+`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`, `nurMonat: zusatz.periode`) und `BANK`
+(`datum: zusatz.periode_bis`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
 die Tabelle `belegnummer_eigen` (Spec 01, 8.9), jetzt über `selbst_ausgestellt`.
 
 ## Data Models (neu, `db/mandant`)

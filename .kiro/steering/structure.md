@@ -95,8 +95,8 @@ ArchUnit prüft: `domain` hängt von nichts ab, `application` nur von `domain`, 
 ## Belegnummern (Erkennung und Validierung)
 | Art | Muster | Beispiel |
 | --- | --- | --- |
-| Ausgangsrechnung | `^\d{4}-\d{3}$` | `2026-003` |
-| Altbestand AbaNinja | `^R\d{4}$` | `R0001` |
+| Ausgangsrechnung | `^(?<jahr>\d{4})-(?<nr>\d{3})$` | `2026-003` |
+| Altbestand AbaNinja | `^R(?<nr>\d{4})$` | `R0001` |
 | Offerte | `^O-\d{4}-\d{3}$` | `O-2026-005` |
 | Lieferantenbeleg (AbaNinja) | `^F\d{4}$` | `F0003` |
 

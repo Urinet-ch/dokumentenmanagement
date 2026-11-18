@@ -27,6 +27,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
@@ -138,6 +139,53 @@ public class VollstaendigkeitSchritte {
                 }
                 kontakte.put(mandant + ":" + name, new Kontakt(mandant, name, id));
             }
+        }
+    }
+
+    @Angenommen("im Mandanten «{word}» sind die Seed-Regeln für den Lückenbericht eingerichtet")
+    public void lueckenRegeln(String mandant) throws SQLException {
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
+            befehl.execute("""
+                    insert into %s.regel (code, art, typ, parameter, schwere, meldung, aktiv) values
+                        ('ausgangsrechnung_folge', 'AUSGANGSRECHNUNG', 'FOLGE',
+                            '{"muster":true,"zeitraum":"GESCHAEFTSJAHR","beginn":1}',
+                            'WARNUNG', 'Die Ausgangsrechnungsnummernfolge weist eine Lücke auf.', true),
+                        ('lohnabrechnung_erwartet', 'LOHNABRECHNUNG', 'ERWARTET',
+                            '{"je":"MONAT","datum":"BELEGDATUM","nurMonat":"zusatz.periode"}',
+                            'WARNUNG', 'Für einen Monat fehlt eine bestätigte Lohnabrechnung.', true),
+                        ('bankbeleg_erwartet', 'BANK', 'ERWARTET',
+                            '{"je":"MONAT","datum":"zusatz.periode_bis"}',
+                            'WARNUNG', 'Für einen Monat fehlt ein bestätigter Bankbeleg.', true)
+                    on conflict (code) do nothing
+                    """.formatted(schema));
+            befehl.execute("""
+                    with regeln as (
+                        select coalesce(jsonb_agg(jsonb_build_object(
+                            'code', code, 'art', art, 'typ', typ, 'parameter', parameter,
+                            'schwere', schwere, 'meldung', meldung, 'aktiv', aktiv)
+                            order by code collate "C"), '[]'::jsonb) as inhalt
+                        from %1$s.regel
+                    ),
+                    aktuell as (
+                        select version, inhalt from %1$s.konfiguration_version
+                        order by version desc limit 1
+                    ),
+                    naechste as (
+                        select coalesce(max(version), 0) + 1 as version from %1$s.konfiguration_version
+                    ),
+                    abbild as (
+                        select n.version, a.inhalt || jsonb_build_object(
+                            'version', n.version, 'regeln', r.inhalt) as inhalt
+                        from aktuell a cross join naechste n cross join regeln r
+                    )
+                    insert into %1$s.konfiguration_version (version, wer, quelle, inhalt, sha256)
+                    select version, 'test:seed', 'SEED', inhalt,
+                        encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex')
+                    from abbild
+                    where (inhalt - 'version') is distinct from (
+                        select inhalt - 'version' from aktuell)
+                    """.formatted(schema));
         }
     }
 
@@ -347,6 +395,29 @@ public class VollstaendigkeitSchritte {
         assertThat(fehlend(reihe(art, gruppe))).as(antwortText).isEmpty();
     }
 
+    @Dann("fehlen bei der Art «{word}» die Monate «{}»")
+    public void fehlendeMonateOhneGruppe(String art, String erwartet) {
+        JsonNode reihe = reihe(art, null);
+        assertThat(fehlend(reihe)).as(antwortText).containsExactlyElementsOf(liste(erwartet));
+        assertThat(reihe.path("anzahlFehlend").asInt()).isEqualTo(liste(erwartet).size());
+    }
+
+    @Dann("hat die Art «{word}» keine fehlenden Monate")
+    public void keineFehlendenMonateOhneGruppe(String art) {
+        for (JsonNode kategorie : antwort.path("kategorien")) {
+            if (art.equals(kategorie.path("art").asText())) {
+                assertThat(kategorie.path("reihen")).as(antwortText).isEmpty();
+                return;
+            }
+        }
+        throw new AssertionError("keine Kategorie " + art + " in " + antwortText);
+    }
+
+    @Dann("enthält der Bericht keine Personennamen")
+    public void keinePersonennamen() {
+        assertThat(antwortText).doesNotContain("Anna Weidmatt", "Clara Moosbrugger", "Beat Rinderli");
+    }
+
     @Dann("hat die Art «{word}» keine Reihe für «{}»")
     public void keineReihe(String art, String gruppe) {
         for (JsonNode kategorie : antwort.path("kategorien")) {
@@ -361,6 +432,11 @@ public class VollstaendigkeitSchritte {
     @Dann("beginnt die Reihe der Art «{word}» für «{}» mit dem Monat «{}»")
     public void beginntMit(String art, String gruppe, String monat) {
         assertThat(reihe(art, gruppe).path("ab").asText()).as(antwortText).isEqualTo(monat);
+    }
+
+    @Dann("beginnt die Reihe der Art «{word}» mit dem Monat «{}»")
+    public void beginntMitOhneGruppe(String art, String monat) {
+        assertThat(reihe(art, null).path("ab").asText()).as(antwortText).isEqualTo(monat);
     }
 
     @Dann("nennt die Antwort die ausdrückliche Lücke «Lieferantenbelege ohne Archivdokument: nur mit AbaNinja»")
