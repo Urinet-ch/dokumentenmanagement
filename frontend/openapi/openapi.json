@@ -2960,7 +2960,7 @@
           }
         },
         "security" : [ {
-          "SecurityScheme" : [ "inhaber", "treuhaender", "geschaeftsstelle" ]
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
         } ]
       }
     },

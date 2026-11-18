@@ -1,5 +1,7 @@
 export * from './api-tokens.service';
 import { APITokensService } from './api-tokens.service';
+export * from './berichte.service';
+import { BerichteService } from './berichte.service';
 export * from './branding.service';
 import { BrandingService } from './branding.service';
 export * from './chat.service';
@@ -20,4 +22,4 @@ export * from './protokoll.service';
 import { ProtokollService } from './protokoll.service';
 export * from './wissen-ingest-resource.service';
 import { WissenIngestResourceService } from './wissen-ingest-resource.service';
-export const APIS = [APITokensService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService];
+export const APIS = [APITokensService, BerichteService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService];

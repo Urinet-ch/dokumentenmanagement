@@ -127,7 +127,7 @@ keine Konfiguration kann die Rechtematrix, den öffentlichen Filter oder eine be
 | GET | `/konfiguration/versionen`, `/konfiguration/versionen/{n}` | Liste (Version, Zeit, Wer, Quelle, SHA-256) bzw. Abbild | A11 |
 | POST | `/konfiguration/pruefen`, `/konfiguration/vergleichen` | Datei im Body; Befunde bzw. Diff; ändert nichts | A11 |
 | PUT | `/konfiguration` | Datei einspielen; 200 mit neuer Version und Diff (bzw. ohne Version bei keinem Unterschied); 409 `KONFIGURATION_VERALTET`, 422 | A11 |
-| GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort`; nur Rollen mit uneingeschränkter Sicht (Req 5.4) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
+| GET | `/berichte/luecken?geschaeftsjahr=` | Lückenbericht nach `FOLGE`/`ERWARTET`, Antwortform `VollstaendigkeitAbfrage.Antwort`; nur Rollen mit uneingeschränkter Sicht (Req 5.4); `@RolesAllowed` nennt alle Rollen (`@AlleArchivRollen`), der Endpunkt prüft die Sicht und meldet die Verweigerung (403 `NICHT_ERLAUBT`) ins Zugriffsprotokoll (Spec 01, Req 10.7) | `inhaber`, `treuhaender`, `geschaeftsstelle` |
 | GET | `/mandant/funktionen` | `{finanz: bool}` (Req 8.8) | alle Rollen |
 
 Alle Änderungen einzelner Elemente verlangen `If-Match` mit der Konfigurationsversion (Req 7.6); jede Antwort trägt

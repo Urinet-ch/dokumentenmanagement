@@ -30,8 +30,12 @@ Funktionalität: Regeln je Mandant
     Dann antwortet der Lückenbericht mit Status 200
     Wenn «geschaeftsstelle-vhf-gsk» den Lückenbericht für das Geschäftsjahr «2003» abruft
     Dann antwortet der Lückenbericht mit Status 200
+    Angenommen der Stand des Zugriffsprotokolls von «urinet» ist gemerkt
     Wenn «mitarbeiter-urinet» den Lückenbericht für das Geschäftsjahr «2003» abruft
     Dann antwortet der Lückenbericht mit Status 403 und Fehlercode «NICHT_ERLAUBT»
+    Und das Zugriffsprotokoll von «urinet» hat genau einen neuen Eintrag:
+      | benutzer           | rolle       | aktion     | dokument | ip | grund | fehlercode    |
+      | mitarbeiter-urinet | MITARBEITER | VERWEIGERT |          |    | A3    | NICHT_ERLAUBT |
 
   @req-5.6
   Szenario: Neue und aktivierte Regeln melden bestätigte Verstösse, ohne archivierte Dokumente zu ändern

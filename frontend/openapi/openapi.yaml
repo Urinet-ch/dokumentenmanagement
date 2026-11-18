@@ -2806,6 +2806,7 @@ paths:
       security:
       - SecurityScheme:
         - inhaber
+        - mitarbeiter
         - treuhaender
         - geschaeftsstelle
   /api/v1/branding:
