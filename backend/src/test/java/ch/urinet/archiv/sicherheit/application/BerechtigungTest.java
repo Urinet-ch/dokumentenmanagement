@@ -45,6 +45,63 @@ class BerechtigungTest {
     }
 
     @Test
+    void unsichtbareWissensseiteErgibtVorDemFehlendenRecht404() {
+        assertThatThrownBy(() -> mit(false).wissensseitenAktion(MITARBEITER, Aktion.A17, false))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_GEFUNDEN));
+        assertThat(gemeldet).containsExactly(Verweigerung.Grund.NICHT_GEFUNDEN);
+    }
+
+    @Test
+    void verweigerungsprotokollErhaeltBeiWissensseitenKeineDokumentId() {
+        List<Optional<UUID>> protokollierteIds = new ArrayList<>();
+        Berechtigung berechtigung = new Berechtigung((benutzer, id) -> false,
+                (benutzerId, rolle, aktion, dokumentId, grund) -> protokollierteIds.add(dokumentId));
+
+        assertThatThrownBy(() -> berechtigung.wissensseitenAktion(MITARBEITER, Aktion.A15, false))
+                .isInstanceOf(Verweigerung.class);
+
+        assertThat(protokollierteIds).containsExactly(Optional.empty());
+    }
+
+    @Test
+    void wissensseitenAktionIstAufDieAktionenA15BisA19Begrenzt() {
+        assertThatThrownBy(() -> mit(true).wissensseitenAktion(MITARBEITER, Aktion.A14, true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Keine Wissensbasis-Aktion");
+    }
+
+    @Test
+    void eigeneAnalysevorschlaegeSindFuerA18AufStatusEntscheidUndGrundBegrenzt() {
+        assertThat(mit(true).wissensentwurfLesen(MITARBEITER, Optional.of(MITARBEITER.id())))
+                .isEqualTo(Berechtigung.Wissensentwurfszugriff.NUR_STATUS_ENTSCHEID_GRUND);
+        assertThat(mit(true).wissensentwurfLesen(new Benutzer("inhaber-urinet", Rolle.INHABER), Optional.empty()))
+                .isEqualTo(Berechtigung.Wissensentwurfszugriff.VOLL);
+        assertThat(mit(true).wissensentwurfLesen(GESCHAEFTSSTELLE, Optional.empty()))
+                .isEqualTo(Berechtigung.Wissensentwurfszugriff.VOLL);
+        assertThatThrownBy(() -> mit(true).wissensentwurfLesen(MITARBEITER, Optional.of("anderer")))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
+        assertThatThrownBy(() -> mit(true).wissensentwurfLesen(TREUHAENDER, Optional.of(TREUHAENDER.id())))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
+    }
+
+    @Test
+    void sichtbareWissensseiteOhneRechtErgibt403() {
+        assertThatThrownBy(() -> mit(true).wissensseitenAktion(MITARBEITER, Aktion.A17, true))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
+    }
+
+    @Test
+    void geschaeftsstelleDarfDieWissensbasisNichtVerwalten() {
+        assertThatThrownBy(() -> mit(true).aktion(GESCHAEFTSSTELLE, Aktion.A19))
+                .isInstanceOfSatisfying(Verweigerung.class,
+                        v -> assertThat(v.grund()).isEqualTo(Verweigerung.Grund.NICHT_ERLAUBT));
+    }
+
+    @Test
     void zelle404GiltAuchBeiSichtbaremDokument() {
         assertThatThrownBy(() -> mit(true).dokumentAktion(MITARBEITER, Aktion.A3, DOKUMENT))
                 .isInstanceOfSatisfying(Verweigerung.class,
