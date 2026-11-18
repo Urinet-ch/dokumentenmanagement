@@ -1,6 +1,8 @@
 package ch.urinet.archiv.konfiguration;
 
+import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.mandant.domain.MandantCode;
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
@@ -9,18 +11,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.After;
+import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +44,10 @@ public class KonfigurationsVersionSchritte {
     private static final String KONFIGURATION = "/api/v1/konfiguration";
     private static final String KI_TEXTE = KONFIGURATION + "/ki-texte";
     private final List<String> eigeneArten = new ArrayList<>();
+    private final List<UUID> eigeneDokumente = new ArrayList<>();
+
+    @Inject
+    Instance<AgroalDataSource> datenbank;
 
     private Response antwort;
     private int versionVorher;
@@ -43,6 +57,10 @@ public class KonfigurationsVersionSchritte {
     private String kiRolleVorher;
     private String kiFeldregelnVorher;
     private boolean kiTexteWiederherstellen;
+    private ObjectNode datei;
+    private ObjectNode ausgangsdatei;
+    private boolean dateiWiederherstellen;
+    private final Map<String, Integer> gemerkteVersionen = new java.util.HashMap<>();
 
     @Wenn("«{word}» die Konfigurationsversionen auflistet")
     public void versionenAuflisten(String benutzer) {
@@ -132,6 +150,14 @@ public class KonfigurationsVersionSchritte {
         konfigurationsdatei = antwort.asString();
         konfigurationsEtag = antwort.getHeader("ETag");
         versionVorher = Integer.parseInt(konfigurationsEtag.replace("\"", ""));
+        try {
+            datei = (ObjectNode) JSON.readTree(konfigurationsdatei);
+        } catch (IOException e) {
+            throw new IllegalStateException("Export nicht lesbar", e);
+        }
+        if (ausgangsdatei == null && "inhaber-urinet".equals(benutzer)) {
+            ausgangsdatei = datei.deepCopy();
+        }
     }
 
     @Wenn("«{word}» die exportierte Konfigurationsdatei prüft")
@@ -143,7 +169,7 @@ public class KonfigurationsVersionSchritte {
     @Wenn("«{word}» die exportierte Konfigurationsdatei mit Kommentar einspielt")
     public void exportierteKonfigurationMitKommentarEinspielen(String benutzer) {
         String dateiMitKommentar = konfigurationsdatei.replaceFirst("^\\{", "{\"_hinweis\":\"Probe\",");
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", konfigurationsEtag)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(dateiMitKommentar).when().put(KONFIGURATION);
     }
 
@@ -151,7 +177,7 @@ public class KonfigurationsVersionSchritte {
     public void konfigurationMitAbweichenderBasisversionEinspielen(String benutzer) {
         String datei = konfigurationsdatei.replaceFirst("\"basisVersion\"\\s*:\\s*\\d+",
                 "\"basisVersion\":" + (versionVorher + 1));
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", konfigurationsEtag)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(datei).when().put(KONFIGURATION);
     }
 
@@ -159,7 +185,7 @@ public class KonfigurationsVersionSchritte {
     public void konfigurationMitGeaenderterKiFreigabeEinspielen(String benutzer) {
         String datei = konfigurationsdatei.replaceFirst("\"kiFreigegeben\"\\s*:\\s*(true|false)",
                 "\"kiFreigegeben\":" + !konfigurationsdatei.contains("\"kiFreigegeben\":true"));
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", konfigurationsEtag)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(datei).when().put(KONFIGURATION);
     }
 
@@ -173,7 +199,7 @@ public class KonfigurationsVersionSchritte {
                 break;
             }
         }
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", konfigurationsEtag)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
     }
 
@@ -186,7 +212,7 @@ public class KonfigurationsVersionSchritte {
                 arten.remove(i);
             }
         }
-        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", konfigurationsEtag)
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer))
                 .contentType(ContentType.JSON).body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
     }
 
@@ -224,6 +250,275 @@ public class KonfigurationsVersionSchritte {
                 .contentType(ContentType.JSON)
                 .body("{\"rolle\":\"Synthetische Probe\",\"feldregeln\":\"Probe\",\"grund\":\"Synthetischer Test\"}")
                 .when().patch(KI_TEXTE);
+    }
+
+    @Angenommen("«{word}» merkt sich die Konfigurationsversion")
+    public void versionMerken(String benutzer) {
+        gemerkteVersionen.put(benutzer, aktuelleNummer(benutzer));
+    }
+
+    @Wenn("in der Datei die Art «{word}» ergänzt wird")
+    public void artErgaenzen(String code) {
+        ObjectNode art = JSON.createObjectNode();
+        art.put("code", code).put("name", "Test " + code);
+        art.putArray("gruppen").add("frei");
+        art.putArray("pflichtfelder").add("titel");
+        art.put("vertraulichkeit", "NORMAL");
+        art.putObject("aufbewahrung").put("jahre", 10).put("ab", "BELEGDATUM");
+        art.put("gesetzlichePflicht", false).put("aktiv", true).put("selbstAusgestellt", false);
+        art.putObject("zusatzSchema").put("type", "object").put("additionalProperties", false)
+                .putObject("properties");
+        art.putArray("klassifikationen");
+        ((ArrayNode) datei.path("arten")).add(art);
+        if (!eigeneArten.contains(code)) {
+            eigeneArten.add(code);
+        }
+    }
+
+    @Wenn("in der Datei die Art «{word}» als Fremdbeleg auf «{word}» verweist")
+    public void artVerweist(String code, String ziel) {
+        art(code).put("fremdbelegArt", ziel);
+    }
+
+    @Wenn("in der Datei die Art «{word}» fehlt")
+    public void artEntfernen(String code) {
+        ArrayNode arten = (ArrayNode) datei.path("arten");
+        for (int i = arten.size() - 1; i >= 0; i--) {
+            if (code.equals(arten.get(i).path("code").asText())) {
+                arten.remove(i);
+            }
+        }
+    }
+
+    @Wenn("in der Datei die Aufbewahrung der Art «{word}» {int} Jahre beträgt")
+    public void aufbewahrungSetzen(String code, int jahre) {
+        ((ObjectNode) art(code).path("aufbewahrung")).put("jahre", jahre);
+    }
+
+    @Wenn("in der Datei die mehrfache Klassifikation «{word}» mit den Werten «{word}» und «{word}» ergänzt wird")
+    public void klassifikationErgaenzen(String code, String wert1, String wert2) {
+        ObjectNode klasse = JSON.createObjectNode();
+        klasse.put("code", code).put("name", "Test " + code);
+        ArrayNode werte = klasse.putArray("werte");
+        werte.addObject().put("code", wert1).put("name", wert1);
+        werte.addObject().put("code", wert2).put("name", wert2);
+        klasse.put("mehrfach", true).put("kiVorschlag", false).put("suchfilter", false)
+                .put("oeffentlichFilter", false).put("aktiv", true);
+        ((ArrayNode) datei.path("klassifikationen")).add(klasse);
+    }
+
+    @Wenn("in der Datei die Klassifikation «{word}» einfach ist")
+    public void klassifikationEinfach(String code) {
+        klasse(code).put("mehrfach", false);
+    }
+
+    @Wenn("in der Datei die Klassifikation «{word}» inaktiv ist")
+    public void klassifikationInaktiv(String code) {
+        klasse(code).put("aktiv", false);
+    }
+
+    @Wenn("in der Datei die Klassifikation «{word}» fehlt")
+    public void klassifikationEntfernen(String code) {
+        ArrayNode klassen = (ArrayNode) datei.path("klassifikationen");
+        for (int i = klassen.size() - 1; i >= 0; i--) {
+            if (code.equals(klassen.get(i).path("code").asText())) {
+                klassen.remove(i);
+            }
+        }
+    }
+
+    @Wenn("in der Datei die Art «{word}» der Klassifikation «{word}» als Pflicht zugeordnet ist")
+    public void zuordnen(String art, String klasse) {
+        ((ArrayNode) art(art).path("klassifikationen")).addObject().put("code", klasse).put("pflicht", true);
+    }
+
+    @Wenn("in der Datei das Feld «{word}» mit dem Wert «{word}» steht")
+    public void feldSetzen(String feld, String wert) {
+        datei.put(feld, wert);
+    }
+
+    @Wenn("in der Datei das Geschäftsjahresende «{word}» steht")
+    public void geschaeftsjahrEnde(String datum) {
+        ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
+    }
+
+    @Wenn("«{word}» die geänderte Konfigurationsdatei einspielt")
+    public void geaenderteDateiEinspielen(String benutzer) throws IOException {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(JSON.writeValueAsString(datei)).when().put(KONFIGURATION);
+        if (antwort.statusCode() == 200) {
+            dateiWiederherstellen = true;
+            etagLesen();
+        }
+    }
+
+    @Wenn("«{word}» die geänderte Konfigurationsdatei prüft")
+    public void geaenderteDateiPruefen(String benutzer) throws IOException {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(JSON.writeValueAsString(datei)).when().post(KONFIGURATION + "/pruefen");
+    }
+
+    @Wenn("«{word}» die exportierte Konfigurationsdatei ohne If-Match einspielt")
+    public void exportierteDateiEinspielen(String benutzer) {
+        antwort = given().auth().oauth2(Testanmeldung.token(benutzer)).contentType(ContentType.JSON)
+                .body(konfigurationsdatei).when().put(KONFIGURATION);
+    }
+
+    @Wenn("«{word}» die Konfigurationsverwaltung mit {word} {string} aufruft")
+    public void aufrufen(String benutzer, String methode, String pfad) {
+        var anfrage = given().auth().oauth2(Testanmeldung.token(benutzer)).header("If-Match", "\"1\"");
+        if (!"GET".equals(methode)) {
+            anfrage = anfrage.contentType(ContentType.JSON).body("{}");
+        }
+        antwort = anfrage.when().request(methode, KONFIGURATION + pfad);
+    }
+
+    @Angenommen("«{word}» legt ein Dokument der Art «{word}» an")
+    public void dokumentAnlegen(String benutzer, String art) throws SQLException {
+        dokumentMitKlassifikation(benutzer, art, null, List.of());
+    }
+
+    @Angenommen("«{word}» legt ein Dokument der Art «{word}» mit den Werten «{word}» und «{word}» der Klassifikation «{word}» an")
+    public void dokumentMitWerten(String benutzer, String art, String wert1, String wert2, String klasse)
+            throws SQLException {
+        dokumentMitKlassifikation(benutzer, art, klasse, List.of(wert1, wert2));
+    }
+
+    @Dann("hat die Konfigurationsversion die Quelle «{word}»")
+    public void quelle(String quelle) {
+        Response version = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when()
+                .get(VERSIONEN + "/" + letzteVersion);
+        assertThat(version.statusCode()).as(version.asString()).isEqualTo(200);
+        assertThat(version.jsonPath().getString("version.quelle")).isEqualTo(quelle);
+    }
+
+    @Dann("ist die Konfigurationsversion von «{word}» unverändert")
+    public void gemerkteVersionUnveraendert(String benutzer) {
+        assertThat(aktuelleNummer(benutzer)).isEqualTo(gemerkteVersionen.get(benutzer));
+    }
+
+    @Dann("nennt der letzte Eintrag «{word}» im Protokoll von «{word}» den Text «{word}»")
+    public void protokolleintrag(String aktion, String mandant, String text) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select details::text from "
+                     + new MandantCode(mandant).schema() + ".zugriff_protokoll where aktion = ? "
+                     + "order by id desc limit 1")) {
+            abfrage.setString(1, aktion);
+            try (var ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).as("Protokolleintrag " + aktion).isTrue();
+                assertThat(ergebnis.getString(1)).contains(text);
+            }
+        }
+    }
+
+    @Dann("enthält der Export die Art «{word}» nicht")
+    public void exportOhneArt(String code) {
+        List<Map<String, Object>> arten = antwort.jsonPath().getList("arten");
+        assertThat(arten).noneSatisfy(art -> assertThat(art.get("code")).isEqualTo(code));
+    }
+
+    @Dann("ist im Export die Art «{word}» inaktiv")
+    public void exportArtInaktiv(String code) {
+        List<Map<String, Object>> arten = antwort.jsonPath().getList("arten");
+        assertThat(arten).anySatisfy(art -> {
+            assertThat(art.get("code")).isEqualTo(code);
+            assertThat(art.get("aktiv")).isEqualTo(false);
+        });
+    }
+
+    @Dann("ist im Export die Klassifikation «{word}» inaktiv")
+    public void exportKlassifikationInaktiv(String code) {
+        List<Map<String, Object>> klassen = antwort.jsonPath().getList("klassifikationen");
+        assertThat(klassen).anySatisfy(klasse -> {
+            assertThat(klasse.get("code")).isEqualTo(code);
+            assertThat(klasse.get("aktiv")).isEqualTo(false);
+        });
+    }
+
+    @Dann("ist im Export die Klassifikation «{word}» der Art «{word}» weder Pflicht noch vorbelegt")
+    public void zuordnungEntschaerft(String klasse, String art) {
+        List<Map<String, Object>> zuordnungen = antwort.jsonPath()
+                .getList("arten.find { it.code == '" + art + "' }.klassifikationen");
+        assertThat(zuordnungen).anySatisfy(zuordnung -> {
+            assertThat(zuordnung.get("code")).isEqualTo(klasse);
+            assertThat(zuordnung.get("pflicht")).isEqualTo(false);
+            assertThat(zuordnung.get("standardWert")).isNull();
+        });
+    }
+
+    @Dann("nennt die Antwort den Befund {string} mit dem Code «{word}»")
+    public void befund(String pfad, String code) {
+        List<Map<String, Object>> befunde = antwort.jsonPath().getList("befunde");
+        assertThat(befunde).as(antwort.asString()).anySatisfy(befund -> {
+            assertThat(befund.get("pfad")).isEqualTo(pfad);
+            assertThat(befund.get("code")).isEqualTo(code);
+        });
+    }
+
+    @Dann("nennt das Ergebnis die Änderung {string} mit {int} betroffenen Dokument(en)")
+    public void aenderungGenannt(String pfad, int anzahl) {
+        List<Map<String, Object>> aenderungen = antwort.jsonPath().getList("aenderungen");
+        assertThat(aenderungen).as(antwort.asString()).anySatisfy(aenderung -> {
+            assertThat(aenderung.get("pfad")).isEqualTo(pfad);
+            assertThat(((Number) aenderung.get("betroffeneDokumente")).intValue()).isEqualTo(anzahl);
+        });
+    }
+
+    @Dann("ist die Konfigurationsdatei ungültig")
+    public void dateiUngueltig() {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getBoolean("gueltig")).isFalse();
+    }
+
+    private void dokumentMitKlassifikation(String benutzer, String art, String klasse, List<String> werte)
+            throws SQLException {
+        String mandant = benutzer.substring(benutzer.indexOf('-') + 1);
+        UUID id = Testdokumente.anlegen(datenbank.get(), new Testdokumente.Angaben(mandant, art, "NORMAL", false,
+                Testanmeldung.sub(benutzer), null, "EINGANGSKORB"));
+        eigeneDokumente.add(id);
+        for (String wert : werte) {
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement einfuegen = verbindung.prepareStatement("insert into "
+                         + new MandantCode(mandant).schema()
+                         + ".dokument_klassifikation (dokument_id, klassifikation, wert) values (?, ?, ?)")) {
+                einfuegen.setObject(1, id);
+                einfuegen.setString(2, klasse);
+                einfuegen.setString(3, wert);
+                einfuegen.executeUpdate();
+            }
+        }
+    }
+
+    private ObjectNode art(String code) {
+        for (JsonNode art : datei.path("arten")) {
+            if (code.equals(art.path("code").asText())) {
+                return (ObjectNode) art;
+            }
+        }
+        throw new AssertionError("Art " + code + " fehlt in der Datei");
+    }
+
+    private ObjectNode klasse(String code) {
+        for (JsonNode klasse : datei.path("klassifikationen")) {
+            if (code.equals(klasse.path("code").asText())) {
+                return (ObjectNode) klasse;
+            }
+        }
+        throw new AssertionError("Klassifikation " + code + " fehlt in der Datei");
+    }
+
+    /** Spielt die Ausgangsdatei zweimal ein: Erst danach sind Zuordnungen weg, die eine Klassifikation hielten. */
+    private void ausgangsdateiWiederherstellen() throws IOException {
+        for (int lauf = 0; lauf < 2; lauf++) {
+            Response stand = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when().get(KONFIGURATION);
+            assertThat(stand.statusCode()).as(stand.asString()).isEqualTo(200);
+            ObjectNode zurueck = ausgangsdatei.deepCopy();
+            zurueck.put("basisVersion", stand.jsonPath().getInt("basisVersion"));
+            Response einspielen = given().auth().oauth2(Testanmeldung.token("inhaber-urinet"))
+                    .header("X-Aenderungsgrund", "Testwerte wiederherstellen").contentType(ContentType.JSON)
+                    .body(JSON.writeValueAsString(zurueck)).when().put(KONFIGURATION);
+            assertThat(einspielen.statusCode()).as(einspielen.asString()).isEqualTo(200);
+        }
     }
 
     @Dann("antwortet die Konfigurationsverwaltung mit Status {int}")
@@ -316,8 +611,15 @@ public class KonfigurationsVersionSchritte {
     }
 
     @After
-    public void aufraeumen() {
+    public void aufraeumen() throws SQLException, IOException {
         String benutzer = "inhaber-urinet";
+        Testdokumente.loeschen(datenbank.get(), "urinet", eigeneDokumente);
+        eigeneDokumente.clear();
+        if (dateiWiederherstellen && ausgangsdatei != null) {
+            ausgangsdateiWiederherstellen();
+        }
+        dateiWiederherstellen = false;
+        ausgangsdatei = null;
         if (kiTexteWiederherstellen && kiRolleVorher != null && kiFeldregelnVorher != null) {
             Response stand = given().auth().oauth2(Testanmeldung.token(benutzer)).when().get(KI_TEXTE);
             Response wiederherstellen = given().auth().oauth2(Testanmeldung.token(benutzer))

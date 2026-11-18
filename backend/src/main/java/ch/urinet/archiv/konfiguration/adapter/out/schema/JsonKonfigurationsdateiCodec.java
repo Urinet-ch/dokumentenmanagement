@@ -3,6 +3,7 @@ package ch.urinet.archiv.konfiguration.adapter.out.schema;
 import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.application.KonfigurationVersionsRepository;
 import ch.urinet.archiv.konfiguration.application.KonfigurationsdateiCodec;
 import ch.urinet.archiv.konfiguration.domain.Konfiguration;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 @ApplicationScoped
@@ -54,7 +56,12 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             throw new FachFehler(Fehlercode.DATEI_ZU_GROSS);
         }
         try {
-            schemaPruefer.konfigurationPruefen(schema, text);
+            List<ZusatzSchemaPruefer.Verletzung> verletzungen = schemaPruefer.konfigurationPruefen(schema, text);
+            if (!verletzungen.isEmpty()) {
+                throw new KonfigurationUngueltig(verletzungen.stream().map(verletzung ->
+                        new KonfigurationUngueltig.Befund(verletzung.pfad(), verletzung.schluesselwort(),
+                                "Die Datei verletzt das Schema der Konfigurationsdatei.")).toList());
+            }
             JsonNode root = ch.urinet.archiv.gemeinsam.adapter.StrengesJson.lesenGenau(text);
             Integer basisVersion = root.path("basisVersion").isInt() ? root.path("basisVersion").intValue() : null;
             ObjectNode bereinigt = (ObjectNode) root.deepCopy();
@@ -73,6 +80,7 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
                     if (!artObjekt.has("kiFelder")) {
                         artObjekt.putArray("kiFelder");
                     }
+                    zuordnungsfeldUmbenennen(artObjekt, "code", "klassifikation");
                 }
             }
             for (JsonNode klassifikation : bereinigt.path("klassifikationen")) {
@@ -97,7 +105,7 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
                     inhalt.klassifikationen(), inhalt.regeln(), inhalt.kiTexte());
             return new KonfigurationsdateiCodec.Datei(basisVersion, typisiert);
         } catch (FachFehler e) {
-            if (e.code() == Fehlercode.DATEI_ZU_GROSS) {
+            if (e.code() == Fehlercode.DATEI_ZU_GROSS || e instanceof KonfigurationUngueltig) {
                 throw e;
             }
             throw ungueltig();
@@ -118,6 +126,7 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
             for (Art art : inhalt.arten()) {
                 ObjectNode artJson = json.valueToTree(art);
                 artJson.remove("zusatzFeldTypen");
+                zuordnungsfeldUmbenennen(artJson, "klassifikation", "code");
                 artJson.set("zusatzSchema", ch.urinet.archiv.gemeinsam.adapter.StrengesJson
                         .lesenGenau(art.zusatzSchema()));
                 arten.add(artJson);
@@ -141,6 +150,16 @@ public class JsonKonfigurationsdateiCodec implements KonfigurationsdateiCodec {
                 } else if (!"zusatzSchema".equals(feld.getKey())) {
                     kommentareEntfernen(feld.getValue());
                 }
+            }
+        }
+    }
+
+    /** Die Datei nennt die Klassifikation einer Zuordnung {@code code} (design.md), die Domain {@code klassifikation}. */
+    private static void zuordnungsfeldUmbenennen(ObjectNode art, String von, String nach) {
+        for (JsonNode zuordnung : art.path("klassifikationen")) {
+            if (zuordnung instanceof ObjectNode objekt && objekt.has(von)) {
+                JsonNode wert = objekt.remove(von);
+                objekt.set(nach, wert);
             }
         }
     }

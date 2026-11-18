@@ -18,7 +18,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/01-archiv-kern/` | Phase 0 + 1: 17 Requirements, Design, Aufgaben | 0–5 | ca. 19 Tage |
 | `.kiro/specs/02-abgleich-chat/` | Phase 2: 13 Requirements, Design, Aufgaben | 6–9 | ca. 10 Tage |
 | `.kiro/specs/03-zweiter-mandant/` | Phase 3: 15 Requirements (10–15 ergänzt 13.11.2026: Webseiten-Schnittstelle), Design, Aufgaben | 10–12 | ca. 6 Tage (vor der Erweiterung; Aufgaben 11.6–11.13 noch nicht geschätzt) |
-| `.kiro/specs/04-wissensbasis/` | Phase 4: 18 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
+| `.kiro/specs/04-wissensbasis/` | Phase 4: 19 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
 | `.kiro/specs/05-mandanten-konfiguration/` | Konfiguration je Mandant: 9 Requirements, Design, Aufgaben (Dokumentarten, Klassifikationen, Fristen, Regeln) | 17–18, umgesetzt nach Gate Phase 1 und spätestens vor Welle 10 (Entscheid Fabian 11.11.2026) | noch nicht geschätzt |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
@@ -187,7 +187,7 @@ Grundlagen: `docs/spikes/golden-ergebnis.md`, `docs/spikes/s3-object-lock.md`, `
 Entscheide aus der Prüfung von Spec 01 (im Prüfbericht E1–E18; hier P1–P18, damit sie nicht
 mit den Konzept-Entscheiden E1–E5 oben verwechselt werden). Alle **entschieden 08.11.2026, wie empfohlen**;
 P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS starten»); P2 am 09.11.2026 von Fabian **geändert** (Option B); P19 am 08.11.2026 von Fabian
-**ergänzt** (lokales Modell, eng begrenzt); P20–P22 am 09.11.2026 von Fabian zu Spec 04 **ergänzt** (Wissensbasis, ADR-013):
+**ergänzt** (lokales Modell, eng begrenzt); P20–P22 am 09.11.2026 und P23 am 18.11.2026 von Fabian zu Spec 04 **ergänzt** (Wissensbasis, ADR-013):
 
 | Nr. | Thema | Entscheid | Noch offen |
 | --- | --- | --- | --- |
@@ -213,6 +213,7 @@ P1 am 08.11.2026 von Fabian **geändert** («Zuerst mit der vorhandenen VPS star
 | P20 | Pflege der Wissensbasis (09.11.2026) | **neu 09.11.2026:** Die KI schreibt nur Entwürfe; wirksam wird eine Änderung erst, wenn der `inhaber` bzw. im Mandanten `vhf-gsk` die `geschaeftsstelle` sie einzeln nach angesehenem Diff freigibt (A17; Spec 04, Req 6; ADR-013) | Seitenversionen gelöschter Dokumente (revDSG), siehe Entscheid «Spec 04 Wissensbasis» oben |
 | P21 | Quelle der Wissensbasis (09.11.2026) | **neu 09.11.2026:** Dokumentart `WISSENSQUELLE` ohne gesetzliche Pflicht, auf demselben Erfassungsweg wie andere Dokumente (Spec 04, Req 1) | – |
 | P22 | Zeitpunkt Spec 04 (09.11.2026) | **neu 09.11.2026:** Spec 04 nach Spec 02 und Spec 03 (Wellen 13–16); Spec 01 bleibt im Umfang stabil | – |
+| P23 | Lokale Erarbeitung und Import (18.11.2026) | **neu 18.11.2026** (Spec 04, Req 19): (1) Ein lokales Modell darf mit allen Quellen ausser Personendaten arbeiten, Cloud-Modelle nur mit `NORMAL` ohne Personendaten auf Verantwortung des Inhabers, `INTERN` und `PERSONAL` nie; (2) Quellen per SHA-256 zugeordnet, kein Quellen-Export; (3) Übertragung per Upload eines ZIP in der Web-App plus Offline-Prüfwerkzeug, kein Import per API-Token. Aufgaben 15.6 bis 15.8 (Welle 15) | 19-a bis 19-c (Spec 04, design.md, Open Points) |
 
 Offene Klärungen aus dem Konzept: K1 Bildeingabe (Spike AI Services, Aufgabe 0.3, Req 0.5), K2 Zeitbudget, K3 Treuhänder
 (Aufgabe 5.7), K4 21.CRM-Export (Aufgabe 0.4), K5 Servergrösse und -kosten (vor Welle 5; vorgeschlagen 12.11.2026, entschieden mit dem Merge von PR #86, VPS Lite 4/4/80, siehe Abschnitt 6 und P1).

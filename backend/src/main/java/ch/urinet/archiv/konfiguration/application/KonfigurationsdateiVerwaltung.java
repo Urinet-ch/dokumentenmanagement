@@ -3,12 +3,14 @@ package ch.urinet.archiv.konfiguration.application;
 import ch.urinet.archiv.dokumentart.application.DokumentartPruefung;
 import ch.urinet.archiv.dokumentart.application.DokumentartRepository;
 import ch.urinet.archiv.dokumentart.application.DokumentZaehlerPort;
+import ch.urinet.archiv.dokumentart.application.RegelProtokollPort;
 import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.dokumentart.domain.Aufbewahrungsregel;
 import ch.urinet.archiv.dokumentart.domain.Dokumentart;
 import ch.urinet.archiv.dokumentart.domain.Vertraulichkeit;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.gemeinsam.domain.KonfigurationUngueltig;
 import ch.urinet.archiv.konfiguration.domain.ArtKlassifikation;
 import ch.urinet.archiv.konfiguration.domain.Klassifikation;
 import ch.urinet.archiv.konfiguration.domain.KlassifikationWert;
@@ -43,6 +45,7 @@ public class KonfigurationsdateiVerwaltung {
     private final RegelRepository regeln;
     private final KiTexteRepository kiTexte;
     private final KonfigurationsEinstellungenSpeichern einstellungenSpeichern;
+    private final RegelProtokollPort regelProtokoll;
 
     public KonfigurationsdateiVerwaltung(KonfigurationsdateiCodec codec, KonfigurationVerwaltung konfiguration,
                                          DokumentartRepository dokumentarten,
@@ -50,7 +53,8 @@ public class KonfigurationsdateiVerwaltung {
                                          DokumentZaehlerPort dokumentZaehler,
                                          KlassifikationRepository klassifikationen, RegelRepository regeln,
                                          KiTexteRepository kiTexte,
-                                         KonfigurationsEinstellungenSpeichern einstellungenSpeichern) {
+                                         KonfigurationsEinstellungenSpeichern einstellungenSpeichern,
+                                         RegelProtokollPort regelProtokoll) {
         this.codec = codec;
         this.konfiguration = konfiguration;
         this.dokumentarten = dokumentarten;
@@ -60,6 +64,7 @@ public class KonfigurationsdateiVerwaltung {
         this.regeln = regeln;
         this.kiTexte = kiTexte;
         this.einstellungenSpeichern = einstellungenSpeichern;
+        this.regelProtokoll = regelProtokoll;
     }
 
     public String exportieren() {
@@ -70,9 +75,16 @@ public class KonfigurationsdateiVerwaltung {
         return konfiguration.aktuelleVersion();
     }
 
+    /** Schemaverletzungen erscheinen wie die übrigen Prüfungen als Befunde (Spec 05, Req 6.2). */
     public Analyse pruefen(String text) {
-        KonfigurationsdateiCodec.Datei datei = codec.lesen(text);
         Konfiguration aktuell = konfiguration.aktuell();
+        KonfigurationsdateiCodec.Datei datei;
+        try {
+            datei = codec.lesen(text);
+        } catch (KonfigurationUngueltig e) {
+            return new Analyse(aktuell.version(), null, null, e.befunde().stream()
+                    .map(befund -> new Befund(befund.pfad(), befund.code(), befund.meldung())).toList(), List.of());
+        }
         return analysieren(aktuell, datei);
     }
 
@@ -80,17 +92,23 @@ public class KonfigurationsdateiVerwaltung {
         return pruefen(text);
     }
 
-    public Ergebnis einspielen(String text, int erwarteteVersion, String wer, String grund) {
+    /**
+     * Massgeblich für den Stand ist allein {@code basisVersion} der Datei (Spec 05, Req 7.6); ein {@code If-Match}
+     * spielt hier keine Rolle.
+     */
+    public Ergebnis einspielen(String text, String wer, String grund) {
         KonfigurationsdateiCodec.Datei datei = codec.lesen(text);
         if (datei.basisVersion() == null) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            throw new KonfigurationUngueltig(List.of(new KonfigurationUngueltig.Befund("/basisVersion",
+                    "BASISVERSION_FEHLT", "Die Datei nennt keine basisVersion; bitte zuerst exportieren.")));
         }
-        konfiguration.aenderungStarten(erwarteteVersion);
         konfiguration.dateiAenderungStarten(datei.basisVersion());
         Konfiguration aktuell = konfiguration.aktuell();
         Analyse analyse = analysieren(aktuell, datei);
         if (!analyse.befunde().isEmpty()) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+            throw new KonfigurationUngueltig(analyse.befunde().stream()
+                    .map(befund -> new KonfigurationUngueltig.Befund(befund.pfad(), befund.code(), befund.meldung()))
+                    .toList());
         }
         if (aktuell.gleicherInhalt(analyse.ziel())) {
             return new Ergebnis(aktuell.version(), analyse.aenderungen());
@@ -131,6 +149,15 @@ public class KonfigurationsdateiVerwaltung {
             befunde.add(new Befund("kiTexte.kiFreigegeben", "KI_FREIGABE_UNGUELTIG",
                     "Die Freigabe der KI-Texte kann nicht über eine Konfigurationsdatei geändert werden."));
         }
+        Map<String, Klassifikation> bisherigeKlassen = nachCodeKlasse(aktuell.klassifikationen());
+        for (Klassifikation klasse : ziel.klassifikationen()) {
+            Klassifikation alt = bisherigeKlassen.get(klasse.code());
+            if (alt != null && alt.mehrfach() && !klasse.mehrfach()
+                    && klassifikationen.mehrfachWirdVerletzt(klasse.code())) {
+                befunde.add(new Befund("klassifikationen." + klasse.code() + ".mehrfach", "MEHRFACH_IN_GEBRAUCH",
+                        "Dokumente tragen mehrere Werte dieser Klassifikation; sie kann nicht einfach werden."));
+            }
+        }
         for (Art art : ziel.arten()) {
             try {
                 dokumentartPruefung.pruefen(dokumentart(art), art.kiFelder());
@@ -146,33 +173,41 @@ public class KonfigurationsdateiVerwaltung {
     private Konfiguration fehlendesAusBestandErhalten(Konfiguration aktuell, Konfiguration datei) {
         Map<String, Art> arten = new HashMap<>();
         datei.arten().forEach(art -> arten.put(art.code(), art));
+        Set<String> erhalteneArten = new HashSet<>();
         for (Art alt : aktuell.arten()) {
             if (!arten.containsKey(alt.code())
                     && (WISSENSQUELLE.equals(alt.code()) || dokumentZaehler.anzahl(alt.code()) > 0)) {
                 arten.put(alt.code(), WISSENSQUELLE.equals(alt.code()) ? alt : mitAktivitaet(alt, false));
+                erhalteneArten.add(alt.code());
             }
         }
 
         Map<String, Klassifikation> klassen = new HashMap<>();
         datei.klassifikationen().forEach(klasse -> klassen.put(klasse.code(), klasse));
+        Set<String> erhalteneKlassen = new HashSet<>();
         for (Klassifikation alt : aktuell.klassifikationen()) {
             Klassifikation neu = klassen.get(alt.code());
             if (neu == null) {
-                if (klassifikationen.inGebrauch(alt.code())) {
+                // Req 6.3: nur Dokumente halten eine fehlende Klassifikation; Zuordnungen bestimmt die Datei.
+                if (klassifikationen.dokumentAnzahl(alt.code()) > 0) {
                     klassen.put(alt.code(), mitAktivitaet(alt, false));
+                    erhalteneKlassen.add(alt.code());
                 }
             } else {
                 klassen.put(alt.code(), verwendeteWerteErhalten(alt, neu));
             }
         }
 
+        // Nur was der Bestand erhält, wird angepasst; Fehler der Datei selbst meldet pruefen() mit Pfad.
         List<Art> artenMitKlassen = arten.values().stream().map(art -> {
+            boolean ausBestand = erhalteneArten.contains(art.code());
             List<ArtKlassifikation> zuordnungen = art.klassifikationen().stream().map(zuordnung -> {
                 Klassifikation klasse = klassen.get(zuordnung.klassifikation());
                 if (klasse == null) {
-                    return null;
+                    return ausBestand ? null : zuordnung;
                 }
-                return !klasse.aktiv()
+                boolean entschaerfen = erhalteneKlassen.contains(klasse.code()) || ausBestand && !klasse.aktiv();
+                return entschaerfen
                         ? new ArtKlassifikation(zuordnung.klassifikation(), false, null) : zuordnung;
             }).filter(java.util.Objects::nonNull).toList();
             return new Art(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
@@ -209,13 +244,20 @@ public class KonfigurationsdateiVerwaltung {
         }
         Map<String, Dokumentart> alteArten = new HashMap<>();
         dokumentarten.alle().forEach(art -> alteArten.put(art.code(), art));
+        // Neue Arten zuerst ohne Verweise anlegen, damit Verweise unter neuen Arten keinen Fremdschlüssel verletzen.
+        for (Art art : ziel.arten()) {
+            if (!alteArten.containsKey(art.code())) {
+                dokumentarten.anlegen(ohneArtVerweise(dokumentart(art)));
+            }
+        }
         for (Art art : ziel.arten()) {
             Dokumentart neu = dokumentart(art);
-            if (alteArten.containsKey(art.code())) {
-                dokumentarten.speichern(neu);
-            } else {
-                dokumentarten.anlegen(neu);
+            Dokumentart bisher = alteArten.get(art.code());
+            if (bisher != null && (!neu.aufbewahrung().equals(bisher.aufbewahrung())
+                    || neu.gesetzlichePflicht() != bisher.gesetzlichePflicht())) {
+                regelProtokoll.regelGeaendert(bisher, neu);
             }
+            dokumentarten.speichern(neu);
         }
         zuordnungenSpeichern(ziel, alteArten.keySet(), zielKlassen);
         regeln.ersetzen(ziel.regeln());
@@ -324,6 +366,13 @@ public class KonfigurationsdateiVerwaltung {
                 new Aufbewahrungsregel(art.aufbewahrung().jahre(), ab, art.aufbewahrung().feld()),
                 art.gesetzlichePflicht(), art.aktiv(), art.selbstAusgestellt(), art.belegnummerMuster(),
                 art.fremdbelegArt(), art.ohneZahlungsdatenArt(), art.kiVorschlag(), art.kiFelder(),
+                art.kiHinweise(), art.reihenfolge());
+    }
+
+    private static Dokumentart ohneArtVerweise(Dokumentart art) {
+        return new Dokumentart(art.code(), art.name(), art.beschreibung(), art.gruppen(), art.pflichtfelder(),
+                art.zusatzSchema(), art.vertraulichkeit(), art.aufbewahrung(), art.gesetzlichePflicht(), art.aktiv(),
+                art.selbstAusgestellt(), art.belegnummerMuster(), null, null, art.kiVorschlag(), art.kiFelder(),
                 art.kiHinweise(), art.reihenfolge());
     }
 

@@ -53,6 +53,32 @@ class JsonKonfigurationsdateiCodecTest {
     }
 
     @Test
+    void zuordnungenHeissenInDerDateiCode() throws Exception {
+        KonfigurationsdateiCodec codec = codec();
+        KonfigurationsdateiCodec.Datei datei = codec.lesen("""
+                {
+                  "format": 1, "basisVersion": 4,
+                  "einstellungen": { "geschaeftsjahrEnde": "12-31", "kennungen": { "uid": null, "ibans": [] } },
+                  "kiTexte": { "rolle": "", "feldregeln": "", "kiFreigegeben": false },
+                  "klassifikationen": [], "regeln": [],
+                  "arten": [{
+                    "code": "BULLETIN", "name": "Bulletin", "gruppen": ["frei"], "pflichtfelder": ["titel"],
+                    "vertraulichkeit": "NORMAL", "aufbewahrung": { "jahre": null }, "gesetzlichePflicht": false,
+                    "zusatzSchema": { "type": "object" },
+                    "klassifikationen": [{ "code": "fachgebiet", "pflicht": true, "standardWert": "bad" }]
+                  }]
+                }
+                """);
+
+        assertThat(datei.inhalt().arten().getFirst().klassifikationen()).singleElement()
+                .satisfies(zuordnung -> assertThat(zuordnung.klassifikation()).isEqualTo("fachgebiet"));
+        var zuordnung = new ObjectMapper().readTree(codec.schreiben(datei.inhalt()))
+                .path("arten").get(0).path("klassifikationen").get(0);
+        assertThat(zuordnung.path("code").asText()).isEqualTo("fachgebiet");
+        assertThat(zuordnung.has("klassifikation")).isFalse();
+    }
+
+    @Test
     void weistDateienUeberEinMiBAb() {
         KonfigurationsdateiCodec codec = codec();
 
@@ -84,7 +110,8 @@ class JsonKonfigurationsdateiCodecTest {
             }
 
             @Override
-            public void konfigurationPruefen(String schemaJson, String dateiJson) {
+            public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
+                return List.of();
             }
 
             @Override

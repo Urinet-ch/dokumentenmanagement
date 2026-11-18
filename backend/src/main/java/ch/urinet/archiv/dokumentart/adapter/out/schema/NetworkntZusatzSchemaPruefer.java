@@ -92,6 +92,7 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     static final int MAX_WERTE_BYTES = 64 * 1024;
     static final int MAX_KONFIGURATION_BYTES = 1024 * 1024;
     static final int MAX_TIEFE = 10;
+    private static final Pattern EINFACHER_NAME = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]{0,63}$");
     static final int MAX_MUSTER_ZEICHEN = 1_000;
     private static final int CACHE_GROESSE = 32;
     private static final String DIALEKT = "https://json-schema.org/draft/2020-12/schema";
@@ -309,21 +310,41 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
     }
 
     @Override
-    public void konfigurationPruefen(String schemaJson, String dateiJson) {
-        mitFrist(zeitgrenzeNanos, () -> {
+    public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
+        return mitFrist(zeitgrenzeNanos, () -> {
             JsonNode datei = lesen(dateiJson, MAX_KONFIGURATION_BYTES, true);
             if (!datei.isObject() || tiefe(datei) > MAX_TIEFE) {
                 throw ungueltig();
             }
             try {
-                if (!geprueft(schemaJson).kompiliert().validate(Jackson3Baum.wert(datei)).isEmpty()) {
-                    throw ungueltig();
-                }
+                return geprueft(schemaJson).kompiliert().validate(Jackson3Baum.wert(datei)).stream()
+                        .map(fehler -> new Verletzung(zeiger(fehler.getInstanceLocation(), fehler.getProperty()),
+                                fehler.getKeyword()))
+                        .distinct().limit(MAX_VERLETZUNGEN).toList();
             } catch (RuntimeException | StackOverflowError e) {
                 throw ungueltig();
             }
-            return null;
         });
+    }
+
+    /** JSON-Pointer ohne Werte: nur Indizes und einfache Bezeichner, andere Namen als {@code *}. */
+    static String zeiger(NodePath ort, String eigenschaft) {
+        StringBuilder zeiger = new StringBuilder();
+        for (int i = 0; ort != null && i < ort.getNameCount(); i++) {
+            zeiger.append('/').append(segment(ort.getElement(i)));
+        }
+        if (eigenschaft != null) {
+            zeiger.append('/').append(segment(eigenschaft));
+        }
+        return zeiger.toString();
+    }
+
+    private static String segment(Object element) {
+        if (element instanceof Integer index) {
+            return index.toString();
+        }
+        String name = String.valueOf(element);
+        return EINFACHER_NAME.matcher(name).matches() ? name : "*";
     }
 
     @Override

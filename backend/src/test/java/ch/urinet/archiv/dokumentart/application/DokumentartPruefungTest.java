@@ -50,7 +50,7 @@ class DokumentartPruefungTest {
         }
 
         @Override
-        public void konfigurationPruefen(String schemaJson, String dateiJson) {
+        public List<Verletzung> konfigurationPruefen(String schemaJson, String dateiJson) {
             throw new UnsupportedOperationException();
         }
 

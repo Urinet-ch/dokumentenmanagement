@@ -210,6 +210,15 @@ Beispiel (nur das Format; die Werte für `vhf-gsk` legt Spec 03 fest):
   Klassifikation, 200 Regeln, 20 Belegnummer-Muster je Art, Datei 1 MiB; `name` ≤ 100, `beschreibung` ≤ 1'000,
   `meldung` ≤ 300 Zeichen; KI-Texte nach «Erweiterungen» (`ki/`).
 
+Umsetzung 17.7a (Review PR #310): `PUT /konfiguration` wertet kein `If-Match` aus; massgeblich ist nur die
+`basisVersion` der Datei (Req 7.6), fehlt sie, kommt 422 mit Befund `/basisVersion` (`BASISVERSION_FEHLT`).
+422 `KONFIGURATION_UNGUELTIG` trägt `befunde[]` mit `pfad`, `code`, `meldung`: Schemafehler der Datei als
+JSON-Pointer (`/arten/0/code`, Code = Schlüsselwort des JSON Schemas, unbekannte Namen als `*`), Befunde der
+Prüfungen gepunktet (`arten.<code>.feld`). Die Zuordnung einer Klassifikation heisst in der Datei `code`, im Domain-Modell
+`klassifikation`. Eine in der Datei fehlende Klassifikation bleibt nur erhalten (inaktiv), wenn Dokumente sie tragen;
+Zuordnungen von Arten aus dem Bestand auf solche Klassifikationen werden weder Pflicht noch vorbelegt. Neue Arten
+werden zuerst ohne Artverweise angelegt, wegfallende Arten lösen ihre Verweise vor dem Löschen.
+
 ## Regeltypen
 | Typ | Parameter | Prüfung | Wann |
 | --- | --- | --- | --- |
