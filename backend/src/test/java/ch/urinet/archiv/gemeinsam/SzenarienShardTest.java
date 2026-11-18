@@ -3,6 +3,7 @@ package ch.urinet.archiv.gemeinsam;
 import ch.urinet.archiv.SzenarienRestTest;
 import ch.urinet.archiv.SzenarienShards;
 import ch.urinet.archiv.SzenarienTest;
+import ch.urinet.archiv.integration.WebseitenDateiMessfallTest;
 import io.cucumber.gherkin.GherkinParser;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.Pickle;
@@ -22,10 +23,9 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Vollständigkeit der Szenario-Aufteilung ({@link SzenarienShards}, CI-Jobs «Backend-Szenarien»): Jedes Szenario
- * (bei Szenariogrundrissen jede Beispielzeile, wie Cucumber sie zählt), das die Backend-Szenarien überhaupt laufen,
- * läuft in genau einem der beiden Runner, auch ohne Spec-Tag; die Summe der Shards ist die Gesamtzahl. Ohne Quarkus-Start,
- * damit der Beweis auch im Job «Backend-Tests» ohne die Runner selbst steht.
+ * Vollständigkeit der Szenario-Aufteilung ({@link SzenarienShards}): Jedes Backend-Szenario (bei Szenariogrundrissen
+ * jede Beispielzeile, wie Cucumber sie zählt) läuft in genau einem der drei Runner, auch ohne Spec-Tag. Ohne
+ * Quarkus-Start, damit der Beweis auch im Job «Backend-Tests» ohne die Runner selbst steht.
  */
 class SzenarienShardTest {
 
@@ -39,10 +39,13 @@ class SzenarienShardTest {
         long gesamt = szenarien.stream().filter(basis::evaluate).count();
         long shard1 = szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_1)::evaluate).count();
         long shard2 = szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_2)::evaluate).count();
+        long shard3 = szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_3)::evaluate).count();
 
         assertThat(shard1).as("Szenarien in Shard 1 (SzenarienTest)").isPositive();
         assertThat(shard2).as("Szenarien in Shard 2 (SzenarienRestTest)").isPositive();
-        assertThat(shard1 + shard2).as("Summe der Shards = Gesamtzahl der Backend-Szenarien (%s)", gesamt)
+        assertThat(shard3).as("Szenarien im isolierten Messfall-Runner").isEqualTo(1);
+        assertThat(shard1 + shard2 + shard3)
+                .as("Summe der Shards = Gesamtzahl der Backend-Szenarien (%s)", gesamt)
                 .isEqualTo(gesamt);
         assertThat(fehler(szenarien)).isEmpty();
     }
@@ -52,6 +55,8 @@ class SzenarienShardTest {
         assertThat(SzenarienTest.class.getAnnotation(CucumberOptions.class).tags()).isEqualTo(SzenarienShards.SHARD_1);
         assertThat(SzenarienRestTest.class.getAnnotation(CucumberOptions.class).tags())
                 .isEqualTo(SzenarienShards.SHARD_2);
+        assertThat(WebseitenDateiMessfallTest.class.getAnnotation(CucumberOptions.class).tags())
+                .isEqualTo(SzenarienShards.SHARD_3);
     }
 
     @Test
@@ -64,25 +69,27 @@ class SzenarienShardTest {
                 List.of("@spec-01", "@browser"),            // nie im Backend
                 List.of("@spec-02", "@sicherung"),          // nie im Backend
                 List.of("@spec-03", "@mandant-bericht"),   // nie im Backend
-                List.of("@spec-04", "@wissen-sichtbarkeit")); // eigene Klasse
+                List.of("@spec-04", "@wissen-sichtbarkeit"), // eigene Klasse
+                List.of("@spec-03", "@webseiten-datei-messfall")); // eigener Runner
 
         assertThat(fehler(szenarien)).isEmpty();
         assertThat(szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_2)::evaluate)).hasSize(3);
+        assertThat(szenarien.stream().filter(TagExpressionParser.parse(SzenarienShards.SHARD_3)::evaluate)).hasSize(1);
         // ein Szenario in beiden oder keinem Shard wird gemeldet: Ausdruck von Shard 1 ohne Komplement
-        assertThat(fehler(szenarien, SzenarienShards.SHARD_1, SzenarienShards.AUSGENOMMEN + " and @spec-02")).hasSize(2);
+        assertThat(fehler(szenarien, SzenarienShards.SHARD_1, SzenarienShards.AUSGENOMMEN + " and @spec-02",
+                SzenarienShards.SHARD_3)).hasSize(2);
     }
 
     static List<String> fehler(List<List<String>> szenarien) {
-        return fehler(szenarien, SzenarienShards.SHARD_1, SzenarienShards.SHARD_2);
+        return fehler(szenarien, SzenarienShards.SHARD_1, SzenarienShards.SHARD_2, SzenarienShards.SHARD_3);
     }
 
-    private static List<String> fehler(List<List<String>> szenarien, String ausdruck1, String ausdruck2) {
+    private static List<String> fehler(List<List<String>> szenarien, String... ausdruecke) {
         Expression basis = TagExpressionParser.parse(SzenarienShards.AUSGENOMMEN);
-        Expression s1 = TagExpressionParser.parse(ausdruck1);
-        Expression s2 = TagExpressionParser.parse(ausdruck2);
+        List<Expression> runner = java.util.Arrays.stream(ausdruecke).map(TagExpressionParser::parse).toList();
         List<String> fehler = new ArrayList<>();
         for (List<String> tags : szenarien) {
-            int treffer = (s1.evaluate(tags) ? 1 : 0) + (s2.evaluate(tags) ? 1 : 0);
+            int treffer = (int) runner.stream().filter(ausdruck -> ausdruck.evaluate(tags)).count();
             int erwartet = basis.evaluate(tags) ? 1 : 0;
             if (treffer != erwartet) {
                 fehler.add(tags + ": läuft in " + treffer + " Shards, erwartet " + erwartet);
