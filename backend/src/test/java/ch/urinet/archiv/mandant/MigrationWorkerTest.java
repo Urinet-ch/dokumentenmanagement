@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Der Worker migriert nie, weder {@code db/public} noch Mandanten-Schemas (design.md «Mandant»): Mit Eigentümer-Zugang,
  * den es nicht gibt, startet er trotzdem, weil er keine Verbindung als Eigentümer öffnet.
  */
-@Tag("start-2")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(MigrationWorkerTest.NurWorker.class)
 class MigrationWorkerTest {
