@@ -557,6 +557,12 @@ public class KonfigurationsVersionSchritte {
         assertThat(antwort.jsonPath().getBoolean("geaendert")).isFalse();
     }
 
+    @Dann("ist die KI laut KI-Texte-Endpunkt {word}")
+    public void kiFreigabe(String zustand) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getBoolean("kiFreigegeben")).isEqualTo("freigegeben".equals(zustand));
+    }
+
     @Dann("enthält der KI-Texte-Endpunkt Rolle, Feldregeln und Freigabestatus")
     public void kiTexteVollstaendig() {
         assertThat(antwort.jsonPath().getMap("$")).containsKeys("rolle", "feldregeln", "kiFreigegeben");

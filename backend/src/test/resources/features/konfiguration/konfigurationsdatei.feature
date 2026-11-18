@@ -64,6 +64,9 @@ Funktionalität: Konfigurationsdatei
     Wenn «inhaber-urinet» die KI-Texte liest
     Dann antwortet die Konfigurationsverwaltung mit Status 200
     Und enthält der KI-Texte-Endpunkt Rolle, Feldregeln und Freigabestatus
+    Und ist die KI laut KI-Texte-Endpunkt freigegeben
+    Wenn «inhaber-vhf-gsk» die KI-Texte liest
+    Dann ist die KI laut KI-Texte-Endpunkt gesperrt
     Wenn «inhaber-urinet» die KI-Texte ohne If-Match ändert
     Dann antwortet die Konfigurationsverwaltung mit Status 428 und Fehlercode «VERSION_FEHLT»
     Wenn «inhaber-urinet» die KI-Texte mit der aktuellen Version ändert

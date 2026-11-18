@@ -217,7 +217,8 @@ JSON-Pointer (`/arten/0/code`, Code = Schlüsselwort des JSON Schemas, unbekannt
 Prüfungen gepunktet (`arten.<code>.feld`). Die Zuordnung einer Klassifikation heisst in der Datei `code`, im Domain-Modell
 `klassifikation`. Eine in der Datei fehlende Klassifikation bleibt nur erhalten (inaktiv), wenn Dokumente sie tragen;
 Zuordnungen von Arten aus dem Bestand auf solche Klassifikationen werden weder Pflicht noch vorbelegt. Neue Arten
-werden zuerst ohne Artverweise angelegt, wegfallende Arten lösen ihre Verweise vor dem Löschen.
+werden zuerst ohne Artverweise angelegt, wegfallende Arten lösen ihre Verweise vor dem Löschen. `ki_texte.ki_freigegeben`
+startet nur im Schema `m_urinet` mit `true` (Req 8.4), sonst mit `false`.
 
 ## Regeltypen
 | Typ | Parameter | Prüfung | Wann |

@@ -24,7 +24,7 @@
                 check (char_length(rolle) &lt;= 8000);
             alter table ki_texte add constraint ki_texte_feldregeln_laenge_ck
                 check (char_length(feldregeln) &lt;= 8000);
-            insert into ki_texte (id, rolle, feldregeln, ki_freigegeben) values (1, '', '', false);
+            insert into ki_texte (id, rolle, feldregeln, ki_freigegeben) values (1, '', '', current_schema() = 'm_urinet');
         </sql>
     </changeSet>
 </databaseChangeLog>
