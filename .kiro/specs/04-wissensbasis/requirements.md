@@ -222,11 +222,13 @@ damit die KI-Pflege unter menschlicher Kontrolle bleibt (ADR-006).
 | --- | --- | --- | --- | --- | --- |
 | A15 | Wissensseiten, Index, Versionen und Log lesen (Sichtbarkeit nach 11.2) | erlaubt | erlaubt | erlaubt (nur lesend) | erlaubt |
 | A16 | Ingest einer Wissensquelle starten oder wiederholen | erlaubt | 403 | 403 | erlaubt |
-| A17 | Entwürfe einsehen, Seiten von Hand ändern, Wissenspakete importieren (19.5), Änderungen annehmen oder verwerfen, Lint starten | erlaubt | 403 | 403 | erlaubt |
+| A17 | Entwürfe einsehen, Seiten von Hand ändern, Änderungen annehmen oder verwerfen, Lint starten | erlaubt | 403 | 403 | erlaubt |
 | A18 | Chat-Antwort als Analyse vorschlagen, Status eigener Vorschläge sehen | erlaubt | erlaubt | 403 | erlaubt |
 | A19 | Wissensbasis verwalten (Einstellungen, OKF-Export) | erlaubt | 403 | 403 | 403 |
 
 ¹ Im Mandanten `vhf-gsk` gibt die `geschaeftsstelle` frei (Entscheid 09.11.2026). A19 für die Geschäftsstelle: 403; Einstellungen und OKF-Export bleiben dem Inhaber vorbehalten (entschieden von Fabian am 09.11.2026). Weil Spec 03 im Mandanten `vhf-gsk` nur Benutzer mit Rolle `geschaeftsstelle` anlegt, gelten dort die Startwerte (10.1, 13.4, 13.6); einen OKF-Export erhält VHF/GSK nur über den Vollexport des Betreibers (Spec 03, 8.2; 17.5).
+
+Spec 04, 19.5 ergänzt (ohne neue Zeile, Aktionstext der Tabelle unverändert): A17 umfasst auch das Importieren eines Wissenspakets und die Wiederholung seiner Prüfung; A16 und A19 sind dafür nicht nötig.
 
 2. FALLS ein Benutzer mit Rolle `treuhaender` eine schreibende Aktion der Wissensbasis ausführt, DANN SOLL das Archiv mit HTTP 403 antworten und nichts ändern (Spec 01, 2.4).
 3. FALLS ein Benutzer ohne Recht A17 einen Entwurf oder eine Änderung abruft, der bzw. die nicht sein eigener Vorschlag nach A18 ist, DANN SOLL das Archiv mit HTTP 403 antworten. Eigene Vorschläge SOLL es ihm nur mit Status, Entscheid und Grund liefern, ohne Fassung und Diff.

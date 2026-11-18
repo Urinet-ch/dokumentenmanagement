@@ -981,7 +981,7 @@ das hier als «Spec 04 ergänzt …» beschrieben ist.
    `WISSEN_EMBEDDING_ALLE`, `WISSEN_EXPORT` mit Zeitgrenzen. Grund: Jede Auftragsart braucht
    `archiv.auftrag.zeitgrenze.<typ>`.
 9. **design.md, Zugriffsprotokoll-Tabelle:** Aktionen `WISSEN_ANZEIGEN`, `WISSEN_ANNEHMEN`, `WISSEN_VERWERFEN`,
-   `WISSEN_INGEST`, `WISSEN_LINT`; `EXPORTIEREN` und `VERWEIGERT` auf die Wissens-Endpunkte erweitern. Grund: Die
+   `WISSEN_INGEST`, `WISSEN_LINT`, `WISSEN_IMPORT` (Requirement 19); `EXPORTIEREN` und `VERWEIGERT` auf die Wissens-Endpunkte erweitern. Grund: Die
    Tabelle ist die Liste der protokollierten Endpunkte.
 10. **design.md, Fehlercodes:** `KEINE_WISSENSQUELLE`, `ENTWURF_BEFUND`, `VERTRAULICHKEIT_ZU_TIEF`,
     `VERTRAULICHKEIT_UNGUELTIG`, `ANALYSE_NICHT_MOEGLICH` in die abschliessende Code-Liste aufnehmen, mit PR #20
