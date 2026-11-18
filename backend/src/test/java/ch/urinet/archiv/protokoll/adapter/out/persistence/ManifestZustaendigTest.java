@@ -3,11 +3,16 @@ package ch.urinet.archiv.protokoll.adapter.out.persistence;
 import ch.urinet.archiv.dokument.adapter.out.persistence.PanacheDokumentPrueflauf;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Datei;
 import ch.urinet.archiv.dokument.application.DokumentPrueflaufPort.Pruefdokument;
+import ch.urinet.archiv.gemeinsam.LogMitschnitt;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.protokoll.application.ManifestDaten;
+import ch.urinet.archiv.protokoll.application.ManifestSpeichern;
 import ch.urinet.archiv.protokoll.application.ManifestDaten.Zustaendig;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
+import ch.urinet.archiv.protokoll.domain.ManifestFenster;
+import ch.urinet.archiv.protokoll.domain.ProtokollHash;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
@@ -57,6 +62,9 @@ class ManifestZustaendigTest {
 
     @Inject
     JdbcManifestDaten daten;
+
+    @Inject
+    ManifestSpeichern speichern;
 
     @Inject
     PanacheDokumentPrueflauf prueflauf;
@@ -123,6 +131,57 @@ class ManifestZustaendigTest {
     void nachDemJuengstenManifestKeinesZustaendig() {
         Optional<Zustaendig> spaeter = zurueckgerollt(() -> daten.zustaendig(Instant.parse("2999-01-01T00:00:00Z")));
         assertThat(spaeter).isEmpty();
+    }
+
+    @Test
+    void manifestEnthaeltWissensversionenUndLog() {
+        ManifestSpeichern.Sammlung sammlung = zurueckgerollt(() -> speichern.sammeln(MANDANT,
+                ManifestFenster.fuer(LocalDate.parse("2001-01-02"), null)));
+        assertThat(sammlung.blaetter()).containsKeys(ProtokollHash.WISSENSSEITE_VERSION, ProtokollHash.WISSENS_LOG);
+    }
+
+    @Test
+    void wissensseitenUndLogWerdenGehashtOhneInhalteZuLoggen() {
+        String inhalt = "synthetischer-wissensinhalt-nicht-loggen";
+        record Blaetter(List<ManifestDaten.Blatt> versionen, List<ManifestDaten.Blatt> log, String protokoll) {
+        }
+        Blaetter blaetter = zurueckgerollt(() -> {
+            UUID seite = UUID.randomUUID();
+            Instant zeit = T1.plusSeconds(10);
+            ausfuehren("insert into " + MANDANT.schema()
+                    + ".wissensseite (id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, erzeugt_von, erzeugt_am, "
+                    + "freigegeben_von, freigegeben_am) values (?, ?, 'Konzept', ?, 'synthetisch', 'NORMAL', ?, 1, "
+                    + "'human:probe', ?, 'human:probe', ?)", p -> {
+                p.setObject(1, seite);
+                p.setString(2, "probe/" + seite);
+                p.setString(3, "Synthetische Probe");
+                p.setString(4, inhalt);
+                p.setObject(5, zeit.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);
+                p.setObject(6, zeit.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);
+            });
+            ausfuehren("insert into " + MANDANT.schema()
+                    + ".wissensseite_version (seite_id, version, daten, inhalt, erzeugt_von, freigegeben_von, zeit) "
+                    + "values (?, 1, '{}', ?, 'human:probe', 'human:probe', ?)", p -> {
+                p.setObject(1, seite);
+                p.setString(2, inhalt);
+                p.setObject(3, zeit.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);
+            });
+            ausfuehren("insert into " + MANDANT.schema()
+                    + ".wissens_log (zeit, aktion, akteur, seiten, angaben) "
+                    + "values (?, 'CREATION', 'human:probe', array[?::uuid], ?::jsonb)", p -> {
+                p.setObject(1, zeit.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);
+                p.setObject(2, seite);
+                p.setString(3, "{\"inhalt\":\"" + inhalt + "\"}");
+            });
+            try (LogMitschnitt protokoll = LogMitschnitt.starten()) {
+                return new Blaetter(daten.blaetter(ProtokollHash.WISSENSSEITE_VERSION, T1, T2),
+                        daten.blaetter(ProtokollHash.WISSENS_LOG, T1, T2), protokoll.volltext());
+            }
+        });
+
+        assertThat(blaetter.versionen()).hasSize(1).allSatisfy(b -> assertThat(b.sha256()).hasSize(64));
+        assertThat(blaetter.log()).hasSize(1).allSatisfy(b -> assertThat(b.sha256()).hasSize(64));
+        assertThat(blaetter.protokoll()).doesNotContain(inhalt);
     }
 
     @Test

@@ -40,7 +40,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
      * ein Trigger UPDATE, DELETE und TRUNCATE, auch für den Eigentümer.
      */
     static final List<String> NUR_EINFUEGEN = List.of("zugriff_protokoll", "dokument_version", "benutzer_verzeichnis",
-            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version");
+            "manifest", "manifest_zeitstempel", "protokoll_blatt", "konfiguration_version", "wissensseite_version",
+            "wissensseite_version_dokument", "wissens_log");
 
     private final EigentuemerVerbindung eigentuemer;
     private final String appRolle;
@@ -112,8 +113,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
         String sql = "insert into " + schema + ".dokumentart (code, name, gruppen, pflichtfelder, zusatz_schema, "
                 + "vertraulichkeit, aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung, "
                 + "selbst_ausgestellt, belegnummer_muster, fremdbeleg_art, ohne_zahlungsdaten_art, ki_vorschlag, "
-                + "ki_felder, ki_hinweise, reihenfolge) values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, "
-                + "?, null, null, ?, ?, ?, ?) on conflict (code) do nothing returning code";
+                + "ki_felder, ki_hinweise, reihenfolge, aufbewahrung_feld) values (?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, "
+                + "?, null, null, ?, ?, ?, ?, ?) on conflict (code) do nothing returning code";
         String referenzenAktualisieren = "update " + schema
                 + ".dokumentart set fremdbeleg_art = ?, ohne_zahlungsdaten_art = ? where code = ?";
         try (Connection verbindung = eigentuemer.oeffnen(); PreparedStatement einfuegen = verbindung.prepareStatement(sql)) {
@@ -141,6 +142,7 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                     einfuegen.setArray(15, verbindung.createArrayOf("text", art.kiFelder().toArray()));
                     einfuegen.setString(16, art.kiHinweise());
                     einfuegen.setInt(17, art.reihenfolge());
+                    einfuegen.setString(18, art.aufbewahrungFeld());
                     try (ResultSet eingefuegt = einfuegen.executeQuery()) {
                         if (eingefuegt.next()) {
                             referenzen.setString(1, art.fremdbelegArt());
@@ -193,7 +195,8 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                             'vertraulichkeit', a.vertraulichkeit,
                             'aufbewahrung', jsonb_build_object(
                                 'jahre', a.aufbewahrung_jahre,
-                                'ab', a.aufbewahrung_ab),
+                                'ab', a.aufbewahrung_ab)
+                                || jsonb_strip_nulls(jsonb_build_object('feld', a.aufbewahrung_feld)),
                             'gesetzlichePflicht', a.gesetzliche_pflicht,
                             'aktiv', a.aktiv,
                             'selbstAusgestellt', a.selbst_ausgestellt,

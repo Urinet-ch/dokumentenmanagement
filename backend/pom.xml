@@ -17,7 +17,7 @@
         <!-- Quarkus 3.40 LTS; 3.40.1.2 ist das aktuelle Patch-Release (CVE-Fixes) -->
         <quarkus.platform.version>3.40.1.2</quarkus.platform.version>
         <quinoa.version>2.9.3</quinoa.version>
-        <quarkus-cucumber.version>1.4.0</quarkus-cucumber.version>
+        <quarkus-cucumber.version>1.5.0</quarkus-cucumber.version>
         <archunit.version>1.5.1</archunit.version>
         <assertj.version>3.27.7</assertj.version>
         <pdfbox.version>3.0.8</pdfbox.version>
@@ -35,7 +35,7 @@
         <icu4j.version>79.1</icu4j.version>
         <!-- Swiss QR Code (Aufgabe 3.2, Req 7.11): dieselbe Version wie im Golden-Lauf (spikes/golden-lauf) -->
         <zxing.version>3.5.4</zxing.version>
-        <wiremock.version>3.13.0</wiremock.version>
+        <wiremock.version>3.13.2</wiremock.version>
         <greenmail.version>2.1.15</greenmail.version>
     </properties>
 

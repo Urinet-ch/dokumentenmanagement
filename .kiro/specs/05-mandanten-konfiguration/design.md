@@ -319,6 +319,27 @@ Spec 03, design.md «Reservierte Felder» (dort bei Aufgabe 10.4 für die Vorsta
 Req 2.9 nicht an einen Art-Code gebunden. Nachverfolgung 17.2/17.3: Das ist die technische Auslegung dieser
 Prüfung, kein zusätzlicher allgemeiner Entscheid von Fabian; die bestehende Zulässigkeit bleibt unverändert.
 
+Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
+Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
+in `Europe/Zurich`, auch beim Jahreswechsel und während der Sommerzeit. Alle taggenauen Bezüge verwenden
+`LocalDate.plusYears`: Der 29. Februar wird im Nicht-Schaltjahr zum 28. Februar (wie bisher bei `GUELTIG_BIS`).
+`Fristbezug` liefert das benannte Zusatzdatum ohne JSON-Abhängigkeit in der Domain. Das Feld steht ohne Präfix
+`zusatz.` in `aufbewahrungFeld` (API) bzw. `aufbewahrung_feld` (Datenbank und Übergangs-Seed); es muss direkt unter
+`properties` als `string` mit `format: date` definiert und in `pflichtfelder` als `zusatz.<feld>` enthalten sein.
+Schema- und Seed-Prüfung nutzen dafür denselben Port `ZusatzSchemaPruefer`; `Konfiguration.pruefen` prüft die
+fachliche Pflichtfeld-Zuordnung.
+
+Fehlend, `null` oder leer bedeutet bei vorhandenen Dokumenten unbefristet, nicht ein Ersatzdatum. Der Eingangskorb
+und die Dokumentantwort führen dann `FRISTBEZUG_FEHLT` ohne Dokumentverweis, auch nach Bestätigung oder einem
+Artwechsel; andere Pflichtfelder bleiben unverändert verpflichtend. Der Generator verlangt bei neuen Dokumenten
+weiter sämtliche Pflichtfelder. Ungültige, nicht leere Datumswerte ergeben `ZUSATZ_UNGUELTIG`, keinen stillen
+Rückfall. Ein Wechsel der Art darf das Fristfeld leer lassen; das Entfernen eines bereits vorhandenen Pflichtwerts
+derselben Art bleibt nach Spec 01, 8.3 verboten. Eine Änderung des Zusatzdatums löst dieselbe Neuberechnung wie das
+Belegdatum aus: bei Pflicht oder bestehender Sperre früheres Ergebnis nur als Konflikt protokollieren, ohne beides
+übernehmen. Änderungen anderer Zusatzfelder lösen keine Fristneuberechnung aus. Die bestehende Sperrpflege bleibt
+unverändert; insbesondere bleiben nicht pflichtige Dokumente ohne vorhandene Sperre ungesperrt. Konfigurationsabbild
+und Regelprotokoll enthalten auch den Feldnamen, nie dessen Dokumentwert.
+
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet id="042-fristbezuege" author="archiv">
+        <addColumn tableName="dokumentart">
+            <column name="aufbewahrung_feld" type="text"/>
+        </addColumn>
+        <sql>
+            alter table dokumentart drop constraint dokumentart_aufbewahrung_ab_ck;
+            alter table dokumentart add constraint dokumentart_aufbewahrung_ab_ck
+                check (aufbewahrung_ab in ('GESCHAEFTSJAHR', 'GUELTIG_BIS', 'BELEGDATUM', 'FELD'));
+            alter table dokumentart add constraint dokumentart_aufbewahrung_feld_ck
+                check ((coalesce(aufbewahrung_ab = 'FELD', false)) = (aufbewahrung_feld is not null)
+                    and (aufbewahrung_feld is null or aufbewahrung_feld ~ '^[a-z][a-z0-9_]{0,62}$'));
+        </sql>
+    </changeSet>
+</databaseChangeLog>

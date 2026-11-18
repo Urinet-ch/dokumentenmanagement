@@ -78,6 +78,15 @@ class KonfigurationTest {
                 List.of(), null, null, true, List.of(), null, 0);
     }
 
+    @Test
+    void fristfeldMussPflichtfeldDerArtSein() {
+        var art = new Konfiguration.Art("PROBE", "Probe", null, List.of("frei"), List.of("titel"),
+                "{\"type\":\"object\"}", "NORMAL", new Konfiguration.Aufbewahrung(10, "FELD", "sitzung"),
+                false, true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(art)).pruefen())
+                .extracting(Konfiguration.Befund::code).containsExactly("FRISTFELD_UNGUELTIG");
+    }
+
     private static Konfiguration.Einstellungen einstellungen() {
         return new Konfiguration.Einstellungen("12-31", new Konfiguration.Kennungen(null, List.of()));
     }

@@ -6,6 +6,7 @@ import ch.urinet.archiv.protokoll.domain.Jcs;
 import ch.urinet.archiv.protokoll.domain.ManifestEintrag;
 import ch.urinet.archiv.protokoll.domain.ManifestFenster;
 import ch.urinet.archiv.protokoll.domain.ManifestInhalt;
+import ch.urinet.archiv.protokoll.domain.ProtokollHash;
 import ch.urinet.archiv.verarbeitung.domain.Nutzlast;
 import org.junit.jupiter.api.Test;
 
@@ -138,6 +139,47 @@ class ManifestErzeugenTest {
 
         assertThat(warnungen.meldungen).hasSize(2).allSatisfy(meldung -> assertThat(meldung)
                 .contains("abgelegt=0", "neu=1").doesNotContain(hash, "original"));
+    }
+
+    @Test
+    void wissenstabellenStehenNurMitZeilenUnterProtokollen() {
+        Map<String, List<ManifestDaten.Blatt>> ohneWissen = blaetter(List.of());
+        Map<String, List<ManifestDaten.Blatt>> mitWissen = blaetter(List.of(new ManifestDaten.Blatt(1, "d".repeat(64))));
+
+        assertThat(ManifestErzeugen.protokolle(ohneWissen))
+                .containsOnlyKeys(ProtokollHash.DOKUMENT_VERSION, ProtokollHash.ZUGRIFF_PROTOKOLL);
+        assertThat(ManifestErzeugen.protokolle(mitWissen)).containsOnlyKeys(ProtokollHash.DOKUMENT_VERSION,
+                ProtokollHash.ZUGRIFF_PROTOKOLL, ProtokollHash.WISSENSSEITE_VERSION);
+        assertThat(ManifestErzeugen.protokolle(mitWissen).get(ProtokollHash.WISSENSSEITE_VERSION).anzahl()).isOne();
+    }
+
+    @Test
+    void einManifestDesVorgaengerReleasesBleibtOhneWissenszeilenWiederverwendbar() {
+        TreeMap<String, ProtokollHash> vorgaenger = new TreeMap<>(Map.of(
+                ProtokollHash.DOKUMENT_VERSION, ProtokollHash.aus(new byte[0]),
+                ProtokollHash.ZUGRIFF_PROTOKOLL, ProtokollHash.aus(new byte[0])));
+        byte[] abgelegt = inhalt(List.of(eintrag("a")), vorgaenger).kanonisch();
+        JsonLeser leser = new JacksonJsonLeser();
+
+        assertThat(ManifestErzeugen.wiederverwenden(leser, DATUM, abgelegt,
+                inhalt(List.of(eintrag("a")), ManifestErzeugen.protokolle(blaetter(List.of())))).kanonisch())
+                .isEqualTo(abgelegt);
+        assertThatThrownBy(() -> ManifestErzeugen.wiederverwenden(leser, DATUM, abgelegt, inhalt(List.of(eintrag("a")),
+                ManifestErzeugen.protokolle(blaetter(List.of(new ManifestDaten.Blatt(1, "d".repeat(64))))))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("verspätet festgeschriebene Zeile");
+    }
+
+    private static Map<String, List<ManifestDaten.Blatt>> blaetter(List<ManifestDaten.Blatt> wissensversionen) {
+        Map<String, List<ManifestDaten.Blatt>> blaetter = new java.util.LinkedHashMap<>();
+        for (String tabelle : ManifestSpeichern.PROTOKOLLE) {
+            blaetter.put(tabelle, tabelle.equals(ProtokollHash.WISSENSSEITE_VERSION) ? wissensversionen : List.of());
+        }
+        return blaetter;
+    }
+
+    private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege, TreeMap<String, ProtokollHash> protokolle) {
+        ManifestFenster fenster = ManifestFenster.fuer(DATUM, null);
+        return new ManifestInhalt("probe", DATUM, null, fenster.bis(), null, null, eintraege, protokolle, List.of());
     }
 
     private static ManifestInhalt inhalt(List<ManifestEintrag> eintraege) {
