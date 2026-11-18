@@ -22,4 +22,6 @@ export * from './protokoll.service';
 import { ProtokollService } from './protokoll.service';
 export * from './wissen-ingest-resource.service';
 import { WissenIngestResourceService } from './wissen-ingest-resource.service';
-export const APIS = [APITokensService, BerichteService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService];
+export * from './wissensbasis.service';
+import { WissensbasisService } from './wissensbasis.service';
+export const APIS = [APITokensService, BerichteService, BrandingService, ChatService, DokumentartenService, DokumenteService, ExporteService, ImporteService, KonfigurationService, KontakteService, ProtokollService, WissenIngestResourceService, WissensbasisService];

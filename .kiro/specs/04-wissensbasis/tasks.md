@@ -46,14 +46,14 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Aktionen A15–A19 in `Berechtigung`, 404 vor 403, A19 für `geschaeftsstelle` 403; Szenarien mit zwei Mandanten und allen vier Rollen; Seite von Hand auf `INTERN` → `mitarbeiter` erhält 404, auch nach Neuberechnung
   - _Anforderungen: 11.1–11.3, 11.5, 11.8, 11.9, 12.1–12.3_
   - _Abhängig von: 13.3_
-  - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) liegt in `WissensPruefung` (13.4), die wirksame Stufe nach Annahme in `WissensGraph.wirksameStufeNachAnnahme` (13.5), der Aufruf bei jedem Annehmen kommt mit 14.2. Eine Übersicht erhält bei einer Dokumentänderung die wirksame Stufe (11.9, entschieden von Fabian am 18.11.2026). Der Nachweis von 12.2/12.3 über einen Endpunkt folgt mit 13.6 bzw. dem Entwurfszugriff in 14.x.
+  - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) liegt in `WissensPruefung` (13.4), die wirksame Stufe nach Annahme in `WissensGraph.wirksameStufeNachAnnahme` (13.5), der Aufruf bei jedem Annehmen kommt mit 14.2. Eine Übersicht erhält bei einer Dokumentänderung die wirksame Stufe (11.9, entschieden von Fabian am 18.11.2026). Der Endpunkt-Nachweis zu 12.2 folgt mit 14.2 am ersten schreibenden A17-Endpunkt (`POST /wissensentwuerfe`); ein Leseendpunkt aus 13.6 kann die schreibende Sperre für `treuhaender` nicht prüfen. Der Endpunkt-Nachweis zu 12.3 folgt mit dem Entwurfszugriff in 14.x.
 
-- [ ] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
+- [x] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
   - Zugriffsprotokoll `WISSEN_ANZEIGEN` und `VERWEIGERT`, ohne Inhalte
   - Sichtbarkeit als SQL-Prädikat an den Abfragen von `wissensseite` (Zähler und Paging verraten nichts); ersetzt den Java-Filter aus 13.5 (design.md, «Umsetzung 13.5»), inkl. fail-closed bei Quellen ohne gespeicherte Hülle und bei live erreichbaren Dokumenten ausserhalb der gespeicherten Hülle (Review PR #300, ebc9d0b6, S2)
-  - Wissens-Endpunkte nur für OIDC-Benutzer; API-Tokens (auch Webseiten-Schlüssel mit Rolle `geschaeftsstelle`) erhalten A15–A19 nicht über die Rolle (Review PR #300, ebc9d0b6, K4)
-  - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4)
+  - Wissens-Endpunkte nur für OIDC-Benutzer; API-Tokens (auch Webseiten-Schlüssel mit Rolle `geschaeftsstelle`) erhalten A15–A19 nicht über die Rolle (Review PR #300, ebc9d0b6, K4); Nachweis: Szenarien `@req-12.1` «API-Tokens …» und «Webseiten-Schlüssel erreichen die Wissensbasis nicht» (`sichtbarkeit-rechte.feature`) und `EndpunktWaechterTest` (Review PR #311)
+  - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4) → verschoben auf 14.2 (`POST /wissensentwuerfe`, Vermerk bei 13.5; Review PR #311, M2)
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
 
@@ -71,6 +71,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
 
 - [ ] 14.2 Entwurf, Diff und Freigabe [Backend]
   - `DiffDienst` (java-diff-utils, Felddiff), `FreigabeDienst` mit `If-Match`, 412/428, `WissensPruefung` bei jedem Annehmen, Befund 422, Vertraulichkeit nicht senkbar und nur bis `INTERN` erhöhbar (Mindeststufe), kein gesammeltes Annehmen, «neu erzeugen»; Kernaussagen im Ingest-Entwurf
+  - Endpunkt-Szenario `@req-12.2`: `treuhaender` erhält am `POST /wissensentwuerfe` HTTP 403; Datenbank und Zugriffsprotokoll bleiben unverändert
   - Transaktion: Seite, Version, Hülle der Version, Quelleneinträge, Links, Hüllen, Log, Zugriffsprotokoll `WISSEN_ANNEHMEN`/`WISSEN_VERWERFEN`, Auftrag `WISSEN_EMBEDDING` (nur einreihen; Handler in 15.1, bis dahin bleibt der Auftrag wartend, der Test prüft nur das Einreihen); Start des nächsten wartenden Ingest
   - manueller Entwurf `POST /wissensentwuerfe`; Felder nach 7.6 nur vom System
   - wirksame Stufe nach Annahme über `WissensGraph.wirksameStufeNachAnnahme` als `Kontext.wirksameVertraulichkeit`, Seitenstufe = Mindeststufe; zuerst `WissenHuelleDienst.sperren()`, dann Seite und Version, dann `versionFreigeben` in derselben Transaktion; Test mit zwei parallelen Freigaben (Review PR #300, S1, S2)
