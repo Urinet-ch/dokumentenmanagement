@@ -301,7 +301,7 @@ damit mein Wissen nicht im Archiv eingeschlossen ist.
 ## Optionen (nicht Teil des Plans, Aufgaben mit `*`)
 - Wissensseiten für Verbandsmitglieder von VHF/GSK über die öffentliche Schnittstelle und den Chatbot (ändert Spec 03, 6.1).
 - Import eines bestehenden OKF-Bundles (z. B. eines LLM-Wikis) als Entwurf mit Freigabe.
-- Werkzeuge der Wissensbasis im MCP-Server (Spec 02, Option C3), nur lesend.
+- Werkzeuge der Wissensbasis im MCP-Server (Spec 02, Option C3), nur lesend — entfällt (folgt aus Spec 02, O.3, Entscheid 18.11.2026).
 - KI-Vorschlag der Art `WISSENSQUELLE` (Spec 01, Requirement 7), erst nach einem erneuten Lauf des Golden-Datensatzes mit den Schwellen aus Gate 0; ein solcher Vorschlag gälte nie als «sicher».
 - Zweite Synthese-Seite für Wissen aus `INTERN`-Quellen (z. B. `ueberblick-intern`), nur bei Bedarf, falls die Synthese nur aus `NORMAL`-Quellen (11.8) nicht genügt (entschieden von Fabian am 09.11.2026).
 - Ingest auch für archivierte Dokumente anderer Arten über «Zur Wissensbasis hinzufügen» (vorerst nicht, entschieden von Fabian am 09.11.2026; das Design ist vorbereitet, design.md, Open Points).

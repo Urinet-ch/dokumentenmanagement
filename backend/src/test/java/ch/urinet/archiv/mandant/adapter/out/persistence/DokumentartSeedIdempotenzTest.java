@@ -16,6 +16,7 @@ import java.sql.Statement;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Seed ist idempotent (Req 9.2): zweimal einspielen ergibt dieselben Arten, und eine seither geänderte Art überschreibt
@@ -33,6 +34,38 @@ class DokumentartSeedIdempotenzTest {
     void aufraeumen() throws SQLException {
         try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
             befehl.execute("drop schema if exists " + SCHEMA + " cascade");
+            befehl.execute("drop schema if exists m_probe_seed_abbruch cascade");
+        }
+    }
+
+    @Test
+    void abbruchNachErsterArtRolltZurueckUndWiederholungBleibtMandantengetrennt() throws SQLException {
+        String zweitesSchema = "m_probe_seed_abbruch";
+        datenbank.schemaAnlegen(SCHEMA);
+        datenbank.schemaAnlegen(zweitesSchema);
+        datenbank.dokumentartenEinspielen(zweitesSchema, List.of(art("SEED_A", "Anderer Mandant")));
+        var ungueltig = new DokumentartVorlage("SEED_B", "B", null, List.of(), List.of(), null, "UNGUELTIG",
+                null, null, false, true);
+
+        assertThatThrownBy(() -> datenbank.dokumentartenEinspielen(SCHEMA,
+                List.of(art("SEED_A", "A"), ungueltig)))
+                .isInstanceOf(IllegalStateException.class).hasCauseInstanceOf(SQLException.class);
+
+        try (Connection verbindung = verbinden(); Statement befehl = verbindung.createStatement()) {
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".dokumentart")).isEqualTo("0");
+            assertThat(wert(befehl, "select name from " + zweitesSchema + ".dokumentart"))
+                    .isEqualTo("Anderer Mandant");
+            var fehlenderVerweis = new DokumentartVorlage("SEED_B", "B", null, List.of(), List.of(), null,
+                    "NORMAL", null, null, false, true, false, List.of(), "FEHLT", null, true, List.of(), null, 0);
+            assertThatThrownBy(() -> datenbank.dokumentartenEinspielen(SCHEMA,
+                    List.of(art("SEED_A", "A"), fehlenderVerweis)))
+                    .isInstanceOf(IllegalStateException.class).hasCauseInstanceOf(SQLException.class);
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".dokumentart")).isEqualTo("0");
+            datenbank.dokumentartenEinspielen(SCHEMA, List.of(art("SEED_A", "A"), art("SEED_B", "B")));
+            datenbank.dokumentartenEinspielen(SCHEMA, List.of(art("SEED_A", "A"), art("SEED_B", "B")));
+            assertThat(wert(befehl, "select count(*) from " + SCHEMA + ".dokumentart")).isEqualTo("2");
+            assertThat(wert(befehl, "select name from " + zweitesSchema + ".dokumentart"))
+                    .isEqualTo("Anderer Mandant");
         }
     }
 

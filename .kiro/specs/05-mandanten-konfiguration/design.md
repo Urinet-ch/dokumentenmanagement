@@ -314,9 +314,11 @@ auf die eine andere verweist, 409 `DOKUMENTART_IN_GEBRAUCH`. Reservierte Felder 
 `ZusatzSchemaPruefer.reservierteFelderGueltig` und läuft über `DokumentartPruefung` für jeden Pfad, der Arten
 speichert (Verwaltung, Seed); `Konfiguration.pruefen` bleibt rein fachlich ohne Schema-Bibliothek. `zugriff` und
 `veroeffentlicht` müssen direkt unter `properties` der Wurzel stehen (nicht über patternProperties, Kombinatoren
-oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder` oder
-`vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig (Entscheid Fabian 17.11.2026 für
-VORSTANDSPROTOKOLL, Spec 03 Aufgabe 10.4).
+oder `$ref`); der Standard wird typgenau geprüft (`veroeffentlicht`: JSON-`false`; `zugriff`: Text `mitglieder`
+oder `vorstand`, nie `oeffentlich`). `vorstand` als Standard ist ohne Art-Code zulässig, für jede Art (Req 2.7,
+Entscheid Fabian 18.11.2026, PR #290, Punkt 3); wegen Req 2.9 bindet die Prüfung den Startwert von
+`VORSTANDSPROTOKOLL` im Seed `vhf-gsk` (Aufgabe 10.4, Entscheid Fabian 17.11.2026) nicht an einen Art-Code. Die
+Vorbelegung der Auswahl im Eingangskorb mit dem Standard der Art belegt `eingangskorb-karte.spec.ts` (PR #301).
 
 Umsetzung 17.4: Changeset 042 ergänzt `aufbewahrung_feld` und erweitert den Check für den Fristbezug, ohne bestehende
 Arten, Dokumentfristen oder Sperren umzuschreiben. `BELEGDATUM` rechnet taggenau; ohne Belegdatum gilt der Eingangstag
@@ -351,6 +353,29 @@ Klassifikationen und Werten enthalten keine Steuerzeichen, Beschreibungen nur Ze
 Protokoll: `KONFIGURATION_AENDERN` mit `{version, aenderungen: [{pfad, alt, neu}]}` für jede Konfigurationsänderung,
 **zusätzlich** zu `REGEL_AENDERN`: Ändern sich Jahre, «ab» oder `gesetzliche_pflicht` einer Art, schreibt das Archiv
 weiter `REGEL_AENDERN` nach Spec 01, 9.10 (Entscheid 10.11.2026), mit Verweis auf die Version.
+Datensparsame Ausnahme bei `einstellungen.kennungen.uid` und `.ibans` (Req 1.3, geändert 18.11.2026, vorgeschlagen
+in PR #290, entschieden mit dessen Merge): Diese Änderungen enthalten nur `{pfad, aenderung: "geändert"}`, keine alten
+oder neuen Werte. Grund ist die Datensparsamkeit: Die Kennungen stehen vollständig im unveränderlichen
+Konfigurationsabbild und müssen im Zugriffsprotokoll nicht vervielfältigt werden (Spec 01, 16.7 regelt Datenstandort
+und CI-Logs, nicht dieses Protokoll, und trägt die Ausnahme nicht). Die Regel steht an einer Stelle:
+`Konfiguration.Aenderung.ohneWerte()` (alle Pfade unter `einstellungen.kennungen.`), der Adapter
+`ZugriffKonfigurationAenderungsProtokoll` gibt das Merkmal an `ProtokollDetails.Aenderung` weiter, das die Werte vor
+jeder Serialisierung entfernt; die Protokoll-Domain kennt keine Konfigurationspfade. `toString()` von
+`Konfiguration.Aenderung` und `Konfiguration.Kennungen` gibt UID und IBANs nicht aus. Andere Elemente behalten die
+bisherige Form mit `alt` und `neu`.
+Altzeilen: Protokollzeilen `KONFIGURATION_AENDERN` aus der Zeit vor PR #290 können UID und IBAN im Klartext als
+`alt`/`neu` enthalten (bisher nur Stufe A mit Testdaten). Das Zugriffsprotokoll ist nur anfügend (Append-only,
+Aufbewahrung nach Spec 01, 10.9), darum bleiben sie unverändert (kein UPDATE). Ob sie bereinigt werden, ist offen
+für Fabian (PR #290). Das unveränderliche Konfigurationsabbild enthält die vollständigen Einstellungen weiterhin; dort
+lässt sich die Änderung mit der protokollierten Version nachvollziehen.
+
+Nachweise der Nachverfolgung: `KonfigurationMigrationTest` migriert zwei getrennte synthetische Mandantenschemas
+mit allen echten Changesets bis 036, legt Bestand an und führt erst dann 037 aus. Dokumente, Fassungen und
+Einstellungen bleiben erhalten, ihre Version verweist auf das mit gültigem SHA-256 lesbare Migrationsabbild.
+Der Dokumentarten-Seed ist bereits eine JDBC-Transaktion einschliesslich des nachgelagerten Referenz-Batches;
+`DokumentartSeedIdempotenzTest` belegt jetzt Abbruch nach der ersten Art sowie Abbruch im Referenz-Batch, vollständigen
+Rollback, erfolgreiche Wiederholung und Unverändertheit eines zweiten Mandanten. Keine Änderung alter Changesets
+und keine zusätzliche Transaktionslogik für einen bereits atomaren Schritt.
 
 ## Error Handling (neue Codes)
 | Status | Code | Wann |

@@ -147,4 +147,4 @@ Optionale Aufgaben führen die Nummern von Spec 02 (`O.1`–`O.3`) fort.
   - Spec 03 ergänzt (Spec 03, 3.7; 13.11.2026): Die Zugriffsstufe einer Seite wäre die höchste Stufe ihrer Hülle (drei Stufen); die Erweiterung wäre additiv im Vertrag `public-v1` (Spec 03, 11.3)
 - [ ]* O.5 Import eines OKF-Bundles als Entwurf [Backend]
   - z. B. ein bestehendes LLM-Wiki; Quellen ohne Archivdokument werden als Befund markiert
-- [ ]* O.6 Wissenswerkzeuge im MCP-Server (O.3) [Backend]
+- [ ]* O.6 Wissenswerkzeuge im MCP-Server (O.3) [Backend] — **entfällt (folgt aus Spec 02, O.3, Entscheid 18.11.2026)** (nicht umsetzen)

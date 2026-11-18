@@ -38,7 +38,7 @@ public class ZugriffKonfigurationAenderungsProtokoll implements KonfigurationAen
                           List<Konfiguration.Aenderung> aenderungen) {
         var details = ProtokollDetails.konfiguration(grund,
                 new ProtokollDetails.Konfiguration(version, quelle.name(), aenderungen.stream()
-                        .map(a -> new ProtokollDetails.Aenderung(a.pfad(), a.alt(), a.neu())).toList()));
+                        .map(a -> new ProtokollDetails.Aenderung(a.pfad(), a.alt(), a.neu(), a.ohneWerte())).toList()));
         protokoll.schreiben(new ZugriffEintrag(benutzer(), rolle(), ProtokollAktion.KONFIGURATION_AENDERN,
                 Optional.empty(), ip(), details));
     }
