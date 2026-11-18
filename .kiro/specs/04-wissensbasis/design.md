@@ -65,19 +65,22 @@ flowchart LR
 
 | Befund | Regel |
 | --- | --- |
-| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen) fehlen oder sind ungültig |
+| `FELD_FEHLT` | Typ, Titel, Beschreibung (≤ 200 Zeichen), Status oder Vertraulichkeit fehlen oder sind ungültig |
+| `SCHLAGWORT_UNGUELTIG` | Schlagwort ist nicht kleingeschriebenes kebab-case |
 | `PFAD_UNGUELTIG` | `ueberblick` oder `<ordner>/<name>` mit Name `[a-z0-9]+(-[a-z0-9]+)*`, Ordner passt zum Typ, Name nicht `index`/`log`, bei `NEU` nicht vergeben (auch nicht von einer für den Kontext unsichtbaren Seite) |
 | `FUSSNOTE_OHNE_QUELLE` | Label ohne Quelleneintrag |
-| `AUSSAGE_OHNE_BELEG` | Absatz oder Listenpunkt ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
-| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, oder Seite ausserhalb `1..dokument.seiten` |
+| `FUSSNOTE_DEFINITION` | Fussnoten-Definition `[^label]: …` im Inhalt; die Quelle steht nur im Quelleneintrag (Umsetzung 13.4) |
+| `AUSSAGE_OHNE_BELEG` | Absatz, Listenpunkt oder Codeblock ohne Fussnote, ausser Überschriften, Widerspruchsblöcken und den Abschnitten «Offene Fragen» und «Berührte Seiten» (Requirement 2.6) |
+| `QUELLE_UNGUELTIG` | Dokument nicht im Mandanten, nicht `ARCHIVIERT`, Seite ausserhalb `1..dokument.seiten`, oder Wissensseitenquelle mit PDF-Angaben; Wissensquelle einer Quelle-Seite fehlt, fremd, nicht archiviert oder ohne Fussnote auf sie, Wissensquelle an einer Seite anderen Typs (Umsetzung 13.4) |
 | `SEITE_FEHLT` | Dokumentquelle ohne PDF-Seite (z. B. aus einem Analyse-Vorschlag, Requirement 12.4) |
-| `QUELLE_PERSONAL` | Dokument einer Quelle hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
+| `QUELLE_PERSONAL` | Dokument einer Quelle oder Wissensquelle einer Quelle-Seite hat die Vertraulichkeit `PERSONAL`, bei jedem Anlass |
 | `QUELLE_NICHT_BELEGT` | Änderung `NEU`/`AENDERN` eines Ingest ohne Fussnote auf einen Kernaussagen-Schlüssel der aktuellen Wissensquelle |
 | `STUFE_UEBERBLICK` | Änderung an `ueberblick` mit wirksamer Vertraulichkeit über `NORMAL` (Requirement 11.8) |
-| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum und Silbentrennung normalisiert) nicht auf der angegebenen PDF-Seite vor |
-| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]` |
+| `AUSZUG_NICHT_GEFUNDEN` | Auszug kommt (Leerraum, Silbentrennung und Unicode NFKC normalisiert, Gross-/Kleinschreibung unverändert) nicht auf der angegebenen PDF-Seite vor |
+| `LINK_UNGUELTIG` | externer Link, Bild, HTML, Wikilink `[[…]]`, Link-Referenzdefinition `[x]: …` (auch unbenutzt) und damit jeder Referenzlink (Umsetzung 13.4) |
 | `AUSSAGE_ENTFERNT` | Quellenschlüssel der Basisversion fehlt in der neuen Fassung und nicht unter «entfernte Aussagen» (ein Grund nach Requirement 7.3 gilt als Begründung) |
 | `ZU_GROSS` | Inhalt > `archiv.wissen.seite-max-zeichen` |
+| `MARKDOWN_ZU_TIEF` | Markdown überschreitet die feste Grenze von 64 Verschachtelungsebenen |
 | Hinweis `ABSCHNITT_FEHLT` | Pflichtabschnitte nach Requirement 2.8 |
 | Hinweis `HOEHERE_STUFE_VORHANDEN` | geplanter Pfad von einer Seite höherer Vertraulichkeit belegt (Requirement 5.12), nur für A17 sichtbar |
 | Hinweis `STUFE_STEIGT` | Annahme erhöht die wirksame Vertraulichkeit der Seite dauerhaft (Requirement 6.8) |
@@ -88,6 +91,69 @@ flowchart LR
   liefert die PDF-Seiten der PDF/A-Fassung (1-basiert); darauf beruhen Abschnitte,
   Seitenangaben und Auszugsprüfung. Bei `pdfa_fehlt` (Tika-Text ohne `\f`) oder wenn die Zahl der Seiten nicht
   `dokument.seiten` entspricht, gibt es keinen Ingest (Requirement 5.6).
+
+#### Umsetzung 13.4
+- `commonmark` und `commonmark-ext-footnotes` verwenden gemeinsam Version `0.32.0` (beide Artefakte in Maven Central
+  geprüft). `WissensMarkdown` wertet Fussnoten, Abschnitte, Aussagen und Links am selben CommonMark-Baum aus, den es
+  darstellt. Rohes HTML wird escaped; externe oder ungültige Linkziele erhalten kein `href`, Bilder kein `src`.
+- Interne Linkziele sind nur `ueberblick` und `/<ordner>/<name>` aus den sechs festen Seitentypen; gespeichert wird
+  der Pfad ohne führenden Schrägstrich für `wissensseite_link`. Die Markdown-Eingabe hat eine harte Grenze von
+  200'000 Zeichen und maximal 64 Verschachtelungsebenen; zusätzlich gilt der konfigurierte Seitenhöchstwert.
+- `WissensPruefung` erhält Dokument- und Seitenreferenzen sowie Basisversion und Ingest-Kontext als Eingabe. Sie bleibt
+  deterministisch und framework-frei; PDF-Seiten und Auszüge werden über `Seitentext` geprüft.
+- Nachbesserung Review PR #298:
+  - Fussnoten stehen im Inhalt nur als Verweis `[^label]` (Format von Requirement 2.7). Damit commonmark-java auch
+    ohne Definition einen Fussnotenverweis erkennt, hängt `WissensMarkdown` vor dem Parsen je Label eine
+    synthetische, leere Definition an; die Darstellung zeigt dort nur das Label, die Quellenliste kommt aus den
+    Quelleneinträgen. Jedes Label mit Verweis zählt, auch neben bekannten Labels und in Widerspruchsblöcken.
+    Definitionen im Inhalt selbst sind ein Befund `FUSSNOTE_DEFINITION` und werden nicht dargestellt, damit kein
+    unbelegter Text über eine Fussnote in die Seite kommt. Labels werden wie geschrieben verglichen.
+  - Vor Vorprüfung und Parsen werden die Zeilenenden vereinheitlicht (`\r\n` und `\r` → `\n`), weil CommonMark
+    auch ein einzelnes `\r` als Zeilenende wertet; die Grössengrenze gilt für den Inhalt wie gespeichert. Ob eine
+    Definition synthetisch ist, entscheidet ihre Eingabeposition (`SourceSpan.getInputIndex()` hinter dem Inhalt),
+    nicht die Zeilennummer (Nachbesserung Review PR #298, Kopf e819aaa4).
+  - Fenced und eingerückte Codeblöcke ausserhalb von Widerspruchsblöcken und den ausgenommenen Abschnitten zählen
+    als Aussage, auch in Listenpunkten; ohne Fussnote gilt `AUSSAGE_OHNE_BELEG`. Ein Listenpunkt ist mit der
+    Fussnote seines ersten Absatzes belegt; jeder weitere Absatz und Codeblock darin (auch in einem Blockzitat im
+    Listenpunkt) ist eine eigene Aussage (Requirement 2.6: «jeder Absatz und jeder Listenpunkt»).
+  - Die Beschreibung ist «ein Satz», wenn kein `!` oder `?` mit Folgetext und kein Punkt mit Leerraum und folgendem
+    Grossbuchstaben vorkommt; ausgenommen sind Punkte nach Zahlen, Einzelbuchstaben (z. B. «z. B.») und einer
+    festen Liste deutscher Abkürzungen («Art.», «gem.», «Hrn.», «Jan.», …). `BreakIterator` entfällt, weil es
+    Abkürzungen als Satzende wertete.
+  - Die Auszugsprüfung bleibt case-sensitiv (wörtlicher Auszug nach Requirement 2.7); normalisiert werden nur
+    Leerraum, Silbentrennung und Unicode NFKC.
+  - Die wirksame Vertraulichkeit nach Annahme berechnet die Anwendungsschicht (Aufgabe 13.5, inkl. Quellen und
+    Annahme-Vorschlägen) und übergibt sie als `Kontext.wirksameVertraulichkeit`; die Prüfung nimmt das Maximum aus
+    Seitenstufe und diesem Wert. Für `ueberblick` gilt `STUFE_UEBERBLICK`, wenn die wirksame Stufe über `NORMAL`
+    liegt oder nicht übergeben wurde (fail closed); `STUFE_STEIGT` vergleicht dieselbe wirksame Stufe.
+  - Ein Blockzitat mit der Marke «⚠️ Widerspruch:» gilt nur dann als Widerspruchsblock (und ist von der
+    Belegpflicht ausgenommen), wenn es Fussnoten auf mindestens zwei verschiedene Labels enthält (Glossar: «mit den
+    Quellen beider Aussagen», Requirement 7.1); sonst zählen seine Absätze, Listenpunkte und Codeblöcke als Aussagen
+    nach Requirement 2.6 (Nachbesserung Review PR #298, Kopf 197a8883).
+  - Link-Referenzdefinitionen `[x]: ziel "Titel"` sind ein Befund `LINK_UNGUELTIG`, auch unbenutzt: Requirement 3.5
+    erlaubt nur `[Titel](/pfad)`, und eine Definition trägt sonst externe Ziele (Requirement 3.7) oder unsichtbaren,
+    unbelegten Titeltext in den gespeicherten Inhalt (Suche, Chunks). Damit ist auch jeder Referenzlink
+    (`[Titel][k]`, `[k][]`, `[k]`) ein Befund (Nachbesserung Review PR #298, Kopf 197a8883).
+  - Offene Klammern zählen nur innerhalb eines Absatzes zur Verschachtelung; eine Leerzeile setzt Klammer- und
+    Inline-Code-Zähler zurück.
+  - Die Wissensquelle einer Seite vom Typ `Quelle` (`wissensquelle_id`) prüft `WissensPruefung` wie eine
+    Dokumentquelle (Requirement 2.7, bei jedem Anlass): fehlt sie im Kontext, ist sie fremd oder nicht archiviert,
+    gilt `QUELLE_UNGUELTIG`, ist sie `PERSONAL`, `QUELLE_PERSONAL` (bei fremdem Dokument nur `QUELLE_UNGUELTIG`).
+    Eine `wissensquelle_id` an einer Seite anderen Typs ist `QUELLE_UNGUELTIG` (Datenmodell: «nur Typ Quelle»).
+    Eine Quelle-Seite muss mindestens eine Fussnote auf einen Quelleneintrag zu ihrer Wissensquelle tragen, sonst
+    `QUELLE_UNGUELTIG`: Die Hülle besteht nur aus den Quelleneinträgen, und die Quelle-Seite beruht auf ihrer
+    Wissensquelle (Glossar «Hülle», Requirement 2.3, 11.2); ohne diesen Eintrag richtete sich ihre Sichtbarkeit
+    nicht nach der Wissensquelle (Nachbesserung Review PR #298, Kopf 42587e8f, M1).
+  - Die Ausnahme von der Belegpflicht für «Offene Fragen» und «Berührte Seiten» gilt nur bis zur nächsten
+    Überschrift beliebiger Ebene; ein Unterabschnitt (z. B. «Kernaussagen» unter «Berührte Seiten») ist wieder
+    belegpflichtig (Requirement 2.6; Nachbesserung Review PR #298, Kopf 42587e8f, S1).
+  - Aufgabe 13.4 liefert die Links aus dem Inhalt als `Ergebnis.links`; das Schreiben nach `wissensseite_link`
+    folgt mit der Freigabe (Schritt «Quelleneinträge, Links und Hüllen neu schreiben», Aufgabe 14.2).
+  - Tika bringt `commonmark` mit `commonmark-ext-gfm-tables` und `-strikethrough` in Version `0.31.0` mit;
+    `dependencyManagement` hebt alle commonmark-Artefakte auf `${commonmark.version}` (`0.32.0`), damit keine
+    gemischten Versionen auf dem Klassenpfad liegen.
+- Die allgemeine ArchUnit-Regel für framework-freie Domain-Typen bleibt bestehen; nur `WissensMarkdown` und seine
+  inneren Typen dürfen zusätzlich von `org.commonmark` abhängen. Eine eigene ArchUnit-Regel hält diese Ausnahme eng.
 
 ### Sichtbarkeit und Hülle (`wissen/application`)
 - `wissensseite_dokument` speichert die Hülle der aktuellen Version: direkte Dokumentquellen plus die Hüllen der
