@@ -93,7 +93,7 @@ public class RegelnSchritte {
         fehler = null;
         warnungen = List.of();
         try {
-            warnungen = pruefung(regel, (art, alle, felder, werte, id) -> false)
+            warnungen = pruefung(regel, (art, alle, felder, werte, id, sperren) -> false)
                     .pruefen("RECHNUNG", Map.of("belegnummer", "R1"), vorher, UUID.randomUUID());
         } catch (RegelVerletzt e) {
             fehler = e;

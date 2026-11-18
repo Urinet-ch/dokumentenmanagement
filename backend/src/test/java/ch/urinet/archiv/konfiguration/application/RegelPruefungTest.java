@@ -23,7 +23,7 @@ class RegelPruefungTest {
         Regel regel = new Regel("datum_pflicht", "RECHNUNG", "PFLICHT_WENN",
                 Map.of("wenn", Map.of("feld", "belegnummer", "gleich", "R1"), "dann", List.of("datum")),
                 "FEHLER", "Belegdatum fehlt.", true);
-        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> false);
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> false);
         Map<String, Object> werte = Map.of("belegnummer", "R1");
 
         assertThatThrownBy(() -> pruefung.pruefen("RECHNUNG", werte, null, UUID.randomUUID()))
@@ -40,7 +40,7 @@ class RegelPruefungTest {
     void eindeutigIgnoriertLeereFelderUndLehntGefundeneDubletteAb() {
         Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
                 Map.of("felder", List.of("belegnummer")), "FEHLER", "Nummer bereits erfasst.", true);
-        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> true);
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> true);
 
         assertThat(pruefung.pruefen("RECHNUNG", Map.of("belegnummer", ""), null, null)).isEmpty();
         assertThatThrownBy(() -> pruefung.pruefen("RECHNUNG", Map.of("belegnummer", "R1"), null, null))
@@ -51,7 +51,7 @@ class RegelPruefungTest {
     void artwechselGiltAlsAenderungDerRegelfelder() {
         Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
                 Map.of("felder", List.of("belegnummer")), "FEHLER", "Nummer bereits erfasst.", true);
-        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> true);
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> true);
         Map<String, Object> vorher = Map.of("art", "QUITTUNG", "belegnummer", "R1");
         Map<String, Object> nachher = Map.of("art", "RECHNUNG", "belegnummer", "R1");
 
@@ -66,7 +66,7 @@ class RegelPruefungTest {
         Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
                 Map.of("felder", List.of("klassifikation.fachgebiet", "tags")), "FEHLER", "Doppelt.", true);
         List<List<Object>> gepruefteWerte = new java.util.ArrayList<>();
-        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id) -> {
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> {
             gepruefteWerte.add(werte);
             return false;
         });
@@ -78,10 +78,57 @@ class RegelPruefungTest {
         assertThat(pruefung.pruefen("RECHNUNG", nachher, vorher, UUID.randomUUID())).isEmpty();
         assertThat(gepruefteWerte).containsExactly(List.of(List.of("a", "b"), List.of("x")));
 
-        RegelPruefung verletzt = pruefung(List.of(regel), (art, alle, felder, werte, id) -> true);
+        RegelPruefung verletzt = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> true);
         assertThat(verletzt.pruefen("RECHNUNG", nachher, vorher, UUID.randomUUID()))
                 .as("gleiche Menge in anderer Reihenfolge ist keine Änderung")
                 .containsExactly(new RegelPruefung.Warnung("einmalig", "Doppelt."));
+    }
+
+    @Test
+    void nurSchreibpfadeSperrenUndDerLesepfadNutztDieUebergebenenRegeln() {
+        Regel regel = new Regel("einmalig", "RECHNUNG", "EINDEUTIG",
+                Map.of("felder", List.of("belegnummer")), "FEHLER", "Nummer bereits erfasst.", true);
+        List<Boolean> sperren = new java.util.ArrayList<>();
+        RegelPruefung pruefung = pruefung(List.of(), (art, alle, felder, werte, id, sperre) -> {
+            sperren.add(sperre);
+            return true;
+        });
+        Map<String, Object> werte = Map.of("art", "RECHNUNG", "belegnummer", "R1");
+
+        assertThat(pruefung.warnungen(List.of(regel), "RECHNUNG", werte, UUID.randomUUID()))
+                .containsExactly(new RegelPruefung.Warnung("einmalig", "Nummer bereits erfasst."));
+        assertThat(pruefung.pruefen("RECHNUNG", werte, werte, UUID.randomUUID()))
+                .as("Konfiguration ohne Regel").isEmpty();
+        RegelPruefung schreiben = pruefung(List.of(regel), (art, alle, felder, w, id, sperre) -> {
+            sperren.add(sperre);
+            return false;
+        });
+        assertThat(schreiben.pruefen("RECHNUNG", werte, null, null)).isEmpty();
+        assertThat(sperren).containsExactly(false, true);
+    }
+
+    @Test
+    void pflichtWennVergleichtZahlenNachWert() {
+        Regel regel = new Regel("betrag_pflicht", "RECHNUNG", "PFLICHT_WENN",
+                Map.of("wenn", Map.of("feld", "zusatz.stufe", "gleich", 1), "dann", List.of("datum")),
+                "FEHLER", "Belegdatum fehlt.", true);
+        RegelPruefung pruefung = pruefung(List.of(regel), (art, alle, felder, werte, id, sperren) -> false);
+
+        assertThatThrownBy(() -> pruefung.pruefen("RECHNUNG",
+                Map.of("zusatz.stufe", new java.math.BigDecimal("1.00")), null, null))
+                .isInstanceOf(RegelVerletzt.class);
+        assertThatThrownBy(() -> pruefung.pruefen("RECHNUNG", Map.of("zusatz.stufe", 1.0), null, null))
+                .isInstanceOf(RegelVerletzt.class);
+        assertThat(pruefung.pruefen("RECHNUNG", Map.of("zusatz.stufe", 2), null, null)).isEmpty();
+        assertThat(pruefung.pruefen("RECHNUNG", Map.of("zusatz.stufe", "1"), null, null))
+                .as("Text bleibt Text").isEmpty();
+    }
+
+    @Test
+    void mehrfachwerteFolgenDerCodepointReihenfolgeDerDatenbank() {
+        // U+1F600 (Surrogatpaar) liegt nach Codepoint hinter U+FF5E, in UTF-16-Einheiten davor
+        assertThat(RegelPruefung.normalisiert("tags", List.of("\uFF5E", "\uD83D\uDE00", "a")))
+                .isEqualTo(List.of("a", "\uFF5E", "\uD83D\uDE00"));
     }
 
     private static RegelPruefung pruefung(List<Regel> regeln, RegelDatenPort daten) {

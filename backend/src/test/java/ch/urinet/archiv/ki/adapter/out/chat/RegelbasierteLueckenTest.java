@@ -248,6 +248,50 @@ class RegelbasierteLueckenTest {
     }
 
     @Test
+    void reiheMitDokumentNurImFolgejahrWirdNichtGemeldet() {
+        Konfiguration config = mitRegel("LOHN",
+                Map.of("je", "MONAT", "datum", "BELEGDATUM", "gruppe", "zusatz.person"), "12-31");
+        WerkzeugDaten daten = daten(List.of(zeile("anna", "Anna", "2026-01"), zeile("neu", "Neu", "2027-01")),
+                List.of(), new Object[2]);
+        Clock uhr = Clock.fixed(Instant.parse("2027-02-10T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Kategorie kategorie = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2026, SICHT).kategorien().getFirst();
+
+        assertThat(kategorie.reihen()).extracting(Lueckenbericht.Reihe::gruppe).containsExactly("Anna");
+    }
+
+    @Test
+    void geschaeftsjahrOhneAbgeschlossenenVollenMonatNenntDenHinweis() {
+        Konfiguration config = mitRegel("LOHN", Map.of("je", "MONAT", "datum", "BELEGDATUM", "ab", "2026-01-01"),
+                "12-31");
+        WerkzeugDaten daten = daten(List.of(zeile("", "", "2026-03")), List.of(), new Object[2]);
+        Clock uhr = Clock.fixed(Instant.parse("2026-11-18T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Kategorie kategorie = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2027, SICHT).kategorien().getFirst();
+
+        assertThat(kategorie.hinweis()).startsWith("Für dieses Geschäftsjahr liegen keine abgeschlossenen vollen Monate vor");
+        assertThat(kategorie.reihen()).isEmpty();
+    }
+
+    @Test
+    void erwarteteMonateFolgenDemGeschaeftsjahresende() {
+        Konfiguration config = mitRegel("LOHN",
+                Map.of("je", "MONAT", "datum", "BELEGDATUM", "gruppe", "zusatz.person"), "06-30");
+        WerkzeugDaten daten = daten(List.of(zeile("anna", "Anna", "2024-07"), zeile("anna", "Anna", "2024-09")),
+                List.of(), new Object[2]);
+        Clock uhr = Clock.fixed(Instant.parse("2026-11-18T10:00:00Z"), ZoneId.of("Europe/Zurich"));
+
+        Lueckenbericht.Reihe reihe = new KonfigurierteLuecken(daten, () -> config, uhr)
+                .erstellen(new MandantCode("urinet"), 2025, SICHT).kategorien().getFirst().reihen().getFirst();
+
+        // Geschäftsjahr 2025 = 01.07.2024–30.06.2025
+        assertThat(reihe.fehlend()).containsExactly("2024-08", "2024-10", "2024-11", "2024-12", "2025-01",
+                "2025-02", "2025-03", "2025-04", "2025-05", "2025-06");
+    }
+
+    @Test
     void berichtVerweigertRollenOhneVolleSichtAufA3UndA4() {
         Konfiguration config = mitRegel("LOHN", Map.of("je", "MONAT", "datum", "BELEGDATUM"), "12-31");
         Sichtregel mitarbeiter = Sichtregel.fuer(new Benutzer("joel", Rolle.MITARBEITER));

@@ -13,14 +13,21 @@ final class RegelMetadaten {
     private RegelMetadaten() {
     }
 
-    static Map<String, Object> aus(Bestaetigung bestaetigung, Map<String, Object> zusatz) {
+    /**
+     * Werte, wie sie gespeichert werden: ohne Angabe die Standardvertraulichkeit der Art und bei Finanzarten die
+     * Währung {@code CHF}.
+     */
+    static Map<String, Object> aus(Bestaetigung bestaetigung, String standardVertraulichkeit, boolean finanzArt,
+                                   Map<String, Object> zusatz) {
         Map<String, Object> werte = new LinkedHashMap<>();
         grundfelder(werte, bestaetigung.art(), bestaetigung.titel(), bestaetigung.datum(),
                 bestaetigung.partnerId() == null ? null : bestaetigung.partnerId().toString(),
-                bestaetigung.projekt(), bestaetigung.tags(), bestaetigung.vertraulichkeit(),
+                bestaetigung.projekt(), bestaetigung.tags(),
+                bestaetigung.vertraulichkeit() != null ? bestaetigung.vertraulichkeit() : standardVertraulichkeit,
                 bestaetigung.personBenutzer(), bestaetigung.klassifikationen());
         finanz(werte, bestaetigung.belegnummer(), bestaetigung.richtung(), bestaetigung.betrag(),
-                bestaetigung.waehrung(), bestaetigung.faelligkeit(), bestaetigung.qrReferenz(), bestaetigung.konto());
+                bestaetigung.waehrung() == null && finanzArt ? "CHF" : bestaetigung.waehrung(),
+                bestaetigung.faelligkeit(), bestaetigung.qrReferenz(), bestaetigung.konto());
         vertrag(werte, bestaetigung.gueltigAb(), bestaetigung.gueltigBis(), bestaetigung.kuendigungsfrist(),
                 bestaetigung.naechsteFrist());
         zusatz(werte, zusatz);

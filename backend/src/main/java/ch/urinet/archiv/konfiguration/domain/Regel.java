@@ -104,7 +104,12 @@ public record Regel(String code, String art, String typ, Map<String, Object> par
         if (!(gleich instanceof String || gleich instanceof Boolean || gleich instanceof Number)) {
             throw ungueltig();
         }
-        return new PflichtWenn(text(wenn.get("feld")), gleich, texte(p.get("dann")));
+        List<String> dann = texte(p.get("dann"));
+        // ohne Pflichtfeld wäre die Regel nie verletzt und würde still nichts prüfen
+        if (dann.isEmpty()) {
+            throw ungueltig();
+        }
+        return new PflichtWenn(text(wenn.get("feld")), gleich, dann);
     }
 
     private static Eindeutig eindeutig(Map<String, Object> p) {

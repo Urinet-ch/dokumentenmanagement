@@ -161,7 +161,8 @@ public class DokumentGenerator {
             return new Ergebnis(vorhanden.get(), stand, false, List.of());
         }
         List<RegelPruefung.Warnung> warnungen = regelPruefung.pruefen(art.code(),
-                RegelMetadaten.aus(mitPartner, regelPruefung.zusatzWerte(anfrage.zusatzJson())), null, null);
+                RegelMetadaten.aus(mitPartner, art.vertraulichkeit().name(), art.gruppen().contains("finanz"),
+                        regelPruefung.zusatzWerte(anfrage.zusatzJson())), null, null);
 
         MandantEinstellungen.Werte mandant = einstellungen.lesen(aufloesung.pruefen());
         boolean finanz = art.gruppen().contains("finanz");

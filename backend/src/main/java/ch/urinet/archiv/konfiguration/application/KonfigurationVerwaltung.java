@@ -60,9 +60,11 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     public Konfiguration aktuell() {
         MandantCode mandant = mandantAktuell();
         KonfigurationsVersion stand = basisSicherstellen();
+        // Feldtypen erst bei einem Fehlschlag ableiten: aktuell() läuft je Dokument (Regeln im Eingangskorb)
         return cache.finden(mandant, stand.version()).orElseGet(() -> {
-            cache.speichern(mandant, stand.inhalt());
-            return stand.inhalt();
+            Konfiguration typisiert = mitFeldTypen(stand).inhalt();
+            cache.speichern(mandant, typisiert);
+            return typisiert;
         });
     }
 
@@ -85,7 +87,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     }
 
     public int aenderungSpeichern(String wer, String grund) {
-        KonfigurationsVersion vorher = basisSicherstellen();
+        KonfigurationsVersion vorher = mitFeldTypen(basisSicherstellen());
         Konfiguration neu = abbild(vorher.version() + 1);
         if (vorher.inhalt().gleicherInhalt(neu)) {
             return vorher.version();
@@ -100,16 +102,17 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
         return gespeichert.version();
     }
 
+    /** Gespeicherte Version, ohne die abgeleiteten Feldtypen ({@link #mitFeldTypen}). */
     private KonfigurationsVersion basisSicherstellen() {
         MandantCode mandant = mandantAktuell();
         Optional<KonfigurationsVersion> aktuell = repository.aktuell();
         if (aktuell.isPresent()) {
-            return mitFeldTypen(aktuell.get());
+            return aktuell.get();
         }
         repository.sperren();
         aktuell = repository.aktuell();
         if (aktuell.isPresent()) {
-            return mitFeldTypen(aktuell.get());
+            return aktuell.get();
         }
         Konfiguration initial = abbild(1);
         if (!initial.pruefen().isEmpty()) {

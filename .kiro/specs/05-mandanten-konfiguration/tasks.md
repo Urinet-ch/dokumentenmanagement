@@ -62,7 +62,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     bestehende Verletzungen als Warnung, `Lueckenbericht` mit Recht nach 5.4 (im Chat), Regeln von `urinet` per
     Changeset (Version mit Quelle `MIGRATION`) und bei der Provisionierung.
   - Aufgeteilt in der Nachbesserung von PR #304: Die Meldung betroffener Dokumente (5.6) und die REST-Endpunkte
-    folgen in 17.8.
+    folgen in 17.8. 5.4 gilt in 17.6 nur im Chat (Werkzeug `vollstaendigkeit`); HTTP 403 für
+    `GET /berichte/luecken` folgt in 17.8.
   - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 5.5, 5.7_
   - _Abhängig von: 17.5; Spec 01: 3.4, 3.5, 4.7, 4.8_
 

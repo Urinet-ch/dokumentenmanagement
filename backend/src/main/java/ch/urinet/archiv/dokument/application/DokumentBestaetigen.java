@@ -149,8 +149,8 @@ public class DokumentBestaetigen {
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
                         b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
-        regelPruefung.pruefen(art.code(), RegelMetadaten.aus(b, regelPruefung.zusatzWerte(dokument.zusatz())),
-                null, id);
+        regelPruefung.pruefen(art.code(), RegelMetadaten.aus(b, art.vertraulichkeit().name(), finanz,
+                regelPruefung.zusatzWerte(dokument.zusatz())), null, id);
         Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)

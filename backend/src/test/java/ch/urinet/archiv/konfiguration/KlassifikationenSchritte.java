@@ -203,6 +203,11 @@ public class KlassifikationenSchritte {
         assertThat(antwort.jsonPath().<String>getList("warnungen.code")).as(antwort.asString()).contains(code);
     }
 
+    @Dann("enthält die Antwort der Klassifikationsverwaltung keine Warnung")
+    public void keineWarnung() {
+        assertThat(antwort.jsonPath().<String>getList("warnungen")).as(antwort.asString()).isNullOrEmpty();
+    }
+
     @Wenn("«{word}» liest das Dokument «{word}»")
     public void dokumentLesen(String benutzer, String name) {
         antwort = gegeben(benutzer).when().get("/api/v1/dokumente/" + dokument(name).id());

@@ -81,8 +81,7 @@ class DokumentLesenWarnungenTest {
             }
 
             @Override
-            public List<Warnung> pruefen(String art, Map<String, Object> werte, Map<String, Object> vorher,
-                                         UUID dokumentId) {
+            public List<ch.urinet.archiv.konfiguration.domain.Regel> regeln() {
                 return List.of();
             }
         };

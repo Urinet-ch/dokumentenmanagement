@@ -33,6 +33,9 @@ class RegelTest {
     void lehntFreieAusdrueckeUnbekannteParameterUndUngueltigeDatenAb() {
         assertThatThrownBy(() -> regel("PFLICHT_WENN", Map.of("script", "true"))
                 .typisierteParameter()).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> regel("PFLICHT_WENN", Map.of(
+                "wenn", Map.of("feld", "datum", "gleich", "2026-01-01"), "dann", List.of()))
+                .typisierteParameter()).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> regel("EINDEUTIG", Map.of(
                 "felder", List.of("titel"), "ausdruck", "true")).typisierteParameter())
                 .isInstanceOf(IllegalArgumentException.class);

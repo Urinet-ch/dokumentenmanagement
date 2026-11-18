@@ -56,23 +56,29 @@ public class PanacheRegelDaten implements RegelDatenPort {
     }
 
     @Override
-    public boolean eindeutig(String art, boolean ueberAlleArten, List<String> felder, List<Object> werte,
-                             UUID dokumentId) {
+    public boolean dubletteVorhanden(String art, boolean ueberAlleArten, List<String> felder, List<Object> werte,
+                                     UUID dokumentId, boolean sperren) {
         List<String> ausdruecke = new ArrayList<>(felder.size());
         for (int i = 0; i < felder.size(); i++) {
             ausdruecke.add(ausdruck(felder.get(i), i));
         }
         String werteJson = serialisieren(werte);
-        // Prüfen und Speichern sind nicht atomar: gleiche Werte derselben Regel werden bis zum Commit serialisiert
-        entityManager().createNativeQuery(SPERRE)
-                .setParameter("schluessel", (ueberAlleArten ? "*" : art) + ":" + String.join(",", felder) + ":"
-                        + werteJson)
-                .getSingleResult();
+        if (sperren) {
+            // Prüfen und Speichern sind nicht atomar: gleiche Werte derselben Regel werden bis zum Commit serialisiert
+            entityManager().createNativeQuery(SPERRE)
+                    .setParameter("schluessel", (ueberAlleArten ? "*" : art) + ":" + String.join(",", felder) + ":"
+                            + werteJson)
+                    .getSingleResult();
+        }
+        // Grundmenge (Req 5.1): bestätigte Dokumente, die archiviert werden oder sind. Generator-Dokumente sind schon
+        // beim Erfassen bestätigt und warten bis zum Worker in NEU/VERARBEITUNG (oder nach Fehlversuchen in FEHLER,
+        // «Wiederholen» archiviert sie später); sie zählen mit, sonst ginge eine zweite Erfassung bis dahin durch.
         String sql = "select exists (select 1 from dokument d "
                 + "left join dokument_finanz f on f.dokument_id = d.id "
                 + "left join dokument_vertrag v on v.dokument_id = d.id "
                 + "where d.bestaetigt is not null "
-                + "and d.status in ('ARCHIVIERUNG', 'ARCHIVIERUNG_FEHLER', 'ARCHIVIERT') "
+                + "and (d.status in ('ARCHIVIERUNG', 'ARCHIVIERUNG_FEHLER', 'ARCHIVIERT') "
+                + "or d.quelle = 'GENERATOR' and d.status in ('NEU', 'VERARBEITUNG', 'FEHLER')) "
                 + (ueberAlleArten ? "" : "and d.art = :art ")
                 + (dokumentId == null ? "" : "and d.id <> :dokumentId ")
                 + "and jsonb_build_array(" + String.join(", ", ausdruecke) + ") = cast(:werte as jsonb))";

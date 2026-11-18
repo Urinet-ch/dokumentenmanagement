@@ -238,6 +238,29 @@ Für `urinet` schreibt der Seed die Lücken aus Spec 02 design.md (`vollstaendig
 `gruppe: zusatz.person`) und `BANK` (`datum: zusatz.periode_bis`, `gruppe: PARTNER`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
 die Tabelle `belegnummer_eigen` (Spec 01, 8.9), jetzt über `selbst_ausgestellt`.
 
+Umsetzung 17.6 (Nachbesserung Review PR #304):
+- Grundmenge von `EINDEUTIG`: Dokumente mit `bestaetigt` im Status `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER` oder
+  `ARCHIVIERT`, dazu Generator-Dokumente (`quelle = GENERATOR`) schon in `NEU`, `VERARBEITUNG` und `FEHLER`. Der
+  Generator setzt `bestaetigt` bei der Annahme, archiviert aber erst im Worker; ohne diese Erweiterung kämen zwei
+  gleiche Aufrufe vor dem Worker beide durch (auch «Wiederholen» kann ein Dokument in `FEHLER` noch archivieren).
+  Die Erweiterung geht über die Statusliste in Req 5.1 hinaus (im PR unter «Offen für Fabian»).
+- Schreibpfade (Bestätigen, Ändern, Generator, Drive-Import) nehmen je Mandant, Art, Feldern und Werten eine
+  Advisory-Sperre der Transaktion, damit zwei gleichzeitige Vorgänge nicht beide durchkommen. Der Lesepfad
+  (Warnungen im Eingangskorb und in der Einzelansicht) prüft ohne Sperre und lädt die Regeln einmal je Seite.
+- Vor der Prüfung setzt das Archiv dieselben Standardwerte wie beim Speichern (Vertraulichkeit der Art, Währung `CHF`
+  bei Finanzarten), damit `PFLICHT_WENN` auf diese Felder nicht am fehlenden Wert scheitert.
+- `PFLICHT_WENN` vergleicht Zahlen nach Wert (`1` = `1.0`); ein leeres `dann` ist ungültig. Mehrfachwerte (`tags`,
+  Klassifikationen) werden nach Codepoints sortiert verglichen, wie `collate "C"` in der Datenbank.
+- Eine `EINDEUTIG`-Warnung im Lesepfad zeigt ohne ID und Werte, dass ein weiteres bestätigtes Dokument mit gleichen
+  Werten existiert, auch wenn der Leser es nicht sieht. Das ist bewusst so und entspricht dem Schreibpfad (HTTP 422
+  nennt dieselbe Tatsache) und Spec 01, 2.3 bei `BELEGNUMMER_BEKANNT`; Req 5.2 verlangt nur, keine IDs und Werte zu
+  nennen.
+- `FOLGE` mit `muster: true` nimmt das erste Belegnummer-Muster der Art mit einer Gruppe `nr`.
+- Rollback auf das Vorgänger-Release: Es kennt `regeln` in der Konfigurationsversion nicht und schreibt bei einer
+  Konfigurationsänderung eine Version ohne Regeln. Nach dem erneuten Wechsel gelten die Regeln erst wieder mit der
+  nächsten Konfigurationsänderung (das Abbild liest sie aus der Tabelle `regel`, die erhalten bleibt); es gehen keine
+  Daten verloren, und die Seed-Regeln von `urinet` haben nur Schwere `WARNUNG`.
+
 ## Data Models (neu, `db/mandant`)
 Changeset-Nummern: die nächste freie Nummer in `db/mandant/changesets/` zum Zeitpunkt der Aufgabe; unten nur die
 Namen.

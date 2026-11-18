@@ -4,6 +4,7 @@ import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.domain.Dokument;
 import ch.urinet.archiv.dokument.domain.DokumentStatus;
 import ch.urinet.archiv.konfiguration.application.RegelPruefung;
+import ch.urinet.archiv.konfiguration.domain.Regel;
 import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
 import ch.urinet.archiv.dokumentart.domain.AufbewahrungAb;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
@@ -129,8 +130,22 @@ public class DokumentLesen {
         return warnungen(benutzer, dokument, dokument.art() == null ? Map.of() : klassifikationen.laden(dokument.id()));
     }
 
-    /** Wie {@link #warnungen(Benutzer, Dokument)} mit schon geladenen Klassifikationen (Liste im Eingangskorb). */
+    /** Wie {@link #warnungen(Benutzer, Dokument)} mit schon geladenen Klassifikationen. */
     public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument, Map<String, List<String>> klassifikationsWerte) {
+        return warnungen(benutzer, dokument, klassifikationsWerte, dokument.art() == null ? List.of() : regeln());
+    }
+
+    /** Dokumentregeln der aktuellen Konfiguration, einmal je Seite des Eingangskorbs geladen. */
+    public List<Regel> regeln() {
+        return regelPruefung.regeln();
+    }
+
+    /**
+     * Wie {@link #warnungen(Benutzer, Dokument, Map)} mit schon geladenen Regeln (Liste im Eingangskorb). Der Lesepfad
+     * nimmt keine Sperre (Spec 05, Req 5.3).
+     */
+    public List<Warnung> warnungen(Benutzer benutzer, Dokument dokument, Map<String, List<String>> klassifikationsWerte,
+                                   List<Regel> regeln) {
         List<Warnung> warnungen = new ArrayList<>();
         if (dokument.art() != null) {
             var regel = arten.finden(dokument.art()).aufbewahrung();
@@ -139,7 +154,7 @@ public class DokumentLesen {
             }
             var werte = RegelMetadaten.aus(dokument, klassifikationsWerte,
                     regelPruefung.zusatzWerte(dokument.zusatz()));
-            regelPruefung.pruefen(dokument.art(), werte, werte, dokument.id()).forEach(w ->
+            regelPruefung.warnungen(regeln, dokument.art(), werte, dokument.id()).forEach(w ->
                     warnungen.add(new Warnung(w.code(), null, w.meldung())));
         }
         if (!DokumentStatus.EINGANGSKORB_STATUS.contains(dokument.status()) || dokument.art() == null
