@@ -148,8 +148,12 @@ public class JdbcZugriffProtokoll implements ZugriffProtokoll {
             for (ProtokollDetails.Aenderung aenderung : konfiguration.aenderungen()) {
                 ObjectNode eintrag = aenderungen.addObject();
                 eintrag.put("pfad", aenderung.pfad());
-                eintrag.put("alt", aenderung.alt());
-                eintrag.put("neu", aenderung.neu());
+                if (aenderung.ohneWerte()) {
+                    eintrag.put("aenderung", "geändert");
+                } else {
+                    eintrag.put("alt", aenderung.alt());
+                    eintrag.put("neu", aenderung.neu());
+                }
             }
         }
         try {
