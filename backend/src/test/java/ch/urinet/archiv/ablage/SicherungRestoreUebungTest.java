@@ -250,6 +250,9 @@ class SicherungRestoreUebungTest {
             assertThatThrownBy(() -> zielAblage.sicherungsManifestKopie(mandant, "manifest/2026-01-02.json",
                     Pruefsumme.von(manifestBytes), new ByteArrayOutputStream()))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("Manifest-Teil fehlt");
+            assertThatThrownBy(() -> zielAblage.sicherungsManifestKopie(mandant, manifest, null,
+                    new ByteArrayOutputStream()))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Ungültige Manifest-Referenz");
 
             s3.putObject(r -> r.bucket(zielBucket).key(manifest), RequestBody.fromBytes(manifestBytes));
             assertThatThrownBy(() -> zielAblage.sicherungsManifestKopie(mandant, manifest,

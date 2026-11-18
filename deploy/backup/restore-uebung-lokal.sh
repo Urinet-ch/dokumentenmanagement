@@ -5,7 +5,7 @@ umask 077
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 backend="$repo_root/backend"
 compose_file="$repo_root/deploy/backup/test/restore-compose.yml"
-temp=$(mktemp -d)
+temp=$(mktemp -d "${TMPDIR:-/tmp}/archiv-restore.XXXXXX")
 chmod 700 "$temp"
 project="archiv-restore-$$"
 compose_started=0
@@ -35,10 +35,27 @@ compose() {
 
 pruefsummen_pruefen() {
   if command -v sha256sum >/dev/null 2>&1; then
-    (cd "$1" && sha256sum --check SHA256SUMS)
+    (cd "$1" && sha256sum --strict --check SHA256SUMS)
   else
-    (cd "$1" && shasum -a 256 -c SHA256SUMS)
+    (cd "$1" && shasum -a 256 --strict -c SHA256SUMS)
   fi
+}
+
+# Jede verschlüsselte Datei steht genau einmal in SHA256SUMS, und SHA256SUMS nennt keine weiteren Dateien.
+pruefsummen_vollstaendig() {
+  local verzeichnis=$1
+  local erwartet gelistet
+  erwartet=$(cd "$verzeichnis" && find . -maxdepth 1 -type f -name '*.age' | sed 's|^\./||' | LC_ALL=C sort)
+  gelistet=$(awk '{ sub(/^\*/, "", $2); print $2 }' "$verzeichnis/SHA256SUMS" | LC_ALL=C sort)
+  [[ -n $erwartet && $erwartet == "$gelistet" ]]
+}
+
+# Die Test-Images kommen aus der Restore-Compose-Datei und den Dockerfiles, die das Skript baut; eine eigene Liste
+# mit Digests gibt es hier nicht, damit sie nicht von den Quellen abweichen kann.
+erwartete_images() {
+  compose config --images | grep -v '^archiv:'
+  awk 'toupper($1) == "FROM" && $2 ~ /[:@]/ { print $2 }' \
+    "$repo_root/deploy/infomaniak/keycloak/Dockerfile" "$backend/src/main/docker/Dockerfile.jvm"
 }
 
 aufräumen() {
@@ -73,20 +90,17 @@ if ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
-for image in \
-  pgvector/pgvector:0.8.7-pg17-trixie \
-  quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0 \
-  eclipse-temurin:25.0.5_8-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c \
-  cgr.dev/chainguard/minio:latest@sha256:59953701f8f8d0de81aab456f8b0b6c0a1804119415559bf7ede79d944108879; do
+compose config --quiet || fehler "Restore-Compose-Konfiguration ist ungültig."
+images=$(erwartete_images | LC_ALL=C sort -u) || fehler "Test-Images konnten nicht ermittelt werden."
+[[ -n $images ]] || fehler "Test-Images konnten nicht ermittelt werden."
+while IFS= read -r image; do
   if ! docker image inspect "$image" >/dev/null 2>&1; then
-    printf 'FEHLER  Lokales Test-Image fehlt: %s\n' "$image" >&2
+    printf 'FEHLER  Lokales Test-Image fehlt: %s – vorher «docker pull %s» ausführen.\n' "$image" "$image" >&2
     exit 2
   fi
-done
+done <<< "$images"
 
-mkdir -p "$temp/secrets" "$temp/postgres" "$temp/minio" "$temp/backup" \
-  "$temp/entschluesselt" "$temp/entschluesselt-probe"
-chmod 777 "$temp/minio"
+mkdir -p "$temp/secrets" "$temp/backup" "$temp/entschluesselt" "$temp/entschluesselt-probe"
 
 geheimnis_erzeugen() {
   openssl rand -hex 32 > "$temp/secrets/$1"
@@ -108,8 +122,8 @@ chmod 444 "$temp"/secrets/*
 age-keygen -o "$temp/sicherung.agekey" >/dev/null 2>&1
 age-keygen -o "$temp/probe.agekey" >/dev/null 2>&1
 age-keygen -o "$temp/falsch.agekey" >/dev/null 2>&1
-sicherung_empfaenger=$(age-keygen -y -i "$temp/sicherung.agekey")
-probe_empfaenger=$(age-keygen -y -i "$temp/probe.agekey")
+sicherung_empfaenger=$(age-keygen -y "$temp/sicherung.agekey")
+probe_empfaenger=$(age-keygen -y "$temp/probe.agekey")
 
 start=$SECONDS
 if bash "$repo_root/deploy/backup/test/taeglich-test.sh" >"$temp/taeglich-shelltest.log" 2>&1; then
@@ -171,10 +185,13 @@ start_dienste() {
   fehler "Eigener Restore-Compose-Stack konnte nicht gestartet werden."
 }
 
+# Nur PostgreSQL und MinIO veröffentlichen einen Port an 127.0.0.1 (Netz «hostzugang»).
 dienstport() {
-  local adresse
-  adresse=$(compose port "$1" "$2") || fehler "Compose-Port konnte nicht gelesen werden."
-  printf '%s\n' "${adresse##*:}"
+  local adresse port
+  adresse=$(compose port "$1" "$2") || fehler "Compose-Port von $1 konnte nicht gelesen werden."
+  port=${adresse##*:}
+  [[ $port =~ ^[0-9]+$ ]] && (( port > 0 )) || fehler "Compose-Port von $1 fehlt (Antwort: ${adresse:-leer})."
+  printf '%s\n' "$port"
 }
 
 warte_url() {
@@ -192,13 +209,38 @@ warte_url() {
   fehler "$beschreibung nicht bereit."
 }
 
-warte_keycloak_realm() {
-  local port url
-  port=$(dienstport kc_restore 8080)
-  url="http://127.0.0.1:$port/realms/urinet-archiv/.well-known/openid-configuration"
+# Keycloak und die API hängen nur am internen Netz; geprüft wird über den Datenbank-Container (bash, /dev/tcp).
+http_intern() {
+  local dienst=$1 port=$2 pfad=$3
+  compose exec -T db timeout 3 bash -c \
+    'exec 3<>"/dev/tcp/$1/$2" && printf "GET %s HTTP/1.0\r\nHost: %s:%s\r\n\r\n" "$3" "$1" "$2" >&3 && cat <&3' \
+    _ "$dienst" "$port" "$pfad" 2>/dev/null
+}
+
+http_ok() {
+  local statuszeile=${1%%$'\n'*}
+  [[ $statuszeile =~ ^HTTP/1\.[01]\ 200[[:space:]] ]]
+}
+
+warte_intern() {
+  local dienst=$1 port=$2 pfad=$3 beschreibung=$4 antwort
   for ((versuch = 0; versuch < 90; versuch++)); do
-    if curl --fail --silent --max-time 2 -H 'Host: kc_restore:8080' "$url" \
-      | grep -q '"issuer":"http://kc_restore:8080/realms/urinet-archiv"'; then
+    if antwort=$(http_intern "$dienst" "$port" "$pfad") && http_ok "$antwort"; then
+      bericht OK "$beschreibung" 0
+      return 0
+    fi
+    sleep 2
+  done
+  compose logs --no-color --tail 40 "$dienst" >&2 || true
+  fehler "$beschreibung nicht bereit."
+}
+
+warte_keycloak_realm() {
+  local antwort
+  for ((versuch = 0; versuch < 90; versuch++)); do
+    if antwort=$(http_intern kc_restore 8080 /realms/urinet-archiv/.well-known/openid-configuration) \
+      && http_ok "$antwort" \
+      && grep -Fq '"issuer":"http://kc_restore:8080/realms/urinet-archiv"' <<< "$antwort"; then
       bericht OK "Wiederhergestellter Keycloak-Realm erreichbar" 0
       return 0
     fi
@@ -238,7 +280,6 @@ test_maven() {
   fi
 }
 
-compose config --quiet || fehler "Restore-Compose-Konfiguration ist ungültig."
 start_dienste db minio kc
 
 container=$(compose ps --quiet db)
@@ -250,10 +291,10 @@ done
 [[ $status == healthy ]] || fehler "PostgreSQL nicht bereit."
 bericht OK "PostgreSQL bereit" 0
 warte_url minio 9000 /minio/health/ready "MinIO bereit"
-warte_url kc 9000 /health/ready "Keycloak bereit"
+warte_intern kc 9000 /health/ready "Keycloak bereit"
 
 start_dienste api
-warte_url api 8080 /q/health/ready "Quell-Anwendung bereit"
+warte_intern api 8080 /q/health/ready "Quell-Anwendung bereit"
 
 db_port=$(dienstport db 5432)
 minio_port=$(dienstport minio 9000)
@@ -278,6 +319,7 @@ fi
 
 lauf=$(find "$temp/backup/laeufe" -mindepth 1 -maxdepth 1 -type d -name 'lauf-*' -print -quit)
 [[ -n $lauf && -s $lauf/FERTIG && -s $lauf/SHA256SUMS ]] || fehler "Vollständiger Sicherungslauf fehlt."
+pruefsummen_vollstaendig "$lauf" || fehler "SHA256SUMS nennt nicht genau die verschlüsselten Dateien des Laufs."
 if pruefsummen_pruefen "$lauf" >"$temp/checksum.log" 2>&1; then
   bericht OK "SHA256SUMS des Sicherungspakets prüfen" 0
 else
@@ -295,8 +337,10 @@ bericht OK "Falschen age-Schlüssel zurückweisen" 0
 
 mkdir "$temp/manipuliert"
 cp -- "$lauf"/*.age "$temp/manipuliert/"
-awk 'NR == 1 { $1 = sprintf("%064d", 0) } { print }' "$lauf/SHA256SUMS" \
-  > "$temp/manipuliert/SHA256SUMS"
+# Nur die erste Prüfsumme ersetzen; Trennzeichen und Dateiname bleiben, damit «--strict» die Zeile als gültig
+# formatiert annimmt und allein der falsche Hash zur Ablehnung führt.
+sed -E "1s/^[0-9a-fA-F]{64}/$(printf '%064d' 0)/" "$lauf/SHA256SUMS" > "$temp/manipuliert/SHA256SUMS"
+cmp -s -- "$lauf/SHA256SUMS" "$temp/manipuliert/SHA256SUMS" && fehler "SHA256SUMS konnte nicht manipuliert werden."
 if pruefsummen_pruefen "$temp/manipuliert" >/dev/null 2>&1; then
   fehler "Manipulierte SHA256SUMS wurde nicht zurückgewiesen."
 fi
@@ -339,7 +383,7 @@ else
 fi
 
 start_dienste kc_restore
-warte_url kc_restore 9000 /health/ready "Wiederhergestelltes Keycloak bereit"
+warte_intern kc_restore 9000 /health/ready "Wiederhergestelltes Keycloak bereit"
 warte_keycloak_realm
 
 test_maven ziel P urinet-archiv-p- archiv_restore

@@ -8,6 +8,7 @@ import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import ch.urinet.archiv.protokoll.adapter.in.kommando.ManifestKommando;
 import ch.urinet.archiv.protokoll.adapter.out.json.JacksonJsonLeser;
+import ch.urinet.archiv.protokoll.application.FestgehalteneManifeste;
 import ch.urinet.archiv.protokoll.application.ManifestPruefen;
 import ch.urinet.archiv.protokoll.application.ManifestSchluessel;
 import ch.urinet.archiv.protokoll.application.ZeitstempelPort;
@@ -57,14 +58,18 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -109,6 +114,9 @@ class SicherungPaketRoundtripTest {
     @Inject
     ch.urinet.archiv.mandant.application.MandantRegister register;
 
+    @Inject
+    FestgehalteneManifeste festgehalteneManifeste;
+
     @TestHTTPResource("/q/health/ready")
     URI readiness;
 
@@ -119,11 +127,6 @@ class SicherungPaketRoundtripTest {
         var mandant = provisionierung.anlegen("urinet", null, null);
         assertThat(mandant.bucket()).isEqualTo(new MandantCode("urinet").bucket(QUELL_PRAEFIX));
 
-        String zielBucket = new MandantCode("urinet").bucket(ZIEL_PRAEFIX);
-        s3.createBucket(b -> b.bucket(zielBucket).objectLockEnabledForBucket(true));
-        s3.putBucketVersioning(b -> b.bucket(zielBucket)
-                .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
-
         UUID id = UUID.randomUUID();
         String originalKey = "archiv/2026/" + id + "/original.pdf";
         String pdfaKey = "archiv/2026/" + id + "/pdfa.pdf";
@@ -133,13 +136,12 @@ class SicherungPaketRoundtripTest {
 
         KeyPair schluessel = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         ManifestTestdaten manifest = manifestErzeugen(schluessel);
-        String manifestVersion = null;
+        Map<String, String> versionen = new HashMap<>();
         for (var teil : manifest.teile().entrySet()) {
-            String version = ablegenGesperrt(mandant.bucket(), teil.getKey(), teil.getValue());
-            if (teil.getKey().equals(MANIFEST)) {
-                manifestVersion = version;
-            }
+            versionen.put(teil.getKey(), ablegenGesperrt(mandant.bucket(), teil.getKey(), teil.getValue()));
         }
+        String manifestVersion = versionen.get(MANIFEST);
+        manifestFesthalten(mandant.schema(), manifest, versionen);
         Properties zustand = new Properties();
         zustand.setProperty("dokument.id", id.toString());
         zustand.setProperty("dokument.original.schluessel", originalKey);
@@ -158,9 +160,11 @@ class SicherungPaketRoundtripTest {
     void wiederhergestellteAnwendungUndManifestPruefen() throws Exception {
         Assumptions.assumeTrue("ziel".equals(System.getProperty("archiv.restore.phase")));
 
-        HttpResponse<Void> health = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(readiness).GET().build(), HttpResponse.BodyHandlers.discarding());
-        assertThat(health.statusCode()).isEqualTo(200);
+        // Wie bei der Restore-Probe: leerer Ziel-Bucket erst im Ziel-Schritt, die Wiederherstellung verlangt ihn leer.
+        String zielBucket = new MandantCode("urinet").bucket(ZIEL_PRAEFIX);
+        s3.createBucket(b -> b.bucket(zielBucket).objectLockEnabledForBucket(true));
+        s3.putBucketVersioning(b -> b.bucket(zielBucket)
+                .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
 
         Path inventar = Path.of(System.getProperty("archiv.restore.inventar"));
         List<String> inventarzeilen = Files.readAllLines(inventar, StandardCharsets.UTF_8);
@@ -170,10 +174,11 @@ class SicherungPaketRoundtripTest {
         Path inventarOhneManifest = Files.createTempFile("restore-ohne-manifest-", ".jsonl");
         try {
             Files.write(inventarOhneManifest, ohneManifest, StandardCharsets.UTF_8);
-            int fehlendesManifestExit = sicherung.ausfuehren(List.of("wiederherstellen", "--mandant", "urinet",
+            int fehlendesManifestExit = ohneAnfrage(() -> sicherung.ausfuehren(List.of("wiederherstellen",
+                    "--mandant", "urinet",
                     "--inventar", inventarOhneManifest.toString(), "--strom",
                     System.getProperty("archiv.restore.bucket"), "--kappen"),
-                    new PrintStream(new ByteArrayOutputStream()), new PrintStream(new ByteArrayOutputStream()));
+                    new PrintStream(new ByteArrayOutputStream()), new PrintStream(new ByteArrayOutputStream())));
             assertThat(fehlendesManifestExit).isEqualTo(4);
         } finally {
             Files.deleteIfExists(inventarOhneManifest);
@@ -181,12 +186,18 @@ class SicherungPaketRoundtripTest {
 
         var restoreAusgabe = new ByteArrayOutputStream();
         var restoreFehler = new ByteArrayOutputStream();
-        int restoreExit = sicherung.ausfuehren(List.of("wiederherstellen", "--mandant", "urinet", "--inventar",
+        int restoreExit = ohneAnfrage(() -> sicherung.ausfuehren(List.of("wiederherstellen", "--mandant", "urinet",
+                "--inventar",
                 System.getProperty("archiv.restore.inventar"), "--strom",
                 System.getProperty("archiv.restore.bucket"), "--kappen"),
-                new PrintStream(restoreAusgabe), new PrintStream(restoreFehler));
-        assertThat(restoreExit).isZero();
+                new PrintStream(restoreAusgabe), new PrintStream(restoreFehler)));
+        assertThat(restoreExit).as(() -> restoreFehler.toString(StandardCharsets.UTF_8)
+                + restoreAusgabe.toString(StandardCharsets.UTF_8)).isZero();
         assertThat(restoreFehler.toString(StandardCharsets.UTF_8)).isEmpty();
+
+        HttpResponse<Void> health = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(readiness).GET().build(), HttpResponse.BodyHandlers.discarding());
+        assertThat(health.statusCode()).isEqualTo(200);
 
         Properties erwartet = zustandLaden();
         UUID id = UUID.fromString(erwartet.getProperty("dokument.id"));
@@ -211,6 +222,17 @@ class SicherungPaketRoundtripTest {
                     pruefeDatei(r.getString(5), r.getString(6), erwartet.getProperty("dokument.original.inhalt"));
                 }
             }
+            // manifest ist nur Einfügen: Die Zeile behält die Versions-ID der Quelle, geprüft wird über die Hashes.
+            try (PreparedStatement p = connection.prepareStatement(
+                    "select sha256, s3_version from m_urinet.manifest where datum = ?")) {
+                p.setObject(1, MANIFEST_DATUM);
+                try (ResultSet r = p.executeQuery()) {
+                    assertThat(r.next()).isTrue();
+                    assertThat(r.getString(1)).isEqualTo(Pruefsumme.von(
+                            manifestErzeugen(schluesselLesen(erwartet)).inhalt()));
+                    assertThat(r.getString(2)).isEqualTo(erwartet.getProperty("manifest.version"));
+                }
+            }
         }
 
         var mandant = new MandantCode("urinet");
@@ -222,16 +244,34 @@ class SicherungPaketRoundtripTest {
 
         var schluessel = schluesselLesen(erwartet);
         var pruefer = new ManifestPruefen(zielAblage, new JacksonJsonLeser(), manifestSchluessel(schluessel),
-                new SynthetischerZeitstempel(), (ignoredMandant, ignoredDatum) -> Optional.empty(),
-                Duration.ofHours(24));
+                new SynthetischerZeitstempel(), festgehalteneManifeste, Duration.ofHours(24));
+        var kommando = new ManifestKommando(pruefer, register, datenquelleInstanz);
         var ausgabe = new ByteArrayOutputStream();
         var fehler = new ByteArrayOutputStream();
-        int exit = new ManifestKommando(pruefer, register, datenquelleInstanz).ausfuehren(List.of(
-                "pruefen", MANIFEST_DATUM.toString(), "--mandant", mandant.wert(), "--ohne-datenbank"),
-                new PrintStream(ausgabe), new PrintStream(fehler));
-        assertThat(exit).isZero();
-        assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("Ergebnis: gültig");
+        int exit = ohneAnfrage(() -> kommando.ausfuehren(List.of("pruefen", MANIFEST_DATUM.toString(), "--mandant",
+                mandant.wert()),
+                new PrintStream(ausgabe), new PrintStream(fehler)));
         assertThat(fehler.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(ausgabe.toString(StandardCharsets.UTF_8)).contains("gegen die Datenbank")
+                .contains("Ergebnis: gültig").doesNotContain("nicht festgehalten");
+        assertThat(exit).isZero();
+
+        // Negativprobe: Eine weitere, veränderte Fassung des Manifests im Ziel-Bucket muss die Prüfung scheitern lassen.
+        byte[] veraendert = Arrays.copyOf(manifestImZiel.inhalt(), manifestImZiel.inhalt().length + 1);
+        veraendert[veraendert.length - 1] = ' ';
+        s3.putObject(r -> r.bucket(zielBucket).key(MANIFEST), RequestBody.fromBytes(veraendert));
+        var negativAusgabe = new ByteArrayOutputStream();
+        int negativExit = ohneAnfrage(() -> kommando.ausfuehren(List.of("pruefen", MANIFEST_DATUM.toString(), "--mandant",
+                mandant.wert()), new PrintStream(negativAusgabe), new PrintStream(new ByteArrayOutputStream())));
+        assertThat(negativExit).isNotZero();
+        assertThat(negativAusgabe.toString(StandardCharsets.UTF_8)).doesNotContain("Ergebnis: gültig");
+    }
+
+    // Wie im Kommando-Betrieb ohne Request-Kontext; MandantKontext verlangt sonst eine Anmeldung.
+    private static <T> T ohneAnfrage(Callable<T> arbeit) throws Exception {
+        try (var thread = Executors.newSingleThreadExecutor()) {
+            return thread.submit(arbeit).get();
+        }
     }
 
     private String ablegen(String bucket, String key, byte[] bytes) {
@@ -263,6 +303,44 @@ class SicherungPaketRoundtripTest {
                 p.setString(2, Pruefsumme.von(ORIGINAL));
                 p.setString(3, originalKey);
                 p.setString(4, originalVersion);
+                p.executeUpdate();
+            }
+        }
+    }
+
+    /** Hält das synthetische Manifest wie {@code JdbcManifestDaten.festhalten} fest (Zeilen nur Einfügen). */
+    private void manifestFesthalten(String schema, ManifestTestdaten manifest, Map<String, String> versionen)
+            throws Exception {
+        OffsetDateTime bis = ManifestFenster.bis(MANIFEST_DATUM).atOffset(ZoneOffset.UTC);
+        String sig = ManifestTeil.SIG.pfad(MANIFEST_DATUM);
+        String tsr = ManifestTeil.tsr("haupt").pfad(MANIFEST_DATUM);
+        String kette = ManifestTeil.kette("haupt").pfad(MANIFEST_DATUM);
+        String crl = ManifestTeil.crl("haupt").pfad(MANIFEST_DATUM);
+        try (Connection connection = datenquelle.getConnection()) {
+            try (PreparedStatement p = connection.prepareStatement("insert into " + schema + ".manifest (datum, von, "
+                    + "bis, sha256, vorher_sha256, anzahl, protokolle, s3_schluessel, s3_version, sig_sha256, "
+                    + "sig_s3_version, sperre_bis) values (?, null, ?, ?, null, 0, '{}'::jsonb, ?, ?, ?, ?, null)")) {
+                p.setObject(1, MANIFEST_DATUM);
+                p.setObject(2, bis);
+                p.setString(3, Pruefsumme.von(manifest.inhalt()));
+                p.setString(4, MANIFEST);
+                p.setString(5, versionen.get(MANIFEST));
+                p.setString(6, Pruefsumme.von(manifest.teile().get(sig)));
+                p.setString(7, versionen.get(sig));
+                p.executeUpdate();
+            }
+            String pruefdaten = "[{\"art\":\"kette\",\"sha256\":\"" + Pruefsumme.von(manifest.teile().get(kette))
+                    + "\",\"s3_version\":\"" + versionen.get(kette) + "\"},{\"art\":\"crl\",\"sha256\":\""
+                    + Pruefsumme.von(manifest.teile().get(crl)) + "\",\"s3_version\":\"" + versionen.get(crl) + "\"}]";
+            try (PreparedStatement p = connection.prepareStatement("insert into " + schema + ".manifest_zeitstempel "
+                    + "(datum, dienst, gen_time, tsr_sha256, s3_schluessel, s3_version, pruefdaten) "
+                    + "values (?, 'haupt', ?, ?, ?, ?, cast(? as jsonb))")) {
+                p.setObject(1, MANIFEST_DATUM);
+                p.setObject(2, bis.plus(Duration.ofMinutes(20)));
+                p.setString(3, Pruefsumme.von(manifest.teile().get(tsr)));
+                p.setString(4, tsr);
+                p.setString(5, versionen.get(tsr));
+                p.setString(6, pruefdaten);
                 p.executeUpdate();
             }
         }
@@ -352,6 +430,10 @@ class SicherungPaketRoundtripTest {
                     Map.entry("archiv.ablage.manifest-max-sperrfrist", "P1D"),
                     Map.entry("quarkus.datasource.devservices.enabled", "false"),
                     Map.entry("quarkus.compose.devservices.enabled", "false"),
+                    // ohne Compose Dev Services: Zugang aus den Secret-Dateien des Skripts (smallrye.config.source.file)
+                    Map.entry("quarkus.s3.aws.credentials.static-provider.access-key-id", "${s3_app_zugang_id}"),
+                    Map.entry("quarkus.s3.aws.credentials.static-provider.secret-access-key",
+                            "${s3_app_zugang_geheimnis}"),
                     Map.entry("quarkus.keycloak.devservices.enabled", "false"),
                     Map.entry("quarkus.oidc.tenant-enabled", "false"),
                     Map.entry("quarkus.oidc.health.enabled", "false"),

@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:0.8.7-pg17-trixie
+    image: pgvector/pgvector:0.8.7-pg17-trixie@sha256:89947206f52eac3a9df9b663df7e76987cbdc623be6576b3a524953d568700d7
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
@@ -10,9 +10,12 @@ services:
       - archiv_db_owner
       - archiv_db_app
       - keycloak_db
+    # Daten nur im tmpfs des Containers: «compose down» räumt sie mit weg, ohne Dateien fremder uid im Temp-Verzeichnis.
+    tmpfs:
+      - /var/lib/postgresql/data
     volumes:
-      - ${ARCHIV_RESTORE_TMP:?}/postgres:/var/lib/postgresql/data
       - ./restore-db-init.sh:/docker-entrypoint-initdb.d/10-restore-test.sh:ro
+    networks: [intern, hostzugang]
     ports:
       - 127.0.0.1::5432
     healthcheck:
@@ -27,14 +30,18 @@ services:
     environment:
       MINIO_ROOT_USER: archiv-dev
       MINIO_ROOT_PASSWORD: archiv-dev-zugang
-    volumes:
-      - ${ARCHIV_RESTORE_TMP:?}/minio:/tmp/daten
+    tmpfs:
+      - /tmp/daten
+    networks: [intern, hostzugang]
     ports:
       - 127.0.0.1::9000
 
   kc:
     image: archiv:restore-roundtrip-kc
+    # Speichergrenze, damit drei JVMs in eine kleine Docker-VM passen (z. B. Colima mit 6 GB)
+    mem_limit: 768m
     environment:
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=25
       KC_DB: postgres
       KC_DB_URL_HOST: db
       KC_DB_URL_DATABASE: keycloak
@@ -50,11 +57,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - 127.0.0.1::9000
+    networks: [intern]
 
   api:
     image: archiv:restore-roundtrip
+    mem_limit: 768m
     environment:
       SMALLRYE_CONFIG_SOURCE_FILE_LOCATIONS: /run/secrets
       QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/archiv
@@ -68,6 +75,8 @@ services:
       ARCHIV_ABLAGE_MAX_SPERRFRIST: P1D
       ARCHIV_ABLAGE_MANIFEST_MAX_SPERRFRIST: P1D
       ARCHIV_ABLAGE_MANIFEST_SPERRMODUS: GOVERNANCE
+      # Nur für die Startprüfung (TsaStartpruefung) wie im Deploy; ohne Internet (Netz intern) stempelt der Stack nicht.
+      ARCHIV_TSA_DIENSTE: sgpki,freetsa
     secrets:
       - archiv_db_app
       - archiv_db_owner
@@ -84,12 +93,14 @@ services:
         condition: service_started
       kc:
         condition: service_started
-    ports:
-      - 127.0.0.1::8080
+    networks: [intern]
 
   kc_restore:
     image: archiv:restore-roundtrip-kc
+    # Speichergrenze, damit drei JVMs in eine kleine Docker-VM passen (z. B. Colima mit 6 GB)
+    mem_limit: 768m
     environment:
+      JAVA_OPTS_KC_HEAP: -XX:MaxRAMPercentage=50 -XX:InitialRAMPercentage=25
       KC_DB: postgres
       KC_DB_URL_HOST: db
       KC_DB_URL_DATABASE: keycloak_restore
@@ -105,9 +116,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - 127.0.0.1::8080
-      - 127.0.0.1::9000
+    networks: [intern]
 
 secrets:
   postgres_password:
@@ -129,6 +138,10 @@ secrets:
   keycloak_admin:
     file: ${ARCHIV_RESTORE_TMP:?}/secrets/keycloak_admin
 
+# Docker veröffentlicht auf einem Netz mit «internal: true» keine Ports. Darum hängen nur PostgreSQL und MinIO, die die
+# Maven-Phasen vom Host aus brauchen, zusätzlich an «hostzugang» (Ports nur an 127.0.0.1). Keycloak und die API bleiben
+# allein im internen Netz; das Skript prüft sie über den Datenbank-Container.
 networks:
-  default:
+  intern:
     internal: true
+  hostzugang: {}

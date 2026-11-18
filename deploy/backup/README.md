@@ -72,8 +72,10 @@ traefik.enable=false api …`), nie per `exec` im laufenden API-Container: Eine 
 Auf der VPS muss dafür kurz Platz für einen zweiten API-Container sein. Der Manifest-Schlüssel wird mit `compose cp`
 als Datei aus dem laufenden Container kopiert; dabei startet keine JVM. Für den konsistenten Realm-Export wird
 Keycloak kurz angehalten und ein Wegwerf-Container verwendet. Dessen Export schreibt in ein Bind-Mount unter dem
-Arbeitsverzeichnis, weil `/tmp` des Dienstes ein 32-MiB-tmpfs ist, das mit dem Container verschwindet. Dieser Teil ist
-nur gegen Attrappen getestet; der Lauf gegen die echte Compose-Umgebung ist Teil der Inbetriebnahme (Infra). Die Shell-Skripte transportieren keine
+Arbeitsverzeichnis, weil `/tmp` des Dienstes ein 32-MiB-tmpfs ist, das mit dem Container verschwindet. Ab Keycloak 26.8
+bricht `kc.sh export` ab, wenn `KC_BOOTSTRAP_ADMIN_USERNAME` ohne Passwort gesetzt ist; der Wegwerf-Container entfernt
+die Variable darum vor dem Export. Der Realm-Export läuft in der lokalen Restore-Übung echt; der Lauf gegen die
+Compose-Umgebung der VPS ist Teil der Inbetriebnahme (Infra). Die Shell-Skripte transportieren keine
 Exporte an einen Backup-Anbieter.
 
 ## Aufruf und Fehlercodes
@@ -114,18 +116,38 @@ Der lokale Prüflauf erstellt keine Verbindung zu einem Sicherungsanbieter und v
 deploy/backup/restore-uebung-lokal.sh
 ```
 
-Voraussetzungen sind Docker, Maven, `age`, `age-keygen`, OpenSSL, `curl` und die lokal vorhandenen Images für
-PostgreSQL/pgvector, Keycloak, Java und MinIO. Das Skript erzeugt eigene Wegwerf-Schlüssel und synthetische Zugangsdaten,
-startet einen Compose-Stack mit internem Netzwerk und führt den echten `taeglich.sh`-Export aus. Es prüft `SHA256SUMS`,
+Voraussetzungen sind Docker, Maven, `age`, `age-keygen`, OpenSSL, `curl` und die lokal vorhandenen Images. Das Skript
+liest die erwarteten Images aus `compose config --images` und den Dockerfiles unter `deploy/infomaniak/` (PostgreSQL
+per Digest wie im Deploy); fehlt eines, bricht es mit Exit-Code `2` und dem passenden `docker pull` ab. Es erzeugt eigene
+Wegwerf-Schlüssel und synthetische Zugangsdaten und führt den echten `taeglich.sh`-Export aus.
+
+Der Compose-Stack (`deploy/backup/test/restore-compose.yml`) hat zwei Netze: Keycloak, die API und das
+wiederhergestellte Keycloak hängen nur am Netz `intern` (`internal: true`) und veröffentlichen keine Ports; ihre
+HTTP-Prüfungen laufen per `compose exec` aus dem Datenbank-Container. Nur PostgreSQL und MinIO hängen zusätzlich am Netz
+`hostzugang` und sind an `127.0.0.1` veröffentlicht, weil Maven-Test und Wiederherstellungskommando vom Host aus auf sie
+zugreifen. Ihre Daten liegen in einem tmpfs, es entstehen keine Volumes. Keycloak und die API haben ein `mem_limit` von
+768 MiB, Keycloak dazu eine Heap-Grenze; ohne sie beendet der OOM-Killer einer knappen Docker-VM Keycloak.
+
+Das temporäre Verzeichnis entsteht unter `${TMPDIR:-/tmp}`. Läuft Docker in einer VM, die nur das Home-Verzeichnis
+einbindet (z. B. Colima unter macOS), muss `TMPDIR` auf ein Verzeichnis darunter zeigen:
+
+```sh
+TMPDIR="$HOME/tmp" deploy/backup/restore-uebung-lokal.sh
+```
+
+Der Lauf prüft `SHA256SUMS` (`--strict`, jede Datei genau einmal),
 weist einen falschen Schlüssel und eine manipulierte Prüfsumme zurück und entschlüsselt das Paket mit beiden
 Wegwerf-Schlüsseln.
 
 Der Lauf spielt den Archiv- und Keycloak-Dump in neue Datenbanken ein. Danach startet er Keycloak mit der
-wiederhergestellten Datenbank und prüft den Realm. Der Bucket-Strom wird mit `archiv sicherung wiederherstellen`
+wiederhergestellten Datenbank und prüft den Realm über den Issuer seiner OIDC-Konfiguration; eine Anmeldung mit
+Token gegen das Ziel prüft der Lauf nicht. Der Bucket-Strom wird mit `archiv sicherung wiederherstellen`
 in den neuen `urinet-archiv-p-`-Bucket eingespielt; eine absichtlich unvollständige Inventarliste ohne Manifest wird
 vorher zurückgewiesen. Die Quarkus-Testanwendung startet gegen die wiederhergestellte Archivdatenbank und prüft
 Dokumentanzahl, IDs, SHA-256 und Lesbarkeit der Dateien. `archiv manifest pruefen` validiert danach das signierte
-Manifest im Ziel-Bucket anhand der Schlüssel und SHA-256, nicht anhand der alten S3-Versions-IDs. Die
+Manifest im Ziel-Bucket anhand der Schlüssel und SHA-256, nicht anhand der alten S3-Versions-IDs, und gleicht es mit
+dem in der Datenbank festgehaltenen Hash ab; eine zusätzliche, veränderte Fassung im Ziel-Bucket lässt die Prüfung
+scheitern. Die
 Zeitstempelprüfung verwendet eine synthetische TSA-Attrappe ohne Netzaufruf.
 
 Alle Daten liegen in einem temporären Verzeichnis. Beim Beenden entfernt das Skript nur den Compose-Stack mit seinem

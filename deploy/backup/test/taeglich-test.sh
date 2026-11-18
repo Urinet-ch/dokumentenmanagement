@@ -134,6 +134,8 @@ case "$subcommand" in
     if [[ $service == kc ]]; then
       if [[ $MOCK_FAIL_REALM == 1 ]]; then exit 3; fi
       [[ $volume == *:/archiv-export ]] || exit 1
+      # Keycloak 26.8 bricht den Export ab, wenn der Bootstrap-Admin ohne Passwort gesetzt ist
+      [[ ${1:-} == -c && ${2:-} == *'unset KC_BOOTSTRAP_ADMIN_USERNAME;'*'kc.sh export'* ]] || exit 1
       quelle=${volume%%:*}
       [[ -d $quelle ]] || exit 1
       printf '{"realm":"synthetic"}\n' > "$quelle/urinet-archiv-realm.json"

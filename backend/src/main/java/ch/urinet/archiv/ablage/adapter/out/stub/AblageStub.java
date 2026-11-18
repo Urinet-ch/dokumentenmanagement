@@ -47,6 +47,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -447,12 +448,18 @@ public class AblageStub implements AblagePort {
     @Override
     public synchronized Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256,
                                                         OutputStream ziel) {
-        if (!schluessel.startsWith("manifest/") || !sha256.matches("[0-9a-fA-F]{64}")) {
+        Objects.requireNonNull(ziel, "ziel");
+        if (schluessel == null || sha256 == null || !schluessel.startsWith("manifest/")
+                || !sha256.matches("[0-9a-fA-F]{64}")) {
             throw new IllegalArgumentException("Ungültige Manifest-Referenz");
         }
+        // gleiche Reihenfolge und Meldungen wie S3Ablage; der Stub kennt keine Löschmarken, nur Versionen
         List<Version> vorhanden = liste(mandant, schluessel);
-        if (vorhanden.size() != 1) {
-            throw new IllegalStateException("Manifest-Teil fehlt oder ist mehrdeutig: " + schluessel);
+        if (vorhanden.isEmpty()) {
+            throw new IllegalStateException("Manifest-Teil fehlt: " + schluessel);
+        }
+        if (vorhanden.size() > 1) {
+            throw new IllegalStateException("Unter " + schluessel + " liegen weitere Versionen oder Löschmarken");
         }
         Version version = vorhanden.getFirst();
         byte[] daten = lesen(version);
