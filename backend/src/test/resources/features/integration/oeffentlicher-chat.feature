@@ -230,8 +230,7 @@ Funktionalität: Öffentlicher Chatbot der Webseiten-Schnittstelle (Aufgabe 11.3
     Und sind die Quellen des Chatbots leer
     Und enthält der Text des Chatbots nicht «Die Quantenphysik ist in Ausgabe 4/2071 auf Seite 99 erklärt.»
     Und enthält der Text des Chatbots «keine passende Publikation gefunden»
-    Und enthält der Text des Chatbots «Bitte wenden Sie sich an die Geschäftsstelle.»
-    Und enthält der Text des Chatbots «Testkontakt UriNet»
+    Und enthält der Text des Chatbots «Bitte wenden Sie sich an die Geschäftsstelle (Testkontakt UriNet).»
     Und enthält das fertig-Ereignis einen Hinweis zur massgebenden Quelle
 
   @req-6.1 @req-15.4
