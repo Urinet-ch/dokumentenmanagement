@@ -220,6 +220,19 @@ Zuordnungen von Arten aus dem Bestand auf solche Klassifikationen werden weder P
 werden zuerst ohne Artverweise angelegt, wegfallende Arten lösen ihre Verweise vor dem Löschen. `ki_texte.ki_freigegeben`
 startet nur im Schema `m_urinet` mit `true` (Req 8.4), sonst mit `false`.
 
+Nachbesserung 17.7a (Review PR #310, Kopf 9885408b): Abbilder ohne `kiTexte` (Versionen vor 047, Seed älterer
+Releases) erhalten beim Lesen die KI-Texte aus `ki_texte` (`Konfiguration.ohneKiTexte`); Abbilder mit `kiTexte`
+bleiben unverändert, damit ein späteres Ändern der Freigabe eine neue Version erzeugt. Beim Einspielen und im Diff kommt
+`kiFreigegeben` immer aus `ki_texte`, nie aus der Datei (Req 8.4: nur das Admin-Kommando ändert die Freigabe).
+Der Seed (`SEED`) enthält `kiTexte`; der changeSet `047-ki-texte-version` hängt bei bestehenden Mandanten mit Arten
+eine Version `MIGRATION` mit den KI-Texten an, wenn das letzte Abbild keine hat. Die Summe von 24'000 Zeichen zählt
+`rolle`, `feldregeln` sowie Name, Beschreibung und `kiHinweise` aller Arten mit `kiVorschlag` und Name und Beschreibung
+aller Klassifikationen mit `kiVorschlag` samt Werten (auch inaktive, strenger als der tatsächliche Prompt); Befund
+`kiTexte` mit Code `TEXTE_ZU_LANG`. Vor dem Löschen wegfallender Werte oder Klassifikationen setzt das Einspielen
+Standardwerte, die auf sie zeigen, auf `null`; danach schreibt es die Zuordnungen der Datei. Export und `ETag` stammen
+aus demselben Stand. `PATCH /konfiguration/ki-texte` antwortet bei zu langen Texten oder fehlendem Grund mit 422
+`KONFIGURATION_UNGUELTIG` samt `befunde[]`.
+
 ## Regeltypen
 | Typ | Parameter | Prüfung | Wann |
 | --- | --- | --- | --- |

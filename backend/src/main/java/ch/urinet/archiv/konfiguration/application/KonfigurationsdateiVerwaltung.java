@@ -67,8 +67,10 @@ public class KonfigurationsdateiVerwaltung {
         this.regelProtokoll = regelProtokoll;
     }
 
-    public String exportieren() {
-        return codec.schreiben(konfiguration.aktuell());
+    /** Datei und Version stammen aus demselben Stand, damit der ETag zur {@code basisVersion} passt. */
+    public Export exportieren() {
+        Konfiguration aktuell = konfiguration.aktuell();
+        return new Export(codec.schreiben(aktuell), aktuell.version());
     }
 
     public int aktuelleVersion() {
@@ -123,9 +125,21 @@ public class KonfigurationsdateiVerwaltung {
     }
 
     public int kiTexteAendern(String rolle, String feldregeln, int erwarteteVersion, String wer, String grund) {
-        if (rolle == null || feldregeln == null || codepunkte(rolle) > 8000 || codepunkte(feldregeln) > 8000
-                || grund == null || grund.isBlank() || codepunkte(grund) > 1000) {
-            throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+        List<KonfigurationUngueltig.Befund> befunde = new ArrayList<>();
+        if (rolle == null || codepunkte(rolle) > 8000) {
+            befunde.add(new KonfigurationUngueltig.Befund("rolle", "TEXT_ZU_LANG",
+                    "Die Rolle fehlt oder überschreitet 8'000 Zeichen."));
+        }
+        if (feldregeln == null || codepunkte(feldregeln) > 8000) {
+            befunde.add(new KonfigurationUngueltig.Befund("feldregeln", "TEXT_ZU_LANG",
+                    "Die Feldregeln fehlen oder überschreiten 8'000 Zeichen."));
+        }
+        if (grund == null || grund.isBlank() || codepunkte(grund) > 1000) {
+            befunde.add(new KonfigurationUngueltig.Befund("grund", "GRUND_UNGUELTIG",
+                    "Der Änderungsgrund fehlt oder überschreitet 1'000 Zeichen."));
+        }
+        if (!befunde.isEmpty()) {
+            throw new KonfigurationUngueltig(befunde);
         }
         konfiguration.aenderungStarten(erwarteteVersion);
         KiTexte alt = kiTexte.lesen();
@@ -136,7 +150,8 @@ public class KonfigurationsdateiVerwaltung {
     private Analyse analysieren(Konfiguration aktuell, KonfigurationsdateiCodec.Datei datei) {
         Konfiguration ziel = fehlendesAusBestandErhalten(aktuell, datei.inhalt());
         List<Befund> befunde = new ArrayList<>(ziel.pruefen());
-        if (datei.inhalt().kiTexte().kiFreigegeben() != aktuell.kiTexte().kiFreigegeben()) {
+        // Massgeblich ist die Tabelle ki_texte, nicht das gespeicherte Abbild (Req 6.6, 8.4).
+        if (datei.inhalt().kiTexte().kiFreigegeben() != kiTexte.lesen().kiFreigegeben()) {
             befunde.add(new Befund("kiTexte.kiFreigegeben", "KI_FREIGABE_UNGUELTIG",
                     "Die Freigabe der KI-Texte kann nicht über eine Konfigurationsdatei geändert werden."));
         }
@@ -226,6 +241,7 @@ public class KonfigurationsdateiVerwaltung {
 
     private void speichern(Konfiguration ziel) {
         Map<String, Klassifikation> zielKlassen = nachCodeKlasse(ziel.klassifikationen());
+        standardwerteOhneZielLoesen(zielKlassen);
         for (Klassifikation klasse : ziel.klassifikationen()) {
             if (klassifikationen.finden(klasse.code()).isPresent()) {
                 klassifikationen.speichern(klasse);
@@ -265,7 +281,25 @@ public class KonfigurationsdateiVerwaltung {
             }
         }
         einstellungenSpeichern.speichern(ziel.einstellungen());
-        kiTexte.speichern(ziel.kiTexte());
+        KiTexte texte = ziel.kiTexte();
+        kiTexte.speichern(new KiTexte(texte.rolle(), texte.feldregeln(), kiTexte.lesen().kiFreigegeben()));
+    }
+
+    /**
+     * Ein Standardwert, dessen Wert die Datei entfernt, wird vor dem Löschen der Werte geleert; den neuen Standardwert
+     * setzt danach {@link #zuordnungenSpeichern}. Sonst verletzt das Löschen den Fremdschlüssel auf den Wert.
+     */
+    private void standardwerteOhneZielLoesen(Map<String, Klassifikation> zielKlassen) {
+        for (Dokumentart art : dokumentarten.alle()) {
+            for (ArtKlassifikation zuordnung : klassifikationen.zuordnungen(art.code())) {
+                Klassifikation ziel = zielKlassen.get(zuordnung.klassifikation());
+                if (zuordnung.standardWert() != null && (ziel == null || ziel.werte().stream()
+                        .noneMatch(wert -> wert.code().equals(zuordnung.standardWert())))) {
+                    klassifikationen.zuordnungSpeichern(art.code(),
+                            new ArtKlassifikation(zuordnung.klassifikation(), zuordnung.pflicht(), null));
+                }
+            }
+        }
     }
 
     private void zuordnungenSpeichern(Konfiguration ziel, Set<String> alteArten,
@@ -287,7 +321,7 @@ public class KonfigurationsdateiVerwaltung {
             }
             for (ArtKlassifikation neu : zielZuordnungen.values()) {
                 if (!zielKlassen.containsKey(neu.klassifikation())) {
-                    throw new FachFehler(Fehlercode.KONFIGURATION_UNGUELTIG);
+                    throw new IllegalStateException("Zuordnung auf eine Klassifikation ausserhalb des Ziels");
                 }
                 if (klassifikationen.zugeordnet(art, neu.klassifikation())) {
                     klassifikationen.zuordnungSpeichern(art, neu);
@@ -399,5 +433,8 @@ public class KonfigurationsdateiVerwaltung {
     }
 
     public record Ergebnis(int version, List<DiffEintrag> aenderungen) {
+    }
+
+    public record Export(String datei, int version) {
     }
 }

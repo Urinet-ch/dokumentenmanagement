@@ -220,7 +220,13 @@ public class LiquibaseMandantDatenbank implements MandantDatenbank {
                             'meldung', r.meldung,
                             'aktiv', r.aktiv)
                             order by r.code collate "C")
-                        from regel r), '[]'::jsonb)
+                        from regel r), '[]'::jsonb),
+                    'kiTexte', (
+                        select jsonb_build_object(
+                            'rolle', t.rolle,
+                            'feldregeln', t.feldregeln,
+                            'kiFreigegeben', t.ki_freigegeben)
+                        from ki_texte t where t.id = 1)
                 ) as inhalt
                 from naechste n, (select current_schema() as schema_name) s
                 left join public.mandant m on m.schema_name = s.schema_name
