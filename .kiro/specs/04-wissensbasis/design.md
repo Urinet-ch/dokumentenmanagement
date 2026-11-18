@@ -720,7 +720,7 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 
 | Aktion | Endpunkt bzw. Auslöser |
 | --- | --- |
-| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/versionen/{n}`, `GET /wissensentwuerfe/{id}` |
+| `WISSEN_ANZEIGEN` | `GET /wissensseiten/{id}`, `/wissensseiten?pfad=…`, `/versionen/{n}`, `/diff`, `/eingehend`, `GET /wissensentwuerfe/{id}` |
 | `WISSEN_ANNEHMEN` | `…/annehmen` (Seite, Entwurf, Basisversion, neue Version) |
 | `WISSEN_VERWERFEN` | `…/verwerfen` (mit Grund) |
 | `WISSEN_INGEST` | `POST /dokumente/{id}/wissen-ingest` (mit Dokument-ID) |
@@ -960,6 +960,31 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   `wissensseite_pfad_uk`); es setzt voraus, dass kein anderer Test dort `ueberblick` committet (Review PR #300, K5). Eine Lese-API für Seiten, Log oder
   Entwürfe gehört nicht zu 13.5; die Rechte für eingeschränkten Zugriff auf eigene Analysevorschläge nach 12.3 sind
   bereits in `Berechtigung` modelliert und werden beim späteren Entwurfszugriff verwendet.
+
+### Umsetzung 13.6
+- `WissenLesen` und `PanacheWissenLesenRepository` liefern Index mit sichtbarkeitsgefiltertem Zähler und Paging,
+  Seite, Versionen, Diff, eingehende Links und Log. Die SQL-Prädikate für aktuelle Seiten, Versionen und Quelldokumente
+  verwenden die gemeinsame Sichtregel; Sortierung und Zähler werden vor dem Paging angewandt.
+- Quelleneinträge und eingehende Links enthalten nur sichtbare Seiten und Dokumente. Beim Rendern interner Markdown-
+  Links werden fehlende und unsichtbare Ziele gleich als «Seite nicht vorhanden» ohne Linktitel ausgegeben.
+- Versionen zeigen Erzeuger, Freigeber, Entwurf samt Anlass und auslösendes Dokument nur, wenn diese Angaben für den
+  Benutzer sichtbar sind; unsichtbare Versionen bleiben auf ihre Nummer beschränkt. Einzelseiten, Versionen, Diff,
+  eingehende Links und Log bleiben privat und tragen ETags, wo eine einzelne Fassung abgerufen wird.
+- Das Log erzeugt Anzeigetexte aus den strukturierten Feldern und sichtbaren Seiten, nie aus `angaben`; Einträge ohne
+  sichtbare Seite werden ausgelassen. Der Index und das Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge;
+  ein Seitenabruf über `?pfad=` protokolliert die Seiten-ID wie `GET /wissensseiten/{id}`. Die `entwurfId` eines
+  Logeintrags erscheint nur, wenn das auslösende Dokument des Entwurfs sichtbar ist (gleiche Regel wie bei den
+  Versionen). Ein Log-Cursor `vor`, der sich nicht dekodieren lässt, eine ID kleiner 1 oder eine Zeit ausserhalb
+  0001–9999 enthält, ergibt 400 `ANFRAGE_UNGUELTIG` (Review PR #311).
+- Version und Diff entscheiden über 404 aus dem Ergebnis der Abfrage mit Sichtprädikat; ändert sich die Sichtbarkeit
+  zwischen Prüfung und Abfrage, bleibt es bei 404 statt eines Serverfehlers (Review PR #311).
+- Eine Seiten-ID im Pfad, die keine UUID ist, gilt wie eine unsichtbare Seite: 404 `NICHT_GEFUNDEN` über
+  `Berechtigung.wissensseitenAktion` und damit ein `VERWEIGERT`-Eintrag (Req 14.4; Review PR #311).
+- Die Dokumentensicht entsteht für SQL (Suche, Wissensbasis) und HQL (Dokumentlisten) aus derselben Quelle
+  `SichtregelSql.praedikat` mit Spaltennamen je Sprache; `VertraulichkeitFilterTest` vergleicht beide für alle Regeln
+  (Review PR #311).
+- Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
+  Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

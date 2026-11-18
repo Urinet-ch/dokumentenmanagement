@@ -30,7 +30,7 @@ import java.util.UUID;
  * <p>
  * Die Erklärung ist die Bindung, mit der CDI den Interceptor aufruft (an der Methode, sonst an der Bean-Klasse, auch für
  * geerbte Methoden) – dieselbe Stelle, die {@code EndpunktWaechterTest} prüft. Die Dokument-ID kommt wie im
- * {@code ZugangFilter} aus dem Pfad-Parameter {@code id} der Anfrage, unabhängig davon, wie die Methode ihn annimmt.
+ * {@code ZugangFilter} aus dem Pfad-Parameter {@code id} der Anfrage oder, wenn angegeben, aus dem Methodenargument.
  */
 @Protokolliert(aktion = ProtokollAktion.ANZEIGEN)
 @Interceptor
@@ -57,7 +57,8 @@ public class ZugriffProtokollInterceptor {
     @AroundInvoke
     Object protokollieren(InvocationContext aufruf) throws Exception {
         Protokolliert erklaerung = aufruf.getInterceptorBinding(Protokolliert.class);
-        ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(), dokumentId(),
+        ZugriffEintrag eintrag = new ZugriffEintrag(benutzer(), rolle(), erklaerung.aktion(),
+                id(aufruf, erklaerung),
                 ip(), tokenDetails(), bearbeiter());
         return QuarkusTransaction.joiningExisting().call(() -> {
             protokoll.schreiben(eintrag);
@@ -101,6 +102,18 @@ public class ZugriffProtokollInterceptor {
             // ausserhalb einer HTTP-Anfrage (z. B. Worker) gibt es keinen Pfad
             return Optional.empty();
         }
+    }
+
+    private Optional<UUID> id(InvocationContext aufruf, Protokolliert erklaerung) {
+        int index = erklaerung.idArgument();
+        if (index < 0) {
+            return dokumentId();
+        }
+        Object[] parameter = aufruf.getParameters();
+        if (index >= parameter.length || !(parameter[index] instanceof UUID id)) {
+            throw new IllegalStateException("Protokollierte ID fehlt oder ist keine UUID");
+        }
+        return Optional.of(id);
     }
 
     /** Pfad-Parameter {@code tokenId} (API-Token-Verwaltung): die ID gehört ins Protokoll, weil sie keine UUID ist. */
