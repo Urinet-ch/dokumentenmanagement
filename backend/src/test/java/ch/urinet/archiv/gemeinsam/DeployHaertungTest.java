@@ -1,6 +1,8 @@
 package ch.urinet.archiv.gemeinsam;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -11,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,7 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Härtung des Deploys nach der Compose-Policy der VPS (tech.md «Plattform und Betrieb», Aufgabe 1.9, Review PR #42
  * S1 und S2). Die Policy des Infra-Repos prüft Limits, {@code cap_drop}, {@code no-new-privileges} und die uid nur für
- * Apps auf {@code -api}, nicht für {@code archiv}; darum prüft das Repo sie selbst.
+ * Apps auf {@code -api}, nicht für {@code archiv}; darum prüft das Repo sie selbst – auch für die Restore-Probe
+ * ({@code deploy/probe/compose.yml}) mit ihrem eigenständigen Dienst {@code worker} (Aufgabe 2.6, Review PR #266, M2).
  */
 class DeployHaertungTest {
 
@@ -39,10 +43,11 @@ class DeployHaertungTest {
                     + "|\\b(?:tee|cp|mv|mkdir|install|touch)\\s|\\bdocker\\s+save\\b"
                     + "|\\bcurl\\b[^\\n]*\\s-o\\s*(?!/dev/null)\\S");
 
-    @Test
-    void jederDienstGehaertet() throws IOException {
+    @ParameterizedTest
+    @ValueSource(strings = {"deploy/infomaniak/compose.yml", "deploy/probe/compose.yml"})
+    void jederDienstGehaertet(String datei) throws IOException {
         List<String> fehler = new ArrayList<>();
-        dienste().forEach((name, dienst) -> {
+        dienste(REPO.resolve(datei)).forEach((name, dienst) -> {
             if (!(dienst.get("cap_drop") instanceof List<?> drop) || !drop.contains("ALL")) {
                 fehler.add(name + ": cap_drop ohne ALL");
             }
@@ -67,6 +72,18 @@ class DeployHaertungTest {
             }
         });
         assertThat(fehler).isEmpty();
+    }
+
+    /** Auch der eigenständige Worker der Restore-Probe läuft nie als root (Aufgabe 2.6, Review PR #266, M2). */
+    @ParameterizedTest
+    @ValueSource(strings = {"deploy/infomaniak/compose.yml", "deploy/probe/compose.yml"})
+    void workerDienstLaeuftMitNumerischerNichtRootUid(String datei) throws IOException {
+        List<Map.Entry<String, Map<String, Object>>> worker = dienste(REPO.resolve(datei)).entrySet().stream()
+                .filter(e -> hatWorkerRolle(e.getValue()))
+                .toList();
+
+        assertThat(worker).isNotEmpty().allSatisfy(e ->
+                assertThat(String.valueOf(e.getValue().get("user"))).as(e.getKey()).matches(UID));
     }
 
     @Test
@@ -148,11 +165,22 @@ class DeployHaertungTest {
     }
 
     private static Map<String, Map<String, Object>> dienste() throws IOException {
-        Map<String, Object> roh = karte(yaml(COMPOSE).get("services"));
+        return dienste(COMPOSE);
+    }
+
+    private static Map<String, Map<String, Object>> dienste(Path compose) throws IOException {
+        Map<String, Object> roh = karte(yaml(compose).get("services"));
         assertThat(roh).isNotEmpty();
         Map<String, Map<String, Object>> dienste = new java.util.TreeMap<>();
         roh.forEach((name, dienst) -> dienste.put(name, karte(dienst)));
         return dienste;
+    }
+
+    private static boolean hatWorkerRolle(Map<String, Object> dienst) {
+        Object environment = dienst.get("environment");
+        Object rolle = environment instanceof Map<?, ?> werte ? werte.get("ARCHIV_ROLLE") : null;
+        return rolle != null && Arrays.stream(String.valueOf(rolle).split(","))
+                .map(String::strip).anyMatch("worker"::equals);
     }
 
     @SuppressWarnings("unchecked")

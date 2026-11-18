@@ -44,5 +44,6 @@
     <include file="changesets/040-dokumentart-konfiguration.xml" relativeToChangelogFile="true"/>
     <include file="changesets/041-webseite-fassungs-bearbeiter.xml" relativeToChangelogFile="true"/>
     <include file="changesets/042-fristbezuege.xml" relativeToChangelogFile="true"/>
-    <include file="changesets/043-klassifikation.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/043-wissen-datenmodell.xml" relativeToChangelogFile="true"/>
+    <include file="changesets/044-klassifikation.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

@@ -171,6 +171,18 @@ class SkriptTest(unittest.TestCase):
         self.assertTrue(all(b'filename="lastlauf.heic"' in u and b"Content-Type: image/heic" in u for u in uploads))
         self.assertEqual(len(set(uploads)), 5)
 
+    def test_foto_standardwerte_entsprechen_messbedingungen(self):
+        foto = Path(self.ordner.name) / "foto.jpg"
+        foto.write_bytes(JPEG)
+
+        lauf = self.starten("verarbeitung_foto.py", "--basis-url", self.url, "--foto", str(foto),
+                            "--intervall", "0.01")
+
+        self.assertEqual(lauf.returncode, 0, lauf.stderr)
+        self.assertIn("p95 über 50 Läufe", lauf.stdout)
+        self.assertEqual(lauf.stdout.count("zählt nicht"), 20)
+        self.assertEqual(len([a for a in Server.anfragen if a[0] == "POST"]), 70)
+
 
 if __name__ == "__main__":
     unittest.main()

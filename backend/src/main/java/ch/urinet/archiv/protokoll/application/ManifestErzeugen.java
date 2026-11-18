@@ -221,11 +221,9 @@ public class ManifestErzeugen implements AuftragHandler {
         MandantCode mandant = auftrag.mandant();
         ManifestFenster fenster = ManifestFenster.fuer(datum, vorgaenger.map(ManifestStand::bis).orElse(null));
         ManifestSpeichern.Sammlung sammlung = speichern.sammeln(mandant, fenster);
-        Map<String, ProtokollHash> protokolle = new TreeMap<>();
-        sammlung.blaetter().forEach((tabelle, blaetter) -> protokolle.put(tabelle, ProtokollHash.aus(bytes(blaetter))));
         ManifestInhalt inhalt = new ManifestInhalt(mandant.wert(), datum, fenster.von(), fenster.bis(),
                 vorgaenger.map(ManifestStand::sha256).orElse(null), vorgaenger.map(ManifestStand::verweis).orElse(null),
-                sammlung.eintraege(), new TreeMap<>(protokolle), sammlung.sicherungen());
+                sammlung.eintraege(), protokolle(sammlung.blaetter()), sammlung.sicherungen());
         Optional<LocalDate> sperre = sperre(sammlung.fristen(), ManifestFenster.tag(Instant.now()), datum,
                 einstellungen.lesen(mandant).geschaeftsjahresende().monatTag());
 
@@ -386,6 +384,20 @@ public class ManifestErzeugen implements AuftragHandler {
 
     static ManifestTeil teil(String dienst, Pruefdaten.Art art) {
         return art == Pruefdaten.Art.OCSP ? ManifestTeil.ocsp(dienst) : ManifestTeil.crl(dienst);
+    }
+
+    /**
+     * Hashes unter {@code protokolle}: {@link ManifestSpeichern#PROTOKOLLE_IMMER} immer, die übrigen Tabellen nur mit
+     * Zeilen im Fenster (design.md «Manifest»). Die Blätter in {@code protokoll_blatt} entstehen für alle Tabellen.
+     */
+    static TreeMap<String, ProtokollHash> protokolle(Map<String, List<Blatt>> blaetter) {
+        TreeMap<String, ProtokollHash> protokolle = new TreeMap<>();
+        blaetter.forEach((tabelle, liste) -> {
+            if (!liste.isEmpty() || ManifestSpeichern.PROTOKOLLE_IMMER.contains(tabelle)) {
+                protokolle.put(tabelle, ProtokollHash.aus(bytes(liste)));
+            }
+        });
+        return protokolle;
     }
 
     private static byte[] bytes(List<Blatt> blaetter) {
