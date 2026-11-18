@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Ohne Handler für {@code KI_VORSCHLAG} (ausgeschlossen) geht das Dokument nach der Verarbeitung direkt in den
  * Eingangskorb, und es entsteht kein Auftrag, den niemand bearbeitet (VerarbeitungSpeichern, Rückfall).
  */
-@Tag("start-1")
+@Tag("start-3")
 @QuarkusTest
 @TestProfile(VerarbeitenOhneKiHandlerTest.OhneKiHandler.class)
 class VerarbeitenOhneKiHandlerTest {
