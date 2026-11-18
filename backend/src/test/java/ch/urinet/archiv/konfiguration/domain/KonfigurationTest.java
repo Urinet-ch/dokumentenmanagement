@@ -391,6 +391,36 @@ class KonfigurationTest {
                 .extracting(Konfiguration.Befund::code).contains("TEXT_UNGUELTIG");
     }
 
+    /** design.md «Grenzen gegen zu lange Prompts»: Summe der Prompt-Texte höchstens 24'000 Zeichen (Req 6.6). */
+    @Test
+    void summeDerPromptTexteHoechstens24000Zeichen() {
+        List<KlassifikationWert> werte = new java.util.ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            werte.add(new KlassifikationWert("w" + i, "W", "x".repeat(1000), i, true));
+        }
+        var kiKlasse = new Klassifikation("fachgebiet", "F", null, werte, false, true, true, false, true);
+        var ohneKi = new Klassifikation("fachgebiet", "F", null, werte, false, false, true, false, true);
+        var texte = new Konfiguration.KiTexte("r".repeat(8000), "f".repeat(8000), true);
+
+        // 8'000 + 8'000 + 8 × (1 + 1'000) + 1 = 24'009
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(kiKlasse), List.of(), texte).pruefen())
+                .containsExactly(new Konfiguration.Befund("kiTexte", "TEXTE_ZU_LANG",
+                        "Die Texte im KI-Prompt überschreiten zusammen 24'000 Zeichen."));
+        // Klassifikationen ohne KI-Vorschlag gelangen nicht in den Prompt
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(ohneKi), List.of(), texte).pruefen())
+                .isEmpty();
+        var knapp = new Konfiguration.KiTexte("r".repeat(8000), "f".repeat(7990), true);
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(kiKlasse), List.of(), knapp).pruefen())
+                .isEmpty();
+    }
+
+    @Test
+    void erkenntAbbildOhneKiTexte() {
+        assertThat(new Konfiguration(1, einstellungen(), List.of()).ohneKiTexte()).isTrue();
+        assertThat(new Konfiguration(1, einstellungen(), List.of(), List.of(), List.of(),
+                new Konfiguration.KiTexte("", "", false)).ohneKiTexte()).isFalse();
+    }
+
     private static Konfiguration.Einstellungen einstellungen() {
         return new Konfiguration.Einstellungen("12-31", new Konfiguration.Kennungen(null, List.of()));
     }

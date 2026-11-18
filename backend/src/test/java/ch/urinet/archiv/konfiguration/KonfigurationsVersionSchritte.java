@@ -307,6 +307,22 @@ public class KonfigurationsVersionSchritte {
         ((ArrayNode) datei.path("klassifikationen")).add(klasse);
     }
 
+    /** 2 × 8'000 Zeichen KI-Texte plus 9 Werte mit je 1'000 Zeichen Beschreibung: über 24'000 (design.md, Req 6.6). */
+    @Wenn("in der Datei die KI-Texte und die Klassifikation «{word}» mit KI-Vorschlag zusammen über 24'000 Zeichen lang sind")
+    public void promptZuLang(String code) {
+        ObjectNode texte = (ObjectNode) datei.path("kiTexte");
+        texte.put("rolle", "r".repeat(8000)).put("feldregeln", "f".repeat(8000));
+        ObjectNode klasse = JSON.createObjectNode();
+        klasse.put("code", code).put("name", "Test " + code);
+        ArrayNode werte = klasse.putArray("werte");
+        for (int i = 0; i < 9; i++) {
+            werte.addObject().put("code", "w" + i).put("name", "W" + i).put("beschreibung", "b".repeat(1000));
+        }
+        klasse.put("mehrfach", false).put("kiVorschlag", true).put("suchfilter", false)
+                .put("oeffentlichFilter", false).put("aktiv", true);
+        ((ArrayNode) datei.path("klassifikationen")).add(klasse);
+    }
+
     @Wenn("in der Datei die Klassifikation «{word}» einfach ist")
     public void klassifikationEinfach(String code) {
         klasse(code).put("mehrfach", false);
@@ -332,6 +348,43 @@ public class KonfigurationsVersionSchritte {
         ((ArrayNode) art(art).path("klassifikationen")).addObject().put("code", klasse).put("pflicht", true);
     }
 
+    @Wenn("in der Datei die Art «{word}» der Klassifikation «{word}» mit dem Standardwert «{word}» zugeordnet ist")
+    public void mitStandardwertZuordnen(String art, String klasse, String wert) {
+        ArrayNode zuordnungen = (ArrayNode) art(art).path("klassifikationen");
+        for (int i = zuordnungen.size() - 1; i >= 0; i--) {
+            if (klasse.equals(zuordnungen.get(i).path("code").asText())) {
+                zuordnungen.remove(i);
+            }
+        }
+        zuordnungen.addObject().put("code", klasse).put("pflicht", false).put("standardWert", wert);
+    }
+
+    @Wenn("in der Datei der Wert «{word}» der Klassifikation «{word}» fehlt")
+    public void wertEntfernen(String wert, String klasse) {
+        ArrayNode werte = (ArrayNode) klasse(klasse).path("werte");
+        for (int i = werte.size() - 1; i >= 0; i--) {
+            if (wert.equals(werte.get(i).path("code").asText())) {
+                werte.remove(i);
+            }
+        }
+    }
+
+    /** Wie ein Abbild vor Changeset 048 oder von einem älteren Release: ohne {@code kiTexte} (Req 6.6, 8.4). */
+    @Angenommen("die letzte Konfigurationsversion von «{word}» enthält keine KI-Texte")
+    public void versionOhneKiTexte(String mandant) throws SQLException {
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement anlegen = verbindung.prepareStatement("with letzte as (select version, inhalt from "
+                     + schema + ".konfiguration_version order by version desc limit 1), "
+                     + "abbild as (select version + 1 as version, (inhalt - 'kiTexte') || jsonb_build_object("
+                     + "'version', version + 1) as inhalt from letzte) "
+                     + "insert into " + schema + ".konfiguration_version (version, wer, grund, quelle, inhalt, sha256) "
+                     + "select version, 'system:migration', null, 'MIGRATION', inhalt, "
+                     + "encode(sha256(convert_to(inhalt::text, 'UTF8')), 'hex') from abbild")) {
+            assertThat(anlegen.executeUpdate()).isEqualTo(1);
+        }
+    }
+
     @Wenn("in der Datei das Feld «{word}» mit dem Wert «{word}» steht")
     public void feldSetzen(String feld, String wert) {
         datei.put(feld, wert);
@@ -340,6 +393,11 @@ public class KonfigurationsVersionSchritte {
     @Wenn("in der Datei das Geschäftsjahresende «{word}» steht")
     public void geschaeftsjahrEnde(String datum) {
         ((ObjectNode) datei.path("einstellungen")).put("geschaeftsjahrEnde", datum);
+    }
+
+    @Wenn("in der Datei der KI-Rollentext geändert wird")
+    public void kiRollentextAendern() {
+        ((ObjectNode) datei.path("kiTexte")).put("rolle", "Synthetische Testrolle");
     }
 
     @Wenn("«{word}» die geänderte Konfigurationsdatei einspielt")
@@ -409,6 +467,35 @@ public class KonfigurationsVersionSchritte {
                 assertThat(ergebnis.getString(1)).contains(text);
             }
         }
+    }
+
+    @Dann("nennt der letzte Eintrag «{word}» im Protokoll von «{word}» den Text «{word}» nicht")
+    public void protokolleintragOhne(String aktion, String mandant, String text) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select details::text from "
+                     + new MandantCode(mandant).schema() + ".zugriff_protokoll where aktion = ? "
+                     + "order by id desc limit 1")) {
+            abfrage.setString(1, aktion);
+            try (var ergebnis = abfrage.executeQuery()) {
+                assertThat(ergebnis.next()).as("Protokolleintrag " + aktion).isTrue();
+                assertThat(ergebnis.getString(1)).doesNotContain(text);
+            }
+        }
+    }
+
+    @Dann("ist die KI im Export freigegeben")
+    public void exportKiFreigegeben() {
+        assertThat(datei.path("kiTexte").path("kiFreigegeben").asBoolean()).as(konfigurationsdatei).isTrue();
+    }
+
+    @Dann("ist im Export «{word}» der Standardwert der Klassifikation «{word}» der Art «{word}»")
+    public void exportStandardwert(String wert, String klasse, String art) {
+        List<Map<String, Object>> zuordnungen = antwort.jsonPath()
+                .getList("arten.find { it.code == '" + art + "' }.klassifikationen");
+        assertThat(zuordnungen).anySatisfy(zuordnung -> {
+            assertThat(zuordnung.get("code")).isEqualTo(klasse);
+            assertThat(zuordnung.get("standardWert")).isEqualTo(wert);
+        });
     }
 
     @Dann("enthält der Export die Art «{word}» nicht")

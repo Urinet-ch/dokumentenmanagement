@@ -141,12 +141,16 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     /**
      * Die Typen der Zusatzfelder gehören nicht ins gespeicherte Abbild; sie werden beim Lesen aus dem Zusatz-Schema
      * abgeleitet, damit Abbilder aus Migration und App gleich sind und Regeln mit {@code zusatz.} prüfbar bleiben.
+     * Ein Abbild ohne {@code kiTexte} (vor Changeset 048 oder von einem älteren Release) erhält die KI-Texte aus
+     * {@code ki_texte}; sonst gälte die KI als nicht freigegeben und Export und Protokoll zeigten falsche Werte
+     * (Req 6.6, 8.4).
      */
     private KonfigurationsVersion mitFeldTypen(KonfigurationsVersion stand) {
         Konfiguration inhalt = stand.inhalt();
         Konfiguration ergaenzt = new Konfiguration(inhalt.version(), inhalt.einstellungen(), inhalt.arten().stream()
                 .map(art -> art.mitZusatzFeldTypen(zusatzSchema.feldTypen(art.zusatzSchema()))).toList(),
-                inhalt.klassifikationen(), inhalt.regeln(), inhalt.kiTexte());
+                inhalt.klassifikationen(), inhalt.regeln(),
+                inhalt.ohneKiTexte() ? kiTexteRepository.lesen() : inhalt.kiTexte());
         return new KonfigurationsVersion(stand.version(), stand.zeit(), stand.wer(), stand.grund(), stand.quelle(),
                 ergaenzt, stand.sha256());
     }

@@ -42,6 +42,20 @@ Funktionalität: Konfigurationsdatei
     Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
     Und ist die Konfigurationsversion unverändert
 
+  @req-6.6
+  Szenario: Eine Version ohne KI-Texte entzieht beim Einspielen die KI-Freigabe nicht
+    Angenommen die letzte Konfigurationsversion von «urinet» enthält keine KI-Texte
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Dann ist die KI im Export freigegeben
+    Wenn in der Datei die Art «TEST_DATEI_KI» ergänzt wird
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Und ist die Konfigurationsversion um eins gestiegen
+    Und nennt der letzte Eintrag «KONFIGURATION_AENDERN» im Protokoll von «urinet» den Text «arten.TEST_DATEI_KI»
+    Und nennt der letzte Eintrag «KONFIGURATION_AENDERN» im Protokoll von «urinet» den Text «kiTexte» nicht
+    Wenn «inhaber-urinet» die KI-Texte liest
+    Dann ist die KI laut KI-Texte-Endpunkt freigegeben
+
   @req-6.3
   Szenario: Eine ungültige Konfiguration wird vor dem Schreiben abgelehnt
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
@@ -155,6 +169,22 @@ Funktionalität: Konfigurationsdatei
     Und ist die Konfigurationsversion unverändert
 
   @req-6.3
+  Szenario: Ein Standardwert wechselt auf einen anderen Wert, während sein bisheriger Wert wegfällt
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei die Art «TEST_DATEI_STANDARD» ergänzt wird
+    Und in der Datei die mehrfache Klassifikation «test_datei» mit den Werten «a» und «b» ergänzt wird
+    Und in der Datei die Art «TEST_DATEI_STANDARD» der Klassifikation «test_datei» mit dem Standardwert «a» zugeordnet ist
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei der Wert «a» der Klassifikation «test_datei» fehlt
+    Und in der Datei die Art «TEST_DATEI_STANDARD» der Klassifikation «test_datei» mit dem Standardwert «b» zugeordnet ist
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 200
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Dann ist im Export «b» der Standardwert der Klassifikation «test_datei» der Art «TEST_DATEI_STANDARD»
+
+  @req-6.3
   Szenario: Zwei neue Arten dürfen aufeinander verweisen und zusammen wegfallen
     Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
     Und in der Datei die Art «TEST_DATEI_ERSTE» ergänzt wird
@@ -203,6 +233,18 @@ Funktionalität: Konfigurationsdatei
     Dann antwortet die Konfigurationsverwaltung mit Status 201
     Wenn «inhaber-urinet» die exportierte Konfigurationsdatei ohne If-Match einspielt
     Dann antwortet die Konfigurationsverwaltung mit Status 409 und Fehlercode «KONFIGURATION_VERALTET»
+
+  @req-6.6
+  Szenario: Die Texte im KI-Prompt dürfen zusammen höchstens 24'000 Zeichen lang sein
+    Wenn «inhaber-urinet» die Konfigurationsdatei exportiert
+    Und in der Datei die KI-Texte und die Klassifikation «test_ki_lang» mit KI-Vorschlag zusammen über 24'000 Zeichen lang sind
+    Und «inhaber-urinet» die geänderte Konfigurationsdatei prüft
+    Dann ist die Konfigurationsdatei ungültig
+    Und nennt die Antwort den Befund "kiTexte" mit dem Code «TEXTE_ZU_LANG»
+    Wenn «inhaber-urinet» die geänderte Konfigurationsdatei einspielt
+    Dann antwortet die Konfigurationsverwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+    Und nennt die Antwort den Befund "kiTexte" mit dem Code «TEXTE_ZU_LANG»
+    Und ist die Konfigurationsversion unverändert
 
   @req-6.2 @req-6.6
   Szenario: Ein unbekanntes Feld wird mit Pfad gemeldet und abgelehnt
