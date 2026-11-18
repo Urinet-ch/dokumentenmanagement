@@ -3,7 +3,6 @@ package ch.urinet.archiv.protokoll.domain;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -189,23 +188,24 @@ public record ProtokollDetails(String grund, String sha256, String fehlercode, R
         }
     }
 
-    /** Kennungswerte bleiben ausschliesslich im Konfigurationsabbild, nicht im Änderungsprotokoll. */
-    public record Aenderung(String pfad, String alt, String neu) {
-        private static final Set<String> OHNE_WERTE = Set.of(
-                "einstellungen.kennungen.uid", "einstellungen.kennungen.ibans");
-
+    /**
+     * Ein geändertes Konfigurationselement: Pfad, alter und neuer Wert als Text ({@code null} = nicht vorhanden).
+     * Mit {@code ohneWerte} (Kennungen, Spec 05, Req 1.3) entfallen alter und neuer Wert schon hier, vor jeder
+     * Serialisierung; welches Element so gilt, bestimmt der Aufrufer, nicht dieser Record.
+     */
+    public record Aenderung(String pfad, String alt, String neu, boolean ohneWerte) {
         public Aenderung {
             if (pfad == null || pfad.isBlank()) {
                 throw new IllegalArgumentException("pfad ist Pflicht");
             }
-            if (OHNE_WERTE.contains(pfad)) {
+            if (ohneWerte) {
                 alt = null;
                 neu = null;
             }
         }
 
-        public boolean ohneWerte() {
-            return OHNE_WERTE.contains(pfad);
+        public Aenderung(String pfad, String alt, String neu) {
+            this(pfad, alt, neu, false);
         }
     }
 }

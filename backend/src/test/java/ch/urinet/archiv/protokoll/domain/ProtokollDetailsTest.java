@@ -45,14 +45,11 @@ class ProtokollDetailsTest {
 
     @Test
     void kennungswerteWerdenSchonVorSerialisierungUndToStringEntfernt() {
-        for (String feld : new String[]{"uid", "ibans"}) {
-            var aenderung = new ProtokollDetails.Aenderung("einstellungen.kennungen." + feld,
-                    "synthetisch-alt", "synthetisch-neu");
-            assertThat(aenderung.ohneWerte()).isTrue();
-            assertThat(aenderung.alt()).isNull();
-            assertThat(aenderung.neu()).isNull();
-            assertThat(aenderung.toString()).doesNotContain("synthetisch-alt", "synthetisch-neu");
-        }
+        var aenderung = new ProtokollDetails.Aenderung("einstellungen.kennungen.uid",
+                "synthetisch-alt", "synthetisch-neu", true);
+        assertThat(aenderung.alt()).isNull();
+        assertThat(aenderung.neu()).isNull();
+        assertThat(aenderung.toString()).doesNotContain("synthetisch-alt", "synthetisch-neu");
         var anderesFeld = new ProtokollDetails.Aenderung("arten.PROBE.name", null, "geändert");
         assertThat(anderesFeld.ohneWerte()).isFalse();
         assertThat(anderesFeld.neu()).isEqualTo("geändert");

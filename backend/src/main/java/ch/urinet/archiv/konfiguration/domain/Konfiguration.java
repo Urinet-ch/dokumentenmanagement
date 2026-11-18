@@ -191,14 +191,28 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         public Kennungen {
             ibans = ibans == null ? List.of() : List.copyOf(ibans);
         }
-    }
 
-    public record Aenderung(String pfad, String alt, String neu) {
-        /** Kennungen (UID, IBAN) nie im Klartext ausgeben (Spec 01, 16.7). */
+        /** UID und IBANs nie im Klartext ausgeben (Datensparsamkeit, Spec 05, Req 1.3). */
         @Override
         public String toString() {
-            boolean kennung = pfad != null && pfad.startsWith("einstellungen.kennungen.");
-            return kennung ? "Aenderung[pfad=" + pfad + ", geändert]"
+            return "Kennungen[uid=" + (uid == null ? "keine" : "verdeckt") + ", ibans=" + ibans.size() + "]";
+        }
+    }
+
+    /**
+     * Ein geändertes Element: Pfad, alter und neuer Wert als Text ({@code null} = nicht vorhanden). Bei Kennungen
+     * ({@link #ohneWerte()}) halten Protokoll und {@code toString()} nur den Pfad fest (Spec 05, Req 1.3).
+     */
+    public record Aenderung(String pfad, String alt, String neu) {
+        private static final String KENNUNGEN = "einstellungen.kennungen.";
+
+        public boolean ohneWerte() {
+            return pfad != null && pfad.startsWith(KENNUNGEN);
+        }
+
+        @Override
+        public String toString() {
+            return ohneWerte() ? "Aenderung[pfad=" + pfad + ", geändert]"
                     : "Aenderung[pfad=" + pfad + ", alt=" + alt + ", neu=" + neu + "]";
         }
     }

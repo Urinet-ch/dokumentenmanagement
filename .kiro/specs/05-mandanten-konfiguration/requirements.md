@@ -72,7 +72,9 @@ damit ein Verband andere Kategorien, Fristen und Regeln erhält als eine Firma, 
    vollständigen Abbild, SHA-256, Zeit, Benutzer bzw. Betreiber und Quelle (`APP`, `DATEI`, `SEED`, `KOMMANDO`,
    `MIGRATION`) anlegen und
    die Änderung mit Version, alten und neuen Werten der geänderten Elemente im Zugriffsprotokoll festhalten (ausser bei Kennungen
-   `uid` und `ibans`: dort nur Feldname und «geändert», keine Werte, Spec 01, 16.7);
+   `uid` und `ibans`: dort nur Feldname und «geändert», keine Werte; geändert 18.11.2026, bisher alte und neue Werte
+   auch der Kennungen, Grund Datensparsamkeit; vorgeschlagen 18.11.2026 in PR #290, entschieden mit dem Merge von
+   PR #290);
    scheitert einer der Schritte, SOLL keine Änderung wirksam sein (wie Spec 01, 10.8). Eine Änderung ohne
    Unterschied zum aktuellen Stand SOLL keine Version erzeugen.
 4. WENN ein Dokument bestätigt, über einen Generator archiviert oder in seinen Metadaten geändert wird, DANN SOLL

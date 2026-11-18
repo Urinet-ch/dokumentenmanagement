@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -40,6 +41,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class ZugriffProtokollSchritte {
 
     private static final String FEHLER_TRIGGER = "probe_protokoll_fehler";
+    private static final String KENNUNGEN = "einstellungen.kennungen.";
+    private static final String UID_PROBE = "CHE-000.000.077";
+    private static final String IBAN_PROBE = "CH0000000000000000077";
 
     @Inject
     Instance<AgroalDataSource> datenbank;
@@ -53,6 +57,7 @@ public class ZugriffProtokollSchritte {
     private final Map<String, Long> stand = new HashMap<>();
     private final List<String> fehlerSchemas = new ArrayList<>();
     private final List<String[]> angelegteArten = new ArrayList<>();
+    private final Map<String, String> kennungenVorher = new HashMap<>();
 
     @Angenommen("der Stand des Zugriffsprotokolls von «{word}» ist gemerkt")
     public void merken(String mandant) throws SQLException {
@@ -121,6 +126,11 @@ public class ZugriffProtokollSchritte {
         assertThat(details.path("quelle").asText()).isEqualTo("APP");
         JsonNode jahre = null;
         for (JsonNode aenderung : details.path("aenderungen")) {
+            if (aenderung.path("pfad").asText().startsWith(KENNUNGEN)) {
+                // Kennungen eines früheren Szenarios (Req 1.3): nur Pfad und «geändert»
+                assertThat(feldnamen(aenderung)).containsExactlyInAnyOrder("pfad", "aenderung");
+                continue;
+            }
             assertThat(feldnamen(aenderung)).containsExactlyInAnyOrder("pfad", "alt", "neu");
             if ("arten.PROBE_DA_REGEL.aufbewahrung.jahre".equals(aenderung.path("pfad").asText())) {
                 jahre = aenderung;
@@ -165,6 +175,62 @@ public class ZugriffProtokollSchritte {
         assertThat(anderesFeld.path("pfad").asText()).isEqualTo("einstellungen.geschaeftsjahrEnde");
         assertThat(anderesFeld.path("alt").asText()).isEqualTo("12-31");
         assertThat(anderesFeld.path("neu").asText()).isEqualTo("06-30");
+    }
+
+    /**
+     * Sichert erst die aktuelle Konfigurationsversion (GET mit ETag), dann setzt {@code public.mandant.kennungen}
+     * synthetisch: Die nächste Änderung über die Verwaltung schreibt den Unterschied der Kennungen ins Protokoll.
+     */
+    @Angenommen("der Mandant «{word}» hat synthetische Kennungen, die seit der letzten Konfigurationsversion geändert sind")
+    public void kennungenSynthetisch(String mandant) throws SQLException {
+        given().auth().oauth2(Testanmeldung.token("inhaber-" + mandant)).when().get("/api/v1/dokumentarten")
+                .then().statusCode(200);
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement lesen = verbindung
+                .prepareStatement("select kennungen::text from public.mandant where code = ?")) {
+            lesen.setString(1, mandant);
+            try (ResultSet zeile = lesen.executeQuery()) {
+                assertThat(zeile.next()).isTrue();
+                kennungenVorher.putIfAbsent(mandant, zeile.getString(1));
+            }
+        }
+        kennungenSetzen(mandant, "{\"uid\":\"" + UID_PROBE + "\",\"ibans\":[\"" + IBAN_PROBE + "\"]}");
+    }
+
+    @Wenn("die Kennungen von «{word}» wieder wie vorher sind")
+    public void kennungenZuruecksetzen(String mandant) throws SQLException {
+        kennungenSetzen(mandant, kennungenVorher.remove(mandant));
+    }
+
+    @Dann("der neue Konfigurationseintrag von «{word}» nennt die Kennungen nur mit Feldnamen und «geändert»")
+    public void kennungenNurMitFeldnamen(String mandant) throws Exception {
+        var eintraege = eintraegeFuerAktion(mandant, "KONFIGURATION_AENDERN");
+        assertThat(eintraege).hasSize(1);
+        String text = eintraege.getFirst().get("details");
+        assertThat(text).doesNotContain("000.000.077", "0000000000000000077");
+        List<String> kennungen = new ArrayList<>();
+        boolean art = false;
+        for (JsonNode aenderung : new ObjectMapper().readTree(text).path("aenderungen")) {
+            String pfad = aenderung.path("pfad").asText();
+            if (pfad.startsWith(KENNUNGEN)) {
+                kennungen.add(pfad);
+                assertThat(feldnamen(aenderung)).as(pfad).containsExactlyInAnyOrder("pfad", "aenderung");
+                assertThat(aenderung.path("aenderung").asText()).isEqualTo("geändert");
+            } else {
+                art |= pfad.startsWith("arten.PROBE_DA_KENNUNG");
+                assertThat(feldnamen(aenderung)).as(pfad).containsExactlyInAnyOrder("pfad", "alt", "neu");
+            }
+        }
+        assertThat(kennungen).containsExactlyInAnyOrder(KENNUNGEN + "uid", KENNUNGEN + "ibans");
+        assertThat(art).as("Änderung der Art mit alt und neu").isTrue();
+    }
+
+    private void kennungenSetzen(String mandant, String json) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection(); PreparedStatement setzen = verbindung
+                .prepareStatement("update public.mandant set kennungen = cast(? as jsonb) where code = ?")) {
+            setzen.setString(1, json);
+            setzen.setString(2, mandant);
+            assertThat(setzen.executeUpdate()).isEqualTo(1);
+        }
     }
 
     private static List<String> feldnamen(JsonNode knoten) {
@@ -223,6 +289,9 @@ public class ZugriffProtokollSchritte {
 
     @After
     public void aufraeumen() throws SQLException {
+        for (String mandant : List.copyOf(kennungenVorher.keySet())) {
+            kennungenZuruecksetzen(mandant);
+        }
         try (Connection verbindung = datenbank.get().getConnection(); Statement befehl = verbindung.createStatement()) {
             for (String schema : fehlerSchemas) {
                 befehl.execute("drop trigger if exists " + FEHLER_TRIGGER + " on " + schema + ".zugriff_protokoll");

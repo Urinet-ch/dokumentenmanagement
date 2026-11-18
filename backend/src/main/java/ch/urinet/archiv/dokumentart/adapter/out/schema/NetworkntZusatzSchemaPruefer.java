@@ -296,10 +296,9 @@ public class NetworkntZusatzSchemaPruefer implements ZusatzSchemaPruefer {
             if (!properties.isObject()) {
                 return false;
             }
-            // Spec 05, design.md «Umsetzung 17.3»: «vorstand» ist ohne Art-Code zulässig: Massgeblich ist
-            // Spec 03 design.md «Reservierte Felder» (Req 2.7), und Req 2.9 verbietet Art-Codes in der Programmlogik
-            // (Spec 03 design.md, Aufgabe 10.4, nennt VORSTANDSPROTOKOLL nur als Seed-Wert). «oeffentlich» bleibt
-            // ausgeschlossen (Req 2.7).
+            // Standard von zugriff: «mitglieder» (Spec 03 design.md «Reservierte Felder») oder «vorstand» (Spec 03
+            // design.md, Aufgabe 10.4: Ausnahme VORSTANDSPROTOKOLL, Entscheid Fabian 17.11.2026); nach Spec 05
+            // design.md «Umsetzung 17.3» wegen Req 2.9 ohne Art-Code, also für jede Art. «oeffentlich» nie (Req 2.7).
             return reserviertesFeldGueltig(properties, schema.path("required"), "zugriff", "string",
                     List.of("oeffentlich", "mitglieder", "vorstand"), List.of("mitglieder", "vorstand"))
                     && reserviertesFeldGueltig(properties, schema.path("required"), "veroeffentlicht", "boolean",

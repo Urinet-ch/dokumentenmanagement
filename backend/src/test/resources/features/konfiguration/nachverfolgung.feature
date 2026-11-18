@@ -42,3 +42,26 @@ Funktionalität: Datenschutz und reservierte Standards der Konfiguration
        {"zugriff":{"type":"string","enum":["oeffentlich","mitglieder","vorstand"],"default":"oeffentlich"}}}}
       """
     Dann antwortet die Dokumentart-Verwaltung mit Status 422 und Fehlercode «KONFIGURATION_UNGUELTIG»
+
+  @req-1.3
+  Szenariogrundriss: Geänderte Kennungen erscheinen bei der nächsten Änderung über die Verwaltung ohne Werte im Protokoll
+    Angenommen der Mandant «<mandant>» hat synthetische Kennungen, die seit der letzten Konfigurationsversion geändert sind
+    Und der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Und der Stand des Zugriffsprotokolls von «<anderer>» ist gemerkt
+    Wenn «inhaber-<mandant>» eine Dokumentart anlegt:
+      """
+      {"code":"PROBE_DA_KENNUNG","name":"Probe Kennung","vertraulichkeit":"INTERN","gesetzlichePflicht":false}
+      """
+    Dann antwortet die Dokumentart-Verwaltung mit Status 201
+    Und der neue Konfigurationseintrag von «<mandant>» nennt die Kennungen nur mit Feldnamen und «geändert»
+    Und das Zugriffsprotokoll von «<anderer>» hat keinen neuen Eintrag für die Aktion «KONFIGURATION_AENDERN»
+    Wenn die Kennungen von «<mandant>» wieder wie vorher sind
+    Und der Stand des Zugriffsprotokolls von «<mandant>» ist gemerkt
+    Und «inhaber-<mandant>» die Dokumentart «PROBE_DA_KENNUNG» löscht
+    Dann antwortet die Dokumentart-Verwaltung mit Status 204
+    Und der neue Konfigurationseintrag von «<mandant>» nennt die Kennungen nur mit Feldnamen und «geändert»
+
+    Beispiele:
+      | mandant | anderer |
+      | urinet  | vhf-gsk |
+      | vhf-gsk | urinet  |
