@@ -19,6 +19,7 @@ class WissenHuelleDienstTest {
     private static final UUID SEITE = UUID.fromString("00000000-0000-0000-0000-000000000401");
     private static final UUID QUELLE = UUID.fromString("00000000-0000-0000-0000-000000000402");
     private static final UUID DOKUMENT = UUID.fromString("00000000-0000-0000-0000-000000000403");
+    private static final UUID ZITIERENDE = UUID.fromString("00000000-0000-0000-0000-000000000404");
 
     @Test
     void freigabeSchreibtRekursiveHuelleJeVersionUndErhaeltMindeststufe() {
@@ -26,8 +27,7 @@ class WissenHuelleDienstTest {
                 Map.of(QUELLE, Set.of(DOKUMENT)),
                 Map.of(SEITE, Set.of(QUELLE)),
                 Map.of(DOKUMENT, WissensStufe.NORMAL),
-                Map.of(SEITE, WissensStufe.INTERN, QUELLE, WissensStufe.NORMAL),
-                Map.of(SEITE, "konzepte/arbeit", QUELLE, "quellen/2026-03-test")));
+                Map.of(SEITE, WissensStufe.INTERN, QUELLE, WissensStufe.NORMAL)));
 
         Set<UUID> huelle = new WissenHuelleDienst(repository).versionFreigeben(SEITE, 2);
 
@@ -41,8 +41,7 @@ class WissenHuelleDienstTest {
     void ueberblickSpeichertDieWirksameStufeAuchWennSieUeberNormalSteigt() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
-                Map.of(DOKUMENT, WissensStufe.INTERN), Map.of(SEITE, WissensStufe.NORMAL),
-                Map.of(SEITE, "ueberblick")));
+                Map.of(DOKUMENT, WissensStufe.INTERN), Map.of(SEITE, WissensStufe.NORMAL)));
 
         new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
 
@@ -55,8 +54,7 @@ class WissenHuelleDienstTest {
     void neuberechnungSperrtDenMandantenBevorSieDenGraphenLiest() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
-                Map.of(DOKUMENT, WissensStufe.NORMAL), Map.of(SEITE, WissensStufe.NORMAL),
-                Map.of(SEITE, "konzepte/arbeit")));
+                Map.of(DOKUMENT, WissensStufe.NORMAL), Map.of(SEITE, WissensStufe.NORMAL)));
         repository.mitDokument.add(SEITE);
 
         WissenHuelleDienst dienst = new WissenHuelleDienst(repository);
@@ -70,8 +68,7 @@ class WissenHuelleDienstTest {
     void dokumentaenderungBerechnetAlleSeitenNeuOhneVersionenZuAendern() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
-                Map.of(DOKUMENT, WissensStufe.INTERN), Map.of(SEITE, WissensStufe.NORMAL),
-                Map.of(SEITE, "konzepte/arbeit")));
+                Map.of(DOKUMENT, WissensStufe.INTERN), Map.of(SEITE, WissensStufe.NORMAL)));
         repository.mitDokument.add(SEITE);
 
         Set<UUID> betroffen = new WissenHuelleDienst(repository).dokumentSichtbarkeitGeaendert(DOKUMENT);
@@ -79,6 +76,34 @@ class WissenHuelleDienstTest {
         assertThat(betroffen).containsExactly(SEITE);
         assertThat(repository.stufen).containsEntry(SEITE, WissensStufe.INTERN);
         assertThat(repository.versionen).isEmpty();
+    }
+
+    @Test
+    void freigabeBerechnetAuchSeitenNeuDieDieFreigegebeneSeiteZitieren() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(SEITE, Set.of(DOKUMENT)),
+                Map.of(ZITIERENDE, Set.of(SEITE)),
+                Map.of(DOKUMENT, WissensStufe.INTERN),
+                Map.of(SEITE, WissensStufe.NORMAL, ZITIERENDE, WissensStufe.NORMAL)));
+
+        new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
+
+        assertThat(repository.aktuelle).containsEntry(ZITIERENDE, Set.of(DOKUMENT));
+        assertThat(repository.stufen).containsEntry(ZITIERENDE, WissensStufe.INTERN);
+        assertThat(repository.versionen).containsOnlyKeys(SEITE);
+    }
+
+    @Test
+    void sperrenVorDerFreigabeNimmtDieMandantensperreVorDemGraphen() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
+                Map.of(DOKUMENT, WissensStufe.NORMAL), Map.of(SEITE, WissensStufe.NORMAL)));
+
+        WissenHuelleDienst dienst = new WissenHuelleDienst(repository);
+        dienst.sperren();
+        dienst.versionFreigeben(SEITE, 1);
+
+        assertThat(repository.aufrufe).containsExactly("sperren", "sperren", "graph");
     }
 
     private static final class TestRepository implements WissenHuelleRepository {

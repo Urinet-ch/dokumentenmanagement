@@ -10,7 +10,14 @@ import ch.urinet.archiv.sicherheit.domain.Ergebnis;
 import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenHuelleDienst;
+import ch.urinet.archiv.wissen.application.WissenHuelleRepository;
 import ch.urinet.archiv.wissen.application.WissenSichtbarkeit;
+import ch.urinet.archiv.wissen.domain.Quelleneintrag;
+import ch.urinet.archiv.wissen.domain.Seitentyp;
+import ch.urinet.archiv.wissen.domain.WissensGraph;
+import ch.urinet.archiv.wissen.domain.WissensPruefung;
+import ch.urinet.archiv.wissen.domain.WissensStufe;
+import ch.urinet.archiv.wissen.domain.Wissensseite;
 import io.agroal.api.AgroalDataSource;
 import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
@@ -28,7 +35,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -53,6 +62,9 @@ public class WissenSichtbarkeitSchritte {
     WissenHuelleDienst huellen;
 
     @Inject
+    WissenHuelleRepository huellenRepository;
+
+    @Inject
     WissenSichtbarkeit sichtbarkeit;
 
     @Inject
@@ -66,6 +78,8 @@ public class WissenSichtbarkeitSchritte {
     private final Map<String, Integer> huellenGroessen = new HashMap<>();
     private final Map<String, Object> isolation = new HashMap<>();
     private final Map<String, String> uebersichtStufen = new HashMap<>();
+    private final Map<String, WissensStufe> fassungStufen = new HashMap<>();
+    private final Map<String, Set<WissensPruefung.Code>> fassungBefunde = new HashMap<>();
 
     @Wenn("rekursive Wissenshüllen und Sichtbarkeit in beiden Mandanten bei gleichzeitigen Daten des anderen Mandanten geprüft werden")
     public void sichtbarkeitPruefen() throws Exception {
@@ -212,6 +226,7 @@ public class WissenSichtbarkeitSchritte {
             String schema = new MandantCode("urinet").schema();
             try (Connection verbindung = datenbank.get().getConnection()) {
                 dokumentEinfuegen(verbindung, schema, quelle, "NORMAL");
+                // Pfad ist eindeutig: setzt voraus, dass kein Test `ueberblick` in urinet committet.
                 seiteEinfuegen(verbindung, schema, uebersicht, "ueberblick", "NORMAL");
                 quellEintragen(verbindung, schema, uebersicht, "quelle", quelle, null);
                 versionEinfuegen(verbindung, schema, uebersicht, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
@@ -247,6 +262,205 @@ public class WissenSichtbarkeitSchritte {
         for (Rolle rolle : ROLLEN) {
             assertThat(sichtbarkeiten).containsEntry("ueberblick/intern/" + rolle.code(), rolle != Rolle.MITARBEITER);
         }
+    }
+
+    @Wenn("für die Übersicht eine Fassung mit einer intern eingestuften Quellseite und eine Fassung mit einer normalen Quellseite geprüft werden")
+    public void uebersichtFassungenPruefen() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            UUID interneQuellseite = UUID.randomUUID();
+            UUID normaleQuellseite = UUID.randomUUID();
+            UUID internesDokument = UUID.randomUUID();
+            UUID normalesDokument = UUID.randomUUID();
+            String schema = new MandantCode("urinet").schema();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, internesDokument, "INTERN");
+                dokumentEinfuegen(verbindung, schema, normalesDokument, "NORMAL");
+                seiteEinfuegen(verbindung, schema, interneQuellseite, "probe/" + UUID.randomUUID(), "NORMAL");
+                seiteEinfuegen(verbindung, schema, normaleQuellseite, "probe/" + UUID.randomUUID(), "NORMAL");
+                quellEintragen(verbindung, schema, interneQuellseite, "quelle", internesDokument, null);
+                quellEintragen(verbindung, schema, normaleQuellseite, "quelle", normalesDokument, null);
+                versionEinfuegen(verbindung, schema, interneQuellseite, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                versionEinfuegen(verbindung, schema, normaleQuellseite, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+            }
+            huellen.versionFreigeben(interneQuellseite, 1);
+            huellen.versionFreigeben(normaleQuellseite, 1);
+            WissensGraph graph = huellenRepository.graphLaden();
+            Set<UUID> seiten = Set.of(interneQuellseite, normaleQuellseite);
+            fassungPruefen("intern", graph, interneQuellseite, seiten);
+            fassungPruefen("normal", graph, normaleQuellseite, seiten);
+        });
+    }
+
+    @Dann("ergibt die Fassung mit der internen Quellseite die wirksame Vertraulichkeit INTERN und den Befund «STUFE_UEBERBLICK»")
+    public void uebersichtFassungIntern() {
+        assertThat(fassungStufen).containsEntry("intern", WissensStufe.INTERN);
+        assertThat(fassungBefunde.get("intern")).containsExactly(WissensPruefung.Code.STUFE_UEBERBLICK);
+    }
+
+    @Dann("ergibt die Fassung mit der normalen Quellseite die wirksame Vertraulichkeit NORMAL und keinen Befund")
+    public void uebersichtFassungNormal() {
+        assertThat(fassungStufen).containsEntry("normal", WissensStufe.NORMAL);
+        assertThat(fassungBefunde.get("normal")).isEmpty();
+    }
+
+    @Wenn("eine normale Seite mit einer Quelle ohne gespeicherte Hülle gelesen wird")
+    public void seiteOhneHuelleLesen() throws Exception {
+        imMandantenKontext("vhf-gsk", () -> {
+            String schema = new MandantCode("vhf-gsk").schema();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, dokument, "NORMAL");
+                seiteEinfuegen(verbindung, schema, seite, "probe/" + UUID.randomUUID(), "NORMAL");
+                quellEintragen(verbindung, schema, seite, "dokument", dokument, null);
+            }
+            rollenSichtbarkeitErfassen("vhf-gsk", "ohne-huelle", seite, null);
+            for (Rolle rolle : ROLLEN) {
+                sichtbarkeiten.put("ohne-huelle/liste/" + rolle.code(),
+                        sichtbarkeit.sichtbareSeiten(benutzer(rolle)).contains(seite));
+            }
+        });
+    }
+
+    @Dann("sehen nur die Rollen mit Recht A3 die Seite ohne Hülle")
+    public void seiteOhneHuelleNurMitA3() {
+        for (Rolle rolle : ROLLEN) {
+            boolean erwartet = rolle != Rolle.MITARBEITER;
+            assertThat(sichtbarkeiten).as(rolle.code())
+                    .containsEntry(schluessel("vhf-gsk", "ohne-huelle", seite, rolle), erwartet)
+                    .containsEntry("ohne-huelle/liste/" + rolle.code(), erwartet);
+        }
+    }
+
+    @Wenn("nach der Freigabe neue Quellen ausserhalb der gespeicherten Hülle ohne Neuberechnung eingetragen werden")
+    public void neueQuellenOhneNeuberechnung() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            String schema = new MandantCode("urinet").schema();
+            UUID alt = UUID.randomUUID();
+            UUID neuNormal = UUID.randomUUID();
+            UUID neuInQuellseite = UUID.randomUUID();
+            UUID unbestaetigt = UUID.randomUUID();
+            UUID direkt = UUID.randomUUID();
+            UUID zitierend = UUID.randomUUID();
+            UUID zitiert = UUID.randomUUID();
+            UUID mitUnbestaetigtem = UUID.randomUUID();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, alt, "NORMAL");
+                dokumentEinfuegen(verbindung, schema, neuNormal, "NORMAL");
+                dokumentEinfuegen(verbindung, schema, neuInQuellseite, "NORMAL");
+                unbestaetigtesDokumentEinfuegen(verbindung, schema, unbestaetigt);
+                for (UUID id : List.of(direkt, zitierend, zitiert, mitUnbestaetigtem)) {
+                    seiteEinfuegen(verbindung, schema, id, "probe/" + UUID.randomUUID(), "NORMAL");
+                    versionEinfuegen(verbindung, schema, id, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+                }
+                quellEintragen(verbindung, schema, direkt, "alt", alt, null);
+                quellEintragen(verbindung, schema, zitiert, "alt", alt, null);
+                quellEintragen(verbindung, schema, zitierend, "zitat", null, zitiert);
+                quellEintragen(verbindung, schema, mitUnbestaetigtem, "alt", alt, null);
+            }
+            for (UUID id : List.of(zitiert, direkt, zitierend, mitUnbestaetigtem)) {
+                huellen.versionFreigeben(id, 1);
+            }
+            for (UUID id : List.of(direkt, zitierend, mitUnbestaetigtem)) {
+                liveSichtbarkeitErfassen("vorher", id);
+            }
+
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                quellEintragen(verbindung, schema, direkt, "neu", neuNormal, null);
+                quellEintragen(verbindung, schema, zitiert, "neu", neuInQuellseite, null);
+                quellEintragen(verbindung, schema, mitUnbestaetigtem, "neu", unbestaetigt, null);
+            }
+            liveSichtbarkeitErfassen("direkt", direkt);
+            liveSichtbarkeitErfassen("zitierend", zitierend);
+            liveSichtbarkeitErfassen("unbestaetigt", mitUnbestaetigtem);
+        });
+    }
+
+    @Dann("sehen vor der Änderung alle Rollen mit Recht A15 die Seiten")
+    public void liveVorher() {
+        assertThat(liveErfasst("vorher")).hasSize(3 * ROLLEN.size() * 2).doesNotContainValue(false);
+    }
+
+    @Dann("sieht «mitarbeiter» die Seite mit einem neuen normalen Dokument danach nicht, einzeln und in der Liste")
+    public void liveDirekt() {
+        liveNurOhne("direkt", Set.of(Rolle.MITARBEITER));
+    }
+
+    @Dann("sieht «mitarbeiter» die Seite nicht, deren zitierte Quellseite ein neues Dokument erhalten hat")
+    public void liveZitierend() {
+        liveNurOhne("zitierend", Set.of(Rolle.MITARBEITER));
+    }
+
+    @Dann("sieht «treuhaender» die Seite mit einem neuen unbestätigten Dokument nicht, «inhaber» und «geschaeftsstelle» sehen sie")
+    public void liveUnbestaetigt() {
+        liveNurOhne("unbestaetigt", Set.of(Rolle.MITARBEITER, Rolle.TREUHAENDER));
+    }
+
+    @Wenn("eine Seite mit Mindeststufe NORMAL, normaler Hülle und gespeicherter Vertraulichkeit INTERN gelesen wird")
+    public void internGespeicherteSeiteLesen() throws Exception {
+        imMandantenKontext("urinet", () -> {
+            String schema = new MandantCode("urinet").schema();
+            UUID quelle = UUID.randomUUID();
+            UUID id = UUID.randomUUID();
+            try (Connection verbindung = datenbank.get().getConnection()) {
+                dokumentEinfuegen(verbindung, schema, quelle, "NORMAL");
+                seiteEinfuegen(verbindung, schema, id, "probe/" + UUID.randomUUID(), "NORMAL");
+                quellEintragen(verbindung, schema, id, "quelle", quelle, null);
+                versionEinfuegen(verbindung, schema, id, 1, "{\"vertraulichkeit_mindest\":\"NORMAL\"}");
+            }
+            huellen.versionFreigeben(id, 1);
+            liveSichtbarkeitErfassen("gespeichert-normal", id);
+            try (Connection verbindung = datenbank.get().getConnection();
+                 PreparedStatement p = verbindung.prepareStatement(
+                         "update " + schema + ".wissensseite set vertraulichkeit = 'INTERN' where id = ?")) {
+                p.setObject(1, id);
+                p.executeUpdate();
+            }
+            liveSichtbarkeitErfassen("gespeichert-intern", id);
+        });
+    }
+
+    @Dann("sehen nur die Rollen mit Recht A3 die intern gespeicherte Seite, einzeln und in der Liste")
+    public void internGespeicherteSeiteNurMitA3() {
+        liveNurOhne("gespeichert-normal", Set.of());
+        liveNurOhne("gespeichert-intern", Set.of(Rolle.MITARBEITER));
+    }
+
+    private void liveSichtbarkeitErfassen(String phase, UUID seiteId) {
+        for (Rolle rolle : ROLLEN) {
+            String basis = "live/" + phase + "/" + seiteId + "/" + rolle.code();
+            sichtbarkeiten.put(basis + "/einzeln", sichtbarkeit.aktuelleSeiteSichtbar(benutzer(rolle), seiteId));
+            sichtbarkeiten.put(basis + "/liste", sichtbarkeit.sichtbareSeiten(benutzer(rolle)).contains(seiteId));
+        }
+    }
+
+    private Map<String, Boolean> liveErfasst(String phase) {
+        return sichtbarkeiten.entrySet().stream()
+                .filter(e -> e.getKey().startsWith("live/" + phase + "/"))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private void liveNurOhne(String phase, Set<Rolle> ohne) {
+        Map<String, Boolean> erfasst = liveErfasst(phase);
+        assertThat(erfasst).as(phase).hasSize(ROLLEN.size() * 2);
+        erfasst.forEach((schluessel, sichtbar) -> assertThat(sichtbar).as(schluessel)
+                .isEqualTo(ohne.stream().noneMatch(rolle -> schluessel.endsWith("/" + rolle.code() + "/einzeln")
+                        || schluessel.endsWith("/" + rolle.code() + "/liste"))));
+    }
+
+    // Vorgabe für 14.2: Seitenstufe der Prüfung ist die Mindeststufe, die wirksame Stufe kommt aus dem Graphen.
+    private void fassungPruefen(String name, WissensGraph graph, UUID quellseiteId, Set<UUID> seiten) {
+        WissensStufe wirksam = graph.wirksameStufeNachAnnahme(Set.of(), Set.of(quellseiteId),
+                WissensStufe.NORMAL, WissensStufe.NORMAL);
+        Wissensseite fassung = new Wissensseite(null, "ueberblick", Seitentyp.SYNTHESE, "Überblick",
+                "Synthetische Übersicht", List.of("synthetisch"), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q", null, null, null, null, quellseiteId)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q]", 1, "human:probe", null, "human:probe", null,
+                false, false, null);
+        WissensPruefung.Kontext pruefkontext = new WissensPruefung.Kontext(20_000, null, Set.of(), Map.of(), seiten,
+                Set.of(), Set.of(), Set.of(), false, false, false, Wissensseite.Vertraulichkeit.NORMAL,
+                Wissensseite.Vertraulichkeit.valueOf(wirksam.name()));
+        fassungStufen.put(name, wirksam);
+        fassungBefunde.put(name, WissensPruefung.pruefen(fassung, pruefkontext).befunde().stream()
+                .map(WissensPruefung.Befund::code).collect(Collectors.toSet()));
     }
 
     private void imMandantenKontext(String code, GepruefteArbeit arbeit) throws Exception {
@@ -322,6 +536,18 @@ public class WissenSichtbarkeitSchritte {
             p.setObject(1, id);
             p.setString(2, vertraulichkeit);
             p.setObject(3, ZEIT);
+            p.executeUpdate();
+        }
+    }
+
+    // Ohne bestätigte Art: nur für Rollen mit Recht A7 und den Erfasser sichtbar (Spec 01, Req 2).
+    private static void unbestaetigtesDokumentEinfuegen(Connection verbindung, String schema, UUID id)
+            throws Exception {
+        try (PreparedStatement p = verbindung.prepareStatement("""
+                insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status)
+                values (?, 'UPLOAD', 'NORMAL', 'synthetisch', 'EINGANGSKORB')
+                """.formatted(schema))) {
+            p.setObject(1, id);
             p.executeUpdate();
         }
     }

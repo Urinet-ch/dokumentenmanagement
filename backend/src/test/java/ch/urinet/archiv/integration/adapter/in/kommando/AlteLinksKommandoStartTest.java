@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * «alte-links» in Validierung und Verteilung ist verdrahtet. Ein falscher Aufruf endet vor dem Start mit Exit-Code 2
  * und dem Aufrufhinweis des Kommandos, ein gültiger Aufruf kommt bis zum Kommando (kein Aufrufhinweis, kein Code 2).
  */
-@Tag("start-2")
+@Tag("start-4")
 @QuarkusMainTest
 class AlteLinksKommandoStartTest {
 

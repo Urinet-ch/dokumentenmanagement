@@ -29,8 +29,7 @@ class WissensGraphTest {
                 Map.of(DOKUMENT_A, WissensStufe.NORMAL, DOKUMENT_B, WissensStufe.INTERN,
                         DOKUMENT_C, WissensStufe.NORMAL),
                 Map.of(SEITE_A, WissensStufe.NORMAL, SEITE_B, WissensStufe.NORMAL,
-                        SEITE_C, WissensStufe.NORMAL),
-                Map.of());
+                        SEITE_C, WissensStufe.NORMAL));
 
         assertThat(graph.dokumente(SEITE_A)).containsExactlyInAnyOrder(DOKUMENT_A, DOKUMENT_B, DOKUMENT_C);
         assertThat(graph.abhaengigeSeiten(SEITE_B)).containsExactlyInAnyOrder(SEITE_A, SEITE_B, SEITE_C);
@@ -55,7 +54,7 @@ class WissensGraphTest {
             }
         }
         WissensGraph graph = new WissensGraph(direkteDokumente, quellen, Map.of(dokument, WissensStufe.NORMAL),
-                mindeststufen, Map.of());
+                mindeststufen);
 
         assertThat(graph.dokumente(seiten.getFirst())).containsExactly(dokument);
     }
@@ -63,8 +62,39 @@ class WissensGraphTest {
     @Test
     void mindeststufeWirdBeiDerWirksamenStufeNichtAbgesenkt() {
         WissensGraph graph = new WissensGraph(Map.of(SEITE_A, Set.of(DOKUMENT_A)), Map.of(),
-                Map.of(DOKUMENT_A, WissensStufe.NORMAL), Map.of(SEITE_A, WissensStufe.INTERN), Map.of());
+                Map.of(DOKUMENT_A, WissensStufe.NORMAL), Map.of(SEITE_A, WissensStufe.INTERN));
 
         assertThat(graph.wirksameStufe(SEITE_A, graph.dokumente(SEITE_A))).isEqualTo(WissensStufe.INTERN);
+    }
+
+    @Test
+    void unbekanntesDokumentGiltAlsIntern() {
+        WissensGraph graph = new WissensGraph(Map.of(SEITE_A, Set.of(DOKUMENT_A)), Map.of(), Map.of(),
+                Map.of(SEITE_A, WissensStufe.NORMAL));
+
+        assertThat(graph.wirksameStufe(SEITE_A, graph.dokumente(SEITE_A))).isEqualTo(WissensStufe.INTERN);
+    }
+
+    @Test
+    void wirksameStufeNachAnnahmeNimmtDieHuellenDerVorgeschlagenenQuellseitenMit() {
+        WissensGraph graph = new WissensGraph(
+                Map.of(SEITE_B, Set.of(DOKUMENT_B), SEITE_C, Set.of(DOKUMENT_C)),
+                Map.of(SEITE_B, Set.of(SEITE_C)),
+                Map.of(DOKUMENT_A, WissensStufe.NORMAL, DOKUMENT_B, WissensStufe.NORMAL,
+                        DOKUMENT_C, WissensStufe.INTERN),
+                Map.of(SEITE_B, WissensStufe.NORMAL, SEITE_C, WissensStufe.NORMAL));
+
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(DOKUMENT_A), Set.of(SEITE_B),
+                WissensStufe.NORMAL, WissensStufe.NORMAL)).isEqualTo(WissensStufe.INTERN);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(DOKUMENT_A), Set.of(),
+                WissensStufe.NORMAL, WissensStufe.NORMAL)).isEqualTo(WissensStufe.NORMAL);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(DOKUMENT_A), Set.of(),
+                WissensStufe.NORMAL, WissensStufe.INTERN)).isEqualTo(WissensStufe.INTERN);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(DOKUMENT_A), Set.of(),
+                WissensStufe.INTERN, WissensStufe.NORMAL)).isEqualTo(WissensStufe.INTERN);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(), Set.of(SEITE_A),
+                WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekannte Quellseite").isEqualTo(WissensStufe.INTERN);
+        assertThat(graph.wirksameStufeNachAnnahme(Set.of(UUID.randomUUID()), Set.of(),
+                WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekanntes Dokument").isEqualTo(WissensStufe.INTERN);
     }
 }

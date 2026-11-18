@@ -45,13 +45,14 @@ docker build -f backend/src/main/docker/Dockerfile.jvm -t urinet-archiv backend
 ```
 
 Die CI (`.github/workflows/ci.yml`) führt dieselben Schritte bei jedem PR aus (ausser bei reinen Spec-Anpassungen, siehe unten), ohne Secrets, ohne echte KI und
-ohne Golden-Lauf. Die Backend-Tests verteilt sie auf drei parallele Jobs: «Backend-Tests» (alles ohne eigenen
-Quarkus-Start, dazu SpotBugs) und «Backend-Starttests» `start-1` und `start-2` (Klassen mit `@TestProfile` oder
-`@QuarkusMainTest`, je mit `@Tag("start-1")` oder `@Tag("start-2")`, erzwungen durch `StartGruppenTest`). Der Job
-«Backend-Tests vollständig» prüft aus den Surefire-Berichten, dass jede Testklasse in genau einem Job lief
-(`.github/scripts/pruefe-testaufteilung.py`). Das Artefakt für Browser-Szenarien und Docker-Image baut der Job «Build»
+ohne Golden-Lauf. Die Backend-Tests verteilt sie auf fünf parallele Jobs: «Backend-Tests» (alles ohne Gruppe, ohne eigenen
+Quarkus-Start, dazu ArchUnit, Abdeckung und SpotBugs) und vier «Backend-Gruppe» (`gruppe-1` bis `gruppe-4`): Klassen mit
+`@TestProfile` oder `@QuarkusMainTest` je mit `@Tag("start-1")` bis `@Tag("start-4")` (erzwungen durch `StartGruppenTest`),
+dazu die Cucumber-Szenarien, die zwei Runner `SzenarienTest` und `SzenarienRestTest` über Tags teilen (siehe `SzenarienShards`,
+bewiesen durch `SzenarienShardTest`; Zuordnung der Gruppen in der Matrix von `ci.yml`). Der Job «Backend-Tests vollständig» prüft aus den
+Surefire-Berichten, dass jede Testklasse in genau einem Job lief (`.github/scripts/pruefe-testaufteilung.py`). Das Artefakt für Browser-Szenarien und Docker-Image baut der Job «Build»
 ohne Tests; dort laufen auch die Liquibase-, OpenAPI- und Drive-Import-Prüfungen. Eine neue Klasse mit eigenem Start
-bekommt die Startgruppe mit der kleineren Laufzeit-Summe. Lokal deckt `mvn verify` weiterhin alles in einem Lauf ab.
+bekommt die Startgruppe mit der kleinsten Laufzeit-Summe. Lokal deckt `mvn verify` weiterhin alles in einem Lauf ab.
 Ändert ein PR oder Push nur `.md`-Dateien unter `.kiro/` oder `docs/` (`.github/scripts/nur-spec.py`), laufen statt
 dieser Jobs nur die «Spec-Prüfungen» (Tests, die Specs und Docs lesen, ohne Quarkus-Start; tech.md «Tests und
 Qualität»).

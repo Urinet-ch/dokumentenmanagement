@@ -1799,12 +1799,15 @@ entschieden von Fabian am 13.11.2026): Dann laufen nur «Änderungsart» und «S
 lesen, ohne Quarkus-Start), alle anderen Jobs samt «Backend-Tests vollständig» sind übersprungen. «Build» baut das
 Artefakt mit Quinoa ohne Tests (`-Dmaven.test.skip=true`) und prüft Liquibase-Changesets, OpenAPI und generierten Client
 sowie das Drive-Import-Werkzeug; «Browser-Szenarien» und «Docker-Image» hängen nur von «Build» ab. «Backend-Tests» führt
-`mvn verify -DexcludedGroups=start-1,start-2` aus (Szenarien, JUnit, ArchUnit, Abdeckung `@req`, SpotBugs; Quinoa aus,
-die PWA baut «Build»), «Backend-Starttests» `mvn test -Dgroups=start-1` bzw. `start-2` (Matrix). `StartGruppenTest`
+`mvn verify -DexcludedGroups=szenarien-1,szenarien-2,start-1,start-2,start-3,start-4` aus (JUnit, ArchUnit, Abdeckung
+`@req`, SpotBugs; Quinoa aus, die PWA baut «Build»), «Backend-Gruppe» `mvn test -Dgroups=<tags>` (Matrix `gruppe-1` bis
+`gruppe-4`: `start-1` bis `start-4` und die Runner `SzenarienTest` (`szenarien-1`, `@spec-01`) und `SzenarienRestTest`
+(`szenarien-2`, Komplement); geändert 18.11.2026, Aufteilung nach gemessener Laufzeit, `SzenarienShardTest` beweist, dass jedes Szenario
+genau einmal läuft). `StartGruppenTest`
 erzwingt, dass genau die Klassen mit eigenem Start genau eine Startgruppe tragen; «Backend-Tests vollständig» prüft aus
 den Surefire-Berichten, dass jede Testklasse (Datei nach den Surefire-Mustern, nicht abstrakt, mit Test) in genau einem
 Job lief und kein Job leer ist (`pruefe-testaufteilung.py`, `TestaufteilungTest`). Die Gruppen sind nach den gemessenen
-Laufzeiten ausgeglichen; eine neue Startklasse kommt in die Gruppe mit der kleineren Summe.
+Laufzeiten ausgeglichen; eine neue Startklasse kommt in die Gruppe mit der kleinsten Summe.
 
 Reichweite der CI-Prüfung (Req 16.14, entschieden mit Aufgabe 1.1): Geprüft werden die Kriterien unter
 `_Anforderungen_` abgehakter Aufgaben ab Welle 1; die Prüfung wächst mit jeder abgehakten Aufgabe. Optionale Aufgaben

@@ -84,7 +84,6 @@ public class WissenLesenSchritte {
                     "Fremdmandant " + kennung, tag, "NORMAL", null);
             huelle(verbindung, ANDERER_SCHEMA, normaleSeite, interneQuelle);
             quelle(verbindung, normaleSeite, "normal", normaleQuelle);
-            quelle(verbindung, normaleSeite, "intern", interneQuelle);
             quelle(verbindung, interneSeite, "intern", interneQuelle);
             quelle(verbindung, quellenSeite, "quelle", wissensquelle);
             quelle(verbindung, verweisendeSeite, "quelle", wissensquelle);

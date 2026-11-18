@@ -27,11 +27,35 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen die Rollen der Wissensbasis sind geprüft
     Dann dürfen Benutzer ohne Recht A17 nur Status, Entscheid und Grund eigener Analysevorschläge sehen
 
-  @req-11.1 @req-11.8
+  @req-11.1 @req-11.9
   Szenario: Die Übersicht bleibt aus normalen Quellen normal, eine interne Quelle stuft sie wirksam hoch
     Wenn eine Übersicht aus einer normalen Quelle freigegeben wird und die Quelle danach intern wird
     Dann ist die gespeicherte Vertraulichkeit der Übersicht zuerst NORMAL und alle Rollen mit Recht A15 sehen sie
     Und speichert die Neuberechnung danach die wirksame Vertraulichkeit INTERN und «mitarbeiter» sieht die Übersicht nicht
+
+  @req-11.8
+  Szenario: Eine Änderung, die die Übersicht über NORMAL einstufen würde, erhält einen Befund
+    Wenn für die Übersicht eine Fassung mit einer intern eingestuften Quellseite und eine Fassung mit einer normalen Quellseite geprüft werden
+    Dann ergibt die Fassung mit der internen Quellseite die wirksame Vertraulichkeit INTERN und den Befund «STUFE_UEBERBLICK»
+    Und ergibt die Fassung mit der normalen Quellseite die wirksame Vertraulichkeit NORMAL und keinen Befund
+
+  @req-11.2 @req-11.5
+  Szenario: Eine aktuelle Seite mit Quellen, aber ohne gespeicherte Hülle, ist nur für Rollen mit Recht A3 sichtbar
+    Wenn eine normale Seite mit einer Quelle ohne gespeicherte Hülle gelesen wird
+    Dann sehen nur die Rollen mit Recht A3 die Seite ohne Hülle
+
+  @req-11.2 @req-11.5
+  Szenario: Neue Quellen ausserhalb der gespeicherten Hülle werden ohne Neuberechnung nach dem Live-Stand geprüft
+    Wenn nach der Freigabe neue Quellen ausserhalb der gespeicherten Hülle ohne Neuberechnung eingetragen werden
+    Dann sehen vor der Änderung alle Rollen mit Recht A15 die Seiten
+    Und sieht «mitarbeiter» die Seite mit einem neuen normalen Dokument danach nicht, einzeln und in der Liste
+    Und sieht «mitarbeiter» die Seite nicht, deren zitierte Quellseite ein neues Dokument erhalten hat
+    Und sieht «treuhaender» die Seite mit einem neuen unbestätigten Dokument nicht, «inhaber» und «geschaeftsstelle» sehen sie
+
+  @req-11.2
+  Szenario: Eine Seite mit gespeicherter wirksamer Vertraulichkeit INTERN ist nur für Rollen mit Recht A3 sichtbar
+    Wenn eine Seite mit Mindeststufe NORMAL, normaler Hülle und gespeicherter Vertraulichkeit INTERN gelesen wird
+    Dann sehen nur die Rollen mit Recht A3 die intern gespeicherte Seite, einzeln und in der Liste
 
   @req-3.1 @req-3.2 @req-3.3 @req-3.4 @req-3.6 @req-3.8 @req-4.4 @req-4.5 @req-14.2 @req-14.4 @req-14.5 @req-14.6
   Szenario: Leseendpunkte filtern Index, Seiten, Versionen, Links und Log nach Sichtbarkeit
