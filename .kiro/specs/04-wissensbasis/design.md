@@ -613,6 +613,24 @@ wissens_einstellung(id int pk default 1, budget_tokens int, lint_budget_tokens i
   sichtbare Seite werden ausgelassen. Index und Log selbst erzeugen keine `WISSEN_ANZEIGEN`-Zugriffsprotokolleinträge.
 - Das Akzeptanzszenario verwendet synthetische Testdaten in zwei Mandantenschemas und prüft Paging, veraltete Seiten,
   Hüllen je Version, Links, Quellen, Log, Protokollierung ohne Inhalte sowie Mandantentrennung.
+- Nachbesserung Review PR #308 (fba3d386, 18.11.2026):
+  - Der Abruf per Pfad (`GET /wissensseiten?pfad=`) protokolliert `WISSEN_ANZEIGEN` wie der Abruf per ID, über den
+    Port `WissenAnzeigeProtokoll` (Adapter `ZugriffWissenAnzeigeProtokoll`, nur die Seiten-ID).
+  - Der Diff vergleicht maskierte Fassungen (`WissensMarkdown.maskieren`): interne Links auf fehlende oder unsichtbare
+    Seiten werden wie in der Darstellung zu «Seite nicht vorhanden» ohne Pfad und Linktext; externe Links und Bilder
+    erscheinen als Text, Link-Referenz-Definitionen werden entfernt, Code bleibt unverändert.
+  - `daten` einer Version wird nur über eine Positivliste einfacher Anzeigefelder ausgegeben
+    (`WissensVersion.ANZEIGEFELDER`); Quelleneinträge früherer Versionen folgen mit 14.2.
+  - Das Log nennt `entwurf_id` nur, wenn kein unsichtbares Dokument am Entwurf hängt.
+  - Die Index-Suche nutzt `inhalt_tsv @@ plainto_tsquery('german', :q)` (GIN, Gewichtung, Tags); Pfade sind nicht
+    mehr durchsuchbar. Linkziele im Inhalt bleiben im Suchvektor; ein Treffer verrät nicht, ob das Ziel existiert.
+  - `SichtregelSql.dokument` bricht bei einer Webseiten-Regel ab (fail-closed); der Dokumentfilter mit festem
+    Webseiten-Filter verwendet `SichtregelSql.ohneFestenFilter`.
+  - Anders als die Szenarien zu 13.5 (Rollback) committet das Szenario zu 13.6 seine Testdaten (append-only Tabellen erlauben kein Aufräumen, die Abfragen laufen über die
+    REST-Schnittstelle in eigener Transaktion); es verwendet eindeutige Kennungen und Testdokumente im Status
+    `VERWORFEN`, damit Export, Suche, Chat und Prüfungen sie nicht sehen, und legt keinen Pfad `ueberblick` an.
+  - API-Tokens und Webseiten-Schlüssel erhalten auf Wissens-Endpunkten 403 (Szenario `@req-12.1`). Der Nachweis von
+    12.2 über einen Endpunkt folgt mit 14.1 (erster schreibender Endpunkt).
 
 ## Error Handling
 - KI nicht erreichbar oder Zeitüberschreitung: Teilauftrag zählt als Fehlversuch (3 Versuche, Backoff nach Spec 01).

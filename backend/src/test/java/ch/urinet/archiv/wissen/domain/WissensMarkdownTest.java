@@ -2,9 +2,35 @@ package ch.urinet.archiv.wissen.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WissensMarkdownTest {
+
+    @Test
+    void maskierenVerbirgtUnsichtbareZieleWieDieDarstellung() {
+        String markdown = "Aussage.[^q1]\r\n"
+                + "[Geheimer Titel](/konzepte/geheim) und [Sichtbar](/konzepte/offen)\n"
+                + "[Zwei\nZeilen](/konzepte/geheim) [extern](https://example.invalid/geheim) ![Alt](/konzepte/geheim)\n"
+                + "\n[ref]: /konzepte/geheim\n"
+                + "`[Code](/konzepte/geheim)`";
+
+        String maskiert = WissensMarkdown.maskieren(markdown, Set.of("konzepte/offen"));
+
+        assertThat(maskiert).isEqualTo("Aussage.[^q1]\n"
+                + "Seite nicht vorhanden und [Sichtbar](/konzepte/offen)\n"
+                + "Seite nicht vorhanden\n extern Alt\n"
+                + "\n\n"
+                + "`[Code](/konzepte/geheim)`");
+    }
+
+    @Test
+    void maskierenBelaesstTextOhneLinksUnveraendert() {
+        String markdown = "# Titel\n\nAussage mit *Betonung*.[^q1]\n\n- Punkt";
+
+        assertThat(WissensMarkdown.maskieren(markdown, Set.of())).isEqualTo(markdown);
+    }
 
     @Test
     void fussnotenUndInterneLinksWerdenGemeinsamGeparst() {

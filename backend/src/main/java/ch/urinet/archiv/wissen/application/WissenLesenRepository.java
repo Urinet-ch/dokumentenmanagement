@@ -52,8 +52,33 @@ public interface WissenLesenRepository {
     record WissensVersion(int nummer, Map<String, Object> daten, String inhalt, String erzeugtVon,
                           String freigegebenVon, Instant zeit, String grund, UUID entwurfId, String entwurfAnlass,
                           UUID dokumentId) {
+        /**
+         * Felder aus {@code daten}, die eine sichtbare Version ohne weitere Prüfung zeigen darf. Quelleneinträge, Links
+         * und unbekannte Felder bleiben aussen vor, weil sie auf unsichtbare Seiten oder Dokumente zeigen können.
+         */
+        static final Set<String> ANZEIGEFELDER = Set.of("titel", "beschreibung", "typ", "pfad", "status",
+                "veraltet_ab", "tags", "vertraulichkeit", "vertraulichkeit_mindest");
+
         public WissensVersion {
             daten = Collections.unmodifiableMap(new LinkedHashMap<>(daten));
+        }
+
+        /** Dieselbe Version mit {@code daten} nur aus {@link #ANZEIGEFELDER} und nur mit Text, Zahl, Wahrheitswert
+         * oder einer Liste von Texten. */
+        public WissensVersion ohneInterneDaten() {
+            Map<String, Object> anzeige = new LinkedHashMap<>();
+            daten.forEach((schluessel, wert) -> {
+                if (ANZEIGEFELDER.contains(schluessel) && einfacherWert(wert)) {
+                    anzeige.put(schluessel, wert);
+                }
+            });
+            return new WissensVersion(nummer, anzeige, inhalt, erzeugtVon, freigegebenVon, zeit, grund, entwurfId,
+                    entwurfAnlass, dokumentId);
+        }
+
+        private static boolean einfacherWert(Object wert) {
+            return wert instanceof String || wert instanceof Number || wert instanceof Boolean
+                    || wert instanceof List<?> liste && liste.stream().allMatch(String.class::isInstance);
         }
     }
 

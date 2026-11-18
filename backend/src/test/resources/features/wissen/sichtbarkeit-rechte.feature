@@ -62,3 +62,9 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen synthetische Wissensleseproben sind angelegt
     Wenn «mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft
     Dann verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten
+
+  @req-12.1
+  Szenario: API-Tokens und Webseiten-Schlüssel lesen die Wissensbasis nicht
+    Angenommen synthetische Wissensleseproben sind angelegt
+    Wenn ein API-Token und ein Webseiten-Schlüssel die Wissensbasis lesen wollen
+    Dann erhalten beide 403 ohne Inhalt der Wissensbasis

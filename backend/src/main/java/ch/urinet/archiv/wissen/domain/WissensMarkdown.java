@@ -19,6 +19,7 @@ import org.commonmark.node.ListItem;
 import org.commonmark.node.Node;
 import org.commonmark.node.Paragraph;
 import org.commonmark.node.SoftLineBreak;
+import org.commonmark.node.SourceSpan;
 import org.commonmark.node.Text;
 import org.commonmark.parser.IncludeSourceSpans;
 import org.commonmark.parser.Parser;
@@ -27,6 +28,7 @@ import org.commonmark.renderer.html.HtmlRenderer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,6 +47,8 @@ public final class WissensMarkdown {
     private static final Pattern FUSSNOTE = Pattern.compile("\\[\\^([^\\s\\[\\]\\\\]+)]");
     private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS)
             .includeSourceSpans(IncludeSourceSpans.BLOCKS).build();
+    private static final Parser MASKIER_PARSER = Parser.builder().extensions(EXTENSIONS)
+            .includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES).build();
     private static final HtmlRenderer RENDERER = HtmlRenderer.builder()
             .extensions(EXTENSIONS)
             .escapeHtml(true)
@@ -134,6 +138,76 @@ public final class WissensMarkdown {
             throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
         }
         return analyse.html();
+    }
+
+    /**
+     * Markdown für den Zeilen-Diff so, wie die Darstellung es preisgibt: ein interner Link auf einen Pfad ausserhalb von
+     * {@code sichtbarePfade} wird zu «Seite nicht vorhanden» (ohne Linktext und Ziel), jeder andere Link ausser einem
+     * sichtbaren internen auf seinen Text und ein Bild auf seinen Alternativtext gekürzt, Linkdefinitionen entfallen.
+     * Der übrige Text bleibt zeichengleich.
+     */
+    public static String maskieren(String markdown, Set<String> sichtbarePfade) {
+        String roh = markdown == null ? "" : markdown;
+        String text = roh.replace("\r\n", "\n").replace('\r', '\n');
+        if (zeichen(roh) > MAX_EINGABE_ZEICHEN || tiefeUeberschritten(text)) {
+            throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
+        }
+        Set<String> sichtbar = Set.copyOf(sichtbarePfade);
+        Node dokument = MASKIER_PARSER.parse(text + fussnotenDefinitionen(text));
+        List<Ersetzung> ersetzungen = new ArrayList<>();
+        Deque<Node> offen = new ArrayDeque<>();
+        offen.push(dokument);
+        while (!offen.isEmpty()) {
+            Node node = offen.pop();
+            String ersatz = null;
+            if (node instanceof Link link) {
+                String pfad = internerPfad(link.getDestination());
+                if (pfad == null) {
+                    ersatz = text(link);
+                } else if (!sichtbar.contains(pfad)) {
+                    ersatz = "Seite nicht vorhanden";
+                }
+            } else if (node instanceof Image) {
+                ersatz = text(node);
+            } else if (node instanceof LinkReferenceDefinition) {
+                ersatz = "";
+            }
+            if (ersatz != null) {
+                ersetzen(node, ersatz, text.length(), ersetzungen);
+                continue;
+            }
+            for (Node kind = node.getLastChild(); kind != null; kind = kind.getPrevious()) {
+                offen.push(kind);
+            }
+        }
+        ersetzungen.sort(Comparator.comparingInt(Ersetzung::von));
+        StringBuilder ergebnis = new StringBuilder(text.length());
+        int position = 0;
+        for (Ersetzung ersetzung : ersetzungen) {
+            if (ersetzung.von() < position) {
+                continue;
+            }
+            ergebnis.append(text, position, ersetzung.von()).append(ersetzung.text());
+            position = ersetzung.bis();
+        }
+        return ergebnis.append(text, position, text.length()).toString();
+    }
+
+    private record Ersetzung(int von, int bis, String text) {
+    }
+
+    private static void ersetzen(Node node, String ersatz, int laenge, List<Ersetzung> ersetzungen) {
+        boolean erste = true;
+        for (SourceSpan spanne : node.getSourceSpans()) {
+            int von = spanne.getInputIndex();
+            int bis = Math.min(von + spanne.getLength(), laenge);
+            if (von >= laenge) {
+                continue;
+            }
+            // mehrzeilige Knoten: der Ersatz steht in der ersten Zeile, die Zeilenumbrüche dazwischen bleiben
+            ersetzungen.add(new Ersetzung(von, bis, erste ? ersatz : ""));
+            erste = false;
+        }
     }
 
     private static String rendern(Node dokument, Set<String> sichtbarePfade) {

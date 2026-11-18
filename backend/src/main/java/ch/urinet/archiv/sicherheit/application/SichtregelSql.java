@@ -22,7 +22,22 @@ public final class SichtregelSql {
     private SichtregelSql() {
     }
 
+    /**
+     * Sicht eines Benutzers der App. Für eine Regel der Webseiten-Schnittstelle bricht die Methode ab, weil ihr fester
+     * Filter hier fehlt: lieber ein Fehler als eine zu weite Sicht.
+     */
     public static Ausdruck dokument(Sichtregel regel, String alias) {
+        if (regel.webseite() != null) {
+            throw new IllegalStateException("Sichtregel der Webseite nur mit dem festen Filter der Webseite");
+        }
+        return ohneFestenFilter(regel, alias);
+    }
+
+    /**
+     * Sicht nach Vertraulichkeit und Bestätigung ohne den festen Filter der Webseiten-Schnittstelle; wer eine Regel der
+     * Webseite übergibt, muss diesen Filter selbst ergänzen.
+     */
+    public static Ausdruck ohneFestenFilter(Sichtregel regel, String alias) {
         if (!ALIAS.matcher(alias).matches()) {
             throw new IllegalArgumentException("Ungültiger Alias");
         }

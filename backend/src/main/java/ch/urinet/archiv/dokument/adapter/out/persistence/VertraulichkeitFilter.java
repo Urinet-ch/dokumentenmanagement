@@ -41,7 +41,7 @@ record VertraulichkeitFilter(String bedingung, Map<String, Object> parameter) {
 
     /** SQL-Prädikat auf {@code dokument} unter dem Alias {@code alias} (fester Bezeichner, nie Benutzereingabe). */
     static VertraulichkeitFilter sql(Sichtregel regel, String alias) {
-        SichtregelSql.Ausdruck ausdruck = SichtregelSql.dokument(regel, alias);
+        SichtregelSql.Ausdruck ausdruck = SichtregelSql.ohneFestenFilter(regel, alias);
         VertraulichkeitFilter sicht = new VertraulichkeitFilter(ausdruck.bedingung(), ausdruck.parameter());
         return regel.webseite() == null ? sicht : webseite(sicht, regel.webseite(), alias);
     }

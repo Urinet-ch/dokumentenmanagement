@@ -60,11 +60,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
             parameter.put("tag", anfrage.tag());
         }
         if (anfrage.q() != null) {
-            bedingungen.add("""
-                    to_tsvector('german', coalesce(s.titel, '') || ' ' || coalesce(s.pfad, '') || ' '
-                        || coalesce(s.beschreibung, '') || ' ' || coalesce(s.inhalt, ''))
-                        @@ plainto_tsquery('german', :q)
-                    """);
+            // gespeicherte Spalte mit GIN-Index (Titel, Beschreibung, Schlagwörter, Inhalt; Changeset 043)
+            bedingungen.add("s.inhalt_tsv @@ plainto_tsquery('german', :q)");
             parameter.put("q", anfrage.q());
         }
         parameter.put("groesse", anfrage.groesse());
@@ -270,7 +267,12 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                        case when l.dokument_id is not null and exists (
                            select 1 from dokument d where d.id = l.dokument_id and %s
                        ) then l.dokument_id end,
-                       l.entwurf_id
+                       case when not exists (
+                           select 1 from wissens_entwurf e
+                           where e.id = l.entwurf_id and e.dokument_id is not null and not exists (
+                               select 1 from dokument d where d.id = e.dokument_id and %s
+                           )
+                       ) then l.entwurf_id end
                 from wissens_log l
                 where exists (
                     select p.seite_id from unnest(l.seiten) as p(seite_id)
@@ -280,7 +282,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                   %s
                 order by l.zeit desc, l.id desc
                 limit :limit
-                """.formatted(sicht.bedingung(), dokumentSicht.bedingung(), sicht.bedingung(), cursor));
+                """.formatted(sicht.bedingung(), dokumentSicht.bedingung(), dokumentSicht.bedingung(),
+                sicht.bedingung(), cursor));
         parameter.forEach(query::setParameter);
         @SuppressWarnings("unchecked")
         List<Object[]> rows = query.getResultList();

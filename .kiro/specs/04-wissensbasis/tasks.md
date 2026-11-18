@@ -52,8 +52,8 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
   - Zugriffsprotokoll `WISSEN_ANZEIGEN` und `VERWEIGERT`, ohne Inhalte
   - Sichtbarkeit als SQL-Prädikat an den Abfragen von `wissensseite` (Zähler und Paging verraten nichts); ersetzt den Java-Filter aus 13.5 (design.md, «Umsetzung 13.5»), inkl. fail-closed bei Quellen ohne gespeicherte Hülle und bei live erreichbaren Dokumenten ausserhalb der gespeicherten Hülle (Review PR #300, ebc9d0b6, S2)
-  - Wissens-Endpunkte nur für OIDC-Benutzer; API-Tokens (auch Webseiten-Schlüssel mit Rolle `geschaeftsstelle`) erhalten A15–A19 nicht über die Rolle (Review PR #300, ebc9d0b6, K4)
-  - Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4)
+  - Wissens-Endpunkte nur für OIDC-Benutzer; API-Tokens (auch Webseiten-Schlüssel mit Rolle `geschaeftsstelle`) erhalten A15–A19 nicht über die Rolle (Review PR #300, ebc9d0b6, K4); Nachweis: Szenario `@req-12.1` «API-Tokens und Webseiten-Schlüssel lesen die Wissensbasis nicht» (Review PR #308, fba3d386)
+  - ~~Szenario `@req-12.2` über einen Endpunkt: `treuhaender` erhält 403, Datenbank und Log bleiben unverändert (Review PR #300, S4)~~ – Vermerk (18.11.2026, Review PR #308, fba3d386, M4/M3): 13.6 hat nur lesende Endpunkte, eine schreibende Aktion der Wissensbasis gibt es erst mit 14.1; der Punkt ist darum nach 14.1 verschoben und dort aufgenommen
   - _Anforderungen: 3.1–3.4, 3.6, 3.8, 4.4, 4.5, 14.2, 14.4–14.6_
   - _Abhängig von: 13.4, 13.5_
 
@@ -65,7 +65,8 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - `archiv.wissen.*` (Modell über `archiv.ki.basis-url`, kein eigener URL-Schlüssel); `ki_verbrauch` mit neuen Zwecken; Zeitgrenzen der neuen Auftragstypen
   - Szenarien mit WireMock je Schritt (gültig, ungültig mit Nachfrage je Schritt, Zeitüberschreitung, Budget erreicht, Monatsbudget erschöpft, zwei Wissensquellen nacheinander); Konfigurationstests nach 13.1 und 13.2 (JUnit, Nachweis); Startwerte `budget-tokens` 300'000 und `monatsbudget-tokens` 1'000'000 (Test über die Konfiguration); Profil `lokal` zusätzlich von Hand mit LM Studio (kein Nachweis); Stufe A nur mit Testdaten
   - Prompt-Injection-PDF: Ergebnis nur als Entwurf mit Befunden
-  - _Anforderungen: 5.1–5.13, 11.6, 11.7, 13.1–13.8, 14.3_
+  - Szenario `@req-12.2` über den ersten schreibenden Endpunkt `POST /dokumente/{id}/wissen-ingest`: `treuhaender` erhält 403, Datenbank (Aufträge, Entwürfe) und Wissens-Log bleiben unverändert (Review PR #300, S4; aus 13.6 verschoben am 18.11.2026, Review PR #308, fba3d386)
+  - _Anforderungen: 5.1–5.13, 11.6, 11.7, 12.2, 13.1–13.8, 14.3_
   - _Abhängig von: 13.2, 13.4, 13.5_
 
 - [ ] 14.2 Entwurf, Diff und Freigabe [Backend]

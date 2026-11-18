@@ -21,12 +21,14 @@ public class WissenLesen {
     private final WissenLesenRepository repository;
     private final WissenSichtbarkeit sichtbarkeit;
     private final Berechtigung berechtigung;
+    private final WissenAnzeigeProtokoll anzeigeProtokoll;
 
     public WissenLesen(WissenLesenRepository repository, WissenSichtbarkeit sichtbarkeit,
-                       Berechtigung berechtigung) {
+                       Berechtigung berechtigung, WissenAnzeigeProtokoll anzeigeProtokoll) {
         this.repository = repository;
         this.sichtbarkeit = sichtbarkeit;
         this.berechtigung = berechtigung;
+        this.anzeigeProtokoll = anzeigeProtokoll;
     }
 
     public IndexErgebnis index(Benutzer benutzer, Seitentyp typ, String tag, String q, int offset, int groesse) {
@@ -47,6 +49,8 @@ public class WissenLesen {
     public Wissensseite seite(Benutzer benutzer, String pfad) {
         Optional<Wissensseite> seite = repository.seite(pfad, Sichtregel.fuer(benutzer));
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, seite.isPresent());
+        // Der Interceptor protokolliert nur Abrufe mit der Seiten-ID im Pfad; ohne Seite gibt es keinen Eintrag.
+        anzeigeProtokoll.seiteAngezeigt(seite.orElseThrow().id());
         return seite.orElseThrow();
     }
 
@@ -54,14 +58,17 @@ public class WissenLesen {
     public List<WissenLesenRepository.VersionZeile> versionen(Benutzer benutzer, UUID seiteId) {
         boolean sichtbar = sichtbarkeit.aktuelleSeiteSichtbar(benutzer, seiteId);
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, sichtbar);
-        return repository.versionen(seiteId, Sichtregel.fuer(benutzer));
+        return repository.versionen(seiteId, Sichtregel.fuer(benutzer)).stream()
+                .map(zeile -> new WissenLesenRepository.VersionZeile(zeile.nummer(),
+                        zeile.version().map(WissenLesenRepository.WissensVersion::ohneInterneDaten)))
+                .toList();
     }
 
     @Transactional
     public WissenLesenRepository.WissensVersion version(Benutzer benutzer, UUID seiteId, int nummer) {
         boolean sichtbar = sichtbarkeit.versionSichtbar(benutzer, seiteId, nummer);
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, sichtbar);
-        return repository.version(seiteId, nummer, Sichtregel.fuer(benutzer)).orElseThrow();
+        return repository.version(seiteId, nummer, Sichtregel.fuer(benutzer)).orElseThrow().ohneInterneDaten();
     }
 
     @Transactional
@@ -69,11 +76,19 @@ public class WissenLesen {
         boolean sichtbar = sichtbarkeit.versionSichtbar(benutzer, seiteId, von)
                 && sichtbarkeit.versionSichtbar(benutzer, seiteId, bis);
         berechtigung.wissensseitenAktion(benutzer, Aktion.A15, sichtbar);
-        WissenLesenRepository repository = this.repository;
         Sichtregel regel = Sichtregel.fuer(benutzer);
         WissenLesenRepository.WissensVersion alt = repository.version(seiteId, von, regel).orElseThrow();
         WissenLesenRepository.WissensVersion neu = repository.version(seiteId, bis, regel).orElseThrow();
-        return Diff.aus(alt, neu);
+        return Diff.aus(von, maskieren(regel, alt.inhalt()), bis, maskieren(regel, neu.inhalt()));
+    }
+
+    /** Der Diff zeigt Links so wie die Darstellung: unsichtbare und fehlende Ziele nur als «Seite nicht vorhanden». */
+    private String maskieren(Sichtregel regel, String markdown) {
+        WissensMarkdown.Analyse analyse = WissensMarkdown.analysieren(markdown, WissensMarkdown.MAX_EINGABE_ZEICHEN);
+        if (analyse.zuGross() || analyse.zuTief()) {
+            throw new IllegalArgumentException("Das Markdown ueberschreitet die zulaessige Groesse oder Verschachtelung.");
+        }
+        return WissensMarkdown.maskieren(markdown, repository.sichtbarePfade(regel, analyse.links()));
     }
 
     @Transactional
@@ -126,9 +141,9 @@ public class WissenLesen {
             nachher = List.copyOf(nachher);
         }
 
-        static Diff aus(WissenLesenRepository.WissensVersion alt, WissenLesenRepository.WissensVersion neu) {
-            List<String> alteZeilen = alt.inhalt().lines().toList();
-            List<String> neueZeilen = neu.inhalt().lines().toList();
+        static Diff aus(int von, String alterInhalt, int bis, String neuerInhalt) {
+            List<String> alteZeilen = alterInhalt.lines().toList();
+            List<String> neueZeilen = neuerInhalt.lines().toList();
             int anfang = 0;
             while (anfang < alteZeilen.size() && anfang < neueZeilen.size()
                     && alteZeilen.get(anfang).equals(neueZeilen.get(anfang))) {
@@ -142,7 +157,7 @@ public class WissenLesen {
                 endeNeu--;
             }
             int gemeinsameZeilen = alteZeilen.size() - endeAlt;
-            return new Diff(alt.nummer(), neu.nummer(), alteZeilen.subList(0, anfang),
+            return new Diff(von, bis, alteZeilen.subList(0, anfang),
                     alteZeilen.subList(anfang, endeAlt), neueZeilen.subList(anfang, endeNeu),
                     alteZeilen.subList(endeAlt, endeAlt + gemeinsameZeilen));
         }
