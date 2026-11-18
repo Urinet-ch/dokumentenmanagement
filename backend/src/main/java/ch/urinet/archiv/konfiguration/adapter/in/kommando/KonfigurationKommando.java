@@ -180,7 +180,7 @@ public class KonfigurationKommando {
     }
 
     private int exportieren(Aufruf aufruf, PrintStream aus) throws IOException {
-        String datei = kontext.mit(aufruf.mandant(), verwaltung::exportieren);
+        String datei = kontext.mit(aufruf.mandant(), () -> verwaltung.exportieren().datei());
         if (aufruf.datei().isPresent()) {
             Files.writeString(aufruf.datei().get(), datei, StandardCharsets.UTF_8);
             aus.printf("Konfiguration exportiert: %s%n", aufruf.datei().get());
