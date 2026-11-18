@@ -17,6 +17,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
 
     /** Schema einer Art ohne Zusatzfelder. */
     public static final String OHNE_ZUSATZ = "{\"additionalProperties\":false,\"properties\":{},\"type\":\"object\"}";
+    private static final Pattern GESCHAEFTSJAHR_ENDE = Pattern.compile("^\\d{2}-\\d{2}$");
     private static final Pattern KLASSIFIKATIONSCODE = Pattern.compile("^[a-z][a-z0-9_]{0,39}$");
     private static final Set<String> RESERVIERTE_PUBLIC_PARAMETER = Set.of("q", "reihe", "jahr", "ausgabe", "seite",
             "pro_seite", "dateiname", "id", "sortierung", "gespraech_id", "zugriff", "veroeffentlicht", "seit", "max",
@@ -60,6 +61,10 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
         if (arten.size() > 200) {
             befunde.add(new Befund("arten", "ANZAHL_UNGUELTIG", "Die Konfiguration enthält zu viele Dokumentarten."));
+        }
+        if (einstellungen != null && !geschaeftsjahrEndeGueltig(einstellungen.geschaeftsjahrEnde())) {
+            befunde.add(new Befund("einstellungen.geschaeftsjahrEnde", "DATUM_UNGUELTIG",
+                    "Das Geschäftsjahresende ist kein gültiger Tag im Format MM-TT."));
         }
         Set<String> codes = new HashSet<>();
         Map<String, Art> nachCode = nachCode(arten);
@@ -586,6 +591,19 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
         }
     }
 
+    /** {@code MM-dd} mit einem Tag, den der Monat hat (29.02. zählt, wie in der Datenbankprüfung). */
+    private static boolean geschaeftsjahrEndeGueltig(String wert) {
+        if (wert == null || !GESCHAEFTSJAHR_ENDE.matcher(wert).matches()) {
+            return false;
+        }
+        try {
+            java.time.MonthDay.of(Integer.parseInt(wert.substring(0, 2)), Integer.parseInt(wert.substring(3)));
+            return true;
+        } catch (java.time.DateTimeException e) {
+            return false;
+        }
+    }
+
     private static int codepunkte(String wert) {
         return wert.codePointCount(0, wert.length());
     }
@@ -685,10 +703,9 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
      */
     public record Aenderung(String pfad, String alt, String neu) {
         private static final String KENNUNGEN = "einstellungen.kennungen.";
-        private static final String KI_TEXTE = "kiTexte.";
 
         public boolean ohneWerte() {
-            return pfad != null && (pfad.startsWith(KENNUNGEN) || pfad.startsWith(KI_TEXTE));
+            return pfad != null && pfad.startsWith(KENNUNGEN);
         }
 
         @Override

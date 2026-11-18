@@ -4288,15 +4288,11 @@ paths:
         - inhaber
     put:
       summary: Konfigurationsdatei einspielen
-      description: Einspielen verlangt If-Match und eine passende basisVersion in
-        der Datei.
+      description: "Massgeblich ist die basisVersion in der Datei; weicht sie vom\
+        \ aktuellen Stand ab, kommt 409. Ein If-Match wird nicht ausgewertet."
       tags:
       - Konfiguration
       parameters:
-      - name: If-Match
-        in: header
-        schema:
-          type: string
       - name: X-Aenderungsgrund
         in: header
         schema:
@@ -4315,10 +4311,6 @@ paths:
               schema: {}
         "409":
           description: KONFIGURATION_VERALTET
-        "412":
-          description: VERSION_KONFLIKT
-        "428":
-          description: VERSION_FEHLT
         "413":
           description: DATEI_ZU_GROSS
         "422":

@@ -27,6 +27,24 @@ class KonfigurationTest {
     }
 
     @Test
+    void geschaeftsjahrEndeMussEinTagDesMonatsSein() {
+        for (String ungueltig : List.of("02-30", "04-31", "13-01", "00-10", "12-00", "1231", "12-31x")) {
+            assertThat(new Konfiguration(1, new Konfiguration.Einstellungen(ungueltig, null), List.of()).pruefen())
+                    .as(ungueltig).extracting(Konfiguration.Befund::pfad)
+                    .containsExactly("einstellungen.geschaeftsjahrEnde");
+        }
+        for (String gueltig : List.of("02-29", "06-30", "12-31")) {
+            assertThat(new Konfiguration(1, new Konfiguration.Einstellungen(gueltig, null), List.of()).pruefen())
+                    .as(gueltig).isEmpty();
+        }
+    }
+
+    @Test
+    void kiTexteStehenMitWertenImProtokoll() {
+        assertThat(new Konfiguration.Aenderung("kiTexte.rolle", "alt", "neu").ohneWerte()).isFalse();
+    }
+
+    @Test
     void aenderungToStringGibtKennungenNichtAus() {
         var kennung = new Konfiguration.Aenderung("einstellungen.kennungen.uid", "PROBE-ALT", "PROBE-NEU");
         var andere = new Konfiguration.Aenderung("einstellungen.geschaeftsjahrEnde", "06-30", "12-31");

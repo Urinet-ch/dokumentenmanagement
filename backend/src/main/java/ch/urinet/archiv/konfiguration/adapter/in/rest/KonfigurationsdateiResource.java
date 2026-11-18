@@ -126,23 +126,20 @@ public class KonfigurationsdateiResource {
     @ErfordertAktion(Aktion.A11)
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Konfigurationsdatei einspielen",
-            description = "Einspielen verlangt If-Match und eine passende basisVersion in der Datei.")
+            description = "Massgeblich ist die basisVersion in der Datei; weicht sie vom aktuellen Stand ab, "
+                    + "kommt 409. Ein If-Match wird nicht ausgewertet.")
     @APIResponse(responseCode = "200", description = "Eingespielt oder bereits aktuell")
     @APIResponse(responseCode = "409", description = "KONFIGURATION_VERALTET")
-    @APIResponse(responseCode = "412", description = "VERSION_KONFLIKT")
-    @APIResponse(responseCode = "428", description = "VERSION_FEHLT")
     @APIResponse(responseCode = "413", description = "DATEI_ZU_GROSS")
     @APIResponse(responseCode = "422", description = "KONFIGURATION_UNGUELTIG")
-    public Response einspielen(@HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
-                               @HeaderParam("X-Aenderungsgrund") String aenderungsgrund, String body) {
+    public Response einspielen(@HeaderParam("X-Aenderungsgrund") String aenderungsgrund, String body) {
         aufloesung.pruefen();
-        int version = Versionskopf.version(ifMatch);
         String grund = aenderungsgrund == null || aenderungsgrund.isBlank() ? GRUND_DATEI : aenderungsgrund.strip();
         if (grund.codePointCount(0, grund.length()) > GRUND_MAX) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         KonfigurationsdateiVerwaltung.Ergebnis gespeichert =
-                verwaltung.einspielen(body, version, wer(), grund);
+                verwaltung.einspielen(body, wer(), grund);
         return Response.ok(ErgebnisDto.aus(gespeichert))
                 .tag(new EntityTag(Integer.toString(gespeichert.version()))).build();
     }
