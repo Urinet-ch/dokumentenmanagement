@@ -23,11 +23,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** {@link WissenIngestPort} mit SQL im Schema des Mandanten aus dem Hibernate-Kontext. */
 @ApplicationScoped
@@ -35,6 +39,8 @@ import java.util.UUID;
 public class JdbcWissenIngest implements WissenIngestPort {
 
     private static final String ZEITGRENZE = "10s";
+    private static final Pattern WORT = Pattern.compile("[\\p{L}][\\p{L}\\p{N}]*");
+    private static final int MAX_SUCHBEGRIFFE = 200;
     private static final String WISSEN_ZWECKE = "'WISSEN_INGEST', 'WISSEN_LINT', 'WISSEN_EMBEDDING'";
 
     private final Instance<EntityManager> entityManager;
@@ -185,7 +191,7 @@ public class JdbcWissenIngest implements WissenIngestPort {
                             (d.s3_pdfa is not null and d.s3_version_pdfa is not null and not d.pdfa_fehlt),
                             e.seite_von, e.seite_bis, e.schritt, e.tokens_ein, e.tokens_aus,
                             e.ki_modell, e.ingest_daten, e.unvollstaendig,
-                            we.budget_tokens, we.monatsbudget_tokens
+                            we.budget_tokens, we.monatsbudget_tokens, d.art
                         from wissens_entwurf e join dokument d on d.id = e.dokument_id
                         left join wissens_einstellung we on we.id = 1
                         where e.id = :id and e.anlass = 'INGEST'""")
@@ -195,7 +201,8 @@ public class JdbcWissenIngest implements WissenIngestPort {
             return Optional.empty();
         }
         Object[] d = zeilen.getFirst();
-        return Optional.of(new Lauf(uuid(d[0]), uuid(d[1]), (String) d[2], (String) d[3], (String) d[4],
+        return Optional.of(new Lauf(uuid(d[0]), uuid(d[1]), (String) d[2], (String) d[3], (String) d[21],
+                (String) d[4],
                 Boolean.TRUE.equals(d[5]), (String) d[6], datum(d[7]),
                 (String) d[8], d[9] == null ? null : ((Number) d[9]).intValue(), Boolean.TRUE.equals(d[10]),
                 d[11] == null ? null : ((Number) d[11]).intValue(),
@@ -271,7 +278,8 @@ public class JdbcWissenIngest implements WissenIngestPort {
 
     @Override
     public List<SeitenMetadaten> seitenIndexLaden(Set<UUID> seiteIds, String suchtext) {
-        if (seiteIds.isEmpty()) {
+        String begriffe = oderSuche(suchtext);
+        if (seiteIds.isEmpty() || begriffe.isEmpty()) {
             return List.of();
         }
         zeitgrenze();
@@ -286,11 +294,42 @@ public class JdbcWissenIngest implements WissenIngestPort {
                 order by ts_rank_cd(s.inhalt_tsv, websearch_to_tsquery('german', :suchtext)) desc, s.pfad
                 limit 500
                 """.formatted(parameter);
-        Query query = em().createNativeQuery(sql).setParameter("suchtext", suchtext);
+        Query query = em().createNativeQuery(sql).setParameter("suchtext", begriffe);
         for (int i = 0; i < ids.size(); i++) {
             query.setParameter("seite" + i, ids.get(i));
         }
         return seitenMetadaten(query);
+    }
+
+    /**
+     * Verbindet die Wörter der Kernaussagen mit «or» für {@code websearch_to_tsquery}: Ohne «or» verknüpft die Suche
+     * alle Wörter mit UND und findet bei mehreren Aussagen kaum eine Seite (Req 5.4). Zahlen und Wörter unter drei
+     * Zeichen tragen nichts zur Auswahl bei.
+     */
+    static String oderSuche(String suchtext) {
+        if (suchtext == null) {
+            return "";
+        }
+        Set<String> woerter = new LinkedHashSet<>();
+        Matcher treffer = WORT.matcher(suchtext);
+        while (treffer.find() && woerter.size() < MAX_SUCHBEGRIFFE) {
+            String wort = treffer.group().toLowerCase(Locale.ROOT);
+            if (wort.codePointCount(0, wort.length()) >= 3) {
+                woerter.add(wort);
+            }
+        }
+        return String.join(" or ", woerter);
+    }
+
+    @Override
+    public Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
+        zeitgrenze();
+        @SuppressWarnings("unchecked")
+        List<Object> zeilen = em().createNativeQuery(
+                        "select s.id from wissensseite s where s.wissensquelle_id = :dokument limit 1")
+                .setParameter("dokument", dokumentId)
+                .getResultList();
+        return zeilen.stream().findFirst().map(JdbcWissenIngest::uuid);
     }
 
     @Override
@@ -429,6 +468,10 @@ public class JdbcWissenIngest implements WissenIngestPort {
                             unvollstaendig = false, hinweis = null, abgeschlossen = null
                         where alt.anlass = 'INGEST' and alt.status = 'FEHLER' and alt.dokument_id is not null
                             and alt.hinweis = :hinweis
+                            and exists (
+                                select 1 from dokument d
+                                where d.id = alt.dokument_id and d.art = 'WISSENSQUELLE'
+                            )
                             and not exists (
                                 select 1 from wissens_entwurf neu
                                 where neu.anlass = 'INGEST' and neu.dokument_id = alt.dokument_id

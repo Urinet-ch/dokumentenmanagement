@@ -23,6 +23,13 @@ class WissenIngestAuszuegeTest {
     }
 
     @Test
+    void normalisiertWieDiePruefungMitLigaturUndSilbentrennung() {
+        assertThat(WissenIngestAuszuege.belegt("Die Ab-\ngabefrist ist de\uFB01nitiv.", "Die Abgabefrist ist definitiv."))
+                .isTrue();
+        assertThat(WissenIngestAuszuege.belegt("Die Ab-\r\ngabefrist", "Die Abgabefrist")).isTrue();
+    }
+
+    @Test
     void lehntLeereUndZuLangeAuszuegeAb() {
         assertThat(WissenIngestAuszuege.belegt("Text", " ")).isFalse();
         assertThat(WissenIngestAuszuege.belegt("x".repeat(301), "x".repeat(301))).isFalse();

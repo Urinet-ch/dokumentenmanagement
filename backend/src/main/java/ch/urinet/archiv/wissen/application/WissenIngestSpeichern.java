@@ -95,6 +95,9 @@ public class WissenIngestSpeichern {
     public List<SeitenMetadaten> indexLaden(UUID entwurfId, String suchtext) {
         Stand stand = laden(entwurfId, Set.of()).orElseThrow(
                 () -> new IllegalStateException("Ingest-Entwurf nicht gefunden"));
+        if (stand.quellStufe() == null) {
+            return List.of();
+        }
         List<SeitenMetadaten> sichtbar = sichtbareSeiten(stand).stream()
                 .filter(seite -> stand.quellStufe() != WissensStufe.INTERN || !"ueberblick".equals(seite.pfad()))
                 .toList();
@@ -117,6 +120,20 @@ public class WissenIngestSpeichern {
             zeichen += laenge;
         }
         return List.copyOf(begrenzt);
+    }
+
+    @Transactional
+    public Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
+        return port.quelleSeiteFinden(dokumentId);
+    }
+
+    /**
+     * Prüft bei jedem Teilauftrag erneut, ob die Quelle noch für den Ingest freigegeben ist (Req 5.6, 5.7): archiviert,
+     * bestätigt, Art WISSENSQUELLE und nicht PERSONAL.
+     */
+    public static boolean freigegeben(Lauf lauf) {
+        return lauf != null && "ARCHIVIERT".equals(lauf.dokumentStatus()) && "WISSENSQUELLE".equals(lauf.art())
+                && quellStufe(lauf) != null;
     }
 
     @Transactional
@@ -232,17 +249,23 @@ public class WissenIngestSpeichern {
 
     public boolean sichtbar(SeitenMetadaten seite, Lauf quelle, WissensGraph graph,
                             Set<UUID> personalDokumente) {
-        if ("ueberblick".equals(seite.pfad()) && quellStufe(quelle) != WissensStufe.NORMAL) {
+        return !"VERALTET".equals(seite.status()) && zugaenglich(seite, quelle, graph, personalDokumente);
+    }
+
+    /** Wie {@link #sichtbar}, aber ohne den Status: unterscheidet eine veraltete von einer höher eingestuften Seite. */
+    public boolean zugaenglich(SeitenMetadaten seite, Lauf quelle, WissensGraph graph,
+                               Set<UUID> personalDokumente) {
+        WissensStufe stufe = quellStufe(quelle);
+        if (stufe == null) {
             return false;
         }
-        if ("VERALTET".equals(seite.status())) {
+        if ("ueberblick".equals(seite.pfad()) && stufe != WissensStufe.NORMAL) {
             return false;
         }
         if (personalDokumente.stream().anyMatch(graph.dokumente(seite.id())::contains)) {
             return false;
         }
-        return rang(graph.wirksameStufe(seite.id(), graph.dokumente(seite.id())))
-                <= rang(quellStufe(quelle));
+        return rang(graph.wirksameStufe(seite.id(), graph.dokumente(seite.id()))) <= rang(stufe);
     }
 
     public List<SeitenMetadaten> sichtbareSeiten(Stand stand) {
@@ -251,14 +274,15 @@ public class WissenIngestSpeichern {
                 .toList();
     }
 
+    /** {@code null}, wenn die Quelle nicht (mehr) freigegeben ist; der Aufrufer schliesst den Ingest dann ab. */
     private static WissensStufe quellStufe(Lauf lauf) {
-        if (!lauf.bestaetigt() || "PERSONAL".equals(lauf.quelleVertraulichkeit())) {
-            throw new IllegalStateException("Wissensquelle ist nicht für den Ingest freigegeben");
+        if (!lauf.bestaetigt() || lauf.quelleVertraulichkeit() == null) {
+            return null;
         }
         return switch (lauf.quelleVertraulichkeit()) {
             case "NORMAL" -> WissensStufe.NORMAL;
             case "INTERN" -> WissensStufe.INTERN;
-            default -> throw new IllegalStateException("Unbekannte Vertraulichkeit der Wissensquelle");
+            default -> null;
         };
     }
 

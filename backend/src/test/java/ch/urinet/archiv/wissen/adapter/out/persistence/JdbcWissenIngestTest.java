@@ -68,6 +68,7 @@ class JdbcWissenIngestTest {
     private final Map<MandantCode, List<UUID>> entwuerfe = new HashMap<>();
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
     private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
+    private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
 
     @BeforeEach
     void mandanten() throws SQLException {
@@ -78,6 +79,7 @@ class JdbcWissenIngestTest {
             dokumente.put(code, new ArrayList<>());
             entwuerfe.put(code, new ArrayList<>());
             verbrauch.put(code, new ArrayList<>());
+            seiten.put(code, new ArrayList<>());
             monatsbudgets.put(code, monatsbudget(code));
         }
     }
@@ -86,6 +88,9 @@ class JdbcWissenIngestTest {
     void aufraeumen() throws SQLException {
         worker.shutdown();
         for (MandantCode code : List.of(URINET, ZWEITER)) {
+            for (UUID id : seiten.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissensseite where id = ?", id);
+            }
             for (UUID id : entwuerfe.get(code)) {
                 ausfuehren("delete from " + code.schema() + ".wissens_entwurf where id = ?", id);
             }
@@ -210,6 +215,54 @@ class JdbcWissenIngestTest {
         assertThat(im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT))).isEqualTo(1);
         assertThat(zeile(URINET, alt)).containsEntry("status", "WARTEND").containsEntry("hinweis", null);
         assertThat(zeile(URINET, neuer)).containsEntry("status", "FEHLER");
+    }
+
+    @Test
+    void indexsucheVerbindetDieWoerterDerKernaussagenMitOder() throws SQLException {
+        UUID lohn = seite(URINET, "probe/index-lohn", "Die Lohndeklaration ist bis Ende Januar fällig.", null);
+        UUID uvg = seite(URINET, "probe/index-uvg", "Die Unfallversicherung wird jährlich abgerechnet.", null);
+        UUID fremd = seite(URINET, "probe/index-fremd", "Ein Text über Fussballvereine.", null);
+        String suchtext = "Die Lohndeklaration ist fällig.\nDie Unfallversicherung wird abgerechnet.";
+
+        assertThat(im(URINET, () -> ingest.seitenIndexLaden(java.util.Set.of(lohn, uvg, fremd), suchtext)))
+                .extracting(WissenIngestPort.SeitenMetadaten::id).containsExactlyInAnyOrder(lohn, uvg);
+        assertThat(im(ZWEITER, () -> ingest.seitenIndexLaden(java.util.Set.of(lohn, uvg, fremd), suchtext)))
+                .isEmpty();
+        assertThat(JdbcWissenIngest.oderSuche("Am 1. April: UVG-Prämie, uvg!")).isEqualTo("april or uvg or prämie");
+        assertThat(JdbcWissenIngest.oderSuche("ab 12 zu")).isEmpty();
+    }
+
+    @Test
+    void findetDieQuelleSeiteNurImEigenenSchema() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID ohneSeite = quelle(URINET);
+        UUID seite = seite(URINET, "quellen/probe-" + dokument.toString().substring(0, 8), "Quelle", dokument);
+
+        assertThat(im(URINET, () -> ingest.quelleSeiteFinden(dokument))).contains(seite);
+        assertThat(im(URINET, () -> ingest.quelleSeiteFinden(ohneSeite))).isEmpty();
+        assertThat(im(ZWEITER, () -> ingest.quelleSeiteFinden(dokument))).isEmpty();
+    }
+
+    @Test
+    void holtHandlerFehltNichtNachWennDasDokumentKeineWissensquelleMehrIst() throws SQLException {
+        UUID dokument = quelle(URINET);
+        ausfuehren("update " + URINET.schema() + ".dokument set art = 'PROJEKTDOKUMENT' where id = ?", dokument);
+        UUID entwurf = entwurf(URINET, dokument, "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
+
+        im(URINET, () -> ingest.handlerFehltNachholen(WissenIngestStarten.HANDLER_FEHLT));
+
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "FEHLER");
+    }
+
+    private UUID seite(MandantCode code, String pfad, String inhalt, UUID wissensquelle) throws SQLException {
+        UUID id = UUID.randomUUID();
+        seiten.get(code).add(id);
+        ausfuehren("insert into " + code.schema() + ".wissensseite (id, pfad, typ, titel, beschreibung, "
+                        + "vertraulichkeit, inhalt, version, erzeugt_von, erzeugt_am, freigegeben_von, freigegeben_am, "
+                        + "wissensquelle_id) values (?, ?, ?, 'Probe', 'Probe', 'NORMAL', ?, 1, 'probe', now(), "
+                        + "'probe', now(), ?)",
+                id, pfad, wissensquelle == null ? "Konzept" : "Quelle", inhalt, wissensquelle);
+        return id;
     }
 
     private UUID quelle(MandantCode code) throws SQLException {

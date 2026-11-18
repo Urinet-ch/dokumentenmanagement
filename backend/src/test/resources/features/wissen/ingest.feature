@@ -130,6 +130,30 @@ Funktionalität: Start eines Ingests einer Wissensquelle
     Und der Ingest-Hinweis enthält den Text "Überblick nicht aktualisiert (höhere Vertraulichkeit)"
     Und die Änderung hat die Kontextstufe «INTERN»
 
+  @req-5.11 @req-5.3
+  Szenario: Eine interne Quelle mit leerer Seitenplanung meldet den nicht aktualisierten Überblick
+    Angenommen im Mandanten «urinet» liegt die archivierte Wissensquelle «QUELLE» mit Vertraulichkeit «INTERN» und 2 Seiten
+    Und das Dokument «QUELLE» hat ein Belegdatum
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten mit leerer Seitenplanung
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und der Ingest-Hinweis enthält den Text "Überblick nicht aktualisiert (höhere Vertraulichkeit)"
+    Und der Ingest-Hinweis enthält den Text "Die Seitenplanung nennt keine betroffenen Seiten."
+
+  @req-5.3
+  Szenario: Ein erneuter Ingest aktualisiert die bestehende Quelle-Seite
+    Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»
+    Und das Dokument «QUELLE» hat Seitentext und eine PDF/A-Fassung
+    Und die Wissensquelle «QUELLE» hat schon eine Quelle-Seite aus einem früheren Ingest
+    Und die Wissensbasis von «urinet» hat das Ingest-Budget 2000000 und das Monatsbudget 100000000 Tokens
+    Und WireMock liefert gültige Antworten für alle vier Ingest-Schritte
+    Wenn «inhaber-urinet» den Ingest für «QUELLE» startet
+    Dann antwortet der Ingest-Endpunkt mit Status 202
+    Und der Ingest-Entwurf wird mit vier KI-Aufrufen «OFFEN»
+    Und aktualisiert der Ingest die Quelle-Seite von «QUELLE» ohne Befund
+
   @req-5.12
   Szenario: Eine geplante Seite gibt keinen Inhalt einer unsichtbaren höheren Seite preis
     Angenommen im Mandanten «urinet» liegt ein archiviertes Dokument «QUELLE» der Art «WISSENSQUELLE»

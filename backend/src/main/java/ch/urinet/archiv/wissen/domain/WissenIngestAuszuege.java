@@ -1,8 +1,6 @@
 package ch.urinet.archiv.wissen.domain;
 
-import java.text.Normalizer;
-
-/** Prüft KI-Auszüge gegen den Volltext der angegebenen PDF-Seite. */
+/** Prüft KI-Auszüge gegen den Volltext der angegebenen PDF-Seite, normalisiert wie {@link WissensPruefung}. */
 public final class WissenIngestAuszuege {
 
     private WissenIngestAuszuege() {
@@ -13,12 +11,8 @@ public final class WissenIngestAuszuege {
                 || auszug.codePointCount(0, auszug.length()) > WissensPruefung.AUSZUG_MAX_ZEICHEN) {
             return false;
         }
-        String seite = normalisieren(seitentext);
-        String zitat = normalisieren(auszug);
-        return !zitat.isEmpty() && seite.contains(zitat);
-    }
-
-    private static String normalisieren(String text) {
-        return Normalizer.normalize(text, Normalizer.Form.NFC).replaceAll("(?U)\\s+", " ").strip();
+        String seite = WissensPruefung.auszugNormalisieren(seitentext);
+        String zitat = WissensPruefung.auszugNormalisieren(auszug);
+        return !zitat.isBlank() && seite.contains(zitat);
     }
 }

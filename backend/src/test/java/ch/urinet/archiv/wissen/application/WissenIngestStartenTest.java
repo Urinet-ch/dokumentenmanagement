@@ -429,6 +429,11 @@ class WissenIngestStartenTest {
         }
 
         @Override
+        public java.util.Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
         public Optional<SeitenFassung> seiteLaden(UUID seiteId) {
             return Optional.empty();
         }

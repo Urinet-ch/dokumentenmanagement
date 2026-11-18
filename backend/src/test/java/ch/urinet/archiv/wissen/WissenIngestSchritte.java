@@ -239,6 +239,65 @@ public class WissenIngestSchritte {
         KiWireMock.wissenFolge(List.of(ersteSeite, zweiteSeite, antworten.get(1), quelle));
     }
 
+    @Angenommen("WireMock liefert gültige Antworten mit leerer Seitenplanung")
+    public void gueltigeAntwortenLeerePlanung() {
+        String ersteSeite = """
+                {"aussagen":[{"nr":1,"text":"Synthetische Seite 1","seiten":[1],
+                "auszug":"Synthetische Seite 1"}]}
+                """;
+        String zweiteSeite = """
+                {"aussagen":[{"nr":1,"text":"Synthetische Seite 2","seiten":[2],
+                "auszug":"Synthetische Seite 2"}]}
+                """;
+        String quelle = """
+                {"titel":"Quelle","beschreibung":"Zusammenfassung der Quelle","tags":[],
+                "zusammenfassung":[{"text":"Synthetische Seite 1","aussagen":[1]}]}
+                """;
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(List.of(ersteSeite, zweiteSeite, "{\"seiten\":[]}", quelle));
+    }
+
+    @Angenommen("die Wissensquelle «{word}» hat schon eine Quelle-Seite aus einem früheren Ingest")
+    public void quelleSeiteAnlegen(String name) throws SQLException {
+        Ort ort = ort(name);
+        String kurz = ort.id().toString().substring(0, 8);
+        String neu = "q-" + kurz + "-1";
+        String alt = "q-" + kurz + "-99";
+        UUID id = UUID.randomUUID();
+        ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite "
+                        + "(id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, erzeugt_von, "
+                        + "erzeugt_am, freigegeben_von, freigegeben_am, wissensquelle_id) "
+                        + "values (?, ?, 'Quelle', 'Fristen', 'Frühere Quelle', 'NORMAL', ?, 2, 'test', "
+                        + "clock_timestamp(), 'inhaber', clock_timestamp(), ?)",
+                id, "quellen/2026-04-fristen-" + kurz,
+                "## Zusammenfassung\n\nFrühere Zusammenfassung. [^" + neu + "]\n\n## Kernaussagen\n\n"
+                        + "- Frühere Fassung der Frist. [^" + neu + "]\n- Eine ältere Aussage. [^" + alt + "]\n",
+                ort.id());
+        wissensseiten.computeIfAbsent(ort.mandant(), ignored -> new ArrayList<>()).add(id);
+        for (String schluessel : List.of(neu, alt)) {
+            ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite_quelle "
+                            + "(seite_id, schluessel, dokument_id, seite_von, seite_bis, auszug) "
+                            + "values (?, ?, ?, 1, 1, 'Die Abgabefrist endet am 30. April.')",
+                    id, schluessel, ort.id());
+        }
+    }
+
+    @Dann("aktualisiert der Ingest die Quelle-Seite von «{word}» ohne Befund")
+    public void quelleSeiteAktualisiert(String name) throws SQLException {
+        String kurz = ort(name).id().toString().substring(0, 8);
+        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, befunde::text as befunde "
+                + "from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = ?", entwurfId,
+                "quellen/2026-04-fristen-" + kurz);
+        assertThat(aenderung).containsEntry("aktion", "AENDERN").containsEntry("basis_version", 2);
+        assertThat(aenderung.get("seite_id")).isNotNull();
+        assertThat((String) aenderung.get("inhalt")).contains("- Eine ältere Aussage. [^q-" + kurz + "-99]",
+                "- Die Abgabefrist endet am 30. April. [^q-" + kurz + "-1]").doesNotContain("Frühere Fassung");
+        assertThat((String) aenderung.get("befunde")).doesNotContain("QUELLE_NICHT_BELEGT", "AUSSAGE_ENTFERNT");
+        assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
+                + "where entwurf_id = ? and pfad like ?", entwurfId, "quellen/%").get("anzahl")).intValue())
+                .isEqualTo(1);
+    }
+
     @Angenommen("WireMock liefert einen nicht belegten Vorschlag auf die Prompt-Injection")
     public void promptInjectionAntwort() {
         KiWireMock.zuruecksetzen();
@@ -422,9 +481,10 @@ public class WissenIngestSchritte {
 
     @Dann("die Planung übergibt höchstens 40 Indexzeilen")
     public void indexAufVierzigZeilenBegrenzt() {
-        List<String> anfragen = KiWireMock.wissenAnfragen();
-        assertThat(anfragen).hasSizeGreaterThan(1);
-        int zeilen = String.join("\n", anfragen).split("konzepte/indexlimit-", -1).length - 1;
+        List<String> planung = KiWireMock.wissenAnfragen().stream()
+                .filter(anfrage -> anfrage.contains("Sichtbarer Index (")).toList();
+        assertThat(planung).hasSize(1);
+        int zeilen = planung.getFirst().split("konzepte/indexlimit-", -1).length - 1;
         assertThat(zeilen).isBetween(1, 40);
     }
 

@@ -46,7 +46,14 @@ public interface WissenIngestPort {
 
     Map<UUID, WissensPruefung.DokumentQuelle> dokumentQuellenLaden(Set<UUID> dokumentIds);
 
+    /**
+     * Sucht die sichtbaren Seiten zu den Texten der Kernaussagen; jeder Begriff zählt für sich (ODER), das Ranking
+     * ordnet nach Übereinstimmung (Req 5.4).
+     */
     List<SeitenMetadaten> seitenIndexLaden(Set<UUID> seiteIds, String suchtext);
+
+    /** Die Seite, die auf die Wissensquelle verweist ({@code wissensquelle_id}, höchstens eine je Quelle). */
+    Optional<UUID> quelleSeiteFinden(UUID dokumentId);
 
     Optional<SeitenFassung> seiteLaden(UUID seiteId);
 
@@ -76,7 +83,7 @@ public interface WissenIngestPort {
         }
     }
 
-    record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus,
+    record Lauf(UUID entwurfId, UUID dokumentId, String entwurfStatus, String dokumentStatus, String art,
                 String quelleVertraulichkeit,
                 boolean bestaetigt, String titel, LocalDate datum, String volltext, Integer seiten,
                 boolean pdfaVorhanden, Integer seiteVon, Integer seiteBis, String schritt, int tokensEin,

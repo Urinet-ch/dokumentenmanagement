@@ -257,12 +257,37 @@ flowchart LR
     zurück und `ARCHIVIEREN` wird nach Spec 01 wiederholt; ein fachliches Hindernis ist dagegen ein Entwurf `FEHLER`.
   - Systemakteur der Entwürfe aus dem automatischen Start: `process:wissen-ingest` («Akteure»).
   - Die Zeitgrenze `archiv.auftrag.zeitgrenze.WISSEN_INGEST` stand schon vor 14.1a in `application.properties`.
-- Umsetzung 14.1b (PR #312): `WissenIngestNachholen` reaktiviert beim Worker-Start einmalig alte
+- Umsetzung 14.1b (PR #319): `WissenIngestNachholen` reaktiviert beim Worker-Start einmalig alte
   `HANDLER_FEHLT`-Entwürfe, wenn kein neuerer Ingest desselben Dokuments existiert; danach läuft die normale
   Warteschlange. Bei einem Fehler in einem Mandanten wird die Wiederherstellung protokolliert und im nächsten Takt
   erneut versucht. Der Indexloader begrenzt Suchtreffer auf höchstens 40 Zeilen und schliesst `ueberblick` bei
   `INTERN` auch als Index-Metadaten aus. Monatsverbrauch, Reservierungen und Ingest-Schritte verwenden dasselbe
   Monatsfenster `Europe/Zurich`.
+- Nachbesserung 14.1b (Review PR #319):
+  - Die Eingrenzung des Index (5.4) sucht die Wörter der Kernaussagen mit ODER verknüpft
+    (`websearch_to_tsquery('german', 'wort or wort …')`, Wörter ab drei Zeichen, Zahlen ausgenommen), damit nicht
+    jede Seite alle Wörter enthalten muss; ohne Suchwort bleibt der Index leer. Der Suchtext enthält nur die Aussagetexte.
+  - Vor jedem Schritt und nach jedem erneuten Laden prüft der Ingest, ob die Quelle noch `ARCHIVIERT`, von der Art
+    `WISSENSQUELLE`, bestätigt und nicht `PERSONAL` ist; sonst endet der Entwurf ohne weiteren KI-Aufruf mit `FEHLER`
+    «Die Wissensquelle ist nicht mehr für den Ingest freigegeben.» (5.6, 5.7). Das Nachholen von `HANDLER_FEHLT`
+    berücksichtigt nur Dokumente der Art `WISSENSQUELLE`.
+  - Eine schemagültige, leere Planung ist kein Fehler: Der Ingest geht mit dem Hinweis «Die Seitenplanung nennt keine
+    betroffenen Seiten.» direkt zur Quelle-Seite. `AENDERN` auf einen Pfad ohne sichtbare Seite wird zu `NEU` (mit
+    Hinweis), `VERALTEN` ohne Seite und Pfade von Seiten im Status `VERALTET` werden mit Hinweis verworfen; eine
+    veraltete Seite gilt nicht als «höhere Vertraulichkeit».
+  - Der Hinweis «Überblick nicht aktualisiert (höhere Vertraulichkeit)» steht bei einer Quelle über `NORMAL` immer
+    im Entwurf, auch wenn die KI den Überblick nicht plant (5.11).
+  - Quelle-Seite: Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>` (die ersten 8 Zeichen der Dokument-ID, damit zwei
+    Quellen mit gleichem Titel im selben Monat nicht kollidieren; bei Kollision Suffix `-2`). Gibt es zur
+    Wissensquelle schon eine Quelle-Seite (`wissensseite.wissensquelle_id` ist eindeutig), schlägt ein erneuter
+    Ingest `AENDERN` dieser Seite vor (Pfad, Seiten-ID und Basisversion bleiben); Quelleneinträge und Kernaussagen
+    der bisherigen Fassung, die der neue Lauf nicht mehr ergibt (z. B. Seitenbereich nach 5.2), bleiben erhalten.
+    Ist die bestehende Quelle-Seite nicht `AKTIV` oder für den Ingest nicht sichtbar, entfällt die Änderung mit
+    Hinweis. Ohne Belegdatum oder ohne belegte Kernaussage entfällt nur die Quelle-Seite, nicht der ganze Ingest.
+  - Die Auszugsprüfung des Ingests normalisiert wie `WissensPruefung` (NFKC, Trennstrich am Zeilenende, Leerraum);
+    der Seitenbereich einer Fussnote umfasst nur Seiten, auf denen der Auszug steht.
+  - Budgets ≤ 0 gelten als nicht gesetzt (Startwert).
+  - Diff (`diff = '{}'`) und Kennzeichnung der Kernaussagen ohne Änderung im Entwurf gehören zu 14.2 (`DiffDienst`).
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).
 - Schritte:
@@ -272,7 +297,7 @@ flowchart LR
 | `KERNAUSSAGEN` je Abschnitt | Abschnittstext mit Markern `[Seite n]`, Dokumenttitel, Datum | `{aussagen:[{nr, text, seiten:[n], auszug}]}`, höchstens 40 | Auszug auf Seite prüfen; Aussagen ohne gültigen Auszug bleiben mit Befund markiert und werden im Entwurf gezeigt (Requirement 6.1) |
 | `PLANUNG` | Index (gefiltert nach 5.5, ggf. eingegrenzt nach 5.4), `ueberblick` nur bei Wissensquelle `NORMAL` (5.3, 5.11), Kernaussagen (Nr. + Text) | `{seiten:[{pfad, aktion, typ, grund, aussagen:[nr]}]}` | `AENDERN` nur für vorhandene, im Kontext sichtbare Pfade; `NEU` auf einem von einer unsichtbaren Seite belegten Pfad → Änderung bleibt leer mit Befund `PFAD_UNGUELTIG` und Hinweis `HOEHERE_STUFE_VORHANDEN`, ohne Teilauftrag `SEITE` (5.12); `ueberblick` bei höherer Stufe verworfen mit Hinweis (5.11); Kürzung auf `max-seiten`; fehlt `ueberblick`, wird sie bei `NORMAL` als `NEU` ergänzt (2.3) |
 | `SEITE` je geplanter Seite | aktuelle Fassung (Felder + Inhalt) bzw. leer, zugeordnete Kernaussagen mit Schlüssel `q-<kurz>-<nr>`, Index-Zeilen der Nachbarn | `{titel, beschreibung, tags, inhalt, widersprueche:[{bestehend, neu, text}], entfernte_aussagen:[{schluessel, begruendung}], begruendung}` | Quelleneinträge aus den Kernaussagen erzeugen (Dokument-ID, Seiten, Auszug stammen nie aus diesem Schritt), prüfen, Diff |
-| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (aus der Planung) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>` |
+| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (aus der Planung) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>`, bei erneutem Ingest `AENDERN` der bestehenden Quelle-Seite |
 | `ABSCHLUSS` (ohne KI-Aufruf) | – | – | `WissensPruefung` für alle Änderungen, Kernaussagen ohne Änderung kennzeichnen, `status = OFFEN` |
 
 - Systemprompt (deutsch): Rolle «pflegt die Wissensbasis», Regeln: nur belegte Aussagen, jede mit Fussnote auf

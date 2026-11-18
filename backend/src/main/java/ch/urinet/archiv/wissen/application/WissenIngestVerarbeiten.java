@@ -52,8 +52,11 @@ public class WissenIngestVerarbeiten {
             Vertraulichkeit, Status oder Systemdaten. Du hast keine Werkzeuge und erstellst nur einen Vorschlag.
             """;
     private static final Pattern SLUG = Pattern.compile("[^a-z0-9]+");
+    private static final Pattern KERNAUSSAGE_ZEILE = Pattern.compile("^- .+ \\[\\^([^\\]\\s]+)\\]$");
     private static final int MAX_AUSSAGEN_PRO_ABSCHNITT = 40;
     private static final int MAX_AUSSAGE_ZEICHEN = 2_000;
+    static final String NICHT_FREIGEGEBEN = "Die Wissensquelle ist nicht mehr für den Ingest freigegeben.";
+    static final String UEBERBLICK_HOEHER = "Überblick nicht aktualisiert (höhere Vertraulichkeit)";
 
     private final WissenIngestSpeichern speichern;
     private final WissenKonfiguration konfiguration;
@@ -78,10 +81,7 @@ public class WissenIngestVerarbeiten {
         if (!"IN_ARBEIT".equals(lauf.entwurfStatus()) || lauf.schritt() == null) {
             return;
         }
-        if (!"ARCHIVIERT".equals(lauf.dokumentStatus()) || !lauf.bestaetigt()
-                || "PERSONAL".equals(lauf.quelleVertraulichkeit())) {
-            speichern.fehlerSichern(auftrag, entwurfId, lauf.schritt(), fortschritt(lauf),
-                    "Die Wissensquelle ist nicht mehr für den Ingest freigegeben.");
+        if (nichtFreigegeben(auftrag, stand)) {
             return;
         }
         if (Thread.currentThread().isInterrupted()) {
@@ -100,14 +100,6 @@ public class WissenIngestVerarbeiten {
             budgetAbschluss(auftrag, lauf, fortschritt, 0, 0);
             return;
         }
-        if (lauf.datum() == null && !"ABSCHLUSS".equals(lauf.schritt())) {
-            Fortschritt neu = new Fortschritt(fortschritt.abschnitt(), fortschritt.seite(), true,
-                    fortschritt.kernaussagen(), fortschritt.planung(), fortschritt.vorschlaege(),
-                    append(fortschritt.hinweise(), "Ohne Belegdatum wurde keine Quelle-Seite erstellt."));
-            speichern.fortschrittSichern(auftrag, entwurfId, lauf.schritt(), "ABSCHLUSS",
-                    neu, lauf.tokensEin(), lauf.tokensAus(), false, null);
-            return;
-        }
 
         switch (lauf.schritt()) {
             case "KERNAUSSAGEN" -> kernaussagen(auftrag, stand, fortschritt, budget, monatsbudget, grenzen);
@@ -122,6 +114,19 @@ public class WissenIngestVerarbeiten {
 
     private OptionalStand laden(UUID entwurfId, Set<UUID> seitenIds) {
         return new OptionalStand(speichern.laden(entwurfId, seitenIds).orElse(null));
+    }
+
+    /**
+     * Schliesst den Ingest mit FEHLER ab, wenn die Quelle nicht mehr freigegeben ist (Req 5.6, 5.7); geprüft vor jedem
+     * Schritt und nach jedem erneuten Laden.
+     */
+    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand) {
+        if (WissenIngestSpeichern.freigegeben(stand.lauf()) && stand.quellStufe() != null) {
+            return false;
+        }
+        speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(),
+                fortschritt(stand.lauf()), NICHT_FREIGEGEBEN);
+        return true;
     }
 
     private void kernaussagen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher,
@@ -174,8 +179,13 @@ public class WissenIngestVerarbeiten {
                 List<Integer> seiten = aussage.seiten() == null ? List.of() : aussage.seiten().stream()
                         .filter(Objects::nonNull).filter(seite -> seite >= von && seite <= bis)
                         .distinct().sorted().toList();
-                boolean belegt = !seiten.isEmpty() && seiten.stream()
-                        .anyMatch(seite -> WissenIngestAuszuege.belegt(text.seiten().get(seite - 1), aussage.auszug()));
+                List<Integer> mitAuszug = seiten.stream()
+                        .filter(seite -> WissenIngestAuszuege.belegt(text.seiten().get(seite - 1), aussage.auszug()))
+                        .toList();
+                boolean belegt = !mitAuszug.isEmpty();
+                if (belegt) {
+                    seiten = mitAuszug;
+                }
                 int nummer = Math.addExact(Math.multiplyExact(index, MAX_AUSSAGEN_PRO_ABSCHNITT), aussage.nr());
                 String schluessel = schluessel(lauf.dokumentId(), nummer);
                 aussagen.add(new Kernaussage(nummer, schluessel, aussage.text(), seiten, aussage.auszug(), belegt));
@@ -203,7 +213,8 @@ public class WissenIngestVerarbeiten {
         List<Kernaussage> belegt = belegteAussagen(bisher);
         String aussagenText = belegt.stream().map(a -> a.nr() + " [" + a.schluessel() + "] " + a.text())
                 .collect(java.util.stream.Collectors.joining("\n"));
-        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(), aussagenText);
+        List<SeitenMetadaten> index = speichern.indexLaden(lauf.entwurfId(), belegt.stream().map(Kernaussage::text)
+                .collect(java.util.stream.Collectors.joining("\n")));
         String indexText = index.stream().map(WissenIngestVerarbeiten::indexZeile)
                 .collect(java.util.stream.Collectors.joining("\n"));
         String ueberblick = stand.quellStufe() == WissensStufe.NORMAL
@@ -233,14 +244,11 @@ public class WissenIngestVerarbeiten {
                     "Die Seitenplanung war nach einer Nachfrage ungültig.");
             return;
         }
-        if (planung.seiten().isEmpty()) {
-            speichern.fehlerSichern(auftrag, lauf.entwurfId(), lauf.schritt(), bisher,
-                    "Die Seitenplanung war nach einer Nachfrage ungültig.");
-            return;
-        }
-        List<Planung> geplant = plane(planung, stand, belegt, grenzen.maxSeiten());
         List<String> hinweise = new ArrayList<>(bisher.hinweise());
-        if (planung.seiten().size() > grenzen.maxSeiten()) {
+        List<Planung> geplant = plane(planung, stand, belegt, grenzen.maxSeiten(), hinweise);
+        if (planung.seiten() == null || planung.seiten().isEmpty()) {
+            hinweise.add("Die Seitenplanung nennt keine betroffenen Seiten.");
+        } else if (planung.seiten().size() > grenzen.maxSeiten()) {
             hinweise.add("Die Seitenplanung wurde auf die zulässige Höchstzahl gekürzt.");
         }
         boolean hatUeberblick = geplant.stream().anyMatch(s -> "ueberblick".equals(s.pfad()));
@@ -252,9 +260,6 @@ public class WissenIngestVerarbeiten {
             }
             geplant.addFirst(new Planung("ueberblick", "NEU", "Synthese", "Syntheseseite",
                     belegt.stream().map(Kernaussage::nr).toList(), null, null, false));
-        } else if (stand.quellStufe() == WissensStufe.INTERN
-                && planung.seiten().stream().anyMatch(s -> "ueberblick".equals(s.pfad()))) {
-            hinweise.add("Überblick nicht aktualisiert (höhere Vertraulichkeit)");
         }
         if (antwort.budgetErreicht()) {
             hinweise.add("Budget erschöpft");
@@ -268,13 +273,13 @@ public class WissenIngestVerarbeiten {
     }
 
     private List<Planung> plane(KiPort.Planung antwort, WissenIngestSpeichern.Stand stand,
-                               List<Kernaussage> aussagen, int maxSeiten) {
+                               List<Kernaussage> aussagen, int maxSeiten, List<String> hinweise) {
         Map<String, SeitenMetadaten> sichtbar = speichern.sichtbareSeiten(stand).stream()
                 .collect(java.util.stream.Collectors.toMap(SeitenMetadaten::pfad, seite -> seite));
         List<Planung> result = new ArrayList<>();
         Set<String> duplicate = new HashSet<>();
         if (antwort.seiten() == null) {
-            return List.of();
+            return result;
         }
         for (KiPort.Plan plan : antwort.seiten()) {
             if (result.size() >= maxSeiten) {
@@ -288,13 +293,28 @@ public class WissenIngestVerarbeiten {
                 continue;
             }
             SeitenMetadaten page = sichtbar.get(plan.pfad());
-            boolean hoeher = stand.seiten().stream().anyMatch(s -> s.pfad().equals(plan.pfad()))
-                    && page == null;
+            SeitenMetadaten belegt = page != null ? null : stand.seiten().stream()
+                    .filter(s -> s.pfad().equals(plan.pfad())).findFirst().orElse(null);
+            if (belegt != null && "VERALTET".equals(belegt.status())
+                    && speichern.zugaenglich(belegt, stand.lauf(), stand.graph(), stand.personalDokumente())) {
+                hinweise.add("Eine veraltete Seite belegt den Pfad «" + plan.pfad()
+                        + "»; der Vorschlag wurde verworfen.");
+                continue;
+            }
+            boolean hoeher = belegt != null;
             UUID pageId = null;
             Integer version = null;
             String aktion = plan.aktion().toUpperCase(Locale.ROOT);
             boolean aktionOk = Set.of("NEU", "AENDERN", "VERALTEN").contains(aktion);
             if (!aktionOk) {
+                aktion = "NEU";
+            }
+            if (page == null && !hoeher && "VERALTEN".equals(aktion)) {
+                hinweise.add("Eine zu veraltende Seite fehlt oder ist nicht sichtbar; der Vorschlag wurde verworfen.");
+                continue;
+            }
+            if (page == null && !hoeher && "AENDERN".equals(aktion)) {
+                hinweise.add("Die zu ändernde Seite «" + plan.pfad() + "» fehlt; sie wird neu vorgeschlagen.");
                 aktion = "NEU";
             }
             if (page != null && ("AENDERN".equals(aktion) || "VERALTEN".equals(aktion))) {
@@ -330,6 +350,9 @@ public class WissenIngestVerarbeiten {
         if (plan.seiteId() != null) {
             WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(plan.seiteId())).stand();
             if (aktuell == null) {
+                return;
+            }
+            if (nichtFreigegeben(auftrag, aktuell)) {
                 return;
             }
             stand = aktuell;
@@ -434,13 +457,28 @@ public class WissenIngestVerarbeiten {
             return;
         }
         List<Kernaussage> aussagen = belegteAussagen(bisher);
-        if (aussagen.isEmpty()) {
-            Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
-                    bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(),
-                    "Ohne belegte Kernaussagen wurde keine Quelle-Seite erstellt."));
-            speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "ABSCHLUSS", neu,
-                    lauf.tokensEin(), lauf.tokensAus(), false, null);
+        if (aussagen.isEmpty() || lauf.datum() == null) {
+            quelleUeberspringen(auftrag, lauf, bisher, aussagen.isEmpty()
+                    ? "Ohne belegte Kernaussagen wurde keine Quelle-Seite erstellt."
+                    : "Ohne Belegdatum wurde keine Quelle-Seite erstellt.");
             return;
+        }
+        SeitenFassung bestehende = null;
+        java.util.Optional<UUID> bestehendeId = speichern.quelleSeiteFinden(lauf.dokumentId());
+        if (bestehendeId.isPresent()) {
+            WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(bestehendeId.get())).stand();
+            if (aktuell == null || nichtFreigegeben(auftrag, aktuell)) {
+                return;
+            }
+            stand = aktuell;
+            lauf = stand.lauf();
+            bestehende = stand.fassungen().get(bestehendeId.get());
+            if (bestehende == null || bestehende.metadaten().status() == null
+                    || !"AKTIV".equals(bestehende.metadaten().status())) {
+                quelleUeberspringen(auftrag, lauf, bisher, "Die bestehende Quelle-Seite dieser Wissensquelle ist "
+                        + "veraltet oder nicht sichtbar; sie wurde nicht aktualisiert.");
+                return;
+            }
         }
         String nachricht = feld("Wissensquelle (Titel und Datum)", lauf.titel() + "\n" + lauf.datum())
                 + feld("Geplante Seiten", bisher.planung().stream().filter(plan -> !plan.pfadHoehereStufe())
@@ -472,7 +510,7 @@ public class WissenIngestVerarbeiten {
                     false, null);
             return;
         }
-        SeitenVorschlag entwurf = quelleVorschlag(inhalt, aussagen, bisher, lauf, stand, grenzen);
+        SeitenVorschlag entwurf = quelleVorschlag(inhalt, aussagen, bisher, lauf, stand, bestehende);
         List<SeitenVorschlag> vorschlaege = new ArrayList<>(bisher.vorschlaege());
         vorschlaege.add(entwurf);
         Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
@@ -483,13 +521,23 @@ public class WissenIngestVerarbeiten {
                 antwort.budgetErreicht(), antwort.budgetErreicht() ? "Budget erschöpft" : null);
     }
 
-    private void abschluss(Auftrag auftrag, UUID entwurfId, Fortschritt fortschritt, long budget) {
-        Set<UUID> seitenIds = fortschritt.planung().stream().map(Planung::seiteId).filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
+    private void quelleUeberspringen(Auftrag auftrag, Lauf lauf, Fortschritt bisher, String hinweis) {
+        Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
+                bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(), hinweis));
+        speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "ABSCHLUSS", neu,
+                lauf.tokensEin(), lauf.tokensAus(), false, null);
+    }
+
+    private void abschluss(Auftrag auftrag, UUID entwurfId, Fortschritt bisher, long budget) {
+        Set<UUID> seitenIds = new HashSet<>();
+        bisher.planung().stream().map(Planung::seiteId).filter(Objects::nonNull).forEach(seitenIds::add);
+        bisher.vorschlaege().stream().map(SeitenVorschlag::seiteId).filter(Objects::nonNull).forEach(seitenIds::add);
         WissenIngestSpeichern.Stand stand = laden(entwurfId, seitenIds).stand();
-        if (stand == null) {
+        if (stand == null || nichtFreigegeben(auftrag, stand)) {
             return;
         }
+        Fortschritt fortschritt = stand.quellStufe() != WissensStufe.NORMAL
+                && !bisher.hinweise().contains(UEBERBLICK_HOEHER) ? mitHinweis(bisher, UEBERBLICK_HOEHER) : bisher;
         Lauf lauf = stand.lauf();
         List<NeueAenderung> aenderungen = new ArrayList<>();
         Map<String, SeitenMetadaten> seitenNachPfad = stand.seiten().stream()
@@ -504,12 +552,15 @@ public class WissenIngestVerarbeiten {
                     : fassung.quellen().stream().map(Quelleneintrag::schluessel).collect(java.util.stream.Collectors.toSet());
             Set<String> entfernt = vorschlag.entfernteAussagen().stream().map(KiPort.EntfernteAussage::schluessel)
                     .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
-            Set<String> genutzt = belegte.stream().filter(a -> fortschritt.planung().stream()
+            boolean quelleSeite = vorschlag.daten() != null && vorschlag.daten().typ() == Seitentyp.QUELLE
+                    && lauf.dokumentId().equals(vorschlag.daten().wissensquelleId());
+            Set<String> genutzt = belegte.stream().filter(a -> quelleSeite || fortschritt.planung().stream()
                             .filter(p -> p.pfad().equals(vorschlag.pfad()))
                             .anyMatch(p -> p.aussagen().contains(a.nr())))
                     .map(Kernaussage::schluessel).collect(java.util.stream.Collectors.toSet());
             boolean hoeher = vorschlag.seiteId() == null && stand.seiten().stream()
-                    .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id()));
+                    .anyMatch(seite -> seite.pfad().equals(vorschlag.pfad()) && !sichtbar.contains(seite.id())
+                            && !speichern.zugaenglich(seite, lauf, stand.graph(), stand.personalDokumente()));
             WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(konfiguration.ingest().seiteMaxZeichen(),
                     bisherige == null ? null : bisherige.pfad(),
                     stand.seiten().stream().map(SeitenMetadaten::pfad).collect(java.util.stream.Collectors.toSet()),
@@ -615,11 +666,6 @@ public class WissenIngestVerarbeiten {
         return new KiErgebnis(null, tokensEin, tokensAus, budgetErreicht, monatsbudgetErreicht, false);
     }
 
-    private List<Planung> planung(KiPort.Planung planung, WissenIngestSpeichern.Stand stand,
-                                  List<Kernaussage> aussagen, int maxSeiten) {
-        return plane(planung, stand, aussagen, maxSeiten);
-    }
-
     private SeitenVorschlag seitenVorschlag(Planung plan, int nummer, KiPort.Seite inhalt,
                                             List<Kernaussage> aussagen, SeitenFassung bisherige, Lauf lauf,
                                             WissensStufe stufe) {
@@ -642,15 +688,23 @@ public class WissenIngestVerarbeiten {
                 List.of(), List.of(), stufe.name());
     }
 
+    /**
+     * Erstellt die Quelle-Seite oder aktualisiert sie, wenn die Wissensquelle schon eine hat (Req 5.3 (d), 5.2): Pfad,
+     * Seite und Basisversion bleiben; Kernaussagen und Quelleneinträge früherer Durchgänge, die der neue Durchgang nicht
+     * ersetzt, werden übernommen.
+     */
     private SeitenVorschlag quelleVorschlag(KiPort.Quelle inhalt, List<Kernaussage> aussagen,
                                              Fortschritt fortschritt, Lauf lauf,
-                                             WissenIngestSpeichern.Stand stand, WissenIngestGrenzen grenzen) {
+                                             WissenIngestSpeichern.Stand stand, SeitenFassung bestehende) {
         Map<Integer, Kernaussage> nachNummer = aussagen.stream()
                 .collect(java.util.stream.Collectors.toMap(Kernaussage::nr, a -> a));
-        List<Kernaussage> quelleAussagen = aussagen;
-        List<Quelleneintrag> quellen = quelleAussagen.stream().map(a -> new Quelleneintrag(a.schluessel(),
+        Map<String, Quelleneintrag> quellenNachSchluessel = new java.util.LinkedHashMap<>();
+        if (bestehende != null) {
+            bestehende.quellen().forEach(quelle -> quellenNachSchluessel.put(quelle.schluessel(), quelle));
+        }
+        aussagen.forEach(a -> quellenNachSchluessel.put(a.schluessel(), new Quelleneintrag(a.schluessel(),
                 lauf.dokumentId(), a.seiten().stream().min(Integer::compareTo).orElse(null),
-                a.seiten().stream().max(Integer::compareTo).orElse(null), a.auszug(), null)).toList();
+                a.seiten().stream().max(Integer::compareTo).orElse(null), a.auszug(), null)));
         StringBuilder text = new StringBuilder("## Zusammenfassung\n\n");
         for (KiPort.Zusammenfassung zusammenfassung : inhalt.zusammenfassung()) {
             if (zusammenfassung == null || zusammenfassung.text() == null || zusammenfassung.text().isBlank()) {
@@ -665,14 +719,45 @@ public class WissenIngestVerarbeiten {
                     .append(fussnoten(verwendete)).append("\n\n");
         }
         text.append("## Kernaussagen\n\n");
+        Set<String> neueSchluessel = new HashSet<>();
         for (Kernaussage aussage : aussagen) {
+            neueSchluessel.add(aussage.schluessel());
             text.append("- ").append(aussage.text()).append(" [^").append(aussage.schluessel()).append("]\n");
+        }
+        List<KiPort.EntfernteAussage> entfernt = new ArrayList<>();
+        if (bestehende != null) {
+            Map<String, String> alteZeilen = kernaussageZeilen(bestehende.inhalt());
+            for (Quelleneintrag alt : bestehende.quellen()) {
+                if (alt.schluessel() == null || neueSchluessel.contains(alt.schluessel())) {
+                    continue;
+                }
+                String zeile = alteZeilen.get(alt.schluessel());
+                if (zeile != null) {
+                    text.append(zeile).append("\n");
+                } else {
+                    quellenNachSchluessel.remove(alt.schluessel());
+                    entfernt.add(new KiPort.EntfernteAussage(alt.schluessel(),
+                            "Die Aussage stand nicht unter den Kernaussagen der bisherigen Quelle-Seite."));
+                }
+            }
         }
         text.append("\n## Berührte Seiten\n\n");
         fortschritt.planung().stream().filter(plan -> !plan.pfadHoehereStufe())
                 .map(Planung::pfad).distinct().forEach(pfad ->
                 text.append("- [").append(pfad).append("](/").append(pfad).append(")\n"));
 
+        List<Quelleneintrag> quellen = List.copyOf(quellenNachSchluessel.values());
+        int nummer = fortschritt.vorschlaege().size() + 1;
+        if (bestehende != null) {
+            SeitenMetadaten m = bestehende.metadaten();
+            Wissensseite daten = new Wissensseite(m.id(), m.pfad(), Seitentyp.QUELLE, inhalt.titel(),
+                    inhalt.beschreibung(), inhalt.tags(), Wissensseite.Status.AKTIV, null, quellen,
+                    vertraulichkeit(stand.quellStufe()), text.toString(), m.version(), "KI:" + lauf.modell(),
+                    Instant.now(), null, null, false, false, lauf.dokumentId());
+            return new SeitenVorschlag(nummer, "AENDERN", m.id(), m.pfad(), m.version(), daten,
+                    "Aktualisierung der Quelle-Seite nach erneutem Ingest", List.of(), entfernt, List.of(), List.of(),
+                    stand.quellStufe().name());
+        }
         String slug = slug(inhalt.titel());
         if (slug.isEmpty()) {
             slug = "quelle";
@@ -680,8 +765,7 @@ public class WissenIngestVerarbeiten {
         if (slug.length() > 80) {
             slug = slug.substring(0, 80).replaceAll("-+$", "");
         }
-        String monat = lauf.datum() == null ? LocalDate.now().toString().substring(0, 7)
-                : lauf.datum().toString().substring(0, 7);
+        String monat = lauf.datum().toString().substring(0, 7);
         String basisPfad = "quellen/" + monat + "-" + slug + "-" + lauf.dokumentId().toString().substring(0, 8);
         String pfad = stand.seiten().stream().anyMatch(seite -> seite.pfad().equals(basisPfad))
                 ? basisPfad + "-2" : basisPfad;
@@ -689,9 +773,26 @@ public class WissenIngestVerarbeiten {
                 inhalt.tags(), Wissensseite.Status.AKTIV, null, quellen, vertraulichkeit(stand.quellStufe()),
                 text.toString(), 1, "KI:" + lauf.modell(), Instant.now(), null, null, false, false,
                 lauf.dokumentId());
-        return new SeitenVorschlag(fortschritt.vorschlaege().size() + 1, "NEU", null, pfad, null, daten,
+        return new SeitenVorschlag(nummer, "NEU", null, pfad, null, daten,
                 "Zusammenfassung der Wissensquelle", List.of(), List.of(), List.of(), List.of(),
                 stand.quellStufe().name());
+    }
+
+    /** Zeilen «- Text [^schlüssel]» im Abschnitt «## Kernaussagen» einer bestehenden Quelle-Seite. */
+    private static Map<String, String> kernaussageZeilen(String inhalt) {
+        Map<String, String> zeilen = new HashMap<>();
+        boolean imAbschnitt = false;
+        for (String zeile : (inhalt == null ? "" : inhalt).split("\\R")) {
+            if (zeile.startsWith("## ")) {
+                imAbschnitt = "## Kernaussagen".equals(zeile.strip());
+                continue;
+            }
+            java.util.regex.Matcher treffer = KERNAUSSAGE_ZEILE.matcher(zeile);
+            if (imAbschnitt && treffer.matches()) {
+                zeilen.putIfAbsent(treffer.group(1), zeile);
+            }
+        }
+        return zeilen;
     }
 
     private SeitenVorschlag blockierterVorschlag(Planung plan, int nummer, WissenIngestSpeichern.Stand stand,
@@ -787,7 +888,7 @@ public class WissenIngestVerarbeiten {
     }
 
     private static long begrenzt(Integer wert, long standard) {
-        return Math.min(wert == null ? standard : Integer.toUnsignedLong(wert), Integer.MAX_VALUE);
+        return Math.min(wert == null || wert <= 0 ? standard : wert, Integer.MAX_VALUE);
     }
 
     private static long addiere(long a, long b) {
