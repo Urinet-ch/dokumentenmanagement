@@ -23,10 +23,10 @@ class VhfGskDokumentartSeedTest {
 
         JsonNode arten = seed.path("dokumentarten");
         JsonNode hinweise = seed.path("_hinweise");
-        assertThat(arten).hasSize(7);
+        assertThat(arten).hasSize(8);
         assertThat(arten).extracting(art -> art.path("code").asText())
                 .containsExactlyInAnyOrder("BULLETIN", "NORM_RICHTLINIE", "VORSTANDSPROTOKOLL", "MERKBLATT",
-                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT");
+                        "FORMULAR", "SONSTIGES", "JAHRESBERICHT", "WISSENSQUELLE");
 
         assertThat(hinweise.path("verband").path("mehrfach").asBoolean()).isTrue();
         assertThat(hinweise.path("verband").path("suchfilter").asBoolean()).isTrue();
@@ -65,6 +65,33 @@ class VhfGskDokumentartSeedTest {
         assertThat(bulletin.has("fachgebiet")).isTrue();
         assertThat(finde(arten, "JAHRESBERICHT").path("zusatz_schema").path("properties").has("jahr")).isTrue();
         assertThat(finde(arten, "VORSTANDSPROTOKOLL").path("vertraulichkeit").asText()).isEqualTo("INTERN");
+    }
+
+    // Spec 04, Req 1.1: in vhf-gsk trägt WISSENSQUELLE zusätzlich die reservierten Felder zugriff und veroeffentlicht
+    @Test
+    void wissensquelleHaeltDieFestenEigenschaftenUndGleichtDemTestSeed() throws IOException {
+        JsonNode art = finde(lesen("src/main/resources/seed/vhf-gsk/dokumentarten.json").path("dokumentarten"),
+                "WISSENSQUELLE");
+
+        assertThat(texte(art.path("gruppen"))).containsExactly("frei");
+        assertThat(texte(art.path("pflichtfelder"))).contains("titel", "datum");
+        assertThat(art.path("aufbewahrung_jahre").isNull()).isTrue();
+        assertThat(art.path("gesetzliche_pflicht").asBoolean()).isFalse();
+        assertThat(art.path("ki_vorschlag").isBoolean()).isTrue();
+        assertThat(art.path("ki_vorschlag").asBoolean()).isFalse();
+        assertThat(art.path("zusatz_schema").path("properties").has("herausgeber")).isTrue();
+        assertThat(art.path("zusatz_schema").path("additionalProperties").asBoolean(true)).isFalse();
+
+        // Der Test-Seed überdeckt den echten auf dem Klassenpfad; die Art muss dort gleich lauten.
+        JsonNode test = finde(lesen("src/test/resources/seed/vhf-gsk/dokumentarten.json").path("dokumentarten"),
+                "WISSENSQUELLE");
+        assertThat(test).isEqualTo(art);
+    }
+
+    private static JsonNode lesen(String pfad) throws IOException {
+        try (var inhalt = Files.newInputStream(Path.of(pfad))) {
+            return new ObjectMapper().readTree(inhalt);
+        }
     }
 
     private static List<String> texte(JsonNode werte) {

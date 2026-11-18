@@ -23,6 +23,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - Art nicht in der Artenliste des KI-Vorschlags (Test: Prompt aus Spec 01 unverändert); Szenarien: Art im Eingangskorb von Hand gewählt, Upload bis `ARCHIVIERT` ohne Sperre, Datei im Manifest, Titel aus `dokument.titel`, Jahresexport ohne Wissensquelle
   - Satz zu GeBüV in der Verfahrensbeschreibung (Nachweis Dokument, zusammen mit der Folgeänderung zu Spec 01, 16.6)
   - Spec 05 ergänzt: Die Ergänzung für `vhf-gsk` (`zugriff`, `veroeffentlicht`) kommt aus der Konfiguration von `vhf-gsk`, nicht aus dem Seed-Teil; `WISSENSQUELLE` trägt fest `ki_vorschlag = nein` (Spec 05, Req 2.6; Aufgabe 17.3)
+  - Teil erledigt (PR #297): Seed-Teil, Art in `seed/vhf-gsk/dokumentarten.json` mit `zugriff` und `veroeffentlicht`, Prüfung der festen Eigenschaften beim Anlegen, Changeset `044-wissensquelle-bestand` für bestehende Mandanten, Archivierung ohne Sperre, Manifest, Jahresexport ohne Wissensquelle, Verfahrensbeschreibung (Req 1.1–1.3, 1.5, 1.6; design.md, «Umsetzung 13.2»). Offen: Req 1.4, nachgewiesen erst mit Ingest, Freigabe und Lint (14.x)
   - _Anforderungen: 1.1–1.6_
   - _Abhängig von: Spec 01: Feld `dokument.titel` (vorhanden, Requirement 7.2)_
 
