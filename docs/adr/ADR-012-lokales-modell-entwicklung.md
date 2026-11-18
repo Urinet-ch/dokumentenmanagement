@@ -140,6 +140,15 @@ Profil `lokal`).
   [offen: lokales Modell für die Erfassung – Entscheid vor Welle 3]
 - Punkt 8 («Kein Nachweis») gilt unverändert: Das lokale Modell ersetzt keinen Golden-Lauf gegen Infomaniak.
 
+## Nachtrag 18.11.2026 (Ergebnis darf als Wissenspaket ins produktive Archiv)
+Spec 04, Requirement 19 (entschieden von Fabian am 18.11.2026): Das Ergebnis von Ingest und Lint im Profil `lokal` darf als
+OKF-Export in Form eines Wissenspakets ins produktive Archiv importiert werden, ausschliesslich als Entwurf mit Anlass
+`IMPORT`, ohne KI-Aufruf im Archiv und mit Freigabe je Änderung durch einen Menschen mit Recht A17.
+- Punkt 3 («Erlaubt») und Punkt 8 («Kein Nachweis») gelten unverändert: Die Daten bleiben auf dem Entwicklerrechner, das Archiv
+  ruft kein lokales Modell auf, und die lokale Fassung gilt erst als Wissen, wenn der Freigeber sie im produktiven Archiv
+  angenommen hat. Das Profil bleibt für Produktion, Stufe A und B und Abnahmen ausgeschlossen (Punkt 4).
+- Ein lokales Modell darf dabei Quellen jeder Stufe ausser `PERSONAL` und ausser Personendaten sehen (Spec 04, 19.24).
+
 ## Verweise
 - Req 0.2, 0.3, 0.8, 7.3, 16.7, 16.14, 16.20–16.22; P19
 - tech.md Regel 6 und «Infomaniak AI Services»; design.md «KI», Abschnitt «Profil `lokal`»
