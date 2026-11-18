@@ -28,7 +28,6 @@ import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.InjectableInstance;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -66,7 +65,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Lokaler Restore-Roundtrip mit synthetischen DB-Zeilen und getrennten MinIO-Quell- und Ziel-Buckets. */
 @QuarkusTest
-@Tag("start-2")
 class SicherungRestoreUebungTest {
 
     private static final String QUELL_PRAEFIX = "restore-source-";
