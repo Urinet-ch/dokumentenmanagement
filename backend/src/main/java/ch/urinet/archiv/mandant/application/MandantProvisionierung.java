@@ -65,6 +65,7 @@ public class MandantProvisionierung {
         seedPruefung.pruefen(mandantCode, arten);
         datenbank.schemaAnlegen(mandantCode.schema());
         datenbank.dokumentartenEinspielen(mandantCode.schema(), arten);
+        datenbank.regelnEinspielen(mandantCode.schema());
         schemaPruefung.pruefen(mandantCode.schema());
         bucket.einrichten(bucketName);
         Mandant mandant = new Mandant(mandantCode, name == null || name.isBlank() ? code : name,

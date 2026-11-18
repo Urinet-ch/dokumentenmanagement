@@ -221,13 +221,13 @@ Rollen nach Rechtematrix (Req 2.6); `inhaber` und `geschaeftsstelle` haben A1–
 | Methode | Pfad | Zweck und Antworten | Recht |
 | --- | --- | --- | --- |
 | POST | `/dokumente` | Upload (siehe unten) → 202 mit Ergebnis je Datei; 400, 413, 415, 422, 503 | A1; Token `import` |
-| POST | `/dokumente/generator` | PDF + `metadaten` (JSON) → 202, 200 (gleiche SHA-256), 409 `BELEGNUMMER_VERGEBEN`, 422 | Token `generator` |
+| POST | `/dokumente/generator` | PDF + `metadaten` (JSON) → 202, 200 (gleiche SHA-256) mit `warnungen` (u. a. Regeln mit Schwere `WARNUNG`, Spec 05, Req 5.2), 409 `BELEGNUMMER_VERGEBEN`, 422 (auch `REGEL_VERLETZT` mit `regeln`) | Token `generator` |
 | GET | `/dokumente` | Suche/Liste mit Filtern (Req 14), nur sichtbare | A2–A4 |
 | GET | `/dokumente/{id}` | Metadaten, Status, Versionen, Warnungen; `ETag`; 404 | A2–A4 |
 | GET | `/dokumente/{id}/datei?variante=pdfa\|original\|arbeitsfassung&nr=&ansicht=download\|vorschau` | 302 auf vorsignierte URL der gespeicherten Versions-ID (5 Min.); mit `Accept: application/json` 200 `{url, gueltigBis}` (Aufgabe 4.6) | A2–A4 |
 | GET | `/dokumente/{id}/vorschau?seite=1` | PNG-Vorschau (im Worker erzeugt) | A2–A4 |
-| PATCH | `/dokumente/{id}` | Metadaten ändern; bei `ARCHIVIERT` `grund` Pflicht; 412, 428, 422 `ZUSATZ_UNGUELTIG` | A6 (Vertraulichkeit A8) |
-| POST | `/dokumente/{id}/bestaetigen` | bestätigte Metadaten inkl. Vertraulichkeit → 202 mit `DokumentDto` (ETag = `version`), Status `ARCHIVIERUNG`; 409 `STATUS_KONFLIKT` (nicht `EINGANGSKORB`), `BELEGNUMMER_VERGEBEN`, `FRIST_ABGELAUFEN`; 422 `PFLICHTFELD_FEHLT`; 412, 428 | A7 (+A8) |
+| PATCH | `/dokumente/{id}` | Metadaten ändern; bei `ARCHIVIERT` `grund` Pflicht; 412, 428, 422 `ZUSATZ_UNGUELTIG`, `REGEL_VERLETZT` mit `regeln` (Spec 05, Req 5.2; eine schon bestehende Verletzung ohne geänderte Regelfelder nur als Warnung, Req 5.3) | A6 (Vertraulichkeit A8) |
+| POST | `/dokumente/{id}/bestaetigen` | bestätigte Metadaten inkl. Vertraulichkeit → 202 mit `DokumentDto` (ETag = `version`), Status `ARCHIVIERUNG`; 409 `STATUS_KONFLIKT` (nicht `EINGANGSKORB`), `BELEGNUMMER_VERGEBEN`, `FRIST_ABGELAUFEN`; 422 `PFLICHTFELD_FEHLT`, `REGEL_VERLETZT` mit `regeln`; 412, 428 | A7 (+A8) |
 | POST | `/dokumente/{id}/verwerfen` | `{grund}` → 204; 409 bei `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER`, `ARCHIVIERT`; 412, 428 | A9 |
 | POST | `/dokumente/{id}/wiederholen` | `FEHLER` → `NEU`, `ARCHIVIERUNG_FEHLER` → `ARCHIVIERUNG` → 202; sonst 409; 412, 428 | A10 |
 | GET | `/eingangskorb` | Status `EINGANGSKORB`, `FEHLER`, `ARCHIVIERUNG_FEHLER`, neueste zuerst | A5 |
@@ -1760,6 +1760,7 @@ Mitarbeiters, nie der Benutzername (Abschnitt «Umsetzung (Aufgabe 1.4)»; geän
 | 422 | `ZUSATZ_UNGUELTIG` | Zusatzfelder oder Schema ungültig (Req 9.5) |
 | 422 | `KONFIGURATION_UNGUELTIG` | Abbild der Mandantenkonfiguration ist ungültig (Spec 05, Req 1.5) |
 | 422 | `KLASSIFIKATION_UNGUELTIG` | Klassifikationswerte am Dokument passen nicht zur Art (Spec 05, Req 3.5) |
+| 422 | `REGEL_VERLETZT` | Dokumentregel verletzt; mit Codes und Meldungen der Regeln in `regeln` (Spec 05, Req 5.2) |
 | 422 | `CSV_UNGUELTIG`, `CSV_LEER` | Req 13.10, 13.11 |
 | 422 | `KEINE_WISSENSQUELLE` | Ingest für ein Dokument einer anderen Art als `WISSENSQUELLE` (Spec 04, Req 5.7) |
 | 422 | `ENTWURF_BEFUND` | Änderung der Wissensbasis mit Befund, mit Liste der Befund-Codes (Spec 04, Req 6.3) |

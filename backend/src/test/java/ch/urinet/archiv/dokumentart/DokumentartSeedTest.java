@@ -48,7 +48,7 @@ class DokumentartSeedTest {
 
         assertThat(arten.get("AUSGANGSRECHNUNG").path("selbst_ausgestellt").asBoolean()).isTrue();
         assertThat(texte(arten.get("AUSGANGSRECHNUNG").path("belegnummer_muster")))
-                .containsExactly("^\\d{4}-\\d{3}$", "^R\\d{4}$");
+                .containsExactly("^(?<jahr>\\d{4})-(?<nr>\\d{3})$", "^R(?<nr>\\d{4})$");
         assertThat(arten.get("AUSGANGSRECHNUNG").path("fremdbeleg_art").asText()).isEqualTo("LIEFERANTENBELEG");
         assertThat(arten.get("OFFERTE").path("selbst_ausgestellt").asBoolean()).isTrue();
         assertThat(texte(arten.get("OFFERTE").path("belegnummer_muster"))).containsExactly("^O-\\d{4}-\\d{3}$");

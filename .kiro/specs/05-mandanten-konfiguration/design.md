@@ -216,15 +216,50 @@ Beispiel (nur das Format; die Werte für `vhf-gsk` legt Spec 03 fest):
 | `PFLICHT_WENN` | `wenn: {feld, gleich}`, `dann: [feld…]` | Hat `wenn.feld` den Wert `gleich` (bei Klassifikationen: enthält), müssen alle `dann`-Felder gesetzt sein | Bestätigen, Generator, Import, Änderung |
 | `EINDEUTIG` | `felder: [feld…]`, optional `ueberAlleArten` | Kein zweites bestätigtes Dokument mit gleichen Werten in allen Feldern (Req 5.1) | wie oben |
 | `FOLGE` | `feld` (ganzzahlig) oder `muster: true` (Gruppe `nr` des Belegnummer-Musters), `zeitraum`: `GESCHAEFTSJAHR`, `{feld}` (ganzzahliges Jahresfeld) oder `GESAMT`, `beginn` (Standard 1) | Fehlende Nummern zwischen `beginn` und dem Höchstwert je Zeitraum | Lückenbericht |
-| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art) | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art | Lückenbericht |
+| `ERWARTET` | `je: MONAT` oder `JAHR`, `datum`: `BELEGDATUM` oder ein Datumsfeld, optional `ab` (sonst ab dem ersten bestätigten Dokument der Art), `nurMonat`: `zusatz.<feld>` im Format `JJJJ-MM`, optional `gruppe` (nur `je: MONAT`): `PARTNER` oder `zusatz.<feld>` | Zeiträume bis zum letzten abgeschlossenen ohne Dokument der Art (bei `gruppe` je Gruppe) | Lückenbericht |
 
 Grundmenge von `FOLGE` und `ERWARTET` sind die bestätigten Dokumente; der Bericht im Importlauf nach Spec 03, 4.2
 zählt serverseitig zusätzlich die Dokumente dieses Laufs im Eingangskorb.
+Die `FOLGE`-Auswertung verarbeitet insgesamt höchstens 10'000 Belegnummern pro Bericht und prüft je Regel innerhalb
+von `archiv.dokumentart.muster-zeitgrenze`; Belegnummern über 64 Zeichen gelten als ausserhalb des Musters. Bei
+überschrittener Grenze bricht das Werkzeug ab, statt einen unvollständigen Bericht als vollständig auszugeben.
+
+`nurMonat` schliesst Dokumente aus, deren Zusatzfeld nicht dem Format `JJJJ-MM` entspricht. Ohne `gruppe` gibt es eine
+Monatsreihe je Dokumentart; mit `gruppe` eine Reihe je Partner bzw. je Wert des Zusatzfelds (Gross-/Kleinschreibung und
+Leerzeichen am Rand gleich), jede ab ihrem ersten Dokument, wie in Spec 02 design.md (Aufgabe 7.1c) für den Übergang
+festgelegt (Umsetzung 17.6, Nachbesserung Review PR #304: ohne `gruppe` gingen Lücken einer Person oder eines Kontos
+unter, sobald eine andere den Monat abdeckte). Den Bericht sehen nur Rollen, die A3 und A4 voll sehen (Req 5.4).
+`ab` setzt den Beginn auch dann, wenn schon frühere Dokumente vorliegen. `je: JAHR` ordnet die Dokumente nach dem Tag
+des Bezugs dem Geschäftsjahr zu (Geschäftsjahresende der Einstellungen) und prüft nur abgeschlossene Geschäftsjahre.
 
 Für `urinet` schreibt der Seed die Lücken aus Spec 02 design.md (`vollstaendigkeit`) als Regeln: `FOLGE` mit
 `muster: true` auf `AUSGANGSRECHNUNG` (Muster `^(?<jahr>\d{4})-(?<nr>\d{3})$`, Zeitraum `GESCHAEFTSJAHR`) sowie
-`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`) und `BANK` (`datum: zusatz.periode_bis`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
+`ERWARTET` je Monat ohne `ab` für `LOHNABRECHNUNG` (`datum: BELEGDATUM`, `nurMonat: zusatz.periode`,
+`gruppe: zusatz.person`) und `BANK` (`datum: zusatz.periode_bis`, `gruppe: PARTNER`). Die Belegnummer-Eindeutigkeit eigener Arten bleibt
 die Tabelle `belegnummer_eigen` (Spec 01, 8.9), jetzt über `selbst_ausgestellt`.
+
+Umsetzung 17.6 (Nachbesserung Review PR #304):
+- Grundmenge von `EINDEUTIG`: Dokumente mit `bestaetigt` im Status `ARCHIVIERUNG`, `ARCHIVIERUNG_FEHLER` oder
+  `ARCHIVIERT`, dazu Generator-Dokumente (`quelle = GENERATOR`) schon in `NEU`, `VERARBEITUNG` und `FEHLER`. Der
+  Generator setzt `bestaetigt` bei der Annahme, archiviert aber erst im Worker; ohne diese Erweiterung kämen zwei
+  gleiche Aufrufe vor dem Worker beide durch (auch «Wiederholen» kann ein Dokument in `FEHLER` noch archivieren).
+  Die Erweiterung geht über die Statusliste in Req 5.1 hinaus (im PR unter «Offen für Fabian»).
+- Schreibpfade (Bestätigen, Ändern, Generator, Drive-Import) nehmen je Mandant, Art, Feldern und Werten eine
+  Advisory-Sperre der Transaktion, damit zwei gleichzeitige Vorgänge nicht beide durchkommen. Der Lesepfad
+  (Warnungen im Eingangskorb und in der Einzelansicht) prüft ohne Sperre und lädt die Regeln einmal je Seite.
+- Vor der Prüfung setzt das Archiv dieselben Standardwerte wie beim Speichern (Vertraulichkeit der Art, Währung `CHF`
+  bei Finanzarten), damit `PFLICHT_WENN` auf diese Felder nicht am fehlenden Wert scheitert.
+- `PFLICHT_WENN` vergleicht Zahlen nach Wert (`1` = `1.0`); ein leeres `dann` ist ungültig. Mehrfachwerte (`tags`,
+  Klassifikationen) werden nach Codepoints sortiert verglichen, wie `collate "C"` in der Datenbank.
+- Eine `EINDEUTIG`-Warnung im Lesepfad zeigt ohne ID und Werte, dass ein weiteres bestätigtes Dokument mit gleichen
+  Werten existiert, auch wenn der Leser es nicht sieht. Das ist bewusst so und entspricht dem Schreibpfad (HTTP 422
+  nennt dieselbe Tatsache) und Spec 01, 2.3 bei `BELEGNUMMER_BEKANNT`; Req 5.2 verlangt nur, keine IDs und Werte zu
+  nennen.
+- `FOLGE` mit `muster: true` nimmt das erste Belegnummer-Muster der Art mit einer Gruppe `nr`.
+- Rollback auf das Vorgänger-Release: Es kennt `regeln` in der Konfigurationsversion nicht und schreibt bei einer
+  Konfigurationsänderung eine Version ohne Regeln. Nach dem erneuten Wechsel gelten die Regeln erst wieder mit der
+  nächsten Konfigurationsänderung (das Abbild liest sie aus der Tabelle `regel`, die erhalten bleibt); es gehen keine
+  Daten verloren, und die Seed-Regeln von `urinet` haben nur Schwere `WARNUNG`.
 
 ## Data Models (neu, `db/mandant`)
 Changeset-Nummern: die nächste freie Nummer in `db/mandant/changesets/` zum Zeitpunkt der Aufgabe; unten nur die

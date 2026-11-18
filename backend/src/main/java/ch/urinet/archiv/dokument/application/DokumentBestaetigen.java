@@ -19,6 +19,7 @@ import ch.urinet.archiv.ki.application.KorrekturLernen;
 import ch.urinet.archiv.kontakt.application.KontaktRegister;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
 import ch.urinet.archiv.konfiguration.application.KlassifikationVerwaltung;
+import ch.urinet.archiv.konfiguration.application.RegelPruefung;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -73,11 +74,13 @@ public class DokumentBestaetigen {
     private final AuftragService auftraege;
     private final KorrekturLernen lernen;
     private final KlassifikationVerwaltung klassifikationen;
+    private final RegelPruefung regelPruefung;
 
     public DokumentBestaetigen(DokumentRepository repository, DokumentStatusPort status, FristKennzeichen frist,
                                DokumentartVerwaltung arten, KontaktRegister kontakte, MandantAufloesung aufloesung,
                                MandantEinstellungen einstellungen, AuftragService auftraege,
-                               KorrekturLernen lernen, KlassifikationVerwaltung klassifikationen) {
+                               KorrekturLernen lernen, KlassifikationVerwaltung klassifikationen,
+                               RegelPruefung regelPruefung) {
         this.repository = repository;
         this.status = status;
         this.frist = frist;
@@ -88,6 +91,7 @@ public class DokumentBestaetigen {
         this.auftraege = auftraege;
         this.lernen = lernen;
         this.klassifikationen = klassifikationen;
+        this.regelPruefung = regelPruefung;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -145,6 +149,8 @@ public class DokumentBestaetigen {
                         : Optional.empty(),
                 vertrag ? Optional.of(new Vertrag(b.gueltigAb(), b.gueltigBis(), b.kuendigungsfrist(),
                         b.naechsteFrist())) : Optional.empty(), b.klassifikationen());
+        regelPruefung.pruefen(art.code(), RegelMetadaten.aus(b, art.vertraulichkeit().name(), finanz,
+                regelPruefung.zusatzWerte(dokument.zusatz())), null, id);
         Optional<KiBeispielPort.Lernstand> vorher = lernen.vorher(id);
         if (!status.bestaetigen(id, erwarteteVersion, daten)) {
             // inzwischen geändert: zuerst die Version, dann der Status (wie oben)
