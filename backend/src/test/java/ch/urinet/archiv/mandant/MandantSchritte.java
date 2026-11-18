@@ -1,5 +1,6 @@
 package ch.urinet.archiv.mandant;
 
+import ch.urinet.archiv.mandant.adapter.out.seed.KlassenpfadWissensquelleSeed;
 import ch.urinet.archiv.mandant.application.MandantFehler;
 import ch.urinet.archiv.mandant.application.MandantMigration;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
@@ -139,13 +140,17 @@ public class MandantSchritte {
                 || (aws.isArray() && aws.size() == 1 && "*".equals(aws.get(0).asText()));
     }
 
-    @Dann("enthält das Schema «{word}» genau die Dokumentarten aus «{word}»")
+    @Dann("enthält das Schema «{word}» genau die Dokumentarten aus «{word}» und den Seed-Teil der Wissensquelle")
     public void seedEingespielt(String schema, String seed) throws IOException, SQLException {
         List<String> erwartet = new ArrayList<>();
         try (InputStream inhalt = getClass().getClassLoader().getResourceAsStream(seed)) {
             json.readTree(inhalt).path("dokumentarten").forEach(a -> erwartet.add(a.path("code").asText()));
         }
         assertThat(erwartet).hasSize(11);
+        String wissensquelle = new KlassenpfadWissensquelleSeed(json).lesen().code();
+        if (!erwartet.contains(wissensquelle)) {
+            erwartet.add(wissensquelle);
+        }
         assertThat(werte("select code from " + schema + ".dokumentart")).containsExactlyInAnyOrderElementsOf(erwartet);
         assertThat(werte("select vertraulichkeit || '/' || gesetzliche_pflicht from " + schema
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");

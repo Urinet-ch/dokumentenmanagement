@@ -33,7 +33,8 @@ public class DokumentartSchritte {
         List<StammdatenTabelle.Art> arten = new ArrayList<>();
         try (Connection verbindung = datenbank.get().getConnection(); Statement abfrage = verbindung.createStatement();
              ResultSet zeilen = abfrage.executeQuery("select code, name, gruppen, pflichtfelder, vertraulichkeit, "
-                     + "aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung from " + schema + ".dokumentart")) {
+                     + "aufbewahrung_jahre, aufbewahrung_ab, gesetzliche_pflicht, aktiv, beschreibung from " + schema
+                     + ".dokumentart where code <> 'WISSENSQUELLE'")) {
             while (zeilen.next()) {
                 arten.add(new StammdatenTabelle.Art(zeilen.getString("code"), zeilen.getString("name"),
                         texte(zeilen.getArray("gruppen")), texte(zeilen.getArray("pflichtfelder")),

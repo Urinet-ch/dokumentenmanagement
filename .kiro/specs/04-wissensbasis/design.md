@@ -352,6 +352,17 @@ die Pflichtfelder `titel` und `datum`, «unbefristet», `gesetzliche_pflicht = n
 jeder Konfiguration fest. Zusatzfelder (auch als Pflicht, z. B. `zusatz.zugriff`) und Klassifikationen darf ein
 Mandant ergänzen.
 
+**Umsetzung 13.2 (PR #297):** Bis Spec 05, Aufgabe 17.7 ist `seed/vhf-gsk/dokumentarten.json` die Konfiguration von
+`vhf-gsk`; dort steht `WISSENSQUELLE` mit `herausgeber`, `zugriff` (Pflicht, Standard `mitglieder`), `veroeffentlicht`
+(Pflicht, Standard `false`) und wie alle Arten des Mandanten mit `verband` (Spec 03, 1.6), darum legt der Seed-Teil sie
+dort nicht an. `SeedPruefung` lehnt beim Anlegen eines Mandanten eine `WISSENSQUELLE` aus dem Seed des Mandanten ab,
+die von den festen Eigenschaften abweicht (`SEED_UNGUELTIG`; gleiche Regel wie `WISSENSQUELLE_UNGUELTIG` der
+Konfiguration). Mandanten, die vor 13.2 angelegt wurden, erhalten die Art über das Changeset
+`044-wissensquelle-bestand` mit denselben Werten wie aus dem Seed (in `m_vhf_gsk` mit den Feldern oben) und eine neue
+Version der Konfiguration (`MIGRATION`); ein neues Schema hat beim Migrieren noch keine Arten und übergeht es
+(`MARK_RAN`). Der Jahresexport schliesst nur `WISSENSQUELLE` aus (`art is distinct from`), Dokumente ohne Art bleiben
+wie bisher drin. Req 1.4 weisen erst Ingest, Freigabe und Lint nach (14.x).
+
 | Code | Name | Gruppen | Pflichtfelder | Zusatz | Vertraulichkeit | Aufbewahrung | `gesetzliche_pflicht` |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `WISSENSQUELLE` | Wissensquelle | `frei` | `titel`, `datum` | `herausgeber` (Text, optional) | `NORMAL` | unbefristet | nein |
