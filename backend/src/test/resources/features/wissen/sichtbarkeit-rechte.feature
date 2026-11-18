@@ -56,3 +56,9 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
   Szenario: Eine Seite mit gespeicherter wirksamer Vertraulichkeit INTERN ist nur für Rollen mit Recht A3 sichtbar
     Wenn eine Seite mit Mindeststufe NORMAL, normaler Hülle und gespeicherter Vertraulichkeit INTERN gelesen wird
     Dann sehen nur die Rollen mit Recht A3 die intern gespeicherte Seite, einzeln und in der Liste
+
+  @req-3.1 @req-3.2 @req-3.3 @req-3.4 @req-3.6 @req-3.8 @req-4.4 @req-4.5 @req-14.2 @req-14.4 @req-14.5 @req-14.6
+  Szenario: Leseendpunkte filtern Index, Seiten, Versionen, Links und Log nach Sichtbarkeit
+    Angenommen synthetische Wissensleseproben sind angelegt
+    Wenn «mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft
+    Dann verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten

@@ -48,7 +48,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Abhängig von: 13.3_
   - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) liegt in `WissensPruefung` (13.4), die wirksame Stufe nach Annahme in `WissensGraph.wirksameStufeNachAnnahme` (13.5), der Aufruf bei jedem Annehmen kommt mit 14.2. Eine Übersicht erhält bei einer Dokumentänderung die wirksame Stufe (11.9, entschieden von Fabian am 18.11.2026). Der Nachweis von 12.2/12.3 über einen Endpunkt folgt mit 13.6 bzw. dem Entwurfszugriff in 14.x.
 
-- [ ] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
+- [x] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
   - Zugriffsprotokoll `WISSEN_ANZEIGEN` und `VERWEIGERT`, ohne Inhalte
   - Sichtbarkeit als SQL-Prädikat an den Abfragen von `wissensseite` (Zähler und Paging verraten nichts); ersetzt den Java-Filter aus 13.5 (design.md, «Umsetzung 13.5»), inkl. fail-closed bei Quellen ohne gespeicherte Hülle und bei live erreichbaren Dokumenten ausserhalb der gespeicherten Hülle (Review PR #300, ebc9d0b6, S2)
