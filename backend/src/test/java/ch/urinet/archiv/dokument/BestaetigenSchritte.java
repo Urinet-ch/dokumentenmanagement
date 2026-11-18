@@ -585,6 +585,27 @@ public class BestaetigenSchritte {
         assertThat(spalte(ort(name), "status")).isEqualTo(status);
     }
 
+    /** Spec 04, Req 5.1: Die Archivierung legt den Ingest-Entwurf in ihrer Transaktion an. */
+    @Dann("hat das Dokument «{word}» einen Ingest-Entwurf im Status «{word}» mit dem Hinweis {string}")
+    public void ingestEntwurf(String name, String status, String hinweis) throws SQLException {
+        Ort ort = ort(name);
+        Map<String, Object> entwurf = zeile("select count(*) as anzahl, max(status) as status, max(hinweis) as hinweis, "
+                + "max(erstellt_von) as von from " + schema(ort.mandant()) + ".wissens_entwurf where dokument_id = ? "
+                + "and anlass = 'INGEST'", ort.id());
+        assertThat(((Number) entwurf.get("anzahl")).intValue()).as("Ingest-Entwürfe").isEqualTo(1);
+        assertThat(entwurf.get("status")).isEqualTo(status);
+        assertThat(entwurf.get("hinweis")).isEqualTo(hinweis);
+        assertThat(entwurf.get("von")).isEqualTo("process:wissen-ingest");
+        assertThat(spalte(ort, "hinweis")).as("dokument.hinweis (Req 1.4)").isNull();
+    }
+
+    @Dann("hat das Dokument «{word}» keinen Ingest-Entwurf")
+    public void keinIngestEntwurf(String name) throws SQLException {
+        Ort ort = ort(name);
+        assertThat(((Number) zeile("select count(*) as anzahl from " + schema(ort.mandant())
+                + ".wissens_entwurf where dokument_id = ?", ort.id()).get("anzahl")).intValue()).isZero();
+    }
+
     /** Spec 02, Req 2.1: Nach der Archivierung hat das Dokument Abschnitte, alle mit Embedding (Aufgabe 6.3). */
     @Dann("hat das archivierte Dokument «{word}» Abschnitte mit Embedding")
     public void abschnitteMitEmbedding(String name) throws SQLException {

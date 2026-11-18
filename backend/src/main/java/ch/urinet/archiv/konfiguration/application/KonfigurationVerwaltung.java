@@ -141,7 +141,7 @@ public class KonfigurationVerwaltung implements KonfigurationVersionsPort, Konfi
     /**
      * Die Typen der Zusatzfelder gehören nicht ins gespeicherte Abbild; sie werden beim Lesen aus dem Zusatz-Schema
      * abgeleitet, damit Abbilder aus Migration und App gleich sind und Regeln mit {@code zusatz.} prüfbar bleiben.
-     * Ein Abbild ohne {@code kiTexte} (vor Changeset 047 oder von einem älteren Release) erhält die KI-Texte aus
+     * Ein Abbild ohne {@code kiTexte} (vor Changeset 048 oder von einem älteren Release) erhält die KI-Texte aus
      * {@code ki_texte}; sonst gälte die KI als nicht freigegeben und Export und Protokoll zeigten falsche Werte
      * (Req 6.6, 8.4).
      */

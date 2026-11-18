@@ -36,10 +36,12 @@ public enum Aktion {
     }
 
     /**
-     * A2–A10 betreffen ein einzelnes Dokument: Endpunkte mit {@code {id}} prüfen zuerst die Sichtbarkeit (404), dann
-     * das Recht (403); {@code @RolesAllowed} lässt darum alle Archiv-Rollen zu (Req 2.6, ADR-009 Entscheid 7).
+     * A2–A10 und A16 (Ingest einer Wissensquelle, Spec 04, Req 12.1) betreffen ein einzelnes Dokument: Endpunkte mit
+     * {@code {id}} prüfen zuerst die Sichtbarkeit (404), dann das Recht (403); {@code @RolesAllowed} lässt darum alle
+     * Archiv-Rollen zu (Req 2.6, ADR-009 Entscheid 7). Ein A16-Endpunkt, dessen {@code {id}} kein Dokument ist, trägt
+     * {@code @NichtDokumentbezogen}.
      */
     public boolean dokumentbezogen() {
-        return compareTo(A2) >= 0 && compareTo(A10) <= 0;
+        return (compareTo(A2) >= 0 && compareTo(A10) <= 0) || this == A16;
     }
 }

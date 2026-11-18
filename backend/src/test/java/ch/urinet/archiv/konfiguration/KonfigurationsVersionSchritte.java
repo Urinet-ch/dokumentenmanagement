@@ -369,7 +369,7 @@ public class KonfigurationsVersionSchritte {
         }
     }
 
-    /** Wie ein Abbild vor Changeset 047 oder von einem älteren Release: ohne {@code kiTexte} (Req 6.6, 8.4). */
+    /** Wie ein Abbild vor Changeset 048 oder von einem älteren Release: ohne {@code kiTexte} (Req 6.6, 8.4). */
     @Angenommen("die letzte Konfigurationsversion von «{word}» enthält keine KI-Texte")
     public void versionOhneKiTexte(String mandant) throws SQLException {
         String schema = new MandantCode(mandant).schema();

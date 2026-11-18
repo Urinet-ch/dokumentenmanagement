@@ -3,7 +3,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="047-ki-texte" author="archiv">
+    <changeSet id="048-ki-texte" author="archiv">
         <createTable tableName="ki_texte">
             <column name="id" type="integer">
                 <constraints primaryKey="true" nullable="false"/>
@@ -27,9 +27,9 @@
             insert into ki_texte (id, rolle, feldregeln, ki_freigegeben) values (1, '', '', current_schema() = 'm_urinet');
         </sql>
     </changeSet>
-    <!-- Abbilder vor 047 kennen kiTexte nicht; ohne diese Version gälte die KI beim Einspielen einer Datei als
+    <!-- Abbilder vor 048 kennen kiTexte nicht; ohne diese Version gälte die KI beim Einspielen einer Datei als
          nicht freigegeben (Req 6.6, 8.4). Frisch angelegte Mandanten (noch ohne Arten) erhalten sie mit dem Seed. -->
-    <changeSet id="047-ki-texte-version" author="archiv">
+    <changeSet id="048-ki-texte-version" author="archiv">
         <sql>
             with aktuelle as (
                 select inhalt from konfiguration_version order by version desc limit 1

@@ -52,7 +52,7 @@ public record Konfiguration(int version, Einstellungen einstellungen, List<Art> 
     }
 
     /**
-     * {@code true}, wenn das Abbild keine KI-Texte enthielt (gespeichert vor Changeset 047): Der Konstruktor ersetzt
+     * {@code true}, wenn das Abbild keine KI-Texte enthielt (gespeichert vor Changeset 048): Der Konstruktor ersetzt
      * {@code null} durch genau die Instanz {@link KiTexte#LEER}, gelesene oder gebaute KI-Texte sind eigene Instanzen.
      */
     public boolean ohneKiTexte() {
