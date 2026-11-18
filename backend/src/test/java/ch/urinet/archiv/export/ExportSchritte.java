@@ -120,6 +120,11 @@ public class ExportSchritte {
         zip = null;
     }
 
+    @After("@spec-04 and @req-1.6")
+    public void wissensquelleAufraeumen() throws SQLException {
+        aufraeumen();
+    }
+
     @Angenommen("im Mandanten «{word}» gibt es keinen offenen Export")
     public void keinOffenerExport(String mandant) throws SQLException {
         ausfuehren("delete from " + schema(mandant) + ".export");
@@ -150,8 +155,11 @@ public class ExportSchritte {
                         + "s3_version, mime, groesse) values (?, 1, 'ORIGINAL', ?, ?, ?, 'application/pdf', ?)",
                         id, sha, schluessel, version, (long) inhalt.length);
             }
-            ausfuehren("insert into " + s + ".dokument_finanz (dokument_id, belegnummer, richtung, betrag) "
-                    + "values (?, ?, ?, ?)", id, z.get("belegnummer"), z.get("richtung"), new BigDecimal(z.get("betrag")));
+            if (z.get("betrag") != null) {
+                ausfuehren("insert into " + s + ".dokument_finanz (dokument_id, belegnummer, richtung, betrag) "
+                        + "values (?, ?, ?, ?)", id, z.get("belegnummer"), z.get("richtung"),
+                        new BigDecimal(z.get("betrag")));
+            }
             belege.put(name, new Beleg(mandant, id, jahr, schluessel, sha));
         }
     }

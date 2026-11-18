@@ -30,6 +30,10 @@ public class SeedPruefung {
 
     public void pruefen(MandantCode mandant, List<DokumentartVorlage> vorlagen) {
         for (DokumentartVorlage vorlage : vorlagen) {
+            if (!wissensquelleFest(vorlage)) {
+                throw new MandantFehler(MandantFehler.Grund.SEED_UNGUELTIG, "Seed für Mandant " + mandant.wert()
+                        + ": Dokumentart WISSENSQUELLE weicht von den festen Eigenschaften ab");
+            }
             try {
                 pruefung.seedPruefen(art(vorlage));
             } catch (FachFehler e) {
@@ -37,6 +41,21 @@ public class SeedPruefung {
                         + ": Dokumentart " + vorlage.code() + " ist ungültig (" + e.code().name() + ")", e);
             }
         }
+    }
+
+    /**
+     * Feste Eigenschaften von {@code WISSENSQUELLE} in jeder Konfiguration (Spec 04, Req 1.1 und 1.5, ergänzt durch
+     * Spec 05, Req 2.6): Gruppe nur {@code frei}, mindestens die Pflichtfelder {@code titel} und {@code datum},
+     * unbefristet, ohne gesetzliche Pflicht und ohne KI-Vorschlag. Gleiche Regel wie
+     * {@code Konfiguration.wissensquellePruefen}, hier schon beim Anlegen des Mandanten. Andere Arten gelten als fest.
+     */
+    static boolean wissensquelleFest(DokumentartVorlage v) {
+        if (!"WISSENSQUELLE".equals(v.code())) {
+            return true;
+        }
+        return v.gruppen().equals(List.of("frei")) && v.pflichtfelder().containsAll(List.of("titel", "datum"))
+                && v.aufbewahrungJahre() == null && v.aufbewahrungAb() == null && v.aufbewahrungFeld() == null
+                && !v.gesetzlichePflicht() && !v.kiVorschlag();
     }
 
     /** Wie das Repository eine gespeicherte Art liest: ohne Schema gilt {@link Dokumentart#OHNE_ZUSATZ}. */
