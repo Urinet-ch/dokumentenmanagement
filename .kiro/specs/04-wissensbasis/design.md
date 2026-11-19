@@ -840,6 +840,8 @@ design.md); Lebenszeichen, Wiederholung und Aufräumen wie dort:
 
 `ki_verbrauch.zweck` erhält die Werte `WISSEN_INGEST`, `WISSEN_LINT`, `WISSEN_EMBEDDING`.
 
+Nachtrag Spec 06 (18.11.2026, Vorschlag, [offen: Entscheid Fabian im PR von Spec 06]): Die Werte `budget-tokens`, `lint-budget-tokens`, `monatsbudget-tokens` und `lint-zeitplan` je Mandant (A19, `/wissensbasis/einstellungen`) sollen nach der gemeinsamen Mechanik der Konfiguration (Spec 05: Version, `If-Match`, Protokoll `KONFIGURATION_AENDERN`) geführt werden, mit den Grenzen in Spec 06, design.md «Inventar der Einstellungen» (Spec 06, 2.13, Aufgabe 20.3). Bis zum Entscheid gilt diese Spec unverändert.
+
 ### Dokumentart (Seed-Teil dieser Spec)
 `backend/src/main/resources/seed/_alle/dokumentarten-wissen.json`, mandantenunabhängig, eingelesen nach dem Seed des
 Mandanten beim Anlegen jedes Mandanten (Spec 04 ergänzt Spec 01, 1.5 und Spec 03, 1.1) und nur angelegt, wenn der Code

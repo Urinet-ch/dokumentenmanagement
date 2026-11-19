@@ -18,6 +18,8 @@ export MOCK_FAIL_ZUWACHS=0
 export MOCK_FAIL_FESTHALTEN=0
 export MOCK_FAIL_REALM=0
 export MOCK_FAIL_AGE=0
+export MOCK_FAIL_ZUWACHS_MANDANT=
+export MOCK_SCHEMAS=$'m_urinet\nm_vhf_gsk\n'
 export MOCK_EMPTY_BUCKET=0
 export MOCK_HANG_ZUWACHS=0
 export MOCK_STARTED="$temp/gestartet"
@@ -69,6 +71,7 @@ api_befehl() {
             while [[ ! -e $MOCK_RELEASE ]]; do sleep 0.1; done
           fi
           if [[ $MOCK_FAIL_ZUWACHS == 1 ]]; then exit 3; fi
+          if [[ -n $MOCK_FAIL_ZUWACHS_MANDANT && ${3:-} == "$MOCK_FAIL_ZUWACHS_MANDANT" ]]; then exit 3; fi
           [[ ${2:-} == --mandant ]] || exit 1
           if [[ ${4:-} == --inventar-vorher ]]; then
             cat > "$(mktemp "$MOCK_STDIN_DIR/vorher-${3:-}.XXXXXX")"
@@ -106,6 +109,8 @@ case "$subcommand" in
     shift
     if [[ $service == db && ${1:-} == pg_dump ]]; then
       printf 'synthetic-database-dump\n'
+    elif [[ $service == db && ${1:-} == psql ]]; then
+      printf '%s' "$MOCK_SCHEMAS"
     else
       exit 1
     fi
@@ -272,6 +277,8 @@ if grep -q ' exec -T api' "$MOCK_LOG"; then
   exit 1
 fi
 assert grep -q 'sicherung zuwachs --mandant urinet' "$MOCK_LOG"
+assert grep -q 'sicherung inventar --mandant vhf-gsk' "$MOCK_LOG"
+assert grep -q 'sicherung zuwachs --mandant vhf-gsk' "$MOCK_LOG"
 inventar_zeile=$(grep -n 'sicherung inventar --mandant urinet' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 zuwachs_zeile=$(grep -n 'sicherung zuwachs --mandant urinet' "$MOCK_LOG" | head -n 1 | cut -d: -f1)
 assert test "$inventar_zeile" -lt "$zuwachs_zeile"
@@ -282,6 +289,8 @@ festhalten_aufrufe=$(grep -c 'sicherung festhalten ' "$MOCK_LOG" || true)
 assert test "$age_dateien" -eq 8
 assert test "$festhalten_aufrufe" -eq "$age_dateien"
 assert grep -q 'festhalten --art bucket --mandant urinet' "$MOCK_LOG"
+assert grep -q 'festhalten --art bucket --mandant vhf-gsk' "$MOCK_LOG"
+assert grep -q 'festhalten --art inventar --mandant vhf-gsk' "$MOCK_LOG"
 assert grep -q 'festhalten --art db --sha256' "$MOCK_LOG"
 while read -r summe _; do
   assert grep -q -- "--sha256 $summe" "$MOCK_LOG"
@@ -406,6 +415,32 @@ assert test ! -e "$register_failed_root/.zustand/aktuell"
 assert grep -q 'SHA-256 konnte nicht im Sicherungsregister festgehalten werden' "$temp/register-failure.stderr"
 export MOCK_FAIL_FESTHALTEN=0
 
+# Fehlt ein Mandant in ARCHIV_MANDANTEN, obwohl sein Schema in der Datenbank liegt, bricht der Lauf vor jedem Export ab.
+schema_root="$temp/schema-backup"
+export ARCHIV_SICHERUNGSVERZEICHNIS=$schema_root
+export ARCHIV_MANDANTEN=urinet
+if "$script" > /dev/null 2> "$temp/schema.stderr"; then
+  printf 'Fehlender Mandant hätte abgelehnt werden müssen.\n' >&2
+  exit 1
+fi
+assert grep -q 'Mandantenschema m_vhf_gsk fehlt in ARCHIV_MANDANTEN' "$temp/schema.stderr"
+assert test -z "$(find "$schema_root/laeufe" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+export ARCHIV_MANDANTEN='urinet vhf-gsk'
+
+# Schlägt erst der Export von Mandant 2 fehl, gibt es keinen veröffentlichten Lauf.
+m2_root="$temp/m2-failed-backup"
+export ARCHIV_SICHERUNGSVERZEICHNIS=$m2_root
+export MOCK_FAIL_ZUWACHS_MANDANT=vhf-gsk
+if "$script" > /dev/null 2> "$temp/m2.stderr"; then
+  printf 'Fehler bei Mandant 2 hätte den Lauf abbrechen müssen.\n' >&2
+  exit 1
+fi
+assert grep -q 'sicherung zuwachs --mandant urinet' "$MOCK_LOG"
+assert grep -q 'sicherung zuwachs --mandant vhf-gsk' "$MOCK_LOG"
+assert test ! -e "$m2_root/.zustand/aktuell"
+assert test -z "$(find "$m2_root/laeufe" -mindepth 1 -maxdepth 1 -type d -exec test -e '{}/FERTIG' ';' -print -quit)"
+export MOCK_FAIL_ZUWACHS_MANDANT=
+
 # ---- Konfiguration -----------------------------------------------------------------------------------------------
 duplicate_root="$temp/duplicate-backup"
 export ARCHIV_SICHERUNGSVERZEICHNIS=$duplicate_root
@@ -417,6 +452,7 @@ fi
 assert grep -q 'Mandant ist mehrfach angegeben' "$temp/duplicate.stderr"
 assert test -z "$(find "$duplicate_root/laeufe" -mindepth 1 -maxdepth 1 -type d -print -quit)"
 export ARCHIV_MANDANTEN=urinet
+export MOCK_SCHEMAS=$'m_urinet\n'
 
 erwarte_konfigurationsfehler 'ARCHIV_MANDANTEN darf keinen Zeilenumbruch' ARCHIV_MANDANTEN=$'urinet\nvhf-gsk'
 vorherige_befehle=$(wc -l < "$MOCK_LOG")

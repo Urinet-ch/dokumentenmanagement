@@ -82,6 +82,7 @@ class SicherungPaketRoundtripTest {
 
     private static final String QUELL_PRAEFIX = "urinet-archiv-a-";
     private static final String ZIEL_PRAEFIX = "urinet-archiv-p-";
+    private static final List<String> MANDANTEN = List.of("urinet", "vhf-gsk");
     private static final String MANIFEST = "manifest/2026-01-01.json";
     private static final LocalDate MANIFEST_DATUM = LocalDate.of(2026, 1, 1);
     private static final byte[] ORIGINAL = ("%PDF-1.4\n% synthetisches Original\n"
@@ -124,35 +125,40 @@ class SicherungPaketRoundtripTest {
     void quelleVorbereiten() throws Exception {
         Assumptions.assumeTrue("quelle".equals(System.getProperty("archiv.restore.phase")));
 
-        var mandant = provisionierung.anlegen("urinet", null, null);
-        assertThat(mandant.bucket()).isEqualTo(new MandantCode("urinet").bucket(QUELL_PRAEFIX));
-
-        UUID id = UUID.randomUUID();
-        String originalKey = "archiv/2026/" + id + "/original.pdf";
-        String pdfaKey = "archiv/2026/" + id + "/pdfa.pdf";
-        String originalVersion = ablegen(mandant.bucket(), originalKey, ORIGINAL);
-        String pdfaVersion = ablegen(mandant.bucket(), pdfaKey, PDFA);
-        dokumentAnlegen(mandant.schema(), id, pdfaKey, pdfaVersion, originalKey, originalVersion);
-
-        KeyPair schluessel = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        ManifestTestdaten manifest = manifestErzeugen(schluessel);
-        Map<String, String> versionen = new HashMap<>();
-        for (var teil : manifest.teile().entrySet()) {
-            versionen.put(teil.getKey(), ablegenGesperrt(mandant.bucket(), teil.getKey(), teil.getValue()));
-        }
-        String manifestVersion = versionen.get(MANIFEST);
-        manifestFesthalten(mandant.schema(), manifest, versionen);
         Properties zustand = new Properties();
-        zustand.setProperty("dokument.id", id.toString());
-        zustand.setProperty("dokument.original.schluessel", originalKey);
-        zustand.setProperty("dokument.original.sha256", Pruefsumme.von(ORIGINAL));
-        zustand.setProperty("dokument.original.inhalt", Base64.getEncoder().encodeToString(ORIGINAL));
-        zustand.setProperty("dokument.pdfa.schluessel", pdfaKey);
-        zustand.setProperty("dokument.pdfa.sha256", Pruefsumme.von(PDFA));
-        zustand.setProperty("dokument.pdfa.inhalt", Base64.getEncoder().encodeToString(PDFA));
-        zustand.setProperty("manifest.version", manifestVersion);
-        zustand.setProperty("manifest.private", Base64.getEncoder().encodeToString(schluessel.getPrivate().getEncoded()));
-        zustand.setProperty("manifest.public", Base64.getEncoder().encodeToString(schluessel.getPublic().getEncoded()));
+        for (String code : MANDANTEN) {
+            MandantCode mandantCode = new MandantCode(code);
+            var mandant = provisionierung.anlegen(code, null, null);
+            assertThat(mandant.bucket()).isEqualTo(mandantCode.bucket(QUELL_PRAEFIX));
+
+            UUID id = UUID.randomUUID();
+            String originalKey = "archiv/2026/" + id + "/original.pdf";
+            String pdfaKey = "archiv/2026/" + id + "/pdfa.pdf";
+            String originalVersion = ablegen(mandant.bucket(), originalKey, ORIGINAL);
+            String pdfaVersion = ablegen(mandant.bucket(), pdfaKey, PDFA);
+            dokumentAnlegen(mandant.schema(), id, pdfaKey, pdfaVersion, originalKey, originalVersion);
+
+            KeyPair schluessel = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+            ManifestTestdaten manifest = manifestErzeugen(schluessel, code);
+            Map<String, String> versionen = new HashMap<>();
+            for (var teil : manifest.teile().entrySet()) {
+                versionen.put(teil.getKey(), ablegenGesperrt(mandant.bucket(), teil.getKey(), teil.getValue()));
+            }
+            manifestFesthalten(mandant.schema(), manifest, versionen);
+            String prefix = code + ".";
+            zustand.setProperty(prefix + "dokument.id", id.toString());
+            zustand.setProperty(prefix + "dokument.original.schluessel", originalKey);
+            zustand.setProperty(prefix + "dokument.original.sha256", Pruefsumme.von(ORIGINAL));
+            zustand.setProperty(prefix + "dokument.original.inhalt", Base64.getEncoder().encodeToString(ORIGINAL));
+            zustand.setProperty(prefix + "dokument.pdfa.schluessel", pdfaKey);
+            zustand.setProperty(prefix + "dokument.pdfa.sha256", Pruefsumme.von(PDFA));
+            zustand.setProperty(prefix + "dokument.pdfa.inhalt", Base64.getEncoder().encodeToString(PDFA));
+            zustand.setProperty(prefix + "manifest.version", versionen.get(MANIFEST));
+            zustand.setProperty(prefix + "manifest.private",
+                    Base64.getEncoder().encodeToString(schluessel.getPrivate().getEncoded()));
+            zustand.setProperty(prefix + "manifest.public",
+                    Base64.getEncoder().encodeToString(schluessel.getPublic().getEncoded()));
+        }
         zustandSpeichern(zustand);
     }
 
@@ -160,13 +166,21 @@ class SicherungPaketRoundtripTest {
     void wiederhergestellteAnwendungUndManifestPruefen() throws Exception {
         Assumptions.assumeTrue("ziel".equals(System.getProperty("archiv.restore.phase")));
 
-        // Wie bei der Restore-Probe: leerer Ziel-Bucket erst im Ziel-Schritt, die Wiederherstellung verlangt ihn leer.
-        String zielBucket = new MandantCode("urinet").bucket(ZIEL_PRAEFIX);
+        for (String code : MANDANTEN) {
+            wiederhergestelltenMandantenPruefen(code);
+        }
+    }
+
+    private void wiederhergestelltenMandantenPruefen(String code) throws Exception {
+        MandantCode mandant = new MandantCode(code);
+        String schema = mandant.schema();
+        String zielBucket = mandant.bucket(ZIEL_PRAEFIX);
         s3.createBucket(b -> b.bucket(zielBucket).objectLockEnabledForBucket(true));
         s3.putBucketVersioning(b -> b.bucket(zielBucket)
                 .versioningConfiguration(v -> v.status(BucketVersioningStatus.ENABLED)));
 
-        Path inventar = Path.of(System.getProperty("archiv.restore.inventar"));
+        Path inventar = restoreDatei("inventar", code);
+        Path bucket = restoreDatei("bucket", code);
         List<String> inventarzeilen = Files.readAllLines(inventar, StandardCharsets.UTF_8);
         List<String> ohneManifest = inventarzeilen.stream()
                 .filter(zeile -> !zeile.contains("\"schluessel\":\"manifest/")).toList();
@@ -175,9 +189,8 @@ class SicherungPaketRoundtripTest {
         try {
             Files.write(inventarOhneManifest, ohneManifest, StandardCharsets.UTF_8);
             int fehlendesManifestExit = ohneAnfrage(() -> sicherung.ausfuehren(List.of("wiederherstellen",
-                    "--mandant", "urinet",
-                    "--inventar", inventarOhneManifest.toString(), "--strom",
-                    System.getProperty("archiv.restore.bucket"), "--kappen"),
+                    "--mandant", code, "--inventar", inventarOhneManifest.toString(), "--strom", bucket.toString(),
+                    "--kappen"),
                     new PrintStream(new ByteArrayOutputStream()), new PrintStream(new ByteArrayOutputStream())));
             assertThat(fehlendesManifestExit).isEqualTo(4);
         } finally {
@@ -186,10 +199,8 @@ class SicherungPaketRoundtripTest {
 
         var restoreAusgabe = new ByteArrayOutputStream();
         var restoreFehler = new ByteArrayOutputStream();
-        int restoreExit = ohneAnfrage(() -> sicherung.ausfuehren(List.of("wiederherstellen", "--mandant", "urinet",
-                "--inventar",
-                System.getProperty("archiv.restore.inventar"), "--strom",
-                System.getProperty("archiv.restore.bucket"), "--kappen"),
+        int restoreExit = ohneAnfrage(() -> sicherung.ausfuehren(List.of("wiederherstellen", "--mandant", code,
+                "--inventar", inventar.toString(), "--strom", bucket.toString(), "--kappen"),
                 new PrintStream(restoreAusgabe), new PrintStream(restoreFehler)));
         assertThat(restoreExit).as(() -> restoreFehler.toString(StandardCharsets.UTF_8)
                 + restoreAusgabe.toString(StandardCharsets.UTF_8)).isZero();
@@ -200,49 +211,51 @@ class SicherungPaketRoundtripTest {
         assertThat(health.statusCode()).isEqualTo(200);
 
         Properties erwartet = zustandLaden();
-        UUID id = UUID.fromString(erwartet.getProperty("dokument.id"));
+        String prefix = code + ".";
+        UUID id = UUID.fromString(erwartet.getProperty(prefix + "dokument.id"));
         try (Connection connection = datenquelle.getConnection()) {
-            try (PreparedStatement p = connection.prepareStatement("select count(*) from m_urinet.dokument");
+            try (PreparedStatement p = connection.prepareStatement("select count(*) from " + schema + ".dokument");
                  ResultSet r = p.executeQuery()) {
                 assertThat(r.next()).isTrue();
                 assertThat(r.getLong(1)).isEqualTo(1);
             }
             try (PreparedStatement p = connection.prepareStatement("select d.sha256_pdfa, d.s3_pdfa, "
                     + "d.s3_version_pdfa, f.sha256, f.s3_schluessel, f.s3_version "
-                    + "from m_urinet.dokument d join m_urinet.dokument_datei f on f.dokument_id = d.id "
+                    + "from " + schema + ".dokument d join " + schema + ".dokument_datei f on f.dokument_id = d.id "
                     + "where d.id = ?")) {
                 p.setObject(1, id);
                 try (ResultSet r = p.executeQuery()) {
                     assertThat(r.next()).isTrue();
-                    assertThat(r.getString(1)).isEqualTo(erwartet.getProperty("dokument.pdfa.sha256"));
-                    assertThat(r.getString(2)).isEqualTo(erwartet.getProperty("dokument.pdfa.schluessel"));
-                    assertThat(r.getString(4)).isEqualTo(erwartet.getProperty("dokument.original.sha256"));
-                    assertThat(r.getString(5)).isEqualTo(erwartet.getProperty("dokument.original.schluessel"));
-                    pruefeDatei(r.getString(2), r.getString(3), erwartet.getProperty("dokument.pdfa.inhalt"));
-                    pruefeDatei(r.getString(5), r.getString(6), erwartet.getProperty("dokument.original.inhalt"));
+                    assertThat(r.getString(1)).isEqualTo(erwartet.getProperty(prefix + "dokument.pdfa.sha256"));
+                    assertThat(r.getString(2)).isEqualTo(erwartet.getProperty(prefix + "dokument.pdfa.schluessel"));
+                    assertThat(r.getString(4)).isEqualTo(erwartet.getProperty(prefix + "dokument.original.sha256"));
+                    assertThat(r.getString(5)).isEqualTo(erwartet.getProperty(prefix + "dokument.original.schluessel"));
+                    pruefeDatei(code, r.getString(2), r.getString(3),
+                            erwartet.getProperty(prefix + "dokument.pdfa.inhalt"));
+                    pruefeDatei(code, r.getString(5), r.getString(6),
+                            erwartet.getProperty(prefix + "dokument.original.inhalt"));
                 }
             }
             // manifest ist nur Einfügen: Die Zeile behält die Versions-ID der Quelle, geprüft wird über die Hashes.
             try (PreparedStatement p = connection.prepareStatement(
-                    "select sha256, s3_version from m_urinet.manifest where datum = ?")) {
+                    "select sha256, s3_version from " + schema + ".manifest where datum = ?")) {
                 p.setObject(1, MANIFEST_DATUM);
                 try (ResultSet r = p.executeQuery()) {
                     assertThat(r.next()).isTrue();
-                    assertThat(r.getString(1)).isEqualTo(Pruefsumme.von(
-                            manifestErzeugen(schluesselLesen(erwartet)).inhalt()));
-                    assertThat(r.getString(2)).isEqualTo(erwartet.getProperty("manifest.version"));
+                    assertThat(r.getString(1)).isEqualTo(Pruefsumme.von(manifestErzeugen(
+                            schluesselLesen(erwartet, code), code).inhalt()));
+                    assertThat(r.getString(2)).isEqualTo(erwartet.getProperty(prefix + "manifest.version"));
                 }
             }
         }
 
-        var mandant = new MandantCode("urinet");
         var zielAblage = new S3Ablage(s3, S3Ablage.presigner(s3, true), einstellungen, Clock.systemUTC());
         var manifestImZiel = zielAblage.lesenManifest(mandant, MANIFEST_DATUM,
                 ManifestTeil.JSON).orElseThrow();
-        assertThat(manifestImZiel.datei().versionId()).isNotEqualTo(erwartet.getProperty("manifest.version"));
-        assertThat(manifestImZiel.inhalt()).isEqualTo(manifestErzeugen(schluesselLesen(erwartet)).inhalt());
+        assertThat(manifestImZiel.datei().versionId()).isNotEqualTo(erwartet.getProperty(prefix + "manifest.version"));
+        assertThat(manifestImZiel.inhalt()).isEqualTo(manifestErzeugen(schluesselLesen(erwartet, code), code).inhalt());
 
-        var schluessel = schluesselLesen(erwartet);
+        var schluessel = schluesselLesen(erwartet, code);
         var pruefer = new ManifestPruefen(zielAblage, new JacksonJsonLeser(), manifestSchluessel(schluessel),
                 new SynthetischerZeitstempel(), festgehalteneManifeste, Duration.ofHours(24));
         var kommando = new ManifestKommando(pruefer, register, datenquelleInstanz);
@@ -265,6 +278,11 @@ class SicherungPaketRoundtripTest {
                 mandant.wert()), new PrintStream(negativAusgabe), new PrintStream(new ByteArrayOutputStream())));
         assertThat(negativExit).isNotZero();
         assertThat(negativAusgabe.toString(StandardCharsets.UTF_8)).doesNotContain("Ergebnis: gültig");
+    }
+
+    private static Path restoreDatei(String art, String mandant) {
+        String endung = art.equals("inventar") ? ".jsonl" : ".bin";
+        return Path.of(System.getProperty("archiv.restore.verzeichnis"), art + "-" + mandant + endung);
     }
 
     // Wie im Kommando-Betrieb ohne Request-Kontext; MandantKontext verlangt sonst eine Anmeldung.
@@ -346,8 +364,8 @@ class SicherungPaketRoundtripTest {
         }
     }
 
-    private void pruefeDatei(String key, String version, String erwarteterInhalt) throws Exception {
-        try (var objekt = s3.getObject(r -> r.bucket(new MandantCode("urinet").bucket(ZIEL_PRAEFIX))
+    private void pruefeDatei(String code, String key, String version, String erwarteterInhalt) throws Exception {
+        try (var objekt = s3.getObject(r -> r.bucket(new MandantCode(code).bucket(ZIEL_PRAEFIX))
                 .key(key).versionId(version))) {
             byte[] erhalten = objekt.readAllBytes();
             byte[] erwartet = Base64.getDecoder().decode(erwarteterInhalt);
@@ -356,8 +374,8 @@ class SicherungPaketRoundtripTest {
         }
     }
 
-    private static ManifestTestdaten manifestErzeugen(KeyPair schluessel) {
-        byte[] inhalt = new ManifestInhalt("urinet", MANIFEST_DATUM, null, ManifestFenster.bis(MANIFEST_DATUM),
+    private static ManifestTestdaten manifestErzeugen(KeyPair schluessel, String code) {
+        byte[] inhalt = new ManifestInhalt(code, MANIFEST_DATUM, null, ManifestFenster.bis(MANIFEST_DATUM),
                 null, null, List.of(), new TreeMap<>(), List.of()).kanonisch();
         byte[] signatur = ManifestSignatur.signieren(schluessel.getPrivate(), inhalt);
         byte[] imprint = ManifestSignatur.imprint(inhalt, signatur);
@@ -393,12 +411,13 @@ class SicherungPaketRoundtripTest {
         return zustand;
     }
 
-    private static KeyPair schluesselLesen(Properties zustand) throws Exception {
+    private static KeyPair schluesselLesen(Properties zustand, String mandant) throws Exception {
+        String prefix = mandant + ".";
         KeyFactory factory = KeyFactory.getInstance("Ed25519");
         PrivateKey privat = factory.generatePrivate(new PKCS8EncodedKeySpec(
-                Base64.getDecoder().decode(zustand.getProperty("manifest.private"))));
+                Base64.getDecoder().decode(zustand.getProperty(prefix + "manifest.private"))));
         PublicKey oeffentlich = factory.generatePublic(new X509EncodedKeySpec(
-                Base64.getDecoder().decode(zustand.getProperty("manifest.public"))));
+                Base64.getDecoder().decode(zustand.getProperty(prefix + "manifest.public"))));
         return new KeyPair(oeffentlich, privat);
     }
 
