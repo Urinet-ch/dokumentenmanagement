@@ -147,6 +147,10 @@ jobs:
           # Passwort des Postfachs archiv@urinet.ch für Benachrichtigungen (Aufgabe 5.6, Entscheid Fabian 14.11.2026);
           # optional: ohne es ist die Datei leer, das Archiv startet, und jede Benachrichtigung bleibt beim Log
           ARCHIV_SMTP_PASSWORT: ${{ secrets.ARCHIV_SMTP_PASSWORT }}
+          # Anmeldung mit Google (O.8): Client-ID und -Secret; optional: ohne sie sind die Dateien leer, Keycloak
+          # startet, und der Google-Provider bleibt deaktiviert
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           # Empfänger der Benachrichtigungen je Mandant (kein Geheimnis, GitHub-Variable); optional, leer heisst nur Log
           ARCHIV_ALARM_EMPFAENGER_URINET: ${{ vars.ARCHIV_ALARM_EMPFAENGER_URINET }}
         run: |
@@ -169,6 +173,8 @@ jobs:
           schreibe archiv_manifest_key "$ARCHIV_MANIFEST_KEY"
           schreibe archiv_data_key "$ARCHIV_DATA_KEY"
           schreibe archiv_smtp_passwort "$ARCHIV_SMTP_PASSWORT"
+          schreibe google_client_id "$GOOGLE_CLIENT_ID"
+          schreibe google_client_secret "$GOOGLE_CLIENT_SECRET"
           # .env für die Interpolation in compose.yml (deploy-app.sh übernimmt sie): nur eine einzelne Adresse, sonst
           # bricht das Skript ab (kein Deploy)
           bash .github/scripts/schreibe-env.sh bundle/.env
