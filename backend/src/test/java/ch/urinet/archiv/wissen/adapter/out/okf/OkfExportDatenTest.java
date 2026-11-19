@@ -2,6 +2,7 @@ package ch.urinet.archiv.wissen.adapter.out.okf;
 
 import ch.urinet.archiv.ablage.application.AblagePort;
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.application.MandantVollexportDaten;
@@ -36,6 +37,7 @@ import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static io.restassured.RestAssured.given;
 
 @QuarkusTest
 class OkfExportDatenTest {
@@ -47,6 +49,30 @@ class OkfExportDatenTest {
     MandantProvisionierung provisionierung;
     @Inject
     Instance<AgroalDataSource> datenbank;
+
+    @Test
+    void geschaeftsstelleErhaeltBeiEinstellungen403OhneAenderung() throws SQLException {
+        MandantCode code = new MandantCode("vhf-gsk");
+        if (!vorhanden(code)) {
+            provisionierung.anlegen(code.wert(), null, null);
+        }
+        String vorher = einstellungen(code);
+        String token = Testanmeldung.token("geschaeftsstelle-vhf-gsk");
+        given().auth().oauth2(token).when().get("/api/v1/wissensbasis/einstellungen").then().statusCode(403);
+        given().auth().oauth2(token).contentType("application/json")
+                .body("{\"budgetTokens\":100,\"lintBudgetTokens\":100,\"monatsbudgetTokens\":100}")
+                .when().put("/api/v1/wissensbasis/einstellungen").then().statusCode(403);
+        assertThat(einstellungen(code)).isEqualTo(vorher);
+    }
+
+    private String einstellungen(MandantCode code) throws SQLException {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("select row_to_json(e)::text from " + code.schema()
+                     + ".wissens_einstellung e where id = 1");
+             ResultSet rs = sql.executeQuery()) {
+            return rs.next() ? rs.getString(1) : null;
+        }
+    }
 
     @Test
     void exportLiestNurDasSchemaDesAuftrags(@TempDir Path temp) throws Exception {
