@@ -67,6 +67,19 @@ describe('Wissensoberfläche', () => {
     }
   });
 
+  it('zeigt einen unvollständigen fertigen Export nicht als Download an', async () => {
+    const fixture = TestBed.createComponent(WissenEinstellungenSeite);
+    http.expectOne('/api/v1/wissensbasis/einstellungen').flush({});
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    [...element.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes(TEXTE.wissenEinstellungen.exportStart))!.click();
+    http.expectOne('/api/v1/wissensbasis/exporte').flush({ id: 'e1', status: 'FERTIG' });
+    await fixture.whenStable();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(TEXTE.wissenEinstellungen.exportUngueltig);
+    expect(element.textContent).not.toContain(TEXTE.wissenEinstellungen.herunterladen);
+  });
+
   it('filtert den Index über die API und zeigt die sichtbaren Ergebnisse', async () => {
     const fixture = TestBed.createComponent(WissenIndex);
     http.expectOne((anfrage) => anfrage.url === '/api/v1/wissensseiten')

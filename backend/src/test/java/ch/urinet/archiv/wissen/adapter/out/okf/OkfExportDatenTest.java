@@ -67,6 +67,21 @@ class OkfExportDatenTest {
     }
 
     @Test
+    void exportIstNurFuerA19Erlaubt() throws SQLException {
+        for (String code : List.of("urinet", "vhf-gsk")) {
+            if (!vorhanden(new MandantCode(code))) {
+                provisionierung.anlegen(code, null, null);
+            }
+        }
+        for (String benutzer : List.of("mitarbeiter-urinet", "treuhaender-urinet", "geschaeftsstelle-vhf-gsk")) {
+            String token = Testanmeldung.token(benutzer);
+            given().auth().oauth2(token).when().post("/api/v1/wissensbasis/exporte").then().statusCode(403);
+            given().auth().oauth2(token).when().get("/api/v1/wissensbasis/exporte/" + UUID.randomUUID())
+                    .then().statusCode(403);
+        }
+    }
+
+    @Test
     void inhaberSpeichertNurGueltigeEinstellungenImEigenenMandanten() throws SQLException {
         MandantCode eigener = new MandantCode("urinet");
         MandantCode fremder = new MandantCode("vhf-gsk");
