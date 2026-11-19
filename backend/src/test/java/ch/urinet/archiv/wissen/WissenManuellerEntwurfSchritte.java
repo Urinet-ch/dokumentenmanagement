@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 
 public class WissenManuellerEntwurfSchritte {
     @Inject
@@ -91,7 +93,8 @@ public class WissenManuellerEntwurfSchritte {
     public void annehmenMitVersion() {
         String inhaber = Testanmeldung.token("inhaber-urinet");
         int etag = given().auth().oauth2(inhaber).when().get("/api/v1/wissensentwuerfe/" + entwurf)
-                .then().statusCode(200).extract().path("aenderungen[0].etag");
+                .then().statusCode(200).body("aenderungen[0].diff", notNullValue())
+                .extract().path("aenderungen[0].etag");
         antwort = given().auth().oauth2(inhaber).header("If-Match", "\"" + etag + "\"")
                 .contentType("application/json").body("{}")
                 .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen");
@@ -106,12 +109,74 @@ public class WissenManuellerEntwurfSchritte {
                 .body("aenderungen[0].status", is("OFFEN"));
     }
 
+    @Wenn("der Inhaber die Fassung korrigiert und einzeln annimmt")
+    public void korrigiertAnnehmen() {
+        Map<String, Object> fassung = Map.of("titel", "Probe", "beschreibung", "Ein Satz.", "tags", List.of(),
+                "quellen", List.of(), "inhalt", "");
+        antwort = given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).header("If-Match", "\"0\"")
+                .contentType("application/json").body(Map.of("fassung", fassung))
+                .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen");
+    }
+
+    @Dann("sind die Seite und ihre Version freigegeben und der Entscheid ist protokolliert")
+    public void freigabeProtokolliert() throws Exception {
+        antwort.then().statusCode(204);
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("""
+                     select a.status, s.version, s.freigegeben_von, p.benutzer,
+                            p.details->'wissen'->>'seiteId' = s.id::text,
+                            p.details->'wissen'->>'neueVersion',
+                            exists (select 1 from public.auftrag o where o.typ = 'WISSEN_EMBEDDING'
+                                    and o.nutzlast->>'seiteId' = s.id::text)
+                     from m_urinet.wissens_aenderung a
+                     join m_urinet.wissensseite s on s.id = a.seite_id
+                     join m_urinet.wissensseite_version v on v.seite_id = s.id and v.version = s.version
+                     join m_urinet.zugriff_protokoll p
+                       on p.dokument_id = a.entwurf_id and p.aktion = 'WISSEN_ANNEHMEN'
+                     where a.entwurf_id = ?
+                     """)) {
+            befehl.setObject(1, entwurf);
+            try (var ergebnis = befehl.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getString(1)).isEqualTo("ANGENOMMEN");
+                assertThat(ergebnis.getInt(2)).isEqualTo(1);
+                assertThat(ergebnis.getString(3)).isEqualTo("human:" + ergebnis.getString(4));
+                assertThat(ergebnis.getBoolean(5)).isTrue();
+                assertThat(ergebnis.getString(6)).isEqualTo("1");
+                assertThat(ergebnis.getBoolean(7)).isTrue();
+                assertThat(ergebnis.next()).isFalse();
+            }
+        }
+    }
+
     @After("@wissen-manuell")
     public void aufraeumen() throws Exception {
         if (entwurf == null) {
             return;
         }
         try (Connection verbindung = datenbank.get().getConnection()) {
+            verbindung.setAutoCommit(false);
+            try (var befehl = verbindung.createStatement()) {
+                befehl.execute("set local session_replication_role = replica");
+            }
+            String seiten = "(select seite_id from m_urinet.wissens_aenderung "
+                    + "where entwurf_id = ? and aktion = 'NEU' and seite_id is not null)";
+            for (String sql : List.of(
+                    "delete from public.auftrag where typ = 'WISSEN_EMBEDDING' and nutzlast->>'seiteId' in "
+                            + "(select seite_id::text from m_urinet.wissens_aenderung where entwurf_id = ?)",
+                    "delete from m_urinet.wissensseite_version_dokument where seite_id in " + seiten,
+                    "delete from m_urinet.wissensseite_version where entwurf_id = ?",
+                    "delete from m_urinet.wissens_log where entwurf_id = ?",
+                    "delete from m_urinet.zugriff_protokoll where dokument_id = ?",
+                    "delete from m_urinet.wissensseite_quelle where seite_id in " + seiten,
+                    "delete from m_urinet.wissensseite_dokument where seite_id in " + seiten,
+                    "delete from m_urinet.wissensseite_link where von_seite_id in " + seiten,
+                    "delete from m_urinet.wissensseite where id in " + seiten)) {
+                try (PreparedStatement befehl = verbindung.prepareStatement(sql)) {
+                    befehl.setObject(1, entwurf);
+                    befehl.executeUpdate();
+                }
+            }
             for (String tabelle : new String[]{"wissens_aenderung", "wissens_entwurf"}) {
                 try (PreparedStatement befehl = verbindung.prepareStatement("delete from m_urinet." + tabelle
                         + (tabelle.equals("wissens_aenderung") ? " where entwurf_id = ?" : " where id = ?"))) {
@@ -119,6 +184,7 @@ public class WissenManuellerEntwurfSchritte {
                     befehl.executeUpdate();
                 }
             }
+            verbindung.commit();
         }
     }
 
