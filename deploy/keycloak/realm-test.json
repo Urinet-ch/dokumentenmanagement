@@ -4,6 +4,17 @@
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
+  "eventsEnabled": true,
+  "eventsListeners": [],
+  "enabledEventTypes": [
+    "IDENTITY_PROVIDER_LOGIN",
+    "IDENTITY_PROVIDER_LOGIN_ERROR",
+    "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR",
+    "FEDERATED_IDENTITY_LINK",
+    "REMOVE_FEDERATED_IDENTITY"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
   "resetPasswordAllowed": false,
   "rememberMe": false,
   "loginWithEmailAllowed": true,
@@ -313,13 +324,7 @@
           "name": "manage-account",
           "description": "${role_manage-account}",
           "composite": true,
-          "composites": {
-            "client": {
-              "account": [
-                "manage-account-links"
-              ]
-            }
-          },
+          "composites": {},
           "clientRole": true,
           "attributes": {}
         },
@@ -416,6 +421,38 @@
     }
   ],
   "authenticationFlows": [
+    {
+      "alias": "google-nur-verknuepft",
+      "description": "Unbekannte oder nicht verknüpfte Google-Konten werden abgelehnt (Req 2.26)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "deny-access-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "google-totp-pflicht",
+      "description": "Nach Google-Anmeldung ist TOTP Pflicht (Req 2.28)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        }
+      ]
+    },
     {
       "alias": "browser-totp-pflicht",
       "description": "Anmeldung im Browser: Cookie oder Passwort und immer TOTP (Req 2.1)",
@@ -982,7 +1019,42 @@
     "composite": true,
     "clientRole": false
   },
-  "identityProviders": [],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "firstBrokerLoginFlowAlias": "google-nur-verknuepft",
+      "postBrokerLoginFlowAlias": "google-totp-pflicht",
+      "config": {
+        "clientId": "GOOGLE_CLIENT_ID",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+        "syncMode": "IMPORT",
+        "defaultScope": "openid email profile"
+      }
+    },
+    {
+      "alias": "archiv-test-oidc",
+      "displayName": "OIDC-Test-IdP",
+      "providerId": "oidc",
+      "enabled": false,
+      "trustEmail": false,
+      "storeToken": false,
+      "firstBrokerLoginFlowAlias": "google-nur-verknuepft",
+      "postBrokerLoginFlowAlias": "google-totp-pflicht",
+      "config": {
+        "authorizationUrl": "https://oidc-test.example.invalid/authorize",
+        "tokenUrl": "https://oidc-test.example.invalid/token",
+        "clientId": "archiv-test-oidc",
+        "syncMode": "IMPORT",
+        "clientAuthMethod": "client_secret_post",
+        "defaultScope": "openid email profile"
+      }
+    }
+  ],
   "directGrantFlow": "direct-grant-totp-pflicht",
   "resetCredentialsFlow": "reset-credentials-totp-pflicht",
   "users": [
