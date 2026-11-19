@@ -441,15 +441,7 @@ public class WissenIngestVerarbeiten {
 
         List<SeitenMetadaten> indexSeiten = speichern.indexLaden(lauf.entwurfId(),
                 aussagen.stream().map(Kernaussage::text).collect(java.util.stream.Collectors.joining(" ")));
-        String nachricht = feld("Geplanter Pfad", plan.pfad()) + feld("Geplante Aktion", plan.aktion())
-                + feld("Begründung", plan.grund())                 + feld("Index der sichtbaren Seiten",
-                indexSeiten.stream().map(WissenIngestVerarbeiten::indexZeile)
-                        .collect(java.util.stream.Collectors.joining("\n")))
-                + feld("Kernaussagen", aussagen.stream().map(a -> a.schluessel() + " " + a.text())
-                        .collect(java.util.stream.Collectors.joining("\n")))
-                + (aktuelleFassung == null ? "" : feld("Bestehende Seite (Daten)",
-                        aktuelleFassung.metadaten().titel() + "\n" + aktuelleFassung.metadaten().beschreibung()
-                                + "\n" + aktuelleFassung.inhalt()));
+        String nachricht = seitenNachricht(plan, indexSeiten, aussagen, aktuelleFassung);
         KiErgebnis antwort = aufrufen(lauf, stand, KiPort.WissensSchritt.SEITE, nachricht, budget, monatsbudget);
         if (antwort.ohneZugang()) {
             speichern.fehlerSichern(auftrag, lauf.entwurfId(), lauf.schritt(), bisher,
@@ -479,6 +471,36 @@ public class WissenIngestVerarbeiten {
                 antwort.budgetErreicht() ? "ABSCHLUSS" : "SEITE", neu,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
                 antwort.budgetErreicht(), antwort.budgetErreicht() ? "Budget erschöpft" : null);
+    }
+
+    private static String seitenNachricht(Planung plan, List<SeitenMetadaten> indexSeiten,
+                                          List<Kernaussage> aussagen, SeitenFassung aktuelleFassung) {
+        return feld("Geplanter Pfad", plan.pfad()) + feld("Geplante Aktion", plan.aktion())
+                + feld("Begründung", plan.grund()) + feld("Index der sichtbaren Seiten",
+                indexSeiten.stream().map(WissenIngestVerarbeiten::indexZeile)
+                        .collect(java.util.stream.Collectors.joining("\n")))
+                + feld("Kernaussagen", aussagen.stream().map(a -> a.schluessel() + " " + a.text())
+                        .collect(java.util.stream.Collectors.joining("\n")))
+                + (aktuelleFassung == null ? "" : feld("Bestehende Seite (Daten)",
+                        aktuelleFassung.metadaten().titel() + "\n" + aktuelleFassung.metadaten().beschreibung()
+                                + "\n" + aktuelleFassung.inhalt()));
+    }
+
+    static Planung neuerzeugungsPlan(SeitenVorschlag vorher, Fortschritt fortschritt, SeitenFassung aktuell) {
+        if (vorher.seiteId() == null || !vorher.seiteId().equals(aktuell.metadaten().id())
+                || !vorher.pfad().equals(aktuell.metadaten().pfad())) {
+            throw new IllegalStateException("Die aktuelle Seite passt nicht zur veralteten Änderung");
+        }
+        List<Integer> aussagen = fortschritt.planung().stream()
+                .filter(plan -> plan.pfad().equals(vorher.pfad()))
+                .findFirst().map(Planung::aussagen).orElseGet(() -> {
+                    Set<String> schluessel = vorher.daten().quellen().stream().map(Quelleneintrag::schluessel)
+                            .collect(java.util.stream.Collectors.toSet());
+                    return fortschritt.kernaussagen().stream()
+                            .filter(a -> schluessel.contains(a.schluessel())).map(Kernaussage::nr).toList();
+                });
+        return new Planung(vorher.pfad(), vorher.aktion(), vorher.daten().typ().datenbankwert(),
+                vorher.begruendung(), aussagen, vorher.seiteId(), aktuell.metadaten().version(), false);
     }
 
     private void quelle(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher, long budget,

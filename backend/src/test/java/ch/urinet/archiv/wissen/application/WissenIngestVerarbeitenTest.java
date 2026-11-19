@@ -262,6 +262,9 @@ class WissenIngestVerarbeitenTest {
                 "Später geändert", "Später geändert", List.of(), "AKTIV", 4, null);
         SeitenFassung spaetereFassung = new SeitenFassung(spaetereMetadaten, "Späterer Inhalt",
                 DOKUMENT_ID, List.of());
+        var erneuterPlan = WissenIngestVerarbeiten.neuerzeugungsPlan(vorschlag, gespeichert, spaetereFassung);
+        assertThat(erneuterPlan.basisVersion()).isEqualTo(4);
+        assertThat(erneuterPlan.aussagen()).containsExactly(1);
         Speicher abschluss = new Speicher(stand(lauf("ABSCHLUSS", false, gespeichert), 0,
                 WissensStufe.NORMAL, List.of(spaetereMetadaten), Map.of(seiteId, spaetereFassung)));
         verarbeiten(abschluss, new KiAntwort(null), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
@@ -337,6 +340,38 @@ class WissenIngestVerarbeitenTest {
         assertThat(vorschlag.daten().quellen()).singleElement().isEqualTo(frueher);
         assertThat(vorschlag.befunde()).extracting(WissensPruefung.Befund::code)
                 .containsExactly(WissensPruefung.Code.QUELLE_UNGUELTIG);
+    }
+
+    @Test
+    void erneuterSeitenplanNimmtAktuelleBasisUndNurZugeordneteKernaussagen() throws InterruptedException {
+        UUID seiteId = UUID.randomUUID();
+        SeitenMetadaten alt = new SeitenMetadaten(seiteId, "konzepte/frist", "Konzept", "Frist", "Frist",
+                List.of(), "AKTIV", 2, "NORMAL");
+        SeitenFassung alteFassung = new SeitenFassung(alt, "# Frist", null, List.of());
+        Fortschritt geplant = new Fortschritt(1, 0, false, mitAussage().kernaussagen(), List.of(
+                new WissenIngestPort.Planung("konzepte/frist", "AENDERN", "Konzept", "Grund", List.of(1), seiteId,
+                        2, false)), List.of(), List.of(), null);
+        Speicher speichern = new Speicher(stand(lauf("SEITE", false, geplant), 0, WissensStufe.NORMAL,
+                List.of(alt), Map.of(seiteId, alteFassung)));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Frist", "Frist", List.of(),
+                "# Frist\n\nFrist. [^q-neu]", List.of(), List.of(), "Neue Frist"),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        SeitenVorschlag vorschlag = speichern.fortschritt.vorschlaege().getFirst();
+        SeitenMetadaten neu = new SeitenMetadaten(seiteId, alt.pfad(), alt.typ(), alt.titel(), alt.beschreibung(),
+                alt.tags(), alt.status(), 4, alt.vertraulichkeitMindest());
+        var plan = WissenIngestVerarbeiten.neuerzeugungsPlan(vorschlag, speichern.fortschritt,
+                new SeitenFassung(neu, "# Neuer Stand", null, List.of()));
+        assertThat(plan.basisVersion()).isEqualTo(4);
+        assertThat(plan.aussagen()).containsExactly(1);
+        assertThat(plan.seiteId()).isEqualTo(seiteId);
+        assertThat(plan.aktion()).isEqualTo("AENDERN");
+
+        SeitenMetadaten fremd = new SeitenMetadaten(UUID.randomUUID(), alt.pfad(), alt.typ(), alt.titel(),
+                alt.beschreibung(), alt.tags(), alt.status(), 4, alt.vertraulichkeitMindest());
+        assertThatThrownBy(() -> WissenIngestVerarbeiten.neuerzeugungsPlan(vorschlag, speichern.fortschritt,
+                new SeitenFassung(fremd, "", null, List.of()))).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
