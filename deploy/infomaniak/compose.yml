@@ -259,6 +259,9 @@ services:
     secrets:
       - keycloak_db
       - keycloak_admin
+      # O.8: leer, solange die GitHub-Secrets fehlen; dann bleibt der Google-Provider deaktiviert
+      - google_client_id
+      - google_client_secret
     networks:
       intern: {}
       web: {}
@@ -335,3 +338,7 @@ secrets:
     file: ./secrets/keycloak_db
   keycloak_admin:
     file: ./secrets/keycloak_admin
+  google_client_id:
+    file: ./secrets/google_client_id
+  google_client_secret:
+    file: ./secrets/google_client_secret
