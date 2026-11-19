@@ -21,16 +21,20 @@ public class ZugriffFreigabeProtokoll implements FreigabeProtokoll {
     }
 
     @Override
-    public void angenommen(Benutzer benutzer, UUID entwurfId, String realIp) {
+    public void angenommen(Benutzer benutzer, UUID entwurfId, int nummer, UUID seiteId, Integer basisVersion,
+                           int neueVersion, String realIp) {
         protokoll.schreiben(new ZugriffEintrag(Optional.of(benutzer.id()), Optional.of(benutzer.rolle().name()),
                 ProtokollAktion.WISSEN_ANNEHMEN, Optional.of(entwurfId), IpAdresse.aus(realIp),
-                ProtokollDetails.KEINE));
+                ProtokollDetails.wissensEntscheid(null,
+                        new ProtokollDetails.WissensEntscheid(nummer, seiteId, basisVersion, neueVersion))));
     }
 
     @Override
-    public void verworfen(Benutzer benutzer, UUID entwurfId, String grund, String realIp) {
+    public void verworfen(Benutzer benutzer, UUID entwurfId, int nummer, UUID seiteId, Integer basisVersion,
+                          String grund, String realIp) {
         protokoll.schreiben(new ZugriffEintrag(Optional.of(benutzer.id()), Optional.of(benutzer.rolle().name()),
                 ProtokollAktion.WISSEN_VERWERFEN, Optional.of(entwurfId), IpAdresse.aus(realIp),
-                new ProtokollDetails(grund, null, null)));
+                ProtokollDetails.wissensEntscheid(grund,
+                        new ProtokollDetails.WissensEntscheid(nummer, seiteId, basisVersion, null))));
     }
 }

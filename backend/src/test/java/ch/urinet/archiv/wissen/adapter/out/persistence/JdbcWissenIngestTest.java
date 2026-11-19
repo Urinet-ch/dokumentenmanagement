@@ -247,6 +247,10 @@ class JdbcWissenIngestTest {
     void verwerfenEndpunktPrueftRolleUndIfMatch() throws SQLException {
         UUID entwurf = manuellerEntwurf(URINET);
         aenderung(URINET, entwurf, 1);
+        UUID seite = seite(URINET, "konzepte/verwerfen-" + UUID.randomUUID(), "Probe", null);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, basis_version = 1 "
+                + "where entwurf_id = ?", seite, entwurf);
         String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/verwerfen";
         String inhaber = Testanmeldung.token("inhaber-urinet");
         String treuhaender = Testanmeldung.token("treuhaender-urinet");
@@ -261,8 +265,12 @@ class JdbcWissenIngestTest {
                 .body("{\"grund\":\"Probe\"}").when().post(pfad).then().statusCode(412);
         assertThat(zeile(URINET, entwurf)).containsEntry("status", "ERLEDIGT");
         assertThat(anzahl("select count(*) from " + URINET.schema()
-                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN' "
-                + "and details->>'grund' = 'Probe'", entwurf)).isEqualTo(1);
+                + ".zugriff_protokoll p join " + URINET.schema()
+                + ".wissens_aenderung a on a.entwurf_id = p.dokument_id "
+                + "where p.dokument_id = ? and p.aktion = 'WISSEN_VERWERFEN' "
+                + "and p.details->>'grund' = 'Probe' and p.details->'wissen'->>'seiteId' = a.seite_id::text "
+                + "and p.details->'wissen'->>'basisVersion' = '1' "
+                + "and p.details->'wissen'->>'aenderungNr' = '1'", entwurf)).isEqualTo(1);
     }
 
     @Test
@@ -519,7 +527,12 @@ class JdbcWissenIngestTest {
                     + ".wissensseite_version v on v.seite_id = h.seite_id and v.version = h.version "
                     + "where v.entwurf_id = ?", entwurf)).isEqualTo(1);
             assertThat(anzahl("select count(*) from " + URINET.schema()
-                    + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_ANNEHMEN'", entwurf))
+                    + ".zugriff_protokoll p join " + URINET.schema()
+                    + ".wissens_aenderung a on a.entwurf_id = p.dokument_id "
+                    + "where p.dokument_id = ? and p.aktion = 'WISSEN_ANNEHMEN' "
+                    + "and p.details->'wissen'->>'seiteId' = a.seite_id::text "
+                    + "and p.details->'wissen'->>'neueVersion' = '1' "
+                    + "and p.details->'wissen'->>'aenderungNr' = '1'", entwurf))
                     .isEqualTo(1);
             assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_EMBEDDING' and "
                     + "nutzlast->>'seiteId' in (select seite_id::text from " + URINET.schema()

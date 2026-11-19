@@ -48,7 +48,7 @@ public class FreigabeDienst {
         if (text.length() > GRUND_MAX) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
-        protokoll.verworfen(benutzer, entwurfId, text, realIp);
+        protokoll.verworfen(benutzer, entwurfId, nummer, aenderung.seiteId(), aenderung.basisVersion(), text, realIp);
         repository.verwerfen(aenderung.id(), aenderung.etag(), benutzer.id(), text);
         if (repository.entwurfAbschliessen(entwurfId)) {
             repository.abschlussProtokollieren(entwurfId);

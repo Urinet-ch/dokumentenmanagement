@@ -100,7 +100,7 @@ public class FreigabeAnnahme {
         repository.fassungSpeichern(entwurfId, aenderung, fassung, ergebnis.mindeststufe(), ergebnis.wirksameStufe(),
                 erzeugt, benutzer.id(), grund, links);
         huelle.versionFreigeben(seiteId, version);
-        protokoll.angenommen(benutzer, entwurfId, realIp);
+        protokoll.angenommen(benutzer, entwurfId, nummer, seiteId, aenderung.basisVersion(), version, realIp);
         auftraege.wissensEmbeddingEinreihen(seiteId, version);
         if (repository.entwurfAbschliessen(entwurfId)) {
             repository.abschlussProtokollieren(entwurfId);
