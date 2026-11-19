@@ -43,7 +43,7 @@ class RealmExportTest {
         assertThat(google.path("config").path("syncMode").asText()).isEqualTo("IMPORT");
         assertThat(google.path("firstBrokerLoginFlowAlias").asText()).isEqualTo("google-nur-verknuepft");
         assertThat(google.path("postBrokerLoginFlowAlias").asText()).isEqualTo("google-totp-pflicht");
-        assertThat(google.path("config").path("clientId").asText()).isEqualTo("GOOGLE_CLIENT_ID");
+        assertThat(google.path("config").path("clientId").asText()).isEqualTo("${GOOGLE_CLIENT_ID}");
         assertThat(google.path("config").path("clientSecret").asText()).isEqualTo("${GOOGLE_CLIENT_SECRET}");
         assertThat(google.path("mappers").isMissingNode()).isTrue();
 

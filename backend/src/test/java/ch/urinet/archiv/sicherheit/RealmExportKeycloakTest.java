@@ -123,7 +123,9 @@ class RealmExportKeycloakTest {
         assertThat(googleConfig.get("clientSecret")).isEqualTo("**********");
         Object mappers = google.get("mappers");
         assertThat(mappers == null || mappers.equals(List.of())).isTrue();
-        assertThat(identityProvider()).containsExactly("google");
+        assertThat(identityProvider()).containsExactlyInAnyOrder("google", "archiv-test-oidc");
+        String oidcProviderId = adminGet(REALM + "/identity-provider/instances/archiv-test-oidc").path("providerId");
+        assertThat(oidcProviderId).isEqualTo("oidc");
     }
 
     @Test
@@ -146,20 +148,10 @@ class RealmExportKeycloakTest {
     @Test
     @Order(2)
     void oidcTestProviderKannNebenGoogleBestehen() {
-        given().auth().oauth2(admin).contentType(ContentType.JSON)
-                .body(Map.of("alias", "archiv-test-oidc", "providerId", "oidc", "enabled", true,
-                        "config", Map.of("authorizationUrl", "https://idp.example.invalid/auth",
-                                "tokenUrl", "https://idp.example.invalid/token", "clientId", "probe",
-                                "clientAuthMethod", "client_secret_post")))
-                .post(ExportKeycloak.basisUrl + REALM + "/identity-provider/instances").then().statusCode(201);
-        try {
-            assertThat(identityProvider()).containsExactlyInAnyOrder("google", "archiv-test-oidc");
-            String providerId = adminGet(REALM + "/identity-provider/instances/archiv-test-oidc").path("providerId");
-            assertThat(providerId).isEqualTo("oidc");
-        } finally {
-            loeschen("/identity-provider/instances/archiv-test-oidc");
-        }
-        assertThat(identityProvider()).containsExactly("google");
+        Map<String, Object> oidc = adminGet(REALM + "/identity-provider/instances/archiv-test-oidc").as(Map.class);
+        assertThat(oidc.get("providerId")).isEqualTo("oidc");
+        assertThat(((Map<String, String>) oidc.get("config")).get("authorizationUrl"))
+                .startsWith("http://host.testcontainers.internal:");
     }
 
     @Test

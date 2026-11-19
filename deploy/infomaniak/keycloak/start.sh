@@ -4,7 +4,7 @@
 set -euo pipefail
 
 lesen() {
-  local datei="/run/secrets/$1"
+  local datei="${ARCHIV_SECRETS_DIR:-/run/secrets}/$1"
   if [[ ! -s "$datei" ]]; then
     echo "Secret-Datei $1 fehlt oder ist leer: Deploy-Workflow mit allen Secrets erneut ausführen." >&2
     exit 1
@@ -15,10 +15,15 @@ lesen() {
 # Befehlsersetzung entfernt den abschliessenden Zeilenumbruch
 KC_DB_PASSWORD=$(lesen keycloak_db)
 KC_BOOTSTRAP_ADMIN_PASSWORD=$(lesen keycloak_admin)
-if [[ -e /run/secrets/google_client_secret ]]; then
+GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+if [[ -n "$GOOGLE_CLIENT_ID" && -s "${ARCHIV_SECRETS_DIR:-/run/secrets}/google_client_secret" ]]; then
   GOOGLE_CLIENT_SECRET=$(lesen google_client_secret)
+  if [[ -z "$GOOGLE_CLIENT_SECRET" ]]; then
+    GOOGLE_CLIENT_ID=
+  fi
 else
+  GOOGLE_CLIENT_ID=
   GOOGLE_CLIENT_SECRET=
 fi
-export KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD GOOGLE_CLIENT_SECRET
-exec /opt/keycloak/bin/kc.sh start --optimized --import-realm "$@"
+export KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
+exec "${KEYCLOAK_BIN:-/opt/keycloak/bin/kc.sh}" start --optimized --import-realm "$@"

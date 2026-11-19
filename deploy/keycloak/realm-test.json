@@ -1031,7 +1031,7 @@
       "firstBrokerLoginFlowAlias": "google-nur-verknuepft",
       "postBrokerLoginFlowAlias": "google-totp-pflicht",
       "config": {
-        "clientId": "GOOGLE_CLIENT_ID",
+        "clientId": "${GOOGLE_CLIENT_ID}",
         "clientSecret": "${GOOGLE_CLIENT_SECRET}",
         "syncMode": "IMPORT",
         "defaultScope": "openid email profile"

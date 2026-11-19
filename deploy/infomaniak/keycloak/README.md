@@ -1,10 +1,10 @@
 # Google-IdP
 
-Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann
-`google_client_secret` aus `/run/secrets/` lesen und den Wert beim erstmaligen Import als `GOOGLE_CLIENT_SECRET`
-bereitstellen. Ohne diese Datei wird der Platzhalter leer aufgelöst; das ist nur zulässig, solange der Provider
-deaktiviert bleibt. Das Produktions-Compose-File bindet das Secret noch nicht ein: Der Deploy-Workflow muss die Datei
-erst nach dem Entscheid zu OAuth-Client und GitHub-Secret bereitstellen.
+Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` liest
+`google_client_secret` aus `/run/secrets/` und verwendet die nichtgeheime `GOOGLE_CLIENT_ID` nur, wenn beide Werte nicht
+leer sind. Fehlt einer, werden beide beim Realm-Import leer übergeben; der Provider im Export bleibt deaktiviert. Das
+Produktions-Compose-File bindet das Secret noch nicht ein: Der Deploy-Workflow muss die Datei erst nach dem Entscheid zu
+OAuth-Client und GitHub-Secret bereitstellen.
 
 `--import-realm` überspringt einen Realm, der bereits in der Datenbank vorhanden ist. Die Vorlage
 [`google-idp-einrichten-vorlage.sh`](./google-idp-einrichten-vorlage.sh) bildet darum die einmalige Nachrüstung ab. Sie
@@ -32,6 +32,8 @@ Die Shell- und Stub-Prüfung läuft mit:
 ```bash
 bash -n deploy/infomaniak/keycloak/google-idp-einrichten-vorlage.sh
 bash deploy/infomaniak/keycloak/test/google-idp-einrichten-vorlage-test.sh
+bash -n deploy/infomaniak/keycloak/start.sh
+bash deploy/infomaniak/keycloak/test/start-test.sh
 ```
 
 ## Nachbesserung Review (PR #334)
@@ -42,10 +44,11 @@ bash deploy/infomaniak/keycloak/test/google-idp-einrichten-vorlage-test.sh
 - Verknüpfen und Lösen durch den Administrator erscheinen im Admin-Ereignisprotokoll (`adminEventsEnabled`), nicht als
   Benutzerereignisse `FEDERATED_IDENTITY_LINK` und `REMOVE_FEDERATED_IDENTITY`. Fehlversuche des zweiten Faktors stehen
   als `LOGIN_ERROR` im Protokoll.
-- Die Cucumber-Szenarien prüfen nur die Konfiguration. Anmeldeläufe gegen einen `oidc`-Test-IdP und ein Test zum
-  Sitzungsende nach dem Lösen (`users/{id}/logout`) sind in `tasks.md` O.8 offen.
+- Ein dedizierter Cucumber-Runner prüft unbekannte Konten, eine nicht automatisch verknüpfte gleiche E-Mail-Adresse,
+  TOTP nach einer bestehenden Verknüpfung sowie Admin-Ereignisse und Sitzungsende nach dem Lösen gegen einen lokalen
+  `oidc`-Test-IdP.
 - `eventsListeners` ist in Realm-Export und Vorlage gleich (`[]`, Ereignisse nur in der Datenbank); `eventsExpiration` ist
   bewusst nicht gesetzt (unbegrenzte Aufbewahrung, Zugriffsprotokoll nach Req 2.27).
-- `start.sh` setzt ein fehlendes `google_client_secret` auf leer; das gilt nur bei deaktiviertem Provider. Mit der Freigabe
-  wird die Datei Pflicht (offen für Fabian, Workflow-Prüfung).
+- `start.sh` übergibt Google-ID und -Secret nur gemeinsam, wenn beide nicht leer sind. Der Stub-Test prüft beide
+  Leerlauf-Fälle und den Fall mit synthetischen Werten; er läuft nicht in der CI (Workflow-Änderung liegt bei Fabian).
 - Der Stub-Test der Vorlage läuft nicht in der CI (Workflow-Änderung liegt bei Fabian) und wird von Hand gestartet.

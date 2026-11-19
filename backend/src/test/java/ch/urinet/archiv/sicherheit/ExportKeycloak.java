@@ -1,16 +1,23 @@
 package ch.urinet.archiv.sicherheit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 import io.smallrye.config.PropertiesConfigSource;
 import io.smallrye.config.SmallRyeConfigBuilder;
+import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,17 +29,27 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     static final String ADMIN = "admin";
     static final String ADMIN_PASSWORT = "admin-nur-test";
     static String basisUrl;
+    static OidcTestIdp oidcTestIdp;
 
     private GenericContainer<?> keycloak;
+    private Path exportTemporaer;
 
     @Override
     public Map<String, String> start() {
         Path export = Path.of(System.getProperty("archiv.realm-export", "../deploy/keycloak/realm-export.json"));
+        try {
+            oidcTestIdp = new OidcTestIdp();
+            oidcTestIdp.start();
+            Testcontainers.exposeHostPorts(oidcTestIdp.port());
+            exportTemporaer = exportMitOidcTestIdp(export);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         keycloak = new GenericContainer<>(image())
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
-                .withCopyFileToContainer(MountableFile.forHostPath(export.toAbsolutePath()),
+                .withCopyFileToContainer(MountableFile.forHostPath(exportTemporaer.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
                 .withCommand("start-dev", "--import-realm")
                 .withExposedPorts(8080)
@@ -47,6 +64,17 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
     public void stop() {
         if (keycloak != null) {
             keycloak.stop();
+        }
+        if (oidcTestIdp != null) {
+            oidcTestIdp.close();
+            oidcTestIdp = null;
+        }
+        if (exportTemporaer != null) {
+            try {
+                Files.deleteIfExists(exportTemporaer);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 
@@ -64,5 +92,67 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private Path exportMitOidcTestIdp(Path quelle) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode realm = (ObjectNode) mapper.readTree(quelle.toFile());
+        ArrayNode provider = realm.withArray("identityProviders");
+        for (int i = provider.size() - 1; i >= 0; i--) {
+            if ("archiv-test-oidc".equals(provider.get(i).path("alias").asText())) {
+                provider.remove(i);
+            }
+        }
+        String basis = oidcTestIdp.basisUrl();
+        Map<String, String> oidcConfig = Map.ofEntries(
+                Map.entry("authorizationUrl", basis + "/authorize"),
+                Map.entry("tokenUrl", basis + "/token"),
+                Map.entry("userInfoUrl", basis + "/userinfo"),
+                Map.entry("issuer", basis),
+                Map.entry("clientId", "archiv-test-oidc"),
+                Map.entry("clientSecret", "synthetischer-oidc-testwert"),
+                Map.entry("clientAuthMethod", "client_secret_post"),
+                Map.entry("defaultScope", "openid email profile"),
+                Map.entry("validateSignature", "true"),
+                Map.entry("jwksUrl", basis + "/jwks"),
+                Map.entry("useJwksUrl", "true"));
+        provider.add(mapper.valueToTree(Map.of(
+                "alias", "archiv-test-oidc",
+                "displayName", "Lokaler OIDC-Test-IdP",
+                "providerId", "oidc",
+                "enabled", true,
+                "trustEmail", false,
+                "storeToken", false,
+                "firstBrokerLoginFlowAlias", "google-nur-verknuepft",
+                "postBrokerLoginFlowAlias", "google-totp-pflicht",
+                "config", oidcConfig)));
+
+        ArrayNode clients = realm.withArray("clients");
+        clients.add(mapper.valueToTree(Map.of(
+                "clientId", "archiv-test-google",
+                "name", "Nur Entwicklung und Tests: OIDC-Broker-Anmeldung",
+                "enabled", true,
+                "protocol", "openid-connect",
+                "publicClient", true,
+                "standardFlowEnabled", true,
+                "implicitFlowEnabled", false,
+                "directAccessGrantsEnabled", false,
+                "redirectUris", List.of("http://localhost/callback"),
+                "protocolMappers", List.of(
+                        Map.of("name", "mandant", "protocol", "openid-connect",
+                                "protocolMapper", "oidc-usermodel-attribute-mapper",
+                                "config", Map.of("user.attribute", "mandant", "claim.name", "mandant",
+                                        "jsonType.label", "String", "id.token.claim", "true",
+                                        "access.token.claim", "true", "userinfo.token.claim", "true")),
+                        Map.of("name", "realm-roles", "protocol", "openid-connect",
+                                "protocolMapper", "oidc-usermodel-realm-role-mapper",
+                                "config", Map.of("multivalued", "true", "claim.name", "realm_access.roles",
+                                        "jsonType.label", "String", "id.token.claim", "true",
+                                        "access.token.claim", "true", "userinfo.token.claim", "true"))))));
+
+        exportTemporaer = Files.createTempFile("urinet-realm-oidc-test-", ".json");
+        mapper.writeValue(exportTemporaer.toFile(), realm);
+        Files.setPosixFilePermissions(exportTemporaer, PosixFilePermissions.fromString("rw-r--r--"));
+        return exportTemporaer;
     }
 }
