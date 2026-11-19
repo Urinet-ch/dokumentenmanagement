@@ -2998,6 +2998,18 @@
           },
           "quellSeiteId" : {
             "$ref" : "#/components/schemas/UUID"
+          },
+          "dokumentTitel" : {
+            "type" : "string"
+          },
+          "dokumentDateiname" : {
+            "type" : "string"
+          },
+          "quellSeitePfad" : {
+            "type" : "string"
+          },
+          "quellSeiteTitel" : {
+            "type" : "string"
           }
         }
       },

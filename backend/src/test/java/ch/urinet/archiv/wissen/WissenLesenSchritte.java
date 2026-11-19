@@ -220,6 +220,7 @@ public class WissenLesenSchritte {
         assertThat(seite.body().asString()).doesNotContain(interneSeiteTitel);
         assertThat(seite.jsonPath().getList("quellen.dokumentId", String.class))
                 .containsExactly(normaleQuelle.toString());
+        assertThat(seite.jsonPath().getList("quellen.dokumentTitel", String.class)).containsExactly("Quelle NORMAL");
 
         versionen.then().statusCode(200);
         List<Map<String, Object>> versionZeilen = versionen.jsonPath().getList("versionen");
@@ -348,12 +349,13 @@ public class WissenLesenSchritte {
             throws Exception {
         try (PreparedStatement query = verbindung.prepareStatement("""
                 insert into %s.dokument (id, quelle, vertraulichkeit, erstellt_von, status, bestaetigt,
-                                                bestaetigt_von)
-                values (?, 'UPLOAD', ?, 'synthetisch', 'ARCHIVIERT', ?, 'inhaber')
+                                                bestaetigt_von, titel)
+                values (?, 'UPLOAD', ?, 'synthetisch', 'ARCHIVIERT', ?, 'inhaber', 'Quelle ' || ?)
                 """.formatted(schema))) {
             query.setObject(1, id);
             query.setString(2, vertraulichkeit);
             query.setObject(3, OffsetDateTime.now(ZoneOffset.UTC));
+            query.setString(4, vertraulichkeit);
             query.executeUpdate();
         }
     }

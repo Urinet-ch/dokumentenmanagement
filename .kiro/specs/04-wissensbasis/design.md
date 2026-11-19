@@ -801,7 +801,10 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 - Seite: gerendertes HTML vom Server wird ohne `[innerHTML]` in sichere Textknoten und interne Links umgewandelt;
   Quellenliste mit Chips zum Dokument (`/dokument/:id?seite=n`); Banner für Hinweise. Der Index liefert den Hinweis
   `quellePruefen` und filtert auf Wunsch nach einer Dokument-ID, jeweils unter demselben Sichtbarkeitsfilter wie
-  der übrige Index.
+  der übrige Index. Die Seite liefert je Quelleneintrag `dokumentTitel`, `dokumentDateiname`, `quellSeitePfad` und
+  `quellSeiteTitel` unter derselben Sichtregel mit (nur Anzeige, kein Nachladen je Quelle im Frontend, damit keine
+  fremden Zugriffsprotokoll-Einträge entstehen); der Hinweis «Abgelaufen» erscheint, wenn `veraltetAb` erreicht
+  und der Status nicht VERALTET ist.
 - Diff: ab 1024 px nebeneinander, darunter untereinander; Zeilen mit `−`/`+` und Farbe; Aktionen je Änderung mit
   Bestätigungsdialog, kein gesammeltes Annehmen. Ingest-Entwurf mit Liste der Kernaussagen (Seite, Auszug,
   Prüfergebnis, «keiner Änderung zugeordnet»).

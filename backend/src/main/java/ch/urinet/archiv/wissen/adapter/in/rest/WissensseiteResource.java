@@ -91,7 +91,8 @@ public class WissensseiteResource {
 
     @Schema(name = "Wissensquelleneintrag")
     public record QuelleDto(String schluessel, UUID dokumentId, Integer seiteVon, Integer seiteBis, String auszug,
-                            UUID quellSeiteId) {
+                            UUID quellSeiteId, String dokumentTitel, String dokumentDateiname, String quellSeitePfad,
+                            String quellSeiteTitel) {
     }
 
     @Schema(name = "Wissensversion")
@@ -286,15 +287,22 @@ public class WissensseiteResource {
     private WissensseiteDto dto(Benutzer benutzer, Wissensseite seite) {
         return new WissensseiteDto(seite.id(), seite.pfad(), seite.typ().datenbankwert(), seite.titel(),
                 seite.beschreibung(), seite.tags(), seite.status().name(), seite.veraltetAb(),
-                seite.vertraulichkeit().name(), seite.quellen().stream().map(WissensseiteResource::dto).toList(),
+                seite.vertraulichkeit().name(), quellen(benutzer, seite),
                 lesen.inhaltDarstellen(benutzer, seite.inhalt()), seite.version(), seite.erzeugtVon(), seite.erzeugtAm(),
                 seite.freigegebenVon(), seite.freigegebenAm(), seite.quellePruefen(), seite.widerspruchOffen(),
                 seite.wissensquelleId());
     }
 
-    private static QuelleDto dto(Quelleneintrag quelle) {
+    private List<QuelleDto> quellen(Benutzer benutzer, Wissensseite seite) {
+        Map<String, WissenLesen.QuellenAnzeige> anzeige = lesen.quellenAnzeige(benutzer, seite);
+        return seite.quellen().stream().map(quelle -> dto(quelle, anzeige.get(quelle.schluessel()))).toList();
+    }
+
+    private static QuelleDto dto(Quelleneintrag quelle, WissenLesen.QuellenAnzeige anzeige) {
         return new QuelleDto(quelle.schluessel(), quelle.dokumentId(), quelle.seiteVon(), quelle.seiteBis(),
-                quelle.auszug(), quelle.quellSeiteId());
+                quelle.auszug(), quelle.quellSeiteId(),
+                anzeige == null ? null : anzeige.dokumentTitel(), anzeige == null ? null : anzeige.dokumentDateiname(),
+                anzeige == null ? null : anzeige.seitePfad(), anzeige == null ? null : anzeige.seiteTitel());
     }
 
     private static IndexZeileDto dto(WissenLesenRepository.IndexZeile seite) {

@@ -136,6 +136,48 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
         return Set.copyOf(rows);
     }
 
+    @Override
+    public Map<UUID, DokumentKopf> dokumentKoepfe(Sichtregel sichtregel, Set<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        SichtregelSql.Ausdruck sicht = SichtregelSql.dokument(sichtregel, "dd");
+        Query query = em.get().createNativeQuery("""
+                select dd.id, dd.titel, dd.dateiname from dokument dd
+                where dd.id in (:ids) and %s
+                """.formatted(sicht.bedingung()));
+        query.setParameter("ids", ids);
+        sicht.parameter().forEach(query::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        Map<UUID, DokumentKopf> ergebnis = new HashMap<>();
+        for (Object[] row : rows) {
+            ergebnis.put((UUID) row[0], new DokumentKopf((String) row[1], (String) row[2]));
+        }
+        return ergebnis;
+    }
+
+    @Override
+    public Map<UUID, SeiteVerweis> sichtbareSeiten(Sichtregel sichtregel, Set<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        WissenSichtbarkeitSql.Ausdruck sicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);
+        Query query = em.get().createNativeQuery("""
+                select s.id, s.pfad, s.titel from wissensseite s
+                where s.id in (:ids) and %s
+                """.formatted(sicht.bedingung()));
+        query.setParameter("ids", ids);
+        sicht.parameter().forEach(query::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        Map<UUID, SeiteVerweis> ergebnis = new HashMap<>();
+        for (Object[] row : rows) {
+            ergebnis.put((UUID) row[0], new SeiteVerweis((UUID) row[0], (String) row[1], (String) row[2]));
+        }
+        return ergebnis;
+    }
+
     private Optional<Wissensseite> seite(String bedingung, Map<String, Object> parameter,
                                          Sichtregel sichtregel) {
         WissenSichtbarkeitSql.Ausdruck sicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);

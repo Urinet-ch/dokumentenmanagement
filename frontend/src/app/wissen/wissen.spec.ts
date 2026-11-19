@@ -76,9 +76,8 @@ describe('Wissensoberfläche', () => {
         + '<p>Belegt <a href="/wissen/ueberblick">Überblick</a>'
         + '<sup class="footnote-ref"><a href="#fn-q1" data-footnote-ref>1</a></sup></p>'
         + '<section data-footnotes><ol><li><p>q1 <a href="#fnref-q1">↩</a></p></li></ol></section>',
-      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3 }], quellePruefen: true,
+      quellen: [{ schluessel: 'q1', dokumentId: 'd1', seiteVon: 3, dokumentTitel: 'Quelle' }], quellePruefen: true,
     });
-    http.expectOne('/api/v1/dokumente/d1').flush({ titel: 'Quelle' });
     http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
     http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
     await fixture.whenStable();
@@ -97,6 +96,41 @@ describe('Wissensoberfläche', () => {
       .toBe('/dokument/d1?seite=3');
   });
 
+  it('lädt Quellentitel nicht nach und zeigt Hinweise für abgelaufene Seiten und Seitenquellen', async () => {
+    const fixture = TestBed.createComponent(WissenSeite);
+    fixture.componentRef.setInput('pfad', 'konzepte/probe');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({
+      id: 's1', titel: 'Probe', status: 'AKTIV', veraltetAb: '2000-01-01',
+      quellen: [
+        { schluessel: 'q1', dokumentId: 'd1', dokumentDateiname: 'scan.pdf' },
+        { schluessel: 'q2', quellSeiteId: 's2', quellSeitePfad: 'quellen/zwei', quellSeiteTitel: 'Quelle Zwei' },
+        { schluessel: 'q3', dokumentId: 'd3' },
+      ],
+    });
+    http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+    http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain(TEXTE.wissen.abgelaufen);
+    expect(element.querySelector('a[href="/wissen/quellen/zwei"]')?.textContent).toContain('Quelle Zwei');
+    expect(element.querySelector('a[href*="/dokument/d1"]')?.textContent).toContain('scan.pdf');
+    expect(element.querySelector('a[href*="/dokument/d3"]')?.textContent).toContain('q3');
+  });
+
+  it('zeigt keinen Abgelaufen-Hinweis bei künftigem Datum oder Status VERALTET', async () => {
+    for (const seite of [{ status: 'AKTIV', veraltetAb: '2999-01-01' }, { status: 'VERALTET', veraltetAb: '2000-01-01' }]) {
+      const fixture = TestBed.createComponent(WissenSeite);
+      fixture.componentRef.setInput('pfad', 'konzepte/probe');
+      fixture.detectChanges();
+      http.expectOne((r) => r.url === '/api/v1/wissensseiten').flush({ id: 's1', titel: 'Probe', quellen: [], ...seite });
+      http.expectOne('/api/v1/wissensseiten/s1/eingehend').flush([]);
+      http.expectOne('/api/v1/wissensseiten/s1/versionen').flush({ versionen: [] });
+      await fixture.whenStable();
+      expect(fixture.nativeElement.textContent).not.toContain(TEXTE.wissen.abgelaufen);
+    }
+  });
+
   it('zeigt bei fehlender oder unsichtbarer Wissensseite denselben 404-Hinweis', async () => {
     const fixture = TestBed.createComponent(WissenSeite);
     fixture.componentRef.setInput('pfad', 'konzepte/fehlt');
@@ -105,6 +139,20 @@ describe('Wissensoberfläche', () => {
       .flush({}, { status: 404, statusText: 'Not Found' });
     await fixture.whenStable();
     expect(fixture.nativeElement.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
+  });
+
+  it('zeigt je Fehlerstatus der Seite die passende Meldung ohne Rechte-Hinweis bei 404', async () => {
+    for (const status of [401, 403, 404, 409, 429, 500, 0]) {
+      const fixture = TestBed.createComponent(WissenSeite);
+      fixture.componentRef.setInput('pfad', 'konzepte/probe');
+      fixture.detectChanges();
+      http.expectOne((r) => r.url === '/api/v1/wissensseiten')
+        .flush({}, { status, statusText: 'Fehler' });
+      await fixture.whenStable();
+      const alarm = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement | null;
+      expect(alarm?.textContent?.trim()).toBeTruthy();
+      if (status === 404) expect(alarm?.textContent).toContain(TEXTE.httpFehler.nichtGefunden);
+    }
   });
 
   it('fragt sichtbare Versionen beim Öffnen erneut ab und bietet unsichtbare nicht an', async () => {

@@ -54,6 +54,7 @@ export const TEXTE = {
     weiter: 'Weiter',
     zurueckSeite: 'Zurück',
     veraltet: 'Veraltet',
+    abgelaufen: 'Abgelaufen: «veraltet ab» erreicht',
     aktiv: 'Aktiv',
     quellePruefen: 'Quelle prüfen',
     widerspruch: 'Widerspruch offen',

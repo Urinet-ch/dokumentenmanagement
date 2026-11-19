@@ -3,13 +3,19 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { forkJoin, map, of, switchMap } from 'rxjs';
-import { Dokument, WissensIndexZeile, Wissensseite, Wissensversion, Wissensversionen } from '../gemeinsam/api';
+import { forkJoin, of, switchMap } from 'rxjs';
+import { WissensIndexZeile, Wissensseite, Wissensversion, Wissensversionen } from '../gemeinsam/api';
 import { anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { zeitpunkt } from '../gemeinsam/format';
 import { httpFehlerMeldung } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { Textteil, wissenText } from './wissen-text';
+
+function heuteIso(): string {
+  const jetzt = new Date();
+  const zweistellig = (zahl: number) => String(zahl).padStart(2, '0');
+  return `${jetzt.getFullYear()}-${zweistellig(jetzt.getMonth() + 1)}-${zweistellig(jetzt.getDate())}`;
+}
 
 interface Quelle {
   schluessel: string;
@@ -63,6 +69,11 @@ export class WissenSeite {
     });
   }
 
+  /** Hinweis ABGELAUFEN (8.3): «veraltet ab» erreicht, Status aber noch nicht VERALTET. */
+  protected abgelaufen(seite: Wissensseite): boolean {
+    return !!seite.veraltetAb && seite.status !== 'VERALTET' && seite.veraltetAb.slice(0, 10) <= heuteIso();
+  }
+
   protected laden(): void {
     const nummer = ++this.anfrage;
     this.versionSchliessen();
@@ -75,31 +86,23 @@ export class WissenSeite {
       switchMap((seite) => {
         if (!seite.id) throw new Error('Wissensseite ohne ID');
         const id = encodeURIComponent(seite.id);
-        const quellen = (seite.quellen ?? []).map((quelle) => {
+        // Titel und Ziele der Quellen liefert der Server mit (unter derselben Sichtregel): kein Nachladen je Quelle.
+        const quellen = (seite.quellen ?? []).map((quelle): Quelle => {
+          const schluessel = quelle.schluessel ?? '';
           if (quelle.dokumentId) {
-            return this.http.get<Dokument>(`/api/v1/dokumente/${encodeURIComponent(quelle.dokumentId)}`).pipe(
-              map((dokument): Quelle => ({
-                schluessel: quelle.schluessel ?? '',
-                titel: anzeigeTitel(dokument.titel, null, dokument.dateiname).text,
-                dokumentId: quelle.dokumentId,
-                seite: quelle.seiteVon,
-              })),
-            );
+            const bekannt = quelle.dokumentTitel || quelle.dokumentDateiname;
+            return {
+              schluessel,
+              titel: bekannt ? anzeigeTitel(quelle.dokumentTitel, null, quelle.dokumentDateiname).text : schluessel,
+              dokumentId: quelle.dokumentId,
+              seite: quelle.seiteVon,
+            };
           }
-          if (quelle.quellSeiteId) {
-            return this.http.get<Wissensseite>(`/api/v1/wissensseiten/${encodeURIComponent(quelle.quellSeiteId)}`).pipe(
-              map((quelleSeite): Quelle => ({
-                schluessel: quelle.schluessel ?? '',
-                titel: quelleSeite.titel ?? '',
-                pfad: quelleSeite.pfad,
-              })),
-            );
-          }
-          throw new Error('Quelleneintrag ohne Ziel');
+          return { schluessel, titel: quelle.quellSeiteTitel || schluessel, pfad: quelle.quellSeitePfad };
         });
         return forkJoin({
           seite: of(seite),
-          quellen: quellen.length ? forkJoin(quellen) : of([]),
+          quellen: of(quellen),
           eingehend: this.http.get<WissensIndexZeile[]>(`/api/v1/wissensseiten/${id}/eingehend`),
           versionen: this.http.get<Wissensversionen>(`/api/v1/wissensseiten/${id}/versionen`),
         });

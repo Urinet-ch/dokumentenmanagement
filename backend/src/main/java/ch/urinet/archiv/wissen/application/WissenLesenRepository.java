@@ -29,6 +29,12 @@ public interface WissenLesenRepository {
 
     List<IndexZeile> eingehend(UUID seiteId, Sichtregel sichtregel);
 
+    /** Titel und Dateiname der für die Regel sichtbaren Dokumente; unsichtbare fehlen im Ergebnis. */
+    Map<UUID, DokumentKopf> dokumentKoepfe(Sichtregel sichtregel, Set<UUID> ids);
+
+    /** Pfad und Titel der für die Regel sichtbaren Wissensseiten; unsichtbare fehlen im Ergebnis. */
+    Map<UUID, SeiteVerweis> sichtbareSeiten(Sichtregel sichtregel, Set<UUID> ids);
+
     LogSeite log(Sichtregel sichtregel, LogCursor vor, int groesse);
 
     record IndexAnfrage(Seitentyp typ, String tag, String q, UUID dokumentId, int offset, int groesse) {
@@ -56,6 +62,9 @@ public interface WissenLesenRepository {
         public WissensVersion {
             daten = Collections.unmodifiableMap(new LinkedHashMap<>(daten));
         }
+    }
+
+    record DokumentKopf(String titel, String dateiname) {
     }
 
     record SeiteVerweis(UUID id, String pfad, String titel) {

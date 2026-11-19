@@ -18,16 +18,16 @@ Given('synthetische Wissensseiten sind für die Oberfläche verfügbar', async f
     if (url.pathname === '/api/v1/wissensbasis/log') {
       antwort = { eintraege: [{ id: 1, text: 'Synthetischer Logeintrag', seiten: [] }] };
     } else if (url.pathname.endsWith('/eingehend')) {
-      antwort = [];
+      antwort = [{ id: 'seite-0', pfad: 'konzepte/verweis', typ: 'Konzept', titel: 'Synthetische Verweisseite' }];
     } else if (url.pathname.endsWith('/versionen')) {
-      antwort = { versionen: [] };
+      antwort = { versionen: [{ nummer: 1, zeit: '2026-01-01T10:00:00Z' }] };
     } else if (url.searchParams.has('pfad')) {
       antwort = {
         ...zeile, version: 1, freigegebenAm: '2026-01-01T10:00:00Z',
         inhaltHtml: '<h2>Aussagen</h2><ul><li>Synthetischer Eintrag</li></ul>'
           + '<p>Belegte Aussage. <a href="/wissen/ueberblick">Überblick</a><sup class="footnote-ref">'
           + '<a href="#fn-q1" data-footnote-ref>1</a></sup></p>',
-        quellen: [{ schluessel: 'q1', dokumentId: dokument.id, seiteVon: 2 }],
+        quellen: [{ schluessel: 'q1', dokumentId: dokument.id, seiteVon: 2, dokumentTitel: dokument.titel }],
       };
     } else {
       antwort = { gesamt: 1, gruppen: [{ typ: 'Konzept', seiten: [zeile] }] };
@@ -60,12 +60,15 @@ async function pruefen(seite) {
 Then('sind Index, Seite, Quellen und Log ohne horizontales Scrollen und ohne axe-Befund bedienbar', async function () {
   const seite = this.seite;
   await seite.getByText('Quelle prüfen', { exact: true }).waitFor();
+  for (const feld of ['Suchbegriff', 'Seitentyp', 'Schlagwort']) await seite.getByLabel(feld).waitFor();
   await pruefen(seite);
   await seite.getByRole('link', { name: zeile.titel }).click();
   await seite.getByRole('heading', { name: zeile.titel }).waitFor();
   await seite.getByRole('heading', { name: 'Aussagen' }).waitFor();
   assert.equal(await seite.locator('article').getByRole('link', { name: 'Überblick' }).getAttribute('href'),
     '/wissen/ueberblick');
+  await seite.getByRole('link', { name: 'Synthetische Verweisseite' }).waitFor();
+  await seite.getByRole('button', { name: 'Version 1' }).waitFor();
   await pruefen(seite);
   const fussnote = seite.locator('article').getByRole('link', { name: `[1] ${dokument.titel} · Seite 2` });
   assert.equal(await fussnote.getAttribute('href'), `/dokument/${dokument.id}?seite=2`);

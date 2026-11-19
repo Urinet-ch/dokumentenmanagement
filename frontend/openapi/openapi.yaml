@@ -2820,6 +2820,14 @@ components:
           type: string
         quellSeiteId:
           $ref: "#/components/schemas/UUID"
+        dokumentTitel:
+          type: string
+        dokumentDateiname:
+          type: string
+        quellSeitePfad:
+          type: string
+        quellSeiteTitel:
+          type: string
     Wissensseite:
       type: object
       properties:
