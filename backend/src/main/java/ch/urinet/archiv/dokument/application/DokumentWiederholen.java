@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,11 +27,14 @@ public class DokumentWiederholen {
     private final DokumentRepository repository;
     private final DokumentStatusPort status;
     private final AuftragService auftraege;
+    private final DokumentEreignisse ereignisse;
 
-    public DokumentWiederholen(DokumentRepository repository, DokumentStatusPort status, AuftragService auftraege) {
+    public DokumentWiederholen(DokumentRepository repository, DokumentStatusPort status, AuftragService auftraege,
+                              DokumentEreignisse ereignisse) {
         this.repository = repository;
         this.status = status;
         this.auftraege = auftraege;
+        this.ereignisse = ereignisse;
     }
 
     /** @return die neue Version des Dokuments (für das ETag) */
@@ -40,6 +44,7 @@ public class DokumentWiederholen {
         if (dokument.version() != erwarteteVersion) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
+        ereignisse.vorAenderung();
         Stand stand = status.stand(id, true).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (stand.version() != erwarteteVersion) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
@@ -61,6 +66,7 @@ public class DokumentWiederholen {
             }
             default -> throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
+        ereignisse.geaendert(id, Set.of("status"));
         return erwarteteVersion + 1;
     }
 }

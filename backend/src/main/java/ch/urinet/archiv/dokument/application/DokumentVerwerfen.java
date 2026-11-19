@@ -39,14 +39,17 @@ public class DokumentVerwerfen {
     private final VerwerfenProtokollPort protokoll;
     private final AblagePort ablage;
     private final MandantAufloesung aufloesung;
+    private final DokumentEreignisse ereignisse;
 
     public DokumentVerwerfen(DokumentRepository repository, DokumentStatusPort status,
-                             VerwerfenProtokollPort protokoll, AblagePort ablage, MandantAufloesung aufloesung) {
+                             VerwerfenProtokollPort protokoll, AblagePort ablage, MandantAufloesung aufloesung,
+                             DokumentEreignisse ereignisse) {
         this.repository = repository;
         this.status = status;
         this.protokoll = protokoll;
         this.ablage = ablage;
         this.aufloesung = aufloesung;
+        this.ereignisse = ereignisse;
     }
 
     public void verwerfen(Benutzer benutzer, UUID id, int erwarteteVersion, String grund) {
@@ -66,6 +69,7 @@ public class DokumentVerwerfen {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
         MandantCode mandant = aufloesung.pruefen();
+        ereignisse.vorAenderung();
         Stand stand = status.stand(id, true).orElseThrow(() -> new FachFehler(Fehlercode.NICHT_GEFUNDEN));
         if (stand.version() != erwarteteVersion) {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
@@ -73,6 +77,7 @@ public class DokumentVerwerfen {
         if (!ERLAUBT.contains(stand.status()) || !status.verwerfen(id, erwarteteVersion, text)) {
             throw new FachFehler(Fehlercode.STATUS_KONFLIKT);
         }
+        ereignisse.geaendert(id, Set.of("status"));
         for (String sha256 : stand.sha256()) {
             protokoll.dateiVerworfen(id, sha256, text);
         }

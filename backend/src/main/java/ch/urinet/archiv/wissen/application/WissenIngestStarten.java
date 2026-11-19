@@ -1,6 +1,5 @@
 package ch.urinet.archiv.wissen.application;
 
-import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.gemeinsam.domain.Seitentext;
@@ -28,7 +27,7 @@ import java.util.UUID;
  * Hinweise stehen nur im Entwurf ({@code wissens_entwurf.hinweis}).
  */
 @ApplicationScoped
-public class WissenIngestStarten implements DokumentEreignisse {
+public class WissenIngestStarten {
 
     public static final AuftragTyp TYP = new AuftragTyp("WISSEN_INGEST");
     public static final String NUTZLAST_ENTWURF_ID = "entwurfId";
@@ -65,7 +64,6 @@ public class WissenIngestStarten implements DokumentEreignisse {
      * wiederholt (design.md, «Ingest»).
      */
     @Transactional
-    @Override
     public void archiviert(UUID dokumentId, String art) {
         if (!WISSENSQUELLE.equals(art)) {
             return;

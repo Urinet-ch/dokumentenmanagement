@@ -2,7 +2,7 @@
 <databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="051-klassifikation-volltext" author="copilot">
+    <changeSet id="055-klassifikation-volltext" author="copilot">
         <sql>alter table dokument alter column volltext_tsv drop expression</sql>
         <sql splitStatements="false"><![CDATA[
             create function archiv_dokument_volltext_tsv(p_id uuid, p_titel text, p_partner text, p_tags text[],
