@@ -3,7 +3,13 @@ set -euo pipefail
 
 realm=${KC_REALM:-urinet-archiv}
 kcadm=${KCADM:-/opt/keycloak/bin/kcadm.sh}
+id_datei=${GOOGLE_CLIENT_ID_DATEI:-/run/secrets/google_client_id}
 secret_datei=${GOOGLE_CLIENT_SECRET_DATEI:-/run/secrets/google_client_secret}
+
+if [[ ! -s "$id_datei" ]]; then
+  echo "Secret-Datei google_client_id fehlt oder ist leer." >&2
+  exit 1
+fi
 
 if [[ ! -s "$secret_datei" ]]; then
   echo "Secret-Datei google_client_secret fehlt oder ist leer." >&2
@@ -58,7 +64,7 @@ fi
 neuen_flow_anlegen google-nur-verknuepft deny-access-authenticator
 neuen_flow_anlegen google-totp-pflicht auth-otp-form
 
-jq -n --rawfile geheimnis "$secret_datei" '{
+jq -n --rawfile kennung "$id_datei" --rawfile geheimnis "$secret_datei" '{
   alias: "google",
   displayName: "Google",
   providerId: "google",
@@ -68,7 +74,7 @@ jq -n --rawfile geheimnis "$secret_datei" '{
   firstBrokerLoginFlowAlias: "google-nur-verknuepft",
   postBrokerLoginFlowAlias: "google-totp-pflicht",
   config: {
-    clientId: "GOOGLE_CLIENT_ID",
+    clientId: ($kennung | rtrimstr("\n")),
     clientSecret: ($geheimnis | rtrimstr("\n")),
     syncMode: "IMPORT",
     defaultScope: "openid email profile"

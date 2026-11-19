@@ -1,15 +1,15 @@
 # Google-IdP
 
 Der Realm-Export enthält den deaktivierten Provider `google`, beide Anmeldeflows und die Ereignistypen. `start.sh` kann
-`google_client_secret` aus `/run/secrets/` lesen und den Wert beim erstmaligen Import als `GOOGLE_CLIENT_SECRET`
-bereitstellen. Ohne diese Datei wird der Platzhalter leer aufgelöst; das ist nur zulässig, solange der Provider
+`google_client_id` und `google_client_secret` aus `/run/secrets/` lesen und die Werte beim erstmaligen Import als
+`GOOGLE_CLIENT_ID` und `GOOGLE_CLIENT_SECRET` bereitstellen. Ohne diese Dateien werden die Platzhalter leer aufgelöst; das ist nur zulässig, solange der Provider
 deaktiviert bleibt. Das Produktions-Compose-File bindet das Secret noch nicht ein: Der Deploy-Workflow muss die Datei
-erst nach dem Entscheid zu OAuth-Client und GitHub-Secret bereitstellen.
+erst nach dem Entscheid zu OAuth-Client und GitHub-Secrets (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) bereitstellen.
 
 `--import-realm` überspringt einen Realm, der bereits in der Datenbank vorhanden ist. Die Vorlage
 [`google-idp-einrichten-vorlage.sh`](./google-idp-einrichten-vorlage.sh) bildet darum die einmalige Nachrüstung ab. Sie
-ist für einen Wegwerf-Container mit authentifiziertem `kcadm.sh`, `jq` und einer Secret-Datei unter
-`/run/secrets/google_client_secret` gedacht. Die Vorlage wurde mit einem `kcadm.sh`-Stub und synthetischem Secret
+ist für einen Wegwerf-Container mit authentifiziertem `kcadm.sh`, `jq` und Secret-Dateien unter
+`/run/secrets/google_client_id` und `/run/secrets/google_client_secret` gedacht. Die Vorlage wurde mit einem `kcadm.sh`-Stub und synthetischen Testwerten
 geprüft, aber nicht gegen einen bestehenden Realm oder einen Betriebsserver ausgeführt. Sie legt den Provider absichtlich
 deaktiviert an.
 
@@ -46,6 +46,6 @@ bash deploy/infomaniak/keycloak/test/google-idp-einrichten-vorlage-test.sh
   Sitzungsende nach dem Lösen (`users/{id}/logout`) sind in `tasks.md` O.8 offen.
 - `eventsListeners` ist in Realm-Export und Vorlage gleich (`[]`, Ereignisse nur in der Datenbank); `eventsExpiration` ist
   bewusst nicht gesetzt (unbegrenzte Aufbewahrung, Zugriffsprotokoll nach Req 2.27).
-- `start.sh` setzt ein fehlendes `google_client_secret` auf leer; das gilt nur bei deaktiviertem Provider. Mit der Freigabe
-  wird die Datei Pflicht (offen für Fabian, Workflow-Prüfung).
+- `start.sh` setzt fehlende `google_client_id` und `google_client_secret` auf leer; das gilt nur bei deaktiviertem Provider. Mit der Freigabe
+  werden die Dateien Pflicht (offen für Fabian, Workflow-Prüfung).
 - Der Stub-Test der Vorlage läuft nicht in der CI (Workflow-Änderung liegt bei Fabian) und wird von Hand gestartet.

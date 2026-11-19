@@ -15,10 +15,15 @@ lesen() {
 # Befehlsersetzung entfernt den abschliessenden Zeilenumbruch
 KC_DB_PASSWORD=$(lesen keycloak_db)
 KC_BOOTSTRAP_ADMIN_PASSWORD=$(lesen keycloak_admin)
+if [[ -e /run/secrets/google_client_id ]]; then
+  GOOGLE_CLIENT_ID=$(lesen google_client_id)
+else
+  GOOGLE_CLIENT_ID=
+fi
 if [[ -e /run/secrets/google_client_secret ]]; then
   GOOGLE_CLIENT_SECRET=$(lesen google_client_secret)
 else
   GOOGLE_CLIENT_SECRET=
 fi
-export KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD GOOGLE_CLIENT_SECRET
+export KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
 exec /opt/keycloak/bin/kc.sh start --optimized --import-realm "$@"

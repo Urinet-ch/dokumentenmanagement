@@ -6,6 +6,7 @@ vorlage="$repo/deploy/infomaniak/keycloak/google-idp-einrichten-vorlage.sh"
 temp=$(mktemp -d)
 trap 'rm -rf -- "$temp"' EXIT
 mkdir -p "$temp/secrets" "$temp/bin"
+printf '%s\n' 'synthetische-client-id.apps.test' > "$temp/secrets/google_client_id"
 printf '%s\n' 'nur-synthetischer-testwert' > "$temp/secrets/google_client_secret"
 
 cat > "$temp/bin/kcadm-stub" <<'STUB'
@@ -39,13 +40,14 @@ elif [[ ( "$1" == create && "$2" == identity-provider/instances ) || ( "$1" == u
     fi
     shift
   done
-  jq -e '.enabled == false and .config.clientSecret == "nur-synthetischer-testwert" and .config.syncMode == "IMPORT"' "$payload" >/dev/null
+  jq -e '.enabled == false and .config.clientId == "synthetische-client-id.apps.test" and .config.clientSecret == "nur-synthetischer-testwert" and .config.syncMode == "IMPORT"' "$payload" >/dev/null
 fi
 STUB
 chmod +x "$temp/bin/kcadm-stub"
 
 KC_KCADM_AUFRUFPROTOKOLL="$temp/aufrufe.log" \
 KCADM="$temp/bin/kcadm-stub" \
+GOOGLE_CLIENT_ID_DATEI="$temp/secrets/google_client_id" \
 GOOGLE_CLIENT_SECRET_DATEI="$temp/secrets/google_client_secret" \
 bash "$vorlage" >/dev/null
 
@@ -57,6 +59,7 @@ grep -q 'clients/account-client/roles/manage-account/composites' "$temp/aufrufe.
 KC_STUB_VORHANDEN=1 \
 KC_KCADM_AUFRUFPROTOKOLL="$temp/wiederholung.log" \
 KCADM="$temp/bin/kcadm-stub" \
+GOOGLE_CLIENT_ID_DATEI="$temp/secrets/google_client_id" \
 GOOGLE_CLIENT_SECRET_DATEI="$temp/secrets/google_client_secret" \
 bash "$vorlage" >/dev/null
 ! grep -q '^create ' "$temp/wiederholung.log"

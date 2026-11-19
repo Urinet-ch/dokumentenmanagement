@@ -31,6 +31,7 @@ public class ExportKeycloak implements QuarkusTestResourceLifecycleManager {
         keycloak = new GenericContainer<>(image())
                 .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN)
                 .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORT)
+                .withEnv("GOOGLE_CLIENT_ID", "synthetische-google-client-id.apps.test")
                 .withEnv("GOOGLE_CLIENT_SECRET", "synthetischer-google-testwert")
                 .withCopyFileToContainer(MountableFile.forHostPath(export.toAbsolutePath()),
                         "/opt/keycloak/data/import/realm-export.json")
