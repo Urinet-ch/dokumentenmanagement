@@ -49,6 +49,11 @@ public class FreigabePruefung {
                 kontext.entfernteAussagen(), kontext.kernaussagenSchluessel(), kontext.ingest(), kontext.veralten(),
                 kontext.pfadHoehereStufe(), kontext.bisherigeVertraulichkeit(),
                 Wissensseite.Vertraulichkeit.valueOf(mindeststufe.name()));
-        return new Ergebnis(mindeststufe, WissensPruefung.pruefen(fassung, aktuell));
+        Wissensseite gepruefteFassung = new Wissensseite(fassung.id(), fassung.pfad(), fassung.typ(), fassung.titel(),
+                fassung.beschreibung(), fassung.tags(), fassung.status(), fassung.veraltetAb(), fassung.quellen(),
+                Wissensseite.Vertraulichkeit.valueOf(mindeststufe.name()), fassung.inhalt(), fassung.version(),
+                fassung.erzeugtVon(), fassung.erzeugtAm(), fassung.freigegebenVon(), fassung.freigegebenAm(),
+                fassung.quellePruefen(), fassung.widerspruchOffen(), fassung.wissensquelleId());
+        return new Ergebnis(mindeststufe, WissensPruefung.pruefen(gepruefteFassung, aktuell));
     }
 }

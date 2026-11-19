@@ -81,6 +81,22 @@ class FreigabePruefungTest {
                 .contains(WissensPruefung.Code.QUELLE_PERSONAL);
     }
 
+    @Test
+    void vertraulichkeitDerVorgeschlagenenFassungWirdNichtUebernommen() {
+        WissensGraph graph = new WissensGraph(Map.of(quelle, Set.of()), Map.of(quelle, Set.of()), Map.of(),
+                Map.of(quelle, WissensStufe.NORMAL));
+        Wissensseite vorschlag = new Wissensseite(null, "ueberblick", Seitentyp.SYNTHESE, "Probe", "Beschreibung.",
+                List.of(), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", null, null, null, null, quelle)),
+                Wissensseite.Vertraulichkeit.INTERN, "Aussage.[^q1]", 1, null, null, null, null, false, false, null);
+
+        FreigabePruefung.Ergebnis ergebnis = pruefung.pruefen(vorschlag, graph, WissensStufe.NORMAL,
+                WissensStufe.NORMAL, null, WissensPruefung.Kontext.leer());
+        assertThat(ergebnis.mindeststufe()).isEqualTo(WissensStufe.NORMAL);
+        assertThat(ergebnis.pruefung().befunde()).extracting(WissensPruefung.Befund::code)
+                .doesNotContain(WissensPruefung.Code.STUFE_UEBERBLICK);
+    }
+
     private Wissensseite seite(String pfad, Seitentyp typ) {
         return new Wissensseite(null, pfad, typ, "Probe", "Beschreibung.", List.of(),
                 Wissensseite.Status.AKTIV, null, List.of(new Quelleneintrag("q1", null, null, null, null, quelle)),
