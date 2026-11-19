@@ -47,6 +47,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 11.1–11.3, 11.5, 11.8, 11.9, 12.1–12.3_
   - _Abhängig von: 13.3_
   - Vermerk (PR #300): Die Neuberechnung bei Änderung eines Dokuments (11.1, 11.3) ist umgesetzt, wird aber erst mit 14.4 (`QuelldokumentBeobachter`) angebunden; der Befund `STUFE_UEBERBLICK` (11.8) liegt in `WissensPruefung` (13.4), die wirksame Stufe nach Annahme in `WissensGraph.wirksameStufeNachAnnahme` (13.5), der Aufruf bei jedem Annehmen kommt mit 14.2. Eine Übersicht erhält bei einer Dokumentänderung die wirksame Stufe (11.9, entschieden von Fabian am 18.11.2026). Der Endpunkt-Nachweis zu 12.2 folgt mit 14.2 am ersten schreibenden A17-Endpunkt (`POST /wissensentwuerfe`); ein Leseendpunkt aus 13.6 kann die schreibende Sperre für `treuhaender` nicht prüfen. Der Endpunkt-Nachweis zu 12.3 folgt mit dem Entwurfszugriff in 14.x.
+  - Ergänzung 13.5b (PR #318, Req 11.10; erledigt, Auftrag Copilot-Runde 27 «Mindeststufe Zitate»): Mindeststufen zitierter Quellseiten rekursiv und monoton übernehmen, Zyklen und Tiefengrenze absichern; abhängige Seiten bei Freigabe unter Mandantensperre neu berechnen, historische Versionen unverändert lassen. Nachweis (Req 11.1, 11.8, 11.10): Szenario `@req-11.10` in `sichtbarkeit-rechte.feature`, `WissensGraphTest` (Zyklus, Tiefe 128/129, Nicht-Senken), `WissenHuelleDienstTest`.
 
 - [x] 13.6 Lesen: Index, Seite, Versionen, Log [Backend]
   - REST `GET /wissensseiten…`, `/wissensbasis/log` nach design.md mit ETag; Index nach Typ gruppiert, Log aus Feldern erzeugt und gefiltert; eingehende Links inkl. Quelleneinträgen auf die Wissensquelle einer Quelle-Seite; Versionen und Diff mit Sichtbarkeit je Version (Szenario: frühere `INTERN`-Version bleibt für `mitarbeiter` 404)
@@ -78,7 +79,7 @@ Nachweis-Vermerk) und erfüllt die Definition of Done aus `tech.md`.
   - manueller Entwurf `POST /wissensentwuerfe`; Felder nach 7.6 nur vom System
   - wirksame Stufe nach Annahme über `WissensGraph.wirksameStufeNachAnnahme` als `Kontext.wirksameVertraulichkeit`, Seitenstufe = Mindeststufe; zuerst `WissenHuelleDienst.sperren()`, dann Seite und Version, dann `versionFreigeben` in derselben Transaktion; Test mit zwei parallelen Freigaben (Review PR #300, S1, S2)
   - Szenario `@req-12.3` über den Entwurfszugriff: eigener Analysevorschlag ohne Fassung und Diff (Review PR #300, S4)
-  - Szenario `@req-11.8` Ende zu Ende: Annehmen einer Fassung von `ueberblick`, deren wirksame Stufe über `NORMAL` liegt, ergibt 422 mit dem Befund `STUFE_UEBERBLICK` (Review PR #300, ebc9d0b6, K3); vorher klären, ob Mindeststufen zitierter Quellseiten in die wirksame Stufe einfliessen (design.md, «Umsetzung 13.5»)
+  - Szenario `@req-11.8` Ende zu Ende: Annehmen einer Fassung von `ueberblick`, deren wirksame Stufe über `NORMAL` liegt, ergibt 422 mit dem Befund `STUFE_UEBERBLICK` (Review PR #300, ebc9d0b6, K3); Mindeststufen zitierter Quellseiten fliessen in die wirksame Stufe ein (geklärt durch Req 11.10 / 13.5b, PR #318, Entscheid vom 18.11.2026); der Endpunkt-Test prüft 422 `STUFE_UEBERBLICK` auch mit einer Zitat-Quelle höherer Stufe
   - _Anforderungen: 6.1–6.10, 7.6, 14.1_
   - _Abhängig von: 14.1_
 

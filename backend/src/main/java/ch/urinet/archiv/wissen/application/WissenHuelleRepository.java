@@ -17,6 +17,8 @@ public interface WissenHuelleRepository {
 
     void aktuelleHuelleSetzen(UUID seiteId, Set<UUID> dokumente);
 
+    void mindeststufeAnheben(UUID seiteId, WissensStufe mindeststufe);
+
     void vertraulichkeitSetzen(UUID seiteId, WissensStufe stufe);
 
     void versionsHuelleEinfuegen(UUID seiteId, int version, Set<UUID> dokumente);

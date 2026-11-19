@@ -47,6 +47,14 @@
   @if (d.fehler && !imKorb()) {
     <p class="warnung" data-test="fehlertext">{{ d.fehler }}</p>
   }
+  @if (entwurfWiederhergestellt()) {
+    <div class="hinweis" role="status" data-test="entwurf-wiederhergestellt">
+      <span>{{ texte.entwurfWiederhergestellt }}</span>
+      <button mat-button type="button" data-test="entwurf-verwerfen" (click)="entwurfVerwerfen()">
+        {{ texte.entwurfVerwerfen }}
+      </button>
+    </div>
+  }
   @if (d.pdfaFehlt) {
     <p class="warnung" data-test="hinweis-pdfa">{{ texte.hinweisPdfa }}</p>
   }

@@ -294,6 +294,8 @@ export const TEXTE = {
     bestaetigenLaeuft: 'Wird bestätigt …',
     aendern: 'Angaben ändern',
     aendernSchliessen: 'Änderungen verwerfen',
+    entwurfWiederhergestellt: 'Entwurf wiederhergestellt',
+    entwurfVerwerfen: 'Entwurf verwerfen',
     angaben: (titel: string) => `Angaben zu «${titel}»`,
     verwerfen: 'Verwerfen',
     erneutVerarbeiten: 'Erneut verarbeiten',
