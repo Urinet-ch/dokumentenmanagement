@@ -168,7 +168,10 @@ flowchart LR
   ihrer eigenen Hülle gefiltert werden (Requirement 4.4).
 - Mindeststufe `vertraulichkeit_mindest` (`NORMAL` | `INTERN`): Maximum aus der Erhöhung von Hand (Requirement 6.8)
   und den Kontextstufen aller angenommenen Änderungen (`wissens_aenderung.vertraulichkeit_kontext`, Requirement
-  11.7); sie sinkt nie. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`.
+  11.7) sowie den Mindeststufen zitierter Quellseiten (11.10, Entscheid Fabian vom 18.11.2026); sie sinkt nie.
+  Quellseiten werden rekursiv mit Zyklenschutz berücksichtigt; ab Tiefe 129 oder bei unbekannter Quellseite gilt
+  vorsorglich `INTERN`. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`. Bei Freigabe
+  einer Quellseite werden ihre abhängigen Seiten unter derselben Mandantensperre neu berechnet.
 - `WissenSichtbarkeit` hängt an jede Abfrage auf Seiten (Index, Suche, Zähler, Log, eingehende Links, Versionen,
   Diff, Werkzeuge) denselben Filter. Er nutzt den `VertraulichkeitFilter` aus Spec 01 (ADR-009) und wertet live aus,
   damit eine Änderung nach A8 sofort wirkt (Requirement 11.3):
@@ -180,7 +183,8 @@ flowchart LR
       AND NOT (<Sichtbarkeitsfilter des Benutzers für d nach Spec 01, 2.6, Zeilen A2 bis A4>))
     AND <Stufe s.vertraulichkeit_mindest für den Benutzer nach A2/A3 sichtbar>   -- mitarbeiter: nur NORMAL
   ```
-  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument` und der Mindeststufe aus `daten`.
+  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument`, der Mindeststufe aus `daten` und der
+  aktuellen Mindeststufe der Seite; historische Versionen bleiben unveränderlich.
   Unsichtbare Versionen erscheinen in der Liste nur als Nummer; `/versionen/{n}` antwortet mit 404, `/diff` nur,
   wenn beide Versionen sichtbar sind.
 - `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Lint-Paare nach 10.4). Für den

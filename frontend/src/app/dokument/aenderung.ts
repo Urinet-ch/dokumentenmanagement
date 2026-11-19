@@ -38,6 +38,8 @@ export type ZusatzTyp = 'text' | 'datum' | 'zahl' | 'ganzzahl' | 'janein' | 'aus
 /** Eingabefeld für einen Eintrag unter `properties` des Zusatz-Schemas der Art. */
 export interface ZusatzFeld {
   name: string;
+  titel?: string;
+  beschreibung?: string;
   typ: ZusatzTyp;
   optionen: readonly string[];
   /** Optionale Anzeigetexte je Enum-Wert (`x-labels` im Schema); fehlt ein Wert, gilt der Rohwert. */
@@ -220,6 +222,12 @@ export function zusatzFelder(art: Dokumentart | undefined): ZusatzFeld[] {
     const optionen =
       typ === 'auswahl' ? (e['enum'] as string[]) : typ === 'mehrfach' ? (objekt(e['items'])['enum'] as string[]) : [];
     const feld: ZusatzFeld = { name, typ, optionen, pflicht: pflicht.has(name) };
+    if (typeof e['title'] === 'string') {
+      feld.titel = e['title'];
+    }
+    if (typeof e['description'] === 'string') {
+      feld.beschreibung = e['description'];
+    }
     const beschriftungen = beschriftungenAus(e, optionen);
     if (beschriftungen) {
       feld.beschriftungen = beschriftungen;

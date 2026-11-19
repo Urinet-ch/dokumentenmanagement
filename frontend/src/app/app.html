@@ -46,7 +46,7 @@
     }
   }
   @if (anmeldung.zustand() !== 'abgemeldet') {
-    <button mat-button type="button" (click)="anmeldung.abmelden()">{{ texte.anmeldung.abmelden }}</button>
+    <button mat-button type="button" (click)="abmelden()">{{ texte.anmeldung.abmelden }}</button>
   }
 </mat-toolbar>
 <mat-sidenav-container class="rahmen">
