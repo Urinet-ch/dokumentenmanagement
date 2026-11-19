@@ -37,7 +37,7 @@ Funktionalität: Kontakte ansehen und pflegen in der PWA
     Wenn ich die Seite «/kontakte» öffne
     Und ich mich anmelde
     Dann bin ich auf der Seite «/»
-    Und sehe ich im geöffneten Menü genau «Erfassen, Eingangskorb, Suche, Chat»
+    Und sehe ich im geöffneten Menü genau «Erfassen, Eingangskorb, Suche, Wissen, Chat»
     Und hat die PWA die Kontakte-Schnittstelle nicht aufgerufen
     Und verweigert das Archiv «mitarbeiter» im Mandanten «urinet» die Kontaktliste mit 403 «NICHT_ERLAUBT»
     Und enthält das Zugriffsprotokoll von «urinet» eine neue Verweigerung «VERWEIGERT» für die Rolle «MITARBEITER» mit dem Grund «A6»

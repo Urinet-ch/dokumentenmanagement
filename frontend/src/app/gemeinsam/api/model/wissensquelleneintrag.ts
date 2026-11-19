@@ -16,5 +16,9 @@ export interface Wissensquelleneintrag {
     seiteBis?: number;
     auszug?: string;
     quellSeiteId?: string;
+    dokumentTitel?: string;
+    dokumentDateiname?: string;
+    quellSeitePfad?: string;
+    quellSeiteTitel?: string;
 }
 
