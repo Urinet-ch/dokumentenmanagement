@@ -23,6 +23,7 @@ import { filter, map } from 'rxjs';
 import { AnmeldungService } from './gemeinsam/anmeldung/anmeldung.service';
 import { BrandingService } from './gemeinsam/branding.service';
 import { EingangskorbZaehler } from './gemeinsam/eingangskorb-zaehler';
+import { EingangskorbEntwurfSpeicher } from './eingangskorb/entwurf-speicher';
 import { MENUE } from './gemeinsam/navigation';
 import { ONLINE } from './gemeinsam/online';
 import { TEXTE } from './gemeinsam/texte.de-CH';
@@ -52,6 +53,7 @@ export class App {
   protected readonly anmeldung = inject(AnmeldungService);
   protected readonly branding = inject(BrandingService);
   protected readonly zaehler = inject(EingangskorbZaehler);
+  private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   protected readonly online = inject(ONLINE);
   protected readonly updateBereit = signal(false);
   protected readonly updateFehler = signal(false);
@@ -68,6 +70,13 @@ export class App {
   protected readonly menue = computed(() => MENUE.filter((punkt) => this.anmeldung.darf(punkt.aktion)));
 
   constructor() {
+    effect(() => {
+      const benutzerId = this.anmeldung.benutzer()?.id;
+      if (benutzerId) {
+        this.entwurfSpeicher.benutzerWechsel(benutzerId);
+      }
+    });
+
     if (this.swUpdate.isEnabled) {
       this.swUpdate.versionUpdates
         .pipe(
@@ -102,6 +111,11 @@ export class App {
 
   protected zumInhalt(inhalt: HTMLElement): void {
     inhalt.focus();
+  }
+
+  protected abmelden(): void {
+    this.entwurfSpeicher.alleLoeschen();
+    this.anmeldung.abmelden();
   }
 
   protected async aktualisieren(): Promise<void> {
