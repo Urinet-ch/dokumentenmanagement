@@ -290,8 +290,9 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
     expect(knoepfe()).toEqual([T.bestaetigen, T.aendern, T.verwerfen]);
 
     await klicken(T.bestaetigen);
+    expect(http.match({ method: 'PATCH', url: '/api/v1/dokumente/d1' })).toHaveLength(0);
     const anfrage = await antworten('/api/v1/dokumente/d1/bestaetigen', null, 202, 'Accepted');
-    expect(anfrage.headers.get('If-Match')).toBe('"4"');
+    expect(anfrage.headers.get('If-Match')).toBe('"3"');
     expect(anfrage.body).toEqual(
       expect.objectContaining({
         art: 'LIEFERANTENRECHNUNG',

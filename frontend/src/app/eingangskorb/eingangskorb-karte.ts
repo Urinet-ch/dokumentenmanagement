@@ -657,9 +657,10 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     const klassifikationenBody = this.klassifikationenBody();
     const bisherigerZusatz = objekt(this.dokument().zusatz);
     const bisherigeKlassifikationen = this.dokument().klassifikationen ?? {};
-    const klassifikationenGeaendert =
-      artNeu !== null ||
-      !gleicheKlassifikationen(this.klassifikationenWerte(), bisherigeKlassifikationen);
+    const klassifikationenGeaendert = !gleicheKlassifikationen(
+      this.klassifikationenWerte(),
+      bisherigeKlassifikationen,
+    );
     const aendern = this.aenderungGespeichert()
       ? of(this.dokument())
       : JSON.stringify(zusatzBody) === JSON.stringify(bisherigerZusatz) &&
