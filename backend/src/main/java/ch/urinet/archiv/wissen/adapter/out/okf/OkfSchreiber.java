@@ -8,6 +8,7 @@ import ch.urinet.archiv.wissen.domain.Wissensseite;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -278,34 +280,53 @@ public final class OkfSchreiber {
 
     private static final class PaketZip implements AutoCloseable {
         private final ZipOutputStream zip;
-        private ZipEntry eintrag;
-        private long dateiGroesse;
+        private final ByteArrayOutputStream datei = new ByteArrayOutputStream();
+        private String name;
         private long gesamtGroesse;
 
         private PaketZip(OutputStream ziel) {
             zip = new ZipOutputStream(new BegrenzteAusgabe(ziel), StandardCharsets.UTF_8);
         }
 
-        private void beginnen(String name) throws IOException {
-            eintrag = new ZipEntry(name);
-            dateiGroesse = 0;
-            zip.putNextEntry(eintrag);
+        private void beginnen(String name) {
+            this.name = name;
+            datei.reset();
         }
 
         private void schreiben(String text) throws IOException {
             byte[] daten = text.getBytes(StandardCharsets.UTF_8);
-            dateiGroesse += daten.length;
             gesamtGroesse += daten.length;
-            if (dateiGroesse > MAX_DATEI || gesamtGroesse > MAX_ENTPACKT) {
+            if ((long) datei.size() + daten.length > MAX_DATEI || gesamtGroesse > MAX_ENTPACKT) {
                 throw new IOException("Wissenspaket überschreitet die Importgrössengrenzen");
             }
-            zip.write(daten);
+            datei.write(daten);
         }
 
         private void ende() throws IOException {
+            byte[] daten = datei.toByteArray();
+            zip.setLevel(zuStarkKomprimiert(daten) ? Deflater.NO_COMPRESSION : Deflater.DEFAULT_COMPRESSION);
+            ZipEntry eintrag = new ZipEntry(name);
+            zip.putNextEntry(eintrag);
+            zip.write(daten);
             zip.closeEntry();
             if (eintrag.getSize() > eintrag.getCompressedSize() * 100) {
                 throw new IOException("Wissenspaket überschreitet das zulässige Kompressionsverhältnis");
+            }
+        }
+
+        private static boolean zuStarkKomprimiert(byte[] daten) {
+            Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, true);
+            try {
+                deflater.setInput(daten);
+                deflater.finish();
+                byte[] puffer = new byte[4096];
+                long komprimiert = 0;
+                while (!deflater.finished()) {
+                    komprimiert += deflater.deflate(puffer);
+                }
+                return daten.length > komprimiert * 100;
+            } finally {
+                deflater.end();
             }
         }
 

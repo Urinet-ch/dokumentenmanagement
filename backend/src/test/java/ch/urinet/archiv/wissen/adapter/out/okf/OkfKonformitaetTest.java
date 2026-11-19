@@ -121,7 +121,7 @@ class OkfKonformitaetTest {
     }
 
     @Test
-    void importgrenzenWerdenVorEinerUnbrauchbarenAusgabeErzwungen() {
+    void importgrenzenWerdenVorEinerUnbrauchbarenAusgabeErzwungen() throws Exception {
         Set<String> zuViele = java.util.stream.IntStream.range(0, 201)
                 .mapToObj(n -> "konzepte/seite-" + n).collect(java.util.stream.Collectors.toSet());
         assertThatIllegalArgumentException().isThrownBy(() -> paket(zuViele, "lokal"));
@@ -140,10 +140,16 @@ class OkfKonformitaetTest {
 
         Wissensseite starkKomprimierbar = seite(KONZEPT, "konzepte/probe", Seitentyp.KONZEPT, "Konzept",
                 "x".repeat(100_000), List.of(), null, Wissensseite.Vertraulichkeit.NORMAL);
-        assertThatIOException().isThrownBy(() -> OkfSchreiber.schreiben(
+        ByteArrayOutputStream ausgabe = new ByteArrayOutputStream();
+        OkfSchreiber.schreiben(
                 paket(Set.of(starkKomprimierbar.pfad()), "lokal"),
                 List.of(new OkfSchreiber.Seite(starkKomprimierbar, Map.of(), Map.of())), List.of(),
-                new ByteArrayOutputStream())).withMessageContaining("Kompressionsverhältnis");
+                ausgabe);
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(ausgabe.toByteArray()))) {
+            var eintrag = zip.getNextEntry();
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).endsWith("x".repeat(100_000));
+            assertThat(eintrag.getSize()).isLessThanOrEqualTo(eintrag.getCompressedSize() * 100);
+        }
     }
 
     private static Wissensseite seite(UUID id, String pfad, Seitentyp typ, String titel, String inhalt,
