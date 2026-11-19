@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -61,6 +62,23 @@ class FreigabePruefungTest {
                 WissensPruefung.Kontext.leer()).mindeststufe()).isEqualTo(WissensStufe.INTERN);
         assertThat(pruefung.pruefen(seite, graph, WissensStufe.NORMAL, WissensStufe.INTERN, null,
                 WissensPruefung.Kontext.leer()).mindeststufe()).isEqualTo(WissensStufe.INTERN);
+    }
+
+    @Test
+    void inzwischenPersonelleQuelleWirdBeiPruefungAbgelehnt() {
+        UUID dokument = UUID.randomUUID();
+        Wissensseite seite = new Wissensseite(null, "konzepte/probe", Seitentyp.KONZEPT, "Probe", "Beschreibung.",
+                List.of(), Wissensseite.Status.AKTIV, null,
+                List.of(new Quelleneintrag("q1", dokument, 1, null, "Probe", null)),
+                Wissensseite.Vertraulichkeit.NORMAL, "Aussage.[^q1]", 1, null, null, null, null, false, false, null);
+        WissensGraph graph = new WissensGraph(Map.of(), Map.of(), Map.of(dokument, WissensStufe.NORMAL), Map.of());
+        WissensPruefung.Kontext kontext = new WissensPruefung.Kontext(20000, null, Set.of(),
+                Map.of(dokument, new WissensPruefung.DokumentQuelle(true, true, true, 1, null, Optional.empty())),
+                Set.of(), Set.of(), Set.of(), Set.of(), false, false, false, null, null);
+
+        assertThat(pruefung.pruefen(seite, graph, WissensStufe.NORMAL, WissensStufe.NORMAL, null, kontext)
+                .pruefung().befunde()).extracting(WissensPruefung.Befund::code)
+                .contains(WissensPruefung.Code.QUELLE_PERSONAL);
     }
 
     private Wissensseite seite(String pfad, Seitentyp typ) {
