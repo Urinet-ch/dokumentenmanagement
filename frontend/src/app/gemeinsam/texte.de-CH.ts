@@ -249,6 +249,18 @@ export const TEXTE = {
     hinweisFrist: 'Frist abgelaufen: Die Aufbewahrungsfrist dieses Dokuments ist schon vorbei.',
     warnungBelegnummer:
       'Ein Dokument mit gleicher Belegnummer, gleichem Partner und gleicher Art ist schon im Archiv.',
+    klassifikationen: 'Klassifikationen',
+    klassifikationenLaedt: 'Klassifikationen werden geladen …',
+    klassifikationenFehler:
+      'Die Klassifikationen konnten nicht geladen werden. Bitte schliessen Sie die Angaben und öffnen Sie sie erneut.',
+    klassifikationPflicht: 'Bitte einen Wert wählen.',
+    klassifikationFeld: (code: string) => `Klassifikation «${code}»`,
+    klassifikationOptional: 'Optionale Auswahl.',
+    klassifikationInaktiv: 'Inaktiv; bestehende Werte bleiben sichtbar.',
+    klassifikationUngueltig: (name: string) =>
+      `Der gespeicherte Wert der Klassifikation «${name}» ist ungültig. Bitte anpassen.`,
+    klassifikationAlteWerte: (name: string, werte: string) =>
+      `Nicht übernommene Werte für «${name}»: ${werte}.`,
     zumVorhandenen: 'Vorhandenes Dokument öffnen',
     bestaetigen: 'Bestätigen',
     bestaetigenLaeuft: 'Wird bestätigt …',
@@ -269,6 +281,11 @@ export const TEXTE = {
     betragUngueltig:
       'Bitte einen Betrag mit höchstens zwei Nachkommastellen angeben, z. B. 1234.50.',
     zusatzUngueltig: (felder: string) => `Bitte gültige Werte eingeben: ${felder}.`,
+    zusatzAlteWerte: (name: string, wert: string) =>
+      `Zusatzwert «${name}» wird für die gewählte Dokumentart nicht übernommen: ${wert}.`,
+    zusatzNichtAngegeben: 'Nicht angegeben',
+    zusatzWertUngueltig: (name: string) =>
+      `Der gespeicherte Wert von «${name}» ist nach der Konfigurationsänderung ungültig.`,
     rueckfragePdfa:
       'Für dieses Dokument gibt es keine PDF/A-Fassung. Trotzdem nur mit Original und Arbeitsfassung archivieren?',
     rueckfragePdfaJa: 'Ohne PDF/A bestätigen',

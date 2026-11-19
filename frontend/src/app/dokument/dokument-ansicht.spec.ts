@@ -15,6 +15,11 @@ import { Aktion, Rolle, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentAnsicht, sichereAdresse } from './dokument-ansicht';
 import { Ansicht, DokumentPort, Variante } from './dokument-port';
+import {
+  DokumentKlassifikationen,
+  DokumentKlassifikationenService,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from './klassifikationen';
 
 const zukunft = () => new Date(Date.now() + 5 * 60_000).toISOString();
 
@@ -111,15 +116,21 @@ describe('DokumentAnsicht (Req 14.6)', () => {
   let port: DokumentAttrappe;
   let element: HTMLElement;
   const rolle = signal<Rolle>('inhaber');
+  let klassifikationen: DokumentKlassifikationen;
 
   beforeEach(() => {
     port = new DokumentAttrappe();
+    klassifikationen = LEERE_DOKUMENT_KLASSIFIKATIONEN;
     rolle.set('inhaber');
     TestBed.configureTestingModule({
       imports: [DokumentAnsicht],
       providers: [
         provideRouter([]),
         { provide: DokumentPort, useValue: port },
+        {
+          provide: DokumentKlassifikationenService,
+          useValue: { fuerArt: () => of(klassifikationen) },
+        },
         {
           provide: AnmeldungService,
           useValue: {
@@ -165,6 +176,59 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     await oeffnen();
     expect(element.textContent).toContain('VHF, GSK');
     expect(element.textContent).not.toContain('vhf');
+  });
+
+  it('zeigt Klassifikationen, Regelwarnungen und nach Konfigurationsänderungen ungültige Werte', async () => {
+    port.arten = [
+      {
+        ...ART,
+        zusatzSchema: {
+          type: 'object',
+          properties: { zugriff: { type: 'string', enum: ['oeffentlich', 'intern'] } },
+        },
+      },
+    ];
+    port.dokument = of({
+      ...DOKUMENT,
+      zusatz: { zugriff: 'alt' },
+      klassifikationen: { fachgebiet: ['alt'] },
+      klassifikationenUngueltig: ['fachgebiet'],
+      warnungen: [{ code: 'REGEL_HINWEIS', meldung: 'Bitte prüfen.' }],
+    });
+    klassifikationen = {
+      alle: [
+        {
+          code: 'fachgebiet',
+          name: 'Fachgebiet',
+          aktiv: true,
+          mehrfach: false,
+          werte: [{ code: 'technik', name: 'Technik', aktiv: true }],
+        },
+      ],
+      art: [
+        {
+          code: 'fachgebiet',
+          name: 'Fachgebiet',
+          aktiv: true,
+          mehrfach: false,
+          pflicht: false,
+          standardWert: null,
+          werte: [{ code: 'technik', name: 'Technik', aktiv: true }],
+        },
+      ],
+    };
+
+    await oeffnen();
+
+    expect(element.querySelector('[data-test=klassifikationen]')?.textContent).toContain(
+      'Fachgebiet',
+    );
+    expect(element.querySelector('[data-test=klassifikationen]')?.textContent).toContain('alt');
+    expect(element.querySelectorAll('[role=alert]').length).toBeGreaterThan(0);
+    expect(element.querySelector('[data-test=regelwarnung]')?.textContent).toContain(
+      'Bitte prüfen.',
+    );
+    expect(element.textContent).toContain('ist nach der Konfigurationsänderung ungültig');
   });
 
   it('zeigt Listenwerte ohne x-labels als Rohwert', async () => {
@@ -558,7 +622,14 @@ describe('DokumentAnsicht (Req 14.6)', () => {
         element.querySelector<HTMLButtonElement>('[data-test=speichern]')!.click();
         await fixture.whenStable();
         expect(port.aenderungen).toEqual([
-          { version: 1, aenderung: { art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10' } } },
+          {
+            version: 1,
+            aenderung: {
+              art: 'LOHNABRECHNUNG',
+              zusatz: { periode: '2026-10' },
+              klassifikationen: {},
+            },
+          },
         ]);
       });
 

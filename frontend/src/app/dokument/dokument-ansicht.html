@@ -34,6 +34,9 @@
       @if (d.fristAbgelaufen) {
         <p class="hinweis">{{ texte.fristAbgelaufen }}</p>
       }
+      @for (warnung of regelWarnungen(); track $index) {
+        <p class="warnung" data-test="regelwarnung">{{ warnung.meldung || warnung.code }}</p>
+      }
       <div class="spalten">
         <section class="karte metadaten" aria-labelledby="metadaten-titel">
           <h2 id="metadaten-titel">{{ texte.metadaten }}</h2>
@@ -148,7 +151,33 @@
               <dl>
                 @for (z of zusatz(); track z.name) {
                   <dt>{{ z.name }}</dt>
-                  <dd>{{ z.wert }}</dd>
+                  <dd [class.fehler]="z.ungueltig">
+                    {{ z.wert }}
+                    @if (z.ungueltig) {
+                      <span role="alert">{{ korb.zusatzWertUngueltig(z.name) }}</span>
+                    }
+                  </dd>
+                }
+              </dl>
+            }
+            @if (klassifikationenStatus().status === 'laedt') {
+              <p class="hinweis" role="status">{{ korb.klassifikationenLaedt }}</p>
+            } @else if (klassifikationenStatus().status === 'fehler') {
+              <p class="fehler" role="alert">{{ korb.klassifikationenFehler }}</p>
+            }
+            @if (klassifikationenAnzeige().length > 0) {
+              <h3>{{ korb.klassifikationen }}</h3>
+              <dl data-test="klassifikationen">
+                @for (klassifikation of klassifikationenAnzeige(); track klassifikation.name) {
+                  <dt>{{ klassifikation.name }}</dt>
+                  <dd [class.fehler]="klassifikation.ungueltig">
+                    {{ klassifikation.werte }}
+                    @if (klassifikation.ungueltig) {
+                      <span role="alert">{{
+                        korb.klassifikationUngueltig(klassifikation.name)
+                      }}</span>
+                    }
+                  </dd>
                 }
               </dl>
             }

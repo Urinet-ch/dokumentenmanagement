@@ -1,4 +1,5 @@
 @let f = formular();
+@let klassifikationen = klassifikationenStatus();
 <form
   class="formular"
   data-test="bearbeiten-formular"
@@ -158,7 +159,9 @@
         <label for="bearbeiten-vertraulichkeit">{{ feldNamen['vertraulichkeit'] }}</label>
         <select id="bearbeiten-vertraulichkeit" (change)="setze('vertraulichkeit', wert($event))">
           @for (v of vertraulichkeiten; track v) {
-            <option [value]="v" [selected]="v === f.vertraulichkeit">{{ vertraulichkeitNamen[v] }}</option>
+            <option [value]="v" [selected]="v === f.vertraulichkeit">
+              {{ vertraulichkeitNamen[v] }}
+            </option>
           }
         </select>
       </div>
@@ -217,57 +220,85 @@
             (geaendert)="setzeZusatz(z.name, $event)"
           />
         } @else {
-        <div class="feld">
-          <label [for]="'bearbeiten-zusatz-' + z.name"
-            >{{ beschriftung(z.name) }}
-            @if (z.pflicht) {
-              <span aria-hidden="true"> *</span>
-            }
-          </label>
-          @switch (z.typ) {
-            @case ('auswahl') {
-              <select
-                [id]="'bearbeiten-zusatz-' + z.name"
-                [attr.aria-required]="z.pflicht || null"
-                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
-                (change)="setzeZusatz(z.name, wert($event))"
-              >
-                <option value="" [selected]="!f.zusatz[z.name]"></option>
-                @for (o of z.optionen; track o) {
-                  <option [value]="o" [selected]="o === f.zusatz[z.name]">
-                    {{ z.name === 'zugriff' ? (zugriffNamen[o] ?? o) : o }}
+          <div class="feld">
+            <label [for]="'bearbeiten-zusatz-' + z.name"
+              >{{ beschriftung(z.name) }}
+              @if (z.pflicht) {
+                <span aria-hidden="true"> *</span>
+              }
+            </label>
+            @switch (z.typ) {
+              @case ('auswahl') {
+                <select
+                  [id]="'bearbeiten-zusatz-' + z.name"
+                  [attr.aria-required]="z.pflicht || null"
+                  [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                  (change)="setzeZusatz(z.name, wert($event))"
+                >
+                  <option value="" [selected]="!f.zusatz[z.name]"></option>
+                  @for (o of z.optionen; track o) {
+                    <option [value]="o" [selected]="o === f.zusatz[z.name]">
+                      {{ z.name === 'zugriff' ? (zugriffNamen[o] ?? o) : o }}
+                    </option>
+                  }
+                </select>
+              }
+              @case ('janein') {
+                <select
+                  [id]="'bearbeiten-zusatz-' + z.name"
+                  [attr.aria-required]="z.pflicht || null"
+                  [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                  (change)="setzeZusatz(z.name, wert($event))"
+                >
+                  <option value="" [selected]="!f.zusatz[z.name]"></option>
+                  <option value="true" [selected]="f.zusatz[z.name] === 'true'">
+                    {{ texte.ja }}
                   </option>
-                }
-              </select>
+                  <option value="false" [selected]="f.zusatz[z.name] === 'false'">
+                    {{ texte.nein }}
+                  </option>
+                </select>
+              }
+              @default {
+                <input
+                  [id]="'bearbeiten-zusatz-' + z.name"
+                  [type]="z.typ === 'datum' ? 'date' : 'text'"
+                  [attr.inputmode]="
+                    z.typ === 'zahl' ? 'decimal' : z.typ === 'ganzzahl' ? 'numeric' : null
+                  "
+                  [attr.aria-required]="z.pflicht || null"
+                  [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
+                  [value]="f.zusatz[z.name] ?? ''"
+                  (input)="setzeZusatz(z.name, wert($event))"
+                />
+              }
             }
-            @case ('janein') {
-              <select
-                [id]="'bearbeiten-zusatz-' + z.name"
-                [attr.aria-required]="z.pflicht || null"
-                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
-                (change)="setzeZusatz(z.name, wert($event))"
-              >
-                <option value="" [selected]="!f.zusatz[z.name]"></option>
-                <option value="true" [selected]="f.zusatz[z.name] === 'true'">{{ texte.ja }}</option>
-                <option value="false" [selected]="f.zusatz[z.name] === 'false'">{{ texte.nein }}</option>
-              </select>
-            }
-            @default {
-              <input
-                [id]="'bearbeiten-zusatz-' + z.name"
-                [type]="z.typ === 'datum' ? 'date' : 'text'"
-                [attr.inputmode]="z.typ === 'zahl' ? 'decimal' : z.typ === 'ganzzahl' ? 'numeric' : null"
-                [attr.aria-required]="z.pflicht || null"
-                [attr.aria-invalid]="ungueltig('zusatz.' + z.name) || null"
-                [value]="f.zusatz[z.name] ?? ''"
-                (input)="setzeZusatz(z.name, wert($event))"
-              />
-            }
-          }
-        </div>
+          </div>
         }
       }
     </fieldset>
+  }
+
+  @if (klassifikationen.status === 'laedt') {
+    <p class="hinweis" role="status">{{ korb.klassifikationenLaedt }}</p>
+  } @else if (klassifikationen.status === 'fehler') {
+    <p class="fehler" role="alert">{{ korb.klassifikationenFehler }}</p>
+  } @else {
+    @if (klassifikationen.daten.art.length > 0) {
+      <app-klassifikationen-formular
+        class="breit"
+        [felder]="klassifikationen.daten.art"
+        [kennung]="'bearbeiten-klassifikationen'"
+        [werte]="klassifikationenWerte()"
+        [ungueltigeCodes]="klassifikationUngueltigeCodes()"
+        (geaendert)="setzeKlassifikationen($event)"
+      />
+    }
+    @for (alt of klassifikationenAlt(); track alt.name) {
+      <p class="fehler breit" data-test="klassifikation-alt">
+        {{ korb.klassifikationAlteWerte(alt.name, alt.werte) }}
+      </p>
+    }
   }
 
   <div class="feld">
@@ -293,7 +324,12 @@
   </div>
 
   <div class="knoepfe">
-    <button mat-flat-button type="submit" data-test="speichern" [disabled]="laeuft()">
+    <button
+      mat-flat-button
+      type="submit"
+      data-test="speichern"
+      [disabled]="laeuft() || klassifikationen.status !== 'ok'"
+    >
       {{ laeuft() ? texte.laeuft : texte.speichern }}
     </button>
     <button mat-button type="button" [disabled]="laeuft()" (click)="abbrechen()">

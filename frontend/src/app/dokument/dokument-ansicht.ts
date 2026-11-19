@@ -13,18 +13,33 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import {
+  Observable,
+  Subscription,
+  catchError,
+  distinctUntilChanged,
+  map,
+  of,
+  startWith,
+  switchMap,
+} from 'rxjs';
 import { Dokument, Dokumentart, DownloadAdresse } from '../gemeinsam/api';
-import { anzeigeText, zusatzFelder } from './aenderung';
+import { anzeigeText, listeZu, zusatzFelder, zusatzGueltig } from './aenderung';
 import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { betrag, datum, zeitpunkt } from '../gemeinsam/format';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import { DokumentPort, Variante } from './dokument-port';
 import { MetadatenFormular } from './metadaten-formular';
+import {
+  DokumentKlassifikationenService,
+  KlassifikationenLadezustand,
+  LEERE_DOKUMENT_KLASSIFIKATIONEN,
+} from './klassifikationen';
 
 type Laden = 'laedt' | 'ok' | 'fehlt' | 'fehler' | 'verbindung';
 type Vorschau = 'laedt' | 'ok' | 'fehlt' | 'fehler';
@@ -49,6 +64,7 @@ export function sichereAdresse(url: string | null | undefined): string | null {
 interface Zusatzfeld {
   name: string;
   wert: string;
+  ungueltig: boolean;
 }
 
 /**
@@ -66,6 +82,7 @@ interface Zusatzfeld {
 })
 export class DokumentAnsicht {
   private readonly port = inject(DokumentPort);
+  private readonly klassifikationenService = inject(DokumentKlassifikationenService);
   private readonly anmeldung = inject(AnmeldungService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -75,6 +92,7 @@ export class DokumentAnsicht {
   readonly art = input<string | undefined>();
 
   protected readonly texte = TEXTE.dokument;
+  protected readonly korb = TEXTE.eingangskorb;
   protected readonly neuLadenText = TEXTE.eingangskorb.neuLaden;
   protected readonly stati = TEXTE.suche.stati;
   protected readonly datum = datum;
@@ -146,24 +164,90 @@ export class DokumentAnsicht {
   );
   protected readonly titel = computed(() => this.anzeige().text);
   protected readonly zusatz = computed<Zusatzfeld[]>(() => {
-    const z = this.dokument()?.zusatz as Record<string, unknown> | null | undefined;
-    if (!z || typeof z !== 'object') {
+    const dokument = this.dokument();
+    if (!dokument) {
       return [];
     }
-    const art = this.arten().find((a) => a.code === this.dokument()?.art);
-    const felder = new Map(zusatzFelder(art).map((f) => [f.name, f]));
-    return Object.entries(z)
+    const roh = dokument.zusatz;
+    const z =
+      roh && typeof roh === 'object' && !Array.isArray(roh) ? (roh as Record<string, unknown>) : {};
+    const art = this.arten().find((a) => a.code === dokument.art);
+    const schema = zusatzFelder(art);
+    const felder = new Map(schema.map((feld) => [feld.name, feld]));
+    const ergebnis: Zusatzfeld[] = Object.entries(z)
       .filter(([, wert]) => wert !== null && wert !== undefined && wert !== '')
-      .map(([name, wert]) => ({
-        name,
-        wert:
-          Array.isArray(wert) && wert.every((e) => typeof e !== 'object')
-            ? wert.map((e) => anzeigeText(felder.get(name), String(e))).join(', ')
+      .map(([name, wert]) => {
+        const feld = felder.get(name);
+        const roh =
+          Array.isArray(wert) && wert.every((eintrag) => typeof eintrag === 'string')
+            ? listeZu(wert)
             : typeof wert === 'object'
               ? JSON.stringify(wert)
-              : String(wert),
-      }));
+              : String(wert);
+        return {
+          name,
+          wert:
+            Array.isArray(wert) && wert.every((eintrag) => typeof eintrag === 'string')
+              ? wert.map((eintrag) => anzeigeText(feld, eintrag)).join(', ')
+              : typeof wert === 'object'
+                ? JSON.stringify(wert)
+                : String(wert),
+          ungueltig: !feld || !zusatzGueltig(feld, roh, true),
+        };
+      });
+    for (const feld of schema) {
+      if (feld.pflicht && !ergebnis.some((eintrag) => eintrag.name === feld.name)) {
+        ergebnis.push({
+          name: feld.name,
+          wert: this.korb.zusatzNichtAngegeben,
+          ungueltig: true,
+        });
+      }
+    }
+    return ergebnis;
   });
+  protected readonly klassifikationenStatus = toSignal(
+    toObservable(this.dokument).pipe(
+      map((dokument) => dokument?.art ?? ''),
+      distinctUntilChanged(),
+      switchMap((code): Observable<KlassifikationenLadezustand> =>
+        code
+          ? this.klassifikationenService.fuerArt(code).pipe(
+              map((daten) => ({ status: 'ok', daten }) as const),
+              catchError(() => of({ status: 'fehler' }) as Observable<KlassifikationenLadezustand>),
+              startWith({ status: 'laedt' } as const),
+            )
+          : of({ status: 'ok', daten: LEERE_DOKUMENT_KLASSIFIKATIONEN } as const),
+      ),
+    ),
+    { initialValue: { status: 'laedt' } as const },
+  );
+  protected readonly klassifikationenAnzeige = computed(() => {
+    const dokument = this.dokument();
+    if (!dokument) {
+      return [];
+    }
+    const status = this.klassifikationenStatus();
+    const daten = status.status === 'ok' ? status.daten : LEERE_DOKUMENT_KLASSIFIKATIONEN;
+    const zugeordnet = new Set(daten.art.map((feld) => feld.code));
+    const definitionen = new Map(daten.alle.map((feld) => [feld.code, feld]));
+    const ungueltig = new Set(dokument.klassifikationenUngueltig ?? []);
+    return Object.entries(dokument.klassifikationen ?? {})
+      .filter(([, werte]) => werte.length > 0)
+      .map(([code, werte]) => {
+        const definition = definitionen.get(code);
+        const wertNamen = new Map(definition?.werte.map((wert) => [wert.code, wert.name]) ?? []);
+        return {
+          name: definition?.name ?? code,
+          werte: werte.map((wert) => wertNamen.get(wert) ?? wert).join(', '),
+          ungueltig: ungueltig.has(code) || (status.status === 'ok' && !zugeordnet.has(code)),
+        };
+      });
+  });
+  protected readonly regelWarnungen = computed(
+    () =>
+      this.dokument()?.warnungen.filter((warnung) => warnung.code !== 'BELEGNUMMER_BEKANNT') ?? [],
+  );
 
   private abos = new Subscription();
 

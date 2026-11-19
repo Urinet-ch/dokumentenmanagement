@@ -1,6 +1,15 @@
 import { Dokument, Dokumentart } from '../gemeinsam/api';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
-import { aenderungAus, anzeigeText, feldText, formularAus, formularFeld, zusatzFelder, zusatzGueltig } from './aenderung';
+import { KlassifikationFeld } from './klassifikationen';
+import {
+  aenderungAus,
+  anzeigeText,
+  feldText,
+  formularAus,
+  formularFeld,
+  zusatzFelder,
+  zusatzGueltig,
+} from './aenderung';
 
 const ART = (teil: Partial<Dokumentart> = {}): Dokumentart => ({
   code: 'OFFERTE',
@@ -67,16 +76,32 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
   it('sendet nur geänderte Felder und bei ARCHIVIERT den Grund', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
-    const ergebnis = aenderungAus(d, start, { ...start, titel: ' Offerte FC ', projekt: '', grund: ' Tippfehler ' }, kontext());
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, titel: ' Offerte FC ', projekt: '', grund: ' Tippfehler ' },
+      kontext(),
+    );
     expect(ergebnis).toEqual({ aenderung: { titel: 'Offerte FC', grund: 'Tippfehler' } });
   });
 
   it('sendet beim Artwechsel zusatz ohne Schlüssel der alten Art (QUITTUNG ohne Felder)', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
-    const quittung = ART({ code: 'QUITTUNG', zusatzSchema: { type: 'object', properties: {} }, pflichtfelder: [] });
-    const ergebnis = aenderungAus(d, start, { ...start, art: 'QUITTUNG', grund: 'Art korrigiert' }, kontext({ art: quittung }));
-    expect(ergebnis).toEqual({ aenderung: { art: 'QUITTUNG', zusatz: {}, grund: 'Art korrigiert' } });
+    const quittung = ART({
+      code: 'QUITTUNG',
+      zusatzSchema: { type: 'object', properties: {} },
+      pflichtfelder: [],
+    });
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, art: 'QUITTUNG', grund: 'Art korrigiert' },
+      kontext({ art: quittung }),
+    );
+    expect(ergebnis).toEqual({
+      aenderung: { art: 'QUITTUNG', zusatz: {}, klassifikationen: {}, grund: 'Art korrigiert' },
+    });
   });
 
   it('sendet beim Artwechsel nur die Felder der neuen Art (LOHNABRECHNUNG)', () => {
@@ -84,51 +109,156 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
     const start = formularAus(d);
     const lohn = ART({
       code: 'LOHNABRECHNUNG',
-      zusatzSchema: { type: 'object', properties: { periode: { type: 'string' }, person: { type: 'string' } } },
+      zusatzSchema: {
+        type: 'object',
+        properties: { periode: { type: 'string' }, person: { type: 'string' } },
+      },
       pflichtfelder: ['zusatz.periode', 'zusatz.person'],
     });
     const ergebnis = aenderungAus(
       d,
       start,
-      { ...start, art: 'LOHNABRECHNUNG', grund: 'g', zusatz: { periode: '2026-10', person: 'Joel' } },
+      {
+        ...start,
+        art: 'LOHNABRECHNUNG',
+        grund: 'g',
+        zusatz: { periode: '2026-10', person: 'Joel' },
+      },
       kontext({ art: lohn }),
     );
     expect(ergebnis).toEqual({
-      aenderung: { art: 'LOHNABRECHNUNG', zusatz: { periode: '2026-10', person: 'Joel' }, grund: 'g' },
+      aenderung: {
+        art: 'LOHNABRECHNUNG',
+        zusatz: { periode: '2026-10', person: 'Joel' },
+        klassifikationen: {},
+        grund: 'g',
+      },
     });
+  });
+
+  it('übernimmt beim Artwechsel nur Klassifikationen der neuen Art und ergänzt deren Standardwerte', () => {
+    const d = DOKUMENT({ klassifikationen: { alt: ['altwert'], gemeinsam: ['bestand'] } });
+    const start = formularAus(d);
+    const neueArt = ART({
+      code: 'NEU',
+      zusatzSchema: { type: 'object', properties: {} },
+      pflichtfelder: [],
+    });
+    const klassifikationen: KlassifikationFeld[] = [
+      {
+        code: 'gemeinsam',
+        name: 'Gemeinsam',
+        aktiv: true,
+        mehrfach: false,
+        pflicht: false,
+        standardWert: null,
+        werte: [{ code: 'bestand', name: 'Bestand', aktiv: true }],
+      },
+      {
+        code: 'neu',
+        name: 'Neu',
+        aktiv: true,
+        mehrfach: false,
+        pflicht: true,
+        standardWert: 'standard',
+        werte: [{ code: 'standard', name: 'Standard', aktiv: true }],
+      },
+    ];
+
+    expect(
+      aenderungAus(
+        d,
+        start,
+        { ...start, art: 'NEU', grund: 'Artwechsel' },
+        kontext({ art: neueArt, klassifikationen }),
+      ),
+    ).toEqual({
+      aenderung: {
+        art: 'NEU',
+        zusatz: {},
+        klassifikationen: { gemeinsam: ['bestand'], neu: ['standard'] },
+        grund: 'Artwechsel',
+      },
+    });
+  });
+
+  it('weist fehlende Pflichtklassifikationen bei einer Metadatenänderung aus', () => {
+    const d = DOKUMENT();
+    const start = formularAus(d);
+    const klassifikation: KlassifikationFeld = {
+      code: 'kategorie',
+      name: 'Kategorie',
+      aktiv: true,
+      mehrfach: false,
+      pflicht: true,
+      standardWert: null,
+      werte: [{ code: 'bau', name: 'Bau', aktiv: true }],
+    };
+
+    expect(
+      aenderungAus(
+        d,
+        start,
+        { ...start, titel: 'Neu', grund: 'Titel' },
+        kontext({ klassifikationen: [klassifikation] }),
+      ),
+    ).toMatchObject({
+      pruefung: { felder: ['klassifikationen.kategorie'] },
+    });
+    expect(feldText('klassifikationen.kategorie')).toBe(
+      TEXTE.eingangskorb.klassifikationFeld('kategorie'),
+    );
   });
 
   it('verlangt bei ARCHIVIERT einen Grund und sendet dann nichts', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
     const ergebnis = aenderungAus(d, start, { ...start, titel: 'Neu' }, kontext());
-    expect(ergebnis).toEqual({ pruefung: { meldung: TEXTE.dokument.bearbeiten.grundFehlt, felder: ['grund'] } });
+    expect(ergebnis).toEqual({
+      pruefung: { meldung: TEXTE.dokument.bearbeiten.grundFehlt, felder: ['grund'] },
+    });
   });
 
   it('lässt den Grund im Eingangskorb weg, wenn keiner angegeben ist', () => {
     const d = DOKUMENT({ status: 'EINGANGSKORB' });
     const start = formularAus(d);
-    expect(aenderungAus(d, start, { ...start, titel: 'Neu' }, kontext())).toEqual({ aenderung: { titel: 'Neu' } });
+    expect(aenderungAus(d, start, { ...start, titel: 'Neu' }, kontext())).toEqual({
+      aenderung: { titel: 'Neu' },
+    });
   });
 
   it('weist einen zu langen Grund ab', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
-    const ergebnis = aenderungAus(d, start, { ...start, titel: 'Neu', grund: 'x'.repeat(1001) }, kontext());
-    expect(ergebnis).toEqual({ pruefung: { meldung: TEXTE.dokument.bearbeiten.grundZuLang, felder: ['grund'] } });
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, titel: 'Neu', grund: 'x'.repeat(1001) },
+      kontext(),
+    );
+    expect(ergebnis).toEqual({
+      pruefung: { meldung: TEXTE.dokument.bearbeiten.grundZuLang, felder: ['grund'] },
+    });
   });
 
   it('meldet, wenn nichts geändert ist', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
     const ergebnis = aenderungAus(d, start, { ...start, grund: 'nur Grund' }, kontext());
-    expect(ergebnis).toEqual({ pruefung: { meldung: TEXTE.dokument.bearbeiten.keineAenderung, felder: [] } });
+    expect(ergebnis).toEqual({
+      pruefung: { meldung: TEXTE.dokument.bearbeiten.keineAenderung, felder: [] },
+    });
   });
 
   it('leert ein Feld mit null und liest Beträge mit Apostroph und Komma', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
-    const ergebnis = aenderungAus(d, start, { ...start, belegnummer: '', betrag: "1'500,25", grund: 'g' }, kontext());
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, belegnummer: '', betrag: "1'500,25", grund: 'g' },
+      kontext(),
+    );
     expect(ergebnis).toEqual({ aenderung: { belegnummer: null, betrag: 1500.25, grund: 'g' } });
   });
 
@@ -141,14 +271,20 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
       { ...start, betrag: '12.345', waehrung: '', geschaeftsjahr: '', grund: 'g' },
       kontext(),
     );
-    expect('pruefung' in ergebnis && ergebnis.pruefung.felder).toEqual(['geschaeftsjahr', 'betrag', 'waehrung']);
+    expect('pruefung' in ergebnis && ergebnis.pruefung.felder).toEqual([
+      'geschaeftsjahr',
+      'betrag',
+      'waehrung',
+    ]);
   });
 
   it('sendet Finanzfelder nur, wenn die Art die Gruppe hat', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
     const ohne = kontext({ art: ART({ gruppen: [] }) });
-    expect(aenderungAus(d, start, { ...start, belegnummer: 'X', titel: 'T', grund: 'g' }, ohne)).toEqual({
+    expect(
+      aenderungAus(d, start, { ...start, belegnummer: 'X', titel: 'T', grund: 'g' }, ohne),
+    ).toEqual({
       aenderung: { titel: 'T', grund: 'g' },
     });
   });
@@ -171,18 +307,30 @@ describe('Metadaten bearbeiten: Änderung (Req 10.1)', () => {
     const ergebnis = aenderungAus(
       d,
       start,
-      { ...start, zusatz: { angebot_gueltig_bis: '', stufe: 'B', anzahl: "1'200", verbindlich: 'true' }, grund: 'g' },
+      {
+        ...start,
+        zusatz: { angebot_gueltig_bis: '', stufe: 'B', anzahl: "1'200", verbindlich: 'true' },
+        grund: 'g',
+      },
       kontext(),
     );
     expect(ergebnis).toEqual({
-      aenderung: { zusatz: { positionen: [1, 2], stufe: 'B', anzahl: 1200, verbindlich: true }, grund: 'g' },
+      aenderung: {
+        zusatz: { positionen: [1, 2], stufe: 'B', anzahl: 1200, verbindlich: true },
+        grund: 'g',
+      },
     });
   });
 
   it('meldet ungültige Zusatzwerte mit Feldnamen', () => {
     const d = DOKUMENT();
     const start = formularAus(d);
-    const ergebnis = aenderungAus(d, start, { ...start, zusatz: { anzahl: '1.5' }, grund: 'g' }, kontext());
+    const ergebnis = aenderungAus(
+      d,
+      start,
+      { ...start, zusatz: { anzahl: '1.5' }, grund: 'g' },
+      kontext(),
+    );
     expect(ergebnis).toEqual({
       pruefung: {
         meldung: TEXTE.dokument.bearbeiten.ungueltig(TEXTE.eingangskorb.zusatzFeld('anzahl')),
@@ -214,7 +362,12 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
   const schema = {
     type: 'object',
     properties: {
-      verband: { type: 'array', items: { type: 'string', enum: ['vhf', 'gsk'] }, minItems: 1, uniqueItems: true },
+      verband: {
+        type: 'array',
+        items: { type: 'string', enum: ['vhf', 'gsk'] },
+        minItems: 1,
+        uniqueItems: true,
+      },
       stichworte: { type: 'array', items: { type: 'string' } },
       zahlen: { type: 'array', items: { type: 'integer' } },
     },
@@ -223,8 +376,22 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
 
   it('erkennt Mehrfachauswahl und freie Liste, nicht aber Listen anderer Elementtypen', () => {
     expect(zusatzFelder(art)).toEqual([
-      { name: 'verband', typ: 'mehrfach', optionen: ['vhf', 'gsk'], pflicht: true, minEintraege: 1, eindeutig: true },
-      { name: 'stichworte', typ: 'liste', optionen: [], pflicht: false, minEintraege: 0, eindeutig: false },
+      {
+        name: 'verband',
+        typ: 'mehrfach',
+        optionen: ['vhf', 'gsk'],
+        pflicht: true,
+        minEintraege: 1,
+        eindeutig: true,
+      },
+      {
+        name: 'stichworte',
+        typ: 'liste',
+        optionen: [],
+        pflicht: false,
+        minEintraege: 0,
+        eindeutig: false,
+      },
     ]);
   });
 
@@ -243,7 +410,11 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
     const d = DOKUMENT({ zusatz: { verband: ['vhf'] } });
     const start = formularAus(d);
     expect(start.zusatz['verband']).toBe('vhf');
-    const neu = { ...start, zusatz: { ...start.zusatz, verband: 'vhf\ngsk' }, grund: 'Verband ergänzt' };
+    const neu = {
+      ...start,
+      zusatz: { ...start.zusatz, verband: 'vhf\ngsk' },
+      grund: 'Verband ergänzt',
+    };
     expect(aenderungAus(d, start, neu, kontext({ art }))).toEqual({
       aenderung: { zusatz: { verband: ['vhf', 'gsk'] }, grund: 'Verband ergänzt' },
     });
@@ -259,7 +430,10 @@ describe('Zusatzfelder vom Typ Liste (Array)', () => {
   });
 
   it('erkennt Pflicht auch nur über `required` im Schema (Seed vhf-gsk)', () => {
-    const seed = ART({ pflichtfelder: ['titel'], zusatzSchema: { ...schema, required: ['verband'] } });
+    const seed = ART({
+      pflichtfelder: ['titel'],
+      zusatzSchema: { ...schema, required: ['verband'] },
+    });
     const [verband, stichworte] = zusatzFelder(seed);
     expect(verband.pflicht).toBe(true);
     expect(stichworte.pflicht).toBe(false);
@@ -301,7 +475,11 @@ describe('Anzeigetexte je Enum-Wert (x-labels)', () => {
           properties: {
             verband: {
               type: 'array',
-              items: { type: 'string', enum: ['vhf', 'gsk'], ...(ort === 'items' ? { 'x-labels': labels } : {}) },
+              items: {
+                type: 'string',
+                enum: ['vhf', 'gsk'],
+                ...(ort === 'items' ? { 'x-labels': labels } : {}),
+              },
               ...(ort === 'eigenschaft' ? { 'x-labels': labels } : {}),
             },
           },

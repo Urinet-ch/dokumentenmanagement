@@ -108,7 +108,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 7.3, 7.4_
   - _Abhängig von: 17.7_
 
-- [ ] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
+- [x] 18.4 Felder und Klassifikationen je Art im Eingangskorb und in der Detailansicht [Frontend]
   - Darstellung aus Zusatz-Schema und Klassifikationen der Art, Wechsel der Art, Warnungen aus Regeln, ungültige
     Werte nach Konfigurationsänderung.
   - _Anforderungen: 7.5_

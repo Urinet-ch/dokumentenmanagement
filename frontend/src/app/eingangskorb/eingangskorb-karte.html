@@ -1,5 +1,6 @@
 @let d = dokument();
 @let e = entwurf();
+@let k = klassifikationenStatus();
 <article
   class="karte eintrag"
   [attr.aria-labelledby]="'titel-' + d.id"
@@ -63,7 +64,12 @@
       }
       @if (darfAendern()) {
         @if (zusatzFelder().length > 0) {
-          <button mat-button type="button" data-test="zusatz-ergaenzen" (click)="oeffnen('formular')">
+          <button
+            mat-button
+            type="button"
+            data-test="zusatz-ergaenzen"
+            (click)="oeffnen('formular')"
+          >
             {{ texte.zusatzFormularOeffnen }}
           </button>
         } @else {
@@ -85,12 +91,20 @@
       }
     </p>
   }
+  @for (warnung of regelWarnungen(); track $index) {
+    <p class="warnung" data-test="regelwarnung">{{ warnung.meldung || warnung.code }}</p>
+  }
 
   @if (fehler()) {
     <div class="fehler" role="alert" tabindex="-1" data-test="fehler">
       <p>{{ fehler() }}</p>
       @if (konfliktNeuLaden()) {
-        <button mat-button type="button" data-test="konflikt-neu-laden" (click)="neuLadenNachKonflikt()">
+        <button
+          mat-button
+          type="button"
+          data-test="konflikt-neu-laden"
+          (click)="neuLadenNachKonflikt()"
+        >
           {{ texte.neuLaden }}
         </button>
       }
@@ -342,60 +356,104 @@
                   [feld]="f"
                   [kennung]="d.id + '-zusatz-' + f.name"
                   [beschriftung]="zusatzBeschriftung(f)"
-                  [wert]="zusatzEingaben()[f.name] ?? ''"
-                  [ungueltig]="ungueltig('zusatz.' + f.name)"
+                  [wert]="zusatzWerte()[f.name] ?? ''"
+                  [ungueltig]="
+                    ungueltig('zusatz.' + f.name) || zusatzUngueltig().includes('zusatz.' + f.name)
+                  "
                   (geaendert)="setzeZusatz(f.name, $event)"
                 />
               } @else {
-              <div class="feld">
-                <label [for]="d.id + '-zusatz-' + f.name"
-                  >{{ zusatzBeschriftung(f) }}
-                  @if (f.pflicht) {
-                    <span aria-hidden="true"> *</span>
-                  }
-                </label>
-                @if (f.name === 'zugriff' || f.typ === 'auswahl') {
-                  <select
-                    [id]="d.id + '-zusatz-' + f.name"
-                    [attr.aria-required]="f.pflicht || null"
-                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
-                    [value]="zusatzEingaben()[f.name] ?? ''"
-                    (change)="setzeZusatz(f.name, wert($event))"
-                  >
-                    <option value="" [selected]="!(zusatzEingaben()[f.name] ?? '')"></option>
-                    @for (option of (f.name === 'zugriff' ? zugriffOptionen : f.optionen); track option) {
-                      <option [value]="option" [selected]="option === zusatzEingaben()[f.name]">
-                        {{ zusatzOption(f, option) }}
-                      </option>
+                <div class="feld">
+                  <label [for]="d.id + '-zusatz-' + f.name"
+                    >{{ zusatzBeschriftung(f) }}
+                    @if (f.pflicht) {
+                      <span aria-hidden="true"> *</span>
                     }
-                  </select>
-                } @else if (f.typ === 'janein') {
-                  <select
-                    [id]="d.id + '-zusatz-' + f.name"
-                    [attr.aria-required]="f.pflicht || null"
-                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
-                    [value]="zusatzEingaben()[f.name] ?? ''"
-                    (change)="setzeZusatz(f.name, wert($event))"
-                  >
-                    <option value=""></option>
-                    <option value="true">{{ texte.ja }}</option>
-                    <option value="false">{{ texte.nein }}</option>
-                  </select>
-                } @else {
-                  <input
-                    [id]="d.id + '-zusatz-' + f.name"
-                    [type]="f.typ === 'datum' ? 'date' : 'text'"
-                    [attr.inputmode]="f.typ === 'zahl' ? 'decimal' : f.typ === 'ganzzahl' ? 'numeric' : null"
-                    [attr.aria-required]="f.pflicht || null"
-                    [attr.aria-invalid]="ungueltig('zusatz.' + f.name) || null"
-                    [value]="zusatzEingaben()[f.name] ?? ''"
-                    (input)="setzeZusatz(f.name, wert($event))"
-                  />
-                }
-              </div>
+                  </label>
+                  @if (f.name === 'zugriff' || f.typ === 'auswahl') {
+                    <select
+                      [id]="d.id + '-zusatz-' + f.name"
+                      [attr.aria-required]="f.pflicht || null"
+                      [attr.aria-invalid]="
+                        ungueltig('zusatz.' + f.name) ||
+                        zusatzUngueltig().includes('zusatz.' + f.name) ||
+                        null
+                      "
+                      [value]="zusatzWerte()[f.name] ?? ''"
+                      (change)="setzeZusatz(f.name, wert($event))"
+                    >
+                      <option value="" [selected]="!(zusatzWerte()[f.name] ?? '')"></option>
+                      @for (
+                        option of f.name === 'zugriff' ? zugriffOptionen : f.optionen;
+                        track option
+                      ) {
+                        <option [value]="option" [selected]="option === zusatzWerte()[f.name]">
+                          {{ zusatzOption(f, option) }}
+                        </option>
+                      }
+                    </select>
+                  } @else if (f.typ === 'janein') {
+                    <select
+                      [id]="d.id + '-zusatz-' + f.name"
+                      [attr.aria-required]="f.pflicht || null"
+                      [attr.aria-invalid]="
+                        ungueltig('zusatz.' + f.name) ||
+                        zusatzUngueltig().includes('zusatz.' + f.name) ||
+                        null
+                      "
+                      [value]="zusatzWerte()[f.name] ?? ''"
+                      (change)="setzeZusatz(f.name, wert($event))"
+                    >
+                      <option value=""></option>
+                      <option value="true">{{ texte.ja }}</option>
+                      <option value="false">{{ texte.nein }}</option>
+                    </select>
+                  } @else {
+                    <input
+                      [id]="d.id + '-zusatz-' + f.name"
+                      [type]="f.typ === 'datum' ? 'date' : 'text'"
+                      [attr.inputmode]="
+                        f.typ === 'zahl' ? 'decimal' : f.typ === 'ganzzahl' ? 'numeric' : null
+                      "
+                      [attr.aria-required]="f.pflicht || null"
+                      [attr.aria-invalid]="
+                        ungueltig('zusatz.' + f.name) ||
+                        zusatzUngueltig().includes('zusatz.' + f.name) ||
+                        null
+                      "
+                      [value]="zusatzWerte()[f.name] ?? ''"
+                      (input)="setzeZusatz(f.name, wert($event))"
+                    />
+                  }
+                </div>
               }
             }
           </fieldset>
+        }
+        @for (alt of zusatzAlt(); track alt.name) {
+          <p class="warnung" data-test="zusatz-alt">
+            {{ texte.zusatzAlteWerte(alt.name, alt.wert) }}
+          </p>
+        }
+        @if (k.status === 'laedt') {
+          <p class="hinweis" role="status">{{ texte.klassifikationenLaedt }}</p>
+        } @else if (k.status === 'fehler') {
+          <p class="fehler" role="alert">{{ texte.klassifikationenFehler }}</p>
+        } @else {
+          @if (k.daten.art.length > 0) {
+            <app-klassifikationen-formular
+              [felder]="k.daten.art"
+              [kennung]="d.id + '-klassifikationen'"
+              [werte]="klassifikationenWerte()"
+              [ungueltigeCodes]="klassifikationUngueltigeCodes()"
+              (geaendert)="setzeKlassifikationen($event)"
+            />
+          }
+          @for (alt of klassifikationenAlt(); track alt.name) {
+            <p class="warnung" data-test="klassifikation-alt">
+              {{ texte.klassifikationAlteWerte(alt.name, alt.werte) }}
+            </p>
+          }
         }
         @if (darfVertraulichkeit()) {
           <div class="feld">
@@ -413,7 +471,7 @@
           </div>
         }
         <div class="knoepfe">
-          <button mat-flat-button type="submit" [disabled]="laeuft()">
+          <button mat-flat-button type="submit" [disabled]="laeuft() || k.status !== 'ok'">
             {{ laeuft() ? texte.bestaetigenLaeuft : texte.bestaetigen }}
           </button>
           <button mat-button type="button" [disabled]="laeuft()" (click)="schliessen()">
