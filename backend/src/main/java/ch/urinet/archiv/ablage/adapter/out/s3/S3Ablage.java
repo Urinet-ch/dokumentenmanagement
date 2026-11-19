@@ -957,7 +957,9 @@ public class S3Ablage implements AblagePort {
 
     @Override
     public Kopie sicherungsManifestKopie(MandantCode mandant, String schluessel, String sha256, OutputStream ziel) {
-        if (!schluessel.startsWith("manifest/") || !sha256.matches("[0-9a-fA-F]{64}")) {
+        Objects.requireNonNull(ziel, "ziel");
+        if (schluessel == null || sha256 == null || !schluessel.startsWith("manifest/")
+                || !sha256.matches("[0-9a-fA-F]{64}")) {
             throw new IllegalArgumentException("Ungültige Manifest-Referenz");
         }
         ManifestDatei manifest = pruefzugriff(schluessel,
