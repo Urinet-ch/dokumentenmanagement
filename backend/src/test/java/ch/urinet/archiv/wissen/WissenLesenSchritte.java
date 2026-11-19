@@ -277,7 +277,8 @@ public class WissenLesenSchritte {
             assertThat(ch.urinet.archiv.sicherheit.ProblemDetails.pruefen(ungueltig, 404))
                     .isEqualTo("NICHT_GEFUNDEN");
         }
-        assertThat(seite.jsonPath().getString("inhaltHtml")).contains("Sichtbare Seite", "Seite nicht vorhanden")
+        assertThat(seite.jsonPath().getString("inhaltHtml"))
+                .contains("Sichtbare Seite", "Seite nicht vorhanden", "href=\"/wissen/" + zweiterPfad + "\"")
                 .doesNotContain("Interne Seite", "Fehlende Seite");
         zugriffsprotokollPruefen();
     }
