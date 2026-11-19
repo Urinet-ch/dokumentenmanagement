@@ -57,10 +57,19 @@ final class WerkzeugErgebnisse {
     private static void dokument(JsonNode knoten, Map<String, ChatEreignis.QuellDokument> ziel) {
         try {
             UUID id = UUID.fromString(knoten.path("id").asText(""));
-            ziel.putIfAbsent(id.toString(), new ChatEreignis.QuellDokument(id, knoten.path("titel").asText("")));
+            ziel.putIfAbsent(id.toString(), new ChatEreignis.QuellDokument(id, knoten.path("titel").asText(""),
+                    seite(knoten.path("seiten"))));
         } catch (IllegalArgumentException e) {
             // keine gültige ID: kein Dokument
         }
+    }
+
+    private static String seite(JsonNode knoten) {
+        if (!knoten.isTextual()) {
+            return null;
+        }
+        String text = knoten.asText();
+        return text.length() <= 20 && text.matches("[1-9]\\d*(?:-[1-9]\\d*)?") ? text : null;
     }
 
     /** «TT.MM.JJJJ HH:mm» (Zürich) des Werkzeugs; sonst der Zeitpunkt des Aufrufs. */

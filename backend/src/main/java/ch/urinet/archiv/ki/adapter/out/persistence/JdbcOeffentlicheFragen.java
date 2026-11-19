@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 /**
  * {@code m_<code>.oeffentliche_frage} des Mandanten aus dem Kontext (Changeset {@code mandant/030}, Schema immer
- * qualifiziert): bereinigte Frage, Quellen (ID, Titel, Reihe, Ausgabe) und Tokens, Zeit; nie Antwort, Client, IP,
+ * qualifiziert): bereinigte Frage, Quellen (ID, Titel, Reihe, Ausgabe, Jahr und Fundstelle) und Tokens, Zeit; nie Antwort, Client, IP,
  * Schlüssel oder Webseite (Spec 03, Req 6.5). Jede Operation in eigener Transaktion mit Zeitgrenze.
  */
 @ApplicationScoped
@@ -46,8 +46,18 @@ public class JdbcOeffentlicheFragen implements OeffentlicheFragenSpeicher {
     public void speichern(String frage, List<OeffentlicheQuelle> quellen, int tokens, Instant zeit) {
         ArrayNode knoten = json.createArrayNode();
         for (OeffentlicheQuelle q : quellen) {
-            knoten.addObject().put("dokumentId", q.dokumentId().toString()).put("titel", q.titel())
+            var quelle = knoten.addObject().put("dokumentId", q.dokumentId().toString()).put("titel", q.titel())
                     .put("reihe", q.reiheCode()).put("ausgabe", q.ausgabe());
+            if (q.jahr() == null) {
+                quelle.putNull("jahr");
+            } else {
+                quelle.put("jahr", q.jahr());
+            }
+            if (q.seite() == null) {
+                quelle.putNull("fundstelle");
+            } else {
+                quelle.putObject("fundstelle").put("seite", q.seite());
+            }
         }
         String quellenJson;
         try {

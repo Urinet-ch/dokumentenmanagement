@@ -23,6 +23,7 @@ import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -48,7 +49,8 @@ import java.util.function.Consumer;
  *       Datenbank-Transaktion; ein Platz gilt bis zum Ende von {@link #starten}.</li>
  *   <li>{@link #starten}: der Agent läuft auf einem eigenen Thread im Mandanten-Kontext der Anfrage. Die Quellen kommen
  *       aus den Werkzeugergebnissen, nie aus dem Modelltext, und werden über den festen Filter nochmals geprüft und mit
- *       Titel, Reihe und Ausgabe angereichert. Ohne Quelle folgt der feste Hinweis auf die Geschäftsstelle (Req 6.3).</li>
+ *       Titel, Reihe, Ausgabe, Jahr und Fundstellenseite angereichert. Modelltext wird erst nach der Quellenprüfung
+ *       ausgegeben; ohne Quelle folgt nur der feste Hinweis auf die Geschäftsstelle (Req 6.3).</li>
  *   <li>danach Speichern von Frage (bereinigt), Quellen und Tokens in {@code oeffentliche_frage} (Req 6.5).</li>
  * </ol>
  * Frage, Antwort, Titel und Werkzeugparameter erscheinen nie im Log, nur IDs, Zahlen und Klassennamen.
@@ -76,8 +78,8 @@ public class OeffentlicheFragen {
     private final WerkzeugDaten daten;
     private final MandantKontext kontext;
     private final MandantEinstellungen einstellungen;
+    private final Config konfiguration;
     private final int maxFrage;
-    private final String kontakt;
     private final Clock uhr = Clock.systemUTC();
     private final ExecutorService ausfuehrung = Executors.newThreadPerTaskExecutor(
             Thread.ofPlatform().name("oeffentlicher-chat-", 0).daemon().factory());
@@ -86,9 +88,8 @@ public class OeffentlicheFragen {
     public OeffentlicheFragen(OeffentlicherChatAgentPort agent, OeffentlicheGrenzen grenzen, MandantBudget budget,
                               OeffentlicheGespraeche gespraeche, OeffentlicheFragenSpeicher speicher,
                               OeffentlicheDokumente dokumente, WerkzeugTransaktion transaktion, WerkzeugDaten daten,
-                              MandantKontext kontext, MandantEinstellungen einstellungen,
-                              @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage,
-                              @ConfigProperty(name = "archiv.webseite.chat.geschaeftsstelle") Optional<String> kontakt) {
+                              MandantKontext kontext, MandantEinstellungen einstellungen, Config konfiguration,
+                              @ConfigProperty(name = "archiv.webseite.chat.max-frage") int maxFrage) {
         if (maxFrage < 1) {
             throw new IllegalArgumentException("archiv.webseite.chat.max-frage muss mindestens 1 sein");
         }
@@ -102,8 +103,12 @@ public class OeffentlicheFragen {
         this.daten = daten;
         this.kontext = kontext;
         this.einstellungen = einstellungen;
+        this.konfiguration = konfiguration;
         this.maxFrage = maxFrage;
-        this.kontakt = kontakt.map(String::strip).filter(k -> !k.isEmpty()).map(k -> " (" + k + ")").orElse("");
+        if (konfiguration.getOptionalValue("archiv.webseite.chat.geschaeftsstelle", String.class).isPresent()) {
+            LOG.warn("archiv.webseite.chat.geschaeftsstelle wird nicht mehr gelesen; den Kontakt je Mandant unter "
+                    + "archiv.mandant.<code>.chat-geschaeftsstelle setzen");
+        }
     }
 
     /** Angenommene Frage: Gespräch, Anfrage an den Agenten und belegter Platz (bis {@link #starten} ihn freigibt). */
@@ -216,7 +221,11 @@ public class OeffentlicheFragen {
         try {
             agent.beantworten(anfrage, ereignis -> {
                 if (!abbruch.gesetzt()) {
-                    durchgang.aufnehmen(Objects.requireNonNull(ereignis, "ereignis"), e -> weitergeben(e, strom));
+                    durchgang.aufnehmen(Objects.requireNonNull(ereignis, "ereignis"), e -> {
+                        if (e instanceof ChatEreignis.WerkzeugStart start) {
+                            strom.accept(new OeffentlicheAusgabe.Werkzeug(start.name()));
+                        }
+                    });
                 }
             }, abbruch);
         } catch (RuntimeException e) {
@@ -244,9 +253,10 @@ public class OeffentlicheFragen {
         }
         String text = antwort.inhalt();
         if (quellen.isEmpty()) {
-            String hinweis = KEIN_TREFFER.formatted(kontakt);
-            strom.accept(new OeffentlicheAusgabe.Text((text.isBlank() ? "" : "\n\n") + hinweis));
-            text = text.isBlank() ? hinweis : text + "\n\n" + hinweis;
+            text = KEIN_TREFFER.formatted(kontakt(anfrage.mandant()));
+        }
+        if (!text.isBlank()) {
+            strom.accept(new OeffentlicheAusgabe.Text(text));
         }
         int tokens = antwort.tokens().map(t -> (int) Math.min(Integer.MAX_VALUE, (long) t.tokensEin() + t.tokensAus()))
                 .orElse(0);
@@ -263,6 +273,12 @@ public class OeffentlicheFragen {
         } catch (RuntimeException e) {
             LOG.warnf("Öffentlicher Chat: Ausgabe nach dem Speichern gescheitert, ursache=%s", Ursachen.kette(e));
         }
+    }
+
+    private String kontakt(MandantCode mandant) {
+        return konfiguration.getOptionalValue("archiv.mandant." + mandant.wert() + ".chat-geschaeftsstelle",
+                String.class).map(OeffentlicheFragen::ohneSteuerzeichen).filter(k -> !k.isEmpty())
+                .map(k -> " (" + k + ")").orElse("");
     }
 
     /**
@@ -283,12 +299,16 @@ public class OeffentlicheFragen {
         Map<UUID, OeffentlichesDokument> map = new LinkedHashMap<>();
         sichtbar.forEach(d -> map.put(d.id(), d));
         List<OeffentlicheQuelle> ergebnis = new ArrayList<>();
+        Map<UUID, String> seiten = new LinkedHashMap<>();
+        antwort.quellen().stream().filter(q -> q instanceof Quelle.Dokument)
+                .map(q -> (Quelle.Dokument) q).filter(q -> q.seite() != null)
+                .forEach(q -> seiten.putIfAbsent(q.id(), q.seite()));
         for (UUID id : ids) {
             OeffentlichesDokument d = map.get(id);
             if (d != null) {
                 ergebnis.add(new OeffentlicheQuelle(d.id(), ohneSteuerzeichen(d.titel()), d.reiheCode(),
                         ohneSteuerzeichen(d.reiheName()), d.ausgabe() == null || d.ausgabe().isBlank() ? null
-                        : ohneSteuerzeichen(d.ausgabe())));
+                        : ohneSteuerzeichen(d.ausgabe()), d.jahr(), seiten.get(d.id())));
             }
         }
         return List.copyOf(ergebnis);
@@ -296,16 +316,6 @@ public class OeffentlicheFragen {
 
     private static String ohneSteuerzeichen(String wert) {
         return wert.replaceAll("[\\p{Cc}\\p{Cf}]", " ").replaceAll("\\s+", " ").strip();
-    }
-
-    private static void weitergeben(ChatEreignis ereignis, Consumer<OeffentlicheAusgabe> strom) {
-        switch (ereignis) {
-            case ChatEreignis.WerkzeugStart start -> strom.accept(new OeffentlicheAusgabe.Werkzeug(start.name()));
-            case ChatEreignis.Text teil -> strom.accept(new OeffentlicheAusgabe.Text(teil.delta()));
-            default -> {
-                // nur Werkzeugstart und Text gehen sofort an den Client
-            }
-        }
     }
 
     /** Lässt nach der letzten Ausgabe nichts mehr durch; Aufrufe nacheinander. */

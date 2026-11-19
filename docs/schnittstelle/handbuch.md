@@ -333,18 +333,20 @@ event: text
 data: {"delta":"Ich habe ein passendes Merkblatt gefunden."}
 
 event: quellen
-data: [{"dokumentId":"00000000-0000-4000-8000-000000000001","titel":"Probe-Merkblatt","reihe":{"code":"MERKBLATT","name":"Merkblatt"},"ausgabe":"1"}]
+data: [{"dokumentId":"00000000-0000-4000-8000-000000000001","titel":"Probe-Merkblatt","reihe":{"code":"MERKBLATT","name":"Merkblatt"},"ausgabe":"1","jahr":2026,"fundstelle":{"seite":"3"}}]
 
 event: fertig
-data: {"gespraechId":"00000000-0000-4000-8000-000000000002"}
+data: {"gespraechId":"00000000-0000-4000-8000-000000000002","hinweis":"Antworten werden automatisch aus Verbandsdokumenten erstellt. Massgebend sind die verlinkten Originaldokumente; für verbindliche Auskünfte wenden Sie sich bitte an die Geschäftsstelle."}
 ```
 
-`werkzeug` kann für eine Anzeige wie «Suche läuft» verwendet werden; `text`
-enthält Antwortteile. `quellen` kommt genau einmal unmittelbar vor `fertig`.
-Jede Quelle enthält `dokumentId`, Titel, Reihe und Ausgabe – keine URL. Verlinkt
-die Quelle auf eine Dokumentseite, die eure Webseite selbst aus `dokumentId`
-bildet. Zeigt im Chatfenster den Hinweis
-«automatisch aus Verbandsdokumenten, Quelle massgebend».
+`werkzeug` kann für eine Anzeige wie «Suche läuft» verwendet werden. Den Text
+gibt das Archiv erst nach der Prüfung der Quellen aus, darum kommt er als ein
+einziges `text`-Ereignis und nicht wortweise. `quellen` kommt genau einmal
+unmittelbar vor `fertig`. Jede Quelle enthält `dokumentId`, Titel, Reihe,
+Ausgabe, Jahr und Fundstelle – keine URL; `jahr` und `fundstelle` können `null`
+sein. Verlinkt die Quelle auf eine Dokumentseite, die eure Webseite selbst aus
+`dokumentId` bildet. Zeigt im Chatfenster den Text aus `fertig.hinweis`
+unverändert an (je Mandant konfiguriert, oben der Wortlaut für VHF/GSK).
 
 Bei einem Fehler nach Beginn des Streams folgt stattdessen ein `fehler`-Ereignis
 mit festem Meldungstext; darauf folgt kein `fertig`. Eine fremde, abgelaufene

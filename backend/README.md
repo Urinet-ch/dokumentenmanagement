@@ -359,3 +359,26 @@ Eine der 13 weiteren Fragen kann prüfen, dass der Chat Anweisungen in Dokumente
   Port `Lueckenbericht` mit den drei Regeln je Mandant: Nummernfolge der Ausgangsrechnungen, Lohnabrechnung je Monat,
   Kontoauszug je Monat); richtig ist, was diese Regeln als Lücken ergeben. Der Datenstand des Werkzeugs
   `vollstaendigkeit` (`datenstand: vollstaendigkeit`) gehört zu den erwarteten Quellen.
+
+## Prüfliste des öffentlichen Chatbots
+`OeffentlicherChatPrueflisteIT` ist ein späterer manueller Prüflauf und standardmässig deaktiviert. Er liest
+`oeffentlicher-chat-pruefliste.yaml` ausschliesslich aus `$ARCHIV_OEFFENTLICHER_CHAT_GOLDEN_DIR`; das Schema
+`src/test/resources/abnahme/oeffentlicher-chat-pruefliste.schema.json` verlangt 40 bis 60 Fragen mit erwarteten
+Kernwerten und Quellen (Dokument-ID, Titel, Reihe, Ausgabe, Jahr und Seite); bei Fragen ohne Beleg ist `quellen`
+leer, und die Antwort darf keine Quelle nennen. Echte Fragen und der vollständige Bericht
+bleiben ausserhalb des Repositorys. `OeffentlicherChatPrueflaufTest` verwendet ausschliesslich einen lokalen Fake-Server
+und synthetische Fragen; echte Modellaufrufe gehören nie in die CI.
+
+Für den manuellen Lauf müssen `ARCHIV_OEFFENTLICHER_CHAT_URL` (HTTPS), `ARCHIV_OEFFENTLICHER_CHAT_TOKEN_DATEI`
+(Dateirechte 600) und `ARCHIV_OEFFENTLICHER_CHAT_CLIENT_HASH` (64 kleingeschriebene Hexziffern) gesetzt sein. Die
+optionale `ARCHIV_OEFFENTLICHER_CHAT_PAUSE_SEKUNDEN` ist mindestens 180, damit die Grenze von 20 Fragen pro Stunde
+eingehalten wird. Die optionale `ARCHIV_OEFFENTLICHER_CHAT_HINWEIS` nennt den erwarteten Wortlaut von
+`fertig.hinweis` des Mandanten (`archiv.mandant.<code>.chat-hinweis`); ohne sie prüft der Lauf nur, dass der Hinweis
+nicht leer ist. Bei 401, 403 oder 429 `BUDGET` bricht der Lauf nach der ersten Frage ab. Der vollständige Bericht wird mit Dateirechten 600 nur im Golden-Verzeichnis abgelegt; die Konsole
+zeigt ausschliesslich Nummern und Prüfergebnisse.
+
+Im Ordner `backend/` kann der Lauf nur ausdrücklich und gezielt gestartet werden:
+```sh
+mvn -ntp test -Dtest=OeffentlicherChatPrueflisteIT -Dsurefire.failIfNoSpecifiedTests=false \
+  -Darchiv.oeffentlicher-chat-prueflauf=true
+```

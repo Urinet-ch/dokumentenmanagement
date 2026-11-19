@@ -7,10 +7,14 @@ import java.util.UUID;
 public sealed interface Quelle {
 
     /** Dokument; {@link #link()} ist der relative PWA-Pfad, auf dem Server aus der ID gebaut. */
-    record Dokument(UUID id, String titel) implements Quelle {
+    record Dokument(UUID id, String titel, String seite) implements Quelle {
         public Dokument {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(titel, "titel");
+        }
+
+        public Dokument(UUID id, String titel) {
+            this(id, titel, null);
         }
 
         public String link() {

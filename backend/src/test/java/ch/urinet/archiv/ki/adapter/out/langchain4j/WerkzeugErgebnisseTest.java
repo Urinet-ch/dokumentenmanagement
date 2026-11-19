@@ -24,14 +24,25 @@ class WerkzeugErgebnisseTest {
     @Test
     void suchtreffer() {
         ChatEreignis.WerkzeugErgebnis e = abbilden("dokumente_suchen", "{\"frage\":\"Gondel\",\"anzahl\":5,\"neueste\":null}",
-                "{\"treffer\":[{\"id\":\"" + A + "\",\"titel\":\"Rechnung A\",\"auszug\":\"GEHEIMER TEXT\"},"
+                "{\"treffer\":[{\"id\":\"" + A + "\",\"titel\":\"Rechnung A\",\"seiten\":\"7-8\","
+                        + "\"auszug\":\"GEHEIMER TEXT\"},"
                         + "{\"id\":\"" + B + "\",\"titel\":\"Rechnung B\"}],\"gesamt\":2}");
         assertThat(e.name()).isEqualTo("dokumente_suchen");
         assertThat(e.parameter()).containsEntry("frage", "Gondel").containsEntry("anzahl", 5).doesNotContainKey("neueste");
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::id).containsExactly(A, B);
         assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::titel).containsExactly("Rechnung A", "Rechnung B");
+        assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::seite).containsExactly("7-8", null);
         assertThat(e.datenstand()).isEmpty();
         assertThat(e.toString()).doesNotContain("GEHEIMER TEXT");
+    }
+
+    @Test
+    void seiteNurImGeprueftenFormatUebernehmen() {
+        ChatEreignis.WerkzeugErgebnis e = abbilden("dokumente_suchen", "{}",
+                "{\"treffer\":[{\"id\":\"" + A + "\",\"titel\":\"A\",\"seiten\":\"7-8\"},"
+                        + "{\"id\":\"" + B + "\",\"titel\":\"B\",\"seiten\":\"http://example.test\"}]}");
+
+        assertThat(e.dokumente()).extracting(ChatEreignis.QuellDokument::seite).containsExactly("7-8", null);
     }
 
     @Test
