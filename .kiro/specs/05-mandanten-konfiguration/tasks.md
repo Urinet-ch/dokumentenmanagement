@@ -67,7 +67,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 5.1, 5.2, 5.3, 5.4, 5.5, 5.7_
   - _Abhängig von: 17.5; Spec 01: 3.4, 3.5, 4.7, 4.8_
 
-- [ ] 17.8 Regeln über die REST-Schnittstelle und betroffene Dokumente [Backend]
+- [x] 17.8 Regeln über die REST-Schnittstelle und betroffene Dokumente [Backend]
   - Aus 17.6 abgetrennt (Nachbesserung PR #304): Endpunkte `/regeln` (Anlegen, Ändern, Aktivieren mit neuer
     Konfigurationsversion) mit `betroffeneDokumente` beim Anlegen, Verschärfen oder Aktivieren (5.6) und
     `GET /berichte/luecken` mit HTTP 403 für Rollen ohne uneingeschränkte Sicht (5.4); OpenAPI im selben PR.
@@ -80,6 +80,8 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
     die Test-Seeds), `KonfigurationSeedTest` ersetzt `DokumentartSeedTest` (`StammdatenTabelle` und Spalten der
     Stammdaten-Tabelle in Spec 01 design.md im selben PR), Endpunkte der KI-Texte, `If-Match` für alle Elemente,
     Umfang A11 und Lesen für alle Rollen, Migrationstest mit Schema im Stand vor Spec 05.
+  - `DELETE /regeln/{code}` (Req 7.1 «löschen»; in 17.8 offen geblieben, Review PR #317) mit neuer
+    Konfigurationsversion, `If-Match` und Recht A11.
   - _Anforderungen: 1.6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.6, 9.1, 9.2_
   - _Abhängig von: 17.4, 17.6_
 
