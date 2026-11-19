@@ -18,6 +18,7 @@ export const MENUE: readonly Menuepunkt[] = [
     eingangskorbZaehler: true,
   },
   { pfad: '/suche', text: TEXTE.menue.suche, aktion: 'A2' },
+  { pfad: '/wissen', text: TEXTE.menue.wissen, aktion: 'A15' },
   { pfad: '/chat', text: TEXTE.menue.chat, aktion: 'A2' },
   { pfad: '/kontakte', text: TEXTE.menue.kontakte, aktion: 'A6' },
   { pfad: '/importe', text: TEXTE.menue.importe, aktion: 'A12' },

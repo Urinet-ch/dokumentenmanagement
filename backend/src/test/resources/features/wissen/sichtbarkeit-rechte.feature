@@ -56,6 +56,12 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Dann ist die gespeicherte Vertraulichkeit der Übersicht zuerst NORMAL und alle Rollen mit Recht A15 sehen sie
     Und speichert die Neuberechnung danach die wirksame Vertraulichkeit INTERN und «mitarbeiter» sieht die Übersicht nicht
 
+  @req-11.10
+  Szenario: Eine zitierte interne Mindeststufe bleibt über die Quellkette erhalten
+    Wenn eine dreiseitige Zitierkette mit einer internen Mindeststufe freigegeben und die Quelle herabgestuft wird
+    Dann bleibt die Mindeststufe der zitierenden Seite INTERN
+    Und sehen nur Rollen mit Recht A3 die zitierende Seite im Index, in der Einzelansicht und in der Version
+
   @req-11.8
   Szenario: Eine Änderung, die die Übersicht über NORMAL einstufen würde, erhält einen Befund
     Wenn für die Übersicht eine Fassung mit einer intern eingestuften Quellseite und eine Fassung mit einer normalen Quellseite geprüft werden
@@ -85,3 +91,9 @@ Funktionalität: Sichtbarkeit und Rechte der Wissensbasis
     Angenommen synthetische Wissensleseproben sind angelegt
     Wenn «mitarbeiter» Index, Seite, Versionen, Diff, Links und Log abruft
     Dann verraten Zähler, Seiten, Versionen, Links und Log keine unsichtbaren Daten
+
+  @req-15.2 @req-15.4
+  Szenario: Dokumentfilter und Prüfhinweis zeigen nur sichtbare Wissensseiten
+    Angenommen synthetische Wissensleseproben sind angelegt
+    Wenn die Wissensseiten nach einem Quelldokument gefiltert werden
+    Dann zeigt der Index nur sichtbare Seiten des eigenen Mandanten und deren Prüfhinweis
