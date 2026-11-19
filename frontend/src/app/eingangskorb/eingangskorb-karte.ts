@@ -30,6 +30,7 @@ import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
 import { TitelAnzeige, anzeigeTitel } from '../gemeinsam/anzeige-titel';
 import { httpFehlerText } from '../gemeinsam/http-fehler';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
+import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
 import {
   ZusatzFeld,
   istListe,
@@ -77,6 +78,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   private readonly api = inject(DokumenteService);
   private readonly kontakte = inject(KontakteService);
   private readonly anmeldung = inject(AnmeldungService);
+  private readonly entwurfSpeicher = inject(EingangskorbEntwurfSpeicher);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
@@ -100,6 +102,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
   protected readonly laeuft = signal(false);
   protected readonly fehler = signal('');
   protected readonly konfliktNeuLaden = signal(false);
+  protected readonly entwurfWiederhergestellt = signal(false);
   protected readonly fehlerFelder = signal<readonly string[]>([]);
   protected readonly grund = signal('');
   protected readonly vorschauUrl = signal<string | null>(null);
@@ -253,6 +256,16 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const dokument = this.dokument();
+    const benutzerId = this.anmeldung.benutzer()?.id;
+    if (benutzerId) {
+      const gespeichert = this.entwurfSpeicher.lesen(benutzerId, dokument.id);
+      if (gespeichert) {
+        this.entwurf.set(gespeichert.entwurf);
+        this.zusatzEingaben.set(gespeichert.zusatz);
+        this.entwurfWiederhergestellt.set(true);
+        this.vertraulichkeitGewaehlt = gespeichert.entwurf.vertraulichkeit !== '';
+      }
+    }
     if (!dokument.seiten || dokument.seiten < 1) {
       return;
     }
@@ -394,7 +407,20 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     this.fokus(ziel === 'formular' ? '[data-fokus="formular"]' : '[data-test="aktionen"] button');
   }
 
+  protected entwurfVerwerfen(): void {
+    const benutzerId = this.anmeldung.benutzer()?.id;
+    if (benutzerId) {
+      this.entwurfSpeicher.loeschen(benutzerId, this.id());
+    }
+    this.entwurf.set(entwurfAus(this.dokument()));
+    this.zusatzEingaben.set(this.zusatzStart());
+    this.zusatzGespeichert.set(false);
+    this.vertraulichkeitGewaehlt = false;
+    this.entwurfWiederhergestellt.set(false);
+  }
+
   protected bestaetigen(zusatz: Zusatz = {}): void {
+    const benutzerId = this.anmeldung.benutzer()?.id ?? '';
     const entwurf = this.entwurf();
     if (!entwurf.art) {
       this.imFormular(this.texte.artWaehlen, ['art']);
@@ -451,6 +477,7 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
       ),
       this.texte.erfolgBestaetigt(this.titel()),
       zusatz,
+      benutzerId,
     );
   }
 
@@ -566,18 +593,31 @@ export class EingangskorbKarte implements OnInit, OnDestroy {
     return body;
   }
 
-  private ausfuehren(aufruf: Observable<unknown>, erfolg: string, zusatz: Zusatz = {}): void {
+  private ausfuehren(
+    aufruf: Observable<unknown>,
+    erfolg: string,
+    zusatz: Zusatz = {},
+    benutzerId = '',
+  ): void {
     this.laeuft.set(true);
     this.fehler.set('');
     this.konfliktNeuLaden.set(false);
     aufruf.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.laeuft.set(false);
+        if (benutzerId) {
+          this.entwurfSpeicher.loeschen(benutzerId, this.id());
+          this.entwurfWiederhergestellt.set(false);
+        }
         this.erledigt.emit(erfolg);
       },
       error: (fehler: unknown) => {
         this.laeuft.set(false);
-        this.fehlerBehandeln(fehlerAus(fehler), zusatz);
+        const aktionFehler = fehlerAus(fehler);
+        if (aktionFehler.status === 401 && benutzerId && this.anmeldung.zustand() === 'abgelaufen') {
+          this.entwurfSpeicher.speichern(benutzerId, this.id(), this.entwurf(), this.zusatzEingaben());
+        }
+        this.fehlerBehandeln(aktionFehler, zusatz);
       },
     });
   }

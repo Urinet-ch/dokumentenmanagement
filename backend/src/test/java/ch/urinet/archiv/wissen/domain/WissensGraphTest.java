@@ -68,6 +68,27 @@ class WissensGraphTest {
     }
 
     @Test
+    void mindeststufeZitierterQuellseitenGiltAuchUeberKettenUndZyklen() {
+        WissensGraph nurNormaleStufen = new WissensGraph(Map.of(),
+                Map.of(SEITE_A, Set.of(SEITE_B), SEITE_B, Set.of(SEITE_C), SEITE_C, Set.of(SEITE_A)),
+                Map.of(), Map.of(SEITE_A, WissensStufe.NORMAL, SEITE_B, WissensStufe.NORMAL,
+                        SEITE_C, WissensStufe.NORMAL));
+        WissensGraph graph = new WissensGraph(Map.of(),
+                Map.of(SEITE_A, Set.of(SEITE_B), SEITE_B, Set.of(SEITE_C), SEITE_C, Set.of(SEITE_A)),
+                Map.of(), Map.of(SEITE_A, WissensStufe.NORMAL, SEITE_B, WissensStufe.NORMAL,
+                        SEITE_C, WissensStufe.INTERN));
+
+        assertThat(nurNormaleStufen.wirksameStufe(SEITE_A, Set.of())).isEqualTo(WissensStufe.NORMAL);
+        assertThat(graph.wirksameStufe(SEITE_A, graph.dokumente(SEITE_A))).isEqualTo(WissensStufe.INTERN);
+    }
+
+    @Test
+    void quellkettenBis128QuellseitenSindZulaessigUndTiefereGeltenAlsIntern() {
+        assertThat(graphKette(128).mindeststufeMitQuellen(SEITE_A)).isEqualTo(WissensStufe.NORMAL);
+        assertThat(graphKette(129).mindeststufeMitQuellen(SEITE_A)).isEqualTo(WissensStufe.INTERN);
+    }
+
+    @Test
     void unbekanntesDokumentGiltAlsIntern() {
         WissensGraph graph = new WissensGraph(Map.of(SEITE_A, Set.of(DOKUMENT_A)), Map.of(), Map.of(),
                 Map.of(SEITE_A, WissensStufe.NORMAL));
@@ -76,13 +97,13 @@ class WissensGraphTest {
     }
 
     @Test
-    void wirksameStufeNachAnnahmeNimmtDieHuellenDerVorgeschlagenenQuellseitenMit() {
+    void wirksameStufeNachAnnahmeNimmtHuelleUndMindeststufeDerVorgeschlagenenQuellseitenMit() {
         WissensGraph graph = new WissensGraph(
                 Map.of(SEITE_B, Set.of(DOKUMENT_B), SEITE_C, Set.of(DOKUMENT_C)),
                 Map.of(SEITE_B, Set.of(SEITE_C)),
                 Map.of(DOKUMENT_A, WissensStufe.NORMAL, DOKUMENT_B, WissensStufe.NORMAL,
-                        DOKUMENT_C, WissensStufe.INTERN),
-                Map.of(SEITE_B, WissensStufe.NORMAL, SEITE_C, WissensStufe.NORMAL));
+                        DOKUMENT_C, WissensStufe.NORMAL),
+                Map.of(SEITE_B, WissensStufe.NORMAL, SEITE_C, WissensStufe.INTERN));
 
         assertThat(graph.wirksameStufeNachAnnahme(Set.of(DOKUMENT_A), Set.of(SEITE_B),
                 WissensStufe.NORMAL, WissensStufe.NORMAL)).isEqualTo(WissensStufe.INTERN);
@@ -96,5 +117,20 @@ class WissensGraphTest {
                 WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekannte Quellseite").isEqualTo(WissensStufe.INTERN);
         assertThat(graph.wirksameStufeNachAnnahme(Set.of(UUID.randomUUID()), Set.of(),
                 WissensStufe.NORMAL, WissensStufe.NORMAL)).as("unbekanntes Dokument").isEqualTo(WissensStufe.INTERN);
+    }
+
+    private static WissensGraph graphKette(int seiten) {
+        List<UUID> ids = IntStream.range(0, seiten).mapToObj(ignored -> UUID.randomUUID()).toList();
+        Map<UUID, Set<UUID>> quellen = new HashMap<>();
+        Map<UUID, WissensStufe> mindeststufen = new HashMap<>();
+        for (int i = 0; i < seiten; i++) {
+            mindeststufen.put(ids.get(i), WissensStufe.NORMAL);
+            if (i + 1 < seiten) {
+                quellen.put(ids.get(i), Set.of(ids.get(i + 1)));
+            }
+        }
+        quellen.put(SEITE_A, Set.of(ids.getFirst()));
+        mindeststufen.put(SEITE_A, WissensStufe.NORMAL);
+        return new WissensGraph(Map.of(), quellen, Map.of(), mindeststufen);
     }
 }

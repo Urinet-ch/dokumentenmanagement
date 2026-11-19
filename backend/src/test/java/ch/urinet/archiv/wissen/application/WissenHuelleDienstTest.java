@@ -34,6 +34,7 @@ class WissenHuelleDienstTest {
         assertThat(huelle).containsExactly(DOKUMENT);
         assertThat(repository.aktuelle).containsEntry(SEITE, Set.of(DOKUMENT));
         assertThat(repository.stufen).containsEntry(SEITE, WissensStufe.INTERN);
+        assertThat(repository.mindeststufen).containsEntry(SEITE, WissensStufe.INTERN);
         assertThat(repository.versionen).containsEntry(SEITE, Set.of(DOKUMENT));
     }
 
@@ -94,6 +95,37 @@ class WissenHuelleDienstTest {
     }
 
     @Test
+    void zitatierteMindeststufeErhoehtAktuelleSeiteVersionUndAbhaengigeSeiten() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(QUELLE, Set.of(DOKUMENT)),
+                Map.of(SEITE, Set.of(QUELLE), ZITIERENDE, Set.of(SEITE)),
+                Map.of(DOKUMENT, WissensStufe.NORMAL),
+                Map.of(QUELLE, WissensStufe.INTERN, SEITE, WissensStufe.NORMAL,
+                        ZITIERENDE, WissensStufe.NORMAL)));
+
+        new WissenHuelleDienst(repository).versionFreigeben(SEITE, 2);
+
+        assertThat(repository.mindeststufen).containsEntry(SEITE, WissensStufe.INTERN)
+                .containsEntry(ZITIERENDE, WissensStufe.INTERN);
+        assertThat(repository.stufen).containsEntry(SEITE, WissensStufe.INTERN)
+                .containsEntry(ZITIERENDE, WissensStufe.INTERN);
+    }
+
+    @Test
+    void neuberechnungSenktEineBereitsGeerbteMindeststufeNichtAb() {
+        TestRepository repository = new TestRepository(new WissensGraph(
+                Map.of(QUELLE, Set.of(DOKUMENT)),
+                Map.of(SEITE, Set.of(QUELLE), ZITIERENDE, Set.of(SEITE)),
+                Map.of(DOKUMENT, WissensStufe.NORMAL),
+                Map.of(QUELLE, WissensStufe.NORMAL, SEITE, WissensStufe.NORMAL,
+                        ZITIERENDE, WissensStufe.INTERN)));
+
+        new WissenHuelleDienst(repository).versionFreigeben(SEITE, 1);
+
+        assertThat(repository.mindeststufen).containsEntry(ZITIERENDE, WissensStufe.INTERN);
+    }
+
+    @Test
     void sperrenVorDerFreigabeNimmtDieMandantensperreVorDemGraphen() {
         TestRepository repository = new TestRepository(new WissensGraph(
                 Map.of(SEITE, Set.of(DOKUMENT)), Map.of(),
@@ -111,6 +143,7 @@ class WissenHuelleDienstTest {
         private final WissensGraph graph;
         private final Map<UUID, Set<UUID>> aktuelle = new HashMap<>();
         private final Map<UUID, WissensStufe> stufen = new HashMap<>();
+        private final Map<UUID, WissensStufe> mindeststufen = new HashMap<>();
         private final Map<UUID, Set<UUID>> versionen = new HashMap<>();
         private final Set<UUID> mitDokument = new HashSet<>();
         private final List<String> aufrufe = new ArrayList<>();
@@ -139,6 +172,13 @@ class WissenHuelleDienstTest {
         @Override
         public void aktuelleHuelleSetzen(UUID seiteId, Set<UUID> dokumente) {
             aktuelle.put(seiteId, dokumente);
+        }
+
+        @Override
+        public void mindeststufeAnheben(UUID seiteId, WissensStufe mindeststufe) {
+            // wie das SQL im Produktivcode: nie senken
+            mindeststufen.merge(seiteId, mindeststufe, (alt, neu) ->
+                    alt == WissensStufe.INTERN || neu == WissensStufe.INTERN ? WissensStufe.INTERN : WissensStufe.NORMAL);
         }
 
         @Override

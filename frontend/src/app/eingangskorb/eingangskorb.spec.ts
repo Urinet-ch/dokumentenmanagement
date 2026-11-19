@@ -54,7 +54,14 @@ describe('Eingangskorb (Req 8.1, 8.6)', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideApi(''),
-        { provide: AnmeldungService, useValue: { darf: (a: Aktion) => darf('inhaber', a) } },
+        {
+          provide: AnmeldungService,
+          useValue: {
+            darf: (a: Aktion) => darf('inhaber', a),
+            benutzer: () => null,
+            zustand: () => 'abgemeldet',
+          },
+        },
         { provide: EingangskorbZaehler, useValue: zaehler },
       ],
     });
