@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -177,6 +178,58 @@ class JdbcWissenIngestTest {
             assertThat(anzahl).isEqualTo(1);
             throw new IllegalStateException("Rollback-Probe");
         })).hasMessage("Rollback-Probe");
+    }
+
+    @Test
+    void paralleleQuellenAenderungenWartenAufDieMandantensperre() throws Exception {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        CountDownLatch gesperrt = new CountDownLatch(1);
+        CountDownLatch fortfahren = new CountDownLatch(1);
+        CountDownLatch zweiterGestartet = new CountDownLatch(1);
+        ExecutorService parallel = Executors.newFixedThreadPool(2);
+        try {
+            var erster = parallel.submit(() -> kontext.mit(URINET, () -> QuarkusTransaction.requiringNew().call(() -> {
+                ereignisse.vorAenderung();
+                gesperrt.countDown();
+                if (!fortfahren.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Zweite Transaktion nicht gestartet");
+                }
+                entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                        .setParameter("id", dokument).executeUpdate();
+                ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+                return null;
+            })));
+            assertThat(gesperrt.await(10, TimeUnit.SECONDS)).isTrue();
+            var zweiter = parallel.submit(() -> kontext.mit(URINET, () -> QuarkusTransaction.requiringNew().call(() -> {
+                zweiterGestartet.countDown();
+                ereignisse.vorAenderung();
+                entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'PERSONAL' where id = :id")
+                        .setParameter("id", dokument).executeUpdate();
+                ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+                return null;
+            })));
+            assertThat(zweiterGestartet.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> zweiter.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            fortfahren.countDown();
+            erster.get(10, TimeUnit.SECONDS);
+            zweiter.get(10, TimeUnit.SECONDS);
+        } finally {
+            fortfahren.countDown();
+            parallel.shutdown();
+            if (!parallel.awaitTermination(15, TimeUnit.SECONDS)) {
+                parallel.shutdownNow();
+                throw new IllegalStateException("Parallele Testtransaktionen sind nicht beendet");
+            }
+        }
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".dokument where id = ? and vertraulichkeit = 'PERSONAL'", dokument)).isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and quelle_pruefen and vertraulichkeit = 'INTERN'", seite)).isEqualTo(1);
     }
 
     @BeforeEach
