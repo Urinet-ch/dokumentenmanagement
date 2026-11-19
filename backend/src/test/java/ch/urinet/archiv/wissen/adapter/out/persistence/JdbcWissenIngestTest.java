@@ -603,6 +603,36 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void freigabeEntferntQuellenhinweisDerGeaendertenSeite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String pfad = "konzepte/quelle-" + UUID.randomUUID();
+        UUID seite = seite(URINET, pfad, "Alter Inhalt", null);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set quelle_pruefen = true where id = ?", seite);
+        String daten = """
+                {"typ":"Konzept","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","quellen":[{"schluessel":"q1","dokumentId":"%s","seiteVon":1,
+                 "seiteBis":1,"auszug":"Seite 1","quellSeiteId":null}],"vertraulichkeit":"NORMAL",
+                 "inhalt":"Aussage.[^q1]","wissensquelleId":null}
+                """.formatted(dokument);
+        ausfuehren("update " + URINET.schema()
+                        + ".wissens_aenderung set aktion = 'AENDERN', seite_id = ?, pfad = ?, basis_version = 1, "
+                        + "daten = cast(? as jsonb), inhalt = 'Aussage.[^q1]' where entwurf_id = ?",
+                seite, pfad, daten, entwurf);
+        try {
+            given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).header("If-Match", "\"0\"")
+                    .contentType("application/json").body("{}")
+                    .when().post("/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen")
+                    .then().statusCode(204);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite where id = ? and not quelle_pruefen and version = 2", seite)).isEqualTo(1);
+        } finally {
+            annahmeBereinigen(entwurf);
+        }
+    }
+
+    @Test
     void manuellerEntwurfWirdGeprueftUndNurMitA17Angelegt() throws SQLException {
         UUID dokument = quelle(URINET);
         String pfad = "konzepte/manuell-" + UUID.randomUUID();
