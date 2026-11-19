@@ -26,6 +26,8 @@ public class JavaWissenZeilendiff implements WissenZeilendiff {
     }
 
     private List<String> zeilen(String text) {
-        return text.isEmpty() ? List.of() : Arrays.asList(text.split("\n", -1));
+        // Zeilenenden normalisieren (kein Scheindiff); ein Schlussumbruch bleibt bewusst sichtbar
+        String normal = text.replace("\r\n", "\n").replace('\r', '\n');
+        return normal.isEmpty() ? List.of() : Arrays.asList(normal.split("\n", -1));
     }
 }

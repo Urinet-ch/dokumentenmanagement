@@ -1129,6 +1129,30 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void abschlussAnalyseSchreibtLogMitVorschlagendemUndAngenommenenSeiten() throws SQLException {
+        UUID seite = seite(URINET, "konzepte/analyse-" + UUID.randomUUID(), "Probe", null);
+        UUID entwurf = UUID.randomUUID();
+        entwuerfe.get(URINET).add(entwurf);
+        ausfuehren("insert into " + URINET.schema() + ".wissens_entwurf (id, anlass, status, erstellt_von, erstellt) "
+                + "values (?, 'ANALYSE', 'ERLEDIGT', 'mitarbeiter', now())", entwurf);
+        ausfuehren("insert into " + URINET.schema() + ".wissens_aenderung "
+                + "(entwurf_id, nr, aktion, seite_id, basis_version, pfad, daten, inhalt, diff, status) "
+                + "values (?, 1, 'AENDERN', ?, 1, 'konzepte/probe', '{}'::jsonb, '', '{}'::jsonb, 'ANGENOMMEN')",
+                entwurf, seite);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabeRepository.abschlussProtokollieren(entwurf);
+            assertThat(((Number) entityManager.get().createNativeQuery(
+                            "select count(*) from wissens_log where entwurf_id = :id and aktion = 'ANALYSE' "
+                                    + "and akteur = 'human:mitarbeiter' and seiten = array[cast(:seite as uuid)] "
+                                    + "and angaben->>'vorschlagender' = 'mitarbeiter'")
+                    .setParameter("id", entwurf).setParameter("seite", seite.toString())
+                    .getSingleResult()).longValue()).isEqualTo(1);
+            throw new IllegalStateException("Testabbruch");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("Testabbruch");
+    }
+
+    @Test
     void veralteteBasisWirdUnterSperreMarkiertUndBleibtNachCommitErhalten() throws SQLException {
         UUID seite = seite(URINET, "konzepte/basis-" + UUID.randomUUID(), "Probe", null);
         UUID entwurf = manuellerEntwurf(URINET);

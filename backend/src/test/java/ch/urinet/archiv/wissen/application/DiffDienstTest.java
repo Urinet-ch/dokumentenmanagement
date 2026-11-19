@@ -32,6 +32,13 @@ class DiffDienstTest {
     }
 
     @Test
+    void unterschiedlicheZeilenendenErgebenKeinenDiff() {
+        DiffDienst.Diff diff = dienst.vergleichen(seite("Titel", List.of(), List.of(), "a\r\nb\rc"),
+                seite("Titel", List.of(), List.of(), "a\nb\nc"));
+        assertThat(diff.zeilen()).isEmpty();
+    }
+
+    @Test
     void neueSeiteUndLetzterZeilenumbruchSindNichtUnsichtbar() {
         DiffDienst.Diff neu = dienst.vergleichen(null, seite("Neu", List.of(), List.of(), "Inhalt"));
         assertThat(neu.zeilen()).containsExactly(new WissenZeilendiff.Aenderung(WissenZeilendiff.Art.EINFUEGEN,

@@ -33,6 +33,7 @@ public class WissenManuellerEntwurfSchritte {
     private UUID zitierteSeite;
     private int status;
     private Response antwort;
+    private List<Long> vorherZaehler;
 
     @Wenn("der Inhaber einen manuellen Wissensentwurf ohne Titel anlegt")
     public void inhaberLegtEntwurfAn() {
@@ -61,7 +62,8 @@ public class WissenManuellerEntwurfSchritte {
     }
 
     @Wenn("der Treuhänder denselben manuellen Wissensentwurf anlegen möchte")
-    public void treuhaenderLegtEntwurfAn() {
+    public void treuhaenderLegtEntwurfAn() throws Exception {
+        vorherZaehler = zaehler();
         status = given().auth().oauth2(Testanmeldung.token("treuhaender-urinet"))
                 .contentType("application/json").body(eingabe())
                 .when().post("/api/v1/wissensentwuerfe").statusCode();
@@ -70,6 +72,9 @@ public class WissenManuellerEntwurfSchritte {
     @Dann("erhält er 403 und es entsteht kein weiterer Wissensentwurf")
     public void treuhaenderAbgewiesen() throws Exception {
         assertThat(status).isEqualTo(403);
+        // Datenbank unverändert; im Zugriffsprotokoll nur kein WISSEN_*-Eintrag (ein VERWEIGERT-Eintrag nach
+        // Req 14.4 ist ausdrücklich erlaubt, Auslegung in tasks.md 14.2)
+        assertThat(zaehler()).isEqualTo(vorherZaehler);
         try (Connection verbindung = datenbank.get().getConnection();
              PreparedStatement befehl = verbindung.prepareStatement(
                      "select count(*) from m_urinet.wissens_aenderung where pfad = ?")) {
@@ -78,6 +83,21 @@ public class WissenManuellerEntwurfSchritte {
                 assertThat(ergebnis.next()).isTrue();
                 assertThat(ergebnis.getInt(1)).isEqualTo(1);
             }
+        }
+    }
+
+    /** Zeilenzahlen von wissens_entwurf, wissens_aenderung, wissens_log und WISSEN_*-Zugriffsprotokoll. */
+    private List<Long> zaehler() throws Exception {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement befehl = verbindung.prepareStatement("""
+                     select (select count(*) from m_urinet.wissens_entwurf),
+                            (select count(*) from m_urinet.wissens_aenderung),
+                            (select count(*) from m_urinet.wissens_log),
+                            (select count(*) from m_urinet.zugriff_protokoll where aktion like 'WISSEN\\_%')
+                     """);
+             var ergebnis = befehl.executeQuery()) {
+            assertThat(ergebnis.next()).isTrue();
+            return List.of(ergebnis.getLong(1), ergebnis.getLong(2), ergebnis.getLong(3), ergebnis.getLong(4));
         }
     }
 

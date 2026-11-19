@@ -5,6 +5,7 @@ import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.sicherheit.application.Berechtigung;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rechtematrix;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -47,6 +48,10 @@ public class FreigabeSperre {
 
     private FreigabeRepository.Aenderung laden(Benutzer benutzer, UUID entwurfId, int nummer, IntSupplier ifMatch,
                                                 Zweck zweck) {
+        // Rolle vor jeder Sperre prüfen: Rollen ohne A17 erhalten einheitlich 403 und belegen keine Sperre
+        if (!Rechtematrix.ergebnis(benutzer.rolle(), Aktion.A17).zugaenglich()) {
+            berechtigung.wissensseitenAktion(benutzer, Aktion.A17, true);
+        }
         huelle.sperren();
         Optional<FreigabeRepository.Aenderung> gefunden = repository.sperren(entwurfId, nummer);
         boolean sichtbar = gefunden.filter(a -> a.seiteId() == null
