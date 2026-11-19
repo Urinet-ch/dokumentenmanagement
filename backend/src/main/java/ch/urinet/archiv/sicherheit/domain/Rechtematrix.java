@@ -14,8 +14,8 @@ import static ch.urinet.archiv.sicherheit.domain.Ergebnis.VERBOTEN;
 
 /**
  * Rechtematrix Rolle × Aktion als einzige Domain-Regel (Req 2.6, ADR-009). Quelle ist die Tabelle in requirements.md;
- * {@code RechtematrixSpecTest} vergleicht jede Zelle. Eine neue Zeile (A15–A19, Spec 04) braucht eine Konstante in
- * {@link Aktion} und einen Eintrag hier; fehlt eine Zelle, scheitert schon das Laden der Klasse.
+ * {@code RechtematrixSpecTest} vergleicht jede Zelle. Eine neue Zeile braucht eine Konstante in {@link Aktion} und
+ * einen Eintrag hier; fehlt eine Zelle, scheitert schon das Laden der Klasse.
  */
 public final class Rechtematrix {
 
@@ -43,6 +43,10 @@ public final class Rechtematrix {
         zeile(Aktion.A17, ERLAUBT, VERBOTEN, VERBOTEN, ERLAUBT);
         zeile(Aktion.A18, ERLAUBT, ERLAUBT, VERBOTEN, ERLAUBT);
         zeile(Aktion.A19, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A20, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A21, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A22, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
+        zeile(Aktion.A23, ERLAUBT, VERBOTEN, VERBOTEN, VERBOTEN);
         if (ZEILEN.size() != Aktion.values().length) {
             throw new IllegalStateException("Rechtematrix unvollständig");
         }

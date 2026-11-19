@@ -51,7 +51,7 @@ auf Server oder Secrets aus der Sitzung.
   - _Anforderungen: 3.3, 5.1, 5.4, 5.5, 5.6, 5.8, 5.9, 5.10_
   - _Abhängig von: 19.1_
 
-- [ ] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
+- [x] 19.5 Domain-Regeln und Rechtematrix A20 bis A23 [Backend]
   - `Vergaberegeln` (Eskalationsschutz, Satz der Rollen, letzter Inhaber, Rollen ausserhalb der vier), `Benutzerstatus` und
     Statusautomat, `Aktion` A20 bis A23 mit Zeilen der Matrix, `RechteUebersicht`; `RechtematrixSpecTest` liest die Tabelle aus
     Spec 06; Absatz unter der Tabelle in Spec 01 requirements.md 2.6; Changeset `public.mandant.verwaltung_rollen`.
