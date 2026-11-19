@@ -60,6 +60,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 4.1–4.3_
 
 - [ ] 10.6 Sicherung für Mandant 2 [Infra]
+  - Repo-Teil umgesetzt: täglicher Export und lokaler Restore prüfen beide Mandanten. Zweitkopie, `backup-gate.sh` und VPS-Schritt liegen ausserhalb dieses Repos und bleiben offen [Fabian]; VPS-Schritt offen. `taeglich.sh` bricht ab, wenn ein Schema `m_*` nicht in `ARCHIV_MANDANTEN` steht.
   - Schema `m_vhf_gsk` und Bucket `urinet-archiv-vhf-gsk` in Sicherung, Zweitkopie und `backup-gate.sh` aufnehmen; Restore-Probe stellt beide mit wieder her
   - _Anforderungen: 1.5_
 

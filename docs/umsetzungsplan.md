@@ -20,6 +20,7 @@ die nächste Phase beginnt erst, wenn es erfüllt ist.**
 | `.kiro/specs/03-zweiter-mandant/` | Phase 3: 15 Requirements (10–15 ergänzt 13.11.2026: Webseiten-Schnittstelle), Design, Aufgaben | 10–12 | ca. 6 Tage (vor der Erweiterung; Aufgaben 11.6–11.13 noch nicht geschätzt) |
 | `.kiro/specs/04-wissensbasis/` | Phase 4: 19 Requirements, Design, Aufgaben (Wissensbasis nach LLM-Wiki-Muster, ADR-013) | 13–16 | noch nicht geschätzt |
 | `.kiro/specs/05-mandanten-konfiguration/` | Konfiguration je Mandant: 9 Requirements, Design, Aufgaben (Dokumentarten, Klassifikationen, Fristen, Regeln) | 17–18, umgesetzt nach Gate Phase 1 und spätestens vor Welle 10 (Entscheid Fabian 11.11.2026) | noch nicht geschätzt |
+| `.kiro/specs/06-verwaltung-einstellungen-benutzer/` | Einstellungen, Benutzer und Rollen in der App verwalten: 9 Requirements, Design, Aufgaben (Keycloak-Dienstkonto, Benutzer, Rollen, Einstellungen; ADR-015) | 19–21, Welle 19 nach Gate Phase 1 und parallel zu 17–18, Welle 20 nach Spec 05, 17.7 | noch nicht geschätzt (27 Aufgaben bis je 3 Stunden) |
 
 Jede Spec folgt dem Kiro-Muster: `requirements.md` (User Stories + Akzeptanzkriterien in EARS),
 `design.md` (Architektur, Schnittstellen, Datenmodell, Fehler, Tests), `tasks.md` (Aufgaben mit

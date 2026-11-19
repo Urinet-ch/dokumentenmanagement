@@ -87,11 +87,23 @@ if [[ ${1:-} == "$MOCK_BACKUP_TEST" ]]; then
 fi
 if [[ ${1:-} == "$MOCK_TAEGLICH_SCRIPT" ]]; then
   printf 'taeglich %s\n' "$*" >> "$MOCK_LOG"
+  printf 'ARCHIV_MANDANTEN=%s\n' "$ARCHIV_MANDANTEN" >> "$MOCK_LOG"
   lauf="$ARCHIV_SICHERUNGSVERZEICHNIS/laeufe/lauf-20260101T000000Z-1"
   realm="$ARCHIV_RESTORE_TMP/fake-realm/realm"
   mkdir -p "$lauf"
-  for datei in archiv.dump keycloak.dump inventar-urinet.jsonl bucket-urinet.bin; do
+  for datei in archiv.dump keycloak.dump; do
     printf 'synthetisch:%s\n' "$datei" > "$lauf/$datei.age"
+  done
+  for mandant in urinet vhf-gsk; do
+    for art in inventar bucket; do
+      if [[ ${MOCK_FEHLENDER_BUCKET:-} == "$mandant" && $art == bucket ]]; then
+        continue
+      fi
+      endung=jsonl
+      [[ $art != bucket ]] || endung=bin
+      datei="$art-$mandant.$endung"
+      printf 'synthetisch:%s\n' "$datei" > "$lauf/$datei.age"
+    done
   done
   mkdir -p "$realm"
   printf 'synthetischer Realm\n' > "$realm/urinet-archiv-realm.json"
@@ -157,6 +169,18 @@ if [[ ${1:-} == compose ]]; then
   case " $* " in
     *" config --images "*) awk '$1 == "image:" { print $2 }' "$datei" ;;
     *" ps --quiet db "*) printf 'mock-container\n' ;;
+    *" exec -T db psql "*)
+      if [[ $* == *"to_regclass('m_vhf_gsk.dokument')"* && ${MOCK_FEHLENDES_SCHEMA:-} == vhf-gsk ]]; then
+        exit 0
+      fi
+      if [[ $* == *"to_regclass('m_urinet.dokument')"* ]]; then
+        printf 'm_urinet.dokument\n'
+      elif [[ $* == *"to_regclass('m_vhf_gsk.dokument')"* ]]; then
+        printf 'm_vhf_gsk.dokument\n'
+      else
+        exit 1
+      fi
+      ;;
     # Wie Docker bei Diensten ohne veröffentlichten Port: Exit 0 mit Port 0.
     *" port db 5432 "*) printf '127.0.0.1:25432\n' ;;
     *" port minio 9000 "*) [[ ${MOCK_PORT_NULL:-0} == 1 ]] && printf ':0\n' || printf '127.0.0.1:29000\n' ;;
@@ -248,6 +272,8 @@ assert grep -q "taeglich $MOCK_TAEGLICH_SCRIPT" "$MOCK_LOG"
 assert grep -q "mvn cwd=$repo_root/backend -ntp -DskipTests package" "$MOCK_LOG"
 assert grep -q 'mvn cwd=.*-Darchiv.restore.phase=quelle' "$MOCK_LOG"
 assert grep -q 'mvn cwd=.*-Darchiv.restore.phase=ziel' "$MOCK_LOG"
+assert grep -q -- '-Darchiv.restore.verzeichnis=' "$MOCK_LOG"
+assert grep -q '^ARCHIV_MANDANTEN=urinet vhf-gsk$' "$MOCK_LOG"
 assert grep -q 'docker compose --project-name archiv-restore-' "$MOCK_LOG"
 assert grep -q 'down --remove-orphans' "$MOCK_LOG"
 assert grep -q '^OK      SHA256SUMS des Sicherungspakets prüfen' "$temp/erfolg.stdout"
@@ -304,6 +330,9 @@ fehlendes=$(grep '/minio:' "$MOCK_IMAGES")
 erwarte_abbruch 2 "docker pull $fehlendes" "MOCK_FEHLENDES_IMAGE=$fehlendes"
 erwarte_abbruch 3 'SHA256SUMS nennt nicht genau die verschlüsselten Dateien' MOCK_SUMS_LUECKE=1
 erwarte_abbruch 3 'Compose-Port von minio fehlt' MOCK_PORT_NULL=1
+erwarte_abbruch 3 'Sicherungspaket für Mandant vhf-gsk ist unvollständig (bucket-vhf-gsk.bin fehlt)' \
+  MOCK_FEHLENDER_BUCKET=vhf-gsk
+erwarte_abbruch 3 'Wiederhergestelltes Schema für Mandant vhf-gsk fehlt' MOCK_FEHLENDES_SCHEMA=vhf-gsk
 
 # Dieselbe Übung mit «shasum» statt «sha256sum» (macOS ohne coreutils): PATH ohne sha256sum nachbauen.
 if command -v shasum >/dev/null 2>&1; then

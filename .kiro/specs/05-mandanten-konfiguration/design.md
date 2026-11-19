@@ -549,3 +549,4 @@ Code kommen: Fehlercodes und A11 (siehe oben) sowie die Stammdaten-Tabelle (Aufg
 - [offen: Entscheid Fabian] Weg, die KI-Vorschläge für die Stichprobe vor der Freigabe zu erzeugen und zu bewerten
   («Probelauf»): Solange `ki_freigegeben = false` gilt, erzeugt der Worker keinen Auftrag `KI_VORSCHLAG` (Req 8.4).
 - Rechte der Geschäftsstelle für A11 bleiben der Entscheid aus Spec 03, 3.5.
+- Nachtrag Spec 06 (18.11.2026): Der Abschnitt `einstellungen` des Abbilds wächst um weitere Einstellungen je Mandant (`branding`, `chat`, `webseitenChat`, `wissen`), mit Katalog, Grenzen, Bestätigung riskanter Änderungen und `GET/PATCH /mandant/einstellungen` nach Spec 06, Requirement 1 und 2; Versionen, `If-Match`, Konfigurationsdatei und Protokoll bleiben die Mechanik dieser Spec (keine zweite). Benutzer und Rollen gehören nicht zur Konfiguration (Spec 06, Requirement 3 und 4).
