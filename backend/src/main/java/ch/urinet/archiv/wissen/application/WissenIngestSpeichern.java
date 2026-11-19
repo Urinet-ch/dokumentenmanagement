@@ -127,6 +127,11 @@ public class WissenIngestSpeichern {
         return port.quelleSeiteFinden(dokumentId);
     }
 
+    @Transactional
+    public long hoechsteQuellenNummer(UUID dokumentId) {
+        return port.hoechsteQuellenNummer(dokumentId);
+    }
+
     /**
      * Prüft bei jedem Teilauftrag erneut, ob die Quelle noch für den Ingest freigegeben ist (Req 5.6, 5.7): archiviert,
      * bestätigt, Art WISSENSQUELLE und nicht PERSONAL.

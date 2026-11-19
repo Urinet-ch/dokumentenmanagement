@@ -434,6 +434,11 @@ class WissenIngestStartenTest {
         }
 
         @Override
+        public long hoechsteQuellenNummer(UUID dokumentId) {
+            return 0;
+        }
+
+        @Override
         public Optional<SeitenFassung> seiteLaden(UUID seiteId) {
             return Optional.empty();
         }

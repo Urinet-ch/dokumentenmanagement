@@ -58,6 +58,7 @@ public class WissenIngestSchritte {
     private final Map<String, Object[]> vorher = new HashMap<>();
     private final Map<String, Einstellung> einstellungen = new HashMap<>();
     private final List<Long> verbrauch = new ArrayList<>();
+    private final Map<UUID, Integer> ersteQuellenNummer = new HashMap<>();
     private Response antwort;
     private UUID entwurfId;
     private Long kiVerbrauchId;
@@ -263,6 +264,7 @@ public class WissenIngestSchritte {
         String kurz = ort.id().toString().substring(0, 8);
         String neu = "q-" + kurz + "-1";
         String alt = "q-" + kurz + "-99";
+        ersteQuellenNummer.put(ort.id(), 100);
         UUID id = UUID.randomUUID();
         ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite "
                         + "(id, pfad, typ, titel, beschreibung, vertraulichkeit, inhalt, version, erzeugt_von, "
@@ -274,25 +276,30 @@ public class WissenIngestSchritte {
                         + "- Frühere Fassung der Frist. [^" + neu + "]\n- Eine ältere Aussage. [^" + alt + "]\n",
                 ort.id());
         wissensseiten.computeIfAbsent(ort.mandant(), ignored -> new ArrayList<>()).add(id);
-        for (String schluessel : List.of(neu, alt)) {
+        // q-…-1 belegt dieselbe Textstelle wie die neue Aussage, q-…-99 eine andere (Review PR #319, M1)
+        for (Map.Entry<String, String> quelle : Map.of(neu, "Die Abgabefrist endet am 30. April.",
+                alt, "Die Abgabefrist endet").entrySet()) {
             ausfuehren("insert into " + schema(ort.mandant()) + ".wissensseite_quelle "
                             + "(seite_id, schluessel, dokument_id, seite_von, seite_bis, auszug) "
-                            + "values (?, ?, ?, 1, 1, 'Die Abgabefrist endet am 30. April.')",
-                    id, schluessel, ort.id());
+                            + "values (?, ?, ?, 1, 1, ?)",
+                    id, quelle.getKey(), ort.id(), quelle.getValue());
         }
     }
 
     @Dann("aktualisiert der Ingest die Quelle-Seite von «{word}» ohne Befund")
     public void quelleSeiteAktualisiert(String name) throws SQLException {
         String kurz = ort(name).id().toString().substring(0, 8);
-        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, befunde::text as befunde "
-                + "from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = ?", entwurfId,
+        Map<String, Object> aenderung = zeile("select aktion, seite_id, basis_version, inhalt, befunde::text as befunde, "
+                + "entfernte_aussagen::text as entfernt from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = ?", entwurfId,
                 "quellen/2026-04-fristen-" + kurz);
         assertThat(aenderung).containsEntry("aktion", "AENDERN").containsEntry("basis_version", 2);
         assertThat(aenderung.get("seite_id")).isNotNull();
         assertThat((String) aenderung.get("inhalt")).contains("- Eine ältere Aussage. [^q-" + kurz + "-99]",
-                "- Die Abgabefrist endet am 30. April. [^q-" + kurz + "-1]").doesNotContain("Frühere Fassung");
-        assertThat((String) aenderung.get("befunde")).doesNotContain("QUELLE_NICHT_BELEGT", "AUSSAGE_ENTFERNT");
+                "- Die Abgabefrist endet am 30. April. [^q-" + kurz + "-100]").doesNotContain("Frühere Fassung");
+        assertThat((String) aenderung.get("entfernt")).contains("\"q-" + kurz + "-1\"")
+                .doesNotContain("q-" + kurz + "-99");
+        assertThat(String.valueOf(aenderung.get("befunde")))
+                .doesNotContain("QUELLE_NICHT_BELEGT", "AUSSAGE_ENTFERNT", "QUELLE_UNGUELTIG");
         assertThat(((Number) zeile("select count(*) as anzahl from m_urinet.wissens_aenderung "
                 + "where entwurf_id = ? and pfad like ?", entwurfId, "quellen/%").get("anzahl")).intValue())
                 .isEqualTo(1);
@@ -362,8 +369,8 @@ public class WissenIngestSchritte {
         }
     }
 
-    private static List<String> gueltigeAntworten(UUID id) {
-        String quellenschluessel = "q-" + id.toString().substring(0, 8) + "-1";
+    private List<String> gueltigeAntworten(UUID id) {
+        String quellenschluessel = "q-" + id.toString().substring(0, 8) + "-" + ersteQuellenNummer.getOrDefault(id, 1);
         return List.of(
                 """
                 {"aussagen":[{"nr":1,"text":"Die Abgabefrist endet am 30. April.","seiten":[1],

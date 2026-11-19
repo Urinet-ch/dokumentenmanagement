@@ -92,6 +92,7 @@ class JdbcWissenIngestTest {
                 ausfuehren("delete from " + code.schema() + ".wissensseite where id = ?", id);
             }
             for (UUID id : entwuerfe.get(code)) {
+                ausfuehren("delete from " + code.schema() + ".wissens_aenderung where entwurf_id = ?", id);
                 ausfuehren("delete from " + code.schema() + ".wissens_entwurf where id = ?", id);
             }
             for (Long id : verbrauch.get(code)) {
@@ -241,6 +242,32 @@ class JdbcWissenIngestTest {
         assertThat(im(URINET, () -> ingest.quelleSeiteFinden(dokument))).contains(seite);
         assertThat(im(URINET, () -> ingest.quelleSeiteFinden(ohneSeite))).isEmpty();
         assertThat(im(ZWEITER, () -> ingest.quelleSeiteFinden(dokument))).isEmpty();
+    }
+
+    @Test
+    void hoechsteQuellenNummerAusSeitenUndVorschlaegenNurImEigenenSchema() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID anderes = quelle(URINET);
+        String kurz = dokument.toString().substring(0, 8);
+        UUID seite = seite(URINET, "quellen/probe-" + kurz, "Quelle", dokument);
+        for (String schluessel : List.of("q-" + kurz + "-7", "q-" + kurz + "-12", "q-" + kurz + "-x", "fremd-99")) {
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle (seite_id, schluessel, dokument_id, "
+                    + "seite_von, seite_bis, auszug) values (?, ?, ?, 1, 1, 'Seite')", seite, schluessel, dokument);
+        }
+
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(dokument))).isEqualTo(12);
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(anderes))).isZero();
+        assertThat(im(ZWEITER, () -> ingest.hoechsteQuellenNummer(dokument))).isZero();
+
+        UUID entwurf = entwurf(URINET, dokument, "ABGELEHNT");
+        ausfuehren("insert into " + URINET.schema() + ".wissens_aenderung (entwurf_id, nr, aktion, pfad, daten, "
+                + "inhalt, diff, status) values (?, 1, 'NEU', 'konzepte/probe', cast(? as jsonb), 'Probe', "
+                + "'[]'::jsonb, 'VERWORFEN')", entwurf, "{\"quellen\": [{\"schluessel\": \"q-" + kurz
+                + "-31\", \"dokumentId\": \"" + dokument + "\"}, {\"schluessel\": \"q-" + kurz
+                + "-77\", \"dokumentId\": \"" + anderes + "\"}]}");
+
+        assertThat(im(URINET, () -> ingest.hoechsteQuellenNummer(dokument))).isEqualTo(31);
+        assertThat(im(ZWEITER, () -> ingest.hoechsteQuellenNummer(dokument))).isZero();
     }
 
     @Test

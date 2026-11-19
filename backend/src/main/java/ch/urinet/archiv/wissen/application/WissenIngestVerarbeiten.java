@@ -53,7 +53,9 @@ public class WissenIngestVerarbeiten {
             """;
     private static final Pattern SLUG = Pattern.compile("[^a-z0-9]+");
     private static final Pattern KERNAUSSAGE_ZEILE = Pattern.compile("^- .+ \\[\\^([^\\]\\s]+)\\]$");
+    private static final Pattern SCHLUESSEL_NUMMER = Pattern.compile("[0-9]{1,15}");
     private static final int MAX_AUSSAGEN_PRO_ABSCHNITT = 40;
+    private static final int HINWEIS_PFAD_ZEICHEN = 120;
     private static final int MAX_AUSSAGE_ZEICHEN = 2_000;
     static final String NICHT_FREIGEGEBEN = "Die Wissensquelle ist nicht mehr für den Ingest freigegeben.";
     static final String UEBERBLICK_HOEHER = "Überblick nicht aktualisiert (höhere Vertraulichkeit)";
@@ -168,6 +170,9 @@ public class WissenIngestVerarbeiten {
         if (antwort.inhalt() instanceof KiPort.Kernaussagen inhalt && inhalt.aussagen() != null) {
             int anzahl = 0;
             Set<Integer> lokaleNummern = new HashSet<>();
+            // Schlüssel zählen über alle Durchgänge weiter (Req 5.2, 5.3): nie ein Schlüssel einer früheren Aussage
+            long basis = Math.max(speichern.hoechsteQuellenNummer(lauf.dokumentId()),
+                    hoechsteNummer(lauf.dokumentId(), bisher.kernaussagen()));
             for (KiPort.Aussage aussage : inhalt.aussagen()) {
                 if (anzahl++ >= MAX_AUSSAGEN_PRO_ABSCHNITT || aussage == null || aussage.nr() == null
                         || aussage.nr() < 1 || aussage.nr() > MAX_AUSSAGEN_PRO_ABSCHNITT
@@ -187,7 +192,7 @@ public class WissenIngestVerarbeiten {
                     seiten = mitAuszug;
                 }
                 int nummer = Math.addExact(Math.multiplyExact(index, MAX_AUSSAGEN_PRO_ABSCHNITT), aussage.nr());
-                String schluessel = schluessel(lauf.dokumentId(), nummer);
+                String schluessel = schluessel(lauf.dokumentId(), Math.addExact(basis, aussage.nr()));
                 aussagen.add(new Kernaussage(nummer, schluessel, aussage.text(), seiten, aussage.auszug(), belegt));
                 if (!belegt) {
                     hinweise.add("Kernaussage " + nummer + " hat keinen überprüfbaren Auszug.");
@@ -293,11 +298,18 @@ public class WissenIngestVerarbeiten {
                 continue;
             }
             SeitenMetadaten page = sichtbar.get(plan.pfad());
+            Seitentyp geplanterTyp = Seitentyp.vonDatenbankwert(page == null ? plan.typ() : page.typ()).orElse(null);
+            if (geplanterTyp == Seitentyp.QUELLE) {
+                // die Quelle-Seite schlägt nur der Schritt QUELLE vor: je Seite genau eine Änderung (Req 6.1)
+                hinweise.add("Quelle-Seiten entstehen nur im Schritt QUELLE; der Vorschlag für «"
+                        + hinweisPfad(plan.pfad()) + "» wurde verworfen.");
+                continue;
+            }
             SeitenMetadaten belegt = page != null ? null : stand.seiten().stream()
                     .filter(s -> s.pfad().equals(plan.pfad())).findFirst().orElse(null);
             if (belegt != null && "VERALTET".equals(belegt.status())
                     && speichern.zugaenglich(belegt, stand.lauf(), stand.graph(), stand.personalDokumente())) {
-                hinweise.add("Eine veraltete Seite belegt den Pfad «" + plan.pfad()
+                hinweise.add("Eine veraltete Seite belegt den Pfad «" + hinweisPfad(plan.pfad())
                         + "»; der Vorschlag wurde verworfen.");
                 continue;
             }
@@ -314,7 +326,7 @@ public class WissenIngestVerarbeiten {
                 continue;
             }
             if (page == null && !hoeher && "AENDERN".equals(aktion)) {
-                hinweise.add("Die zu ändernde Seite «" + plan.pfad() + "» fehlt; sie wird neu vorgeschlagen.");
+                hinweise.add("Die zu ändernde Seite «" + hinweisPfad(plan.pfad()) + "» fehlt; sie wird neu vorgeschlagen.");
                 aktion = "NEU";
             }
             if (page != null && ("AENDERN".equals(aktion) || "VERALTEN".equals(aktion))) {
@@ -432,7 +444,7 @@ public class WissenIngestVerarbeiten {
             return;
         }
         if (!(antwort.inhalt() instanceof KiPort.Seite inhalt)) {
-            Fortschritt neu = mitHinweis(bisher, "Änderung für «" + plan.pfad()
+            Fortschritt neu = mitHinweis(bisher, "Änderung für «" + hinweisPfad(plan.pfad())
                     + "» nach einer ungültigen Antwort verworfen.");
             speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "SEITE",
                     fortsetzenSeite(neu, index + 1), addiere(lauf.tokensEin(), antwort.tokensEin()),
@@ -673,9 +685,16 @@ public class WissenIngestVerarbeiten {
         if (bisherige != null) {
             bisherige.quellen().forEach(quelle -> quellenNachSchluessel.put(quelle.schluessel(), quelle));
         }
-        aussagen.forEach(a -> quellenNachSchluessel.put(a.schluessel(), new Quelleneintrag(a.schluessel(),
-                lauf.dokumentId(), a.seiten().stream().min(Integer::compareTo).orElse(null),
-                a.seiten().stream().max(Integer::compareTo).orElse(null), a.auszug(), null)));
+        List<WissensPruefung.Befund> befunde = new ArrayList<>();
+        for (Kernaussage aussage : aussagen) {
+            Quelleneintrag neu = eintrag(aussage, lauf.dokumentId());
+            Quelleneintrag vorhanden = quellenNachSchluessel.get(aussage.schluessel());
+            if (vorhanden != null && !gleicherBeleg(vorhanden, neu)) {
+                befunde.add(kollision(aussage.schluessel()));
+                continue;
+            }
+            quellenNachSchluessel.put(aussage.schluessel(), neu);
+        }
         List<Quelleneintrag> quellen = List.copyOf(quellenNachSchluessel.values());
         Seitentyp typ = Seitentyp.vonDatenbankwert(plan.typ()).orElseThrow();
         Wissensseite daten = new Wissensseite(plan.seiteId(), plan.pfad(), typ, inhalt.titel(),
@@ -685,26 +704,37 @@ public class WissenIngestVerarbeiten {
                 !inhalt.widersprueche().isEmpty(), bisherige == null ? null : bisherige.wissensquelleId());
         return new SeitenVorschlag(nummer, plan.aktion(), plan.seiteId(), plan.pfad(), plan.basisVersion(),
                 daten, inhalt.begruendung(), inhalt.widersprueche(), inhalt.entfernteAussagen(),
-                List.of(), List.of(), stufe.name());
+                List.copyOf(befunde), List.of(), stufe.name());
     }
 
     /**
      * Erstellt die Quelle-Seite oder aktualisiert sie, wenn die Wissensquelle schon eine hat (Req 5.3 (d), 5.2): Pfad,
-     * Seite und Basisversion bleiben; Kernaussagen und Quelleneinträge früherer Durchgänge, die der neue Durchgang nicht
-     * ersetzt, werden übernommen.
+     * Seite und Basisversion bleiben; Kernaussagen und Quelleneinträge früherer Durchgänge bleiben erhalten, ausser eine
+     * neue Kernaussage belegt dieselbe Textstelle (gleiche Seiten und gleicher Auszug): Dann ersetzt sie die alte, und
+     * die alte steht unter den entfernten Aussagen. Ein Schlüssel, der schon eine andere Textstelle belegt, überschreibt
+     * nichts, sondern ergibt einen Befund.
      */
-    private SeitenVorschlag quelleVorschlag(KiPort.Quelle inhalt, List<Kernaussage> aussagen,
+    private SeitenVorschlag quelleVorschlag(KiPort.Quelle inhalt, List<Kernaussage> belegte,
                                              Fortschritt fortschritt, Lauf lauf,
                                              WissenIngestSpeichern.Stand stand, SeitenFassung bestehende) {
-        Map<Integer, Kernaussage> nachNummer = aussagen.stream()
-                .collect(java.util.stream.Collectors.toMap(Kernaussage::nr, a -> a));
         Map<String, Quelleneintrag> quellenNachSchluessel = new java.util.LinkedHashMap<>();
         if (bestehende != null) {
             bestehende.quellen().forEach(quelle -> quellenNachSchluessel.put(quelle.schluessel(), quelle));
         }
-        aussagen.forEach(a -> quellenNachSchluessel.put(a.schluessel(), new Quelleneintrag(a.schluessel(),
-                lauf.dokumentId(), a.seiten().stream().min(Integer::compareTo).orElse(null),
-                a.seiten().stream().max(Integer::compareTo).orElse(null), a.auszug(), null)));
+        List<WissensPruefung.Befund> befunde = new ArrayList<>();
+        List<Kernaussage> aussagen = new ArrayList<>();
+        for (Kernaussage aussage : belegte) {
+            Quelleneintrag neu = eintrag(aussage, lauf.dokumentId());
+            Quelleneintrag vorhanden = quellenNachSchluessel.get(aussage.schluessel());
+            if (vorhanden != null && !gleicherBeleg(vorhanden, neu)) {
+                befunde.add(kollision(aussage.schluessel()));
+                continue;
+            }
+            quellenNachSchluessel.put(aussage.schluessel(), neu);
+            aussagen.add(aussage);
+        }
+        Map<Integer, Kernaussage> nachNummer = aussagen.stream()
+                .collect(java.util.stream.Collectors.toMap(Kernaussage::nr, a -> a));
         StringBuilder text = new StringBuilder("## Zusammenfassung\n\n");
         for (KiPort.Zusammenfassung zusammenfassung : inhalt.zusammenfassung()) {
             if (zusammenfassung == null || zusammenfassung.text() == null || zusammenfassung.text().isBlank()) {
@@ -732,7 +762,13 @@ public class WissenIngestVerarbeiten {
                     continue;
                 }
                 String zeile = alteZeilen.get(alt.schluessel());
-                if (zeile != null) {
+                Kernaussage ersatz = aussagen.stream()
+                        .filter(a -> gleicherBeleg(alt, eintrag(a, lauf.dokumentId()))).findFirst().orElse(null);
+                if (ersatz != null) {
+                    quellenNachSchluessel.remove(alt.schluessel());
+                    entfernt.add(new KiPort.EntfernteAussage(alt.schluessel(),
+                            "Durch [^" + ersatz.schluessel() + "] mit derselben Textstelle ersetzt."));
+                } else if (zeile != null) {
                     text.append(zeile).append("\n");
                 } else {
                     quellenNachSchluessel.remove(alt.schluessel());
@@ -755,8 +791,8 @@ public class WissenIngestVerarbeiten {
                     vertraulichkeit(stand.quellStufe()), text.toString(), m.version(), "KI:" + lauf.modell(),
                     Instant.now(), null, null, false, false, lauf.dokumentId());
             return new SeitenVorschlag(nummer, "AENDERN", m.id(), m.pfad(), m.version(), daten,
-                    "Aktualisierung der Quelle-Seite nach erneutem Ingest", List.of(), entfernt, List.of(), List.of(),
-                    stand.quellStufe().name());
+                    "Aktualisierung der Quelle-Seite nach erneutem Ingest", List.of(), entfernt, List.copyOf(befunde),
+                    List.of(), stand.quellStufe().name());
         }
         String slug = slug(inhalt.titel());
         if (slug.isEmpty()) {
@@ -774,8 +810,27 @@ public class WissenIngestVerarbeiten {
                 text.toString(), 1, "KI:" + lauf.modell(), Instant.now(), null, null, false, false,
                 lauf.dokumentId());
         return new SeitenVorschlag(nummer, "NEU", null, pfad, null, daten,
-                "Zusammenfassung der Wissensquelle", List.of(), List.of(), List.of(), List.of(),
+                "Zusammenfassung der Wissensquelle", List.of(), List.of(), List.copyOf(befunde), List.of(),
                 stand.quellStufe().name());
+    }
+
+    private static Quelleneintrag eintrag(Kernaussage aussage, UUID dokumentId) {
+        return new Quelleneintrag(aussage.schluessel(), dokumentId,
+                aussage.seiten().stream().min(Integer::compareTo).orElse(null),
+                aussage.seiten().stream().max(Integer::compareTo).orElse(null), aussage.auszug(), null);
+    }
+
+    /** Gleiche Textstelle: dasselbe Dokument bzw. dieselbe Seite, dieselben PDF-Seiten und derselbe Auszug. */
+    private static boolean gleicherBeleg(Quelleneintrag a, Quelleneintrag b) {
+        return Objects.equals(a.dokumentId(), b.dokumentId()) && Objects.equals(a.quellSeiteId(), b.quellSeiteId())
+                && Objects.equals(a.seiteVon(), b.seiteVon()) && Objects.equals(a.seiteBis(), b.seiteBis())
+                && Objects.equals(a.auszug() == null ? null : WissensPruefung.auszugNormalisieren(a.auszug()),
+                        b.auszug() == null ? null : WissensPruefung.auszugNormalisieren(b.auszug()));
+    }
+
+    private static WissensPruefung.Befund kollision(String schluessel) {
+        return new WissensPruefung.Befund(WissensPruefung.Code.QUELLE_UNGUELTIG, "Der Quellenschlüssel «"
+                + schluessel + "» belegt schon eine andere Textstelle; die neue Aussage wurde nicht übernommen.");
     }
 
     /** Zeilen «- Text [^schlüssel]» im Abschnitt «## Kernaussagen» einer bestehenden Quelle-Seite. */
@@ -853,8 +908,31 @@ public class WissenIngestVerarbeiten {
         return fortschritt.kernaussagen().stream().filter(Kernaussage::belegt).toList();
     }
 
-    private static String schluessel(UUID dokumentId, int nummer) {
-        return "q-" + dokumentId.toString().substring(0, 8) + "-" + nummer;
+    private static String schluessel(UUID dokumentId, long nummer) {
+        return praefix(dokumentId) + nummer;
+    }
+
+    private static String praefix(UUID dokumentId) {
+        return "q-" + dokumentId.toString().substring(0, 8) + "-";
+    }
+
+    private static long hoechsteNummer(UUID dokumentId, List<Kernaussage> aussagen) {
+        String praefix = praefix(dokumentId);
+        long hoechste = 0;
+        for (Kernaussage aussage : aussagen) {
+            String schluessel = aussage.schluessel();
+            if (schluessel != null && schluessel.startsWith(praefix)
+                    && SCHLUESSEL_NUMMER.matcher(schluessel.substring(praefix.length())).matches()) {
+                hoechste = Math.max(hoechste, Long.parseLong(schluessel.substring(praefix.length())));
+            }
+        }
+        return hoechste;
+    }
+
+    /** Pfade aus der KI-Antwort stehen gekürzt in Hinweisen, damit ein überlanger Pfad den Hinweis nicht aufbläht. */
+    private static String hinweisPfad(String pfad) {
+        return pfad.codePointCount(0, pfad.length()) <= HINWEIS_PFAD_ZEICHEN ? pfad
+                : pfad.substring(0, pfad.offsetByCodePoints(0, HINWEIS_PFAD_ZEICHEN)) + "…";
     }
 
     private static String indexZeile(SeitenMetadaten seite) {

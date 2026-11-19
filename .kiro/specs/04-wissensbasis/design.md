@@ -287,6 +287,26 @@ flowchart LR
   - Die Auszugsprüfung des Ingests normalisiert wie `WissensPruefung` (NFKC, Trennstrich am Zeilenende, Leerraum);
     der Seitenbereich einer Fussnote umfasst nur Seiten, auf denen der Auszug steht.
   - Budgets ≤ 0 gelten als nicht gesetzt (Startwert).
+  - Quellenschlüssel (Review PR #319, Kopf 99c72b0c, M1): `q-<dokid8>-<n>` zählt je Wissensquelle über alle
+    Durchgänge weiter. `KERNAUSSAGEN` beginnt nach der höchsten Nummer `n`, die schon in `wissensseite_quelle` (zu
+    diesem Dokument) oder in den Quellen eines Änderungsvorschlags (`wissens_aenderung.daten.quellen`, jeder Status)
+    oder in den Kernaussagen des laufenden Entwurfs vorkommt; ein erneuter Ingest vergibt so keinen Schlüssel einer
+    früheren Aussage. Gleichzeitige Ingests desselben Dokuments verhindert die Vorprüfung. Ergibt ein Lauf eine
+    Aussage mit demselben Beleg (Dokument, Seiten, normalisierter Auszug) wie ein bisheriger Quelleneintrag der
+    Quelle-Seite, ersetzt die neue Aussage den alten Eintrag; der alte Schlüssel steht dann in `entfernte_aussagen`
+    mit «Durch [^neu] mit derselben Textstelle ersetzt.». Trifft ein neuer Schlüssel dennoch auf einen bestehenden
+    Eintrag mit anderem Beleg (Quelle- oder Fachseite), bleibt der bestehende Eintrag unverändert und der Vorschlag
+    erhält den Befund `QUELLE_UNGUELTIG` «Der Quellenschlüssel «…» belegt schon eine andere Textstelle; die neue
+    Aussage wurde nicht übernommen.» (blockiert die Annahme).
+  - Quelle-Seiten nur im Schritt `QUELLE` (Review PR #319, S1): Ein Planungseintrag mit Typ `Quelle` oder auf eine
+    bestehende Seite vom Typ `Quelle` wird mit dem Hinweis «Quelle-Seiten entstehen nur im Schritt QUELLE; der
+    Vorschlag für «…» wurde verworfen.» verworfen, damit ein Entwurf nie zwei Änderungen derselben Seite enthält.
+  - Pfade in Hinweisen, die aus der KI-Antwort stammen, sind auf 120 Zeichen gekürzt (mit «…»).
+  - Steigt die Vertraulichkeit der Wissensquelle während des Laufs (z. B. `NORMAL` → `INTERN`), gilt für die
+    folgenden Schritte die neue Stufe (sie wird je Schritt neu geladen; `PERSONAL` beendet den Lauf, siehe oben);
+    schon gespeicherte Vorschläge behalten die Kontextstufe ihres Schritts. Die Prüfung beim Annehmen gehört zu 14.2.
+  - Changesets: Die Changesets von 14.1b tragen die Nummern `049-wissen-ingest-fortschritt` und
+    `050-wissen-budget-reservierung`, weil `048-ki-texte-version` (Spec 05) vorher auf `main` kam.
   - Diff (`diff = '{}'`) und Kennzeichnung der Kernaussagen ohne Änderung im Entwurf gehören zu 14.2 (`DiffDienst`).
 - Kontextstufe: Jeder Teilauftrag, der eine Änderung erzeugt, speichert in `wissens_aenderung.vertraulichkeit_kontext`
   die höchste Stufe der Wissensquelle und aller ihm gezeigten Seiten (Requirement 11.7).

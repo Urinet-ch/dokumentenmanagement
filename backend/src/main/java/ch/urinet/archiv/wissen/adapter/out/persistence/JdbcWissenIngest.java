@@ -324,12 +324,36 @@ public class JdbcWissenIngest implements WissenIngestPort {
     @Override
     public Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
         zeitgrenze();
+        // höchstens eine Zeile: Unique-Index wissensseite_wissensquelle_uk (043), darum ohne order by
         @SuppressWarnings("unchecked")
         List<Object> zeilen = em().createNativeQuery(
                         "select s.id from wissensseite s where s.wissensquelle_id = :dokument limit 1")
                 .setParameter("dokument", dokumentId)
                 .getResultList();
         return zeilen.stream().findFirst().map(JdbcWissenIngest::uuid);
+    }
+
+    @Override
+    public long hoechsteQuellenNummer(UUID dokumentId) {
+        zeitgrenze();
+        String muster = "^q-" + dokumentId.toString().substring(0, 8) + "-([0-9]{1,15})$";
+        Object wert = em().createNativeQuery("""
+                        select coalesce(max(n), 0) from (
+                            select substring(q.schluessel from :muster)::bigint as n
+                            from wissensseite_quelle q where q.dokument_id = :dokument
+                            union all
+                            select substring(e.value ->> 'schluessel' from :muster)::bigint
+                            from wissens_aenderung a
+                            cross join lateral jsonb_array_elements(case jsonb_typeof(a.daten -> 'quellen')
+                                when 'array' then a.daten -> 'quellen' else '[]'::jsonb end) e
+                            where e.value ->> 'dokumentId' = :dokumentText
+                        ) nummern
+                        """)
+                .setParameter("muster", muster)
+                .setParameter("dokument", dokumentId)
+                .setParameter("dokumentText", dokumentId.toString())
+                .getSingleResult();
+        return ((Number) wert).longValue();
     }
 
     @Override

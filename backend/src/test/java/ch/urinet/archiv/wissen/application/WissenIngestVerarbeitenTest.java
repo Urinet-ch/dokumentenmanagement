@@ -173,38 +173,39 @@ class WissenIngestVerarbeitenTest {
     }
 
     @Test
-    void erneuterIngestAktualisiertDieBestehendeQuelleSeite() throws InterruptedException {
+    void erneuterIngestBehaeltFruehereAussagenUndErsetztNurDieselbeTextstelle() throws InterruptedException {
         UUID seiteId = UUID.randomUUID();
         SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "quellen/2026-04-alt-12345678", "Quelle",
                 "Alt", "Alt", List.of(), "AKTIV", 3, null);
         String inhalt = "## Zusammenfassung\n\nAlt. [^q-alt]\n\n## Kernaussagen\n\n- Alte Aussage. [^q-alt]\n"
-                + "- Frühere Fassung. [^q-neu]\n\n## Berührte Seiten\n\n- [x](/x)\n";
+                + "- Frühere Fassung. [^q-gleich]\n\n## Berührte Seiten\n\n- [x](/x)\n";
         SeitenFassung fassung = new SeitenFassung(metadaten, inhalt, DOKUMENT_ID, List.of(
                 new Quelleneintrag("q-alt", DOKUMENT_ID, 1, 1, "Alte Aussage", null),
-                new Quelleneintrag("q-neu", DOKUMENT_ID, 1, 1, "Frühere Fassung", null),
+                new Quelleneintrag("q-gleich", DOKUMENT_ID, 1, 1, "Frist  endet am 30. April.", null),
                 new Quelleneintrag("q-weg", DOKUMENT_ID, 1, 1, "Weg", null)));
         Speicher speichern = new Speicher(stand(lauf("QUELLE", false, mitAussage()), 0, WissensStufe.NORMAL,
                 List.of(metadaten), Map.of(seiteId, fassung)));
         speichern.quelleSeite = Optional.of(seiteId);
-        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Quelle("Testquelle", "Beschreibung",
-                List.of(), List.of(new KiPort.Zusammenfassung("Die Frist ist bekannt.", List.of(1)))),
-                new KiPort.Verbrauch("test-modell", 10, 10)));
 
-        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+        verarbeiten(speichern, quelleAntwort(), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
 
         SeitenVorschlag vorschlag = speichern.fortschritt.vorschlaege().getLast();
         assertThat(vorschlag.aktion()).isEqualTo("AENDERN");
         assertThat(vorschlag.seiteId()).isEqualTo(seiteId);
         assertThat(vorschlag.basisVersion()).isEqualTo(3);
         assertThat(vorschlag.pfad()).isEqualTo(metadaten.pfad());
+        assertThat(vorschlag.befunde()).isEmpty();
         assertThat(vorschlag.daten().inhalt()).contains("- Alte Aussage. [^q-alt]", "- Die Frist endet am 30. April. [^q-neu]")
                 .doesNotContain("Frühere Fassung");
         assertThat(vorschlag.daten().quellen()).extracting(Quelleneintrag::schluessel)
                 .containsExactlyInAnyOrder("q-alt", "q-neu");
-        assertThat(vorschlag.daten().quellen()).filteredOn(q -> q.schluessel().equals("q-neu"))
-                .singleElement().extracting(Quelleneintrag::auszug).isEqualTo("Frist endet am 30. April.");
+        assertThat(vorschlag.daten().quellen()).filteredOn(q -> q.schluessel().equals("q-alt"))
+                .singleElement().extracting(Quelleneintrag::auszug).isEqualTo("Alte Aussage");
         assertThat(vorschlag.entfernteAussagen()).extracting(KiPort.EntfernteAussage::schluessel)
-                .containsExactly("q-weg");
+                .containsExactlyInAnyOrder("q-gleich", "q-weg");
+        assertThat(vorschlag.entfernteAussagen()).filteredOn(a -> a.schluessel().equals("q-gleich"))
+                .singleElement().extracting(KiPort.EntfernteAussage::begruendung)
+                .isEqualTo("Durch [^q-neu] mit derselben Textstelle ersetzt.");
 
         Speicher abschluss = new Speicher(stand(lauf("ABSCHLUSS", false, speichern.fortschritt), 0,
                 WissensStufe.NORMAL, List.of(metadaten), Map.of(seiteId, fassung)));
@@ -213,6 +214,117 @@ class WissenIngestVerarbeitenTest {
         assertThat(abschluss.aenderungen).singleElement().satisfies(aenderung ->
                 assertThat(aenderung.befunde()).extracting(WissensPruefung.Befund::code).doesNotContain(
                         WissensPruefung.Code.QUELLE_NICHT_BELEGT, WissensPruefung.Code.AUSSAGE_ENTFERNT));
+    }
+
+    @Test
+    void gleicherSchluesselMitAndererTextstelleUeberschreibtDieQuelleSeiteNicht() throws InterruptedException {
+        UUID seiteId = UUID.randomUUID();
+        SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "quellen/2026-04-alt-12345678", "Quelle",
+                "Alt", "Alt", List.of(), "AKTIV", 3, null);
+        String inhalt = "## Zusammenfassung\n\nAlt. [^q-neu]\n\n## Kernaussagen\n\n- Frühere Fassung. [^q-neu]\n";
+        SeitenFassung fassung = new SeitenFassung(metadaten, inhalt, DOKUMENT_ID, List.of(
+                new Quelleneintrag("q-neu", DOKUMENT_ID, 1, 1, "Frühere Fassung", null)));
+        Speicher speichern = new Speicher(stand(lauf("QUELLE", false, mitAussage()), 0, WissensStufe.NORMAL,
+                List.of(metadaten), Map.of(seiteId, fassung)));
+        speichern.quelleSeite = Optional.of(seiteId);
+
+        verarbeiten(speichern, quelleAntwort(), new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        SeitenVorschlag vorschlag = speichern.fortschritt.vorschlaege().getLast();
+        assertThat(vorschlag.daten().quellen()).singleElement().isEqualTo(fassung.quellen().getFirst());
+        assertThat(vorschlag.daten().inhalt()).contains("- Frühere Fassung. [^q-neu]")
+                .doesNotContain("Die Frist endet am 30. April.");
+        assertThat(vorschlag.entfernteAussagen()).isEmpty();
+        assertThat(vorschlag.befunde()).extracting(WissensPruefung.Befund::code)
+                .containsExactly(WissensPruefung.Code.QUELLE_UNGUELTIG);
+    }
+
+    @Test
+    void gleicherSchluesselMitAndererTextstelleUeberschreibtDieFachseiteNicht() throws InterruptedException {
+        UUID seiteId = UUID.randomUUID();
+        SeitenMetadaten metadaten = new SeitenMetadaten(seiteId, "konzepte/frist", "Konzept", "Frist", "Frist",
+                List.of(), "AKTIV", 2, null);
+        Quelleneintrag frueher = new Quelleneintrag("q-neu", DOKUMENT_ID, 1, 1, "Frühere Fassung", null);
+        SeitenFassung fassung = new SeitenFassung(metadaten, "# Frist\n\nFrüher. [^q-neu]", null,
+                List.of(frueher));
+        Fortschritt geplant = new Fortschritt(1, 0, false, mitAussage().kernaussagen(), List.of(
+                new WissenIngestPort.Planung("konzepte/frist", "AENDERN", "Konzept", "Grund", List.of(1), seiteId,
+                        2, false)), List.of(), List.of());
+        Speicher speichern = new Speicher(stand(lauf("SEITE", false, geplant), 0, WissensStufe.NORMAL,
+                List.of(metadaten), Map.of(seiteId, fassung)));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Frist", "Frist", List.of(),
+                "# Frist\n\nDie Frist endet am 30. April. [^q-neu]", List.of(), List.of(), "Neue Frist"),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        SeitenVorschlag vorschlag = speichern.fortschritt.vorschlaege().getLast();
+        assertThat(vorschlag.daten().quellen()).singleElement().isEqualTo(frueher);
+        assertThat(vorschlag.befunde()).extracting(WissensPruefung.Befund::code)
+                .containsExactly(WissensPruefung.Code.QUELLE_UNGUELTIG);
+    }
+
+    @Test
+    void neueKernaussagenZaehlenNachDenSchluesselnFruehererDurchgaengeWeiter() throws InterruptedException {
+        String kurz = DOKUMENT_ID.toString().substring(0, 8);
+        Fortschritt bisher = new Fortschritt(0, 0, false, List.of(new Kernaussage(1, "q-" + kurz + "-45",
+                "Frühere Aussage im selben Lauf.", List.of(1), "Frist", true)), List.of(), List.of(), List.of());
+        Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
+                true, "Testquelle", LocalDate.of(2026, 4, 30), "Erste Seite.\fDie Frist endet am 30. April.\f", 2,
+                true, 2, 2, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000, Fortschritt.leer());
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of(
+                new KiPort.Aussage(1, "Die Frist endet am 30. April.", List.of(2), "Die Frist endet am 30. April."),
+                new KiPort.Aussage(2, "Die Frist ist im April.", List.of(2), "30. April"))),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        Speicher ausDerDatenbank = new Speicher(stand(lauf, 0));
+        ausDerDatenbank.hoechsteNummer = 7;
+        verarbeiten(ausDerDatenbank, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(ausDerDatenbank.geprueftesDokument).isEqualTo(DOKUMENT_ID);
+        assertThat(ausDerDatenbank.fortschritt.kernaussagen()).extracting(Kernaussage::nr, Kernaussage::schluessel)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(1, "q-" + kurz + "-8"),
+                        org.assertj.core.groups.Tuple.tuple(2, "q-" + kurz + "-9"));
+
+        Speicher imLauf = new Speicher(stand(new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT",
+                "WISSENSQUELLE", "NORMAL", true, "Testquelle", LocalDate.of(2026, 4, 30),
+                "Erste Seite.\fDie Frist endet am 30. April.\f", 2, true, 1, 2, "KERNAUSSAGEN", 0, 0,
+                "test-modell", false, 300_000, 1_000_000, bisher), 0));
+        imLauf.hoechsteNummer = 3;
+        verarbeiten(imLauf, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(imLauf.fortschritt.kernaussagen()).extracting(Kernaussage::schluessel)
+                .containsExactly("q-" + kurz + "-45", "q-" + kurz + "-46", "q-" + kurz + "-47");
+    }
+
+    @Test
+    void planungSchlaegtKeineQuelleSeiteAlsFachseiteVor() throws InterruptedException {
+        SeitenMetadaten quelleSeite = new SeitenMetadaten(UUID.randomUUID(), "quellen/2026-04-frist-12345678",
+                "Quelle", "Frist", "Frist", List.of(), "AKTIV", 2, null);
+        Speicher speichern = new Speicher(stand(lauf("PLANUNG", false, mitAussage()), 0, WissensStufe.NORMAL,
+                List.of(quelleSeite), Map.of()));
+        speichern.sichtbar = List.of(quelleSeite);
+        String langerPfad = "quellen/" + "x".repeat(300);
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Planung(List.of(
+                new KiPort.Plan(quelleSeite.pfad(), "AENDERN", "Analyse", "Grund", List.of(1)),
+                new KiPort.Plan(langerPfad, "NEU", "Quelle", "Grund", List.of(1)),
+                new KiPort.Plan("konzepte/frist", "NEU", "Konzept", "Grund", List.of(1)))),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(speichern.fortschritt.planung()).extracting(WissenIngestPort.Planung::pfad)
+                .containsExactlyInAnyOrder("ueberblick", "konzepte/frist");
+        assertThat(speichern.fortschritt.hinweise()).contains("Quelle-Seiten entstehen nur im Schritt QUELLE; "
+                + "der Vorschlag für «" + quelleSeite.pfad() + "» wurde verworfen.");
+        assertThat(speichern.fortschritt.hinweise()).anySatisfy(hinweis -> assertThat(hinweis)
+                .contains("«quellen/" + "x".repeat(112) + "…»").hasSizeLessThan(220));
+    }
+
+    private static KiAntwort quelleAntwort() {
+        return new KiAntwort(new KiPort.WissensGueltig(new KiPort.Quelle("Testquelle", "Beschreibung",
+                List.of(), List.of(new KiPort.Zusammenfassung("Die Frist ist bekannt.", List.of(1)))),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
     }
 
     @Test
@@ -275,6 +387,9 @@ class WissenIngestVerarbeitenTest {
         private List<NeueAenderung> aenderungen;
         private String hinweis;
         private Optional<UUID> quelleSeite = Optional.empty();
+        private List<SeitenMetadaten> sichtbar = List.of();
+        private long hoechsteNummer;
+        private UUID geprueftesDokument;
 
         private Speicher(Stand stand) {
             super(null, null, null, null);
@@ -289,6 +404,12 @@ class WissenIngestVerarbeitenTest {
         @Override
         public Optional<UUID> quelleSeiteFinden(UUID dokumentId) {
             return quelleSeite;
+        }
+
+        @Override
+        public long hoechsteQuellenNummer(UUID dokumentId) {
+            geprueftesDokument = dokumentId;
+            return hoechsteNummer;
         }
 
         @Override
@@ -326,7 +447,7 @@ class WissenIngestVerarbeitenTest {
         @Override
         public List<SeitenMetadaten> sichtbareSeiten(
                 Stand geladenerStand) {
-            return List.of();
+            return sichtbar;
         }
 
         @Override

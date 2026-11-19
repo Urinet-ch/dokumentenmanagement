@@ -55,6 +55,13 @@ public interface WissenIngestPort {
     /** Die Seite, die auf die Wissensquelle verweist ({@code wissensquelle_id}, höchstens eine je Quelle). */
     Optional<UUID> quelleSeiteFinden(UUID dokumentId);
 
+    /**
+     * Höchste Nummer der Quellenschlüssel {@code q-<kurz>-<nr>} dieser Wissensquelle über alle Seiten und alle
+     * Änderungsvorschläge des Mandanten, sonst 0. Ein neuer Ingest zählt danach weiter, damit ein Schlüssel nie für
+     * eine andere Aussage wiederverwendet wird (Req 5.2, 5.3).
+     */
+    long hoechsteQuellenNummer(UUID dokumentId);
+
     Optional<SeitenFassung> seiteLaden(UUID seiteId);
 
     void aenderungAnlegen(NeueAenderung aenderung);
