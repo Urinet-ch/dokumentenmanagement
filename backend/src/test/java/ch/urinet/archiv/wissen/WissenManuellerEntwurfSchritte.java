@@ -27,6 +27,8 @@ public class WissenManuellerEntwurfSchritte {
 
     private final String pfad = "konzepte/manuell-" + UUID.randomUUID();
     private UUID entwurf;
+    private UUID zweiterEntwurf;
+    private UUID seite;
     private int status;
     private Response antwort;
 
@@ -149,6 +151,64 @@ public class WissenManuellerEntwurfSchritte {
         }
     }
 
+    @Wenn("der Inhaber die korrigierte Fassung zuerst als PERSONAL und dann als INTERN annehmen möchte")
+    public void vertraulichkeitErhoehen() {
+        Map<String, Object> fassung = Map.of("titel", "Probe", "beschreibung", "Ein Satz.", "tags", List.of(),
+                "quellen", List.of(), "inhalt", "");
+        String url = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+        String token = Testanmeldung.token("inhaber-urinet");
+        given().auth().oauth2(token).header("If-Match", "\"0\"")
+                .contentType("application/json").body(Map.of("fassung", fassung, "vertraulichkeit", "PERSONAL"))
+                .when().post(url).then().statusCode(422).body("fehlercode", is("VERTRAULICHKEIT_UNGUELTIG"));
+        antwort = given().auth().oauth2(token).header("If-Match", "\"0\"")
+                .contentType("application/json").body(Map.of("fassung", fassung, "vertraulichkeit", "INTERN"))
+                .when().post(url);
+    }
+
+    @Dann("wird PERSONAL abgelehnt und die erhöhte Mindeststufe INTERN gespeichert")
+    public void internGespeichert() throws Exception {
+        antwort.then().statusCode(204);
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("""
+                     select s.id, s.vertraulichkeit_mindest from m_urinet.wissensseite s
+                     join m_urinet.wissens_aenderung a on a.seite_id = s.id where a.entwurf_id = ?
+                     """)) {
+            sql.setObject(1, entwurf);
+            try (var rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                seite = rs.getObject(1, UUID.class);
+                assertThat(rs.getString(2)).isEqualTo("INTERN");
+            }
+        }
+    }
+
+    @Wenn("der Inhaber die Seite erneut ändern und auf NORMAL senken möchte")
+    public void vertraulichkeitSenken() {
+        String token = Testanmeldung.token("inhaber-urinet");
+        Map<String, Object> eingabe = Map.of("seiteId", seite, "pfad", pfad, "typ", "Konzept",
+                "titel", "Probe", "beschreibung", "Ein Satz.", "tags", List.of(), "quellen", List.of(),
+                "inhalt", "");
+        zweiterEntwurf = UUID.fromString(given().auth().oauth2(token).contentType("application/json").body(eingabe)
+                .when().post("/api/v1/wissensentwuerfe").then().statusCode(201).extract().path("id"));
+        antwort = given().auth().oauth2(token).header("If-Match", "\"0\"")
+                .contentType("application/json").body(Map.of("vertraulichkeit", "NORMAL"))
+                .when().post("/api/v1/wissensentwuerfe/" + zweiterEntwurf + "/aenderungen/1/annehmen");
+    }
+
+    @Dann("wird die Senkung abgelehnt und die Mindeststufe bleibt INTERN")
+    public void senkungAbgelehnt() throws Exception {
+        antwort.then().statusCode(422).body("fehlercode", is("VERTRAULICHKEIT_ZU_TIEF"));
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement(
+                     "select vertraulichkeit_mindest from m_urinet.wissensseite where id = ?")) {
+            sql.setObject(1, seite);
+            try (var rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("INTERN");
+            }
+        }
+    }
+
     @After("@wissen-manuell")
     public void aufraeumen() throws Exception {
         if (entwurf == null) {
@@ -158,6 +218,15 @@ public class WissenManuellerEntwurfSchritte {
             verbindung.setAutoCommit(false);
             try (var befehl = verbindung.createStatement()) {
                 befehl.execute("set local session_replication_role = replica");
+            }
+            if (zweiterEntwurf != null) {
+                for (String tabelle : List.of("wissens_aenderung", "wissens_entwurf")) {
+                    try (PreparedStatement befehl = verbindung.prepareStatement("delete from m_urinet." + tabelle
+                            + (tabelle.equals("wissens_aenderung") ? " where entwurf_id = ?" : " where id = ?"))) {
+                        befehl.setObject(1, zweiterEntwurf);
+                        befehl.executeUpdate();
+                    }
+                }
             }
             String seiten = "(select seite_id from m_urinet.wissens_aenderung "
                     + "where entwurf_id = ? and aktion = 'NEU' and seite_id is not null)";
