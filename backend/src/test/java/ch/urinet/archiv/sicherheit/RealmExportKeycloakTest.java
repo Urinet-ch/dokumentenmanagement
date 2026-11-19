@@ -138,7 +138,7 @@ class RealmExportKeycloakTest {
         assertThat(realm.get("eventsEnabled")).isEqualTo(true);
         assertThat(realm.get("adminEventsEnabled")).isEqualTo(true);
         assertThat((List<String>) realm.get("enabledEventTypes"))
-                .contains("IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
+                .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
                         "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR", "FEDERATED_IDENTITY_LINK",
                         "REMOVE_FEDERATED_IDENTITY");
     }

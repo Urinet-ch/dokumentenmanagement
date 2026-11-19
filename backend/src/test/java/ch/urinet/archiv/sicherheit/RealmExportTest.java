@@ -60,7 +60,7 @@ class RealmExportTest {
         assertThat(export.path("adminEventsDetailsEnabled").asBoolean()).isFalse();
         assertThat(export.path("enabledEventTypes"))
                 .extracting(JsonNode::asText)
-                .contains("IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
+                .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
                         "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR", "FEDERATED_IDENTITY_LINK",
                         "REMOVE_FEDERATED_IDENTITY");
         assertThat(export.path("authenticationFlows").findValuesAsText("alias"))

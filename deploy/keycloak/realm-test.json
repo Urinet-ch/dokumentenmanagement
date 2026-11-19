@@ -7,6 +7,7 @@
   "eventsEnabled": true,
   "eventsListeners": [],
   "enabledEventTypes": [
+    "LOGIN_ERROR",
     "IDENTITY_PROVIDER_LOGIN",
     "IDENTITY_PROVIDER_LOGIN_ERROR",
     "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR",

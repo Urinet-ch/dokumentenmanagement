@@ -597,6 +597,9 @@ Optionale Aufgaben tragen die Nummern `O.<n>` über alle Specs (O.1–O.3 in Spe
   - Identity Provider, Flows und Ereignisse im Realm-Export, `start.sh` setzt den Platzhalter, Pflichtprüfung des Secrets im Deploy-Workflow, `RealmExportTest` und `RealmExportKeycloakTest` angepasst; bei Stufe A einmalige Einrichtung im bestehenden Realm per `kcadm.sh` im Wegwerf-Container
   - Szenarien gegen einen `oidc`-Test-IdP: unbekanntes Konto abgelehnt, E-Mail allein verknüpft nicht, verknüpftes Konto angemeldet mit TOTP, Rollen und `mandant` nur aus Keycloak, Lösen der Verknüpfung im Ereignisprotokoll und Sitzungen beendet
   - ab Stufe B: Google als Empfänger der Anmeldedaten im Verzeichnis der Bearbeitungen und im Datenschutzhinweis [Fabian]
+  - Stand Umsetzung (PR #334, Repo-Teil): Realm-Export, `realm-test.json`, `start.sh` und wiederholbare `kcadm`-Vorlage (`google-idp-einrichten-vorlage.sh`) mit Stub-Test umgesetzt; die Cucumber-Szenarien `@req-2.25`–`2.29` belegen nur die Konfiguration (Export und Keycloak-Admin-API), keinen Anmeldelauf.
+  - Offen: Szenarien mit aktivem `oidc`-Test-IdP (unbekanntes Konto abgelehnt, E-Mail allein verknüpft nicht, verknüpftes Konto mit TOTP, Rollen und `mandant` nur aus Keycloak); Sitzungsende nach Lösen der Verknüpfung nur als Runbook (README `users/{id}/logout`) ohne Test; Pflichtprüfung des Secrets im Deploy-Workflow.
+  - Vorläufig: «Verknüpfung nur durch den Administrator» (`manage-account-links` aus `manage-account` entfernt) ist eine Voreinstellung bis zum Entscheid [Fabian] zu 2.27; ein späterer Wechsel gilt nicht als Regression. Verknüpfen und Lösen erscheinen im Admin-Ereignisprotokoll (`adminEventsEnabled`), nicht als Benutzerereignisse.
   - _Anforderungen: 2.25–2.29_
 
 - [x]* O.9 Nachprüfung Frontend: Fehlermatrix für die übrigen Seiten [Frontend]
