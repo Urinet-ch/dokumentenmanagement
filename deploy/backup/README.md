@@ -39,8 +39,10 @@ weder als Argument noch in Logs aus. Der Manifest-Schlüssel wird nur als Datei 
 Container kopiert und sofort verschlüsselt.
 
 Für die Sicherung beider Mandanten muss `ARCHIV_MANDANTEN` die Codes `urinet` und `vhf-gsk`
-enthalten. `taeglich.sh` erstellt Inventar und Bucket-Export je Mandant; die lokale Restore-Übung
-stellt und prüft beide Mandanten. Transport der Läufe, Zweitkopie und `backup-gate.sh` gehören
+enthalten; `taeglich.sh` gleicht dazu vor dem Export alle Mandantenschemas `m_*` der Datenbank mit der Liste ab
+und bricht mit Exit 2 ab, wenn ein Mandant fehlt (kein stilles Überspringen). `taeglich.sh` erstellt Inventar und Bucket-Export je Mandant; die lokale Restore-Übung
+stellt und prüft beide Mandanten (die Mandantenliste der Übung ist bewusst fest verdrahtet: Sie prüft genau
+die zwei Mandanten der Sollausstattung, nicht die Konfiguration des Betriebs). Transport der Läufe, Zweitkopie und `backup-gate.sh` gehören
 zum Infra-Repository und sind nicht Teil dieser Skripte.
 
 Der Ordner `.zustand/` ausserhalb von `laeufe/` enthält das letzte Inventar unverschlüsselt,
