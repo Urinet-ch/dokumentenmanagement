@@ -16,7 +16,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der Realm-Export für Stufe A und B enthält keine Benutzer und keine Secrets (design.md, Sicherheit); der Test-Realm
+ * Der Realm-Export enthält keine Benutzer und keine Secrets ausser dem festgelegten Google-Platzhalter; der Test-Realm
  * ist der Export plus Testanteile (Benutzer, Clients {@code archiv-test*}, localhost für {@code archiv-pwa}).
  */
 class RealmExportTest {
@@ -33,13 +33,38 @@ class RealmExportTest {
     @Test
     void exportOhneBenutzerUndOhneSecrets() throws IOException {
         JsonNode export = JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile());
-        assertThat(heikleFelder(export)).as("Benutzer oder Secrets im Realm-Export").isEmpty();
+        JsonNode google = export.path("identityProviders").path(0);
+        assertThat(export.path("identityProviders").size()).isEqualTo(1);
+        assertThat(google.path("alias").asText()).isEqualTo("google");
+        assertThat(google.path("providerId").asText()).isEqualTo("google");
+        assertThat(google.path("enabled").asBoolean()).isFalse();
+        assertThat(google.path("trustEmail").asBoolean()).isFalse();
+        assertThat(google.path("storeToken").asBoolean()).isFalse();
+        assertThat(google.path("config").path("syncMode").asText()).isEqualTo("IMPORT");
+        assertThat(google.path("firstBrokerLoginFlowAlias").asText()).isEqualTo("google-nur-verknuepft");
+        assertThat(google.path("postBrokerLoginFlowAlias").asText()).isEqualTo("google-totp-pflicht");
+        assertThat(google.path("config").path("clientId").asText()).isEqualTo("${GOOGLE_CLIENT_ID}");
+        assertThat(google.path("config").path("clientSecret").asText()).isEqualTo("${GOOGLE_CLIENT_SECRET}");
+        assertThat(google.path("mappers").isMissingNode()).isTrue();
+
+        JsonNode exportOhneIdp = export.deepCopy();
+        ((ObjectNode) exportOhneIdp).remove("identityProviders");
+        assertThat(heikleFelder(exportOhneIdp)).as("Benutzer oder Secrets im Realm-Export").isEmpty();
         for (JsonNode client : export.path("clients")) {
             boolean ohneSecret = client.path("publicClient").asBoolean() || client.path("bearerOnly").asBoolean();
             assertThat(ohneSecret).as(client.path("clientId").asText()).isTrue();
         }
         assertThat(export.toString()).doesNotContain("localhost");
-        assertThat(export.path("identityProviders")).as("keine Identity Provider").isEmpty();
+        assertThat(export.path("eventsEnabled").asBoolean()).isTrue();
+        assertThat(export.path("adminEventsEnabled").asBoolean()).isTrue();
+        assertThat(export.path("adminEventsDetailsEnabled").asBoolean()).isFalse();
+        assertThat(export.path("enabledEventTypes"))
+                .extracting(JsonNode::asText)
+                .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
+                        "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR", "FEDERATED_IDENTITY_LINK",
+                        "REMOVE_FEDERATED_IDENTITY");
+        assertThat(export.path("authenticationFlows").findValuesAsText("alias"))
+                .contains("google-nur-verknuepft", "google-totp-pflicht");
     }
 
     /**
@@ -78,6 +103,12 @@ class RealmExportTest {
                 ObjectNode attribute = (ObjectNode) client.path("attributes");
                 attribute.put("post.logout.redirect.uris",
                         attribute.path("post.logout.redirect.uris").asText().replace("##" + LOKAL + "/*", ""));
+            }
+        }
+        ArrayNode identityProviders = (ArrayNode) test.path("identityProviders");
+        for (int i = identityProviders.size() - 1; i >= 0; i--) {
+            if ("archiv-test-oidc".equals(identityProviders.get(i).path("alias").asText())) {
+                identityProviders.remove(i);
             }
         }
         assertThat(test).isEqualTo(JSON.readTree(KEYCLOAK.resolve("realm-export.json").toFile()));

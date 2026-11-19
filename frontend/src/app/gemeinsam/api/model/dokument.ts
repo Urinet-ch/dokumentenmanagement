@@ -11,6 +11,7 @@ import { DokumentFinanz } from './dokument-finanz';
 import { Warnung } from './warnung';
 import { DokumentVertrag } from './dokument-vertrag';
 import { DokumentVersion } from './dokument-version';
+import { DokumentWissensseitenVerweis } from './dokument-wissensseiten-verweis';
 
 
 /**
@@ -94,6 +95,10 @@ export interface Dokument {
      * Codes der Klassifikationen, an denen die nächste Speicherung nach der gültigen Konfiguration scheitern würde (Req 1.7); in Eingangskorb und Einzelabruf gleich. Unbestätigt: Werte, die es nicht mehr gibt, die inaktiv oder der Art nicht zugeordnet sind; fehlende Pflicht-Werte zählen erst bei der Bestätigung. Bestätigt: wie beim Ändern
      */
     klassifikationenUngueltig: Array<string>;
+    /**
+     * Sichtbare Wissensseiten mit diesem Dokument als Quelle; nur beim Einzelabruf
+     */
+    wissensseiten?: Array<DokumentWissensseitenVerweis> | null;
 }
 export namespace Dokument {
     export const QuelleEnum = {

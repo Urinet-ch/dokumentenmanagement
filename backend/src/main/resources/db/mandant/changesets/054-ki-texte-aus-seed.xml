@@ -3,7 +3,7 @@
         xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
-    <changeSet id="051-ki-texte-aus-seed" author="archiv">
+    <changeSet id="054-ki-texte-aus-seed" author="archiv">
         <sql splitStatements="false"><![CDATA[
             do $$
             declare

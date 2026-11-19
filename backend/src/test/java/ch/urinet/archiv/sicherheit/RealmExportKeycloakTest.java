@@ -109,21 +109,61 @@ class RealmExportKeycloakTest {
 
     @Test
     @Order(2)
-    void keineIdentityProvider() {
-        assertThat(identityProvider()).isEmpty();
-        // Gegenprobe: ein angelegter IdP wird erkannt
-        given().auth().oauth2(admin).contentType(ContentType.JSON)
-                .body(Map.of("alias", "probe-idp", "providerId", "oidc", "enabled", true,
-                        "config", Map.of("authorizationUrl", "https://idp.example.invalid/auth",
-                                "tokenUrl", "https://idp.example.invalid/token", "clientId", "probe",
-                                "clientAuthMethod", "client_secret_post")))
-                .post(ExportKeycloak.basisUrl + REALM + "/identity-provider/instances").then().statusCode(201);
-        try {
-            assertThat(identityProvider()).containsExactly("probe-idp");
-        } finally {
-            loeschen("/identity-provider/instances/probe-idp");
-        }
-        assertThat(identityProvider()).isEmpty();
+    void googleProviderWirdMitTestSecretImportiert() {
+        Map<String, Object> google = adminGet(REALM + "/identity-provider/instances/google").as(Map.class);
+        assertThat(google.get("alias")).isEqualTo("google");
+        assertThat(google.get("providerId")).isEqualTo("google");
+        assertThat(google.get("enabled")).isEqualTo(false);
+        assertThat(google.get("trustEmail")).isEqualTo(false);
+        assertThat(google.get("storeToken")).isEqualTo(false);
+        assertThat(google.get("firstBrokerLoginFlowAlias")).isEqualTo("google-nur-verknuepft");
+        assertThat(google.get("postBrokerLoginFlowAlias")).isEqualTo("google-totp-pflicht");
+        Map<String, String> googleConfig = (Map<String, String>) google.get("config");
+        assertThat(googleConfig.get("syncMode")).isEqualTo("IMPORT");
+        assertThat(googleConfig.get("clientId")).isEqualTo("synthetische-google-client-id.apps.test");
+        assertThat(googleConfig.get("clientSecret")).isEqualTo("**********");
+        Object mappers = google.get("mappers");
+        assertThat(mappers == null || mappers.equals(List.of())).isTrue();
+        assertThat(identityProvider()).containsExactlyInAnyOrder("google", "archiv-test-oidc");
+        String oidcProviderId = adminGet(REALM + "/identity-provider/instances/archiv-test-oidc").path("providerId");
+        assertThat(oidcProviderId).isEqualTo("oidc");
+    }
+
+    @Test
+    @Order(2)
+    void verknuepfungIstNichtTeilDerBenutzerrolleUndEreignisseSindAktiv() {
+        List<Map<String, Object>> composites = adminGet(
+                REALM + "/clients/{id}/roles/manage-account/composites", clientId("account"))
+                .jsonPath().getList("$");
+        assertThat(composites).noneMatch(role -> "manage-account-links".equals(role.get("name")));
+
+        Map<String, Object> realm = adminGet(REALM).as(Map.class);
+        assertThat(realm.get("eventsEnabled")).isEqualTo(true);
+        assertThat(realm.get("adminEventsEnabled")).isEqualTo(true);
+        assertThat((List<String>) realm.get("enabledEventTypes"))
+                .contains("LOGIN_ERROR", "IDENTITY_PROVIDER_LOGIN", "IDENTITY_PROVIDER_LOGIN_ERROR",
+                        "IDENTITY_PROVIDER_FIRST_LOGIN_ERROR", "FEDERATED_IDENTITY_LINK",
+                        "REMOVE_FEDERATED_IDENTITY");
+    }
+
+    @Test
+    @Order(2)
+    void oidcTestProviderKannNebenGoogleBestehen() {
+        Map<String, Object> oidc = adminGet(REALM + "/identity-provider/instances/archiv-test-oidc").as(Map.class);
+        assertThat(oidc.get("providerId")).isEqualTo("oidc");
+        assertThat(((Map<String, String>) oidc.get("config")).get("authorizationUrl"))
+                .startsWith("http://host.testcontainers.internal:");
+    }
+
+    @Test
+    @Order(2)
+    void googleFlowsVerweigernUnbekannteKontenUndVerlangenTotp() {
+        List<Map<String, Object>> unbekannt = schritte("google-nur-verknuepft");
+        assertThat(unbekannt).hasSize(1);
+        assertThat(unbekannt.getFirst().get("providerId")).isEqualTo("deny-access-authenticator");
+        assertThat(unbekannt.getFirst().get("requirement")).isEqualTo("REQUIRED");
+
+        assertThat(OtpPruefung.otpOhneBedingung(schritte("google-totp-pflicht"))).isTrue();
     }
 
     @Test

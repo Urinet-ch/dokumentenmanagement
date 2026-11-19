@@ -34,7 +34,8 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
     private static final String SEITENFELDER = """
             s.id, s.pfad, s.typ, s.titel, s.beschreibung, cast(array_to_json(s.tags) as text),
             s.status, s.veraltet_ab, s.vertraulichkeit, s.inhalt, s.version, s.erzeugt_von, s.erzeugt_am,
-            s.freigegeben_von, s.freigegeben_am, s.quelle_pruefen, s.widerspruch_offen, s.wissensquelle_id
+            s.freigegeben_von, s.freigegeben_am, s.quelle_pruefen, s.widerspruch_offen, s.wissensquelle_id,
+            s.quellen_revision
             """;
 
     private final Instance<EntityManager> em;
@@ -101,6 +102,22 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                         text(row[5]), text(row[6]), bool(row[7])))
                 .toList();
         return new IndexErgebnis(seiten, gesamt);
+    }
+
+    @Override
+    public List<SeiteVerweis> seitenFuerDokument(Sichtregel sichtregel, UUID dokumentId) {
+        WissenSichtbarkeitSql.Ausdruck sicht = WissenSichtbarkeitSql.aktuell("s", sichtregel);
+        Query query = em.get().createNativeQuery("""
+                select s.id, s.pfad, s.titel from wissensseite s
+                where %s and exists (
+                    select 1 from wissensseite_quelle q where q.seite_id = s.id and q.dokument_id = :dokumentId
+                ) order by s.titel, s.pfad
+                """.formatted(sicht.bedingung()));
+        query.setParameter("dokumentId", dokumentId);
+        sicht.parameter().forEach(query::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        return rows.stream().map(row -> new SeiteVerweis(uuid(row[0]), text(row[1]), text(row[2]))).toList();
     }
 
     @Override
@@ -196,7 +213,7 @@ public class PanacheWissenLesenRepository implements WissenLesenRepository {
                 tags(text(row[5])), Wissensseite.Status.valueOf(text(row[6])), datum(row[7]), quellen(id, sichtregel),
                 Wissensseite.Vertraulichkeit.valueOf(text(row[8])), text(row[9]),
                 ((Number) row[10]).intValue(), text(row[11]), zeit(row[12]), text(row[13]), zeit(row[14]),
-                bool(row[15]), bool(row[16]), uuidNullable(row[17])));
+                bool(row[15]), bool(row[16]), uuidNullable(row[17]), ((Number) row[18]).longValue()));
     }
 
     @Override

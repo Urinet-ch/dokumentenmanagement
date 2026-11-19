@@ -1,6 +1,7 @@
 package ch.urinet.archiv.kontakt.application;
 
 import ch.urinet.archiv.dokument.application.DokumentAenderungPort;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import ch.urinet.archiv.gemeinsam.domain.FachFehler;
 import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
 import ch.urinet.archiv.kontakt.domain.Kontakt;
@@ -10,6 +11,7 @@ import org.jboss.logging.Logger;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -31,13 +33,15 @@ public class KontaktZusammenfuehren {
     private final KontaktVerweise verweise;
     private final DokumentAenderungPort dokumente;
     private final KontaktProtokoll protokoll;
+    private final DokumentEreignisse ereignisse;
 
     public KontaktZusammenfuehren(KontaktRegister register, KontaktVerweise verweise, DokumentAenderungPort dokumente,
-                                  KontaktProtokoll protokoll) {
+                                  KontaktProtokoll protokoll, DokumentEreignisse ereignisse) {
         this.register = register;
         this.verweise = verweise;
         this.dokumente = dokumente;
         this.protokoll = protokoll;
+        this.ereignisse = ereignisse;
     }
 
     /** Ergebnis: die Quelle danach (für das neue ETag) und die Zahlen der umgehängten Verweise. */
@@ -54,6 +58,7 @@ public class KontaktZusammenfuehren {
      */
     @Transactional
     public Ergebnis zusammenfuehren(String benutzer, UUID quelleId, int version, UUID zielId, String grund) {
+        ereignisse.vorAenderung();
         Map<UUID, Kontakt> gesperrt = register.sperren(quelleId.equals(zielId) ? List.of(quelleId)
                         : List.of(quelleId, zielId)).stream()
                 .collect(Collectors.toMap(Kontakt::id, Function.identity()));
@@ -72,6 +77,7 @@ public class KontaktZusammenfuehren {
             throw new FachFehler(Fehlercode.VERSION_KONFLIKT);
         }
         List<UUID> umgehaengt = dokumente.partnerUmhaengen(quelleId, zielId, benutzer, GRUND_PRAEFIX + grund);
+        umgehaengt.forEach(id -> ereignisse.geaendert(id, Set.of("partnerId")));
         KontaktVerweise.Zahlen uebrige = verweise.umhaengen(quelleId, zielId);
         KontaktVerweise.Zahlen zahlen = new KontaktVerweise.Zahlen(umgehaengt.size(), uebrige.verkaufschancen(),
                 uebrige.korrekturbeispiele());
