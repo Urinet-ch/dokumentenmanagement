@@ -234,6 +234,40 @@ public class WissenIngestSchritte {
         KiWireMock.wissenFolge(antworten);
     }
 
+    @Angenommen("WireMock liefert eine Seitenantwort mit manipulierten Freigabefeldern")
+    public void antwortMitFreigabefeldern() {
+        List<String> antworten = new ArrayList<>(gueltigeAntworten(dokumente.values().iterator().next().id()));
+        antworten.add(2, antworten.get(2).replace("\"titel\":\"Überblick\"",
+                "\"status\":\"VERALTET\",\"vertraulichkeit\":\"INTERN\","
+                        + "\"freigegeben_von\":\"angreifer\",\"freigegeben_am\":\"2026-01-01T00:00:00Z\","
+                        + "\"version\":999,\"titel\":\"Überblick\""));
+        KiWireMock.zuruecksetzen();
+        KiWireMock.wissenFolge(antworten);
+    }
+
+    @Dann("Status, Stufe und Freigabe stammen nicht aus der manipulierten KI-Antwort")
+    public void freigabefelderNichtUebernommen() throws SQLException {
+        try (Connection c = datenbank.get().getConnection();
+             PreparedStatement sql = c.prepareStatement("""
+                     select status, daten->>'status', daten->>'vertraulichkeit',
+                            jsonb_exists_any(daten,
+                                array['freigegebenVon', 'freigegeben_von', 'freigegeben_am', 'version']),
+                            seite_id
+                     from m_urinet.wissens_aenderung where entwurf_id = ? and pfad = 'ueberblick'
+                     """)) {
+            sql.setObject(1, entwurfId);
+            try (ResultSet rs = sql.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString(1)).isEqualTo("OFFEN");
+                assertThat(rs.getString(2)).isEqualTo("AKTIV");
+                assertThat(rs.getString(3)).isEqualTo("NORMAL");
+                assertThat(rs.getBoolean(4)).isFalse();
+                assertThat(rs.getObject(5)).isNull();
+                assertThat(rs.next()).isFalse();
+            }
+        }
+    }
+
     @Angenommen("WireMock liefert gültige Antworten ohne Überblicksschritt")
     public void gueltigeAntwortenOhneUeberblick() {
         List<String> antworten = gueltigeAntworten(dokumente.values().iterator().next().id());
@@ -492,6 +526,14 @@ public class WissenIngestSchritte {
         entwurfWarten("OFFEN");
         assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))))
                 .hasSize(4);
+    }
+
+    @Dann("der Ingest-Entwurf wird mit fünf KI-Aufrufen «OFFEN»")
+    public void entwurfOffenMitFuenfAufrufen()
+            throws SQLException, InterruptedException, ExecutionException, TimeoutException {
+        entwurfWarten("OFFEN");
+        assertThat(KiWireMock.client().find(postRequestedFor(urlPathEqualTo(KiWireMock.CHAT_PFAD))))
+                .hasSize(5);
     }
 
     @Dann("die Entwurfsansicht kennzeichnet beide Kernaussagen entsprechend ihrer Zuordnung")
