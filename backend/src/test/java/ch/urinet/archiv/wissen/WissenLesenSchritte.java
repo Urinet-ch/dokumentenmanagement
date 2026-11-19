@@ -213,7 +213,7 @@ public class WissenLesenSchritte {
         assertThat((String) indexZweiteSeite.jsonPath()
                 .getMap("gruppen.find { it.typ == 'Konzept' }.seiten[0]").get("status")).isEqualTo("VERALTET");
 
-        seite.then().statusCode(200).header("ETag", "\"" + 3 + "\"");
+        seite.then().statusCode(200).header("ETag", "\"3-0\"");
         assertThat(seite.jsonPath().getString("titel")).isEqualTo("Normale Leseprobe " + kennung);
         seitePerPfad.then().statusCode(200);
         interneSeiteAntwort.then().statusCode(404);

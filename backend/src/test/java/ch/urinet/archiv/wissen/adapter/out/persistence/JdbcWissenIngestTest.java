@@ -1,9 +1,14 @@
 package ch.urinet.archiv.wissen.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
+import ch.urinet.archiv.dokument.application.DokumentWiederholen;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import io.agroal.api.AgroalDataSource;
@@ -11,6 +16,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,8 +32,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +44,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
@@ -55,6 +65,15 @@ class JdbcWissenIngestTest {
     JdbcWissenIngest ingest;
 
     @Inject
+    DokumentEreignisse ereignisse;
+
+    @Inject
+    DokumentWiederholen wiederholen;
+
+    @Inject
+    Instance<EntityManager> entityManager;
+
+    @Inject
     MandantKontext kontext;
 
     @Inject
@@ -69,6 +88,249 @@ class JdbcWissenIngestTest {
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
     private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
     private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
+
+    @Test
+    void quellenAenderungBleibtTransaktionalUndImMandanten() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID fremdesDokument = quelle(ZWEITER);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        UUID fremdeSeite = seite(ZWEITER, "probe/quelle-" + fremdesDokument, "Fremder Inhalt", null);
+        for (var eintrag : Map.of(URINET, Map.entry(seite, dokument),
+                ZWEITER, Map.entry(fremdeSeite, fremdesDokument)).entrySet()) {
+            String schema = eintrag.getKey().schema();
+            UUID seitenId = eintrag.getValue().getKey();
+            UUID dokumentId = eintrag.getValue().getValue();
+            ausfuehren("insert into " + schema + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seitenId, dokumentId);
+            ausfuehren("insert into " + schema + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    seitenId, dokumentId);
+        }
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            ereignisse.vorAenderung();
+            entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                    .setParameter("id", dokument).executeUpdate();
+            ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+            throw new IllegalStateException("Rollback-Probe");
+        })).hasMessage("Rollback-Probe");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and not quelle_pruefen and vertraulichkeit = 'NORMAL'", seite))
+                .isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".dokument where id = ? and vertraulichkeit = 'NORMAL'", dokument)).isEqualTo(1);
+
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                    .setParameter("id", dokument).executeUpdate();
+            ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+            return null;
+        });
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and quelle_pruefen and vertraulichkeit = 'INTERN'"
+                + " and inhalt = 'Unveränderter Inhalt'", seite)).isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + ZWEITER.schema()
+                + ".wissensseite where id = ? and not quelle_pruefen and vertraulichkeit = 'NORMAL'", fremdeSeite))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void vertraulichkeitPerDokumentApiAendernEntziehtMitarbeiterDieSeite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String mitarbeiter = Testanmeldung.token("mitarbeiter-urinet");
+        String dokumentPfad = "/api/v1/dokumente/" + dokument;
+        String seitenPfad = "/api/v1/wissensseiten/" + seite;
+
+        given().auth().oauth2(mitarbeiter).when().get(seitenPfad).then().statusCode(200);
+        String etag = given().auth().oauth2(inhaber).when().get(dokumentPfad).then().statusCode(200)
+                .extract().header("ETag");
+        given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                .body(Map.of("vertraulichkeit", "INTERN", "grund", "Synthetische Quellenprüfung"))
+                .when().patch(dokumentPfad).then().statusCode(200);
+
+        given().auth().oauth2(mitarbeiter).when().get(seitenPfad).then().statusCode(404);
+        given().auth().oauth2(inhaber).when().get(seitenPfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true));
+    }
+
+    @Test
+    void quellenpruefungSchuetztGegenSpaetereAenderungUndProtokolliertBestaetigung() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String mitarbeiter = Testanmeldung.token("mitarbeiter-urinet");
+        String pfad = "/api/v1/wissensseiten/" + seite;
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            ereignisse.geaendert(dokument, Set.of("titel"));
+            return null;
+        });
+        String alterStand = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true)).extract().header("ETag");
+        given().auth().oauth2(mitarbeiter).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(403);
+        given().auth().oauth2(Testanmeldung.token("treuhaender-urinet")).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(403);
+        given().auth().oauth2(inhaber).when().post(pfad + "/quelle-geprueft").then().statusCode(428);
+
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            ereignisse.geaendert(dokument, Set.of("titel"));
+            return null;
+        });
+        given().auth().oauth2(inhaber).header("If-Match", alterStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(412);
+        String aktuellerStand = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(true)).extract().header("ETag");
+        assertThat(aktuellerStand).isNotEqualTo(alterStand);
+        given().auth().oauth2(inhaber).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(204);
+        given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                .body("quellePruefen", org.hamcrest.Matchers.is(false)).body("version", org.hamcrest.Matchers.is(1));
+        given().auth().oauth2(inhaber).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(412);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_log where aktion = 'UPDATE' and ? = any(seiten)"
+                + " and angaben @> '{\"quelle_geprueft\":true}'::jsonb", seite)).isEqualTo(1);
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).header("If-Match", aktuellerStand)
+                .when().post(pfad + "/quelle-geprueft").then().statusCode(404);
+    }
+
+    @Test
+    void dokumentAbrufLiefertNurSichtbareVerwendendeSeiten() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID sichtbar = seite(URINET, "probe/offen-" + dokument, "Inhalt", null);
+        UUID intern = seite(URINET, "probe/intern-" + dokument, "Inhalt", null);
+        ausfuehren("update " + URINET.schema() + ".wissensseite set vertraulichkeit = 'INTERN', "
+                + "vertraulichkeit_mindest = 'INTERN' where id = ?", intern);
+        for (UUID id : List.of(sichtbar, intern)) {
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", id, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    id, dokument);
+        }
+        String pfad = "/api/v1/dokumente/" + dokument;
+        given().auth().oauth2(Testanmeldung.token("inhaber-urinet")).when().get(pfad).then().statusCode(200)
+                .body("wissensseiten.id", org.hamcrest.Matchers.containsInAnyOrder(sichtbar.toString(), intern.toString()));
+        given().auth().oauth2(Testanmeldung.token("mitarbeiter-urinet")).when().get(pfad).then().statusCode(200)
+                .body("wissensseiten.id", org.hamcrest.Matchers.contains(sichtbar.toString()));
+        given().auth().oauth2(Testanmeldung.token("inhaber-vhf-gsk")).when().get(pfad).then().statusCode(404);
+    }
+
+    @Test
+    void erneuteArchivierungMarkiertVerwendendeSeite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("update " + URINET.schema() + ".dokument set status = 'ARCHIVIERUNG_FEHLER' where id = ?",
+                dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            wiederholen.wiederholen(new Benutzer("probe", Rolle.INHABER), dokument, 0);
+            long anzahl = ((Number) entityManager.get().createNativeQuery(
+                            "select count(*) from wissensseite where id = :id and quelle_pruefen")
+                    .setParameter("id", seite).getSingleResult()).longValue();
+            assertThat(anzahl).isEqualTo(1);
+            throw new IllegalStateException("Rollback-Probe");
+        })).hasMessage("Rollback-Probe");
+    }
+
+    @Test
+    void paralleleQuellenAenderungenWartenAufDieMandantensperre() throws Exception {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+        ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                seite, dokument);
+        CountDownLatch gesperrt = new CountDownLatch(1);
+        CountDownLatch fortfahren = new CountDownLatch(1);
+        CountDownLatch zweiterGestartet = new CountDownLatch(1);
+        ExecutorService parallel = Executors.newFixedThreadPool(2);
+        try {
+            var erster = parallel.submit(() -> kontext.mit(URINET, () -> QuarkusTransaction.requiringNew().call(() -> {
+                ereignisse.vorAenderung();
+                gesperrt.countDown();
+                if (!fortfahren.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Zweite Transaktion nicht gestartet");
+                }
+                entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                        .setParameter("id", dokument).executeUpdate();
+                ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+                return null;
+            })));
+            assertThat(gesperrt.await(10, TimeUnit.SECONDS)).isTrue();
+            var zweiter = parallel.submit(() -> kontext.mit(URINET, () -> QuarkusTransaction.requiringNew().call(() -> {
+                zweiterGestartet.countDown();
+                ereignisse.vorAenderung();
+                entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'PERSONAL' where id = :id")
+                        .setParameter("id", dokument).executeUpdate();
+                ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+                return null;
+            })));
+            assertThat(zweiterGestartet.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> zweiter.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
+            fortfahren.countDown();
+            erster.get(10, TimeUnit.SECONDS);
+            zweiter.get(10, TimeUnit.SECONDS);
+        } finally {
+            fortfahren.countDown();
+            parallel.shutdown();
+            if (!parallel.awaitTermination(15, TimeUnit.SECONDS)) {
+                parallel.shutdownNow();
+                throw new IllegalStateException("Parallele Testtransaktionen sind nicht beendet");
+            }
+        }
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".dokument where id = ? and vertraulichkeit = 'PERSONAL'", dokument)).isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and quelle_pruefen and vertraulichkeit = 'INTERN'", seite)).isEqualTo(1);
+    }
+
+    @Test
+    void kontaktZusammenfuehrenMarkiertQuellseite() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        UUID quelle = UUID.randomUUID();
+        UUID ziel = UUID.randomUUID();
+        try {
+            for (UUID kontakt : List.of(quelle, ziel)) {
+                ausfuehren("insert into " + URINET.schema() + ".kontakt "
+                                + "(id, typ, name, name_normalisiert, quelle) "
+                                + "values (?, 'ORGANISATION', 'Probe', 'probe', 'MANUELL')", kontakt);
+            }
+            ausfuehren("update " + URINET.schema() + ".dokument set partner_id = ? where id = ?", quelle, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seite, dokument);
+            ausfuehren("insert into " + URINET.schema() + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    seite, dokument);
+            String inhaber = Testanmeldung.token("inhaber-urinet");
+            String pfad = "/api/v1/kontakte/" + quelle;
+            String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
+                    .extract().header("ETag");
+            given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
+                    .body(Map.of("ziel", ziel.toString(), "grund", "Synthetische Zusammenführung"))
+                    .when().post(pfad + "/zusammenfuehren").then().statusCode(200);
+            assertThat(anzahl("select count(*) from " + URINET.schema()
+                    + ".wissensseite where id = ? and quelle_pruefen", seite)).isEqualTo(1);
+        } finally {
+            ausfuehren("update " + URINET.schema() + ".dokument set partner_id = null where id = ?", dokument);
+            ausfuehren("delete from " + URINET.schema() + ".kontakt where id = ? or id = ?", quelle, ziel);
+        }
+    }
 
     @BeforeEach
     void mandanten() throws SQLException {

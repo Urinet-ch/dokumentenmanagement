@@ -17,6 +17,8 @@ public interface WissenLesenRepository {
 
     IndexErgebnis index(Sichtregel sichtregel, IndexAnfrage anfrage);
 
+    List<SeiteVerweis> seitenFuerDokument(Sichtregel sichtregel, UUID dokumentId);
+
     Optional<Wissensseite> seite(UUID id, Sichtregel sichtregel);
 
     Optional<Wissensseite> seite(String pfad, Sichtregel sichtregel);
