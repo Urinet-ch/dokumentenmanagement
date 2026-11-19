@@ -22,6 +22,7 @@ model/api-token-neu.ts
 model/api-token.ts
 model/art-klassifikation.ts
 model/auszug-teil.ts
+model/befund.ts
 model/bestaetigung.ts
 model/branding-dto.ts
 model/chat-frage.ts
@@ -29,6 +30,7 @@ model/chat-gespraech.ts
 model/chat-nachricht.ts
 model/chat-quelle.ts
 model/chat-verlauf.ts
+model/diff-eintrag.ts
 model/dokument-aenderung.ts
 model/dokument-finanz.ts
 model/dokument-version.ts
@@ -59,8 +61,11 @@ model/import-zuordnung-gespeichert.ts
 model/import-zuordnung.ts
 model/klassifikation-wert.ts
 model/klassifikation.ts
+model/konfiguration-ki-texte.ts
 model/konfigurations-version-detail.ts
 model/konfigurations-version.ts
+model/konfigurationsdatei-analyse.ts
+model/konfigurationsdatei-ergebnis.ts
 model/kontakt-angaben.ts
 model/kontakt-detail.ts
 model/kontakt-eintrag.ts

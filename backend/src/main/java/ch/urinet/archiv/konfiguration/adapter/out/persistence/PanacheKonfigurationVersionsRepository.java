@@ -41,6 +41,7 @@ public class PanacheKonfigurationVersionsRepository implements KonfigurationVers
     }
 
     @Override
+    @Transactional(Transactional.TxType.SUPPORTS)
     public String kanonisch(String text) {
         try {
             return kanonisch.writeValueAsString(kanonisch.readValue(text, Object.class));
