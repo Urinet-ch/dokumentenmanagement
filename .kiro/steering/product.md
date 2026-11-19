@@ -33,6 +33,8 @@ Vertraulichkeit (`NORMAL` | `INTERN` | `PERSONAL`):
 - `INTERN` – `inhaber` und `treuhaender` sowie `geschaeftsstelle` (Mandant 2).
 - `PERSONAL` – `inhaber`, `treuhaender` (nur lesend), `geschaeftsstelle` (Mandant 2) und der Mitarbeiter, den das Dokument betrifft (`person_benutzer`). Ein Dokument ohne bestätigte Art gilt als `PERSONAL` und ist nur für Rollen mit Recht A7 und den Erfasser sichtbar.
 
+Benutzer, Rollen und Einstellungen eines Mandanten pflegt der Inhaber ab Spec 06 selbst in der App (Einladung per Keycloak, Rollen statt einzelner Rechte, Zeilen A20–A23); den ersten Inhaber eines Mandanten richtet der Betreiber ein.
+
 Verbindlich ist die Matrix Rolle × Aktion in Requirement 2 von Spec 01; jede Zeile ist ein testbares Kriterium.
 Die Wissensbasis (Spec 04) gibt der `inhaber` frei, im Mandanten `vhf-gsk` die `geschaeftsstelle` (Recht A17;
 Zeilen A15–A19 in Spec 04, Requirement 12.1). Wissen darf auch lokal erarbeitet und als Paket importiert werden; wirksam wird es erst durch dieselbe Freigabe (Spec 04, Requirement 19).
