@@ -56,9 +56,9 @@ Funktionalität: Konfigurationsversionen
     Und ist die Art «PROBE_KONF_VERSION» in dieser Version unter dem Namen "Probe vorher" enthalten
 
   @req-1.6
-  Szenario: Ein neuer Mandant erhält seine Konfiguration aus dem Seed mit Quelle SEED
+  Szenario: Die Seed-Version eines neuen Mandanten enthält die Konfiguration aus seinem Seed und den Seed-Teil «_alle»
     Wenn der Betreiber den Mandanten «probe-konfig-seed» anlegt
-    Dann ist im Schema «m_probe_konfig_seed» die neueste Konfigurationsversion aus dem Seed und jede frühere aus der Migration
+    Dann ist die neueste Konfigurationsversion im Schema «m_probe_konfig_seed» die Version mit Quelle «SEED»
     Und enthält diese Konfigurationsversion genau die Arten aus «seed/probe-konfig-seed/konfiguration.json» und den Seed-Teil der Wissensquelle
     Und enthält diese Konfigurationsversion das Geschäftsjahresende «09-30» und die KI-Rolle aus dem Seed
 

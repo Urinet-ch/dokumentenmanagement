@@ -158,17 +158,12 @@ public class MandantSchritte {
                 + ".dokumentart where code = 'PROJEKTDOKUMENT'")).containsExactly("NORMAL/false");
     }
 
-    /**
-     * Spec 05, Req 1.6: Die Changesets legen auf dem leeren Schema Version 1 mit Quelle {@code MIGRATION} an
-     * (design.md, «Umsetzung 17.2»); der Seed folgt als nächste Version mit Quelle {@code SEED}.
-     */
-    @Dann("ist im Schema «{word}» die neueste Konfigurationsversion aus dem Seed und jede frühere aus der Migration")
-    public void seedVersion(String schema) throws SQLException, IOException {
+    /** Spec 05, Req 1.6; die Reihenfolge {@code MIGRATION} vor {@code SEED} prüft konfigurationsdatei.feature. */
+    @Dann("ist die neueste Konfigurationsversion im Schema «{word}» die Version mit Quelle «{word}»")
+    public void neuesteVersion(String schema, String quelle) throws SQLException, IOException {
         assertThat(fehler).as("Anlegen ohne Fehler erwartet").isNull();
-        List<String> quellen = werte("select quelle from " + schema + ".konfiguration_version order by version");
-        assertThat(quellen).isNotEmpty();
-        assertThat(quellen.getLast()).isEqualTo("SEED");
-        assertThat(quellen.subList(0, quellen.size() - 1)).containsOnly("MIGRATION");
+        assertThat(werte("select quelle from " + schema + ".konfiguration_version order by version desc limit 1"))
+                .containsExactly(quelle);
         seedAbbild = json.readTree(werte("select inhalt::text from " + schema
                 + ".konfiguration_version order by version desc limit 1").getFirst());
     }
