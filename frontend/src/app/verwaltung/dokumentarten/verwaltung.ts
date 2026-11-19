@@ -9,6 +9,9 @@ import { Klassifikation } from '../../gemeinsam/api/model/klassifikation';
 import { KlassifikationWert } from '../../gemeinsam/api/model/klassifikation-wert';
 import { KonfigurationsdateiAnalyse } from '../../gemeinsam/api/model/konfigurationsdatei-analyse';
 import { KonfigurationsVersion } from '../../gemeinsam/api/model/konfigurations-version';
+import { Regel } from '../../gemeinsam/api/model/regel';
+import { RegelAenderung } from '../../gemeinsam/api/model/regel-aenderung';
+import { RegelAnlegen } from '../../gemeinsam/api/model/regel-anlegen';
 import { DokumentartenService } from '../../gemeinsam/api/api/dokumentarten.service';
 import { KonfigurationService } from '../../gemeinsam/api/api/konfiguration.service';
 import {
@@ -75,10 +78,66 @@ interface ZuordnungForm {
   standardWert: string;
 }
 
+interface RegelForm {
+  code: string;
+  art: string;
+  typ: RegelAnlegen.TypEnum;
+  parameter: string;
+  schwere: RegelAnlegen.SchwereEnum;
+  meldung: string;
+  aktiv: boolean;
+  grund: string;
+}
+
 function objekt(wert: unknown): Record<string, unknown> | null {
   return wert !== null && typeof wert === 'object' && !Array.isArray(wert)
     ? (wert as Record<string, unknown>)
     : null;
+}
+
+function istRegelTyp(wert: string | undefined): wert is RegelAnlegen.TypEnum {
+  return wert !== undefined && Object.values(RegelAnlegen.TypEnum).some((typ) => typ === wert);
+}
+
+function istRegelSchwere(wert: string | undefined): wert is RegelAnlegen.SchwereEnum {
+  return wert !== undefined && Object.values(RegelAnlegen.SchwereEnum).some((schwere) => schwere === wert);
+}
+
+function regelFormLeer(): RegelForm {
+  return {
+    code: '',
+    art: '',
+    typ: RegelAnlegen.TypEnum.PflichtWenn,
+    parameter: '{}',
+    schwere: RegelAnlegen.SchwereEnum.Warnung,
+    meldung: '',
+    aktiv: true,
+    grund: '',
+  };
+}
+
+function regelFormAus(regel: Regel): RegelForm | null {
+  const parameter = objekt(regel.parameter);
+  if (
+    typeof regel.code !== 'string' ||
+    !istRegelTyp(regel.typ) ||
+    !istRegelSchwere(regel.schwere) ||
+    typeof regel.meldung !== 'string' ||
+    typeof regel.aktiv !== 'boolean' ||
+    parameter === null
+  ) {
+    return null;
+  }
+  return {
+    code: regel.code,
+    art: regel.art ?? '',
+    typ: regel.typ,
+    parameter: JSON.stringify(parameter, null, 2),
+    schwere: regel.schwere,
+    meldung: regel.meldung,
+    aktiv: regel.aktiv,
+    grund: '',
+  };
 }
 
 function artFormLeer(): ArtForm {
@@ -258,6 +317,8 @@ export class Verwaltung implements OnInit {
   protected readonly ausgewaehlteArt = signal<string | null>(null);
   protected readonly klassifikationen = signal<Klassifikation[] | null>(null);
   protected readonly ausgewaehlteKlassifikation = signal<string | null>(null);
+  protected readonly regeln = signal<Regel[] | null>(null);
+  protected readonly ausgewaehlteRegel = signal<string | null>(null);
   protected readonly zuordnungen = signal<ArtKlassifikation[]>([]);
   protected readonly versionen = signal<KonfigurationsVersion[]>([]);
   protected readonly versionenGeladen = signal(false);
@@ -271,6 +332,7 @@ export class Verwaltung implements OnInit {
   protected readonly beschaeftigt = signal(false);
   protected readonly artNeu = signal(false);
   protected readonly klassifikationNeu = signal(false);
+  protected readonly regelNeu = signal(false);
   protected readonly artLoeschenFrage = signal(false);
   protected readonly klassifikationLoeschenFrage = signal(false);
   protected readonly wertLoeschenFrage = signal<string | null>(null);
@@ -281,6 +343,8 @@ export class Verwaltung implements OnInit {
   protected readonly versionNeu = signal<number | null>(null);
   protected readonly vergleichAusgefuehrt = signal(false);
   protected readonly gruppen = ['finanz', 'vertrag', 'frei'] as const;
+  protected readonly regelTypen = Object.values(RegelAnlegen.TypEnum);
+  protected readonly regelSchweren = Object.values(RegelAnlegen.SchwereEnum);
   protected readonly felderTypen = [
     'text',
     'ganzzahl',
@@ -321,6 +385,7 @@ export class Verwaltung implements OnInit {
   protected wertBearbeiten: string | null = null;
   protected zuordnungForm: ZuordnungForm = { klassifikation: '', pflicht: false, standardWert: '' };
   protected zuordnungBearbeiten: string | null = null;
+  protected regelForm: RegelForm = regelFormLeer();
   private dateiInhalt: string | null = null;
   private dateiLeseLauf = 0;
 
@@ -332,6 +397,7 @@ export class Verwaltung implements OnInit {
   ngOnInit(): void {
     this.ladeArten();
     this.ladeKlassifikationen();
+    this.ladeRegeln();
     this.ladeVersionen();
   }
 
@@ -945,6 +1011,126 @@ export class Verwaltung implements OnInit {
     );
   }
 
+  protected regelWaehlen(regel: Regel): void {
+    const form = regelFormAus(regel);
+    if (form === null) {
+      this.fehler.set(this.texte.regeln.antwortUngueltig);
+      return;
+    }
+    this.ausgewaehlteRegel.set(form.code);
+    this.regelNeu.set(false);
+    this.regelForm = form;
+    this.fehler.set(null);
+    this.meldung.set(null);
+  }
+
+  protected neueRegel(): void {
+    this.ausgewaehlteRegel.set(null);
+    this.regelNeu.set(true);
+    this.regelForm = regelFormLeer();
+    this.fehler.set(null);
+    this.meldung.set(null);
+  }
+
+  protected regelTypName(typ: string | undefined): string {
+    return istRegelTyp(typ) ? this.texte.regeln.typen[typ] : this.texte.regeln.unbekannterTyp;
+  }
+
+  protected regelSpeichern(): void {
+    const etag = this.etagPruefen();
+    if (etag === null) {
+      return;
+    }
+    const istNeu = this.regelNeu();
+    const code = this.regelForm.code.trim();
+    const bestehenderCode = this.ausgewaehlteRegel();
+    if (
+      (istNeu && !/^[a-z][a-z0-9_]{0,39}$/.test(code)) ||
+      (!istNeu && bestehenderCode === null) ||
+      this.regelForm.meldung.trim() === ''
+    ) {
+      this.fehler.set(this.texte.fehlerUngueltig);
+      return;
+    }
+    let parameter: Record<string, unknown> | null;
+    try {
+      parameter = objekt(JSON.parse(this.regelForm.parameter));
+    } catch {
+      parameter = null;
+    }
+    if (parameter === null) {
+      this.fehler.set(this.texte.regeln.parameterUngueltig);
+      return;
+    }
+    const art = this.regelForm.art.trim() || null;
+    const meldung = this.regelForm.meldung.trim();
+    const grund = this.regelForm.grund.trim() || null;
+    const beiErfolg = (antwort: HttpResponse<Regel>) => {
+        this.beschaeftigt.set(false);
+        this.etagAktualisieren(antwort);
+        const gespeichert = antwort.body;
+        const codeGespeichert = gespeichert?.code;
+        const form = gespeichert === null ? null : regelFormAus(gespeichert);
+        if (gespeichert === null || codeGespeichert === undefined || form === null) {
+          this.fehler.set(this.texte.regeln.antwortUngueltig);
+          this.ladeRegeln();
+          return;
+        }
+        this.regeln.update((liste) => {
+          const ohne = (liste ?? []).filter((eintrag) => eintrag.code !== codeGespeichert);
+          return [...ohne, gespeichert].sort((a, b) =>
+            (a.code ?? '').localeCompare(b.code ?? ''),
+          );
+        });
+        this.ausgewaehlteRegel.set(codeGespeichert);
+        this.regelNeu.set(false);
+        this.regelForm = form;
+        this.meldung.set(
+          gespeichert.betroffeneDokumente == null
+            ? this.texte.regeln.gespeichert
+            : `${this.texte.regeln.gespeichert} ${this.texte.regeln.betroffene(gespeichert.betroffeneDokumente)}`,
+        );
+        this.fehler.set(null);
+        this.ladeVersionen();
+      };
+    const beiFehler = (fehler: unknown) => this.anfrageFehler(fehler);
+    if (istNeu) {
+      const payload: RegelAnlegen = {
+        code,
+        art,
+        typ: this.regelForm.typ,
+        parameter,
+        schwere: this.regelForm.schwere,
+        meldung,
+        aktiv: this.regelForm.aktiv,
+        grund,
+      };
+      this.beschaeftigt.set(true);
+      this.konfigurationService.apiV1RegelnPost(etag, payload, 'response').subscribe({
+        next: beiErfolg,
+        error: beiFehler,
+      });
+      return;
+    }
+    if (bestehenderCode === null) {
+      this.fehler.set(this.texte.fehlerUngueltig);
+      return;
+    }
+    const payload: RegelAenderung = {
+      art,
+      typ: this.regelForm.typ,
+      parameter,
+      schwere: this.regelForm.schwere,
+      meldung,
+      aktiv: this.regelForm.aktiv,
+      grund,
+    };
+    this.beschaeftigt.set(true);
+    this.konfigurationService
+      .apiV1RegelnCodePatch(bestehenderCode, etag, payload, 'response')
+      .subscribe({ next: beiErfolg, error: beiFehler });
+  }
+
   protected versionAuswahlAendern(seite: 'alt' | 'neu', wert: number | null): void {
     const version = wert === null ? null : Number(wert);
     if (seite === 'alt') {
@@ -1146,6 +1332,7 @@ export class Verwaltung implements OnInit {
     this.fehler.set(null);
     this.ladeArten();
     this.ladeKlassifikationen();
+    this.ladeRegeln();
     this.ladeVersionen();
     const art = this.ausgewaehlteArt();
     if (art !== null) {
@@ -1186,6 +1373,16 @@ export class Verwaltung implements OnInit {
       next: (antwort) => {
         this.etagAktualisieren(antwort);
         this.klassifikationen.set(klassifikationsListe(antwort.body));
+      },
+      error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
+    });
+  }
+
+  private ladeRegeln(): void {
+    this.konfigurationService.apiV1RegelnGet('response').subscribe({
+      next: (antwort) => {
+        this.etagAktualisieren(antwort);
+        this.regeln.set(antwort.body ?? []);
       },
       error: (fehler: unknown) => this.anfrageFehler(fehler, 'laden'),
     });

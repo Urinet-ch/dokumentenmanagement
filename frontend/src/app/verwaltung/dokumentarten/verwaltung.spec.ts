@@ -6,6 +6,7 @@ import { DokumentartenService } from '../../gemeinsam/api/api/dokumentarten.serv
 import { KonfigurationService } from '../../gemeinsam/api/api/konfiguration.service';
 import { Dokumentart } from '../../gemeinsam/api/model/dokumentart';
 import { KonfigurationsVersion } from '../../gemeinsam/api/model/konfigurations-version';
+import { Regel } from '../../gemeinsam/api/model/regel';
 import { TEXTE } from '../../gemeinsam/texte.de-CH';
 import { Verwaltung } from './verwaltung';
 
@@ -26,6 +27,16 @@ const ART: Dokumentart = {
   kiVorschlag: true,
   kiFelder: [],
   reihenfolge: 1,
+};
+
+const REGEL: Regel = {
+  code: 'probe_regel',
+  art: 'RECHNUNG',
+  typ: 'EINDEUTIG',
+  parameter: { felder: ['titel'] },
+  schwere: 'WARNUNG',
+  meldung: 'Titel muss eindeutig sein.',
+  aktiv: true,
 };
 
 function antwort<T>(body: T): HttpResponse<T> {
@@ -63,6 +74,9 @@ describe('Verwaltung der Dokumentarten', () => {
     apiV1KonfigurationVergleichenPost: vi.fn(),
     apiV1KonfigurationPut: vi.fn(),
     apiV1KonfigurationGet: vi.fn(),
+    apiV1RegelnGet: vi.fn(),
+    apiV1RegelnPost: vi.fn(),
+    apiV1RegelnCodePatch: vi.fn(),
   };
 
   async function starten(
@@ -79,6 +93,13 @@ describe('Verwaltung der Dokumentarten', () => {
     konfigurationService.apiV1KonfigurationVersionenGet
       .mockReset()
       .mockReturnValue(of(antwort(versionen)));
+    konfigurationService.apiV1RegelnGet.mockReset().mockReturnValue(of(antwort([REGEL])));
+    konfigurationService.apiV1RegelnPost
+      .mockReset()
+      .mockReturnValue(of(antwort({ ...REGEL, betroffeneDokumente: 0 })));
+    konfigurationService.apiV1RegelnCodePatch
+      .mockReset()
+      .mockReturnValue(of(antwort({ ...REGEL, betroffeneDokumente: 0 })));
     konfigurationService.apiV1DokumentartenArtKlassifikationenGet
       .mockReset()
       .mockReturnValue(of(antwort([])));
@@ -110,6 +131,20 @@ describe('Verwaltung der Dokumentarten', () => {
     return label?.querySelector('input')!;
   }
 
+  function textbereich(labelText: string): HTMLTextAreaElement {
+    const label = [...element.querySelectorAll<HTMLLabelElement>('label')].find((eintrag) =>
+      eintrag.textContent?.includes(labelText),
+    );
+    return label?.querySelector('textarea')!;
+  }
+
+  function auswahl(labelText: string): HTMLSelectElement {
+    const label = [...element.querySelectorAll<HTMLLabelElement>('label')].find((eintrag) =>
+      eintrag.textContent?.includes(labelText),
+    );
+    return label?.querySelector('select')!;
+  }
+
   it('zeigt Dokumentarten, inaktive Stati, Klassifikationen und Versionen', async () => {
     await starten();
 
@@ -119,6 +154,8 @@ describe('Verwaltung der Dokumentarten', () => {
     expect(element.textContent).toContain(ART.name);
     expect(element.textContent).toContain(TEXTE.verwaltung.dokumentarten.liste);
     expect(element.textContent).toContain(TEXTE.verwaltung.klassifikationen.titel);
+    expect(element.textContent).toContain(REGEL.code);
+    expect(element.textContent).toContain(TEXTE.verwaltung.regeln.titel);
     expect(element.textContent).toContain(TEXTE.verwaltung.versionen.titel);
     expect(element.textContent).toContain(TEXTE.verwaltung.datei.titel);
   });
@@ -193,6 +230,112 @@ describe('Verwaltung der Dokumentarten', () => {
 
     expect(element.querySelector('[role=alert]')?.textContent).toContain(
       TEXTE.verwaltung.fehlerGebrauch,
+    );
+    expect(element.textContent).not.toContain('private value');
+  });
+
+  it('legt Regeln mit If-Match an und zeigt die Zahl betroffener Dokumente', async () => {
+    await starten();
+    konfigurationService.apiV1RegelnPost.mockReturnValue(
+      of(antwort({ ...REGEL, code: 'probe_neu', betroffeneDokumente: 2 })),
+    );
+
+    knopf(TEXTE.verwaltung.regeln.neueRegel).click();
+    fixture.detectChanges();
+    const code = eingabe(TEXTE.verwaltung.regeln.code);
+    code.value = 'probe_neu';
+    code.dispatchEvent(new Event('input', { bubbles: true }));
+    const art = auswahl(TEXTE.verwaltung.regeln.art);
+    art.value = 'RECHNUNG';
+    art.dispatchEvent(new Event('change', { bubbles: true }));
+    const typ = auswahl(TEXTE.verwaltung.regeln.typ);
+    typ.value = 'EINDEUTIG';
+    typ.dispatchEvent(new Event('change', { bubbles: true }));
+    const parameter = textbereich(TEXTE.verwaltung.regeln.parameter);
+    parameter.value = '{"felder":["titel"]}';
+    parameter.dispatchEvent(new Event('input', { bubbles: true }));
+    const meldung = textbereich(TEXTE.verwaltung.regeln.meldung);
+    meldung.value = 'Titel muss eindeutig sein.';
+    meldung.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+
+    knopf(TEXTE.verwaltung.speichern).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(konfigurationService.apiV1RegelnPost).toHaveBeenCalledExactlyOnceWith(
+      '"konfig-7"',
+      expect.objectContaining({
+        code: 'probe_neu',
+        art: 'RECHNUNG',
+        typ: 'EINDEUTIG',
+        parameter: { felder: ['titel'] },
+        meldung: 'Titel muss eindeutig sein.',
+      }),
+      'response',
+    );
+    expect(element.textContent).toContain(TEXTE.verwaltung.regeln.gespeichert);
+    expect(element.textContent).toContain(TEXTE.verwaltung.regeln.betroffene(2));
+  });
+
+  it('weist ungültige Regelparameter zurück, ohne sie an die API zu senden', async () => {
+    await starten();
+
+    knopf(TEXTE.verwaltung.regeln.neueRegel).click();
+    fixture.detectChanges();
+    const code = eingabe(TEXTE.verwaltung.regeln.code);
+    code.value = 'probe_neu';
+    code.dispatchEvent(new Event('input', { bubbles: true }));
+    const meldung = textbereich(TEXTE.verwaltung.regeln.meldung);
+    meldung.value = 'Titel muss eindeutig sein.';
+    meldung.dispatchEvent(new Event('input', { bubbles: true }));
+    const parameter = textbereich(TEXTE.verwaltung.regeln.parameter);
+    parameter.value = '[';
+    parameter.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+
+    knopf(TEXTE.verwaltung.speichern).click();
+    fixture.detectChanges();
+
+    expect(konfigurationService.apiV1RegelnPost).not.toHaveBeenCalled();
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.verwaltung.regeln.parameterUngueltig,
+    );
+  });
+
+  it('behält Regeländerungen bei einem Versionskonflikt im Formular', async () => {
+    await starten();
+    konfigurationService.apiV1RegelnCodePatch.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 412,
+            error: { detail: 'private value' },
+          }),
+      ),
+    );
+
+    element.querySelector<HTMLButtonElement>('#regeln .auswahl')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const meldung = textbereich(TEXTE.verwaltung.regeln.meldung);
+    meldung.value = 'Geänderte Meldung';
+    meldung.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    knopf(TEXTE.verwaltung.speichern).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(konfigurationService.apiV1RegelnCodePatch).toHaveBeenCalledExactlyOnceWith(
+      REGEL.code,
+      '"konfig-7"',
+      expect.objectContaining({ meldung: 'Geänderte Meldung' }),
+      'response',
+    );
+    expect(textbereich(TEXTE.verwaltung.regeln.meldung).value).toBe('Geänderte Meldung');
+    expect(element.querySelector('[role=alert]')?.textContent).toContain(
+      TEXTE.verwaltung.fehlerKonflikt,
     );
     expect(element.textContent).not.toContain('private value');
   });

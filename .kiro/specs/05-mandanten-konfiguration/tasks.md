@@ -102,7 +102,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 8.5, 8.7, 8.8_
   - _Abhängig von: 17.7; Spec 01: 4.5, 4.7, 4.8_
 
-- [ ] 18.3 Verwaltungsseiten [Frontend]
+- [x] 18.3 Verwaltungsseiten [Frontend]
   - Seiten für Dokumentarten (Platzhalter `/verwaltung/dokumentarten`) mit Feld-Editor, Klassifikationen, Regeln,
     Versionen mit Vergleich, Import mit Vorschau.
   - _Anforderungen: 7.3, 7.4_

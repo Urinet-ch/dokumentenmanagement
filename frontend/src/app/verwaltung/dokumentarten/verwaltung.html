@@ -4,7 +4,7 @@
 
   @if (fehler()) {
     <p class="meldung fehler" role="alert">{{ fehlerMeldung() }}</p>
-    @if (arten() === null || klassifikationen() === null || !versionenGeladen()) {
+    @if (arten() === null || klassifikationen() === null || regeln() === null || !versionenGeladen()) {
       <button type="button" class="sekundaer" (click)="neuLaden()">{{ texte.erneutLaden }}</button>
     }
   }
@@ -616,7 +616,92 @@
   <section id="regeln" aria-labelledby="regeln-titel">
     <h2 id="regeln-titel">{{ texte.regeln.titel }}</h2>
     <p>{{ texte.regeln.einleitung }}</p>
-    <p>{{ texte.laden }}</p>
+    <div class="zweispaltig">
+      <aside [attr.aria-label]="texte.regeln.liste">
+        <h3>{{ texte.regeln.liste }}</h3>
+        @if (regeln() === null) {
+          <p>{{ texte.laden }}</p>
+        } @else if (regeln()?.length === 0) {
+          <p>{{ texte.regeln.keine }}</p>
+        } @else {
+          <ul class="auswahlliste">
+            @for (regel of regeln() ?? []; track regel.code) {
+              <li>
+                <button
+                  type="button"
+                  class="auswahl"
+                  [attr.aria-current]="ausgewaehlteRegel() === regel.code ? 'true' : null"
+                  (click)="regelWaehlen(regel)"
+                >
+                  <span>{{ regel.code }}</span>
+                  <span>{{ regelTypName(regel.typ) }} · {{ regel.art || texte.regeln.alleArten }}</span>
+                  <span class="status">{{ regel.aktiv ? texte.aktiv : texte.inaktiv }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+        <button type="button" (click)="neueRegel()">{{ texte.regeln.neueRegel }}</button>
+      </aside>
+
+      @if (ausgewaehlteRegel() !== null || regelNeu()) {
+        <div class="formular">
+          <h3>{{ regelNeu() ? texte.regeln.neueRegel : regelForm.code }}</h3>
+          <label>
+            {{ texte.regeln.code }}
+            <input [(ngModel)]="regelForm.code" [disabled]="!regelNeu()" autocomplete="off" />
+          </label>
+          <label>
+            {{ texte.regeln.art }}
+            <select [(ngModel)]="regelForm.art">
+              <option value=""></option>
+              @for (art of arten() ?? []; track art.code) {
+                <option [value]="art.code">{{ art.name }} ({{ art.code }})</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.typ }}
+            <select [(ngModel)]="regelForm.typ">
+              @for (typ of regelTypen; track typ) {
+                <option [value]="typ">{{ regelTypName(typ) }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.parameter }}
+            <textarea [(ngModel)]="regelForm.parameter" rows="8" spellcheck="false"></textarea>
+            <span class="hinweis">{{ texte.regeln.parameterHinweis }}</span>
+          </label>
+          <label>
+            {{ texte.regeln.schwere }}
+            <select [(ngModel)]="regelForm.schwere">
+              @for (schwere of regelSchweren; track schwere) {
+                <option [value]="schwere">{{ texte.regeln.schweren[schwere] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            {{ texte.regeln.meldung }}
+            <textarea [(ngModel)]="regelForm.meldung" rows="2"></textarea>
+          </label>
+          <label class="inline">
+            <input type="checkbox" [(ngModel)]="regelForm.aktiv" />
+            {{ texte.aktiv }}
+          </label>
+          <label>
+            {{ texte.aenderungsgrund }}
+            <input [(ngModel)]="regelForm.grund" maxlength="1000" />
+          </label>
+          @if (!regelNeu()) {
+            <p class="hinweis">{{ texte.regeln.warnungBetroffene }}</p>
+          }
+          <button type="button" [disabled]="beschaeftigt()" (click)="regelSpeichern()">
+            {{ texte.speichern }}
+          </button>
+        </div>
+      }
+    </div>
   </section>
 
   <section id="versionen" aria-labelledby="versionen-titel">
