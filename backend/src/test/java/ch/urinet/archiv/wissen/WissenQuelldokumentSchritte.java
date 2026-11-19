@@ -49,14 +49,14 @@ public class WissenQuelldokumentSchritte {
                 .when().get("/api/v1/wissensseiten/" + seite).then().statusCode(200);
     }
 
-    @Wenn("der Inhaber die Vertraulichkeit des Quelldokuments auf INTERN ändert")
-    public void quelleIntern() {
+    @Wenn("der Inhaber die Vertraulichkeit des Quelldokuments auf «{word}» ändert")
+    public void quelleVertraulicher(String stufe) {
         String inhaber = Testanmeldung.token("inhaber-urinet");
         String pfad = "/api/v1/dokumente/" + dokument;
         String etag = given().auth().oauth2(inhaber).when().get(pfad).then().statusCode(200)
                 .extract().header("ETag");
         given().auth().oauth2(inhaber).header("If-Match", etag).contentType("application/json")
-                .body(Map.of("vertraulichkeit", "INTERN", "grund", "Synthetische Quellenprüfung"))
+                .body(Map.of("vertraulichkeit", stufe, "grund", "Synthetische Quellenprüfung"))
                 .when().patch(pfad).then().statusCode(200);
     }
 
