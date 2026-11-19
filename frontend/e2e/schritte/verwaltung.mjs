@@ -31,6 +31,7 @@ const REGELN = [
   },
 ];
 
+// Auswahlfelder über ihre Rolle: getByLabel findet ein <select> im umschliessenden <label> nicht zuverlässig.
 function json(route, status, body, etag = ETAG) {
   return route.fulfill({
     status,
@@ -101,12 +102,12 @@ When(
     await regeln.getByRole('button', { name: 'Neue Regel', exact: true }).click();
     await regeln.getByLabel('Code', { exact: true }).fill(code);
     await regeln
-      .getByLabel('Dokumentart (leer = alle)', { exact: true })
+      .getByRole('combobox', { name: 'Dokumentart (leer = alle)', exact: true })
       .selectOption('RECHNUNG');
-    await regeln.getByLabel('Regeltyp', { exact: true }).selectOption('EINDEUTIG');
+    await regeln.getByRole('combobox', { name: 'Regeltyp', exact: true }).selectOption('EINDEUTIG');
     await regeln.getByLabel('Parameter (JSON)').fill('{"felder":["titel"]}');
     await regeln.getByLabel('Meldung', { exact: true }).fill(meldung);
-    await regeln.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await regeln.getByRole('button', { name: 'Änderungen speichern', exact: true }).click();
   },
 );
 
@@ -125,12 +126,12 @@ When(
     const feld = dokumentarten.locator('.feld-editor');
     await feld.getByLabel('Feldcode', { exact: true }).fill(feldcode);
     await feld.getByLabel('Name', { exact: true }).fill('Priorität');
-    await feld.getByLabel('Typ', { exact: true }).selectOption('auswahl');
+    await feld.getByRole('combobox', { name: 'Typ', exact: true }).selectOption('auswahl');
     await feld.getByLabel('Pflicht', { exact: true }).check();
     await feld.getByRole('button', { name: 'Wert hinzufügen', exact: true }).click();
     await feld.getByLabel('Wert', { exact: true }).fill('hoch');
     await feld.getByLabel('Anzeigetext', { exact: true }).fill('Hoch');
-    await dokumentarten.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await dokumentarten.getByRole('button', { name: 'Änderungen speichern', exact: true }).click();
   },
 );
 
@@ -150,8 +151,10 @@ Then('wurde die Dokumentart mit dem aktuellen ETag gespeichert', function () {
 });
 
 Then('zeigt die Verwaltungsseite zwei betroffene Dokumente', async function () {
+  // Die Erfolgsmeldung nennt zuerst «Regel gespeichert.», danach die Anzahl
   await this.seite
-    .getByText('2 bestätigte Dokumente mit Regelverstössen', { exact: true })
+    .getByRole('status')
+    .filter({ hasText: '2 bestätigte Dokumente mit Regelverstössen' })
     .waitFor();
 });
 
