@@ -27,6 +27,8 @@ class KlassenpfadDokumentartSeedTest {
         assertThat(projekt.aufbewahrungJahre()).isNull();
         assertThat(projekt.aufbewahrungAb()).isNull();
         assertThat(projekt.gesetzlichePflicht()).isFalse();
+        DokumentartVorlage offerte = arten.stream().filter(a -> a.code().equals("OFFERTE")).findFirst().orElseThrow();
+        assertThat(offerte.kiHinweise()).isEmpty();
     }
 
     @Test
