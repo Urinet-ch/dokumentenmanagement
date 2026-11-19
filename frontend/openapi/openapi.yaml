@@ -5248,6 +5248,7 @@ paths:
   /api/v1/regeln:
     get:
       summary: Regeln des Mandanten auflisten
+      description: "Nur mit Recht A11 (Spec 05, Req 7.2)."
       tags:
       - Konfiguration
       responses:
@@ -5262,16 +5263,13 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Regel"
+        "403":
+          description: NICHT_ERLAUBT
         "401":
           description: Not Authorized
-        "403":
-          description: Not Allowed
       security:
       - SecurityScheme:
         - inhaber
-        - mitarbeiter
-        - treuhaender
-        - geschaeftsstelle
     post:
       summary: Dokumentregel anlegen
       description: If-Match mit Konfigurationsversion ist Pflicht.

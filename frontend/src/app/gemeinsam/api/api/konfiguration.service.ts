@@ -1013,6 +1013,7 @@ export class KonfigurationService extends BaseService {
 
     /**
      * Regeln des Mandanten auflisten
+     * Nur mit Recht A11 (Spec 05, Req 7.2).
      * @endpoint get /api/v1/regeln
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.

@@ -5,7 +5,6 @@ import ch.urinet.archiv.konfiguration.domain.Regel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.persistence.EntityManager;
@@ -28,15 +27,22 @@ public class PanacheRegelRepository implements RegelRepository {
         this.em = em;
     }
 
+    // Nativ gelesen wie geschrieben: Entitäten im Persistenzkontext sähen ein natives UPDATE derselben Transaktion nicht.
+    private static final String SPALTEN = "select code, art, typ, parameter::text, schwere, meldung, aktiv from regel";
+
     @Override
     public List<Regel> alle() {
-        return RegelEintrag.<RegelEintrag>findAll(Sort.ascending("code")).list().stream()
-                .map(this::domain).toList();
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em.get().createNativeQuery(SPALTEN + " order by code").getResultList();
+        return zeilen.stream().map(this::domain).toList();
     }
 
     @Override
     public Optional<Regel> finden(String code) {
-        return RegelEintrag.<RegelEintrag>findByIdOptional(code).map(this::domain);
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = em.get().createNativeQuery(SPALTEN + " where code = :code")
+                .setParameter("code", code).getResultList();
+        return zeilen.stream().findFirst().map(this::domain);
     }
 
     @Override
@@ -64,10 +70,11 @@ public class PanacheRegelRepository implements RegelRepository {
         }
     }
 
-    private Regel domain(RegelEintrag eintrag) {
+    private Regel domain(Object[] zeile) {
         try {
-            return new Regel(eintrag.code, eintrag.art, eintrag.typ,
-                    json.readValue(eintrag.parameter, PARAMETER_TYP), eintrag.schwere, eintrag.meldung, eintrag.aktiv);
+            return new Regel((String) zeile[0], (String) zeile[1], (String) zeile[2],
+                    json.readValue((String) zeile[3], PARAMETER_TYP), (String) zeile[4], (String) zeile[5],
+                    (Boolean) zeile[6]);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Regelparameter nicht lesbar", e);
         }

@@ -149,15 +149,17 @@ public class PanacheRegelDaten implements RegelDatenPort, RegelVerletzungsZaehle
             ausdruecke.add(ausdruck(feld, gebundeneFelder));
             vorhanden.add("not " + leer(feld, gebundeneFelder));
         }
-        String artFilter = regel.art() == null || eindeutig.ueberAlleArten() ? ""
-                : " and d.art = :art";
-        String sql = "select coalesce(sum(anzahl), 0) from (select count(*) as anzahl "
-                + dokumenteVonRegel(regel, artFilter) + " and " + String.join(" and ", vorhanden)
-                + " group by jsonb_build_array(" + String.join(", ", ausdruecke) + ") having count(*) > 1) "
-                + "doppelte";
+        // Vergleichsmenge wie RegelPruefung: alle Arten ohne Art oder mit ueberAlleArten; gezählt nur Dokumente der Art.
+        String vergleichFilter = regel.art() == null || eindeutig.ueberAlleArten() ? "" : " and d.art = :art";
+        String sql = "with basis as (select d.art, jsonb_build_array(" + String.join(", ", ausdruecke)
+                + ") as schluessel " + dokumenteVonRegel(regel, vergleichFilter) + " and "
+                + String.join(" and ", vorhanden) + "), doppelt as (select schluessel from basis "
+                + "group by schluessel having count(*) > 1) "
+                + "select count(*) from basis b join doppelt g on g.schluessel = b.schluessel"
+                + (regel.art() == null ? "" : " where b.art = :art");
         Query abfrage = entityManager().createNativeQuery(sql);
         felderBinden(abfrage, gebundeneFelder);
-        if (!artFilter.isEmpty()) {
+        if (regel.art() != null) {
             abfrage.setParameter("art", regel.art());
         }
         return ((Number) abfrage.getSingleResult()).longValue();

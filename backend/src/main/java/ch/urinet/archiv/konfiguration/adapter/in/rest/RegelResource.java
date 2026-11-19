@@ -7,7 +7,6 @@ import ch.urinet.archiv.konfiguration.application.RegelAenderung;
 import ch.urinet.archiv.konfiguration.application.RegelVerwaltung;
 import ch.urinet.archiv.konfiguration.domain.Regel;
 import ch.urinet.archiv.mandant.application.MandantAufloesung;
-import ch.urinet.archiv.sicherheit.application.AlleArchivRollen;
 import ch.urinet.archiv.sicherheit.application.ErfordertAktion;
 import ch.urinet.archiv.sicherheit.domain.Aktion;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -104,14 +103,15 @@ public class RegelResource {
     }
 
     @GET
-    @AlleArchivRollen
-    @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
-    @Operation(summary = "Regeln des Mandanten auflisten")
+    @ErfordertAktion(Aktion.A11)
+    @RolesAllowed("inhaber")
+    @Operation(summary = "Regeln des Mandanten auflisten", description = "Nur mit Recht A11 (Spec 05, Req 7.2).")
     @APIResponse(responseCode = "200", description = "Aktive und inaktive Regeln",
             headers = @org.eclipse.microprofile.openapi.annotations.headers.Header(
                     name = "ETag", description = "Aktuelle Konfigurationsversion für If-Match"),
             content = @Content(mediaType = MediaType.APPLICATION_JSON,
                     schema = @Schema(type = SchemaType.ARRAY, implementation = RegelDto.class)))
+    @APIResponse(responseCode = "403", description = "NICHT_ERLAUBT")
     public Response liste() {
         aufloesung.pruefen();
         return Response.ok(verwaltung.alle().stream().map(regel -> RegelDto.aus(regel, null)).toList())
@@ -137,11 +137,12 @@ public class RegelResource {
     public Response anlegen(@HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                             String body) {
         aufloesung.pruefen();
+        int version = version(ifMatch);
         JsonNode objekt = objekt(body, ANLAGEFELDER);
         Regel neu = new Regel(erforderlichText(objekt, "code"), text(objekt, "art"), erforderlichText(objekt, "typ"),
                 parameter(objekt.get("parameter")), erforderlichText(objekt, "schwere"),
                 erforderlichText(objekt, "meldung"), optionalBool(objekt, "aktiv", true));
-        RegelVerwaltung.Ergebnis ergebnis = verwaltung.anlegen(neu, version(ifMatch), wer(), grund(objekt));
+        RegelVerwaltung.Ergebnis ergebnis = verwaltung.anlegen(neu, version, wer(), grund(objekt));
         return Response.status(Response.Status.CREATED)
                 .entity(RegelDto.aus(ergebnis.regel(), ergebnis.betroffeneDokumente()))
                 .tag(new EntityTag(Integer.toString(ergebnis.version()))).build();
@@ -169,6 +170,7 @@ public class RegelResource {
                             @HeaderParam(HttpHeaders.IF_MATCH) @Parameter(required = true) String ifMatch,
                             String body) {
         aufloesung.pruefen();
+        int version = version(ifMatch);
         JsonNode objekt = objekt(body, AENDERUNGSFELDER);
         Set<String> gesetzt = gesetzteFelder(objekt, AENDERUNGSFELDER);
         gesetzt.remove("grund");
@@ -178,7 +180,7 @@ public class RegelResource {
         RegelAenderung aenderung = new RegelAenderung(gesetzt, text(objekt, "art"), text(objekt, "typ"),
                 objekt.has("parameter") ? parameter(objekt.get("parameter")) : null, text(objekt, "schwere"),
                 text(objekt, "meldung"), bool(objekt, "aktiv"));
-        RegelVerwaltung.Ergebnis ergebnis = verwaltung.aendern(code, aenderung, version(ifMatch), wer(),
+        RegelVerwaltung.Ergebnis ergebnis = verwaltung.aendern(code, aenderung, version, wer(),
                 grund(objekt));
         return Response.ok(RegelDto.aus(ergebnis.regel(), ergebnis.betroffeneDokumente()))
                 .tag(new EntityTag(Integer.toString(ergebnis.version()))).build();

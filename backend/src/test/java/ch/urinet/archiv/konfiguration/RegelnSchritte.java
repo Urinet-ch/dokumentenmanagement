@@ -16,6 +16,7 @@ import io.cucumber.java.de.Angenommen;
 import io.cucumber.java.de.Dann;
 import io.cucumber.java.de.Wenn;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -61,6 +62,8 @@ public class RegelnSchritte {
     private List<RegelPruefung.Warnung> warnungen = List.of();
     private RegelVerletzt fehler;
     private Response antwort;
+    private int gemerkteVersion;
+    private long gemerktesProtokoll;
 
     @Wenn("die vier Regeltypen der Konfiguration aufgebaut werden")
     public void regeltypenAufbauen() {
@@ -194,6 +197,116 @@ public class RegelnSchritte {
     public void regelAktivieren(String benutzer, String code) {
         antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("aktiv", true))
                 .patch("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» deaktiviert die Regel «{word}»")
+    public void regelDeaktivieren(String benutzer, String code) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(Map.of("aktiv", false))
+                .patch("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» die Regeln liest")
+    public void regelnLesen(String benutzer) {
+        antwort = gegeben(benutzer).get("/api/v1/regeln");
+    }
+
+    @Wenn("«{word}» eine Regel ohne If-Match anlegt:")
+    public void regelOhneVersionAnlegen(String benutzer, String body) {
+        eingerichtet.add(new Eingerichtet(mandant(benutzer), JsonPath.from(body).getString("code")));
+        antwort = gegeben(benutzer).contentType(ContentType.JSON).body(body).post("/api/v1/regeln");
+    }
+
+    @Wenn("«{word}» eine Regel mit der Version «{word}» anlegt:")
+    public void regelMitVersionAnlegen(String benutzer, String version, String body) {
+        eingerichtet.add(new Eingerichtet(mandant(benutzer), JsonPath.from(body).getString("code")));
+        antwort = gegeben(benutzer).header("If-Match", "\"" + version + "\"").contentType(ContentType.JSON)
+                .body(body).post("/api/v1/regeln");
+    }
+
+    @Wenn("«{word}» die Regel «{word}» ohne If-Match ändert:")
+    public void regelOhneVersionAendern(String benutzer, String code, String body) {
+        antwort = gegeben(benutzer).contentType(ContentType.JSON).body(body).patch("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» die Regel «{word}» mit der Version «{word}» ändert:")
+    public void regelMitVersionAendern(String benutzer, String code, String version, String body) {
+        antwort = gegeben(benutzer).header("If-Match", "\"" + version + "\"").contentType(ContentType.JSON)
+                .body(body).patch("/api/v1/regeln/" + code);
+    }
+
+    @Wenn("«{word}» die Regel «{word}» mit dem aktuellen Stand ändert:")
+    public void regelAendern(String benutzer, String code, String body) {
+        antwort = mitVersion(benutzer).contentType(ContentType.JSON).body(body).patch("/api/v1/regeln/" + code);
+    }
+
+    @Angenommen("der Konfigurationsstand von «{word}» ist gemerkt")
+    public void konfigurationsstandMerken(String mandant) throws SQLException {
+        String schema = new MandantCode(mandant).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             Statement abfrage = verbindung.createStatement();
+             var ergebnis = abfrage.executeQuery("select (select coalesce(max(version), 0) from " + schema
+                     + ".konfiguration_version), (select coalesce(max(id), 0) from " + schema
+                     + ".zugriff_protokoll)")) {
+            assertThat(ergebnis.next()).isTrue();
+            gemerkteVersion = ergebnis.getInt(1);
+            gemerktesProtokoll = ergebnis.getLong(2);
+        }
+    }
+
+    /** Antwort, Tabelle, Konfigurationsversion und Protokoll führen dieselbe Änderung (Req 1.3, 5.6, 7.6). */
+    @Dann("führt «{word}» die Regel «{word}» mit aktiv «{word}» in genau einer neuen Konfigurationsversion")
+    public void regelInNeuerVersion(String benutzer, String code, String aktiv) throws SQLException {
+        boolean erwartet = Boolean.parseBoolean(aktiv);
+        int neueVersion = gemerkteVersion + 1;
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().getString("code")).isEqualTo(code);
+        assertThat(antwort.jsonPath().getBoolean("aktiv")).as("Antwort").isEqualTo(erwartet);
+        assertThat(antwort.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
+        Response liste = gegeben(benutzer).get("/api/v1/regeln");
+        assertThat(liste.statusCode()).as(liste.asString()).isEqualTo(200);
+        assertThat(liste.getHeader("ETag")).isEqualTo("\"" + neueVersion + "\"");
+        assertThat(liste.jsonPath().<Boolean>getList("findAll { it.code == '" + code + "' }.aktiv"))
+                .as("Liste").containsExactly(erwartet);
+        String schema = new MandantCode(mandant(benutzer)).schema();
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement versionen = verbindung.prepareStatement("select v.version, v.quelle, r ->> 'aktiv' "
+                     + "from " + schema + ".konfiguration_version v "
+                     + "left join lateral jsonb_array_elements(v.inhalt -> 'regeln') r on r ->> 'code' = ? "
+                     + "where v.version > ?");
+             PreparedStatement protokoll = verbindung.prepareStatement("select count(*) from " + schema
+                     + ".zugriff_protokoll where id > ? and aktion = 'KONFIGURATION_AENDERN'")) {
+            versionen.setString(1, code);
+            versionen.setInt(2, gemerkteVersion);
+            try (var ergebnis = versionen.executeQuery()) {
+                assertThat(ergebnis.next()).as("neue Konfigurationsversion").isTrue();
+                assertThat(ergebnis.getInt(1)).isEqualTo(neueVersion);
+                assertThat(ergebnis.getString(2)).isEqualTo("APP");
+                assertThat(ergebnis.getString(3)).as("Abbild der Version").isEqualTo(aktiv);
+                assertThat(ergebnis.next()).as("genau eine neue Version").isFalse();
+            }
+            protokoll.setLong(1, gemerktesProtokoll);
+            try (var ergebnis = protokoll.executeQuery()) {
+                assertThat(ergebnis.next()).isTrue();
+                assertThat(ergebnis.getLong(1)).as("Konfigurationseinträge im Zugriffsprotokoll").isEqualTo(1);
+            }
+        }
+    }
+
+    @Dann("antwortet die Regelverwaltung mit Status {int} und Fehlercode «{word}»")
+    public void regelFehler(int status, String code) {
+        assertThat(ProblemDetails.pruefen(antwort, status)).isEqualTo(code);
+    }
+
+    @Dann("enthält die Regelliste die Regel «{word}»")
+    public void regelInListe(String code) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().<String>getList("code")).contains(code);
+    }
+
+    @Dann("enthält die Regelliste die Regel «{word}» nicht")
+    public void regelNichtInListe(String code) {
+        assertThat(antwort.statusCode()).as(antwort.asString()).isEqualTo(200);
+        assertThat(antwort.jsonPath().<String>getList("code")).doesNotContain(code);
     }
 
     @Wenn("«{word}» den Lückenbericht für das Geschäftsjahr «{int}» abruft")
