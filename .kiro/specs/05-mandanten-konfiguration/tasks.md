@@ -74,7 +74,7 @@ erweitert sie A11, trägt sie das im selben PR in Spec 01 nach (design.md, «Err
   - _Anforderungen: 5.4, 5.6_
   - _Abhängig von: 17.6_
 
-- [ ] 17.7 Konfigurationsdatei, Admin-Kommando und Seeds [Backend]
+- [x] 17.7 Konfigurationsdatei, Admin-Kommando und Seeds [Backend]
   - Schema-Datei, Export, Prüfen, Vergleichen, Einspielen (ganz oder gar nicht, Basisversion, Rundlauf),
     Admin-Kommando mit `--wer` und `--grund`, `konfiguration.json` als Seed (ersetzt `dokumentarten.json`, auch
     die Test-Seeds), `KonfigurationSeedTest` ersetzt `DokumentartSeedTest` (`StammdatenTabelle` und Spalten der
