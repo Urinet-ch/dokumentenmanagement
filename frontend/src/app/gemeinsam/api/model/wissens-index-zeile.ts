@@ -16,5 +16,6 @@ export interface WissensIndexZeile {
     titel?: string;
     beschreibung?: string;
     status?: string;
+    quellePruefen?: boolean;
 }
 
