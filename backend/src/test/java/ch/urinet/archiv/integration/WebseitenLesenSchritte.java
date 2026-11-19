@@ -849,6 +849,13 @@ public class WebseitenLesenSchritte {
                         + KiWireMock.TOKENS_JE_TEXT + ",\"total_tokens\":" + KiWireMock.TOKENS_JE_TEXT + "}}")));
     }
 
+    @Angenommen("der Reranker bewertet die Treffer gleich")
+    public void rerankerBewertetGleich() {
+        KiWireMock.client().register(post(urlPathEqualTo(KiWireMock.RERANKER_PFAD)).atPriority(5)
+                .willReturn(okJson("{\"results\":[{\"index\":0,\"relevance_score\":0.7},"
+                        + "{\"index\":1,\"relevance_score\":0.7}],\"usage\":{\"prompt_tokens\":10}}")));
+    }
+
     /** Spalte {@code seiten}: «von-bis» oder «-» ohne Seitenbereich; der Vektor liegt nahe bei der Frage. */
     @Angenommen("das Dokument «{word}» hat diese Abschnitte nahe der Frage:")
     public void abschnitte(String name, DataTable tabelle) throws SQLException {

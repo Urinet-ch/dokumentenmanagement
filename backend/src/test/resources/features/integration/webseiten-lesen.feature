@@ -192,6 +192,27 @@ Funktionalität: Lesende Endpunkte der Webseiten-Schnittstelle (Aufgabe 11.2)
     Wenn der Webseiten-Lesezugang «oeffentlich» «/public/v1/suche?q=ausschreibungsunikat» mit der Stufe «oeffentlich» aufruft
     Dann nennt die Antwort genau die Dokumente «»
 
+  @req-5.12
+  Szenario: Bei gleicher Relevanz erscheint das neuere Dokument zuerst
+    Angenommen der Webseiten-Lesezugang «vhf-lesen» der Webseite «probe-lesen» im Mandanten «vhf-gsk» hat die höchste Stufe «vorstand»
+    Und im Mandanten «vhf-gsk» sind diese Reihen angelegt:
+      | code        | name              | aktiv |
+      | WEBTEST_AKT | Probe-Aktualität  | true  |
+    Und im Mandanten «vhf-gsk» liegen diese Webseiten-Dokumente:
+      | name | art         | datum      | text                            |
+      | alt  | WEBTEST_AKT | 2000-01-01 | Aktualitaetsprobe Merkblatt     |
+      | neu  | WEBTEST_AKT | 2020-01-01 | Aktualitaetsprobe Merkblatt     |
+    Und das Embedding-Modell bettet jede Frage der Webseiten-Suche gleich ein
+    Und der Reranker bewertet die Treffer gleich
+    Und das Dokument «alt» hat diese Abschnitte nahe der Frage:
+      | nr | seiten |
+      | 1  | 1-1    |
+    Und das Dokument «neu» hat diese Abschnitte nahe der Frage:
+      | nr | seiten |
+      | 1  | 1-1    |
+    Wenn der Webseiten-Lesezugang «vhf-lesen» «/public/v1/suche?q=Aktualitaetsprobe» mit der Stufe «vorstand» aufruft
+    Dann nennt die Antwort genau die Dokumente «neu,alt»
+
   @req-5.1
   Szenariogrundriss: Die Suche filtert nach Reihe, Jahr und Ausgabe
     Wenn der Webseiten-Lesezugang «vorstand» «/public/v1/suche?q=Zitronenkuchen&<parameter>» mit der Stufe «vorstand» aufruft

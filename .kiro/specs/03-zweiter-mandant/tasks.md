@@ -178,7 +178,7 @@ und erfüllt die Definition of Done aus `tech.md`.
   - _Anforderungen: 5.7_
   - _Abhängig von: 11.2; Spec 02: 6.3, 6.4_
 
-- [ ] 11.14 Aktualitätsgewichtung der öffentlichen Suche [Backend]
+- [x] 11.14 Aktualitätsgewichtung der öffentlichen Suche [Backend]
   - Herkunft: S5-Auftrag; ergänzt Requirement 5.12
   - Erscheinungsdatum ist bereits im öffentlichen Suchtreffer enthalten, fliesst aber noch nicht ins Ranking ein. Gewichtung je Mandant konfigurierbar und standardmässig aus; Vorschlag: maximal 5 % Abwertung bei 365 Tagen Halbwertszeit, Dokumente ohne Datum unverändert. Festuhr-Tests für gleiche Relevanz (neuer vor alt) und deutlichen Relevanzvorsprung (alt vor schwach relevant neu); öffentliches Szenario
   - Keine Reranker-Modell-, Vertrags- oder Frontendänderung

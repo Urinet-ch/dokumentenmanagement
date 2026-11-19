@@ -9,6 +9,8 @@ import ch.urinet.archiv.ki.application.RerankerPort;
 import ch.urinet.archiv.sicherheit.domain.Benutzer;
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.domain.Abschnitttreffer;
+import ch.urinet.archiv.suche.domain.Aktualitaetsranking;
+import ch.urinet.archiv.suche.domain.Aktualitaetsregel;
 import ch.urinet.archiv.suche.domain.Hybridergebnis;
 import ch.urinet.archiv.suche.domain.Hybridtreffer;
 import ch.urinet.archiv.suche.domain.Rrf;
@@ -19,6 +21,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -91,6 +95,12 @@ public class HybridSuche {
      * @param k            1 bis {@value #RERANKER}
      */
     public Hybridergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k) {
+        return suchen(anfrage, regel, mitDateiname, k, Aktualitaetsregel.AUS);
+    }
+
+    /** Wie {@link #suchen(Suchanfrage, Sichtregel, boolean, int)}, mit optionaler mandantenspezifischer Gewichtung. */
+    public Hybridergebnis suchen(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k,
+                                 Aktualitaetsregel aktualitaetsregel) {
         if (anfrage.begriff() == null) {
             throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
         }
@@ -103,7 +113,7 @@ public class HybridSuche {
                 0, VOLLTEXT);
         List<Suchtreffer> treffer = transaktion.ausfuehren(
                 () -> volltext.suchen(besteVolltext, regel, mitDateiname)).treffer();
-        return hybrid(anfrage, regel, mitDateiname, k, treffer)
+        return hybrid(anfrage, regel, mitDateiname, k, treffer, aktualitaetsregel)
                 .map(t -> new Hybridergebnis(t, false))
                 .orElseGet(() -> new Hybridergebnis(treffer.stream().limit(k).map(t -> new Hybridtreffer(t, null))
                         .toList(), true));
@@ -111,7 +121,8 @@ public class HybridSuche {
 
     /** Schritte 2–4; leer heisst Rückfall auf den Volltext (schon geloggt). */
     private Optional<List<Hybridtreffer>> hybrid(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname, int k,
-                                                 List<Suchtreffer> volltextTreffer) {
+                                                 List<Suchtreffer> volltextTreffer,
+                                                 Aktualitaetsregel aktualitaetsregel) {
         Optional<float[]> frage = frage(anfrage.begriff());
         if (frage.isEmpty()) {
             return Optional.empty();
@@ -143,18 +154,37 @@ public class HybridSuche {
             }
         }
         List<UUID> reihenfolge = new ArrayList<>(belegnummern);
+        Map<UUID, Suchtreffer> details = new HashMap<>();
         if (!gesendet.isEmpty()) {
-            Optional<List<Integer>> sortiert = sortieren(anfrage.begriff(), texte);
+            Optional<RerankerReihenfolge> sortiert = sortieren(anfrage.begriff(), texte);
             if (sortiert.isEmpty()) {
                 return Optional.empty();
             }
-            sortiert.get().forEach(i -> reihenfolge.add(gesendet.get(i)));
+            List<UUID> rerankerIds = sortiert.get().indizes().stream().map(gesendet::get).toList();
+            if (aktualitaetsregel.aktiviert()) {
+                List<Abschnitttreffer> nachladen = rerankerIds.stream().filter(id -> !ausVolltext.containsKey(id))
+                        .map(ausVektor::get).toList();
+                if (!nachladen.isEmpty()) {
+                    transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
+                            .forEach(t -> details.put(t.id(), t));
+                }
+                Map<UUID, LocalDate> daten = new HashMap<>();
+                rerankerIds.forEach(id -> {
+                    Suchtreffer dokument = ausVolltext.containsKey(id) ? ausVolltext.get(id) : details.get(id);
+                    if (dokument != null) {
+                        daten.put(id, dokument.datum());
+                    }
+                });
+                rerankerIds = Aktualitaetsranking.ordnen(rerankerIds, sortiert.get().scores(), daten,
+                        aktualitaetsregel, Clock.systemUTC());
+            }
+            reihenfolge.addAll(rerankerIds);
         }
         List<UUID> beste = reihenfolge.stream().limit(k).toList();
 
-        List<Abschnitttreffer> nachladen = beste.stream().filter(id -> !ausVolltext.containsKey(id))
+        List<Abschnitttreffer> nachladen = beste.stream()
+                .filter(id -> !ausVolltext.containsKey(id) && !details.containsKey(id))
                 .map(ausVektor::get).toList();
-        Map<UUID, Suchtreffer> details = new HashMap<>();
         if (!nachladen.isEmpty()) {
             transaktion.ausfuehren(() -> vektor.details(nachladen, anfrage, regel, mitDateiname))
                     .forEach(t -> details.put(t.id(), t));
@@ -188,11 +218,11 @@ public class HybridSuche {
     }
 
     /** Schritt 4: Indizes in {@code texte} in der Reihenfolge des Rerankers; leer heisst Rückfall. */
-    private Optional<List<Integer>> sortieren(String begriff, List<String> texte) {
+    private Optional<RerankerReihenfolge> sortieren(String begriff, List<String> texte) {
         return switch (reranker.sortieren(begriff, texte, texte.size())) {
             case RerankerPort.Sortiert s -> {
                 erfassen(s.verbrauch());
-                yield Optional.of(s.indizes());
+                yield Optional.of(new RerankerReihenfolge(s.indizes(), s.werte()));
             }
             case RerankerPort.Ausfall a -> {
                 erfassenMitTokens(a.verbrauch());
@@ -201,6 +231,9 @@ public class HybridSuche {
             case RerankerPort.OhneSortierung o -> ohne("Reranker", "Dev-Stub");
             case RerankerPort.OhneZugang o -> ohne("Reranker", "kein Token");
         };
+    }
+
+    private record RerankerReihenfolge(List<Integer> indizes, List<Double> scores) {
     }
 
     private static <T> Optional<T> rueckfall(String teil, String grund) {
