@@ -76,6 +76,17 @@ public class JdbcFreigabeRepository implements FreigabeRepository {
     }
 
     @Override
+    public void neuerzeugungStarten(UUID entwurfId) {
+        int geaendert = em.get().createNativeQuery("""
+                update wissens_entwurf set status = 'IN_ARBEIT', schritt = 'NEU_ERZEUGEN'
+                where id = :id and status = 'OFFEN'
+                """).setParameter("id", entwurfId).executeUpdate();
+        if (geaendert != 1) {
+            throw new IllegalStateException("Gesperrter Wissensentwurf konnte nicht zur Neuerzeugung gestartet werden");
+        }
+    }
+
+    @Override
     public Vorschlag vorschlagLaden(Aenderung aenderung) {
         Object[] zeile = (Object[]) em.get().createNativeQuery("""
                 select cast(a.daten as text), a.inhalt, cast(a.entfernte_aussagen as text),

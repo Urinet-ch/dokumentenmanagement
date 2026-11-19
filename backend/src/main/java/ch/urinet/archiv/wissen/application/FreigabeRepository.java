@@ -16,6 +16,8 @@ public interface FreigabeRepository {
 
     void alsVeraltetMarkieren(long aenderungId, int etag);
 
+    void neuerzeugungStarten(UUID entwurfId);
+
     Vorschlag vorschlagLaden(Aenderung aenderung);
 
     void fassungSpeichern(UUID entwurfId, Aenderung aenderung, Wissensseite fassung, WissensStufe mindeststufe,

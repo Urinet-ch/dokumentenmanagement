@@ -303,6 +303,30 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void neuErzeugenReihtGenauEinenAuftragAtomarMitDerSperreEin() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID entwurf = entwurf(URINET, dokument, "OFFEN");
+        UUID seiteId = seite(URINET, "konzepte/auftrag-" + UUID.randomUUID(), "Probe", null);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                + ".wissens_aenderung set status = 'VERALTET', aktion = 'AENDERN', seite_id = ?, "
+                + "basis_version = 1, etag = 1 where entwurf_id = ?", seiteId, entwurf);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.neuErzeugen(inhaber, entwurf, 1, () -> 1);
+            EntityManager em = entityManager.get();
+            assertThat(((Number) em.createNativeQuery("""
+                    select count(*) from public.auftrag where typ = 'WISSEN_INGEST'
+                        and nutzlast->>'entwurfId' = :id and nutzlast->>'aenderungNr' = '1'
+                    """).setParameter("id", entwurf.toString()).getSingleResult()).intValue()).isEqualTo(1);
+            throw new IllegalStateException("Testabbruch");
+        })).hasMessage("Testabbruch");
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(anzahl("select count(*) from public.auftrag where typ = 'WISSEN_INGEST' "
+                + "and nutzlast->>'entwurfId' = ?", entwurf.toString())).isZero();
+    }
+
+    @Test
     void verwerfenRolltBeiNachfolgendemFehlerZurueck() throws SQLException {
         UUID entwurf = manuellerEntwurf(URINET);
         aenderung(URINET, entwurf, 1);
