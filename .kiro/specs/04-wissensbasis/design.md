@@ -305,6 +305,23 @@ flowchart LR
   - Steigt die Vertraulichkeit der Wissensquelle während des Laufs (z. B. `NORMAL` → `INTERN`), gilt für die
     folgenden Schritte die neue Stufe (sie wird je Schritt neu geladen; `PERSONAL` beendet den Lauf, siehe oben);
     schon gespeicherte Vorschläge behalten die Kontextstufe ihres Schritts. Die Prüfung beim Annehmen gehört zu 14.2.
+  - Sinkt die Vertraulichkeit während des Laufs (Review PR #319, Kopf b8f64e41, M1): Der Fortschritt
+    (`ingest_daten`) führt `kontextStufe`, die höchste Stufe der Wissensquelle, die schon in einem Schritt in den
+    Kontext gelangt ist. Liegt die geladene Stufe vor einem Schritt oder nach einem erneuten Laden darunter (z. B.
+    `INTERN` → `NORMAL`), endet der Entwurf ohne weiteren KI-Aufruf mit `FEHLER` «Die Vertraulichkeit der
+    Wissensquelle wurde während des Ingests gesenkt; bitte den Ingest neu starten.» (11.7). Sonst trügen spätere
+    Vorschläge (z. B. `ueberblick`) eine zu tiefe Kontextstufe, obwohl frühere Schritte den `INTERN`-Text gesehen
+    haben. Der Hinweis «Überblick nicht aktualisiert (höhere Vertraulichkeit)» bleibt so im Entwurf zutreffend.
+  - Ausgabegrenze und Reservierung (Review PR #319, Kopf b8f64e41, S1): `max_tokens` je KI-Aufruf ist höchstens
+    das Restbudget nach der Eingabe und höchstens die geschätzte Tokenzahl der doppelten
+    `archiv.wissen.seite-max-zeichen` (`⌈2 × seite-max-zeichen × 13 / 30⌉`, bei 20'000 Zeichen 17'334 Tokens),
+    damit Eingabe und Ausgabe ins Kontextfenster des Modells passen; ein eigener Konfigurationsschlüssel entfällt.
+    Reserviert wird `Eingabe-Obergrenze + max_tokens`, nicht mehr das ganze Restbudget, damit parallele Ingests
+    das Monatsbudget nicht vorzeitig blockieren. Vor Gate Phase 4 gegen das Kontextfenster bei Infomaniak
+    gegenprüfen.
+  - Berührte Seiten der Quelle-Seite (Review PR #319, Kopf b8f64e41, P2 S1): Bei einem erneuten Ingest bleiben die
+    Links im Abschnitt «Berührte Seiten» der bestehenden Quelle-Seite erhalten; neue Pfade aus der Planung werden
+    angehängt, je Pfad einmal. Ein Teil-Ingest (5.2) hängt so die Fachseiten früherer Läufe nicht ab.
   - Changesets: Die Changesets von 14.1b tragen die Nummern `049-wissen-ingest-fortschritt` und
     `050-wissen-budget-reservierung`, weil `048-ki-texte-version` (Spec 05) vorher auf `main` kam.
   - Diff (`diff = '{}'`) und Kennzeichnung der Kernaussagen ohne Änderung im Entwurf gehören zu 14.2 (`DiffDienst`).
@@ -316,8 +333,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | `KERNAUSSAGEN` je Abschnitt | Abschnittstext mit Markern `[Seite n]`, Dokumenttitel, Datum | `{aussagen:[{nr, text, seiten:[n], auszug}]}`, höchstens 40 | Auszug auf Seite prüfen; Aussagen ohne gültigen Auszug bleiben mit Befund markiert und werden im Entwurf gezeigt (Requirement 6.1) |
 | `PLANUNG` | Index (gefiltert nach 5.5, ggf. eingegrenzt nach 5.4), `ueberblick` nur bei Wissensquelle `NORMAL` (5.3, 5.11), Kernaussagen (Nr. + Text) | `{seiten:[{pfad, aktion, typ, grund, aussagen:[nr]}]}` | `AENDERN` nur für vorhandene, im Kontext sichtbare Pfade; `NEU` auf einem von einer unsichtbaren Seite belegten Pfad → Änderung bleibt leer mit Befund `PFAD_UNGUELTIG` und Hinweis `HOEHERE_STUFE_VORHANDEN`, ohne Teilauftrag `SEITE` (5.12); `ueberblick` bei höherer Stufe verworfen mit Hinweis (5.11); Kürzung auf `max-seiten`; fehlt `ueberblick`, wird sie bei `NORMAL` als `NEU` ergänzt (2.3) |
-| `SEITE` je geplanter Seite | aktuelle Fassung (Felder + Inhalt) bzw. leer, zugeordnete Kernaussagen mit Schlüssel `q-<kurz>-<nr>`, Index-Zeilen der Nachbarn | `{titel, beschreibung, tags, inhalt, widersprueche:[{bestehend, neu, text}], entfernte_aussagen:[{schluessel, begruendung}], begruendung}` | Quelleneinträge aus den Kernaussagen erzeugen (Dokument-ID, Seiten, Auszug stammen nie aus diesem Schritt), prüfen, Diff |
-| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (aus der Planung) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>`, bei erneutem Ingest `AENDERN` der bestehenden Quelle-Seite |
+| `SEITE` je geplanter Seite | aktuelle Fassung (Felder + Inhalt) bzw. leer, zugeordnete Kernaussagen mit Schlüssel `q-<dokid8>-<n>`, Index-Zeilen der Nachbarn | `{titel, beschreibung, tags, inhalt, widersprueche:[{bestehend, neu, text}], entfernte_aussagen:[{schluessel, begruendung}], begruendung}` | Quelleneinträge aus den Kernaussagen erzeugen (Dokument-ID, Seiten, Auszug stammen nie aus diesem Schritt), prüfen, Diff |
+| `QUELLE` | Kernaussagen, geplante Seiten | `{titel, beschreibung, tags, zusammenfassung:[{text, aussagen:[nr]}]}` | Abschnitte «Zusammenfassung» (Fussnoten aus `aussagen`), «Kernaussagen» (aus den geprüften Kernaussagen, je mit Fussnote) und «Berührte Seiten» (bisherige Links der Quelle-Seite und Pfade der Planung, je Pfad einmal) ohne KI erzeugen; Pfad `quellen/<JJJJ-MM>-<stichwort>-<dokid8>`, bei erneutem Ingest `AENDERN` der bestehenden Quelle-Seite |
 | `ABSCHLUSS` (ohne KI-Aufruf) | – | – | `WissensPruefung` für alle Änderungen, Kernaussagen ohne Änderung kennzeichnen, `status = OFFEN` |
 
 - Systemprompt (deutsch): Rolle «pflegt die Wissensbasis», Regeln: nur belegte Aussagen, jede mit Fussnote auf
@@ -339,7 +356,7 @@ flowchart LR
   `wissens_einstellung.monatsbudget_tokens`, sonst den Startwert `archiv.wissen.monatsbudget-tokens` (1'000'000); `public.mandant_budget` (Chatbot, Spec 03) wird
   weder gelesen noch geschrieben. Erschöpft: manuell 429 `BUDGET`, automatisch Entwurf `FEHLER` mit Hinweis «Budget
   erschöpft» (Requirement 13.6). Vor jedem Ingest-KI-Aufruf reserviert `ki_verbrauch_reservierung` die höchstmögliche
-  Tokenzahl in einer Transaktion mit mandantenspezifischer Advisory-Sperre; `ki_verbrauch.ingest_entwurf_id`
+  Tokenzahl dieses Aufrufs (Eingabe-Obergrenze + `max_tokens`) in einer Transaktion mit mandantenspezifischer Advisory-Sperre; `ki_verbrauch.ingest_entwurf_id`
   ordnet auch fehlgeschlagene Versuche dem Entwurf zu. Nach protokolliertem Verbrauch wird die Reservierung freigegeben;
   bleibt die Protokollierung aus, läuft sie nach fünf Minuten ab. So zählen parallele Aufträge und Wiederholungen in
   die harte Monats- und Ingest-Grenze.

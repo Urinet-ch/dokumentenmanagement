@@ -207,6 +207,50 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void budgetReservierungZaehltLaufUndMonatNurImEigenenSchema() throws SQLException {
+        UUID lauf = entwurf(URINET, quelle(URINET), "IN_ARBEIT");
+        // nur ein aktiver Ingest je Mandant; für die Reservierung zählt der Status nicht
+        UUID andererLauf = entwurf(URINET, quelle(URINET), "WARTEND");
+        UUID fremderLauf = entwurf(ZWEITER, quelle(ZWEITER), "IN_ARBEIT");
+        // Reservierungen anderer Tests laufen nach 5 Minuten ab; sie zählen hier als Sockel mit
+        long monat = reserviert(URINET) + 1_000;
+
+        WissenIngestPort.BudgetReservierung erste = im(URINET,
+                () -> ingest.budgetReservieren(lauf, 600, 1_000, monat, VON, BIS));
+        assertThat(erste.reserviert()).isTrue();
+
+        WissenIngestPort.BudgetReservierung lauflimit = im(URINET,
+                () -> ingest.budgetReservieren(lauf, 500, 1_000, monat + 10_000, VON, BIS));
+        assertThat(lauflimit.reserviert()).isFalse();
+        assertThat(lauflimit.monatsbudgetErschoepft()).isFalse();
+
+        WissenIngestPort.BudgetReservierung monatslimit = im(URINET,
+                () -> ingest.budgetReservieren(andererLauf, 500, 1_000, monat, VON, BIS));
+        assertThat(monatslimit.reserviert()).isFalse();
+        assertThat(monatslimit.monatsbudgetErschoepft()).isTrue();
+
+        long fremdesMonatsbudget = reserviert(ZWEITER) + 1_000;
+        assertThat(im(ZWEITER, () -> ingest.budgetReservieren(fremderLauf, 900, 1_000, fremdesMonatsbudget,
+                VON, BIS)).reserviert()).isTrue();
+        assertThat(im(URINET, () -> ingest.budgetReservieren(andererLauf, 400, 1_000, monat, VON, BIS))
+                .reserviert()).isTrue();
+
+        im(URINET, () -> {
+            ingest.budgetFreigeben(erste.id());
+            return null;
+        });
+        assertThat(im(URINET, () -> ingest.budgetReservieren(lauf, 500, 1_000, monat, VON, BIS)).reserviert())
+                .isTrue();
+
+        ausfuehren("update " + URINET.schema() + ".ki_verbrauch_reservierung set ablauf = now() - interval '1 second' "
+                + "where entwurf_id in (?, ?)", lauf, andererLauf);
+        assertThat(im(URINET, () -> ingest.budgetReservieren(lauf, 1_000, 1_000, monat, VON, BIS)).reserviert())
+                .isTrue();
+        assertThat(anzahl("select count(*) from " + URINET.schema() + ".ki_verbrauch_reservierung "
+                + "where entwurf_id = ?", andererLauf)).isZero();
+    }
+
+    @Test
     void holtNurHandlerFehltEntwuerfeOhneNeuerenIngestNach() throws SQLException {
         UUID alt = entwurf(URINET, quelle(URINET), "FEHLER", WissenIngestStarten.HANDLER_FEHLT);
         UUID neuer = entwurf(URINET, quelle(URINET), "FEHLER", "Neuerer Entwurf");
@@ -382,6 +426,16 @@ class JdbcWissenIngestTest {
                 z.next();
                 return z.getLong(1);
             }
+        }
+    }
+
+    private long reserviert(MandantCode code) throws SQLException {
+        try (Connection verbindung = datenbank.get().getConnection();
+             PreparedStatement abfrage = verbindung.prepareStatement("select coalesce(sum(tokens), 0) from "
+                     + code.schema() + ".ki_verbrauch_reservierung where ablauf > now()");
+             ResultSet z = abfrage.executeQuery()) {
+            z.next();
+            return z.getLong(1);
         }
     }
 

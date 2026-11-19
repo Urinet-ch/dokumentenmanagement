@@ -53,12 +53,15 @@ public class WissenIngestVerarbeiten {
             """;
     private static final Pattern SLUG = Pattern.compile("[^a-z0-9]+");
     private static final Pattern KERNAUSSAGE_ZEILE = Pattern.compile("^- .+ \\[\\^([^\\]\\s]+)\\]$");
+    private static final Pattern BERUEHRTE_SEITE_ZEILE = Pattern.compile("^- \\[[^\\]]*\\]\\(/([^)\\s]+)\\)$");
     private static final Pattern SCHLUESSEL_NUMMER = Pattern.compile("[0-9]{1,15}");
     private static final int MAX_AUSSAGEN_PRO_ABSCHNITT = 40;
     private static final int HINWEIS_PFAD_ZEICHEN = 120;
     private static final int MAX_AUSSAGE_ZEICHEN = 2_000;
     static final String NICHT_FREIGEGEBEN = "Die Wissensquelle ist nicht mehr für den Ingest freigegeben.";
     static final String UEBERBLICK_HOEHER = "Überblick nicht aktualisiert (höhere Vertraulichkeit)";
+    static final String STUFE_GESENKT = "Die Vertraulichkeit der Wissensquelle wurde während des Ingests gesenkt; "
+            + "bitte den Ingest neu starten.";
 
     private final WissenIngestSpeichern speichern;
     private final WissenKonfiguration konfiguration;
@@ -83,14 +86,15 @@ public class WissenIngestVerarbeiten {
         if (!"IN_ARBEIT".equals(lauf.entwurfStatus()) || lauf.schritt() == null) {
             return;
         }
-        if (nichtFreigegeben(auftrag, stand)) {
+        Fortschritt fortschritt = fortschritt(lauf);
+        if (nichtFreigegeben(auftrag, stand, fortschritt)) {
             return;
         }
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException("Wissens-Ingest unterbrochen");
         }
 
-        Fortschritt fortschritt = fortschritt(lauf);
+        fortschritt = mitKontextStufe(fortschritt, stand.quellStufe());
         WissenIngestGrenzen grenzen = konfiguration.ingest();
         long budget = begrenzt(lauf.budgetTokens(), grenzen.budgetTokens());
         long monatsbudget = begrenzt(lauf.monatsbudgetTokens(), grenzen.monatsbudgetTokens());
@@ -119,16 +123,29 @@ public class WissenIngestVerarbeiten {
     }
 
     /**
-     * Schliesst den Ingest mit FEHLER ab, wenn die Quelle nicht mehr freigegeben ist (Req 5.6, 5.7); geprüft vor jedem
-     * Schritt und nach jedem erneuten Laden.
+     * Schliesst den Ingest mit FEHLER ab, wenn die Quelle nicht mehr freigegeben ist (Req 5.6, 5.7) oder ihre
+     * Vertraulichkeit unter eine Stufe gesunken ist, die schon in den Kontext gelangt ist (Req 11.7): Sonst trügen
+     * spätere Änderungen eine zu tiefe Kontextstufe. Geprüft vor jedem Schritt und nach jedem erneuten Laden.
      */
-    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand) {
-        if (WissenIngestSpeichern.freigegeben(stand.lauf()) && stand.quellStufe() != null) {
-            return false;
+    private boolean nichtFreigegeben(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher) {
+        if (!WissenIngestSpeichern.freigegeben(stand.lauf()) || stand.quellStufe() == null) {
+            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
+                    NICHT_FREIGEGEBEN);
+            return true;
         }
-        speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(),
-                fortschritt(stand.lauf()), NICHT_FREIGEGEBEN);
-        return true;
+        if (bisher.kontextStufe() != null && stand.quellStufe().ordinal() < bisher.kontextStufe().ordinal()) {
+            speichern.fehlerSichern(auftrag, stand.lauf().entwurfId(), stand.lauf().schritt(), bisher,
+                    STUFE_GESENKT);
+            return true;
+        }
+        return false;
+    }
+
+    private static Fortschritt mitKontextStufe(Fortschritt bisher, WissensStufe stufe) {
+        WissensStufe hoechste = bisher.kontextStufe() == null ? stufe : bisher.kontextStufe().hoechste(stufe);
+        return hoechste == bisher.kontextStufe() ? bisher : new Fortschritt(bisher.abschnitt(), bisher.seite(),
+                bisher.quelleErzeugt(), bisher.kernaussagen(), bisher.planung(), bisher.vorschlaege(),
+                bisher.hinweise(), hoechste);
     }
 
     private void kernaussagen(Auftrag auftrag, WissenIngestSpeichern.Stand stand, Fortschritt bisher,
@@ -205,7 +222,7 @@ public class WissenIngestVerarbeiten {
             hinweise.add("Budget erschöpft");
         }
         Fortschritt aktualisiert = new Fortschritt(index + 1, bisher.seite(), bisher.quelleErzeugt(), aussagen,
-                bisher.planung(), bisher.vorschlaege(), hinweise);
+                bisher.planung(), bisher.vorschlaege(), hinweise, bisher.kontextStufe());
         speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(),
                 antwort.budgetErreicht() ? "ABSCHLUSS" : "KERNAUSSAGEN", aktualisiert,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
@@ -270,7 +287,7 @@ public class WissenIngestVerarbeiten {
             hinweise.add("Budget erschöpft");
         }
         Fortschritt aktualisiert = new Fortschritt(bisher.abschnitt(), 0, false, bisher.kernaussagen(), geplant,
-                bisher.vorschlaege(), hinweise);
+                bisher.vorschlaege(), hinweise, bisher.kontextStufe());
         speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(),
                 antwort.budgetErreicht() ? "ABSCHLUSS" : geplant.isEmpty() ? "QUELLE" : "SEITE", aktualisiert,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
@@ -364,11 +381,12 @@ public class WissenIngestVerarbeiten {
             if (aktuell == null) {
                 return;
             }
-            if (nichtFreigegeben(auftrag, aktuell)) {
+            if (nichtFreigegeben(auftrag, aktuell, bisher)) {
                 return;
             }
             stand = aktuell;
             lauf = stand.lauf();
+            bisher = mitKontextStufe(bisher, stand.quellStufe());
         }
         List<Kernaussage> aussagen = bisher.kernaussagen().stream()
                 .filter(Kernaussage::belegt).filter(a -> plan.aussagen().contains(a.nr())).toList();
@@ -479,11 +497,12 @@ public class WissenIngestVerarbeiten {
         java.util.Optional<UUID> bestehendeId = speichern.quelleSeiteFinden(lauf.dokumentId());
         if (bestehendeId.isPresent()) {
             WissenIngestSpeichern.Stand aktuell = laden(lauf.entwurfId(), Set.of(bestehendeId.get())).stand();
-            if (aktuell == null || nichtFreigegeben(auftrag, aktuell)) {
+            if (aktuell == null || nichtFreigegeben(auftrag, aktuell, bisher)) {
                 return;
             }
             stand = aktuell;
             lauf = stand.lauf();
+            bisher = mitKontextStufe(bisher, stand.quellStufe());
             bestehende = stand.fassungen().get(bestehendeId.get());
             if (bestehende == null || bestehende.metadaten().status() == null
                     || !"AKTIV".equals(bestehende.metadaten().status())) {
@@ -516,7 +535,7 @@ public class WissenIngestVerarbeiten {
         if (!(antwort.inhalt() instanceof KiPort.Quelle inhalt)) {
             Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
                     bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(),
-                    "Die Quelle-Seite wurde nach einer ungültigen Antwort verworfen."));
+                    "Die Quelle-Seite wurde nach einer ungültigen Antwort verworfen."), bisher.kontextStufe());
             speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "ABSCHLUSS", neu,
                     addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
                     false, null);
@@ -527,7 +546,7 @@ public class WissenIngestVerarbeiten {
         vorschlaege.add(entwurf);
         Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
                 bisher.planung(), vorschlaege, antwort.budgetErreicht()
-                        ? append(bisher.hinweise(), "Budget erschöpft") : bisher.hinweise());
+                        ? append(bisher.hinweise(), "Budget erschöpft") : bisher.hinweise(), bisher.kontextStufe());
         speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "ABSCHLUSS", neu,
                 addiere(lauf.tokensEin(), antwort.tokensEin()), addiere(lauf.tokensAus(), antwort.tokensAus()),
                 antwort.budgetErreicht(), antwort.budgetErreicht() ? "Budget erschöpft" : null);
@@ -535,7 +554,7 @@ public class WissenIngestVerarbeiten {
 
     private void quelleUeberspringen(Auftrag auftrag, Lauf lauf, Fortschritt bisher, String hinweis) {
         Fortschritt neu = new Fortschritt(bisher.abschnitt(), bisher.seite(), true, bisher.kernaussagen(),
-                bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(), hinweis));
+                bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(), hinweis), bisher.kontextStufe());
         speichern.fortschrittSichern(auftrag, lauf.entwurfId(), lauf.schritt(), "ABSCHLUSS", neu,
                 lauf.tokensEin(), lauf.tokensAus(), false, null);
     }
@@ -545,7 +564,7 @@ public class WissenIngestVerarbeiten {
         bisher.planung().stream().map(Planung::seiteId).filter(Objects::nonNull).forEach(seitenIds::add);
         bisher.vorschlaege().stream().map(SeitenVorschlag::seiteId).filter(Objects::nonNull).forEach(seitenIds::add);
         WissenIngestSpeichern.Stand stand = laden(entwurfId, seitenIds).stand();
-        if (stand == null || nichtFreigegeben(auftrag, stand)) {
+        if (stand == null || nichtFreigegeben(auftrag, stand, bisher)) {
             return;
         }
         Fortschritt fortschritt = stand.quellStufe() != WissensStufe.NORMAL
@@ -624,10 +643,11 @@ public class WissenIngestVerarbeiten {
                 boolean monatsbudgetErreicht = monatsbudget - monatVerbraucht <= eingabeObergrenze;
                 return new KiErgebnis(null, tokensEin, tokensAus, true, monatsbudgetErreicht, false);
             }
-            int maxAusgabe = (int) Math.min(Integer.MAX_VALUE, frei - eingabeObergrenze);
+            // max_tokens nie über das Restbudget hinaus, aber auch nie über die längste erwartete Antwort
+            int maxAusgabe = (int) Math.min(frei - eingabeObergrenze, maxAusgabeTokens());
             WissenIngestStarten.Zeitraum monat = WissenIngestStarten.monat(Instant.now());
-            var reservierung = speichern.budgetReservieren(lauf.entwurfId(), frei, budget, monatsbudget,
-                    monat.von(), monat.bis());
+            var reservierung = speichern.budgetReservieren(lauf.entwurfId(),
+                    addiere(eingabeObergrenze, maxAusgabe), budget, monatsbudget, monat.von(), monat.bis());
             if (!reservierung.reserviert()) {
                 return new KiErgebnis(null, tokensEin, tokensAus, true,
                         reservierung.monatsbudgetErschoepft(), false);
@@ -778,9 +798,12 @@ public class WissenIngestVerarbeiten {
             }
         }
         text.append("\n## Berührte Seiten\n\n");
-        fortschritt.planung().stream().filter(plan -> !plan.pfadHoehereStufe())
-                .map(Planung::pfad).distinct().forEach(pfad ->
-                text.append("- [").append(pfad).append("](/").append(pfad).append(")\n"));
+        // bisherige Links bleiben, damit ein Teil-Ingest die Fachseiten früherer Läufe nicht abhängt (Req 10.2, 3.8)
+        Map<String, String> beruehrt = new java.util.LinkedHashMap<>(
+                bestehende == null ? Map.of() : beruehrteSeitenZeilen(bestehende.inhalt()));
+        fortschritt.planung().stream().filter(plan -> !plan.pfadHoehereStufe()).map(Planung::pfad)
+                .forEach(pfad -> beruehrt.putIfAbsent(pfad, "- [" + pfad + "](/" + pfad + ")"));
+        beruehrt.values().forEach(zeile -> text.append(zeile).append("\n"));
 
         List<Quelleneintrag> quellen = List.copyOf(quellenNachSchluessel.values());
         int nummer = fortschritt.vorschlaege().size() + 1;
@@ -850,6 +873,23 @@ public class WissenIngestVerarbeiten {
         return zeilen;
     }
 
+    /** Zeilen «- [Titel](/pfad)» im Abschnitt «## Berührte Seiten» einer bestehenden Quelle-Seite, je Pfad einmal. */
+    private static Map<String, String> beruehrteSeitenZeilen(String inhalt) {
+        Map<String, String> zeilen = new java.util.LinkedHashMap<>();
+        boolean imAbschnitt = false;
+        for (String zeile : (inhalt == null ? "" : inhalt).split("\\R")) {
+            if (zeile.startsWith("## ")) {
+                imAbschnitt = "## Berührte Seiten".equals(zeile.strip());
+                continue;
+            }
+            java.util.regex.Matcher treffer = BERUEHRTE_SEITE_ZEILE.matcher(zeile);
+            if (imAbschnitt && treffer.matches()) {
+                zeilen.putIfAbsent(treffer.group(1), zeile);
+            }
+        }
+        return zeilen;
+    }
+
     private SeitenVorschlag blockierterVorschlag(Planung plan, int nummer, WissenIngestSpeichern.Stand stand,
                                                   WissensPruefung.Hinweiscode hinweis, String meldung) {
         Seitentyp typ = Seitentyp.vonDatenbankwert(plan.typ()).orElse(Seitentyp.ANALYSE);
@@ -885,17 +925,17 @@ public class WissenIngestVerarbeiten {
             hinweise.add(hinweis);
         }
         return new Fortschritt(bisher.abschnitt(), seite, bisher.quelleErzeugt(), bisher.kernaussagen(),
-                bisher.planung(), vorschlaege, hinweise);
+                bisher.planung(), vorschlaege, hinweise, bisher.kontextStufe());
     }
 
     private Fortschritt mitHinweis(Fortschritt bisher, String hinweis) {
         return new Fortschritt(bisher.abschnitt(), bisher.seite(), bisher.quelleErzeugt(), bisher.kernaussagen(),
-                bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(), hinweis));
+                bisher.planung(), bisher.vorschlaege(), append(bisher.hinweise(), hinweis), bisher.kontextStufe());
     }
 
     private static Fortschritt fortsetzenSeite(Fortschritt bisher, int seite) {
         return new Fortschritt(bisher.abschnitt(), seite, bisher.quelleErzeugt(), bisher.kernaussagen(),
-                bisher.planung(), bisher.vorschlaege(), bisher.hinweise());
+                bisher.planung(), bisher.vorschlaege(), bisher.hinweise(), bisher.kontextStufe());
     }
 
     private static List<String> append(List<String> values, String value) {
@@ -959,6 +999,16 @@ public class WissenIngestVerarbeiten {
     private static Wissensseite.Vertraulichkeit vertraulichkeit(WissensStufe stufe) {
         return stufe == WissensStufe.NORMAL ? Wissensseite.Vertraulichkeit.NORMAL
                 : Wissensseite.Vertraulichkeit.INTERN;
+    }
+
+    /**
+     * Obergrenze für {@code max_tokens} je KI-Aufruf: geschätzte Tokens für die doppelte Höchstlänge einer Seite
+     * ({@code archiv.wissen.seite-max-zeichen}), damit die Antwort samt Feldern und JSON Platz hat, ohne das
+     * Kontextfenster des Modells zu überschreiten.
+     */
+    long maxAusgabeTokens() {
+        return Math.min(Integer.MAX_VALUE,
+                Math.max(1, Math.ceilDiv(2L * konfiguration.ingest().seiteMaxZeichen() * 13, 30)));
     }
 
     private static long schaetzen(int zeichen) {

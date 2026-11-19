@@ -98,8 +98,13 @@ public interface WissenIngestPort {
                 Fortschritt fortschritt) {
     }
 
+    /**
+     * {@code kontextStufe}: höchste Vertraulichkeit der Wissensquelle, die bisher in einem Schritt in den Kontext
+     * gelangt ist (Req 11.7); {@code null} vor dem ersten Schritt.
+     */
     record Fortschritt(int abschnitt, int seite, boolean quelleErzeugt, List<Kernaussage> kernaussagen,
-                       List<Planung> planung, List<SeitenVorschlag> vorschlaege, List<String> hinweise) {
+                       List<Planung> planung, List<SeitenVorschlag> vorschlaege, List<String> hinweise,
+                       WissensStufe kontextStufe) {
         public Fortschritt {
             kernaussagen = kernaussagen == null ? List.of() : List.copyOf(kernaussagen);
             planung = planung == null ? List.of() : List.copyOf(planung);
@@ -108,7 +113,7 @@ public interface WissenIngestPort {
         }
 
         public static Fortschritt leer() {
-            return new Fortschritt(0, 0, false, List.of(), List.of(), List.of(), List.of());
+            return new Fortschritt(0, 0, false, List.of(), List.of(), List.of(), List.of(), null);
         }
     }
 

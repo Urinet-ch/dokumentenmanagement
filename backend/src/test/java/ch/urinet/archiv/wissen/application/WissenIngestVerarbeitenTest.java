@@ -49,6 +49,49 @@ class WissenIngestVerarbeitenTest {
         assertThat(ki.aufrufe).isEqualTo(1);
         assertThat(verbrauch.entwurfId).isEqualTo(ENTWURF_ID);
         assertThat(speichern.freigegebeneReservierung).isEqualTo(speichern.reservierungId);
+        assertThat(speichern.fortschritt.kontextStufe()).isEqualTo(WissensStufe.NORMAL);
+    }
+
+    @Test
+    void begrenztMaxTokensUndReserviertNurEingabeUndAusgabeStattDesRestbudgets() throws InterruptedException {
+        Speicher speichern = new Speicher(stand(lauf("KERNAUSSAGEN", false, Fortschritt.leer()), 0));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of()),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        // seite-max-zeichen 20'000: 2 × 20'000 Zeichen × 13 / 30 Tokens je Zeichen, aufgerundet
+        assertThat(ki.maxAusgabe).isEqualTo(17_334);
+        assertThat(speichern.reservierteTokens).isGreaterThan(17_334).isLessThan(17_334 + 20_000);
+    }
+
+    @Test
+    void schliesstMitFehlerAbWennDieVertraulichkeitWaehrendDesIngestsSinkt() throws InterruptedException {
+        for (String schritt : List.of("KERNAUSSAGEN", "PLANUNG", "SEITE", "QUELLE", "ABSCHLUSS")) {
+            Speicher speichern = new Speicher(stand(lauf(schritt, false,
+                    mitKontextStufe(mitAussage(), WissensStufe.INTERN)), 0, WissensStufe.NORMAL));
+            KiAntwort ki = new KiAntwort(null);
+
+            verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+            assertThat(speichern.fehler).as(schritt).isEqualTo(WissenIngestVerarbeiten.STUFE_GESENKT);
+            assertThat(ki.aufrufe).as(schritt).isZero();
+            assertThat(speichern.aenderungenGesichert).as(schritt).isFalse();
+            assertThat(speichern.neuerSchritt).as(schritt).isNull();
+        }
+    }
+
+    @Test
+    void merktSichEineGestiegeneVertraulichkeitFuerDieFolgendenSchritte() throws InterruptedException {
+        Speicher speichern = new Speicher(stand(lauf("KERNAUSSAGEN", false,
+                mitKontextStufe(Fortschritt.leer(), WissensStufe.NORMAL)), 0, WissensStufe.INTERN));
+        KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Kernaussagen(List.of()),
+                new KiPort.Verbrauch("test-modell", 10, 10)));
+
+        verarbeiten(speichern, ki, new Verbrauch()).ausfuehren(null, ENTWURF_ID);
+
+        assertThat(speichern.fehler).isNull();
+        assertThat(speichern.fortschritt.kontextStufe()).isEqualTo(WissensStufe.INTERN);
     }
 
     @Test
@@ -197,6 +240,8 @@ class WissenIngestVerarbeitenTest {
         assertThat(vorschlag.befunde()).isEmpty();
         assertThat(vorschlag.daten().inhalt()).contains("- Alte Aussage. [^q-alt]", "- Die Frist endet am 30. April. [^q-neu]")
                 .doesNotContain("Frühere Fassung");
+        assertThat(vorschlag.daten().inhalt().substring(vorschlag.daten().inhalt().indexOf("## Berührte Seiten")))
+                .contains("- [x](/x)");
         assertThat(vorschlag.daten().quellen()).extracting(Quelleneintrag::schluessel)
                 .containsExactlyInAnyOrder("q-alt", "q-neu");
         assertThat(vorschlag.daten().quellen()).filteredOn(q -> q.schluessel().equals("q-alt"))
@@ -249,7 +294,7 @@ class WissenIngestVerarbeitenTest {
                 List.of(frueher));
         Fortschritt geplant = new Fortschritt(1, 0, false, mitAussage().kernaussagen(), List.of(
                 new WissenIngestPort.Planung("konzepte/frist", "AENDERN", "Konzept", "Grund", List.of(1), seiteId,
-                        2, false)), List.of(), List.of());
+                        2, false)), List.of(), List.of(), null);
         Speicher speichern = new Speicher(stand(lauf("SEITE", false, geplant), 0, WissensStufe.NORMAL,
                 List.of(metadaten), Map.of(seiteId, fassung)));
         KiAntwort ki = new KiAntwort(new KiPort.WissensGueltig(new KiPort.Seite("Frist", "Frist", List.of(),
@@ -268,7 +313,7 @@ class WissenIngestVerarbeitenTest {
     void neueKernaussagenZaehlenNachDenSchluesselnFruehererDurchgaengeWeiter() throws InterruptedException {
         String kurz = DOKUMENT_ID.toString().substring(0, 8);
         Fortschritt bisher = new Fortschritt(0, 0, false, List.of(new Kernaussage(1, "q-" + kurz + "-45",
-                "Frühere Aussage im selben Lauf.", List.of(1), "Frist", true)), List.of(), List.of(), List.of());
+                "Frühere Aussage im selben Lauf.", List.of(1), "Frist", true)), List.of(), List.of(), List.of(), null);
         Lauf lauf = new Lauf(ENTWURF_ID, DOKUMENT_ID, "IN_ARBEIT", "ARCHIVIERT", "WISSENSQUELLE", "NORMAL",
                 true, "Testquelle", LocalDate.of(2026, 4, 30), "Erste Seite.\fDie Frist endet am 30. April.\f", 2,
                 true, 2, 2, "KERNAUSSAGEN", 0, 0, "test-modell", false, 300_000, 1_000_000, Fortschritt.leer());
@@ -358,7 +403,13 @@ class WissenIngestVerarbeitenTest {
 
     private static Fortschritt mitAussage() {
         return new Fortschritt(1, 0, false, List.of(new Kernaussage(1, "q-neu", "Die Frist endet am 30. April.",
-                List.of(1), "Frist endet am 30. April.", true)), List.of(), List.of(), List.of());
+                List.of(1), "Frist endet am 30. April.", true)), List.of(), List.of(), List.of(), null);
+    }
+
+    private static Fortschritt mitKontextStufe(Fortschritt fortschritt, WissensStufe stufe) {
+        return new Fortschritt(fortschritt.abschnitt(), fortschritt.seite(), fortschritt.quelleErzeugt(),
+                fortschritt.kernaussagen(), fortschritt.planung(), fortschritt.vorschlaege(), fortschritt.hinweise(),
+                stufe);
     }
 
     private static Lauf laufMit(String schritt, String dokumentStatus, String art, String vertraulichkeit,
@@ -390,6 +441,7 @@ class WissenIngestVerarbeitenTest {
         private List<SeitenMetadaten> sichtbar = List.of();
         private long hoechsteNummer;
         private UUID geprueftesDokument;
+        private long reservierteTokens;
 
         private Speicher(Stand stand) {
             super(null, null, null, null);
@@ -421,6 +473,7 @@ class WissenIngestVerarbeitenTest {
         public BudgetReservierung budgetReservieren(UUID entwurfId, long tokens, long budgetTokens,
                                                     long monatsbudgetTokens, java.time.Instant von,
                                                     java.time.Instant bis) {
+            reservierteTokens = tokens;
             return new BudgetReservierung(reservierungId, false);
         }
 
@@ -464,6 +517,7 @@ class WissenIngestVerarbeitenTest {
     private static final class KiAntwort implements KiPort {
         private final WissensAntwort antwort;
         private int aufrufe;
+        private int maxAusgabe;
 
         private KiAntwort(WissensAntwort antwort) {
             this.antwort = antwort;
@@ -477,6 +531,7 @@ class WissenIngestVerarbeitenTest {
         @Override
         public WissensAntwort wissensIngest(WissensAnfrage anfrage) {
             aufrufe++;
+            maxAusgabe = anfrage.maxAusgabeTokens();
             return antwort;
         }
 
