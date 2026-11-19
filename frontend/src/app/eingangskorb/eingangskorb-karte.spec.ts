@@ -1,10 +1,16 @@
 import { HttpHeaders, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Dokument, Dokumentart, provideApi } from '../gemeinsam/api';
-import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import {
+  AnmeldungService,
+  Benutzer,
+  FENSTER,
+  Sitzungszustand,
+} from '../gemeinsam/anmeldung/anmeldung.service';
 import { Rolle, Aktion, darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
@@ -13,6 +19,7 @@ import {
 } from '../dokument/klassifikationen';
 import { EingangskorbKarte } from './eingangskorb-karte';
 import { feldName } from './entwurf';
+import { EingangskorbEntwurfSpeicher } from './entwurf-speicher';
 
 const T = TEXTE.eingangskorb;
 
@@ -106,14 +113,78 @@ const VHF_ART: Dokumentart = {
   reihenfolge: 0,
 };
 
+const LIST_ART: Dokumentart = {
+  ...VHF_ART,
+  code: 'LIST',
+  name: 'Liste',
+  pflichtfelder: [],
+  zusatzSchema: {
+    type: 'object',
+    properties: {
+      stichworte: { type: 'array', items: { type: 'string' } },
+    },
+  },
+};
+
+class SpeicherAttrappe implements Storage {
+  private readonly werte = new Map<string, string>();
+  fehler = false;
+  voll = false;
+
+  get length(): number {
+    this.pruefen();
+    return this.werte.size;
+  }
+
+  clear(): void {
+    this.pruefen();
+    this.werte.clear();
+  }
+
+  getItem(schluessel: string): string | null {
+    this.pruefen();
+    return this.werte.get(schluessel) ?? null;
+  }
+
+  key(index: number): string | null {
+    this.pruefen();
+    return [...this.werte.keys()][index] ?? null;
+  }
+
+  removeItem(schluessel: string): void {
+    this.pruefen();
+    this.werte.delete(schluessel);
+  }
+
+  setItem(schluessel: string, wert: string): void {
+    this.pruefen();
+    if (this.voll) {
+      throw new DOMException('Storage ist voll', 'QuotaExceededError');
+    }
+    this.werte.set(schluessel, String(wert));
+  }
+
+  private pruefen(): void {
+    if (this.fehler) {
+      throw new DOMException('Storage ist nicht verfügbar', 'SecurityError');
+    }
+  }
+}
+
 describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
   let fixture: ComponentFixture<EingangskorbKarte>;
   let element: HTMLElement;
   let http: HttpTestingController;
   let erledigt: string[];
   let veraltet: string[];
+  let benutzer: ReturnType<typeof signal<Benutzer | null>>;
+  let zustand: ReturnType<typeof signal<Sitzungszustand>>;
+  let speicher: SpeicherAttrappe;
 
   async function zeigen(d: Dokument, rolle: Rolle = 'inhaber', arten: Dokumentart[] = ARTEN) {
+    benutzer = signal<Benutzer | null>({ id: 'u-1', name: 'Test', mandant: 'urinet', rolle });
+    zustand = signal<Sitzungszustand>('angemeldet');
+    speicher = new SpeicherAttrappe();
     TestBed.configureTestingModule({
       imports: [EingangskorbKarte],
       providers: [
@@ -122,13 +193,31 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
         provideHttpClientTesting(),
         provideApi(''),
         {
+          provide: AnmeldungService,
+          useValue: {
+            darf: (a: Aktion) => darf(rolle, a),
+            benutzer: benutzer.asReadonly(),
+            zustand: zustand.asReadonly(),
+          },
+        },
+        {
+          provide: FENSTER,
+          useValue: {
+            location: { origin: 'https://test.invalid', assign: vi.fn() },
+            sessionStorage: speicher,
+          },
+        },
+        {
           provide: DokumentKlassifikationenService,
           useValue: { fuerArt: () => of(LEERE_DOKUMENT_KLASSIFIKATIONEN) },
         },
-        { provide: AnmeldungService, useValue: { darf: (a: Aktion) => darf(rolle, a) } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
+    await montieren(d, arten);
+  }
+
+  async function montieren(d: Dokument, arten: Dokumentart[] = ARTEN) {
     fixture = TestBed.createComponent(EingangskorbKarte);
     fixture.componentRef.setInput('dokument', d);
     fixture.componentRef.setInput('arten', new Map(arten.map((a) => [a.code, a])));
@@ -800,6 +889,107 @@ describe('EingangskorbKarte (Req 8.1, 8.5, 8.7, 8.10)', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('Sitzungsentwurf (O.10)', () => {
+    it('speichert bei 401 nur Metadaten, stellt sie sichtbar wieder her und löscht nach Erfolg', async () => {
+      const d = dokument({
+        id: 'doc-401',
+        art: 'LIEFERANTENRECHNUNG',
+        vorschlag: {
+          art: 'LIEFERANTENRECHNUNG',
+          titel: 'Vorgeschlagener Titel',
+          dokumenttext: 'SYNTHETISCHER OCR-TEXT',
+        },
+      });
+      await zeigen(d);
+      await klicken(T.aendern);
+      const titel = element.querySelector<HTMLInputElement>('#doc-401-titel')!;
+      titel.value = 'Korrigierter Titel';
+      titel.dispatchEvent(new Event('input'));
+      await klicken(T.bestaetigen);
+      zustand.set('abgelaufen');
+      await antworten('/api/v1/dokumente/doc-401/bestaetigen', null, 401, 'Unauthorized');
+
+      const entwurfSpeicher = TestBed.inject(EingangskorbEntwurfSpeicher);
+      const gespeichert = entwurfSpeicher.lesen('u-1', 'doc-401');
+      expect(gespeichert?.entwurf.titel).toBe('Korrigierter Titel');
+      expect(JSON.stringify(gespeichert)).not.toContain('SYNTHETISCHER OCR-TEXT');
+
+      zustand.set('angemeldet');
+      fixture.destroy();
+      await montieren(d);
+      expect(
+        element.querySelector('[role=status][data-test=entwurf-wiederhergestellt]')?.textContent,
+      ).toContain(T.entwurfWiederhergestellt);
+      await klicken(T.aendern);
+      expect(element.querySelector<HTMLInputElement>('#doc-401-titel')?.value).toBe(
+        'Korrigierter Titel',
+      );
+      await klicken(T.bestaetigen);
+      await antworten('/api/v1/dokumente/doc-401/bestaetigen', null, 202, 'Accepted');
+      expect(entwurfSpeicher.lesen('u-1', 'doc-401')).toBeNull();
+      expect(element.querySelector('[data-test=entwurf-wiederhergestellt]')).toBeNull();
+    });
+
+    it('verwirft den wiederhergestellten Entwurf und bewahrt Listenfelder als Rohwerte', async () => {
+      const d = dokument({
+        id: 'doc-liste',
+        art: 'LIST',
+        zusatz: { stichworte: ['eins', ' zwei '] },
+      });
+      await zeigen(d, 'geschaeftsstelle', [LIST_ART]);
+      await klicken(T.bestaetigen);
+      zustand.set('abgelaufen');
+      await antworten('/api/v1/dokumente/doc-liste', null, 401, 'Unauthorized');
+      const entwurfSpeicher = TestBed.inject(EingangskorbEntwurfSpeicher);
+      expect(entwurfSpeicher.lesen('u-1', 'doc-liste')?.zusatz['stichworte']).toBe('eins\n zwei ');
+
+      zustand.set('angemeldet');
+      fixture.destroy();
+      await montieren(d, [LIST_ART]);
+      await klicken(T.entwurfVerwerfen);
+      expect(entwurfSpeicher.lesen('u-1', 'doc-liste')).toBeNull();
+      expect(element.querySelector('[data-test=entwurf-wiederhergestellt]')).toBeNull();
+    });
+
+    it.each(['blockiert', 'voll'] as const)(
+      'arbeitet bei %s sessionStorage ohne gespeicherten Entwurf weiter',
+      async (zustandSpeicher) => {
+        const d = dokument({
+          id: 'doc-storage',
+          art: 'LIEFERANTENRECHNUNG',
+          vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'Probe' },
+        });
+        await zeigen(d);
+        if (zustandSpeicher === 'blockiert') {
+          speicher.fehler = true;
+        } else {
+          speicher.voll = true;
+        }
+        await klicken(T.bestaetigen);
+        zustand.set('abgelaufen');
+        await antworten('/api/v1/dokumente/doc-storage/bestaetigen', null, 401, 'Unauthorized');
+        expect(element.querySelector('[role=alert]')?.textContent).toContain(
+          TEXTE.anmeldung.abgelaufen,
+        );
+        expect(element.querySelector('[data-test=entwurf-wiederhergestellt]')).toBeNull();
+        expect(TestBed.inject(EingangskorbEntwurfSpeicher).lesen('u-1', 'doc-storage')).toBeNull();
+      },
+    );
+
+    it('speichert keinen Entwurf oberhalb der Grössengrenze', async () => {
+      const d = dokument({
+        id: 'doc-gross',
+        art: 'LIEFERANTENRECHNUNG',
+        vorschlag: { art: 'LIEFERANTENRECHNUNG', titel: 'x'.repeat(20_000) },
+      });
+      await zeigen(d);
+      await klicken(T.bestaetigen);
+      zustand.set('abgelaufen');
+      await antworten('/api/v1/dokumente/doc-gross/bestaetigen', null, 401, 'Unauthorized');
+      expect(TestBed.inject(EingangskorbEntwurfSpeicher).lesen('u-1', 'doc-gross')).toBeNull();
     });
   });
 

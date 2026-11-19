@@ -1,10 +1,16 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Dokument, Dokumentart, provideApi } from '../gemeinsam/api';
-import { AnmeldungService } from '../gemeinsam/anmeldung/anmeldung.service';
+import {
+  AnmeldungService,
+  Benutzer,
+  FENSTER,
+  Sitzungszustand,
+} from '../gemeinsam/anmeldung/anmeldung.service';
 import { darf } from '../gemeinsam/anmeldung/rechte';
 import { TEXTE } from '../gemeinsam/texte.de-CH';
 import {
@@ -78,6 +84,13 @@ describe('EingangskorbKarte Klassifikationen (Req 18.4)', () => {
     arten: Dokumentart[],
     daten: ReadonlyMap<string, DokumentKlassifikationen>,
   ) {
+    const benutzer = signal<Benutzer | null>({
+      id: 'u-1',
+      name: 'Test',
+      mandant: 'urinet',
+      rolle: 'inhaber',
+    });
+    const zustand = signal<Sitzungszustand>('angemeldet');
     TestBed.configureTestingModule({
       imports: [EingangskorbKarte],
       providers: [
@@ -87,7 +100,18 @@ describe('EingangskorbKarte Klassifikationen (Req 18.4)', () => {
         provideApi(''),
         {
           provide: AnmeldungService,
-          useValue: { darf: (aktion: Parameters<typeof darf>[1]) => darf('inhaber', aktion) },
+          useValue: {
+            darf: (aktion: Parameters<typeof darf>[1]) => darf('inhaber', aktion),
+            benutzer: benutzer.asReadonly(),
+            zustand: zustand.asReadonly(),
+          },
+        },
+        {
+          provide: FENSTER,
+          useValue: {
+            location: { origin: 'https://test.invalid', assign: () => {} },
+            sessionStorage: window.sessionStorage,
+          },
         },
         {
           provide: DokumentKlassifikationenService,

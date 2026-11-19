@@ -168,7 +168,10 @@ flowchart LR
   ihrer eigenen Hülle gefiltert werden (Requirement 4.4).
 - Mindeststufe `vertraulichkeit_mindest` (`NORMAL` | `INTERN`): Maximum aus der Erhöhung von Hand (Requirement 6.8)
   und den Kontextstufen aller angenommenen Änderungen (`wissens_aenderung.vertraulichkeit_kontext`, Requirement
-  11.7); sie sinkt nie. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`.
+  11.7) sowie den Mindeststufen zitierter Quellseiten (11.10, Entscheid Fabian vom 18.11.2026); sie sinkt nie.
+  Quellseiten werden rekursiv mit Zyklenschutz berücksichtigt; ab Tiefe 129 oder bei unbekannter Quellseite gilt
+  vorsorglich `INTERN`. Die wirksame Stufe `vertraulichkeit = max(Hülle, vertraulichkeit_mindest)`. Bei Freigabe
+  einer Quellseite werden ihre abhängigen Seiten unter derselben Mandantensperre neu berechnet.
 - `WissenSichtbarkeit` hängt an jede Abfrage auf Seiten (Index, Suche, Zähler, Log, eingehende Links, Versionen,
   Diff, Werkzeuge) denselben Filter. Er nutzt den `VertraulichkeitFilter` aus Spec 01 (ADR-009) und wertet live aus,
   damit eine Änderung nach A8 sofort wirkt (Requirement 11.3):
@@ -180,7 +183,8 @@ flowchart LR
       AND NOT (<Sichtbarkeitsfilter des Benutzers für d nach Spec 01, 2.6, Zeilen A2 bis A4>))
     AND <Stufe s.vertraulichkeit_mindest für den Benutzer nach A2/A3 sichtbar>   -- mitarbeiter: nur NORMAL
   ```
-  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument` und der Mindeststufe aus `daten`.
+  Für eine Version gilt derselbe Filter mit `wissensseite_version_dokument`, der Mindeststufe aus `daten` und der
+  aktuellen Mindeststufe der Seite; historische Versionen bleiben unveränderlich.
   Unsichtbare Versionen erscheinen in der Liste nur als Nummer; `/versionen/{n}` antwortet mit 404, `/diff` nur,
   wenn beide Versionen sichtbar sind.
 - `wissensseite.vertraulichkeit` ist die gespeicherte wirksame Stufe (Anzeige, Lint-Paare nach 10.4). Für den
@@ -758,7 +762,7 @@ Gerät hat es geschrieben). Das Archiv vertraut dem Paket nichts ausser Text:
 ### REST (`/api/v1`, Fehler als RFC 9457)
 | Methode | Pfad | Zweck |
 | --- | --- | --- |
-| GET | `/wissensseiten?typ=&tag=&q=` | Index bzw. Suche (A15) |
+| GET | `/wissensseiten?typ=&tag=&q=&dokumentId=` | Index bzw. Suche (A15); optionaler Dokumentfilter für den Rückverweis |
 | GET | `/wissensseiten/{id}` und `?pfad=` | Seite mit gerenderten Fussnoten, ETag (A15) |
 | GET | `/wissensseiten/{id}/versionen`, `/versionen/{n}`, `/diff?von=&bis=` | Versionen (A15, Sichtbarkeit je Version) |
 | GET | `/wissensseiten/{id}/eingehend` | eingehende Links (A15) |
@@ -794,8 +798,13 @@ Einträge mit Seiten- bzw. Entwurfs-ID statt Dokument-ID, wie der Jahresexport (
 ### Frontend (`frontend/src/app/wissen/`)
 - Routen: `/wissen` (Index, Filter, Suche), `/wissen/ueberblick`, `/wissen/:ordner/:name` (Seite), `/wissen/log`,
   `/wissen/entwuerfe`, `/wissen/entwuerfe/:id` (Diff und Aktionen). Angular standalone, Signals, OnPush.
-- Seite: gerendertes HTML vom Server (bereits ohne HTML-Eingabe erzeugt) über `[innerHTML]` mit Angular-Sanitizer;
-  Quellenliste mit Chips zum Dokument (`/dokument/:id?seite=n`); Banner für Hinweise.
+- Seite: gerendertes HTML vom Server wird ohne `[innerHTML]` in sichere Textknoten und interne Links umgewandelt;
+  Quellenliste mit Chips zum Dokument (`/dokument/:id?seite=n`); Banner für Hinweise. Der Index liefert den Hinweis
+  `quellePruefen` und filtert auf Wunsch nach einer Dokument-ID, jeweils unter demselben Sichtbarkeitsfilter wie
+  der übrige Index. Die Seite liefert je Quelleneintrag `dokumentTitel`, `dokumentDateiname`, `quellSeitePfad` und
+  `quellSeiteTitel` unter derselben Sichtregel mit (nur Anzeige, kein Nachladen je Quelle im Frontend, damit keine
+  fremden Zugriffsprotokoll-Einträge entstehen); der Hinweis «Abgelaufen» erscheint, wenn `veraltetAb` erreicht
+  und der Status nicht VERALTET ist.
 - Diff: ab 1024 px nebeneinander, darunter untereinander; Zeilen mit `−`/`+` und Farbe; Aktionen je Änderung mit
   Bestätigungsdialog, kein gesammeltes Annehmen. Ingest-Entwurf mit Liste der Kernaussagen (Seite, Auszug,
   Prüfergebnis, «keiner Änderung zugeordnet»).
@@ -830,6 +839,8 @@ design.md); Lebenszeichen, Wiederholung und Aufräumen wie dort:
 | `WISSEN_EXPORT` | 15 min |
 
 `ki_verbrauch.zweck` erhält die Werte `WISSEN_INGEST`, `WISSEN_LINT`, `WISSEN_EMBEDDING`.
+
+Nachtrag Spec 06 (18.11.2026, Vorschlag, [offen: Entscheid Fabian im PR von Spec 06]): Die Werte `budget-tokens`, `lint-budget-tokens`, `monatsbudget-tokens` und `lint-zeitplan` je Mandant (A19, `/wissensbasis/einstellungen`) sollen nach der gemeinsamen Mechanik der Konfiguration (Spec 05: Version, `If-Match`, Protokoll `KONFIGURATION_AENDERN`) geführt werden, mit den Grenzen in Spec 06, design.md «Inventar der Einstellungen» (Spec 06, 2.13, Aufgabe 20.3). Bis zum Entscheid gilt diese Spec unverändert.
 
 ### Dokumentart (Seed-Teil dieser Spec)
 `backend/src/main/resources/seed/_alle/dokumentarten-wissen.json`, mandantenunabhängig, eingelesen nach dem Seed des

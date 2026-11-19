@@ -1,4 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
@@ -126,6 +127,8 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       imports: [DokumentAnsicht],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: DokumentPort, useValue: port },
         {
           provide: DokumentKlassifikationenService,
@@ -418,6 +421,7 @@ describe('DokumentAnsicht (Req 14.6)', () => {
       url: 'https://s3.example/pdfa?sig=alt',
       gueltigBis: new Date(Date.now() - 1000).toISOString(),
     });
+
     await oeffnen();
     port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
     const fenster = { opener: 'x', location: { href: '' }, close: vi.fn() };
@@ -433,6 +437,20 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(fenster.location.href).toBe('https://s3.example/pdfa?sig=neu');
     expect(element.querySelector('[data-test=pdf-bereit]')).toBeNull();
     expect(port.ansichten).toEqual(['vorschau', 'vorschau']);
+  });
+
+  it('behält die angeforderte Seite beim Erneuern des PDF-Links', async () => {
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=alt', gueltigBis: '2020-01-01T00:00:00Z' });
+    await oeffnen();
+    fixture.componentRef.setInput('seite', '2');
+    await fixture.whenStable();
+    port.pdfa = of({ url: 'https://s3.example/pdfa?sig=neu', gueltigBis: zukunft() });
+    const fenster = { opener: null, location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(fenster as unknown as Window);
+    element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!
+      .dispatchEvent(new MouseEvent('click', { cancelable: true, bubbles: true }));
+    await fixture.whenStable();
+    expect(fenster.location.href).toBe('https://s3.example/pdfa?sig=neu#page=2');
   });
 
   it('lässt beim Neuholen der PDF-Adresse nur eine Anfrage laufen und zeigt einen Fehler ohne die Vorschau zu verlieren', async () => {
@@ -747,6 +765,32 @@ describe('DokumentAnsicht (Req 14.6)', () => {
     expect(port.bilder).toEqual([1]);
     fixture.destroy();
     expect(freigeben).toHaveBeenCalledWith('blob:bild-1');
+  });
+
+  it('öffnet die angeforderte PDF-Seite auch in der mobilen Vorschau', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:bild'), revokeObjectURL: vi.fn() });
+    port.dokument = of({ ...DOKUMENT, seiten: 3 });
+    fixture = TestBed.createComponent(DokumentAnsicht);
+    fixture.componentRef.setInput('id', 'd1');
+    fixture.componentRef.setInput('seite', '2');
+    element = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    expect(port.bilder).toEqual([2]);
+    expect(element.querySelector<HTMLImageElement>('[data-test=bild]')!.alt)
+      .toBe(TEXTE.dokument.bildSeite('Rechnung 2026-003', 2));
+    fixture.componentRef.setInput('seite', '3');
+    await fixture.whenStable();
+    expect(port.bilder).toEqual([2, 3]);
+  });
+
+  it('hängt die angeforderte Seite an den PDF-Vorschaulink', async () => {
+    fixture = TestBed.createComponent(DokumentAnsicht);
+    fixture.componentRef.setInput('id', 'd1');
+    fixture.componentRef.setInput('seite', '2');
+    element = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    expect(element.querySelector<HTMLAnchorElement>('[data-test=pdf-laden]')!.href)
+      .toBe('https://s3.example/pdfa?sig=1#page=2');
   });
 
   it('bestellt den Abruf des Vorschaubilds beim Verlassen ab und legt keine Object-URL mehr an', async () => {
