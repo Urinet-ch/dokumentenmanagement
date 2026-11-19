@@ -29,11 +29,6 @@ Funktionalität: Werkzeuge des Chat-Agenten: Kennzahl und offene Posten (Aufgabe
       | A_LOHN      | LOHNABRECHNUNG   | AUSGABE  |                         | 2075-03-31 | 5000.00  | CHF      |             |             | PERSONAL        | ja         | inhaber-urinet     | inhaber-urinet     | ARCHIVIERT   | 2075-03 |
       | A_AUSWEIS   | LOHNABRECHNUNG   | AUSGABE  |                         | 2075-12-31 | 60000.00 | CHF      |             |             | PERSONAL        | ja         | inhaber-urinet     | inhaber-urinet     | ARCHIVIERT   | 2075    |
       | A_VERS      | VERSICHERUNG     | AUSGABE  | Sachversicherung AG     | 2075-04-01 | 800.00   | CHF      | 2075-04-30  | V-1         | NORMAL          | ja         | inhaber-urinet     |                    | ARCHIVIERT   |         |
-    Und im Mandanten «vhf-gsk» liegen diese Finanzbelege:
-      | name | art              | richtung | partner      | datum      | betrag   | waehrung | faelligkeit | belegnummer | vertraulichkeit | bestaetigt | erfasser       | person | status     | periode |
-      | V1   | AUSGANGSRECHNUNG | EINNAHME | Quellwald AG | 2075-02-11 | 77777.00 | CHF      | 2075-03-13  | 2075-001    | NORMAL          | ja         | inhaber-vhf-gsk |        | ARCHIVIERT |         |
-      | V2   | LIEFERANTENBELEG | AUSGABE  | Seilerei AG  | 2075-02-14 | 66.00    | CHF      | 2075-03-15  | L-1         | NORMAL          | ja         | inhaber-vhf-gsk |        | ARCHIVIERT |         |
-
   @req-3.3
   Szenario: Einnahmen je Jahr, ohne Offerte, Entwurf, unbestätigte Belege und Fremdwährung
     Wenn «inhaber-urinet» im Chat die Kennzahl «EINNAHMEN» von «2075-01-01» bis «2076-12-31» nach «JAHR» auf Basis «BELEGDATUM» abfragt
@@ -92,12 +87,8 @@ Funktionalität: Werkzeuge des Chat-Agenten: Kennzahl und offene Posten (Aufgabe
     Und entspricht die Summe der Kennzahl der direkt in SQL gerechneten Summe der Arten «AUSGANGSRECHNUNG» im Mandanten «urinet»
 
   @req-3.2 @req-5.1
-  Szenario: Die Mandanten sind getrennt
-    Wenn «inhaber-vhf-gsk» im Chat die Kennzahl «EINNAHMEN» von «2075-01-01» bis «2075-12-31» nach «KEINE» auf Basis «BELEGDATUM» abfragt
-    Dann ist die Summe der Kennzahl «CHF 77'777.00» bei 1 Belegen und der Datenstand lautet «nach Rechnungsdatum, 1 Rechnung»
-    Und die Kennzahl nennt 0 ausgeschlossene Fremdwährungsbelege und die Belege «V1»
-    Wenn «inhaber-vhf-gsk» im Chat die Kennzahl «AUSGABEN» von «2075-01-01» bis «2075-12-31» nach «ART» auf Basis «BELEGDATUM» abfragt
-    Dann ist die Summe der Kennzahl «CHF 66.00» bei 1 Belegen und der Datenstand lautet «nach Belegdatum, 1 Beleg»
+  Szenario: Finanzwerkzeuge richten sich nach der Mandantenkonfiguration
+    Dann antwortet kennzahl und offene_posten für «inhaber-vhf-gsk» mit «{"fehler":"Werkzeug nicht verfügbar"}»
     Wenn «inhaber-urinet» im Chat die Kennzahl «EINNAHMEN» von «2075-01-01» bis «2075-12-31» nach «KEINE» auf Basis «BELEGDATUM» abfragt
     Dann ist die Summe der Kennzahl «CHF 2'390.50» bei 6 Belegen und der Datenstand lautet «nach Rechnungsdatum, 6 Rechnungen»
 
@@ -179,12 +170,6 @@ Funktionalität: Werkzeuge des Chat-Agenten: Kennzahl und offene Posten (Aufgabe
 
   @req-3.4
   Szenario: Offene Posten liefern höchstens 50 Rechnungen und nennen die Gesamtzahl
-    Angenommen im Mandanten «vhf-gsk» liegen 52 weitere Rechnungen mit Fälligkeit am «2070-08-31»
-    Wenn «inhaber-vhf-gsk» im Chat die offenen Posten zum Stichtag «2070-09-01» für «EINNAHME» abfragt
+    Angenommen im Mandanten «urinet» liegen 52 weitere Rechnungen mit Fälligkeit am «2070-08-31»
+    Wenn «inhaber-urinet» im Chat die offenen Posten zum Stichtag «2070-09-01» für «EINNAHME» abfragt
     Dann enthält die Antwort 50 offene Posten bei der Gesamtzahl 52
-
-  Szenario: Ein Mandant ohne Finanzarten erhält kennzahl und offene_posten nicht angeboten
-    Angenommen im Mandanten «vhf-gsk» sind alle Arten der Gruppe finanz inaktiv
-    Dann bietet das Archiv «inhaber-vhf-gsk» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen,vollstaendigkeit»
-    Und antwortet kennzahl und offene_posten für «inhaber-vhf-gsk» mit «{"fehler":"Werkzeug nicht verfügbar"}»
-    Und bietet das Archiv «inhaber-urinet» diese Werkzeuge an: «dokumente_suchen,dokument_zeigen,fristen,kennzahl,offene_posten,vollstaendigkeit»

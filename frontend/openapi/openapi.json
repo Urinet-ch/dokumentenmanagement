@@ -1844,6 +1844,41 @@
           }
         }
       },
+      "Klassifikationsfacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "werte" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "werte" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/KlassifikationswertFacette"
+            }
+          }
+        }
+      },
+      "KlassifikationswertFacette" : {
+        "type" : "object",
+        "required" : [ "code", "name", "anzahl" ],
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "anzahl" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "Anzahl sichtbarer Dokumente"
+          }
+        }
+      },
       "KonfigurationKiTexte" : {
         "type" : "object",
         "properties" : {
@@ -2317,6 +2352,16 @@
         "format" : "date",
         "examples" : [ "2022-03-10" ]
       },
+      "Mandantenfunktionen" : {
+        "type" : "object",
+        "required" : [ "finanzVerfuegbar" ],
+        "properties" : {
+          "finanzVerfuegbar" : {
+            "type" : "boolean",
+            "description" : "Mindestens eine aktive Dokumentart hat die Gruppe «finanz» (Spec 05, Req 8.8)"
+          }
+        }
+      },
       "ProtokollAktion" : {
         "type" : "string",
         "enum" : [ "ERFASSEN", "ANZEIGEN", "HERUNTERLADEN", "AENDERN", "BESTAETIGEN", "VERWERFEN", "WIEDERHOLEN", "EXPORTIEREN", "VERWEIGERT", "SPERRE_KONFLIKT", "REGEL_AENDERN", "KONFIGURATION_AENDERN", "WISSEN_ANZEIGEN", "WISSEN_ANNEHMEN", "WISSEN_VERWERFEN", "WISSEN_INGEST", "WISSEN_LINT", "KONTAKT_ZUSAMMENFUEHREN", "KONTAKT_INAKTIV", "KONTAKT_AKTIV" ]
@@ -2520,12 +2565,18 @@
       },
       "Suchergebnis" : {
         "type" : "object",
-        "required" : [ "treffer", "gesamt", "seite", "groesse" ],
+        "required" : [ "treffer", "facetten", "gesamt", "seite", "groesse" ],
         "properties" : {
           "treffer" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/Suchtreffer"
+            }
+          },
+          "facetten" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Klassifikationsfacette"
             }
           },
           "gesamt" : {
@@ -3905,7 +3956,7 @@
     "/api/v1/dokumente" : {
       "post" : {
         "summary" : "Dateien hochladen",
-        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
+        "description" : "PDF, JPEG, PNG, HEIC/HEIF und TIFF bis 50 MB je Datei; je Datei ein Ergebnis (Req 3). Für unbestätigte Importe können «art» und «klassifikationen» als JSON-Objekt mit Codes übergeben werden; Werte werden nach Req 3.5 geprüft. Sind alle Dateien abgelehnt, folgt Problem Details mit dem Status der ersten Ablehnung und der Erweiterung «ergebnisse».",
         "tags" : [ "Dokumente" ],
         "requestBody" : {
           "content" : {
@@ -3931,6 +3982,12 @@
                     "type" : "boolean"
                   },
                   "hinweis" : {
+                    "type" : "string"
+                  },
+                  "art" : {
+                    "type" : "string"
+                  },
+                  "klassifikationen" : {
                     "type" : "string"
                   }
                 }
@@ -3986,7 +4043,7 @@
       },
       "get" : {
         "summary" : "Dokumente suchen",
-        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
+        "description" : "Volltext (deutsche Stammformen; Titel, Partner, Tags, OCR-Text) mit Filtern; alle Filter mit «und», mehrere tag müssen alle stehen. Eine exakte Belegnummer als q steht zuerst. Nur sichtbare Dokumente, auch in gesamt (Req 2.3). Ohne status keine verworfenen Dokumente. Mit modus=hybrid Volltext und semantische Suche mit Reranker (Spec 02, Req 2.2, 2.7): q Pflicht, ohne sortierung=DATUM, seite und groesse; höchstens 30 Treffer ohne Blättern, degradiert bei Rückfall auf den Volltext. Klassifikationsfilter als wiederholbare Parameter klassifikation.<code>=<wert>; Antwort enthält sichtbarkeitsgeprüfte Facetten. Ungültige Parameter → 400 ANFRAGE_UNGUELTIG.",
         "tags" : [ "Dokumente" ],
         "parameters" : [ {
           "description" : "Code der Dokumentart",
@@ -6305,6 +6362,33 @@
         },
         "security" : [ {
           "SecurityScheme" : [ "inhaber" ]
+        } ]
+      }
+    },
+    "/api/v1/mandant/funktionen" : {
+      "get" : {
+        "summary" : "Verfügbare Funktionen des Mandanten",
+        "tags" : [ "Konfiguration" ],
+        "responses" : {
+          "200" : {
+            "description" : "Funktionen des aktuellen Mandanten",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Mandantenfunktionen"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Not Authorized"
+          },
+          "403" : {
+            "description" : "Not Allowed"
+          }
+        },
+        "security" : [ {
+          "SecurityScheme" : [ "inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle" ]
         } ]
       }
     },

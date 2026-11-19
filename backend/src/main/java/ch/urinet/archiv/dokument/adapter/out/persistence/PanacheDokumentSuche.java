@@ -2,6 +2,7 @@ package ch.urinet.archiv.dokument.adapter.out.persistence;
 
 import ch.urinet.archiv.sicherheit.domain.Sichtregel;
 import ch.urinet.archiv.suche.application.SuchePort;
+import ch.urinet.archiv.suche.application.SuchfacettenPort;
 import ch.urinet.archiv.suche.domain.Auszug;
 import ch.urinet.archiv.suche.domain.Sortierung;
 import ch.urinet.archiv.suche.domain.Suchanfrage;
@@ -38,7 +39,7 @@ import java.util.UUID;
  */
 @ApplicationScoped
 @Transactional(Transactional.TxType.MANDATORY)
-public class PanacheDokumentSuche implements SuchePort {
+public class PanacheDokumentSuche implements SuchePort, SuchfacettenPort {
 
     /** Höchstens so viele Zeichen des Volltexts gehen in {@code ts_headline} (Kosten der Textstelle). */
     static final int AUSZUG_ZEICHEN = 20_000;
@@ -51,6 +52,9 @@ public class PanacheDokumentSuche implements SuchePort {
             + "|| chr(31) || ', MaxFragments=2, MaxWords=20, MinWords=8'";
     // der Dateiname in der Form des Index, sonst bildete ts_headline andere Wörter (Req 14.8)
     private static final String AUSZUG_DATEINAME = "nullif(archiv_dateiname_text(d.dateiname), ''), ";
+    private static final String AUSZUG_KLASSIFIKATIONEN = "(select string_agg(w.name, ' ') "
+            + "from dokument_klassifikation k join klassifikation_wert w "
+            + "on w.klassifikation = k.klassifikation and w.code = k.wert where k.dokument_id = d.id), ";
     /*
      * Ohne Dateinamen (Req 3.13) treffen und ranken nur die Teile A–C. Bewusst ohne zusätzliches
      * "volltext_tsv @@ q" als Vorfilter: Bei einer Negation («-Wort») entschiede sonst der Dateiname mit. Den Ausdruck
@@ -59,8 +63,8 @@ public class PanacheDokumentSuche implements SuchePort {
      */
     private static final String OHNE_DATEINAME = "ts_filter(d.volltext_tsv, '{a,b,c}')";
     private static final String AUSZUG = "ts_headline('german', translate(concat_ws(' ', d.titel, d.partner_name, "
-            + "archiv_tags_text(d.tags), %sleft(d.volltext, " + AUSZUG_ZEICHEN + ")), " + MARKEN + ", ''), " + TSQ
-            + ", " + AUSZUG_OPTIONEN + ")";
+            + "archiv_tags_text(d.tags), " + AUSZUG_KLASSIFIKATIONEN + "%sleft(d.volltext, " + AUSZUG_ZEICHEN
+            + ")), " + MARKEN + ", ''), " + TSQ + ", " + AUSZUG_OPTIONEN + ")";
     private static final String RELEVANZ = "belegtreffer desc, rang desc, eingang desc, id desc";
     private static final String DATUM = "datum desc nulls last, eingang desc, id desc";
     private static final TypeReference<List<String>> TEXTE = new TypeReference<>() {
@@ -94,6 +98,80 @@ public class PanacheDokumentSuche implements SuchePort {
             }
         }
         return new Suchergebnis(treffer, gesamt);
+    }
+
+    @Override
+    public List<SuchfacettenPort.Facette> facetten(Suchanfrage anfrage, Sichtregel regel, boolean mitDateiname) {
+        Map<String, Object> parameter = new HashMap<>();
+        List<String> bedingungen = SuchFilter.bedingungen(anfrage, regel, parameter, true);
+        if (anfrage.begriff() != null) {
+            String vektor = mitDateiname ? "d.volltext_tsv" : OHNE_DATEINAME;
+            bedingungen.add(1, "(" + vektor + " @@ " + TSQ + " or d.id = any (array(select b.dokument_id "
+                    + "from dokument_finanz b where b.belegnummer = :begriff)))");
+            parameter.put("begriff", anfrage.begriff());
+        }
+
+        List<String> klassifikationsFilter = new ArrayList<>();
+        int index = 0;
+        for (Map.Entry<String, List<String>> eintrag : anfrage.klassifikationen().entrySet()) {
+            String klasse = "facetKlasse" + index;
+            parameter.put(klasse, eintrag.getKey());
+            List<String> werte = new ArrayList<>();
+            for (int i = 0; i < eintrag.getValue().size(); i++) {
+                String wert = klasse + "Wert" + i;
+                parameter.put(wert, eintrag.getValue().get(i));
+                werte.add(":" + wert);
+            }
+            klassifikationsFilter.add("(c.code = :" + klasse + " or exists (select 1 from "
+                    + "dokument_klassifikation fk where fk.dokument_id = t.id and fk.klassifikation = :" + klasse
+                    + " and fk.wert in (" + String.join(", ", werte) + ")))");
+            index++;
+        }
+
+        String sql = """
+                with treffer as materialized (
+                    select d.id
+                    from dokument d left join dokument_finanz f on f.dokument_id = d.id
+                    where %s
+                )
+                select c.code, c.name, w.code, w.name, count(distinct t.id)
+                from klassifikation c
+                join klassifikation_wert w on w.klassifikation = c.code
+                left join dokument_klassifikation dk on dk.klassifikation = c.code and dk.wert = w.code
+                left join treffer t on t.id = dk.dokument_id
+                where c.aktiv and c.suchfilter and w.aktiv
+                  %s
+                group by c.code, c.name, w.code, w.name, w.reihenfolge
+                order by c.code, w.reihenfolge, w.code
+                """.formatted(String.join("\n      and ", bedingungen),
+                klassifikationsFilter.isEmpty() ? "" : "and " + String.join("\n      and ", klassifikationsFilter));
+
+        EntityManager em = DokumentEintrag.getEntityManager();
+        em.createNativeQuery("select set_config('statement_timeout', :ms, true)")
+                .setParameter("ms", Long.toString(zeitgrenze.toMillis())).getSingleResult();
+        Query abfrage = em.createNativeQuery(sql);
+        parameter.forEach(abfrage::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> zeilen = abfrage.getResultList();
+        List<SuchfacettenPort.Facette> facetten = new ArrayList<>();
+        String code = null;
+        String name = null;
+        List<SuchfacettenPort.Wert> werte = new ArrayList<>();
+        for (Object[] zeile : zeilen) {
+            String naechsterCode = (String) zeile[0];
+            if (code != null && !code.equals(naechsterCode)) {
+                facetten.add(new SuchfacettenPort.Facette(code, name, werte));
+                werte = new ArrayList<>();
+            }
+            code = naechsterCode;
+            name = (String) zeile[1];
+            werte.add(new SuchfacettenPort.Wert((String) zeile[2], (String) zeile[3],
+                    ((Number) zeile[4]).longValue()));
+        }
+        if (code != null) {
+            facetten.add(new SuchfacettenPort.Facette(code, name, werte));
+        }
+        return List.copyOf(facetten);
     }
 
     /** Baut das SQL aus festen Stücken und legt die Werte in {@code parameter} ab. */

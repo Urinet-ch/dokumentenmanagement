@@ -20,6 +20,12 @@ final class SuchFilter {
 
     /** Erste Bedingung ist die Sicht; die Werte landen in {@code parameter}. */
     static List<String> bedingungen(Suchanfrage a, Sichtregel regel, Map<String, Object> parameter) {
+        return bedingungen(a, regel, parameter, false);
+    }
+
+    /** Mit {@code klassifikationenAuslassen} bleiben die Klassifikationsfilter für die Facettenabfrage separat. */
+    static List<String> bedingungen(Suchanfrage a, Sichtregel regel, Map<String, Object> parameter,
+                                   boolean klassifikationenAuslassen) {
         VertraulichkeitFilter sicht = VertraulichkeitFilter.sql(regel, "d");
         parameter.putAll(sicht.parameter());
         List<String> bedingungen = new ArrayList<>();
@@ -52,6 +58,23 @@ final class SuchFilter {
                 parameter.put("tag" + i, a.tags().get(i));
             }
             bedingungen.add("d.tags @> cast(array[" + String.join(", ", namen) + "] as text[])");
+        }
+        if (!klassifikationenAuslassen) {
+            int index = 0;
+            for (Map.Entry<String, List<String>> eintrag : a.klassifikationen().entrySet()) {
+                String parameterKlasse = "klassifikation" + index;
+                List<String> parameterWerte = new ArrayList<>();
+                parameter.put(parameterKlasse, eintrag.getKey());
+                for (int i = 0; i < eintrag.getValue().size(); i++) {
+                    String parameterWert = parameterKlasse + "Wert" + i;
+                    parameter.put(parameterWert, eintrag.getValue().get(i));
+                    parameterWerte.add(":" + parameterWert);
+                }
+                bedingungen.add("exists (select 1 from dokument_klassifikation k where k.dokument_id = d.id "
+                        + "and k.klassifikation = :" + parameterKlasse + " and k.wert in ("
+                        + String.join(", ", parameterWerte) + "))");
+                index++;
+            }
         }
         return bedingungen;
     }
