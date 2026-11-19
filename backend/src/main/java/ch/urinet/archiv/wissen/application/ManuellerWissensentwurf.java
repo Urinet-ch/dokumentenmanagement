@@ -93,7 +93,7 @@ public class ManuellerWissensentwurf {
         return id;
     }
 
-    private static boolean enthaeltNull(List<?> werte) {
+    static boolean enthaeltNull(List<?> werte) {
         return werte != null && werte.stream().anyMatch(Objects::isNull);
     }
 

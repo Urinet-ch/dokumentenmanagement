@@ -59,6 +59,10 @@ public class FreigabeAnnahme {
         Wissensseite entwurf = vorschlag.fassung();
         Set<String> entfernt = vorschlag.entfernteAussagen();
         if (bearbeitung != null) {
+            if (ManuellerWissensentwurf.enthaeltNull(bearbeitung.tags())
+                    || ManuellerWissensentwurf.enthaeltNull(bearbeitung.quellen())) {
+                throw new FachFehler(Fehlercode.ANFRAGE_UNGUELTIG);
+            }
             entfernt = bearbeitung.entfernteAussagen() == null ? Set.of()
                     : bearbeitung.entfernteAussagen().stream()
                     .filter(a -> a != null && a.schluessel() != null

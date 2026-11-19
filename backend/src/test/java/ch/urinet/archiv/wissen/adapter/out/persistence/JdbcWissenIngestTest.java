@@ -604,6 +604,32 @@ class JdbcWissenIngestTest {
     }
 
     @Test
+    void geaenderteAnnahmeMitNullInListenWirdOhneSchreibvorgangAbgewiesen() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        ausfuehren("update " + URINET.schema()
+                        + ".wissens_aenderung set daten = cast(? as jsonb) where entwurf_id = ?",
+                """
+                {"typ":"Konzept","titel":"Probe","beschreibung":"Ein Satz.","tags":[],
+                 "status":"AKTIV","quellen":[],"inhalt":"Probe.","wissensquelleId":null}
+                """, entwurf);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/annehmen";
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        for (String fassung : List.of("{\"tags\":[null],\"quellen\":[]}",
+                "{\"tags\":[],\"quellen\":[null]}")) {
+            given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json")
+                    .body("{\"fassung\":" + fassung + "}")
+                    .when().post(pfad).then().statusCode(400);
+        }
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'OFFEN' and etag = 0", entwurf))
+                .isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite_version where entwurf_id = ?", entwurf)).isZero();
+    }
+
+    @Test
     void annahmeRolltMitAuftragProtokollUndVersionshuelleZurueck() throws SQLException {
         UUID dokument = quelle(URINET);
         UUID entwurf = manuellerEntwurf(URINET);
