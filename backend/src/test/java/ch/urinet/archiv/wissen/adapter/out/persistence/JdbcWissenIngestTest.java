@@ -4,6 +4,14 @@ import ch.urinet.archiv.dokument.Testdokumente;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
+import ch.urinet.archiv.gemeinsam.adapter.in.rest.Versionskopf;
+import ch.urinet.archiv.gemeinsam.Testanmeldung;
+import ch.urinet.archiv.gemeinsam.domain.FachFehler;
+import ch.urinet.archiv.gemeinsam.domain.Fehlercode;
+import ch.urinet.archiv.sicherheit.application.Verweigerung;
+import ch.urinet.archiv.sicherheit.domain.Benutzer;
+import ch.urinet.archiv.sicherheit.domain.Rolle;
+import ch.urinet.archiv.wissen.application.FreigabeDienst;
 import ch.urinet.archiv.wissen.application.WissenIngestPort;
 import ch.urinet.archiv.wissen.application.WissenIngestStarten;
 import ch.urinet.archiv.wissen.domain.WissensStufe;
@@ -38,7 +46,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static io.restassured.RestAssured.given;
 
 /**
  * Lesen und Anlegen für den Ingest-Start (Spec 04, Aufgabe 14.1a) je Mandant: Jeder Mandant sieht nur Dokumente,
@@ -58,6 +68,9 @@ class JdbcWissenIngestTest {
 
     @Inject
     PanacheWissenHuelleRepository huellen;
+
+    @Inject
+    FreigabeDienst freigabe;
 
     @Inject
     MandantKontext kontext;
@@ -138,6 +151,92 @@ class JdbcWissenIngestTest {
                 .containsEntry(intern, WissensStufe.INTERN).doesNotContainKey(fremd);
         assertThat(im(ZWEITER, () -> huellen.graphLaden(Set.of(normal, fremd))).dokumentStufen())
                 .containsEntry(fremd, WissensStufe.NORMAL).doesNotContainKey(normal);
+    }
+
+    @Test
+    void verwerfenPrueftRechteUndVersionUndSchliesstNurNachLetzterEntscheidung() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        aenderung(URINET, entwurf, 2);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+        Benutzer treuhaender = new Benutzer("treuhaender", Rolle.TREUHAENDER);
+
+        assertThatThrownBy(() -> im(ZWEITER, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> 0, "Grund", null);
+            return null;
+        })).isInstanceOf(Verweigerung.class);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.verwerfen(treuhaender, entwurf, 1, () -> Versionskopf.version(null), "Grund", null);
+            return null;
+        })).isInstanceOf(Verweigerung.class);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> Versionskopf.version(null), "Grund", null);
+            return null;
+        })).isInstanceOfSatisfying(FachFehler.class,
+                fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.VERSION_FEHLT));
+
+        im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> 0, "Grund", null);
+            return null;
+        });
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'VERWORFEN' and etag = 1", entwurf))
+                .isEqualTo(1);
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> 0, "Grund", null);
+            return null;
+        })).isInstanceOfSatisfying(FachFehler.class,
+                fehler -> assertThat(fehler.code()).isEqualTo(Fehlercode.VERSION_KONFLIKT));
+
+        im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 2, () -> 0, "Grund", null);
+            return null;
+        });
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "ERLEDIGT");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN' "
+                + "and details->>'grund' = 'Grund'", entwurf)).isEqualTo(2);
+    }
+
+    @Test
+    void verwerfenRolltBeiNachfolgendemFehlerZurueck() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        Benutzer inhaber = new Benutzer("inhaber", Rolle.INHABER);
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            freigabe.verwerfen(inhaber, entwurf, 1, () -> 0, "Grund", null);
+            throw new IllegalStateException("Testabbruch");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "OFFEN");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissens_aenderung where entwurf_id = ? and status = 'OFFEN' and etag = 0", entwurf))
+                .isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN'", entwurf)).isZero();
+    }
+
+    @Test
+    void verwerfenEndpunktPrueftRolleUndIfMatch() throws SQLException {
+        UUID entwurf = manuellerEntwurf(URINET);
+        aenderung(URINET, entwurf, 1);
+        String pfad = "/api/v1/wissensentwuerfe/" + entwurf + "/aenderungen/1/verwerfen";
+        String inhaber = Testanmeldung.token("inhaber-urinet");
+        String treuhaender = Testanmeldung.token("treuhaender-urinet");
+
+        given().auth().oauth2(treuhaender).contentType("application/json").body("{\"grund\":\"Probe\"}")
+                .when().post(pfad).then().statusCode(403);
+        given().auth().oauth2(inhaber).contentType("application/json").body("{\"grund\":\"Probe\"}")
+                .when().post(pfad).then().statusCode(428);
+        given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json")
+                .body("{\"grund\":\"Probe\"}").when().post(pfad).then().statusCode(204);
+        given().auth().oauth2(inhaber).header("If-Match", "\"0\"").contentType("application/json")
+                .body("{\"grund\":\"Probe\"}").when().post(pfad).then().statusCode(412);
+        assertThat(zeile(URINET, entwurf)).containsEntry("status", "ERLEDIGT");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".zugriff_protokoll where dokument_id = ? and aktion = 'WISSEN_VERWERFEN' "
+                + "and details->>'grund' = 'Probe'", entwurf)).isEqualTo(1);
     }
 
     @Test
@@ -362,6 +461,21 @@ class JdbcWissenIngestTest {
         ausfuehren("update " + code.schema() + ".dokument set volltext = 'Seite 1\fSeite 2\f', seiten = 2, "
                 + "s3_pdfa = 'archiv/probe.pdf', s3_version_pdfa = 'v1', pdfa_fehlt = false where id = ?", id);
         return id;
+    }
+
+    private UUID manuellerEntwurf(MandantCode code) throws SQLException {
+        UUID id = UUID.randomUUID();
+        entwuerfe.get(code).add(id);
+        ausfuehren("insert into " + code.schema()
+                + ".wissens_entwurf (id, anlass, status, erstellt_von, erstellt) "
+                + "values (?, 'MANUELL', 'OFFEN', 'inhaber', now())", id);
+        return id;
+    }
+
+    private void aenderung(MandantCode code, UUID entwurfId, int nr) throws SQLException {
+        ausfuehren("insert into " + code.schema()
+                + ".wissens_aenderung (entwurf_id, nr, aktion, pfad, daten, inhalt, diff, status) "
+                + "values (?, ?, 'NEU', 'konzepte/probe', '{}'::jsonb, '', '{}'::jsonb, 'OFFEN')", entwurfId, nr);
     }
 
     private UUID entwurf(MandantCode code, UUID dokument, String status) throws SQLException {
