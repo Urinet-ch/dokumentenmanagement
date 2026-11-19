@@ -15,6 +15,9 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 @Path("/wissensbasis/einstellungen")
@@ -22,6 +25,13 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Wissensbasis")
 public class WissenEinstellungenResource {
+    @Schema(name = "WissenEinstellungen")
+    public record WerteDto(@Schema(nullable = true, minimum = "1") Integer budgetTokens,
+                           @Schema(nullable = true, minimum = "1") Integer lintBudgetTokens,
+                           @Schema(nullable = true) String lintZeitplan,
+                           @Schema(nullable = true, minimum = "1") Integer monatsbudgetTokens) {
+    }
+
     private final WissenEinstellungen einstellungen;
     private final MandantAufloesung aufloesung;
     private final SecurityIdentity identitaet;
@@ -38,9 +48,9 @@ public class WissenEinstellungenResource {
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Wissenseinstellungen lesen",
             description = "Nur Inhaber (A19); null bedeutet den konfigurierten Startwert.")
-    public WissenEinstellungen.Werte lesen() {
+    public WerteDto lesen() {
         aufloesung.pruefen();
-        return einstellungen.lesen(benutzer());
+        return dto(einstellungen.lesen(benutzer()));
     }
 
     @PUT
@@ -48,9 +58,20 @@ public class WissenEinstellungenResource {
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "Wissenseinstellungen ersetzen",
             description = "Nur Inhaber (A19); null setzt den jeweiligen Startwert ein.")
-    public WissenEinstellungen.Werte speichern(WissenEinstellungen.Werte werte) {
+    @APIResponse(responseCode = "200", description = "Einstellungen gespeichert",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON,
+                    schema = @Schema(implementation = WerteDto.class)))
+    @APIResponse(responseCode = "422", description = "Budget oder Zeitplan ungültig")
+    public WerteDto speichern(WerteDto werte) {
         aufloesung.pruefen();
-        return einstellungen.speichern(benutzer(), werte);
+        WissenEinstellungen.Werte eingabe = werte == null ? null : new WissenEinstellungen.Werte(
+                werte.budgetTokens(), werte.lintBudgetTokens(), werte.lintZeitplan(), werte.monatsbudgetTokens());
+        return dto(einstellungen.speichern(benutzer(), eingabe));
+    }
+
+    private static WerteDto dto(WissenEinstellungen.Werte werte) {
+        return new WerteDto(werte.budgetTokens(), werte.lintBudgetTokens(), werte.lintZeitplan(),
+                werte.monatsbudgetTokens());
     }
 
     private Benutzer benutzer() {

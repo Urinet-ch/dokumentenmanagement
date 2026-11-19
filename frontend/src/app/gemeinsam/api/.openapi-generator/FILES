@@ -96,6 +96,8 @@ model/upload-fehler.ts
 model/verwerfen.ts
 model/verzeichnis-eintrag.ts
 model/warnung.ts
+model/wissen-einstellungen.ts
+model/wissen-export.ts
 model/wissen-ingest-auftrag.ts
 model/wissen-ingest-start.ts
 model/wissens-index-gruppe.ts

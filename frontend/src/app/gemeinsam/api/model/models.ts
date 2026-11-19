@@ -76,6 +76,8 @@ export * from './upload-fehler';
 export * from './verwerfen';
 export * from './verzeichnis-eintrag';
 export * from './warnung';
+export * from './wissen-einstellungen';
+export * from './wissen-export';
 export * from './wissen-ingest-auftrag';
 export * from './wissen-ingest-start';
 export * from './wissens-index';

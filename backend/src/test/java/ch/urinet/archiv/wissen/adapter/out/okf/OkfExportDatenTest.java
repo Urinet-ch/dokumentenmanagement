@@ -38,6 +38,7 @@ import java.util.zip.ZipInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
 
 @QuarkusTest
 class OkfExportDatenTest {
@@ -63,6 +64,45 @@ class OkfExportDatenTest {
                 .body("{\"budgetTokens\":100,\"lintBudgetTokens\":100,\"monatsbudgetTokens\":100}")
                 .when().put("/api/v1/wissensbasis/einstellungen").then().statusCode(403);
         assertThat(einstellungen(code)).isEqualTo(vorher);
+    }
+
+    @Test
+    void inhaberSpeichertNurGueltigeEinstellungenImEigenenMandanten() throws SQLException {
+        MandantCode eigener = new MandantCode("urinet");
+        MandantCode fremder = new MandantCode("vhf-gsk");
+        for (MandantCode code : List.of(eigener, fremder)) {
+            if (!vorhanden(code)) {
+                provisionierung.anlegen(code.wert(), null, null);
+            }
+        }
+        String vorher = einstellungen(eigener);
+        String fremdVorher = einstellungen(fremder);
+        String token = Testanmeldung.token("inhaber-urinet");
+        String url = "/api/v1/wissensbasis/einstellungen";
+        String urspruenglicheWerte = given().auth().oauth2(token).when().get(url).then()
+                .statusCode(200).extract().asString();
+        try {
+            given().auth().oauth2(token).contentType("application/json")
+                    .body("{\"budgetTokens\":1234,\"lintBudgetTokens\":2345,\"monatsbudgetTokens\":3456}")
+                    .when().put(url).then().statusCode(200).body("budgetTokens", is(1234));
+            given().auth().oauth2(token).contentType("application/json")
+                    .body("{\"budgetTokens\":0,\"lintBudgetTokens\":2345,\"monatsbudgetTokens\":3456}")
+                    .when().put(url).then().statusCode(422);
+            given().auth().oauth2(token).when().get(url).then().statusCode(200)
+                    .body("budgetTokens", is(1234)).body("monatsbudgetTokens", is(3456));
+            assertThat(einstellungen(fremder)).isEqualTo(fremdVorher);
+        } finally {
+            if (vorher == null) {
+                try (Connection c = datenbank.get().getConnection();
+                     PreparedStatement sql = c.prepareStatement("delete from " + eigener.schema()
+                             + ".wissens_einstellung where id = 1")) {
+                    sql.executeUpdate();
+                }
+            } else {
+                given().auth().oauth2(token).contentType("application/json").body(urspruenglicheWerte)
+                        .when().put(url).then().statusCode(200);
+            }
+        }
     }
 
     private String einstellungen(MandantCode code) throws SQLException {

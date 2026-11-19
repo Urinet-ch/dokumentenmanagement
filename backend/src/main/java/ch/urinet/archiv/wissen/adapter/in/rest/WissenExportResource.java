@@ -21,7 +21,9 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.time.Duration;
@@ -44,14 +46,18 @@ public class WissenExportResource {
     }
 
     @Schema(name = "WissenExport")
-    public record ExportDto(UUID id, String status, Instant erstellt, Instant fertig, Instant gueltigBis,
-                            Long groesse, String sha256, String url, UUID fehlerId) {
+    public record ExportDto(UUID id, String status, Instant erstellt, @Schema(nullable = true) Instant fertig,
+                            @Schema(nullable = true) Instant gueltigBis, @Schema(nullable = true) Long groesse,
+                            @Schema(nullable = true) String sha256, @Schema(nullable = true) String url,
+                            @Schema(nullable = true) UUID fehlerId) {
     }
 
     @POST
     @ErfordertAktion(Aktion.A19)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "OKF-Export anfordern", description = "Nur Inhaber (A19); reiht WISSEN_EXPORT ein.")
+    @APIResponse(responseCode = "202", description = "Export angelegt und eingereiht",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
     public Response anfordern() {
         aufloesung.pruefen();
         return Response.accepted(dto(verwaltung.anfordern(benutzer()), null)).build();
@@ -62,6 +68,9 @@ public class WissenExportResource {
     @ErfordertAktion(Aktion.A19)
     @RolesAllowed({"inhaber", "mitarbeiter", "treuhaender", "geschaeftsstelle"})
     @Operation(summary = "OKF-Export abrufen", description = "Nur Inhaber (A19); Download ab Abschluss für 24 Stunden.")
+    @APIResponse(responseCode = "200", description = "Exportstatus und gegebenenfalls Download-Adresse",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = ExportDto.class)))
+    @APIResponse(responseCode = "404", description = "Export nicht gefunden")
     public Response abrufen(@PathParam("id") String id) {
         MandantCode mandant = aufloesung.pruefen();
         UUID exportId;

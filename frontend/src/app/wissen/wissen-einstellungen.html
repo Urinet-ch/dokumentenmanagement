@@ -1,0 +1,42 @@
+<h1>{{ texte.titel }}</h1>
+<nav><a routerLink="/wissen">{{ texte.zurueck }}</a></nav>
+@if (fehler(); as meldung) {
+  <p role="alert">{{ meldung }}</p>
+  @if (!werte()) { <button type="button" (click)="laden()">{{ texte.erneut }}</button> }
+} @else if (!werte()) {
+  <p role="status">{{ texte.laden }}</p>
+}
+@if (werte(); as werte) {
+  <form #formular (submit)="$event.preventDefault(); speichern(formular)">
+    <p>{{ texte.standard }}</p>
+    <label for="wissen-budget">{{ texte.budget }}</label>
+    <input id="wissen-budget" name="budgetTokens" type="number" min="1" step="1" [value]="werte.budgetTokens ?? ''" />
+    <label for="wissen-lint-budget">{{ texte.lintBudget }}</label>
+    <input id="wissen-lint-budget" name="lintBudgetTokens" type="number" min="1" step="1" [value]="werte.lintBudgetTokens ?? ''" />
+    <label for="wissen-lint-zeitplan">{{ texte.lintZeitplan }}</label>
+    <input id="wissen-lint-zeitplan" name="lintZeitplan" [value]="werte.lintZeitplan ?? ''" />
+    <label for="wissen-monat">{{ texte.monat }}</label>
+    <input id="wissen-monat" name="monatsbudgetTokens" type="number" min="1" step="1" [value]="werte.monatsbudgetTokens ?? ''" />
+    <button type="submit" [disabled]="speichert()">{{ texte.speichern }}</button>
+    @if (gespeichert()) { <p role="status">{{ texte.gespeichert }}</p> }
+  </form>
+}
+<section>
+  <h2>{{ texte.exportTitel }}</h2>
+  <button type="button" [disabled]="startet() || (export()?.status === 'OFFEN' && !exportFehler())"
+    (click)="exportStarten()">{{ texte.exportStart }}</button>
+  @if (exportFehler(); as meldung) {
+    <p role="alert">{{ meldung }}</p>
+    @if (export()?.status === 'OFFEN' || export()?.status === 'IN_ARBEIT') {
+      <button type="button" (click)="exportAbrufen()">{{ texte.erneut }}</button>
+    }
+  } @else if (export(); as exportInfo) {
+    @if (exportInfo.status === 'OFFEN' || exportInfo.status === 'IN_ARBEIT') {
+      <p role="status">{{ texte.exportLaeuft }}</p>
+    } @else if (exportInfo.status === 'FERTIG') {
+      <p><a [href]="exportInfo.url">{{ texte.herunterladen }}</a></p>
+      <p>{{ texte.gueltigBis }}: {{ zeit(exportInfo.gueltigBis) }}</p>
+      <p>{{ texte.pruefsumme }}: {{ exportInfo.sha256 }}</p>
+    }
+  }
+</section>
