@@ -85,6 +85,10 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
             return new Frist(grenze, cpuUhr());
         }
 
+        public long ende() {
+            return uhr.getAsLong() + grenze.toNanos();
+        }
+
         private static LongSupplier cpuUhr() {
             ThreadMXBean threads = ManagementFactory.getThreadMXBean();
             if (threads.isCurrentThreadCpuTimeSupported()) {
@@ -102,6 +106,23 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         public Ergebnis {
             Objects.requireNonNull(merkmale, "merkmale");
             abgebrochen = List.copyOf(abgebrochen);
+        }
+    }
+
+    public record MusterErgebnis(boolean trifftZu, boolean abgebrochen) {
+    }
+
+    /** Prüft ein ganzes Feld mit derselben Zeitgrenze, die auch für die Beispielmerkmale gilt. */
+    public static MusterErgebnis musterTrifft(Pattern muster, String text, Frist frist, long ende) {
+        try {
+            if (frist.uhr().getAsLong() > ende) {
+                return new MusterErgebnis(false, true);
+            }
+            boolean trifftZu = muster.matcher(new MitFrist(text, frist.uhr(), ende)).matches();
+            return frist.uhr().getAsLong() > ende
+                    ? new MusterErgebnis(false, true) : new MusterErgebnis(trifftZu, false);
+        } catch (FristAbgelaufen e) {
+            return new MusterErgebnis(false, true);
         }
     }
 
@@ -141,10 +162,14 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
         Set<String> treffer = new LinkedHashSet<>();
         List<Integer> abgebrochen = new ArrayList<>();
         String[] woerter = WORT.split(t.strip());
+        long ende = frist.ende();
         for (int nr = 0; nr < muster.size() && treffer.size() < MAX_JE_TYP; nr++) {
-            switch (trifft(muster.get(nr), woerter, frist)) {
+            switch (trifft(muster.get(nr), woerter, frist, ende)) {
                 case JA -> treffer.add(muster.get(nr).pattern());
-                case ABGEBROCHEN -> abgebrochen.add(nr);
+                case ABGEBROCHEN -> {
+                    abgebrochen.add(nr);
+                    break;
+                }
                 case NEIN -> {
                 }
             }
@@ -154,8 +179,7 @@ public record Merkmale(Set<String> ibans, Set<String> uids, Set<String> emails, 
 
     private enum Auswertung { JA, NEIN, ABGEBROCHEN }
 
-    private static Auswertung trifft(Pattern muster, String[] woerter, Frist frist) {
-        long ende = frist.uhr().getAsLong() + frist.grenze().toNanos();
+    private static Auswertung trifft(Pattern muster, String[] woerter, Frist frist, long ende) {
         try {
             for (String wort : woerter) {
                 if (frist.uhr().getAsLong() > ende) {

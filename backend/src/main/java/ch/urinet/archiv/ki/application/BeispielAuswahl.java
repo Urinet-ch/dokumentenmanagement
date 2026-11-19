@@ -80,7 +80,8 @@ public class BeispielAuswahl {
 
     /** Merkmale nach {@link Merkmale#erkennen}; ein abgebrochenes Muster nur mit seiner Nummer im Log (Spec 05, Req 2.4). */
     Merkmale merkmale(String text, Optional<String> qrIban, ErfassungMandant eigene, UUID dokumentId) {
-        Merkmale.Ergebnis ergebnis = Merkmale.erkennen(text, qrIban, eigene.uid(), eigene.ibans(), muster(),
+        Merkmale.Ergebnis ergebnis = Merkmale.erkennen(text, qrIban, eigene.uid(), eigene.ibans(),
+                muster(eigene),
                 Merkmale.Frist.cpu(zeitgrenze));
         ergebnis.abgebrochen().forEach(nr -> LOG.warnf(
                 "Belegnummer-Muster %d für Dokument %s nach %s abgebrochen, gilt als nicht zutreffend", nr,
@@ -88,8 +89,8 @@ public class BeispielAuswahl {
         return ergebnis.merkmale();
     }
 
-    static List<Pattern> muster() {
-        return VorschlagNachbearbeitung.belegnummerMuster();
+    static List<Pattern> muster(ErfassungMandant mandant) {
+        return mandant.belegnummerMuster().stream().map(Pattern::compile).toList();
     }
 
     /**

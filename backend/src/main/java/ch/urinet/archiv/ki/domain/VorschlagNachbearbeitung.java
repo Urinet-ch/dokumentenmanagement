@@ -2,15 +2,17 @@ package ch.urinet.archiv.ki.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -31,32 +33,12 @@ public final class VorschlagNachbearbeitung {
     /** A1 (Auflage Gate 0): unter der Schwelle (Startwert 0.8), also immer «bitte prüfen». */
     public static final BigDecimal BELEGNUMMER_HOECHSTENS = new BigDecimal("0.7");
 
-    /** structure.md «Belegnummern» (Werte des Mandanten urinet, bis Spec 05 fest). */
-    private static final Map<Pattern, String> MUSTER = muster();
     static final int KOPF_FUSS_ZEILEN = 10;
-    /** Eigene Arten, die bei fremdem QR-Zahlungsempfänger zu LIEFERANTENBELEG werden; LOHNABRECHNUNG bewusst nicht. */
-    static final Set<String> UMSTUFBAR = Set.of("AUSGANGSRECHNUNG", "OFFERTE");
-    static final String UMSTUFUNG_ZIEL = "LIEFERANTENBELEG";
-    static final String QUITTUNG = "QUITTUNG";
     static final BigDecimal UMSTUFUNG_SICHERHEIT = new BigDecimal("0.5");
     /** {@code NUMERIC(12,2)} der Spalte {@code dokument_finanz.betrag}. */
     static final int BETRAG_STELLEN_VOR_KOMMA = 10;
 
     private VorschlagNachbearbeitung() {
-    }
-
-    /** Belegnummer-Muster des Mandanten in fester Reihenfolge, Merkmal der Vorauswahl (Req 7.9). */
-    public static List<Pattern> belegnummerMuster() {
-        return List.copyOf(MUSTER.keySet());
-    }
-
-    private static Map<Pattern, String> muster() {
-        Map<Pattern, String> m = new LinkedHashMap<>();
-        m.put(Pattern.compile("^\\d{4}-\\d{3}$"), "AUSGANGSRECHNUNG");
-        m.put(Pattern.compile("^R\\d{4}$"), "AUSGANGSRECHNUNG");
-        m.put(Pattern.compile("^O-\\d{4}-\\d{3}$"), "OFFERTE");
-        m.put(Pattern.compile("^F\\d{4}$"), "LIEFERANTENBELEG");
-        return m;
     }
 
     /**
@@ -66,6 +48,20 @@ public final class VorschlagNachbearbeitung {
      */
     public static Vorschlag bearbeite(Rohvorschlag v, Optional<QrDaten> qr, String text, ErfassungMandant mandant,
                                       List<ArtEintrag> arten, LocalDate eingang) {
+        return bearbeiteMitProtokoll(v, qr, text, mandant, arten, List.of(), eingang,
+                Merkmale.Frist.cpu(Duration.ofMillis(100))).vorschlag();
+    }
+
+    public record Ergebnis(Vorschlag vorschlag, List<Integer> abgebrochen) {
+        public Ergebnis {
+            abgebrochen = List.copyOf(abgebrochen);
+        }
+    }
+
+    public static Ergebnis bearbeiteMitProtokoll(Rohvorschlag v, Optional<QrDaten> qr, String text,
+                                                  ErfassungMandant mandant, List<ArtEintrag> arten,
+                                                  List<KiKlassifikation> klassifikationen, LocalDate eingang,
+                                                  Merkmale.Frist frist) {
         Map<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
         for (Feld f : Feld.values()) {
             if (!f.mitSicherheit()) {
@@ -125,10 +121,22 @@ public final class VorschlagNachbearbeitung {
         boolean qrFremd = qr.isPresent() && !qrVomMandant;
         boolean aussteller = !qrFremd && (qrVomMandant || kopfOderFussEnthaeltKennung(text, mandant));
         boolean musterGesetzt = false;
+        List<Integer> abgebrochen = new ArrayList<>();
         if (aussteller && belegnummer != null) {
-            for (Map.Entry<Pattern, String> m : MUSTER.entrySet()) {
-                if (m.getKey().matcher(belegnummer).matches() && aktiv(arten, m.getValue())) {
-                    art = m.getValue();
+            long ende = frist.ende();
+            List<ArtMuster> muster = muster(arten);
+            for (int i = 0; i < muster.size(); i++) {
+                ArtMuster m = muster.get(i);
+                if (!aktiv(arten, m.art())) {
+                    continue;
+                }
+                Merkmale.MusterErgebnis ergebnis = Merkmale.musterTrifft(m.muster(), belegnummer, frist, ende);
+                if (ergebnis.abgebrochen()) {
+                    abgebrochen.add(i + 1);
+                    break;
+                }
+                if (ergebnis.trifftZu()) {
+                    art = m.art();
                     sicherheit.put(Feld.ART, BigDecimal.ONE);
                     musterGesetzt = true;
                 }
@@ -136,9 +144,10 @@ public final class VorschlagNachbearbeitung {
         }
         // Eigene Art ohne Kennung des Mandanten: bei fremdem QR umstufen, sonst unverändert (Req 7.12) und prüfen lassen
         String umstufung = null;
-        if (!aussteller && art != null && mandant.eigeneArten().contains(art)) {
-            if (qrFremd && UMSTUFBAR.contains(art) && aktiv(arten, UMSTUFUNG_ZIEL)) {
-                art = UMSTUFUNG_ZIEL;
+        if (!aussteller && art != null && art(arten, art).map(ArtEintrag::selbstAusgestellt).orElse(false)) {
+            String ziel = art(arten, art).map(ArtEintrag::fremdbelegArt).orElse(null);
+            if (qrFremd && ziel != null && aktiv(arten, ziel)) {
+                art = ziel;
                 sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
                 umstufung = GRUND_QR;
             } else {
@@ -150,9 +159,11 @@ public final class VorschlagNachbearbeitung {
         if (faelligkeit == null) {
             sicherheit.put(Feld.FAELLIGKEIT, leer(v.faelligkeit()) ? sicherheit.get(Feld.FAELLIGKEIT) : BigDecimal.ZERO);
         }
-        if (!musterGesetzt && UMSTUFUNG_ZIEL.equals(artRoh) && UMSTUFUNG_ZIEL.equals(art) && qr.isEmpty()
-                && leer(partnerIban) && faelligkeit == null && aktiv(arten, QUITTUNG)) {
-            art = QUITTUNG;
+        String ohneZahlungsdatenArt = art(arten, artRoh).map(ArtEintrag::ohneZahlungsdatenArt).orElse(null);
+        if (!musterGesetzt && artRoh != null && artRoh.equals(art) && ohneZahlungsdatenArt != null
+                && qr.isEmpty() && leer(partnerIban) && faelligkeit == null
+                && aktiv(arten, ohneZahlungsdatenArt)) {
+            art = ohneZahlungsdatenArt;
             sicherheit.put(Feld.ART, UMSTUFUNG_SICHERHEIT);
             umstufung = GRUND_E2;
         }
@@ -173,9 +184,104 @@ public final class VorschlagNachbearbeitung {
         // ohne Art keine Vorbelegung (das Dokument gilt bis zur Bestätigung als PERSONAL)
         String vertraulichkeit = standard.orElse(null);
         sicherheit.put(Feld.VERTRAULICHKEIT, sicherheit.get(Feld.ART));
-        return new Vorschlag(art, leer(v.titel()) ? null : v.titel().strip(), datum, partner, v.partnerUid(),
-                partnerIban, v.partnerEmail(), belegnummer, v.richtung(), betrag, waehrung, faelligkeit, qrReferenz,
-                vertraulichkeit, v.tags(), sicherheit, aussteller, umstufung);
+        if (arten.stream().noneMatch(a -> a.gruppen().contains("finanz"))) {
+            finanzwerteEntfernen(sicherheit);
+            partnerIban = null;
+            belegnummer = null;
+            qrReferenz = null;
+            betrag = null;
+            waehrung = null;
+            faelligkeit = null;
+        }
+        Map<String, Object> dynamischeWerte = dynamischeWerte(v, art(arten, art).orElse(null), klassifikationen);
+        Map<String, BigDecimal> dynamischeSicherheit = new LinkedHashMap<>();
+        dynamischeWerte.keySet().forEach(feld -> dynamischeSicherheit.put(feld,
+                wert(v.dynamischeSicherheit().get(feld))));
+        Vorschlag vorschlag = new Vorschlag(art, leer(v.titel()) ? null : v.titel().strip(), datum, partner,
+                v.partnerUid(), partnerIban, v.partnerEmail(), belegnummer, v.richtung(), betrag, waehrung,
+                faelligkeit, qrReferenz, vertraulichkeit, v.tags(), sicherheit, aussteller, umstufung,
+                dynamischeWerte, dynamischeSicherheit);
+        return new Ergebnis(vorschlag, abgebrochen);
+    }
+
+    private record ArtMuster(Pattern muster, String art) {
+    }
+
+    private static List<ArtMuster> muster(List<ArtEintrag> arten) {
+        List<ArtMuster> muster = new ArrayList<>();
+        for (ArtEintrag art : arten) {
+            for (String regex : art.belegnummerMuster()) {
+                muster.add(new ArtMuster(Pattern.compile(regex), art.code()));
+            }
+        }
+        return muster;
+    }
+
+    private static Optional<ArtEintrag> art(List<ArtEintrag> arten, String code) {
+        return code == null ? Optional.empty() : arten.stream().filter(a -> a.code().equals(code)).findFirst();
+    }
+
+    private static void finanzwerteEntfernen(Map<Feld, BigDecimal> sicherheit) {
+        for (Feld feld : List.of(Feld.BELEGNUMMER, Feld.RICHTUNG, Feld.BETRAG, Feld.WAEHRUNG, Feld.FAELLIGKEIT,
+                Feld.QR_REFERENZ)) {
+            sicherheit.remove(feld);
+        }
+    }
+
+    private static Map<String, Object> dynamischeWerte(Rohvorschlag roh, ArtEintrag art,
+                                                        List<KiKlassifikation> klassifikationen) {
+        if (art == null) {
+            return Map.of();
+        }
+        Map<String, Object> werte = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> eintrag : roh.dynamischeWerte().entrySet()) {
+            String feld = eintrag.getKey();
+            Object wert = eintrag.getValue();
+            if (feld.startsWith("zusatz.")) {
+                if (wert != null
+                        && art.kiFelder().contains(feld.substring("zusatz.".length()))
+                        && !feld.equals("zusatz.zugriff") && !feld.equals("zusatz.veroeffentlicht")
+                        && typPasst(art.zusatzFeldTypen().get(feld.substring("zusatz.".length())), wert)) {
+                    werte.put(feld, wert);
+                }
+                continue;
+            }
+            if (!feld.startsWith("klassifikationen.")) {
+                continue;
+            }
+            String code = feld.substring("klassifikationen.".length());
+            if (!art.klassifikationen().contains(code)) {
+                continue;
+            }
+            KiKlassifikation klassifikation = klassifikationen.stream()
+                    .filter(k -> k.code().equals(code)).findFirst().orElse(null);
+            if (klassifikation != null && klassifikationWertGueltig(klassifikation, wert)) {
+                werte.put(feld, wert);
+            }
+        }
+        return Map.copyOf(werte);
+    }
+
+    private static boolean typPasst(String typ, Object wert) {
+        return switch (typ == null ? "" : typ) {
+            case "string", "date" -> wert instanceof String;
+            case "integer" -> wert instanceof Number zahl
+                    && new BigDecimal(zahl.toString()).stripTrailingZeros().scale() <= 0;
+            case "number" -> wert instanceof Number;
+            case "boolean" -> wert instanceof Boolean;
+            case "array" -> wert instanceof Collection<?>;
+            case "object" -> wert instanceof Map<?, ?>;
+            default -> true;
+        };
+    }
+
+    private static boolean klassifikationWertGueltig(KiKlassifikation klassifikation, Object wert) {
+        List<String> erlaubt = klassifikation.werte().stream().filter(KiKlassifikation.Wert::aktiv)
+                .map(KiKlassifikation.Wert::code).toList();
+        if (klassifikation.mehrfach() && wert instanceof List<?> mehrere) {
+            return !mehrere.isEmpty() && mehrere.stream().allMatch(v -> v instanceof String code && erlaubt.contains(code));
+        }
+        return !klassifikation.mehrfach() && wert instanceof String code && erlaubt.contains(code);
     }
 
     /** Eine Regel setzt nur eine Art, die beim Mandanten aktiv ist; sonst bleibt die bisherige Art. */

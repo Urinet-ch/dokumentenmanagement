@@ -1,10 +1,10 @@
 package ch.urinet.archiv.ki.application;
 
+import ch.urinet.archiv.konfiguration.application.KonfigurationLesen;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Korrektur;
 import ch.urinet.archiv.ki.domain.Merkmale;
-import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Status;
@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Lernen aus Korrekturen beim Bestätigen (Req 7.7; design.md «KI», Korrektur): Differenz zwischen KI-Vorschlag und
@@ -41,16 +42,16 @@ public class KorrekturLernen {
 
     private final KiBeispielPort beispiele;
     private final KorrekturZaehlerPort zaehler;
-    private final MandantEinstellungen einstellungen;
+    private final KonfigurationLesen konfiguration;
     private final TransactionSynchronizationRegistry transaktion;
     private final Duration zeitgrenze;
 
-    public KorrekturLernen(KiBeispielPort beispiele, KorrekturZaehlerPort zaehler, MandantEinstellungen einstellungen,
+    public KorrekturLernen(KiBeispielPort beispiele, KorrekturZaehlerPort zaehler, KonfigurationLesen konfiguration,
                            TransactionSynchronizationRegistry transaktion,
                            @ConfigProperty(name = "archiv.dokumentart.muster-zeitgrenze") Duration zeitgrenze) {
         this.beispiele = beispiele;
         this.zaehler = zaehler;
-        this.einstellungen = einstellungen;
+        this.konfiguration = konfiguration;
         this.transaktion = transaktion;
         this.zeitgrenze = zeitgrenze;
     }
@@ -100,10 +101,13 @@ public class KorrekturLernen {
         }
         Korrektur korrektur = Korrektur.ermitteln(vorher.vorschlag(), werte, ergebnis.finanz(), partnerUebernommen);
         if (korrektur.beispiel()) {
-            MandantEinstellungen.Werte eigene = einstellungen.lesen(mandant);
+            var aktuell = konfiguration.aktuell();
+            var kennungen = aktuell.einstellungen().kennungen();
+            List<Pattern> muster = aktuell.arten().stream().filter(art -> art.aktiv())
+                    .flatMap(art -> art.belegnummerMuster().stream()).map(Pattern::compile).toList();
             Merkmale.Ergebnis merkmale = Merkmale.erkennen(ErfassungPrompt.gekuerzt(vorher.volltext()),
-                    vorher.partnerIban(), eigene.uid(),
-                    eigene.ibans(), BeispielAuswahl.muster(), Merkmale.Frist.cpu(zeitgrenze));
+                    vorher.partnerIban(), kennungen.uid(),
+                    kennungen.ibans(), muster, Merkmale.Frist.cpu(zeitgrenze));
             merkmale.abgebrochen().forEach(nr -> LOG.warnf(
                     "Belegnummer-Muster %d für Dokument %s nach %s abgebrochen, gilt als nicht zutreffend", nr,
                     dokumentId, zeitgrenze));

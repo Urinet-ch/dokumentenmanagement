@@ -13,7 +13,8 @@ import java.util.Map;
 public record Rohvorschlag(String art, String titel, String datum, String partnerName, String partnerUid,
                            String partnerIban, String partnerEmail, String belegnummer, String richtung,
                            BigDecimal betrag, String waehrung, String faelligkeit, String qrReferenz,
-                           String vertraulichkeit, List<String> tags, Map<Feld, BigDecimal> sicherheit) {
+                           String vertraulichkeit, List<String> tags, Map<Feld, BigDecimal> sicherheit,
+                           Map<String, Object> dynamischeWerte, Map<String, BigDecimal> dynamischeSicherheit) {
 
     public Rohvorschlag {
         tags = tags == null ? List.of() : tags.stream().filter(t -> t != null && !t.isBlank()).map(String::strip)
@@ -27,5 +28,16 @@ public record Rohvorschlag(String art, String titel, String datum, String partne
             });
         }
         sicherheit = kopie;
+        dynamischeWerte = dynamischeWerte == null ? Map.of() : Map.copyOf(dynamischeWerte);
+        dynamischeSicherheit = dynamischeSicherheit == null ? Map.of()
+                : Map.copyOf(dynamischeSicherheit);
+    }
+
+    public Rohvorschlag(String art, String titel, String datum, String partnerName, String partnerUid,
+                        String partnerIban, String partnerEmail, String belegnummer, String richtung,
+                        BigDecimal betrag, String waehrung, String faelligkeit, String qrReferenz,
+                        String vertraulichkeit, List<String> tags, Map<Feld, BigDecimal> sicherheit) {
+        this(art, titel, datum, partnerName, partnerUid, partnerIban, partnerEmail, belegnummer, richtung, betrag,
+                waehrung, faelligkeit, qrReferenz, vertraulichkeit, tags, sicherheit, Map.of(), Map.of());
     }
 }

@@ -24,16 +24,27 @@ class VorschlagNachbearbeitungTest {
     static final ErfassungMandant MANDANT = new ErfassungMandant("Testfirma AG", UID, List.of(IBAN),
             Set.of("AUSGANGSRECHNUNG", "OFFERTE", "LOHNABRECHNUNG"));
     static final List<ArtEintrag> ARTEN = List.of(
-            new ArtEintrag("AUSGANGSRECHNUNG", "Ausgangsrechnung", "INTERN"),
-            new ArtEintrag("OFFERTE", "Offerte", "NORMAL"),
-            new ArtEintrag("LIEFERANTENBELEG", "Lieferantenbeleg", "INTERN"),
-            new ArtEintrag("QUITTUNG", "Quittung / Spesen", "INTERN"),
-            new ArtEintrag("LOHNABRECHNUNG", "Lohnabrechnung", "PERSONAL"),
-            new ArtEintrag("VERTRAG", "Vertrag", "PERSONAL"),
-            new ArtEintrag("PROJEKTDOKUMENT", "Projektdokument", "NORMAL"));
+            art("AUSGANGSRECHNUNG", "Ausgangsrechnung", "INTERN", List.of("finanz"), true,
+                    List.of("^(?<jahr>\\d{4})-(?<nr>\\d{3})$", "^R\\d{4}$"), "LIEFERANTENBELEG", null),
+            art("OFFERTE", "Offerte", "NORMAL", List.of("finanz"), true,
+                    List.of("^O-\\d{4}-\\d{3}$"), "LIEFERANTENBELEG", null),
+            art("LIEFERANTENBELEG", "Lieferantenbeleg", "INTERN", List.of("finanz"), false,
+                    List.of("^F\\d{4}$"), null, "QUITTUNG"),
+            art("QUITTUNG", "Quittung / Spesen", "INTERN", List.of(), false, List.of(), null, null),
+            art("LOHNABRECHNUNG", "Lohnabrechnung", "PERSONAL", List.of(), true, List.of(), null, null),
+            art("VERTRAG", "Vertrag", "PERSONAL", List.of(), false, List.of(), null, null),
+            art("PROJEKTDOKUMENT", "Projektdokument", "NORMAL", List.of(), false, List.of(), null, null));
     static final LocalDate EINGANG = LocalDate.of(2026, 11, 12);
     static final String EIGENER_KOPF = "Testfirma AG\nMWST " + UID + "\nRechnung";
     static final String FREMDER_KOPF = "Lieferant GmbH\nRechnung an Testfirma AG";
+
+    private static ArtEintrag art(String code, String name, String vertraulichkeit, List<String> gruppen,
+                                  boolean selbstAusgestellt, List<String> muster, String fremdbelegArt,
+                                  String ohneZahlungsdatenArt) {
+        return new ArtEintrag(code, name, null, vertraulichkeit, gruppen, selbstAusgestellt, true, muster,
+                fremdbelegArt, ohneZahlungsdatenArt, List.of(), null, 0,
+                "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}", Map.of(), List.of());
+    }
 
     static Rohvorschlag roh(String art, String belegnummer, BigDecimal sicherheitBelegnummer, String vertraulichkeit) {
         Map<Feld, BigDecimal> s = new EnumMap<>(Feld.class);
@@ -265,6 +276,28 @@ class VorschlagNachbearbeitungTest {
 
             assertThat(v.art()).as(nummer).isEqualTo("PROJEKTDOKUMENT");
         }
+    }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(5)
+    void zeitintensivesKonfigurationsmusterTrifftNichtUndWirdProtokolliert() {
+        List<ArtEintrag> arten = List.of(
+                art("PROJEKTDOKUMENT", "Projektdokument", "NORMAL", List.of(), false, List.of(), null, null),
+                art("EIGENE_TESTART", "Eigene Testart", "NORMAL", List.of(), true, List.of("(a+)+$"), null, null));
+        ErfassungMandant mandant = new ErfassungMandant("Testfirma AG", UID, List.of(IBAN),
+                Set.of("EIGENE_TESTART"));
+        java.util.concurrent.atomic.AtomicInteger uhr = new java.util.concurrent.atomic.AtomicInteger();
+        Merkmale.Frist frist = new Merkmale.Frist(java.time.Duration.ofMillis(1),
+                () -> uhr.getAndIncrement() < 2 ? 0 : 2_000_000);
+        String nummer = "a".repeat(50_000) + "!";
+        Rohvorschlag roh = roh("PROJEKTDOKUMENT", nummer, new BigDecimal("0.95"), "NORMAL");
+
+        VorschlagNachbearbeitung.Ergebnis ergebnis = VorschlagNachbearbeitung.bearbeiteMitProtokoll(roh,
+                Optional.empty(), EIGENER_KOPF, mandant, arten, List.of(), EINGANG, frist);
+
+        assertThat(ergebnis.vorschlag().art()).isEqualTo("PROJEKTDOKUMENT");
+        assertThat(ergebnis.abgebrochen()).isNotEmpty();
+        assertThat(uhr.get()).isGreaterThanOrEqualTo(3);
     }
 
     @Test

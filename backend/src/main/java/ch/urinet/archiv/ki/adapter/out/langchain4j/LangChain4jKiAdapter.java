@@ -1,18 +1,24 @@
 package ch.urinet.archiv.ki.adapter.out.langchain4j;
 
 import ch.urinet.archiv.ki.application.KiPort;
+import ch.urinet.archiv.ki.domain.ErfassungPrompt;
 import ch.urinet.archiv.ki.domain.Feld;
 import ch.urinet.archiv.ki.domain.Rohvorschlag;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.image.Image;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.internal.JsonSchemaElementUtils;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.request.json.JsonSchema;
+import dev.langchain4j.model.chat.request.json.JsonRawSchema;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.TokenUsage;
-import dev.langchain4j.service.Result;
 import dev.langchain4j.service.output.JsonSchemas;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
@@ -20,11 +26,14 @@ import jakarta.enterprise.inject.Typed;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Adapter des {@link KiPort} mit Quarkus LangChain4j gegen Infomaniak AI Services (design.md «KI»; Req 7.1, 7.3): genau
@@ -38,12 +47,10 @@ import java.util.Map;
 @Typed(LangChain4jKiAdapter.class)
 public class LangChain4jKiAdapter implements KiPort {
 
-    private final MetadatenExtraktor extraktor;
     private final TokenZaehler zaehler;
     private final KiModell modell;
 
-    public LangChain4jKiAdapter(MetadatenExtraktor extraktor, TokenZaehler zaehler, KiModell modell) {
-        this.extraktor = extraktor;
+    public LangChain4jKiAdapter(TokenZaehler zaehler, KiModell modell) {
         this.zaehler = zaehler;
         this.modell = modell;
     }
@@ -55,15 +62,20 @@ public class LangChain4jKiAdapter implements KiPort {
         }
         zaehler.zuruecksetzen();
         try {
-            Result<MetadatenVorschlag> ergebnis = aufrufen(anfrage);
-            Verbrauch verbrauch = verbrauch(ergebnis.tokenUsage());
-            if (ergebnis.content() == null) {
+            String schema = antwortschema(anfrage);
+            ChatResponse ergebnis = modell.get().chat(aufbau(anfrage, schema));
+            String roh = ergebnis == null || ergebnis.aiMessage() == null ? null : ergebnis.aiMessage().text();
+            TokenUsage tokenUsage = ergebnis == null ? null : ergebnis.tokenUsage();
+            Verbrauch verbrauch = tokenUsage == null || tokenUsage.inputTokenCount() == null
+                    || tokenUsage.outputTokenCount() == null
+                    ? verbrauch(null) : verbrauch(tokenUsage, modell.modell());
+            if (roh == null) {
                 return new Schemafehler("leere Antwort", verbrauch);
             }
-            if (!AntwortSchema.gueltig(zaehler.stand().text())) {
+            if (!AntwortSchema.gueltig(roh, schema)) {
                 return new Schemafehler("Antwort ausserhalb des Schemas", verbrauch);
             }
-            return new Gueltig(roh(ergebnis.content()), verbrauch);
+            return new Gueltig(roh(roh), verbrauch);
         } catch (RuntimeException e) {
             Verbrauch verbrauch = verbrauch(null);
             return KiFehler.istSchemafehler(e) ? new Schemafehler(KiFehler.grund(e), verbrauch)
@@ -120,29 +132,39 @@ public class LangChain4jKiAdapter implements KiPort {
         }
     }
 
-    /** Ohne Beispiele genau die Methoden des Gate-Laufs, damit die Nachricht unverändert bleibt. */
-    private Result<MetadatenVorschlag> aufrufen(Anfrage a) {
-        String b = a.beispiele();
-        if (a.bildJpeg().isPresent()) {
-            Image bild = Image.builder().base64Data(Base64.getEncoder().encodeToString(a.bildJpeg().get()))
+    private ChatRequest aufbau(Anfrage anfrage, String schema) {
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(SystemMessage.from(anfrage.systemPrompt()));
+        String text = (anfrage.beispiele().isEmpty() ? ""
+                : ErfassungPrompt.BEISPIELE.replace("{beispiele}", anfrage.beispiele()))
+                + benutzernachricht(anfrage);
+        if (anfrage.fehler().isPresent()) {
+            text += ErfassungPrompt.NACHFRAGE.replace("{fehler}", anfrage.fehler().get());
+        }
+        if (anfrage.bildJpeg().isPresent()) {
+            Image bild = Image.builder().base64Data(Base64.getEncoder().encodeToString(anfrage.bildJpeg().get()))
                     .mimeType("image/jpeg").build();
-            if (b.isEmpty()) {
-                return a.fehler().isPresent()
-                        ? extraktor.nachfrageBild(a.systemPrompt(), a.qr(), bild, a.fehler().get())
-                        : extraktor.extrahiereBild(a.systemPrompt(), a.qr(), bild);
-            }
-            return a.fehler().isPresent()
-                    ? extraktor.nachfrageBildMitBeispielen(a.systemPrompt(), b, a.qr(), bild, a.fehler().get())
-                    : extraktor.extrahiereBildMitBeispielen(a.systemPrompt(), b, a.qr(), bild);
+            messages.add(UserMessage.from(TextContent.from(text), ImageContent.from(bild)));
+        } else {
+            messages.add(UserMessage.from(text));
         }
-        if (b.isEmpty()) {
-            return a.fehler().isPresent()
-                    ? extraktor.nachfrage(a.systemPrompt(), a.qr(), a.text(), a.fehler().get())
-                    : extraktor.extrahiere(a.systemPrompt(), a.qr(), a.text());
-        }
-        return a.fehler().isPresent()
-                ? extraktor.nachfrageMitBeispielen(a.systemPrompt(), b, a.qr(), a.text(), a.fehler().get())
-                : extraktor.extrahiereMitBeispielen(a.systemPrompt(), b, a.qr(), a.text());
+        JsonSchema antwortschema = JsonSchema.builder().name("metadaten_vorschlag")
+                .rootElement(JsonRawSchema.builder().schema(schema).build()).build();
+        return ChatRequest.builder().messages(messages)
+                .parameters(ChatRequestParameters.builder()
+                        .modelName(modell.modell())
+                        .temperature(0.0)
+                        .topP(1.0)
+                        .presencePenalty(0.0)
+                        .frequencyPenalty(0.0)
+                        .responseFormat(antwortschema)
+                        .build())
+                .build();
+    }
+
+    private static String benutzernachricht(Anfrage anfrage) {
+        String vorlage = anfrage.bildJpeg().isPresent() ? ErfassungPrompt.BENUTZER_K1 : ErfassungPrompt.BENUTZER;
+        return vorlage.replace("{qr}", anfrage.qr()).replace("{text}", anfrage.text());
     }
 
     /** Tokens aus dem Listener (auch bei nicht parsebarer Antwort), sonst aus dem Ergebnis. */
@@ -165,8 +187,13 @@ public class LangChain4jKiAdapter implements KiPort {
     }
 
     @Override
+    public String antwortschema(Anfrage anfrage) {
+        return AntwortSchema.json(anfrage.arten(), anfrage.klassifikationen());
+    }
+
+    @Override
     public List<String> artCodes() {
-        return codes();
+        return List.of();
     }
 
     /** Antwortschema aus {@link MetadatenVorschlag}, wie es LangChain4j an das Modell sendet (Prompt-Hash). */
@@ -175,33 +202,61 @@ public class LangChain4jKiAdapter implements KiPort {
                 .orElseThrow(() -> new IllegalStateException("kein JSON-Schema für MetadatenVorschlag"));
     }
 
-    /** Art-Codes des Antwortschemas in dessen Reihenfolge. */
+    /** Art-Codes werden je Anfrage aus der Konfiguration gebildet. */
     public static List<String> codes() {
-        return Arrays.stream(MetadatenVorschlag.ArtCode.values()).map(Enum::name).toList();
+        return List.of();
     }
 
-    static Rohvorschlag roh(MetadatenVorschlag v) {
-        Map<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
-        MetadatenVorschlag.Sicherheit s = v.sicherheit();
-        if (s != null) {
-            sicherheit.put(Feld.ART, s.art());
-            sicherheit.put(Feld.TITEL, s.titel());
-            sicherheit.put(Feld.DATUM, s.datum());
-            sicherheit.put(Feld.PARTNER, s.partnerName());
-            sicherheit.put(Feld.BELEGNUMMER, s.belegnummer());
-            sicherheit.put(Feld.RICHTUNG, s.richtung());
-            sicherheit.put(Feld.BETRAG, s.betrag());
-            sicherheit.put(Feld.WAEHRUNG, s.waehrung());
-            sicherheit.put(Feld.FAELLIGKEIT, s.faelligkeit());
-            sicherheit.put(Feld.VERTRAULICHKEIT, s.vertraulichkeit());
-            sicherheit.values().removeIf(java.util.Objects::isNull);
+    static Rohvorschlag roh(String inhalt) {
+        JsonNode v;
+        try {
+            v = new ObjectMapper().readTree(inhalt);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalArgumentException("KI-Antwort ist kein gültiges JSON", e);
         }
-        return new Rohvorschlag(name(v.art()), v.titel(), v.datum(), v.partnerName(), v.partnerUid(), v.partnerIban(),
-                v.partnerEmail(), v.belegnummer(), name(v.richtung()), v.betrag(), v.waehrung(), v.faelligkeit(),
-                v.qrReferenz(), name(v.vertraulichkeit()), v.tags(), sicherheit);
+        Map<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
+        JsonNode s = v.path("sicherheit");
+        Map<String, BigDecimal> dynamischeSicherheit = new LinkedHashMap<>();
+        if (s.isObject()) {
+            s.properties().forEach(e -> {
+                Feld feld = Arrays.stream(Feld.values()).filter(f -> f.schluessel().equals(e.getKey()))
+                        .findFirst().orElse(null);
+                if (feld != null && e.getValue().isNumber()) {
+                    sicherheit.put(feld, e.getValue().decimalValue());
+                } else if (e.getValue().isNumber()) {
+                    dynamischeSicherheit.put(e.getKey(), e.getValue().decimalValue());
+                }
+            });
+        }
+        List<String> tags = new ArrayList<>();
+        if (v.path("tags").isArray()) {
+            v.path("tags").forEach(tag -> {
+                if (tag.isTextual()) {
+                    tags.add(tag.asText());
+                }
+            });
+        }
+        Map<String, Object> dynamischeWerte = new LinkedHashMap<>();
+        v.properties().forEach(e -> {
+            if ((e.getKey().startsWith("zusatz.") || e.getKey().startsWith("klassifikationen."))
+                    && !e.getValue().isNull()) {
+                dynamischeWerte.put(e.getKey(), new ObjectMapper().convertValue(e.getValue(), Object.class));
+            }
+        });
+        return new Rohvorschlag(text(v, "art"), text(v, "titel"), text(v, "datum"), text(v, "partnerName"),
+                text(v, "partnerUid"), text(v, "partnerIban"), text(v, "partnerEmail"), text(v, "belegnummer"),
+                text(v, "richtung"), dezimal(v, "betrag"), text(v, "waehrung"), text(v, "faelligkeit"),
+                text(v, "qrReferenz"), text(v, "vertraulichkeit"), tags, sicherheit, dynamischeWerte,
+                dynamischeSicherheit);
     }
 
-    private static String name(Enum<?> wert) {
-        return wert == null ? null : wert.name();
+    private static String text(JsonNode node, String feld) {
+        JsonNode wert = node.get(feld);
+        return wert == null || wert.isNull() ? null : wert.asText();
+    }
+
+    private static BigDecimal dezimal(JsonNode node, String feld) {
+        JsonNode wert = node.get(feld);
+        return wert != null && wert.isNumber() ? wert.decimalValue() : null;
     }
 }

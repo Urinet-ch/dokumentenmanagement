@@ -1,28 +1,34 @@
 package ch.urinet.archiv.ki.application;
 
-import ch.urinet.archiv.dokumentart.application.DokumentartVerwaltung;
-import ch.urinet.archiv.dokumentart.domain.Dokumentart;
+import ch.urinet.archiv.konfiguration.application.KonfigurationLesen;
+import ch.urinet.archiv.konfiguration.domain.Klassifikation;
+import ch.urinet.archiv.konfiguration.domain.KlassifikationWert;
+import ch.urinet.archiv.konfiguration.domain.Konfiguration;
+import ch.urinet.archiv.dokumentart.application.ZusatzSchemaPruefer;
 import ch.urinet.archiv.ki.domain.ArtEintrag;
 import ch.urinet.archiv.ki.domain.ErfassungMandant;
 import ch.urinet.archiv.ki.domain.ErfassungPrompt;
-import ch.urinet.archiv.ki.domain.Feld;
+import ch.urinet.archiv.ki.domain.KiKlassifikation;
+import ch.urinet.archiv.ki.domain.Merkmale;
 import ch.urinet.archiv.ki.domain.QrDaten;
 import ch.urinet.archiv.ki.domain.Vorschlag;
 import ch.urinet.archiv.ki.domain.VorschlagNachbearbeitung;
 import ch.urinet.archiv.mandant.application.MandantEinstellungen;
 import ch.urinet.archiv.mandant.domain.MandantCode;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Metadaten-Extraktor der Erfassung (Aufgabe 3.2; Req 7.1–7.3, 7.5, 7.6, 7.11, 7.12; design.md «KI»), Ablauf wie im
@@ -43,20 +49,25 @@ public class MetadatenExtraktion {
     private final QrLeserPort qrLeser;
     private final SeitenbildPort seitenbild;
     private final KiVerbrauchPort verbrauch;
-    private final DokumentartVerwaltung dokumentarten;
+    private final KonfigurationLesen konfiguration;
+    private final ZusatzSchemaPruefer zusatzSchema;
     private final MandantEinstellungen einstellungen;
     private final BeispielAuswahl beispiele;
+    private final Duration musterZeitgrenze;
 
     public MetadatenExtraktion(KiPort ki, QrLeserPort qrLeser, SeitenbildPort seitenbild, KiVerbrauchPort verbrauch,
-                               DokumentartVerwaltung dokumentarten, MandantEinstellungen einstellungen,
-                               BeispielAuswahl beispiele) {
+                               KonfigurationLesen konfiguration, ZusatzSchemaPruefer zusatzSchema,
+                               MandantEinstellungen einstellungen, BeispielAuswahl beispiele,
+                               @ConfigProperty(name = "archiv.dokumentart.muster-zeitgrenze") Duration musterZeitgrenze) {
         this.ki = ki;
         this.qrLeser = qrLeser;
         this.seitenbild = seitenbild;
         this.verbrauch = verbrauch;
-        this.dokumentarten = dokumentarten;
+        this.konfiguration = konfiguration;
+        this.zusatzSchema = zusatzSchema;
         this.einstellungen = einstellungen;
         this.beispiele = beispiele;
+        this.musterZeitgrenze = musterZeitgrenze;
     }
 
     /**
@@ -115,20 +126,35 @@ public class MetadatenExtraktion {
      *                   wiederholt nach Req 5.4; ohne Token dagegen leer und ohne Request
      */
     public Optional<Vorschlag> vorschlagen(Eingabe eingabe) {
+        Konfiguration konfig = konfiguration.aktuell();
+        if (!konfig.kiTexte().kiFreigegeben()) {
+            return Optional.empty();
+        }
         MandantEinstellungen.Werte werte = einstellungen.lesen(eingabe.mandant());
-        ErfassungMandant mandant = new ErfassungMandant(werte.name(), werte.uid(), werte.ibans(), werte.eigeneArten());
-        List<ArtEintrag> arten = arten();
+        List<ArtEintrag> alleArten = arten(konfig, zusatzSchema);
+        List<ArtEintrag> arten = alleArten.stream().filter(ArtEintrag::kiVorschlag).toList();
+        if (arten.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<String> eigeneArten = alleArten.stream().filter(ArtEintrag::selbstAusgestellt)
+                .map(ArtEintrag::code).collect(Collectors.toUnmodifiableSet());
+        ErfassungMandant mandant = new ErfassungMandant(werte.name(), konfig.einstellungen().kennungen().uid(),
+                konfig.einstellungen().kennungen().ibans(), eigeneArten,
+                alleArten.stream().flatMap(art -> art.belegnummerMuster().stream()).toList());
+        List<KiKlassifikation> klassifikationen = klassifikationen(konfig, arten);
         String grundPrompt = ErfassungPrompt.system(mandant.name(),
-                ErfassungPrompt.artListe(arten, mandant.eigeneArten(), mandant.name()));
-        String system = grundPrompt + ErfassungPrompt.mandantenHinweise(eingabe.mandant().wert());
+                ErfassungPrompt.artListe(arten, eigeneArten, mandant.name()),
+                kiRolle(konfig.kiTexte().rolle()), konfig.kiTexte().feldregeln(), klassifikationen);
+        String system = grundPrompt;
         Optional<QrDaten> qr = eingabe.qr();
         Optional<byte[]> bild = eingabe.bild();
         String text = bild.isPresent() ? "" : ErfassungPrompt.gekuerzt(eingabe.text());
         String auswahl = beispiele.fuer(eingabe.dokumentId(), eingabe.mandant(),
                 ErfassungPrompt.gekuerzt(eingabe.text()), qr.map(QrDaten::iban), mandant);
         KiPort.Anfrage anfrage = new KiPort.Anfrage(system, ErfassungPrompt.qr(qr), text, bild, Optional.empty(),
-                auswahl);
-        String kennung = ErfassungPrompt.hash(grundPrompt, ki.antwortschema(), ki.artCodes(), ErfassungPrompt.BILDWEG);
+                auswahl, arten, klassifikationen);
+        String schema = ki.antwortschema(anfrage);
+        String kennung = ErfassungPrompt.hash(grundPrompt, schema, ki.artCodes(anfrage), ErfassungPrompt.BILDWEG);
         if (!ErfassungPrompt.GATE_KENNUNG.equals(kennung)) {
             LOG.warnf("KI-Vorschlag für Dokument %s mit Prompt %s statt %s aus Gate 0 (Mandantenname oder Arten "
                     + "weichen ab)", eingabe.dokumentId(), kennung, ErfassungPrompt.GATE_KENNUNG);
@@ -139,11 +165,13 @@ public class MetadatenExtraktion {
         }
         return switch (antwort) {
             case KiPort.Gueltig g -> {
-                Vorschlag vorschlag = VorschlagNachbearbeitung.bearbeite(g.vorschlag(), qr, eingabe.text(),
-                        mandant, arten, eingabe.eingang());
-                if (ErfassungPrompt.hatMandantenHinweise(eingabe.mandant().wert())) {
-                    vorschlag = ohneFinanz(vorschlag);
-                }
+                VorschlagNachbearbeitung.Ergebnis bearbeitung = VorschlagNachbearbeitung.bearbeiteMitProtokoll(
+                        g.vorschlag(), qr, eingabe.text(), mandant, alleArten, klassifikationen, eingabe.eingang(),
+                        Merkmale.Frist.cpu(musterZeitgrenze));
+                bearbeitung.abgebrochen().forEach(nr -> LOG.warnf(
+                        "Belegnummer-Muster %d für Dokument %s nach %s abgebrochen, gilt als nicht zutreffend", nr,
+                        eingabe.dokumentId(), musterZeitgrenze));
+                Vorschlag vorschlag = bearbeitung.vorschlag();
                 LOG.infof("KI-Vorschlag für Dokument %s (Prompt %s, Nachbearbeitung %s, QR %s, Bildweg %s)",
                         eingabe.dokumentId(), kennung, VorschlagNachbearbeitung.FASSUNG,
                         qr.isPresent(), bild.isPresent());
@@ -163,28 +191,36 @@ public class MetadatenExtraktion {
         };
     }
 
-    static Vorschlag ohneFinanz(Vorschlag vorschlag) {
-        EnumMap<Feld, BigDecimal> sicherheit = new EnumMap<>(Feld.class);
-        sicherheit.putAll(vorschlag.sicherheit());
-        for (Feld feld : List.of(Feld.BELEGNUMMER, Feld.RICHTUNG, Feld.BETRAG, Feld.WAEHRUNG, Feld.FAELLIGKEIT,
-                Feld.QR_REFERENZ)) {
-            sicherheit.remove(feld);
-        }
-        return new Vorschlag(vorschlag.art(), vorschlag.titel(), vorschlag.datum(), vorschlag.partnerName(),
-                vorschlag.partnerUid(), null, vorschlag.partnerEmail(), null, null, null, null, null, null,
-                vorschlag.vertraulichkeit(), vorschlag.tags(), sicherheit, vorschlag.mandantIstAussteller(),
-                vorschlag.umstufung());
+    private static String kiRolle(String rolle) {
+        return rolle == null || rolle.isBlank() ? "Archivassistent für ein Schweizer KMU" : rolle;
     }
 
-    /**
-     * Aktive Arten des Mandanten, die das Antwortschema kennt, in dessen Reihenfolge (die Reihenfolge der Seed-Tabelle
-     * im Golden-Lauf; {@code ErfassungPrompt.artListe} stellt die eigenen Arten nach hinten).
-     */
-    List<ArtEintrag> arten() {
-        return ErfassungPrompt.schemaArten(dokumentarten.alle().stream()
-                .filter(Dokumentart::aktiv)
-                .map(a -> new ArtEintrag(a.code(), a.name(), a.vertraulichkeit().name()))
-                .toList(), ki.artCodes());
+    private static List<ArtEintrag> arten(Konfiguration konfiguration, ZusatzSchemaPruefer zusatzSchema) {
+        return konfiguration.arten().stream()
+                .filter(Konfiguration.Art::aktiv)
+                .sorted(java.util.Comparator.comparingInt(Konfiguration.Art::reihenfolge))
+                .map(art -> new ArtEintrag(art.code(), art.name(), art.beschreibung(), art.vertraulichkeit(),
+                        art.gruppen(), art.selbstAusgestellt(), art.kiVorschlag(), art.belegnummerMuster(),
+                        art.fremdbelegArt(), art.ohneZahlungsdatenArt(), art.kiFelder(), art.kiHinweise(),
+                        art.reihenfolge(), art.zusatzSchema(), art.zusatzFeldTypen(),
+                        art.klassifikationen().stream().map(k -> k.klassifikation()).toList(),
+                        zusatzSchema.feldBeschreibungen(art.zusatzSchema())))
+                .toList();
+    }
+
+    private static List<KiKlassifikation> klassifikationen(Konfiguration konfiguration, List<ArtEintrag> arten) {
+        Set<String> zugeordnet = arten.stream().flatMap(art -> art.klassifikationen().stream())
+                .collect(Collectors.toUnmodifiableSet());
+        return konfiguration.klassifikationen().stream()
+                .filter(Klassifikation::aktiv)
+                .filter(Klassifikation::kiVorschlag)
+                .filter(klassifikation -> zugeordnet.contains(klassifikation.code()))
+                .map(klassifikation -> new KiKlassifikation(klassifikation.code(), klassifikation.name(),
+                        klassifikation.beschreibung(), klassifikation.mehrfach(),
+                        klassifikation.werte().stream().filter(KlassifikationWert::aktiv)
+                                .map(wert -> new KiKlassifikation.Wert(wert.code(),
+                                wert.name(), wert.beschreibung(), wert.aktiv())).toList()))
+                .toList();
     }
 
     private KiPort.Antwort aufrufen(KiPort.Anfrage anfrage) {
