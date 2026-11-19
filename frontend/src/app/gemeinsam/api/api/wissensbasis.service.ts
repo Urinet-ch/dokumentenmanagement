@@ -116,6 +116,7 @@ export class WissensbasisService extends BaseService {
      * Wissensseiten-Index
      * Nach Seitentyp gruppiert. Filter und Zähler berücksichtigen nur sichtbare Seiten. Mit pfad wird stattdessen eine einzelne Seite abgerufen.
      * @endpoint get /api/v1/wissensseiten
+     * @param dokumentId 
      * @param groesse 
      * @param offset 
      * @param pfad 
@@ -126,12 +127,21 @@ export class WissensbasisService extends BaseService {
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public apiV1WissensseitenGet(groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public apiV1WissensseitenGet(groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public apiV1WissensseitenGet(groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public apiV1WissensseitenGet(groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public apiV1WissensseitenGet(dokumentId?: string, groesse?: number, offset?: number, pfad?: string, q?: string, tag?: string, typ?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarQueryParameters = new OpenApiHttpParams(this.encoder);
+
+        localVarQueryParameters = this.addToHttpParams(
+            localVarQueryParameters,
+            'dokumentId',
+            <any>dokumentId,
+            QueryParamStyle.Form,
+            true,
+        );
+
 
         localVarQueryParameters = this.addToHttpParams(
             localVarQueryParameters,
