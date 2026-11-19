@@ -1,6 +1,7 @@
 package ch.urinet.archiv.wissen.adapter.out.persistence;
 
 import ch.urinet.archiv.dokument.Testdokumente;
+import ch.urinet.archiv.dokument.application.DokumentEreignisse;
 import ch.urinet.archiv.mandant.application.MandantKontext;
 import ch.urinet.archiv.mandant.application.MandantProvisionierung;
 import ch.urinet.archiv.mandant.domain.MandantCode;
@@ -11,6 +12,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
@@ -55,6 +59,12 @@ class JdbcWissenIngestTest {
     JdbcWissenIngest ingest;
 
     @Inject
+    DokumentEreignisse ereignisse;
+
+    @Inject
+    Instance<EntityManager> entityManager;
+
+    @Inject
     MandantKontext kontext;
 
     @Inject
@@ -69,6 +79,51 @@ class JdbcWissenIngestTest {
     private final Map<MandantCode, List<Long>> verbrauch = new HashMap<>();
     private final Map<MandantCode, Monatsbudget> monatsbudgets = new HashMap<>();
     private final Map<MandantCode, List<UUID>> seiten = new HashMap<>();
+
+    @Test
+    void quellenAenderungBleibtTransaktionalUndImMandanten() throws SQLException {
+        UUID dokument = quelle(URINET);
+        UUID fremdesDokument = quelle(ZWEITER);
+        UUID seite = seite(URINET, "probe/quelle-" + dokument, "Unveränderter Inhalt", null);
+        UUID fremdeSeite = seite(ZWEITER, "probe/quelle-" + fremdesDokument, "Fremder Inhalt", null);
+        for (var eintrag : Map.of(URINET, Map.entry(seite, dokument),
+                ZWEITER, Map.entry(fremdeSeite, fremdesDokument)).entrySet()) {
+            String schema = eintrag.getKey().schema();
+            UUID seitenId = eintrag.getValue().getKey();
+            UUID dokumentId = eintrag.getValue().getValue();
+            ausfuehren("insert into " + schema + ".wissensseite_quelle "
+                    + "(seite_id, schluessel, dokument_id, seite_von) values (?, 'q1', ?, 1)", seitenId, dokumentId);
+            ausfuehren("insert into " + schema + ".wissensseite_dokument (seite_id, dokument_id) values (?, ?)",
+                    seitenId, dokumentId);
+        }
+
+        assertThatThrownBy(() -> im(URINET, () -> {
+            ereignisse.vorAenderung();
+            entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                    .setParameter("id", dokument).executeUpdate();
+            ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+            throw new IllegalStateException("Rollback-Probe");
+        })).hasMessage("Rollback-Probe");
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and not quelle_pruefen and vertraulichkeit = 'NORMAL'", seite))
+                .isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".dokument where id = ? and vertraulichkeit = 'NORMAL'", dokument)).isEqualTo(1);
+
+        im(URINET, () -> {
+            ereignisse.vorAenderung();
+            entityManager.get().createNativeQuery("update dokument set vertraulichkeit = 'INTERN' where id = :id")
+                    .setParameter("id", dokument).executeUpdate();
+            ereignisse.geaendert(dokument, Set.of("vertraulichkeit"));
+            return null;
+        });
+        assertThat(anzahl("select count(*) from " + URINET.schema()
+                + ".wissensseite where id = ? and quelle_pruefen and vertraulichkeit = 'INTERN'"
+                + " and inhalt = 'Unveränderter Inhalt'", seite)).isEqualTo(1);
+        assertThat(anzahl("select count(*) from " + ZWEITER.schema()
+                + ".wissensseite where id = ? and not quelle_pruefen and vertraulichkeit = 'NORMAL'", fremdeSeite))
+                .isEqualTo(1);
+    }
 
     @BeforeEach
     void mandanten() throws SQLException {
